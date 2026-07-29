@@ -25,6 +25,16 @@
   body{margin:0;background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;transition:background .2s ease, color .2s ease;}
   body, body *{ transition: background-color .18s ease, border-color .18s ease, color .18s ease; }
   .app{display:grid;grid-template-columns:224px 1fr;min-height:100vh;}
+
+  .login-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:2000;padding:20px;}
+  .login-card{background:var(--card);border:1px solid #EDEEF1;border-radius:12px;box-shadow:0 24px 64px rgba(16,24,40,.12);padding:32px 30px;width:100%;max-width:340px;display:flex;flex-direction:column;align-items:center;text-align:center;}
+  .login-title{font-family:'Oswald',sans-serif;font-size:19px;font-weight:600;letter-spacing:.01em;color:var(--ink);}
+  .login-sub{font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-lt);margin-top:3px;}
+  .login-card .settings-field{width:100%;text-align:left;margin-top:12px;}
+  .login-error{width:100%;background:var(--red-bg);color:var(--red);font-size:12px;border-radius:6px;padding:9px 11px;margin-top:16px;text-align:left;}
+  .login-footnote{font-size:11px;color:var(--muted-lt);margin-top:18px;line-height:1.5;}
+
+  .role-chip{font-family:'IBM Plex Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-lt);border:1px solid var(--border);border-radius:10px;padding:1px 6px;margin-left:2px;}
   @media (max-width:900px){ .app{grid-template-columns:1fr;} .sidebar{display:none;} }
 
   /* Sidebar */
@@ -256,7 +266,28 @@
 </style>
 </head>
 <body>
-<div class="app">
+
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="brand-mark" style="width:40px;height:40px;font-size:16px;margin-bottom:16px;">BA</div>
+    <div class="login-title">Based Agency</div>
+    <div class="login-sub">Client Update Workflow</div>
+    <div id="loginError" class="login-error" style="display:none;"></div>
+    <div class="settings-field" style="margin-top:20px;"><label>Email</label><input id="loginEmail" type="email" placeholder="you@basedagency.com" style="width:100%;"></div>
+    <div class="settings-field"><label>Password</label><input id="loginPassword" type="password" placeholder="••••••••" style="width:100%;"></div>
+    <button class="btn btn-brand" id="loginBtn" onclick="handleLogin()" style="width:100%;justify-content:center;margin-top:6px;">Sign in</button>
+    <p class="login-footnote">No account? Ask your admin to add you — this tool doesn't support self-signup.</p>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const pw = document.getElementById('loginPassword');
+  if(pw) pw.addEventListener('keydown', (e)=>{ if(e.key==='Enter') handleLogin(); });
+});
+</script>
+
+<div class="app" id="appRoot" style="display:none;">
   <div class="sidebar">
     <div class="brand">
       <div class="brand-mark">BA</div>
@@ -398,7 +429,7 @@
             </svg>
             <span class="clock-mini-text"><span class="gauge-d">0</span>d <span class="gauge-h">00</span>h <span class="gauge-m">00</span>m</span>
           </div>
-          <button class="btn btn-dark" onclick="notifyApprovers()">Notify Daniel &amp; Eric</button>
+          <button class="btn btn-dark" id="notifyBtn" onclick="notifyApprovers()">Notify Daniel &amp; Eric</button>
         </div>
       </div>
 
@@ -547,16 +578,30 @@
 
       <!-- TEAM -->
       <div class="settings-subview" id="stab-team">
-        <div class="panel">
-          <div class="panel-head"><span class="panel-title">Team</span></div>
+        <div class="panel" id="addMemberPanel" style="display:none;">
+          <div class="panel-head"><span class="panel-title">Add team member</span></div>
           <div class="panel-body">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">This tool doesn't have logins — everyone shares one link. "Invite" just opens a pre-filled email with that link, for a person to actually send.</p>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Creates a real login for this person and assigns their role. You'll get a one-time temporary password to send them directly — they should change it after logging in.</p>
             <div class="form-grid" style="margin-bottom:12px;">
               <div><label>Name</label><input id="tmName" placeholder="e.g. Priya"></div>
               <div><label>Email</label><input id="tmEmail" placeholder="priya@basedagency.com"></div>
+              <div><label>Role</label>
+                <select id="tmRole">
+                  <option value="member">Member — can log improvements, can't approve</option>
+                  <option value="approver">Approver — can approve/skip drafts</option>
+                  <option value="admin">Admin — full access, can manage team &amp; roles</option>
+                </select>
+              </div>
             </div>
-            <button class="btn btn-brand" onclick="inviteTeamMember()">Invite via email</button>
-            <div style="margin-top:16px;" id="teamList"></div>
+            <button class="btn btn-brand" onclick="addTeamMember()">Create account</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Team</span></div>
+          <div class="panel-body">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;" id="teamPanelNote"></p>
+            <div id="teamList"></div>
           </div>
         </div>
       </div>
@@ -623,43 +668,36 @@ async function toggleTheme(){
   await safeSetPersonal('theme-preference', next);
 }
 
-/* ---------- "Logging as" identity — set your name once, never type it again ---------- */
-let myName = '';
-async function initMyName(){
-  const saved = await safeGetPersonal('my-name');
-  myName = saved || '';
-  if(!myName) promptForName(false);
-  renderWhoAmI();
+/* ---------- Real identity — comes from Supabase Auth + team_profiles, not self-reported ---------- */
+let currentUser = null;   // Supabase auth user object
+let myProfile = null;     // { id, name, email, role }
+let teamProfiles = [];    // everyone's profiles, for the Team admin panel
+
+function myName(){ return myProfile ? myProfile.name : ''; }
+function canApprove(){ return !!myProfile && (myProfile.role === 'admin' || myProfile.role === 'approver'); }
+function isAdmin(){ return !!myProfile && myProfile.role === 'admin'; }
+
+async function loadMyProfile(){
+  if(!currentUser) return;
+  const { data } = await supabaseClient.from('team_profiles').select('*').eq('id', currentUser.id).maybeSingle();
+  myProfile = data;
 }
-function promptForName(isChange){
-  openAppModal(`
-    <div class="modal-head"><span class="panel-title">${isChange ? "Change your name" : "What's your name?"}</span>${isChange ? `<span class="toast-close" onclick="closeAppModal()">✕</span>` : ''}</div>
-    <div class="modal-body">
-      <p style="font-size:12.5px;color:var(--muted);margin:0;line-height:1.5;">This is set once on your own device/account — it auto-fills whenever you log an improvement, so you never have to type it again.</p>
-      <div class="settings-field"><label>Your name</label><input id="myNameInput" placeholder="e.g. Priya"></div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-brand" onclick="saveMyName()">Save</button>
-      ${isChange ? `<button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>` : ''}
-    </div>`, 420);
-  const input = document.getElementById('myNameInput');
-  input.value = myName;
-  input.focus();
-  input.addEventListener('keydown', (e)=>{ if(e.key==='Enter') saveMyName(); });
+
+async function loadTeamProfiles(){
+  const { data } = await supabaseClient.from('team_profiles').select('*').order('name');
+  teamProfiles = data || [];
 }
-async function saveMyName(){
-  const val = document.getElementById('myNameInput').value.trim();
-  if(!val){ showToast('error','Name required','Enter a name so your logs are attributed correctly.'); return; }
-  myName = val;
-  await safeSetPersonal('my-name', val);
-  closeAppModal();
-  renderWhoAmI();
-  showToast('success','Saved', `Logging future improvements as ${val}.`);
-}
+
 function renderWhoAmI(){
   document.querySelectorAll('.who-am-i').forEach(el=>{
-    el.innerHTML = `Logging as <b>${myName || 'Unknown'}</b> — <span class="row-link" onclick="promptForName(true)">not you?</span>`;
+    if(!myProfile){ el.innerHTML = ''; return; }
+    const roleLabel = myProfile.role==='admin' ? 'Admin' : myProfile.role==='approver' ? 'Approver' : 'Team member';
+    el.innerHTML = `Logging as <b>${myProfile.name}</b> <span class="role-chip">${roleLabel}</span> — <span class="row-link" onclick="handleLogout()">Log out</span>`;
   });
+}
+
+async function handleLogout(){
+  await supabaseClient.auth.signOut();
 }
 
 /* ---------- Button loading state ---------- */
@@ -738,7 +776,7 @@ const DEFAULT_SERVICE_OPTIONS = ['Google Ads (PPC)','Meta Ads','SEO / Local Sear
 const DEFAULT_STATUS_OPTIONS = ['Active','Onboarding','At Risk','Paused'];
 
 async function loadAll(){
-  const [appData, s, t] = await Promise.all([safeGet('app-data'), safeGet('settings'), safeGet('team-members')]);
+  const [appData, s] = await Promise.all([safeGet('app-data'), safeGet('settings')]);
   if(appData){
     const parsed = JSON.parse(appData);
     clients = parsed.clients || [];
@@ -759,7 +797,6 @@ async function loadAll(){
   settings.emailInstructions = settings.emailInstructions || '';
   settings.serviceOptions = (settings.serviceOptions && settings.serviceOptions.length) ? settings.serviceOptions : DEFAULT_SERVICE_OPTIONS.slice();
   settings.statusOptions = (settings.statusOptions && settings.statusOptions.length) ? settings.statusOptions : DEFAULT_STATUS_OPTIONS.slice();
-  team = t ? JSON.parse(t) : [];
   document.getElementById('setDaniel').value = settings.danielEmail || '';
   document.getElementById('setEric').value = settings.ericEmail || '';
   const sheetInput = document.getElementById('sheetCsvUrl');
@@ -855,7 +892,12 @@ async function fullRefresh(showFeedback){
   renderAll();
   if(showFeedback && btn){ btn.disabled = false; btn.textContent = 'Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
-function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); }
+function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); }
+
+function applyRoleVisibility(){
+  const notifyBtn = document.getElementById('notifyBtn');
+  if(notifyBtn) notifyBtn.style.display = canApprove() ? 'inline-flex' : 'none';
+}
 
 async function switchView(name){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name));
@@ -1308,9 +1350,8 @@ async function deleteImprovement(clientId, idx){
 
 async function logImprovement(id){
   const text = document.getElementById('imp-'+id).value.trim();
-  const author = myName || 'Team member';
+  const author = myName() || 'Team member';
   if(!text){ showToast('error','Nothing to log','Write what you improved before saving.'); return; }
-  if(!myName){ promptForName(false); return; }
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
   await loadAll();
@@ -1458,8 +1499,9 @@ function openQueueCardModal(id){
     </div>
     <div class="modal-actions">
       ${c.improvements.length ? `<button class="btn btn-dark" id="gen-${c.id}" onclick="generateDraft('${c.id}')">${c.draft?'Regenerate with AI':'Generate with AI'}</button>` : ''}
-      ${c.draft ? `<button class="btn btn-brand" onclick="approveDraft('${c.id}')" ${c.draftStatus==='approved'?'disabled':''}>Approve &amp; open email</button>
+      ${c.draft && canApprove() ? `<button class="btn btn-brand" onclick="approveDraft('${c.id}')" ${c.draftStatus==='approved'?'disabled':''}>Approve &amp; open email</button>
       <button class="btn btn-outline" onclick="skipDraft('${c.id}')">Skip this week</button>` : ''}
+      ${c.draft && !canApprove() ? `<span class="warn-text" style="color:var(--muted-lt);">Only admins and approvers can approve or skip drafts.</span>` : ''}
       <button class="btn btn-outline" onclick="closeAppModal()">Close</button>
     </div>`, 560);
   const card = document.querySelector('#appModalOverlay .modal-card');
@@ -1536,6 +1578,7 @@ ${contentRules}`;
 }
 
 async function approveDraft(id){
+  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can approve drafts.'); return; }
   const cNow = clients.find(x=>x.id===id);
   const ta = document.getElementById('draft-'+id);
   const draftText = ta ? ta.value : (cNow ? cNow.draft : '');
@@ -1559,6 +1602,7 @@ async function approveDraft(id){
 }
 
 async function skipDraft(id){
+  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can skip drafts.'); return; }
   setBtnLoading(clickedBtn(), 'Skipping…');
   await loadAll();
   const c = clients.find(x=>x.id===id);
@@ -1752,6 +1796,7 @@ function exportRosterCsv(){
 }
 
 function notifyApprovers(){
+  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can send this notification.'); return; }
   const pending = clients.filter(c=>c.draftStatus==='pending');
   const to = [settings.danielEmail, settings.ericEmail].filter(Boolean).join(',');
   if(!to){ showToast('error',"Missing approver emails","Add Daniel's and Eric's email addresses in Settings first."); return; }
@@ -1763,49 +1808,74 @@ function notifyApprovers(){
   showMailModal(to, subject, body);
 }
 
-async function inviteTeamMember(){
+async function addTeamMember(){
+  if(!isAdmin()){ showToast('error','Not allowed','Only admins can add team members.'); return; }
   const name = document.getElementById('tmName').value.trim();
   const email = document.getElementById('tmEmail').value.trim();
-  if(!email){ showToast('error','Email required','Enter an email address to invite.'); return; }
+  const role = document.getElementById('tmRole').value;
+  if(!name || !email){ showToast('error','Missing info','Enter both a name and email.'); return; }
 
-  const link = window.location.href;
-  const subject = "You're invited — Based Agency Client Update Workflow";
-  const body = `Hi${name?' '+name:''},\n\nYou've been added to the weekly client update workflow. Bookmark this link — it's the shared dashboard for logging improvements and reviewing approvals:\n\n${link}\n\nNo login needed, just open the link.`;
-  showMailModal(email, subject, body);
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Creating…');
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/create-member', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ name, email, role }),
+    });
+    const data = await response.json();
+    restoreBtn(btn);
+    if(!response.ok){ showToast('error','Could not create account', data.error || 'Unknown error'); return; }
 
-  await loadAll();
-  if(team.some(m=>m.email.toLowerCase()===email.toLowerCase())){
-    showToast('info','Already invited', `${email} was already on the team list — resent the email anyway.`);
-  } else {
-    team.push({name: name || email, email, invitedAt: nowTime()});
-    const ok = await persistTeam();
-    if(!ok){ showToast('error','Save failed','Invite email opened, but saving to the team list failed — try again.'); }
-    else {
-      log.unshift({t:nowTime(), tag:'you', text:`Invited <b>${name || email}</b> to the workflow.`});
-      await persistLog();
-    }
+    document.getElementById('tmName').value = '';
+    document.getElementById('tmEmail').value = '';
+    await loadTeamProfiles();
+    renderTeam();
+    log.unshift({t:nowTime(), tag:'you', text:`Added <b>${name}</b> (${role}) to the team.`});
+    await persistLog();
+    showToastWithCopy('success','Account created', `Send this temporary password to ${name} — they should change it after logging in.`, `Email: ${email}\nTemporary password: ${data.tempPassword}`);
+  }catch(e){
+    restoreBtn(btn);
+    showToast('error','Could not create account', String(e));
   }
-  document.getElementById('tmName').value=''; document.getElementById('tmEmail').value='';
-  renderTeam(); renderLog();
 }
 
 function renderTeam(){
   const el = document.getElementById('teamList');
+  const noteEl = document.getElementById('teamPanelNote');
+  const addPanel = document.getElementById('addMemberPanel');
+  if(addPanel) addPanel.style.display = isAdmin() ? 'block' : 'none';
+  if(noteEl) noteEl.textContent = isAdmin()
+    ? 'You can change anyone\'s role below, except your own.'
+    : 'Only admins can add members or change roles.';
   if(!el) return;
-  if(!team.length){ el.innerHTML = `<div class="empty" style="padding:14px 0;">No team members invited yet.</div>`; return; }
-  el.innerHTML = team.map(m=>`
-    <div class="integ-row">
+  if(!teamProfiles.length){ el.innerHTML = `<div class="empty" style="padding:14px 0;">No team members yet.</div>`; return; }
+  el.innerHTML = teamProfiles.map(m=>{
+    const isSelf = currentUser && m.id === currentUser.id;
+    const roleControl = (isAdmin() && !isSelf)
+      ? `<select onchange="changeTeamRole('${m.id}', this.value)" style="font-family:'Inter',sans-serif;font-size:12px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);">
+          <option value="member" ${m.role==='member'?'selected':''}>Member</option>
+          <option value="approver" ${m.role==='approver'?'selected':''}>Approver</option>
+          <option value="admin" ${m.role==='admin'?'selected':''}>Admin</option>
+        </select>`
+      : `<span class="role-chip">${m.role}${isSelf ? ' · you' : ''}</span>`;
+    return `<div class="integ-row">
       <div><div class="integ-name">${m.name}</div><div class="integ-desc">${m.email}</div></div>
-      <span class="row-link" onclick="resendInvite('${m.email}','${m.name.replace(/'/g,"\\'")}')">Resend invite</span>
-    </div>
-  `).join('');
+      ${roleControl}
+    </div>`;
+  }).join('');
 }
 
-function resendInvite(email, name){
-  const link = window.location.href;
-  const subject = "You're invited — Based Agency Client Update Workflow";
-  const body = `Hi${name?' '+name:''},\n\nReminder: here's the shared client update dashboard:\n\n${link}\n\nNo login needed, just open the link.`;
-  showMailModal(email, subject, body);
+async function changeTeamRole(userId, newRole){
+  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change roles.'); return; }
+  const { error } = await supabaseClient.from('team_profiles').update({ role: newRole }).eq('id', userId);
+  if(error){ showToast('error','Could not update role', error.message); await loadTeamProfiles(); renderTeam(); return; }
+  await loadTeamProfiles();
+  renderTeam();
+  log.unshift({t:nowTime(), tag:'you', text:`Changed a team member's role to <b>${newRole}</b>.`});
+  await persistLog(); renderLog();
+  showToast('success','Role updated', 'Change is live immediately for that person.');
 }
 
 function nowTime(){ return new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
@@ -1852,13 +1922,55 @@ function renderGauge(){
   document.querySelectorAll('.gauge-row').forEach(e=> e.classList.toggle('crit', isCrit));
 }
 
-(async function init(){
+async function handleLogin(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.style.display = 'none';
+  if(!email || !password){ errEl.textContent = 'Enter both email and password.'; errEl.style.display = 'block'; return; }
+  const btn = document.getElementById('loginBtn');
+  setBtnLoading(btn, 'Signing in…');
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  restoreBtn(btn);
+  if(error){ errEl.textContent = error.message; errEl.style.display = 'block'; }
+}
+
+function showLoginScreen(){
+  document.getElementById('loginOverlay').style.display = 'flex';
+  document.getElementById('appRoot').style.display = 'none';
+  currentUser = null; myProfile = null;
+}
+
+async function showApp(session){
+  currentUser = session.user;
+  await loadMyProfile();
+  if(!myProfile){
+    // Auth account exists but no team_profiles row — shouldn't normally happen
+    // since create-member.js creates both together, but handle it gracefully.
+    document.getElementById('loginError').textContent = 'Your account has no profile set up. Ask your admin to check the team_profiles table.';
+    document.getElementById('loginError').style.display = 'block';
+    await supabaseClient.auth.signOut();
+    return;
+  }
+  document.getElementById('loginOverlay').style.display = 'none';
+  document.getElementById('appRoot').style.display = 'grid';
   await initTheme();
   await loadAll();
-  await initMyName();
+  await loadTeamProfiles();
   renderAll();
+}
+
+(async function init(){
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if(session){ await showApp(session); } else { showLoginScreen(); }
+
+  supabaseClient.auth.onAuthStateChange(async (event, session) => {
+    if(event === 'SIGNED_IN' && session){ await showApp(session); }
+    if(event === 'SIGNED_OUT'){ showLoginScreen(); }
+  });
+
   setInterval(renderGauge, 1000);
-  setInterval(fullRefresh, 20000);
+  setInterval(()=>{ if(currentUser) fullRefresh(); }, 20000);
 })();
 </script>
 </body>
