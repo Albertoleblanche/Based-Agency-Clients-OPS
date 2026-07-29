@@ -677,9 +677,12 @@ function myName(){ return myProfile ? myProfile.name : ''; }
 function canApprove(){ return !!myProfile && (myProfile.role === 'admin' || myProfile.role === 'approver'); }
 function isAdmin(){ return !!myProfile && myProfile.role === 'admin'; }
 
+let lastProfileError = null;
 async function loadMyProfile(){
   if(!currentUser) return;
-  const { data } = await supabaseClient.from('team_profiles').select('*').eq('id', currentUser.id).maybeSingle();
+  const { data, error } = await supabaseClient.from('team_profiles').select('*').eq('id', currentUser.id).maybeSingle();
+  if(error){ console.error('loadMyProfile error:', error); lastProfileError = error; }
+  else { lastProfileError = null; }
   myProfile = data;
 }
 
@@ -1947,7 +1950,8 @@ async function showApp(session){
   if(!myProfile){
     // Auth account exists but no team_profiles row — shouldn't normally happen
     // since create-member.js creates both together, but handle it gracefully.
-    document.getElementById('loginError').textContent = 'Your account has no profile set up. Ask your admin to check the team_profiles table.';
+    const detail = lastProfileError ? ` (${lastProfileError.message || JSON.stringify(lastProfileError)})` : '';
+    document.getElementById('loginError').textContent = `Your account has no profile set up${detail}. Ask your admin to check the team_profiles table.`;
     document.getElementById('loginError').style.display = 'block';
     await supabaseClient.auth.signOut();
     return;
