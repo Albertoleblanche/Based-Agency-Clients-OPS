@@ -1,0 +1,1865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Based Agency — Client Update Workflow</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F3F4F7; --sidebar:#101B33; --sidebar-hover:#1B2A4D; --sidebar-active:#24365E;
+    --card:#FFFFFF; --surface-2:#FAFAFB; --border:#E5E7EB; --ink:#151B26; --muted:#6B7280; --muted-lt:#9AA3AF;
+    --brand:#E8622C; --brand-dark:#C94F1F; --brand-bg:#FDEAE0;
+    --green:#16A34A; --green-bg:#E8F8ED; --red:#DC2626; --red-bg:#FDEAEA; --amber:#D97706; --amber-bg:#FEF3D6;
+    --shadow:0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06);
+  }
+  body[data-theme="dark"]{
+    --bg:#0B0E14; --sidebar:#05070B; --sidebar-hover:#12161F; --sidebar-active:#191F2C;
+    --card:#12151C; --surface-2:#191D26; --border:#22262F; --ink:#EDEFF3; --muted:#98A0AD; --muted-lt:#5E6673;
+    --brand:#E8622C; --brand-dark:#F27B49; --brand-bg:#2A1C14;
+    --green:#3ECF7E; --green-bg:#12261B; --red:#F0685F; --red-bg:#2A1414; --amber:#E5B04B; --amber-bg:#2A2314;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 1px 3px rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;transition:background .2s ease, color .2s ease;}
+  body, body *{ transition: background-color .18s ease, border-color .18s ease, color .18s ease; }
+  .app{display:grid;grid-template-columns:224px 1fr;min-height:100vh;}
+  @media (max-width:900px){ .app{grid-template-columns:1fr;} .sidebar{display:none;} }
+
+  /* Sidebar */
+  .sidebar{background:var(--sidebar);color:#C9D2E3;padding:18px 12px;display:flex;flex-direction:column;}
+  .brand{display:flex;align-items:center;gap:9px;padding:6px 10px 20px;}
+  .brand-mark{width:26px;height:26px;border-radius:6px;background:var(--brand);display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;font-weight:700;font-size:13px;color:#2A1200;flex:none;}
+  .brand-name{font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:#fff;}
+  .brand-sub{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted-lt);letter-spacing:.06em;}
+  nav{display:flex;flex-direction:column;gap:2px;margin-top:6px;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;color:#AEB9CC;}
+  .nav-item svg{flex:none;opacity:.8;}
+  .nav-item:hover{background:var(--sidebar-hover);color:#fff;}
+  .nav-item.active{background:var(--sidebar-active);color:#fff;}
+  .nav-item.active svg{opacity:1;}
+  .nav-badge{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;background:var(--brand);color:#2A1200;border-radius:20px;padding:1px 7px;font-weight:600;}
+  .sidebar-foot{margin-top:auto;padding:12px 11px;border-top:1px solid #24365E;font-size:11px;color:var(--muted-lt);line-height:1.5;}
+  .theme-toggle{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:#C9D2E3;cursor:pointer;padding:8px 9px;border-radius:6px;}
+  .theme-toggle:hover{background:var(--sidebar-hover);}
+
+  /* Main */
+  .main{padding:22px 28px 60px;}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
+
+  .settings-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:22px;border-bottom:1px solid var(--border);}
+  .settings-tab{font-size:12.5px;font-weight:600;color:var(--muted);padding:9px 4px;margin-right:18px;cursor:pointer;border-bottom:2px solid transparent;transition:color .15s ease, border-color .15s ease;}
+  .settings-tab:hover{color:var(--ink);}
+  .settings-tab.active{color:var(--brand);border-bottom-color:var(--brand);}
+  .settings-subview{display:none;}
+  .settings-subview.active{display:block;}
+  .page-title{font-family:'Oswald',sans-serif;font-size:22px;font-weight:600;text-transform:uppercase;letter-spacing:.01em;}
+  .page-sub{font-size:12.5px;color:var(--muted);margin-top:3px;}
+  .topbar-right{display:flex;align-items:center;gap:10px;}
+  .sync-pill{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--muted);display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border);padding:6px 10px;border-radius:20px;box-shadow:var(--shadow);}
+
+  .clock-mini-pill{display:flex;align-items:center;gap:7px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;color:var(--ink);background:var(--card);border:1px solid var(--border);padding:6px 12px;border-radius:20px;box-shadow:var(--shadow);cursor:pointer;transition:border-color .15s ease;}
+  .clock-mini-pill:hover{border-color:var(--brand);}
+  .clock-mini-pill.crit{color:var(--red);border-color:var(--red);}
+  .ring-track{fill:none;stroke:#EEF0F4;stroke-width:2;}
+  .ring-fill{fill:none;stroke:var(--brand);stroke-width:2;stroke-linecap:round;transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke-dashoffset .6s ease;}
+  .clock-mini-pill.crit .ring-fill{stroke:var(--red);}
+  body[data-theme="dark"] .ring-track{stroke:#22262F;}
+
+  .bento-row{display:grid;grid-template-columns:2fr 1fr;gap:16px;align-items:start;}
+  @media (max-width:900px){.bento-row{grid-template-columns:1fr;}}
+  .sync-dot{width:6px;height:6px;border-radius:50%;background:var(--green);}
+  .btn{font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;border:none;border-radius:7px;padding:9px 16px;cursor:pointer;transition:opacity .15s ease, transform .1s ease;}
+  .btn:hover{opacity:.88;} .btn:active{transform:scale(.98);} .btn:disabled{opacity:.4;cursor:not-allowed;}
+  .btn-brand{background:var(--brand);color:#fff;}
+  .btn-dark{background:var(--sidebar);color:#fff;}
+  .btn-outline{background:var(--card);color:var(--ink);border:1px solid var(--border);}
+  .view{display:none;} .view.active{display:block;}
+
+  /* KPI cards */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
+  @media (max-width:820px){.kpis{grid-template-columns:repeat(2,1fr);}}
+  .kpi{background:var(--card);border:1px solid #EDEEF1;border-radius:10px;padding:20px 22px;box-shadow:0 1px 2px rgba(16,24,40,.03);}
+  .kpi-label{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted-lt);}
+  .kpi-val{font-family:'Oswald',sans-serif;font-size:30px;font-weight:600;margin-top:7px;letter-spacing:.01em;}
+  .kpi-val.warn{color:var(--red);}
+  .kpi-foot{font-size:11px;color:var(--muted-lt);margin-top:5px;}
+  .kpi-click{cursor:pointer;transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;}
+  .kpi-click:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(16,24,40,.08);border-color:#DDE0E5;}
+
+  .filter-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+  .filter-pill{font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;padding:6px 12px;border-radius:20px;background:var(--card);border:1px solid var(--border);color:var(--muted);cursor:pointer;font-weight:600;transition:border-color .15s ease, color .15s ease;}
+  .filter-pill:hover{border-color:var(--brand);color:var(--brand-dark);}
+  .filter-pill.active{background:var(--sidebar);border-color:var(--sidebar);color:#fff;}
+
+  .date-filter-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:var(--muted);}
+  .date-filter-row label{font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted-lt);}
+  .date-filter-row select, .date-filter-row input[type="date"]{font-family:'Inter',sans-serif;font-size:12.5px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);}
+
+  .clients-filter-panel{padding:18px 20px;}
+  .clients-filter-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .search-field{display:flex;align-items:center;gap:8px;flex:1;min-width:200px;padding:0 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);}
+  .search-field svg{color:var(--muted-lt);flex:none;}
+  .search-field input{border:none;background:transparent;padding:9px 0;font-family:'Inter',sans-serif;font-size:12.5px;color:var(--ink);width:100%;}
+  .search-field input:focus{outline:none;}
+  .clients-filter-bar select{font-family:'Inter',sans-serif;font-size:12.5px;padding:9px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);min-width:150px;}
+  .clients-filter-count{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted-lt);margin-top:10px;}
+  .filter-btn{display:flex;align-items:center;white-space:nowrap;}
+  .filter-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;margin-left:7px;border-radius:20px;background:var(--brand);color:#fff;font-size:10px;font-weight:700;}
+
+  .attn-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #F3F4F6;cursor:pointer;transition:padding-left .12s ease;}
+  .attn-row:hover{padding-left:4px;}
+  .attn-row:last-child{border-bottom:none;}
+  .attn-row:hover .attn-name{color:var(--brand-dark);}
+  .attn-name{font-size:13px;font-weight:600;transition:color .1s;}
+  .attn-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+
+  @keyframes flash{0%{box-shadow:0 0 0 2px var(--brand);}100%{box-shadow:0 0 0 2px transparent;}}
+  .q-card.highlight-flash{animation:flash 1.4s ease-out;}
+
+  .panel{background:var(--card);border:1px solid #EDEEF1;border-radius:10px;box-shadow:0 1px 2px rgba(16,24,40,.03);margin-bottom:20px;}
+  .panel-head{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #F3F4F6;flex-wrap:wrap;gap:8px;}
+  .panel-title{font-size:13.5px;font-weight:600;letter-spacing:.01em;}
+  .panel-body{padding:18px 20px;}
+
+  /* Table */
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th{text-align:left;font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-lt);padding:18px 14px 12px;border-bottom:1px solid #F3F4F6;}
+  th.sortable{cursor:pointer;user-select:none;transition:color .12s ease;}
+  th.sortable:hover{color:var(--ink);}
+  .sort-arrow{display:inline-flex;align-items:center;margin-left:4px;color:var(--brand);vertical-align:-1px;}
+  td{padding:14px;border-bottom:1px solid #F6F7F8;vertical-align:middle;}
+  tbody tr:hover td{background:var(--surface-2);}
+  tr:last-child td{border-bottom:none;}
+  .client-cell{display:flex;align-items:center;gap:11px;}
+  .avatar-circle{width:32px;height:32px;border-radius:50%;background:linear-gradient(160deg,var(--surface-2),var(--border));border:1px solid var(--border);color:var(--ink);font-family:'Oswald',sans-serif;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;flex:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.5);}
+  body[data-theme="dark"] .avatar-circle{box-shadow:none;}
+  .cell-name{font-weight:600;font-size:13px;}
+  .cell-email{font-size:11px;color:var(--muted-lt);margin-top:2px;}
+  .cell-service{color:var(--ink);font-weight:500;}
+  .pill{font-family:'IBM Plex Mono',monospace;font-size:9.5px;padding:3px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.04em;font-weight:600;display:inline-block;}
+  .pill-status{background:#EEF0F4;color:var(--muted);}
+  .pill-good{background:var(--green-bg);color:var(--green);}
+  .pill-mid{background:var(--amber-bg);color:var(--amber);}
+  .pill-bad{background:var(--red-bg);color:var(--red);}
+  .row-link{color:var(--brand);font-size:12px;font-weight:600;cursor:pointer;}
+  .row-link:hover{text-decoration:underline;}
+
+  .empty{padding:34px 18px;text-align:center;color:var(--muted);font-size:13px;}
+
+  /* Add client form */
+  .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
+  .form-grid label{font-family:'IBM Plex Mono',monospace;font-size:9.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px;}
+  .form-grid input,.form-grid select{width:100%;font-family:'Inter',sans-serif;font-size:13px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);}
+  .form-actions{margin-top:12px;display:flex;gap:8px;}
+
+  /* Log improvement drawer */
+  .drawer-row{background:var(--surface-2);}
+  .drawer-row td{padding:14px 18px;}
+  .log-inline{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;}
+  .log-inline textarea{flex:1;min-width:220px;font-family:'Inter',sans-serif;font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);resize:vertical;min-height:38px;}
+  .log-inline input{width:130px;font-family:'Inter',sans-serif;font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);}
+  .mini-improvements{font-size:11.5px;color:var(--muted);margin-top:8px;}
+  .mini-improvements div{padding:2px 0;}
+  .mini-improvements b{color:var(--ink);}
+  .mini-imp-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:4px 0;}
+  .mini-imp-text{flex:1;}
+  .mini-imp-actions{display:flex;gap:8px;flex:none;white-space:nowrap;}
+  .danger-link{color:var(--red);}
+
+  .actions-cell{position:relative;}
+  .dropdown{position:relative;display:inline-block;}
+  .dropdown-menu{display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(16,24,40,.14);min-width:170px;z-index:50;overflow:hidden;}
+  .dropdown-menu.open{display:block;}
+  .dropdown-item{padding:10px 14px;font-size:12.5px;font-weight:500;color:var(--ink);cursor:pointer;}
+  .dropdown-item:hover{background:var(--surface-2);}
+  .dropdown-item.danger{color:var(--red);}
+
+  /* Approval queue */
+  .queue-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:18px;margin-bottom:24px;}
+  .q-card{border:1px solid #EDEEF1;border-radius:8px;padding:22px 24px;background:var(--card);box-shadow:0 1px 2px rgba(16,24,40,.03);transition:box-shadow .18s ease, border-color .18s ease, transform .18s ease;cursor:pointer;}
+  .q-card:hover{box-shadow:0 10px 28px rgba(16,24,40,.08);border-color:#DDE0E5;transform:translateY(-2px);}
+  .q-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;}
+  .q-name{font-family:'Oswald',sans-serif;font-size:16.5px;font-weight:600;letter-spacing:.015em;}
+  .q-service-caption{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-lt);margin-top:4px;}
+  .q-risk-flag{color:#9C5C48;font-weight:600;}
+  .q-status-label{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;white-space:nowrap;flex:none;}
+  .q-ratings{margin-top:20px;display:flex;flex-direction:column;gap:9px;}
+  .rating-row{display:flex;align-items:center;gap:10px;}
+  .rating-label{font-family:'IBM Plex Mono',monospace;font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-lt);width:64px;flex:none;}
+  .rate-dots{display:flex;gap:5px;}
+  .rate-dots-compact{display:flex;align-items:center;gap:4px;}
+  .rate-dot{width:5px;height:5px;border-radius:50%;flex:none;}
+  .rating-num{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted-lt);margin-left:2px;}
+  .q-bulk-preview{font-size:11.5px;color:var(--muted-lt);margin-top:18px;padding-top:16px;border-top:1px solid #F3F4F6;}
+  .q-bulk{font-size:12.5px;color:var(--muted);line-height:1.6;}
+  .q-bulk-title{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-lt);margin-bottom:6px;}
+  .q-bulk-list{max-height:190px;overflow-y:auto;position:relative;padding-right:4px;}
+  .q-bulk-list.scrollable{mask-image:linear-gradient(to bottom, black calc(100% - 18px), transparent 100%);-webkit-mask-image:linear-gradient(to bottom, black calc(100% - 18px), transparent 100%);}
+  .q-bulk-list ul{margin:0;padding-left:18px;}
+  .q-bulk-list li{padding:2px 0;}
+  .q-bulk ul{margin:4px 0 0;padding-left:18px;}
+  textarea.draft{width:100%;min-height:110px;font-family:'Inter',sans-serif;font-size:13px;line-height:1.55;padding:12px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);resize:vertical;margin-top:10px;}
+  .warn-text{font-size:11.5px;color:var(--red);display:block;margin-top:6px;}
+  .spinner{display:inline-block;width:11px;height:11px;border:2px solid #E5E7EB;border-top-color:var(--brand);border-radius:50%;animation:spin .7s linear infinite;margin-right:6px;vertical-align:-1px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  body[data-theme="dark"] .pill-status, body[data-theme="dark"] .integ-status.off, body[data-theme="dark"] .tag.auto{background:#1E222C;}
+
+  /* Settings / integrations */
+  .integ-row{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid #F0F1F4;}
+  .integ-row:last-child{border-bottom:none;}
+  .integ-name{font-size:13px;font-weight:600;}
+  .integ-desc{font-size:11.5px;color:var(--muted);margin-top:2px;}
+  .integ-status{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:4px 10px;border-radius:20px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;}
+  .integ-status.on{background:var(--green-bg);color:var(--green);}
+  .integ-status.off{background:#EEF0F4;color:var(--muted);}
+  .settings-field{margin-bottom:12px;}
+  .settings-field label{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px;}
+  .settings-field input{width:280px;max-width:100%;font-family:'Inter',sans-serif;font-size:13px;padding:9px 11px;border-radius:6px;border:1px solid var(--border);}
+  .options-list{display:flex;flex-wrap:wrap;gap:8px;}
+  .option-chip{display:inline-flex;align-items:center;gap:7px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:6px 8px 6px 12px;font-size:12px;color:var(--ink);}
+  .option-chip-x{cursor:pointer;color:var(--muted-lt);font-size:11px;padding:2px 4px;}
+  .option-chip-x:hover{color:var(--red);}
+
+  .log-list{max-height:220px;overflow-y:auto;}
+  .log-row{display:flex;gap:10px;padding:9px 0;font-size:12px;border-bottom:1px solid #F0F1F4;}
+  .log-row:last-child{border-bottom:none;}
+  .log-time{font-family:'IBM Plex Mono',monospace;color:var(--muted-lt);white-space:nowrap;}
+  .tag{font-family:'IBM Plex Mono',monospace;font-size:9px;padding:1px 6px;border-radius:3px;margin-right:6px;text-transform:uppercase;}
+  .tag.auto{background:#EEF0F4;color:var(--muted);}
+  .tag.you{background:var(--brand-bg);color:var(--brand-dark);}
+
+  /* Toasts */
+  .toast-stack{position:fixed;top:18px;right:18px;z-index:999;display:flex;flex-direction:column;gap:8px;max-width:320px;}
+  .toast{display:flex;align-items:flex-start;gap:9px;background:var(--card);color:var(--ink);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:8px;padding:11px 13px;box-shadow:0 6px 20px rgba(16,24,40,.12);font-size:12.5px;line-height:1.4;animation:toastIn .18s ease-out;}
+  .toast.error{border-left-color:var(--red);}
+  .toast.info{border-left-color:var(--muted-lt);}
+  .toast-icon{flex:none;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;background:var(--green);margin-top:1px;}
+  .toast.error .toast-icon{background:var(--red);}
+  .toast.info .toast-icon{background:var(--muted-lt);}
+  .toast-text b{display:block;font-weight:600;margin-bottom:1px;}
+  .toast-copy-area{width:100%;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:4px;padding:6px 7px;margin:6px 0 4px;resize:none;height:52px;}
+
+  /* Mail modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(16,24,40,.55);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;}
+  .modal-card{background:var(--card);color:var(--ink);border-radius:10px;max-width:520px;width:100%;box-shadow:0 24px 64px rgba(16,24,40,.32);max-height:88vh;overflow-y:auto;}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid var(--border);}
+  .modal-body{padding:16px 18px;display:flex;flex-direction:column;gap:12px;}
+  .modal-body input[readonly]{background:var(--surface-2);color:var(--muted);}
+  .modal-actions{display:flex;gap:8px;padding:14px 18px;border-top:1px solid var(--border);flex-wrap:wrap;}
+  .toast-close{margin-left:auto;flex:none;cursor:pointer;color:var(--muted-lt);font-size:13px;line-height:1;padding:2px;}
+  .toast.leaving{animation:toastOut .18s ease-in forwards;}
+  @keyframes toastIn{from{opacity:0;transform:translateX(16px);}to{opacity:1;transform:translateX(0);}}
+  @keyframes toastOut{from{opacity:1;transform:translateX(0);}to{opacity:0;transform:translateX(16px);}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">BA</div>
+      <div><div class="brand-name">Based Agency</div><div class="brand-sub">CLIENT OPS</div></div>
+    </div>
+    <nav>
+      <div class="nav-item active" data-view="overview" onclick="switchView('overview')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+        Overview
+      </div>
+      <div class="nav-item" data-view="clients" onclick="switchView('clients')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Clients
+      </div>
+      <div class="nav-item" data-view="approve" onclick="switchView('approve')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Approval Queue
+        <span class="nav-badge" id="navPendingBadge">0</span>
+      </div>
+      <div class="nav-item" data-view="settings" onclick="switchView('settings')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings &amp; Integrations
+      </div>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="theme-toggle" onclick="toggleTheme()">
+        <span id="themeIcon">☀</span> <span id="themeLabel">Light mode</span>
+      </div>
+      <div style="margin-top:10px;">Shared workspace — data syncs across everyone using this link.</div>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- OVERVIEW -->
+    <div class="view active" id="view-overview">
+      <div class="topbar">
+        <div><div class="page-title">Overview</div><div class="page-sub">Weekly client update workflow at a glance</div></div>
+        <div class="topbar-right">
+          <div class="clock-mini-pill gauge-row" onclick="switchView('approve')" title="Time until Wednesday auto-notification">
+            <svg class="clock-ring" width="18" height="18" viewBox="0 0 20 20">
+              <circle class="ring-track" cx="10" cy="10" r="8"></circle>
+              <circle class="ring-fill gauge-ring" cx="10" cy="10" r="8"></circle>
+            </svg>
+            <span class="clock-mini-text"><span class="gauge-d">0</span>d <span class="gauge-h">00</span>h <span class="gauge-m">00</span>m</span>
+          </div>
+          <div class="sync-pill"><span class="sync-dot"></span>Synced <span id="syncTime">—</span></div>
+          <button class="btn btn-outline" id="refreshBtn" onclick="fullRefresh(true)">Refresh</button>
+        </div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi kpi-click" onclick="switchView('clients')"><div class="kpi-label">Total clients</div><div class="kpi-val" id="kpiTotal">0</div><div class="kpi-foot">Active in roster · view all</div></div>
+        <div class="kpi kpi-click" onclick="goToQueueFilter('atrisk')"><div class="kpi-label">At risk</div><div class="kpi-val warn" id="kpiRisk">0</div><div class="kpi-foot">Danger score 4–5 · view queue</div></div>
+        <div class="kpi kpi-click" onclick="goToQueueFilter('pending')"><div class="kpi-label">Pending approval</div><div class="kpi-val" id="kpiPending">0</div><div class="kpi-foot">Awaiting Daniel &amp; Eric · view queue</div></div>
+        <div class="kpi kpi-click" onclick="goToQueueFilter('approved')"><div class="kpi-label">Approved this week</div><div class="kpi-val" id="kpiApproved">0</div><div class="kpi-foot">Sent or ready · view queue</div></div>
+      </div>
+
+      <div class="bento-row">
+        <div class="panel bento-main">
+          <div class="panel-head"><span class="panel-title">Needs attention</span></div>
+          <div class="panel-body"><div id="attentionList"></div></div>
+        </div>
+
+        <div class="panel bento-side">
+          <div class="panel-head"><span class="panel-title">Activity Log</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--muted-lt);" id="logCountOverview"></span></div>
+          <div class="panel-body"><div class="log-list" id="logListOverview"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLIENTS -->
+    <div class="view" id="view-clients">
+      <div class="topbar">
+        <div><div class="page-title">Clients</div><div class="page-sub">Log improvements here whenever you make one — any of the six of you, any time</div></div>
+        <button class="btn btn-brand" onclick="openAddClientForm()">+ Add client</button>
+      </div>
+
+      <div class="panel" id="newClientPanel" style="display:none;">
+        <div class="panel-head"><span class="panel-title" id="clientFormTitle">Add client</span></div>
+        <div class="panel-body">
+          <div class="form-grid">
+            <div><label>Client name</label><input id="ncName" placeholder="e.g. Premium Homes"></div>
+            <div><label>Client email</label><input id="ncEmail" placeholder="contact@client.com"></div>
+            <div><label>Service</label>
+              <select id="ncService"></select>
+            </div>
+            <div><label>Status</label><select id="ncStatus"></select></div>
+            <div><label>Importance (1–10)</label><select id="ncImportance"></select></div>
+            <div><label>Danger score (1–5)</label><select id="ncDanger"><option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
+            <div style="grid-column:1/-1;"><label>SOW / scope notes</label><input id="ncSow" placeholder="Brief scope summary"></div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-brand" id="clientFormSubmitBtn" onclick="saveClientForm()">Save client</button>
+            <button class="btn btn-outline" onclick="closeClientForm()">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel clients-filter-panel">
+        <div class="clients-filter-bar">
+          <div class="search-field">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="clientSearch" placeholder="Search by name or email…" oninput="onClientSearchInput()">
+          </div>
+          <button class="btn btn-outline filter-btn" onclick="openClientFiltersModal()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:-2px;"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            Filters<span class="filter-badge" id="filterBadge" style="display:none;">0</span>
+          </button>
+        </div>
+        <div class="clients-filter-count" id="clientsFilterCount"></div>
+      </div>
+
+      <div class="panel">
+        <table id="clientsTable">
+          <thead><tr>
+            <th class="sortable" onclick="setClientSort('name')">Client<span class="sort-arrow" id="sortArrow-name"></span></th>
+            <th>Service</th>
+            <th>Status</th>
+            <th class="sortable" onclick="setClientSort('importance')">Importance<span class="sort-arrow" id="sortArrow-importance"></span></th>
+            <th class="sortable" onclick="setClientSort('danger')">Danger<span class="sort-arrow" id="sortArrow-danger"></span></th>
+            <th>This week</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="clientsTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- APPROVAL QUEUE -->
+    <div class="view" id="view-approve">
+      <div class="topbar">
+        <div><div class="page-title">Approval Queue</div><div class="page-sub">Sorted by danger score — highest risk clients first</div></div>
+        <div class="topbar-right">
+          <div class="clock-mini-pill gauge-row" title="Time until Wednesday auto-notification">
+            <svg class="clock-ring" width="18" height="18" viewBox="0 0 20 20">
+              <circle class="ring-track" cx="10" cy="10" r="8"></circle>
+              <circle class="ring-fill gauge-ring" cx="10" cy="10" r="8"></circle>
+            </svg>
+            <span class="clock-mini-text"><span class="gauge-d">0</span>d <span class="gauge-h">00</span>h <span class="gauge-m">00</span>m</span>
+          </div>
+          <button class="btn btn-dark" onclick="notifyApprovers()">Notify Daniel &amp; Eric</button>
+        </div>
+      </div>
+
+      <div class="filter-bar" id="queueFilterBar">
+        <span class="filter-pill active" data-f="all" onclick="setQueueFilter('all')">All</span>
+        <span class="filter-pill" data-f="pending" onclick="setQueueFilter('pending')">Draft ready</span>
+        <span class="filter-pill" data-f="approved" onclick="setQueueFilter('approved')">Approved</span>
+        <span class="filter-pill" data-f="none" onclick="setQueueFilter('none')">No draft yet</span>
+        <span class="filter-pill" data-f="atrisk" onclick="setQueueFilter('atrisk')">At risk (4–5)</span>
+      </div>
+
+      <div class="date-filter-row">
+        <label for="dateFilterSelect">Improvements logged:</label>
+        <select id="dateFilterSelect" onchange="onDateFilterChange()">
+          <option value="all">All time</option>
+          <option value="today">Today</option>
+          <option value="7days">Last 7 days</option>
+          <option value="30days">Last 30 days</option>
+          <option value="custom">Custom range…</option>
+        </select>
+        <span id="customDateRange" style="display:none;">
+          <input type="date" id="dateFrom"> <span style="color:var(--muted-lt);font-size:11.5px;">to</span> <input type="date" id="dateTo">
+          <button class="btn btn-outline" style="padding:6px 10px;" onclick="applyCustomDateRange()">Apply</button>
+        </span>
+      </div>
+
+      <div id="queueList"></div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="view" id="view-settings">
+      <div class="topbar">
+        <div><div class="page-title">Settings &amp; Integrations</div><div class="page-sub">What's actually connected right now — no guessing</div></div>
+      </div>
+
+      <div class="tabs settings-tabs">
+        <div class="tab settings-tab active" data-stab="general" onclick="switchSettingsTab('general')">General</div>
+        <div class="tab settings-tab" data-stab="fields" onclick="switchSettingsTab('fields')">Client Fields</div>
+        <div class="tab settings-tab" data-stab="ai" onclick="switchSettingsTab('ai')">AI &amp; Email</div>
+        <div class="tab settings-tab" data-stab="integrations" onclick="switchSettingsTab('integrations')">Integrations &amp; Sync</div>
+        <div class="tab settings-tab" data-stab="team" onclick="switchSettingsTab('team')">Team</div>
+      </div>
+
+      <!-- GENERAL -->
+      <div class="settings-subview active" id="stab-general">
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Your Name</span></div>
+          <div class="panel-body">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 10px;line-height:1.5;">Set once per person — auto-fills whenever you log an improvement, so you don't type it every time.</p>
+            <div class="who-am-i" style="font-size:13px;"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Approvers</span></div>
+          <div class="panel-body">
+            <div class="settings-field"><label>Daniel's email</label><input id="setDaniel" placeholder="daniel@basedagency.com"></div>
+            <div class="settings-field"><label>Eric's email</label><input id="setEric" placeholder="eric@basedagency.com"></div>
+            <button class="btn btn-brand" onclick="saveSettingsInline()">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CLIENT FIELDS -->
+      <div class="settings-subview" id="stab-fields">
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Client Field Options</span></div>
+          <div class="panel-body">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Add or remove the choices available in the Service and Status dropdowns when adding/editing clients. Importance (1–10) and Danger (1–5) are fixed numeric scales.</p>
+            <div style="margin-bottom:18px;">
+              <label style="font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:8px;">Service options</label>
+              <div id="serviceOptionsList" class="options-list"></div>
+              <div style="display:flex;gap:8px;margin-top:10px;">
+                <input id="serviceOptionInput" placeholder="New service option" style="flex:1;font-family:'Inter',sans-serif;font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);">
+                <button class="btn btn-outline" onclick="addFieldOption('service')">Add</button>
+              </div>
+            </div>
+            <div>
+              <label style="font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:8px;">Status options</label>
+              <div id="statusOptionsList" class="options-list"></div>
+              <div style="display:flex;gap:8px;margin-top:10px;">
+                <input id="statusOptionInput" placeholder="New status option" style="flex:1;font-family:'Inter',sans-serif;font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);">
+                <button class="btn btn-outline" onclick="addFieldOption('status')">Add</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI & EMAIL -->
+      <div class="settings-subview" id="stab-ai">
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Email Structure &amp; Instructions</span></div>
+          <div class="panel-body">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.6;">
+              Tell the AI exactly how you want every client email structured — greeting style, paragraph order, sign-off, tone, length, anything. This applies to every draft it generates from here on. A few rules always apply no matter what you write here: every improvement must be described as a specific, measurable deliverable (never vague claims), and nothing that could make the agency look bad.
+            </p>
+            <textarea id="emailInstructions" placeholder="Example:&#10;- Open with 'Hi [Client First Name],'&#10;- First paragraph: one-sentence summary of the week&#10;- Second paragraph: bulleted list of specific deliverables completed&#10;- Third paragraph (only if relevant): what's planned next week&#10;- Close with: 'Nothing needed from you — reach out anytime with questions.'&#10;- Sign off: 'The Based Agency Team'&#10;- Keep it under 150 words total" style="width:100%;min-height:160px;font-family:'Inter',sans-serif;font-size:13px;padding:12px;border-radius:8px;border:1px solid var(--border);resize:vertical;"></textarea>
+            <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <button class="btn btn-brand" onclick="saveEmailInstructions()">Save instructions</button>
+              <span id="emailInstructionsStatus" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted-lt);"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- INTEGRATIONS & SYNC -->
+      <div class="settings-subview" id="stab-integrations">
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Integrations</span></div>
+          <div class="panel-body">
+            <div class="integ-row"><div><div class="integ-name">Shared data sync</div><div class="integ-desc">Roster, improvement logs, and drafts save and sync across the team</div></div><span class="integ-status on">Connected</span></div>
+            <div class="integ-row"><div><div class="integ-name">AI email drafting</div><div class="integ-desc">Live calls to Claude to draft each client update</div></div><span class="integ-status on">Connected</span></div>
+            <div class="integ-row"><div><div class="integ-name">Email sending</div><div class="integ-desc">Approve / Notify open a pre-filled draft in your own mail app — nothing sends without a person clicking send</div></div><span class="integ-status off">Manual step</span></div>
+            <div class="integ-row"><div><div class="integ-name">Wednesday auto-trigger</div><div class="integ-desc">A scheduled Zap (Schedule by Zapier → Gmail) needs to be built in Zapier's own dashboard — this tool can't create that on its own</div></div><span class="integ-status off">Not connected</span></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Google Sheet Sync</span></div>
+          <div class="panel-body">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.6;">
+              <b>Live pull (Sheet → App):</b> In your Google Sheet, go to <b>File → Share → Publish to web</b>, choose the specific tab, select <b>CSV</b>, and publish. Paste that link below. This reads the sheet — it can't write back to it.<br><br>
+              <b>Columns recognized</b> (any order, case-insensitive): Name, Email, Service, Status, Importance, Danger, SOW.
+            </p>
+            <div class="settings-field"><label>Published CSV link</label><input id="sheetCsvUrl" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv"></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+              <button class="btn btn-brand" onclick="saveAndSyncSheet()">Save link &amp; sync now</button>
+              <button class="btn btn-outline" onclick="syncFromSheetUrl()">Sync now</button>
+            </div>
+            <p id="sheetSyncStatus" style="font-size:11.5px;color:var(--muted-lt);margin-top:6px;"></p>
+
+            <div style="margin-top:20px;padding-top:16px;border-top:1px solid #F0F1F4;">
+              <p style="font-size:12px;color:var(--muted);margin:0 0 10px;line-height:1.5;">If publishing to web isn't an option, paste the sheet's cells directly (select all in Sheets, copy, paste here):</p>
+              <textarea id="csvPasteArea" placeholder="Name,Email,Service,Status,Importance,Danger,SOW&#10;Premium Homes,contact@premiumhomes.com,SEO,Active,4,2,Bathroom remodels" style="width:100%;min-height:90px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:10px;border-radius:6px;border:1px solid var(--border);"></textarea>
+              <div style="margin-top:8px;"><button class="btn btn-outline" onclick="importPastedCsv()">Import pasted data</button></div>
+            </div>
+
+            <div style="margin-top:20px;padding-top:16px;border-top:1px solid #F0F1F4;">
+              <p style="font-size:12px;color:var(--muted);margin:0 0 10px;line-height:1.5;">To push changes back to the Sheet, export the current roster and paste it over your sheet's data.</p>
+              <button class="btn btn-outline" onclick="exportRosterCsv()">Export roster as CSV</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TEAM -->
+      <div class="settings-subview" id="stab-team">
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Team</span></div>
+          <div class="panel-body">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">This tool doesn't have logins — everyone shares one link. "Invite" just opens a pre-filled email with that link, for a person to actually send.</p>
+            <div class="form-grid" style="margin-bottom:12px;">
+              <div><label>Name</label><input id="tmName" placeholder="e.g. Priya"></div>
+              <div><label>Email</label><input id="tmEmail" placeholder="priya@basedagency.com"></div>
+            </div>
+            <button class="btn btn-brand" onclick="inviteTeamMember()">Invite via email</button>
+            <div style="margin-top:16px;" id="teamList"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast-stack" id="toastStack"></div>
+
+<script>
+let clients = [];
+let log = [];
+let settings = {danielEmail:'', ericEmail:''};
+let team = [];
+let editingClientId = null;
+let queueFilter = 'all';
+let dateFilterMode = 'all';
+let dateFilterFrom = null; // inclusive, Date object
+let dateFilterTo = null;   // inclusive, Date object
+
+// ====== SUPABASE CONFIG — fill these in from Project Settings -> API ======
+const SUPABASE_URL = 'https://rwhfddzitabeingajvuf.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3aGZkZHppdGFiZWluZ2FqdnVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUzMTQ2NDUsImV4cCI6MjEwMDg5MDY0NX0.38FIw8GJRl47FcXxHNCExTLGkKlezEItF7TFdDOwmC8';
+// ============================================================================
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Shared (team-wide) storage — backed by Supabase, replaces window.storage.
+async function safeGet(key){
+  try{
+    const { data, error } = await supabaseClient.from('app_storage').select('value').eq('key', key).maybeSingle();
+    if(error) throw error;
+    return data ? data.value : null;
+  }catch(e){ console.error('storage get failed', key, e); return null; }
+}
+async function safeSet(key, value){
+  try{
+    const { error } = await supabaseClient.from('app_storage').upsert({ key, value }, { onConflict: 'key' });
+    if(error) throw error;
+    return true;
+  }catch(e){ console.error('storage set failed', key, e); return false; }
+}
+
+// Personal (per-browser) storage — used for theme preference and "who am I."
+// Outside of Claude's artifact sandbox there's no restriction on localStorage,
+// so it's used here directly. Note this is per-BROWSER, not per-person like a
+// real login would be — if that distinction matters, add real auth later.
+async function safeGetPersonal(key){ try{ return localStorage.getItem('bda_'+key); }catch(e){ return null; } }
+async function safeSetPersonal(key, value){ try{ localStorage.setItem('bda_'+key, value); return true; }catch(e){ return false; } }
+
+/* ---------- Theme ---------- */
+async function initTheme(){
+  const saved = await safeGetPersonal('theme-preference');
+  applyTheme(saved === 'dark' ? 'dark' : 'light');
+}
+function applyTheme(theme){
+  document.body.dataset.theme = theme;
+  document.getElementById('themeIcon').textContent = theme==='dark' ? '☾' : '☀';
+  document.getElementById('themeLabel').textContent = theme==='dark' ? 'Dark mode' : 'Light mode';
+}
+async function toggleTheme(){
+  const next = document.body.dataset.theme==='dark' ? 'light' : 'dark';
+  applyTheme(next);
+  await safeSetPersonal('theme-preference', next);
+}
+
+/* ---------- "Logging as" identity — set your name once, never type it again ---------- */
+let myName = '';
+async function initMyName(){
+  const saved = await safeGetPersonal('my-name');
+  myName = saved || '';
+  if(!myName) promptForName(false);
+  renderWhoAmI();
+}
+function promptForName(isChange){
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">${isChange ? "Change your name" : "What's your name?"}</span>${isChange ? `<span class="toast-close" onclick="closeAppModal()">✕</span>` : ''}</div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--muted);margin:0;line-height:1.5;">This is set once on your own device/account — it auto-fills whenever you log an improvement, so you never have to type it again.</p>
+      <div class="settings-field"><label>Your name</label><input id="myNameInput" placeholder="e.g. Priya"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-brand" onclick="saveMyName()">Save</button>
+      ${isChange ? `<button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>` : ''}
+    </div>`, 420);
+  const input = document.getElementById('myNameInput');
+  input.value = myName;
+  input.focus();
+  input.addEventListener('keydown', (e)=>{ if(e.key==='Enter') saveMyName(); });
+}
+async function saveMyName(){
+  const val = document.getElementById('myNameInput').value.trim();
+  if(!val){ showToast('error','Name required','Enter a name so your logs are attributed correctly.'); return; }
+  myName = val;
+  await safeSetPersonal('my-name', val);
+  closeAppModal();
+  renderWhoAmI();
+  showToast('success','Saved', `Logging future improvements as ${val}.`);
+}
+function renderWhoAmI(){
+  document.querySelectorAll('.who-am-i').forEach(el=>{
+    el.innerHTML = `Logging as <b>${myName || 'Unknown'}</b> — <span class="row-link" onclick="promptForName(true)">not you?</span>`;
+  });
+}
+
+/* ---------- Button loading state ---------- */
+function setBtnLoading(btn, label){
+  if(!btn || btn.tagName!=='BUTTON') return;
+  btn.dataset.originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span>${label || 'Working…'}`;
+}
+function restoreBtn(btn){
+  if(!btn || btn.tagName!=='BUTTON') return;
+  if(btn.dataset.originalHtml !== undefined){ btn.innerHTML = btn.dataset.originalHtml; delete btn.dataset.originalHtml; }
+  btn.disabled = false;
+}
+function clickedBtn(){
+  const el = document.activeElement;
+  return (el && el.tagName==='BUTTON') ? el : null;
+}
+
+function showToast(type, title, detail){
+  const stack = document.getElementById('toastStack');
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  const icon = type==='error' ? '!' : type==='info' ? 'i' : '✓';
+  el.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-text"><b>${title}</b>${detail?detail:''}</span><span class="toast-close" onclick="this.parentElement.remove()">✕</span>`;
+  stack.appendChild(el);
+  setTimeout(()=>{
+    el.classList.add('leaving');
+    setTimeout(()=>el.remove(), 200);
+  }, 4200);
+}
+
+// Same as showToast, but stays on screen with a "Copy" button — used as a
+// fallback wherever a mailto link might silently fail to open (no default
+// mail app registered, or a restricted browser environment).
+function showToastWithCopy(type, title, detail, copyText){
+  const stack = document.getElementById('toastStack');
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  const icon = type==='error' ? '!' : type==='info' ? 'i' : '✓';
+  const copyId = 'copytext-' + Date.now();
+  el.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-text"><b>${title}</b>${detail}<br><textarea class="toast-copy-area" id="${copyId}" readonly>${copyText}</textarea><span class="row-link" style="font-size:11.5px;" onclick="copyToastText('${copyId}', this)">Copy details</span></span><span class="toast-close" onclick="this.parentElement.remove()">✕</span>`;
+  stack.appendChild(el);
+}
+
+function copyToastText(id, linkEl){
+  const ta = document.getElementById(id);
+  ta.removeAttribute('readonly');
+  ta.focus();
+  ta.select();
+  ta.setSelectionRange(0, 999999);
+
+  let copiedSync = false;
+  try{ copiedSync = document.execCommand('copy'); }catch(e){ copiedSync = false; }
+  ta.setAttribute('readonly', 'readonly');
+
+  if(copiedSync){
+    linkEl.textContent = 'Copied ✓';
+    setTimeout(()=>{ linkEl.textContent = 'Copy details'; }, 2000);
+    return;
+  }
+
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(ta.value).then(()=>{
+      linkEl.textContent = 'Copied ✓';
+      setTimeout(()=>{ linkEl.textContent = 'Copy details'; }, 2000);
+    }).catch(()=>{
+      linkEl.textContent = 'Copy blocked — select text above (Ctrl/Cmd+C)';
+    });
+  } else {
+    linkEl.textContent = 'Copy blocked — select text above (Ctrl/Cmd+C)';
+  }
+}
+
+const DEFAULT_SERVICE_OPTIONS = ['Google Ads (PPC)','Meta Ads','SEO / Local Search','AI Domination Framework','Full Framework'];
+const DEFAULT_STATUS_OPTIONS = ['Active','Onboarding','At Risk','Paused'];
+
+async function loadAll(){
+  const [appData, s, t] = await Promise.all([safeGet('app-data'), safeGet('settings'), safeGet('team-members')]);
+  if(appData){
+    const parsed = JSON.parse(appData);
+    clients = parsed.clients || [];
+    log = parsed.log || [];
+  } else {
+    // One-time migration from the old two-key layout (clients-roster + activity-log),
+    // which doubled write volume on every action and was the actual cause of the
+    // "rate limit exceeded" error. New saves go through the combined key below.
+    const [c, l] = await Promise.all([safeGet('clients-roster'), safeGet('activity-log')]);
+    clients = c ? JSON.parse(c) : [];
+    log = l ? JSON.parse(l) : [];
+    if(clients.length || log.length) await persistAppData();
+  }
+  settings = s ? JSON.parse(s) : {};
+  settings.danielEmail = settings.danielEmail || '';
+  settings.ericEmail = settings.ericEmail || '';
+  settings.sheetCsvUrl = settings.sheetCsvUrl || '';
+  settings.emailInstructions = settings.emailInstructions || '';
+  settings.serviceOptions = (settings.serviceOptions && settings.serviceOptions.length) ? settings.serviceOptions : DEFAULT_SERVICE_OPTIONS.slice();
+  settings.statusOptions = (settings.statusOptions && settings.statusOptions.length) ? settings.statusOptions : DEFAULT_STATUS_OPTIONS.slice();
+  team = t ? JSON.parse(t) : [];
+  document.getElementById('setDaniel').value = settings.danielEmail || '';
+  document.getElementById('setEric').value = settings.ericEmail || '';
+  const sheetInput = document.getElementById('sheetCsvUrl');
+  if(sheetInput && document.activeElement !== sheetInput) sheetInput.value = settings.sheetCsvUrl || '';
+  const instrInput = document.getElementById('emailInstructions');
+  if(instrInput && document.activeElement !== instrInput) instrInput.value = settings.emailInstructions || '';
+  updateEmailInstructionsStatus();
+  document.getElementById('syncTime').textContent = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+}
+
+function updateEmailInstructionsStatus(){
+  const el = document.getElementById('emailInstructionsStatus');
+  if(!el) return;
+  const text = (settings.emailInstructions || '').trim();
+  el.textContent = text ? `● Active — ${text.split(/\s+/).length} words, applied to every new draft` : '○ Not set — using default structure';
+  el.style.color = text ? 'var(--green)' : 'var(--muted-lt)';
+}
+let _appDataSaveInFlight = null;
+async function persistAppData(){
+  if(log.length>60) log=log.slice(0,60);
+  // If a save is already in progress, wait for it, then send one more with current
+  // state — this coalesces rapid consecutive calls (e.g. persistClients immediately
+  // followed by persistLog) into far fewer actual network requests.
+  if(_appDataSaveInFlight){ await _appDataSaveInFlight.catch(()=>{}); }
+  _appDataSaveInFlight = safeSet('app-data', JSON.stringify({clients, log}));
+  const result = await _appDataSaveInFlight;
+  _appDataSaveInFlight = null;
+  return result;
+}
+async function persistClients(){ return await persistAppData(); }
+async function persistLog(){ return await persistAppData(); }
+async function persistSettings(){ return await safeSet('settings', JSON.stringify(settings)); }
+async function persistTeam(){ return await safeSet('team-members', JSON.stringify(team)); }
+
+// A synthetic click on a hidden <a mailto> is unreliable — some browsers/sandboxes
+// block it outright, so it can look "connected" but do nothing. Instead, show a
+// modal with a REAL, visible mailto link the person clicks themselves (which browsers
+// always honor as a genuine user action) plus a guaranteed copy-to-clipboard fallback.
+function showMailModal(to, subject, body){
+  const mailtoHref = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">Email ready</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <div class="settings-field"><label>To</label><input value="${to}" readonly></div>
+      <div class="settings-field"><label>Subject</label><input id="mailModalSubject" readonly></div>
+      <div class="settings-field"><label>Body</label><textarea id="mailModalBody" style="min-height:150px;width:100%;font-family:'Inter',sans-serif;font-size:13px;padding:10px;border-radius:6px;border:1px solid var(--border);"></textarea></div>
+    </div>
+    <div class="modal-actions">
+      <a class="btn btn-brand" href="${mailtoHref}" target="_blank" rel="noopener">Open in mail app</a>
+      <button class="btn btn-outline" id="mailModalCopyBtn" onclick="copyMailModalBody()">Copy details</button>
+      <button class="btn btn-outline" onclick="closeAppModal()">Close</button>
+    </div>`, 500);
+  document.getElementById('mailModalSubject').value = subject;
+  document.getElementById('mailModalBody').value = body;
+}
+
+// Generic modal shell — used for the mail-compose modal and the queue card detail modal.
+function openAppModal(innerHtml, maxWidth){
+  closeAppModal();
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'appModalOverlay';
+  overlay.onclick = (e)=>{ if(e.target===overlay) closeAppModal(); };
+  overlay.innerHTML = `<div class="modal-card" style="max-width:${maxWidth||520}px;">${innerHtml}</div>`;
+  document.body.appendChild(overlay);
+}
+
+function closeAppModal(){
+  const el = document.getElementById('appModalOverlay');
+  if(el) el.remove();
+}
+
+function copyMailModalBody(){
+  const ta = document.getElementById('mailModalBody');
+  const subj = document.getElementById('mailModalSubject').value;
+  const full = `Subject: ${subj}\n\n${ta.value}`;
+  const btn = document.getElementById('mailModalCopyBtn');
+  ta.focus(); ta.select(); ta.setSelectionRange(0, 999999);
+  let copied = false;
+  try{ copied = document.execCommand('copy'); }catch(e){ copied = false; }
+  if(copied){ btn.textContent = 'Copied ✓'; setTimeout(()=>btn.textContent='Copy details', 2000); return; }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(full).then(()=>{
+      btn.textContent = 'Copied ✓'; setTimeout(()=>btn.textContent='Copy details', 2000);
+    }).catch(()=>{ btn.textContent = 'Select the text above (Ctrl/Cmd+C)'; });
+  } else { btn.textContent = 'Select the text above (Ctrl/Cmd+C)'; }
+}
+
+async function fullRefresh(showFeedback){
+  const btn = document.getElementById('refreshBtn');
+  if(showFeedback && btn){ btn.disabled = true; btn.textContent = 'Refreshing…'; }
+  await loadAll();
+  renderAll();
+  if(showFeedback && btn){ btn.disabled = false; btn.textContent = 'Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
+}
+function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); }
+
+async function switchView(name){
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name));
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  await fullRefresh();
+}
+
+function switchSettingsTab(name){
+  document.querySelectorAll('.settings-tab').forEach(t=>t.classList.toggle('active', t.dataset.stab===name));
+  document.querySelectorAll('.settings-subview').forEach(v=>v.classList.remove('active'));
+  document.getElementById('stab-'+name).classList.add('active');
+}
+
+async function goToQueueFilter(filter){
+  queueFilter = filter;
+  await switchView('approve');
+  setQueueFilter(filter);
+}
+
+async function goToClientInQueue(id, filter){
+  queueFilter = filter || 'all';
+  await switchView('approve');
+  setQueueFilter(queueFilter);
+  const el = document.getElementById('q-'+id);
+  if(el){
+    el.scrollIntoView({behavior:'smooth', block:'center'});
+    el.classList.add('highlight-flash');
+    setTimeout(()=>el.classList.remove('highlight-flash'), 1500);
+  }
+  openQueueCardModal(id);
+}
+
+function renderAttentionList(){
+  const el = document.getElementById('attentionList');
+  if(!el) return;
+  const items = clients.filter(c => c.danger>=4 || c.draftStatus==='pending')
+    .sort((a,b)=> b.danger-a.danger || (b.draftStatus==='pending')-(a.draftStatus==='pending'));
+  if(!items.length){ el.innerHTML = `<div class="empty" style="padding:14px 0;">Nothing urgent right now.</div>`; return; }
+  el.innerHTML = items.map(c=>{
+    const reason = c.draftStatus==='pending' ? 'Draft awaiting approval' : `Danger score ${c.danger}/5 — at risk`;
+    const filter = c.draftStatus==='pending' ? 'pending' : 'atrisk';
+    return `<div class="attn-row" onclick="goToClientInQueue('${c.id}','${filter}')">
+      <div><div class="attn-name">${c.name}</div><div class="attn-meta">${reason}</div></div>
+      ${dotRatingCompact(c.danger, 'brand', 5)}
+    </div>`;
+  }).join('');
+}
+
+function showClientFormPanel(show){
+  document.getElementById('newClientPanel').style.display = show ? 'block' : 'none';
+}
+
+function renderClientOptionsSelects(){
+  ['ncService','ncStatus'].forEach(id=>{
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    const options = id==='ncService' ? settings.serviceOptions : settings.statusOptions;
+    const current = sel.value;
+    sel.innerHTML = (options||[]).map(o=>`<option value="${o.replace(/"/g,'&quot;')}">${o}</option>`).join('');
+    if(options && options.includes(current)) sel.value = current;
+  });
+  const impSel = document.getElementById('ncImportance');
+  if(impSel && !impSel.options.length){
+    impSel.innerHTML = Array.from({length:10},(_,i)=>i+1).map(n=>`<option ${n===5?'selected':''}>${n}</option>`).join('');
+  }
+  renderOptionsManager('service');
+  renderOptionsManager('status');
+}
+
+function renderOptionsManager(kind){
+  const listEl = document.getElementById(kind+'OptionsList');
+  if(!listEl) return;
+  const options = kind==='service' ? settings.serviceOptions : settings.statusOptions;
+  listEl.innerHTML = (options||[]).map(o=>`
+    <span class="option-chip">${o} <span class="option-chip-x" onclick="removeFieldOption('${kind}','${o.replace(/'/g,"\\'")}')">✕</span></span>
+  `).join('') || `<span style="color:var(--muted-lt);font-size:12px;">No options yet.</span>`;
+}
+
+async function addFieldOption(kind){
+  const inputId = kind+'OptionInput';
+  const val = document.getElementById(inputId).value.trim();
+  if(!val){ showToast('error','Nothing entered','Type an option name first.'); return; }
+  await loadAll();
+  const key = kind==='service' ? 'serviceOptions' : 'statusOptions';
+  if(settings[key].some(o=>o.toLowerCase()===val.toLowerCase())){ showToast('info','Already exists', `"${val}" is already an option.`); return; }
+  settings[key].push(val);
+  const ok = await persistSettings();
+  document.getElementById(inputId).value = '';
+  renderClientOptionsSelects();
+  ok ? showToast('success','Option added', `"${val}" added.`) : showToast('error','Save failed','Could not save — try again.');
+}
+
+async function removeFieldOption(kind, value){
+  if(!confirm(`Remove "${value}" as an option? Existing clients already set to it will keep the value, but it won't appear in the dropdown anymore.`)) return;
+  await loadAll();
+  const key = kind==='service' ? 'serviceOptions' : 'statusOptions';
+  settings[key] = settings[key].filter(o=>o!==value);
+  const ok = await persistSettings();
+  renderClientOptionsSelects();
+  ok ? showToast('success','Option removed', `"${value}" removed.`) : showToast('error','Save failed','Could not save — try again.');
+}
+
+function resetClientFormFields(){
+  document.getElementById('ncName').value='';
+  document.getElementById('ncEmail').value='';
+  renderClientOptionsSelects();
+  document.getElementById('ncImportance').value='5';
+  document.getElementById('ncDanger').value='1';
+  document.getElementById('ncSow').value='';
+}
+
+function openAddClientForm(){
+  editingClientId = null;
+  resetClientFormFields();
+  document.getElementById('clientFormTitle').textContent = 'Add client';
+  document.getElementById('clientFormSubmitBtn').textContent = 'Save client';
+  showClientFormPanel(true);
+}
+
+function openEditClientForm(id){
+  const c = clients.find(x=>x.id===id);
+  if(!c){ showToast('error','Client not found','Someone may have removed this — refreshing.'); fullRefresh(); return; }
+  editingClientId = id;
+  document.getElementById('ncName').value = c.name;
+  document.getElementById('ncEmail').value = c.email || '';
+  renderClientOptionsSelects();
+  ensureSelectHasValue('ncService', c.service);
+  ensureSelectHasValue('ncStatus', c.status);
+  document.getElementById('ncImportance').value = c.importance;
+  document.getElementById('ncDanger').value = c.danger;
+  document.getElementById('ncSow').value = c.sow || '';
+  document.getElementById('clientFormTitle').textContent = 'Edit client';
+  document.getElementById('clientFormSubmitBtn').textContent = 'Save changes';
+  showClientFormPanel(true);
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// If a client's current value was since removed from the managed options list,
+// add it back temporarily so editing the client doesn't silently change it.
+function ensureSelectHasValue(selectId, value){
+  const sel = document.getElementById(selectId);
+  if(!sel || !value) return;
+  const exists = Array.from(sel.options).some(o=>o.value===value);
+  if(!exists){
+    const opt = document.createElement('option');
+    opt.value = value; opt.textContent = value + ' (no longer a listed option)';
+    sel.appendChild(opt);
+  }
+  sel.value = value;
+}
+
+function closeClientForm(){
+  editingClientId = null;
+  showClientFormPanel(false);
+}
+
+async function saveClientForm(){
+  const name = document.getElementById('ncName').value.trim();
+  if(!name){ showToast('error','Client name required','Enter a name before saving.'); return; }
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Saving…');
+  await loadAll();
+  const fields = {
+    name,
+    email:document.getElementById('ncEmail').value.trim(),
+    service:document.getElementById('ncService').value,
+    status:document.getElementById('ncStatus').value,
+    importance:parseInt(document.getElementById('ncImportance').value),
+    danger:parseInt(document.getElementById('ncDanger').value),
+    sow:document.getElementById('ncSow').value.trim(),
+  };
+  let ok, msg;
+  if(editingClientId){
+    const c = clients.find(x=>x.id===editingClientId);
+    if(!c){ showToast('error','Client not found','This client may have been removed — refreshing.'); closeClientForm(); restoreBtn(btn); await fullRefresh(); return; }
+    Object.assign(c, fields);
+    ok = await persistClients();
+    msg = `${name} updated.`;
+  } else {
+    clients.push({ id:'c'+Date.now(), ...fields, improvements:[], draft:'', draftStatus:'none' });
+    ok = await persistClients();
+    msg = `${name} is now on the roster.`;
+  }
+  closeClientForm();
+  restoreBtn(btn);
+  renderAll();
+  ok ? showToast('success', editingClientId ? 'Client updated' : 'Client added', msg) : showToast('error','Save failed','Could not save — check your connection and try again.');
+}
+
+function renderKpis(){
+  document.getElementById('kpiTotal').textContent = clients.length;
+  document.getElementById('kpiRisk').textContent = clients.filter(c=>c.danger>=4).length;
+  const pending = clients.filter(c=>c.draftStatus==='pending').length;
+  document.getElementById('kpiPending').textContent = pending;
+  document.getElementById('kpiApproved').textContent = clients.filter(c=>c.draftStatus==='approved').length;
+  document.getElementById('navPendingBadge').textContent = pending;
+}
+
+let clientFilters = { search:'', service:'all', status:'all', importance:'all', danger:'all' };
+let clientSort = { field:'name', dir:'asc' };
+
+function onClientSearchInput(){
+  clientFilters.search = document.getElementById('clientSearch').value.trim().toLowerCase();
+  renderClientsTable();
+}
+
+function openClientFiltersModal(){
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">Filter clients</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <div class="settings-field"><label>Service</label><select id="mfService" onchange="onModalFilterChange()" style="width:100%;"></select></div>
+      <div class="settings-field"><label>Status</label><select id="mfStatus" onchange="onModalFilterChange()" style="width:100%;"></select></div>
+      <div class="settings-field"><label>Importance</label>
+        <select id="mfImportance" onchange="onModalFilterChange()" style="width:100%;">
+          <option value="all">Any importance</option>
+          <option value="high">High importance (8–10)</option>
+          <option value="mid">Medium importance (4–7)</option>
+          <option value="low">Low importance (1–3)</option>
+        </select>
+      </div>
+      <div class="settings-field"><label>Danger</label>
+        <select id="mfDanger" onchange="onModalFilterChange()" style="width:100%;">
+          <option value="all">Any danger</option>
+          <option value="atrisk">At risk (4–5)</option>
+          <option value="low">Low risk (1–3)</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="clearClientFilters()">Clear all</button>
+      <button class="btn btn-brand" onclick="closeAppModal()">Done</button>
+    </div>`, 420);
+  populateModalFilterSelects();
+}
+
+function populateModalFilterSelects(){
+  const svcSel = document.getElementById('mfService');
+  const statSel = document.getElementById('mfStatus');
+  if(svcSel){
+    svcSel.innerHTML = `<option value="all">All services</option>` + (settings.serviceOptions||[]).map(o=>`<option value="${o.replace(/"/g,'&quot;')}">${o}</option>`).join('');
+    svcSel.value = clientFilters.service;
+  }
+  if(statSel){
+    statSel.innerHTML = `<option value="all">All statuses</option>` + (settings.statusOptions||[]).map(o=>`<option value="${o.replace(/"/g,'&quot;')}">${o}</option>`).join('');
+    statSel.value = clientFilters.status;
+  }
+  const impSel = document.getElementById('mfImportance'); if(impSel) impSel.value = clientFilters.importance;
+  const dangerSel = document.getElementById('mfDanger'); if(dangerSel) dangerSel.value = clientFilters.danger;
+}
+
+function onModalFilterChange(){
+  clientFilters.service = document.getElementById('mfService').value;
+  clientFilters.status = document.getElementById('mfStatus').value;
+  clientFilters.importance = document.getElementById('mfImportance').value;
+  clientFilters.danger = document.getElementById('mfDanger').value;
+  renderClientsTable();
+}
+
+function updateFilterBadge(){
+  const badge = document.getElementById('filterBadge');
+  if(!badge) return;
+  const count = ['service','status','importance','danger'].filter(k=>clientFilters[k]!=='all').length;
+  badge.textContent = count;
+  badge.style.display = count ? 'inline-flex' : 'none';
+}
+
+const SORT_ICON_UP = '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="18 15 12 9 6 15"/></svg>';
+const SORT_ICON_DOWN = '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"/></svg>';
+
+function updateSortArrows(){
+  ['name','importance','danger'].forEach(f=>{
+    const el = document.getElementById('sortArrow-'+f);
+    if(!el) return;
+    el.innerHTML = clientSort.field===f ? (clientSort.dir==='asc' ? SORT_ICON_UP : SORT_ICON_DOWN) : '';
+  });
+}
+
+function clearClientFilters(){
+  const searchInput = document.getElementById('clientSearch');
+  if(searchInput) searchInput.value = '';
+  clientFilters = { search:'', service:'all', status:'all', importance:'all', danger:'all' };
+  if(document.getElementById('mfService')) populateModalFilterSelects();
+  renderClientsTable();
+}
+
+function setClientSort(field){
+  if(clientSort.field===field) clientSort.dir = clientSort.dir==='asc' ? 'desc' : 'asc';
+  else { clientSort.field = field; clientSort.dir = 'asc'; }
+  renderClientsTable();
+}
+
+function matchesClientFilters(c){
+  if(clientFilters.search && !(c.name.toLowerCase().includes(clientFilters.search) || (c.email||'').toLowerCase().includes(clientFilters.search))) return false;
+  if(clientFilters.service!=='all' && c.service!==clientFilters.service) return false;
+  if(clientFilters.status!=='all' && c.status!==clientFilters.status) return false;
+  if(clientFilters.importance==='high' && c.importance<8) return false;
+  if(clientFilters.importance==='mid' && (c.importance<4 || c.importance>7)) return false;
+  if(clientFilters.importance==='low' && c.importance>3) return false;
+  if(clientFilters.danger==='atrisk' && c.danger<4) return false;
+  if(clientFilters.danger==='low' && c.danger>3) return false;
+  return true;
+}
+
+function renderClientsTable(){
+  const tbody = document.getElementById('clientsTbody');
+  const countEl = document.getElementById('clientsFilterCount');
+  updateFilterBadge();
+  updateSortArrows();
+  if(!clients.length){
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty">No clients yet. Click "+ Add client" to start the roster.</div></td></tr>`;
+    if(countEl) countEl.textContent = '';
+    return;
+  }
+  let filtered = clients.filter(matchesClientFilters);
+  filtered.sort((a,b)=>{
+    let av = a[clientSort.field], bv = b[clientSort.field];
+    if(typeof av==='string'){ av = av.toLowerCase(); bv = (bv||'').toLowerCase(); }
+    if(av<bv) return clientSort.dir==='asc' ? -1 : 1;
+    if(av>bv) return clientSort.dir==='asc' ? 1 : -1;
+    return 0;
+  });
+  if(countEl){
+    const isFiltered = clientFilters.search || clientFilters.service!=='all' || clientFilters.status!=='all' || clientFilters.importance!=='all' || clientFilters.danger!=='all';
+    countEl.textContent = isFiltered ? `${filtered.length} of ${clients.length} shown` : '';
+  }
+  if(!filtered.length){
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty">No clients match these filters.</div></td></tr>`;
+    renderWhoAmI();
+    return;
+  }
+  tbody.innerHTML = filtered.map(c=>`
+    <tr>
+      <td style="border-left:3px solid ${c.danger>=4 ? 'var(--brand)' : 'transparent'};"><div class="client-cell"><div class="avatar-circle">${c.name.trim().charAt(0).toUpperCase()}</div><div><div class="cell-name">${c.name}</div>${c.email?`<div class="cell-email">${c.email}</div>`:''}</div></div></td>
+      <td><span class="cell-service">${c.service}</span></td>
+      <td><span class="pill pill-status">${c.status}</span></td>
+      <td>${dotRatingCompact(c.importance,'ink',10)}</td>
+      <td>${dotRatingCompact(c.danger,'brand',5)}</td>
+      <td>${c.improvements.length} logged</td>
+      <td class="actions-cell">
+        <div class="dropdown">
+          <button class="btn btn-outline" onclick="toggleActionsMenu('${c.id}')">Actions ▾</button>
+          <div class="dropdown-menu" id="menu-${c.id}">
+            <div class="dropdown-item" onclick="closeActionsMenus(); openEditClientForm('${c.id}')">Edit client</div>
+            <div class="dropdown-item" onclick="closeActionsMenus(); toggleDrawer('${c.id}')">Log / view improvements</div>
+            <div class="dropdown-item danger" onclick="closeActionsMenus(); deleteClient('${c.id}')">Delete client</div>
+          </div>
+        </div>
+      </td>
+    </tr>
+    <tr class="drawer-row" id="drawer-${c.id}" style="display:none;">
+      <td colspan="7">
+        ${c.improvements.length ? `<div class="mini-improvements">${c.improvements.map((imp,idx)=>`
+          <div class="mini-imp-row" id="imp-row-${c.id}-${idx}">
+            <span class="mini-imp-text"><b>${imp.author}:</b> ${imp.text}</span>
+            <span class="mini-imp-actions">
+              <span class="row-link" onclick="startEditImprovement('${c.id}', ${idx})">Edit</span>
+              <span class="row-link danger-link" onclick="deleteImprovement('${c.id}', ${idx})">Delete</span>
+            </span>
+          </div>
+        `).join('')}</div>` : ''}
+        <div class="log-inline" style="margin-top:8px;">
+          <textarea placeholder="What did you improve for this client this week?" id="imp-${c.id}"></textarea>
+          <button class="btn btn-brand" onclick="logImprovement('${c.id}')">Log it</button>
+        </div>
+        <div class="who-am-i" style="font-size:11px;color:var(--muted-lt);margin-top:6px;"></div>
+      </td>
+    </tr>
+  `).join('');
+  renderWhoAmI();
+}
+
+function toggleDrawer(id){
+  const row = document.getElementById('drawer-'+id);
+  row.style.display = row.style.display==='none' ? 'table-row' : 'none';
+}
+
+function toggleActionsMenu(id){
+  const menu = document.getElementById('menu-'+id);
+  const wasOpen = menu.classList.contains('open');
+  closeActionsMenus();
+  if(!wasOpen) menu.classList.add('open');
+  menu.closest('.dropdown').classList.toggle('force-open', !wasOpen);
+}
+function closeActionsMenus(){
+  document.querySelectorAll('.dropdown-menu.open').forEach(m=>m.classList.remove('open'));
+  document.querySelectorAll('.dropdown.force-open').forEach(d=>d.classList.remove('force-open'));
+}
+document.addEventListener('click', function(e){
+  if(!e.target.closest('.dropdown')) closeActionsMenus();
+});
+
+async function deleteClient(id){
+  const c = clients.find(x=>x.id===id);
+  if(!c) return;
+  if(!confirm(`Delete ${c.name}? This removes all logged improvements and drafts for this client — can't be undone.`)) return;
+  await loadAll();
+  const stillThere = clients.find(x=>x.id===id);
+  if(!stillThere){ showToast('info','Already gone', `${c.name} was already removed.`); renderAll(); return; }
+  clients = clients.filter(x=>x.id!==id);
+  log.unshift({t:nowTime(), tag:'you', text:`Deleted client <b>${c.name}</b>.`});
+  const ok = await persistClients();
+  renderAll();
+  ok ? showToast('success','Client deleted', `${c.name} removed from the roster.`) : showToast('error','Delete failed','Could not save — try again.');
+}
+
+function startEditImprovement(clientId, idx){
+  const c = clients.find(x=>x.id===clientId);
+  if(!c || !c.improvements[idx]) return;
+  const imp = c.improvements[idx];
+  const row = document.getElementById(`imp-row-${clientId}-${idx}`);
+  if(!row) return;
+  row.innerHTML = `
+    <div class="log-inline" style="margin-top:0;width:100%;">
+      <textarea id="editimp-text-${clientId}-${idx}"></textarea>
+      <input id="editimp-author-${clientId}-${idx}" style="width:130px;">
+      <button class="btn btn-brand" onclick="saveEditImprovement('${clientId}', ${idx})">Save</button>
+      <button class="btn btn-outline" onclick="renderClientsTable()">Cancel</button>
+    </div>`;
+  document.getElementById(`editimp-text-${clientId}-${idx}`).value = imp.text;
+  document.getElementById(`editimp-author-${clientId}-${idx}`).value = imp.author;
+}
+
+async function saveEditImprovement(clientId, idx){
+  const textEl = document.getElementById(`editimp-text-${clientId}-${idx}`);
+  const authorEl = document.getElementById(`editimp-author-${clientId}-${idx}`);
+  const text = textEl.value.trim();
+  const author = authorEl.value.trim() || 'Team member';
+  if(!text){ showToast('error','Nothing to save','Text can\'t be empty — delete the entry instead if you want it gone.'); return; }
+  await loadAll();
+  const c = clients.find(x=>x.id===clientId);
+  if(!c || !c.improvements[idx]){ showToast('error','Entry not found','This may have changed elsewhere — refreshing.'); renderAll(); return; }
+  c.improvements[idx].text = text;
+  c.improvements[idx].author = author;
+  const ok = await persistClients();
+  renderClientsTable(); renderKpis();
+  ok ? showToast('success','Improvement updated','Changes saved.') : showToast('error','Save failed','Could not save — try again.');
+}
+
+async function deleteImprovement(clientId, idx){
+  if(!confirm('Delete this logged improvement? This can\'t be undone.')) return;
+  await loadAll();
+  const c = clients.find(x=>x.id===clientId);
+  if(!c || !c.improvements[idx]){ showToast('info','Already gone','This entry was already removed.'); renderAll(); return; }
+  c.improvements.splice(idx, 1);
+  const ok = await persistClients();
+  renderClientsTable(); renderKpis();
+  ok ? showToast('success','Improvement deleted','Removed from the log.') : showToast('error','Delete failed','Could not save — try again.');
+}
+
+async function logImprovement(id){
+  const text = document.getElementById('imp-'+id).value.trim();
+  const author = myName || 'Team member';
+  if(!text){ showToast('error','Nothing to log','Write what you improved before saving.'); return; }
+  if(!myName){ promptForName(false); return; }
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Saving…');
+  await loadAll();
+  const c = clients.find(x=>x.id===id);
+  if(!c){ showToast('error','Client not found','This client may have been removed by someone else — refreshing.'); renderClientsTable(); return; }
+  c.improvements.push({author, text, date: new Date().toISOString()});
+  const ok = await persistClients();
+  renderClientsTable();
+  renderKpis();
+  ok ? showToast('success','Improvement logged', `Saved for ${c.name}.`) : showToast('error','Save failed','Could not save this entry — try again.');
+}
+
+function setQueueFilter(f){
+  queueFilter = f;
+  document.querySelectorAll('.filter-pill').forEach(p=>p.classList.toggle('active', p.dataset.f===f));
+  renderQueue();
+}
+
+function computeDateRange(mode){
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0,0,0,0);
+  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23,59,59,999);
+  if(mode==='today') return {from:startOfToday, to:endOfToday};
+  if(mode==='7days'){ const from = new Date(startOfToday); from.setDate(from.getDate()-6); return {from, to:endOfToday}; }
+  if(mode==='30days'){ const from = new Date(startOfToday); from.setDate(from.getDate()-29); return {from, to:endOfToday}; }
+  return {from:null, to:null};
+}
+
+function onDateFilterChange(){
+  const mode = document.getElementById('dateFilterSelect').value;
+  dateFilterMode = mode;
+  document.getElementById('customDateRange').style.display = mode==='custom' ? 'inline-flex' : 'none';
+  if(mode==='custom') return; // wait for Apply click
+  const {from, to} = computeDateRange(mode);
+  dateFilterFrom = from; dateFilterTo = to;
+  renderQueue();
+}
+
+function applyCustomDateRange(){
+  const fromVal = document.getElementById('dateFrom').value;
+  const toVal = document.getElementById('dateTo').value;
+  if(!fromVal && !toVal){ showToast('error','Pick at least one date','Set a start date, end date, or both.'); return; }
+  dateFilterFrom = fromVal ? new Date(fromVal + 'T00:00:00') : null;
+  dateFilterTo = toVal ? new Date(toVal + 'T23:59:59') : null;
+  renderQueue();
+}
+
+function improvementInDateRange(imp){
+  if(dateFilterMode==='all') return true;
+  if(!imp.date) return false; // logged before dates were tracked — excluded from specific ranges, still shown under "All time"
+  const d = new Date(imp.date);
+  if(dateFilterFrom && d < dateFilterFrom) return false;
+  if(dateFilterTo && d > dateFilterTo) return false;
+  return true;
+}
+
+function renderQueue(){
+  const el = document.getElementById('queueList');
+  if(!clients.length){ el.innerHTML = `<div class="panel"><div class="empty">No clients yet — add clients in the Clients tab.</div></div>`; return; }
+  let sorted = [...clients].sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
+  if(queueFilter==='pending') sorted = sorted.filter(c=>c.draftStatus==='pending');
+  else if(queueFilter==='approved') sorted = sorted.filter(c=>c.draftStatus==='approved');
+  else if(queueFilter==='none') sorted = sorted.filter(c=>c.draftStatus==='none');
+  else if(queueFilter==='atrisk') sorted = sorted.filter(c=>c.danger>=4);
+
+  // Attach the date-filtered improvement subset per client, and drop clients with none when a date filter is active.
+  let rows = sorted.map(c => ({ c, shownImprovements: c.improvements.filter(improvementInDateRange) }));
+  if(dateFilterMode !== 'all') rows = rows.filter(r => r.shownImprovements.length > 0);
+
+  if(!rows.length){
+    const msg = dateFilterMode!=='all' ? 'No improvements logged in this date range.' : 'No clients match this filter.';
+    el.innerHTML = `<div class="panel"><div class="empty">${msg}</div></div>`;
+    return;
+  }
+
+  el.innerHTML = `<div class="queue-grid">` + rows.map(({c, shownImprovements})=>{
+    const status = statusMeta(c.draftStatus);
+    return `<div class="q-card" id="q-${c.id}" onclick="openQueueCardModal('${c.id}')">
+      <div class="q-card-top">
+        <div>
+          <div class="q-name">${c.name}</div>
+          <div class="q-service-caption">${c.service}${c.danger>=4 ? ' · <span class="q-risk-flag">At risk</span>' : ''}</div>
+        </div>
+        <span class="q-status-label" style="color:${status.color};">${status.label}</span>
+      </div>
+      <div class="q-ratings">
+        ${dotRating('Importance', c.importance, 'ink', 10)}
+        ${dotRating('Danger', c.danger, 'brand')}
+      </div>
+      <div class="q-bulk-preview">${shownImprovements.length} improvement${shownImprovements.length!==1?'s':''} logged${dateFilterMode!=='all'?' in range':' this week'}</div>
+    </div>`;
+  }).join('') + `</div>`;
+}
+
+function statusMeta(draftStatus){
+  if(draftStatus==='approved') return {label:'✓ Approved', color:'var(--ink)'};
+  if(draftStatus==='pending') return {label:'Draft ready', color:'var(--brand)'};
+  return {label:'No draft yet', color:'var(--muted-lt)'};
+}
+
+function dotRating(label, n, tone, max){
+  max = max || 5;
+  const fillColor = tone==='brand' ? 'var(--brand)' : 'var(--ink)';
+  let dots = '';
+  for(let i=1;i<=max;i++){
+    dots += `<span class="rate-dot" style="background:${i<=n?fillColor:'#E7E8EB'};"></span>`;
+  }
+  return `<div class="rating-row"><span class="rating-label">${label}</span><div class="rate-dots">${dots}</div><span class="rating-num">${n}/${max}</span></div>`;
+}
+
+function dotRatingCompact(n, tone, max){
+  max = max || 5;
+  const fillColor = tone==='brand' ? 'var(--brand)' : 'var(--ink)';
+  let dots = '';
+  for(let i=1;i<=max;i++){
+    dots += `<span class="rate-dot" style="background:${i<=n?fillColor:'#E7E8EB'};"></span>`;
+  }
+  return `<div class="rate-dots-compact">${dots}<span class="rating-num">${n}/${max}</span></div>`;
+}
+
+function openQueueCardModal(id){
+  const c = clients.find(x=>x.id===id);
+  if(!c) return;
+  const shownImprovements = c.improvements.filter(improvementInDateRange);
+  const status = statusMeta(c.draftStatus);
+  openAppModal(`
+    <div class="modal-head">
+      <div>
+        <div class="q-name">${c.name}</div>
+        <div class="q-service-caption">${c.service}${c.danger>=4 ? ' · <span class="q-risk-flag">At risk</span>' : ''}</div>
+        <div class="q-ratings" style="margin-top:12px;">
+          ${dotRating('Importance', c.importance, 'ink', 10)}
+          ${dotRating('Danger', c.danger, 'brand')}
+        </div>
+      </div>
+      <span class="toast-close" onclick="closeAppModal()">✕</span>
+    </div>
+    <div class="modal-body">
+      <span class="q-status-label" style="color:${status.color};">${status.label}</span>
+      <div class="q-bulk">
+        ${shownImprovements.length ? `<div class="q-bulk-title">Logged this week (${shownImprovements.length})</div><div class="q-bulk-list"><ul>${shownImprovements.map(i=>`<li>${i.text} — <span style="color:#9AA3AF;">${i.author}</span></li>`).join('')}</ul></div>` : `<i>No improvements logged this week — nothing to send.</i>`}
+      </div>
+      ${c.draft ? `<textarea class="draft" id="draft-${c.id}">${c.draft}</textarea>` : ''}
+      ${c.draft && !c.email ? `<span class="warn-text">No client email on file — add one in Clients</span>` : ''}
+    </div>
+    <div class="modal-actions">
+      ${c.improvements.length ? `<button class="btn btn-dark" id="gen-${c.id}" onclick="generateDraft('${c.id}')">${c.draft?'Regenerate with AI':'Generate with AI'}</button>` : ''}
+      ${c.draft ? `<button class="btn btn-brand" onclick="approveDraft('${c.id}')" ${c.draftStatus==='approved'?'disabled':''}>Approve &amp; open email</button>
+      <button class="btn btn-outline" onclick="skipDraft('${c.id}')">Skip this week</button>` : ''}
+      <button class="btn btn-outline" onclick="closeAppModal()">Close</button>
+    </div>`, 560);
+  const card = document.querySelector('#appModalOverlay .modal-card');
+  if(card) card.dataset.clientId = id;
+  const list = document.querySelector('#appModalOverlay .q-bulk-list');
+  if(list && list.scrollHeight > list.clientHeight) list.classList.add('scrollable');
+}
+
+
+async function generateDraft(id){
+  await loadAll();
+  const c = clients.find(x=>x.id===id);
+  if(!c) return;
+  const modalCard = document.querySelector('#appModalOverlay .modal-card');
+  const modalOpenForThis = modalCard && modalCard.dataset.clientId === id;
+  const btn = document.getElementById('gen-'+id);
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Generating…'; }
+  const bullets = c.improvements.map(i=>'- '+i.text).join('\n');
+  const customStructure = (settings.emailInstructions || '').trim();
+  const contentRules = `Content rules that apply no matter what — never overridden by anything above:
+- Describe every improvement as a specific, measurable deliverable — a concrete action taken, a number, a metric, or a defined output. Never state it as a vague, broad claim (e.g. never say "improved performance," "made things better," "optimized the account" with nothing concrete attached).
+- If a logged improvement itself is vague or lacks a concrete detail, do not invent specifics to make it sound more impressive — describe only what was actually logged, worded as precisely as the source allows, and keep it modest rather than embellished.
+- Never say anything that could make the agency look bad: no admitting mistakes, no exposing internal problems, no hedging language that implies something isn't working, no comparisons that read as excuses. State what was done factually and confidently without overstating results.
+- No subject line, no meta-commentary about the email itself — output only the email body.`;
+
+  const prompt = customStructure
+    ? `Write a weekly client update email for a home-services/construction client from their marketing agency (Based Agency).
+
+The agency has specified an exact structure below. Follow it precisely and completely — every element it describes (greeting, paragraph order, sign-off, length, tone) — and do NOT fall back to any generic or default email structure, even partially:
+
+--- REQUIRED STRUCTURE ---
+${customStructure}
+--- END REQUIRED STRUCTURE ---
+
+Client: ${c.name}
+Service: ${c.service}
+Scope notes: ${c.sow || 'n/a'}
+Improvements made this week:
+${bullets}
+
+${contentRules}`
+    : `Write a short, warm, professional weekly update email to a home-services/construction client from their marketing agency (Based Agency).
+Client: ${c.name}
+Service: ${c.service}
+Scope notes: ${c.sow || 'n/a'}
+Improvements made this week:
+${bullets}
+
+Structure: 2-4 short paragraphs max, no fluff or filler compliments, plain language, no subject line, no signature block, sound like a competent account manager not a sales email. End by noting nothing is needed from them unless something explicitly requires their input.
+
+${contentRules}`;
+  try{
+    const response = await fetch("/api/generate-draft", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ prompt })
+    });
+    const data = await response.json();
+    const text = (data.text || '').trim();
+    c.draft = text || 'Could not generate a draft — try again.';
+    c.draftStatus = 'pending';
+    log.unshift({t:nowTime(), tag:'auto', text:`AI drafted the update for <b>${c.name}</b> from ${c.improvements.length} logged improvement${c.improvements.length!==1?'s':''}.`});
+    await persistClients();
+    renderQueue(); renderLog(); renderKpis();
+    if(modalOpenForThis) openQueueCardModal(id);
+    showToast('success','Draft generated', `AI wrote the update for ${c.name}.`);
+  }catch(e){
+    c.draft = 'AI generation failed — you can write the draft manually here.';
+    c.draftStatus = 'pending';
+    await persistClients();
+    renderQueue(); renderLog(); renderKpis();
+    if(modalOpenForThis) openQueueCardModal(id);
+    showToast('error','AI generation failed', 'Write the draft manually below, or try again.');
+  }
+}
+
+async function approveDraft(id){
+  const cNow = clients.find(x=>x.id===id);
+  const ta = document.getElementById('draft-'+id);
+  const draftText = ta ? ta.value : (cNow ? cNow.draft : '');
+  const email = cNow ? cNow.email : '';
+  setBtnLoading(clickedBtn(), 'Approving…');
+
+  await loadAll();
+  const c = clients.find(x=>x.id===id);
+  if(!c) return;
+  if(ta) c.draft = ta.value;
+  c.draftStatus = 'approved';
+  log.unshift({t:nowTime(), tag:'you', text:`Approved <b>${c.name}</b> — email drafted for send.`});
+  const ok = await persistClients();
+  renderQueue(); renderLog(); renderKpis();
+  if(!ok){ showToast('error','Save failed','Approval may not have synced — refresh and check.'); return; }
+  if(email){
+    showMailModal(email, 'Your weekly update from Based Agency', draftText);
+  } else {
+    showToast('info','Approved — no email sent', `${c.name} has no email on file. Add one in Clients to send.`);
+  }
+}
+
+async function skipDraft(id){
+  setBtnLoading(clickedBtn(), 'Skipping…');
+  await loadAll();
+  const c = clients.find(x=>x.id===id);
+  if(!c) return;
+  const modalCard = document.querySelector('#appModalOverlay .modal-card');
+  const modalOpenForThis = modalCard && modalCard.dataset.clientId === id;
+  c.draftStatus='none'; c.draft='';
+  log.unshift({t:nowTime(), tag:'you', text:`Skipped <b>${c.name}</b> this week — no email sent.`});
+  const ok = await persistClients();
+  renderQueue(); renderLog(); renderKpis();
+  if(modalOpenForThis) openQueueCardModal(id);
+  ok ? showToast('info','Skipped', `${c.name} won't get an update this week.`) : showToast('error','Save failed','Could not save — try again.');
+}
+
+async function saveSettingsInline(){
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Saving…');
+  settings.danielEmail = document.getElementById('setDaniel').value.trim();
+  settings.ericEmail = document.getElementById('setEric').value.trim();
+  const ok = await persistSettings();
+  log.unshift({t:nowTime(), tag:'you', text:'Updated approver email addresses.'});
+  await persistLog();
+  renderLog();
+  restoreBtn(btn);
+  ok ? showToast('success','Settings saved','Approver emails updated.') : showToast('error','Save failed','Could not save settings — try again.');
+}
+
+async function saveEmailInstructions(){
+  const text = document.getElementById('emailInstructions').value.trim();
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Saving…');
+  await loadAll();
+  settings.emailInstructions = text;
+  const ok = await persistSettings();
+  document.getElementById('emailInstructions').value = text; // loadAll may have briefly overwritten the field — restore what was actually saved
+  updateEmailInstructionsStatus();
+  log.unshift({t:nowTime(), tag:'you', text:'Updated the AI email structure instructions.'});
+  await persistLog();
+  renderLog();
+  restoreBtn(btn);
+  ok ? showToast('success','Instructions saved','New drafts will follow this structure.') : showToast('error','Save failed','Could not save — try again.');
+}
+
+/* ---------- Google Sheet CSV sync ---------- */
+
+// Minimal but quote-aware CSV parser — handles commas and newlines inside "quoted" cells.
+function parseCsv(text){
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for(let i=0; i<text.length; i++){
+    const ch = text[i], next = text[i+1];
+    if(inQuotes){
+      if(ch === '"' && next === '"'){ field += '"'; i++; }
+      else if(ch === '"'){ inQuotes = false; }
+      else { field += ch; }
+    } else {
+      if(ch === '"'){ inQuotes = true; }
+      else if(ch === ','){ row.push(field); field=''; }
+      else if(ch === '\n'){ row.push(field); rows.push(row); row=[]; field=''; }
+      else if(ch === '\r'){ /* skip */ }
+      else { field += ch; }
+    }
+  }
+  if(field.length || row.length){ row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(cell => cell.trim() !== ''));
+}
+
+const CSV_FIELD_SYNONYMS = {
+  name: ['name','client','client name'],
+  email: ['email','client email','contact email'],
+  service: ['service','services'],
+  status: ['status'],
+  importance: ['importance','importance score'],
+  danger: ['danger','danger score','risk'],
+  sow: ['sow','scope','scope notes','sow / scope notes'],
+};
+
+function mapCsvHeaders(headerRow){
+  const map = {};
+  headerRow.forEach((h, idx) => {
+    const clean = h.trim().toLowerCase();
+    for(const field in CSV_FIELD_SYNONYMS){
+      if(CSV_FIELD_SYNONYMS[field].includes(clean) && map[field]===undefined) map[field] = idx;
+    }
+  });
+  return map;
+}
+
+function clampScore(v, max){
+  max = max || 5;
+  const n = parseInt(v);
+  if(isNaN(n)) return 1;
+  return Math.max(1, Math.min(max, n));
+}
+
+async function applyCsvRows(rows){
+  if(rows.length < 2){ showToast('error','No data found','Need a header row plus at least one client row.'); return; }
+  const map = mapCsvHeaders(rows[0]);
+  if(map.name === undefined){ showToast('error','No "Name" column found','Add a Name column so rows can be matched to clients.'); return; }
+
+  await loadAll();
+  let added = 0, updated = 0;
+  for(let i=1; i<rows.length; i++){
+    const r = rows[i];
+    const name = (r[map.name]||'').trim();
+    if(!name) continue;
+    const fields = {
+      name,
+      email: map.email!==undefined ? (r[map.email]||'').trim() : undefined,
+      service: map.service!==undefined ? (r[map.service]||'').trim() : undefined,
+      status: map.status!==undefined ? (r[map.status]||'').trim() : undefined,
+      importance: map.importance!==undefined ? clampScore(r[map.importance], 10) : undefined,
+      danger: map.danger!==undefined ? clampScore(r[map.danger], 5) : undefined,
+      sow: map.sow!==undefined ? (r[map.sow]||'').trim() : undefined,
+    };
+    Object.keys(fields).forEach(k => fields[k]===undefined && delete fields[k]);
+
+    const existing = clients.find(c => c.name.trim().toLowerCase() === name.toLowerCase());
+    if(existing){
+      Object.assign(existing, fields);
+      updated++;
+    } else {
+      clients.push({
+        id:'c'+Date.now()+Math.floor(Math.random()*1000),
+        name, email:'', service:'Google Ads (PPC)', status:'Active', importance:5, danger:1, sow:'',
+        improvements:[], draft:'', draftStatus:'none',
+        ...fields
+      });
+      added++;
+    }
+  }
+  log.unshift({t:nowTime(), tag:'you', text:`Synced from Google Sheet — ${added} added, ${updated} updated.`});
+  const ok = await persistClients();
+  renderAll();
+  const statusEl = document.getElementById('sheetSyncStatus');
+  if(statusEl) statusEl.textContent = `Last synced ${nowTime()} — ${added} added, ${updated} updated.`;
+  ok ? showToast('success','Sheet synced', `${added} client${added!==1?'s':''} added, ${updated} updated.`) : showToast('error','Sync partially failed','Data was read but saving failed — try again.');
+}
+
+async function syncFromSheetUrl(){
+  const url = document.getElementById('sheetCsvUrl').value.trim();
+  if(!url){ showToast('error','No link set','Paste a published CSV link first.'); return; }
+  const statusEl = document.getElementById('sheetSyncStatus');
+  if(statusEl) statusEl.textContent = 'Syncing…';
+  try{
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('Fetch failed: ' + res.status);
+    const text = await res.text();
+    const rows = parseCsv(text);
+    await applyCsvRows(rows);
+  }catch(e){
+    if(statusEl) statusEl.textContent = '';
+    showToast('error','Could not fetch the sheet', 'Check the link is a published CSV link (not a normal edit link), or use the paste option below instead.');
+  }
+}
+
+async function saveAndSyncSheet(){
+  settings.sheetCsvUrl = document.getElementById('sheetCsvUrl').value.trim();
+  const ok = await persistSettings();
+  if(!ok){ showToast('error','Save failed','Could not save the link — try again.'); return; }
+  await syncFromSheetUrl();
+}
+
+async function importPastedCsv(){
+  const text = document.getElementById('csvPasteArea').value;
+  if(!text.trim()){ showToast('error','Nothing pasted','Paste CSV or copied sheet cells first.'); return; }
+  const rows = parseCsv(text);
+  await applyCsvRows(rows);
+}
+
+function csvEscape(val){
+  const s = String(val ?? '');
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+}
+
+function exportRosterCsv(){
+  if(!clients.length){ showToast('info','Nothing to export','The roster is empty.'); return; }
+  const headers = ['Name','Email','Service','Status','Importance','Danger','SOW'];
+  const lines = [headers.join(',')];
+  clients.forEach(c => {
+    lines.push([c.name,c.email,c.service,c.status,c.importance,c.danger,c.sow].map(csvEscape).join(','));
+  });
+  const csvText = lines.join('\n');
+  const blob = new Blob([csvText], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'based-agency-clients.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToastWithCopy('success','Roster exported', 'Downloaded as a CSV. If the download didn\'t work, copy the raw data below.', csvText);
+}
+
+function notifyApprovers(){
+  const pending = clients.filter(c=>c.draftStatus==='pending');
+  const to = [settings.danielEmail, settings.ericEmail].filter(Boolean).join(',');
+  if(!to){ showToast('error',"Missing approver emails","Add Daniel's and Eric's email addresses in Settings first."); return; }
+  const subject = `${pending.length} client update${pending.length!==1?'s':''} ready for approval`;
+  const bodyLines = pending.length ? pending.map(c=>`- ${c.name} (danger ${c.danger}/5, importance ${c.importance}/10)`).join('\n') : 'No drafts are ready yet.';
+  const body = `This week's client update drafts are ready for review, sorted by danger score:\n\n${bodyLines}\n\nReview and approve here: ${window.location.href}`;
+  log.unshift({t:nowTime(), tag:'you', text:`Opened notification email to Daniel &amp; Eric — ${pending.length} draft${pending.length!==1?'s':''} pending.`});
+  persistLog().then(renderLog);
+  showMailModal(to, subject, body);
+}
+
+async function inviteTeamMember(){
+  const name = document.getElementById('tmName').value.trim();
+  const email = document.getElementById('tmEmail').value.trim();
+  if(!email){ showToast('error','Email required','Enter an email address to invite.'); return; }
+
+  const link = window.location.href;
+  const subject = "You're invited — Based Agency Client Update Workflow";
+  const body = `Hi${name?' '+name:''},\n\nYou've been added to the weekly client update workflow. Bookmark this link — it's the shared dashboard for logging improvements and reviewing approvals:\n\n${link}\n\nNo login needed, just open the link.`;
+  showMailModal(email, subject, body);
+
+  await loadAll();
+  if(team.some(m=>m.email.toLowerCase()===email.toLowerCase())){
+    showToast('info','Already invited', `${email} was already on the team list — resent the email anyway.`);
+  } else {
+    team.push({name: name || email, email, invitedAt: nowTime()});
+    const ok = await persistTeam();
+    if(!ok){ showToast('error','Save failed','Invite email opened, but saving to the team list failed — try again.'); }
+    else {
+      log.unshift({t:nowTime(), tag:'you', text:`Invited <b>${name || email}</b> to the workflow.`});
+      await persistLog();
+    }
+  }
+  document.getElementById('tmName').value=''; document.getElementById('tmEmail').value='';
+  renderTeam(); renderLog();
+}
+
+function renderTeam(){
+  const el = document.getElementById('teamList');
+  if(!el) return;
+  if(!team.length){ el.innerHTML = `<div class="empty" style="padding:14px 0;">No team members invited yet.</div>`; return; }
+  el.innerHTML = team.map(m=>`
+    <div class="integ-row">
+      <div><div class="integ-name">${m.name}</div><div class="integ-desc">${m.email}</div></div>
+      <span class="row-link" onclick="resendInvite('${m.email}','${m.name.replace(/'/g,"\\'")}')">Resend invite</span>
+    </div>
+  `).join('');
+}
+
+function resendInvite(email, name){
+  const link = window.location.href;
+  const subject = "You're invited — Based Agency Client Update Workflow";
+  const body = `Hi${name?' '+name:''},\n\nReminder: here's the shared client update dashboard:\n\n${link}\n\nNo login needed, just open the link.`;
+  showMailModal(email, subject, body);
+}
+
+function nowTime(){ return new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
+
+function renderLog(){
+  const rows = log.length ? log.map(l=>`<div class="log-row"><span class="log-time">${l.t}</span><span><span class="tag ${l.tag}">${l.tag==='auto'?'auto':'you'}</span>${l.text}</span></div>`).join('') : `<div class="empty">No activity yet.</div>`;
+  const logListEl = document.getElementById('logList');
+  if(logListEl) logListEl.innerHTML = rows;
+  document.getElementById('logListOverview').innerHTML = rows;
+  document.getElementById('logCountOverview').textContent = log.length ? `${log.length} event${log.length!==1?'s':''}` : '';
+}
+
+function pad2(n){ return String(n).padStart(2,'0'); }
+
+function renderGauge(){
+  const now = new Date();
+  const day = now.getDay();
+  const monday = new Date(now); monday.setDate(now.getDate() - ((day+6)%7)); monday.setHours(17,0,0,0);
+  const wed = new Date(monday); wed.setDate(monday.getDate()+2); wed.setHours(9,0,0,0);
+  let start = monday, end = wed;
+  if(now > end){ start = new Date(end); end = new Date(end); end.setDate(end.getDate()+7); }
+  const total = end-start; const elapsed = Math.min(Math.max(now-start,0), total);
+  const pct = total>0 ? elapsed/total*100 : 0;
+
+  const msLeft = Math.max(0, end-now);
+  const days = Math.floor(msLeft/86400000);
+  const hrs = Math.floor((msLeft%86400000)/3600000);
+  const mins = Math.floor((msLeft%3600000)/60000);
+  const secs = Math.floor((msLeft%60000)/1000);
+  const isCrit = msLeft < 6*3600000; // under 6 hours left
+  const caption = isCrit ? 'Auto-notification firing soon' : 'Until Daniel & Eric are notified';
+
+  document.querySelectorAll('.gauge-fill').forEach(e=> e.style.width = pct+'%');
+  document.querySelectorAll('.gauge-ring').forEach(e=>{
+    const c = 2*Math.PI*8;
+    e.style.strokeDasharray = c;
+    e.style.strokeDashoffset = c*(1-pct/100);
+  });
+  document.querySelectorAll('.gauge-d').forEach(e=> e.textContent = pad2(days));
+  document.querySelectorAll('.gauge-h').forEach(e=> e.textContent = pad2(hrs));
+  document.querySelectorAll('.gauge-m').forEach(e=> e.textContent = pad2(mins));
+  document.querySelectorAll('.gauge-s').forEach(e=> e.textContent = pad2(secs));
+  document.querySelectorAll('.gauge-caption').forEach(e=> { e.textContent = caption; e.classList.toggle('crit', isCrit); });
+  document.querySelectorAll('.gauge-row').forEach(e=> e.classList.toggle('crit', isCrit));
+}
+
+(async function init(){
+  await initTheme();
+  await loadAll();
+  await initMyName();
+  renderAll();
+  setInterval(renderGauge, 1000);
+  setInterval(fullRefresh, 20000);
+})();
+</script>
+</body>
+</html>
