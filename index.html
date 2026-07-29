@@ -42,7 +42,7 @@
   /* Sidebar */
   .sidebar{background:var(--sidebar);color:#C9D2E3;padding:18px 12px;display:flex;flex-direction:column;}
   .brand{display:flex;align-items:center;gap:9px;padding:6px 10px 20px;}
-  .brand-mark{width:26px;height:26px;border-radius:6px;background:var(--brand);display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;font-weight:700;font-size:13px;color:#2A1200;flex:none;}
+  .brand-mark{width:26px;height:26px;border-radius:6px;background:var(--brand);display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;font-weight:700;font-size:13px;color:#2A1200;flex:none;overflow:hidden;}
   .brand-name{font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:#fff;}
   .brand-sub{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted-lt);letter-spacing:.06em;}
   nav{display:flex;flex-direction:column;gap:2px;margin-top:6px;}
@@ -1723,7 +1723,7 @@ function applyAppIcon(){
   const preview = document.getElementById('iconPreview');
   const removeBtn = document.getElementById('removeIconBtn');
   if(settings.appIcon){
-    const imgHtml = `<img src="${settings.appIcon}" alt="App icon">`;
+    const imgHtml = `<img src="${settings.appIcon}" alt="App icon" style="width:100%;height:100%;object-fit:cover;display:block;">`;
     if(preview) preview.innerHTML = imgHtml;
     if(removeBtn) removeBtn.style.display = 'inline-block';
     document.querySelectorAll('.brand-mark').forEach(el=>{ el.innerHTML = imgHtml; });
