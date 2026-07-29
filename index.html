@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <title>Based Agency — Client Update Workflow</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -53,6 +55,13 @@
   .sidebar-foot{margin-top:auto;padding:12px 11px;border-top:1px solid #24365E;font-size:11px;color:var(--muted-lt);line-height:1.5;}
   .theme-toggle{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:#C9D2E3;cursor:pointer;padding:8px 9px;border-radius:6px;}
   .theme-toggle:hover{background:var(--sidebar-hover);}
+  .sidebar-profile{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 9px;margin-bottom:4px;}
+  .sidebar-profile-name{font-size:12.5px;font-weight:600;color:#fff;}
+  .sidebar-profile-role{font-family:'IBM Plex Mono',monospace;font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-lt);margin-top:2px;}
+  .sidebar-logout-btn{background:none;border:1px solid #24365E;color:var(--muted-lt);border-radius:6px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;transition:border-color .15s ease, color .15s ease;}
+  .sidebar-logout-btn:hover{border-color:var(--brand);color:var(--brand);}
+  .icon-preview{width:56px;height:56px;border-radius:12px;background:var(--sidebar);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;font-weight:700;font-size:18px;overflow:hidden;flex:none;}
+  .icon-preview img{width:100%;height:100%;object-fit:cover;}
 
   /* Main */
   .main{padding:22px 28px 60px;}
@@ -313,6 +322,15 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
     </nav>
     <div class="sidebar-foot">
+      <div class="sidebar-profile">
+        <div class="sidebar-profile-info">
+          <div class="sidebar-profile-name" id="sidebarProfileName">—</div>
+          <div class="sidebar-profile-role" id="sidebarProfileRole"></div>
+        </div>
+        <button class="sidebar-logout-btn" onclick="handleLogout()" title="Log out">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
       <div class="theme-toggle" onclick="toggleTheme()">
         <span id="themeIcon">☀</span> <span id="themeLabel">Light mode</span>
       </div>
@@ -475,6 +493,21 @@ document.addEventListener('DOMContentLoaded', function(){
 
       <!-- GENERAL -->
       <div class="settings-subview active" id="stab-general">
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">App Icon</span></div>
+          <div class="panel-body">
+            <div style="display:flex;align-items:center;gap:16px;">
+              <div class="icon-preview" id="iconPreview">BA</div>
+              <div>
+                <input type="file" id="iconFileInput" accept="image/*" style="display:none;" onchange="onIconFileSelected(event)">
+                <button class="btn btn-outline" onclick="document.getElementById('iconFileInput').click()">Upload image</button>
+                <button class="btn btn-outline" id="removeIconBtn" style="display:none;margin-left:8px;" onclick="removeAppIcon()">Remove</button>
+              </div>
+            </div>
+            <p style="font-size:11.5px;color:var(--muted-lt);margin-top:12px;line-height:1.5;">Any image works — you'll crop it to a square next. Replaces the "BA" mark in the sidebar and the browser tab icon for everyone.</p>
+          </div>
+        </div>
+
         <div class="panel">
           <div class="panel-head"><span class="panel-title">Your Name</span></div>
           <div class="panel-body">
@@ -695,8 +728,18 @@ function renderWhoAmI(){
   document.querySelectorAll('.who-am-i').forEach(el=>{
     if(!myProfile){ el.innerHTML = ''; return; }
     const roleLabel = myProfile.role==='admin' ? 'Admin' : myProfile.role==='approver' ? 'Approver' : 'Team member';
-    el.innerHTML = `Logging as <b>${myProfile.name}</b> <span class="role-chip">${roleLabel}</span> — <span class="row-link" onclick="handleLogout()">Log out</span>`;
+    el.innerHTML = `Logging as <b>${myProfile.name}</b> <span class="role-chip">${roleLabel}</span>`;
   });
+  const nameEl = document.getElementById('sidebarProfileName');
+  const roleEl = document.getElementById('sidebarProfileRole');
+  if(nameEl && roleEl){
+    if(myProfile){
+      nameEl.textContent = myProfile.name;
+      roleEl.textContent = myProfile.role;
+    } else {
+      nameEl.textContent = '—'; roleEl.textContent = '';
+    }
+  }
 }
 
 async function handleLogout(){
@@ -1620,6 +1663,80 @@ async function skipDraft(id){
   ok ? showToast('info','Skipped', `${c.name} won't get an update this week.`) : showToast('error','Save failed','Could not save — try again.');
 }
 
+/* ---------- App icon: upload, crop, save ---------- */
+let cropperInstance = null;
+
+function onIconFileSelected(e){
+  const file = e.target.files[0];
+  e.target.value = ''; // reset so picking the same file again still fires onchange
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt){
+    openAppModal(`
+      <div class="modal-head"><span class="panel-title">Crop your icon</span><span class="toast-close" onclick="closeCropModal()">✕</span></div>
+      <div class="modal-body">
+        <div style="max-height:360px;overflow:hidden;background:#000;"><img id="cropImage" src="${evt.target.result}" style="max-width:100%;display:block;"></div>
+        <p style="font-size:11.5px;color:var(--muted-lt);margin:0;">Drag to reposition, scroll or pinch to zoom.</p>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-brand" onclick="saveAppIcon()">Save icon</button>
+        <button class="btn btn-outline" onclick="closeCropModal()">Cancel</button>
+      </div>`, 480);
+    setTimeout(()=>{
+      const imgEl = document.getElementById('cropImage');
+      if(imgEl && window.Cropper){
+        cropperInstance = new Cropper(imgEl, { aspectRatio: 1, viewMode: 1, background: false, autoCropArea: 1 });
+      }
+    }, 50);
+  };
+  reader.readAsDataURL(file);
+}
+
+function closeCropModal(){
+  if(cropperInstance){ cropperInstance.destroy(); cropperInstance = null; }
+  closeAppModal();
+}
+
+async function saveAppIcon(){
+  if(!cropperInstance){ showToast('error','Nothing to save','Try uploading the image again.'); return; }
+  const canvas = cropperInstance.getCroppedCanvas({ width: 256, height: 256 });
+  const dataUrl = canvas.toDataURL('image/png', 0.9);
+  cropperInstance.destroy(); cropperInstance = null;
+  closeAppModal();
+  await loadAll();
+  settings.appIcon = dataUrl;
+  const ok = await persistSettings();
+  applyAppIcon();
+  ok ? showToast('success','Icon saved','Your new app icon is live for everyone.') : showToast('error','Save failed','Could not save — try again.');
+}
+
+async function removeAppIcon(){
+  if(!confirm('Remove the custom app icon and go back to the default "BA" mark?')) return;
+  await loadAll();
+  delete settings.appIcon;
+  const ok = await persistSettings();
+  applyAppIcon();
+  ok ? showToast('success','Icon removed','Back to the default.') : showToast('error','Save failed','Could not save — try again.');
+}
+
+function applyAppIcon(){
+  const preview = document.getElementById('iconPreview');
+  const removeBtn = document.getElementById('removeIconBtn');
+  if(settings.appIcon){
+    const imgHtml = `<img src="${settings.appIcon}" alt="App icon">`;
+    if(preview) preview.innerHTML = imgHtml;
+    if(removeBtn) removeBtn.style.display = 'inline-block';
+    document.querySelectorAll('.brand-mark').forEach(el=>{ el.innerHTML = imgHtml; });
+    let favicon = document.querySelector('link[rel="icon"]');
+    if(!favicon){ favicon = document.createElement('link'); favicon.rel = 'icon'; document.head.appendChild(favicon); }
+    favicon.href = settings.appIcon;
+  } else {
+    if(preview) preview.textContent = 'BA';
+    if(removeBtn) removeBtn.style.display = 'none';
+    document.querySelectorAll('.brand-mark').forEach(el=>{ el.textContent = 'BA'; });
+  }
+}
+
 async function saveSettingsInline(){
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
@@ -1962,6 +2079,7 @@ async function showApp(session){
   await loadAll();
   await loadTeamProfiles();
   renderAll();
+  applyAppIcon();
 }
 
 (async function init(){
