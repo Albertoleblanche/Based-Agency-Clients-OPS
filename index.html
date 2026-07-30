@@ -726,7 +726,8 @@ document.addEventListener('DOMContentLoaded', function(){
             <div class="panel-body">
               <div class="timer-display" id="timerDisplay">00:00:00</div>
               <div class="form-grid" style="margin-bottom:14px;">
-                <div style="grid-column:1/-1;"><label>Client</label><select id="timerClient"></select></div>
+                <div><label>Client</label><select id="timerClient"></select></div>
+                <div><label>Service</label><select id="timerService"></select></div>
                 <div style="grid-column:1/-1;"><label>What are you working on?</label><input id="timerDesc" placeholder="e.g. Updating Meta ad creative"></div>
               </div>
               <button class="btn btn-brand" id="timerToggleBtn" onclick="toggleTimer()">Start timer</button>
@@ -737,7 +738,8 @@ document.addEventListener('DOMContentLoaded', function(){
             <div class="panel-head"><span class="panel-title">Add time manually</span></div>
             <div class="panel-body">
               <div class="form-grid">
-                <div style="grid-column:1/-1;"><label>Client</label><select id="manualClient"></select></div>
+                <div><label>Client</label><select id="manualClient"></select></div>
+                <div><label>Service</label><select id="manualService"></select></div>
                 <div><label>Date</label><input type="date" id="manualDate"></div>
                 <div><label>Hours</label><input type="number" id="manualHours" min="0.05" max="24" step="0.25" placeholder="1.5"></div>
                 <div style="grid-column:1/-1;"><label>Description</label><input id="manualDesc" placeholder="What did you work on?"></div>
@@ -2006,7 +2008,7 @@ function updateNotesBadge(){
 
 /* ---------- Time Tracker ---------- */
 let timeEntries = [];
-let timerState = { running:false, startedAt:null, clientId:'', description:'' };
+let timerState = { running:false, startedAt:null, clientId:'', service:'', description:'', resumeEntryId:null };
 let timerIntervalId = null;
 let timesheetMode = 'day';
 let timesheetAnchor = new Date();
@@ -2026,7 +2028,7 @@ function formatMinutes(mins){
 async function loadTimeEntries(){
   const { data, error } = await supabaseClient.from('time_entries').select('*').order('entry_date', { ascending:false });
   if(error){ console.error('loadTimeEntries error', error); timeEntries = []; return; }
-  timeEntries = (data||[]).map(e=>({ id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes, description:e.description||'', createdAt:e.created_at }));
+  timeEntries = (data||[]).map(e=>({ id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes, description:e.description||'', service:e.service||'', createdAt:e.created_at }));
 }
 
 function populateTimeClientSelects(){
@@ -2047,6 +2049,35 @@ function populateTimeClientSelects(){
   }
   const dateInput = document.getElementById('manualDate');
   if(dateInput && !dateInput.value) dateInput.value = toDateStr(new Date());
+
+  // Service dropdowns — same option list as the Clients table's Service field.
+  const serviceOpts = (settings.serviceOptions||[]).map(s=>`<option value="${s.replace(/"/g,'&quot;')}">${s}</option>`).join('');
+  ['timerService','manualService'].forEach(id=>{
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    const current = sel.value;
+    sel.innerHTML = serviceOpts || `<option value="">No services set up</option>`;
+    if([...sel.options].some(o=>o.value===current)) sel.value = current;
+  });
+
+  wireServiceAutoSuggest('timerClient', 'timerService');
+  wireServiceAutoSuggest('manualClient', 'manualService');
+}
+
+// When a client is picked, auto-select that client's own service — still
+// freely changeable afterward, in case time was logged against a different
+// service than the client's default.
+function wireServiceAutoSuggest(clientSelId, serviceSelId){
+  const clientSel = document.getElementById(clientSelId);
+  const serviceSel = document.getElementById(serviceSelId);
+  if(!clientSel || !serviceSel || clientSel.dataset.serviceLinked) return;
+  clientSel.dataset.serviceLinked = '1';
+  clientSel.addEventListener('change', ()=>{
+    const c = clients.find(x=>x.id===clientSel.value);
+    if(c && c.service && [...serviceSel.options].some(o=>o.value===c.service)){
+      serviceSel.value = c.service;
+    }
+  });
 }
 
 function switchTimeTab(name){
@@ -2100,7 +2131,7 @@ function initTimerFromStorage(){
     if(raw) timerState = JSON.parse(raw);
   }catch(e){}
   if(timerState.running && timerState.startedAt && (Date.now() - timerState.startedAt > 12*3600*1000)){
-    timerState = { running:false, startedAt:null, clientId:'', description:'' };
+    timerState = { running:false, startedAt:null, clientId:'', service:'', description:'', resumeEntryId:null };
     saveTimerState();
   }
   if(timerState.running){
@@ -2110,6 +2141,8 @@ function initTimerFromStorage(){
     if(btn){ btn.textContent = 'Stop & save'; btn.classList.add('stop'); }
     const clientSel = document.getElementById('timerClient');
     if(clientSel) clientSel.value = timerState.clientId;
+    const serviceSel = document.getElementById('timerService');
+    if(serviceSel) serviceSel.value = timerState.service || '';
     const descInput = document.getElementById('timerDesc');
     if(descInput) descInput.value = timerState.description;
   }
@@ -2120,7 +2153,8 @@ function toggleTimer(){
   if(!timerState.running){
     const clientId = document.getElementById('timerClient').value;
     if(!clientId){ showToast('error','Pick a client',"Select which client you're working on."); return; }
-    timerState = { running:true, startedAt:Date.now(), clientId, description: document.getElementById('timerDesc').value.trim() };
+    const service = document.getElementById('timerService')?.value || '';
+    timerState = { running:true, startedAt:Date.now(), clientId, service, description: document.getElementById('timerDesc').value.trim(), resumeEntryId:null };
     saveTimerState();
     timerIntervalId = setInterval(updateTimerDisplay, 1000);
     updateTimerDisplay();
@@ -2137,8 +2171,10 @@ async function stopAndSaveTimer(){
   const elapsedMs = Date.now() - timerState.startedAt;
   const minutes = Math.max(1, Math.round(elapsedMs/60000));
   const clientId = timerState.clientId;
+  const service = timerState.service || '';
   const description = timerState.description;
-  timerState = { running:false, startedAt:null, clientId:'', description:'' };
+  const resumeEntryId = timerState.resumeEntryId;
+  timerState = { running:false, startedAt:null, clientId:'', service:'', description:'', resumeEntryId:null };
   saveTimerState();
   const btn = document.getElementById('timerToggleBtn');
   if(btn){ btn.textContent = 'Start timer'; btn.classList.remove('stop'); }
@@ -2146,18 +2182,43 @@ async function stopAndSaveTimer(){
   const descInput = document.getElementById('timerDesc');
   if(descInput) descInput.value = '';
 
-  const { error } = await supabaseClient.from('time_entries').insert({
-    user_id: currentUser.id, client_id: clientId, entry_date: toDateStr(new Date()), minutes, description
-  });
+  const c = clients.find(x=>x.id===clientId);
+  let error, mergedIntoExisting = false;
+
+  if(resumeEntryId){
+    // Re-fetch the current minutes fresh (not from local cache) so we don't
+    // clobber a value someone else may have changed in the meantime.
+    const { data: existing, error: fetchErr } = await supabaseClient
+      .from('time_entries').select('minutes').eq('id', resumeEntryId).maybeSingle();
+    if(existing){
+      const newTotal = existing.minutes + minutes;
+      ({ error } = await supabaseClient.from('time_entries').update({ minutes: newTotal }).eq('id', resumeEntryId));
+      mergedIntoExisting = !error;
+    } else {
+      // Original entry is gone (deleted elsewhere) — fall back to a new entry
+      // rather than silently losing the tracked time.
+      ({ error } = await supabaseClient.from('time_entries').insert({
+        user_id: currentUser.id, client_id: clientId, entry_date: toDateStr(new Date()), minutes, description, service
+      }));
+    }
+  } else {
+    ({ error } = await supabaseClient.from('time_entries').insert({
+      user_id: currentUser.id, client_id: clientId, entry_date: toDateStr(new Date()), minutes, description, service
+    }));
+  }
+
   await loadTimeEntries();
   renderTimesheet(); renderReports();
-  const c = clients.find(x=>x.id===clientId);
-  error ? showToast('error','Save failed', error.message) : showToast('success','Time logged', `${formatMinutes(minutes)} logged for ${c?c.name:'client'}.`);
+  if(error){ showToast('error','Save failed', error.message); return; }
+  mergedIntoExisting
+    ? showToast('success','Time added', `${formatMinutes(minutes)} added to the existing entry for ${c?c.name:'client'}.`)
+    : showToast('success','Time logged', `${formatMinutes(minutes)} logged for ${c?c.name:'client'}.`);
 }
 
 /* --- Manual entry --- */
 async function addManualEntry(){
   const clientId = document.getElementById('manualClient').value;
+  const service = document.getElementById('manualService')?.value || '';
   const dateVal = document.getElementById('manualDate').value;
   const hours = parseFloat(document.getElementById('manualHours').value);
   const description = document.getElementById('manualDesc').value.trim();
@@ -2167,7 +2228,7 @@ async function addManualEntry(){
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
   const { error } = await supabaseClient.from('time_entries').insert({
-    user_id: currentUser.id, client_id: clientId, entry_date: dateVal, minutes: Math.round(hours*60), description
+    user_id: currentUser.id, client_id: clientId, entry_date: dateVal, minutes: Math.round(hours*60), description, service
   });
   restoreBtn(btn);
   await loadTimeEntries();
@@ -2266,12 +2327,12 @@ function renderTimesheetDay(bodyEl){
     const canEdit = currentUser && (e.userId===currentUser.id || isAdmin());
     return `<div class="ts-entry-card">
       <div class="ts-entry-info">
-        <div class="ts-entry-title">${c ? c.name : 'Unknown client'} ${c && c.service ? `<span class="ts-entry-service">(${c.service})</span>` : ''}</div>
+        <div class="ts-entry-title">${c ? c.name : 'Unknown client'} ${(e.service || (c && c.service)) ? `<span class="ts-entry-service">(${e.service || c.service})</span>` : ''}</div>
         ${e.description ? `<div class="ts-entry-desc">${e.description}</div>` : ''}
       </div>
       <div class="ts-entry-right">
         <div class="ts-entry-duration">${formatMinutes(e.minutes)}</div>
-        <button class="btn btn-outline" data-resume-client="${e.clientId}" data-resume-desc="${encodeURIComponent(e.description||'')}" onclick="resumeEntryTimerFromBtn(this)">▶ Start</button>
+        <button class="btn btn-outline" data-resume-client="${e.clientId}" data-resume-desc="${encodeURIComponent(e.description||'')}" data-resume-entry="${e.id}" onclick="resumeEntryTimerFromBtn(this)">▶ Start</button>
         ${canEdit ? `<button class="btn btn-outline" onclick="openTimeEntryModal('${e.id}')">Edit</button><button class="btn btn-outline" style="color:var(--red);" onclick="deleteTimeEntry('${e.id}')">Delete</button>` : ''}
       </div>
     </div>`;
@@ -2343,15 +2404,16 @@ function jumpToDateClient(dStr, clientId){
 function resumeEntryTimerFromBtn(btn){
   const clientId = btn.dataset.resumeClient;
   const description = decodeURIComponent(btn.dataset.resumeDesc || '');
-  resumeEntryTimer(clientId, description);
+  const entryId = btn.dataset.resumeEntry || null;
+  resumeEntryTimer(clientId, description, entryId);
 }
 
-function resumeEntryTimer(clientId, description){
+function resumeEntryTimer(clientId, description, entryId){
   // Recover from a stuck "running" state (e.g. left over from a bug or a
   // browser tab that never got the stop event) — anything over 12 hours old
   // is clearly not a real in-progress session.
   if(timerState.running && timerState.startedAt && (Date.now() - timerState.startedAt > 12*3600*1000)){
-    timerState = { running:false, startedAt:null, clientId:'', description:'' };
+    timerState = { running:false, startedAt:null, clientId:'', service:'', description:'', resumeEntryId:null };
     saveTimerState();
   }
   if(timerState.running){ showToast('error','Timer already running','Stop the current timer before starting another.'); return; }
@@ -2379,16 +2441,25 @@ function resumeEntryTimer(clientId, description){
     return;
   }
   toggleTimer();
+  // toggleTimer() just replaced timerState wholesale, so tag it with the
+  // entry we're resuming AFTER that call, not before.
+  if(timerState.running){
+    timerState.resumeEntryId = entryId || null;
+    saveTimerState();
+    showToast('info','Resuming', 'Time will be added to this existing entry when you stop.');
+  }
 }
 
 function openTimeEntryModal(id){
   const e = timeEntries.find(x=>x.id===id);
   if(!e) return;
   const clientOptions = clients.map(c=>`<option value="${c.id}" ${e.clientId===c.id?'selected':''}>${c.name}</option>`).join('');
+  const serviceOptions = `<option value="">No service set</option>` + (settings.serviceOptions||[]).map(s=>`<option value="${s.replace(/"/g,'&quot;')}" ${e.service===s?'selected':''}>${s}</option>`).join('');
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Edit time entry</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
       <div class="settings-field"><label>Client</label><select id="editEntryClient" style="width:100%;">${clientOptions}</select></div>
+      <div class="settings-field"><label>Service</label><select id="editEntryService" style="width:100%;">${serviceOptions}</select></div>
       <div class="settings-field"><label>Date</label><input type="date" id="editEntryDate" value="${e.date}" style="width:100%;"></div>
       <div class="settings-field"><label>Hours</label><input type="number" id="editEntryHours" min="0.05" max="24" step="0.25" value="${(e.minutes/60).toFixed(2)}" style="width:100%;"></div>
       <div class="settings-field"><label>Description</label><input id="editEntryDesc" value="${(e.description||'').replace(/"/g,'&quot;')}" style="width:100%;"></div>
@@ -2401,6 +2472,7 @@ function openTimeEntryModal(id){
 
 async function saveTimeEntryEdit(id){
   const clientId = document.getElementById('editEntryClient').value;
+  const service = document.getElementById('editEntryService')?.value || '';
   const dateVal = document.getElementById('editEntryDate').value;
   const hours = parseFloat(document.getElementById('editEntryHours').value);
   const description = document.getElementById('editEntryDesc').value.trim();
@@ -2408,7 +2480,7 @@ async function saveTimeEntryEdit(id){
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
   const { error } = await supabaseClient.from('time_entries').update({
-    client_id: clientId, entry_date: dateVal, minutes: Math.round(hours*60), description
+    client_id: clientId, entry_date: dateVal, minutes: Math.round(hours*60), description, service
   }).eq('id', id);
   restoreBtn(btn);
   closeAppModal();
@@ -2494,7 +2566,7 @@ function renderReports(){
   } else if(reportTab==='services'){
     relevant.forEach(e=>{
       const c = clients.find(x=>x.id===e.clientId);
-      const svc = c ? c.service : 'Unknown service';
+      const svc = e.service || (c ? c.service : '') || 'No service set';
       grouped[svc] = (grouped[svc]||0) + e.minutes;
     });
     getLabel = (key)=> key;
