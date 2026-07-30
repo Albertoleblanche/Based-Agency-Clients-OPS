@@ -316,6 +316,9 @@
   .report-name-link{color:var(--brand);font-weight:600;font-size:13px;cursor:pointer;}
   .report-name-link:hover{text-decoration:underline;}
   .report-hours-val{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:13px;}
+  .report-client-scores{display:flex;gap:10px;margin-top:4px;}
+  .report-client-scores .rate-dots-compact{gap:3px;}
+  .report-client-scores .rate-dot{width:4px;height:4px;}
   .q-card{border:1px solid #EDEEF1;border-radius:8px;padding:22px 24px;background:var(--card);box-shadow:0 1px 2px rgba(16,24,40,.03);transition:box-shadow .18s ease, border-color .18s ease, transform .18s ease;cursor:pointer;}
   .q-card:hover{box-shadow:0 10px 28px rgba(16,24,40,.08);border-color:#DDE0E5;transform:translateY(-2px);}
   .q-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;}
@@ -803,11 +806,22 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="clients-filter-bar" style="margin-bottom:16px;">
           <div class="select-field" style="min-width:150px;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            <select id="reportRange" onchange="renderReports()">
+            <select id="reportRange" onchange="onReportRangeChange()">
               <option value="week">This week</option>
               <option value="month">This month</option>
               <option value="all">All time</option>
+              <option value="custom">Custom range…</option>
             </select>
+          </div>
+          <div class="date-nav" id="reportCustomRange" style="display:none;">
+            <div class="date-nav-label" style="border-left:none;" onclick="document.getElementById('reportFromDate').showPicker ? document.getElementById('reportFromDate').showPicker() : document.getElementById('reportFromDate').focus()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <input type="date" id="reportFromDate" onchange="renderReports()" style="border:none;background:transparent;font-family:'Inter',sans-serif;font-size:13px;color:var(--ink);">
+            </div>
+            <span style="padding:0 4px;color:var(--muted-lt);font-size:11.5px;">to</span>
+            <div class="date-nav-label" style="border-right:none;" onclick="document.getElementById('reportToDate').showPicker ? document.getElementById('reportToDate').showPicker() : document.getElementById('reportToDate').focus()">
+              <input type="date" id="reportToDate" onchange="renderReports()" style="border:none;background:transparent;font-family:'Inter',sans-serif;font-size:13px;color:var(--ink);">
+            </div>
           </div>
           <label class="report-checkbox-label">
             <input type="checkbox" id="reportActiveOnly" onchange="renderReports()"> Active clients only
@@ -2589,17 +2603,43 @@ function switchReportTab(name){
   renderReports();
 }
 
-function getReportRangeEntries(){
+function onReportRangeChange(){
+  const range = document.getElementById('reportRange').value;
+  const customEl = document.getElementById('reportCustomRange');
+  if(customEl) customEl.style.display = range==='custom' ? 'flex' : 'none';
+  if(range==='custom'){
+    const fromEl = document.getElementById('reportFromDate');
+    const toEl = document.getElementById('reportToDate');
+    if(fromEl && !fromEl.value){ const d=getWeekStart(new Date()); fromEl.value = toDateStr(d); }
+    if(toEl && !toEl.value){ toEl.value = toDateStr(new Date()); }
+  }
+  renderReports();
+}
+
+function getReportDateBounds(){
   const range = document.getElementById('reportRange')?.value || 'week';
-  const activeOnly = document.getElementById('reportActiveOnly')?.checked;
   const now = new Date();
-  let start;
-  if(range==='week'){ start = getWeekStart(now); }
-  else if(range==='month'){ start = new Date(now.getFullYear(), now.getMonth(), 1); }
-  else { start = new Date(2000,0,1); }
+  if(range==='week') return { start:getWeekStart(now), end:null };
+  if(range==='month') return { start:new Date(now.getFullYear(), now.getMonth(), 1), end:null };
+  if(range==='custom'){
+    const fromVal = document.getElementById('reportFromDate')?.value;
+    const toVal = document.getElementById('reportToDate')?.value;
+    return {
+      start: fromVal ? new Date(fromVal+'T00:00:00') : new Date(2000,0,1),
+      end: toVal ? new Date(toVal+'T23:59:59') : null
+    };
+  }
+  return { start:new Date(2000,0,1), end:null };
+}
+
+function getReportRangeEntries(){
+  const { start, end } = getReportDateBounds();
+  const activeOnly = document.getElementById('reportActiveOnly')?.checked;
 
   return timeEntries.filter(e=>{
-    if(new Date(e.date+'T00:00:00') < start) return false;
+    const d = new Date(e.date+'T00:00:00');
+    if(d < start) return false;
+    if(end && d > end) return false;
     if(activeOnly){
       const c = clients.find(x=>x.id===e.clientId);
       if(!c || c.status!=='Active') return false;
@@ -2668,8 +2708,20 @@ function renderReports(){
 
   tableBody.innerHTML = rows.map(([key,mins])=>{
     const label = getLabel(key);
-    const clickAction = reportTab==='clients' ? ` onclick="goToClientInQueue('${key}','all')"` : '';
-    const nameEl = reportTab==='clients' ? `<span class="report-name-link"${clickAction}>${label}</span>` : `<span style="font-weight:600;font-size:13px;">${label}</span>`;
+    let nameEl;
+    if(reportTab==='clients'){
+      const c = clients.find(x=>x.id===key);
+      const initial = label.trim().charAt(0).toUpperCase();
+      nameEl = `<div class="client-cell" style="cursor:pointer;" onclick="openClientReportDetail('${key}')">
+        <div class="avatar-circle" style="width:28px;height:28px;font-size:11.5px;">${initial}</div>
+        <div>
+          <span class="report-name-link">${label}</span>
+          ${c ? `<div class="report-client-scores">${dotRatingCompact(c.importance,'ink',10)}${dotRatingCompact(c.danger,'brand',5)}</div>` : ''}
+        </div>
+      </div>`;
+    } else {
+      nameEl = `<span style="font-weight:600;font-size:13px;">${label}</span>`;
+    }
     return `<tr>
       <td>${nameEl}</td>
       <td class="report-hours-val">${formatMinutes(mins)}</td>
@@ -2678,15 +2730,55 @@ function renderReports(){
   }).join('');
 }
 
+// Clicking a client in the Clients report opens everything logged for that
+// client within the currently selected report period — not just "click to
+// jump to the client," but a real breakdown scoped to the date range.
+function openClientReportDetail(clientId){
+  const c = clients.find(x=>x.id===clientId);
+  const { start, end } = getReportDateBounds();
+  const entries = timeEntries
+    .filter(e=> e.clientId===clientId && new Date(e.date+'T00:00:00') >= start && (!end || new Date(e.date+'T00:00:00') <= end))
+    .sort((a,b)=> new Date(b.date) - new Date(a.date) || new Date(b.createdAt) - new Date(a.createdAt));
+  const totalMinutes = entries.reduce((s,e)=>s+e.minutes,0);
+
+  const rangeLabel = document.getElementById('reportRange')?.value === 'custom'
+    ? `${document.getElementById('reportFromDate').value || '…'} to ${document.getElementById('reportToDate').value || '…'}`
+    : (document.getElementById('reportRange')?.options[document.getElementById('reportRange').selectedIndex].text || '');
+
+  const rows = entries.length ? entries.map(e=>{
+    const person = teamProfiles.find(p=>p.id===e.userId);
+    return `<div class="ts-entry-card" style="margin-bottom:8px;">
+      <div class="ts-entry-info">
+        <div class="ts-entry-title">${new Date(e.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short', month:'short', day:'numeric'})} ${e.service ? `<span class="ts-entry-service">(${e.service})</span>` : ''}</div>
+        ${e.description ? `<div class="ts-entry-desc">${e.description}</div>` : ''}
+        <div class="ts-entry-desc" style="margin-top:2px;">Logged by ${person ? person.name : 'someone no longer on the team'}</div>
+      </div>
+      <div class="ts-entry-right"><div class="ts-entry-duration">${formatMinutes(e.minutes)}</div></div>
+    </div>`;
+  }).join('') : `<div class="empty">No time logged for this client in this period.</div>`;
+
+  openAppModal(`
+    <div class="modal-head">
+      <div>
+        <div class="q-name">${c ? c.name : 'Unknown client'}</div>
+        <div class="q-service-caption">${rangeLabel} · ${formatMinutes(totalMinutes)} total</div>
+      </div>
+      <span class="toast-close" onclick="closeAppModal()">✕</span>
+    </div>
+    <div class="modal-body" style="max-height:50vh;overflow-y:auto;">${rows}</div>
+    <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 480);
+}
+
 // Same dot language used for Importance/Danger elsewhere — filled dots show
-// this row's value relative to the largest value in the table, instead of a
-// plain progress bar.
+// this row's value relative to the largest value in the table. Uses green
+// rather than the brand/orange color, since orange is used elsewhere to mean
+// "danger" — hours logged shouldn't read as a warning.
 function proportionDots(value, max, count){
   count = count || 10;
   const filled = value<=0 ? 0 : Math.max(1, Math.round((value/max)*count));
   let dots = '';
   for(let i=1;i<=count;i++){
-    dots += `<span class="rate-dot" style="background:${i<=filled?'var(--brand)':'#E7E8EB'};"></span>`;
+    dots += `<span class="rate-dot" style="background:${i<=filled?'var(--green)':'#E7E8EB'};"></span>`;
   }
   return `<div class="rate-dots-compact">${dots}</div>`;
 }
