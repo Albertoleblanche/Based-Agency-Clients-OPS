@@ -741,7 +741,8 @@ document.addEventListener('DOMContentLoaded', function(){
                 <div><label>Client</label><select id="manualClient"></select></div>
                 <div><label>Service</label><select id="manualService"></select></div>
                 <div><label>Date</label><input type="date" id="manualDate"></div>
-                <div><label>Hours</label><input type="number" id="manualHours" min="0.05" max="24" step="0.25" placeholder="1.5"></div>
+                <div><label>Hours</label><input type="number" id="manualHours" min="0" max="23" step="1" placeholder="1"></div>
+                <div><label>Minutes</label><input type="number" id="manualMinutes" min="0" max="59" step="5" placeholder="30"></div>
                 <div style="grid-column:1/-1;"><label>Description</label><input id="manualDesc" placeholder="What did you work on?"></div>
               </div>
               <button class="btn btn-brand" style="margin-top:12px;" onclick="addManualEntry()">Add entry</button>
@@ -2220,23 +2221,26 @@ async function addManualEntry(){
   const clientId = document.getElementById('manualClient').value;
   const service = document.getElementById('manualService')?.value || '';
   const dateVal = document.getElementById('manualDate').value;
-  const hours = parseFloat(document.getElementById('manualHours').value);
+  const hoursPart = parseInt(document.getElementById('manualHours').value) || 0;
+  const minutesPart = parseInt(document.getElementById('manualMinutes').value) || 0;
+  const totalMinutes = hoursPart*60 + minutesPart;
   const description = document.getElementById('manualDesc').value.trim();
   if(!clientId){ showToast('error','Pick a client','Select which client this time is for.'); return; }
   if(!dateVal){ showToast('error','Pick a date','Choose the date this time was worked.'); return; }
-  if(!hours || hours<=0){ showToast('error','Enter hours','How many hours did you work?'); return; }
+  if(totalMinutes<=0){ showToast('error','Enter time','Add hours and/or minutes for how long you worked.'); return; }
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
   const { error } = await supabaseClient.from('time_entries').insert({
-    user_id: currentUser.id, client_id: clientId, entry_date: dateVal, minutes: Math.round(hours*60), description, service
+    user_id: currentUser.id, client_id: clientId, entry_date: dateVal, minutes: totalMinutes, description, service
   });
   restoreBtn(btn);
   await loadTimeEntries();
   document.getElementById('manualHours').value = '';
+  document.getElementById('manualMinutes').value = '';
   document.getElementById('manualDesc').value = '';
   renderTimesheet(); renderReports();
   const c = clients.find(x=>x.id===clientId);
-  error ? showToast('error','Save failed', error.message) : showToast('success','Time added', `${formatMinutes(Math.round(hours*60))} added for ${c?c.name:'client'}.`);
+  error ? showToast('error','Save failed', error.message) : showToast('success','Time added', `${formatMinutes(totalMinutes)} added for ${c?c.name:'client'}.`);
 }
 
 /* --- Timesheet --- */
@@ -2455,13 +2459,17 @@ function openTimeEntryModal(id){
   if(!e) return;
   const clientOptions = clients.map(c=>`<option value="${c.id}" ${e.clientId===c.id?'selected':''}>${c.name}</option>`).join('');
   const serviceOptions = `<option value="">No service set</option>` + (settings.serviceOptions||[]).map(s=>`<option value="${s.replace(/"/g,'&quot;')}" ${e.service===s?'selected':''}>${s}</option>`).join('');
+  const hPart = Math.floor(e.minutes/60), mPart = e.minutes%60;
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Edit time entry</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
       <div class="settings-field"><label>Client</label><select id="editEntryClient" style="width:100%;">${clientOptions}</select></div>
       <div class="settings-field"><label>Service</label><select id="editEntryService" style="width:100%;">${serviceOptions}</select></div>
       <div class="settings-field"><label>Date</label><input type="date" id="editEntryDate" value="${e.date}" style="width:100%;"></div>
-      <div class="settings-field"><label>Hours</label><input type="number" id="editEntryHours" min="0.05" max="24" step="0.25" value="${(e.minutes/60).toFixed(2)}" style="width:100%;"></div>
+      <div style="display:flex;gap:10px;">
+        <div class="settings-field" style="flex:1;"><label>Hours</label><input type="number" id="editEntryHours" min="0" max="23" step="1" value="${hPart}" style="width:100%;"></div>
+        <div class="settings-field" style="flex:1;"><label>Minutes</label><input type="number" id="editEntryMinutes" min="0" max="59" step="5" value="${mPart}" style="width:100%;"></div>
+      </div>
       <div class="settings-field"><label>Description</label><input id="editEntryDesc" value="${(e.description||'').replace(/"/g,'&quot;')}" style="width:100%;"></div>
     </div>
     <div class="modal-actions">
@@ -2474,13 +2482,15 @@ async function saveTimeEntryEdit(id){
   const clientId = document.getElementById('editEntryClient').value;
   const service = document.getElementById('editEntryService')?.value || '';
   const dateVal = document.getElementById('editEntryDate').value;
-  const hours = parseFloat(document.getElementById('editEntryHours').value);
+  const hoursPart = parseInt(document.getElementById('editEntryHours').value) || 0;
+  const minutesPart = parseInt(document.getElementById('editEntryMinutes').value) || 0;
+  const totalMinutes = hoursPart*60 + minutesPart;
   const description = document.getElementById('editEntryDesc').value.trim();
-  if(!hours || hours<=0){ showToast('error','Enter hours','Hours must be greater than 0.'); return; }
+  if(totalMinutes<=0){ showToast('error','Enter time','Hours and minutes can\'t both be zero.'); return; }
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
   const { error } = await supabaseClient.from('time_entries').update({
-    client_id: clientId, entry_date: dateVal, minutes: Math.round(hours*60), description, service
+    client_id: clientId, entry_date: dateVal, minutes: totalMinutes, description, service
   }).eq('id', id);
   restoreBtn(btn);
   closeAppModal();
