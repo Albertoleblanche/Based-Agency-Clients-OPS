@@ -235,6 +235,36 @@
   .note-text{font-size:13px;color:var(--ink);line-height:1.55;margin-top:12px;flex:1;white-space:pre-wrap;}
   .note-actions{display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid #F3F4F6;flex-wrap:wrap;}
   .note-status-select{font-family:'Inter',sans-serif;font-size:11.5px;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);}
+
+  /* Time Tracker */
+  .timer-display{font-family:'IBM Plex Mono',monospace;font-size:44px;font-weight:600;text-align:center;padding:20px 0 24px;letter-spacing:.02em;font-variant-numeric:tabular-nums;}
+  .timer-display.running{color:var(--brand);}
+  #timerToggleBtn{width:100%;justify-content:center;}
+  #timerToggleBtn.stop{background:var(--red);color:#fff;}
+
+  .timesheet-nav{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+  .timesheet-nav-controls{display:flex;align-items:center;gap:10px;}
+  .timesheet-range-label{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;min-width:150px;text-align:center;}
+
+  .day-group{margin-bottom:16px;}
+  .day-group-head{display:flex;justify-content:space-between;align-items:center;}
+  .day-total{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);font-weight:600;}
+  .time-entry-row{display:flex;align-items:center;gap:14px;padding:11px 0;border-bottom:1px solid #F3F4F6;}
+  .time-entry-row:last-child{border-bottom:none;}
+  .time-entry-main{flex:1;min-width:0;}
+  .time-entry-client{font-size:13px;font-weight:600;}
+  .time-entry-desc{font-size:12px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .time-entry-person{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--muted-lt);flex:none;width:90px;}
+  .time-entry-duration{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;flex:none;width:60px;text-align:right;}
+  .time-entry-actions{display:flex;gap:8px;flex:none;}
+
+  .report-bar-row{margin-bottom:14px;}
+  .report-bar-top{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px;}
+  .report-bar-name{font-weight:600;}
+  .report-bar-val{font-family:'IBM Plex Mono',monospace;color:var(--muted);}
+  .report-bar-track{height:7px;border-radius:4px;background:#EEF0F4;overflow:hidden;}
+  .report-bar-fill{height:100%;background:var(--brand);border-radius:4px;transition:width .5s ease;}
+  body[data-theme="dark"] .report-bar-track{background:#1E222C;}
   .q-card{border:1px solid #EDEEF1;border-radius:8px;padding:22px 24px;background:var(--card);box-shadow:0 1px 2px rgba(16,24,40,.03);transition:box-shadow .18s ease, border-color .18s ease, transform .18s ease;cursor:pointer;}
   .q-card:hover{box-shadow:0 10px 28px rgba(16,24,40,.08);border-color:#DDE0E5;transform:translateY(-2px);}
   .q-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;}
@@ -369,6 +399,10 @@ document.addEventListener('DOMContentLoaded', function(){
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         Notes
         <span class="nav-badge" id="navNotesBadge">0</span>
+      </div>
+      <div class="nav-item" data-view="time" onclick="switchView('time')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Time Tracker
       </div>
       <div class="nav-item" data-view="settings" onclick="switchView('settings')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -612,6 +646,87 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
 
       <div id="notesList" class="notes-grid"></div>
+    </div>
+
+    <!-- TIME TRACKER -->
+    <div class="view" id="view-time">
+      <div class="topbar">
+        <div><div class="page-title">Time Tracker</div><div class="page-sub">Log hours per client, review the timesheet, and see where the team's time goes</div></div>
+      </div>
+
+      <div class="tabs settings-tabs">
+        <div class="tab settings-tab active" data-ttab="timer" onclick="switchTimeTab('timer')">Timer</div>
+        <div class="tab settings-tab" data-ttab="timesheet" onclick="switchTimeTab('timesheet')">Timesheet</div>
+        <div class="tab settings-tab" data-ttab="reports" onclick="switchTimeTab('reports')">Reports</div>
+      </div>
+
+      <!-- TIMER -->
+      <div class="settings-subview active" id="ttab-timer">
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Live Timer</span></div>
+          <div class="panel-body">
+            <div class="timer-display" id="timerDisplay">00:00:00</div>
+            <div class="form-grid" style="margin-bottom:14px;">
+              <div><label>Client</label><select id="timerClient"></select></div>
+              <div style="grid-column:1/-1;"><label>What are you working on?</label><input id="timerDesc" placeholder="e.g. Updating Meta ad creative"></div>
+            </div>
+            <button class="btn btn-brand" id="timerToggleBtn" onclick="toggleTimer()">Start timer</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Add time manually</span></div>
+          <div class="panel-body">
+            <div class="form-grid">
+              <div><label>Client</label><select id="manualClient"></select></div>
+              <div><label>Date</label><input type="date" id="manualDate"></div>
+              <div><label>Hours</label><input type="number" id="manualHours" min="0.05" max="24" step="0.25" placeholder="1.5"></div>
+              <div style="grid-column:1/-1;"><label>Description</label><input id="manualDesc" placeholder="What did you work on?"></div>
+            </div>
+            <button class="btn btn-brand" style="margin-top:12px;" onclick="addManualEntry()">Add entry</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TIMESHEET -->
+      <div class="settings-subview" id="ttab-timesheet">
+        <div class="panel">
+          <div class="panel-body timesheet-nav">
+            <div class="filter-bar" id="timesheetModeBar" style="margin-bottom:0;">
+              <span class="filter-pill active" data-mode="day" onclick="setTimesheetMode('day')">Day</span>
+              <span class="filter-pill" data-mode="week" onclick="setTimesheetMode('week')">Week</span>
+            </div>
+            <div class="timesheet-nav-controls">
+              <button class="btn btn-outline" onclick="shiftTimesheet(-1)">← Prev</button>
+              <span class="timesheet-range-label" id="timesheetRangeLabel"></span>
+              <button class="btn btn-outline" onclick="shiftTimesheet(1)">Next →</button>
+              <button class="btn btn-outline" onclick="jumpToToday()">Today</button>
+            </div>
+            <select id="timesheetClientFilter" onchange="renderTimesheet()"><option value="all">All clients</option></select>
+          </div>
+        </div>
+        <div id="timesheetBody"></div>
+      </div>
+
+      <!-- REPORTS -->
+      <div class="settings-subview" id="ttab-reports">
+        <div class="clients-filter-bar" style="margin-bottom:16px;">
+          <select id="reportRange" onchange="renderReports()">
+            <option value="week">This week</option>
+            <option value="month">This month</option>
+            <option value="all">All time</option>
+          </select>
+        </div>
+        <div class="metrics-row" style="grid-template-columns:1fr 1fr;" id="reportSummary"></div>
+        <div class="panel" style="margin-top:16px;">
+          <div class="panel-head"><span class="panel-title">By Client</span></div>
+          <div class="panel-body"><div id="reportByClient"></div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">By Team Member</span></div>
+          <div class="panel-body"><div id="reportByPerson"></div></div>
+        </div>
+      </div>
     </div>
 
     <!-- SETTINGS -->
@@ -1089,10 +1204,11 @@ async function fullRefresh(showFeedback){
   if(showFeedback && btn){ btn.disabled = true; btn.textContent = 'Refreshing…'; }
   await loadAll();
   await loadMyNotes();
+  await loadTimeEntries();
   renderAll();
   if(showFeedback && btn){ btn.disabled = false; btn.textContent = 'Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
-function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); }
+function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); }
 
 function applyRoleVisibility(){
   const notifyBtn = document.getElementById('notifyBtn');
@@ -1107,8 +1223,8 @@ async function switchView(name){
 }
 
 function switchSettingsTab(name){
-  document.querySelectorAll('.settings-tab').forEach(t=>t.classList.toggle('active', t.dataset.stab===name));
-  document.querySelectorAll('.settings-subview').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('#view-settings .settings-tab').forEach(t=>t.classList.toggle('active', t.dataset.stab===name));
+  document.querySelectorAll('#view-settings .settings-subview').forEach(v=>v.classList.remove('active'));
   document.getElementById('stab-'+name).classList.add('active');
 }
 
@@ -1792,6 +1908,336 @@ function updateNotesBadge(){
   const open = notes.filter(n=>n.status!=='done').length;
   badge.textContent = open;
   badge.style.display = open ? 'inline-flex' : 'none';
+}
+
+/* ---------- Time Tracker ---------- */
+let timeEntries = [];
+let timerState = { running:false, startedAt:null, clientId:'', description:'' };
+let timerIntervalId = null;
+let timesheetMode = 'day';
+let timesheetAnchor = new Date();
+
+function toDateStr(d){
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+function formatMinutes(mins){
+  const h = Math.floor(mins/60), m = mins%60;
+  if(h && m) return `${h}h ${m}m`;
+  if(h) return `${h}h`;
+  return `${m}m`;
+}
+
+async function loadTimeEntries(){
+  const { data, error } = await supabaseClient.from('time_entries').select('*').order('entry_date', { ascending:false });
+  if(error){ console.error('loadTimeEntries error', error); timeEntries = []; return; }
+  timeEntries = (data||[]).map(e=>({ id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes, description:e.description||'', createdAt:e.created_at }));
+}
+
+function populateTimeClientSelects(){
+  const activeClients = clients.filter(c=>c.status==='Active');
+  const opts = (activeClients.length ? activeClients : clients).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  ['timerClient','manualClient'].forEach(id=>{
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    const current = sel.value;
+    sel.innerHTML = opts || `<option value="">No clients yet</option>`;
+    if([...sel.options].some(o=>o.value===current)) sel.value = current;
+  });
+  const filterSel = document.getElementById('timesheetClientFilter');
+  if(filterSel){
+    const current = filterSel.value || 'all';
+    filterSel.innerHTML = `<option value="all">All clients</option>` + clients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    if([...filterSel.options].some(o=>o.value===current)) filterSel.value = current;
+  }
+  const dateInput = document.getElementById('manualDate');
+  if(dateInput && !dateInput.value) dateInput.value = toDateStr(new Date());
+}
+
+function switchTimeTab(name){
+  document.querySelectorAll('#view-time .settings-tab').forEach(t=>t.classList.toggle('active', t.dataset.ttab===name));
+  document.querySelectorAll('#view-time .settings-subview').forEach(v=>v.classList.remove('active'));
+  document.getElementById('ttab-'+name).classList.add('active');
+  if(name==='timesheet') renderTimesheet();
+  if(name==='reports') renderReports();
+}
+
+/* --- Live timer --- */
+function updateTimerDisplay(){
+  const el = document.getElementById('timerDisplay');
+  if(!el) return;
+  if(!timerState.running){ el.textContent = '00:00:00'; el.classList.remove('running'); return; }
+  const elapsedSec = Math.floor((Date.now() - timerState.startedAt)/1000);
+  const h = String(Math.floor(elapsedSec/3600)).padStart(2,'0');
+  const m = String(Math.floor((elapsedSec%3600)/60)).padStart(2,'0');
+  const s = String(elapsedSec%60).padStart(2,'0');
+  el.textContent = `${h}:${m}:${s}`;
+  el.classList.add('running');
+}
+
+function saveTimerState(){ try{ localStorage.setItem('bda_timer_state', JSON.stringify(timerState)); }catch(e){} }
+
+function initTimerFromStorage(){
+  try{
+    const raw = localStorage.getItem('bda_timer_state');
+    if(raw) timerState = JSON.parse(raw);
+  }catch(e){}
+  if(timerState.running){
+    timerIntervalId = setInterval(updateTimerDisplay, 1000);
+    updateTimerDisplay();
+    const btn = document.getElementById('timerToggleBtn');
+    if(btn){ btn.textContent = 'Stop & save'; btn.classList.add('stop'); }
+    const clientSel = document.getElementById('timerClient');
+    if(clientSel) clientSel.value = timerState.clientId;
+    const descInput = document.getElementById('timerDesc');
+    if(descInput) descInput.value = timerState.description;
+  }
+}
+
+function toggleTimer(){
+  if(!timerState.running){
+    const clientId = document.getElementById('timerClient').value;
+    if(!clientId){ showToast('error','Pick a client',"Select which client you're working on."); return; }
+    timerState = { running:true, startedAt:Date.now(), clientId, description: document.getElementById('timerDesc').value.trim() };
+    saveTimerState();
+    timerIntervalId = setInterval(updateTimerDisplay, 1000);
+    updateTimerDisplay();
+    const btn = document.getElementById('timerToggleBtn');
+    btn.textContent = 'Stop & save';
+    btn.classList.add('stop');
+  } else {
+    stopAndSaveTimer();
+  }
+}
+
+async function stopAndSaveTimer(){
+  if(timerIntervalId){ clearInterval(timerIntervalId); timerIntervalId = null; }
+  const elapsedMs = Date.now() - timerState.startedAt;
+  const minutes = Math.max(1, Math.round(elapsedMs/60000));
+  const clientId = timerState.clientId;
+  const description = timerState.description;
+  timerState = { running:false, startedAt:null, clientId:'', description:'' };
+  saveTimerState();
+  const btn = document.getElementById('timerToggleBtn');
+  if(btn){ btn.textContent = 'Start timer'; btn.classList.remove('stop'); }
+  updateTimerDisplay();
+  const descInput = document.getElementById('timerDesc');
+  if(descInput) descInput.value = '';
+
+  const { error } = await supabaseClient.from('time_entries').insert({
+    user_id: currentUser.id, client_id: clientId, entry_date: toDateStr(new Date()), minutes, description
+  });
+  await loadTimeEntries();
+  renderTimesheet(); renderReports();
+  const c = clients.find(x=>x.id===clientId);
+  error ? showToast('error','Save failed', error.message) : showToast('success','Time logged', `${formatMinutes(minutes)} logged for ${c?c.name:'client'}.`);
+}
+
+/* --- Manual entry --- */
+async function addManualEntry(){
+  const clientId = document.getElementById('manualClient').value;
+  const dateVal = document.getElementById('manualDate').value;
+  const hours = parseFloat(document.getElementById('manualHours').value);
+  const description = document.getElementById('manualDesc').value.trim();
+  if(!clientId){ showToast('error','Pick a client','Select which client this time is for.'); return; }
+  if(!dateVal){ showToast('error','Pick a date','Choose the date this time was worked.'); return; }
+  if(!hours || hours<=0){ showToast('error','Enter hours','How many hours did you work?'); return; }
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Saving…');
+  const { error } = await supabaseClient.from('time_entries').insert({
+    user_id: currentUser.id, client_id: clientId, entry_date: dateVal, minutes: Math.round(hours*60), description
+  });
+  restoreBtn(btn);
+  await loadTimeEntries();
+  document.getElementById('manualHours').value = '';
+  document.getElementById('manualDesc').value = '';
+  renderTimesheet(); renderReports();
+  const c = clients.find(x=>x.id===clientId);
+  error ? showToast('error','Save failed', error.message) : showToast('success','Time added', `${formatMinutes(Math.round(hours*60))} added for ${c?c.name:'client'}.`);
+}
+
+/* --- Timesheet --- */
+function setTimesheetMode(mode){
+  timesheetMode = mode;
+  document.querySelectorAll('#timesheetModeBar .filter-pill').forEach(p=>p.classList.toggle('active', p.dataset.mode===mode));
+  renderTimesheet();
+}
+
+function shiftTimesheet(dir){
+  const d = new Date(timesheetAnchor);
+  d.setDate(d.getDate() + dir*(timesheetMode==='week' ? 7 : 1));
+  timesheetAnchor = d;
+  renderTimesheet();
+}
+
+function jumpToToday(){ timesheetAnchor = new Date(); renderTimesheet(); }
+
+function getWeekStart(d){
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = (day+6)%7;
+  date.setDate(date.getDate()-diff);
+  date.setHours(0,0,0,0);
+  return date;
+}
+
+function renderTimesheet(){
+  const bodyEl = document.getElementById('timesheetBody');
+  const labelEl = document.getElementById('timesheetRangeLabel');
+  if(!bodyEl) return;
+  const clientFilter = document.getElementById('timesheetClientFilter')?.value || 'all';
+
+  let rangeStart, rangeEnd, days = [];
+  if(timesheetMode==='day'){
+    rangeStart = new Date(timesheetAnchor); rangeStart.setHours(0,0,0,0);
+    rangeEnd = new Date(rangeStart); rangeEnd.setHours(23,59,59,999);
+    days = [new Date(rangeStart)];
+    labelEl.textContent = rangeStart.toLocaleDateString('en-US',{weekday:'short', month:'short', day:'numeric'});
+  } else {
+    rangeStart = getWeekStart(timesheetAnchor);
+    rangeEnd = new Date(rangeStart); rangeEnd.setDate(rangeEnd.getDate()+6); rangeEnd.setHours(23,59,59,999);
+    for(let i=0;i<7;i++){ const d=new Date(rangeStart); d.setDate(d.getDate()+i); days.push(d); }
+    labelEl.textContent = `${rangeStart.toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${rangeEnd.toLocaleDateString('en-US',{month:'short',day:'numeric'})}`;
+  }
+
+  const relevant = timeEntries.filter(e=>{
+    if(clientFilter!=='all' && e.clientId!==clientFilter) return false;
+    const d = new Date(e.date+'T00:00:00');
+    return d >= rangeStart && d <= rangeEnd;
+  });
+
+  if(!relevant.length){
+    bodyEl.innerHTML = `<div class="panel"><div class="empty">No time logged in this range.</div></div>`;
+    return;
+  }
+
+  bodyEl.innerHTML = days.map(day=>{
+    const dateStr = toDateStr(day);
+    const dayEntries = relevant.filter(e=>e.date===dateStr).sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
+    if(!dayEntries.length && timesheetMode==='week') return '';
+    const total = dayEntries.reduce((s,e)=>s+e.minutes,0);
+    const rows = dayEntries.length ? dayEntries.map(e=>{
+      const c = clients.find(x=>x.id===e.clientId);
+      const person = teamProfiles.find(p=>p.id===e.userId);
+      const canEdit = currentUser && (e.userId===currentUser.id || isAdmin());
+      return `<div class="time-entry-row">
+        <div class="time-entry-main">
+          <div class="time-entry-client">${c ? c.name : 'Unknown client'}</div>
+          ${e.description ? `<div class="time-entry-desc">${e.description}</div>` : ''}
+        </div>
+        <div class="time-entry-person">${person ? person.name.split(' ')[0] : ''}</div>
+        <div class="time-entry-duration">${formatMinutes(e.minutes)}</div>
+        <div class="time-entry-actions">
+          ${canEdit ? `<span class="row-link" onclick="openTimeEntryModal('${e.id}')">Edit</span><span class="row-link danger-link" onclick="deleteTimeEntry('${e.id}')">Delete</span>` : ''}
+        </div>
+      </div>`;
+    }).join('') : `<div class="empty" style="padding:14px 0;">Nothing logged.</div>`;
+    return `<div class="panel day-group">
+      <div class="panel-head day-group-head"><span class="panel-title">${day.toLocaleDateString('en-US',{weekday:'long', month:'short', day:'numeric'})}</span><span class="day-total">${total ? formatMinutes(total) : ''}</span></div>
+      <div class="panel-body">${rows}</div>
+    </div>`;
+  }).join('');
+}
+
+function openTimeEntryModal(id){
+  const e = timeEntries.find(x=>x.id===id);
+  if(!e) return;
+  const clientOptions = clients.map(c=>`<option value="${c.id}" ${e.clientId===c.id?'selected':''}>${c.name}</option>`).join('');
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">Edit time entry</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <div class="settings-field"><label>Client</label><select id="editEntryClient" style="width:100%;">${clientOptions}</select></div>
+      <div class="settings-field"><label>Date</label><input type="date" id="editEntryDate" value="${e.date}" style="width:100%;"></div>
+      <div class="settings-field"><label>Hours</label><input type="number" id="editEntryHours" min="0.05" max="24" step="0.25" value="${(e.minutes/60).toFixed(2)}" style="width:100%;"></div>
+      <div class="settings-field"><label>Description</label><input id="editEntryDesc" value="${(e.description||'').replace(/"/g,'&quot;')}" style="width:100%;"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-brand" onclick="saveTimeEntryEdit('${id}')">Save changes</button>
+      <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
+    </div>`, 440);
+}
+
+async function saveTimeEntryEdit(id){
+  const clientId = document.getElementById('editEntryClient').value;
+  const dateVal = document.getElementById('editEntryDate').value;
+  const hours = parseFloat(document.getElementById('editEntryHours').value);
+  const description = document.getElementById('editEntryDesc').value.trim();
+  if(!hours || hours<=0){ showToast('error','Enter hours','Hours must be greater than 0.'); return; }
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Saving…');
+  const { error } = await supabaseClient.from('time_entries').update({
+    client_id: clientId, entry_date: dateVal, minutes: Math.round(hours*60), description
+  }).eq('id', id);
+  restoreBtn(btn);
+  closeAppModal();
+  await loadTimeEntries();
+  renderTimesheet(); renderReports();
+  error ? showToast('error','Save failed', error.message) : showToast('success','Entry updated','Changes saved.');
+}
+
+async function deleteTimeEntry(id){
+  if(!confirm("Delete this time entry? This can't be undone.")) return;
+  const { error } = await supabaseClient.from('time_entries').delete().eq('id', id);
+  await loadTimeEntries();
+  renderTimesheet(); renderReports();
+  error ? showToast('error','Delete failed', error.message) : showToast('success','Entry deleted','Removed.');
+}
+
+/* --- Reports --- */
+function renderReports(){
+  const summaryEl = document.getElementById('reportSummary');
+  const byClientEl = document.getElementById('reportByClient');
+  const byPersonEl = document.getElementById('reportByPerson');
+  if(!summaryEl) return;
+  const range = document.getElementById('reportRange')?.value || 'week';
+  const now = new Date();
+  let start;
+  if(range==='week'){ start = getWeekStart(now); }
+  else if(range==='month'){ start = new Date(now.getFullYear(), now.getMonth(), 1); }
+  else { start = new Date(2000,0,1); }
+
+  const relevant = timeEntries.filter(e=> new Date(e.date+'T00:00:00') >= start);
+  const totalMinutes = relevant.reduce((s,e)=>s+e.minutes,0);
+  const uniqueClients = new Set(relevant.map(e=>e.clientId)).size;
+
+  summaryEl.innerHTML = `
+    <div class="metric-card">
+      <div class="metric-head"><span class="metric-icon metric-icon-blue"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span><span class="metric-label">Total Time</span></div>
+      <div class="metric-value">${formatMinutes(totalMinutes)}</div>
+      <div class="metric-caption">Across ${uniqueClients} client${uniqueClients!==1?'s':''}</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-head"><span class="metric-icon metric-icon-green"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="metric-label">Entries Logged</span></div>
+      <div class="metric-value">${relevant.length}</div>
+      <div class="metric-caption">By the whole team</div>
+    </div>`;
+
+  const byClient = {};
+  relevant.forEach(e=>{ byClient[e.clientId] = (byClient[e.clientId]||0) + e.minutes; });
+  const clientRows = Object.entries(byClient).sort((a,b)=>b[1]-a[1]);
+  const maxClientMin = clientRows.length ? clientRows[0][1] : 1;
+  byClientEl.innerHTML = clientRows.length ? clientRows.map(([cid,mins])=>{
+    const c = clients.find(x=>x.id===cid);
+    const pct = Math.max(4, Math.round(mins/maxClientMin*100));
+    return `<div class="report-bar-row">
+      <div class="report-bar-top"><span class="report-bar-name">${c?c.name:'Unknown client'}</span><span class="report-bar-val">${formatMinutes(mins)}</span></div>
+      <div class="report-bar-track"><div class="report-bar-fill" style="width:${pct}%;"></div></div>
+    </div>`;
+  }).join('') : `<div class="empty">No time logged in this range.</div>`;
+
+  const byPerson = {};
+  relevant.forEach(e=>{ byPerson[e.userId] = (byPerson[e.userId]||0) + e.minutes; });
+  const personRows = Object.entries(byPerson).sort((a,b)=>b[1]-a[1]);
+  const maxPersonMin = personRows.length ? personRows[0][1] : 1;
+  byPersonEl.innerHTML = personRows.length ? personRows.map(([uid,mins])=>{
+    const p = teamProfiles.find(x=>x.id===uid);
+    const pct = Math.max(4, Math.round(mins/maxPersonMin*100));
+    return `<div class="report-bar-row">
+      <div class="report-bar-top"><span class="report-bar-name">${p?p.name:'Unknown'}</span><span class="report-bar-val">${formatMinutes(mins)}</span></div>
+      <div class="report-bar-track"><div class="report-bar-fill" style="width:${pct}%;background:var(--ink);"></div></div>
+    </div>`;
+  }).join('') : `<div class="empty">No time logged in this range.</div>`;
 }
 
 async function logImprovement(id){
@@ -2529,8 +2975,10 @@ async function showApp(session){
   await loadAll();
   await loadTeamProfiles();
   await loadMyNotes();
+  await loadTimeEntries();
   renderAll();
   applyAppIcon();
+  initTimerFromStorage();
 }
 
 (async function init(){
