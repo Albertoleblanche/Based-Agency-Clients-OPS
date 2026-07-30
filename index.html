@@ -53,8 +53,8 @@
   .nav-item.active svg{opacity:1;}
   .nav-badge{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;background:var(--brand);color:#2A1200;border-radius:20px;padding:1px 7px;font-weight:600;}
   .sidebar-foot{margin-top:auto;padding:12px 11px;border-top:1px solid #24365E;font-size:11px;color:var(--muted-lt);line-height:1.5;}
-  .theme-toggle{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:#C9D2E3;cursor:pointer;padding:8px 9px;border-radius:6px;}
-  .theme-toggle:hover{background:var(--sidebar-hover);}
+  .sidebar-action{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:#C9D2E3;cursor:pointer;padding:8px 9px;border-radius:6px;}
+  .sidebar-action:hover{background:var(--sidebar-hover);}
   .sidebar-profile{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 9px;margin-bottom:4px;}
   .sidebar-profile-name{font-size:12.5px;font-weight:600;color:#fff;}
   .sidebar-profile-role{font-family:'IBM Plex Mono',monospace;font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-lt);margin-top:2px;}
@@ -392,6 +392,15 @@
   .ftp-time{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:var(--brand);flex:none;font-variant-numeric:tabular-nums;}
   .ftp-stop{background:#fff;color:var(--ink);border:none;border-radius:20px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;flex:none;}
   .ftp-stop:hover{opacity:.9;}
+
+  .tour-card{position:fixed;bottom:22px;right:22px;z-index:1600;background:var(--card);color:var(--ink);border:1px solid var(--border);border-radius:14px;box-shadow:0 20px 50px rgba(16,24,40,.28);padding:20px 22px;width:320px;max-width:calc(100vw - 44px);}
+  .tour-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .tour-step-count{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-lt);}
+  .tour-title{font-family:'Oswald',sans-serif;font-size:17px;font-weight:600;letter-spacing:.01em;margin-bottom:8px;}
+  .tour-body{font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:16px;}
+  .tour-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
+  .tour-actions .btn{padding:8px 13px;font-size:12px;}
+  #tourPrevBtn.hidden-btn{visibility:hidden;}
   .toast{display:flex;align-items:flex-start;gap:9px;background:var(--card);color:var(--ink);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:8px;padding:11px 13px;box-shadow:0 6px 20px rgba(16,24,40,.12);font-size:12.5px;line-height:1.4;animation:toastIn .18s ease-out;}
   .toast.error{border-left-color:var(--red);}
   .toast.info{border-left-color:var(--muted-lt);}
@@ -480,8 +489,9 @@ document.addEventListener('DOMContentLoaded', function(){
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         </button>
       </div>
-      <div class="theme-toggle" onclick="toggleTheme()">
-        <span id="themeIcon">☀</span> <span id="themeLabel">Light mode</span>
+      <div class="sidebar-action" onclick="startTour()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"/></svg>
+        <span>Take a tour</span>
       </div>
       <div style="margin-top:10px;">Shared workspace — data syncs across everyone using this link.</div>
     </div>
@@ -1014,6 +1024,20 @@ document.addEventListener('DOMContentLoaded', function(){
   <button class="ftp-stop" onclick="event.stopPropagation(); stopAndSaveTimer();">Stop</button>
 </div>
 
+<div class="tour-card" id="tourCard" style="display:none;">
+  <div class="tour-head">
+    <span class="tour-step-count" id="tourStepCount"></span>
+    <span class="toast-close" onclick="endTour()">✕</span>
+  </div>
+  <div class="tour-title" id="tourTitle"></div>
+  <div class="tour-body" id="tourBody"></div>
+  <div class="tour-actions">
+    <button class="btn btn-outline" id="tourPrevBtn" onclick="tourPrev()">Back</button>
+    <button class="btn btn-outline" onclick="endTour()">Skip</button>
+    <button class="btn btn-brand" id="tourNextBtn" onclick="tourNext()">Next</button>
+  </div>
+</div>
+
 <script>
 let clients = [];
 let log = [];
@@ -1055,20 +1079,9 @@ async function safeSet(key, value){
 async function safeGetPersonal(key){ try{ return localStorage.getItem('bda_'+key); }catch(e){ return null; } }
 async function safeSetPersonal(key, value){ try{ localStorage.setItem('bda_'+key, value); return true; }catch(e){ return false; } }
 
-/* ---------- Theme ---------- */
+/* ---------- Theme (always light — the toggle was removed in favor of the tour button) ---------- */
 async function initTheme(){
-  const saved = await safeGetPersonal('theme-preference');
-  applyTheme(saved === 'dark' ? 'dark' : 'light');
-}
-function applyTheme(theme){
-  document.body.dataset.theme = theme;
-  document.getElementById('themeIcon').textContent = theme==='dark' ? '☾' : '☀';
-  document.getElementById('themeLabel').textContent = theme==='dark' ? 'Dark mode' : 'Light mode';
-}
-async function toggleTheme(){
-  const next = document.body.dataset.theme==='dark' ? 'light' : 'dark';
-  applyTheme(next);
-  await safeSetPersonal('theme-preference', next);
+  document.body.dataset.theme = 'light';
 }
 
 /* ---------- Real identity — comes from Supabase Auth + team_profiles, not self-reported ---------- */
@@ -2132,6 +2145,56 @@ function updateFloatingTimerPill(timeStr){
 function switchViewIfNotOnTimer(){
   switchView('time');
   switchTimeTab('timer');
+}
+
+/* ---------- Take a tour ---------- */
+const tourSteps = [
+  { view:'overview', title:"Welcome to Based Agency 👋", body:"A quick tour of everything the platform does — about a minute. You can Skip anytime, or come back to this later from the sidebar." },
+  { view:'overview', title:"Your Overview", body:"Greets you by name and tells you what actually needs attention today. The four cards track client health, pending approvals, and how much of this week's work is done." },
+  { view:'overview', title:"Active This Week & Needs Attention", body:"\"Active This Week\" shows every client with fresh logged work — click a card to jump straight into it. \"Needs Attention\" surfaces at-risk clients and drafts still waiting on approval." },
+  { view:'clients', title:"Client Roster", body:"Search, filter by service/status/importance/danger, and sort any column. The Actions menu on each row lets you edit the client, log an improvement, or add a private note." },
+  { view:'notes', title:"Notes — private to you", body:"Jot down ideas or planned work for any client. Nobody else on the team can see your notes — real database-level privacy, not just hidden in the UI. When you do the work, hit \"Log it now\" to turn it into a real logged improvement." },
+  { view:'approve', title:"Approval Queue", body:"Every client with logged work shows up here, sorted by danger score so the riskiest clients surface first. Click a card, generate an AI draft from that week's improvements, then Approve or Skip." },
+  { view:'time', timeTab:'timer', title:"Track time — live", body:"Start a timer for any client and service, or add time manually. A floating pill keeps a running timer visible on every tab — you can stop it from anywhere, not just here." },
+  { view:'time', timeTab:'timesheet', title:"Your timesheet", body:"Day or week view, with real calendar navigation. Clicking Start on a past entry resumes tracking and adds to that same entry — no duplicates." },
+  { view:'time', timeTab:'reports', title:"See where time goes", body:"Breaks down hours by client, service, or teammate, filterable by range — with an \"Active clients only\" option to cut the noise." },
+  { view:'settings', settingsTab:'general', title:"Settings & Integrations", body:"Manage your name, approvers, client field options, AI email instructions, and Google Sheet sync here. If you're an admin, you can also add team members and assign roles that control who can actually approve drafts." },
+  { view:'overview', title:"That's the platform", body:"You're set. Come back to this tour anytime from the \"Take a tour\" button in the sidebar." },
+];
+let tourIndex = 0;
+
+async function startTour(){
+  tourIndex = 0;
+  document.getElementById('tourCard').style.display = 'block';
+  await renderTourStep();
+}
+
+async function renderTourStep(){
+  const step = tourSteps[tourIndex];
+  if(step.view) await switchView(step.view);
+  if(step.timeTab) switchTimeTab(step.timeTab);
+  if(step.settingsTab) switchSettingsTab(step.settingsTab);
+  document.getElementById('tourTitle').textContent = step.title;
+  document.getElementById('tourBody').textContent = step.body;
+  document.getElementById('tourStepCount').textContent = `${tourIndex+1} of ${tourSteps.length}`;
+  document.getElementById('tourPrevBtn').classList.toggle('hidden-btn', tourIndex===0);
+  document.getElementById('tourNextBtn').textContent = tourIndex===tourSteps.length-1 ? 'Finish' : 'Next';
+}
+
+async function tourNext(){
+  if(tourIndex >= tourSteps.length-1){ endTour(); return; }
+  tourIndex++;
+  await renderTourStep();
+}
+
+async function tourPrev(){
+  if(tourIndex<=0) return;
+  tourIndex--;
+  await renderTourStep();
+}
+
+function endTour(){
+  document.getElementById('tourCard').style.display = 'none';
 }
 
 function saveTimerState(){ try{ localStorage.setItem('bda_timer_state', JSON.stringify(timerState)); }catch(e){} }
