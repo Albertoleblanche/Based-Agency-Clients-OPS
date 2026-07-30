@@ -316,9 +316,6 @@
   .report-name-link{color:var(--brand);font-weight:600;font-size:13px;cursor:pointer;}
   .report-name-link:hover{text-decoration:underline;}
   .report-hours-val{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:13px;}
-  .report-client-scores{display:flex;gap:10px;margin-top:4px;}
-  .report-client-scores .rate-dots-compact{gap:3px;}
-  .report-client-scores .rate-dot{width:4px;height:4px;}
   .q-card{border:1px solid #EDEEF1;border-radius:8px;padding:22px 24px;background:var(--card);box-shadow:0 1px 2px rgba(16,24,40,.03);transition:box-shadow .18s ease, border-color .18s ease, transform .18s ease;cursor:pointer;}
   .q-card:hover{box-shadow:0 10px 28px rgba(16,24,40,.08);border-color:#DDE0E5;transform:translateY(-2px);}
   .q-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;}
@@ -839,7 +836,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="panel">
           <div class="panel-body" style="padding:8px 22px;">
             <table class="report-table">
-              <thead><tr><th>Name</th><th class="report-th-hours">Hours</th><th class="report-th-bar"></th></tr></thead>
+              <thead><tr id="reportTableHead"></tr></thead>
               <tbody id="reportTableBody"></tbody>
             </table>
           </div>
@@ -1595,7 +1592,7 @@ function renderOverviewActiveQueue(){
       <div class="q-card-top">
         <div>
           <div class="q-name">${c.name}</div>
-          <div class="q-service-caption">${c.service}${c.danger>=4 ? ' · <span class="q-risk-flag">At risk</span>' : ''}</div>
+          <div class="q-service-caption">${c.service} · ${riskCaptionHtml(c.danger)}</div>
         </div>
         <span class="q-status-label" style="color:${status.color};">${status.label}</span>
       </div>
@@ -2682,6 +2679,13 @@ function renderReports(){
 
   if(!tableBody) return;
 
+  const headEl = document.getElementById('reportTableHead');
+  if(headEl){
+    headEl.innerHTML = reportTab==='clients'
+      ? `<th>Name</th><th class="report-th-hours">Importance</th><th class="report-th-hours">Danger</th><th class="report-th-hours">Hours</th><th class="report-th-bar"></th>`
+      : `<th>Name</th><th class="report-th-hours">Hours</th><th class="report-th-bar"></th>`;
+  }
+
   let grouped = {}, getLabel;
   if(reportTab==='clients'){
     relevant.forEach(e=>{ grouped[e.clientId] = (grouped[e.clientId]||0) + e.minutes; });
@@ -2700,28 +2704,39 @@ function renderReports(){
 
   const rows = Object.entries(grouped).sort((a,b)=>b[1]-a[1]);
   const maxMin = rows.length ? rows[0][1] : 1;
+  const colspan = reportTab==='clients' ? 5 : 3;
 
   if(!rows.length){
-    tableBody.innerHTML = `<tr><td colspan="3"><div class="empty">No time logged in this range.</div></td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="${colspan}"><div class="empty">No time logged in this range.</div></td></tr>`;
+    return;
+  }
+
+  if(reportTab==='clients'){
+    tableBody.innerHTML = rows.map(([key,mins])=>{
+      const c = clients.find(x=>x.id===key);
+      const label = getLabel(key);
+      const initial = label.trim().charAt(0).toUpperCase();
+      const nameEl = `<div class="client-cell" style="cursor:pointer;" onclick="openClientReportDetail('${key}')">
+        <div class="avatar-circle" style="width:28px;height:28px;font-size:11.5px;">${initial}</div>
+        <div>
+          <span class="report-name-link">${label}</span>
+          ${c ? `<div class="q-service-caption" style="margin-top:2px;">${c.service} · ${riskCaptionHtml(c.danger)}</div>` : ''}
+        </div>
+      </div>`;
+      return `<tr>
+        <td>${nameEl}</td>
+        <td>${c ? dotRatingCompact(c.importance,'ink',10) : '—'}</td>
+        <td>${c ? dotRatingCompact(c.danger,'brand',5) : '—'}</td>
+        <td class="report-hours-val">${formatMinutes(mins)}</td>
+        <td>${proportionDots(mins, maxMin)}</td>
+      </tr>`;
+    }).join('');
     return;
   }
 
   tableBody.innerHTML = rows.map(([key,mins])=>{
     const label = getLabel(key);
-    let nameEl;
-    if(reportTab==='clients'){
-      const c = clients.find(x=>x.id===key);
-      const initial = label.trim().charAt(0).toUpperCase();
-      nameEl = `<div class="client-cell" style="cursor:pointer;" onclick="openClientReportDetail('${key}')">
-        <div class="avatar-circle" style="width:28px;height:28px;font-size:11.5px;">${initial}</div>
-        <div>
-          <span class="report-name-link">${label}</span>
-          ${c ? `<div class="report-client-scores">${dotRatingCompact(c.importance,'ink',10)}${dotRatingCompact(c.danger,'brand',5)}</div>` : ''}
-        </div>
-      </div>`;
-    } else {
-      nameEl = `<span style="font-weight:600;font-size:13px;">${label}</span>`;
-    }
+    const nameEl = `<span style="font-weight:600;font-size:13px;">${label}</span>`;
     return `<tr>
       <td>${nameEl}</td>
       <td class="report-hours-val">${formatMinutes(mins)}</td>
@@ -2868,7 +2883,7 @@ function renderQueue(){
       <div class="q-card-top">
         <div>
           <div class="q-name">${c.name}</div>
-          <div class="q-service-caption">${c.service}${c.danger>=4 ? ' · <span class="q-risk-flag">At risk</span>' : ''}</div>
+          <div class="q-service-caption">${c.service} · ${riskCaptionHtml(c.danger)}</div>
         </div>
         <span class="q-status-label" style="color:${status.color};">${status.label}</span>
       </div>
@@ -2919,6 +2934,20 @@ function statusPillClass(status){
   return 'pill-status';
 }
 
+// Three-tier risk system based on danger score — always shown, not just when
+// something's wrong, so "No risk" and "Medium risk" are just as visible as
+// "At risk" instead of only flagging the bad case.
+function riskLabel(danger){
+  if(danger>=4) return { text:'At risk', color:'#9C5C48' };
+  if(danger===3) return { text:'Medium risk', color:'var(--amber)' };
+  return { text:'No risk', color:'var(--muted-lt)' };
+}
+
+function riskCaptionHtml(danger){
+  const r = riskLabel(danger);
+  return `<span class="q-risk-flag" style="color:${r.color};">${r.text}</span>`;
+}
+
 function hasLoggedThisWeek(c){
   const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate()-7);
   return c.improvements.some(i=>i.date && new Date(i.date) >= sevenDaysAgo);
@@ -2939,7 +2968,7 @@ function openQueueCardModal(id){
     <div class="modal-head">
       <div>
         <div class="q-name">${c.name}</div>
-        <div class="q-service-caption">${c.service}${c.danger>=4 ? ' · <span class="q-risk-flag">At risk</span>' : ''}</div>
+        <div class="q-service-caption">${c.service} · ${riskCaptionHtml(c.danger)}</div>
         <div class="q-ratings" style="margin-top:12px;">
           ${dotRating('Importance', c.importance, 'ink', 10)}
           ${dotRating('Danger', c.danger, 'brand')}
