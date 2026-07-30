@@ -186,6 +186,7 @@
   .pill{font-family:'IBM Plex Mono',monospace;font-size:9.5px;padding:3px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.04em;font-weight:600;display:inline-block;}
   .pill-status{background:#EEF0F4;color:var(--muted);}
   .pill-good{background:var(--green-bg);color:var(--green);}
+  .pill-brand{background:var(--brand-bg);color:var(--brand-dark);}
   .pill-mid{background:var(--amber-bg);color:var(--amber);}
   .pill-bad{background:var(--red-bg);color:var(--red);}
   .row-link{color:var(--brand);font-size:12px;font-weight:600;cursor:pointer;}
@@ -223,6 +224,17 @@
 
   /* Approval queue */
   .queue-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:18px;margin-bottom:24px;}
+
+  /* Notes */
+  .notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+  .note-card{background:var(--card);border:1px solid #EDEEF1;border-radius:12px;padding:18px 20px;box-shadow:0 1px 2px rgba(16,24,40,.03);display:flex;flex-direction:column;}
+  .note-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+  .note-client{font-family:'Oswald',sans-serif;font-size:14.5px;font-weight:600;cursor:pointer;}
+  .note-client:hover{color:var(--brand-dark);}
+  .note-meta{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted-lt);margin-top:3px;}
+  .note-text{font-size:13px;color:var(--ink);line-height:1.55;margin-top:12px;flex:1;white-space:pre-wrap;}
+  .note-actions{display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid #F3F4F6;flex-wrap:wrap;}
+  .note-status-select{font-family:'Inter',sans-serif;font-size:11.5px;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);}
   .q-card{border:1px solid #EDEEF1;border-radius:8px;padding:22px 24px;background:var(--card);box-shadow:0 1px 2px rgba(16,24,40,.03);transition:box-shadow .18s ease, border-color .18s ease, transform .18s ease;cursor:pointer;}
   .q-card:hover{box-shadow:0 10px 28px rgba(16,24,40,.08);border-color:#DDE0E5;transform:translateY(-2px);}
   .q-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;}
@@ -352,6 +364,11 @@ document.addEventListener('DOMContentLoaded', function(){
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
         Approval Queue
         <span class="nav-badge" id="navPendingBadge">0</span>
+      </div>
+      <div class="nav-item" data-view="notes" onclick="switchView('notes')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Notes
+        <span class="nav-badge" id="navNotesBadge">0</span>
       </div>
       <div class="nav-item" data-view="settings" onclick="switchView('settings')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -569,6 +586,34 @@ document.addEventListener('DOMContentLoaded', function(){
       <div id="queueList"></div>
     </div>
 
+    <!-- NOTES -->
+    <div class="view" id="view-notes">
+      <div class="topbar">
+        <div><div class="page-title">Notes</div><div class="page-sub">Improvements you're planning or want to get to — separate from what's already logged</div></div>
+        <button class="btn btn-brand" onclick="openNoteModal()">+ Add note</button>
+      </div>
+
+      <div class="panel clients-filter-panel">
+        <div class="clients-filter-bar">
+          <div class="search-field">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="notesSearch" placeholder="Search notes…" oninput="renderNotes()">
+          </div>
+          <select id="notesClientFilter" onchange="renderNotes()"><option value="all">All clients</option></select>
+          <select id="notesStatusFilter" onchange="renderNotes()">
+            <option value="all">All statuses</option>
+            <option value="idea">Idea</option>
+            <option value="planned">Planned</option>
+            <option value="in-progress">In progress</option>
+            <option value="done">Done</option>
+          </select>
+          <button class="btn btn-outline" onclick="clearNoteFilters()">Clear</button>
+        </div>
+      </div>
+
+      <div id="notesList" class="notes-grid"></div>
+    </div>
+
     <!-- SETTINGS -->
     <div class="view" id="view-settings">
       <div class="topbar">
@@ -753,6 +798,7 @@ document.addEventListener('DOMContentLoaded', function(){
 <script>
 let clients = [];
 let log = [];
+let notes = [];
 let settings = {danielEmail:'', ericEmail:''};
 let team = [];
 let editingClientId = null;
@@ -933,6 +979,7 @@ async function loadAll(){
     const parsed = JSON.parse(appData);
     clients = parsed.clients || [];
     log = parsed.log || [];
+    notes = parsed.notes || [];
   } else {
     // One-time migration from the old two-key layout (clients-roster + activity-log),
     // which doubled write volume on every action and was the actual cause of the
@@ -940,6 +987,7 @@ async function loadAll(){
     const [c, l] = await Promise.all([safeGet('clients-roster'), safeGet('activity-log')]);
     clients = c ? JSON.parse(c) : [];
     log = l ? JSON.parse(l) : [];
+    notes = [];
     if(clients.length || log.length) await persistAppData();
   }
   settings = s ? JSON.parse(s) : {};
@@ -974,13 +1022,14 @@ async function persistAppData(){
   // state — this coalesces rapid consecutive calls (e.g. persistClients immediately
   // followed by persistLog) into far fewer actual network requests.
   if(_appDataSaveInFlight){ await _appDataSaveInFlight.catch(()=>{}); }
-  _appDataSaveInFlight = safeSet('app-data', JSON.stringify({clients, log}));
+  _appDataSaveInFlight = safeSet('app-data', JSON.stringify({clients, log, notes}));
   const result = await _appDataSaveInFlight;
   _appDataSaveInFlight = null;
   return result;
 }
 async function persistClients(){ return await persistAppData(); }
 async function persistLog(){ return await persistAppData(); }
+async function persistNotes(){ return await persistAppData(); }
 async function persistSettings(){ return await safeSet('settings', JSON.stringify(settings)); }
 async function persistTeam(){ return await safeSet('team-members', JSON.stringify(team)); }
 
@@ -1045,7 +1094,7 @@ async function fullRefresh(showFeedback){
   renderAll();
   if(showFeedback && btn){ btn.disabled = false; btn.textContent = 'Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
-function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); }
+function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); }
 
 function applyRoleVisibility(){
   const notifyBtn = document.getElementById('notifyBtn');
@@ -1453,6 +1502,7 @@ function renderClientsTable(){
           <div class="dropdown-menu" id="menu-${c.id}">
             <div class="dropdown-item" onclick="closeActionsMenus(); openEditClientForm('${c.id}')">Edit client</div>
             <div class="dropdown-item" onclick="closeActionsMenus(); toggleDrawer('${c.id}')">Log / view improvements</div>
+            <div class="dropdown-item" onclick="closeActionsMenus(); openNoteModal(null, '${c.id}')">Add note</div>
             <div class="dropdown-item danger" onclick="closeActionsMenus(); deleteClient('${c.id}')">Delete client</div>
           </div>
         </div>
@@ -1511,11 +1561,12 @@ document.addEventListener('click', function(e){
 async function deleteClient(id){
   const c = clients.find(x=>x.id===id);
   if(!c) return;
-  if(!confirm(`Delete ${c.name}? This removes all logged improvements and drafts for this client — can't be undone.`)) return;
+  if(!confirm(`Delete ${c.name}? This removes all logged improvements, drafts, and notes for this client — can't be undone.`)) return;
   await loadAll();
   const stillThere = clients.find(x=>x.id===id);
   if(!stillThere){ showToast('info','Already gone', `${c.name} was already removed.`); renderAll(); return; }
   clients = clients.filter(x=>x.id!==id);
+  notes = notes.filter(n=>n.clientId!==id);
   log.unshift({t:nowTime(), tag:'you', text:`Deleted client <b>${c.name}</b>.`});
   const ok = await persistClients();
   renderAll();
@@ -1564,6 +1615,177 @@ async function deleteImprovement(clientId, idx){
   const ok = await persistClients();
   renderClientsTable(); renderKpis();
   ok ? showToast('success','Improvement deleted','Removed from the log.') : showToast('error','Delete failed','Could not save — try again.');
+}
+
+/* ---------- Notes: plan future improvements, connected to the real logging system ---------- */
+
+function noteStatusMeta(status){
+  const map = {
+    idea: {cls:'pill-status', label:'Idea'},
+    planned: {cls:'pill-mid', label:'Planned'},
+    'in-progress': {cls:'pill-brand', label:'In progress'},
+    done: {cls:'pill-good', label:'Done'},
+  };
+  return map[status] || map.idea;
+}
+
+function openNoteModal(noteId, presetClientId){
+  const editing = noteId ? notes.find(n=>n.id===noteId) : null;
+  if(!clients.length){ showToast('error','Add a client first','Notes need a client to attach to — add one in Clients.'); return; }
+  const clientOptions = clients.map(c=>`<option value="${c.id}" ${(editing && editing.clientId===c.id) || (!editing && presetClientId===c.id) ? 'selected':''}>${c.name}</option>`).join('');
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">${editing ? 'Edit note' : 'Add note'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <div class="settings-field"><label>Client</label><select id="noteClientSelect" style="width:100%;">${clientOptions}</select></div>
+      <div class="settings-field"><label>Status</label>
+        <select id="noteStatusSelect" style="width:100%;">
+          <option value="idea" ${(!editing || editing.status==='idea')?'selected':''}>Idea</option>
+          <option value="planned" ${editing && editing.status==='planned'?'selected':''}>Planned</option>
+          <option value="in-progress" ${editing && editing.status==='in-progress'?'selected':''}>In progress</option>
+          <option value="done" ${editing && editing.status==='done'?'selected':''}>Done</option>
+        </select>
+      </div>
+      <div class="settings-field"><label>Note</label><textarea id="noteTextInput" style="width:100%;min-height:110px;font-family:'Inter',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${editing ? editing.text : ''}</textarea></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-brand" onclick="saveNote(${editing ? `'${editing.id}'` : 'null'})">${editing?'Save changes':'Add note'}</button>
+      <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
+    </div>`, 460);
+}
+
+async function saveNote(noteId){
+  const clientId = document.getElementById('noteClientSelect').value;
+  const status = document.getElementById('noteStatusSelect').value;
+  const text = document.getElementById('noteTextInput').value.trim();
+  if(!clientId){ showToast('error','Pick a client','Select which client this note is about.'); return; }
+  if(!text){ showToast('error','Nothing written','Add some note text first.'); return; }
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Saving…');
+  await loadAll();
+  if(noteId){
+    const n = notes.find(x=>x.id===noteId);
+    if(n){ n.clientId=clientId; n.status=status; n.text=text; n.updatedAt=new Date().toISOString(); }
+  } else {
+    notes.unshift({ id:'n'+Date.now()+Math.floor(Math.random()*1000), clientId, status, text, author: myName()||'Team member', createdAt: new Date().toISOString() });
+  }
+  const ok = await persistNotes();
+  restoreBtn(btn);
+  closeAppModal();
+  populateNotesClientFilter();
+  renderNotes();
+  ok ? showToast('success', noteId?'Note updated':'Note added', noteId?'Changes saved.':'Added to your notes.') : showToast('error','Save failed','Could not save — try again.');
+}
+
+async function deleteNote(id){
+  if(!confirm("Delete this note? This can't be undone.")) return;
+  await loadAll();
+  notes = notes.filter(n=>n.id!==id);
+  const ok = await persistNotes();
+  renderNotes();
+  ok ? showToast('success','Note deleted','Removed.') : showToast('error','Delete failed','Could not save — try again.');
+}
+
+async function changeNoteStatus(id, newStatus){
+  await loadAll();
+  const n = notes.find(x=>x.id===id);
+  if(!n) return;
+  n.status = newStatus;
+  n.updatedAt = new Date().toISOString();
+  const ok = await persistNotes();
+  renderNotes();
+  if(!ok) showToast('error','Save failed','Could not save — try again.');
+}
+
+// The actual system connection: converts a planned note straight into a real
+// logged improvement on that client — the same thing logImprovement() does —
+// instead of leaving Notes as a disconnected side list.
+async function logNoteNow(id){
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Logging…');
+  await loadAll();
+  const n = notes.find(x=>x.id===id);
+  if(!n){ restoreBtn(btn); showToast('error','Not found','This note may have already been removed.'); return; }
+  const c = clients.find(x=>x.id===n.clientId);
+  if(!c){ restoreBtn(btn); showToast('error','Client not found','This client may have been removed.'); return; }
+  c.improvements.push({ author: myName()||'Team member', text: n.text, date: new Date().toISOString() });
+  n.status = 'done';
+  n.updatedAt = new Date().toISOString();
+  log.unshift({t:nowTime(), tag:'you', text:`Logged a planned improvement for <b>${c.name}</b> from Notes.`});
+  const ok = await persistAppData();
+  renderNotes(); renderClientsTable(); renderKpis(); renderLog();
+  ok ? showToast('success','Logged!', `Added to ${c.name}'s improvement log this week.`) : showToast('error','Save failed','Could not save — try again.');
+}
+
+function populateNotesClientFilter(){
+  const sel = document.getElementById('notesClientFilter');
+  if(!sel) return;
+  const current = sel.value || 'all';
+  sel.innerHTML = `<option value="all">All clients</option>` + clients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  if([...sel.options].some(o=>o.value===current)) sel.value = current;
+}
+
+function clearNoteFilters(){
+  const search = document.getElementById('notesSearch'); if(search) search.value = '';
+  const clientSel = document.getElementById('notesClientFilter'); if(clientSel) clientSel.value = 'all';
+  const statusSel = document.getElementById('notesStatusFilter'); if(statusSel) statusSel.value = 'all';
+  renderNotes();
+}
+
+function renderNotes(){
+  const el = document.getElementById('notesList');
+  if(!el) return;
+  updateNotesBadge();
+  const search = (document.getElementById('notesSearch')?.value || '').trim().toLowerCase();
+  const clientFilter = document.getElementById('notesClientFilter')?.value || 'all';
+  const statusFilter = document.getElementById('notesStatusFilter')?.value || 'all';
+
+  let filtered = notes.filter(n=>{
+    const c = clients.find(x=>x.id===n.clientId);
+    if(clientFilter!=='all' && n.clientId!==clientFilter) return false;
+    if(statusFilter!=='all' && n.status!==statusFilter) return false;
+    if(search && !(n.text.toLowerCase().includes(search) || (c && c.name.toLowerCase().includes(search)))) return false;
+    return true;
+  });
+
+  if(!notes.length){ el.innerHTML = `<div class="empty">No notes yet. Click "+ Add note" to jot down something you'd like to do for a client.</div>`; return; }
+  if(!filtered.length){ el.innerHTML = `<div class="empty">No notes match these filters.</div>`; return; }
+
+  filtered.sort((a,b)=> new Date(b.updatedAt||b.createdAt) - new Date(a.updatedAt||a.createdAt));
+
+  el.innerHTML = filtered.map(n=>{
+    const c = clients.find(x=>x.id===n.clientId);
+    const status = noteStatusMeta(n.status);
+    const dateStr = new Date(n.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    return `<div class="note-card">
+      <div class="note-card-top">
+        <div>
+          <div class="note-client" onclick="goToClientInQueue('${n.clientId}','all')">${c ? c.name : 'Unknown client'}</div>
+          <div class="note-meta">${n.author} · ${dateStr}</div>
+        </div>
+        <span class="pill ${status.cls}">${status.label}</span>
+      </div>
+      <div class="note-text">${n.text}</div>
+      <div class="note-actions">
+        ${n.status!=='done' ? `<button class="btn btn-brand" style="padding:7px 12px;font-size:11.5px;" onclick="logNoteNow('${n.id}')">Log it now</button>` : ''}
+        <select class="note-status-select" onchange="changeNoteStatus('${n.id}', this.value)">
+          <option value="idea" ${n.status==='idea'?'selected':''}>Idea</option>
+          <option value="planned" ${n.status==='planned'?'selected':''}>Planned</option>
+          <option value="in-progress" ${n.status==='in-progress'?'selected':''}>In progress</option>
+          <option value="done" ${n.status==='done'?'selected':''}>Done</option>
+        </select>
+        <span class="row-link" onclick="openNoteModal('${n.id}')">Edit</span>
+        <span class="row-link danger-link" onclick="deleteNote('${n.id}')">Delete</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateNotesBadge(){
+  const badge = document.getElementById('navNotesBadge');
+  if(!badge) return;
+  const open = notes.filter(n=>n.status!=='done').length;
+  badge.textContent = open;
+  badge.style.display = open ? 'inline-flex' : 'none';
 }
 
 async function logImprovement(id){
