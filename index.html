@@ -379,6 +379,16 @@
 
   /* Toasts */
   .toast-stack{position:fixed;top:18px;right:18px;z-index:999;display:flex;flex-direction:column;gap:8px;max-width:320px;}
+
+  .floating-timer-pill{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:1500;display:flex;align-items:center;gap:12px;background:var(--sidebar);color:#fff;border-radius:30px;padding:10px 10px 10px 18px;box-shadow:0 12px 32px rgba(16,24,40,.28);cursor:pointer;max-width:min(92vw,460px);}
+  .ftp-dot{width:8px;height:8px;border-radius:50%;background:var(--brand);flex:none;position:relative;}
+  .ftp-dot::after{content:'';position:absolute;inset:0;border-radius:50%;background:var(--brand);animation:pulseRing 1.8s ease-out infinite;}
+  .ftp-info{min-width:0;overflow:hidden;}
+  .ftp-client{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ftp-desc{font-size:10.5px;color:#9DAAC2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
+  .ftp-time{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:var(--brand);flex:none;font-variant-numeric:tabular-nums;}
+  .ftp-stop{background:#fff;color:var(--ink);border:none;border-radius:20px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;flex:none;}
+  .ftp-stop:hover{opacity:.9;}
   .toast{display:flex;align-items:flex-start;gap:9px;background:var(--card);color:var(--ink);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:8px;padding:11px 13px;box-shadow:0 6px 20px rgba(16,24,40,.12);font-size:12.5px;line-height:1.4;animation:toastIn .18s ease-out;}
   .toast.error{border-left-color:var(--red);}
   .toast.info{border-left-color:var(--muted-lt);}
@@ -983,6 +993,16 @@ document.addEventListener('DOMContentLoaded', function(){
 </div>
 
 <div class="toast-stack" id="toastStack"></div>
+
+<div class="floating-timer-pill" id="floatingTimerPill" style="display:none;" onclick="switchViewIfNotOnTimer(event)">
+  <span class="ftp-dot"></span>
+  <div class="ftp-info">
+    <div class="ftp-client" id="ftpClient">—</div>
+    <div class="ftp-desc" id="ftpDesc"></div>
+  </div>
+  <div class="ftp-time" id="ftpTime">00:00:00</div>
+  <button class="ftp-stop" onclick="event.stopPropagation(); stopAndSaveTimer();">Stop</button>
+</div>
 
 <script>
 let clients = [];
@@ -2040,14 +2060,36 @@ function switchTimeTab(name){
 /* --- Live timer --- */
 function updateTimerDisplay(){
   const el = document.getElementById('timerDisplay');
-  if(!el) return;
-  if(!timerState.running){ el.textContent = '00:00:00'; el.classList.remove('running'); return; }
+  if(!timerState.running){
+    if(el){ el.textContent = '00:00:00'; el.classList.remove('running'); }
+    updateFloatingTimerPill('00:00:00');
+    return;
+  }
   const elapsedSec = Math.floor((Date.now() - timerState.startedAt)/1000);
   const h = String(Math.floor(elapsedSec/3600)).padStart(2,'0');
   const m = String(Math.floor((elapsedSec%3600)/60)).padStart(2,'0');
   const s = String(elapsedSec%60).padStart(2,'0');
-  el.textContent = `${h}:${m}:${s}`;
-  el.classList.add('running');
+  const timeStr = `${h}:${m}:${s}`;
+  if(el){ el.textContent = timeStr; el.classList.add('running'); }
+  updateFloatingTimerPill(timeStr);
+}
+
+// Keeps a persistent pill visible on every tab while a timer is running, so
+// leaving the Time Tracker page doesn't mean losing track of it.
+function updateFloatingTimerPill(timeStr){
+  const pill = document.getElementById('floatingTimerPill');
+  if(!pill) return;
+  if(!timerState.running){ pill.style.display = 'none'; return; }
+  pill.style.display = 'flex';
+  const c = clients.find(x=>x.id===timerState.clientId);
+  document.getElementById('ftpClient').textContent = c ? c.name : 'Tracking time…';
+  document.getElementById('ftpDesc').textContent = timerState.description || '';
+  document.getElementById('ftpTime').textContent = timeStr || '00:00:00';
+}
+
+function switchViewIfNotOnTimer(){
+  switchView('time');
+  switchTimeTab('timer');
 }
 
 function saveTimerState(){ try{ localStorage.setItem('bda_timer_state', JSON.stringify(timerState)); }catch(e){} }
@@ -2057,6 +2099,10 @@ function initTimerFromStorage(){
     const raw = localStorage.getItem('bda_timer_state');
     if(raw) timerState = JSON.parse(raw);
   }catch(e){}
+  if(timerState.running && timerState.startedAt && (Date.now() - timerState.startedAt > 12*3600*1000)){
+    timerState = { running:false, startedAt:null, clientId:'', description:'' };
+    saveTimerState();
+  }
   if(timerState.running){
     timerIntervalId = setInterval(updateTimerDisplay, 1000);
     updateTimerDisplay();
@@ -2067,6 +2113,7 @@ function initTimerFromStorage(){
     const descInput = document.getElementById('timerDesc');
     if(descInput) descInput.value = timerState.description;
   }
+  updateFloatingTimerPill();
 }
 
 function toggleTimer(){
@@ -2224,7 +2271,7 @@ function renderTimesheetDay(bodyEl){
       </div>
       <div class="ts-entry-right">
         <div class="ts-entry-duration">${formatMinutes(e.minutes)}</div>
-        <button class="btn btn-outline" onclick="resumeEntryTimer('${e.clientId}', ${JSON.stringify(e.description||'')})">▶ Start</button>
+        <button class="btn btn-outline" data-resume-client="${e.clientId}" data-resume-desc="${encodeURIComponent(e.description||'')}" onclick="resumeEntryTimerFromBtn(this)">▶ Start</button>
         ${canEdit ? `<button class="btn btn-outline" onclick="openTimeEntryModal('${e.id}')">Edit</button><button class="btn btn-outline" style="color:var(--red);" onclick="deleteTimeEntry('${e.id}')">Delete</button>` : ''}
       </div>
     </div>`;
@@ -2293,7 +2340,20 @@ function jumpToDateClient(dStr, clientId){
   jumpToDate(dStr);
 }
 
+function resumeEntryTimerFromBtn(btn){
+  const clientId = btn.dataset.resumeClient;
+  const description = decodeURIComponent(btn.dataset.resumeDesc || '');
+  resumeEntryTimer(clientId, description);
+}
+
 function resumeEntryTimer(clientId, description){
+  // Recover from a stuck "running" state (e.g. left over from a bug or a
+  // browser tab that never got the stop event) — anything over 12 hours old
+  // is clearly not a real in-progress session.
+  if(timerState.running && timerState.startedAt && (Date.now() - timerState.startedAt > 12*3600*1000)){
+    timerState = { running:false, startedAt:null, clientId:'', description:'' };
+    saveTimerState();
+  }
   if(timerState.running){ showToast('error','Timer already running','Stop the current timer before starting another.'); return; }
   switchTimeTab('timer');
   const clientSel = document.getElementById('timerClient');
