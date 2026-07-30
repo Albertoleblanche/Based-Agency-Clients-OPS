@@ -145,6 +145,9 @@
   .clients-filter-panel{padding:18px 20px;}
   .clients-filter-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
   .search-field{display:flex;align-items:center;gap:8px;flex:1;min-width:200px;padding:0 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);}
+  .select-field{display:flex;align-items:center;gap:8px;min-width:180px;padding:0 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--muted-lt);}
+  .select-field select{border:none;background:transparent;padding:9px 0;font-family:'Inter',sans-serif;font-size:12.5px;color:var(--ink);width:100%;cursor:pointer;}
+  .select-field select:focus{outline:none;}
   .search-field svg{color:var(--muted-lt);flex:none;}
   .search-field input{border:none;background:transparent;padding:9px 0;font-family:'Inter',sans-serif;font-size:12.5px;color:var(--ink);width:100%;}
   .search-field input:focus{outline:none;}
@@ -237,6 +240,8 @@
   .note-status-select{font-family:'Inter',sans-serif;font-size:11.5px;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);}
 
   /* Time Tracker */
+  .timer-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;}
+  @media (max-width:820px){.timer-row{grid-template-columns:1fr;}}
   .timer-display{font-family:'IBM Plex Mono',monospace;font-size:44px;font-weight:600;text-align:center;padding:20px 0 24px;letter-spacing:.02em;font-variant-numeric:tabular-nums;}
   .timer-display.running{color:var(--brand);}
   #timerToggleBtn{width:100%;justify-content:center;}
@@ -287,6 +292,22 @@
   .report-bar-track{height:7px;border-radius:4px;background:#EEF0F4;overflow:hidden;}
   .report-bar-fill{height:100%;background:var(--brand);border-radius:4px;transition:width .5s ease;}
   body[data-theme="dark"] .report-bar-track{background:#1E222C;}
+
+  .report-checkbox-label{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);cursor:pointer;}
+  .report-checkbox-label input{cursor:pointer;}
+
+  .report-table{width:100%;border-collapse:collapse;}
+  .report-table th{text-align:left;font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-lt);padding:12px 0;border-bottom:1px solid var(--border);font-weight:600;}
+  .report-th-hours{width:90px;}
+  .report-th-bar{width:40%;}
+  .report-table td{padding:13px 0;border-bottom:1px solid #F3F4F6;vertical-align:middle;}
+  .report-table tr:last-child td{border-bottom:none;}
+  .report-name-link{color:var(--brand);font-weight:600;font-size:13px;cursor:pointer;}
+  .report-name-link:hover{text-decoration:underline;}
+  .report-hours-val{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:13px;}
+  .report-inline-bar-track{height:9px;border-radius:5px;background:#EEF0F4;overflow:hidden;max-width:260px;}
+  .report-inline-bar-fill{height:100%;background:var(--brand);border-radius:5px;transition:width .5s ease;}
+  body[data-theme="dark"] .report-inline-bar-track{background:#1E222C;}
   .q-card{border:1px solid #EDEEF1;border-radius:8px;padding:22px 24px;background:var(--card);box-shadow:0 1px 2px rgba(16,24,40,.03);transition:box-shadow .18s ease, border-color .18s ease, transform .18s ease;cursor:pointer;}
   .q-card:hover{box-shadow:0 10px 28px rgba(16,24,40,.08);border-color:#DDE0E5;transform:translateY(-2px);}
   .q-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;}
@@ -676,7 +697,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <div><div class="page-title">Time Tracker</div><div class="page-sub">Log hours per client, review the timesheet, and see where the team's time goes</div></div>
       </div>
 
-      <div class="tabs settings-tabs">
+      <div class="tabs settings-tabs" id="timeMainTabs">
         <div class="tab settings-tab active" data-ttab="timer" onclick="switchTimeTab('timer')">Timer</div>
         <div class="tab settings-tab" data-ttab="timesheet" onclick="switchTimeTab('timesheet')">Timesheet</div>
         <div class="tab settings-tab" data-ttab="reports" onclick="switchTimeTab('reports')">Reports</div>
@@ -684,28 +705,30 @@ document.addEventListener('DOMContentLoaded', function(){
 
       <!-- TIMER -->
       <div class="settings-subview active" id="ttab-timer">
-        <div class="panel">
-          <div class="panel-head"><span class="panel-title">Live Timer</span></div>
-          <div class="panel-body">
-            <div class="timer-display" id="timerDisplay">00:00:00</div>
-            <div class="form-grid" style="margin-bottom:14px;">
-              <div><label>Client</label><select id="timerClient"></select></div>
-              <div style="grid-column:1/-1;"><label>What are you working on?</label><input id="timerDesc" placeholder="e.g. Updating Meta ad creative"></div>
+        <div class="timer-row">
+          <div class="panel">
+            <div class="panel-head"><span class="panel-title">Live Timer</span></div>
+            <div class="panel-body">
+              <div class="timer-display" id="timerDisplay">00:00:00</div>
+              <div class="form-grid" style="margin-bottom:14px;">
+                <div style="grid-column:1/-1;"><label>Client</label><select id="timerClient"></select></div>
+                <div style="grid-column:1/-1;"><label>What are you working on?</label><input id="timerDesc" placeholder="e.g. Updating Meta ad creative"></div>
+              </div>
+              <button class="btn btn-brand" id="timerToggleBtn" onclick="toggleTimer()">Start timer</button>
             </div>
-            <button class="btn btn-brand" id="timerToggleBtn" onclick="toggleTimer()">Start timer</button>
           </div>
-        </div>
 
-        <div class="panel">
-          <div class="panel-head"><span class="panel-title">Add time manually</span></div>
-          <div class="panel-body">
-            <div class="form-grid">
-              <div><label>Client</label><select id="manualClient"></select></div>
-              <div><label>Date</label><input type="date" id="manualDate"></div>
-              <div><label>Hours</label><input type="number" id="manualHours" min="0.05" max="24" step="0.25" placeholder="1.5"></div>
-              <div style="grid-column:1/-1;"><label>Description</label><input id="manualDesc" placeholder="What did you work on?"></div>
+          <div class="panel">
+            <div class="panel-head"><span class="panel-title">Add time manually</span></div>
+            <div class="panel-body">
+              <div class="form-grid">
+                <div style="grid-column:1/-1;"><label>Client</label><select id="manualClient"></select></div>
+                <div><label>Date</label><input type="date" id="manualDate"></div>
+                <div><label>Hours</label><input type="number" id="manualHours" min="0.05" max="24" step="0.25" placeholder="1.5"></div>
+                <div style="grid-column:1/-1;"><label>Description</label><input id="manualDesc" placeholder="What did you work on?"></div>
+              </div>
+              <button class="btn btn-brand" style="margin-top:12px;" onclick="addManualEntry()">Add entry</button>
             </div>
-            <button class="btn btn-brand" style="margin-top:12px;" onclick="addManualEntry()">Add entry</button>
           </div>
         </div>
       </div>
@@ -724,7 +747,10 @@ document.addEventListener('DOMContentLoaded', function(){
               <button class="btn btn-outline" onclick="shiftTimesheet(1)">Next →</button>
               <button class="btn btn-outline" onclick="jumpToToday()">Today</button>
             </div>
-            <select id="timesheetClientFilter" onchange="renderTimesheet()"><option value="all">All clients</option></select>
+            <div class="select-field">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <select id="timesheetClientFilter" onchange="renderTimesheet()"><option value="all">All clients</option></select>
+            </div>
           </div>
         </div>
         <div id="timesheetBody"></div>
@@ -733,20 +759,34 @@ document.addEventListener('DOMContentLoaded', function(){
       <!-- REPORTS -->
       <div class="settings-subview" id="ttab-reports">
         <div class="clients-filter-bar" style="margin-bottom:16px;">
-          <select id="reportRange" onchange="renderReports()">
-            <option value="week">This week</option>
-            <option value="month">This month</option>
-            <option value="all">All time</option>
-          </select>
+          <div class="select-field" style="min-width:150px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <select id="reportRange" onchange="renderReports()">
+              <option value="week">This week</option>
+              <option value="month">This month</option>
+              <option value="all">All time</option>
+            </select>
+          </div>
+          <label class="report-checkbox-label">
+            <input type="checkbox" id="reportActiveOnly" onchange="renderReports()"> Active clients only
+          </label>
         </div>
-        <div class="metrics-row" style="grid-template-columns:1fr 1fr;" id="reportSummary"></div>
-        <div class="panel" style="margin-top:16px;">
-          <div class="panel-head"><span class="panel-title">By Client</span></div>
-          <div class="panel-body"><div id="reportByClient"></div></div>
+
+        <div class="metrics-row" id="reportSummary"></div>
+
+        <div class="tabs settings-tabs" style="margin-top:20px;">
+          <div class="tab settings-tab active" data-rtab="clients" onclick="switchReportTab('clients')">Clients</div>
+          <div class="tab settings-tab" data-rtab="services" onclick="switchReportTab('services')">Services</div>
+          <div class="tab settings-tab" data-rtab="teammates" onclick="switchReportTab('teammates')">Teammates</div>
         </div>
+
         <div class="panel">
-          <div class="panel-head"><span class="panel-title">By Team Member</span></div>
-          <div class="panel-body"><div id="reportByPerson"></div></div>
+          <div class="panel-body" style="padding:8px 22px;">
+            <table class="report-table">
+              <thead><tr><th>Name</th><th class="report-th-hours">Hours</th><th class="report-th-bar"></th></tr></thead>
+              <tbody id="reportTableBody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -1978,8 +2018,8 @@ function populateTimeClientSelects(){
 }
 
 function switchTimeTab(name){
-  document.querySelectorAll('#view-time .settings-tab').forEach(t=>t.classList.toggle('active', t.dataset.ttab===name));
-  document.querySelectorAll('#view-time .settings-subview').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('#timeMainTabs .settings-tab').forEach(t=>t.classList.toggle('active', t.dataset.ttab===name));
+  document.querySelectorAll('#view-time > .settings-subview').forEach(v=>v.classList.remove('active'));
   document.getElementById('ttab-'+name).classList.add('active');
   if(name==='timesheet') renderTimesheet();
   if(name==='reports') renderReports();
@@ -2149,7 +2189,7 @@ function renderTimesheetDay(bodyEl){
       <div class="ts-entry-right">
         <div class="ts-entry-duration">${formatMinutes(e.minutes)}</div>
         <button class="btn btn-outline" onclick="resumeEntryTimer('${e.clientId}', ${JSON.stringify(e.description||'')})">▶ Start</button>
-        ${canEdit ? `<button class="btn btn-outline" onclick="openTimeEntryModal('${e.id}')">Edit</button>` : ''}
+        ${canEdit ? `<button class="btn btn-outline" onclick="openTimeEntryModal('${e.id}')">Edit</button><button class="btn btn-outline" style="color:var(--red);" onclick="deleteTimeEntry('${e.id}')">Delete</button>` : ''}
       </div>
     </div>`;
   }).join('') : `<div class="panel"><div class="empty">Nothing logged this day.</div></div>`;
@@ -2272,21 +2312,42 @@ async function deleteTimeEntry(id){
 }
 
 /* --- Reports --- */
-function renderReports(){
-  const summaryEl = document.getElementById('reportSummary');
-  const byClientEl = document.getElementById('reportByClient');
-  const byPersonEl = document.getElementById('reportByPerson');
-  if(!summaryEl) return;
+let reportTab = 'clients';
+
+function switchReportTab(name){
+  reportTab = name;
+  document.querySelectorAll('#ttab-reports .settings-tab').forEach(t=>t.classList.toggle('active', t.dataset.rtab===name));
+  renderReports();
+}
+
+function getReportRangeEntries(){
   const range = document.getElementById('reportRange')?.value || 'week';
+  const activeOnly = document.getElementById('reportActiveOnly')?.checked;
   const now = new Date();
   let start;
   if(range==='week'){ start = getWeekStart(now); }
   else if(range==='month'){ start = new Date(now.getFullYear(), now.getMonth(), 1); }
   else { start = new Date(2000,0,1); }
 
-  const relevant = timeEntries.filter(e=> new Date(e.date+'T00:00:00') >= start);
+  return timeEntries.filter(e=>{
+    if(new Date(e.date+'T00:00:00') < start) return false;
+    if(activeOnly){
+      const c = clients.find(x=>x.id===e.clientId);
+      if(!c || c.status!=='Active') return false;
+    }
+    return true;
+  });
+}
+
+function renderReports(){
+  const summaryEl = document.getElementById('reportSummary');
+  const tableBody = document.getElementById('reportTableBody');
+  if(!summaryEl) return;
+
+  const relevant = getReportRangeEntries();
   const totalMinutes = relevant.reduce((s,e)=>s+e.minutes,0);
   const uniqueClients = new Set(relevant.map(e=>e.clientId)).size;
+  const uniquePeople = new Set(relevant.map(e=>e.userId)).size;
 
   summaryEl.innerHTML = `
     <div class="metric-card">
@@ -2298,33 +2359,55 @@ function renderReports(){
       <div class="metric-head"><span class="metric-icon metric-icon-green"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="metric-label">Entries Logged</span></div>
       <div class="metric-value">${relevant.length}</div>
       <div class="metric-caption">By the whole team</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-head"><span class="metric-icon metric-icon-amber"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="metric-label">Team Members</span></div>
+      <div class="metric-value">${uniquePeople}</div>
+      <div class="metric-caption">Logged time this range</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-head"><span class="metric-icon metric-icon-purple"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="metric-label">Clients Worked</span></div>
+      <div class="metric-value">${uniqueClients}</div>
+      <div class="metric-caption">Had time logged</div>
     </div>`;
 
-  const byClient = {};
-  relevant.forEach(e=>{ byClient[e.clientId] = (byClient[e.clientId]||0) + e.minutes; });
-  const clientRows = Object.entries(byClient).sort((a,b)=>b[1]-a[1]);
-  const maxClientMin = clientRows.length ? clientRows[0][1] : 1;
-  byClientEl.innerHTML = clientRows.length ? clientRows.map(([cid,mins])=>{
-    const c = clients.find(x=>x.id===cid);
-    const pct = Math.max(4, Math.round(mins/maxClientMin*100));
-    return `<div class="report-bar-row">
-      <div class="report-bar-top"><span class="report-bar-name">${c?c.name:'Unknown client'}</span><span class="report-bar-val">${formatMinutes(mins)}</span></div>
-      <div class="report-bar-track"><div class="report-bar-fill" style="width:${pct}%;"></div></div>
-    </div>`;
-  }).join('') : `<div class="empty">No time logged in this range.</div>`;
+  if(!tableBody) return;
 
-  const byPerson = {};
-  relevant.forEach(e=>{ byPerson[e.userId] = (byPerson[e.userId]||0) + e.minutes; });
-  const personRows = Object.entries(byPerson).sort((a,b)=>b[1]-a[1]);
-  const maxPersonMin = personRows.length ? personRows[0][1] : 1;
-  byPersonEl.innerHTML = personRows.length ? personRows.map(([uid,mins])=>{
-    const p = teamProfiles.find(x=>x.id===uid);
-    const pct = Math.max(4, Math.round(mins/maxPersonMin*100));
-    return `<div class="report-bar-row">
-      <div class="report-bar-top"><span class="report-bar-name">${p?p.name:'Unknown'}</span><span class="report-bar-val">${formatMinutes(mins)}</span></div>
-      <div class="report-bar-track"><div class="report-bar-fill" style="width:${pct}%;background:var(--ink);"></div></div>
-    </div>`;
-  }).join('') : `<div class="empty">No time logged in this range.</div>`;
+  let grouped = {}, getLabel;
+  if(reportTab==='clients'){
+    relevant.forEach(e=>{ grouped[e.clientId] = (grouped[e.clientId]||0) + e.minutes; });
+    getLabel = (key)=>{ const c = clients.find(x=>x.id===key); return c ? c.name : 'Unknown client'; };
+  } else if(reportTab==='services'){
+    relevant.forEach(e=>{
+      const c = clients.find(x=>x.id===e.clientId);
+      const svc = c ? c.service : 'Unknown service';
+      grouped[svc] = (grouped[svc]||0) + e.minutes;
+    });
+    getLabel = (key)=> key;
+  } else {
+    relevant.forEach(e=>{ grouped[e.userId] = (grouped[e.userId]||0) + e.minutes; });
+    getLabel = (key)=>{ const p = teamProfiles.find(x=>x.id===key); return p ? p.name : 'Unknown'; };
+  }
+
+  const rows = Object.entries(grouped).sort((a,b)=>b[1]-a[1]);
+  const maxMin = rows.length ? rows[0][1] : 1;
+
+  if(!rows.length){
+    tableBody.innerHTML = `<tr><td colspan="3"><div class="empty">No time logged in this range.</div></td></tr>`;
+    return;
+  }
+
+  tableBody.innerHTML = rows.map(([key,mins])=>{
+    const label = getLabel(key);
+    const pct = Math.max(3, Math.round(mins/maxMin*100));
+    const clickAction = reportTab==='clients' ? ` onclick="goToClientInQueue('${key}','all')"` : '';
+    const nameEl = reportTab==='clients' ? `<span class="report-name-link"${clickAction}>${label}</span>` : `<span style="font-weight:600;font-size:13px;">${label}</span>`;
+    return `<tr>
+      <td>${nameEl}</td>
+      <td class="report-hours-val">${formatMinutes(mins)}</td>
+      <td><div class="report-inline-bar-track"><div class="report-inline-bar-fill" style="width:${pct}%;"></div></div></td>
+    </tr>`;
+  }).join('');
 }
 
 async function logImprovement(id){
