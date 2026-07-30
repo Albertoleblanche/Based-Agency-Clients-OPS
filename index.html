@@ -107,6 +107,58 @@
   .kpi-click{cursor:pointer;transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;}
   .kpi-click:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(16,24,40,.08);border-color:#DDE0E5;}
 
+  /* Hero row: ring cards + portfolio bar */
+  .hero-row{display:grid;grid-template-columns:220px 220px 1fr;gap:16px;margin-bottom:16px;}
+  @media (max-width:900px){.hero-row{grid-template-columns:1fr 1fr;} .hero-row .bar-card{grid-column:1/-1;}}
+  @media (max-width:560px){.hero-row{grid-template-columns:1fr;}}
+
+  .ring-card{border-radius:14px;padding:20px;display:flex;flex-direction:column;align-items:center;background:var(--card);border:1px solid #EDEEF1;box-shadow:0 1px 2px rgba(16,24,40,.03);position:relative;overflow:hidden;}
+  .ring-card-dark{
+    background:
+      radial-gradient(circle at 15% 15%, rgba(255,255,255,.06), transparent 45%),
+      radial-gradient(circle at 85% 90%, rgba(232,98,44,.18), transparent 55%),
+      linear-gradient(155deg, #16213D 0%, #0D1526 100%);
+    border-color:#0D1526;
+    color:#fff;
+  }
+  .ring-card-dark::after{
+    content:'';position:absolute;inset:0;opacity:.5;pointer-events:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+  .ring-card-head{font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-lt);align-self:flex-start;position:relative;z-index:1;}
+  .ring-card-dark .ring-card-head{color:#9DAAC2;}
+  .ring-wrap{position:relative;width:130px;height:130px;margin-top:8px;}
+  .ring-svg{width:100%;height:100%;transform:rotate(-90deg);}
+  .ring-bg{fill:none;stroke:#EEF0F4;stroke-width:9;}
+  .ring-card-dark .ring-bg{stroke:rgba(255,255,255,.1);}
+  .ring-fg{fill:none;stroke:var(--brand);stroke-width:9;stroke-linecap:round;transition:stroke-dashoffset .8s ease;}
+  .ring-fg-brand{stroke:var(--brand);}
+  .ring-card-dark .ring-fg{stroke:#fff;}
+  .ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+  .ring-value{font-family:'Oswald',sans-serif;font-size:26px;font-weight:600;}
+  .ring-caption{font-family:'IBM Plex Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-lt);margin-top:3px;text-align:center;padding:0 6px;}
+  .ring-card-dark .ring-caption{color:#9DAAC2;}
+
+  .bar-card{padding:20px 22px;display:flex;flex-direction:column;}
+  .bar-card-head{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;margin-bottom:16px;}
+  .bar-total{display:flex;align-items:baseline;gap:8px;margin-bottom:14px;}
+  .bar-total-num{font-family:'Oswald',sans-serif;font-size:30px;font-weight:600;}
+  .bar-total-label{font-family:'IBM Plex Mono',monospace;font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-lt);}
+  .segmented-bar{display:flex;height:8px;border-radius:5px;overflow:hidden;background:#EEF0F4;gap:2px;}
+  .bar-segment{height:100%;transition:width .6s ease;}
+  .bar-legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px;}
+  .legend-item{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px;}
+  .legend-dot{width:7px;height:7px;border-radius:50%;flex:none;}
+
+  /* Icon stat tiles */
+  .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;}
+  .stat-tile{background:var(--card);border:1px solid #EDEEF1;border-radius:12px;padding:16px 18px;display:flex;align-items:center;gap:13px;box-shadow:0 1px 2px rgba(16,24,40,.03);}
+  .stat-icon{width:34px;height:34px;border-radius:9px;background:var(--surface-2);color:var(--muted);display:flex;align-items:center;justify-content:center;flex:none;}
+  .stat-icon-warn{background:var(--red-bg);color:var(--red);}
+  .stat-icon-good{background:var(--green-bg);color:var(--green);}
+  .stat-val{font-family:'Oswald',sans-serif;font-size:21px;font-weight:600;line-height:1;}
+  .stat-label{font-size:11px;color:var(--muted-lt);margin-top:4px;}
+
   .filter-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
   .filter-pill{font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;padding:6px 12px;border-radius:20px;background:var(--card);border:1px solid var(--border);color:var(--muted);cursor:pointer;font-weight:600;transition:border-color .15s ease, color .15s ease;}
   .filter-pill:hover{border-color:var(--brand);color:var(--brand-dark);}
@@ -232,6 +284,8 @@
   @keyframes spin{to{transform:rotate(360deg);}}
 
   body[data-theme="dark"] .pill-status, body[data-theme="dark"] .integ-status.off, body[data-theme="dark"] .tag.auto{background:#1E222C;}
+  body[data-theme="dark"] .segmented-bar{background:#1E222C;}
+  body[data-theme="dark"] .ring-bg{stroke:#22262F;}
 
   /* Settings / integrations */
   .integ-row{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid #F0F1F4;}
@@ -350,7 +404,7 @@ document.addEventListener('DOMContentLoaded', function(){
     <!-- OVERVIEW -->
     <div class="view active" id="view-overview">
       <div class="topbar">
-        <div><div class="page-title">Overview</div><div class="page-sub">Weekly client update workflow at a glance</div></div>
+        <div><div class="page-title" id="greetingTitle">Good morning</div><div class="page-sub" id="greetingSub">Here's what's happening with your clients today.</div></div>
         <div class="topbar-right">
           <div class="clock-mini-pill gauge-row" onclick="switchView('approve')" title="Time until Wednesday auto-notification">
             <svg class="clock-ring" width="18" height="18" viewBox="0 0 20 20">
@@ -364,14 +418,50 @@ document.addEventListener('DOMContentLoaded', function(){
         </div>
       </div>
 
-      <div class="kpis">
-        <div class="kpi kpi-click" onclick="switchView('clients')"><div class="kpi-label">Total clients</div><div class="kpi-val" id="kpiTotal">0</div><div class="kpi-foot">Active in roster · view all</div></div>
-        <div class="kpi kpi-click" onclick="goToQueueFilter('atrisk')"><div class="kpi-label">At risk</div><div class="kpi-val warn" id="kpiRisk">0</div><div class="kpi-foot">Danger score 4–5 · view queue</div></div>
-        <div class="kpi kpi-click" onclick="goToQueueFilter('pending')"><div class="kpi-label">Pending approval</div><div class="kpi-val" id="kpiPending">0</div><div class="kpi-foot">Awaiting Daniel &amp; Eric · view queue</div></div>
-        <div class="kpi kpi-click" onclick="goToQueueFilter('approved')"><div class="kpi-label">Approved this week</div><div class="kpi-val" id="kpiApproved">0</div><div class="kpi-foot">Sent or ready · view queue</div></div>
-        <div class="kpi"><div class="kpi-label">Client Health</div><div class="kpi-val" id="kpiHealth">—</div><div class="kpi-foot">Portfolio-wide, based on danger scores</div></div>
-        <div class="kpi"><div class="kpi-label">Weekly Completion</div><div class="kpi-val" id="kpiCompletion">—</div><div class="kpi-foot">Of clients with logs, % approved</div></div>
-        <div class="kpi kpi-click" onclick="goToQueueFilter('approved')"><div class="kpi-label">Weekly Updates Done</div><div class="kpi-val" id="kpiUpdatesDone">—</div><div class="kpi-foot">Approved out of clients with logs</div></div>
+      <div class="hero-row">
+        <div class="ring-card ring-card-dark">
+          <div class="ring-card-head">Client Health</div>
+          <div class="ring-wrap">
+            <svg class="ring-svg" viewBox="0 0 120 120">
+              <circle class="ring-bg" cx="60" cy="60" r="50"></circle>
+              <circle class="ring-fg" id="healthRing" cx="60" cy="60" r="50"></circle>
+            </svg>
+            <div class="ring-center"><div class="ring-value" id="kpiHealth">—</div><div class="ring-caption">Portfolio-wide</div></div>
+          </div>
+        </div>
+
+        <div class="ring-card">
+          <div class="ring-card-head">Weekly Completion</div>
+          <div class="ring-wrap">
+            <svg class="ring-svg" viewBox="0 0 120 120">
+              <circle class="ring-bg" cx="60" cy="60" r="50"></circle>
+              <circle class="ring-fg ring-fg-brand" id="completionRing" cx="60" cy="60" r="50"></circle>
+            </svg>
+            <div class="ring-center"><div class="ring-value" id="kpiCompletion">—</div><div class="ring-caption" id="kpiUpdatesDone">—</div></div>
+          </div>
+        </div>
+
+        <div class="panel bar-card kpi-click" onclick="switchView('clients')">
+          <div class="bar-card-head"><span>Client Portfolio</span><span class="row-link">View all →</span></div>
+          <div class="bar-total"><span class="bar-total-num" id="kpiTotal">0</span><span class="bar-total-label">TOTAL CLIENTS</span></div>
+          <div class="segmented-bar" id="portfolioBar"></div>
+          <div class="bar-legend" id="portfolioLegend"></div>
+        </div>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat-tile kpi-click" onclick="goToQueueFilter('atrisk')">
+          <div class="stat-icon stat-icon-warn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+          <div><div class="stat-val" id="kpiRisk">0</div><div class="stat-label">At risk</div></div>
+        </div>
+        <div class="stat-tile kpi-click" onclick="goToQueueFilter('pending')">
+          <div class="stat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+          <div><div class="stat-val" id="kpiPending">0</div><div class="stat-label">Pending approval</div></div>
+        </div>
+        <div class="stat-tile kpi-click" onclick="goToQueueFilter('approved')">
+          <div class="stat-icon stat-icon-good"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+          <div><div class="stat-val" id="kpiApproved">0</div><div class="stat-label">Approved this week</div></div>
+        </div>
       </div>
 
       <div class="bento-row">
@@ -1179,6 +1269,14 @@ async function saveClientForm(){
   ok ? showToast('success', editingClientId ? 'Client updated' : 'Client added', msg) : showToast('error','Save failed','Could not save — check your connection and try again.');
 }
 
+function setRing(elId, pct){
+  const el = document.getElementById(elId);
+  if(!el) return;
+  const r = 50, c = 2*Math.PI*r;
+  el.style.strokeDasharray = c;
+  el.style.strokeDashoffset = c * (1 - Math.max(0,Math.min(100,pct||0))/100);
+}
+
 function renderKpis(){
   document.getElementById('kpiTotal').textContent = clients.length;
   document.getElementById('kpiRisk').textContent = clients.filter(c=>c.danger>=4).length;
@@ -1189,24 +1287,82 @@ function renderKpis(){
 
   // Client Health: inverse of average danger score across the whole roster, as a %.
   const healthEl = document.getElementById('kpiHealth');
-  if(healthEl){
-    if(clients.length){
-      const avgDanger = clients.reduce((s,c)=>s+c.danger,0) / clients.length;
-      healthEl.textContent = Math.round(100 - (avgDanger/5)*100) + '%';
-    } else { healthEl.textContent = '—'; }
+  let healthPct = 0;
+  if(clients.length){
+    const avgDanger = clients.reduce((s,c)=>s+c.danger,0) / clients.length;
+    healthPct = Math.round(100 - (avgDanger/5)*100);
   }
+  if(healthEl) healthEl.textContent = clients.length ? healthPct + '%' : '—';
+  setRing('healthRing', clients.length ? healthPct : 0);
 
   // Weekly Completion / Updates Done: of clients with an improvement logged in
   // the last 7 days, how many already have an approved draft.
   const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate()-7);
   const withRecentLogs = clients.filter(c=>c.improvements.some(i=>i.date && new Date(i.date) >= sevenDaysAgo));
   const approvedWithLogs = withRecentLogs.filter(c=>c.draftStatus==='approved').length;
+  const completionPct = withRecentLogs.length ? Math.round((approvedWithLogs/withRecentLogs.length)*100) : 0;
 
   const completionEl = document.getElementById('kpiCompletion');
-  if(completionEl) completionEl.textContent = withRecentLogs.length ? Math.round((approvedWithLogs/withRecentLogs.length)*100) + '%' : '—';
+  if(completionEl) completionEl.textContent = withRecentLogs.length ? completionPct + '%' : '—';
+  setRing('completionRing', completionPct);
 
   const doneEl = document.getElementById('kpiUpdatesDone');
-  if(doneEl) doneEl.textContent = withRecentLogs.length ? `${approvedWithLogs} of ${withRecentLogs.length}` : '—';
+  if(doneEl) doneEl.textContent = withRecentLogs.length ? `${approvedWithLogs} of ${withRecentLogs.length} updated` : 'No logs yet';
+
+  renderPortfolioBar();
+  renderGreeting();
+}
+
+function renderPortfolioBar(){
+  const bar = document.getElementById('portfolioBar');
+  const legend = document.getElementById('portfolioLegend');
+  if(!bar || !legend) return;
+  if(!clients.length){
+    bar.innerHTML = '';
+    legend.innerHTML = `<span style="color:var(--muted-lt);font-size:12px;">No clients yet.</span>`;
+    return;
+  }
+  const counts = {};
+  clients.forEach(c=>{ counts[c.status] = (counts[c.status]||0) + 1; });
+  const total = clients.length;
+  const entries = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  bar.innerHTML = entries.map(([status,count])=>{
+    const pct = (count/total*100).toFixed(2);
+    return `<div class="bar-segment" style="width:${pct}%;background:${statusBarColor(status)};" title="${status}: ${count}"></div>`;
+  }).join('');
+  legend.innerHTML = entries.map(([status,count])=>
+    `<span class="legend-item"><span class="legend-dot" style="background:${statusBarColor(status)};"></span>${count} ${status}</span>`
+  ).join('');
+}
+
+function statusBarColor(status){
+  const cls = statusPillClass(status);
+  if(cls==='pill-good') return 'var(--green)';
+  if(cls==='pill-bad') return 'var(--red)';
+  if(cls==='pill-mid') return 'var(--amber)';
+  return 'var(--muted-lt)';
+}
+
+function renderGreeting(){
+  const titleEl = document.getElementById('greetingTitle');
+  const subEl = document.getElementById('greetingSub');
+  if(!titleEl) return;
+  const hour = new Date().getHours();
+  const period = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
+  const first = myProfile && myProfile.name ? myProfile.name.split(' ')[0] : '';
+  titleEl.textContent = `Good ${period}${first ? ', ' + first : ''}`;
+  if(subEl){
+    const pending = clients.filter(c=>c.draftStatus==='pending').length;
+    const atRisk = clients.filter(c=>c.danger>=4).length;
+    if(pending || atRisk){
+      const parts = [];
+      if(pending) parts.push(`${pending} draft${pending!==1?'s':''} waiting on approval`);
+      if(atRisk) parts.push(`${atRisk} client${atRisk!==1?'s':''} at risk`);
+      subEl.textContent = parts.join(' · ');
+    } else {
+      subEl.textContent = "Here's what's happening with your clients today.";
+    }
+  }
 }
 
 let clientFilters = { search:'', service:'all', status:'all', importance:'all', danger:'all', logged:'all' };
