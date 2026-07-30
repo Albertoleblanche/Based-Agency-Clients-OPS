@@ -2298,8 +2298,26 @@ function resumeEntryTimer(clientId, description){
   switchTimeTab('timer');
   const clientSel = document.getElementById('timerClient');
   const descInput = document.getElementById('timerDesc');
-  if(clientSel) clientSel.value = clientId;
+  if(clientSel){
+    // The dropdown only lists Active clients by default — if this entry's
+    // client isn't in that list (e.g. At Risk, Paused), add it temporarily
+    // so it can actually be selected, instead of silently failing to match
+    // and starting the timer for whatever client happened to be selected.
+    const exists = [...clientSel.options].some(o=>o.value===clientId);
+    if(!exists){
+      const c = clients.find(x=>x.id===clientId);
+      const opt = document.createElement('option');
+      opt.value = clientId;
+      opt.textContent = c ? c.name : 'Unknown client';
+      clientSel.appendChild(opt);
+    }
+    clientSel.value = clientId;
+  }
   if(descInput) descInput.value = description || '';
+  if(!clientSel || clientSel.value !== clientId){
+    showToast('error','Could not resume', "This client couldn't be selected — try starting the timer manually.");
+    return;
+  }
   toggleTimer();
 }
 
