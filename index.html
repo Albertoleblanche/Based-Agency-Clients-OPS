@@ -87,7 +87,7 @@
   .clock-mini-pill.crit .ring-fill{stroke:var(--red);}
   body[data-theme="dark"] .ring-track{stroke:#22262F;}
 
-  .bento-row{display:grid;grid-template-columns:2fr 1fr;gap:16px;align-items:start;}
+  .bento-row{display:grid;grid-template-columns:2fr 1fr;gap:16px;align-items:stretch;}
   @media (max-width:900px){.bento-row{grid-template-columns:1fr;}}
   .sync-dot{width:6px;height:6px;border-radius:50%;background:var(--green);}
   .btn{font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;border:none;border-radius:7px;padding:9px 16px;cursor:pointer;transition:opacity .15s ease, transform .1s ease;}
@@ -279,6 +279,7 @@
   .option-chip-x:hover{color:var(--red);}
 
   .log-list{max-height:220px;overflow-y:auto;}
+  .scroll-cap{max-height:220px;overflow-y:auto;}
   .log-row{display:flex;gap:10px;padding:9px 0;font-size:12px;border-bottom:1px solid #F0F1F4;}
   .log-row:last-child{border-bottom:none;}
   .log-time{font-family:'IBM Plex Mono',monospace;color:var(--muted-lt);white-space:nowrap;}
@@ -435,16 +436,15 @@ document.addEventListener('DOMContentLoaded', function(){
         </div>
       </div>
 
-      <div class="panel bar-card kpi-click" onclick="switchView('clients')" style="margin-bottom:24px;">
-        <div class="bar-card-head"><span>Client Portfolio</span><span class="row-link">View all →</span></div>
-        <div class="segmented-bar" id="portfolioBar"></div>
-        <div class="bar-legend" id="portfolioLegend"></div>
+      <div class="panel" style="margin-bottom:24px;">
+        <div class="panel-head"><span class="panel-title">Active This Week</span><span class="row-link" onclick="switchView('approve')">View full queue →</span></div>
+        <div class="panel-body"><div class="queue-grid" id="overviewActiveQueue"></div></div>
       </div>
 
       <div class="bento-row">
         <div class="panel bento-main">
           <div class="panel-head"><span class="panel-title">Needs attention</span></div>
-          <div class="panel-body"><div id="attentionList"></div></div>
+          <div class="panel-body"><div id="attentionList" class="scroll-cap"></div></div>
         </div>
 
         <div class="panel bento-side">
@@ -1285,38 +1285,33 @@ function renderKpis(){
     ? `<span class="pill pill-status">${approvedWithLogs} of ${withRecentLogs.length} updated</span>`
     : `<span class="pill pill-status">No logs yet</span>`;
 
-  renderPortfolioBar();
+  renderOverviewActiveQueue();
   renderGreeting();
 }
 
-function renderPortfolioBar(){
-  const bar = document.getElementById('portfolioBar');
-  const legend = document.getElementById('portfolioLegend');
-  if(!bar || !legend) return;
-  if(!clients.length){
-    bar.innerHTML = '';
-    legend.innerHTML = `<span style="color:var(--muted-lt);font-size:12px;">No clients yet.</span>`;
-    return;
-  }
-  const counts = {};
-  clients.forEach(c=>{ counts[c.status] = (counts[c.status]||0) + 1; });
-  const total = clients.length;
-  const entries = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
-  bar.innerHTML = entries.map(([status,count])=>{
-    const pct = (count/total*100).toFixed(2);
-    return `<div class="bar-segment" style="width:${pct}%;background:${statusBarColor(status)};" title="${status}: ${count}"></div>`;
+function renderOverviewActiveQueue(){
+  const el = document.getElementById('overviewActiveQueue');
+  if(!el) return;
+  const active = clients.filter(hasLoggedThisWeek).sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
+  if(!active.length){ el.innerHTML = `<div class="empty">No clients have logged improvements this week yet.</div>`; return; }
+  el.innerHTML = active.map(c=>{
+    const status = statusMeta(c.draftStatus);
+    const recentCount = c.improvements.filter(i=>i.date && new Date(i.date) >= (()=>{const d=new Date();d.setDate(d.getDate()-7);return d;})()).length;
+    return `<div class="q-card" onclick="goToClientInQueue('${c.id}','all')">
+      <div class="q-card-top">
+        <div>
+          <div class="q-name">${c.name}</div>
+          <div class="q-service-caption">${c.service}${c.danger>=4 ? ' · <span class="q-risk-flag">At risk</span>' : ''}</div>
+        </div>
+        <span class="q-status-label" style="color:${status.color};">${status.label}</span>
+      </div>
+      <div class="q-ratings">
+        ${dotRating('Importance', c.importance, 'ink', 10)}
+        ${dotRating('Danger', c.danger, 'brand')}
+      </div>
+      <div class="q-bulk-preview has-logs"><span class="pulse-dot"></span>${recentCount} improvement${recentCount!==1?'s':''} logged this week</div>
+    </div>`;
   }).join('');
-  legend.innerHTML = entries.map(([status,count])=>
-    `<span class="legend-item"><span class="legend-dot" style="background:${statusBarColor(status)};"></span>${count} ${status}</span>`
-  ).join('');
-}
-
-function statusBarColor(status){
-  const cls = statusPillClass(status);
-  if(cls==='pill-good') return 'var(--green)';
-  if(cls==='pill-bad') return 'var(--red)';
-  if(cls==='pill-mid') return 'var(--amber)';
-  return 'var(--muted-lt)';
 }
 
 function renderGreeting(){
