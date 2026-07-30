@@ -315,6 +315,17 @@
   .report-name-link{color:var(--brand);font-weight:600;font-size:13px;cursor:pointer;}
   .report-name-link:hover{text-decoration:underline;}
   .report-hours-val{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:13px;}
+
+  .report-graphic-row{display:grid;grid-template-columns:2fr 1fr;gap:16px;align-items:stretch;}
+  @media (max-width:900px){.report-graphic-row{grid-template-columns:1fr;}}
+  .graphic-bar-row{margin-bottom:14px;}
+  .graphic-bar-row:last-child{margin-bottom:0;}
+  .graphic-bar-top{display:flex;justify-content:space-between;gap:8px;font-size:12px;margin-bottom:6px;}
+  .graphic-bar-name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .graphic-bar-val{font-family:'IBM Plex Mono',monospace;color:var(--muted);flex:none;}
+  .graphic-bar-track{height:8px;border-radius:4px;background:#EEF0F4;overflow:hidden;}
+  .graphic-bar-fill{height:100%;background:var(--brand);border-radius:4px;transition:width .5s ease;}
+  body[data-theme="dark"] .graphic-bar-track{background:#1E222C;}
   .q-card{border:1px solid #EDEEF1;border-radius:8px;padding:22px 24px;background:var(--card);box-shadow:0 1px 2px rgba(16,24,40,.03);transition:box-shadow .18s ease, border-color .18s ease, transform .18s ease;cursor:pointer;}
   .q-card:hover{box-shadow:0 10px 28px rgba(16,24,40,.08);border-color:#DDE0E5;transform:translateY(-2px);}
   .q-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;}
@@ -562,6 +573,11 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="panel-body"><div class="queue-grid" id="overviewActiveQueue"></div></div>
       </div>
 
+      <div class="panel" style="margin-bottom:24px;">
+        <div class="panel-head"><span class="panel-title">Time This Week, By Client</span><span class="row-link" onclick="switchView('time')">Full reports →</span></div>
+        <div class="panel-body"><div id="overviewTimeGraphic"></div></div>
+      </div>
+
       <div class="bento-row">
         <div class="panel bento-main">
           <div class="panel-head"><span class="panel-title">Needs attention</span></div>
@@ -773,8 +789,8 @@ document.addEventListener('DOMContentLoaded', function(){
             <div class="filter-bar" id="timesheetModeBar" style="margin-bottom:0;">
               <span class="filter-pill active" data-mode="day" onclick="setTimesheetMode('day')">Day</span>
               <span class="filter-pill" data-mode="week" onclick="setTimesheetMode('week')">Week</span>
+              <span class="filter-pill" onclick="jumpToToday()">Return to today</span>
             </div>
-            <button class="btn btn-outline" onclick="jumpToToday()">Return to today</button>
             <div class="date-nav">
               <button class="date-nav-arrow" onclick="shiftTimesheet(-1)" aria-label="Previous">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
@@ -832,12 +848,18 @@ document.addEventListener('DOMContentLoaded', function(){
           <div class="tab settings-tab" data-rtab="teammates" onclick="switchReportTab('teammates')">Teammates</div>
         </div>
 
-        <div class="panel">
-          <div class="panel-body" style="padding:8px 22px;">
-            <table class="report-table">
-              <thead><tr id="reportTableHead"></tr></thead>
-              <tbody id="reportTableBody"></tbody>
-            </table>
+        <div class="report-graphic-row">
+          <div class="panel">
+            <div class="panel-body" style="padding:8px 22px;">
+              <table class="report-table">
+                <thead><tr id="reportTableHead"></tr></thead>
+                <tbody id="reportTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><span class="panel-title">Breakdown</span></div>
+            <div class="panel-body"><div id="reportGraphic"></div></div>
           </div>
         </div>
       </div>
@@ -1335,7 +1357,7 @@ async function fullRefresh(showFeedback){
   renderAll();
   if(showFeedback && btn){ btn.disabled = false; btn.textContent = 'Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
-function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); }
+function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewTimeGraphic(); }
 
 function applyRoleVisibility(){
   const notifyBtn = document.getElementById('notifyBtn');
@@ -2704,6 +2726,8 @@ function renderReports(){
   const rows = Object.entries(grouped).sort((a,b)=>b[1]-a[1]);
   const colspan = reportTab==='clients' ? 4 : 2;
 
+  renderReportGraphic(rows, getLabel);
+
   if(!rows.length){
     tableBody.innerHTML = `<tr><td colspan="${colspan}"><div class="empty">No time logged in this range.</div></td></tr>`;
     return;
@@ -2739,6 +2763,38 @@ function renderReports(){
       <td class="report-hours-val">${formatMinutes(mins)}</td>
     </tr>`;
   }).join('');
+}
+
+// Compact ranked bar chart sitting next to the table — same data, shown as
+// a visual breakdown instead of rows. Uses one accent color at decreasing
+// opacity to show rank, rather than introducing a new color per item.
+function renderReportGraphic(rows, getLabel, elId){
+  const el = document.getElementById(elId || 'reportGraphic');
+  if(!el) return;
+  if(!rows.length){ el.innerHTML = `<div class="empty">Nothing to show yet.</div>`; return; }
+  const top = rows.slice(0, 6);
+  const maxMin = top[0][1];
+  el.innerHTML = top.map(([key,mins], idx)=>{
+    const label = getLabel(key);
+    const pct = Math.max(4, Math.round((mins/maxMin)*100));
+    const opacity = Math.max(0.35, 1 - idx*0.13).toFixed(2);
+    return `<div class="graphic-bar-row">
+      <div class="graphic-bar-top"><span class="graphic-bar-name">${label}</span><span class="graphic-bar-val">${formatMinutes(mins)}</span></div>
+      <div class="graphic-bar-track"><div class="graphic-bar-fill" style="width:${pct}%;opacity:${opacity};"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function renderOverviewTimeGraphic(){
+  const el = document.getElementById('overviewTimeGraphic');
+  if(!el) return;
+  const weekStart = getWeekStart(new Date());
+  const weekEntries = timeEntries.filter(e => new Date(e.date+'T00:00:00') >= weekStart);
+  const grouped = {};
+  weekEntries.forEach(e=>{ grouped[e.clientId] = (grouped[e.clientId]||0) + e.minutes; });
+  const rows = Object.entries(grouped).sort((a,b)=>b[1]-a[1]);
+  const getLabel = (key)=>{ const c = clients.find(x=>x.id===key); return c ? c.name : 'Unknown client'; };
+  renderReportGraphic(rows, getLabel, 'overviewTimeGraphic');
 }
 
 // Clicking a client in the Clients report opens everything logged for that
