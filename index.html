@@ -414,10 +414,25 @@ document.addEventListener('DOMContentLoaded', function(){
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input id="clientSearch" placeholder="Search by name or email…" oninput="onClientSearchInput()">
           </div>
-          <button class="btn btn-outline filter-btn" onclick="openClientFiltersModal()">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:-2px;"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-            Filters<span class="filter-badge" id="filterBadge" style="display:none;">0</span>
-          </button>
+          <select id="filterService" onchange="onClientFilterChange()"></select>
+          <select id="filterStatus" onchange="onClientFilterChange()"></select>
+          <select id="filterImportance" onchange="onClientFilterChange()">
+            <option value="all">Any importance</option>
+            <option value="high">High importance (8–10)</option>
+            <option value="mid">Medium importance (4–7)</option>
+            <option value="low">Low importance (1–3)</option>
+          </select>
+          <select id="filterDanger" onchange="onClientFilterChange()">
+            <option value="all">Any danger</option>
+            <option value="atrisk">At risk (4–5)</option>
+            <option value="low">Low risk (1–3)</option>
+          </select>
+          <select id="filterLogged" onchange="onClientFilterChange()">
+            <option value="all">Logged: doesn't matter</option>
+            <option value="has">Has logs this week</option>
+            <option value="none">No logs yet this week</option>
+          </select>
+          <button class="btn btn-outline" onclick="clearClientFilters()">Clear</button>
         </div>
         <div class="clients-filter-count" id="clientsFilterCount"></div>
       </div>
@@ -1030,6 +1045,7 @@ function renderClientOptionsSelects(){
   }
   renderOptionsManager('service');
   renderOptionsManager('status');
+  populateClientFilterSelects();
 }
 
 const OPTION_KIND_KEYS = { service:'serviceOptions', status:'statusOptions', title:'teamTitleOptions' };
@@ -1194,73 +1210,31 @@ function onClientSearchInput(){
   renderClientsTable();
 }
 
-function openClientFiltersModal(){
-  openAppModal(`
-    <div class="modal-head"><span class="panel-title">Filter clients</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
-    <div class="modal-body">
-      <div class="settings-field"><label>Service</label><select id="mfService" onchange="onModalFilterChange()" style="width:100%;"></select></div>
-      <div class="settings-field"><label>Status</label><select id="mfStatus" onchange="onModalFilterChange()" style="width:100%;"></select></div>
-      <div class="settings-field"><label>Importance</label>
-        <select id="mfImportance" onchange="onModalFilterChange()" style="width:100%;">
-          <option value="all">Any importance</option>
-          <option value="high">High importance (8–10)</option>
-          <option value="mid">Medium importance (4–7)</option>
-          <option value="low">Low importance (1–3)</option>
-        </select>
-      </div>
-      <div class="settings-field"><label>Danger</label>
-        <select id="mfDanger" onchange="onModalFilterChange()" style="width:100%;">
-          <option value="all">Any danger</option>
-          <option value="atrisk">At risk (4–5)</option>
-          <option value="low">Low risk (1–3)</option>
-        </select>
-      </div>
-      <div class="settings-field"><label>Logged this week</label>
-        <select id="mfLogged" onchange="onModalFilterChange()" style="width:100%;">
-          <option value="all">Doesn't matter</option>
-          <option value="has">Has logs this week</option>
-          <option value="none">No logs yet this week</option>
-        </select>
-      </div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-outline" onclick="clearClientFilters()">Clear all</button>
-      <button class="btn btn-brand" onclick="closeAppModal()">Done</button>
-    </div>`, 420);
-  populateModalFilterSelects();
-}
-
-function populateModalFilterSelects(){
-  const svcSel = document.getElementById('mfService');
-  const statSel = document.getElementById('mfStatus');
+function populateClientFilterSelects(){
+  const svcSel = document.getElementById('filterService');
+  const statSel = document.getElementById('filterStatus');
   if(svcSel){
+    const current = svcSel.value || clientFilters.service;
     svcSel.innerHTML = `<option value="all">All services</option>` + (settings.serviceOptions||[]).map(o=>`<option value="${o.replace(/"/g,'&quot;')}">${o}</option>`).join('');
-    svcSel.value = clientFilters.service;
+    if([...svcSel.options].some(o=>o.value===current)) svcSel.value = current;
   }
   if(statSel){
+    const current = statSel.value || clientFilters.status;
     statSel.innerHTML = `<option value="all">All statuses</option>` + (settings.statusOptions||[]).map(o=>`<option value="${o.replace(/"/g,'&quot;')}">${o}</option>`).join('');
-    statSel.value = clientFilters.status;
+    if([...statSel.options].some(o=>o.value===current)) statSel.value = current;
   }
-  const impSel = document.getElementById('mfImportance'); if(impSel) impSel.value = clientFilters.importance;
-  const dangerSel = document.getElementById('mfDanger'); if(dangerSel) dangerSel.value = clientFilters.danger;
-  const loggedSel = document.getElementById('mfLogged'); if(loggedSel) loggedSel.value = clientFilters.logged;
+  const impSel = document.getElementById('filterImportance'); if(impSel) impSel.value = clientFilters.importance;
+  const dangerSel = document.getElementById('filterDanger'); if(dangerSel) dangerSel.value = clientFilters.danger;
+  const loggedSel = document.getElementById('filterLogged'); if(loggedSel) loggedSel.value = clientFilters.logged;
 }
 
-function onModalFilterChange(){
-  clientFilters.service = document.getElementById('mfService').value;
-  clientFilters.status = document.getElementById('mfStatus').value;
-  clientFilters.importance = document.getElementById('mfImportance').value;
-  clientFilters.danger = document.getElementById('mfDanger').value;
-  clientFilters.logged = document.getElementById('mfLogged').value;
+function onClientFilterChange(){
+  clientFilters.service = document.getElementById('filterService').value;
+  clientFilters.status = document.getElementById('filterStatus').value;
+  clientFilters.importance = document.getElementById('filterImportance').value;
+  clientFilters.danger = document.getElementById('filterDanger').value;
+  clientFilters.logged = document.getElementById('filterLogged').value;
   renderClientsTable();
-}
-
-function updateFilterBadge(){
-  const badge = document.getElementById('filterBadge');
-  if(!badge) return;
-  const count = ['service','status','importance','danger','logged'].filter(k=>clientFilters[k]!=='all').length;
-  badge.textContent = count;
-  badge.style.display = count ? 'inline-flex' : 'none';
 }
 
 const SORT_ICON_UP = '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="18 15 12 9 6 15"/></svg>';
@@ -1278,7 +1252,7 @@ function clearClientFilters(){
   const searchInput = document.getElementById('clientSearch');
   if(searchInput) searchInput.value = '';
   clientFilters = { search:'', service:'all', status:'all', importance:'all', danger:'all', logged:'all' };
-  if(document.getElementById('mfService')) populateModalFilterSelects();
+  populateClientFilterSelects();
   renderClientsTable();
 }
 
@@ -1298,8 +1272,7 @@ function matchesClientFilters(c){
   if(clientFilters.danger==='atrisk' && c.danger<4) return false;
   if(clientFilters.danger==='low' && c.danger>3) return false;
   if(clientFilters.logged!=='all'){
-    const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate()-7);
-    const hasRecentLog = c.improvements.some(i=>i.date && new Date(i.date) >= sevenDaysAgo);
+    const hasRecentLog = hasLoggedThisWeek(c);
     if(clientFilters.logged==='has' && !hasRecentLog) return false;
     if(clientFilters.logged==='none' && hasRecentLog) return false;
   }
@@ -1309,7 +1282,6 @@ function matchesClientFilters(c){
 function renderClientsTable(){
   const tbody = document.getElementById('clientsTbody');
   const countEl = document.getElementById('clientsFilterCount');
-  updateFilterBadge();
   updateSortArrows();
   if(!clients.length){
     tbody.innerHTML = `<tr><td colspan="7"><div class="empty">No clients yet. Click "+ Add client" to start the roster.</div></td></tr>`;
@@ -1337,10 +1309,10 @@ function renderClientsTable(){
     <tr>
       <td style="border-left:3px solid ${c.danger>=4 ? 'var(--brand)' : 'transparent'};"><div class="client-cell"><div class="avatar-circle">${c.name.trim().charAt(0).toUpperCase()}</div><div><div class="cell-name">${c.name}</div>${c.email?`<div class="cell-email">${c.email}</div>`:''}</div></div></td>
       <td><span class="cell-service">${c.service}</span></td>
-      <td><span class="pill pill-status">${c.status}</span></td>
+      <td><span class="pill ${statusPillClass(c.status)}">${c.status}</span></td>
       <td>${dotRatingCompact(c.importance,'ink',10)}</td>
       <td>${dotRatingCompact(c.danger,'brand',5)}</td>
-      <td>${c.improvements.length} logged</td>
+      <td>${loggedPill(c)}</td>
       <td class="actions-cell">
         <div class="dropdown">
           <button class="btn btn-outline" onclick="toggleActionsMenu('${c.id}')">Actions ▾</button>
@@ -1582,6 +1554,29 @@ function dotRatingCompact(n, tone, max){
     dots += `<span class="rate-dot" style="background:${i<=n?fillColor:'#E7E8EB'};"></span>`;
   }
   return `<div class="rate-dots-compact">${dots}<span class="rating-num">${n}/${max}</span></div>`;
+}
+
+// Colors the status pill by meaning rather than always flat gray. Matches
+// custom/user-added statuses by keyword so it still makes sense even if the
+// team adds new options beyond the defaults.
+function statusPillClass(status){
+  const s = (status||'').toLowerCase();
+  if(s.includes('risk')) return 'pill-bad';
+  if(s.includes('pause') || s.includes('inactive') || s.includes('offboard') || s.includes('churn')) return 'pill-status';
+  if(s.includes('onboard')) return 'pill-mid';
+  if(s.includes('active')) return 'pill-good';
+  return 'pill-status';
+}
+
+function hasLoggedThisWeek(c){
+  const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate()-7);
+  return c.improvements.some(i=>i.date && new Date(i.date) >= sevenDaysAgo);
+}
+
+function loggedPill(c){
+  const count = c.improvements.length;
+  if(hasLoggedThisWeek(c)) return `<span class="pill pill-good">${count} logged</span>`;
+  return `<span class="pill pill-status">${count ? count+' (older)' : 'No logs'}</span>`;
 }
 
 function openQueueCardModal(id){
