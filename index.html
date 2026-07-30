@@ -248,8 +248,13 @@
   #timerToggleBtn.stop{background:var(--red);color:#fff;}
 
   .timesheet-nav{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
-  .timesheet-nav-controls{display:flex;align-items:center;gap:10px;}
-  .timesheet-range-label{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;min-width:150px;text-align:center;}
+  .date-nav{display:flex;align-items:center;border:1px solid var(--border);border-radius:20px;background:var(--card);overflow:hidden;}
+  .date-nav-arrow{background:none;border:none;color:var(--muted);padding:9px 12px;cursor:pointer;display:flex;align-items:center;transition:color .12s ease, background .12s ease;}
+  .date-nav-arrow:hover{color:var(--ink);background:var(--surface-2);}
+  .date-nav-label{position:relative;display:flex;align-items:center;gap:7px;padding:8px 6px;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;border-left:1px solid var(--border);border-right:1px solid var(--border);white-space:nowrap;}
+  .date-nav-label svg{color:var(--muted-lt);flex:none;}
+  .date-nav-label .today-flag{color:var(--brand);}
+  .date-nav-hidden-input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;border:none;padding:0;}
 
   /* Day view: week strip */
   .week-strip{display:flex;background:var(--card);border:1px solid #EDEEF1;border-radius:10px;margin-bottom:16px;overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.03);}
@@ -741,11 +746,18 @@ document.addEventListener('DOMContentLoaded', function(){
               <span class="filter-pill active" data-mode="day" onclick="setTimesheetMode('day')">Day</span>
               <span class="filter-pill" data-mode="week" onclick="setTimesheetMode('week')">Week</span>
             </div>
-            <div class="timesheet-nav-controls">
-              <button class="btn btn-outline" onclick="shiftTimesheet(-1)">← Prev</button>
-              <span class="timesheet-range-label" id="timesheetRangeLabel"></span>
-              <button class="btn btn-outline" onclick="shiftTimesheet(1)">Next →</button>
-              <button class="btn btn-outline" onclick="jumpToToday()">Today</button>
+            <div class="date-nav">
+              <button class="date-nav-arrow" onclick="shiftTimesheet(-1)" aria-label="Previous">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+              </button>
+              <div class="date-nav-label" onclick="openTimesheetDatePicker()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <span id="timesheetRangeLabel"></span>
+                <input type="date" id="timesheetDateInput" class="date-nav-hidden-input" onchange="onTimesheetDatePicked(this.value)">
+              </div>
+              <button class="date-nav-arrow" onclick="shiftTimesheet(1)" aria-label="Next">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
             </div>
             <div class="select-field">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -2147,9 +2159,33 @@ function getWeekStart(d){
 function renderTimesheet(){
   const bodyEl = document.getElementById('timesheetBody');
   const labelEl = document.getElementById('timesheetRangeLabel');
+  const dateInput = document.getElementById('timesheetDateInput');
   if(!bodyEl) return;
-  if(timesheetMode==='day'){ labelEl.textContent = new Date(timesheetAnchor).toLocaleDateString('en-US',{weekday:'short', month:'short', day:'numeric'}); renderTimesheetDay(bodyEl); }
-  else { const ws=getWeekStart(timesheetAnchor); const we=new Date(ws); we.setDate(we.getDate()+6); labelEl.textContent = `${ws.toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${we.toLocaleDateString('en-US',{month:'short',day:'numeric'})}`; renderTimesheetWeek(bodyEl); }
+  const isToday = toDateStr(timesheetAnchor) === toDateStr(new Date());
+  const todayPrefix = isToday ? `<span class="today-flag">Today</span> ` : '';
+  if(timesheetMode==='day'){
+    labelEl.innerHTML = todayPrefix + new Date(timesheetAnchor).toLocaleDateString('en-US',{weekday:'long', month:'short', day:'numeric'});
+    renderTimesheetDay(bodyEl);
+  } else {
+    const ws=getWeekStart(timesheetAnchor); const we=new Date(ws); we.setDate(we.getDate()+6);
+    const wsIsCurrentWeek = toDateStr(ws) === toDateStr(getWeekStart(new Date()));
+    const weekPrefix = wsIsCurrentWeek ? `<span class="today-flag">This week</span> ` : '';
+    labelEl.innerHTML = `${weekPrefix}${ws.toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${we.toLocaleDateString('en-US',{month:'short',day:'numeric'})}`;
+    renderTimesheetWeek(bodyEl);
+  }
+  if(dateInput) dateInput.value = toDateStr(timesheetAnchor);
+}
+
+function openTimesheetDatePicker(){
+  const input = document.getElementById('timesheetDateInput');
+  if(!input) return;
+  if(input.showPicker){ input.showPicker(); } else { input.focus(); input.click(); }
+}
+
+function onTimesheetDatePicked(value){
+  if(!value) return;
+  timesheetAnchor = new Date(value+'T00:00:00');
+  renderTimesheet();
 }
 
 function renderTimesheetDay(bodyEl){
