@@ -11,7 +11,7 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const { name, email, role } = req.body || {};
+  const { name, email, role, title } = req.body || {};
   if (!name || !email || !role) {
     res.status(400).json({ error: 'Missing name, email, or role' });
     return;
@@ -68,7 +68,7 @@ module.exports = async function handler(req, res) {
 
     const { error: insertErr } = await admin
       .from('team_profiles')
-      .insert({ id: newUser.user.id, email, name, role });
+      .insert({ id: newUser.user.id, email, name, role, title: title || null });
     if (insertErr) {
       res.status(400).json({ error: insertErr.message });
       return;
