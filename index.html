@@ -310,7 +310,6 @@
   .report-table{width:100%;border-collapse:collapse;}
   .report-table th{text-align:left;font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-lt);padding:12px 0;border-bottom:1px solid var(--border);font-weight:600;}
   .report-th-hours{width:90px;}
-  .report-th-bar{width:40%;}
   .report-table td{padding:13px 0;border-bottom:1px solid #F3F4F6;vertical-align:middle;}
   .report-table tr:last-child td{border-bottom:none;}
   .report-name-link{color:var(--brand);font-weight:600;font-size:13px;cursor:pointer;}
@@ -2682,8 +2681,8 @@ function renderReports(){
   const headEl = document.getElementById('reportTableHead');
   if(headEl){
     headEl.innerHTML = reportTab==='clients'
-      ? `<th>Name</th><th class="report-th-hours">Importance</th><th class="report-th-hours">Danger</th><th class="report-th-hours">Hours</th><th class="report-th-bar"></th>`
-      : `<th>Name</th><th class="report-th-hours">Hours</th><th class="report-th-bar"></th>`;
+      ? `<th>Name</th><th class="report-th-hours">Hours</th><th class="report-th-hours">Importance</th><th class="report-th-hours">Danger</th>`
+      : `<th>Name</th><th class="report-th-hours">Hours</th>`;
   }
 
   let grouped = {}, getLabel;
@@ -2703,8 +2702,7 @@ function renderReports(){
   }
 
   const rows = Object.entries(grouped).sort((a,b)=>b[1]-a[1]);
-  const maxMin = rows.length ? rows[0][1] : 1;
-  const colspan = reportTab==='clients' ? 5 : 3;
+  const colspan = reportTab==='clients' ? 4 : 2;
 
   if(!rows.length){
     tableBody.innerHTML = `<tr><td colspan="${colspan}"><div class="empty">No time logged in this range.</div></td></tr>`;
@@ -2725,10 +2723,9 @@ function renderReports(){
       </div>`;
       return `<tr>
         <td>${nameEl}</td>
+        <td class="report-hours-val">${formatMinutes(mins)}</td>
         <td>${c ? dotRatingCompact(c.importance,'ink',10) : '—'}</td>
         <td>${c ? dotRatingCompact(c.danger,'brand',5) : '—'}</td>
-        <td class="report-hours-val">${formatMinutes(mins)}</td>
-        <td>${proportionDots(mins, maxMin)}</td>
       </tr>`;
     }).join('');
     return;
@@ -2740,7 +2737,6 @@ function renderReports(){
     return `<tr>
       <td>${nameEl}</td>
       <td class="report-hours-val">${formatMinutes(mins)}</td>
-      <td>${proportionDots(mins, maxMin)}</td>
     </tr>`;
   }).join('');
 }
@@ -2782,20 +2778,6 @@ function openClientReportDetail(clientId){
     </div>
     <div class="modal-body" style="max-height:50vh;overflow-y:auto;">${rows}</div>
     <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 480);
-}
-
-// Same dot language used for Importance/Danger elsewhere — filled dots show
-// this row's value relative to the largest value in the table. Uses green
-// rather than the brand/orange color, since orange is used elsewhere to mean
-// "danger" — hours logged shouldn't read as a warning.
-function proportionDots(value, max, count){
-  count = count || 10;
-  const filled = value<=0 ? 0 : Math.max(1, Math.round((value/max)*count));
-  let dots = '';
-  for(let i=1;i<=count;i++){
-    dots += `<span class="rate-dot" style="background:${i<=filled?'var(--green)':'#E7E8EB'};"></span>`;
-  }
-  return `<div class="rate-dots-compact">${dots}</div>`;
 }
 
 async function logImprovement(id){
