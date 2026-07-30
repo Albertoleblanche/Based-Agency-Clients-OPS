@@ -246,17 +246,39 @@
   .timesheet-nav-controls{display:flex;align-items:center;gap:10px;}
   .timesheet-range-label{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;min-width:150px;text-align:center;}
 
-  .day-group{margin-bottom:16px;}
-  .day-group-head{display:flex;justify-content:space-between;align-items:center;}
-  .day-total{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);font-weight:600;}
-  .time-entry-row{display:flex;align-items:center;gap:14px;padding:11px 0;border-bottom:1px solid #F3F4F6;}
-  .time-entry-row:last-child{border-bottom:none;}
-  .time-entry-main{flex:1;min-width:0;}
-  .time-entry-client{font-size:13px;font-weight:600;}
-  .time-entry-desc{font-size:12px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .time-entry-person{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--muted-lt);flex:none;width:90px;}
-  .time-entry-duration{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;flex:none;width:60px;text-align:right;}
-  .time-entry-actions{display:flex;gap:8px;flex:none;}
+  /* Day view: week strip */
+  .week-strip{display:flex;background:var(--card);border:1px solid #EDEEF1;border-radius:10px;margin-bottom:16px;overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.03);}
+  .week-strip-day{flex:1;text-align:center;padding:12px 6px;cursor:pointer;border-right:1px solid #F3F4F6;transition:background .12s ease;}
+  .week-strip-day:hover{background:var(--surface-2);}
+  .week-strip-day.selected{background:var(--brand-bg);box-shadow:inset 0 -2px 0 var(--brand);}
+  .wsd-label{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);text-transform:uppercase;line-height:1.5;}
+  .week-strip-day.selected .wsd-label{color:var(--brand-dark);}
+  .wsd-total{font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;margin-top:4px;}
+  .week-strip-total{flex:none;width:110px;text-align:center;padding:12px 10px;background:var(--surface-2);}
+  .wst-label{font-family:'IBM Plex Mono',monospace;font-size:9px;text-transform:uppercase;color:var(--muted-lt);}
+  .wst-val{font-family:'Oswald',sans-serif;font-size:15px;font-weight:600;margin-top:4px;}
+
+  /* Day view: entry cards */
+  .ts-entry-card{background:var(--card);border:1px solid #EDEEF1;border-radius:10px;padding:16px 18px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:16px;box-shadow:0 1px 2px rgba(16,24,40,.03);}
+  .ts-entry-info{min-width:0;flex:1;}
+  .ts-entry-title{font-size:13.5px;font-weight:600;}
+  .ts-entry-service{font-weight:400;color:var(--muted);}
+  .ts-entry-desc{font-size:12px;color:var(--muted);margin-top:4px;}
+  .ts-entry-right{display:flex;align-items:center;gap:10px;flex:none;}
+  .ts-entry-duration{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;min-width:52px;text-align:right;}
+
+  /* Week view: grid table */
+  .timesheet-grid{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .timesheet-grid th, .timesheet-grid td{padding:10px 12px;text-align:center;border-bottom:1px solid #F3F4F6;white-space:nowrap;}
+  .timesheet-grid thead th{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--muted-lt);font-weight:600;border-bottom:1px solid var(--border);}
+  .timesheet-grid th.today, .timesheet-grid td.today{background:var(--brand-bg);}
+  .tsg-row-label{text-align:left !important;min-width:180px;}
+  .tsg-client{font-weight:600;font-size:13px;}
+  .tsg-service{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted-lt);margin-top:2px;}
+  .tsg-cell{cursor:pointer;font-family:'IBM Plex Mono',monospace;color:var(--ink);transition:background .1s ease;}
+  .tsg-cell:hover{background:var(--surface-2);}
+  .tsg-total-cell{font-family:'IBM Plex Mono',monospace;font-weight:600;}
+  .timesheet-grid tfoot td{border-bottom:none;border-top:2px solid var(--border);font-family:'IBM Plex Mono',monospace;}
 
   .report-bar-row{margin-bottom:14px;}
   .report-bar-top{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px;}
@@ -2086,58 +2108,123 @@ function renderTimesheet(){
   const bodyEl = document.getElementById('timesheetBody');
   const labelEl = document.getElementById('timesheetRangeLabel');
   if(!bodyEl) return;
+  if(timesheetMode==='day'){ labelEl.textContent = new Date(timesheetAnchor).toLocaleDateString('en-US',{weekday:'short', month:'short', day:'numeric'}); renderTimesheetDay(bodyEl); }
+  else { const ws=getWeekStart(timesheetAnchor); const we=new Date(ws); we.setDate(we.getDate()+6); labelEl.textContent = `${ws.toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${we.toLocaleDateString('en-US',{month:'short',day:'numeric'})}`; renderTimesheetWeek(bodyEl); }
+}
+
+function renderTimesheetDay(bodyEl){
   const clientFilter = document.getElementById('timesheetClientFilter')?.value || 'all';
+  const weekStart = getWeekStart(timesheetAnchor);
+  const selectedStr = toDateStr(timesheetAnchor);
 
-  let rangeStart, rangeEnd, days = [];
-  if(timesheetMode==='day'){
-    rangeStart = new Date(timesheetAnchor); rangeStart.setHours(0,0,0,0);
-    rangeEnd = new Date(rangeStart); rangeEnd.setHours(23,59,59,999);
-    days = [new Date(rangeStart)];
-    labelEl.textContent = rangeStart.toLocaleDateString('en-US',{weekday:'short', month:'short', day:'numeric'});
-  } else {
-    rangeStart = getWeekStart(timesheetAnchor);
-    rangeEnd = new Date(rangeStart); rangeEnd.setDate(rangeEnd.getDate()+6); rangeEnd.setHours(23,59,59,999);
-    for(let i=0;i<7;i++){ const d=new Date(rangeStart); d.setDate(d.getDate()+i); days.push(d); }
-    labelEl.textContent = `${rangeStart.toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${rangeEnd.toLocaleDateString('en-US',{month:'short',day:'numeric'})}`;
+  // Week strip: 7 mini day-totals + week total, current selection highlighted
+  let weekTotal = 0;
+  const stripDays = [];
+  for(let i=0;i<7;i++){
+    const d = new Date(weekStart); d.setDate(d.getDate()+i);
+    const dStr = toDateStr(d);
+    const dayMins = timeEntries.filter(e=> e.date===dStr && (clientFilter==='all'||e.clientId===clientFilter)).reduce((s,e)=>s+e.minutes,0);
+    weekTotal += dayMins;
+    stripDays.push({d, dStr, dayMins});
   }
+  const stripHtml = `<div class="week-strip">
+    ${stripDays.map(({d,dStr,dayMins})=>`
+      <div class="week-strip-day ${dStr===selectedStr?'selected':''}" onclick="jumpToDate('${dStr}')">
+        <div class="wsd-label">${d.toLocaleDateString('en-US',{weekday:'short'})}<br>${d.getDate()} ${d.toLocaleDateString('en-US',{month:'short'})}</div>
+        <div class="wsd-total">${dayMins?formatMinutes(dayMins):'0:00'}</div>
+      </div>`).join('')}
+    <div class="week-strip-total"><div class="wst-label">Week total</div><div class="wst-val">${formatMinutes(weekTotal)}</div></div>
+  </div>`;
 
-  const relevant = timeEntries.filter(e=>{
-    if(clientFilter!=='all' && e.clientId!==clientFilter) return false;
-    const d = new Date(e.date+'T00:00:00');
-    return d >= rangeStart && d <= rangeEnd;
-  });
+  const dayEntries = timeEntries.filter(e=> e.date===selectedStr && (clientFilter==='all'||e.clientId===clientFilter)).sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
 
-  if(!relevant.length){
-    bodyEl.innerHTML = `<div class="panel"><div class="empty">No time logged in this range.</div></div>`;
-    return;
-  }
-
-  bodyEl.innerHTML = days.map(day=>{
-    const dateStr = toDateStr(day);
-    const dayEntries = relevant.filter(e=>e.date===dateStr).sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
-    if(!dayEntries.length && timesheetMode==='week') return '';
-    const total = dayEntries.reduce((s,e)=>s+e.minutes,0);
-    const rows = dayEntries.length ? dayEntries.map(e=>{
-      const c = clients.find(x=>x.id===e.clientId);
-      const person = teamProfiles.find(p=>p.id===e.userId);
-      const canEdit = currentUser && (e.userId===currentUser.id || isAdmin());
-      return `<div class="time-entry-row">
-        <div class="time-entry-main">
-          <div class="time-entry-client">${c ? c.name : 'Unknown client'}</div>
-          ${e.description ? `<div class="time-entry-desc">${e.description}</div>` : ''}
-        </div>
-        <div class="time-entry-person">${person ? person.name.split(' ')[0] : ''}</div>
-        <div class="time-entry-duration">${formatMinutes(e.minutes)}</div>
-        <div class="time-entry-actions">
-          ${canEdit ? `<span class="row-link" onclick="openTimeEntryModal('${e.id}')">Edit</span><span class="row-link danger-link" onclick="deleteTimeEntry('${e.id}')">Delete</span>` : ''}
-        </div>
-      </div>`;
-    }).join('') : `<div class="empty" style="padding:14px 0;">Nothing logged.</div>`;
-    return `<div class="panel day-group">
-      <div class="panel-head day-group-head"><span class="panel-title">${day.toLocaleDateString('en-US',{weekday:'long', month:'short', day:'numeric'})}</span><span class="day-total">${total ? formatMinutes(total) : ''}</span></div>
-      <div class="panel-body">${rows}</div>
+  const cardsHtml = dayEntries.length ? dayEntries.map(e=>{
+    const c = clients.find(x=>x.id===e.clientId);
+    const canEdit = currentUser && (e.userId===currentUser.id || isAdmin());
+    return `<div class="ts-entry-card">
+      <div class="ts-entry-info">
+        <div class="ts-entry-title">${c ? c.name : 'Unknown client'} ${c && c.service ? `<span class="ts-entry-service">(${c.service})</span>` : ''}</div>
+        ${e.description ? `<div class="ts-entry-desc">${e.description}</div>` : ''}
+      </div>
+      <div class="ts-entry-right">
+        <div class="ts-entry-duration">${formatMinutes(e.minutes)}</div>
+        <button class="btn btn-outline" onclick="resumeEntryTimer('${e.clientId}', ${JSON.stringify(e.description||'')})">▶ Start</button>
+        ${canEdit ? `<button class="btn btn-outline" onclick="openTimeEntryModal('${e.id}')">Edit</button>` : ''}
+      </div>
     </div>`;
+  }).join('') : `<div class="panel"><div class="empty">Nothing logged this day.</div></div>`;
+
+  bodyEl.innerHTML = stripHtml + cardsHtml;
+}
+
+function renderTimesheetWeek(bodyEl){
+  const clientFilter = document.getElementById('timesheetClientFilter')?.value || 'all';
+  const weekStart = getWeekStart(timesheetAnchor);
+  const todayStr = toDateStr(new Date());
+  const days = [];
+  for(let i=0;i<7;i++){ const d=new Date(weekStart); d.setDate(d.getDate()+i); days.push(d); }
+  const dayStrs = days.map(toDateStr);
+
+  const relevant = timeEntries.filter(e=> dayStrs.includes(e.date) && (clientFilter==='all'||e.clientId===clientFilter));
+  if(!relevant.length){ bodyEl.innerHTML = `<div class="panel"><div class="empty">No time logged this week.</div></div>`; return; }
+
+  // Group by client — each client with any entries this week becomes one row
+  const clientIds = [...new Set(relevant.map(e=>e.clientId))];
+  const rows = clientIds.map(cid=>{
+    const c = clients.find(x=>x.id===cid);
+    const cells = dayStrs.map(dStr=>{
+      const mins = relevant.filter(e=>e.clientId===cid && e.date===dStr).reduce((s,e)=>s+e.minutes,0);
+      return `<td class="tsg-cell ${dStr===todayStr?'today':''}" onclick="jumpToDateClient('${dStr}','${cid}')">${mins?formatMinutes(mins):''}</td>`;
+    }).join('');
+    const rowTotal = relevant.filter(e=>e.clientId===cid).reduce((s,e)=>s+e.minutes,0);
+    return `<tr>
+      <td class="tsg-row-label"><div class="tsg-client">${c?c.name:'Unknown client'}</div>${c&&c.service?`<div class="tsg-service">${c.service}</div>`:''}</td>
+      ${cells}
+      <td class="tsg-total-cell">${formatMinutes(rowTotal)}</td>
+    </tr>`;
   }).join('');
+
+  const dailyTotals = dayStrs.map(dStr => relevant.filter(e=>e.date===dStr).reduce((s,e)=>s+e.minutes,0));
+  const weekTotal = dailyTotals.reduce((s,m)=>s+m,0);
+
+  bodyEl.innerHTML = `<div class="panel"><div class="panel-body" style="padding:0;overflow-x:auto;">
+    <table class="timesheet-grid">
+      <thead><tr>
+        <th class="tsg-row-label"></th>
+        ${days.map((d,i)=>`<th class="tsg-day-head ${dayStrs[i]===todayStr?'today':''}">${d.toLocaleDateString('en-US',{weekday:'short'})}<br>${d.getDate()} ${d.toLocaleDateString('en-US',{month:'short'})}</th>`).join('')}
+        <th class="tsg-row-label">Total</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr>
+        <td class="tsg-row-label"><b>Daily total</b></td>
+        ${dailyTotals.map((m,i)=>`<td class="tsg-total-cell ${dayStrs[i]===todayStr?'today':''}">${m?formatMinutes(m):'—'}</td>`).join('')}
+        <td class="tsg-total-cell"><b>${formatMinutes(weekTotal)}</b></td>
+      </tr></tfoot>
+    </table>
+  </div></div>`;
+}
+
+function jumpToDate(dStr){
+  timesheetAnchor = new Date(dStr+'T00:00:00');
+  timesheetMode = 'day';
+  document.querySelectorAll('#timesheetModeBar .filter-pill').forEach(p=>p.classList.toggle('active', p.dataset.mode==='day'));
+  renderTimesheet();
+}
+
+function jumpToDateClient(dStr, clientId){
+  const filterSel = document.getElementById('timesheetClientFilter');
+  if(filterSel) filterSel.value = clientId;
+  jumpToDate(dStr);
+}
+
+function resumeEntryTimer(clientId, description){
+  if(timerState.running){ showToast('error','Timer already running','Stop the current timer before starting another.'); return; }
+  switchTimeTab('timer');
+  const clientSel = document.getElementById('timerClient');
+  const descInput = document.getElementById('timerDesc');
+  if(clientSel) clientSel.value = clientId;
+  if(descInput) descInput.value = description || '';
+  toggleTimer();
 }
 
 function openTimeEntryModal(id){
