@@ -589,7 +589,7 @@ document.addEventListener('DOMContentLoaded', function(){
     <!-- NOTES -->
     <div class="view" id="view-notes">
       <div class="topbar">
-        <div><div class="page-title">Notes</div><div class="page-sub">Improvements you're planning or want to get to — separate from what's already logged</div></div>
+        <div><div class="page-title">Notes</div><div class="page-sub">Private to you — improvements you're planning or want to get to. Nobody else on the team can see these.</div></div>
         <button class="btn btn-brand" onclick="openNoteModal()">+ Add note</button>
       </div>
 
@@ -979,7 +979,6 @@ async function loadAll(){
     const parsed = JSON.parse(appData);
     clients = parsed.clients || [];
     log = parsed.log || [];
-    notes = parsed.notes || [];
   } else {
     // One-time migration from the old two-key layout (clients-roster + activity-log),
     // which doubled write volume on every action and was the actual cause of the
@@ -987,7 +986,6 @@ async function loadAll(){
     const [c, l] = await Promise.all([safeGet('clients-roster'), safeGet('activity-log')]);
     clients = c ? JSON.parse(c) : [];
     log = l ? JSON.parse(l) : [];
-    notes = [];
     if(clients.length || log.length) await persistAppData();
   }
   settings = s ? JSON.parse(s) : {};
@@ -1022,14 +1020,13 @@ async function persistAppData(){
   // state — this coalesces rapid consecutive calls (e.g. persistClients immediately
   // followed by persistLog) into far fewer actual network requests.
   if(_appDataSaveInFlight){ await _appDataSaveInFlight.catch(()=>{}); }
-  _appDataSaveInFlight = safeSet('app-data', JSON.stringify({clients, log, notes}));
+  _appDataSaveInFlight = safeSet('app-data', JSON.stringify({clients, log}));
   const result = await _appDataSaveInFlight;
   _appDataSaveInFlight = null;
   return result;
 }
 async function persistClients(){ return await persistAppData(); }
 async function persistLog(){ return await persistAppData(); }
-async function persistNotes(){ return await persistAppData(); }
 async function persistSettings(){ return await safeSet('settings', JSON.stringify(settings)); }
 async function persistTeam(){ return await safeSet('team-members', JSON.stringify(team)); }
 
@@ -1091,6 +1088,7 @@ async function fullRefresh(showFeedback){
   const btn = document.getElementById('refreshBtn');
   if(showFeedback && btn){ btn.disabled = true; btn.textContent = 'Refreshing…'; }
   await loadAll();
+  await loadMyNotes();
   renderAll();
   if(showFeedback && btn){ btn.disabled = false; btn.textContent = 'Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
@@ -1653,6 +1651,19 @@ function openNoteModal(noteId, presetClientId){
     </div>`, 460);
 }
 
+// Loads only the current user's own notes — RLS on the notes table means this
+// query physically cannot return anyone else's rows, even if we wanted it to.
+async function loadMyNotes(){
+  if(!currentUser){ notes = []; return; }
+  const { data, error } = await supabaseClient
+    .from('notes')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .order('updated_at', { ascending: false });
+  if(error){ console.error('loadMyNotes error', error); notes = []; return; }
+  notes = (data||[]).map(n => ({ id:n.id, clientId:n.client_id, text:n.text, status:n.status, createdAt:n.created_at, updatedAt:n.updated_at }));
+}
+
 async function saveNote(noteId){
   const clientId = document.getElementById('noteClientSelect').value;
   const status = document.getElementById('noteStatusSelect').value;
@@ -1661,59 +1672,54 @@ async function saveNote(noteId){
   if(!text){ showToast('error','Nothing written','Add some note text first.'); return; }
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
-  await loadAll();
+  let error;
   if(noteId){
-    const n = notes.find(x=>x.id===noteId);
-    if(n){ n.clientId=clientId; n.status=status; n.text=text; n.updatedAt=new Date().toISOString(); }
+    ({ error } = await supabaseClient.from('notes').update({ client_id: clientId, status, text }).eq('id', noteId).eq('user_id', currentUser.id));
   } else {
-    notes.unshift({ id:'n'+Date.now()+Math.floor(Math.random()*1000), clientId, status, text, author: myName()||'Team member', createdAt: new Date().toISOString() });
+    ({ error } = await supabaseClient.from('notes').insert({ user_id: currentUser.id, client_id: clientId, status, text }));
   }
-  const ok = await persistNotes();
   restoreBtn(btn);
   closeAppModal();
+  await loadMyNotes();
   populateNotesClientFilter();
   renderNotes();
-  ok ? showToast('success', noteId?'Note updated':'Note added', noteId?'Changes saved.':'Added to your notes.') : showToast('error','Save failed','Could not save — try again.');
+  error ? showToast('error','Save failed', error.message) : showToast('success', noteId?'Note updated':'Note added', noteId?'Changes saved.':'Added to your notes.');
 }
 
 async function deleteNote(id){
   if(!confirm("Delete this note? This can't be undone.")) return;
-  await loadAll();
-  notes = notes.filter(n=>n.id!==id);
-  const ok = await persistNotes();
+  const { error } = await supabaseClient.from('notes').delete().eq('id', id).eq('user_id', currentUser.id);
+  await loadMyNotes();
   renderNotes();
-  ok ? showToast('success','Note deleted','Removed.') : showToast('error','Delete failed','Could not save — try again.');
+  error ? showToast('error','Delete failed', error.message) : showToast('success','Note deleted','Removed.');
 }
 
 async function changeNoteStatus(id, newStatus){
-  await loadAll();
-  const n = notes.find(x=>x.id===id);
-  if(!n) return;
-  n.status = newStatus;
-  n.updatedAt = new Date().toISOString();
-  const ok = await persistNotes();
+  const { error } = await supabaseClient.from('notes').update({ status: newStatus }).eq('id', id).eq('user_id', currentUser.id);
+  await loadMyNotes();
   renderNotes();
-  if(!ok) showToast('error','Save failed','Could not save — try again.');
+  if(error) showToast('error','Save failed', error.message);
 }
 
 // The actual system connection: converts a planned note straight into a real
 // logged improvement on that client — the same thing logImprovement() does —
-// instead of leaving Notes as a disconnected side list.
+// instead of leaving Notes as a disconnected side list. The improvement itself
+// is shared (same as always); only the note that prompted it stays private.
 async function logNoteNow(id){
   const btn = clickedBtn();
   setBtnLoading(btn, 'Logging…');
-  await loadAll();
   const n = notes.find(x=>x.id===id);
   if(!n){ restoreBtn(btn); showToast('error','Not found','This note may have already been removed.'); return; }
+  await loadAll();
   const c = clients.find(x=>x.id===n.clientId);
   if(!c){ restoreBtn(btn); showToast('error','Client not found','This client may have been removed.'); return; }
   c.improvements.push({ author: myName()||'Team member', text: n.text, date: new Date().toISOString() });
-  n.status = 'done';
-  n.updatedAt = new Date().toISOString();
   log.unshift({t:nowTime(), tag:'you', text:`Logged a planned improvement for <b>${c.name}</b> from Notes.`});
   const ok = await persistAppData();
+  const { error } = await supabaseClient.from('notes').update({ status: 'done' }).eq('id', id).eq('user_id', currentUser.id);
+  await loadMyNotes();
   renderNotes(); renderClientsTable(); renderKpis(); renderLog();
-  ok ? showToast('success','Logged!', `Added to ${c.name}'s improvement log this week.`) : showToast('error','Save failed','Could not save — try again.');
+  (ok && !error) ? showToast('success','Logged!', `Added to ${c.name}'s improvement log this week.`) : showToast('error','Save failed','Could not save — try again.');
 }
 
 function populateNotesClientFilter(){
@@ -1760,7 +1766,7 @@ function renderNotes(){
       <div class="note-card-top">
         <div>
           <div class="note-client" onclick="goToClientInQueue('${n.clientId}','all')">${c ? c.name : 'Unknown client'}</div>
-          <div class="note-meta">${n.author} · ${dateStr}</div>
+          <div class="note-meta">${dateStr}</div>
         </div>
         <span class="pill ${status.cls}">${status.label}</span>
       </div>
@@ -2522,6 +2528,7 @@ async function showApp(session){
   await initTheme();
   await loadAll();
   await loadTeamProfiles();
+  await loadMyNotes();
   renderAll();
   applyAppIcon();
 }
