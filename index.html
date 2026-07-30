@@ -245,6 +245,14 @@
   .timer-row .panel{display:flex;flex-direction:column;}
   .timer-row .panel-body{display:flex;flex-direction:column;flex:1;}
   .timer-display-wrap{display:flex;align-items:center;justify-content:center;gap:9px;background:var(--surface-2);border:1px solid var(--border);border-radius:30px;padding:9px 20px;margin-bottom:16px;}
+
+  .client-search-wrap{position:relative;}
+  .client-search-input{width:100%;font-family:'Inter',sans-serif;font-size:12.5px;padding:9px 11px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);box-sizing:border-box;}
+  .client-search-input:focus{outline:none;border-color:var(--brand);}
+  .client-search-dropdown{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:40;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 10px 26px rgba(16,24,40,.14);max-height:220px;overflow-y:auto;}
+  .client-search-item{padding:9px 12px;font-size:12.5px;cursor:pointer;}
+  .client-search-item:hover{background:var(--surface-2);}
+  .client-search-empty{padding:9px 12px;font-size:12px;color:var(--muted-lt);}
   .timer-status-dot{width:7px;height:7px;border-radius:50%;background:var(--muted-lt);flex:none;}
   .timer-status-dot.running{background:var(--brand);position:relative;}
   .timer-status-dot.running::after{content:'';position:absolute;inset:0;border-radius:50%;background:var(--brand);animation:pulseRing 1.8s ease-out infinite;}
@@ -757,7 +765,11 @@ document.addEventListener('DOMContentLoaded', function(){
                 <div class="timer-display" id="timerDisplay">00:00:00</div>
               </div>
               <div class="form-grid" style="margin-bottom:14px;">
-                <div><label>Client</label><select id="timerClient"></select></div>
+                <div class="client-search-wrap"><label>Client</label>
+                  <input type="text" class="client-search-input" id="timerClientSearch" placeholder="Search client…" autocomplete="off">
+                  <input type="hidden" id="timerClient">
+                  <div class="client-search-dropdown" id="timerClientDropdown"></div>
+                </div>
                 <div><label>Service</label><select id="timerService"></select></div>
                 <div style="grid-column:1/-1;"><label>What are you working on?</label><input id="timerDesc" placeholder="e.g. Updating Meta ad creative"></div>
               </div>
@@ -769,7 +781,11 @@ document.addEventListener('DOMContentLoaded', function(){
             <div class="panel-head"><span class="panel-title">Add time manually</span></div>
             <div class="panel-body">
               <div class="form-grid">
-                <div><label>Client</label><select id="manualClient"></select></div>
+                <div class="client-search-wrap"><label>Client</label>
+                  <input type="text" class="client-search-input" id="manualClientSearch" placeholder="Search client…" autocomplete="off">
+                  <input type="hidden" id="manualClient">
+                  <div class="client-search-dropdown" id="manualClientDropdown"></div>
+                </div>
                 <div><label>Service</label><select id="manualService"></select></div>
                 <div><label>Date</label><input type="date" id="manualDate"></div>
                 <div><label>Hours</label><input type="number" id="manualHours" min="0" max="23" step="1" placeholder="1"></div>
@@ -1037,6 +1053,45 @@ document.addEventListener('DOMContentLoaded', function(){
             <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;" id="teamPanelNote"></p>
             <div id="teamList"></div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLIENT DETAIL -->
+    <div class="view" id="view-clientdetail">
+      <div class="topbar">
+        <div>
+          <span class="row-link" onclick="switchView('clients')">← Back to Clients</span>
+          <div class="page-title" id="cdName" style="margin-top:6px;">Client</div>
+          <div class="page-sub" id="cdSub"></div>
+        </div>
+        <div class="topbar-right">
+          <button class="btn btn-outline" onclick="openEditClientFormFromDetail()">Edit client</button>
+          <button class="btn btn-brand" onclick="openNoteModalFromDetail()">+ Add note</button>
+        </div>
+      </div>
+
+      <div class="metrics-row" id="cdMetrics"></div>
+
+      <div class="bento-row">
+        <div class="panel bento-main">
+          <div class="panel-head"><span class="panel-title">Improvements Logged</span></div>
+          <div class="panel-body"><div id="cdImprovements" class="scroll-cap"></div></div>
+        </div>
+        <div class="panel bento-side">
+          <div class="panel-head"><span class="panel-title">This Week's Draft</span></div>
+          <div class="panel-body"><div id="cdDraftStatus"></div></div>
+        </div>
+      </div>
+
+      <div class="bento-row">
+        <div class="panel bento-main">
+          <div class="panel-head"><span class="panel-title">Time Logged</span></div>
+          <div class="panel-body"><div id="cdTimeEntries" class="scroll-cap"></div></div>
+        </div>
+        <div class="panel bento-side">
+          <div class="panel-head"><span class="panel-title">My Notes</span><span class="row-link" onclick="openNoteModalFromDetail()">+ Add</span></div>
+          <div class="panel-body"><div id="cdNotes" class="scroll-cap"></div></div>
         </div>
       </div>
     </div>
@@ -1753,7 +1808,7 @@ function renderClientsTable(){
   }
   tbody.innerHTML = filtered.map(c=>`
     <tr>
-      <td style="border-left:3px solid ${c.danger>=4 ? 'var(--brand)' : 'transparent'};"><div class="client-cell"><div class="avatar-circle">${c.name.trim().charAt(0).toUpperCase()}</div><div><div class="cell-name">${c.name}</div>${c.email?`<div class="cell-email">${c.email}</div>`:''}</div></div></td>
+      <td style="border-left:3px solid ${c.danger>=4 ? 'var(--brand)' : 'transparent'};"><div class="client-cell"><div class="avatar-circle">${c.name.trim().charAt(0).toUpperCase()}</div><div><div class="cell-name" style="cursor:pointer;color:var(--brand-dark);" onclick="openClientDetail('${c.id}')">${c.name}</div>${c.email?`<div class="cell-email">${c.email}</div>`:''}</div></div></td>
       <td><span class="cell-service">${c.service}</span></td>
       <td><span class="pill ${statusPillClass(c.status)}">${c.status}</span></td>
       <td>${dotRatingCompact(c.importance,'ink',10)}</td>
@@ -1763,6 +1818,7 @@ function renderClientsTable(){
         <div class="dropdown">
           <button class="btn btn-outline" onclick="toggleActionsMenu('${c.id}')">Actions ▾</button>
           <div class="dropdown-menu" id="menu-${c.id}">
+            <div class="dropdown-item" onclick="closeActionsMenus(); openClientDetail('${c.id}')">View details</div>
             <div class="dropdown-item" onclick="closeActionsMenus(); openEditClientForm('${c.id}')">Edit client</div>
             <div class="dropdown-item" onclick="closeActionsMenus(); toggleDrawer('${c.id}')">Log / view improvements</div>
             <div class="dropdown-item" onclick="closeActionsMenus(); openNoteModal(null, '${c.id}')">Add note</div>
@@ -1836,6 +1892,112 @@ async function deleteClient(id){
   ok ? showToast('success','Client deleted', `${c.name} removed from the roster.`) : showToast('error','Delete failed','Could not save — try again.');
 }
 
+/* ---------- Client Detail Page — everything about one client, pulled from every tab ---------- */
+let currentDetailClientId = null;
+
+async function openClientDetail(clientId){
+  currentDetailClientId = clientId;
+  await switchView('clientdetail');
+  renderClientDetail();
+}
+
+function openEditClientFormFromDetail(){
+  if(currentDetailClientId) openEditClientForm(currentDetailClientId);
+}
+
+function openNoteModalFromDetail(){
+  if(currentDetailClientId) openNoteModal(null, currentDetailClientId);
+}
+
+function renderClientDetail(){
+  const nameEl = document.getElementById('cdName');
+  if(!nameEl) return;
+  const c = clients.find(x=>x.id===currentDetailClientId);
+  if(!c){
+    nameEl.textContent = 'Client not found';
+    document.getElementById('cdSub').textContent = 'This client may have been removed.';
+    ['cdMetrics','cdImprovements','cdDraftStatus','cdTimeEntries','cdNotes'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=''; });
+    return;
+  }
+
+  nameEl.textContent = c.name;
+  document.getElementById('cdSub').innerHTML = `${c.email ? c.email+' · ' : ''}${c.service} · ${riskCaptionHtml(c.danger)}`;
+
+  const myTimeEntries = timeEntries.filter(e=>e.clientId===c.id).sort((a,b)=> new Date(b.date)-new Date(a.date) || new Date(b.createdAt)-new Date(a.createdAt));
+  const totalMinutes = myTimeEntries.reduce((s,e)=>s+e.minutes,0);
+  const myNotesForClient = notes.filter(n=>n.clientId===c.id).sort((a,b)=> new Date(b.updatedAt||b.createdAt)-new Date(a.updatedAt||a.createdAt));
+
+  document.getElementById('cdMetrics').innerHTML = `
+    <div class="metric-card">
+      <div class="metric-head"><span class="metric-icon metric-icon-blue"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="metric-label">Status</span></div>
+      <div class="metric-value" style="font-size:19px;">${c.status}</div>
+      <div class="metric-chips"><span class="pill ${statusPillClass(c.status)}">${c.status}</span></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-head"><span class="metric-icon metric-icon-purple"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span><span class="metric-label">Importance / Danger</span></div>
+      <div class="metric-value" style="font-size:19px;">${c.importance}/10 · ${c.danger}/5</div>
+      <div class="metric-chips">${riskCaptionHtml(c.danger)}</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-head"><span class="metric-icon metric-icon-green"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span><span class="metric-label">Total Time Logged</span></div>
+      <div class="metric-value">${formatMinutes(totalMinutes)}</div>
+      <div class="metric-caption">${myTimeEntries.length} entr${myTimeEntries.length!==1?'ies':'y'}, all time</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-head"><span class="metric-icon metric-icon-amber"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></span><span class="metric-label">Improvements</span></div>
+      <div class="metric-value">${c.improvements.length}</div>
+      <div class="metric-caption">Logged all time</div>
+    </div>`;
+
+  document.getElementById('cdImprovements').innerHTML = c.improvements.length
+    ? [...c.improvements].reverse().map(imp=>`
+      <div class="ts-entry-card" style="margin-bottom:8px;">
+        <div class="ts-entry-info">
+          <div class="ts-entry-title">${imp.author||'Team member'}</div>
+          <div class="ts-entry-desc">${imp.text}</div>
+        </div>
+        <div class="ts-entry-right"><div class="ts-entry-duration" style="font-size:10.5px;color:var(--muted-lt);">${imp.date ? new Date(imp.date).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : ''}</div></div>
+      </div>`).join('')
+    : `<div class="empty">No improvements logged yet.</div>`;
+
+  const status = statusMeta(c.draftStatus);
+  document.getElementById('cdDraftStatus').innerHTML = `
+    <p style="font-size:13px;margin:0 0 10px;">Status: <b style="color:${status.color};">${status.label}</b></p>
+    ${c.draft ? `<div class="ts-entry-desc" style="white-space:pre-wrap;line-height:1.5;">${c.draft}</div>` : `<div class="empty">No draft generated yet.</div>`}
+    <button class="btn btn-outline" style="margin-top:12px;width:100%;justify-content:center;" onclick="goToClientInQueue('${c.id}','all')">Open in Approval Queue →</button>`;
+
+  document.getElementById('cdTimeEntries').innerHTML = myTimeEntries.length
+    ? myTimeEntries.slice(0,25).map(e=>{
+      const person = teamProfiles.find(p=>p.id===e.userId);
+      return `<div class="ts-entry-card" style="margin-bottom:8px;">
+        <div class="ts-entry-info">
+          <div class="ts-entry-title">${new Date(e.date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})} ${e.service ? `<span class="ts-entry-service">(${e.service})</span>` : ''}</div>
+          ${e.description ? `<div class="ts-entry-desc">${e.description}</div>` : ''}
+          <div class="ts-entry-desc" style="margin-top:2px;color:var(--muted-lt);">Logged by ${person ? person.name : 'someone no longer on the team'}</div>
+        </div>
+        <div class="ts-entry-right"><div class="ts-entry-duration">${formatMinutes(e.minutes)}</div></div>
+      </div>`;
+    }).join('')
+    : `<div class="empty">No time logged for this client yet.</div>`;
+
+  document.getElementById('cdNotes').innerHTML = myNotesForClient.length
+    ? myNotesForClient.map(n=>{
+      const noteStatus = noteStatusMeta(n.status);
+      return `<div class="note-card" style="margin-bottom:10px;">
+        <div class="note-card-top">
+          <div class="note-meta">${new Date(n.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
+          <span class="pill ${noteStatus.cls}">${noteStatus.label}</span>
+        </div>
+        <div class="note-text">${n.text}</div>
+        <div class="note-actions">
+          ${n.status!=='done' ? `<button class="btn btn-brand" style="padding:7px 12px;font-size:11.5px;" onclick="logNoteNow('${n.id}')">Log it now</button>` : ''}
+          <span class="row-link" onclick="openNoteModal('${n.id}')">Edit</span>
+        </div>
+      </div>`;
+    }).join('')
+    : `<div class="empty">No notes for this client yet. Notes are private to you.</div>`;
+}
+
 function startEditImprovement(clientId, idx){
   const c = clients.find(x=>x.id===clientId);
   if(!c || !c.improvements[idx]) return;
@@ -1895,7 +2057,7 @@ function noteStatusMeta(status){
 function openNoteModal(noteId, presetClientId){
   const editing = noteId ? notes.find(n=>n.id===noteId) : null;
   if(!clients.length){ showToast('error','Add a client first','Notes need a client to attach to — add one in Clients.'); return; }
-  const clientOptions = clients.map(c=>`<option value="${c.id}" ${(editing && editing.clientId===c.id) || (!editing && presetClientId===c.id) ? 'selected':''}>${c.name}</option>`).join('');
+  const clientOptions = [...clients].sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${(editing && editing.clientId===c.id) || (!editing && presetClientId===c.id) ? 'selected':''}>${c.name}</option>`).join('');
   openAppModal(`
     <div class="modal-head"><span class="panel-title">${editing ? 'Edit note' : 'Add note'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
@@ -1991,7 +2153,7 @@ function populateNotesClientFilter(){
   const sel = document.getElementById('notesClientFilter');
   if(!sel) return;
   const current = sel.value || 'all';
-  sel.innerHTML = `<option value="all">All clients</option>` + clients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  sel.innerHTML = `<option value="all">All clients</option>` + [...clients].sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
   if([...sel.options].some(o=>o.value===current)) sel.value = current;
 }
 
@@ -2085,19 +2247,13 @@ async function loadTimeEntries(){
 }
 
 function populateTimeClientSelects(){
-  const activeClients = clients.filter(c=>c.status==='Active');
-  const opts = (activeClients.length ? activeClients : clients).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
-  ['timerClient','manualClient'].forEach(id=>{
-    const sel = document.getElementById(id);
-    if(!sel) return;
-    const current = sel.value;
-    sel.innerHTML = opts || `<option value="">No clients yet</option>`;
-    if([...sel.options].some(o=>o.value===current)) sel.value = current;
-  });
+  setupClientSearchSelect('timerClientSearch', 'timerClient', 'timerClientDropdown');
+  setupClientSearchSelect('manualClientSearch', 'manualClient', 'manualClientDropdown');
+
   const filterSel = document.getElementById('timesheetClientFilter');
   if(filterSel){
     const current = filterSel.value || 'all';
-    filterSel.innerHTML = `<option value="all">All clients</option>` + clients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    filterSel.innerHTML = `<option value="all">All clients</option>` + [...clients].sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
     if([...filterSel.options].some(o=>o.value===current)) filterSel.value = current;
   }
   const dateInput = document.getElementById('manualDate');
@@ -2115,6 +2271,56 @@ function populateTimeClientSelects(){
 
   wireServiceAutoSuggest('timerClient', 'timerService');
   wireServiceAutoSuggest('manualClient', 'manualService');
+}
+
+// Sets a client field (search text + hidden id) programmatically — used when
+// restoring a persisted timer or resuming from a past entry, as opposed to
+// the user picking one by typing.
+function setClientFieldValue(hiddenId, searchId, clientId){
+  const hiddenInput = document.getElementById(hiddenId);
+  const searchInput = document.getElementById(searchId);
+  if(hiddenInput) hiddenInput.value = clientId || '';
+  if(searchInput){
+    const c = clients.find(x=>x.id===clientId);
+    searchInput.value = c ? c.name : '';
+  }
+}
+
+// A typeahead combobox backed by a hidden input holding the real client id —
+// everything else in the app (toggleTimer, resumeEntryTimer, etc.) just reads
+// .value off the hidden input's id, unchanged, whether it's a <select> or this.
+function setupClientSearchSelect(searchId, hiddenId, dropdownId){
+  const searchInput = document.getElementById(searchId);
+  const hiddenInput = document.getElementById(hiddenId);
+  const dropdown = document.getElementById(dropdownId);
+  if(!searchInput || !hiddenInput || !dropdown || searchInput.dataset.wired) return;
+  searchInput.dataset.wired = '1';
+
+  function showMatches(term){
+    const lower = (term||'').toLowerCase();
+    const matches = [...clients]
+      .filter(c=>c.name.toLowerCase().includes(lower))
+      .sort((a,b)=>a.name.localeCompare(b.name))
+      .slice(0,50);
+    if(!clients.length){ dropdown.innerHTML = `<div class="client-search-empty">No clients yet — add one in Clients first.</div>`; dropdown.style.display='block'; return; }
+    if(!matches.length){ dropdown.innerHTML = `<div class="client-search-empty">No matching clients</div>`; dropdown.style.display='block'; return; }
+    dropdown.innerHTML = matches.map(c=>`<div class="client-search-item" data-id="${c.id}">${c.name}</div>`).join('');
+    dropdown.style.display = 'block';
+  }
+
+  searchInput.addEventListener('focus', ()=> showMatches(searchInput.value));
+  searchInput.addEventListener('input', ()=>{ hiddenInput.value=''; showMatches(searchInput.value); });
+  dropdown.addEventListener('mousedown', (e)=>{
+    const item = e.target.closest('.client-search-item');
+    if(!item) return;
+    e.preventDefault();
+    setClientFieldValue(hiddenId, searchId, item.dataset.id);
+    dropdown.style.display = 'none';
+    hiddenInput.dispatchEvent(new Event('change'));
+  });
+  document.addEventListener('click', (e)=>{
+    if(e.target!==searchInput && !dropdown.contains(e.target)) dropdown.style.display = 'none';
+  });
 }
 
 // When a client is picked, auto-select that client's own service — still
@@ -2245,8 +2451,7 @@ function initTimerFromStorage(){
     updateTimerDisplay();
     const btn = document.getElementById('timerToggleBtn');
     if(btn){ btn.textContent = 'Stop & save'; btn.classList.add('stop'); }
-    const clientSel = document.getElementById('timerClient');
-    if(clientSel) clientSel.value = timerState.clientId;
+    setClientFieldValue('timerClient', 'timerClientSearch', timerState.clientId);
     const serviceSel = document.getElementById('timerService');
     if(serviceSel) serviceSel.value = timerState.service || '';
     const descInput = document.getElementById('timerDesc');
@@ -2527,26 +2732,11 @@ function resumeEntryTimer(clientId, description, entryId){
   }
   if(timerState.running){ showToast('error','Timer already running','Stop the current timer before starting another.'); return; }
   switchTimeTab('timer');
-  const clientSel = document.getElementById('timerClient');
+  setClientFieldValue('timerClient', 'timerClientSearch', clientId);
   const descInput = document.getElementById('timerDesc');
-  if(clientSel){
-    // The dropdown only lists Active clients by default — if this entry's
-    // client isn't in that list (e.g. At Risk, Paused), add it temporarily
-    // so it can actually be selected, instead of silently failing to match
-    // and starting the timer for whatever client happened to be selected.
-    const exists = [...clientSel.options].some(o=>o.value===clientId);
-    if(!exists){
-      const c = clients.find(x=>x.id===clientId);
-      const opt = document.createElement('option');
-      opt.value = clientId;
-      opt.textContent = c ? c.name : 'Unknown client';
-      clientSel.appendChild(opt);
-    }
-    clientSel.value = clientId;
-  }
   if(descInput) descInput.value = description || '';
-  if(!clientSel || clientSel.value !== clientId){
-    showToast('error','Could not resume', "This client couldn't be selected — try starting the timer manually.");
+  if(document.getElementById('timerClient').value !== clientId){
+    showToast('error','Could not resume', "This client couldn't be found — try starting the timer manually.");
     return;
   }
   toggleTimer();
@@ -2562,7 +2752,7 @@ function resumeEntryTimer(clientId, description, entryId){
 function openTimeEntryModal(id){
   const e = timeEntries.find(x=>x.id===id);
   if(!e) return;
-  const clientOptions = clients.map(c=>`<option value="${c.id}" ${e.clientId===c.id?'selected':''}>${c.name}</option>`).join('');
+  const clientOptions = [...clients].sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${e.clientId===c.id?'selected':''}>${c.name}</option>`).join('');
   const serviceOptions = `<option value="">No service set</option>` + (settings.serviceOptions||[]).map(s=>`<option value="${s.replace(/"/g,'&quot;')}" ${e.service===s?'selected':''}>${s}</option>`).join('');
   const hPart = Math.floor(e.minutes/60), mPart = e.minutes%60;
   openAppModal(`
