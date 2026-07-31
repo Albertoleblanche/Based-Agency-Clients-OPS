@@ -29,6 +29,11 @@
   .app{display:grid;grid-template-columns:224px 1fr;height:100vh;overflow:hidden;}
 
   .login-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:2000;padding:20px;}
+
+  .auth-loading-overlay{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:3000;}
+  .auth-loading-spinner{width:34px;height:34px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--brand);animation:authSpin .8s linear infinite;}
+  .auth-loading-text{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--muted);}
+  @keyframes authSpin{ to{ transform:rotate(360deg); } }
   .login-card{background:var(--card);border:1px solid #EDEEF1;border-radius:12px;box-shadow:0 24px 64px rgba(16,24,40,.12);padding:32px 30px;width:100%;max-width:340px;display:flex;flex-direction:column;align-items:center;text-align:center;}
   .login-title{font-family:'Oswald',sans-serif;font-size:19px;font-weight:600;letter-spacing:.01em;color:var(--ink);}
   .login-sub{font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-lt);margin-top:3px;}
@@ -492,6 +497,11 @@
 </style>
 </head>
 <body>
+
+<div class="auth-loading-overlay" id="authLoadingOverlay" style="display:none;">
+  <div class="auth-loading-spinner"></div>
+  <div class="auth-loading-text" id="authLoadingText">Loading your workspace…</div>
+</div>
 
 <div class="login-overlay" id="loginOverlay">
   <div class="login-card">
@@ -1405,7 +1415,10 @@ function renderWhoAmI(){
 }
 
 async function handleLogout(){
+  showAuthLoading('Signing out…');
   await supabaseClient.auth.signOut();
+  // onAuthStateChange fires SIGNED_OUT → showLoginScreen() runs, which hides
+  // this overlay itself once the clean login form is ready.
 }
 
 /* ---------- Button loading state ---------- */
@@ -4849,10 +4862,26 @@ async function handleLogin(){
   setBtnLoading(btn, 'Signing in…');
   const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
   restoreBtn(btn);
-  if(error){ errEl.textContent = error.message; errEl.style.display = 'block'; }
+  if(error){ errEl.textContent = error.message; errEl.style.display = 'block'; return; }
+  // On success, onAuthStateChange fires SIGNED_IN → showApp() takes over and
+  // shows the full-screen loading overlay for the data-fetch phase.
+  showAuthLoading('Loading your workspace…');
+}
+
+function showAuthLoading(text){
+  const overlay = document.getElementById('authLoadingOverlay');
+  const textEl = document.getElementById('authLoadingText');
+  if(textEl) textEl.textContent = text || 'Loading…';
+  if(overlay) overlay.style.display = 'flex';
+}
+
+function hideAuthLoading(){
+  const overlay = document.getElementById('authLoadingOverlay');
+  if(overlay) overlay.style.display = 'none';
 }
 
 function showLoginScreen(){
+  hideAuthLoading();
   document.getElementById('loginOverlay').style.display = 'flex';
   document.getElementById('appRoot').style.display = 'none';
   currentUser = null; myProfile = null;
@@ -4863,6 +4892,7 @@ function showLoginScreen(){
 }
 
 async function showApp(session){
+  showAuthLoading('Loading your workspace…');
   currentUser = session.user;
   await loadMyProfile();
   if(!myProfile){
@@ -4872,10 +4902,16 @@ async function showApp(session){
     document.getElementById('loginError').textContent = `Your account has no profile set up${detail}. Ask your admin to check the team_profiles table.`;
     document.getElementById('loginError').style.display = 'block';
     await supabaseClient.auth.signOut();
+    hideAuthLoading();
     return;
   }
+  // appRoot stays hidden — and the login form stays gone, replaced by the
+  // loading overlay — for this entire block. This is the actual fix: before,
+  // appRoot was revealed immediately, so whatever was still in the DOM from
+  // a previous session sat there visible for the full duration of these
+  // awaited loads. Now nothing is shown until every load AND the render that
+  // follows are both fully done.
   document.getElementById('loginOverlay').style.display = 'none';
-  document.getElementById('appRoot').style.display = 'grid';
   await initTheme();
   await loadAll();
   await loadTeamProfiles();
@@ -4884,6 +4920,8 @@ async function showApp(session){
   renderAll();
   applyAppIcon();
   initTimerFromStorage();
+  document.getElementById('appRoot').style.display = 'grid';
+  hideAuthLoading();
 }
 
 (async function init(){
