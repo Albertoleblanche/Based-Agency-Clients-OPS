@@ -640,7 +640,7 @@ document.addEventListener('DOMContentLoaded', function(){
           <div class="panel-body">
             <div class="xy-chart-header">
               <div>
-                <div class="xy-chart-title">Hours Logged</div>
+                <div class="xy-chart-title" id="overviewChartTitle">Hours Logged</div>
                 <div class="xy-chart-updated" id="overviewChartUpdated"></div>
               </div>
               <div class="select-field" style="min-width:110px;">
@@ -923,7 +923,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="tabs settings-tabs" style="margin-top:20px;">
           <div class="tab settings-tab active" data-rtab="clients" onclick="switchReportTab('clients')">Clients</div>
           <div class="tab settings-tab" data-rtab="services" onclick="switchReportTab('services')">Services</div>
-          <div class="tab settings-tab" data-rtab="teammates" onclick="switchReportTab('teammates')">Teammates</div>
+          <div class="tab settings-tab" data-rtab="teammates" id="teammatesReportTab" onclick="switchReportTab('teammates')">Teammates</div>
         </div>
 
         <div class="report-graphic-row">
@@ -1208,7 +1208,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
       <div class="bento-row">
         <div class="panel bento-main">
-          <div class="panel-head"><span class="panel-title">Time Logged</span></div>
+          <div class="panel-head"><span class="panel-title" id="cdTimeLoggedTitle">Time Logged</span></div>
           <div class="panel-body"><div id="cdTimeEntries" class="scroll-cap"></div></div>
         </div>
         <div class="panel bento-side">
@@ -1579,6 +1579,12 @@ function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderL
 function applyRoleVisibility(){
   const notifyBtn = document.getElementById('notifyBtn');
   if(notifyBtn) notifyBtn.style.display = canApprove() ? 'inline-flex' : 'none';
+  const teammatesTab = document.getElementById('teammatesReportTab');
+  if(teammatesTab){
+    teammatesTab.style.display = isAdmin() ? 'inline-block' : 'none';
+    // If a non-admin somehow had this selected (e.g. lost admin mid-session), fall back to Clients.
+    if(!isAdmin() && typeof reportTab!=='undefined' && reportTab==='teammates'){ switchReportTab('clients'); }
+  }
 }
 
 async function switchView(name){
@@ -2434,6 +2440,8 @@ function renderClientDetail(){
   }
 
   const myTimeEntries = timeEntries.filter(e=>e.clientId===c.id).sort((a,b)=> new Date(b.date)-new Date(a.date) || new Date(b.createdAt)-new Date(a.createdAt));
+  const timeLoggedTitleEl = document.getElementById('cdTimeLoggedTitle');
+  if(timeLoggedTitleEl) timeLoggedTitleEl.textContent = isAdmin() ? 'Time Logged (Everyone)' : 'Time Logged (Yours)';
   const totalMinutes = myTimeEntries.reduce((s,e)=>s+e.minutes,0);
   const myNotesForClient = notes.filter(n=>n.clientId===c.id).sort((a,b)=> new Date(b.updatedAt||b.createdAt)-new Date(a.updatedAt||a.createdAt));
   const budget = monthBudgetInfo(c);
@@ -3641,6 +3649,8 @@ function renderReportChart(){
 }
 
 function renderOverviewChart(){
+  const titleEl = document.getElementById('overviewChartTitle');
+  if(titleEl) titleEl.textContent = isAdmin() ? 'Hours Logged (Team)' : 'Your Hours Logged';
   const granularity = document.getElementById('overviewChartGranularity')?.value || 'week';
   const count = granularity==='day' ? 14 : granularity==='week' ? 8 : 6;
   const end = new Date();
