@@ -558,6 +558,10 @@ document.addEventListener('DOMContentLoaded', function(){
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         Trash
       </div>
+      <div class="nav-item" data-view="payroll" id="payrollNavItem" onclick="switchView('payroll')" style="display:none;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+        Payroll
+      </div>
       <div class="nav-item" data-view="settings" onclick="switchView('settings')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         Settings &amp; Integrations
@@ -1241,6 +1245,63 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
     </div>
 
+    <!-- PAYROLL -->
+    <div class="view" id="view-payroll">
+      <div class="topbar">
+        <div><div class="page-title">Payroll</div><div class="page-sub">Hourly rates and pay-period totals — visible to admins only</div></div>
+      </div>
+
+      <div class="panel" style="margin-bottom:24px;">
+        <div class="panel-body">
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+            <div class="date-nav">
+              <span class="date-nav-arrow" onclick="shiftPayrollPeriod(-1)">‹</span>
+              <span class="date-nav-label" id="payrollPeriodLabel" style="cursor:default;"></span>
+              <span class="date-nav-arrow" onclick="shiftPayrollPeriod(1)">›</span>
+            </div>
+            <button class="btn btn-outline" onclick="resetPayrollPeriodToToday()">This period</button>
+            <div class="settings-field" style="margin:0;">
+              <label style="font-size:10px;">Set period start</label>
+              <input type="date" id="payrollPeriodStartInput" onchange="setPayrollPeriodStart(this.value)">
+            </div>
+            <span style="font-size:11px;color:var(--muted-lt);">Bi-weekly (14-day) periods — pick a start date once to align with your actual pay calendar, then use the arrows to step through periods.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:24px;">
+        <div class="panel-head"><span class="panel-title">Hourly Rates</span></div>
+        <div class="panel-body">
+          <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Only admins can see or edit these — hourly rate never appears anywhere else in the app, including to the team member it belongs to.</p>
+          <div id="payrollRatesList"></div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:24px;">
+        <div class="panel-head">
+          <span class="panel-title">Pay Period Summary</span>
+          <div style="display:flex;gap:10px;">
+            <button class="btn btn-outline" onclick="exportPayrollCsv()">Export CSV</button>
+            <button class="btn btn-brand" onclick="markPayrollPeriodPaid()">Mark period as paid</button>
+          </div>
+        </div>
+        <div class="panel-body" style="padding:8px 22px;">
+          <table class="report-table">
+            <thead><tr><th>Member</th><th class="report-th-hours">Hours</th><th class="report-th-hours">Rate</th><th class="report-th-hours">Total</th></tr></thead>
+            <tbody id="payrollSummaryBody"></tbody>
+            <tfoot id="payrollSummaryFoot"></tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">Marked-Paid History</span></div>
+        <div class="panel-body">
+          <div id="payrollHistoryList"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- CLIENT DETAIL -->
     <div class="view" id="view-clientdetail">
       <div class="topbar">
@@ -1672,6 +1733,11 @@ function applyRoleVisibility(){
   }
   const trashClientsPanel = document.getElementById('trashClientsPanel');
   if(trashClientsPanel) trashClientsPanel.style.display = canApprove() ? 'block' : 'none';
+  const payrollNavItem = document.getElementById('payrollNavItem');
+  if(payrollNavItem){
+    payrollNavItem.style.display = isAdmin() ? 'flex' : 'none';
+    if(!isAdmin() && document.getElementById('view-payroll')?.classList.contains('active')){ switchView('overview'); }
+  }
 }
 
 function populateReportMemberFilter(){
@@ -1688,6 +1754,7 @@ async function switchView(name){
   document.getElementById('view-'+name).classList.add('active');
   await fullRefresh();
   if(name==='trash') renderTrash();
+  if(name==='payroll') renderPayroll();
 }
 
 function switchSettingsTab(name){
@@ -2581,6 +2648,204 @@ async function renderTrash(){
   }
 }
 
+/* ---------- Payroll — admin-only. Hourly rates never appear anywhere else
+   in the app, including to the team member the rate belongs to. ---------- */
+
+let payrollRates = {}; // userId -> hourly rate (number)
+let payrollPeriodStart = (()=>{
+  const d = new Date();
+  d.setDate(d.getDate()-13); // default: the 14-day window ending today
+  return getWeekStart(d);   // aligned to a Monday for a clean, predictable default
+})();
+
+function getPayrollPeriodEnd(){
+  const end = new Date(payrollPeriodStart);
+  end.setDate(end.getDate()+13);
+  end.setHours(23,59,59,999);
+  return end;
+}
+
+async function loadPayrollRates(){
+  if(!isAdmin()){ payrollRates = {}; return; }
+  const { data, error } = await supabaseClient.from('payroll_rates').select('*');
+  if(error){ console.error('loadPayrollRates error', error); payrollRates = {}; return; }
+  payrollRates = {};
+  (data||[]).forEach(r=>{ payrollRates[r.user_id] = parseFloat(r.hourly_rate) || 0; });
+}
+
+async function renderPayroll(){
+  if(!isAdmin()) return; // defense in depth — nav item and view switch already gate this
+  await loadPayrollRates();
+  renderPayrollPeriodLabel();
+  renderPayrollRatesList();
+  renderPayrollSummary();
+  await renderPayrollHistory();
+}
+
+function renderPayrollPeriodLabel(){
+  const el = document.getElementById('payrollPeriodLabel');
+  if(!el) return;
+  const end = getPayrollPeriodEnd();
+  const fmt = (d)=> d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  el.textContent = `${fmt(payrollPeriodStart)} – ${fmt(end)}`;
+  const startInput = document.getElementById('payrollPeriodStartInput');
+  if(startInput) startInput.value = toDateStr(payrollPeriodStart);
+}
+
+function shiftPayrollPeriod(dir){
+  payrollPeriodStart.setDate(payrollPeriodStart.getDate() + dir*14);
+  renderPayrollPeriodLabel();
+  renderPayrollSummary();
+}
+
+function resetPayrollPeriodToToday(){
+  const d = new Date();
+  d.setDate(d.getDate()-13);
+  payrollPeriodStart = getWeekStart(d);
+  renderPayrollPeriodLabel();
+  renderPayrollSummary();
+}
+
+function setPayrollPeriodStart(val){
+  if(!val) return;
+  payrollPeriodStart = new Date(val+'T00:00:00');
+  renderPayrollPeriodLabel();
+  renderPayrollSummary();
+}
+
+function renderPayrollRatesList(){
+  const el = document.getElementById('payrollRatesList');
+  if(!el) return;
+  if(!teamProfiles.length){ el.innerHTML = `<div class="empty">No team members yet.</div>`; return; }
+  el.innerHTML = [...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>{
+    const rate = payrollRates[p.id] || 0;
+    return `<div class="integ-row">
+      <div><div class="integ-name">${p.name}</div><div class="integ-desc">${p.title || p.role}</div></div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:13px;color:var(--muted-lt);">$</span>
+        <input type="number" min="0" step="0.5" id="payrollRateInput-${p.id}" value="${rate || ''}" placeholder="0.00" style="width:90px;font-family:'IBM Plex Mono',monospace;font-size:13px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);">
+        <span style="font-size:11px;color:var(--muted-lt);">/hr</span>
+        <button class="btn btn-outline" onclick="savePayrollRate('${p.id}')">Save</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function savePayrollRate(userId){
+  const input = document.getElementById(`payrollRateInput-${userId}`);
+  if(!input) return;
+  const rate = parseFloat(input.value) || 0;
+  if(rate < 0){ showToast('error','Invalid rate','Hourly rate can\'t be negative.'); return; }
+  const { error } = await supabaseClient.from('payroll_rates').upsert(
+    { user_id: userId, hourly_rate: rate, updated_at: new Date().toISOString(), updated_by: currentUser.id },
+    { onConflict: 'user_id' }
+  );
+  if(error){ showToast('error','Save failed', error.message); return; }
+  payrollRates[userId] = rate;
+  renderPayrollSummary();
+  showToast('success','Rate saved', `$${rate.toFixed(2)}/hr saved.`);
+}
+
+function getPayrollSummary(){
+  const start = new Date(payrollPeriodStart); start.setHours(0,0,0,0);
+  const end = getPayrollPeriodEnd();
+  const entries = timeEntries.filter(e=>{
+    const d = new Date(e.date+'T00:00:00');
+    return d>=start && d<=end;
+  });
+  const byUser = {};
+  entries.forEach(e=>{ byUser[e.userId] = (byUser[e.userId]||0) + e.minutes; });
+  return [...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>{
+    const minutes = byUser[p.id] || 0;
+    const hours = minutes/60;
+    const rate = payrollRates[p.id] || 0;
+    return { userId:p.id, name:p.name, minutes, hours, rate, pay: hours*rate };
+  });
+}
+
+function renderPayrollSummary(){
+  const body = document.getElementById('payrollSummaryBody');
+  const foot = document.getElementById('payrollSummaryFoot');
+  if(!body) return;
+  const rows = getPayrollSummary();
+  if(!rows.length){ body.innerHTML = `<tr><td colspan="4"><div class="empty">No team members yet.</div></td></tr>`; if(foot) foot.innerHTML = ''; return; }
+
+  body.innerHTML = rows.map(r=>`
+    <tr>
+      <td>${r.name}</td>
+      <td class="report-hours-val">${formatMinutes(r.minutes)}</td>
+      <td class="report-hours-val">${r.rate ? '$'+r.rate.toFixed(2) : `<span style="color:var(--muted-lt);">Not set</span>`}</td>
+      <td class="report-hours-val" style="font-weight:700;">${r.rate ? '$'+r.pay.toFixed(2) : '—'}</td>
+    </tr>`).join('');
+
+  const totalPay = rows.reduce((s,r)=>s+r.pay,0);
+  const totalMinutes = rows.reduce((s,r)=>s+r.minutes,0);
+  if(foot){
+    foot.innerHTML = `<tr style="font-weight:700;border-top:2px solid var(--border);">
+      <td>Total</td>
+      <td class="report-hours-val">${formatMinutes(totalMinutes)}</td>
+      <td></td>
+      <td class="report-hours-val">$${totalPay.toFixed(2)}</td>
+    </tr>`;
+  }
+}
+
+function exportPayrollCsv(){
+  const rows = getPayrollSummary();
+  if(!rows.length){ showToast('info','Nothing to export','No team members yet.'); return; }
+  const end = getPayrollPeriodEnd();
+  const headers = ['Member','Hours','Rate','Total'];
+  const lines = [headers.join(',')];
+  rows.forEach(r=>{
+    lines.push([r.name, (r.minutes/60).toFixed(2), r.rate.toFixed(2), r.pay.toFixed(2)].map(csvEscape).join(','));
+  });
+  const totalPay = rows.reduce((s,r)=>s+r.pay,0);
+  lines.push(['Total','','',totalPay.toFixed(2)].map(csvEscape).join(','));
+  const blob = new Blob([lines.join('\n')], { type:'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `payroll_${toDateStr(payrollPeriodStart)}_to_${toDateStr(end)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function markPayrollPeriodPaid(){
+  const rows = getPayrollSummary();
+  const totalPay = rows.reduce((s,r)=>s+r.pay,0);
+  const end = getPayrollPeriodEnd();
+  const unratedWithHours = rows.filter(r=>r.minutes>0 && !r.rate);
+  let confirmMsg = `Mark ${toDateStr(payrollPeriodStart)} to ${toDateStr(end)} as paid? Total: $${totalPay.toFixed(2)}. This is just a record for your own tracking — it doesn't actually send any money.`;
+  if(unratedWithHours.length){
+    confirmMsg = `Heads up: ${unratedWithHours.map(r=>r.name).join(', ')} logged hours this period but ${unratedWithHours.length===1?'has':'have'} no rate set, so ${unratedWithHours.length===1?'their':'their'} pay isn't included in this total. ` + confirmMsg;
+  }
+  if(!confirm(confirmMsg)) return;
+  const { error } = await supabaseClient.from('payroll_periods').insert({
+    period_start: toDateStr(payrollPeriodStart),
+    period_end: toDateStr(end),
+    total_amount: totalPay,
+    marked_paid_by: currentUser.id
+  });
+  if(error){ showToast('error','Save failed', error.message); return; }
+  await renderPayrollHistory();
+  showToast('success','Marked as paid', `${toDateStr(payrollPeriodStart)} to ${toDateStr(end)} recorded.`);
+}
+
+async function renderPayrollHistory(){
+  const el = document.getElementById('payrollHistoryList');
+  if(!el) return;
+  el.innerHTML = `<div class="empty">Loading…</div>`;
+  const { data, error } = await supabaseClient.from('payroll_periods').select('*').order('period_start', { ascending:false }).limit(26);
+  if(error){ el.innerHTML = `<div class="empty">Could not load payroll history.</div>`; return; }
+  if(!data || !data.length){ el.innerHTML = `<div class="empty">No periods marked as paid yet.</div>`; return; }
+  el.innerHTML = data.map(row=>{
+    const by = teamProfiles.find(p=>p.id===row.marked_paid_by);
+    return `<div class="integ-row">
+      <div><div class="integ-name">${new Date(row.period_start+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${new Date(row.period_end+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div><div class="integ-desc">Marked paid by ${by?by.name:'someone no longer on the team'} · $${parseFloat(row.total_amount).toFixed(2)} total</div></div>
+    </div>`;
+  }).join('');
+}
+
 /* ---------- Client Detail Page — everything about one client, pulled from every tab ---------- */
 let currentDetailClientId = null;
 
@@ -2812,7 +3077,7 @@ function openNoteModal(noteId, presetClientId){
           <option value="done" ${editing && editing.status==='done'?'selected':''}>Done</option>
         </select>
       </div>
-      <div class="settings-field"><label>Note</label><textarea id="noteTextInput" style="width:100%;min-height:110px;font-family:'Inter',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${editing ? editing.text : ''}</textarea></div>
+      <div class="settings-field"><label>Note</label><textarea id="noteTextInput" style="width:100%;min-height:200px;font-family:'Inter',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${editing ? editing.text : ''}</textarea></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" onclick="saveNote(${editing ? `'${editing.id}'` : 'null'})">${editing?'Save changes':'Add note'}</button>
@@ -2961,16 +3226,16 @@ function renderNotes(){
     const c = clients.find(x=>x.id===n.clientId);
     const status = noteStatusMeta(n.status);
     const dateStr = new Date(n.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
-    return `<div class="note-card">
+    return `<div class="note-card" style="cursor:pointer;" onclick="openNoteModal('${n.id}')">
       <div class="note-card-top">
         <div>
-          <div class="note-client" onclick="goToClientInQueue('${n.clientId}','all')">${c ? c.name : 'Unknown client'}</div>
+          <div class="note-client" onclick="event.stopPropagation(); goToClientInQueue('${n.clientId}','all')">${c ? c.name : 'Unknown client'}</div>
           <div class="note-meta">${dateStr}</div>
         </div>
         <span class="pill ${status.cls}">${status.label}</span>
       </div>
       <div class="note-text">${n.text}</div>
-      <div class="note-actions">
+      <div class="note-actions" onclick="event.stopPropagation();">
         ${n.status!=='done' ? `<button class="btn btn-brand" style="padding:7px 12px;font-size:11.5px;" onclick="logNoteNow('${n.id}')">Log it now</button>` : ''}
         <select class="note-status-select" onchange="changeNoteStatus('${n.id}', this.value)">
           <option value="idea" ${n.status==='idea'?'selected':''}>Idea</option>
