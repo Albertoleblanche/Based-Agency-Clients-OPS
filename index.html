@@ -3679,9 +3679,24 @@ function renderTasks(){
   el.innerHTML = visible.map(t=>taskCardHtml(t)).join('');
 }
 
-function taskCardHtml(t){
+function taskActionsHtml(t){
   const amAssigner = t.assignerId===currentUser.id;
   const amAssignee = t.assigneeId===currentUser.id;
+  let actions = '';
+  if(t.status==='open'){
+    if(amAssignee) actions += `<button class="btn btn-brand" onclick="markTaskDone('${t.id}')">Mark done</button>`;
+    if(amAssigner){
+      actions += `<button class="btn btn-outline" onclick="openEditTaskModal('${t.id}')">Edit</button>`;
+      actions += `<button class="btn btn-outline" style="color:var(--red);" onclick="cancelTask('${t.id}')">Cancel</button>`;
+    }
+  } else {
+    actions += `<span class="row-link" onclick="hideTaskFromMyList('${t.id}')">Remove from my list</span>`;
+  }
+  return actions;
+}
+
+function taskCardHtml(t){
+  const amAssigner = t.assignerId===currentUser.id;
   const assigner = teamProfiles.find(p=>p.id===t.assignerId);
   const assignee = teamProfiles.find(p=>p.id===t.assigneeId);
   const pMeta = TASK_PRIORITY_META[t.priority] || TASK_PRIORITY_META.medium;
@@ -3693,18 +3708,7 @@ function taskCardHtml(t){
     ? `→ Assigned to ${assignee ? assignee.name : 'someone no longer on the team'}`
     : `← From ${assigner ? assigner.name : 'someone no longer on the team'}`;
 
-  let actions = '';
-  if(t.status==='open'){
-    if(amAssignee) actions += `<button class="btn btn-brand" onclick="markTaskDone('${t.id}')">Mark done</button>`;
-    if(amAssigner){
-      actions += `<button class="btn btn-outline" onclick="openEditTaskModal('${t.id}')">Edit</button>`;
-      actions += `<button class="btn btn-outline" style="color:var(--red);" onclick="cancelTask('${t.id}')">Cancel</button>`;
-    }
-  } else {
-    actions += `<span class="row-link" onclick="hideTaskFromMyList('${t.id}')">Remove from my list</span>`;
-  }
-
-  return `<div class="ts-entry-card" style="margin-bottom:10px;align-items:flex-start;">
+  return `<div class="ts-entry-card" style="margin-bottom:10px;align-items:flex-start;cursor:pointer;" onclick="openTaskDetailModal('${t.id}')">
     <div class="ts-entry-info">
       <div class="ts-entry-title">
         <span class="pill" style="background:${pMeta.color}18;color:${pMeta.color};font-weight:700;">${pMeta.label}</span>
@@ -3717,9 +3721,49 @@ function taskCardHtml(t){
         ${directionLabel}${dueStr ? ` · Due ${dueStr}` : ''}${overdue ? ` <span style="color:var(--red);font-weight:700;">Overdue</span>` : ''}${t.status==='done' && t.completedAt ? ` · Completed ${new Date(t.completedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})}` : ''}
       </div>
     </div>
-    <div class="ts-entry-right" style="flex-wrap:wrap;justify-content:flex-end;max-width:260px;">${actions}</div>
+    <div class="ts-entry-right" style="flex-wrap:wrap;justify-content:flex-end;max-width:260px;" onclick="event.stopPropagation();">${taskActionsHtml(t)}</div>
   </div>`;
 }
+
+function openTaskDetailModal(taskId){
+  const t = tasks.find(x=>x.id===taskId);
+  if(!t) return;
+  const amAssigner = t.assignerId===currentUser.id;
+  const assigner = teamProfiles.find(p=>p.id===t.assignerId);
+  const assignee = teamProfiles.find(p=>p.id===t.assigneeId);
+  const pMeta = TASK_PRIORITY_META[t.priority] || TASK_PRIORITY_META.medium;
+  const c = t.clientId ? clients.find(x=>x.id===t.clientId) : null;
+  const dueStr = t.dueDate ? new Date(t.dueDate+'T00:00:00').toLocaleDateString('en-US',{weekday:'long', month:'long', day:'numeric'}) : '';
+  const overdue = t.status==='open' && t.dueDate && new Date(t.dueDate+'T00:00:00') < new Date(new Date().toDateString());
+  const directionLabel = amAssigner
+    ? `Assigned to ${assignee ? assignee.name : 'someone no longer on the team'}`
+    : `From ${assigner ? assigner.name : 'someone no longer on the team'}`;
+  const statusMeta = t.status==='done'
+    ? { cls:'pill-good', label:'Done' }
+    : overdue ? { cls:'pill-bad', label:'Overdue' } : { cls:'pill-mid', label:'Open' };
+
+  openAppModal(`
+    <div class="modal-head">
+      <div>
+        <span class="pill" style="background:${pMeta.color}18;color:${pMeta.color};font-weight:700;margin-right:8px;">${pMeta.label} priority</span>
+        <span class="pill ${statusMeta.cls}">${statusMeta.label}</span>
+      </div>
+      <span class="toast-close" onclick="closeAppModal()">✕</span>
+    </div>
+    <div class="modal-body">
+      <div class="q-name" style="margin-bottom:10px;">${t.title}</div>
+      ${t.description ? `<div style="font-size:13px;color:var(--ink);line-height:1.6;white-space:pre-wrap;margin-bottom:14px;">${t.description}</div>` : `<div style="font-size:12.5px;color:var(--muted-lt);margin-bottom:14px;">No description added.</div>`}
+      <div class="form-grid" style="margin-bottom:6px;">
+        <div><label style="font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--muted-lt);display:block;margin-bottom:4px;">Direction</label><div style="font-size:13px;">${directionLabel}</div></div>
+        ${dueStr ? `<div><label style="font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--muted-lt);display:block;margin-bottom:4px;">Due</label><div style="font-size:13px;${overdue?'color:var(--red);font-weight:700;':''}">${dueStr}</div></div>` : ''}
+        ${c ? `<div><label style="font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--muted-lt);display:block;margin-bottom:4px;">Related client</label><div style="font-size:13px;"><span class="row-link" onclick="closeAppModal(); openClientDetail('${c.id}');">${c.name}</span></div></div>` : ''}
+        ${t.status==='done' && t.completedAt ? `<div><label style="font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--muted-lt);display:block;margin-bottom:4px;">Completed</label><div style="font-size:13px;">${new Date(t.completedAt).toLocaleDateString('en-US',{month:'long',day:'numeric'})}</div></div>` : ''}
+      </div>
+      ${t.link ? `<a href="${t.link}" target="_blank" rel="noopener" class="note-link" style="display:block;margin-top:8px;">🔗 ${t.link}</a>` : ''}
+    </div>
+    <div class="modal-actions">${taskActionsHtml(t)}<button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 500);
+}
+
 
 function populateTaskAssigneeSelect(selectedId){
   const options = [...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name))
@@ -3826,6 +3870,7 @@ async function markTaskDone(taskId){
   await loadMyTasks();
   renderTasks();
   updateTasksNavBadge();
+  closeAppModal();
   error ? showToast('error','Save failed', error.message) : showToast('success','Marked done', `${t.assignerId===currentUser.id ? 'You' : (teamProfiles.find(p=>p.id===t.assignerId)?.name||'They')} will see this the next time they check Tasks.`);
 }
 
@@ -3837,6 +3882,7 @@ async function cancelTask(taskId){
   await loadMyTasks();
   renderTasks();
   updateTasksNavBadge();
+  closeAppModal();
   error ? showToast('error','Save failed', error.message) : showToast('success','Task cancelled','Removed for both of you.');
 }
 
@@ -3848,6 +3894,7 @@ async function hideTaskFromMyList(taskId){
   const { error } = await supabaseClient.from('tasks').update({ [field]: true }).eq('id', taskId);
   await loadMyTasks();
   renderTasks();
+  closeAppModal();
   error ? showToast('error','Save failed', error.message) : showToast('success','Removed','Cleared from your Done list — this doesn\'t affect the other person\'s view.');
 }
 
