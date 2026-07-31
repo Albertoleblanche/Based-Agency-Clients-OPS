@@ -1270,6 +1270,21 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
 
       <div class="panel" style="margin-bottom:24px;">
+        <div class="panel-head"><span class="panel-title">Overtime Rules</span></div>
+        <div class="panel-body">
+          <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Calculated per calendar week (Mon–Sun), not per pay period — someone who works 45 hours one week and 35 the next gets 5 overtime hours, even though the two-week total is a normal 80.</p>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span style="font-size:13px;">Overtime after</span>
+            <input type="number" min="0" step="1" id="overtimeThresholdInput" value="40" style="width:70px;font-family:'IBM Plex Mono',monospace;font-size:13px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);">
+            <span style="font-size:13px;">hours/week, paid at</span>
+            <input type="number" min="1" step="0.1" id="overtimeMultiplierInput" value="1.5" style="width:70px;font-family:'IBM Plex Mono',monospace;font-size:13px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);">
+            <span style="font-size:13px;">× the normal rate.</span>
+            <button class="btn btn-outline" onclick="saveOvertimeRules()">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:24px;">
         <div class="panel-head"><span class="panel-title">Hourly Rates</span></div>
         <div class="panel-body">
           <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Only admins can see or edit these — hourly rate never appears anywhere else in the app, including to the team member it belongs to.</p>
@@ -1287,7 +1302,7 @@ document.addEventListener('DOMContentLoaded', function(){
         </div>
         <div class="panel-body" style="padding:8px 22px;">
           <table class="report-table">
-            <thead><tr><th>Member</th><th class="report-th-hours">Hours</th><th class="report-th-hours">Rate</th><th class="report-th-hours">Total</th></tr></thead>
+            <thead><tr><th>Member</th><th class="report-th-hours">Regular Hrs</th><th class="report-th-hours">OT Hrs</th><th class="report-th-hours">Rate</th><th class="report-th-hours">Total</th></tr></thead>
             <tbody id="payrollSummaryBody"></tbody>
             <tfoot id="payrollSummaryFoot"></tfoot>
           </table>
@@ -1587,6 +1602,8 @@ async function loadAll(){
   settings.statusOptions = (settings.statusOptions && settings.statusOptions.length) ? settings.statusOptions : DEFAULT_STATUS_OPTIONS.slice();
   settings.teamTitleOptions = (settings.teamTitleOptions && settings.teamTitleOptions.length) ? settings.teamTitleOptions : DEFAULT_TEAM_TITLE_OPTIONS.slice();
   settings.customFields = settings.customFields || [];
+  settings.overtimeThresholdHours = settings.overtimeThresholdHours ?? 40;
+  settings.overtimeMultiplier = settings.overtimeMultiplier ?? 1.5;
   document.getElementById('setDaniel').value = settings.danielEmail || '';
   document.getElementById('setEric').value = settings.ericEmail || '';
   const sheetInput = document.getElementById('sheetCsvUrl');
@@ -2677,9 +2694,26 @@ async function renderPayroll(){
   if(!isAdmin()) return; // defense in depth — nav item and view switch already gate this
   await loadPayrollRates();
   renderPayrollPeriodLabel();
+  const threshEl = document.getElementById('overtimeThresholdInput');
+  const multEl = document.getElementById('overtimeMultiplierInput');
+  if(threshEl) threshEl.value = settings.overtimeThresholdHours;
+  if(multEl) multEl.value = settings.overtimeMultiplier;
   renderPayrollRatesList();
   renderPayrollSummary();
   await renderPayrollHistory();
+}
+
+async function saveOvertimeRules(){
+  const threshold = parseFloat(document.getElementById('overtimeThresholdInput').value);
+  const multiplier = parseFloat(document.getElementById('overtimeMultiplierInput').value);
+  if(!(threshold >= 0)){ showToast('error','Invalid threshold','Enter a valid number of hours.'); return; }
+  if(!(multiplier >= 1)){ showToast('error','Invalid multiplier','Overtime multiplier should be at least 1×.'); return; }
+  await loadAll();
+  settings.overtimeThresholdHours = threshold;
+  settings.overtimeMultiplier = multiplier;
+  const ok = await persistSettings();
+  renderPayrollSummary();
+  ok ? showToast('success','Overtime rules saved', `${threshold} hrs/week at ${multiplier}×.`) : showToast('error','Save failed','Could not save — try again.');
 }
 
 function renderPayrollPeriodLabel(){
@@ -2747,19 +2781,51 @@ async function savePayrollRate(userId){
 }
 
 function getPayrollSummary(){
-  const start = new Date(payrollPeriodStart); start.setHours(0,0,0,0);
-  const end = getPayrollPeriodEnd();
+  const week1Start = new Date(payrollPeriodStart); week1Start.setHours(0,0,0,0);
+  const week1End = new Date(week1Start); week1End.setDate(week1End.getDate()+6); week1End.setHours(23,59,59,999);
+  const week2End = getPayrollPeriodEnd(); // period start + 13, end of day
+
+  const thresholdMinutes = (parseFloat(settings.overtimeThresholdHours) || 0) * 60;
+  const otMultiplier = parseFloat(settings.overtimeMultiplier) || 1;
+
   const entries = timeEntries.filter(e=>{
     const d = new Date(e.date+'T00:00:00');
-    return d>=start && d<=end;
+    return d>=week1Start && d<=week2End;
   });
-  const byUser = {};
-  entries.forEach(e=>{ byUser[e.userId] = (byUser[e.userId]||0) + e.minutes; });
+
+  // byUserWeek[userId] = [week1Minutes, week2Minutes] — overtime is a
+  // per-calendar-week thing, so each week gets checked against the
+  // threshold on its own, not the two-week total.
+  const byUserWeek = {};
+  entries.forEach(e=>{
+    const d = new Date(e.date+'T00:00:00');
+    const wk = d <= week1End ? 0 : 1;
+    if(!byUserWeek[e.userId]) byUserWeek[e.userId] = [0,0];
+    byUserWeek[e.userId][wk] += e.minutes;
+  });
+
   return [...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>{
-    const minutes = byUser[p.id] || 0;
-    const hours = minutes/60;
+    const weeks = byUserWeek[p.id] || [0,0];
+    let regularMinutes = 0, otMinutes = 0;
+    weeks.forEach(weekMinutes=>{
+      if(weekMinutes > thresholdMinutes){
+        regularMinutes += thresholdMinutes;
+        otMinutes += (weekMinutes - thresholdMinutes);
+      } else {
+        regularMinutes += weekMinutes;
+      }
+    });
     const rate = payrollRates[p.id] || 0;
-    return { userId:p.id, name:p.name, minutes, hours, rate, pay: hours*rate };
+    const regularHours = regularMinutes/60;
+    const otHours = otMinutes/60;
+    const regularPay = regularHours * rate;
+    const otPay = otHours * rate * otMultiplier;
+    return {
+      userId:p.id, name:p.name,
+      minutes: regularMinutes+otMinutes, hours:(regularMinutes+otMinutes)/60,
+      regularMinutes, regularHours, otMinutes, otHours,
+      rate, regularPay, otPay, pay: regularPay+otPay
+    };
   });
 }
 
@@ -2768,22 +2834,25 @@ function renderPayrollSummary(){
   const foot = document.getElementById('payrollSummaryFoot');
   if(!body) return;
   const rows = getPayrollSummary();
-  if(!rows.length){ body.innerHTML = `<tr><td colspan="4"><div class="empty">No team members yet.</div></td></tr>`; if(foot) foot.innerHTML = ''; return; }
+  if(!rows.length){ body.innerHTML = `<tr><td colspan="5"><div class="empty">No team members yet.</div></td></tr>`; if(foot) foot.innerHTML = ''; return; }
 
   body.innerHTML = rows.map(r=>`
     <tr>
       <td>${r.name}</td>
-      <td class="report-hours-val">${formatMinutes(r.minutes)}</td>
+      <td class="report-hours-val">${formatMinutes(r.regularMinutes)}</td>
+      <td class="report-hours-val" style="${r.otMinutes ? 'color:var(--amber);font-weight:700;' : 'color:var(--muted-lt);'}">${r.otMinutes ? formatMinutes(r.otMinutes) : '—'}</td>
       <td class="report-hours-val">${r.rate ? '$'+r.rate.toFixed(2) : `<span style="color:var(--muted-lt);">Not set</span>`}</td>
       <td class="report-hours-val" style="font-weight:700;">${r.rate ? '$'+r.pay.toFixed(2) : '—'}</td>
     </tr>`).join('');
 
   const totalPay = rows.reduce((s,r)=>s+r.pay,0);
-  const totalMinutes = rows.reduce((s,r)=>s+r.minutes,0);
+  const totalRegular = rows.reduce((s,r)=>s+r.regularMinutes,0);
+  const totalOt = rows.reduce((s,r)=>s+r.otMinutes,0);
   if(foot){
     foot.innerHTML = `<tr style="font-weight:700;border-top:2px solid var(--border);">
       <td>Total</td>
-      <td class="report-hours-val">${formatMinutes(totalMinutes)}</td>
+      <td class="report-hours-val">${formatMinutes(totalRegular)}</td>
+      <td class="report-hours-val" style="${totalOt ? 'color:var(--amber);' : ''}">${totalOt ? formatMinutes(totalOt) : '—'}</td>
       <td></td>
       <td class="report-hours-val">$${totalPay.toFixed(2)}</td>
     </tr>`;
@@ -2794,13 +2863,17 @@ function exportPayrollCsv(){
   const rows = getPayrollSummary();
   if(!rows.length){ showToast('info','Nothing to export','No team members yet.'); return; }
   const end = getPayrollPeriodEnd();
-  const headers = ['Member','Hours','Rate','Total'];
+  const headers = ['Member','Regular Hours','OT Hours','Rate','Regular Pay','OT Pay','Total'];
   const lines = [headers.join(',')];
   rows.forEach(r=>{
-    lines.push([r.name, (r.minutes/60).toFixed(2), r.rate.toFixed(2), r.pay.toFixed(2)].map(csvEscape).join(','));
+    lines.push([r.name, r.regularHours.toFixed(2), r.otHours.toFixed(2), r.rate.toFixed(2), r.regularPay.toFixed(2), r.otPay.toFixed(2), r.pay.toFixed(2)].map(csvEscape).join(','));
   });
   const totalPay = rows.reduce((s,r)=>s+r.pay,0);
-  lines.push(['Total','','',totalPay.toFixed(2)].map(csvEscape).join(','));
+  const totalRegular = rows.reduce((s,r)=>s+r.regularHours,0);
+  const totalOt = rows.reduce((s,r)=>s+r.otHours,0);
+  const totalRegularPay = rows.reduce((s,r)=>s+r.regularPay,0);
+  const totalOtPay = rows.reduce((s,r)=>s+r.otPay,0);
+  lines.push(['Total', totalRegular.toFixed(2), totalOt.toFixed(2), '', totalRegularPay.toFixed(2), totalOtPay.toFixed(2), totalPay.toFixed(2)].map(csvEscape).join(','));
   const blob = new Blob([lines.join('\n')], { type:'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
