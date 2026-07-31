@@ -30,6 +30,11 @@
 
   .login-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:2000;padding:20px;}
 
+  .auth-loading-overlay{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:3000;}
+  .auth-loading-spinner{width:34px;height:34px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--brand);animation:authSpin .8s linear infinite;}
+  .auth-loading-text{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--muted);}
+  @keyframes authSpin{ to{ transform:rotate(360deg); } }
+
   .login-card{background:var(--card);border:1px solid #EDEEF1;border-radius:12px;box-shadow:0 24px 64px rgba(16,24,40,.12);padding:32px 30px;width:100%;max-width:340px;display:flex;flex-direction:column;align-items:center;text-align:center;}
   .login-title{font-family:'Oswald',sans-serif;font-size:19px;font-weight:600;letter-spacing:.01em;color:var(--ink);}
   .login-sub{font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-lt);margin-top:3px;}
@@ -493,6 +498,11 @@
 </style>
 </head>
 <body>
+
+<div class="auth-loading-overlay" id="authLoadingOverlay" style="display:none;">
+  <div class="auth-loading-spinner"></div>
+  <div class="auth-loading-text" id="authLoadingText">Loading your workspace…</div>
+</div>
 
 <div class="login-overlay" id="loginOverlay">
   <div class="login-card">
@@ -1406,8 +1416,10 @@ function renderWhoAmI(){
 }
 
 async function handleLogout(){
+  showAuthLoading('Signing out…');
   await supabaseClient.auth.signOut();
-  window.location.reload();
+  // onAuthStateChange fires SIGNED_OUT → showLoginScreen() runs, which hides
+  // this overlay itself once the clean login form is ready.
 }
 
 /* ---------- Button loading state ---------- */
@@ -4857,40 +4869,91 @@ async function handleLogin(){
   setBtnLoading(btn, 'Signing in…');
   const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if(error){ restoreBtn(btn); errEl.textContent = error.message; errEl.style.display = 'block'; return; }
-  // Supabase persists the session, so a real reload picks it right back up
-  // in init() below — a full reload can't get stuck in a bad state the way
-  // an in-page transition can, since the browser rebuilds everything fresh.
-  window.location.reload();
+  // On success, onAuthStateChange fires SIGNED_IN → showApp() takes over,
+  // shows the loading overlay for the data-fetch phase, and this button
+  // never needs restoring since the login form is about to disappear.
+  showAuthLoading('Loading your workspace…');
+}
+
+function showAuthLoading(text){
+  const overlay = document.getElementById('authLoadingOverlay');
+  const textEl = document.getElementById('authLoadingText');
+  if(textEl) textEl.textContent = text || 'Loading…';
+  if(overlay) overlay.style.display = 'flex';
+}
+
+function hideAuthLoading(){
+  const overlay = document.getElementById('authLoadingOverlay');
+  if(overlay) overlay.style.display = 'none';
 }
 
 function showLoginScreen(){
+  hideAuthLoading();
   document.getElementById('loginOverlay').style.display = 'flex';
   document.getElementById('appRoot').style.display = 'none';
   currentUser = null; myProfile = null;
+  // Defensive reset — makes sure nothing from a previous session (e.g. an
+  // admin's team-wide time entries) can render even briefly for whoever
+  // logs in next on this same tab, before their own fresh data loads in.
+  clients = []; notes = []; timeEntries = []; teamProfiles = []; log = [];
 }
 
 async function showApp(session){
-  currentUser = session.user;
-  await loadMyProfile();
-  if(!myProfile){
-    // Auth account exists but no team_profiles row — shouldn't normally happen
-    // since create-member.js creates both together, but handle it gracefully.
-    const detail = lastProfileError ? ` (${lastProfileError.message || JSON.stringify(lastProfileError)})` : '';
-    document.getElementById('loginError').textContent = `Your account has no profile set up${detail}. Ask your admin to check the team_profiles table.`;
-    document.getElementById('loginError').style.display = 'block';
-    await supabaseClient.auth.signOut();
-    return;
+  showAuthLoading('Loading your workspace…');
+
+  // Safety net: if something hangs without ever throwing or resolving (a
+  // stalled network request, for example), don't leave the person staring
+  // at a spinner forever — force back to a working login screen after a
+  // reasonable wait.
+  let settled = false;
+  const safetyTimer = setTimeout(()=>{
+    if(settled) return;
+    settled = true;
+    hideAuthLoading();
+    document.getElementById('loginOverlay').style.display = 'flex';
+    document.getElementById('appRoot').style.display = 'none';
+    const errEl = document.getElementById('loginError');
+    if(errEl){ errEl.textContent = 'This is taking longer than expected. Check your connection and try signing in again.'; errEl.style.display = 'block'; }
+  }, 15000);
+
+  try{
+    currentUser = session.user;
+    await loadMyProfile();
+    if(!myProfile){
+      // Auth account exists but no team_profiles row — shouldn't normally happen
+      // since create-member.js creates both together, but handle it gracefully.
+      const detail = lastProfileError ? ` (${lastProfileError.message || JSON.stringify(lastProfileError)})` : '';
+      document.getElementById('loginError').textContent = `Your account has no profile set up${detail}. Ask your admin to check the team_profiles table.`;
+      document.getElementById('loginError').style.display = 'block';
+      await supabaseClient.auth.signOut();
+      return;
+    }
+    // appRoot stays hidden — and the login form stays gone, replaced by the
+    // loading overlay — for this entire block, so nothing stale from a
+    // previous session can sit visible during the load.
+    document.getElementById('loginOverlay').style.display = 'none';
+    await initTheme();
+    await loadAll();
+    await loadTeamProfiles();
+    await loadMyNotes();
+    await loadTimeEntries();
+    renderAll();
+    applyAppIcon();
+    initTimerFromStorage();
+    if(!settled) document.getElementById('appRoot').style.display = 'grid';
+  }catch(e){
+    console.error('showApp failed', e);
+    if(!settled){
+      document.getElementById('loginOverlay').style.display = 'flex';
+      document.getElementById('appRoot').style.display = 'none';
+      const errEl = document.getElementById('loginError');
+      if(errEl){ errEl.textContent = 'Something went wrong loading your workspace — please try signing in again.'; errEl.style.display = 'block'; }
+    }
+  } finally {
+    settled = true;
+    clearTimeout(safetyTimer);
+    hideAuthLoading();
   }
-  document.getElementById('loginOverlay').style.display = 'none';
-  document.getElementById('appRoot').style.display = 'grid';
-  await initTheme();
-  await loadAll();
-  await loadTeamProfiles();
-  await loadMyNotes();
-  await loadTimeEntries();
-  renderAll();
-  applyAppIcon();
-  initTimerFromStorage();
 }
 
 (async function init(){
@@ -4901,8 +4964,10 @@ async function showApp(session){
   // reporting whatever the current session state already is — which we just
   // handled above via getSession(). Without skipping that first callback,
   // showApp() (or showLoginScreen()) runs a second time back-to-back on
-  // every single page load, which is why it looked like it was loading
-  // twice. Any real, later event still gets handled normally.
+  // every single page load — this was the actual cause of the "loads
+  // twice" look, independent of whether an overlay is used or not. Any
+  // real, later event (an actual future login or logout) still gets
+  // handled normally.
   let ignoreNextAuthEvent = true;
   supabaseClient.auth.onAuthStateChange(async (event, session) => {
     if(ignoreNextAuthEvent){ ignoreNextAuthEvent = false; return; }
