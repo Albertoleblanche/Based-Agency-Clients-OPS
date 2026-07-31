@@ -1081,9 +1081,17 @@ document.addEventListener('DOMContentLoaded', function(){
           <div class="tab settings-tab" data-rtab="teammates" id="teammatesReportTab" onclick="switchReportTab('teammates')">Teammates</div>
         </div>
 
-        <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:10px;">
-          <button class="btn btn-outline" onclick="exportReportCsv()">Export CSV</button>
-          <button class="btn btn-outline" onclick="exportReportPdf()">Export PDF</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+          <div id="bulkDownloadBar" style="display:none;align-items:center;gap:10px;">
+            <span style="font-size:12px;color:var(--muted);" id="bulkDownloadCount"></span>
+            <button class="btn btn-outline" onclick="bulkDownloadSelectedClients('csv')">Download selected (CSV)</button>
+            <button class="btn btn-outline" onclick="bulkDownloadSelectedClients('pdf')">Download selected (PDF)</button>
+            <span class="row-link" onclick="clearReportClientSelection()">Clear</span>
+          </div>
+          <div style="display:flex;gap:10px;margin-left:auto;">
+            <button class="btn btn-outline" onclick="exportReportCsv()">Export CSV</button>
+            <button class="btn btn-outline" onclick="exportReportPdf()">Export PDF</button>
+          </div>
         </div>
 
         <div class="panel">
@@ -4927,7 +4935,7 @@ function renderReports(){
   const headEl = document.getElementById('reportTableHead');
   if(headEl){
     headEl.innerHTML = reportTab==='clients'
-      ? `<th>Name</th><th class="report-th-hours">Hours</th><th class="report-th-hours">Importance</th><th class="report-th-hours">Danger</th>`
+      ? `<th style="width:30px;"><input type="checkbox" id="reportSelectAllClients" onchange="toggleAllReportClientSelection(this.checked)"></th><th>Name</th><th class="report-th-hours">Hours</th><th class="report-th-hours">Importance</th><th class="report-th-hours">Danger</th>`
       : `<th>Name</th><th class="report-th-hours">Hours</th>`;
   }
 
@@ -4948,9 +4956,10 @@ function renderReports(){
   }
 
   const rows = Object.entries(grouped).sort((a,b)=>b[1]-a[1]);
-  const colspan = reportTab==='clients' ? 4 : 2;
+  const colspan = reportTab==='clients' ? 5 : 2;
 
   renderReportChart();
+  updateBulkDownloadBar();
 
   if(!rows.length){
     tableBody.innerHTML = `<tr><td colspan="${colspan}"><div class="empty">No time logged in this range.</div></td></tr>`;
@@ -4958,6 +4967,11 @@ function renderReports(){
   }
 
   if(reportTab==='clients'){
+    // Selections that no longer appear in the current filtered rows
+    // shouldn't linger as phantom "selected" state.
+    const visibleIds = new Set(rows.map(([key])=>key));
+    selectedReportClientIds.forEach(id=>{ if(!visibleIds.has(id)) selectedReportClientIds.delete(id); });
+
     tableBody.innerHTML = rows.map(([key,mins])=>{
       const c = clients.find(x=>x.id===key);
       const label = getLabel(key);
@@ -4970,12 +4984,14 @@ function renderReports(){
         </div>
       </div>`;
       return `<tr>
+        <td><input type="checkbox" ${selectedReportClientIds.has(key)?'checked':''} onchange="toggleReportClientSelection('${key}', this.checked)"></td>
         <td>${nameEl}</td>
         <td class="report-hours-val">${formatMinutes(mins)}</td>
         <td>${c ? ratingPillCompact(c.importance,'ink',10) : '—'}</td>
         <td>${c ? ratingPillCompact(c.danger,'brand',5) : '—'}</td>
       </tr>`;
     }).join('');
+    updateBulkDownloadBar();
     return;
   }
 
@@ -5299,17 +5315,27 @@ function renderBudgetAlerts(){
 // Clicking a client in the Clients report opens everything logged for that
 // client within the currently selected report period — not just "click to
 // jump to the client," but a real breakdown scoped to the date range.
-function openClientReportDetail(clientId){
-  const c = clients.find(x=>x.id===clientId);
+// Shared by the detail modal and both single-client export functions, so
+// what you see in the modal and what downloads are always exactly the same
+// data — same date range, same visibility rules.
+function getSingleClientReportEntries(clientId){
   const { start, end } = getReportDateBounds();
-  const entries = visibleTimeEntries()
+  return visibleTimeEntries()
     .filter(e=> e.clientId===clientId && new Date(e.date+'T00:00:00') >= start && (!end || new Date(e.date+'T00:00:00') <= end))
     .sort((a,b)=> new Date(b.date) - new Date(a.date) || new Date(b.createdAt) - new Date(a.createdAt));
-  const totalMinutes = entries.reduce((s,e)=>s+e.minutes,0);
+}
 
-  const rangeLabel = document.getElementById('reportRange')?.value === 'custom'
+function getReportRangeLabel(){
+  return document.getElementById('reportRange')?.value === 'custom'
     ? `${document.getElementById('reportFromDate').value || '…'} to ${document.getElementById('reportToDate').value || '…'}`
-    : (document.getElementById('reportRange')?.options[document.getElementById('reportRange').selectedIndex].text || '');
+    : (document.getElementById('reportRange')?.options[document.getElementById('reportRange').selectedIndex]?.text || '');
+}
+
+function openClientReportDetail(clientId){
+  const c = clients.find(x=>x.id===clientId);
+  const entries = getSingleClientReportEntries(clientId);
+  const totalMinutes = entries.reduce((s,e)=>s+e.minutes,0);
+  const rangeLabel = getReportRangeLabel();
 
   const rows = entries.length ? entries.map(e=>{
     const person = teamProfiles.find(p=>p.id===e.userId);
@@ -5332,7 +5358,138 @@ function openClientReportDetail(clientId){
       <span class="toast-close" onclick="closeAppModal()">✕</span>
     </div>
     <div class="modal-body" style="max-height:50vh;overflow-y:auto;">${rows}</div>
-    <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 480);
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="exportSingleClientCsv('${clientId}')">Download CSV</button>
+      <button class="btn btn-outline" onclick="exportSingleClientPdf('${clientId}')">Download PDF</button>
+      <button class="btn btn-outline" onclick="closeAppModal()">Close</button>
+    </div>`, 480);
+}
+
+function safeFilenamePart(str){
+  return String(str||'client').replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'').slice(0,50) || 'client';
+}
+
+function exportSingleClientCsv(clientId){
+  const c = clients.find(x=>x.id===clientId);
+  const entries = getSingleClientReportEntries(clientId);
+  if(!entries.length){ showToast('info','Nothing to export', `No time logged for ${c?c.name:'this client'} in this period.`); return; }
+  const headers = ['Date','Service','Team Member','Description','Hours'];
+  const lines = [headers.join(',')];
+  entries.forEach(e=>{
+    const person = teamProfiles.find(p=>p.id===e.userId);
+    lines.push([e.date, e.service||'', person?person.name:'Unknown', e.description||'', (e.minutes/60).toFixed(2)].map(csvEscape).join(','));
+  });
+  const totalMinutes = entries.reduce((s,e)=>s+e.minutes,0);
+  lines.push(['Total','','','',(totalMinutes/60).toFixed(2)].map(csvEscape).join(','));
+  const blob = new Blob([lines.join('\n')], { type:'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `report_${safeFilenamePart(c?c.name:'client')}_${toDateStr(new Date())}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportSingleClientPdf(clientId){
+  const c = clients.find(x=>x.id===clientId);
+  const entries = getSingleClientReportEntries(clientId);
+  if(!entries.length){ showToast('info','Nothing to export', `No time logged for ${c?c.name:'this client'} in this period.`); return; }
+  if(!window.jspdf){ showToast('error','PDF library not loaded','Check your connection and try again.'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const totalMinutes = entries.reduce((s,e)=>s+e.minutes,0);
+  const rangeLabel = getReportRangeLabel();
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(16);
+  doc.text('Based Agency — Time Report', 14, 18);
+  doc.setFont('helvetica','normal'); doc.setFontSize(12); doc.setTextColor(40);
+  doc.text(c ? c.name : 'Unknown client', 14, 26);
+  doc.setFontSize(10); doc.setTextColor(100);
+  doc.text(`${rangeLabel} · Generated ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`, 14, 32);
+  doc.text(`Total: ${formatMinutes(totalMinutes)}`, 14, 38);
+
+  let y = 50;
+  doc.setFontSize(9); doc.setTextColor(120);
+  doc.text('DATE', 14, y); doc.text('SERVICE', 48, y); doc.text('TEAM MEMBER', 90, y);
+  doc.text('HOURS', 180, y, { align:'right' });
+  y += 3;
+  doc.setDrawColor(220); doc.line(14, y, 196, y);
+  y += 7;
+
+  doc.setFontSize(9);
+  entries.forEach(e=>{
+    if(y > 270){ doc.addPage(); y = 20; }
+    const person = teamProfiles.find(p=>p.id===e.userId);
+    doc.setTextColor(30);
+    doc.text(new Date(e.date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}), 14, y);
+    doc.text((e.service||'—').slice(0,20), 48, y);
+    doc.text((person?person.name:'Unknown').slice(0,20), 90, y);
+    doc.text((e.minutes/60).toFixed(2)+'h', 180, y, { align:'right' });
+    if(e.description){
+      y += 5;
+      doc.setTextColor(140); doc.setFontSize(8);
+      doc.text(e.description.slice(0,95), 14, y);
+      doc.setFontSize(9);
+    }
+    y += 7;
+  });
+
+  y += 3;
+  doc.setDrawColor(220); doc.line(14, y, 196, y);
+  y += 7;
+  doc.setFont('helvetica','bold'); doc.setTextColor(30);
+  doc.text('Total', 14, y);
+  doc.text((totalMinutes/60).toFixed(2)+'h', 180, y, { align:'right' });
+
+  doc.save(`report_${safeFilenamePart(c?c.name:'client')}_${toDateStr(new Date())}.pdf`);
+}
+
+/* ---------- Bulk client selection + individual downloads ---------- */
+
+let selectedReportClientIds = new Set();
+
+function toggleReportClientSelection(clientId, checked){
+  if(checked) selectedReportClientIds.add(clientId);
+  else selectedReportClientIds.delete(clientId);
+  const selectAll = document.getElementById('reportSelectAllClients');
+  if(selectAll && !checked) selectAll.checked = false;
+  updateBulkDownloadBar();
+}
+
+function toggleAllReportClientSelection(checked){
+  document.querySelectorAll('#reportTableBody input[type="checkbox"]').forEach(cb=>{
+    cb.checked = checked;
+    cb.dispatchEvent(new Event('change'));
+  });
+}
+
+function clearReportClientSelection(){
+  selectedReportClientIds.clear();
+  renderReports();
+}
+
+function updateBulkDownloadBar(){
+  const bar = document.getElementById('bulkDownloadBar');
+  const countEl = document.getElementById('bulkDownloadCount');
+  if(!bar) return;
+  const n = selectedReportClientIds.size;
+  const show = reportTab==='clients' && n>0;
+  bar.style.display = show ? 'flex' : 'none';
+  if(countEl) countEl.textContent = `${n} client${n!==1?'s':''} selected`;
+}
+
+// Individually — one file per selected client, not one merged file. A tiny
+// stagger between each avoids browsers silently blocking a burst of
+// simultaneous auto-triggered downloads.
+async function bulkDownloadSelectedClients(format){
+  const ids = [...selectedReportClientIds];
+  if(!ids.length) return;
+  showToast('info','Starting downloads', `Your browser may ask to allow multiple downloads — ${ids.length} file${ids.length!==1?'s':''} incoming.`);
+  for(let i=0; i<ids.length; i++){
+    if(format==='csv') exportSingleClientCsv(ids[i]);
+    else exportSingleClientPdf(ids[i]);
+    if(i < ids.length-1) await new Promise(r=>setTimeout(r, 350));
+  }
 }
 
 async function logImprovement(id){
