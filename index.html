@@ -4893,35 +4893,64 @@ function showLoginScreen(){
 
 async function showApp(session){
   showAuthLoading('Loading your workspace…');
-  currentUser = session.user;
-  await loadMyProfile();
-  if(!myProfile){
-    // Auth account exists but no team_profiles row — shouldn't normally happen
-    // since create-member.js creates both together, but handle it gracefully.
-    const detail = lastProfileError ? ` (${lastProfileError.message || JSON.stringify(lastProfileError)})` : '';
-    document.getElementById('loginError').textContent = `Your account has no profile set up${detail}. Ask your admin to check the team_profiles table.`;
-    document.getElementById('loginError').style.display = 'block';
-    await supabaseClient.auth.signOut();
+
+  // Second safety net: if something hangs without ever throwing or
+  // resolving (a stalled network request, for example), don't leave the
+  // person stuck on a spinner forever — force back to a working login
+  // screen after a reasonable wait.
+  let settled = false;
+  const safetyTimer = setTimeout(()=>{
+    if(settled) return;
+    settled = true;
     hideAuthLoading();
-    return;
+    document.getElementById('loginOverlay').style.display = 'flex';
+    document.getElementById('appRoot').style.display = 'none';
+    const errEl = document.getElementById('loginError');
+    if(errEl){ errEl.textContent = 'This is taking longer than expected. Check your connection and try signing in again.'; errEl.style.display = 'block'; }
+  }, 15000);
+
+  try{
+    currentUser = session.user;
+    await loadMyProfile();
+    if(!myProfile){
+      // Auth account exists but no team_profiles row — shouldn't normally happen
+      // since create-member.js creates both together, but handle it gracefully.
+      const detail = lastProfileError ? ` (${lastProfileError.message || JSON.stringify(lastProfileError)})` : '';
+      document.getElementById('loginError').textContent = `Your account has no profile set up${detail}. Ask your admin to check the team_profiles table.`;
+      document.getElementById('loginError').style.display = 'block';
+      await supabaseClient.auth.signOut();
+      return;
+    }
+    // appRoot stays hidden — and the login form stays gone, replaced by the
+    // loading overlay — for this entire block, so nothing stale from a
+    // previous session can sit visible during the load.
+    document.getElementById('loginOverlay').style.display = 'none';
+    await initTheme();
+    await loadAll();
+    await loadTeamProfiles();
+    await loadMyNotes();
+    await loadTimeEntries();
+    renderAll();
+    applyAppIcon();
+    initTimerFromStorage();
+    if(!settled) document.getElementById('appRoot').style.display = 'grid';
+  }catch(e){
+    // This is the actual fix: previously, any error here (a network hiccup,
+    // anything) left execution stuck mid-function with the loading overlay
+    // showing forever, since nothing after the error line ever ran. Now any
+    // failure surfaces a real message and returns to a working login screen.
+    console.error('showApp failed', e);
+    if(!settled){
+      document.getElementById('loginOverlay').style.display = 'flex';
+      document.getElementById('appRoot').style.display = 'none';
+      const errEl = document.getElementById('loginError');
+      if(errEl){ errEl.textContent = 'Something went wrong loading your workspace — please try signing in again.'; errEl.style.display = 'block'; }
+    }
+  } finally {
+    settled = true;
+    clearTimeout(safetyTimer);
+    hideAuthLoading();
   }
-  // appRoot stays hidden — and the login form stays gone, replaced by the
-  // loading overlay — for this entire block. This is the actual fix: before,
-  // appRoot was revealed immediately, so whatever was still in the DOM from
-  // a previous session sat there visible for the full duration of these
-  // awaited loads. Now nothing is shown until every load AND the render that
-  // follows are both fully done.
-  document.getElementById('loginOverlay').style.display = 'none';
-  await initTheme();
-  await loadAll();
-  await loadTeamProfiles();
-  await loadMyNotes();
-  await loadTimeEntries();
-  renderAll();
-  applyAppIcon();
-  initTimerFromStorage();
-  document.getElementById('appRoot').style.display = 'grid';
-  hideAuthLoading();
 }
 
 (async function init(){
