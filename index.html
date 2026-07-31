@@ -92,6 +92,7 @@
   .split-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch;}
   @media (max-width:900px){.split-row{grid-template-columns:1fr;}}
   .split-row-70{display:grid;grid-template-columns:7fr 3fr;gap:16px;align-items:stretch;}
+  .split-row-70 > *{height:100%;box-sizing:border-box;}
   @media (max-width:900px){.split-row-70{grid-template-columns:1fr;}}
   .sync-dot{width:6px;height:6px;border-radius:50%;background:var(--green);}
   .btn{font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;border:none;border-radius:7px;padding:9px 16px;cursor:pointer;transition:opacity .15s ease, transform .1s ease;}
@@ -122,10 +123,10 @@
 
   .donut-card{background:var(--card);border:1px solid #EDEEF1;border-radius:12px;padding:18px 20px;box-shadow:0 1px 2px rgba(16,24,40,.03);display:flex;flex-direction:column;align-items:center;cursor:pointer;transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;}
   .donut-card:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(16,24,40,.08);border-color:#DDE0E5;}
-  .donut-card-head{font-size:12.5px;font-weight:600;color:var(--muted);align-self:flex-start;}
-  .donut-wrap{position:relative;width:140px;height:140px;margin:6px 0;}
+  .donut-card-head{font-size:12.5px;font-weight:600;color:var(--muted);align-self:flex-start;text-transform:capitalize;}
+  .donut-wrap{position:relative;width:190px;height:190px;margin:6px 0;}
   .donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
-  .donut-center-value{font-family:'Oswald',sans-serif;font-size:27px;font-weight:600;color:var(--brand);}
+  .donut-center-value{font-family:'Oswald',sans-serif;font-size:34px;font-weight:600;color:var(--ink);}
   .donut-center-label{font-family:'IBM Plex Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-lt);margin-top:2px;}
   .donut-legend{display:flex;flex-wrap:wrap;justify-content:center;gap:9px;margin-top:2px;}
   .donut-legend-item{font-size:10.5px;color:var(--muted);display:flex;align-items:center;gap:5px;white-space:nowrap;}
@@ -178,7 +179,7 @@
 
   .panel{background:var(--card);border:1px solid #EDEEF1;border-radius:10px;box-shadow:0 1px 2px rgba(16,24,40,.03);margin-bottom:20px;}
   .panel-head{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #F3F4F6;flex-wrap:wrap;gap:8px;}
-  .panel-title{font-size:13.5px;font-weight:600;letter-spacing:.01em;}
+  .panel-title{font-size:13.5px;font-weight:600;letter-spacing:.01em;text-transform:capitalize;}
   .panel-body{padding:18px 20px;}
 
   /* Table */
@@ -1499,13 +1500,17 @@ async function goToClientInQueue(id, filter){
   openQueueCardModal(id);
 }
 
+let attentionShowAll = false;
+
 function renderAttentionList(){
   const el = document.getElementById('attentionList');
   if(!el) return;
   const items = clients.filter(c => c.danger>=4 || c.draftStatus==='pending')
     .sort((a,b)=> b.danger-a.danger || (b.draftStatus==='pending')-(a.draftStatus==='pending'));
-  if(!items.length){ el.innerHTML = `<div class="empty" style="padding:14px 0;">Nothing urgent right now.</div>`; return; }
-  el.innerHTML = `<div class="queue-grid">${items.map(c=>{
+  if(!items.length){ el.innerHTML = `<div class="empty" style="padding:14px 0;">Nothing urgent right now.</div>`; attentionShowAll = false; return; }
+
+  const capped = attentionShowAll ? items : items.slice(0, 6);
+  const cards = capped.map(c=>{
     const reason = c.draftStatus==='pending' ? 'Draft awaiting approval' : `Danger score ${c.danger}/5 — at risk`;
     const filter = c.draftStatus==='pending' ? 'pending' : 'atrisk';
     const status = statusMeta(c.draftStatus);
@@ -1523,7 +1528,18 @@ function renderAttentionList(){
       </div>
       <div class="q-bulk-preview" style="color:var(--red);font-weight:600;"><span class="pulse-dot pulse-red"></span>${reason}</div>
     </div>`;
-  }).join('')}</div>`;
+  }).join('');
+
+  const toggleBtn = items.length > 6
+    ? `<button class="btn btn-outline" style="margin-top:16px;width:100%;justify-content:center;" onclick="toggleAttentionShowAll()">${attentionShowAll ? 'Show less' : `View all ${items.length} →`}</button>`
+    : '';
+
+  el.innerHTML = `<div class="queue-grid">${cards}</div>${toggleBtn}`;
+}
+
+function toggleAttentionShowAll(){
+  attentionShowAll = !attentionShowAll;
+  renderAttentionList();
 }
 
 function renderClientOptionsSelects(){
@@ -3429,7 +3445,7 @@ function renderTotalClientsDonut(){
   }).join('');
 
   wrap.innerHTML = `
-    <svg viewBox="0 0 120 120" width="140" height="140">
+    <svg viewBox="0 0 120 120" width="190" height="190">
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#EEF0F4" stroke-width="${strokeW}"></circle>
       ${segs}
     </svg>
