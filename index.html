@@ -954,6 +954,10 @@ document.addEventListener('DOMContentLoaded', function(){
               <option value="custom">Custom range…</option>
             </select>
           </div>
+          <div class="select-field" style="min-width:170px;" id="reportMemberFilterWrap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <select id="reportMemberFilter" onchange="renderReports()"><option value="all">All team members</option></select>
+          </div>
           <div class="date-nav" id="reportCustomRange" style="display:none;">
             <div class="date-nav-label" style="border-left:none;" onclick="document.getElementById('reportFromDate').showPicker ? document.getElementById('reportFromDate').showPicker() : document.getElementById('reportFromDate').focus()">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -971,38 +975,37 @@ document.addEventListener('DOMContentLoaded', function(){
 
         <div class="metrics-row" id="reportSummary"></div>
 
+        <div class="panel" style="margin-bottom:24px;">
+          <div class="panel-body">
+            <div class="xy-chart-header">
+              <div>
+                <div class="xy-chart-title">Hours Over Time</div>
+                <div class="xy-chart-updated" id="reportChartUpdated"></div>
+              </div>
+              <div class="select-field" style="min-width:110px;">
+                <select id="reportChartGranularity" onchange="renderReportChart()">
+                  <option value="day" selected>Day</option>
+                  <option value="week">Week</option>
+                  <option value="month">Month</option>
+                </select>
+              </div>
+            </div>
+            <div id="reportChart"></div>
+          </div>
+        </div>
+
         <div class="tabs settings-tabs" style="margin-top:20px;">
           <div class="tab settings-tab active" data-rtab="clients" onclick="switchReportTab('clients')">Clients</div>
           <div class="tab settings-tab" data-rtab="services" onclick="switchReportTab('services')">Services</div>
           <div class="tab settings-tab" data-rtab="teammates" id="teammatesReportTab" onclick="switchReportTab('teammates')">Teammates</div>
         </div>
 
-        <div class="report-graphic-row">
-          <div class="panel">
-            <div class="panel-body" style="padding:8px 22px;">
-              <table class="report-table">
-                <thead><tr id="reportTableHead"></tr></thead>
-                <tbody id="reportTableBody"></tbody>
-              </table>
-            </div>
-          </div>
-          <div class="panel">
-            <div class="panel-body">
-              <div class="xy-chart-header">
-                <div>
-                  <div class="xy-chart-title">Hours Over Time</div>
-                  <div class="xy-chart-updated" id="reportChartUpdated"></div>
-                </div>
-                <div class="select-field" style="min-width:110px;">
-                  <select id="reportChartGranularity" onchange="renderReportChart()">
-                    <option value="day" selected>Day</option>
-                    <option value="week">Week</option>
-                    <option value="month">Month</option>
-                  </select>
-                </div>
-              </div>
-              <div id="reportChart"></div>
-            </div>
+        <div class="panel">
+          <div class="panel-body" style="padding:8px 22px;">
+            <table class="report-table">
+              <thead><tr id="reportTableHead"></tr></thead>
+              <tbody id="reportTableBody"></tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -1646,6 +1649,22 @@ function applyRoleVisibility(){
     // If a non-admin somehow had this selected (e.g. lost admin mid-session), fall back to Clients.
     if(!isAdmin() && typeof reportTab!=='undefined' && reportTab==='teammates'){ switchReportTab('clients'); }
   }
+  const memberFilterWrap = document.getElementById('reportMemberFilterWrap');
+  if(memberFilterWrap){
+    // Only meaningful for admins — everyone else only ever sees their own
+    // time anyway, so a "filter by teammate" control would just be a
+    // single-option dropdown that does nothing.
+    memberFilterWrap.style.display = isAdmin() ? 'flex' : 'none';
+    if(isAdmin()) populateReportMemberFilter();
+  }
+}
+
+function populateReportMemberFilter(){
+  const sel = document.getElementById('reportMemberFilter');
+  if(!sel) return;
+  const current = sel.value || 'all';
+  sel.innerHTML = `<option value="all">All team members</option>` + [...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  if([...sel.options].some(o=>o.value===current)) sel.value = current;
 }
 
 async function switchView(name){
@@ -2968,6 +2987,15 @@ function visibleTimeEntries(){
   if(!currentUser) return [];
   return timeEntries.filter(e=>e.userId===currentUser.id);
 }
+
+// Always just your own — used for the Timesheet, which is a personal
+// day-to-day tracking view, not a team-oversight one. Reports is where
+// admins see everyone's time (via visibleTimeEntries above); Timesheet is
+// where everyone, admin or not, tracks and reviews their own hours.
+function myOwnTimeEntries(){
+  if(!currentUser) return [];
+  return timeEntries.filter(e=>e.userId===currentUser.id);
+}
 let timerState = { running:false, startedAt:null, clientId:'', service:'', description:'', resumeEntryId:null };
 let timerIntervalId = null;
 let timesheetMode = 'day';
@@ -3445,7 +3473,7 @@ function renderTimesheetDay(bodyEl){
   for(let i=0;i<7;i++){
     const d = new Date(weekStart); d.setDate(d.getDate()+i);
     const dStr = toDateStr(d);
-    const dayMins = visibleTimeEntries().filter(e=> e.date===dStr && (clientFilter==='all'||e.clientId===clientFilter)).reduce((s,e)=>s+e.minutes,0);
+    const dayMins = myOwnTimeEntries().filter(e=> e.date===dStr && (clientFilter==='all'||e.clientId===clientFilter)).reduce((s,e)=>s+e.minutes,0);
     weekTotal += dayMins;
     stripDays.push({d, dStr, dayMins});
   }
@@ -3458,7 +3486,7 @@ function renderTimesheetDay(bodyEl){
     <div class="week-strip-total"><div class="wst-label">Week total</div><div class="wst-val">${formatMinutes(weekTotal)}</div></div>
   </div>`;
 
-  const dayEntries = visibleTimeEntries().filter(e=> e.date===selectedStr && (clientFilter==='all'||e.clientId===clientFilter)).sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
+  const dayEntries = myOwnTimeEntries().filter(e=> e.date===selectedStr && (clientFilter==='all'||e.clientId===clientFilter)).sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
 
   const cardsHtml = dayEntries.length ? dayEntries.map(e=>{
     const c = clients.find(x=>x.id===e.clientId);
@@ -3491,7 +3519,7 @@ function renderTimesheetWeek(bodyEl){
   for(let i=0;i<7;i++){ const d=new Date(weekStart); d.setDate(d.getDate()+i); days.push(d); }
   const dayStrs = days.map(toDateStr);
 
-  const relevant = visibleTimeEntries().filter(e=> dayStrs.includes(e.date) && (clientFilter==='all'||e.clientId===clientFilter));
+  const relevant = myOwnTimeEntries().filter(e=> dayStrs.includes(e.date) && (clientFilter==='all'||e.clientId===clientFilter));
   if(!relevant.length){ bodyEl.innerHTML = `<div class="panel"><div class="empty">No time logged this week.</div></div>`; return; }
 
   // Group by client — each client with any entries this week becomes one row
@@ -3671,11 +3699,13 @@ function getReportDateBounds(){
 function getReportRangeEntries(){
   const { start, end } = getReportDateBounds();
   const activeOnly = document.getElementById('reportActiveOnly')?.checked;
+  const memberFilter = document.getElementById('reportMemberFilter')?.value || 'all';
 
   return visibleTimeEntries().filter(e=>{
     const d = new Date(e.date+'T00:00:00');
     if(d < start) return false;
     if(end && d > end) return false;
+    if(memberFilter!=='all' && e.userId!==memberFilter) return false;
     if(activeOnly){
       const c = clients.find(x=>x.id===e.clientId);
       if(!c || c.status!=='Active') return false;
