@@ -1324,7 +1324,16 @@ let dateFilterTo = null;   // inclusive, Date object
 const SUPABASE_URL = 'https://rwhfddzitabeingajvuf.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3aGZkZHppdGFiZWluZ2FqdnVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUzMTQ2NDUsImV4cCI6MjEwMDg5MDY0NX0.38FIw8GJRl47FcXxHNCExTLGkKlezEItF7TFdDOwmC8';
 // ============================================================================
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  global: {
+    // Without this, some browsers can serve a cached response for a
+    // fetch() to the same URL — meaning after logging out and a different
+    // person logging in on the same tab, they could briefly see the
+    // previous user's data (e.g. an admin's full team view) until a hard
+    // refresh forced the cache to clear. no-store stops that at the source.
+    fetch: (url, options={}) => fetch(url, { ...options, cache: 'no-store' }),
+  },
+});
 
 // Shared (team-wide) storage — backed by Supabase, replaces window.storage.
 async function safeGet(key){
@@ -4847,6 +4856,10 @@ function showLoginScreen(){
   document.getElementById('loginOverlay').style.display = 'flex';
   document.getElementById('appRoot').style.display = 'none';
   currentUser = null; myProfile = null;
+  // Defensive reset — makes sure nothing from the previous session (e.g. an
+  // admin's team-wide time entries) can render even briefly for whoever
+  // logs in next on this same tab, before their own fresh data loads in.
+  clients = []; notes = []; timeEntries = []; teamProfiles = []; log = [];
 }
 
 async function showApp(session){
