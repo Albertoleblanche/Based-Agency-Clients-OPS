@@ -110,6 +110,7 @@
 
   /* Metric cards — icon badge, big number, status chips, muted caption. Uniform style. */
   .metrics-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px;}
+  #cdMetrics.metrics-row{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));}
   @media (max-width:900px){.metrics-row{grid-template-columns:1fr 1fr;}}
   @media (max-width:560px){.metrics-row{grid-template-columns:1fr;}}
 
@@ -586,6 +587,11 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="panel-body"><div id="overviewTimeGraphic"></div></div>
       </div>
 
+      <div class="panel" id="budgetAlertsPanel" style="margin-bottom:24px;display:none;">
+        <div class="panel-head"><span class="panel-title">Budget Alerts</span></div>
+        <div class="panel-body"><div id="budgetAlertsList"></div></div>
+      </div>
+
       <div class="bento-row">
         <div class="panel bento-main">
           <div class="panel-head"><span class="panel-title">Needs attention</span></div>
@@ -604,27 +610,6 @@ document.addEventListener('DOMContentLoaded', function(){
       <div class="topbar">
         <div><div class="page-title">Clients</div><div class="page-sub">Log improvements here whenever you make one — any of the six of you, any time</div></div>
         <button class="btn btn-brand" onclick="openAddClientForm()">+ Add client</button>
-      </div>
-
-      <div class="panel" id="newClientPanel" style="display:none;">
-        <div class="panel-head"><span class="panel-title" id="clientFormTitle">Add client</span></div>
-        <div class="panel-body">
-          <div class="form-grid">
-            <div><label>Client name</label><input id="ncName" placeholder="e.g. Premium Homes"></div>
-            <div><label>Client email</label><input id="ncEmail" placeholder="contact@client.com"></div>
-            <div><label>Service</label>
-              <select id="ncService"></select>
-            </div>
-            <div><label>Status</label><select id="ncStatus"></select></div>
-            <div><label>Importance (1–10)</label><select id="ncImportance"></select></div>
-            <div><label>Danger score (1–5)</label><select id="ncDanger"><option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
-            <div style="grid-column:1/-1;"><label>SOW / scope notes</label><input id="ncSow" placeholder="Brief scope summary"></div>
-          </div>
-          <div class="form-actions">
-            <button class="btn btn-brand" id="clientFormSubmitBtn" onclick="saveClientForm()">Save client</button>
-            <button class="btn btn-outline" onclick="closeClientForm()">Cancel</button>
-          </div>
-        </div>
       </div>
 
       <div class="panel clients-filter-panel">
@@ -1412,7 +1397,7 @@ async function fullRefresh(showFeedback){
   renderAll();
   if(showFeedback && btn){ btn.disabled = false; btn.textContent = 'Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
-function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewTimeGraphic(); }
+function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewTimeGraphic(); renderBudgetAlerts(); }
 
 function applyRoleVisibility(){
   const notifyBtn = document.getElementById('notifyBtn');
@@ -1465,10 +1450,6 @@ function renderAttentionList(){
       ${dotRatingCompact(c.danger, 'brand', 5)}
     </div>`;
   }).join('');
-}
-
-function showClientFormPanel(show){
-  document.getElementById('newClientPanel').style.display = show ? 'block' : 'none';
 }
 
 function renderClientOptionsSelects(){
@@ -1526,27 +1507,48 @@ async function removeFieldOption(kind, value){
   ok ? showToast('success','Option removed', `"${value}" removed.`) : showToast('error','Save failed','Could not save — try again.');
 }
 
+function clientFormHtml(title, submitLabel){
+  return `
+    <div class="modal-head"><span class="panel-title">${title}</span><span class="toast-close" onclick="closeClientForm()">✕</span></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div><label>Client name</label><input id="ncName" placeholder="e.g. Premium Homes"></div>
+        <div><label>Client email</label><input id="ncEmail" placeholder="contact@client.com"></div>
+        <div><label>Service</label><select id="ncService"></select></div>
+        <div><label>Status</label><select id="ncStatus"></select></div>
+        <div><label>Importance (1–10)</label><select id="ncImportance"></select></div>
+        <div><label>Danger score (1–5)</label><select id="ncDanger"><option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
+        <div><label>Monthly hour budget</label><input type="number" id="ncBudget" min="0" step="0.5" placeholder="e.g. 20 (optional)"></div>
+        <div style="grid-column:1/-1;"><label>SOW / scope notes</label><input id="ncSow" placeholder="Brief scope summary"></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-brand" id="clientFormSubmitBtn" onclick="saveClientForm()">${submitLabel}</button>
+      <button class="btn btn-outline" onclick="closeClientForm()">Cancel</button>
+    </div>`;
+}
+
 function resetClientFormFields(){
   document.getElementById('ncName').value='';
   document.getElementById('ncEmail').value='';
   renderClientOptionsSelects();
   document.getElementById('ncImportance').value='5';
   document.getElementById('ncDanger').value='1';
+  document.getElementById('ncBudget').value='';
   document.getElementById('ncSow').value='';
 }
 
 function openAddClientForm(){
   editingClientId = null;
+  openAppModal(clientFormHtml('Add client', 'Save client'), 560);
   resetClientFormFields();
-  document.getElementById('clientFormTitle').textContent = 'Add client';
-  document.getElementById('clientFormSubmitBtn').textContent = 'Save client';
-  showClientFormPanel(true);
 }
 
 function openEditClientForm(id){
   const c = clients.find(x=>x.id===id);
   if(!c){ showToast('error','Client not found','Someone may have removed this — refreshing.'); fullRefresh(); return; }
   editingClientId = id;
+  openAppModal(clientFormHtml('Edit client', 'Save changes'), 560);
   document.getElementById('ncName').value = c.name;
   document.getElementById('ncEmail').value = c.email || '';
   renderClientOptionsSelects();
@@ -1554,11 +1556,8 @@ function openEditClientForm(id){
   ensureSelectHasValue('ncStatus', c.status);
   document.getElementById('ncImportance').value = c.importance;
   document.getElementById('ncDanger').value = c.danger;
+  document.getElementById('ncBudget').value = c.monthlyHourBudget || '';
   document.getElementById('ncSow').value = c.sow || '';
-  document.getElementById('clientFormTitle').textContent = 'Edit client';
-  document.getElementById('clientFormSubmitBtn').textContent = 'Save changes';
-  showClientFormPanel(true);
-  window.scrollTo({top:0, behavior:'smooth'});
 }
 
 // If a client's current value was since removed from the managed options list,
@@ -1577,7 +1576,7 @@ function ensureSelectHasValue(selectId, value){
 
 function closeClientForm(){
   editingClientId = null;
-  showClientFormPanel(false);
+  closeAppModal();
 }
 
 async function saveClientForm(){
@@ -1593,6 +1592,7 @@ async function saveClientForm(){
     status:document.getElementById('ncStatus').value,
     importance:parseInt(document.getElementById('ncImportance').value),
     danger:parseInt(document.getElementById('ncDanger').value),
+    monthlyHourBudget: parseFloat(document.getElementById('ncBudget').value) || 0,
     sow:document.getElementById('ncSow').value.trim(),
   };
   let ok, msg;
@@ -1926,6 +1926,7 @@ function renderClientDetail(){
   const myTimeEntries = timeEntries.filter(e=>e.clientId===c.id).sort((a,b)=> new Date(b.date)-new Date(a.date) || new Date(b.createdAt)-new Date(a.createdAt));
   const totalMinutes = myTimeEntries.reduce((s,e)=>s+e.minutes,0);
   const myNotesForClient = notes.filter(n=>n.clientId===c.id).sort((a,b)=> new Date(b.updatedAt||b.createdAt)-new Date(a.updatedAt||a.createdAt));
+  const budget = monthBudgetInfo(c);
 
   document.getElementById('cdMetrics').innerHTML = `
     <div class="metric-card">
@@ -1947,7 +1948,13 @@ function renderClientDetail(){
       <div class="metric-head"><span class="metric-icon metric-icon-amber"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></span><span class="metric-label">Improvements</span></div>
       <div class="metric-value">${c.improvements.length}</div>
       <div class="metric-caption">Logged all time</div>
-    </div>`;
+    </div>
+    ${budget ? `
+    <div class="metric-card">
+      <div class="metric-head"><span class="metric-icon" style="background:${budgetTierMeta(budget.tier).pill==='pill-bad'?'var(--red-bg)':budget.tier==='warn'?'var(--amber-bg)':'var(--green-bg)'};color:${budgetTierMeta(budget.tier).color};"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span><span class="metric-label">Monthly Budget</span></div>
+      <div class="metric-value" style="font-size:19px;">${(budget.usedMinutes/60).toFixed(1)}h <span style="color:var(--muted-lt);font-weight:400;font-size:14px;">of ${(budget.budgetMinutes/60).toFixed(1)}h</span></div>
+      <div class="metric-chips"><span class="pill ${budgetTierMeta(budget.tier).pill}">${budgetTierMeta(budget.tier).label} · ${budget.pct}%</span></div>
+    </div>` : ''}`;
 
   document.getElementById('cdImprovements').innerHTML = c.improvements.length
     ? [...c.improvements].reverse().map(imp=>`
@@ -2987,6 +2994,34 @@ function renderOverviewTimeGraphic(){
   renderReportGraphic(rows, getLabel, 'overviewTimeGraphic');
 }
 
+// Surfaces clients approaching or over their monthly hour budget, so the team
+// notices before over-servicing a retainer rather than after the fact.
+function renderBudgetAlerts(){
+  const panel = document.getElementById('budgetAlertsPanel');
+  const list = document.getElementById('budgetAlertsList');
+  if(!panel || !list) return;
+
+  const flagged = clients
+    .map(c=>({ c, budget: monthBudgetInfo(c) }))
+    .filter(x=> x.budget && x.budget.tier!=='ok')
+    .sort((a,b)=> b.budget.pct - a.budget.pct);
+
+  if(!flagged.length){ panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+
+  list.innerHTML = flagged.map(({c,budget})=>{
+    const meta = budgetTierMeta(budget.tier);
+    const pct = Math.min(100, budget.pct);
+    return `<div class="graphic-bar-row" style="cursor:pointer;" onclick="openClientDetail('${c.id}')">
+      <div class="graphic-bar-top">
+        <span class="graphic-bar-name">${c.name} <span class="pill ${meta.pill}" style="margin-left:6px;">${meta.label}</span></span>
+        <span class="graphic-bar-val">${(budget.usedMinutes/60).toFixed(1)}h of ${(budget.budgetMinutes/60).toFixed(1)}h (${budget.pct}%)</span>
+      </div>
+      <div class="graphic-bar-track"><div class="graphic-bar-fill" style="width:${pct}%;background:${meta.color};"></div></div>
+    </div>`;
+  }).join('');
+}
+
 // Clicking a client in the Clients report opens everything logged for that
 // client within the currently selected report period — not just "click to
 // jump to the client," but a real breakdown scoped to the date range.
@@ -3174,6 +3209,28 @@ function riskLabel(danger){
 function riskCaptionHtml(danger){
   const r = riskLabel(danger);
   return `<span class="q-risk-flag" style="color:${r.color};">${r.text}</span>`;
+}
+
+// Compares actual logged time this calendar month against a client's set
+// monthly hour budget/retainer. Returns null if no budget is set — budget
+// tracking is opt-in per client, not assumed for everyone.
+function monthBudgetInfo(c){
+  const budgetHours = parseFloat(c.monthlyHourBudget) || 0;
+  if(!budgetHours) return null;
+  const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
+  const usedMinutes = timeEntries
+    .filter(e=> e.clientId===c.id && new Date(e.date+'T00:00:00') >= monthStart)
+    .reduce((s,e)=>s+e.minutes, 0);
+  const budgetMinutes = Math.round(budgetHours*60);
+  const pct = budgetMinutes ? Math.round((usedMinutes/budgetMinutes)*100) : 0;
+  const tier = pct>=100 ? 'over' : pct>=80 ? 'warn' : 'ok';
+  return { usedMinutes, budgetMinutes, pct, tier };
+}
+
+function budgetTierMeta(tier){
+  if(tier==='over') return { color:'#9C5C48', pill:'pill-bad', label:'Over budget' };
+  if(tier==='warn') return { color:'var(--amber)', pill:'pill-mid', label:'Near budget' };
+  return { color:'var(--green)', pill:'pill-good', label:'On track' };
 }
 
 function hasLoggedThisWeek(c){
