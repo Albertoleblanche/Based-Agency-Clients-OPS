@@ -904,6 +904,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="tab settings-tab active" data-ttab="timer" onclick="switchTimeTab('timer')">Timer</div>
         <div class="tab settings-tab" data-ttab="timesheet" onclick="switchTimeTab('timesheet')">Timesheet</div>
         <div class="tab settings-tab" data-ttab="reports" onclick="switchTimeTab('reports')">Reports</div>
+        <div class="tab settings-tab" data-ttab="dailysummary" id="dailySummaryTab" onclick="switchTimeTab('dailysummary')" style="display:none;">Daily Summary</div>
       </div>
 
       <!-- TIMER -->
@@ -1057,6 +1058,24 @@ document.addEventListener('DOMContentLoaded', function(){
             </table>
           </div>
         </div>
+      </div>
+
+      <!-- DAILY SUMMARY -->
+      <div class="settings-subview" id="ttab-dailysummary">
+        <div class="panel" style="margin-bottom:24px;">
+          <div class="panel-body">
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+              <div class="date-nav">
+                <span class="date-nav-arrow" onclick="shiftDailySummaryDate(-1)">‹</span>
+                <span class="date-nav-label" style="cursor:default;" id="dailySummaryDateLabel"></span>
+                <span class="date-nav-arrow" onclick="shiftDailySummaryDate(1)">›</span>
+              </div>
+              <button class="btn btn-outline" onclick="resetDailySummaryToToday()">Today</button>
+              <button class="btn btn-brand" onclick="openSlackSummaryConfirm()">Send to Slack</button>
+            </div>
+          </div>
+        </div>
+        <div id="dailySummaryList"></div>
       </div>
     </div>
 
@@ -1789,6 +1808,11 @@ function applyRoleVisibility(){
   if(payrollNavItem){
     payrollNavItem.style.display = isAdmin() ? 'flex' : 'none';
     if(!isAdmin() && document.getElementById('view-payroll')?.classList.contains('active')){ switchView('overview'); }
+  }
+  const dailySummaryTab = document.getElementById('dailySummaryTab');
+  if(dailySummaryTab){
+    dailySummaryTab.style.display = canApprove() ? 'inline-block' : 'none';
+    if(!canApprove() && document.getElementById('ttab-dailysummary')?.classList.contains('active')){ switchTimeTab('timer'); }
   }
 }
 
@@ -2955,8 +2979,119 @@ async function renderPayrollHistory(){
   }).join('');
 }
 
-/* ---------- Client Detail Page — everything about one client, pulled from every tab ---------- */
-let currentDetailClientId = null;
+/* ---------- Daily Summary — admins and approvers only. Fetched via a
+   dedicated endpoint (api/get-daily-summary.js) rather than client-side
+   data, since regular time_entries visibility doesn't extend to approvers
+   anywhere else in the app — this is a deliberately narrow exception. ---------- */
+
+let dailySummaryDate = new Date();
+let lastDailySummaryData = null; // cached for the Slack confirm modal
+
+function renderDailySummaryDateLabel(){
+  const el = document.getElementById('dailySummaryDateLabel');
+  if(el) el.textContent = dailySummaryDate.toLocaleDateString('en-US',{weekday:'short', month:'short', day:'numeric'});
+}
+
+function shiftDailySummaryDate(dir){
+  dailySummaryDate.setDate(dailySummaryDate.getDate()+dir);
+  renderDailySummaryDateLabel();
+  loadDailySummary();
+}
+
+function resetDailySummaryToToday(){
+  dailySummaryDate = new Date();
+  renderDailySummaryDateLabel();
+  loadDailySummary();
+}
+
+async function loadDailySummary(){
+  const el = document.getElementById('dailySummaryList');
+  if(!el) return;
+  el.innerHTML = `<div class="panel"><div class="empty">Loading…</div></div>`;
+  renderDailySummaryDateLabel();
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const dateStr = toDateStr(dailySummaryDate);
+    const response = await fetch(`/api/get-daily-summary?date=${dateStr}`, {
+      headers: { 'Authorization': `Bearer ${session.access_token}` },
+    });
+    const data = await response.json();
+    if(!response.ok){ el.innerHTML = `<div class="panel"><div class="empty">${data.error || 'Could not load the summary.'}</div></div>`; return; }
+    lastDailySummaryData = data;
+    renderDailySummaryList(data);
+  }catch(e){
+    el.innerHTML = `<div class="panel"><div class="empty">Could not load the summary — check your connection.</div></div>`;
+  }
+}
+
+function renderDailySummaryList(data){
+  const el = document.getElementById('dailySummaryList');
+  if(!el) return;
+  if(!data.summary.length){ el.innerHTML = `<div class="panel"><div class="empty">Nobody logged time this day.</div></div>`; return; }
+  el.innerHTML = data.summary.map(person=>`
+    <div class="panel" style="margin-bottom:14px;">
+      <div class="panel-head"><span class="panel-title">${person.name}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted-lt);">${formatMinutes(person.totalMinutes)}</span></div>
+      <div class="panel-body">
+        ${person.entries.map(e=>`
+          <div class="ts-entry-card" style="margin-bottom:8px;">
+            <div class="ts-entry-info">
+              <div class="ts-entry-title">${e.client}${e.service ? ` <span class="ts-entry-service">(${e.service})</span>` : ''}</div>
+              ${e.description ? `<div class="ts-entry-desc">${e.description}</div>` : ''}
+            </div>
+            <div class="ts-entry-right"><div class="ts-entry-duration">${formatMinutes(e.minutes)}</div></div>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function buildSlackSummaryText(data){
+  const dateLabel = new Date(data.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long', month:'long', day:'numeric'});
+  if(!data.summary.length) return `*Daily Summary — ${dateLabel}*\n\nNobody logged time this day.`;
+  const lines = data.summary.map(person=>{
+    const entryLines = person.entries.map(e=>
+      `    • ${e.client}${e.service ? ` (${e.service})` : ''} — ${formatMinutes(e.minutes)}${e.description ? `: ${e.description}` : ''}`
+    ).join('\n');
+    return `*${person.name}* — ${formatMinutes(person.totalMinutes)}\n${entryLines}`;
+  });
+  return `*Daily Summary — ${dateLabel}*\n\n${lines.join('\n\n')}`;
+}
+
+function openSlackSummaryConfirm(){
+  if(!lastDailySummaryData){ showToast('error','Nothing loaded yet','Wait for the summary to finish loading first.'); return; }
+  const text = buildSlackSummaryText(lastDailySummaryData);
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">Send this to Slack?</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 12px;">Review before sending — this posts immediately once confirmed.</p>
+      <textarea id="slackSummaryText" readonly style="width:100%;min-height:260px;font-family:'IBM Plex Mono',monospace;font-size:12px;padding:10px;border-radius:8px;border:1px solid var(--border);white-space:pre-wrap;">${text}</textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-brand" id="sendSlackBtn" onclick="confirmSendSlackSummary()">Send to Slack</button>
+      <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
+    </div>`, 560);
+}
+
+async function confirmSendSlackSummary(){
+  const text = document.getElementById('slackSummaryText').value;
+  const btn = document.getElementById('sendSlackBtn');
+  setBtnLoading(btn, 'Sending…');
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/send-slack-summary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ text }),
+    });
+    const data = await response.json();
+    restoreBtn(btn);
+    if(!response.ok){ showToast('error','Send failed', data.error || 'Could not send to Slack.'); return; }
+    closeAppModal();
+    showToast('success','Sent to Slack','The daily summary was posted.');
+  }catch(e){
+    restoreBtn(btn);
+    showToast('error','Send failed','Network error — try again.');
+  }
+}
 
 function refreshClientDetailActivityIfOpen(clientId){
   if(currentDetailClientId === clientId && document.getElementById('cdActivityHistory')){
@@ -3858,6 +3993,7 @@ function switchTimeTab(name){
   document.getElementById('ttab-'+name).classList.add('active');
   if(name==='timesheet') renderTimesheet();
   if(name==='reports') renderReports();
+  if(name==='dailysummary') loadDailySummary();
 }
 
 /* --- Live timer --- */
