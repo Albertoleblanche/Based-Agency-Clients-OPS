@@ -4897,7 +4897,15 @@ async function showApp(session){
   const { data: { session } } = await supabaseClient.auth.getSession();
   if(session){ await showApp(session); } else { showLoginScreen(); }
 
+  // Supabase fires onAuthStateChange once immediately upon subscribing,
+  // reporting whatever the current session state already is — which we just
+  // handled above via getSession(). Without skipping that first callback,
+  // showApp() (or showLoginScreen()) runs a second time back-to-back on
+  // every single page load, which is why it looked like it was loading
+  // twice. Any real, later event still gets handled normally.
+  let ignoreNextAuthEvent = true;
   supabaseClient.auth.onAuthStateChange(async (event, session) => {
+    if(ignoreNextAuthEvent){ ignoreNextAuthEvent = false; return; }
     if(event === 'SIGNED_IN' && session){ await showApp(session); }
     if(event === 'SIGNED_OUT'){ showLoginScreen(); }
   });
