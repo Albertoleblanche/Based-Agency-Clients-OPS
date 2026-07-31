@@ -961,6 +961,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="tab settings-tab" data-stab="ai" onclick="switchSettingsTab('ai')">AI &amp; Email</div>
         <div class="tab settings-tab" data-stab="integrations" onclick="switchSettingsTab('integrations')">Integrations &amp; Sync</div>
         <div class="tab settings-tab" data-stab="team" onclick="switchSettingsTab('team')">Team</div>
+        <div class="tab settings-tab" data-stab="trash" onclick="switchSettingsTab('trash')">Trash</div>
       </div>
 
       <!-- GENERAL -->
@@ -1132,6 +1133,29 @@ document.addEventListener('DOMContentLoaded', function(){
           </div>
         </div>
       </div>
+
+      <!-- TRASH -->
+      <div class="settings-subview" id="stab-trash">
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Deleted Clients</span></div>
+          <div class="panel-body">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Deleting a client moves it here instead of erasing it — improvements, drafts, time entries, and notes all stay intact. Restore it anytime, or delete permanently to actually remove it for good.</p>
+            <div id="trashClientsList"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Deleted Notes <span style="font-weight:400;color:var(--muted-lt);">(yours only — notes are private)</span></span></div>
+          <div class="panel-body">
+            <div id="trashNotesList"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Deleted Time Entries</span></div>
+          <div class="panel-body">
+            <div id="trashTimeList"></div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- CLIENT DETAIL -->
@@ -1214,6 +1238,12 @@ document.addEventListener('DOMContentLoaded', function(){
 
 <script>
 let clients = [];
+
+// clients[] stays the full list (including soft-deleted) so historical
+// lookups by id — old time entries, notes, activity log — still resolve a
+// trashed client's name correctly. Anywhere building a list, dropdown, or
+// aggregate for active work should use this instead.
+function activeClients(){ return clients.filter(c=>!c.deletedAt); }
 let log = [];
 let notes = [];
 let settings = {danielEmail:'', ericEmail:''};
@@ -1546,6 +1576,7 @@ function switchSettingsTab(name){
   document.querySelectorAll('#view-settings .settings-tab').forEach(t=>t.classList.toggle('active', t.dataset.stab===name));
   document.querySelectorAll('#view-settings .settings-subview').forEach(v=>v.classList.remove('active'));
   document.getElementById('stab-'+name).classList.add('active');
+  if(name==='trash') renderTrash();
 }
 
 async function goToQueueFilter(filter){
@@ -1572,7 +1603,7 @@ let attentionShowAll = false;
 function renderAttentionList(){
   const el = document.getElementById('attentionList');
   if(!el) return;
-  const items = clients.filter(c => c.danger>=4 || c.draftStatus==='pending')
+  const items = activeClients().filter(c => c.danger>=4 || c.draftStatus==='pending')
     .sort((a,b)=> b.danger-a.danger || (b.draftStatus==='pending')-(a.draftStatus==='pending'));
   if(!items.length){ el.innerHTML = `<div class="empty" style="padding:14px 0;">Nothing urgent right now.</div>`; attentionShowAll = false; return; }
 
@@ -1979,28 +2010,29 @@ async function saveClientForm(){
 }
 
 function renderKpis(){
-  const atRisk = clients.filter(c=>c.danger>=4).length;
-  const active = clients.filter(c=>c.status==='Active').length;
-  const pending = clients.filter(c=>c.draftStatus==='pending').length;
-  const approved = clients.filter(c=>c.draftStatus==='approved').length;
+  const ac = activeClients();
+  const atRisk = ac.filter(c=>c.danger>=4).length;
+  const active = ac.filter(c=>c.status==='Active').length;
+  const pending = ac.filter(c=>c.draftStatus==='pending').length;
+  const approved = ac.filter(c=>c.draftStatus==='approved').length;
   document.getElementById('navPendingBadge').textContent = pending;
 
   // --- Total Clients ---
-  document.getElementById('kpiTotal').textContent = clients.length;
-  document.getElementById('totalChips').innerHTML = clients.length
+  document.getElementById('kpiTotal').textContent = ac.length;
+  document.getElementById('totalChips').innerHTML = ac.length
     ? `<span class="pill pill-good">${active} Active</span>${atRisk ? `<span class="pill pill-bad">${atRisk} At risk</span>` : ''}`
     : '';
   renderTotalClientsDonut();
 
   // --- Client Health: inverse of average danger score across the roster, as a % ---
   let healthPct = 0;
-  if(clients.length){
-    const avgDanger = clients.reduce((s,c)=>s+c.danger,0) / clients.length;
+  if(ac.length){
+    const avgDanger = ac.reduce((s,c)=>s+c.danger,0) / ac.length;
     healthPct = Math.round(100 - (avgDanger/5)*100);
   }
-  document.getElementById('kpiHealth').textContent = clients.length ? healthPct + '%' : '—';
+  document.getElementById('kpiHealth').textContent = ac.length ? healthPct + '%' : '—';
   const healthTier = healthPct>=70 ? {cls:'pill-good',label:'Healthy'} : healthPct>=40 ? {cls:'pill-mid',label:'Needs attention'} : {cls:'pill-bad',label:'Critical'};
-  document.getElementById('healthChips').innerHTML = clients.length ? `<span class="pill ${healthTier.cls}">${healthTier.label}</span>` : '';
+  document.getElementById('healthChips').innerHTML = ac.length ? `<span class="pill ${healthTier.cls}">${healthTier.label}</span>` : '';
 
   // --- Pending Approval ---
   document.getElementById('kpiPending').textContent = pending;
@@ -2010,7 +2042,7 @@ function renderKpis(){
 
   // --- Weekly Completion: of clients with a log in the last 7 days, how many are approved ---
   const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate()-7);
-  const withRecentLogs = clients.filter(c=>c.improvements.some(i=>i.date && new Date(i.date) >= sevenDaysAgo));
+  const withRecentLogs = ac.filter(c=>c.improvements.some(i=>i.date && new Date(i.date) >= sevenDaysAgo));
   const approvedWithLogs = withRecentLogs.filter(c=>c.draftStatus==='approved').length;
   const completionPct = withRecentLogs.length ? Math.round((approvedWithLogs/withRecentLogs.length)*100) : 0;
   document.getElementById('kpiCompletion').textContent = withRecentLogs.length ? completionPct + '%' : '—';
@@ -2025,7 +2057,7 @@ function renderKpis(){
 function renderOverviewActiveQueue(){
   const el = document.getElementById('overviewActiveQueue');
   if(!el) return;
-  const active = clients.filter(hasLoggedThisWeek).sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
+  const active = activeClients().filter(hasLoggedThisWeek).sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
   if(!active.length){ el.innerHTML = `<div class="empty">No clients have logged improvements this week yet.</div>`; return; }
   el.innerHTML = active.map(c=>{
     const status = statusMeta(c.draftStatus);
@@ -2056,8 +2088,8 @@ function renderGreeting(){
   const first = myProfile && myProfile.name ? myProfile.name.split(' ')[0] : '';
   titleEl.textContent = `Good ${period}${first ? ', ' + first : ''}`;
   if(subEl){
-    const pending = clients.filter(c=>c.draftStatus==='pending').length;
-    const atRisk = clients.filter(c=>c.danger>=4).length;
+    const pending = activeClients().filter(c=>c.draftStatus==='pending').length;
+    const atRisk = activeClients().filter(c=>c.danger>=4).length;
     if(pending || atRisk){
       const parts = [];
       if(pending) parts.push(`${pending} draft${pending!==1?'s':''} waiting on approval`);
@@ -2150,12 +2182,13 @@ function renderClientsTable(){
   const tbody = document.getElementById('clientsTbody');
   const countEl = document.getElementById('clientsFilterCount');
   updateSortArrows();
-  if(!clients.length){
+  const ac = activeClients();
+  if(!ac.length){
     tbody.innerHTML = `<tr><td colspan="7"><div class="empty">No clients yet. Click "+ Add client" to start the roster.</div></td></tr>`;
     if(countEl) countEl.textContent = '';
     return;
   }
-  let filtered = clients.filter(matchesClientFilters);
+  let filtered = ac.filter(matchesClientFilters);
   filtered.sort((a,b)=>{
     let av = a[clientSort.field], bv = b[clientSort.field];
     if(typeof av==='string'){ av = av.toLowerCase(); bv = (bv||'').toLowerCase(); }
@@ -2165,7 +2198,7 @@ function renderClientsTable(){
   });
   if(countEl){
     const isFiltered = clientFilters.search || clientFilters.service!=='all' || clientFilters.status!=='all' || clientFilters.importance!=='all' || clientFilters.danger!=='all' || clientFilters.logged!=='all';
-    countEl.textContent = isFiltered ? `${filtered.length} of ${clients.length} shown` : '';
+    countEl.textContent = isFiltered ? `${filtered.length} of ${ac.length} shown` : '';
   }
   if(!filtered.length){
     tbody.innerHTML = `<tr><td colspan="7"><div class="empty">No clients match these filters.</div></td></tr>`;
@@ -2246,17 +2279,88 @@ document.addEventListener('click', function(e){
 async function deleteClient(id){
   const c = clients.find(x=>x.id===id);
   if(!c) return;
-  if(!confirm(`Delete ${c.name}? This removes all logged improvements, drafts, and notes for this client — can't be undone.`)) return;
+  if(!confirm(`Move ${c.name} to Trash? Their improvements, drafts, time entries, and notes stay intact and this can be undone from Settings → Trash.`)) return;
   await loadAll();
   const stillThere = clients.find(x=>x.id===id);
   if(!stillThere){ showToast('info','Already gone', `${c.name} was already removed.`); renderAll(); return; }
-  clients = clients.filter(x=>x.id!==id);
-  notes = notes.filter(n=>n.clientId!==id);
-  log.unshift({t:nowTime(), tag:'you', text:`Deleted client <b>${c.name}</b>.`});
+  stillThere.deletedAt = new Date().toISOString();
+  log.unshift({t:nowTime(), tag:'you', text:`Moved client <b>${c.name}</b> to Trash.`});
   const ok = await persistClients();
   renderAll();
-  if(ok) logClientActivity(id, 'client_deleted', `${myName()||'Someone'} deleted this client (${c.name}) from the roster.`);
-  ok ? showToast('success','Client deleted', `${c.name} removed from the roster.`) : showToast('error','Delete failed','Could not save — try again.');
+  if(ok) logClientActivity(id, 'client_deleted', `${myName()||'Someone'} moved this client (${c.name}) to Trash.`);
+  ok ? showToast('success','Moved to Trash', `${c.name} can be restored from Settings → Trash.`) : showToast('error','Delete failed','Could not save — try again.');
+}
+
+// True permanent deletion — only reachable from the Trash panel, on a client
+// that's already been soft-deleted. This is the only place data actually
+// gets destroyed rather than hidden.
+async function permanentlyDeleteClient(id){
+  const c = clients.find(x=>x.id===id);
+  if(!c) return;
+  if(!confirm(`Permanently delete ${c.name}? This cannot be undone — all improvements, drafts, and history for this client will be gone for good.`)) return;
+  await loadAll();
+  clients = clients.filter(x=>x.id!==id);
+  notes = notes.filter(n=>n.clientId!==id);
+  const ok = await persistClients();
+  renderAll();
+  renderTrash();
+  ok ? showToast('success','Permanently deleted', `${c.name} is gone for good.`) : showToast('error','Delete failed','Could not save — try again.');
+}
+
+async function restoreClient(id){
+  await loadAll();
+  const c = clients.find(x=>x.id===id);
+  if(!c) return;
+  delete c.deletedAt;
+  const ok = await persistClients();
+  renderAll();
+  renderTrash();
+  ok ? showToast('success','Client restored', `${c.name} is back on the roster.`) : showToast('error','Restore failed','Could not save — try again.');
+}
+
+function trashRowHtml(title, subtitle, deletedAt, restoreFn, deleteFn){
+  const when = deletedAt ? new Date(deletedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
+  return `<div class="integ-row">
+    <div><div class="integ-name">${title}</div>${subtitle ? `<div class="integ-desc">${subtitle}</div>` : ''}${when ? `<div class="integ-desc" style="color:var(--muted-lt);">Deleted ${when}</div>` : ''}</div>
+    <div style="display:flex;gap:14px;flex:none;">
+      <span class="row-link" onclick="${restoreFn}">Restore</span>
+      <span class="row-link danger-link" onclick="${deleteFn}">Delete permanently</span>
+    </div>
+  </div>`;
+}
+
+async function renderTrash(){
+  const clientsEl = document.getElementById('trashClientsList');
+  const notesEl = document.getElementById('trashNotesList');
+  const timeEl = document.getElementById('trashTimeList');
+  if(!clientsEl && !notesEl && !timeEl) return;
+
+  if(clientsEl){
+    const trashedClients = clients.filter(c=>c.deletedAt).sort((a,b)=> new Date(b.deletedAt)-new Date(a.deletedAt));
+    clientsEl.innerHTML = trashedClients.length ? trashedClients.map(c=>
+      trashRowHtml(c.name, c.service, c.deletedAt, `restoreClient('${c.id}')`, `permanentlyDeleteClient('${c.id}')`)
+    ).join('') : `<div class="empty" style="padding:14px 0;">Trash is empty.</div>`;
+  }
+
+  if(notesEl){
+    notesEl.innerHTML = `<div class="empty" style="padding:14px 0;">Loading…</div>`;
+    const trashedNotes = await loadMyTrashedNotes();
+    notesEl.innerHTML = trashedNotes.length ? trashedNotes.map(n=>{
+      const c = clients.find(x=>x.id===n.clientId);
+      const snippet = n.text.length>70 ? n.text.slice(0,70)+'…' : n.text;
+      return trashRowHtml(snippet, c ? c.name : 'Unknown client', n.deletedAt, `restoreNote('${n.id}')`, `permanentlyDeleteNote('${n.id}')`);
+    }).join('') : `<div class="empty" style="padding:14px 0;">Trash is empty.</div>`;
+  }
+
+  if(timeEl){
+    timeEl.innerHTML = `<div class="empty" style="padding:14px 0;">Loading…</div>`;
+    const trashedTime = await loadTrashedTimeEntries();
+    const visibleTrashedTime = trashedTime.filter(e=> isAdmin() || (currentUser && e.userId===currentUser.id));
+    timeEl.innerHTML = visibleTrashedTime.length ? visibleTrashedTime.map(e=>{
+      const c = clients.find(x=>x.id===e.clientId);
+      return trashRowHtml(`${c?c.name:'Unknown client'} — ${formatMinutes(e.minutes)}`, e.description || e.service || '', e.deletedAt, `restoreTimeEntry('${e.id}')`, `permanentlyDeleteTimeEntry('${e.id}')`);
+    }).join('') : `<div class="empty" style="padding:14px 0;">Trash is empty.</div>`;
+  }
 }
 
 /* ---------- Client Detail Page — everything about one client, pulled from every tab ---------- */
@@ -2468,8 +2572,14 @@ function noteStatusMeta(status){
 
 function openNoteModal(noteId, presetClientId){
   const editing = noteId ? notes.find(n=>n.id===noteId) : null;
-  if(!clients.length){ showToast('error','Add a client first','Notes need a client to attach to — add one in Clients.'); return; }
-  const clientOptions = [...clients].sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${(editing && editing.clientId===c.id) || (!editing && presetClientId===c.id) ? 'selected':''}>${c.name}</option>`).join('');
+  const ac = activeClients();
+  if(!ac.length && !editing){ showToast('error','Add a client first','Notes need a client to attach to — add one in Clients.'); return; }
+  let optionSource = [...ac];
+  if(editing && !optionSource.some(c=>c.id===editing.clientId)){
+    const trashedClient = clients.find(c=>c.id===editing.clientId);
+    if(trashedClient) optionSource.push(trashedClient);
+  }
+  const clientOptions = optionSource.sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${(editing && editing.clientId===c.id) || (!editing && presetClientId===c.id) ? 'selected':''}>${c.name}${c.deletedAt?' (in Trash)':''}</option>`).join('');
   openAppModal(`
     <div class="modal-head"><span class="panel-title">${editing ? 'Edit note' : 'Add note'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
@@ -2498,9 +2608,38 @@ async function loadMyNotes(){
     .from('notes')
     .select('*')
     .eq('user_id', currentUser.id)
+    .is('deleted_at', null)
     .order('updated_at', { ascending: false });
   if(error){ console.error('loadMyNotes error', error); notes = []; return; }
   notes = (data||[]).map(n => ({ id:n.id, clientId:n.client_id, text:n.text, status:n.status, createdAt:n.created_at, updatedAt:n.updated_at }));
+}
+
+async function loadMyTrashedNotes(){
+  if(!currentUser) return [];
+  const { data, error } = await supabaseClient
+    .from('notes')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false });
+  if(error){ console.error('loadMyTrashedNotes error', error); return []; }
+  return (data||[]).map(n => ({ id:n.id, clientId:n.client_id, text:n.text, status:n.status, deletedAt:n.deleted_at }));
+}
+
+async function restoreNote(id){
+  const { error } = await supabaseClient.from('notes').update({ deleted_at: null }).eq('id', id).eq('user_id', currentUser.id);
+  await loadMyNotes();
+  populateNotesClientFilter();
+  renderNotes();
+  await renderTrash();
+  error ? showToast('error','Restore failed', error.message) : showToast('success','Note restored','Back in your notes list.');
+}
+
+async function permanentlyDeleteNote(id){
+  if(!confirm("Permanently delete this note? This cannot be undone.")) return;
+  const { error } = await supabaseClient.from('notes').delete().eq('id', id).eq('user_id', currentUser.id);
+  await renderTrash();
+  error ? showToast('error','Delete failed', error.message) : showToast('success','Permanently deleted','Gone for good.');
 }
 
 async function saveNote(noteId){
@@ -2527,11 +2666,11 @@ async function saveNote(noteId){
 }
 
 async function deleteNote(id){
-  if(!confirm("Delete this note? This can't be undone.")) return;
-  const { error } = await supabaseClient.from('notes').delete().eq('id', id).eq('user_id', currentUser.id);
+  if(!confirm("Move this note to Trash? You can restore it later from Settings.")) return;
+  const { error } = await supabaseClient.from('notes').update({ deleted_at: new Date().toISOString() }).eq('id', id).eq('user_id', currentUser.id);
   await loadMyNotes();
   renderNotes();
-  error ? showToast('error','Delete failed', error.message) : showToast('success','Note deleted','Removed.');
+  error ? showToast('error','Delete failed', error.message) : showToast('success','Note moved to Trash','Restore it anytime from Settings → Trash.');
 }
 
 async function changeNoteStatus(id, newStatus){
@@ -2566,7 +2705,7 @@ function populateNotesClientFilter(){
   const sel = document.getElementById('notesClientFilter');
   if(!sel) return;
   const current = sel.value || 'all';
-  sel.innerHTML = `<option value="all">All clients</option>` + [...clients].sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  sel.innerHTML = `<option value="all">All clients</option>` + activeClients().sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
   if([...sel.options].some(o=>o.value===current)) sel.value = current;
 }
 
@@ -2654,9 +2793,30 @@ function formatMinutes(mins){
 }
 
 async function loadTimeEntries(){
-  const { data, error } = await supabaseClient.from('time_entries').select('*').order('entry_date', { ascending:false });
+  const { data, error } = await supabaseClient.from('time_entries').select('*').is('deleted_at', null).order('entry_date', { ascending:false });
   if(error){ console.error('loadTimeEntries error', error); timeEntries = []; return; }
   timeEntries = (data||[]).map(e=>({ id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes, description:e.description||'', service:e.service||'', createdAt:e.created_at }));
+}
+
+async function loadTrashedTimeEntries(){
+  const { data, error } = await supabaseClient.from('time_entries').select('*').not('deleted_at', 'is', null).order('deleted_at', { ascending:false });
+  if(error){ console.error('loadTrashedTimeEntries error', error); return []; }
+  return (data||[]).map(e=>({ id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes, description:e.description||'', service:e.service||'', deletedAt:e.deleted_at }));
+}
+
+async function restoreTimeEntry(id){
+  const { error } = await supabaseClient.from('time_entries').update({ deleted_at: null }).eq('id', id);
+  await loadTimeEntries();
+  renderTimesheet(); renderReports();
+  await renderTrash();
+  error ? showToast('error','Restore failed', error.message) : showToast('success','Entry restored','Back on the timesheet.');
+}
+
+async function permanentlyDeleteTimeEntry(id){
+  if(!confirm("Permanently delete this time entry? This cannot be undone.")) return;
+  const { error } = await supabaseClient.from('time_entries').delete().eq('id', id);
+  await renderTrash();
+  error ? showToast('error','Delete failed', error.message) : showToast('success','Permanently deleted','Gone for good.');
 }
 
 /* ---------- Per-client audit trail (unbounded, unlike the 60-entry global log) ---------- */
@@ -2698,7 +2858,7 @@ function populateTimeClientSelects(){
   const filterSel = document.getElementById('timesheetClientFilter');
   if(filterSel){
     const current = filterSel.value || 'all';
-    filterSel.innerHTML = `<option value="all">All clients</option>` + [...clients].sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    filterSel.innerHTML = `<option value="all">All clients</option>` + activeClients().sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
     if([...filterSel.options].some(o=>o.value===current)) filterSel.value = current;
   }
   const dateInput = document.getElementById('manualDate');
@@ -2743,11 +2903,12 @@ function setupClientSearchSelect(searchId, hiddenId, dropdownId){
 
   function showMatches(term){
     const lower = (term||'').toLowerCase();
-    const matches = [...clients]
+    const ac = activeClients();
+    const matches = [...ac]
       .filter(c=>c.name.toLowerCase().includes(lower))
       .sort((a,b)=>a.name.localeCompare(b.name))
       .slice(0,50);
-    if(!clients.length){ dropdown.innerHTML = `<div class="client-search-empty">No clients yet — add one in Clients first.</div>`; dropdown.style.display='block'; return; }
+    if(!ac.length){ dropdown.innerHTML = `<div class="client-search-empty">No clients yet — add one in Clients first.</div>`; dropdown.style.display='block'; return; }
     if(!matches.length){ dropdown.innerHTML = `<div class="client-search-empty">No matching clients</div>`; dropdown.style.display='block'; return; }
     dropdown.innerHTML = matches.map(c=>`<div class="client-search-item" data-id="${c.id}">${c.name}</div>`).join('');
     dropdown.style.display = 'block';
@@ -3240,11 +3401,11 @@ async function saveTimeEntryEdit(id){
 }
 
 async function deleteTimeEntry(id){
-  if(!confirm("Delete this time entry? This can't be undone.")) return;
-  const { error } = await supabaseClient.from('time_entries').delete().eq('id', id);
+  if(!confirm("Move this time entry to Trash? You can restore it later from Settings.")) return;
+  const { error } = await supabaseClient.from('time_entries').update({ deleted_at: new Date().toISOString() }).eq('id', id);
   await loadTimeEntries();
   renderTimesheet(); renderReports();
-  error ? showToast('error','Delete failed', error.message) : showToast('success','Entry deleted','Removed.');
+  error ? showToast('error','Delete failed', error.message) : showToast('success','Entry moved to Trash','Restore it anytime from Settings → Trash.');
 }
 
 /* --- Reports --- */
@@ -3688,8 +3849,9 @@ function improvementInDateRange(imp){
 
 function renderQueue(){
   const el = document.getElementById('queueList');
-  if(!clients.length){ el.innerHTML = `<div class="panel"><div class="empty">No clients yet — add clients in the Clients tab.</div></div>`; return; }
-  let sorted = [...clients].sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
+  const ac = activeClients();
+  if(!ac.length){ el.innerHTML = `<div class="panel"><div class="empty">No clients yet — add clients in the Clients tab.</div></div>`; return; }
+  let sorted = [...ac].sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
   if(queueFilter==='pending') sorted = sorted.filter(c=>c.draftStatus==='pending');
   else if(queueFilter==='approved') sorted = sorted.filter(c=>c.draftStatus==='approved');
   else if(queueFilter==='none') sorted = sorted.filter(c=>c.draftStatus==='none');
@@ -3768,7 +3930,8 @@ function renderTotalClientsDonut(){
   const wrap = document.getElementById('totalClientsDonut');
   const legend = document.getElementById('totalClientsLegend');
   if(!wrap) return;
-  const total = clients.length;
+  const ac = activeClients();
+  const total = ac.length;
   if(!total){
     wrap.innerHTML = `<div class="empty" style="padding:30px 0;">No clients yet.</div>`;
     if(legend) legend.innerHTML = '';
@@ -3780,7 +3943,7 @@ function renderTotalClientsDonut(){
   // "Active" for most clients, which rendered as one solid ring with nothing
   // to actually show. Risk tier is where the real variation lives.
   const counts = { 'No risk':0, 'Medium risk':0, 'At risk':0 };
-  clients.forEach(c=>{ counts[riskLabel(c.danger).text]++; });
+  ac.forEach(c=>{ counts[riskLabel(c.danger).text]++; });
   const entries = Object.entries(counts).filter(([,count])=>count>0);
   const tierColor = (tier)=> tier==='At risk' ? '#DC2626' : tier==='Medium risk' ? '#5B9BD5' : '#4CAF7D';
 
@@ -3812,9 +3975,9 @@ function renderTotalClientsDonut(){
 
   const statsEl = document.getElementById('totalClientsStats');
   if(statsEl){
-    const avgImportance = (clients.reduce((s,c)=>s+c.importance,0) / total).toFixed(1);
-    const avgDanger = (clients.reduce((s,c)=>s+c.danger,0) / total).toFixed(1);
-    const atRiskNoDraft = clients.filter(c=> c.danger>=4 && c.draftStatus==='none').length;
+    const avgImportance = (ac.reduce((s,c)=>s+c.importance,0) / total).toFixed(1);
+    const avgDanger = (ac.reduce((s,c)=>s+c.danger,0) / total).toFixed(1);
+    const atRiskNoDraft = ac.filter(c=> c.danger>=4 && c.draftStatus==='none').length;
     statsEl.innerHTML = `
       <div class="donut-stat-row"><span class="donut-stat-label">Avg Importance</span><span class="donut-stat-val">${avgImportance}/10</span></div>
       <div class="donut-stat-row"><span class="donut-stat-label">Avg Danger</span><span class="donut-stat-val">${avgDanger}/5</span></div>
@@ -4255,10 +4418,11 @@ function csvEscape(val){
 }
 
 function exportRosterCsv(){
-  if(!clients.length){ showToast('info','Nothing to export','The roster is empty.'); return; }
+  const ac = activeClients();
+  if(!ac.length){ showToast('info','Nothing to export','The roster is empty.'); return; }
   const headers = ['Name','Email','Service','Status','Importance','Danger','SOW'];
   const lines = [headers.join(',')];
-  clients.forEach(c => {
+  ac.forEach(c => {
     lines.push([c.name,c.email,c.service,c.status,c.importance,c.danger,c.sow].map(csvEscape).join(','));
   });
   const csvText = lines.join('\n');
@@ -4273,7 +4437,7 @@ function exportRosterCsv(){
 
 function notifyApprovers(){
   if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can send this notification.'); return; }
-  const pending = clients.filter(c=>c.draftStatus==='pending');
+  const pending = activeClients().filter(c=>c.draftStatus==='pending');
   const to = [settings.danielEmail, settings.ericEmail].filter(Boolean).join(',');
   if(!to){ showToast('error',"Missing approver emails","Add Daniel's and Eric's email addresses in Settings first."); return; }
   const subject = `${pending.length} client update${pending.length!==1?'s':''} ready for approval`;
