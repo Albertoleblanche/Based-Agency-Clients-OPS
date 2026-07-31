@@ -3909,6 +3909,14 @@ function renderXYChart(containerId, buckets){
   }));
   const linePath = points.map((p,idx)=> (idx===0?'M':'L')+p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
   const areaPath = linePath + ` L${points[points.length-1].x.toFixed(1)},${h-padY} L${points[0].x.toFixed(1)},${h-padY} Z`;
+  // A single point has no line segment to stroke and a zero-width area to
+  // fill — both render as literally nothing. Show it as a plain visible dot
+  // instead, which is the one case this happens: a range (like "This week")
+  // that collapses to a single bucket under a coarser granularity (Week or
+  // Month) — common right after selecting one of those from the dropdown.
+  const singlePointDot = points.length===1
+    ? `<circle cx="${points[0].x.toFixed(1)}" cy="${points[0].y.toFixed(1)}" r="4.5" fill="var(--brand)"></circle>`
+    : '';
 
   const totalHours = values.reduce((s,v)=>s+v,0);
   const lastVal = values[values.length-1] || 0;
@@ -3933,6 +3941,7 @@ function renderXYChart(containerId, buckets){
         </defs>
         <path d="${areaPath}" fill="url(#${uid}-grad)" stroke="none"></path>
         <path d="${linePath}" fill="none" stroke="var(--brand)" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"></path>
+        ${singlePointDot}
         <line id="${uid}-guide" class="xy-chart-guide" x1="0" y1="${padY}" x2="0" y2="${h-padY}" style="display:none;"></line>
         <circle id="${uid}-dot" class="xy-chart-dot" r="4" style="display:none;"></circle>
         <rect x="0" y="0" width="${w}" height="${h}" fill="transparent" id="${uid}-overlay" style="cursor:crosshair;"></rect>
