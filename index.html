@@ -413,14 +413,27 @@
   .integ-desc{font-size:11.5px;color:var(--muted);margin-top:2px;}
   .integ-status{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:4px 10px;border-radius:20px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;}
   .integ-status.on{background:var(--green-bg);color:var(--green);}
+
+  .custom-field-row{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid #F0F1F4;}
+  .custom-field-row:last-child{border-bottom:none;}
+  .custom-field-arrows{display:flex;flex-direction:column;gap:2px;}
+  .custom-field-arrow{cursor:pointer;font-size:9px;color:var(--muted-lt);line-height:1;padding:2px;}
+  .custom-field-arrow:hover{color:var(--brand-dark);}
+  .custom-field-arrow.disabled{color:#E5E7EB;cursor:default;pointer-events:none;}
+  .custom-field-info{flex:1;min-width:0;}
+  .custom-field-actions{display:flex;gap:12px;flex:none;}
   .integ-status.off{background:#EEF0F4;color:var(--muted);}
   .settings-field{margin-bottom:12px;}
   .settings-field label{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px;}
   .settings-field input{width:280px;max-width:100%;font-family:'Inter',sans-serif;font-size:13px;padding:9px 11px;border-radius:6px;border:1px solid var(--border);}
   .options-list{display:flex;flex-wrap:wrap;gap:8px;}
-  .option-chip{display:inline-flex;align-items:center;gap:7px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:6px 8px 6px 12px;font-size:12px;color:var(--ink);}
+  .option-chip{display:inline-flex;align-items:center;gap:7px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:6px 8px 6px 8px;font-size:12px;color:var(--ink);}
   .option-chip-x{cursor:pointer;color:var(--muted-lt);font-size:11px;padding:2px 4px;}
   .option-chip-x:hover{color:var(--red);}
+  .option-chip-arrows{display:flex;flex-direction:column;line-height:.7;margin-right:2px;}
+  .option-chip-arrow{cursor:pointer;font-size:7px;color:var(--muted-lt);padding:1px 3px;}
+  .option-chip-arrow:hover{color:var(--brand-dark);}
+  .option-chip-arrow.disabled{color:#DDE0E5;cursor:default;pointer-events:none;}
 
   .log-list{max-height:220px;overflow-y:auto;}
   .scroll-cap{max-height:220px;overflow-y:auto;}
@@ -1008,6 +1021,15 @@ document.addEventListener('DOMContentLoaded', function(){
             </div>
           </div>
         </div>
+
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Custom Fields</span></div>
+          <div class="panel-body">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Add your own fields to the client form — Website, Phone Number, anything you need. They'll show up when adding or editing a client, and on each client's detail page. Reorder with the arrows; deleting a field hides it going forward but keeps existing values.</p>
+            <div id="customFieldsList" style="margin-bottom:14px;"></div>
+            <button class="btn btn-brand" onclick="openAddCustomFieldModal()">+ Add field</button>
+          </div>
+        </div>
       </div>
 
       <!-- AI & EMAIL -->
@@ -1126,6 +1148,11 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
 
       <div class="metrics-row" id="cdMetrics"></div>
+
+      <div class="panel" id="cdCustomFieldsPanel" style="margin-bottom:24px;display:none;">
+        <div class="panel-head"><span class="panel-title">Additional Info</span></div>
+        <div class="panel-body"><div id="cdCustomFields"></div></div>
+      </div>
 
       <div class="bento-row">
         <div class="panel bento-main">
@@ -1374,6 +1401,7 @@ async function loadAll(){
   settings.serviceOptions = (settings.serviceOptions && settings.serviceOptions.length) ? settings.serviceOptions : DEFAULT_SERVICE_OPTIONS.slice();
   settings.statusOptions = (settings.statusOptions && settings.statusOptions.length) ? settings.statusOptions : DEFAULT_STATUS_OPTIONS.slice();
   settings.teamTitleOptions = (settings.teamTitleOptions && settings.teamTitleOptions.length) ? settings.teamTitleOptions : DEFAULT_TEAM_TITLE_OPTIONS.slice();
+  settings.customFields = settings.customFields || [];
   document.getElementById('setDaniel').value = settings.danielEmail || '';
   document.getElementById('setEric').value = settings.ericEmail || '';
   const sheetInput = document.getElementById('sheetCsvUrl');
@@ -1412,25 +1440,53 @@ async function persistTeam(){ return await safeSet('team-members', JSON.stringif
 // block it outright, so it can look "connected" but do nothing. Instead, show a
 // modal with a REAL, visible mailto link the person clicks themselves (which browsers
 // always honor as a genuine user action) plus a guaranteed copy-to-clipboard fallback.
-function showMailModal(to, subject, body){
+function showSendEmailConfirm(to, subject, body){
   const mailtoHref = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   openAppModal(`
-    <div class="modal-head"><span class="panel-title">Email ready</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-head"><span class="panel-title">Send this email?</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
-      <div class="settings-field"><label>To</label><input value="${to}" readonly></div>
+      <div class="settings-field"><label>To</label><input id="mailModalTo" value="${to}" readonly></div>
       <div class="settings-field"><label>Subject</label><input id="mailModalSubject" readonly></div>
       <div class="settings-field"><label>Body</label><textarea id="mailModalBody" style="min-height:150px;width:100%;font-family:'Inter',sans-serif;font-size:13px;padding:10px;border-radius:6px;border:1px solid var(--border);"></textarea></div>
+      <p style="font-size:11.5px;color:var(--muted-lt);margin:8px 0 0;line-height:1.5;">Review the text above — clicking Send delivers it immediately from the app, no further confirmation.</p>
     </div>
     <div class="modal-actions">
-      <a class="btn btn-brand" href="${mailtoHref}" target="_blank" rel="noopener">Open in mail app</a>
+      <button class="btn btn-brand" id="sendEmailConfirmBtn" onclick="confirmSendEmail()">Send Email</button>
+      <a class="btn btn-outline" href="${mailtoHref}" target="_blank" rel="noopener">Open in mail app instead</a>
       <button class="btn btn-outline" id="mailModalCopyBtn" onclick="copyMailModalBody()">Copy details</button>
-      <button class="btn btn-outline" onclick="closeAppModal()">Close</button>
+      <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
     </div>`, 500);
   document.getElementById('mailModalSubject').value = subject;
   document.getElementById('mailModalBody').value = body;
 }
 
-// Generic modal shell — used for the mail-compose modal and the queue card detail modal.
+async function confirmSendEmail(){
+  const to = document.getElementById('mailModalTo').value;
+  const subject = document.getElementById('mailModalSubject').value;
+  const body = document.getElementById('mailModalBody').value;
+  const btn = document.getElementById('sendEmailConfirmBtn');
+  setBtnLoading(btn, 'Sending…');
+  try{
+    const response = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject, body }),
+    });
+    const data = await response.json();
+    restoreBtn(btn);
+    if(!response.ok){
+      showToast('error','Send failed', (data.error || 'Could not send the email') + ' — try "Open in mail app instead."');
+      return;
+    }
+    closeAppModal();
+    showToast('success','Email sent', `Delivered to ${to}.`);
+  }catch(e){
+    restoreBtn(btn);
+    showToast('error','Send failed', 'Network error — try "Open in mail app instead."');
+  }
+}
+
+// Generic modal shell — used for the send-email modal and the queue card detail modal.
 function openAppModal(innerHtml, maxWidth){
   closeAppModal();
   const overlay = document.createElement('div');
@@ -1567,6 +1623,7 @@ function renderClientOptionsSelects(){
   }
   renderOptionsManager('service');
   renderOptionsManager('status');
+  renderCustomFieldsManager();
   populateClientFilterSelects();
 }
 
@@ -1576,8 +1633,14 @@ function renderOptionsManager(kind){
   const listEl = document.getElementById(kind+'OptionsList');
   if(!listEl) return;
   const options = settings[OPTION_KIND_KEYS[kind]];
-  listEl.innerHTML = (options||[]).map(o=>`
-    <span class="option-chip">${o} <span class="option-chip-x" onclick="removeFieldOption('${kind}','${o.replace(/'/g,"\\'")}')">✕</span></span>
+  listEl.innerHTML = (options||[]).map((o,i)=>`
+    <span class="option-chip">
+      <span class="option-chip-arrows">
+        <span class="option-chip-arrow ${i===0?'disabled':''}" onclick="moveFieldOption('${kind}','${o.replace(/'/g,"\\'")}',-1)">▲</span>
+        <span class="option-chip-arrow ${i===options.length-1?'disabled':''}" onclick="moveFieldOption('${kind}','${o.replace(/'/g,"\\'")}',1)">▼</span>
+      </span>
+      ${o} <span class="option-chip-x" onclick="removeFieldOption('${kind}','${o.replace(/'/g,"\\'")}')">✕</span>
+    </span>
   `).join('') || `<span style="color:var(--muted-lt);font-size:12px;">No options yet.</span>`;
 }
 
@@ -1607,7 +1670,179 @@ async function removeFieldOption(kind, value){
   ok ? showToast('success','Option removed', `"${value}" removed.`) : showToast('error','Save failed','Could not save — try again.');
 }
 
-function clientFormHtml(title, submitLabel){
+async function moveFieldOption(kind, value, dir){
+  await loadAll();
+  const key = OPTION_KIND_KEYS[kind];
+  const arr = settings[key];
+  const i = arr.indexOf(value);
+  const j = i + dir;
+  if(i<0 || j<0 || j>=arr.length) return;
+  [arr[i], arr[j]] = [arr[j], arr[i]];
+  const ok = await persistSettings();
+  renderClientOptionsSelects();
+  if(kind==='title') populateAddMemberTitleSelect();
+  if(!ok) showToast('error','Save failed','Could not save the new order — try again.');
+}
+
+/* ---------- Custom client fields — user-defined, no code changes needed ---------- */
+
+const CUSTOM_FIELD_TYPE_LABELS = { text:'Text', url:'URL', email:'Email', phone:'Phone', number:'Number', textarea:'Long text', select:'Dropdown' };
+let customFieldDraftOptions = [];
+let editingCustomFieldId = null;
+
+function renderCustomFieldsManager(){
+  const el = document.getElementById('customFieldsList');
+  if(!el) return;
+  const fields = settings.customFields || [];
+  if(!fields.length){ el.innerHTML = `<div class="empty" style="padding:10px 0;">No custom fields yet.</div>`; return; }
+  el.innerHTML = fields.map((f,i)=>`
+    <div class="custom-field-row">
+      <div class="custom-field-arrows">
+        <span class="custom-field-arrow ${i===0?'disabled':''}" onclick="moveCustomField('${f.id}',-1)">▲</span>
+        <span class="custom-field-arrow ${i===fields.length-1?'disabled':''}" onclick="moveCustomField('${f.id}',1)">▼</span>
+      </div>
+      <div class="custom-field-info">
+        <div class="integ-name">${f.label} <span class="pill pill-status">${CUSTOM_FIELD_TYPE_LABELS[f.type]||f.type}</span></div>
+        ${f.type==='select' ? `<div class="integ-desc">${(f.options||[]).length} option${(f.options||[]).length!==1?'s':''}</div>` : ''}
+      </div>
+      <div class="custom-field-actions">
+        <span class="row-link" onclick="openAddCustomFieldModal('${f.id}')">Edit</span>
+        <span class="row-link danger-link" onclick="deleteCustomField('${f.id}')">Delete</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function moveCustomField(fieldId, dir){
+  await loadAll();
+  const arr = settings.customFields;
+  const i = arr.findIndex(f=>f.id===fieldId);
+  const j = i + dir;
+  if(i<0 || j<0 || j>=arr.length) return;
+  [arr[i], arr[j]] = [arr[j], arr[i]];
+  const ok = await persistSettings();
+  renderCustomFieldsManager();
+  if(!ok) showToast('error','Save failed','Could not save the new order — try again.');
+}
+
+function customFieldModalHtml(editing){
+  return `
+    <div class="modal-head"><span class="panel-title">${editing ? 'Edit field' : 'Add field'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <div class="settings-field"><label>Field label</label><input id="cfLabel" placeholder="e.g. Website" value="${editing?editing.label.replace(/"/g,'&quot;'):''}"></div>
+      <div class="settings-field"><label>Field type</label>
+        <select id="cfType" onchange="onCustomFieldTypeChange()">
+          ${Object.entries(CUSTOM_FIELD_TYPE_LABELS).map(([val,lbl])=>`<option value="${val}" ${editing&&editing.type===val?'selected':''}>${lbl}</option>`).join('')}
+        </select>
+      </div>
+      <div id="cfSelectOptionsWrap" style="display:none;">
+        <label style="font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--muted);display:block;margin:14px 0 8px;">Dropdown options</label>
+        <div id="cfSelectOptionsList" class="options-list"></div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <input id="cfSelectOptionInput" placeholder="New option" style="flex:1;font-family:'Inter',sans-serif;font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);">
+          <button class="btn btn-outline" onclick="addCustomFieldOptionDraft()">Add</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-brand" onclick="saveCustomField()">Save field</button>
+      <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
+    </div>`;
+}
+
+function openAddCustomFieldModal(fieldId){
+  const editing = fieldId ? (settings.customFields||[]).find(f=>f.id===fieldId) : null;
+  editingCustomFieldId = fieldId || null;
+  customFieldDraftOptions = editing && editing.options ? [...editing.options] : [];
+  openAppModal(customFieldModalHtml(editing), 460);
+  onCustomFieldTypeChange();
+}
+
+function onCustomFieldTypeChange(){
+  const type = document.getElementById('cfType').value;
+  const wrap = document.getElementById('cfSelectOptionsWrap');
+  if(wrap) wrap.style.display = type==='select' ? 'block' : 'none';
+  renderCustomFieldOptionsDraft();
+}
+
+function renderCustomFieldOptionsDraft(){
+  const el = document.getElementById('cfSelectOptionsList');
+  if(!el) return;
+  el.innerHTML = customFieldDraftOptions.map(o=>`
+    <span class="option-chip">${o} <span class="option-chip-x" onclick="removeCustomFieldOptionDraft('${o.replace(/'/g,"\\'")}')">✕</span></span>
+  `).join('') || `<span style="color:var(--muted-lt);font-size:12px;">No options yet.</span>`;
+}
+
+function addCustomFieldOptionDraft(){
+  const input = document.getElementById('cfSelectOptionInput');
+  const val = input.value.trim();
+  if(!val) return;
+  if(customFieldDraftOptions.some(o=>o.toLowerCase()===val.toLowerCase())){ showToast('info','Already added', `"${val}" is already in the list.`); return; }
+  customFieldDraftOptions.push(val);
+  input.value = '';
+  renderCustomFieldOptionsDraft();
+}
+
+function removeCustomFieldOptionDraft(val){
+  customFieldDraftOptions = customFieldDraftOptions.filter(o=>o!==val);
+  renderCustomFieldOptionsDraft();
+}
+
+async function saveCustomField(){
+  const label = document.getElementById('cfLabel').value.trim();
+  const type = document.getElementById('cfType').value;
+  if(!label){ showToast('error','Name required','Give the field a label first.'); return; }
+  if(type==='select' && !customFieldDraftOptions.length){ showToast('error','Add options','A dropdown field needs at least one option.'); return; }
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Saving…');
+  await loadAll();
+  if(editingCustomFieldId){
+    const f = settings.customFields.find(x=>x.id===editingCustomFieldId);
+    if(f){ f.label = label; f.type = type; f.options = type==='select' ? [...customFieldDraftOptions] : undefined; }
+  } else {
+    settings.customFields.push({ id:'cf'+Date.now(), label, type, options: type==='select' ? [...customFieldDraftOptions] : undefined });
+  }
+  const ok = await persistSettings();
+  restoreBtn(btn);
+  closeAppModal();
+  renderCustomFieldsManager();
+  ok ? showToast('success', editingCustomFieldId?'Field updated':'Field added', `"${label}" is ready to use.`) : showToast('error','Save failed','Could not save — try again.');
+}
+
+async function deleteCustomField(fieldId){
+  const f = (settings.customFields||[]).find(x=>x.id===fieldId);
+  if(!f) return;
+  if(!confirm(`Remove the "${f.label}" field? It'll disappear from the client form, but any values already saved on clients stay in the data — just hidden.`)) return;
+  await loadAll();
+  settings.customFields = settings.customFields.filter(x=>x.id!==fieldId);
+  const ok = await persistSettings();
+  renderCustomFieldsManager();
+  ok ? showToast('success','Field removed', `"${f.label}" removed.`) : showToast('error','Save failed','Could not save — try again.');
+}
+
+function customFieldInputHtml(field, value){
+  const val = value!=null ? String(value) : '';
+  const escVal = val.replace(/"/g,'&quot;');
+  const id = 'ncCustom_'+field.id;
+  if(field.type==='select'){
+    const opts = `<option value="">—</option>` + (field.options||[]).map(o=>`<option value="${o.replace(/"/g,'&quot;')}" ${val===o?'selected':''}>${o}</option>`).join('');
+    return `<div><label>${field.label}</label><select id="${id}">${opts}</select></div>`;
+  }
+  if(field.type==='textarea'){
+    return `<div style="grid-column:1/-1;"><label>${field.label}</label><textarea id="${id}" style="width:100%;min-height:70px;font-family:'Inter',sans-serif;font-size:13px;padding:9px 11px;border-radius:6px;border:1px solid var(--border);box-sizing:border-box;">${val}</textarea></div>`;
+  }
+  const htmlType = { text:'text', url:'url', email:'email', phone:'tel', number:'number' }[field.type] || 'text';
+  return `<div><label>${field.label}</label><input type="${htmlType}" id="${id}" value="${escVal}" placeholder="${field.label}"></div>`;
+}
+
+function customFieldsFormHtml(existingValues){
+  const fields = settings.customFields || [];
+  if(!fields.length) return '';
+  const values = existingValues || {};
+  return fields.map(f=>customFieldInputHtml(f, values[f.id])).join('');
+}
+
+function clientFormHtml(title, submitLabel, customValues){
   return `
     <div class="modal-head"><span class="panel-title">${title}</span><span class="toast-close" onclick="closeClientForm()">✕</span></div>
     <div class="modal-body">
@@ -1620,6 +1855,7 @@ function clientFormHtml(title, submitLabel){
         <div><label>Danger score (1–5)</label><select id="ncDanger"><option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
         <div><label>Monthly hour budget</label><input type="number" id="ncBudget" min="0" step="0.5" placeholder="e.g. 20 (optional)"></div>
         <div style="grid-column:1/-1;"><label>SOW / scope notes</label><input id="ncSow" placeholder="Brief scope summary"></div>
+        ${customFieldsFormHtml(customValues)}
       </div>
     </div>
     <div class="modal-actions">
@@ -1648,7 +1884,7 @@ function openEditClientForm(id){
   const c = clients.find(x=>x.id===id);
   if(!c){ showToast('error','Client not found','Someone may have removed this — refreshing.'); fullRefresh(); return; }
   editingClientId = id;
-  openAppModal(clientFormHtml('Edit client', 'Save changes'), 560);
+  openAppModal(clientFormHtml('Edit client', 'Save changes', c.customFieldValues), 560);
   document.getElementById('ncName').value = c.name;
   document.getElementById('ncEmail').value = c.email || '';
   renderClientOptionsSelects();
@@ -1695,15 +1931,38 @@ async function saveClientForm(){
     monthlyHourBudget: parseFloat(document.getElementById('ncBudget').value) || 0,
     sow:document.getElementById('ncSow').value.trim(),
   };
+  const customFieldValues = {};
+  (settings.customFields||[]).forEach(f=>{
+    const el = document.getElementById('ncCustom_'+f.id);
+    if(el) customFieldValues[f.id] = el.value.trim();
+  });
+  fields.customFieldValues = customFieldValues;
   let ok, msg, loggedClientId;
   if(editingClientId){
     const c = clients.find(x=>x.id===editingClientId);
     if(!c){ showToast('error','Client not found','This client may have been removed — refreshing.'); closeClientForm(); restoreBtn(btn); await fullRefresh(); return; }
+    const before = { ...c };
     Object.assign(c, fields);
     ok = await persistClients();
     msg = `${name} updated.`;
     loggedClientId = editingClientId;
-    if(ok){ logClientActivity(loggedClientId, 'client_edited', `${myName()||'Someone'} edited this client's details.`); refreshClientDetailActivityIfOpen(loggedClientId); }
+    if(ok){
+      const fieldLabels = { name:'Name', email:'Email', service:'Service', status:'Status', importance:'Importance', danger:'Danger', monthlyHourBudget:'Monthly budget', sow:'SOW' };
+      const changes = Object.keys(fields)
+        .filter(key => key!=='customFieldValues' && String(before[key]||'') !== String(fields[key]||''))
+        .map(key => `${fieldLabels[key]||key}: "${before[key]||'—'}" → "${fields[key]||'—'}"`);
+      const beforeCustom = before.customFieldValues || {};
+      (settings.customFields||[]).forEach(f=>{
+        const oldVal = beforeCustom[f.id] || '';
+        const newVal = customFieldValues[f.id] || '';
+        if(oldVal !== newVal) changes.push(`${f.label}: "${oldVal||'—'}" → "${newVal||'—'}"`);
+      });
+      const desc = changes.length
+        ? `${myName()||'Someone'} changed — ${changes.join('; ')}`
+        : `${myName()||'Someone'} saved this client (no actual field changes).`;
+      logClientActivity(loggedClientId, 'client_edited', desc);
+      refreshClientDetailActivityIfOpen(loggedClientId);
+    }
   } else {
     const newId = 'c'+Date.now();
     clients.push({ id:newId, ...fields, improvements:[], draft:'', draftStatus:'none' });
@@ -2037,6 +2296,22 @@ function renderClientDetail(){
   nameEl.textContent = c.name;
   document.getElementById('cdSub').innerHTML = `${c.email ? c.email+' · ' : ''}${c.service} · ${riskCaptionHtml(c.danger)}`;
 
+  const customFieldsPanel = document.getElementById('cdCustomFieldsPanel');
+  const customFieldsEl = document.getElementById('cdCustomFields');
+  if(customFieldsPanel && customFieldsEl){
+    const fields = settings.customFields || [];
+    if(fields.length){
+      customFieldsPanel.style.display = 'block';
+      const values = c.customFieldValues || {};
+      customFieldsEl.innerHTML = `<div class="form-grid">${fields.map(f=>{
+        const val = values[f.id];
+        return `<div><label style="font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--muted-lt);display:block;margin-bottom:4px;">${f.label}</label><div style="font-size:13px;">${val ? (f.type==='url' ? `<a href="${val.startsWith('http')?val:'https://'+val}" target="_blank" style="color:var(--brand-dark);">${val}</a>` : val) : '<span style="color:var(--muted-lt);">—</span>'}</div></div>`;
+      }).join('')}</div>`;
+    } else {
+      customFieldsPanel.style.display = 'none';
+    }
+  }
+
   const myTimeEntries = timeEntries.filter(e=>e.clientId===c.id).sort((a,b)=> new Date(b.date)-new Date(a.date) || new Date(b.createdAt)-new Date(a.createdAt));
   const totalMinutes = myTimeEntries.reduce((s,e)=>s+e.minutes,0);
   const myNotesForClient = notes.filter(n=>n.clientId===c.id).sort((a,b)=> new Date(b.updatedAt||b.createdAt)-new Date(a.updatedAt||a.createdAt));
@@ -2145,11 +2420,19 @@ async function saveEditImprovement(clientId, idx){
   await loadAll();
   const c = clients.find(x=>x.id===clientId);
   if(!c || !c.improvements[idx]){ showToast('error','Entry not found','This may have changed elsewhere — refreshing.'); renderAll(); return; }
+  const oldText = c.improvements[idx].text;
   c.improvements[idx].text = text;
   c.improvements[idx].author = author;
   const ok = await persistClients();
   renderClientsTable(); renderKpis();
-  if(ok){ logClientActivity(clientId, 'improvement_edited', `${myName()||'Someone'} edited a logged improvement.`); refreshClientDetailActivityIfOpen(clientId); }
+  if(ok){
+    const truncate = (s)=> s && s.length>60 ? s.slice(0,60)+'…' : (s||'—');
+    const desc = oldText !== text
+      ? `${myName()||'Someone'} changed an improvement — "${truncate(oldText)}" → "${truncate(text)}"`
+      : `${myName()||'Someone'} edited an improvement's author/details.`;
+    logClientActivity(clientId, 'improvement_edited', desc);
+    refreshClientDetailActivityIfOpen(clientId);
+  }
   ok ? showToast('success','Improvement updated','Changes saved.') : showToast('error','Save failed','Could not save — try again.');
 }
 
@@ -2158,10 +2441,15 @@ async function deleteImprovement(clientId, idx){
   await loadAll();
   const c = clients.find(x=>x.id===clientId);
   if(!c || !c.improvements[idx]){ showToast('info','Already gone','This entry was already removed.'); renderAll(); return; }
+  const deletedText = c.improvements[idx].text;
   c.improvements.splice(idx, 1);
   const ok = await persistClients();
   renderClientsTable(); renderKpis();
-  if(ok){ logClientActivity(clientId, 'improvement_deleted', `${myName()||'Someone'} deleted a logged improvement.`); refreshClientDetailActivityIfOpen(clientId); }
+  if(ok){
+    const truncate = (s)=> s && s.length>80 ? s.slice(0,80)+'…' : (s||'—');
+    logClientActivity(clientId, 'improvement_deleted', `${myName()||'Someone'} deleted an improvement — "${truncate(deletedText)}"`);
+    refreshClientDetailActivityIfOpen(clientId);
+  }
   ok ? showToast('success','Improvement deleted','Removed from the log.') : showToast('error','Delete failed','Could not save — try again.');
 }
 
@@ -2394,14 +2682,11 @@ async function loadClientActivityHistory(clientId){
   if(!data || !data.length){ el.innerHTML = `<div class="empty">No activity recorded yet.</div>`; return; }
   el.innerHTML = data.map(row=>{
     const person = teamProfiles.find(p=>p.id===row.user_id);
+    const isAuto = row.action_type === 'draft_generated';
+    const tagLabel = isAuto ? 'AI' : (person ? person.name.split(' ')[0] : 'gone');
     const when = new Date(row.created_at);
-    return `<div class="ts-entry-card" style="margin-bottom:8px;">
-      <div class="ts-entry-info">
-        <div class="ts-entry-title">${row.description}</div>
-        <div class="ts-entry-desc" style="margin-top:2px;">${person ? person.name : 'Someone no longer on the team'}</div>
-      </div>
-      <div class="ts-entry-right"><div class="ts-entry-duration" style="font-size:10.5px;color:var(--muted-lt);">${when.toLocaleDateString('en-US',{month:'short',day:'numeric'})} · ${when.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</div></div>
-    </div>`;
+    const timeStr = `${when.toLocaleDateString('en-US',{month:'short',day:'numeric'})}, ${when.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`;
+    return `<div class="log-row"><span class="log-time">${timeStr}</span><span><span class="tag ${isAuto?'auto':'you'}">${tagLabel}</span>${row.description}</span></div>`;
   }).join('');
 }
 
@@ -3710,7 +3995,7 @@ async function approveDraft(id){
   logClientActivity(id, 'draft_approved', `${myName()||'Someone'} approved this week's draft.`);
   refreshClientDetailActivityIfOpen(id);
   if(email){
-    showMailModal(email, 'Your weekly update from Based Agency', draftText);
+    showSendEmailConfirm(email, 'Your weekly update from Based Agency', draftText);
   } else {
     showToast('info','Approved — no email sent', `${c.name} has no email on file. Add one in Clients to send.`);
   }
@@ -3995,7 +4280,7 @@ function notifyApprovers(){
   const body = `This week's client update drafts are ready for review, sorted by danger score:\n\n${bodyLines}\n\nReview and approve here: ${window.location.href}`;
   log.unshift({t:nowTime(), tag:'you', text:`Opened notification email to Daniel &amp; Eric — ${pending.length} draft${pending.length!==1?'s':''} pending.`});
   persistLog().then(renderLog);
-  showMailModal(to, subject, body);
+  showSendEmailConfirm(to, subject, body);
 }
 
 function populateAddMemberTitleSelect(){
