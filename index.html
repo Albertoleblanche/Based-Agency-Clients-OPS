@@ -304,6 +304,10 @@
   .ts-entry-service{font-weight:400;color:var(--muted);}
   .ts-entry-desc{font-size:12px;color:var(--muted);margin-top:4px;}
   .ts-entry-right{display:flex;align-items:center;gap:10px;flex:none;}
+
+  .include-toggle{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted-lt);cursor:pointer;white-space:nowrap;}
+  .include-toggle input{cursor:pointer;}
+  .include-toggle:has(input:checked){color:var(--green);font-weight:600;}
   .ts-entry-duration{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;min-width:52px;text-align:right;}
 
   /* Week view: grid table */
@@ -524,6 +528,10 @@ document.addEventListener('DOMContentLoaded', function(){
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         Clients
       </div>
+      <div class="nav-item" data-view="improvements" onclick="switchView('improvements')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Past Improvements
+      </div>
       <div class="nav-item" data-view="approve" onclick="switchView('approve')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
         Approval Queue
@@ -731,6 +739,48 @@ document.addEventListener('DOMContentLoaded', function(){
           <tbody id="clientsTbody"></tbody>
         </table>
       </div>
+    </div>
+
+    <!-- PAST IMPROVEMENTS -->
+    <div class="view" id="view-improvements">
+      <div class="topbar">
+        <div><div class="page-title">Past Improvements</div><div class="page-sub">Everything logged for every client, searchable and filterable by date</div></div>
+      </div>
+
+      <div class="panel clients-filter-panel">
+        <div class="clients-filter-bar">
+          <div class="search-field">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="improvementsSearch" placeholder="Search improvement text…" oninput="renderImprovementsHistory()">
+          </div>
+          <div class="select-field" style="min-width:170px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <select id="improvementsClientFilter" onchange="renderImprovementsHistory()"><option value="all">All clients</option></select>
+          </div>
+          <div class="select-field" style="min-width:160px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <select id="improvementsInclFilter" onchange="renderImprovementsHistory()">
+              <option value="all">Included &amp; not included</option>
+              <option value="included">Included in email</option>
+              <option value="excluded">Not in email</option>
+            </select>
+          </div>
+          <div class="date-nav">
+            <div class="date-nav-label" style="border-left:none;" onclick="document.getElementById('improvementsFromDate').showPicker ? document.getElementById('improvementsFromDate').showPicker() : document.getElementById('improvementsFromDate').focus()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <input type="date" id="improvementsFromDate" onchange="renderImprovementsHistory()" style="border:none;background:transparent;font-family:'Inter',sans-serif;font-size:13px;color:var(--ink);">
+            </div>
+            <span style="padding:0 4px;color:var(--muted-lt);font-size:11.5px;">to</span>
+            <div class="date-nav-label" style="border-right:none;" onclick="document.getElementById('improvementsToDate').showPicker ? document.getElementById('improvementsToDate').showPicker() : document.getElementById('improvementsToDate').focus()">
+              <input type="date" id="improvementsToDate" onchange="renderImprovementsHistory()" style="border:none;background:transparent;font-family:'Inter',sans-serif;font-size:13px;color:var(--ink);">
+            </div>
+          </div>
+          <button class="btn btn-outline" onclick="clearImprovementsFilters()">Clear</button>
+        </div>
+        <div class="clients-filter-count" id="improvementsFilterCount"></div>
+      </div>
+
+      <div id="improvementsHistoryList"></div>
     </div>
 
     <!-- APPROVAL QUEUE -->
@@ -1574,7 +1624,7 @@ async function fullRefresh(showFeedback){
   renderAll();
   if(showFeedback && btn){ btn.disabled = false; btn.textContent = 'Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
-function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); }
+function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); }
 
 function applyRoleVisibility(){
   const notifyBtn = document.getElementById('notifyBtn');
@@ -1679,6 +1729,104 @@ function renderClientOptionsSelects(){
   renderOptionsManager('status');
   renderCustomFieldsManager();
   populateClientFilterSelects();
+  populateImprovementsClientFilter();
+}
+
+/* ---------- Past Improvements — every logged improvement, across every client, filterable ---------- */
+
+function getAllImprovementsFlat(){
+  const list = [];
+  activeClients().forEach(c=>{
+    (c.improvements||[]).forEach((imp,idx)=>{
+      list.push({ clientId:c.id, clientName:c.name, idx, author:imp.author||'Team member', text:imp.text, date:imp.date, includeInEmail: imp.includeInEmail!==false, source: imp.source||'manual' });
+    });
+  });
+  return list.sort((a,b)=> new Date(b.date||0) - new Date(a.date||0));
+}
+
+function populateImprovementsClientFilter(){
+  const sel = document.getElementById('improvementsClientFilter');
+  if(!sel) return;
+  const current = sel.value || 'all';
+  sel.innerHTML = `<option value="all">All clients</option>` + activeClients().sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  if([...sel.options].some(o=>o.value===current)) sel.value = current;
+}
+
+function clearImprovementsFilters(){
+  const search = document.getElementById('improvementsSearch'); if(search) search.value = '';
+  const clientSel = document.getElementById('improvementsClientFilter'); if(clientSel) clientSel.value = 'all';
+  const fromEl = document.getElementById('improvementsFromDate'); if(fromEl) fromEl.value = '';
+  const toEl = document.getElementById('improvementsToDate'); if(toEl) toEl.value = '';
+  const inclSel = document.getElementById('improvementsInclFilter'); if(inclSel) inclSel.value = 'all';
+  renderImprovementsHistory();
+}
+
+const IMPROVEMENT_SOURCE_LABEL = { time:'From Time Tracker', note:'From Notes', manual:'Logged directly' };
+
+function renderImprovementsHistory(){
+  const el = document.getElementById('improvementsHistoryList');
+  const countEl = document.getElementById('improvementsFilterCount');
+  if(!el) return;
+
+  const all = getAllImprovementsFlat();
+  const search = (document.getElementById('improvementsSearch')?.value || '').trim().toLowerCase();
+  const clientFilter = document.getElementById('improvementsClientFilter')?.value || 'all';
+  const inclFilter = document.getElementById('improvementsInclFilter')?.value || 'all';
+  const fromVal = document.getElementById('improvementsFromDate')?.value;
+  const toVal = document.getElementById('improvementsToDate')?.value;
+  const fromDate = fromVal ? new Date(fromVal+'T00:00:00') : null;
+  const toDate = toVal ? new Date(toVal+'T23:59:59') : null;
+
+  const filtered = all.filter(imp=>{
+    if(clientFilter!=='all' && imp.clientId!==clientFilter) return false;
+    if(inclFilter==='included' && !imp.includeInEmail) return false;
+    if(inclFilter==='excluded' && imp.includeInEmail) return false;
+    if(search && !imp.text.toLowerCase().includes(search) && !imp.clientName.toLowerCase().includes(search)) return false;
+    if(fromDate || toDate){
+      if(!imp.date) return false;
+      const d = new Date(imp.date);
+      if(fromDate && d < fromDate) return false;
+      if(toDate && d > toDate) return false;
+    }
+    return true;
+  });
+
+  if(countEl){
+    const isFiltered = search || clientFilter!=='all' || inclFilter!=='all' || fromVal || toVal;
+    countEl.textContent = isFiltered ? `${filtered.length} of ${all.length} shown` : (all.length ? `${all.length} total` : '');
+  }
+
+  if(!all.length){ el.innerHTML = `<div class="panel"><div class="empty">No improvements logged yet.</div></div>`; return; }
+  if(!filtered.length){ el.innerHTML = `<div class="panel"><div class="empty">No improvements match these filters.</div></div>`; return; }
+
+  el.innerHTML = filtered.map(imp=>`
+    <div class="ts-entry-card" style="margin-bottom:8px;">
+      <div class="ts-entry-info">
+        <div class="ts-entry-title">
+          <span class="report-name-link" onclick="openClientDetail('${imp.clientId}')">${imp.clientName}</span>
+          <span class="ts-entry-service">— ${imp.author}</span>
+          ${imp.source!=='manual' ? `<span class="pill pill-status" style="margin-left:6px;">${IMPROVEMENT_SOURCE_LABEL[imp.source]||imp.source}</span>` : ''}
+        </div>
+        <div class="ts-entry-desc">${imp.text}</div>
+      </div>
+      <div class="ts-entry-right" style="align-items:flex-end;gap:6px;">
+        <div class="ts-entry-duration" style="font-size:10.5px;color:var(--muted-lt);">${imp.date ? new Date(imp.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : ''}</div>
+        <label class="include-toggle" title="Include in the client email">
+          <input type="checkbox" ${imp.includeInEmail?'checked':''} onchange="toggleImprovementIncludeInEmail('${imp.clientId}', ${imp.idx}, this.checked)">
+          <span>${imp.includeInEmail ? 'Included in email' : 'Not in email'}</span>
+        </label>
+      </div>
+    </div>`).join('');
+}
+
+async function toggleImprovementIncludeInEmail(clientId, idx, checked){
+  await loadAll();
+  const c = clients.find(x=>x.id===clientId);
+  if(!c || !c.improvements[idx]) return;
+  c.improvements[idx].includeInEmail = checked;
+  const ok = await persistClients();
+  renderImprovementsHistory();
+  if(!ok) showToast('error','Save failed','Could not save — try again.');
 }
 
 const OPTION_KIND_KEYS = { service:'serviceOptions', status:'statusOptions', title:'teamTitleOptions' };
@@ -2236,14 +2384,16 @@ function renderClientsTable(){
       <td>${dotRatingCompact(c.danger,'brand',5)}</td>
       <td>${loggedPill(c)}</td>
       <td class="actions-cell">
-        <div class="dropdown">
-          <button class="btn btn-outline" onclick="toggleActionsMenu('${c.id}')">Actions ▾</button>
-          <div class="dropdown-menu" id="menu-${c.id}">
-            <div class="dropdown-item" onclick="closeActionsMenus(); openClientDetail('${c.id}')">View details</div>
-            <div class="dropdown-item" onclick="closeActionsMenus(); openEditClientForm('${c.id}')">Edit client</div>
-            <div class="dropdown-item" onclick="closeActionsMenus(); toggleDrawer('${c.id}')">Log / view improvements</div>
-            <div class="dropdown-item" onclick="closeActionsMenus(); openNoteModal(null, '${c.id}')">Add note</div>
-            <div class="dropdown-item danger" onclick="closeActionsMenus(); deleteClient('${c.id}')">Delete client</div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button class="btn btn-outline" onclick="toggleDrawer('${c.id}')" title="Log or view improvements">Log improvement</button>
+          <div class="dropdown">
+            <button class="btn btn-outline" onclick="toggleActionsMenu('${c.id}')">Actions ▾</button>
+            <div class="dropdown-menu" id="menu-${c.id}">
+              <div class="dropdown-item" onclick="closeActionsMenus(); openClientDetail('${c.id}')">View details</div>
+              <div class="dropdown-item" onclick="closeActionsMenus(); openEditClientForm('${c.id}')">Edit client</div>
+              <div class="dropdown-item" onclick="closeActionsMenus(); openNoteModal(null, '${c.id}')">Add note</div>
+              <div class="dropdown-item danger" onclick="closeActionsMenus(); deleteClient('${c.id}')">Delete client</div>
+            </div>
           </div>
         </div>
       </td>
@@ -2716,7 +2866,7 @@ async function logNoteNow(id){
   await loadAll();
   const c = clients.find(x=>x.id===n.clientId);
   if(!c){ restoreBtn(btn); showToast('error','Client not found','This client may have been removed.'); return; }
-  c.improvements.push({ author: myName()||'Team member', text: n.text, date: new Date().toISOString() });
+  c.improvements.push({ author: myName()||'Team member', text: n.text, date: new Date().toISOString(), includeInEmail: true, source: 'note' });
   log.unshift({t:nowTime(), tag:'you', text:`Logged a planned improvement for <b>${c.name}</b> from Notes.`});
   const ok = await persistAppData();
   const { error } = await supabaseClient.from('notes').update({ status: 'done' }).eq('id', id).eq('user_id', currentUser.id);
@@ -3125,7 +3275,7 @@ async function stopAndSaveTimer(){
   if(descInput) descInput.value = '';
 
   const c = clients.find(x=>x.id===clientId);
-  let error, mergedIntoExisting = false;
+  let error, mergedIntoExisting = false, isFreshInsert = false;
 
   if(resumeEntryId){
     // Re-fetch the current minutes fresh (not from local cache) so we don't
@@ -3142,12 +3292,20 @@ async function stopAndSaveTimer(){
       ({ error } = await supabaseClient.from('time_entries').insert({
         user_id: currentUser.id, client_id: clientId, entry_date: toDateStr(new Date()), minutes, description, service
       }));
+      isFreshInsert = !error;
     }
   } else {
     ({ error } = await supabaseClient.from('time_entries').insert({
       user_id: currentUser.id, client_id: clientId, entry_date: toDateStr(new Date()), minutes, description, service
     }));
+    isFreshInsert = !error;
   }
+
+  // A genuinely new entry (not time added to an existing one) with a real
+  // description becomes a log too — off by default for the client email,
+  // since not every internal note is client-appropriate. Review and flip
+  // specific ones on from Past Improvements.
+  if(isFreshInsert) await autoLogFromTimeEntry(clientId, description);
 
   await loadTimeEntries();
   renderTimesheet(); renderReports();
@@ -3155,6 +3313,19 @@ async function stopAndSaveTimer(){
   mergedIntoExisting
     ? showToast('success','Time added', `${formatMinutes(minutes)} added to the existing entry for ${c?c.name:'client'}.`)
     : showToast('success','Time logged', `${formatMinutes(minutes)} logged for ${c?c.name:'client'}.`);
+}
+
+// Creates a linked improvement log from a time entry's description. Defaults
+// to excluded from the client email (includeInEmail:false) — internal record
+// by default, promoted manually from Past Improvements when it's actually
+// worth telling the client about.
+async function autoLogFromTimeEntry(clientId, description){
+  if(!description || !description.trim()) return;
+  await loadAll();
+  const c = clients.find(x=>x.id===clientId);
+  if(!c) return;
+  c.improvements.push({ author: myName()||'Team member', text: description.trim(), date: new Date().toISOString(), includeInEmail: false, source: 'time' });
+  await persistClients();
 }
 
 /* --- Manual entry --- */
@@ -3174,6 +3345,7 @@ async function addManualEntry(){
   const { error } = await supabaseClient.from('time_entries').insert({
     user_id: currentUser.id, client_id: clientId, entry_date: dateVal, minutes: totalMinutes, description, service
   });
+  if(!error) await autoLogFromTimeEntry(clientId, description);
   restoreBtn(btn);
   await loadTimeEntries();
   document.getElementById('manualHours').value = '';
@@ -3822,7 +3994,7 @@ async function logImprovement(id){
   await loadAll();
   const c = clients.find(x=>x.id===id);
   if(!c){ showToast('error','Client not found','This client may have been removed by someone else — refreshing.'); renderClientsTable(); return; }
-  c.improvements.push({author, text, date: new Date().toISOString()});
+  c.improvements.push({author, text, date: new Date().toISOString(), includeInEmail: true, source: 'manual'});
   const ok = await persistClients();
   renderClientsTable();
   renderKpis();
@@ -4079,7 +4251,7 @@ function openQueueCardModal(id){
     <div class="modal-body">
       <span class="q-status-label" style="color:${status.color};">${status.label}</span>
       <div class="q-bulk">
-        ${shownImprovements.length ? `<div class="q-bulk-title">Logged this week (${shownImprovements.length})</div><div class="q-bulk-list"><ul>${shownImprovements.map(i=>`<li>${i.text} — <span style="color:#9AA3AF;">${i.author}</span></li>`).join('')}</ul></div>` : `<i>No improvements logged this week — nothing to send.</i>`}
+        ${shownImprovements.length ? `<div class="q-bulk-title">Logged this week (${shownImprovements.length}) — ${shownImprovements.filter(i=>i.includeInEmail!==false).length} included in email</div><div class="q-bulk-list"><ul>${shownImprovements.map(i=>`<li style="${i.includeInEmail===false?'opacity:.55;':''}">${i.includeInEmail===false ? '<span style="color:var(--muted-lt);font-size:10px;">[not in email]</span> ' : ''}${i.text} — <span style="color:#9AA3AF;">${i.author}</span></li>`).join('')}</ul></div>` : `<i>No improvements logged this week — nothing to send.</i>`}
       </div>
       ${c.draft ? `<textarea class="draft" id="draft-${c.id}">${c.draft}</textarea>` : ''}
       ${c.draft && !c.email ? `<span class="warn-text">No client email on file — add one in Clients</span>` : ''}
@@ -4104,9 +4276,14 @@ async function generateDraft(id){
   if(!c) return;
   const modalCard = document.querySelector('#appModalOverlay .modal-card');
   const modalOpenForThis = modalCard && modalCard.dataset.clientId === id;
+  const includedImprovements = c.improvements.filter(i=> i.includeInEmail !== false);
+  if(!includedImprovements.length){
+    showToast('error','Nothing to include', c.improvements.length ? `${c.name} has logged items, but none are marked "Include in email" yet — review them in Past Improvements.` : `No improvements logged yet for ${c.name}.`);
+    return;
+  }
   const btn = document.getElementById('gen-'+id);
   if(btn){ btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Generating…'; }
-  const bullets = c.improvements.map(i=>'- '+i.text).join('\n');
+  const bullets = includedImprovements.map(i=>'- '+i.text).join('\n');
   const customStructure = (settings.emailInstructions || '').trim();
   const contentRules = `Content rules that apply no matter what — never overridden by anything above:
 - Describe every improvement as a specific, measurable deliverable — a concrete action taken, a number, a metric, or a defined output. Never state it as a vague, broad claim (e.g. never say "improved performance," "made things better," "optimized the account" with nothing concrete attached).
@@ -4149,10 +4326,10 @@ ${contentRules}`;
     const text = (data.text || '').trim();
     c.draft = text || 'Could not generate a draft — try again.';
     c.draftStatus = 'pending';
-    log.unshift({t:nowTime(), tag:'auto', text:`AI drafted the update for <b>${c.name}</b> from ${c.improvements.length} logged improvement${c.improvements.length!==1?'s':''}.`});
+    log.unshift({t:nowTime(), tag:'auto', text:`AI drafted the update for <b>${c.name}</b> from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''}.`});
     await persistClients();
     renderQueue(); renderLog(); renderKpis();
-    logClientActivity(id, 'draft_generated', `AI generated a draft from ${c.improvements.length} logged improvement${c.improvements.length!==1?'s':''}.`);
+    logClientActivity(id, 'draft_generated', `AI generated a draft from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''} (of ${c.improvements.length} logged).`);
     refreshClientDetailActivityIfOpen(id);
     if(modalOpenForThis) openQueueCardModal(id);
     showToast('success','Draft generated', `AI wrote the update for ${c.name}.`);
