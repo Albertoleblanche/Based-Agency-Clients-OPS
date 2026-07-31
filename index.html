@@ -546,6 +546,11 @@ document.addEventListener('DOMContentLoaded', function(){
         Notes
         <span class="nav-badge" id="navNotesBadge">0</span>
       </div>
+      <div class="nav-item" data-view="tasks" onclick="switchView('tasks')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Tasks
+        <span class="nav-badge" id="navTasksBadge">0</span>
+      </div>
       <div class="nav-item" data-view="time" onclick="switchView('time')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         Time Tracker
@@ -860,6 +865,33 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
 
       <div id="notesList" class="notes-grid"></div>
+    </div>
+
+    <!-- TASKS -->
+    <div class="view" id="view-tasks">
+      <div class="topbar">
+        <div><div class="page-title">Tasks</div><div class="page-sub">Assign tasks to anyone on the team — only you and the other person can see it</div></div>
+        <button class="btn btn-brand" onclick="openNewTaskModal()">+ New task</button>
+      </div>
+
+      <div class="panel clients-filter-panel">
+        <div class="clients-filter-bar">
+          <div class="tabs settings-tabs" style="margin:0;">
+            <div class="tab settings-tab active" data-ttab="open" onclick="switchTaskStatusTab('open')">Open</div>
+            <div class="tab settings-tab" data-ttab="done" onclick="switchTaskStatusTab('done')">Done</div>
+          </div>
+          <div class="select-field" style="min-width:170px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <select id="taskDirectionFilter" onchange="renderTasks()">
+              <option value="all">All tasks</option>
+              <option value="tome">Assigned to me</option>
+              <option value="byme">Assigned by me</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div id="tasksList"></div>
     </div>
 
     <!-- TIME TRACKER -->
@@ -1726,7 +1758,10 @@ async function fullRefresh(showFeedback){
   await loadAll();
   await loadMyNotes();
   await loadTimeEntries();
+  await loadMyTasks();
   renderAll();
+  updateTasksNavBadge();
+  await checkTaskNotifications();
   if(showFeedback && btn){ btn.disabled = false; btn.textContent = 'Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
 function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); }
@@ -1772,6 +1807,7 @@ async function switchView(name){
   await fullRefresh();
   if(name==='trash') renderTrash();
   if(name==='payroll') renderPayroll();
+  if(name==='tasks') renderTasks();
 }
 
 function switchSettingsTab(name){
@@ -3329,6 +3365,276 @@ function updateNotesBadge(){
   const open = notes.filter(n=>n.status!=='done').length;
   badge.textContent = open;
   badge.style.display = open ? 'inline-flex' : 'none';
+}
+
+/* ---------- Tasks — private between assigner and assignee only ---------- */
+
+let tasks = [];
+let taskStatusTab = 'open';
+
+// RLS already restricts this to rows where I'm the assigner or assignee —
+// nobody else on the team can ever see a task they're not part of, admins
+// included.
+async function loadMyTasks(){
+  if(!currentUser){ tasks = []; return; }
+  const { data, error } = await supabaseClient.from('tasks').select('*').order('created_at', { ascending:false });
+  if(error){ console.error('loadMyTasks error', error); tasks = []; return; }
+  tasks = (data||[]).map(t=>({
+    id:t.id, title:t.title, description:t.description||'', priority:t.priority, status:t.status,
+    assignerId:t.assigner_id, assigneeId:t.assignee_id, clientId:t.client_id, dueDate:t.due_date,
+    createdAt:t.created_at, completedAt:t.completed_at, cancelledAt:t.cancelled_at,
+    hiddenByAssigner:t.hidden_by_assigner, hiddenByAssignee:t.hidden_by_assignee,
+    assigneeNotified:t.assignee_notified, assignerNotified:t.assigner_notified
+  }));
+}
+
+function switchTaskStatusTab(status){
+  taskStatusTab = status;
+  document.querySelectorAll('#view-tasks .settings-tab').forEach(t=>t.classList.toggle('active', t.dataset.ttab===status));
+  renderTasks();
+}
+
+const TASK_PRIORITY_META = {
+  high:   { label:'High',   color:'var(--red)',   order:0 },
+  medium: { label:'Medium', color:'var(--amber)', order:1 },
+  low:    { label:'Low',    color:'var(--muted-lt)', order:2 },
+};
+
+function updateTasksNavBadge(){
+  const badge = document.getElementById('navTasksBadge');
+  if(!badge || !currentUser) return;
+  const open = tasks.filter(t=> t.status==='open' && !t.cancelledAt && t.assigneeId===currentUser.id).length;
+  badge.textContent = open;
+  badge.style.display = open ? 'inline-flex' : 'none';
+}
+
+function renderTasks(){
+  const el = document.getElementById('tasksList');
+  if(!el || !currentUser) return;
+  const direction = document.getElementById('taskDirectionFilter')?.value || 'all';
+
+  let visible = tasks.filter(t=>{
+    if(t.cancelledAt) return false; // cancelled tasks never show anywhere
+    if(taskStatusTab==='open' && t.status!=='open') return false;
+    if(taskStatusTab==='done' && t.status!=='done') return false;
+    const amAssigner = t.assignerId===currentUser.id;
+    const amAssignee = t.assigneeId===currentUser.id;
+    // Per-user hide — only affects the person who cleared it.
+    if(taskStatusTab==='done'){
+      if(amAssigner && t.hiddenByAssigner) return false;
+      if(amAssignee && t.hiddenByAssignee) return false;
+    }
+    if(direction==='tome' && !amAssignee) return false;
+    if(direction==='byme' && !amAssigner) return false;
+    return true;
+  });
+
+  visible.sort((a,b)=>{
+    const pDiff = TASK_PRIORITY_META[a.priority].order - TASK_PRIORITY_META[b.priority].order;
+    if(pDiff!==0) return pDiff;
+    return new Date(b.createdAt) - new Date(a.createdAt);
+  });
+
+  if(!visible.length){
+    el.innerHTML = `<div class="panel"><div class="empty">${taskStatusTab==='open' ? 'No open tasks.' : 'No completed tasks here yet.'}</div></div>`;
+    return;
+  }
+
+  el.innerHTML = visible.map(t=>taskCardHtml(t)).join('');
+}
+
+function taskCardHtml(t){
+  const amAssigner = t.assignerId===currentUser.id;
+  const amAssignee = t.assigneeId===currentUser.id;
+  const assigner = teamProfiles.find(p=>p.id===t.assignerId);
+  const assignee = teamProfiles.find(p=>p.id===t.assigneeId);
+  const pMeta = TASK_PRIORITY_META[t.priority] || TASK_PRIORITY_META.medium;
+  const c = t.clientId ? clients.find(x=>x.id===t.clientId) : null;
+  const dueStr = t.dueDate ? new Date(t.dueDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
+  const overdue = t.status==='open' && t.dueDate && new Date(t.dueDate+'T00:00:00') < new Date(new Date().toDateString());
+
+  const directionLabel = amAssigner
+    ? `→ Assigned to ${assignee ? assignee.name : 'someone no longer on the team'}`
+    : `← From ${assigner ? assigner.name : 'someone no longer on the team'}`;
+
+  let actions = '';
+  if(t.status==='open'){
+    if(amAssignee) actions += `<button class="btn btn-brand" onclick="markTaskDone('${t.id}')">Mark done</button>`;
+    if(amAssigner){
+      actions += `<button class="btn btn-outline" onclick="openEditTaskModal('${t.id}')">Edit</button>`;
+      actions += `<button class="btn btn-outline" style="color:var(--red);" onclick="cancelTask('${t.id}')">Cancel</button>`;
+    }
+  } else {
+    actions += `<span class="row-link" onclick="hideTaskFromMyList('${t.id}')">Remove from my list</span>`;
+  }
+
+  return `<div class="ts-entry-card" style="margin-bottom:10px;align-items:flex-start;">
+    <div class="ts-entry-info">
+      <div class="ts-entry-title">
+        <span class="pill" style="background:${pMeta.color}18;color:${pMeta.color};font-weight:700;">${pMeta.label}</span>
+        <span style="margin-left:8px;">${t.title}</span>
+        ${c ? `<span class="ts-entry-service">— ${c.name}</span>` : ''}
+      </div>
+      ${t.description ? `<div class="ts-entry-desc">${t.description}</div>` : ''}
+      <div class="ts-entry-desc" style="margin-top:4px;color:var(--muted-lt);">
+        ${directionLabel}${dueStr ? ` · Due ${dueStr}` : ''}${overdue ? ` <span style="color:var(--red);font-weight:700;">Overdue</span>` : ''}${t.status==='done' && t.completedAt ? ` · Completed ${new Date(t.completedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})}` : ''}
+      </div>
+    </div>
+    <div class="ts-entry-right" style="flex-wrap:wrap;justify-content:flex-end;max-width:260px;">${actions}</div>
+  </div>`;
+}
+
+function populateTaskAssigneeSelect(selectedId){
+  const options = [...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name))
+    .map(p=>`<option value="${p.id}" ${p.id===selectedId?'selected':''}>${p.name}${p.id===currentUser.id?' (you)':''}</option>`).join('');
+  return options;
+}
+
+function populateTaskClientSelect(selectedId){
+  const options = `<option value="">No related client</option>` + activeClients().sort((a,b)=>a.name.localeCompare(b.name))
+    .map(c=>`<option value="${c.id}" ${c.id===selectedId?'selected':''}>${c.name}</option>`).join('');
+  return options;
+}
+
+function taskFormHtml(editing){
+  return `
+    <div class="modal-head"><span class="panel-title">${editing ? 'Edit task' : 'New task'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <div class="settings-field"><label>Title</label><input id="taskTitleInput" placeholder="e.g. Update the roofing page copy" value="${editing ? editing.title.replace(/"/g,'&quot;') : ''}"></div>
+      <div class="settings-field"><label>Description (optional)</label><textarea id="taskDescInput" style="width:100%;min-height:80px;font-family:'Inter',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);">${editing ? editing.description : ''}</textarea></div>
+      <div class="form-grid">
+        <div><label>Assign to</label><select id="taskAssigneeSelect">${populateTaskAssigneeSelect(editing ? editing.assigneeId : currentUser.id)}</select></div>
+        <div><label>Priority</label>
+          <select id="taskPrioritySelect">
+            <option value="low" ${editing && editing.priority==='low'?'selected':''}>Low</option>
+            <option value="medium" ${(!editing || editing.priority==='medium')?'selected':''}>Medium</option>
+            <option value="high" ${editing && editing.priority==='high'?'selected':''}>High</option>
+          </select>
+        </div>
+        <div><label>Due date (optional)</label><input type="date" id="taskDueInput" value="${editing && editing.dueDate ? editing.dueDate : ''}"></div>
+        <div><label>Related client (optional)</label><select id="taskClientSelect">${populateTaskClientSelect(editing ? editing.clientId : null)}</select></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-brand" onclick="${editing ? `saveEditTask('${editing.id}')` : 'saveNewTask()'}">${editing ? 'Save changes' : 'Assign task'}</button>
+      <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
+    </div>`;
+}
+
+function openNewTaskModal(){
+  if(!teamProfiles.length){ showToast('error','No team members','Add team members in Team before assigning tasks.'); return; }
+  openAppModal(taskFormHtml(null), 480);
+}
+
+function openEditTaskModal(taskId){
+  const t = tasks.find(x=>x.id===taskId);
+  if(!t) return;
+  if(t.assignerId!==currentUser.id){ showToast('error','Not allowed','Only the person who assigned this task can edit it.'); return; }
+  openAppModal(taskFormHtml(t), 480);
+}
+
+async function saveNewTask(){
+  const title = document.getElementById('taskTitleInput').value.trim();
+  if(!title){ showToast('error','Title required','Give the task a title first.'); return; }
+  const assigneeId = document.getElementById('taskAssigneeSelect').value;
+  const priority = document.getElementById('taskPrioritySelect').value;
+  const description = document.getElementById('taskDescInput').value.trim();
+  const dueDate = document.getElementById('taskDueInput').value || null;
+  const clientId = document.getElementById('taskClientSelect').value || null;
+
+  const { error } = await supabaseClient.from('tasks').insert({
+    title, description, priority, assigner_id: currentUser.id, assignee_id: assigneeId,
+    client_id: clientId, due_date: dueDate
+  });
+  closeAppModal();
+  await loadMyTasks();
+  renderTasks();
+  updateTasksNavBadge();
+  const assignee = teamProfiles.find(p=>p.id===assigneeId);
+  error ? showToast('error','Save failed', error.message) : showToast('success','Task assigned', `${assignee ? assignee.name : 'They'} will see it next time they check Tasks.`);
+}
+
+async function saveEditTask(taskId){
+  const t = tasks.find(x=>x.id===taskId);
+  if(!t || t.assignerId!==currentUser.id) return;
+  const title = document.getElementById('taskTitleInput').value.trim();
+  if(!title){ showToast('error','Title required','Give the task a title first.'); return; }
+  const assigneeId = document.getElementById('taskAssigneeSelect').value;
+  const priority = document.getElementById('taskPrioritySelect').value;
+  const description = document.getElementById('taskDescInput').value.trim();
+  const dueDate = document.getElementById('taskDueInput').value || null;
+  const clientId = document.getElementById('taskClientSelect').value || null;
+
+  // Reassigning to someone new means they haven't been notified yet.
+  const reassigned = assigneeId !== t.assigneeId;
+  const { error } = await supabaseClient.from('tasks').update({
+    title, description, priority, assignee_id: assigneeId, client_id: clientId, due_date: dueDate,
+    assignee_notified: reassigned ? false : t.assigneeNotified
+  }).eq('id', taskId);
+  closeAppModal();
+  await loadMyTasks();
+  renderTasks();
+  error ? showToast('error','Save failed', error.message) : showToast('success','Task updated','Changes saved.');
+}
+
+async function markTaskDone(taskId){
+  const t = tasks.find(x=>x.id===taskId);
+  if(!t || t.assigneeId!==currentUser.id) return;
+  const { error } = await supabaseClient.from('tasks').update({
+    status:'done', completed_at: new Date().toISOString(), assigner_notified:false
+  }).eq('id', taskId);
+  await loadMyTasks();
+  renderTasks();
+  updateTasksNavBadge();
+  error ? showToast('error','Save failed', error.message) : showToast('success','Marked done', `${t.assignerId===currentUser.id ? 'You' : (teamProfiles.find(p=>p.id===t.assignerId)?.name||'They')} will see this the next time they check Tasks.`);
+}
+
+async function cancelTask(taskId){
+  const t = tasks.find(x=>x.id===taskId);
+  if(!t || t.assignerId!==currentUser.id) return;
+  if(!confirm(`Cancel "${t.title}"? This removes it for both of you.`)) return;
+  const { error } = await supabaseClient.from('tasks').update({ cancelled_at: new Date().toISOString() }).eq('id', taskId);
+  await loadMyTasks();
+  renderTasks();
+  updateTasksNavBadge();
+  error ? showToast('error','Save failed', error.message) : showToast('success','Task cancelled','Removed for both of you.');
+}
+
+async function hideTaskFromMyList(taskId){
+  const t = tasks.find(x=>x.id===taskId);
+  if(!t) return;
+  const amAssigner = t.assignerId===currentUser.id;
+  const field = amAssigner ? 'hidden_by_assigner' : 'hidden_by_assignee';
+  const { error } = await supabaseClient.from('tasks').update({ [field]: true }).eq('id', taskId);
+  await loadMyTasks();
+  renderTasks();
+  error ? showToast('error','Save failed', error.message) : showToast('success','Removed','Cleared from your Done list — this doesn\'t affect the other person\'s view.');
+}
+
+// The actual notification delivery. Runs on login and on every periodic
+// refresh, so a toast fires the first time either side's session sees the
+// event — live if they're online when it happens, or the next time they
+// load the app if they weren't. Each flag flips to true right after
+// showing, so nobody gets the same toast twice.
+async function checkTaskNotifications(){
+  if(!currentUser || !tasks.length) return;
+  const newlyAssigned = tasks.filter(t=> t.assigneeId===currentUser.id && !t.assigneeNotified && !t.cancelledAt);
+  const newlyCompleted = tasks.filter(t=> t.assignerId===currentUser.id && t.status==='done' && !t.assignerNotified);
+  if(!newlyAssigned.length && !newlyCompleted.length) return;
+
+  for(const t of newlyAssigned){
+    const assigner = teamProfiles.find(p=>p.id===t.assignerId);
+    showToast('info','New task assigned to you', `${assigner ? assigner.name : 'Someone'}: "${t.title}"`);
+    await supabaseClient.from('tasks').update({ assignee_notified:true }).eq('id', t.id);
+  }
+  for(const t of newlyCompleted){
+    const assignee = teamProfiles.find(p=>p.id===t.assigneeId);
+    showToast('success','Task completed', `${assignee ? assignee.name : 'Someone'} marked "${t.title}" as done.`);
+    await supabaseClient.from('tasks').update({ assigner_notified:true }).eq('id', t.id);
+  }
+  await loadMyTasks();
+  renderTasks();
+  updateTasksNavBadge();
 }
 
 /* ---------- Time Tracker ---------- */
@@ -5430,9 +5736,12 @@ async function showApp(session){
     await loadTeamProfiles();
     await loadMyNotes();
     await loadTimeEntries();
+    await loadMyTasks();
     renderAll();
+    updateTasksNavBadge();
     applyAppIcon();
     initTimerFromStorage();
+    await checkTaskNotifications();
   }catch(e){
     console.error('showApp failed', e);
     document.getElementById('loginOverlay').style.display = 'flex';
