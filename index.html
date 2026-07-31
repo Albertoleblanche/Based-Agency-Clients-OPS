@@ -30,10 +30,6 @@
 
   .login-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:2000;padding:20px;}
 
-  .auth-loading-overlay{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:3000;}
-  .auth-loading-spinner{width:34px;height:34px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--brand);animation:authSpin .8s linear infinite;}
-  .auth-loading-text{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--muted);}
-  @keyframes authSpin{ to{ transform:rotate(360deg); } }
   .login-card{background:var(--card);border:1px solid #EDEEF1;border-radius:12px;box-shadow:0 24px 64px rgba(16,24,40,.12);padding:32px 30px;width:100%;max-width:340px;display:flex;flex-direction:column;align-items:center;text-align:center;}
   .login-title{font-family:'Oswald',sans-serif;font-size:19px;font-weight:600;letter-spacing:.01em;color:var(--ink);}
   .login-sub{font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-lt);margin-top:3px;}
@@ -497,11 +493,6 @@
 </style>
 </head>
 <body>
-
-<div class="auth-loading-overlay" id="authLoadingOverlay" style="display:none;">
-  <div class="auth-loading-spinner"></div>
-  <div class="auth-loading-text" id="authLoadingText">Loading your workspace…</div>
-</div>
 
 <div class="login-overlay" id="loginOverlay">
   <div class="login-card">
@@ -1415,10 +1406,8 @@ function renderWhoAmI(){
 }
 
 async function handleLogout(){
-  showAuthLoading('Signing out…');
   await supabaseClient.auth.signOut();
-  // onAuthStateChange fires SIGNED_OUT → showLoginScreen() runs, which hides
-  // this overlay itself once the clean login form is ready.
+  window.location.reload();
 }
 
 /* ---------- Button loading state ---------- */
@@ -2989,7 +2978,31 @@ function formatMinutes(mins){
 async function loadTimeEntries(){
   const { data, error } = await supabaseClient.from('time_entries').select('*').is('deleted_at', null).order('entry_date', { ascending:false });
   if(error){ console.error('loadTimeEntries error', error); timeEntries = []; return; }
-  timeEntries = (data||[]).map(e=>({ id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes, description:e.description||'', service:e.service||'', createdAt:e.created_at }));
+  timeEntries = (data||[]).map(e=>({ id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes, description:e.description||'', service:e.service||'', createdAt:e.created_at, logged:!!e.logged }));
+}
+
+// Turns one time entry's description into a real improvement log — a
+// deliberate, per-entry choice, not automatic. Marks the entry as logged so
+// this can't be double-applied and the UI can show it's already done.
+async function logTimeEntryAsImprovement(entryId){
+  const entry = timeEntries.find(e=>e.id===entryId);
+  if(!entry) return;
+  if(!entry.description || !entry.description.trim()){ showToast('error','Nothing to log','This entry has no description to turn into a log.'); return; }
+  if(entry.logged){ showToast('info','Already logged','This entry is already in Past Improvements.'); return; }
+
+  await loadAll();
+  const c = clients.find(x=>x.id===entry.clientId);
+  if(!c){ showToast('error','Client not found','This client may have been removed.'); return; }
+  c.improvements.push({ author: myName()||'Team member', text: entry.description.trim(), date: new Date().toISOString(), includeInEmail: false, source: 'time' });
+  const ok = await persistClients();
+  if(!ok){ showToast('error','Save failed','Could not save — try again.'); return; }
+
+  const { error } = await supabaseClient.from('time_entries').update({ logged: true }).eq('id', entryId);
+  await loadTimeEntries();
+  renderTimesheet(); renderReports();
+  error
+    ? showToast('info','Logged, with a hiccup','Added to Past Improvements, but the entry\'s "logged" marker failed to save — you may see the button again.')
+    : showToast('success','Logged', 'Added to Past Improvements — decide later if it goes in the client email.');
 }
 
 async function loadTrashedTimeEntries(){
@@ -3295,7 +3308,7 @@ async function stopAndSaveTimer(){
   if(descInput) descInput.value = '';
 
   const c = clients.find(x=>x.id===clientId);
-  let error, mergedIntoExisting = false, isFreshInsert = false;
+  let error, mergedIntoExisting = false;
 
   if(resumeEntryId){
     // Re-fetch the current minutes fresh (not from local cache) so we don't
@@ -3312,20 +3325,12 @@ async function stopAndSaveTimer(){
       ({ error } = await supabaseClient.from('time_entries').insert({
         user_id: currentUser.id, client_id: clientId, entry_date: toDateStr(new Date()), minutes, description, service
       }));
-      isFreshInsert = !error;
     }
   } else {
     ({ error } = await supabaseClient.from('time_entries').insert({
       user_id: currentUser.id, client_id: clientId, entry_date: toDateStr(new Date()), minutes, description, service
     }));
-    isFreshInsert = !error;
   }
-
-  // A genuinely new entry (not time added to an existing one) with a real
-  // description becomes a log too — off by default for the client email,
-  // since not every internal note is client-appropriate. Review and flip
-  // specific ones on from Past Improvements.
-  if(isFreshInsert) await autoLogFromTimeEntry(clientId, description);
 
   await loadTimeEntries();
   renderTimesheet(); renderReports();
@@ -3333,19 +3338,6 @@ async function stopAndSaveTimer(){
   mergedIntoExisting
     ? showToast('success','Time added', `${formatMinutes(minutes)} added to the existing entry for ${c?c.name:'client'}.`)
     : showToast('success','Time logged', `${formatMinutes(minutes)} logged for ${c?c.name:'client'}.`);
-}
-
-// Creates a linked improvement log from a time entry's description. Defaults
-// to excluded from the client email (includeInEmail:false) — internal record
-// by default, promoted manually from Past Improvements when it's actually
-// worth telling the client about.
-async function autoLogFromTimeEntry(clientId, description){
-  if(!description || !description.trim()) return;
-  await loadAll();
-  const c = clients.find(x=>x.id===clientId);
-  if(!c) return;
-  c.improvements.push({ author: myName()||'Team member', text: description.trim(), date: new Date().toISOString(), includeInEmail: false, source: 'time' });
-  await persistClients();
 }
 
 /* --- Manual entry --- */
@@ -3365,7 +3357,6 @@ async function addManualEntry(){
   const { error } = await supabaseClient.from('time_entries').insert({
     user_id: currentUser.id, client_id: clientId, entry_date: dateVal, minutes: totalMinutes, description, service
   });
-  if(!error) await autoLogFromTimeEntry(clientId, description);
   restoreBtn(btn);
   await loadTimeEntries();
   document.getElementById('manualHours').value = '';
@@ -3469,6 +3460,10 @@ function renderTimesheetDay(bodyEl){
       </div>
       <div class="ts-entry-right">
         <div class="ts-entry-duration">${formatMinutes(e.minutes)}</div>
+        ${e.description ? (e.logged
+          ? `<span class="pill pill-good" title="Already in Past Improvements">✓ Logged</span>`
+          : `<button class="btn btn-outline" onclick="logTimeEntryAsImprovement('${e.id}')">Log as improvement</button>`
+        ) : ''}
         <button class="btn btn-outline" data-resume-client="${e.clientId}" data-resume-desc="${encodeURIComponent(e.description||'')}" data-resume-entry="${e.id}" onclick="resumeEntryTimerFromBtn(this)">▶ Start</button>
         ${canEdit ? `<button class="btn btn-outline" onclick="openTimeEntryModal('${e.id}')">Edit</button><button class="btn btn-outline" style="color:var(--red);" onclick="deleteTimeEntry('${e.id}')">Delete</button>` : ''}
       </div>
@@ -4861,96 +4856,41 @@ async function handleLogin(){
   const btn = document.getElementById('loginBtn');
   setBtnLoading(btn, 'Signing in…');
   const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-  restoreBtn(btn);
-  if(error){ errEl.textContent = error.message; errEl.style.display = 'block'; return; }
-  // On success, onAuthStateChange fires SIGNED_IN → showApp() takes over and
-  // shows the full-screen loading overlay for the data-fetch phase.
-  showAuthLoading('Loading your workspace…');
-}
-
-function showAuthLoading(text){
-  const overlay = document.getElementById('authLoadingOverlay');
-  const textEl = document.getElementById('authLoadingText');
-  if(textEl) textEl.textContent = text || 'Loading…';
-  if(overlay) overlay.style.display = 'flex';
-}
-
-function hideAuthLoading(){
-  const overlay = document.getElementById('authLoadingOverlay');
-  if(overlay) overlay.style.display = 'none';
+  if(error){ restoreBtn(btn); errEl.textContent = error.message; errEl.style.display = 'block'; return; }
+  // Supabase persists the session, so a real reload picks it right back up
+  // in init() below — a full reload can't get stuck in a bad state the way
+  // an in-page transition can, since the browser rebuilds everything fresh.
+  window.location.reload();
 }
 
 function showLoginScreen(){
-  hideAuthLoading();
   document.getElementById('loginOverlay').style.display = 'flex';
   document.getElementById('appRoot').style.display = 'none';
   currentUser = null; myProfile = null;
-  // Defensive reset — makes sure nothing from the previous session (e.g. an
-  // admin's team-wide time entries) can render even briefly for whoever
-  // logs in next on this same tab, before their own fresh data loads in.
-  clients = []; notes = []; timeEntries = []; teamProfiles = []; log = [];
 }
 
 async function showApp(session){
-  showAuthLoading('Loading your workspace…');
-
-  // Second safety net: if something hangs without ever throwing or
-  // resolving (a stalled network request, for example), don't leave the
-  // person stuck on a spinner forever — force back to a working login
-  // screen after a reasonable wait.
-  let settled = false;
-  const safetyTimer = setTimeout(()=>{
-    if(settled) return;
-    settled = true;
-    hideAuthLoading();
-    document.getElementById('loginOverlay').style.display = 'flex';
-    document.getElementById('appRoot').style.display = 'none';
-    const errEl = document.getElementById('loginError');
-    if(errEl){ errEl.textContent = 'This is taking longer than expected. Check your connection and try signing in again.'; errEl.style.display = 'block'; }
-  }, 15000);
-
-  try{
-    currentUser = session.user;
-    await loadMyProfile();
-    if(!myProfile){
-      // Auth account exists but no team_profiles row — shouldn't normally happen
-      // since create-member.js creates both together, but handle it gracefully.
-      const detail = lastProfileError ? ` (${lastProfileError.message || JSON.stringify(lastProfileError)})` : '';
-      document.getElementById('loginError').textContent = `Your account has no profile set up${detail}. Ask your admin to check the team_profiles table.`;
-      document.getElementById('loginError').style.display = 'block';
-      await supabaseClient.auth.signOut();
-      return;
-    }
-    // appRoot stays hidden — and the login form stays gone, replaced by the
-    // loading overlay — for this entire block, so nothing stale from a
-    // previous session can sit visible during the load.
-    document.getElementById('loginOverlay').style.display = 'none';
-    await initTheme();
-    await loadAll();
-    await loadTeamProfiles();
-    await loadMyNotes();
-    await loadTimeEntries();
-    renderAll();
-    applyAppIcon();
-    initTimerFromStorage();
-    if(!settled) document.getElementById('appRoot').style.display = 'grid';
-  }catch(e){
-    // This is the actual fix: previously, any error here (a network hiccup,
-    // anything) left execution stuck mid-function with the loading overlay
-    // showing forever, since nothing after the error line ever ran. Now any
-    // failure surfaces a real message and returns to a working login screen.
-    console.error('showApp failed', e);
-    if(!settled){
-      document.getElementById('loginOverlay').style.display = 'flex';
-      document.getElementById('appRoot').style.display = 'none';
-      const errEl = document.getElementById('loginError');
-      if(errEl){ errEl.textContent = 'Something went wrong loading your workspace — please try signing in again.'; errEl.style.display = 'block'; }
-    }
-  } finally {
-    settled = true;
-    clearTimeout(safetyTimer);
-    hideAuthLoading();
+  currentUser = session.user;
+  await loadMyProfile();
+  if(!myProfile){
+    // Auth account exists but no team_profiles row — shouldn't normally happen
+    // since create-member.js creates both together, but handle it gracefully.
+    const detail = lastProfileError ? ` (${lastProfileError.message || JSON.stringify(lastProfileError)})` : '';
+    document.getElementById('loginError').textContent = `Your account has no profile set up${detail}. Ask your admin to check the team_profiles table.`;
+    document.getElementById('loginError').style.display = 'block';
+    await supabaseClient.auth.signOut();
+    return;
   }
+  document.getElementById('loginOverlay').style.display = 'none';
+  document.getElementById('appRoot').style.display = 'grid';
+  await initTheme();
+  await loadAll();
+  await loadTeamProfiles();
+  await loadMyNotes();
+  await loadTimeEntries();
+  renderAll();
+  applyAppIcon();
+  initTimerFromStorage();
 }
 
 (async function init(){
