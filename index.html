@@ -365,7 +365,7 @@
   .q-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;}
   .q-name{font-family:'Oswald',sans-serif;font-size:16.5px;font-weight:600;letter-spacing:.015em;}
   .q-service-caption{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-lt);margin-top:4px;}
-  .q-risk-flag{color:#C0392B;font-weight:600;}
+  .q-risk-flag{color:var(--red);font-weight:600;}
   .q-status-label{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;white-space:nowrap;flex:none;}
   .q-ratings{margin-top:20px;display:flex;flex-direction:column;gap:9px;}
   .rating-row{display:flex;align-items:center;gap:10px;}
@@ -378,8 +378,8 @@
   .q-bulk-preview.has-logs{color:var(--green);font-weight:600;}
   .pulse-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex:none;position:relative;}
   .pulse-dot::after{content:'';position:absolute;inset:0;border-radius:50%;background:var(--green);animation:pulseRing 1.8s ease-out infinite;}
-  .pulse-dot.pulse-red{background:#C0392B;}
-  .pulse-dot.pulse-red::after{background:#C0392B;}
+  .pulse-dot.pulse-red{background:var(--red);}
+  .pulse-dot.pulse-red::after{background:var(--red);}
   @keyframes pulseRing{
     0%{ transform:scale(1); opacity:.7; }
     100%{ transform:scale(2.8); opacity:0; }
@@ -1521,7 +1521,7 @@ function renderAttentionList(){
         ${dotRating('Importance', c.importance, 'ink', 10)}
         ${dotRating('Danger', c.danger, 'brand')}
       </div>
-      <div class="q-bulk-preview" style="color:#C0392B;font-weight:600;"><span class="pulse-dot pulse-red"></span>${reason}</div>
+      <div class="q-bulk-preview" style="color:var(--red);font-weight:600;"><span class="pulse-dot pulse-red"></span>${reason}</div>
     </div>`;
   }).join('')}</div>`;
 }
@@ -3416,7 +3416,7 @@ function renderTotalClientsDonut(){
   const counts = { 'No risk':0, 'Medium risk':0, 'At risk':0 };
   clients.forEach(c=>{ counts[riskLabel(c.danger).text]++; });
   const entries = Object.entries(counts).filter(([,count])=>count>0);
-  const tierColor = (tier)=> tier==='At risk' ? '#C0392B' : tier==='Medium risk' ? '#C97B6E' : '#B8A29D';
+  const tierColor = (tier)=> tier==='At risk' ? '#DC2626' : tier==='Medium risk' ? '#5B9BD5' : '#4CAF7D';
 
   const r = 46, cx = 60, cy = 60, strokeW = 15;
   const C = 2*Math.PI*r;
@@ -3449,9 +3449,9 @@ function renderTotalClientsDonut(){
 // something's wrong, so "No risk" and "Medium risk" are just as visible as
 // "At risk" instead of only flagging the bad case.
 function riskLabel(danger){
-  if(danger>=4) return { text:'At risk', color:'#C0392B' };
-  if(danger===3) return { text:'Medium risk', color:'#C97B6E' };
-  return { text:'No risk', color:'#B8A29D' };
+  if(danger>=4) return { text:'At risk', color:'var(--red)' };
+  if(danger===3) return { text:'Medium risk', color:'#5B9BD5' };
+  return { text:'No risk', color:'#4CAF7D' };
 }
 
 function riskCaptionHtml(danger){
