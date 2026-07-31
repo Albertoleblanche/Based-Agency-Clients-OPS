@@ -89,6 +89,8 @@
 
   .bento-row{display:grid;grid-template-columns:2fr 1fr;gap:16px;align-items:stretch;}
   @media (max-width:900px){.bento-row{grid-template-columns:1fr;}}
+  .split-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch;}
+  @media (max-width:900px){.split-row{grid-template-columns:1fr;}}
   .sync-dot{width:6px;height:6px;border-radius:50%;background:var(--green);}
   .btn{font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;border:none;border-radius:7px;padding:9px 16px;cursor:pointer;transition:opacity .15s ease, transform .1s ease;}
   .btn:hover{opacity:.88;} .btn:active{transform:scale(.98);} .btn:disabled{opacity:.4;cursor:not-allowed;}
@@ -125,7 +127,8 @@
   .donut-center-label{font-family:'IBM Plex Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-lt);margin-top:2px;}
   .donut-legend{display:flex;flex-wrap:wrap;justify-content:center;gap:9px;margin-top:2px;}
   .donut-legend-item{font-size:10.5px;color:var(--muted);display:flex;align-items:center;gap:5px;white-space:nowrap;}
-  .donut-legend-dot{width:7px;height:7px;border-radius:50%;flex:none;}
+  .donut-legend-dot{width:7px;height:7px;border-radius:50%;flex:none;position:relative;}
+  .donut-legend-dot::after{content:'';position:absolute;inset:0;border-radius:50%;background-color:inherit;animation:pulseRing 1.8s ease-out infinite;}
   .metric-head{display:flex;align-items:center;gap:9px;margin-bottom:14px;}
   .metric-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex:none;}
   .metric-icon-blue{background:#E7EEFC;color:#3A63C9;}
@@ -353,13 +356,6 @@
   .xy-chart-tooltip{position:absolute;display:none;background:var(--sidebar);color:#fff;border-radius:8px;padding:7px 11px;font-size:11.5px;font-weight:600;text-align:center;white-space:nowrap;transform:translate(-50%,-115%);pointer-events:none;box-shadow:0 8px 20px rgba(16,24,40,.22);z-index:5;}
   .xy-chart-tooltip .xy-tt-label{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:400;color:#9DAAC2;margin-top:2px;}
   .xy-chart-labels{display:flex;justify-content:space-between;margin-top:6px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--muted-lt);}
-
-  .vbar-chart{display:flex;justify-content:space-around;align-items:flex-end;gap:10px;height:100%;padding-top:6px;}
-  .vbar-col{display:flex;flex-direction:column;align-items:center;flex:1;height:100%;justify-content:flex-end;}
-  .vbar-count{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;margin-bottom:6px;color:var(--ink);}
-  .vbar-track{width:100%;max-width:40px;height:170px;display:flex;align-items:flex-end;background:var(--surface-2);border-radius:6px 6px 3px 3px;overflow:hidden;}
-  .vbar-fill{width:100%;border-radius:6px 6px 0 0;transition:height .5s ease;}
-  .vbar-label{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted-lt);margin-top:8px;}
 
   .graphic-bar-row{margin-bottom:14px;}
   .graphic-bar-row:last-child{margin-bottom:0;}
@@ -612,7 +608,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="panel-body"><div class="queue-grid" id="overviewActiveQueue"></div></div>
       </div>
 
-      <div class="report-graphic-row" style="margin-bottom:24px;">
+      <div class="split-row" style="margin-bottom:24px;">
         <div class="panel">
           <div class="panel-body">
             <div class="xy-chart-header">
@@ -633,8 +629,8 @@ document.addEventListener('DOMContentLoaded', function(){
         </div>
 
         <div class="panel">
-          <div class="panel-head"><span class="panel-title">Clients by Danger Score</span></div>
-          <div class="panel-body"><div id="dangerDistChart"></div></div>
+          <div class="panel-head"><span class="panel-title">Activity Log</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--muted-lt);" id="logCountOverview"></span></div>
+          <div class="panel-body"><div class="log-list" id="logListOverview"></div></div>
         </div>
       </div>
 
@@ -643,16 +639,9 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="panel-body"><div id="budgetAlertsList"></div></div>
       </div>
 
-      <div class="bento-row">
-        <div class="panel bento-main">
-          <div class="panel-head"><span class="panel-title">Needs attention</span></div>
-          <div class="panel-body"><div id="attentionList" class="scroll-cap"></div></div>
-        </div>
-
-        <div class="panel bento-side">
-          <div class="panel-head"><span class="panel-title">Activity Log</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--muted-lt);" id="logCountOverview"></span></div>
-          <div class="panel-body"><div class="log-list" id="logListOverview"></div></div>
-        </div>
+      <div class="panel" style="margin-bottom:24px;">
+        <div class="panel-head"><span class="panel-title">Needs attention</span></div>
+        <div class="panel-body"><div id="attentionList" class="scroll-cap"></div></div>
       </div>
     </div>
 
@@ -1462,7 +1451,7 @@ async function fullRefresh(showFeedback){
   renderAll();
   if(showFeedback && btn){ btn.disabled = false; btn.textContent = 'Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
-function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderDangerDistributionChart(); }
+function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); }
 
 function applyRoleVisibility(){
   const notifyBtn = document.getElementById('notifyBtn');
@@ -3403,7 +3392,7 @@ function renderTotalClientsDonut(){
   const counts = { 'No risk':0, 'Medium risk':0, 'At risk':0 };
   clients.forEach(c=>{ counts[riskLabel(c.danger).text]++; });
   const entries = Object.entries(counts).filter(([,count])=>count>0);
-  const tierColor = (tier)=> tier==='At risk' ? '#9C5C48' : tier==='Medium risk' ? 'var(--amber)' : 'var(--muted-lt)';
+  const tierColor = (tier)=> tier==='At risk' ? '#9C5C48' : tier==='Medium risk' ? 'var(--amber)' : '#3A63C9';
 
   const r = 46, cx = 60, cy = 60, strokeW = 15;
   const C = 2*Math.PI*r;
@@ -3432,37 +3421,13 @@ function renderTotalClientsDonut(){
   }
 }
 
-// Vertical histogram: how many clients sit at each danger score, colored by
-// the same three risk tiers used everywhere else in the app.
-function renderDangerDistributionChart(){
-  const el = document.getElementById('dangerDistChart');
-  if(!el) return;
-  const counts = [0,0,0,0,0];
-  clients.forEach(c=>{ const d = Math.min(5, Math.max(1, c.danger||1)); counts[d-1]++; });
-  const maxCount = Math.max(...counts, 1);
-  const trackH = 170;
-  const tierColor = (score)=> score>=4 ? '#9C5C48' : score===3 ? 'var(--amber)' : 'var(--muted-lt)';
-
-  el.innerHTML = `<div class="vbar-chart">${counts.map((count,i)=>{
-    const score = i+1;
-    const barH = count ? Math.max(6, Math.round((count/maxCount)*trackH)) : 0;
-    return `<div class="vbar-col">
-      <div class="vbar-count">${count}</div>
-      <div class="vbar-track" style="height:${trackH}px;">
-        <div class="vbar-fill" style="height:${barH}px;background:${tierColor(score)};"></div>
-      </div>
-      <div class="vbar-label">${score}/5</div>
-    </div>`;
-  }).join('')}</div>`;
-}
-
 // Three-tier risk system based on danger score — always shown, not just when
 // something's wrong, so "No risk" and "Medium risk" are just as visible as
 // "At risk" instead of only flagging the bad case.
 function riskLabel(danger){
   if(danger>=4) return { text:'At risk', color:'#9C5C48' };
   if(danger===3) return { text:'Medium risk', color:'var(--amber)' };
-  return { text:'No risk', color:'var(--muted-lt)' };
+  return { text:'No risk', color:'#3A63C9' };
 }
 
 function riskCaptionHtml(danger){
