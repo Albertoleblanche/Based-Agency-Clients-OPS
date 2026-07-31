@@ -2465,7 +2465,7 @@ async function deleteClient(id){
   const stillThere = clients.find(x=>x.id===id);
   if(!stillThere){ showToast('info','Already gone', `${c.name} was already removed.`); renderAll(); return; }
   stillThere.deletedAt = new Date().toISOString();
-  log.unshift({t:nowTime(), tag:'you', text:`Moved client <b>${c.name}</b> to Trash.`});
+  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Moved client <b>${c.name}</b> to Trash.`});
   const ok = await persistClients();
   renderAll();
   if(ok) logClientActivity(id, 'client_deleted', `${myName()||'Someone'} moved this client (${c.name}) to Trash.`);
@@ -2876,7 +2876,7 @@ async function logNoteNow(id){
   const c = clients.find(x=>x.id===n.clientId);
   if(!c){ restoreBtn(btn); showToast('error','Client not found','This client may have been removed.'); return; }
   c.improvements.push({ author: myName()||'Team member', text: n.text, date: new Date().toISOString(), includeInEmail: true, source: 'note' });
-  log.unshift({t:nowTime(), tag:'you', text:`Logged a planned improvement for <b>${c.name}</b> from Notes.`});
+  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Logged a planned improvement for <b>${c.name}</b> from Notes.`});
   const ok = await persistAppData();
   const { error } = await supabaseClient.from('notes').update({ status: 'done' }).eq('id', id).eq('user_id', currentUser.id);
   await loadMyNotes();
@@ -4381,7 +4381,7 @@ async function approveDraft(id){
   if(!c) return;
   if(ta) c.draft = ta.value;
   c.draftStatus = 'approved';
-  log.unshift({t:nowTime(), tag:'you', text:`Approved <b>${c.name}</b> — email drafted for send.`});
+  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Approved <b>${c.name}</b> — email drafted for send.`});
   const ok = await persistClients();
   renderQueue(); renderLog(); renderKpis();
   if(!ok){ showToast('error','Save failed','Approval may not have synced — refresh and check.'); return; }
@@ -4403,7 +4403,7 @@ async function skipDraft(id){
   const modalCard = document.querySelector('#appModalOverlay .modal-card');
   const modalOpenForThis = modalCard && modalCard.dataset.clientId === id;
   c.draftStatus='none'; c.draft='';
-  log.unshift({t:nowTime(), tag:'you', text:`Skipped <b>${c.name}</b> this week — no email sent.`});
+  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Skipped <b>${c.name}</b> this week — no email sent.`});
   const ok = await persistClients();
   renderQueue(); renderLog(); renderKpis();
   if(ok){ logClientActivity(id, 'draft_skipped', `${myName()||'Someone'} skipped this week's update.`); refreshClientDetailActivityIfOpen(id); }
@@ -4491,7 +4491,7 @@ async function saveSettingsInline(){
   settings.danielEmail = document.getElementById('setDaniel').value.trim();
   settings.ericEmail = document.getElementById('setEric').value.trim();
   const ok = await persistSettings();
-  log.unshift({t:nowTime(), tag:'you', text:'Updated approver email addresses.'});
+  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:'Updated approver email addresses.'});
   await persistLog();
   renderLog();
   restoreBtn(btn);
@@ -4507,7 +4507,7 @@ async function saveEmailInstructions(){
   const ok = await persistSettings();
   document.getElementById('emailInstructions').value = text; // loadAll may have briefly overwritten the field — restore what was actually saved
   updateEmailInstructionsStatus();
-  log.unshift({t:nowTime(), tag:'you', text:'Updated the AI email structure instructions.'});
+  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:'Updated the AI email structure instructions.'});
   await persistLog();
   renderLog();
   restoreBtn(btn);
@@ -4602,7 +4602,7 @@ async function applyCsvRows(rows){
       added++;
     }
   }
-  log.unshift({t:nowTime(), tag:'you', text:`Synced from Google Sheet — ${added} added, ${updated} updated.`});
+  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Synced from Google Sheet — ${added} added, ${updated} updated.`});
   const ok = await persistClients();
   renderAll();
   const statusEl = document.getElementById('sheetSyncStatus');
@@ -4672,7 +4672,7 @@ function notifyApprovers(){
   const subject = `${pending.length} client update${pending.length!==1?'s':''} ready for approval`;
   const bodyLines = pending.length ? pending.map(c=>`- ${c.name} (danger ${c.danger}/5, importance ${c.importance}/10)`).join('\n') : 'No drafts are ready yet.';
   const body = `This week's client update drafts are ready for review, sorted by danger score:\n\n${bodyLines}\n\nReview and approve here: ${window.location.href}`;
-  log.unshift({t:nowTime(), tag:'you', text:`Opened notification email to Daniel &amp; Eric — ${pending.length} draft${pending.length!==1?'s':''} pending.`});
+  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Opened notification email to Daniel &amp; Eric — ${pending.length} draft${pending.length!==1?'s':''} pending.`});
   persistLog().then(renderLog);
   showSendEmailConfirm(to, subject, body);
 }
@@ -4749,7 +4749,7 @@ async function addTeamMember(){
     document.getElementById('tmEmail').value = '';
     await loadTeamProfiles();
     renderTeam();
-    log.unshift({t:nowTime(), tag:'you', text:`Added <b>${name}</b> (${role}) to the team.`});
+    log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Added <b>${name}</b> (${role}) to the team.`});
     await persistLog();
     showToastWithCopy('success','Account created', `Send this temporary password to ${name} — they should change it after logging in.`, `Email: ${email}\nTemporary password: ${data.tempPassword}`);
   }catch(e){
@@ -4808,15 +4808,28 @@ async function changeTeamRole(userId, newRole){
   if(error){ showToast('error','Could not update role', error.message); await loadTeamProfiles(); renderTeam(); return; }
   await loadTeamProfiles();
   renderTeam();
-  log.unshift({t:nowTime(), tag:'you', text:`Changed a team member's role to <b>${newRole}</b>.`});
+  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Changed a team member's role to <b>${newRole}</b>.`});
   await persistLog(); renderLog();
   showToast('success','Role updated', 'Change is live immediately for that person.');
 }
 
 function nowTime(){ return new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
 
+function logEntryLabel(l){
+  if(l.tag==='auto') return 'auto';
+  if(currentUser && l.userId && l.userId===currentUser.id) return 'you';
+  if(l.userId){
+    const p = teamProfiles.find(x=>x.id===l.userId);
+    if(p) return p.name.split(' ')[0];
+  }
+  // Entries logged before this fix (or with an unresolvable user) have no
+  // reliable actor to attribute — say so honestly instead of defaulting to
+  // "you", which is what caused this in the first place.
+  return 'team';
+}
+
 function renderLog(){
-  const rows = log.length ? log.map(l=>`<div class="log-row"><span class="log-time">${l.t}</span><span><span class="tag ${l.tag}">${l.tag==='auto'?'auto':'you'}</span>${l.text}</span></div>`).join('') : `<div class="empty">No activity yet.</div>`;
+  const rows = log.length ? log.map(l=>`<div class="log-row"><span class="log-time">${l.t}</span><span><span class="tag ${l.tag}">${logEntryLabel(l)}</span>${l.text}</span></div>`).join('') : `<div class="empty">No activity yet.</div>`;
   const logListEl = document.getElementById('logList');
   if(logListEl) logListEl.innerHTML = rows;
   document.getElementById('logListOverview').innerHTML = rows;
