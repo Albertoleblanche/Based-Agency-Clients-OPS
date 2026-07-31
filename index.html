@@ -991,6 +991,7 @@ document.addEventListener('DOMContentLoaded', function(){
               </div>
             </div>
             <div id="reportChart"></div>
+            <p style="font-size:10.5px;color:var(--muted-lt);margin:10px 0 0;">Shows the most recent stretch of activity at the selected granularity (last 14 days / 8 weeks / 6 months) — independent of the date range selected above, which only affects the KPI cards and table below.</p>
           </div>
         </div>
 
@@ -3858,18 +3859,36 @@ function fillBucketsWithEntries(buckets, entries, granularity){
   return buckets;
 }
 
+// Entries for the chart specifically — respects the member/active-only
+// filters, but deliberately NOT the date-range selector above (This
+// week/month/etc). That selector often narrows to a window so small it
+// collapses to a single bucket under Week/Month granularity, which is what
+// was causing the chart to render nothing. The KPI cards and table below
+// still respect the range selector via getReportRangeEntries(); this chart
+// always shows a recent trend instead, the same proven approach the
+// Overview chart already uses successfully.
+function getReportChartEntries(){
+  const activeOnly = document.getElementById('reportActiveOnly')?.checked;
+  const memberFilter = document.getElementById('reportMemberFilter')?.value || 'all';
+  return visibleTimeEntries().filter(e=>{
+    if(memberFilter!=='all' && e.userId!==memberFilter) return false;
+    if(activeOnly){
+      const c = clients.find(x=>x.id===e.clientId);
+      if(!c || c.status!=='Active') return false;
+    }
+    return true;
+  });
+}
+
 function renderReportChart(){
   const granularity = document.getElementById('reportChartGranularity')?.value || 'day';
-  const entries = getReportRangeEntries();
-  const bounds = getReportDateBounds();
-  let start = bounds.start;
-  const end = bounds.end || new Date();
-  if(start.getFullYear() <= 2000){
-    // "All time" placeholder start — use the earliest real entry instead of
-    // generating decades of empty buckets.
-    start = entries.length ? new Date(Math.min(...entries.map(e=>new Date(e.date+'T00:00:00')))) : new Date(end.getTime() - 30*86400000);
-  }
-  const buckets = fillBucketsWithEntries(buildBucketsInRange(start, end, granularity, 60), entries, granularity);
+  const count = granularity==='day' ? 14 : granularity==='week' ? 8 : 6;
+  const end = new Date();
+  const start = new Date(end);
+  if(granularity==='day') start.setDate(start.getDate()-(count-1));
+  else if(granularity==='week') start.setDate(start.getDate()-(count-1)*7);
+  else start.setMonth(start.getMonth()-(count-1));
+  const buckets = fillBucketsWithEntries(buildBucketsInRange(start, end, granularity, count+1), getReportChartEntries(), granularity);
   renderXYChart('reportChart', buckets);
   const updatedEl = document.getElementById('reportChartUpdated');
   if(updatedEl) updatedEl.textContent = `Updated ${new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`;
