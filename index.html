@@ -737,6 +737,7 @@ document.addEventListener('DOMContentLoaded', function(){
             </svg>
             <span class="clock-mini-text"><span class="gauge-d">0</span>d <span class="gauge-h">00</span>h <span class="gauge-m">00</span>m</span>
           </div>
+          <button class="btn btn-outline" onclick="previewWednesdayEmail()">Preview Wednesday email</button>
           <button class="btn btn-dark" id="notifyBtn" onclick="notifyApprovers()">Notify Daniel &amp; Eric</button>
         </div>
       </div>
@@ -4281,6 +4282,45 @@ function notifyApprovers(){
   log.unshift({t:nowTime(), tag:'you', text:`Opened notification email to Daniel &amp; Eric — ${pending.length} draft${pending.length!==1?'s':''} pending.`});
   persistLog().then(renderLog);
   showSendEmailConfirm(to, subject, body);
+}
+
+// Shows exactly what the Wednesday automation would send right now — same
+// server-side logic as the actual cron job — without sending or logging
+// anything. Read-only, so no confirmation needed to view it.
+async function previewWednesdayEmail(){
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Checking…');
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/preview-wednesday-notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+    });
+    const data = await response.json();
+    restoreBtn(btn);
+    if(!response.ok){ showToast('error','Could not load preview', data.error || 'Unknown error'); return; }
+
+    if(!data.wouldSend){
+      openAppModal(`
+        <div class="modal-head"><span class="panel-title">Wednesday email preview</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+        <div class="modal-body"><p style="font-size:13px;color:var(--muted);line-height:1.5;">${data.reason}</p></div>
+        <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 460);
+      return;
+    }
+
+    openAppModal(`
+      <div class="modal-head"><span class="panel-title">This is what Wednesday's automation will send</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+      <div class="modal-body">
+        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 12px;">Preview only — nothing has been sent. This is exactly what the automated job will send when it runs.</p>
+        <div class="settings-field"><label>To</label><input value="${data.to}" readonly></div>
+        <div class="settings-field"><label>Subject</label><input value="${data.subject.replace(/"/g,'&quot;')}" readonly></div>
+        <div class="settings-field"><label>Body</label><textarea readonly style="min-height:150px;width:100%;font-family:'Inter',sans-serif;font-size:13px;padding:10px;border-radius:6px;border:1px solid var(--border);">${data.body}</textarea></div>
+      </div>
+      <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 500);
+  }catch(e){
+    restoreBtn(btn);
+    showToast('error','Could not load preview', String(e));
+  }
 }
 
 function populateAddMemberTitleSelect(){
