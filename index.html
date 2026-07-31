@@ -136,7 +136,7 @@
   .donut-stats{width:100%;margin-top:18px;padding-top:16px;border-top:1px solid #F3F4F6;}
   .donut-stat-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;}
   .donut-stat-label{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-lt);}
-  .donut-stat-val{font-family:'Oswald',sans-serif;font-size:15px;font-weight:600;color:var(--ink);}
+  .donut-stat-val{font-family:'Oswald',sans-serif;font-size:15px;font-weight:600;color:var(--ink);max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
   .metric-head{display:flex;align-items:center;gap:9px;margin-bottom:14px;}
   .metric-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex:none;}
   .metric-icon-blue{background:#E7EEFC;color:#3A63C9;}
@@ -246,13 +246,13 @@
 
   /* Notes */
   .notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
-  .note-card{background:var(--card);border:1px solid #EDEEF1;border-radius:12px;padding:18px 20px;box-shadow:0 1px 2px rgba(16,24,40,.03);display:flex;flex-direction:column;}
-  .note-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+  .note-card{background:var(--card);border:1px solid #EDEEF1;border-radius:12px;padding:18px 20px;box-shadow:0 1px 2px rgba(16,24,40,.03);display:flex;flex-direction:column;height:270px;}
+  .note-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex:none;}
   .note-client{font-family:'Oswald',sans-serif;font-size:14.5px;font-weight:600;cursor:pointer;}
   .note-client:hover{color:var(--brand-dark);}
   .note-meta{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted-lt);margin-top:3px;}
-  .note-text{font-size:13px;color:var(--ink);line-height:1.55;margin-top:12px;flex:1;white-space:pre-wrap;}
-  .note-actions{display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid #F3F4F6;flex-wrap:wrap;}
+  .note-text{font-size:13px;color:var(--ink);line-height:1.55;margin-top:12px;flex:1;white-space:pre-wrap;overflow:hidden;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;}
+  .note-actions{display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid #F3F4F6;flex-wrap:wrap;flex:none;}
   .note-status-select{font-family:'Inter',sans-serif;font-size:11.5px;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);}
 
   /* Time Tracker */
@@ -382,6 +382,9 @@
   .rating-label{font-family:'IBM Plex Mono',monospace;font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-lt);width:64px;flex:none;}
   .rate-dots{display:flex;gap:5px;}
   .rate-dots-compact{display:flex;align-items:center;gap:4px;}
+  .rating-pill{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;white-space:nowrap;}
+  .rating-pill-ink{background:var(--surface-2);color:var(--ink);}
+  .rating-pill-brand{background:var(--brand-bg);color:var(--brand-dark);}
   .rate-dot{width:5px;height:5px;border-radius:50%;flex:none;}
   .rating-num{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;color:var(--ink);margin-left:2px;}
   .q-bulk-preview{font-size:11.5px;color:var(--muted-lt);margin-top:18px;padding-top:16px;border-top:1px solid #F3F4F6;display:flex;align-items:center;gap:7px;}
@@ -975,23 +978,32 @@ document.addEventListener('DOMContentLoaded', function(){
 
         <div class="metrics-row" id="reportSummary"></div>
 
-        <div class="panel" style="margin-bottom:24px;">
-          <div class="panel-body">
-            <div class="xy-chart-header">
-              <div>
-                <div class="xy-chart-title">Hours Over Time</div>
-                <div class="xy-chart-updated" id="reportChartUpdated"></div>
+        <div class="split-row" style="margin-bottom:24px;">
+          <div class="panel">
+            <div class="panel-body">
+              <div class="xy-chart-header">
+                <div>
+                  <div class="xy-chart-title">Hours Over Time</div>
+                  <div class="xy-chart-updated" id="reportChartUpdated"></div>
+                </div>
+                <div class="select-field" style="min-width:110px;">
+                  <select id="reportChartGranularity" onchange="renderReportChart()">
+                    <option value="day" selected>Day</option>
+                    <option value="week">Week</option>
+                    <option value="month">Month</option>
+                  </select>
+                </div>
               </div>
-              <div class="select-field" style="min-width:110px;">
-                <select id="reportChartGranularity" onchange="renderReportChart()">
-                  <option value="day" selected>Day</option>
-                  <option value="week">Week</option>
-                  <option value="month">Month</option>
-                </select>
-              </div>
+              <div id="reportChart"></div>
+              <p style="font-size:10.5px;color:var(--muted-lt);margin:10px 0 0;">Shows the most recent stretch of activity at the selected granularity (last 14 days / 8 weeks / 6 months) — independent of the date range selected above, which only affects the KPI cards and table below.</p>
             </div>
-            <div id="reportChart"></div>
-            <p style="font-size:10.5px;color:var(--muted-lt);margin:10px 0 0;">Shows the most recent stretch of activity at the selected granularity (last 14 days / 8 weeks / 6 months) — independent of the date range selected above, which only affects the KPI cards and table below.</p>
+          </div>
+
+          <div class="donut-card kpi-click" onclick="switchReportTab('services')">
+            <div class="donut-card-head">Service Breakdown</div>
+            <div class="donut-wrap" id="serviceBreakdownDonut"></div>
+            <div class="donut-legend" id="serviceBreakdownLegend"></div>
+            <div class="donut-stats" id="serviceBreakdownStats"></div>
           </div>
         </div>
 
@@ -2413,8 +2425,8 @@ function renderClientsTable(){
       <td style="border-left:3px solid ${c.danger>=4 ? 'var(--brand)' : 'transparent'};"><div class="client-cell"><div class="avatar-circle">${c.name.trim().charAt(0).toUpperCase()}</div><div><div class="cell-name" style="cursor:pointer;color:var(--brand-dark);" onclick="openClientDetail('${c.id}')">${c.name}</div>${c.email?`<div class="cell-email">${c.email}</div>`:''}</div></div></td>
       <td><span class="cell-service">${c.service}</span></td>
       <td><span class="pill ${statusPillClass(c.status)}">${c.status}</span></td>
-      <td>${dotRatingCompact(c.importance,'ink',10)}</td>
-      <td>${dotRatingCompact(c.danger,'brand',5)}</td>
+      <td>${ratingPillCompact(c.importance,'ink',10)}</td>
+      <td>${ratingPillCompact(c.danger,'brand',5)}</td>
       <td>${loggedPill(c)}</td>
       <td class="actions-cell">
         <div class="dropdown">
@@ -3726,6 +3738,7 @@ function renderReports(){
   if(!summaryEl) return;
 
   const relevant = getReportRangeEntries();
+  renderServiceBreakdownDonut(relevant);
   const totalMinutes = relevant.reduce((s,e)=>s+e.minutes,0);
   const uniqueClients = new Set(relevant.map(e=>e.clientId)).size;
   const uniquePeople = new Set(relevant.map(e=>e.userId)).size;
@@ -3818,8 +3831,8 @@ function renderReports(){
       return `<tr>
         <td>${nameEl}</td>
         <td class="report-hours-val">${formatMinutes(mins)}</td>
-        <td>${c ? dotRatingCompact(c.importance,'ink',10) : '—'}</td>
-        <td>${c ? dotRatingCompact(c.danger,'brand',5) : '—'}</td>
+        <td>${c ? ratingPillCompact(c.importance,'ink',10) : '—'}</td>
+        <td>${c ? ratingPillCompact(c.danger,'brand',5) : '—'}</td>
       </tr>`;
     }).join('');
     return;
@@ -4215,6 +4228,17 @@ function dotRatingCompact(n, tone, max){
   return `<div class="rate-dots-compact">${dots}<span class="rating-num">${n}/${max}</span></div>`;
 }
 
+// Pill-style rating, no dots — just "n/max". Scoped specifically to the
+// Clients table and Reports table (Clients tab), per explicit request.
+// dotRatingCompact above is untouched and still used everywhere else (Queue
+// cards, Overview, Client Detail) — this is a deliberately narrow variant,
+// not a global replacement.
+function ratingPillCompact(n, tone, max){
+  max = max || 5;
+  const cls = tone==='brand' ? 'rating-pill-brand' : 'rating-pill-ink';
+  return `<span class="rating-pill ${cls}">${n}/${max}</span>`;
+}
+
 // Colors the status pill by meaning rather than always flat gray. Matches
 // custom/user-added statuses by keyword so it still makes sense even if the
 // team adds new options beyond the defaults.
@@ -4285,6 +4309,81 @@ function renderTotalClientsDonut(){
       <div class="donut-stat-row"><span class="donut-stat-label">Avg Importance</span><span class="donut-stat-val">${avgImportance}/10</span></div>
       <div class="donut-stat-row"><span class="donut-stat-label">Avg Danger</span><span class="donut-stat-val">${avgDanger}/5</span></div>
       <div class="donut-stat-row"><span class="donut-stat-label">At Risk, No Draft</span><span class="donut-stat-val" style="color:${atRiskNoDraft?'#DC2626':'var(--ink)'};">${atRiskNoDraft}</span></div>`;
+  }
+}
+
+const SERVICE_DONUT_COLORS = ['#E8622C', '#3A63C9', '#16A34A', '#8B5CF6', '#D97706', '#EC4899'];
+
+// Same visual pattern as the Risk Breakdown donut (Overview), applied to
+// service/hours instead of client/risk. entries respects whatever the
+// report's range, member, and active-only filters currently are, since it's
+// passed in from renderReports() using the same relevant[] everything else
+// on the page uses — this donut always matches what the table below shows.
+function renderServiceBreakdownDonut(entries){
+  const wrap = document.getElementById('serviceBreakdownDonut');
+  const legend = document.getElementById('serviceBreakdownLegend');
+  if(!wrap) return;
+
+  const grouped = {};
+  entries.forEach(e=>{
+    const c = clients.find(x=>x.id===e.clientId);
+    const svc = e.service || (c ? c.service : '') || 'No service set';
+    grouped[svc] = (grouped[svc]||0) + e.minutes;
+  });
+  const totalMinutes = Object.values(grouped).reduce((s,m)=>s+m,0);
+
+  const statsEl = document.getElementById('serviceBreakdownStats');
+  if(!totalMinutes){
+    wrap.innerHTML = `<div class="empty" style="padding:30px 0;">No time logged in this range.</div>`;
+    if(legend) legend.innerHTML = '';
+    if(statsEl) statsEl.innerHTML = '';
+    return;
+  }
+
+  // Cap at the top 5 services and bundle the rest into "Other" — keeps the
+  // ring readable instead of a mess of slivers if there are a dozen services.
+  let sorted = Object.entries(grouped).sort((a,b)=>b[1]-a[1]);
+  if(sorted.length > 6){
+    const top = sorted.slice(0,5);
+    const otherMinutes = sorted.slice(5).reduce((s,[,m])=>s+m,0);
+    sorted = [...top, ['Other', otherMinutes]];
+  }
+  const svcColor = (i)=> SERVICE_DONUT_COLORS[i % SERVICE_DONUT_COLORS.length];
+
+  const r = 46, cx = 60, cy = 60, strokeW = 15;
+  const C = 2*Math.PI*r;
+  let cumulative = 0;
+  const segs = sorted.map(([svc,mins],i)=>{
+    const dash = (mins/totalMinutes)*C;
+    const html = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${svcColor(i)}" stroke-width="${strokeW}" stroke-dasharray="${dash.toFixed(2)} ${(C-dash).toFixed(2)}" stroke-dashoffset="${(-cumulative).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"></circle>`;
+    cumulative += dash;
+    return html;
+  }).join('');
+
+  wrap.innerHTML = `
+    <svg viewBox="0 0 120 120" width="190" height="190">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#EEF0F4" stroke-width="${strokeW}"></circle>
+      ${segs}
+    </svg>
+    <div class="donut-center">
+      <div class="donut-center-value">${formatMinutes(totalMinutes)}</div>
+      <div class="donut-center-label">Total Hours</div>
+    </div>`;
+
+  if(legend){
+    legend.innerHTML = sorted.map(([svc,mins],i)=>
+      `<span class="donut-legend-item"><span class="donut-legend-dot" style="background:${svcColor(i)};"></span>${svc} (${formatMinutes(mins)})</span>`
+    ).join('');
+  }
+
+  if(statsEl){
+    const topService = sorted[0];
+    const servicesTracked = Object.keys(grouped).length;
+    const avgPerService = Math.round(totalMinutes / servicesTracked);
+    statsEl.innerHTML = `
+      <div class="donut-stat-row"><span class="donut-stat-label">Top Service</span><span class="donut-stat-val">${topService[0]}</span></div>
+      <div class="donut-stat-row"><span class="donut-stat-label">Services Tracked</span><span class="donut-stat-val">${servicesTracked}</span></div>
+      <div class="donut-stat-row"><span class="donut-stat-label">Avg Hours/Service</span><span class="donut-stat-val">${formatMinutes(avgPerService)}</span></div>`;
   }
 }
 
