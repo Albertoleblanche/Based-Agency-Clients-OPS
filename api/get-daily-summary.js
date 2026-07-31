@@ -1,0 +1,82 @@
+// Powers the Daily Summary tab in Time Tracker. Deliberately its own
+// narrow access path rather than a change to time_entries' RLS policy —
+// admins and approvers get visibility into everyone's day for THIS feature
+// specifically, without reopening team-wide time visibility everywhere else
+// in the app (Reports and Overview stay exactly as restrictive as before).
+
+const { createClient } = require('@supabase/supabase-js');
+
+module.exports = async function handler(req, res) {
+  if (req.method !== 'POST' && req.method !== 'GET') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  const callerToken = (req.headers.authorization || '').replace('Bearer ', '');
+  if (!callerToken) {
+    res.status(401).json({ error: 'Not signed in' });
+    return;
+  }
+
+  const date = req.method === 'GET' ? req.query.date : req.body?.date;
+  if (!date) {
+    res.status(400).json({ error: 'Missing date' });
+    return;
+  }
+
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceKey) {
+    res.status(500).json({ error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' });
+    return;
+  }
+
+  const admin = createClient(supabaseUrl, serviceKey);
+
+  try {
+    const { data: callerData, error: callerErr } = await admin.auth.getUser(callerToken);
+    if (callerErr || !callerData?.user) {
+      res.status(401).json({ error: 'Invalid or expired session — please log in again' });
+      return;
+    }
+
+    const { data: callerProfile, error: profileErr } = await admin
+      .from('team_profiles').select('role').eq('id', callerData.user.id).maybeSingle();
+    if (profileErr || !callerProfile || !['admin', 'approver'].includes(callerProfile.role)) {
+      res.status(403).json({ error: 'Only admins and approvers can view the team daily summary' });
+      return;
+    }
+
+    const [{ data: entries, error: entriesErr }, { data: profiles, error: profilesErr }, { data: appDataRow }] = await Promise.all([
+      admin.from('time_entries').select('*').eq('entry_date', date).is('deleted_at', null),
+      admin.from('team_profiles').select('id, name'),
+      admin.from('app_storage').select('value').eq('key', 'app-data').maybeSingle(),
+    ]);
+    if (entriesErr || profilesErr) {
+      res.status(500).json({ error: (entriesErr || profilesErr).message });
+      return;
+    }
+
+    const appData = appDataRow ? JSON.parse(appDataRow.value) : { clients: [] };
+    const clients = appData.clients || [];
+    const nameOf = (id) => profiles?.find(p => p.id === id)?.name || 'Someone no longer on the team';
+    const clientNameOf = (id) => clients.find(c => c.id === id)?.name || 'Unknown client';
+
+    const byUser = {};
+    (entries || []).forEach(e => {
+      if (!byUser[e.user_id]) byUser[e.user_id] = { userId: e.user_id, name: nameOf(e.user_id), totalMinutes: 0, entries: [] };
+      byUser[e.user_id].totalMinutes += e.minutes;
+      byUser[e.user_id].entries.push({
+        client: clientNameOf(e.client_id),
+        service: e.service || '',
+        description: e.description || '',
+        minutes: e.minutes,
+      });
+    });
+
+    const summary = Object.values(byUser).sort((a, b) => b.totalMinutes - a.totalMinutes);
+    res.status(200).json({ date, summary });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+};
