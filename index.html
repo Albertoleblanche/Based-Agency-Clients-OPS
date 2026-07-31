@@ -6,6 +6,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -43,6 +44,21 @@
   /* Sidebar */
   .sidebar{background:var(--sidebar);color:#C9D2E3;padding:18px 12px;display:flex;flex-direction:column;height:100vh;overflow-y:auto;}
   .brand{display:flex;align-items:center;gap:9px;padding:6px 10px 20px;}
+
+  .notif-bell-btn{background:none;border:none;color:var(--muted-lt);cursor:pointer;padding:6px;border-radius:8px;position:relative;display:flex;}
+  .notif-bell-btn:hover{background:rgba(255,255,255,.06);color:#fff;}
+  .notif-badge{position:absolute;top:1px;right:1px;min-width:15px;height:15px;padding:0 3px;border-radius:20px;background:var(--red);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;}
+  .notif-panel{position:absolute;top:calc(100% + 8px);right:-70px;width:340px;max-height:420px;overflow-y:auto;background:var(--card);border:1px solid #EDEEF1;border-radius:12px;box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:500;}
+  .notif-panel-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;color:var(--ink);border-bottom:1px solid #F0F1F4;}
+  .notif-row{display:flex;gap:10px;padding:12px 16px;border-bottom:1px solid #F5F6F8;cursor:pointer;}
+  .notif-row:last-child{border-bottom:none;}
+  .notif-row:hover{background:var(--surface-2);}
+  .notif-row.unread{background:#FFF8F5;}
+  .notif-row-dot{width:7px;height:7px;border-radius:50%;background:var(--brand);flex:none;margin-top:5px;visibility:hidden;}
+  .notif-row.unread .notif-row-dot{visibility:visible;}
+  .notif-row-title{font-size:12.5px;font-weight:600;color:var(--ink);}
+  .notif-row-body{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.4;}
+  .notif-row-time{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--muted-lt);margin-top:4px;}
   .brand-mark{width:26px;height:26px;border-radius:6px;background:var(--brand);display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;font-weight:700;font-size:13px;color:#2A1200;flex:none;overflow:hidden;}
   .brand-name{font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:#fff;}
   .brand-sub{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted-lt);letter-spacing:.06em;}
@@ -252,6 +268,8 @@
   .note-client:hover{color:var(--brand-dark);}
   .note-meta{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted-lt);margin-top:3px;}
   .note-text{font-size:13px;color:var(--ink);line-height:1.55;margin-top:12px;flex:1;white-space:pre-wrap;overflow:hidden;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;}
+  .note-link{display:inline-block;font-size:11.5px;color:var(--brand-dark);margin-top:8px;text-decoration:none;flex:none;}
+  .note-link:hover{text-decoration:underline;}
   .note-actions{display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid #F3F4F6;flex-wrap:wrap;flex:none;}
   .note-status-select{font-family:'Inter',sans-serif;font-size:11.5px;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);}
 
@@ -522,6 +540,16 @@ document.addEventListener('DOMContentLoaded', function(){
     <div class="brand">
       <div class="brand-mark">BA</div>
       <div><div class="brand-name">Based Agency</div><div class="brand-sub">CLIENT OPS</div></div>
+      <div class="notif-bell-wrap" style="margin-left:auto;position:relative;">
+        <button class="notif-bell-btn" onclick="toggleNotifPanel()" title="Notifications">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="notif-badge" id="notifBadge" style="display:none;">0</span>
+        </button>
+        <div class="notif-panel" id="notifPanel" style="display:none;">
+          <div class="notif-panel-head">Notifications <span class="row-link" onclick="markAllNotificationsRead()">Mark all read</span></div>
+          <div id="notifPanelList"></div>
+        </div>
+      </div>
     </div>
     <nav>
       <div class="nav-item active" data-view="overview" onclick="switchView('overview')">
@@ -574,9 +602,12 @@ document.addEventListener('DOMContentLoaded', function(){
     </nav>
     <div class="sidebar-foot">
       <div class="sidebar-profile">
-        <div class="sidebar-profile-info">
-          <div class="sidebar-profile-name" id="sidebarProfileName">—</div>
-          <div class="sidebar-profile-role" id="sidebarProfileRole"></div>
+        <div class="sidebar-profile-info" onclick="switchView('profile')" style="cursor:pointer;display:flex;align-items:center;gap:9px;">
+          <img id="sidebarProfileAvatar" src="" style="width:28px;height:28px;border-radius:50%;object-fit:cover;display:none;flex:none;">
+          <div>
+            <div class="sidebar-profile-name" id="sidebarProfileName">—</div>
+            <div class="sidebar-profile-role" id="sidebarProfileRole"></div>
+          </div>
         </div>
         <button class="sidebar-logout-btn" onclick="handleLogout()" title="Log out">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -1050,6 +1081,11 @@ document.addEventListener('DOMContentLoaded', function(){
           <div class="tab settings-tab" data-rtab="teammates" id="teammatesReportTab" onclick="switchReportTab('teammates')">Teammates</div>
         </div>
 
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:10px;">
+          <button class="btn btn-outline" onclick="exportReportCsv()">Export CSV</button>
+          <button class="btn btn-outline" onclick="exportReportPdf()">Export PDF</button>
+        </div>
+
         <div class="panel">
           <div class="panel-body" style="padding:8px 22px;">
             <table class="report-table">
@@ -1368,6 +1404,51 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
     </div>
 
+    <!-- PROFILE -->
+    <div class="view" id="view-profile">
+      <div class="topbar">
+        <div><div class="page-title">My Profile</div><div class="page-sub">Your info, visible to the rest of the team the same way it always has been</div></div>
+      </div>
+
+      <div class="split-row" style="margin-bottom:24px;">
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Profile Picture</span></div>
+          <div class="panel-body" style="display:flex;align-items:center;gap:18px;">
+            <img id="profileAvatarPreview" src="" style="width:72px;height:72px;border-radius:50%;object-fit:cover;background:var(--surface-2);display:none;">
+            <div id="profileAvatarPlaceholder" class="avatar-circle" style="width:72px;height:72px;font-size:24px;"></div>
+            <div>
+              <input type="file" id="avatarFileInput" accept="image/*" style="display:none;" onchange="uploadAvatar(this.files[0])">
+              <button class="btn btn-outline" onclick="document.getElementById('avatarFileInput').click()">Upload photo</button>
+              <p style="font-size:11px;color:var(--muted-lt);margin:8px 0 0;">JPG or PNG, under 2MB. Visible to the rest of the team.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Basic Info</span></div>
+          <div class="panel-body">
+            <div class="form-grid">
+              <div><label>Name</label><input id="profileNameInput"></div>
+              <div><label>Phone number</label><input id="profilePhoneInput" placeholder="e.g. (555) 123-4567"></div>
+            </div>
+            <button class="btn btn-brand" style="margin-top:6px;" onclick="saveProfileBasicInfo()">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:24px;" id="profileEmailPanel">
+        <div class="panel-head"><span class="panel-title">Email &amp; Login</span></div>
+        <div class="panel-body" id="profileEmailPanelBody"></div>
+      </div>
+
+      <div class="panel" id="pendingEmailRequestsPanel" style="display:none;">
+        <div class="panel-head"><span class="panel-title">Pending Email Change Requests</span></div>
+        <div class="panel-body">
+          <div id="pendingEmailRequestsList"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- CLIENT DETAIL -->
     <div class="view" id="view-clientdetail">
       <div class="topbar">
@@ -1538,6 +1619,11 @@ function renderWhoAmI(){
   });
   const nameEl = document.getElementById('sidebarProfileName');
   const roleEl = document.getElementById('sidebarProfileRole');
+  const avatarEl = document.getElementById('sidebarProfileAvatar');
+  if(avatarEl){
+    if(myProfile && myProfile.avatar_url){ avatarEl.src = myProfile.avatar_url; avatarEl.style.display = 'block'; }
+    else { avatarEl.style.display = 'none'; }
+  }
   if(nameEl && roleEl){
     if(myProfile){
       nameEl.textContent = myProfile.name;
@@ -1778,9 +1864,11 @@ async function fullRefresh(showFeedback){
   await loadMyNotes();
   await loadTimeEntries();
   await loadMyTasks();
+  await loadNotifications();
   renderAll();
   updateTasksNavBadge();
   await checkTaskNotifications();
+  await checkForNewNotificationToasts();
   if(showFeedback && btn){ btn.disabled = false; btn.textContent = 'Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
 function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); }
@@ -1832,6 +1920,7 @@ async function switchView(name){
   if(name==='trash') renderTrash();
   if(name==='payroll') renderPayroll();
   if(name==='tasks') renderTasks();
+  if(name==='profile') renderProfilePage();
 }
 
 function switchSettingsTab(name){
@@ -3219,6 +3308,7 @@ function renderClientDetail(){
           <span class="pill ${noteStatus.cls}">${noteStatus.label}</span>
         </div>
         <div class="note-text">${n.text}</div>
+        ${n.link ? `<a href="${n.link}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${n.link.replace(/^https?:\/\//,'').slice(0,40)}</a>` : ''}
         <div class="note-actions">
           ${n.status!=='done' ? `<button class="btn btn-brand" style="padding:7px 12px;font-size:11.5px;" onclick="logNoteNow('${n.id}')">Log it now</button>` : ''}
           <span class="row-link" onclick="openNoteModal('${n.id}')">Edit</span>
@@ -3322,6 +3412,7 @@ function openNoteModal(noteId, presetClientId){
         </select>
       </div>
       <div class="settings-field"><label>Note</label><textarea id="noteTextInput" style="width:100%;min-height:200px;font-family:'Inter',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${editing ? editing.text : ''}</textarea></div>
+      <div class="settings-field"><label>Link (optional)</label><input id="noteLinkInput" type="url" placeholder="https://…" value="${editing && editing.link ? editing.link.replace(/"/g,'&quot;') : ''}"></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" onclick="saveNote(${editing ? `'${editing.id}'` : 'null'})">${editing?'Save changes':'Add note'}</button>
@@ -3340,7 +3431,7 @@ async function loadMyNotes(){
     .is('deleted_at', null)
     .order('updated_at', { ascending: false });
   if(error){ console.error('loadMyNotes error', error); notes = []; return; }
-  notes = (data||[]).map(n => ({ id:n.id, clientId:n.client_id, text:n.text, status:n.status, createdAt:n.created_at, updatedAt:n.updated_at }));
+  notes = (data||[]).map(n => ({ id:n.id, clientId:n.client_id, text:n.text, status:n.status, link:n.link, createdAt:n.created_at, updatedAt:n.updated_at }));
 }
 
 async function loadMyTrashedNotes(){
@@ -3375,15 +3466,16 @@ async function saveNote(noteId){
   const clientId = document.getElementById('noteClientSelect').value;
   const status = document.getElementById('noteStatusSelect').value;
   const text = document.getElementById('noteTextInput').value.trim();
+  const link = document.getElementById('noteLinkInput').value.trim() || null;
   if(!clientId){ showToast('error','Pick a client','Select which client this note is about.'); return; }
   if(!text){ showToast('error','Nothing written','Add some note text first.'); return; }
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
   let error;
   if(noteId){
-    ({ error } = await supabaseClient.from('notes').update({ client_id: clientId, status, text }).eq('id', noteId).eq('user_id', currentUser.id));
+    ({ error } = await supabaseClient.from('notes').update({ client_id: clientId, status, text, link }).eq('id', noteId).eq('user_id', currentUser.id));
   } else {
-    ({ error } = await supabaseClient.from('notes').insert({ user_id: currentUser.id, client_id: clientId, status, text }));
+    ({ error } = await supabaseClient.from('notes').insert({ user_id: currentUser.id, client_id: clientId, status, text, link }));
   }
   restoreBtn(btn);
   closeAppModal();
@@ -3479,6 +3571,7 @@ function renderNotes(){
         <span class="pill ${status.cls}">${status.label}</span>
       </div>
       <div class="note-text">${n.text}</div>
+      ${n.link ? `<a href="${n.link}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${n.link.replace(/^https?:\/\//,'').slice(0,40)}</a>` : ''}
       <div class="note-actions" onclick="event.stopPropagation();">
         ${n.status!=='done' ? `<button class="btn btn-brand" style="padding:7px 12px;font-size:11.5px;" onclick="logNoteNow('${n.id}')">Log it now</button>` : ''}
         <select class="note-status-select" onchange="changeNoteStatus('${n.id}', this.value)">
@@ -3516,7 +3609,7 @@ async function loadMyTasks(){
   if(error){ console.error('loadMyTasks error', error); tasks = []; return; }
   tasks = (data||[]).map(t=>({
     id:t.id, title:t.title, description:t.description||'', priority:t.priority, status:t.status,
-    assignerId:t.assigner_id, assigneeId:t.assignee_id, clientId:t.client_id, dueDate:t.due_date,
+    assignerId:t.assigner_id, assigneeId:t.assignee_id, clientId:t.client_id, dueDate:t.due_date, link:t.link,
     createdAt:t.created_at, completedAt:t.completed_at, cancelledAt:t.cancelled_at,
     hiddenByAssigner:t.hidden_by_assigner, hiddenByAssignee:t.hidden_by_assignee,
     assigneeNotified:t.assignee_notified, assignerNotified:t.assigner_notified
@@ -3611,6 +3704,7 @@ function taskCardHtml(t){
         ${c ? `<span class="ts-entry-service">— ${c.name}</span>` : ''}
       </div>
       ${t.description ? `<div class="ts-entry-desc">${t.description}</div>` : ''}
+      ${t.link ? `<a href="${t.link}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${t.link.replace(/^https?:\/\//,'').slice(0,40)}</a>` : ''}
       <div class="ts-entry-desc" style="margin-top:4px;color:var(--muted-lt);">
         ${directionLabel}${dueStr ? ` · Due ${dueStr}` : ''}${overdue ? ` <span style="color:var(--red);font-weight:700;">Overdue</span>` : ''}${t.status==='done' && t.completedAt ? ` · Completed ${new Date(t.completedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})}` : ''}
       </div>
@@ -3649,6 +3743,7 @@ function taskFormHtml(editing){
         <div><label>Due date (optional)</label><input type="date" id="taskDueInput" value="${editing && editing.dueDate ? editing.dueDate : ''}"></div>
         <div><label>Related client (optional)</label><select id="taskClientSelect">${populateTaskClientSelect(editing ? editing.clientId : null)}</select></div>
       </div>
+      <div class="settings-field"><label>Link (optional)</label><input id="taskLinkInput" type="url" placeholder="https://…" value="${editing && editing.link ? editing.link.replace(/"/g,'&quot;') : ''}"></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" onclick="${editing ? `saveEditTask('${editing.id}')` : 'saveNewTask()'}">${editing ? 'Save changes' : 'Assign task'}</button>
@@ -3676,10 +3771,11 @@ async function saveNewTask(){
   const description = document.getElementById('taskDescInput').value.trim();
   const dueDate = document.getElementById('taskDueInput').value || null;
   const clientId = document.getElementById('taskClientSelect').value || null;
+  const link = document.getElementById('taskLinkInput').value.trim() || null;
 
   const { error } = await supabaseClient.from('tasks').insert({
     title, description, priority, assigner_id: currentUser.id, assignee_id: assigneeId,
-    client_id: clientId, due_date: dueDate
+    client_id: clientId, due_date: dueDate, link
   });
   closeAppModal();
   await loadMyTasks();
@@ -3699,11 +3795,12 @@ async function saveEditTask(taskId){
   const description = document.getElementById('taskDescInput').value.trim();
   const dueDate = document.getElementById('taskDueInput').value || null;
   const clientId = document.getElementById('taskClientSelect').value || null;
+  const link = document.getElementById('taskLinkInput').value.trim() || null;
 
   // Reassigning to someone new means they haven't been notified yet.
   const reassigned = assigneeId !== t.assigneeId;
   const { error } = await supabaseClient.from('tasks').update({
-    title, description, priority, assignee_id: assigneeId, client_id: clientId, due_date: dueDate,
+    title, description, priority, assignee_id: assigneeId, client_id: clientId, due_date: dueDate, link,
     assignee_notified: reassigned ? false : t.assigneeNotified
   }).eq('id', taskId);
   closeAppModal();
@@ -3761,15 +3858,279 @@ async function checkTaskNotifications(){
     const assigner = teamProfiles.find(p=>p.id===t.assignerId);
     showToast('info','New task assigned to you', `${assigner ? assigner.name : 'Someone'}: "${t.title}"`);
     await supabaseClient.from('tasks').update({ assignee_notified:true }).eq('id', t.id);
+    // read:true — this event already delivered its own toast above, so it
+    // shouldn't also get picked up and re-toasted by the general
+    // notification poll. It still shows in the bell's history either way.
+    await supabaseClient.from('notifications').insert({ user_id:currentUser.id, type:'task_assigned', title:'New task assigned to you', body:`${assigner?assigner.name:'Someone'}: "${t.title}"`, target_view:'tasks', read:true });
   }
   for(const t of newlyCompleted){
     const assignee = teamProfiles.find(p=>p.id===t.assigneeId);
     showToast('success','Task completed', `${assignee ? assignee.name : 'Someone'} marked "${t.title}" as done.`);
     await supabaseClient.from('tasks').update({ assigner_notified:true }).eq('id', t.id);
+    await supabaseClient.from('notifications').insert({ user_id:currentUser.id, type:'task_completed', title:'Task completed', body:`${assignee?assignee.name:'Someone'} marked "${t.title}" as done.`, target_view:'tasks', read:true });
   }
   await loadMyTasks();
   renderTasks();
   updateTasksNavBadge();
+  await loadNotifications();
+}
+
+/* ---------- Notification bell — unified inbox for tasks, email-change
+   requests, and anything else that needs to reach a specific person. ---------- */
+
+let notifications = [];
+
+async function loadNotifications(){
+  if(!currentUser){ notifications = []; return; }
+  const { data, error } = await supabaseClient.from('notifications').select('*').eq('user_id', currentUser.id).order('created_at', { ascending:false }).limit(50);
+  if(error){ console.error('loadNotifications error', error); notifications = []; return; }
+  notifications = data || [];
+  updateNotifBadge();
+}
+
+function updateNotifBadge(){
+  const badge = document.getElementById('notifBadge');
+  if(!badge) return;
+  const unread = notifications.filter(n=>!n.read).length;
+  badge.textContent = unread > 9 ? '9+' : unread;
+  badge.style.display = unread ? 'flex' : 'none';
+}
+
+function toggleNotifPanel(){
+  const panel = document.getElementById('notifPanel');
+  if(!panel) return;
+  const opening = panel.style.display !== 'block';
+  panel.style.display = opening ? 'block' : 'none';
+  if(opening) renderNotifPanel();
+}
+
+document.addEventListener('click', (e)=>{
+  const wrap = document.querySelector('.notif-bell-wrap');
+  const panel = document.getElementById('notifPanel');
+  if(panel && panel.style.display==='block' && wrap && !wrap.contains(e.target)) panel.style.display='none';
+});
+
+function renderNotifPanel(){
+  const el = document.getElementById('notifPanelList');
+  if(!el) return;
+  if(!notifications.length){ el.innerHTML = `<div class="empty" style="padding:24px;">No notifications yet.</div>`; return; }
+  el.innerHTML = notifications.map(n=>`
+    <div class="notif-row ${n.read?'':'unread'}" onclick="handleNotifClick('${n.id}')">
+      <div class="notif-row-dot"></div>
+      <div>
+        <div class="notif-row-title">${n.title}</div>
+        ${n.body ? `<div class="notif-row-body">${n.body}</div>` : ''}
+        <div class="notif-row-time">${new Date(n.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</div>
+      </div>
+    </div>`).join('');
+}
+
+async function handleNotifClick(id){
+  const n = notifications.find(x=>x.id===id);
+  if(!n) return;
+  if(!n.read){
+    await supabaseClient.from('notifications').update({ read:true }).eq('id', id);
+    n.read = true;
+    updateNotifBadge();
+    renderNotifPanel();
+  }
+  if(n.target_view){
+    document.getElementById('notifPanel').style.display = 'none';
+    switchView(n.target_view);
+  }
+}
+
+async function markAllNotificationsRead(){
+  const unreadIds = notifications.filter(n=>!n.read).map(n=>n.id);
+  if(!unreadIds.length) return;
+  await supabaseClient.from('notifications').update({ read:true }).in('id', unreadIds);
+  notifications.forEach(n=>n.read=true);
+  updateNotifBadge();
+  renderNotifPanel();
+}
+
+// Toasts for anything new since we last checked — tracked per-user in
+// localStorage rather than by read-status, so marking something read from
+// the panel doesn't accidentally suppress its toast, and vice versa. On a
+// person's very first-ever session there's nothing to compare against, so
+// this just starts the clock instead of flooding them with toasts for
+// their entire notification history.
+async function checkForNewNotificationToasts(){
+  if(!currentUser) return;
+  const storageKey = `notif_last_checked_${currentUser.id}`;
+  const lastChecked = localStorage.getItem(storageKey);
+  if(!lastChecked){ localStorage.setItem(storageKey, new Date().toISOString()); return; }
+  const { data, error } = await supabaseClient.from('notifications').select('*')
+    .eq('user_id', currentUser.id).eq('read', false).gt('created_at', lastChecked).order('created_at', { ascending:true });
+  if(!error && data && data.length){
+    data.forEach(n=>{
+      const type = n.type.includes('denied') ? 'error' : n.type.includes('approved') ? 'success' : 'info';
+      showToast(type, n.title, n.body || '');
+    });
+  }
+  localStorage.setItem(storageKey, new Date().toISOString());
+}
+
+/* ---------- Profile — avatar, phone, and the email-change-request flow ---------- */
+
+function renderProfilePage(){
+  if(!myProfile) return;
+  document.getElementById('profileNameInput').value = myProfile.name || '';
+  document.getElementById('profilePhoneInput').value = myProfile.phone || '';
+
+  const avatarImg = document.getElementById('profileAvatarPreview');
+  const avatarPlaceholder = document.getElementById('profileAvatarPlaceholder');
+  if(myProfile.avatar_url){
+    avatarImg.src = myProfile.avatar_url; avatarImg.style.display = 'block';
+    avatarPlaceholder.style.display = 'none';
+  } else {
+    avatarImg.style.display = 'none';
+    avatarPlaceholder.style.display = 'flex';
+    avatarPlaceholder.textContent = (myProfile.name||'?').trim().charAt(0).toUpperCase();
+  }
+
+  renderProfileEmailPanel();
+  if(isAdmin()){
+    document.getElementById('pendingEmailRequestsPanel').style.display = 'block';
+    renderPendingEmailRequests();
+  } else {
+    document.getElementById('pendingEmailRequestsPanel').style.display = 'none';
+  }
+}
+
+async function uploadAvatar(file){
+  if(!file) return;
+  if(!file.type.startsWith('image/')){ showToast('error','Not an image','Please choose an image file.'); return; }
+  if(file.size > 2*1024*1024){ showToast('error','Too large','Photos need to be under 2MB.'); return; }
+  const ext = file.name.split('.').pop();
+  const path = `${currentUser.id}/avatar.${ext}`;
+  const { error: uploadErr } = await supabaseClient.storage.from('avatars').upload(path, file, { upsert:true });
+  if(uploadErr){ showToast('error','Upload failed', uploadErr.message); return; }
+  const { data: urlData } = supabaseClient.storage.from('avatars').getPublicUrl(path);
+  // Cache-bust so the new photo shows immediately instead of a stale cached one.
+  const avatarUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+  const { error: profileErr } = await supabaseClient.from('team_profiles').update({ avatar_url: avatarUrl }).eq('id', currentUser.id);
+  if(profileErr){ showToast('error','Save failed', profileErr.message); return; }
+  myProfile.avatar_url = avatarUrl;
+  await loadTeamProfiles();
+  renderProfilePage();
+  renderWhoAmI();
+  renderTeam();
+  showToast('success','Photo updated','Your new profile picture is live.');
+}
+
+async function saveProfileBasicInfo(){
+  const name = document.getElementById('profileNameInput').value.trim();
+  const phone = document.getElementById('profilePhoneInput').value.trim();
+  if(!name){ showToast('error','Name required','Your name can\'t be empty.'); return; }
+  const { error } = await supabaseClient.from('team_profiles').update({ name, phone }).eq('id', currentUser.id);
+  if(error){ showToast('error','Save failed', error.message); return; }
+  myProfile.name = name; myProfile.phone = phone;
+  await loadTeamProfiles();
+  renderWhoAmI();
+  renderTeam();
+  showToast('success','Saved','Your profile is updated.');
+}
+
+function renderProfileEmailPanel(){
+  const el = document.getElementById('profileEmailPanelBody');
+  if(!el) return;
+  if(isAdmin()){
+    el.innerHTML = `
+      <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">As an admin, you can change your own login email directly. Supabase will send a confirmation link to the new address before the change actually takes effect.</p>
+      <div class="form-grid">
+        <div><label>Current email</label><input value="${currentUser.email}" readonly style="color:var(--muted-lt);"></div>
+        <div><label>New email</label><input id="directEmailInput" placeholder="new@basedagency.com"></div>
+      </div>
+      <button class="btn btn-brand" style="margin-top:6px;" onclick="saveDirectEmailChange()">Update email</button>`;
+  } else {
+    el.innerHTML = `
+      <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Changing your login email needs admin approval — submit a request below and an admin will confirm or deny it.</p>
+      <div class="form-grid">
+        <div><label>Current email</label><input value="${currentUser.email}" readonly style="color:var(--muted-lt);"></div>
+        <div><label>Requested new email</label><input id="requestEmailInput" placeholder="new@basedagency.com"></div>
+      </div>
+      <button class="btn btn-brand" style="margin-top:6px;" onclick="submitEmailChangeRequest()">Submit request</button>
+      <div id="myEmailRequestsList" style="margin-top:16px;"></div>`;
+    renderMyEmailRequests();
+  }
+}
+
+async function saveDirectEmailChange(){
+  const newEmail = document.getElementById('directEmailInput').value.trim();
+  if(!newEmail || !newEmail.includes('@')){ showToast('error','Invalid email','Enter a valid email address.'); return; }
+  const { error } = await supabaseClient.auth.updateUser({ email: newEmail });
+  if(error){ showToast('error','Update failed', error.message); return; }
+  showToast('success','Confirmation sent', `Check ${newEmail} for a link to confirm the change.`);
+}
+
+async function submitEmailChangeRequest(){
+  const requested = document.getElementById('requestEmailInput').value.trim();
+  if(!requested || !requested.includes('@')){ showToast('error','Invalid email','Enter a valid email address.'); return; }
+  const { error } = await supabaseClient.from('email_change_requests').insert({
+    user_id: currentUser.id, current_email: currentUser.email, requested_email: requested
+  });
+  if(error){ showToast('error','Request failed', error.message); return; }
+  // Notify every admin — whichever of them checks first can act on it.
+  const admins = teamProfiles.filter(p=>p.role==='admin');
+  for(const a of admins){
+    await supabaseClient.from('notifications').insert({
+      user_id: a.id, type:'email_change_requested', title:'Email change request',
+      body:`${myProfile.name} wants to change their email to ${requested}.`, target_view:'profile'
+    });
+  }
+  document.getElementById('requestEmailInput').value = '';
+  renderMyEmailRequests();
+  showToast('success','Request submitted','An admin will review it soon.');
+}
+
+async function renderMyEmailRequests(){
+  const el = document.getElementById('myEmailRequestsList');
+  if(!el) return;
+  const { data, error } = await supabaseClient.from('email_change_requests').select('*').eq('user_id', currentUser.id).order('created_at',{ascending:false}).limit(5);
+  if(error || !data || !data.length){ el.innerHTML = ''; return; }
+  const statusMeta = { pending:{cls:'pill-mid',label:'Pending'}, approved:{cls:'pill-good',label:'Approved'}, denied:{cls:'pill-bad',label:'Denied'} };
+  el.innerHTML = `<label style="font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:8px;">Your requests</label>` +
+    data.map(r=>{
+      const s = statusMeta[r.status];
+      return `<div class="integ-row"><div><div class="integ-name">${r.requested_email}</div><div class="integ-desc">${new Date(r.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div></div><span class="pill ${s.cls}">${s.label}</span></div>`;
+    }).join('');
+}
+
+async function renderPendingEmailRequests(){
+  const el = document.getElementById('pendingEmailRequestsList');
+  if(!el) return;
+  el.innerHTML = `<div class="empty">Loading…</div>`;
+  const { data, error } = await supabaseClient.from('email_change_requests').select('*').eq('status','pending').order('created_at',{ascending:true});
+  if(error){ el.innerHTML = `<div class="empty">Could not load requests.</div>`; return; }
+  if(!data || !data.length){ el.innerHTML = `<div class="empty">No pending requests.</div>`; return; }
+  el.innerHTML = data.map(r=>{
+    const p = teamProfiles.find(x=>x.id===r.user_id);
+    return `<div class="integ-row">
+      <div><div class="integ-name">${p?p.name:'Someone no longer on the team'}</div><div class="integ-desc">${r.current_email} → ${r.requested_email}</div></div>
+      <div style="display:flex;gap:10px;">
+        <span class="row-link" onclick="resolveEmailChangeRequest('${r.id}', true)">Approve</span>
+        <span class="row-link danger-link" onclick="resolveEmailChangeRequest('${r.id}', false)">Deny</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function resolveEmailChangeRequest(requestId, approve){
+  if(!confirm(approve ? 'Approve this email change? It takes effect immediately.' : 'Deny this request?')) return;
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/approve-email-change', {
+      method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`},
+      body: JSON.stringify({ requestId, approve })
+    });
+    const data = await response.json();
+    if(!response.ok){ showToast('error','Failed', data.error || 'Could not process this request.'); return; }
+    renderPendingEmailRequests();
+    showToast('success', approve?'Approved':'Denied', approve?'The email change is live.':'The request was denied.');
+  }catch(e){
+    showToast('error','Failed','Network error — try again.');
+  }
 }
 
 /* ---------- Time Tracker ---------- */
@@ -4626,6 +4987,98 @@ function renderReports(){
       <td class="report-hours-val">${formatMinutes(mins)}</td>
     </tr>`;
   }).join('');
+}
+
+// Same grouping logic as renderReports() above, factored out so CSV/PDF
+// export always matches exactly what's currently on screen — same range,
+// same member filter, same active-only filter, same tab (Clients/Services/
+// Teammates).
+function getReportExportRows(){
+  const relevant = getReportRangeEntries();
+  let grouped = {}, getLabel;
+  if(reportTab==='clients'){
+    relevant.forEach(e=>{ grouped[e.clientId] = (grouped[e.clientId]||0) + e.minutes; });
+    getLabel = (key)=>{ const c = clients.find(x=>x.id===key); return c ? c.name : 'Unknown client'; };
+  } else if(reportTab==='services'){
+    relevant.forEach(e=>{
+      const c = clients.find(x=>x.id===e.clientId);
+      const svc = e.service || (c ? c.service : '') || 'No service set';
+      grouped[svc] = (grouped[svc]||0) + e.minutes;
+    });
+    getLabel = (key)=> key;
+  } else {
+    relevant.forEach(e=>{ grouped[e.userId] = (grouped[e.userId]||0) + e.minutes; });
+    getLabel = (key)=>{ const p = teamProfiles.find(x=>x.id===key); return p ? p.name : 'Unknown'; };
+  }
+  return Object.entries(grouped).sort((a,b)=>b[1]-a[1]).map(([key,mins])=>({ label:getLabel(key), minutes:mins }));
+}
+
+function getReportExportMeta(){
+  const rangeSel = document.getElementById('reportRange');
+  const rangeLabel = rangeSel?.value==='custom'
+    ? `${document.getElementById('reportFromDate')?.value || '…'} to ${document.getElementById('reportToDate')?.value || '…'}`
+    : (rangeSel?.options[rangeSel.selectedIndex]?.text || 'This week');
+  const tabLabel = reportTab==='clients' ? 'Clients' : reportTab==='services' ? 'Services' : 'Teammates';
+  return { rangeLabel, tabLabel };
+}
+
+function exportReportCsv(){
+  const rows = getReportExportRows();
+  if(!rows.length){ showToast('info','Nothing to export','No time logged in this range.'); return; }
+  const { rangeLabel, tabLabel } = getReportExportMeta();
+  const headers = [tabLabel==='Clients'?'Client':tabLabel==='Services'?'Service':'Team Member', 'Hours'];
+  const lines = [headers.join(',')];
+  rows.forEach(r=> lines.push([r.label, (r.minutes/60).toFixed(2)].map(csvEscape).join(',')));
+  const totalMinutes = rows.reduce((s,r)=>s+r.minutes,0);
+  lines.push(['Total', (totalMinutes/60).toFixed(2)].map(csvEscape).join(','));
+  const blob = new Blob([lines.join('\n')], { type:'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `report_${tabLabel.toLowerCase()}_${toDateStr(new Date())}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportReportPdf(){
+  const rows = getReportExportRows();
+  if(!rows.length){ showToast('info','Nothing to export','No time logged in this range.'); return; }
+  if(!window.jspdf){ showToast('error','PDF library not loaded','Check your connection and try again.'); return; }
+  const { rangeLabel, tabLabel } = getReportExportMeta();
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const totalMinutes = rows.reduce((s,r)=>s+r.minutes,0);
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(16);
+  doc.text('Based Agency — Time Report', 14, 18);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(100);
+  doc.text(`${tabLabel} · ${rangeLabel} · Generated ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`, 14, 25);
+  doc.text(`Total: ${formatMinutes(totalMinutes)} across ${rows.length} ${tabLabel.toLowerCase()}`, 14, 31);
+
+  let y = 44;
+  doc.setFontSize(9); doc.setTextColor(120);
+  doc.text(tabLabel==='Clients'?'CLIENT':tabLabel==='Services'?'SERVICE':'TEAM MEMBER', 14, y);
+  doc.text('HOURS', 180, y, { align:'right' });
+  y += 3;
+  doc.setDrawColor(220); doc.line(14, y, 196, y);
+  y += 7;
+
+  doc.setFontSize(10); doc.setTextColor(30);
+  rows.forEach(r=>{
+    if(y > 280){ doc.addPage(); y = 20; }
+    doc.text(String(r.label).slice(0,60), 14, y);
+    doc.text((r.minutes/60).toFixed(2)+'h', 180, y, { align:'right' });
+    y += 7;
+  });
+
+  y += 3;
+  doc.setDrawColor(220); doc.line(14, y, 196, y);
+  y += 7;
+  doc.setFont('helvetica','bold');
+  doc.text('Total', 14, y);
+  doc.text((totalMinutes/60).toFixed(2)+'h', 180, y, { align:'right' });
+
+  doc.save(`report_${tabLabel.toLowerCase()}_${toDateStr(new Date())}.pdf`);
 }
 
 /* ---------- Reusable X/Y line chart (gradient area + hover tooltip), no library ---------- */
@@ -5873,11 +6326,13 @@ async function showApp(session){
     await loadMyNotes();
     await loadTimeEntries();
     await loadMyTasks();
+    await loadNotifications();
     renderAll();
     updateTasksNavBadge();
     applyAppIcon();
     initTimerFromStorage();
     await checkTaskNotifications();
+    await checkForNewNotificationToasts();
   }catch(e){
     console.error('showApp failed', e);
     document.getElementById('loginOverlay').style.display = 'flex';
