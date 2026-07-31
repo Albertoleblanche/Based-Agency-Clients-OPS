@@ -115,6 +115,17 @@
   @media (max-width:560px){.metrics-row{grid-template-columns:1fr;}}
 
   .metric-card{background:var(--card);border:1px solid #EDEEF1;border-radius:12px;padding:18px 20px;box-shadow:0 1px 2px rgba(16,24,40,.03);}
+
+  .donut-card{background:var(--card);border:1px solid #EDEEF1;border-radius:12px;padding:18px 20px;box-shadow:0 1px 2px rgba(16,24,40,.03);display:flex;flex-direction:column;align-items:center;cursor:pointer;transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;}
+  .donut-card:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(16,24,40,.08);border-color:#DDE0E5;}
+  .donut-card-head{font-size:12.5px;font-weight:600;color:var(--muted);align-self:flex-start;}
+  .donut-wrap{position:relative;width:140px;height:140px;margin:6px 0;}
+  .donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+  .donut-center-value{font-family:'Oswald',sans-serif;font-size:27px;font-weight:600;color:var(--brand);}
+  .donut-center-label{font-family:'IBM Plex Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-lt);margin-top:2px;}
+  .donut-legend{display:flex;flex-wrap:wrap;justify-content:center;gap:9px;margin-top:2px;}
+  .donut-legend-item{font-size:10.5px;color:var(--muted);display:flex;align-items:center;gap:5px;white-space:nowrap;}
+  .donut-legend-dot{width:7px;height:7px;border-radius:50%;flex:none;}
   .metric-head{display:flex;align-items:center;gap:9px;margin-bottom:14px;}
   .metric-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex:none;}
   .metric-icon-blue{background:#E7EEFC;color:#3A63C9;}
@@ -343,6 +354,13 @@
   .xy-chart-tooltip .xy-tt-label{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:400;color:#9DAAC2;margin-top:2px;}
   .xy-chart-labels{display:flex;justify-content:space-between;margin-top:6px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--muted-lt);}
 
+  .vbar-chart{display:flex;justify-content:space-around;align-items:flex-end;gap:10px;height:100%;padding-top:6px;}
+  .vbar-col{display:flex;flex-direction:column;align-items:center;flex:1;height:100%;justify-content:flex-end;}
+  .vbar-count{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;margin-bottom:6px;color:var(--ink);}
+  .vbar-track{width:100%;max-width:40px;height:170px;display:flex;align-items:flex-end;background:var(--surface-2);border-radius:6px 6px 3px 3px;overflow:hidden;}
+  .vbar-fill{width:100%;border-radius:6px 6px 0 0;transition:height .5s ease;}
+  .vbar-label{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted-lt);margin-top:8px;}
+
   .graphic-bar-row{margin-bottom:14px;}
   .graphic-bar-row:last-child{margin-bottom:0;}
   .graphic-bar-top{display:flex;justify-content:space-between;gap:8px;font-size:12px;margin-bottom:6px;}
@@ -552,14 +570,10 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
 
       <div class="metrics-row">
-        <div class="metric-card kpi-click" onclick="switchView('clients')">
-          <div class="metric-head">
-            <span class="metric-icon metric-icon-blue"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
-            <span class="metric-label">Total Clients</span>
-          </div>
-          <div class="metric-value" id="kpiTotal">0</div>
-          <div class="metric-chips" id="totalChips"></div>
-          <div class="metric-caption">Full roster</div>
+        <div class="donut-card kpi-click" onclick="switchView('clients')">
+          <div class="donut-card-head">Total Clients</div>
+          <div class="donut-wrap" id="totalClientsDonut"></div>
+          <div class="donut-legend" id="totalClientsLegend"></div>
         </div>
 
         <div class="metric-card kpi-click" onclick="switchView('clients')">
@@ -598,22 +612,29 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="panel-body"><div class="queue-grid" id="overviewActiveQueue"></div></div>
       </div>
 
-      <div class="panel" style="margin-bottom:24px;">
-        <div class="panel-body">
-          <div class="xy-chart-header">
-            <div>
-              <div class="xy-chart-title">Hours Logged</div>
-              <div class="xy-chart-updated" id="overviewChartUpdated"></div>
+      <div class="report-graphic-row" style="margin-bottom:24px;">
+        <div class="panel">
+          <div class="panel-body">
+            <div class="xy-chart-header">
+              <div>
+                <div class="xy-chart-title">Hours Logged</div>
+                <div class="xy-chart-updated" id="overviewChartUpdated"></div>
+              </div>
+              <div class="select-field" style="min-width:110px;">
+                <select id="overviewChartGranularity" onchange="renderOverviewChart()">
+                  <option value="day">Day</option>
+                  <option value="week" selected>Week</option>
+                  <option value="month">Month</option>
+                </select>
+              </div>
             </div>
-            <div class="select-field" style="min-width:110px;">
-              <select id="overviewChartGranularity" onchange="renderOverviewChart()">
-                <option value="day">Day</option>
-                <option value="week" selected>Week</option>
-                <option value="month">Month</option>
-              </select>
-            </div>
+            <div id="overviewChart"></div>
           </div>
-          <div id="overviewChart"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Clients by Danger Score</span></div>
+          <div class="panel-body"><div id="dangerDistChart"></div></div>
         </div>
       </div>
 
@@ -1441,7 +1462,7 @@ async function fullRefresh(showFeedback){
   renderAll();
   if(showFeedback && btn){ btn.disabled = false; btn.textContent = 'Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
-function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); }
+function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderDangerDistributionChart(); }
 
 function applyRoleVisibility(){
   const notifyBtn = document.getElementById('notifyBtn');
@@ -1665,10 +1686,7 @@ function renderKpis(){
   document.getElementById('navPendingBadge').textContent = pending;
 
   // --- Total Clients ---
-  document.getElementById('kpiTotal').textContent = clients.length;
-  document.getElementById('totalChips').innerHTML = clients.length
-    ? `<span class="pill pill-good">${active} Active</span>${atRisk ? `<span class="pill pill-bad">${atRisk} At risk</span>` : ''}`
-    : '';
+  renderTotalClientsDonut();
 
   // --- Client Health: inverse of average danger score across the roster, as a % ---
   let healthPct = 0;
@@ -3365,6 +3383,81 @@ function statusPillClass(status){
   if(s.includes('onboard')) return 'pill-mid';
   if(s.includes('active')) return 'pill-good';
   return 'pill-status';
+}
+
+function statusColorFor(status){
+  const cls = statusPillClass(status);
+  if(cls==='pill-good') return 'var(--green)';
+  if(cls==='pill-bad') return '#9C5C48';
+  if(cls==='pill-mid') return 'var(--amber)';
+  return 'var(--muted-lt)';
+}
+
+// Donut chart for the Total Clients card — segments by status, reusing the
+// exact same semantic colors as the status pills elsewhere in the app.
+function renderTotalClientsDonut(){
+  const wrap = document.getElementById('totalClientsDonut');
+  const legend = document.getElementById('totalClientsLegend');
+  if(!wrap) return;
+  const total = clients.length;
+  if(!total){
+    wrap.innerHTML = `<div class="empty" style="padding:30px 0;">No clients yet.</div>`;
+    if(legend) legend.innerHTML = '';
+    return;
+  }
+  const counts = {};
+  clients.forEach(c=>{ counts[c.status] = (counts[c.status]||0)+1; });
+  const entries = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+
+  const r = 46, cx = 60, cy = 60, strokeW = 15;
+  const C = 2*Math.PI*r;
+  let cumulative = 0;
+  const segs = entries.map(([status,count])=>{
+    const dash = (count/total)*C;
+    const html = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${statusColorFor(status)}" stroke-width="${strokeW}" stroke-dasharray="${dash.toFixed(2)} ${(C-dash).toFixed(2)}" stroke-dashoffset="${(-cumulative).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"></circle>`;
+    cumulative += dash;
+    return html;
+  }).join('');
+
+  wrap.innerHTML = `
+    <svg viewBox="0 0 120 120" width="140" height="140">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#EEF0F4" stroke-width="${strokeW}"></circle>
+      ${segs}
+    </svg>
+    <div class="donut-center">
+      <div class="donut-center-value">${total}</div>
+      <div class="donut-center-label">Total Clients</div>
+    </div>`;
+
+  if(legend){
+    legend.innerHTML = entries.map(([status,count])=>
+      `<span class="donut-legend-item"><span class="donut-legend-dot" style="background:${statusColorFor(status)};"></span>${status} (${count})</span>`
+    ).join('');
+  }
+}
+
+// Vertical histogram: how many clients sit at each danger score, colored by
+// the same three risk tiers used everywhere else in the app.
+function renderDangerDistributionChart(){
+  const el = document.getElementById('dangerDistChart');
+  if(!el) return;
+  const counts = [0,0,0,0,0];
+  clients.forEach(c=>{ const d = Math.min(5, Math.max(1, c.danger||1)); counts[d-1]++; });
+  const maxCount = Math.max(...counts, 1);
+  const trackH = 170;
+  const tierColor = (score)=> score>=4 ? '#9C5C48' : score===3 ? 'var(--amber)' : 'var(--muted-lt)';
+
+  el.innerHTML = `<div class="vbar-chart">${counts.map((count,i)=>{
+    const score = i+1;
+    const barH = count ? Math.max(6, Math.round((count/maxCount)*trackH)) : 0;
+    return `<div class="vbar-col">
+      <div class="vbar-count">${count}</div>
+      <div class="vbar-track" style="height:${trackH}px;">
+        <div class="vbar-fill" style="height:${barH}px;background:${tierColor(score)};"></div>
+      </div>
+      <div class="vbar-label">${score}/5</div>
+    </div>`;
+  }).join('')}</div>`;
 }
 
 // Three-tier risk system based on danger score — always shown, not just when
