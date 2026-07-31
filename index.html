@@ -1205,10 +1205,10 @@ document.addEventListener('DOMContentLoaded', function(){
     <!-- TRASH -->
     <div class="view" id="view-trash">
       <div class="topbar">
-        <div><div class="page-title">Trash</div><div class="page-sub">Deleted clients, notes, and time entries — restore anytime, or delete for good</div></div>
+        <div><div class="page-title">Trash</div><div class="page-sub">Deleted notes and time entries — restore anytime, or delete for good. Deleted clients are visible to admins and approvers only.</div></div>
       </div>
 
-      <div class="panel">
+      <div class="panel" id="trashClientsPanel">
         <div class="panel-head"><span class="panel-title">Deleted Clients</span></div>
         <div class="panel-body">
           <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Deleting a client moves it here instead of erasing it — improvements, drafts, time entries, and notes all stay intact. Restore it anytime, or delete permanently to actually remove it for good.</p>
@@ -1658,6 +1658,8 @@ function applyRoleVisibility(){
     memberFilterWrap.style.display = isAdmin() ? 'flex' : 'none';
     if(isAdmin()) populateReportMemberFilter();
   }
+  const trashClientsPanel = document.getElementById('trashClientsPanel');
+  if(trashClientsPanel) trashClientsPanel.style.display = canApprove() ? 'block' : 'none';
 }
 
 function populateReportMemberFilter(){
@@ -2422,7 +2424,7 @@ function renderClientsTable(){
             <div class="dropdown-item" onclick="closeActionsMenus(); openEditClientForm('${c.id}')">Edit client</div>
             <div class="dropdown-item" onclick="closeActionsMenus(); toggleDrawer('${c.id}')">Log / view improvements</div>
             <div class="dropdown-item" onclick="closeActionsMenus(); openNoteModal(null, '${c.id}')">Add note</div>
-            <div class="dropdown-item danger" onclick="closeActionsMenus(); deleteClient('${c.id}')">Delete client</div>
+            ${canApprove() ? `<div class="dropdown-item danger" onclick="closeActionsMenus(); deleteClient('${c.id}')">Delete client</div>` : ''}
           </div>
         </div>
       </td>
@@ -2478,6 +2480,7 @@ document.addEventListener('click', function(e){
 });
 
 async function deleteClient(id){
+  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can delete clients.'); return; }
   const c = clients.find(x=>x.id===id);
   if(!c) return;
   if(!confirm(`Move ${c.name} to Trash? Their improvements, drafts, time entries, and notes stay intact and this can be undone from Trash.`)) return;
@@ -2496,6 +2499,7 @@ async function deleteClient(id){
 // that's already been soft-deleted. This is the only place data actually
 // gets destroyed rather than hidden.
 async function permanentlyDeleteClient(id){
+  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can manage deleted clients.'); return; }
   const c = clients.find(x=>x.id===id);
   if(!c) return;
   if(!confirm(`Permanently delete ${c.name}? This cannot be undone — all improvements, drafts, and history for this client will be gone for good.`)) return;
@@ -2509,6 +2513,7 @@ async function permanentlyDeleteClient(id){
 }
 
 async function restoreClient(id){
+  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can manage deleted clients.'); return; }
   await loadAll();
   const c = clients.find(x=>x.id===id);
   if(!c) return;
@@ -3724,6 +3729,26 @@ function renderReports(){
   const totalMinutes = relevant.reduce((s,e)=>s+e.minutes,0);
   const uniqueClients = new Set(relevant.map(e=>e.clientId)).size;
   const uniquePeople = new Set(relevant.map(e=>e.userId)).size;
+  const uniqueDays = new Set(relevant.map(e=>e.date)).size;
+  const avgMinutesPerDay = uniqueDays ? Math.round(totalMinutes/uniqueDays) : 0;
+
+  // "Team Members" and "By the whole team" only make sense for admins, who
+  // are the only ones actually seeing the whole team's entries here — a
+  // non-admin only ever sees their own, so those would just read "1" and
+  // "by the whole team" on data that's entirely their own. Swap in metrics
+  // that are actually useful for a single person reviewing their own time.
+  const adminView = isAdmin();
+  const thirdCard = adminView
+    ? `<div class="metric-card">
+        <div class="metric-head"><span class="metric-icon metric-icon-amber"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="metric-label">Team Members</span></div>
+        <div class="metric-value">${uniquePeople}</div>
+        <div class="metric-caption">Logged time this range</div>
+      </div>`
+    : `<div class="metric-card">
+        <div class="metric-head"><span class="metric-icon metric-icon-amber"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span><span class="metric-label">Avg Hours/Day</span></div>
+        <div class="metric-value">${uniqueDays ? formatMinutes(avgMinutesPerDay) : '—'}</div>
+        <div class="metric-caption">${uniqueDays ? `On ${uniqueDays} day${uniqueDays!==1?'s':''} you logged time` : 'No time logged yet'}</div>
+      </div>`;
 
   summaryEl.innerHTML = `
     <div class="metric-card">
@@ -3734,13 +3759,9 @@ function renderReports(){
     <div class="metric-card">
       <div class="metric-head"><span class="metric-icon metric-icon-green"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="metric-label">Entries Logged</span></div>
       <div class="metric-value">${relevant.length}</div>
-      <div class="metric-caption">By the whole team</div>
+      <div class="metric-caption">${adminView ? 'By the whole team' : 'By you'}</div>
     </div>
-    <div class="metric-card">
-      <div class="metric-head"><span class="metric-icon metric-icon-amber"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="metric-label">Team Members</span></div>
-      <div class="metric-value">${uniquePeople}</div>
-      <div class="metric-caption">Logged time this range</div>
-    </div>
+    ${thirdCard}
     <div class="metric-card">
       <div class="metric-head"><span class="metric-icon metric-icon-purple"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="metric-label">Clients Worked</span></div>
       <div class="metric-value">${uniqueClients}</div>
