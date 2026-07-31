@@ -327,6 +327,22 @@
 
   .report-graphic-row{display:grid;grid-template-columns:2fr 1fr;gap:16px;align-items:stretch;}
   @media (max-width:900px){.report-graphic-row{grid-template-columns:1fr;}}
+  .xy-chart-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
+  .xy-chart-title{font-size:13.5px;font-weight:600;}
+  .xy-chart-updated{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted-lt);margin-top:2px;}
+  .xy-chart-stats{display:flex;align-items:baseline;gap:10px;margin-bottom:6px;}
+  .xy-chart-value{font-family:'Oswald',sans-serif;font-size:26px;font-weight:600;}
+  .xy-chart-trend{font-size:12px;font-weight:600;display:flex;align-items:center;gap:3px;}
+  .xy-chart-trend.up{color:var(--green);}
+  .xy-chart-trend.down{color:#9C5C48;}
+  .xy-chart-svg-wrap{position:relative;width:100%;}
+  .xy-chart-svg-wrap svg{width:100%;height:180px;display:block;overflow:visible;}
+  .xy-chart-guide{stroke:var(--muted-lt);stroke-width:1;stroke-dasharray:3,3;}
+  .xy-chart-dot{fill:var(--card);stroke:var(--brand);stroke-width:2.5;}
+  .xy-chart-tooltip{position:absolute;display:none;background:var(--sidebar);color:#fff;border-radius:8px;padding:7px 11px;font-size:11.5px;font-weight:600;text-align:center;white-space:nowrap;transform:translate(-50%,-115%);pointer-events:none;box-shadow:0 8px 20px rgba(16,24,40,.22);z-index:5;}
+  .xy-chart-tooltip .xy-tt-label{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:400;color:#9DAAC2;margin-top:2px;}
+  .xy-chart-labels{display:flex;justify-content:space-between;margin-top:6px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--muted-lt);}
+
   .graphic-bar-row{margin-bottom:14px;}
   .graphic-bar-row:last-child{margin-bottom:0;}
   .graphic-bar-top{display:flex;justify-content:space-between;gap:8px;font-size:12px;margin-bottom:6px;}
@@ -583,8 +599,22 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
 
       <div class="panel" style="margin-bottom:24px;">
-        <div class="panel-head"><span class="panel-title">Time This Week, By Client</span><span class="row-link" onclick="switchView('time')">Full reports →</span></div>
-        <div class="panel-body"><div id="overviewTimeGraphic"></div></div>
+        <div class="panel-body">
+          <div class="xy-chart-header">
+            <div>
+              <div class="xy-chart-title">Hours Logged</div>
+              <div class="xy-chart-updated" id="overviewChartUpdated"></div>
+            </div>
+            <div class="select-field" style="min-width:110px;">
+              <select id="overviewChartGranularity" onchange="renderOverviewChart()">
+                <option value="day">Day</option>
+                <option value="week" selected>Week</option>
+                <option value="month">Month</option>
+              </select>
+            </div>
+          </div>
+          <div id="overviewChart"></div>
+        </div>
       </div>
 
       <div class="panel" id="budgetAlertsPanel" style="margin-bottom:24px;display:none;">
@@ -859,8 +889,22 @@ document.addEventListener('DOMContentLoaded', function(){
             </div>
           </div>
           <div class="panel">
-            <div class="panel-head"><span class="panel-title">Breakdown</span></div>
-            <div class="panel-body"><div id="reportGraphic"></div></div>
+            <div class="panel-body">
+              <div class="xy-chart-header">
+                <div>
+                  <div class="xy-chart-title">Hours Over Time</div>
+                  <div class="xy-chart-updated" id="reportChartUpdated"></div>
+                </div>
+                <div class="select-field" style="min-width:110px;">
+                  <select id="reportChartGranularity" onchange="renderReportChart()">
+                    <option value="day" selected>Day</option>
+                    <option value="week">Week</option>
+                    <option value="month">Month</option>
+                  </select>
+                </div>
+              </div>
+              <div id="reportChart"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -1397,7 +1441,7 @@ async function fullRefresh(showFeedback){
   renderAll();
   if(showFeedback && btn){ btn.disabled = false; btn.textContent = 'Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
-function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewTimeGraphic(); renderBudgetAlerts(); }
+function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); }
 
 function applyRoleVisibility(){
   const notifyBtn = document.getElementById('notifyBtn');
@@ -2923,7 +2967,7 @@ function renderReports(){
   const rows = Object.entries(grouped).sort((a,b)=>b[1]-a[1]);
   const colspan = reportTab==='clients' ? 4 : 2;
 
-  renderReportGraphic(rows, getLabel);
+  renderReportChart();
 
   if(!rows.length){
     tableBody.innerHTML = `<tr><td colspan="${colspan}"><div class="empty">No time logged in this range.</div></td></tr>`;
@@ -2962,36 +3006,162 @@ function renderReports(){
   }).join('');
 }
 
-// Compact ranked bar chart sitting next to the table — same data, shown as
-// a visual breakdown instead of rows. Uses one accent color at decreasing
-// opacity to show rank, rather than introducing a new color per item.
-function renderReportGraphic(rows, getLabel, elId){
-  const el = document.getElementById(elId || 'reportGraphic');
-  if(!el) return;
-  if(!rows.length){ el.innerHTML = `<div class="empty">Nothing to show yet.</div>`; return; }
-  const top = rows.slice(0, 6);
-  const maxMin = top[0][1];
-  el.innerHTML = top.map(([key,mins], idx)=>{
-    const label = getLabel(key);
-    const pct = Math.max(4, Math.round((mins/maxMin)*100));
-    const opacity = Math.max(0.35, 1 - idx*0.13).toFixed(2);
-    return `<div class="graphic-bar-row">
-      <div class="graphic-bar-top"><span class="graphic-bar-name">${label}</span><span class="graphic-bar-val">${formatMinutes(mins)}</span></div>
-      <div class="graphic-bar-track"><div class="graphic-bar-fill" style="width:${pct}%;opacity:${opacity};"></div></div>
-    </div>`;
-  }).join('');
+/* ---------- Reusable X/Y line chart (gradient area + hover tooltip), no library ---------- */
+
+function bucketKeyFor(date, granularity){
+  if(granularity==='day') return toDateStr(date);
+  if(granularity==='week') return toDateStr(getWeekStart(date));
+  return `${date.getFullYear()}-${date.getMonth()}`;
+}
+function bucketLabelFor(date, granularity){
+  if(granularity==='month') return date.toLocaleDateString('en-US',{month:'short'});
+  return date.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+function bucketStartFor(date, granularity){
+  if(granularity==='day'){ const d=new Date(date); d.setHours(0,0,0,0); return d; }
+  if(granularity==='week') return getWeekStart(date);
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+function stepBucket(date, granularity){
+  const d = new Date(date);
+  if(granularity==='day') d.setDate(d.getDate()+1);
+  else if(granularity==='week') d.setDate(d.getDate()+7);
+  else d.setMonth(d.getMonth()+1);
+  return d;
+}
+function buildBucketsInRange(startDate, endDate, granularity, maxBuckets){
+  let cursor = bucketStartFor(startDate, granularity);
+  const end = bucketStartFor(endDate, granularity);
+  const buckets = [];
+  let guard = 0;
+  while(cursor <= end && guard < 500){
+    buckets.push({ key: bucketKeyFor(cursor, granularity), label: bucketLabelFor(cursor, granularity), minutes:0, sortDate:new Date(cursor) });
+    cursor = stepBucket(cursor, granularity);
+    guard++;
+  }
+  return buckets.length > (maxBuckets||60) ? buckets.slice(-(maxBuckets||60)) : buckets;
+}
+function fillBucketsWithEntries(buckets, entries, granularity){
+  const map = {};
+  buckets.forEach(b=> map[b.key]=b);
+  entries.forEach(e=>{
+    const key = bucketKeyFor(new Date(e.date+'T00:00:00'), granularity);
+    if(map[key]) map[key].minutes += e.minutes;
+  });
+  return buckets;
 }
 
-function renderOverviewTimeGraphic(){
-  const el = document.getElementById('overviewTimeGraphic');
+function renderReportChart(){
+  const granularity = document.getElementById('reportChartGranularity')?.value || 'day';
+  const entries = getReportRangeEntries();
+  const bounds = getReportDateBounds();
+  let start = bounds.start;
+  const end = bounds.end || new Date();
+  if(start.getFullYear() <= 2000){
+    // "All time" placeholder start — use the earliest real entry instead of
+    // generating decades of empty buckets.
+    start = entries.length ? new Date(Math.min(...entries.map(e=>new Date(e.date+'T00:00:00')))) : new Date(end.getTime() - 30*86400000);
+  }
+  const buckets = fillBucketsWithEntries(buildBucketsInRange(start, end, granularity, 60), entries, granularity);
+  renderXYChart('reportChart', buckets);
+  const updatedEl = document.getElementById('reportChartUpdated');
+  if(updatedEl) updatedEl.textContent = `Updated ${new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`;
+}
+
+function renderOverviewChart(){
+  const granularity = document.getElementById('overviewChartGranularity')?.value || 'week';
+  const count = granularity==='day' ? 14 : granularity==='week' ? 8 : 6;
+  const end = new Date();
+  const start = new Date(end);
+  if(granularity==='day') start.setDate(start.getDate()-(count-1));
+  else if(granularity==='week') start.setDate(start.getDate()-(count-1)*7);
+  else start.setMonth(start.getMonth()-(count-1));
+  const buckets = fillBucketsWithEntries(buildBucketsInRange(start, end, granularity, count+1), timeEntries, granularity);
+  renderXYChart('overviewChart', buckets);
+  const updatedEl = document.getElementById('overviewChartUpdated');
+  if(updatedEl) updatedEl.textContent = `Updated ${new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`;
+}
+
+let xyChartUid = 0;
+function renderXYChart(containerId, buckets){
+  const el = document.getElementById(containerId);
   if(!el) return;
-  const weekStart = getWeekStart(new Date());
-  const weekEntries = timeEntries.filter(e => new Date(e.date+'T00:00:00') >= weekStart);
-  const grouped = {};
-  weekEntries.forEach(e=>{ grouped[e.clientId] = (grouped[e.clientId]||0) + e.minutes; });
-  const rows = Object.entries(grouped).sort((a,b)=>b[1]-a[1]);
-  const getLabel = (key)=>{ const c = clients.find(x=>x.id===key); return c ? c.name : 'Unknown client'; };
-  renderReportGraphic(rows, getLabel, 'overviewTimeGraphic');
+  if(!buckets.length){ el.innerHTML = `<div class="empty">No data for this period.</div>`; return; }
+
+  const uid = 'xy'+(xyChartUid++);
+  const w = 600, h = 180, padX = 6, padY = 14;
+  const values = buckets.map(b=>b.minutes/60);
+  const maxVal = Math.max(...values, 1);
+  const stepX = buckets.length>1 ? (w-2*padX)/(buckets.length-1) : 0;
+  const points = values.map((v,i)=>({
+    x: padX + i*stepX,
+    y: h - padY - (v/maxVal)*(h-2*padY),
+    v, label: buckets[i].label
+  }));
+  const linePath = points.map((p,idx)=> (idx===0?'M':'L')+p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
+  const areaPath = linePath + ` L${points[points.length-1].x.toFixed(1)},${h-padY} L${points[0].x.toFixed(1)},${h-padY} Z`;
+
+  const totalHours = values.reduce((s,v)=>s+v,0);
+  const lastVal = values[values.length-1] || 0;
+  const prevVal = values.length>1 ? values[values.length-2] : 0;
+  let trendPct = prevVal>0 ? Math.round(((lastVal-prevVal)/prevVal)*100) : (lastVal>0 ? 100 : 0);
+  const trendUp = lastVal >= prevVal;
+
+  const showEvery = buckets.length<=8 ? 1 : Math.ceil(buckets.length/6);
+
+  el.innerHTML = `
+    <div class="xy-chart-stats">
+      <div class="xy-chart-value">${totalHours.toFixed(1)}h</div>
+      <div class="xy-chart-trend ${trendUp?'up':'down'}">${trendUp?'↗':'↘'} ${Math.abs(trendPct)}%</div>
+    </div>
+    <div class="xy-chart-svg-wrap" id="${uid}-wrap">
+      <svg viewBox="0 0 ${w} ${h}" id="${uid}-svg" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="${uid}-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" style="stop-color:var(--brand);stop-opacity:0.32;"></stop>
+            <stop offset="100%" style="stop-color:var(--brand);stop-opacity:0;"></stop>
+          </linearGradient>
+        </defs>
+        <path d="${areaPath}" fill="url(#${uid}-grad)" stroke="none"></path>
+        <path d="${linePath}" fill="none" stroke="var(--brand)" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"></path>
+        <line id="${uid}-guide" class="xy-chart-guide" x1="0" y1="${padY}" x2="0" y2="${h-padY}" style="display:none;"></line>
+        <circle id="${uid}-dot" class="xy-chart-dot" r="4" style="display:none;"></circle>
+        <rect x="0" y="0" width="${w}" height="${h}" fill="transparent" id="${uid}-overlay" style="cursor:crosshair;"></rect>
+      </svg>
+      <div class="xy-chart-tooltip" id="${uid}-tooltip"></div>
+    </div>
+    <div class="xy-chart-labels">${buckets.map((b,i)=> (i%showEvery===0 || i===buckets.length-1) ? `<span>${b.label}</span>` : '<span></span>').join('')}</div>`;
+
+  const overlay = document.getElementById(`${uid}-overlay`);
+  const svgEl = document.getElementById(`${uid}-svg`);
+  const guide = document.getElementById(`${uid}-guide`);
+  const dot = document.getElementById(`${uid}-dot`);
+  const tooltip = document.getElementById(`${uid}-tooltip`);
+
+  function showAt(index){
+    const p = points[index];
+    guide.setAttribute('x1', p.x); guide.setAttribute('x2', p.x);
+    guide.style.display = 'block';
+    dot.setAttribute('cx', p.x); dot.setAttribute('cy', p.y);
+    dot.style.display = 'block';
+    tooltip.innerHTML = `${p.v.toFixed(1)}h<div class="xy-tt-label">${p.label}</div>`;
+    tooltip.style.left = ((p.x/w)*100)+'%';
+    tooltip.style.top = ((p.y/h)*100)+'%';
+    tooltip.style.display = 'block';
+  }
+  function hide(){ guide.style.display='none'; dot.style.display='none'; tooltip.style.display='none'; }
+  function nearestIndex(clientX){
+    const rect = svgEl.getBoundingClientRect();
+    const localX = ((clientX-rect.left)/rect.width)*w;
+    let nearest=0, nearestDist=Infinity;
+    points.forEach((p,i)=>{ const d=Math.abs(p.x-localX); if(d<nearestDist){ nearestDist=d; nearest=i; } });
+    return nearest;
+  }
+
+  overlay.addEventListener('mousemove', (e)=> showAt(nearestIndex(e.clientX)));
+  overlay.addEventListener('mouseleave', hide);
+  overlay.addEventListener('touchstart', (e)=>{ if(e.touches[0]) showAt(nearestIndex(e.touches[0].clientX)); }, {passive:true});
+  overlay.addEventListener('touchmove', (e)=>{ if(e.touches[0]) showAt(nearestIndex(e.touches[0].clientX)); }, {passive:true});
 }
 
 // Surfaces clients approaching or over their monthly hour budget, so the team
