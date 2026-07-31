@@ -2384,16 +2384,14 @@ function renderClientsTable(){
       <td>${dotRatingCompact(c.danger,'brand',5)}</td>
       <td>${loggedPill(c)}</td>
       <td class="actions-cell">
-        <div style="display:flex;gap:8px;justify-content:flex-end;">
-          <button class="btn btn-outline" onclick="toggleDrawer('${c.id}')" title="Log or view improvements">Log improvement</button>
-          <div class="dropdown">
-            <button class="btn btn-outline" onclick="toggleActionsMenu('${c.id}')">Actions ▾</button>
-            <div class="dropdown-menu" id="menu-${c.id}">
-              <div class="dropdown-item" onclick="closeActionsMenus(); openClientDetail('${c.id}')">View details</div>
-              <div class="dropdown-item" onclick="closeActionsMenus(); openEditClientForm('${c.id}')">Edit client</div>
-              <div class="dropdown-item" onclick="closeActionsMenus(); openNoteModal(null, '${c.id}')">Add note</div>
-              <div class="dropdown-item danger" onclick="closeActionsMenus(); deleteClient('${c.id}')">Delete client</div>
-            </div>
+        <div class="dropdown">
+          <button class="btn btn-outline" onclick="toggleActionsMenu('${c.id}')">Actions ▾</button>
+          <div class="dropdown-menu" id="menu-${c.id}">
+            <div class="dropdown-item" onclick="closeActionsMenus(); openClientDetail('${c.id}')">View details</div>
+            <div class="dropdown-item" onclick="closeActionsMenus(); openEditClientForm('${c.id}')">Edit client</div>
+            <div class="dropdown-item" onclick="closeActionsMenus(); toggleDrawer('${c.id}')">Log / view improvements</div>
+            <div class="dropdown-item" onclick="closeActionsMenus(); openNoteModal(null, '${c.id}')">Add note</div>
+            <div class="dropdown-item danger" onclick="closeActionsMenus(); deleteClient('${c.id}')">Delete client</div>
           </div>
         </div>
       </td>
