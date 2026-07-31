@@ -538,6 +538,14 @@ document.addEventListener('DOMContentLoaded', function(){
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         Time Tracker
       </div>
+      <div class="nav-item" data-view="team" onclick="switchView('team')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Team
+      </div>
+      <div class="nav-item" data-view="trash" onclick="switchView('trash')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        Trash
+      </div>
       <div class="nav-item" data-view="settings" onclick="switchView('settings')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         Settings &amp; Integrations
@@ -960,8 +968,6 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="tab settings-tab" data-stab="fields" onclick="switchSettingsTab('fields')">Client Fields</div>
         <div class="tab settings-tab" data-stab="ai" onclick="switchSettingsTab('ai')">AI &amp; Email</div>
         <div class="tab settings-tab" data-stab="integrations" onclick="switchSettingsTab('integrations')">Integrations &amp; Sync</div>
-        <div class="tab settings-tab" data-stab="team" onclick="switchSettingsTab('team')">Team</div>
-        <div class="tab settings-tab" data-stab="trash" onclick="switchSettingsTab('trash')">Trash</div>
       </div>
 
       <!-- GENERAL -->
@@ -1092,68 +1098,78 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
 
       <!-- TEAM -->
-      <div class="settings-subview" id="stab-team">
-        <div class="panel" id="addMemberPanel" style="display:none;">
-          <div class="panel-head"><span class="panel-title">Add team member</span></div>
-          <div class="panel-body">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Creates a real login for this person and assigns their role. You'll get a one-time temporary password to send them directly — they should change it after logging in.</p>
-            <div class="form-grid" style="margin-bottom:12px;">
-              <div><label>Name</label><input id="tmName" placeholder="e.g. Priya"></div>
-              <div><label>Email</label><input id="tmEmail" placeholder="priya@basedagency.com"></div>
-              <div><label>Job title</label><select id="tmTitle"></select></div>
-              <div><label>Permission role</label>
-                <select id="tmRole">
-                  <option value="member">Member — can log improvements, can't approve</option>
-                  <option value="approver">Approver — can approve/skip drafts</option>
-                  <option value="admin">Admin — full access, can manage team &amp; roles</option>
-                </select>
-              </div>
-            </div>
-            <button class="btn btn-brand" onclick="addTeamMember()">Create account</button>
-          </div>
-        </div>
+    </div>
 
-        <div class="panel" id="teamTitlesPanel" style="display:none;">
-          <div class="panel-head"><span class="panel-title">Job Titles</span></div>
-          <div class="panel-body">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Manage the job titles available when adding team members (e.g. Web Developer, SEO Specialist). Purely descriptive — doesn't affect permissions.</p>
-            <div id="titleOptionsList" class="options-list"></div>
-            <div style="display:flex;gap:8px;margin-top:10px;">
-              <input id="titleOptionInput" placeholder="New job title" style="flex:1;font-family:'Inter',sans-serif;font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);">
-              <button class="btn btn-outline" onclick="addFieldOption('title')">Add</button>
+    <!-- TEAM -->
+    <div class="view" id="view-team">
+      <div class="topbar">
+        <div><div class="page-title">Team</div><div class="page-sub">Manage who's on the team, their roles, and job titles</div></div>
+      </div>
+
+      <div class="panel" id="addMemberPanel" style="display:none;">
+        <div class="panel-head"><span class="panel-title">Add team member</span></div>
+        <div class="panel-body">
+          <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Creates a real login for this person and assigns their role. You'll get a one-time temporary password to send them directly — they should change it after logging in.</p>
+          <div class="form-grid" style="margin-bottom:12px;">
+            <div><label>Name</label><input id="tmName" placeholder="e.g. Priya"></div>
+            <div><label>Email</label><input id="tmEmail" placeholder="priya@basedagency.com"></div>
+            <div><label>Job title</label><select id="tmTitle"></select></div>
+            <div><label>Permission role</label>
+              <select id="tmRole">
+                <option value="member">Member — can log improvements, can't approve</option>
+                <option value="approver">Approver — can approve/skip drafts</option>
+                <option value="admin">Admin — full access, can manage team &amp; roles</option>
+              </select>
             </div>
           </div>
+          <button class="btn btn-brand" onclick="addTeamMember()">Create account</button>
         </div>
+      </div>
 
-        <div class="panel">
-          <div class="panel-head"><span class="panel-title">Team</span></div>
-          <div class="panel-body">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;" id="teamPanelNote"></p>
-            <div id="teamList"></div>
+      <div class="panel" id="teamTitlesPanel" style="display:none;">
+        <div class="panel-head"><span class="panel-title">Job Titles</span></div>
+        <div class="panel-body">
+          <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Manage the job titles available when adding team members (e.g. Web Developer, SEO Specialist). Purely descriptive — doesn't affect permissions.</p>
+          <div id="titleOptionsList" class="options-list"></div>
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <input id="titleOptionInput" placeholder="New job title" style="flex:1;font-family:'Inter',sans-serif;font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);">
+            <button class="btn btn-outline" onclick="addFieldOption('title')">Add</button>
           </div>
         </div>
       </div>
 
-      <!-- TRASH -->
-      <div class="settings-subview" id="stab-trash">
-        <div class="panel">
-          <div class="panel-head"><span class="panel-title">Deleted Clients</span></div>
-          <div class="panel-body">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Deleting a client moves it here instead of erasing it — improvements, drafts, time entries, and notes all stay intact. Restore it anytime, or delete permanently to actually remove it for good.</p>
-            <div id="trashClientsList"></div>
-          </div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">Team</span></div>
+        <div class="panel-body">
+          <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;" id="teamPanelNote"></p>
+          <div id="teamList"></div>
         </div>
-        <div class="panel">
-          <div class="panel-head"><span class="panel-title">Deleted Notes <span style="font-weight:400;color:var(--muted-lt);">(yours only — notes are private)</span></span></div>
-          <div class="panel-body">
-            <div id="trashNotesList"></div>
-          </div>
+      </div>
+    </div>
+
+    <!-- TRASH -->
+    <div class="view" id="view-trash">
+      <div class="topbar">
+        <div><div class="page-title">Trash</div><div class="page-sub">Deleted clients, notes, and time entries — restore anytime, or delete for good</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">Deleted Clients</span></div>
+        <div class="panel-body">
+          <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Deleting a client moves it here instead of erasing it — improvements, drafts, time entries, and notes all stay intact. Restore it anytime, or delete permanently to actually remove it for good.</p>
+          <div id="trashClientsList"></div>
         </div>
-        <div class="panel">
-          <div class="panel-head"><span class="panel-title">Deleted Time Entries</span></div>
-          <div class="panel-body">
-            <div id="trashTimeList"></div>
-          </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">Deleted Notes <span style="font-weight:400;color:var(--muted-lt);">(yours only — notes are private)</span></span></div>
+        <div class="panel-body">
+          <div id="trashNotesList"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">Deleted Time Entries</span></div>
+        <div class="panel-body">
+          <div id="trashTimeList"></div>
         </div>
       </div>
     </div>
@@ -1570,13 +1586,13 @@ async function switchView(name){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
   await fullRefresh();
+  if(name==='trash') renderTrash();
 }
 
 function switchSettingsTab(name){
   document.querySelectorAll('#view-settings .settings-tab').forEach(t=>t.classList.toggle('active', t.dataset.stab===name));
   document.querySelectorAll('#view-settings .settings-subview').forEach(v=>v.classList.remove('active'));
   document.getElementById('stab-'+name).classList.add('active');
-  if(name==='trash') renderTrash();
 }
 
 async function goToQueueFilter(filter){
@@ -2279,7 +2295,7 @@ document.addEventListener('click', function(e){
 async function deleteClient(id){
   const c = clients.find(x=>x.id===id);
   if(!c) return;
-  if(!confirm(`Move ${c.name} to Trash? Their improvements, drafts, time entries, and notes stay intact and this can be undone from Settings → Trash.`)) return;
+  if(!confirm(`Move ${c.name} to Trash? Their improvements, drafts, time entries, and notes stay intact and this can be undone from Trash.`)) return;
   await loadAll();
   const stillThere = clients.find(x=>x.id===id);
   if(!stillThere){ showToast('info','Already gone', `${c.name} was already removed.`); renderAll(); return; }
@@ -2288,7 +2304,7 @@ async function deleteClient(id){
   const ok = await persistClients();
   renderAll();
   if(ok) logClientActivity(id, 'client_deleted', `${myName()||'Someone'} moved this client (${c.name}) to Trash.`);
-  ok ? showToast('success','Moved to Trash', `${c.name} can be restored from Settings → Trash.`) : showToast('error','Delete failed','Could not save — try again.');
+  ok ? showToast('success','Moved to Trash', `${c.name} can be restored from Trash.`) : showToast('error','Delete failed','Could not save — try again.');
 }
 
 // True permanent deletion — only reachable from the Trash panel, on a client
@@ -2670,7 +2686,7 @@ async function deleteNote(id){
   const { error } = await supabaseClient.from('notes').update({ deleted_at: new Date().toISOString() }).eq('id', id).eq('user_id', currentUser.id);
   await loadMyNotes();
   renderNotes();
-  error ? showToast('error','Delete failed', error.message) : showToast('success','Note moved to Trash','Restore it anytime from Settings → Trash.');
+  error ? showToast('error','Delete failed', error.message) : showToast('success','Note moved to Trash','Restore it anytime from Trash.');
 }
 
 async function changeNoteStatus(id, newStatus){
@@ -3002,7 +3018,8 @@ const tourSteps = [
   { view:'time', timeTab:'timer', title:"Track time — live", body:"Start a timer for any client and service, or add time manually. A floating pill keeps a running timer visible on every tab — you can stop it from anywhere, not just here." },
   { view:'time', timeTab:'timesheet', title:"Your timesheet", body:"Day or week view, with real calendar navigation. Clicking Start on a past entry resumes tracking and adds to that same entry — no duplicates." },
   { view:'time', timeTab:'reports', title:"See where time goes", body:"Breaks down hours by client, service, or teammate, filterable by range — with an \"Active clients only\" option to cut the noise." },
-  { view:'settings', settingsTab:'general', title:"Settings & Integrations", body:"Manage your name, approvers, client field options, AI email instructions, and Google Sheet sync here. If you're an admin, you can also add team members and assign roles that control who can actually approve drafts." },
+  { view:'settings', settingsTab:'general', title:"Settings & Integrations", body:"Manage your name, approvers, client field options, AI email instructions, and Google Sheet sync here — plus custom fields if you need to track something we don't already have a spot for." },
+  { view:'team', title:"Team & Trash", body:"Team management got its own tab — add people, assign roles that control who can approve drafts. Right next to it, Trash holds anything deleted (clients, notes, time entries) so a misclick is never permanent — restore it anytime." },
   { view:'overview', title:"That's the platform", body:"You're set. Come back to this tour anytime from the \"Take a tour\" button in the sidebar." },
 ];
 let tourIndex = 0;
@@ -3405,7 +3422,7 @@ async function deleteTimeEntry(id){
   const { error } = await supabaseClient.from('time_entries').update({ deleted_at: new Date().toISOString() }).eq('id', id);
   await loadTimeEntries();
   renderTimesheet(); renderReports();
-  error ? showToast('error','Delete failed', error.message) : showToast('success','Entry moved to Trash','Restore it anytime from Settings → Trash.');
+  error ? showToast('error','Delete failed', error.message) : showToast('success','Entry moved to Trash','Restore it anytime from Trash.');
 }
 
 /* --- Reports --- */
