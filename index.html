@@ -91,6 +91,8 @@
   @media (max-width:900px){.bento-row{grid-template-columns:1fr;}}
   .split-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch;}
   @media (max-width:900px){.split-row{grid-template-columns:1fr;}}
+  .split-row-70{display:grid;grid-template-columns:7fr 3fr;gap:16px;align-items:stretch;}
+  @media (max-width:900px){.split-row-70{grid-template-columns:1fr;}}
   .sync-dot{width:6px;height:6px;border-radius:50%;background:var(--green);}
   .btn{font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;border:none;border-radius:7px;padding:9px 16px;cursor:pointer;transition:opacity .15s ease, transform .1s ease;}
   .btn:hover{opacity:.88;} .btn:active{transform:scale(.98);} .btn:disabled{opacity:.4;cursor:not-allowed;}
@@ -363,7 +365,7 @@
   .q-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;}
   .q-name{font-family:'Oswald',sans-serif;font-size:16.5px;font-weight:600;letter-spacing:.015em;}
   .q-service-caption{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-lt);margin-top:4px;}
-  .q-risk-flag{color:#9C5C48;font-weight:600;}
+  .q-risk-flag{color:#C0392B;font-weight:600;}
   .q-status-label{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;white-space:nowrap;flex:none;}
   .q-ratings{margin-top:20px;display:flex;flex-direction:column;gap:9px;}
   .rating-row{display:flex;align-items:center;gap:10px;}
@@ -376,8 +378,8 @@
   .q-bulk-preview.has-logs{color:var(--green);font-weight:600;}
   .pulse-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex:none;position:relative;}
   .pulse-dot::after{content:'';position:absolute;inset:0;border-radius:50%;background:var(--green);animation:pulseRing 1.8s ease-out infinite;}
-  .pulse-dot.pulse-red{background:#9C5C48;}
-  .pulse-dot.pulse-red::after{background:#9C5C48;}
+  .pulse-dot.pulse-red{background:#C0392B;}
+  .pulse-dot.pulse-red::after{background:#C0392B;}
   @keyframes pulseRing{
     0%{ transform:scale(1); opacity:.7; }
     100%{ transform:scale(2.8); opacity:0; }
@@ -561,10 +563,14 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
 
       <div class="metrics-row">
-        <div class="donut-card kpi-click" onclick="switchView('clients')">
-          <div class="donut-card-head">Total Clients</div>
-          <div class="donut-wrap" id="totalClientsDonut"></div>
-          <div class="donut-legend" id="totalClientsLegend"></div>
+        <div class="metric-card kpi-click" onclick="switchView('clients')">
+          <div class="metric-head">
+            <span class="metric-icon metric-icon-blue"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+            <span class="metric-label">Total Clients</span>
+          </div>
+          <div class="metric-value" id="kpiTotal">0</div>
+          <div class="metric-chips" id="totalChips"></div>
+          <div class="metric-caption">Full roster</div>
         </div>
 
         <div class="metric-card kpi-click" onclick="switchView('clients')">
@@ -634,9 +640,17 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="panel-body"><div id="budgetAlertsList"></div></div>
       </div>
 
-      <div class="panel" style="margin-bottom:24px;">
-        <div class="panel-head"><span class="panel-title">Needs attention</span></div>
-        <div class="panel-body"><div id="attentionList"></div></div>
+      <div class="split-row-70" style="margin-bottom:24px;">
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Needs attention</span></div>
+          <div class="panel-body"><div id="attentionList"></div></div>
+        </div>
+
+        <div class="donut-card kpi-click" onclick="switchView('clients')">
+          <div class="donut-card-head">Risk Breakdown</div>
+          <div class="donut-wrap" id="totalClientsDonut"></div>
+          <div class="donut-legend" id="totalClientsLegend"></div>
+        </div>
       </div>
     </div>
 
@@ -1507,7 +1521,7 @@ function renderAttentionList(){
         ${dotRating('Importance', c.importance, 'ink', 10)}
         ${dotRating('Danger', c.danger, 'brand')}
       </div>
-      <div class="q-bulk-preview" style="color:#9C5C48;font-weight:600;"><span class="pulse-dot pulse-red"></span>${reason}</div>
+      <div class="q-bulk-preview" style="color:#C0392B;font-weight:600;"><span class="pulse-dot pulse-red"></span>${reason}</div>
     </div>`;
   }).join('')}</div>`;
 }
@@ -1681,6 +1695,10 @@ function renderKpis(){
   document.getElementById('navPendingBadge').textContent = pending;
 
   // --- Total Clients ---
+  document.getElementById('kpiTotal').textContent = clients.length;
+  document.getElementById('totalChips').innerHTML = clients.length
+    ? `<span class="pill pill-good">${active} Active</span>${atRisk ? `<span class="pill pill-bad">${atRisk} At risk</span>` : ''}`
+    : '';
   renderTotalClientsDonut();
 
   // --- Client Health: inverse of average danger score across the roster, as a % ---
@@ -3398,7 +3416,7 @@ function renderTotalClientsDonut(){
   const counts = { 'No risk':0, 'Medium risk':0, 'At risk':0 };
   clients.forEach(c=>{ counts[riskLabel(c.danger).text]++; });
   const entries = Object.entries(counts).filter(([,count])=>count>0);
-  const tierColor = (tier)=> tier==='At risk' ? '#9C5C48' : tier==='Medium risk' ? 'var(--amber)' : '#3A63C9';
+  const tierColor = (tier)=> tier==='At risk' ? '#C0392B' : tier==='Medium risk' ? '#C97B6E' : '#B8A29D';
 
   const r = 46, cx = 60, cy = 60, strokeW = 15;
   const C = 2*Math.PI*r;
@@ -3431,9 +3449,9 @@ function renderTotalClientsDonut(){
 // something's wrong, so "No risk" and "Medium risk" are just as visible as
 // "At risk" instead of only flagging the bad case.
 function riskLabel(danger){
-  if(danger>=4) return { text:'At risk', color:'#9C5C48' };
-  if(danger===3) return { text:'Medium risk', color:'var(--amber)' };
-  return { text:'No risk', color:'#3A63C9' };
+  if(danger>=4) return { text:'At risk', color:'#C0392B' };
+  if(danger===3) return { text:'Medium risk', color:'#C97B6E' };
+  return { text:'No risk', color:'#B8A29D' };
 }
 
 function riskCaptionHtml(danger){
