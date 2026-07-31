@@ -132,6 +132,10 @@
   .donut-legend-item{font-size:10.5px;color:var(--muted);display:flex;align-items:center;gap:5px;white-space:nowrap;}
   .donut-legend-dot{width:7px;height:7px;border-radius:50%;flex:none;position:relative;}
   .donut-legend-dot::after{content:'';position:absolute;inset:0;border-radius:50%;background-color:inherit;animation:pulseRing 1.8s ease-out infinite;}
+  .donut-stats{width:100%;margin-top:18px;padding-top:16px;border-top:1px solid #F3F4F6;}
+  .donut-stat-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;}
+  .donut-stat-label{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-lt);}
+  .donut-stat-val{font-family:'Oswald',sans-serif;font-size:15px;font-weight:600;color:var(--ink);}
   .metric-head{display:flex;align-items:center;gap:9px;margin-bottom:14px;}
   .metric-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex:none;}
   .metric-icon-blue{background:#E7EEFC;color:#3A63C9;}
@@ -651,6 +655,7 @@ document.addEventListener('DOMContentLoaded', function(){
           <div class="donut-card-head">Risk Breakdown</div>
           <div class="donut-wrap" id="totalClientsDonut"></div>
           <div class="donut-legend" id="totalClientsLegend"></div>
+          <div class="donut-stats" id="totalClientsStats"></div>
         </div>
       </div>
     </div>
@@ -1142,6 +1147,11 @@ document.addEventListener('DOMContentLoaded', function(){
           <div class="panel-head"><span class="panel-title">My Notes</span><span class="row-link" onclick="openNoteModalFromDetail()">+ Add</span></div>
           <div class="panel-body"><div id="cdNotes" class="scroll-cap"></div></div>
         </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:24px;">
+        <div class="panel-head"><span class="panel-title">Activity History</span></div>
+        <div class="panel-body"><div id="cdActivityHistory" class="scroll-cap"></div></div>
       </div>
     </div>
 
@@ -1685,17 +1695,22 @@ async function saveClientForm(){
     monthlyHourBudget: parseFloat(document.getElementById('ncBudget').value) || 0,
     sow:document.getElementById('ncSow').value.trim(),
   };
-  let ok, msg;
+  let ok, msg, loggedClientId;
   if(editingClientId){
     const c = clients.find(x=>x.id===editingClientId);
     if(!c){ showToast('error','Client not found','This client may have been removed — refreshing.'); closeClientForm(); restoreBtn(btn); await fullRefresh(); return; }
     Object.assign(c, fields);
     ok = await persistClients();
     msg = `${name} updated.`;
+    loggedClientId = editingClientId;
+    if(ok){ logClientActivity(loggedClientId, 'client_edited', `${myName()||'Someone'} edited this client's details.`); refreshClientDetailActivityIfOpen(loggedClientId); }
   } else {
-    clients.push({ id:'c'+Date.now(), ...fields, improvements:[], draft:'', draftStatus:'none' });
+    const newId = 'c'+Date.now();
+    clients.push({ id:newId, ...fields, improvements:[], draft:'', draftStatus:'none' });
     ok = await persistClients();
     msg = `${name} is now on the roster.`;
+    loggedClientId = newId;
+    if(ok) logClientActivity(loggedClientId, 'client_created', `${myName()||'Someone'} added this client to the roster.`);
   }
   closeClientForm();
   restoreBtn(btn);
@@ -1980,16 +1995,24 @@ async function deleteClient(id){
   log.unshift({t:nowTime(), tag:'you', text:`Deleted client <b>${c.name}</b>.`});
   const ok = await persistClients();
   renderAll();
+  if(ok) logClientActivity(id, 'client_deleted', `${myName()||'Someone'} deleted this client (${c.name}) from the roster.`);
   ok ? showToast('success','Client deleted', `${c.name} removed from the roster.`) : showToast('error','Delete failed','Could not save — try again.');
 }
 
 /* ---------- Client Detail Page — everything about one client, pulled from every tab ---------- */
 let currentDetailClientId = null;
 
+function refreshClientDetailActivityIfOpen(clientId){
+  if(currentDetailClientId === clientId && document.getElementById('cdActivityHistory')){
+    loadClientActivityHistory(clientId);
+  }
+}
+
 async function openClientDetail(clientId){
   currentDetailClientId = clientId;
   await switchView('clientdetail');
   renderClientDetail();
+  loadClientActivityHistory(clientId);
 }
 
 function openEditClientFormFromDetail(){
@@ -2126,6 +2149,7 @@ async function saveEditImprovement(clientId, idx){
   c.improvements[idx].author = author;
   const ok = await persistClients();
   renderClientsTable(); renderKpis();
+  if(ok){ logClientActivity(clientId, 'improvement_edited', `${myName()||'Someone'} edited a logged improvement.`); refreshClientDetailActivityIfOpen(clientId); }
   ok ? showToast('success','Improvement updated','Changes saved.') : showToast('error','Save failed','Could not save — try again.');
 }
 
@@ -2137,6 +2161,7 @@ async function deleteImprovement(clientId, idx){
   c.improvements.splice(idx, 1);
   const ok = await persistClients();
   renderClientsTable(); renderKpis();
+  if(ok){ logClientActivity(clientId, 'improvement_deleted', `${myName()||'Someone'} deleted a logged improvement.`); refreshClientDetailActivityIfOpen(clientId); }
   ok ? showToast('success','Improvement deleted','Removed from the log.') : showToast('error','Delete failed','Could not save — try again.');
 }
 
@@ -2208,6 +2233,7 @@ async function saveNote(noteId){
   await loadMyNotes();
   populateNotesClientFilter();
   renderNotes();
+  if(!error && !noteId){ logClientActivity(clientId, 'note_added', `${myName()||'Someone'} added a private note (content not shared here).`); refreshClientDetailActivityIfOpen(clientId); }
   error ? showToast('error','Save failed', error.message) : showToast('success', noteId?'Note updated':'Note added', noteId?'Changes saved.':'Added to your notes.');
 }
 
@@ -2342,6 +2368,41 @@ async function loadTimeEntries(){
   const { data, error } = await supabaseClient.from('time_entries').select('*').order('entry_date', { ascending:false });
   if(error){ console.error('loadTimeEntries error', error); timeEntries = []; return; }
   timeEntries = (data||[]).map(e=>({ id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes, description:e.description||'', service:e.service||'', createdAt:e.created_at }));
+}
+
+/* ---------- Per-client audit trail (unbounded, unlike the 60-entry global log) ---------- */
+
+// Fire-and-forget: writes an audit entry, but never blocks or breaks the
+// actual action (logging an edit shouldn't be able to stop the edit itself).
+async function logClientActivity(clientId, actionType, description){
+  if(!clientId || !currentUser) return;
+  try{
+    const { error } = await supabaseClient.from('activity_log').insert({
+      client_id: clientId, user_id: currentUser.id, action_type: actionType, description
+    });
+    if(error) console.error('logClientActivity error', error);
+  }catch(e){ console.error('logClientActivity error', e); }
+}
+
+async function loadClientActivityHistory(clientId){
+  const el = document.getElementById('cdActivityHistory');
+  if(!el) return;
+  el.innerHTML = `<div class="empty">Loading…</div>`;
+  const { data, error } = await supabaseClient
+    .from('activity_log').select('*').eq('client_id', clientId).order('created_at', { ascending:false }).limit(200);
+  if(error){ el.innerHTML = `<div class="empty">Could not load activity history.</div>`; return; }
+  if(!data || !data.length){ el.innerHTML = `<div class="empty">No activity recorded yet.</div>`; return; }
+  el.innerHTML = data.map(row=>{
+    const person = teamProfiles.find(p=>p.id===row.user_id);
+    const when = new Date(row.created_at);
+    return `<div class="ts-entry-card" style="margin-bottom:8px;">
+      <div class="ts-entry-info">
+        <div class="ts-entry-title">${row.description}</div>
+        <div class="ts-entry-desc" style="margin-top:2px;">${person ? person.name : 'Someone no longer on the team'}</div>
+      </div>
+      <div class="ts-entry-right"><div class="ts-entry-duration" style="font-size:10.5px;color:var(--muted-lt);">${when.toLocaleDateString('en-US',{month:'short',day:'numeric'})} · ${when.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</div></div>
+    </div>`;
+  }).join('');
 }
 
 function populateTimeClientSelects(){
@@ -3291,6 +3352,7 @@ async function logImprovement(id){
   const ok = await persistClients();
   renderClientsTable();
   renderKpis();
+  if(ok){ logClientActivity(id, 'improvement_logged', `${author} logged an improvement: "${text.length>80?text.slice(0,80)+'…':text}"`); refreshClientDetailActivityIfOpen(id); }
   ok ? showToast('success','Improvement logged', `Saved for ${c.name}.`) : showToast('error','Save failed','Could not save this entry — try again.');
 }
 
@@ -3424,6 +3486,8 @@ function renderTotalClientsDonut(){
   if(!total){
     wrap.innerHTML = `<div class="empty" style="padding:30px 0;">No clients yet.</div>`;
     if(legend) legend.innerHTML = '';
+    const statsEl0 = document.getElementById('totalClientsStats');
+    if(statsEl0) statsEl0.innerHTML = '';
     return;
   }
   // Grouped by risk tier (danger score), not status — status is almost always
@@ -3458,6 +3522,17 @@ function renderTotalClientsDonut(){
     legend.innerHTML = entries.map(([tier,count])=>
       `<span class="donut-legend-item"><span class="donut-legend-dot" style="background:${tierColor(tier)};"></span>${tier} (${count})</span>`
     ).join('');
+  }
+
+  const statsEl = document.getElementById('totalClientsStats');
+  if(statsEl){
+    const avgImportance = (clients.reduce((s,c)=>s+c.importance,0) / total).toFixed(1);
+    const avgDanger = (clients.reduce((s,c)=>s+c.danger,0) / total).toFixed(1);
+    const atRiskNoDraft = clients.filter(c=> c.danger>=4 && c.draftStatus==='none').length;
+    statsEl.innerHTML = `
+      <div class="donut-stat-row"><span class="donut-stat-label">Avg Importance</span><span class="donut-stat-val">${avgImportance}/10</span></div>
+      <div class="donut-stat-row"><span class="donut-stat-label">Avg Danger</span><span class="donut-stat-val">${avgDanger}/5</span></div>
+      <div class="donut-stat-row"><span class="donut-stat-label">At Risk, No Draft</span><span class="donut-stat-val" style="color:${atRiskNoDraft?'#DC2626':'var(--ink)'};">${atRiskNoDraft}</span></div>`;
   }
 }
 
@@ -3601,6 +3676,8 @@ ${contentRules}`;
     log.unshift({t:nowTime(), tag:'auto', text:`AI drafted the update for <b>${c.name}</b> from ${c.improvements.length} logged improvement${c.improvements.length!==1?'s':''}.`});
     await persistClients();
     renderQueue(); renderLog(); renderKpis();
+    logClientActivity(id, 'draft_generated', `AI generated a draft from ${c.improvements.length} logged improvement${c.improvements.length!==1?'s':''}.`);
+    refreshClientDetailActivityIfOpen(id);
     if(modalOpenForThis) openQueueCardModal(id);
     showToast('success','Draft generated', `AI wrote the update for ${c.name}.`);
   }catch(e){
@@ -3630,6 +3707,8 @@ async function approveDraft(id){
   const ok = await persistClients();
   renderQueue(); renderLog(); renderKpis();
   if(!ok){ showToast('error','Save failed','Approval may not have synced — refresh and check.'); return; }
+  logClientActivity(id, 'draft_approved', `${myName()||'Someone'} approved this week's draft.`);
+  refreshClientDetailActivityIfOpen(id);
   if(email){
     showMailModal(email, 'Your weekly update from Based Agency', draftText);
   } else {
@@ -3649,6 +3728,7 @@ async function skipDraft(id){
   log.unshift({t:nowTime(), tag:'you', text:`Skipped <b>${c.name}</b> this week — no email sent.`});
   const ok = await persistClients();
   renderQueue(); renderLog(); renderKpis();
+  if(ok){ logClientActivity(id, 'draft_skipped', `${myName()||'Someone'} skipped this week's update.`); refreshClientDetailActivityIfOpen(id); }
   if(modalOpenForThis) openQueueCardModal(id);
   ok ? showToast('info','Skipped', `${c.name} won't get an update this week.`) : showToast('error','Save failed','Could not save — try again.');
 }
