@@ -171,13 +171,6 @@
   .filter-btn{display:flex;align-items:center;white-space:nowrap;}
   .filter-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;margin-left:7px;border-radius:20px;background:var(--brand);color:#fff;font-size:10px;font-weight:700;}
 
-  .attn-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #F3F4F6;cursor:pointer;transition:padding-left .12s ease;}
-  .attn-row:hover{padding-left:4px;}
-  .attn-row:last-child{border-bottom:none;}
-  .attn-row:hover .attn-name{color:var(--brand-dark);}
-  .attn-name{font-size:13px;font-weight:600;transition:color .1s;}
-  .attn-meta{font-size:11px;color:var(--muted);margin-top:2px;}
-
   @keyframes flash{0%{box-shadow:0 0 0 2px var(--brand);}100%{box-shadow:0 0 0 2px transparent;}}
   .q-card.highlight-flash{animation:flash 1.4s ease-out;}
 
@@ -383,6 +376,8 @@
   .q-bulk-preview.has-logs{color:var(--green);font-weight:600;}
   .pulse-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex:none;position:relative;}
   .pulse-dot::after{content:'';position:absolute;inset:0;border-radius:50%;background:var(--green);animation:pulseRing 1.8s ease-out infinite;}
+  .pulse-dot.pulse-red{background:#9C5C48;}
+  .pulse-dot.pulse-red::after{background:#9C5C48;}
   @keyframes pulseRing{
     0%{ transform:scale(1); opacity:.7; }
     100%{ transform:scale(2.8); opacity:0; }
@@ -641,7 +636,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
       <div class="panel" style="margin-bottom:24px;">
         <div class="panel-head"><span class="panel-title">Needs attention</span></div>
-        <div class="panel-body"><div id="attentionList" class="scroll-cap"></div></div>
+        <div class="panel-body"><div id="attentionList"></div></div>
       </div>
     </div>
 
@@ -1496,14 +1491,25 @@ function renderAttentionList(){
   const items = clients.filter(c => c.danger>=4 || c.draftStatus==='pending')
     .sort((a,b)=> b.danger-a.danger || (b.draftStatus==='pending')-(a.draftStatus==='pending'));
   if(!items.length){ el.innerHTML = `<div class="empty" style="padding:14px 0;">Nothing urgent right now.</div>`; return; }
-  el.innerHTML = items.map(c=>{
+  el.innerHTML = `<div class="queue-grid">${items.map(c=>{
     const reason = c.draftStatus==='pending' ? 'Draft awaiting approval' : `Danger score ${c.danger}/5 — at risk`;
     const filter = c.draftStatus==='pending' ? 'pending' : 'atrisk';
-    return `<div class="attn-row" onclick="goToClientInQueue('${c.id}','${filter}')">
-      <div><div class="attn-name">${c.name}</div><div class="attn-meta">${reason}</div></div>
-      ${dotRatingCompact(c.danger, 'brand', 5)}
+    const status = statusMeta(c.draftStatus);
+    return `<div class="q-card" onclick="goToClientInQueue('${c.id}','${filter}')">
+      <div class="q-card-top">
+        <div>
+          <div class="q-name">${c.name}</div>
+          <div class="q-service-caption">${c.service} · ${riskCaptionHtml(c.danger)}</div>
+        </div>
+        <span class="q-status-label" style="color:${status.color};">${status.label}</span>
+      </div>
+      <div class="q-ratings">
+        ${dotRating('Importance', c.importance, 'ink', 10)}
+        ${dotRating('Danger', c.danger, 'brand')}
+      </div>
+      <div class="q-bulk-preview" style="color:#9C5C48;font-weight:600;"><span class="pulse-dot pulse-red"></span>${reason}</div>
     </div>`;
-  }).join('');
+  }).join('')}</div>`;
 }
 
 function renderClientOptionsSelects(){
