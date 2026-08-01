@@ -48,8 +48,7 @@
   .notif-bell-btn{background:none;border:none;color:var(--muted-lt);cursor:pointer;padding:6px;border-radius:8px;position:relative;display:flex;}
   .notif-bell-btn:hover{background:rgba(255,255,255,.06);color:#fff;}
   .notif-badge{position:absolute;top:1px;right:1px;min-width:15px;height:15px;padding:0 3px;border-radius:20px;background:var(--red);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;}
-  .notif-panel{position:absolute;top:calc(100% + 8px);right:-70px;width:340px;max-height:420px;overflow-y:auto;background:var(--card);border:1px solid #EDEEF1;border-radius:12px;box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:500;}
-  .notif-panel-upward{top:auto;bottom:calc(100% + 8px);right:-8px;}
+  .notif-panel{position:absolute;top:calc(100% + 8px);right:0;width:340px;max-height:420px;overflow-y:auto;background:var(--card);border:1px solid #EDEEF1;border-radius:12px;box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:500;}
   .sidebar-sync-status{display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted-lt);margin-top:10px;}
   .notif-panel-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;color:var(--ink);border-bottom:1px solid #F0F1F4;}
   .notif-row{display:flex;gap:10px;padding:12px 16px;border-bottom:1px solid #F5F6F8;cursor:pointer;}
@@ -74,19 +73,20 @@
   .sidebar-foot{margin-top:auto;padding:12px 11px;border-top:1px solid #24365E;font-size:11px;color:var(--muted-lt);line-height:1.5;}
   .sidebar-action{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:#C9D2E3;cursor:pointer;padding:8px 9px;border-radius:6px;}
   .sidebar-action:hover{background:var(--sidebar-hover);}
-  .sidebar-profile{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 9px;margin-bottom:4px;}
-  .sidebar-profile-name{font-size:12.5px;font-weight:600;color:#fff;}
+  .sidebar-profile-name{font-size:12.5px;font-weight:600;color:var(--ink);}
   .sidebar-profile-role{font-family:'IBM Plex Mono',monospace;font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-lt);margin-top:2px;}
-  .sidebar-logout-btn{background:none;border:1px solid #24365E;color:var(--muted-lt);border-radius:6px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;transition:border-color .15s ease, color .15s ease;}
-  .sidebar-logout-btn:hover{border-color:var(--brand);color:var(--brand);}
   .icon-preview{width:56px;height:56px;border-radius:12px;background:var(--sidebar);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;font-weight:700;font-size:18px;overflow:hidden;flex:none;}
   .icon-preview img{width:100%;height:100%;object-fit:cover;}
 
   /* Main */
   .main{padding:98px 28px 60px;height:100vh;overflow-y:auto;}
   .main > *{max-width:1240px;margin-left:auto;margin-right:auto;}
-  .app-topbar{position:fixed;top:0;left:224px;right:0;height:76px;background:var(--card);display:flex;justify-content:space-between;align-items:center;padding:0 28px;z-index:100;}
+  .app-topbar{position:fixed;top:0;left:224px;right:0;height:76px;background:var(--card);display:flex;align-items:center;padding:0 28px;z-index:100;}
+  .app-topbar-inner{display:flex;justify-content:space-between;align-items:center;width:100%;max-width:1240px;margin:0 auto;}
   @media (max-width:900px){ .app-topbar{left:0;} }
+  .topbar-profile{display:flex;align-items:center;gap:9px;cursor:pointer;padding:6px 8px;border-radius:8px;transition:background .15s ease;}
+  .topbar-profile:hover{background:var(--surface-2);}
+  #sidebarProfileAvatar{width:30px;height:30px;border-radius:50%;object-fit:cover;flex:none;}
   .topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:22px;}
 
   .settings-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:22px;border-bottom:1px solid var(--border);}
@@ -605,27 +605,9 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
     </nav>
     <div class="sidebar-foot">
-      <div class="sidebar-profile">
-        <div class="sidebar-profile-info" onclick="switchView('profile')" style="cursor:pointer;display:flex;align-items:center;gap:9px;">
-          <img id="sidebarProfileAvatar" src="" style="width:28px;height:28px;border-radius:50%;object-fit:cover;display:none;flex:none;">
-          <div>
-            <div class="sidebar-profile-name" id="sidebarProfileName">—</div>
-            <div class="sidebar-profile-role" id="sidebarProfileRole"></div>
-          </div>
-        </div>
-        <div class="notif-bell-wrap" style="position:relative;">
-          <button class="notif-bell-btn" onclick="toggleNotifPanel()" title="Notifications">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            <span class="notif-badge" id="notifBadge" style="display:none;">0</span>
-          </button>
-          <div class="notif-panel notif-panel-upward" id="notifPanel" style="display:none;">
-            <div class="notif-panel-head">Notifications <span class="row-link" onclick="markAllNotificationsRead()">Mark all read</span></div>
-            <div id="notifPanelList"></div>
-          </div>
-        </div>
-        <button class="sidebar-logout-btn" onclick="handleLogout()" title="Log out">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        </button>
+      <div class="sidebar-action" onclick="handleLogout()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <span>Log out</span>
       </div>
       <div class="sidebar-sync-status"><span class="sync-dot"></span>Synced <span id="sidebarSyncTime">—</span></div>
       <div class="sidebar-action" onclick="startTour()">
@@ -637,19 +619,39 @@ document.addEventListener('DOMContentLoaded', function(){
   </div>
 
   <div class="app-topbar" id="appTopbar">
-    <div><div class="page-title" id="topbarTitle">Overview</div><div class="page-sub" id="topbarSub"></div></div>
-    <div class="topbar-right">
-      <div class="clock-mini-pill gauge-row" onclick="switchView('approve')" title="Time until Wednesday auto-notification">
-        <svg class="clock-ring" width="18" height="18" viewBox="0 0 20 20">
-          <circle class="ring-track" cx="10" cy="10" r="8"></circle>
-          <circle class="ring-fill gauge-ring" cx="10" cy="10" r="8"></circle>
-        </svg>
-        <span class="clock-mini-text"><span class="gauge-d">0</span>d <span class="gauge-h">00</span>h <span class="gauge-m">00</span>m</span>
+    <div class="app-topbar-inner">
+      <div><div class="page-title" id="topbarTitle">Overview</div><div class="page-sub" id="topbarSub"></div></div>
+      <div class="topbar-right">
+        <div class="clock-mini-pill gauge-row" onclick="switchView('approve')" title="Time until Wednesday auto-notification">
+          <svg class="clock-ring" width="18" height="18" viewBox="0 0 20 20">
+            <circle class="ring-track" cx="10" cy="10" r="8"></circle>
+            <circle class="ring-fill gauge-ring" cx="10" cy="10" r="8"></circle>
+          </svg>
+          <span class="clock-mini-text"><span class="gauge-d">0</span>d <span class="gauge-h">00</span>h <span class="gauge-m">00</span>m</span>
+        </div>
+        <button class="clock-mini-pill" id="refreshBtn" onclick="fullRefresh(true)" title="Refresh data from the team">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Refresh
+        </button>
+        <div class="topbar-profile" onclick="switchView('profile')" title="My Profile">
+          <img id="sidebarProfileAvatar" src="" style="display:none;">
+          <div class="avatar-circle" id="topbarAvatarPlaceholder" style="width:30px;height:30px;font-size:12px;"></div>
+          <div>
+            <div class="sidebar-profile-name" id="sidebarProfileName">—</div>
+            <div class="sidebar-profile-role" id="sidebarProfileRole"></div>
+          </div>
+        </div>
+        <div class="notif-bell-wrap" style="position:relative;">
+          <button class="notif-bell-btn" onclick="toggleNotifPanel()" title="Notifications">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span class="notif-badge" id="notifBadge" style="display:none;">0</span>
+          </button>
+          <div class="notif-panel" id="notifPanel" style="display:none;">
+            <div class="notif-panel-head">Notifications <span class="row-link" onclick="markAllNotificationsRead()">Mark all read</span></div>
+            <div id="notifPanelList"></div>
+          </div>
+        </div>
       </div>
-      <button class="clock-mini-pill" id="refreshBtn" onclick="fullRefresh(true)" title="Refresh data from the team">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-        Refresh
-      </button>
     </div>
   </div>
 
@@ -1602,9 +1604,15 @@ function renderWhoAmI(){
   const nameEl = document.getElementById('sidebarProfileName');
   const roleEl = document.getElementById('sidebarProfileRole');
   const avatarEl = document.getElementById('sidebarProfileAvatar');
+  const placeholderEl = document.getElementById('topbarAvatarPlaceholder');
   if(avatarEl){
-    if(myProfile && myProfile.avatar_url){ avatarEl.src = myProfile.avatar_url; avatarEl.style.display = 'block'; }
-    else { avatarEl.style.display = 'none'; }
+    if(myProfile && myProfile.avatar_url){
+      avatarEl.src = myProfile.avatar_url; avatarEl.style.display = 'block';
+      if(placeholderEl) placeholderEl.style.display = 'none';
+    } else {
+      avatarEl.style.display = 'none';
+      if(placeholderEl){ placeholderEl.style.display = 'flex'; placeholderEl.textContent = myProfile && myProfile.name ? myProfile.name.trim().charAt(0).toUpperCase() : '?'; }
+    }
   }
   if(nameEl && roleEl){
     if(myProfile){
