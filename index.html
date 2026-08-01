@@ -83,9 +83,11 @@
   .icon-preview img{width:100%;height:100%;object-fit:cover;}
 
   /* Main */
-  .main{padding:22px 28px 60px;height:100vh;overflow-y:auto;}
+  .main{padding:98px 28px 60px;height:100vh;overflow-y:auto;}
   .main > *{max-width:1240px;margin-left:auto;margin-right:auto;}
-  .topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;position:sticky;top:0;z-index:50;background:var(--card);margin:-22px -28px 22px;padding:20px 28px;border-bottom:1px solid var(--border);}
+  .app-topbar{position:fixed;top:0;left:224px;right:0;height:76px;background:var(--card);display:flex;justify-content:space-between;align-items:center;padding:0 28px;z-index:100;}
+  @media (max-width:900px){ .app-topbar{left:0;} }
+  .topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:22px;}
 
   .settings-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:22px;border-bottom:1px solid var(--border);}
   .settings-tab{font-size:12.5px;font-weight:600;color:var(--muted);padding:9px 4px;margin-right:18px;cursor:pointer;border-bottom:2px solid transparent;transition:color .15s ease, border-color .15s ease;}
@@ -634,26 +636,27 @@ document.addEventListener('DOMContentLoaded', function(){
     </div>
   </div>
 
+  <div class="app-topbar" id="appTopbar">
+    <div><div class="page-title" id="topbarTitle">Overview</div><div class="page-sub" id="topbarSub"></div></div>
+    <div class="topbar-right">
+      <div class="clock-mini-pill gauge-row" onclick="switchView('approve')" title="Time until Wednesday auto-notification">
+        <svg class="clock-ring" width="18" height="18" viewBox="0 0 20 20">
+          <circle class="ring-track" cx="10" cy="10" r="8"></circle>
+          <circle class="ring-fill gauge-ring" cx="10" cy="10" r="8"></circle>
+        </svg>
+        <span class="clock-mini-text"><span class="gauge-d">0</span>d <span class="gauge-h">00</span>h <span class="gauge-m">00</span>m</span>
+      </div>
+      <button class="clock-mini-pill" id="refreshBtn" onclick="fullRefresh(true)" title="Refresh data from the team">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Refresh
+      </button>
+    </div>
+  </div>
+
   <div class="main">
 
     <!-- OVERVIEW -->
     <div class="view active" id="view-overview">
-      <div class="topbar">
-        <div><div class="page-title" id="greetingTitle">Good morning</div><div class="page-sub" id="greetingSub">Here's what's happening with your clients today.</div></div>
-        <div class="topbar-right">
-          <div class="clock-mini-pill gauge-row" onclick="switchView('approve')" title="Time until Wednesday auto-notification">
-            <svg class="clock-ring" width="18" height="18" viewBox="0 0 20 20">
-              <circle class="ring-track" cx="10" cy="10" r="8"></circle>
-              <circle class="ring-fill gauge-ring" cx="10" cy="10" r="8"></circle>
-            </svg>
-            <span class="clock-mini-text"><span class="gauge-d">0</span>d <span class="gauge-h">00</span>h <span class="gauge-m">00</span>m</span>
-          </div>
-          <button class="clock-mini-pill" id="refreshBtn" onclick="fullRefresh(true)" title="Refresh data from the team">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-            Refresh
-          </button>
-        </div>
-      </div>
 
       <div class="metrics-row">
         <div class="metric-card kpi-click" onclick="switchView('clients')">
@@ -750,8 +753,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- CLIENTS -->
     <div class="view" id="view-clients">
-      <div class="topbar">
-        <div><div class="page-title">Clients</div><div class="page-sub">Log improvements here whenever you make one — any of the six of you, any time</div></div>
+      <div class="topbar" style="justify-content:flex-end;">
         <button class="btn btn-brand" onclick="openAddClientForm()">+ Add client</button>
       </div>
 
@@ -802,10 +804,6 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- PAST IMPROVEMENTS -->
     <div class="view" id="view-improvements">
-      <div class="topbar">
-        <div><div class="page-title">Past Improvements</div><div class="page-sub">Everything logged for every client, searchable and filterable by date</div></div>
-      </div>
-
       <div class="panel clients-filter-panel">
         <div class="clients-filter-bar">
           <div class="search-field">
@@ -844,19 +842,9 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- APPROVAL QUEUE -->
     <div class="view" id="view-approve">
-      <div class="topbar">
-        <div><div class="page-title">Approval Queue</div><div class="page-sub">Sorted by danger score — highest risk clients first</div></div>
-        <div class="topbar-right">
-          <div class="clock-mini-pill gauge-row" title="Time until Wednesday auto-notification">
-            <svg class="clock-ring" width="18" height="18" viewBox="0 0 20 20">
-              <circle class="ring-track" cx="10" cy="10" r="8"></circle>
-              <circle class="ring-fill gauge-ring" cx="10" cy="10" r="8"></circle>
-            </svg>
-            <span class="clock-mini-text"><span class="gauge-d">0</span>d <span class="gauge-h">00</span>h <span class="gauge-m">00</span>m</span>
-          </div>
-          <button class="btn btn-outline" onclick="previewWednesdayEmail()">Preview Wednesday email</button>
-          <button class="btn btn-dark" id="notifyBtn" onclick="notifyApprovers()">Notify Daniel &amp; Eric</button>
-        </div>
+      <div class="topbar" style="justify-content:flex-end;">
+        <button class="btn btn-outline" onclick="previewWednesdayEmail()">Preview Wednesday email</button>
+        <button class="btn btn-dark" id="notifyBtn" onclick="notifyApprovers()">Notify Daniel &amp; Eric</button>
       </div>
 
       <div class="filter-bar" id="queueFilterBar">
@@ -887,8 +875,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- NOTES -->
     <div class="view" id="view-notes">
-      <div class="topbar">
-        <div><div class="page-title">Notes</div><div class="page-sub">Private to you — improvements you're planning or want to get to. Nobody else on the team can see these.</div></div>
+      <div class="topbar" style="justify-content:flex-end;">
         <button class="btn btn-brand" onclick="openNoteModal()">+ Add note</button>
       </div>
 
@@ -915,8 +902,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- TASKS -->
     <div class="view" id="view-tasks">
-      <div class="topbar">
-        <div><div class="page-title">Tasks</div><div class="page-sub">Assign tasks to anyone on the team — only you and the other person can see it</div></div>
+      <div class="topbar" style="justify-content:flex-end;">
         <button class="btn btn-brand" onclick="openNewTaskModal()">+ New task</button>
       </div>
 
@@ -942,10 +928,6 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- TIME TRACKER -->
     <div class="view" id="view-time">
-      <div class="topbar">
-        <div><div class="page-title">Time Tracker</div><div class="page-sub">Log hours per client, review the timesheet, and see where the team's time goes</div></div>
-      </div>
-
       <div class="tabs settings-tabs" id="timeMainTabs">
         <div class="tab settings-tab active" data-ttab="timer" onclick="switchTimeTab('timer')">Timer</div>
         <div class="tab settings-tab" data-ttab="timesheet" onclick="switchTimeTab('timesheet')">Timesheet</div>
@@ -1209,10 +1191,6 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- SETTINGS -->
     <div class="view" id="view-settings">
-      <div class="topbar">
-        <div><div class="page-title">Settings &amp; Integrations</div><div class="page-sub">What's actually connected right now — no guessing</div></div>
-      </div>
-
       <div class="tabs settings-tabs">
         <div class="tab settings-tab active" data-stab="general" onclick="switchSettingsTab('general')">General</div>
         <div class="tab settings-tab" data-stab="fields" onclick="switchSettingsTab('fields')">Client Fields</div>
@@ -1352,10 +1330,6 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- TEAM -->
     <div class="view" id="view-team">
-      <div class="topbar">
-        <div><div class="page-title">Team</div><div class="page-sub">Manage who's on the team, their roles, and job titles</div></div>
-      </div>
-
       <div class="panel" id="addMemberPanel" style="display:none;">
         <div class="panel-head"><span class="panel-title">Add team member</span></div>
         <div class="panel-body">
@@ -1399,10 +1373,6 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- TRASH -->
     <div class="view" id="view-trash">
-      <div class="topbar">
-        <div><div class="page-title">Trash</div><div class="page-sub">Deleted notes and time entries — restore anytime, or delete for good. Deleted clients are visible to admins and approvers only.</div></div>
-      </div>
-
       <div class="panel" id="trashClientsPanel">
         <div class="panel-head"><span class="panel-title">Deleted Clients</span></div>
         <div class="panel-body">
@@ -1426,10 +1396,6 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- PROFILE -->
     <div class="view" id="view-profile">
-      <div class="topbar">
-        <div><div class="page-title">My Profile</div><div class="page-sub">Your info, visible to the rest of the team the same way it always has been</div></div>
-      </div>
-
       <div class="split-row" style="margin-bottom:24px;">
         <div class="panel">
           <div class="panel-head"><span class="panel-title">Profile Picture</span></div>
@@ -1472,11 +1438,7 @@ document.addEventListener('DOMContentLoaded', function(){
     <!-- CLIENT DETAIL -->
     <div class="view" id="view-clientdetail">
       <div class="topbar">
-        <div>
-          <span class="row-link" onclick="switchView('clients')">← Back to Clients</span>
-          <div class="page-title" id="cdName" style="margin-top:6px;">Client</div>
-          <div class="page-sub" id="cdSub"></div>
-        </div>
+        <span class="row-link" onclick="switchView('clients')">← Back to Clients</span>
         <div class="topbar-right">
           <button class="btn btn-outline" onclick="openEditClientFormFromDetail()">Edit client</button>
           <button class="btn btn-brand" onclick="openNoteModalFromDetail()">+ Add note</button>
@@ -1936,10 +1898,33 @@ function populateReportMemberFilter(){
   if([...sel.options].some(o=>o.value===current)) sel.value = current;
 }
 
+const VIEW_TITLES = {
+  clients: ['Clients', "Log improvements here whenever you make one — any of the six of you, any time"],
+  improvements: ['Past Improvements', 'Everything logged for every client, searchable and filterable by date'],
+  approve: ['Approval Queue', 'Sorted by danger score — highest risk clients first'],
+  notes: ['Notes', "Private to you — improvements you're planning or want to get to. Nobody else on the team can see these."],
+  tasks: ['Tasks', 'Assign tasks to anyone on the team — only you and the other person can see it'],
+  time: ['Time Tracker', "Log hours per client, review the timesheet, and see where the team's time goes"],
+  team: ['Team', "Manage who's on the team, their roles, and job titles"],
+  trash: ['Trash', 'Deleted notes and time entries — restore anytime, or delete for good. Deleted clients are visible to admins and approvers only.'],
+  settings: ['Settings & Integrations', "What's actually connected right now — no guessing"],
+  profile: ['My Profile', 'Your info, visible to the rest of the team the same way it always has been'],
+};
+
 async function switchView(name){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name));
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
+  // Overview and Client Detail aren't in this lookup — their titles are
+  // dynamic (greeting text, client name) and get set by renderGreeting()
+  // and renderClientDetail() respectively, moments later in this same flow.
+  const meta = VIEW_TITLES[name];
+  if(meta){
+    const titleEl = document.getElementById('topbarTitle');
+    const subEl = document.getElementById('topbarSub');
+    if(titleEl) titleEl.textContent = meta[0];
+    if(subEl) subEl.textContent = meta[1];
+  }
   await fullRefresh();
   if(name==='trash') renderTrash();
   if(name==='payroll') renderPayroll();
@@ -2552,8 +2537,10 @@ function renderOverviewActiveQueue(){
 }
 
 function renderGreeting(){
-  const titleEl = document.getElementById('greetingTitle');
-  const subEl = document.getElementById('greetingSub');
+  const isOverviewActive = document.getElementById('view-overview')?.classList.contains('active');
+  if(!isOverviewActive) return;
+  const titleEl = document.getElementById('topbarTitle');
+  const subEl = document.getElementById('topbarSub');
   if(!titleEl) return;
   const hour = new Date().getHours();
   const period = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
@@ -3228,18 +3215,20 @@ function openNoteModalFromDetail(){
 }
 
 function renderClientDetail(){
-  const nameEl = document.getElementById('cdName');
-  if(!nameEl) return;
+  const metricsEl = document.getElementById('cdMetrics');
+  if(!metricsEl) return;
+  const titleEl = document.getElementById('topbarTitle');
+  const subEl = document.getElementById('topbarSub');
   const c = clients.find(x=>x.id===currentDetailClientId);
   if(!c){
-    nameEl.textContent = 'Client not found';
-    document.getElementById('cdSub').textContent = 'This client may have been removed.';
+    if(titleEl) titleEl.textContent = 'Client not found';
+    if(subEl) subEl.textContent = 'This client may have been removed.';
     ['cdMetrics','cdImprovements','cdDraftStatus','cdTimeEntries','cdNotes'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=''; });
     return;
   }
 
-  nameEl.textContent = c.name;
-  document.getElementById('cdSub').innerHTML = `${c.email ? c.email+' · ' : ''}${c.service} · ${riskCaptionHtml(c.danger)}`;
+  if(titleEl) titleEl.textContent = c.name;
+  if(subEl) subEl.innerHTML = `${c.email ? c.email+' · ' : ''}${c.service} · ${riskCaptionHtml(c.danger)}`;
 
   const customFieldsPanel = document.getElementById('cdCustomFieldsPanel');
   const customFieldsEl = document.getElementById('cdCustomFields');
