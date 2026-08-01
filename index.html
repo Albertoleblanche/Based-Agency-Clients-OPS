@@ -49,6 +49,8 @@
   .notif-bell-btn:hover{background:rgba(255,255,255,.06);color:#fff;}
   .notif-badge{position:absolute;top:1px;right:1px;min-width:15px;height:15px;padding:0 3px;border-radius:20px;background:var(--red);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;}
   .notif-panel{position:absolute;top:calc(100% + 8px);right:-70px;width:340px;max-height:420px;overflow-y:auto;background:var(--card);border:1px solid #EDEEF1;border-radius:12px;box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:500;}
+  .notif-panel-upward{top:auto;bottom:calc(100% + 8px);right:-8px;}
+  .sidebar-sync-status{display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted-lt);margin-top:10px;}
   .notif-panel-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;color:var(--ink);border-bottom:1px solid #F0F1F4;}
   .notif-row{display:flex;gap:10px;padding:12px 16px;border-bottom:1px solid #F5F6F8;cursor:pointer;}
   .notif-row:last-child{border-bottom:none;}
@@ -554,16 +556,7 @@ document.addEventListener('DOMContentLoaded', function(){
     <div class="brand">
       <div class="brand-mark">BA</div>
       <div><div class="brand-name">Based Agency</div><div class="brand-sub">CLIENT OPS</div></div>
-      <div class="notif-bell-wrap" style="margin-left:auto;position:relative;">
-        <button class="notif-bell-btn" onclick="toggleNotifPanel()" title="Notifications">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          <span class="notif-badge" id="notifBadge" style="display:none;">0</span>
-        </button>
-        <div class="notif-panel" id="notifPanel" style="display:none;">
-          <div class="notif-panel-head">Notifications <span class="row-link" onclick="markAllNotificationsRead()">Mark all read</span></div>
-          <div id="notifPanelList"></div>
-        </div>
-      </div>
+    </div>
     </div>
     <nav>
       <div class="nav-item active" data-view="overview" onclick="switchView('overview')">
@@ -605,10 +598,6 @@ document.addEventListener('DOMContentLoaded', function(){
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         Trash
       </div>
-      <div class="nav-item" data-view="payroll" id="payrollNavItem" onclick="switchView('payroll')" style="display:none;">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-        Payroll
-      </div>
       <div class="nav-item" data-view="settings" onclick="switchView('settings')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         Settings &amp; Integrations
@@ -623,10 +612,21 @@ document.addEventListener('DOMContentLoaded', function(){
             <div class="sidebar-profile-role" id="sidebarProfileRole"></div>
           </div>
         </div>
+        <div class="notif-bell-wrap" style="position:relative;">
+          <button class="notif-bell-btn" onclick="toggleNotifPanel()" title="Notifications">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span class="notif-badge" id="notifBadge" style="display:none;">0</span>
+          </button>
+          <div class="notif-panel notif-panel-upward" id="notifPanel" style="display:none;">
+            <div class="notif-panel-head">Notifications <span class="row-link" onclick="markAllNotificationsRead()">Mark all read</span></div>
+            <div id="notifPanelList"></div>
+          </div>
+        </div>
         <button class="sidebar-logout-btn" onclick="handleLogout()" title="Log out">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         </button>
       </div>
+      <div class="sidebar-sync-status"><span class="sync-dot"></span>Synced <span id="sidebarSyncTime">—</span></div>
       <div class="sidebar-action" onclick="startTour()">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"/></svg>
         <span>Take a tour</span>
@@ -649,8 +649,10 @@ document.addEventListener('DOMContentLoaded', function(){
             </svg>
             <span class="clock-mini-text"><span class="gauge-d">0</span>d <span class="gauge-h">00</span>h <span class="gauge-m">00</span>m</span>
           </div>
-          <div class="sync-pill"><span class="sync-dot"></span>Synced <span id="syncTime">—</span></div>
-          <button class="btn btn-outline" id="refreshBtn" onclick="fullRefresh(true)">Refresh</button>
+          <button class="clock-mini-pill" id="refreshBtn" onclick="fullRefresh(true)" title="Refresh data from the team">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Refresh
+          </button>
         </div>
       </div>
 
@@ -950,6 +952,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="tab settings-tab" data-ttab="timesheet" onclick="switchTimeTab('timesheet')">Timesheet</div>
         <div class="tab settings-tab" data-ttab="reports" onclick="switchTimeTab('reports')">Reports</div>
         <div class="tab settings-tab" data-ttab="dailysummary" id="dailySummaryTab" onclick="switchTimeTab('dailysummary')" style="display:none;">Daily Summary</div>
+        <div class="tab settings-tab" data-ttab="payroll" id="payrollTab" onclick="switchTimeTab('payroll')" style="display:none;">Payroll</div>
       </div>
 
       <!-- TIMER -->
@@ -1134,6 +1137,74 @@ document.addEventListener('DOMContentLoaded', function(){
           </div>
         </div>
         <div id="dailySummaryList"></div>
+      </div>
+
+      <!-- PAYROLL -->
+      <div class="settings-subview" id="ttab-payroll">
+        <div class="panel" style="margin-bottom:24px;">
+          <div class="panel-body">
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+              <div class="date-nav">
+                <span class="date-nav-arrow" onclick="shiftPayrollPeriod(-1)">‹</span>
+                <span class="date-nav-label" id="payrollPeriodLabel" style="cursor:default;"></span>
+                <span class="date-nav-arrow" onclick="shiftPayrollPeriod(1)">›</span>
+              </div>
+              <button class="btn btn-outline" onclick="resetPayrollPeriodToToday()">This period</button>
+              <div class="settings-field" style="margin:0;">
+                <label style="font-size:10px;">Set period start</label>
+                <input type="date" id="payrollPeriodStartInput" onchange="setPayrollPeriodStart(this.value)">
+              </div>
+              <span style="font-size:11px;color:var(--muted-lt);">Bi-weekly (14-day) periods — pick a start date once to align with your actual pay calendar, then use the arrows to step through periods.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:24px;">
+          <div class="panel-head"><span class="panel-title">Overtime Rules</span></div>
+          <div class="panel-body">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Calculated per calendar week (Mon–Sun), not per pay period — someone who works 45 hours one week and 35 the next gets 5 overtime hours, even though the two-week total is a normal 80.</p>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <span style="font-size:13px;">Overtime after</span>
+              <input type="number" min="0" step="1" id="overtimeThresholdInput" value="40" style="width:70px;font-family:'IBM Plex Mono',monospace;font-size:13px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);">
+              <span style="font-size:13px;">hours/week, paid at</span>
+              <input type="number" min="1" step="0.1" id="overtimeMultiplierInput" value="1.5" style="width:70px;font-family:'IBM Plex Mono',monospace;font-size:13px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);">
+              <span style="font-size:13px;">× the normal rate.</span>
+              <button class="btn btn-outline" onclick="saveOvertimeRules()">Save</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:24px;">
+          <div class="panel-head"><span class="panel-title">Hourly Rates</span></div>
+          <div class="panel-body">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Only admins can see or edit these — hourly rate never appears anywhere else in the app, including to the team member it belongs to.</p>
+            <div id="payrollRatesList"></div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:24px;">
+          <div class="panel-head">
+            <span class="panel-title">Pay Period Summary</span>
+            <div style="display:flex;gap:10px;">
+              <button class="btn btn-outline" onclick="exportPayrollCsv()">Export CSV</button>
+              <button class="btn btn-brand" onclick="markPayrollPeriodPaid()">Mark period as paid</button>
+            </div>
+          </div>
+          <div class="panel-body" style="padding:8px 22px;">
+            <table class="report-table">
+              <thead><tr><th>Member</th><th class="report-th-hours">Regular Hrs</th><th class="report-th-hours">OT Hrs</th><th class="report-th-hours">Rate</th><th class="report-th-hours">Total</th></tr></thead>
+              <tbody id="payrollSummaryBody"></tbody>
+              <tfoot id="payrollSummaryFoot"></tfoot>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Marked-Paid History</span></div>
+          <div class="panel-body">
+            <div id="payrollHistoryList"></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1350,78 +1421,6 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="panel-head"><span class="panel-title">Deleted Time Entries</span></div>
         <div class="panel-body">
           <div id="trashTimeList"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- PAYROLL -->
-    <div class="view" id="view-payroll">
-      <div class="topbar">
-        <div><div class="page-title">Payroll</div><div class="page-sub">Hourly rates and pay-period totals — visible to admins only</div></div>
-      </div>
-
-      <div class="panel" style="margin-bottom:24px;">
-        <div class="panel-body">
-          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-            <div class="date-nav">
-              <span class="date-nav-arrow" onclick="shiftPayrollPeriod(-1)">‹</span>
-              <span class="date-nav-label" id="payrollPeriodLabel" style="cursor:default;"></span>
-              <span class="date-nav-arrow" onclick="shiftPayrollPeriod(1)">›</span>
-            </div>
-            <button class="btn btn-outline" onclick="resetPayrollPeriodToToday()">This period</button>
-            <div class="settings-field" style="margin:0;">
-              <label style="font-size:10px;">Set period start</label>
-              <input type="date" id="payrollPeriodStartInput" onchange="setPayrollPeriodStart(this.value)">
-            </div>
-            <span style="font-size:11px;color:var(--muted-lt);">Bi-weekly (14-day) periods — pick a start date once to align with your actual pay calendar, then use the arrows to step through periods.</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel" style="margin-bottom:24px;">
-        <div class="panel-head"><span class="panel-title">Overtime Rules</span></div>
-        <div class="panel-body">
-          <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Calculated per calendar week (Mon–Sun), not per pay period — someone who works 45 hours one week and 35 the next gets 5 overtime hours, even though the two-week total is a normal 80.</p>
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <span style="font-size:13px;">Overtime after</span>
-            <input type="number" min="0" step="1" id="overtimeThresholdInput" value="40" style="width:70px;font-family:'IBM Plex Mono',monospace;font-size:13px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);">
-            <span style="font-size:13px;">hours/week, paid at</span>
-            <input type="number" min="1" step="0.1" id="overtimeMultiplierInput" value="1.5" style="width:70px;font-family:'IBM Plex Mono',monospace;font-size:13px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);">
-            <span style="font-size:13px;">× the normal rate.</span>
-            <button class="btn btn-outline" onclick="saveOvertimeRules()">Save</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel" style="margin-bottom:24px;">
-        <div class="panel-head"><span class="panel-title">Hourly Rates</span></div>
-        <div class="panel-body">
-          <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Only admins can see or edit these — hourly rate never appears anywhere else in the app, including to the team member it belongs to.</p>
-          <div id="payrollRatesList"></div>
-        </div>
-      </div>
-
-      <div class="panel" style="margin-bottom:24px;">
-        <div class="panel-head">
-          <span class="panel-title">Pay Period Summary</span>
-          <div style="display:flex;gap:10px;">
-            <button class="btn btn-outline" onclick="exportPayrollCsv()">Export CSV</button>
-            <button class="btn btn-brand" onclick="markPayrollPeriodPaid()">Mark period as paid</button>
-          </div>
-        </div>
-        <div class="panel-body" style="padding:8px 22px;">
-          <table class="report-table">
-            <thead><tr><th>Member</th><th class="report-th-hours">Regular Hrs</th><th class="report-th-hours">OT Hrs</th><th class="report-th-hours">Rate</th><th class="report-th-hours">Total</th></tr></thead>
-            <tbody id="payrollSummaryBody"></tbody>
-            <tfoot id="payrollSummaryFoot"></tfoot>
-          </table>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head"><span class="panel-title">Marked-Paid History</span></div>
-        <div class="panel-body">
-          <div id="payrollHistoryList"></div>
         </div>
       </div>
     </div>
@@ -1770,7 +1769,8 @@ async function loadAll(){
   const instrInput = document.getElementById('emailInstructions');
   if(instrInput && document.activeElement !== instrInput) instrInput.value = settings.emailInstructions || '';
   updateEmailInstructionsStatus();
-  document.getElementById('syncTime').textContent = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  const syncTimeEl = document.getElementById('sidebarSyncTime');
+  if(syncTimeEl) syncTimeEl.textContent = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
 }
 
 function updateEmailInstructionsStatus(){
@@ -1881,7 +1881,8 @@ function copyMailModalBody(){
 
 async function fullRefresh(showFeedback){
   const btn = document.getElementById('refreshBtn');
-  if(showFeedback && btn){ btn.disabled = true; btn.textContent = 'Refreshing…'; }
+  const refreshIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>';
+  if(showFeedback && btn){ btn.disabled = true; btn.innerHTML = refreshIcon + ' Refreshing…'; }
   await loadAll();
   await loadMyNotes();
   await loadTimeEntries();
@@ -1891,7 +1892,9 @@ async function fullRefresh(showFeedback){
   updateTasksNavBadge();
   await checkTaskNotifications();
   await checkForNewNotificationToasts();
-  if(showFeedback && btn){ btn.disabled = false; btn.textContent = 'Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
+  const syncEl = document.getElementById('sidebarSyncTime');
+  if(syncEl) syncEl.textContent = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  if(showFeedback && btn){ btn.disabled = false; btn.innerHTML = refreshIcon + ' Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
 function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); }
 
@@ -1914,10 +1917,10 @@ function applyRoleVisibility(){
   }
   const trashClientsPanel = document.getElementById('trashClientsPanel');
   if(trashClientsPanel) trashClientsPanel.style.display = canApprove() ? 'block' : 'none';
-  const payrollNavItem = document.getElementById('payrollNavItem');
-  if(payrollNavItem){
-    payrollNavItem.style.display = isAdmin() ? 'flex' : 'none';
-    if(!isAdmin() && document.getElementById('view-payroll')?.classList.contains('active')){ switchView('overview'); }
+  const payrollTab = document.getElementById('payrollTab');
+  if(payrollTab){
+    payrollTab.style.display = isAdmin() ? 'inline-block' : 'none';
+    if(!isAdmin() && document.getElementById('ttab-payroll')?.classList.contains('active')){ switchTimeTab('timer'); }
   }
   const dailySummaryTab = document.getElementById('dailySummaryTab');
   if(dailySummaryTab){
@@ -2061,7 +2064,7 @@ function clearImprovementsFilters(){
   renderImprovementsHistory();
 }
 
-const IMPROVEMENT_SOURCE_LABEL = { time:'From Time Tracker', note:'From Notes', manual:'Logged directly' };
+const IMPROVEMENT_SOURCE_LABEL = { time:'From Time Tracker', note:'From Notes', manual:'Logged directly', task:'From Tasks' };
 
 function renderImprovementsHistory(){
   const el = document.getElementById('improvementsHistoryList');
@@ -3917,11 +3920,30 @@ async function markTaskDone(taskId){
   const { error } = await supabaseClient.from('tasks').update({
     status:'done', completed_at: new Date().toISOString(), assigner_notified:false
   }).eq('id', taskId);
+
+  // Only tasks tied to a client have anywhere to log to — plenty of tasks
+  // are internal and have no client attached, which is fine, they just
+  // don't create an improvement entry.
+  if(!error && t.clientId){
+    await loadAll();
+    const c = clients.find(x=>x.id===t.clientId);
+    if(c){
+      c.improvements.push({
+        author: myName()||'Team member',
+        text: t.description ? `${t.title} — ${t.description}` : t.title,
+        date: new Date().toISOString(),
+        includeInEmail: false,
+        source: 'task'
+      });
+      await persistClients();
+    }
+  }
+
   await loadMyTasks();
   renderTasks();
   updateTasksNavBadge();
   closeAppModal();
-  error ? showToast('error','Save failed', error.message) : showToast('success','Marked done', `${t.assignerId===currentUser.id ? 'You' : (teamProfiles.find(p=>p.id===t.assignerId)?.name||'They')} will see this the next time they check Tasks.`);
+  error ? showToast('error','Save failed', error.message) : showToast('success','Marked done', `${t.assignerId===currentUser.id ? 'You' : (teamProfiles.find(p=>p.id===t.assignerId)?.name||'They')} will see this the next time they check Tasks.${t.clientId ? ' Logged to Past Improvements.' : ''}`);
 }
 
 async function cancelTask(taskId){
@@ -4584,6 +4606,7 @@ function switchTimeTab(name){
   if(name==='timesheet') renderTimesheet();
   if(name==='reports') renderReports();
   if(name==='dailysummary') loadDailySummary();
+  if(name==='payroll') renderPayroll();
 }
 
 /* --- Live timer --- */
