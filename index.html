@@ -273,6 +273,20 @@
   .note-actions{display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid #F3F4F6;flex-wrap:wrap;flex:none;}
   .note-status-select{font-family:'Inter',sans-serif;font-size:11.5px;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);}
 
+  .attachments-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;}
+  .attachment-item{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--card);display:flex;flex-direction:column;}
+  .attachment-thumb{width:100%;height:84px;object-fit:cover;cursor:zoom-in;display:block;}
+  .attachment-file-icon{width:100%;height:84px;display:flex;align-items:center;justify-content:center;font-size:30px;background:var(--surface-2);}
+  .attachment-meta{padding:6px 8px 4px;}
+  .attachment-name{display:block;font-size:10.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .attachment-size{display:block;font-size:9.5px;color:var(--muted-lt);margin-top:1px;}
+  .attachment-actions{display:flex;justify-content:space-between;padding:0 8px 8px;font-size:10px;}
+
+  .lightbox-overlay{position:fixed;inset:0;background:rgba(10,14,20,.94);z-index:5000;display:flex;align-items:center;justify-content:center;padding:40px;}
+  .lightbox-toolbar{position:absolute;top:18px;right:20px;display:flex;gap:10px;z-index:5001;}
+  .lightbox-img{max-width:88vw;max-height:82vh;object-fit:contain;cursor:zoom-in;transition:transform .2s ease;border-radius:6px;}
+  .lightbox-img.zoomed{transform:scale(1.9);cursor:zoom-out;}
+
   /* Time Tracker */
   .timer-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch;}
   @media (max-width:820px){.timer-row{grid-template-columns:1fr;}}
@@ -3316,7 +3330,7 @@ function renderClientDetail(){
           <span class="pill ${noteStatus.cls}">${noteStatus.label}</span>
         </div>
         <div class="note-text">${n.text}</div>
-        ${n.link ? `<a href="${n.link}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${n.link.replace(/^https?:\/\//,'').slice(0,40)}</a>` : ''}
+        ${n.link ? `<a href="${normalizeUrl(n.link)}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${n.link.replace(/^https?:\/\//,'').slice(0,40)}</a>` : ''}
         <div class="note-actions">
           ${n.status!=='done' ? `<button class="btn btn-brand" style="padding:7px 12px;font-size:11.5px;" onclick="logNoteNow('${n.id}')">Log it now</button>` : ''}
           <span class="row-link" onclick="openNoteModal('${n.id}')">Edit</span>
@@ -3421,11 +3435,19 @@ function openNoteModal(noteId, presetClientId){
       </div>
       <div class="settings-field"><label>Note</label><textarea id="noteTextInput" style="width:100%;min-height:200px;font-family:'Inter',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${editing ? editing.text : ''}</textarea></div>
       <div class="settings-field"><label>Link (optional)</label><input id="noteLinkInput" type="url" placeholder="https://…" value="${editing && editing.link ? editing.link.replace(/"/g,'&quot;') : ''}"></div>
+      ${editing ? `
+      <div class="settings-field">
+        <label>Attachments</label>
+        <input type="file" id="noteAttachmentInput" style="display:none;" onchange="addAttachmentToRecord('note','${editing.id}', this.files[0]); this.value='';">
+        <button class="btn btn-outline" style="margin-bottom:10px;" onclick="document.getElementById('noteAttachmentInput').click()">+ Add file</button>
+        <div id="attachmentsList"></div>
+      </div>` : ''}
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" onclick="saveNote(${editing ? `'${editing.id}'` : 'null'})">${editing?'Save changes':'Add note'}</button>
       <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
     </div>`, 460);
+  if(editing) renderAttachmentsInModal('note', editing.id);
 }
 
 // Loads only the current user's own notes — RLS on the notes table means this
@@ -3474,24 +3496,38 @@ async function saveNote(noteId){
   const clientId = document.getElementById('noteClientSelect').value;
   const status = document.getElementById('noteStatusSelect').value;
   const text = document.getElementById('noteTextInput').value.trim();
-  const link = document.getElementById('noteLinkInput').value.trim() || null;
+  const link = normalizeUrl(document.getElementById('noteLinkInput').value) || null;
   if(!clientId){ showToast('error','Pick a client','Select which client this note is about.'); return; }
   if(!text){ showToast('error','Nothing written','Add some note text first.'); return; }
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
-  let error;
+  let error, newId;
   if(noteId){
     ({ error } = await supabaseClient.from('notes').update({ client_id: clientId, status, text, link }).eq('id', noteId).eq('user_id', currentUser.id));
   } else {
-    ({ error } = await supabaseClient.from('notes').insert({ user_id: currentUser.id, client_id: clientId, status, text, link }));
+    const { data, error: insErr } = await supabaseClient.from('notes').insert({ user_id: currentUser.id, client_id: clientId, status, text, link }).select().single();
+    error = insErr;
+    newId = data?.id;
   }
   restoreBtn(btn);
-  closeAppModal();
   await loadMyNotes();
   populateNotesClientFilter();
   renderNotes();
-  if(!error && !noteId){ logClientActivity(clientId, 'note_added', `${myName()||'Someone'} added a private note (content not shared here).`); refreshClientDetailActivityIfOpen(clientId); }
-  error ? showToast('error','Save failed', error.message) : showToast('success', noteId?'Note updated':'Note added', noteId?'Changes saved.':'Added to your notes.');
+  if(!error && !noteId){
+    logClientActivity(clientId, 'note_added', `${myName()||'Someone'} added a private note (content not shared here).`);
+    refreshClientDetailActivityIfOpen(clientId);
+  }
+  if(!error && newId){
+    // Attachments need the row to already exist (storage RLS checks
+    // ownership against it), so a brand-new note reopens straight into
+    // edit mode instead of making the person manually reopen it themselves
+    // just to attach a file.
+    openNoteModal(newId);
+    showToast('success','Note added','Attach a file below if you want, or close this to finish.');
+  } else {
+    closeAppModal();
+    error ? showToast('error','Save failed', error.message) : showToast('success','Note updated','Changes saved.');
+  }
 }
 
 async function deleteNote(id){
@@ -3579,7 +3615,7 @@ function renderNotes(){
         <span class="pill ${status.cls}">${status.label}</span>
       </div>
       <div class="note-text">${n.text}</div>
-      ${n.link ? `<a href="${n.link}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${n.link.replace(/^https?:\/\//,'').slice(0,40)}</a>` : ''}
+      ${n.link ? `<a href="${normalizeUrl(n.link)}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${n.link.replace(/^https?:\/\//,'').slice(0,40)}</a>` : ''}
       <div class="note-actions" onclick="event.stopPropagation();">
         ${n.status!=='done' ? `<button class="btn btn-brand" style="padding:7px 12px;font-size:11.5px;" onclick="logNoteNow('${n.id}')">Log it now</button>` : ''}
         <select class="note-status-select" onchange="changeNoteStatus('${n.id}', this.value)">
@@ -3716,7 +3752,7 @@ function taskCardHtml(t){
         ${c ? `<span class="ts-entry-service">— ${c.name}</span>` : ''}
       </div>
       ${t.description ? `<div class="ts-entry-desc">${t.description}</div>` : ''}
-      ${t.link ? `<a href="${t.link}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${t.link.replace(/^https?:\/\//,'').slice(0,40)}</a>` : ''}
+      ${t.link ? `<a href="${normalizeUrl(t.link)}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${t.link.replace(/^https?:\/\//,'').slice(0,40)}</a>` : ''}
       <div class="ts-entry-desc" style="margin-top:4px;color:var(--muted-lt);">
         ${directionLabel}${dueStr ? ` · Due ${dueStr}` : ''}${overdue ? ` <span style="color:var(--red);font-weight:700;">Overdue</span>` : ''}${t.status==='done' && t.completedAt ? ` · Completed ${new Date(t.completedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})}` : ''}
       </div>
@@ -3759,9 +3795,16 @@ function openTaskDetailModal(taskId){
         ${c ? `<div><label style="font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--muted-lt);display:block;margin-bottom:4px;">Related client</label><div style="font-size:13px;"><span class="row-link" onclick="closeAppModal(); openClientDetail('${c.id}');">${c.name}</span></div></div>` : ''}
         ${t.status==='done' && t.completedAt ? `<div><label style="font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--muted-lt);display:block;margin-bottom:4px;">Completed</label><div style="font-size:13px;">${new Date(t.completedAt).toLocaleDateString('en-US',{month:'long',day:'numeric'})}</div></div>` : ''}
       </div>
-      ${t.link ? `<a href="${t.link}" target="_blank" rel="noopener" class="note-link" style="display:block;margin-top:8px;">🔗 ${t.link}</a>` : ''}
+      ${t.link ? `<a href="${normalizeUrl(t.link)}" target="_blank" rel="noopener" class="note-link" style="display:block;margin-top:8px;">🔗 ${t.link}</a>` : ''}
+      <div class="settings-field" style="margin-top:16px;">
+        <label>Attachments</label>
+        <input type="file" id="taskAttachmentInput" style="display:none;" onchange="addAttachmentToRecord('task','${t.id}', this.files[0]); this.value='';">
+        <button class="btn btn-outline" style="margin-bottom:10px;" onclick="document.getElementById('taskAttachmentInput').click()">+ Add file</button>
+        <div id="attachmentsList"></div>
+      </div>
     </div>
     <div class="modal-actions">${taskActionsHtml(t)}<button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 500);
+  renderAttachmentsInModal('task', t.id);
 }
 
 
@@ -3823,18 +3866,25 @@ async function saveNewTask(){
   const description = document.getElementById('taskDescInput').value.trim();
   const dueDate = document.getElementById('taskDueInput').value || null;
   const clientId = document.getElementById('taskClientSelect').value || null;
-  const link = document.getElementById('taskLinkInput').value.trim() || null;
+  const link = normalizeUrl(document.getElementById('taskLinkInput').value) || null;
 
-  const { error } = await supabaseClient.from('tasks').insert({
+  const { data, error } = await supabaseClient.from('tasks').insert({
     title, description, priority, assigner_id: currentUser.id, assignee_id: assigneeId,
     client_id: clientId, due_date: dueDate, link
-  });
-  closeAppModal();
+  }).select().single();
   await loadMyTasks();
   renderTasks();
   updateTasksNavBadge();
   const assignee = teamProfiles.find(p=>p.id===assigneeId);
-  error ? showToast('error','Save failed', error.message) : showToast('success','Task assigned', `${assignee ? assignee.name : 'They'} will see it next time they check Tasks.`);
+  if(!error && data){
+    // Same reasoning as notes — attachments need the row to already exist,
+    // so reopen straight into edit mode instead of a separate manual step.
+    openTaskDetailModal(data.id);
+    showToast('success','Task assigned', `${assignee ? assignee.name : 'They'} will see it next time they check Tasks. Attach a file below if you want.`);
+  } else {
+    closeAppModal();
+    showToast('error','Save failed', error?.message || 'Unknown error');
+  }
 }
 
 async function saveEditTask(taskId){
@@ -3847,7 +3897,7 @@ async function saveEditTask(taskId){
   const description = document.getElementById('taskDescInput').value.trim();
   const dueDate = document.getElementById('taskDueInput').value || null;
   const clientId = document.getElementById('taskClientSelect').value || null;
-  const link = document.getElementById('taskLinkInput').value.trim() || null;
+  const link = normalizeUrl(document.getElementById('taskLinkInput').value) || null;
 
   // Reassigning to someone new means they haven't been notified yet.
   const reassigned = assigneeId !== t.assigneeId;
@@ -4213,6 +4263,130 @@ let timerState = { running:false, startedAt:null, clientId:'', service:'', descr
 let timerIntervalId = null;
 let timesheetMode = 'day';
 let timesheetAnchor = new Date();
+
+// Without this, a link typed as "example.com" (no protocol) gets used
+// as-is in href="", and the browser treats it as relative to the current
+// page instead of an external address — producing exactly the
+// "myapp.vercel.app/example.com" bug this fixes.
+function normalizeUrl(url){
+  if(!url) return '';
+  url = url.trim();
+  if(!url) return '';
+  if(!/^https?:\/\//i.test(url)) url = 'https://' + url;
+  return url;
+}
+
+/* ---------- Attachments — notes and tasks. Files live in a private
+   storage bucket; access mirrors exactly who can already see the note or
+   task, enforced by storage RLS, not just hidden in the UI. Viewing and
+   downloading go through short-lived signed URLs, generated on demand. ---------- */
+
+const ATTACHMENT_IMAGE_EXT = ['jpg','jpeg','png','gif','webp','svg','bmp'];
+
+function isImageAttachment(att){
+  const ext = (att.name.split('.').pop()||'').toLowerCase();
+  return ATTACHMENT_IMAGE_EXT.includes(ext);
+}
+
+function formatFileSize(bytes){
+  if(!bytes) return '';
+  if(bytes < 1024) return bytes+' B';
+  if(bytes < 1024*1024) return (bytes/1024).toFixed(0)+' KB';
+  return (bytes/1024/1024).toFixed(1)+' MB';
+}
+
+async function addAttachmentToRecord(recordType, recordId, file){
+  if(!file) return;
+  if(file.size > 10*1024*1024){ showToast('error','Too large','Files need to be under 10MB.'); return; }
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  const path = `${recordType}s/${recordId}/${Date.now()}-${safeName}`;
+  const { error: uploadErr } = await supabaseClient.storage.from('attachments').upload(path, file);
+  if(uploadErr){ showToast('error','Upload failed', uploadErr.message); return; }
+
+  const table = recordType==='note' ? 'notes' : 'tasks';
+  const { data: current } = await supabaseClient.from(table).select('attachments').eq('id', recordId).maybeSingle();
+  const updated = [...(current?.attachments||[]), { name:file.name, path, size:file.size, type:file.type, uploadedAt:new Date().toISOString() }];
+  const { error } = await supabaseClient.from(table).update({ attachments: updated }).eq('id', recordId);
+  if(error){ showToast('error','Save failed', error.message); return; }
+
+  if(recordType==='note'){ await loadMyNotes(); renderNotes(); } else { await loadMyTasks(); renderTasks(); }
+  renderAttachmentsInModal(recordType, recordId);
+  showToast('success','File attached', file.name);
+}
+
+async function removeAttachmentFromRecord(recordType, recordId, path){
+  if(!confirm('Remove this attachment? This can\'t be undone.')) return;
+  const table = recordType==='note' ? 'notes' : 'tasks';
+  await supabaseClient.storage.from('attachments').remove([path]);
+  const { data: current } = await supabaseClient.from(table).select('attachments').eq('id', recordId).maybeSingle();
+  const updated = (current?.attachments||[]).filter(a=>a.path!==path);
+  const { error } = await supabaseClient.from(table).update({ attachments: updated }).eq('id', recordId);
+  if(error){ showToast('error','Save failed', error.message); return; }
+  if(recordType==='note'){ await loadMyNotes(); renderNotes(); } else { await loadMyTasks(); renderTasks(); }
+  renderAttachmentsInModal(recordType, recordId);
+  showToast('success','Removed','Attachment deleted.');
+}
+
+async function renderAttachmentsInModal(recordType, recordId){
+  const el = document.getElementById('attachmentsList');
+  if(!el) return;
+  el.innerHTML = `<div class="empty" style="padding:10px 0;">Loading…</div>`;
+  const record = recordType==='note' ? notes.find(n=>n.id===recordId) : tasks.find(t=>t.id===recordId);
+  const attachments = record?.attachments || [];
+  if(!attachments.length){ el.innerHTML = `<div class="empty" style="padding:10px 0;">No files attached yet.</div>`; return; }
+
+  const withUrls = await Promise.all(attachments.map(async a=>{
+    const { data } = await supabaseClient.storage.from('attachments').createSignedUrl(a.path, 3600);
+    return { ...a, url: data?.signedUrl || null };
+  }));
+
+  el.innerHTML = `<div class="attachments-grid">${withUrls.map(a=>attachmentItemHtml(a, recordType, recordId)).join('')}</div>`;
+}
+
+function attachmentItemHtml(a, recordType, recordId){
+  const isImg = isImageAttachment(a);
+  const sizeStr = formatFileSize(a.size);
+  const escName = a.name.replace(/'/g,"\\'");
+  const body = isImg && a.url
+    ? `<img src="${a.url}" class="attachment-thumb" onclick="openImageLightbox('${a.url.replace(/'/g,"\\'")}', '${escName}')">`
+    : `<div class="attachment-file-icon">📄</div>`;
+  return `<div class="attachment-item">
+    ${body}
+    <div class="attachment-meta">
+      <span class="attachment-name" title="${a.name}">${a.name}</span>
+      <span class="attachment-size">${sizeStr}</span>
+    </div>
+    <div class="attachment-actions">
+      ${a.url ? `<a href="${a.url}" download="${a.name}" class="row-link">Download</a>` : `<span></span>`}
+      <span class="row-link danger-link" onclick="removeAttachmentFromRecord('${recordType}','${recordId}','${a.path}')">Remove</span>
+    </div>
+  </div>`;
+}
+
+function openImageLightbox(url, filename){
+  closeLightbox();
+  const overlay = document.createElement('div');
+  overlay.className = 'lightbox-overlay';
+  overlay.id = 'lightboxOverlay';
+  overlay.onclick = (e)=>{ if(e.target===overlay) closeLightbox(); };
+  overlay.innerHTML = `
+    <div class="lightbox-toolbar">
+      <a href="${url}" download="${filename}" class="btn btn-outline">Download</a>
+      <button class="btn btn-outline" onclick="closeLightbox()">Close ✕</button>
+    </div>
+    <img src="${url}" class="lightbox-img" id="lightboxImg" onclick="toggleLightboxZoom()" title="Click to zoom">`;
+  document.body.appendChild(overlay);
+}
+
+function closeLightbox(){
+  const el = document.getElementById('lightboxOverlay');
+  if(el) el.remove();
+}
+
+function toggleLightboxZoom(){
+  const img = document.getElementById('lightboxImg');
+  if(img) img.classList.toggle('zoomed');
+}
 
 function toDateStr(d){
   const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
