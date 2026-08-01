@@ -3715,7 +3715,7 @@ function renderTasks(){
     return;
   }
 
-  el.innerHTML = visible.map(t=>taskCardHtml(t)).join('');
+  el.innerHTML = `<div class="notes-grid">${visible.map(t=>taskCardHtml(t)).join('')}</div>`;
 }
 
 function taskActionsHtml(t){
@@ -3744,23 +3744,24 @@ function taskCardHtml(t){
   const overdue = t.status==='open' && t.dueDate && new Date(t.dueDate+'T00:00:00') < new Date(new Date().toDateString());
 
   const directionLabel = amAssigner
-    ? `→ Assigned to ${assignee ? assignee.name : 'someone no longer on the team'}`
-    : `← From ${assigner ? assigner.name : 'someone no longer on the team'}`;
+    ? `→ ${assignee ? assignee.name : 'someone no longer on the team'}`
+    : `← ${assigner ? assigner.name : 'someone no longer on the team'}`;
 
-  return `<div class="ts-entry-card" style="margin-bottom:10px;align-items:flex-start;cursor:pointer;" onclick="openTaskDetailModal('${t.id}')">
-    <div class="ts-entry-info">
-      <div class="ts-entry-title">
-        <span class="pill" style="background:${pMeta.color}18;color:${pMeta.color};font-weight:700;">${pMeta.label}</span>
-        <span style="margin-left:8px;">${t.title}</span>
-        ${c ? `<span class="ts-entry-service">— ${c.name}</span>` : ''}
+  let metaLine = overdue ? `<span style="color:var(--red);font-weight:700;">Overdue</span>` : dueStr ? `Due ${dueStr}` : 'No due date';
+  if(t.status==='done' && t.completedAt) metaLine = `Completed ${new Date(t.completedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})}`;
+
+  return `<div class="note-card" style="cursor:pointer;" onclick="openTaskDetailModal('${t.id}')">
+    <div class="note-card-top">
+      <div>
+        <div class="note-client" style="cursor:default;">${directionLabel}${c ? ` · ${c.name}` : ''}</div>
+        <div class="note-meta">${metaLine}</div>
       </div>
-      ${t.description ? `<div class="ts-entry-desc">${t.description}</div>` : ''}
-      ${t.link ? `<a href="${normalizeUrl(t.link)}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${t.link.replace(/^https?:\/\//,'').slice(0,40)}</a>` : ''}
-      <div class="ts-entry-desc" style="margin-top:4px;color:var(--muted-lt);">
-        ${directionLabel}${dueStr ? ` · Due ${dueStr}` : ''}${overdue ? ` <span style="color:var(--red);font-weight:700;">Overdue</span>` : ''}${t.status==='done' && t.completedAt ? ` · Completed ${new Date(t.completedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})}` : ''}
-      </div>
+      <span class="pill" style="background:${pMeta.color}18;color:${pMeta.color};font-weight:700;flex:none;">${pMeta.label}</span>
     </div>
-    <div class="ts-entry-right" style="flex-wrap:wrap;justify-content:flex-end;max-width:260px;" onclick="event.stopPropagation();">${taskActionsHtml(t)}</div>
+    <div style="font-family:'Oswald',sans-serif;font-size:14.5px;font-weight:600;color:var(--ink);margin-top:10px;line-height:1.3;">${t.title}</div>
+    <div class="note-text" style="margin-top:6px;-webkit-line-clamp:3;">${t.description || '<span style="color:var(--muted-lt);">No description added.</span>'}</div>
+    ${t.link ? `<a href="${normalizeUrl(t.link)}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${t.link.replace(/^https?:\/\//,'').slice(0,40)}</a>` : ''}
+    <div class="note-actions" onclick="event.stopPropagation();">${taskActionsHtml(t)}</div>
   </div>`;
 }
 
