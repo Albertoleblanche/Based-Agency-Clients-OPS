@@ -1087,32 +1087,6 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- NOTES -->
     <div class="view" id="view-notes">
-      <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
-        <div class="icon-tab-group" id="noteStatusTabs" style="margin-bottom:0;flex:1;">
-          <div class="icon-tab active" data-nstatus="all" onclick="switchNoteStatusTab('all')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
-            <span>All statuses</span>
-          </div>
-          <div class="icon-tab" data-nstatus="idea" onclick="switchNoteStatusTab('idea')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.4 1 1.2 1 2.05V17h6v-2.25c0-.85.4-1.65 1-2.05A7 7 0 0 0 12 2z"/></svg>
-            <span>Idea</span>
-          </div>
-          <div class="icon-tab" data-nstatus="planned" onclick="switchNoteStatusTab('planned')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            <span>Planned</span>
-          </div>
-          <div class="icon-tab" data-nstatus="in-progress" onclick="switchNoteStatusTab('in-progress')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            <span>In progress</span>
-          </div>
-          <div class="icon-tab" data-nstatus="done" onclick="switchNoteStatusTab('done')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            <span>Done</span>
-          </div>
-        </div>
-        <button class="btn btn-brand" style="flex:none;" onclick="openNoteModal()">+ Add note</button>
-      </div>
-
       <div class="clients-filter-bar" style="margin-bottom:8px;">
         <div class="select-field">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -1120,7 +1094,7 @@ document.addEventListener('DOMContentLoaded', function(){
         </div>
       </div>
 
-      <div id="notesList" class="notes-grid"></div>
+      <div class="kanban-board" id="notesBoard"></div>
     </div>
 
     <!-- TASKS -->
@@ -3622,7 +3596,7 @@ function renderClientDetail(){
           <div class="note-meta">${new Date(n.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
           <span class="pill ${noteStatus.cls}">${noteStatus.label}</span>
         </div>
-        <div class="note-text">${n.text}</div>
+        <div class="note-text">${escapeHtml(n.text)}</div>
         ${n.link ? `<a href="${normalizeUrl(n.link)}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${n.link.replace(/^https?:\/\//,'').slice(0,40)}</a>` : ''}
         <div class="note-actions">
           ${n.status!=='done' ? `<button class="btn btn-brand" style="padding:7px 12px;font-size:11.5px;" onclick="logNoteNow('${n.id}')">Log it now</button>` : ''}
@@ -3704,7 +3678,7 @@ function noteStatusMeta(status){
   return map[status] || map.idea;
 }
 
-function openNoteModal(noteId, presetClientId){
+function openNoteModal(noteId, presetClientId, presetStatus){
   const editing = noteId ? notes.find(n=>n.id===noteId) : null;
   const ac = activeClients();
   if(!ac.length && !editing){ showToast('error','Add a client first','Notes need a client to attach to — add one in Clients.'); return; }
@@ -3714,16 +3688,17 @@ function openNoteModal(noteId, presetClientId){
     if(trashedClient) optionSource.push(trashedClient);
   }
   const clientOptions = optionSource.sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${(editing && editing.clientId===c.id) || (!editing && presetClientId===c.id) ? 'selected':''}>${c.name}${c.deletedAt?' (in Trash)':''}</option>`).join('');
+  const effectiveStatus = editing ? editing.status : (presetStatus || 'idea');
   openAppModal(`
     <div class="modal-head"><span class="panel-title">${editing ? 'Edit note' : 'Add note'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
       <div class="settings-field"><label>Client</label><select id="noteClientSelect" style="width:100%;">${clientOptions}</select></div>
       <div class="settings-field"><label>Status</label>
         <select id="noteStatusSelect" style="width:100%;">
-          <option value="idea" ${(!editing || editing.status==='idea')?'selected':''}>Idea</option>
-          <option value="planned" ${editing && editing.status==='planned'?'selected':''}>Planned</option>
-          <option value="in-progress" ${editing && editing.status==='in-progress'?'selected':''}>In progress</option>
-          <option value="done" ${editing && editing.status==='done'?'selected':''}>Done</option>
+          <option value="idea" ${effectiveStatus==='idea'?'selected':''}>Idea</option>
+          <option value="planned" ${effectiveStatus==='planned'?'selected':''}>Planned</option>
+          <option value="in-progress" ${effectiveStatus==='in-progress'?'selected':''}>In progress</option>
+          <option value="done" ${effectiveStatus==='done'?'selected':''}>Done</option>
         </select>
       </div>
       <div class="settings-field"><label>Note</label><textarea id="noteTextInput" style="width:100%;min-height:200px;font-family:'DM Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${editing ? editing.text : ''}</textarea></div>
@@ -3867,63 +3842,86 @@ function populateNotesClientFilter(){
   if([...sel.options].some(o=>o.value===current)) sel.value = current;
 }
 
-let noteStatusTab = 'all';
-
-function switchNoteStatusTab(status){
-  noteStatusTab = status;
-  document.querySelectorAll('#noteStatusTabs .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.nstatus===status));
-  renderNotes();
-}
+const NOTE_STAGES = [
+  { key:'idea',        label:'Idea',        color:'#7C93B0' },
+  { key:'planned',      label:'Planned',     color:'#C99A55' },
+  { key:'in-progress',  label:'In Progress', color:'#C17A6E' },
+  { key:'done',         label:'Done',        color:'#5E9E7E' },
+];
 
 function renderNotes(){
-  const el = document.getElementById('notesList');
-  if(!el) return;
+  const board = document.getElementById('notesBoard');
+  if(!board) return;
   updateNotesBadge();
   const clientFilter = document.getElementById('notesClientFilter')?.value || 'all';
 
-  let filtered = notes.filter(n=>{
-    if(clientFilter!=='all' && n.clientId!==clientFilter) return false;
-    if(noteStatusTab!=='all' && n.status!==noteStatusTab) return false;
-    return true;
-  });
+  const visible = notes.filter(n=> clientFilter==='all' || n.clientId===clientFilter);
 
-  if(!notes.length){ el.innerHTML = emptyStateHtml(
-    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
-    'No notes yet',
-    'Notes are private to you — jot down something you\'d like to do for a client, and it\'ll only ever be visible to you.',
-    '<button class="btn btn-brand" onclick="openNoteModal()">+ Add note</button>'
-  ); return; }
-  if(!filtered.length){ el.innerHTML = `<div class="empty">No notes match these filters.</div>`; return; }
+  if(!notes.length){
+    board.innerHTML = `<div style="grid-column:1/-1;">${emptyStateHtml(
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+      'No notes yet',
+      'Notes are private to you — jot down something you\'d like to do for a client, and it\'ll only ever be visible to you.',
+      '<button class="btn btn-brand" onclick="openNoteModal()">+ Add note</button>'
+    )}</div>`;
+    return;
+  }
 
-  filtered.sort((a,b)=> new Date(b.updatedAt||b.createdAt) - new Date(a.updatedAt||a.createdAt));
-
-  el.innerHTML = filtered.map(n=>{
-    const c = clients.find(x=>x.id===n.clientId);
-    const status = noteStatusMeta(n.status);
-    const dateStr = new Date(n.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
-    return `<div class="note-card" style="cursor:pointer;" onclick="openNoteModal('${n.id}')">
-      <div class="note-card-top">
-        <div>
-          <div class="note-client" onclick="event.stopPropagation(); goToClientInQueue('${n.clientId}','all')">${c ? c.name : 'Unknown client'}</div>
-          <div class="note-meta">${dateStr}</div>
-        </div>
-        <span class="pill ${status.cls}">${status.label}</span>
+  board.innerHTML = NOTE_STAGES.map(stage=>{
+    const stageNotes = visible.filter(n=>n.status===stage.key)
+      .sort((a,b)=> new Date(b.updatedAt||b.createdAt) - new Date(a.updatedAt||a.createdAt));
+    return `<div class="kanban-column">
+      <div class="kanban-column-head" style="background:${stage.color}22;">
+        <span class="kanban-column-dot" style="background:${stage.color};"></span>
+        <span class="kanban-column-title">${stage.label}</span>
+        <span class="kanban-column-count">${stageNotes.length}</span>
+        <button class="kanban-add-btn" onclick="openNoteModal(undefined,undefined,'${stage.key}')" title="New note in ${stage.label}">+</button>
       </div>
-      <div class="note-text">${escapeHtml(n.text)}</div>
-      ${n.link ? `<a href="${normalizeUrl(n.link)}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${n.link.replace(/^https?:\/\//,'').slice(0,40)}</a>` : ''}
-      <div class="note-actions" onclick="event.stopPropagation();">
-        ${n.status!=='done' ? `<button class="btn btn-brand" style="padding:7px 12px;font-size:11.5px;" onclick="logNoteNow('${n.id}')">Log it now</button>` : ''}
-        <select class="note-status-select" onchange="changeNoteStatus('${n.id}', this.value)">
-          <option value="idea" ${n.status==='idea'?'selected':''}>Idea</option>
-          <option value="planned" ${n.status==='planned'?'selected':''}>Planned</option>
-          <option value="in-progress" ${n.status==='in-progress'?'selected':''}>In progress</option>
-          <option value="done" ${n.status==='done'?'selected':''}>Done</option>
-        </select>
-        <span class="row-link" onclick="openNoteModal('${n.id}')">Edit</span>
-        <span class="row-link danger-link" onclick="deleteNote('${n.id}')">Delete</span>
+      <div class="kanban-cards">
+        ${stageNotes.length ? stageNotes.map(n=>noteCardHtml(n)).join('') : `<div class="empty" style="padding:18px 8px;font-size:11.5px;">Nothing here.</div>`}
       </div>
     </div>`;
   }).join('');
+}
+
+function noteCardMenuHtml(n){
+  const moveOptions = NOTE_STAGES.filter(s=>s.key!==n.status).map(s=>
+    `<div class="kanban-card-menu-item" onclick="event.stopPropagation();changeNoteStatus('${n.id}','${s.key}')">Move to ${s.label}</div>`
+  ).join('');
+  return moveOptions
+    + `<div class="kanban-card-menu-divider"></div>`
+    + `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();openNoteModal('${n.id}')">Edit</div>`
+    + `<div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();deleteNote('${n.id}')">Delete</div>`;
+}
+
+function noteCardHtml(n){
+  const c = clients.find(x=>x.id===n.clientId);
+  const dateStr = new Date(n.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const isDone = n.status==='done';
+
+  return `<div class="kanban-card" onclick="openNoteModal('${n.id}')">
+    <div class="kanban-card-top">
+      ${isDone
+        ? `<span class="kanban-card-due" style="color:#5E9E7E;font-weight:700;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Done ${dateStr}
+          </span>`
+        : `<span class="kanban-card-due">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            ${dateStr}
+          </span>`}
+      <div class="kanban-card-menu-wrap">
+        <span class="kanban-card-menu-btn" onclick="event.stopPropagation();toggleKanbanCardMenu('note-${n.id}')">⋯</span>
+        <div class="kanban-card-menu" id="kanbanMenu-note-${n.id}" style="display:none;">${noteCardMenuHtml(n)}</div>
+      </div>
+    </div>
+    <div class="kanban-card-title" onclick="event.stopPropagation(); goToClientInQueue('${n.clientId}','all')">${c ? escapeHtml(c.name) : 'Unknown client'}</div>
+    <div class="kanban-card-desc" style="white-space:normal;-webkit-line-clamp:3;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtml(n.text)}</div>
+    ${n.link ? `<a href="${normalizeUrl(n.link)}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${n.link.replace(/^https?:\/\//,'').slice(0,40)}</a>` : ''}
+    <div class="kanban-card-footer">
+      ${!isDone ? `<button class="btn btn-brand" style="padding:6px 12px;font-size:11px;" onclick="event.stopPropagation();logNoteNow('${n.id}')">Log it now</button>` : `<span style="font-size:11px;color:var(--muted-lt);">Logged as an improvement</span>`}
+    </div>
+  </div>`;
 }
 
 function updateNotesBadge(){
