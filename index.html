@@ -315,6 +315,19 @@
 
   .timesheet-nav{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
   .date-nav{display:flex;align-items:center;border:1px solid var(--border);border-radius:20px;background:var(--card);overflow:hidden;}
+
+  .calendar-grid-head{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-bottom:none;border-radius:10px 10px 0 0;overflow:hidden;}
+  .calendar-grid-head > div{background:var(--surface-2);padding:9px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;}
+  .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:0 0 10px 10px;overflow:hidden;}
+  .calendar-day{background:var(--card);min-height:112px;padding:8px;cursor:pointer;transition:background .15s ease;display:flex;flex-direction:column;gap:3px;}
+  .calendar-day:hover{background:var(--surface-2);}
+  .calendar-day.other-month{background:#FAFBFC;}
+  .calendar-day.other-month .calendar-day-num{color:var(--muted-lt);}
+  .calendar-day.today{background:#FFF8F5;}
+  .calendar-day-num{font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;color:var(--ink);}
+  .calendar-day.today .calendar-day-num{color:var(--brand);}
+  .calendar-event-pill{font-size:10px;padding:2px 6px;border-radius:5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;}
+  .calendar-more-pill{font-size:9.5px;color:var(--muted-lt);padding:2px 6px;}
   .date-nav-arrow{background:none;border:none;color:var(--muted);padding:9px 12px;cursor:pointer;display:flex;align-items:center;transition:color .12s ease, background .12s ease;}
   .date-nav-arrow:hover{color:var(--ink);background:var(--surface-2);}
   .date-nav-label{position:relative;display:flex;align-items:center;gap:7px;padding:8px 6px;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;border-left:1px solid var(--border);border-right:1px solid var(--border);white-space:nowrap;}
@@ -586,6 +599,10 @@ document.addEventListener('DOMContentLoaded', function(){
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         Tasks
         <span class="nav-badge" id="navTasksBadge">0</span>
+      </div>
+      <div class="nav-item" data-view="calendar" onclick="switchView('calendar')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Calendar
       </div>
       <div class="nav-item" data-view="time" onclick="switchView('time')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -926,6 +943,41 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
 
       <div id="tasksList"></div>
+    </div>
+
+    <!-- CALENDAR -->
+    <div class="view" id="view-calendar">
+      <div class="topbar" style="justify-content:flex-end;">
+        <button class="btn btn-brand" onclick="openNewEventModal()">+ New event</button>
+      </div>
+
+      <div class="panel" style="margin-bottom:20px;">
+        <div class="panel-body">
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+            <div class="date-nav">
+              <span class="date-nav-arrow" onclick="shiftCalendarMonth(-1)">‹</span>
+              <span class="date-nav-label" id="calendarMonthLabel" style="cursor:default;"></span>
+              <span class="date-nav-arrow" onclick="shiftCalendarMonth(1)">›</span>
+            </div>
+            <button class="btn btn-outline" onclick="resetCalendarToToday()">Today</button>
+            <div class="select-field" style="min-width:170px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <select id="calendarTypeFilter" onchange="renderCalendar()">
+                <option value="all">All event types</option>
+                <option value="meeting">Meetings</option>
+                <option value="deadline">Deadlines</option>
+                <option value="reminder">Reminders</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="calendar-grid-head">
+        <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+      </div>
+      <div class="calendar-grid" id="calendarGrid"></div>
     </div>
 
     <!-- TIME TRACKER -->
@@ -1435,6 +1487,13 @@ document.addEventListener('DOMContentLoaded', function(){
           <div id="pendingEmailRequestsList"></div>
         </div>
       </div>
+
+      <div class="panel" style="margin-top:24px;">
+        <div class="panel-head"><span class="panel-title">Google Calendar</span></div>
+        <div class="panel-body">
+          <div id="gcalStatusBox"></div>
+        </div>
+      </div>
     </div>
 
     <!-- CLIENT DETAIL -->
@@ -1857,6 +1916,7 @@ async function fullRefresh(showFeedback){
   await loadTimeEntries();
   await loadMyTasks();
   await loadNotifications();
+  await loadCalendarEvents();
   renderAll();
   updateTasksNavBadge();
   await checkTaskNotifications();
@@ -1912,6 +1972,7 @@ const VIEW_TITLES = {
   approve: ['Approval Queue', 'Sorted by danger score — highest risk clients first'],
   notes: ['Notes', "Private to you — improvements you're planning or want to get to. Nobody else on the team can see these."],
   tasks: ['Tasks', 'Assign tasks to anyone on the team — only you and the other person can see it'],
+  calendar: ['Calendar', 'Shared team calendar — meetings, deadlines, and reminders, visible to everyone'],
   time: ['Time Tracker', "Log hours per client, review the timesheet, and see where the team's time goes"],
   team: ['Team', "Manage who's on the team, their roles, and job titles"],
   trash: ['Trash', 'Deleted notes and time entries — restore anytime, or delete for good. Deleted clients are visible to admins and approvers only.'],
@@ -1937,7 +1998,8 @@ async function switchView(name){
   if(name==='trash') renderTrash();
   if(name==='payroll') renderPayroll();
   if(name==='tasks') renderTasks();
-  if(name==='profile') renderProfilePage();
+  if(name==='calendar') renderCalendar();
+  if(name==='profile'){ renderProfilePage(); loadGoogleCalendarStatus(); }
 }
 
 function switchSettingsTab(name){
@@ -3820,14 +3882,14 @@ function populateTaskClientSelect(selectedId){
   return options;
 }
 
-function taskFormHtml(editing){
+function taskFormHtml(editing, presetAssigneeId){
   return `
     <div class="modal-head"><span class="panel-title">${editing ? 'Edit task' : 'New task'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
       <div class="settings-field"><label>Title</label><input id="taskTitleInput" placeholder="e.g. Update the roofing page copy" value="${editing ? editing.title.replace(/"/g,'&quot;') : ''}"></div>
       <div class="settings-field"><label>Description (optional)</label><textarea id="taskDescInput" style="width:100%;min-height:80px;font-family:'Inter',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);">${editing ? editing.description : ''}</textarea></div>
       <div class="form-grid">
-        <div><label>Assign to</label><select id="taskAssigneeSelect">${populateTaskAssigneeSelect(editing ? editing.assigneeId : currentUser.id)}</select></div>
+        <div><label>Assign to</label><select id="taskAssigneeSelect">${populateTaskAssigneeSelect(editing ? editing.assigneeId : (presetAssigneeId || currentUser.id))}</select></div>
         <div><label>Priority</label>
           <select id="taskPrioritySelect">
             <option value="low" ${editing && editing.priority==='low'?'selected':''}>Low</option>
@@ -3846,9 +3908,9 @@ function taskFormHtml(editing){
     </div>`;
 }
 
-function openNewTaskModal(){
+function openNewTaskModal(presetAssigneeId){
   if(!teamProfiles.length){ showToast('error','No team members','Add team members in Team before assigning tasks.'); return; }
-  openAppModal(taskFormHtml(null), 480);
+  openAppModal(taskFormHtml(null, presetAssigneeId), 480);
 }
 
 function openEditTaskModal(taskId){
@@ -3933,6 +3995,7 @@ async function markTaskDone(taskId){
         source: 'task'
       });
       await persistClients();
+      renderImprovementsHistory();
     }
   }
 
@@ -3997,6 +4060,291 @@ async function checkTaskNotifications(){
   renderTasks();
   updateTasksNavBadge();
   await loadNotifications();
+}
+
+/* ---------- Calendar — shared team calendar, with room for Google Calendar
+   sync alongside manually-created events. ---------- */
+
+let calendarEvents = [];
+let calendarAnchorDate = new Date();
+
+const CALENDAR_TYPE_META = {
+  meeting:  { label:'Meeting',  color:'#3A63C9' },
+  deadline: { label:'Deadline', color:'var(--red)' },
+  reminder: { label:'Reminder', color:'var(--amber)' },
+  other:    { label:'Other',    color:'var(--muted-lt)' },
+};
+
+async function loadCalendarEvents(){
+  const { data, error } = await supabaseClient.from('calendar_events').select('*').order('start_at', { ascending:true });
+  if(error){ console.error('loadCalendarEvents error', error); calendarEvents = []; return; }
+  calendarEvents = (data||[]).map(e=>({
+    id:e.id, title:e.title, description:e.description||'', startAt:e.start_at, endAt:e.end_at,
+    allDay:e.all_day, clientId:e.client_id, createdBy:e.created_by, eventType:e.event_type,
+    googleEventId:e.google_event_id, googleOwner:e.google_calendar_owner
+  }));
+}
+
+function renderCalendarMonthLabel(){
+  const el = document.getElementById('calendarMonthLabel');
+  if(el) el.textContent = calendarAnchorDate.toLocaleDateString('en-US',{month:'long', year:'numeric'});
+}
+
+function shiftCalendarMonth(dir){
+  calendarAnchorDate.setMonth(calendarAnchorDate.getMonth()+dir);
+  renderCalendarMonthLabel();
+  renderCalendar();
+}
+
+function resetCalendarToToday(){
+  calendarAnchorDate = new Date();
+  renderCalendarMonthLabel();
+  renderCalendar();
+}
+
+function renderCalendar(){
+  const grid = document.getElementById('calendarGrid');
+  if(!grid) return;
+  renderCalendarMonthLabel();
+  const typeFilter = document.getElementById('calendarTypeFilter')?.value || 'all';
+
+  const year = calendarAnchorDate.getFullYear(), month = calendarAnchorDate.getMonth();
+  const firstOfMonth = new Date(year, month, 1);
+  const gridStart = getWeekStart(firstOfMonth); // Monday-aligned
+  const todayStr = toDateStr(new Date());
+
+  const eventsByDay = {};
+  calendarEvents.forEach(e=>{
+    if(typeFilter!=='all' && e.eventType!==typeFilter) return;
+    const d = toDateStr(new Date(e.startAt));
+    if(!eventsByDay[d]) eventsByDay[d] = [];
+    eventsByDay[d].push(e);
+  });
+
+  let html = '';
+  for(let i=0;i<42;i++){
+    const cellDate = new Date(gridStart);
+    cellDate.setDate(cellDate.getDate()+i);
+    const cellStr = toDateStr(cellDate);
+    const isOtherMonth = cellDate.getMonth()!==month;
+    const isToday = cellStr===todayStr;
+    const dayEvents = (eventsByDay[cellStr]||[]).sort((a,b)=> new Date(a.startAt)-new Date(b.startAt));
+    const shown = dayEvents.slice(0,3);
+    const extra = dayEvents.length - shown.length;
+
+    html += `<div class="calendar-day ${isOtherMonth?'other-month':''} ${isToday?'today':''}" onclick="openNewEventModal('${cellStr}')">
+      <div class="calendar-day-num">${cellDate.getDate()}</div>
+      ${shown.map(e=>{
+        const meta = CALENDAR_TYPE_META[e.eventType] || CALENDAR_TYPE_META.other;
+        const timeStr = e.allDay ? '' : new Date(e.startAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})+' ';
+        return `<div class="calendar-event-pill" style="background:${meta.color}18;color:${meta.color};" onclick="event.stopPropagation();openEventDetailModal('${e.id}')" title="${e.title}">${e.googleEventId?'📅 ':''}${timeStr}${e.title}</div>`;
+      }).join('')}
+      ${extra>0 ? `<div class="calendar-more-pill">+${extra} more</div>` : ''}
+    </div>`;
+  }
+  grid.innerHTML = html;
+}
+
+function populateCalendarClientSelect(selectedId){
+  return `<option value="">No related client</option>` + activeClients().sort((a,b)=>a.name.localeCompare(b.name))
+    .map(c=>`<option value="${c.id}" ${c.id===selectedId?'selected':''}>${c.name}</option>`).join('');
+}
+
+function eventFormHtml(editing, presetDateStr){
+  const startDate = editing ? toDateStr(new Date(editing.startAt)) : (presetDateStr || toDateStr(new Date()));
+  const startTime = editing && !editing.allDay ? new Date(editing.startAt).toTimeString().slice(0,5) : '09:00';
+  const endTime = editing && !editing.allDay ? new Date(editing.endAt).toTimeString().slice(0,5) : '10:00';
+  return `
+    <div class="modal-head"><span class="panel-title">${editing ? 'Edit event' : 'New event'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <div class="settings-field"><label>Title</label><input id="eventTitleInput" placeholder="e.g. Kickoff call with Flame Auto Repair" value="${editing ? editing.title.replace(/"/g,'&quot;') : ''}"></div>
+      <div class="settings-field"><label>Description (optional)</label><textarea id="eventDescInput" style="width:100%;min-height:70px;font-family:'Inter',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);">${editing ? editing.description : ''}</textarea></div>
+      <div class="form-grid">
+        <div><label>Date</label><input type="date" id="eventDateInput" value="${startDate}"></div>
+        <div><label>Type</label>
+          <select id="eventTypeSelect">
+            ${Object.entries(CALENDAR_TYPE_META).map(([val,m])=>`<option value="${val}" ${editing && editing.eventType===val ? 'selected' : (!editing && val==='meeting' ? 'selected' : '')}>${m.label}</option>`).join('')}
+          </select>
+        </div>
+        <div><label>Start time</label><input type="time" id="eventStartInput" value="${startTime}"></div>
+        <div><label>End time</label><input type="time" id="eventEndInput" value="${endTime}"></div>
+      </div>
+      <div class="settings-field"><label><input type="checkbox" id="eventAllDayInput" ${editing && editing.allDay ? 'checked' : ''} onchange="toggleEventAllDay()" style="width:auto;margin-right:6px;">All-day event</label></div>
+      <div class="settings-field"><label>Related client (optional)</label><select id="eventClientSelect">${populateCalendarClientSelect(editing ? editing.clientId : null)}</select></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-brand" onclick="${editing ? `saveEditEvent('${editing.id}')` : 'saveNewEvent()'}">${editing ? 'Save changes' : 'Add event'}</button>
+      ${editing && !editing.googleEventId ? `<button class="btn btn-outline" style="color:var(--red);" onclick="deleteCalendarEvent('${editing.id}')">Delete</button>` : ''}
+      <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
+    </div>`;
+}
+
+function toggleEventAllDay(){
+  const isAllDay = document.getElementById('eventAllDayInput').checked;
+  const startEl = document.getElementById('eventStartInput');
+  const endEl = document.getElementById('eventEndInput');
+  if(startEl) startEl.disabled = isAllDay;
+  if(endEl) endEl.disabled = isAllDay;
+}
+
+function openNewEventModal(presetDateStr){
+  openAppModal(eventFormHtml(null, presetDateStr), 480);
+  setTimeout(toggleEventAllDay, 0);
+}
+
+function openEventDetailModal(eventId){
+  const e = calendarEvents.find(x=>x.id===eventId);
+  if(!e) return;
+  if(e.googleEventId){
+    const c = e.clientId ? clients.find(x=>x.id===e.clientId) : null;
+    openAppModal(`
+      <div class="modal-head"><span class="panel-title">${e.title}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+      <div class="modal-body">
+        <p style="font-size:11px;color:var(--muted-lt);margin:0 0 12px;">📅 Synced from Google Calendar — edit it in Google, changes appear here on next sync.</p>
+        <div style="font-size:13px;color:var(--ink);">${e.allDay ? 'All day' : `${new Date(e.startAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})} – ${new Date(e.endAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`}</div>
+        ${e.description ? `<div style="font-size:13px;color:var(--muted);margin-top:10px;white-space:pre-wrap;">${e.description}</div>` : ''}
+        ${c ? `<div style="margin-top:10px;"><span class="row-link" onclick="closeAppModal();openClientDetail('${c.id}');">${c.name}</span></div>` : ''}
+      </div>
+      <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 460);
+    return;
+  }
+  openAppModal(eventFormHtml(e), 480);
+  setTimeout(toggleEventAllDay, 0);
+}
+
+function buildEventTimestamps(){
+  const dateVal = document.getElementById('eventDateInput').value;
+  const isAllDay = document.getElementById('eventAllDayInput').checked;
+  if(!dateVal) return null;
+  if(isAllDay){
+    return { startAt: `${dateVal}T00:00:00`, endAt: `${dateVal}T23:59:59`, allDay:true };
+  }
+  const startTime = document.getElementById('eventStartInput').value || '09:00';
+  const endTime = document.getElementById('eventEndInput').value || '10:00';
+  return { startAt: `${dateVal}T${startTime}:00`, endAt: `${dateVal}T${endTime}:00`, allDay:false };
+}
+
+async function saveNewEvent(){
+  const title = document.getElementById('eventTitleInput').value.trim();
+  if(!title){ showToast('error','Title required','Give the event a title first.'); return; }
+  const ts = buildEventTimestamps();
+  if(!ts){ showToast('error','Pick a date','A date is required.'); return; }
+  const description = document.getElementById('eventDescInput').value.trim();
+  const eventType = document.getElementById('eventTypeSelect').value;
+  const clientId = document.getElementById('eventClientSelect').value || null;
+
+  const { error } = await supabaseClient.from('calendar_events').insert({
+    title, description, start_at: ts.startAt, end_at: ts.endAt, all_day: ts.allDay,
+    client_id: clientId, created_by: currentUser.id, event_type: eventType
+  });
+  closeAppModal();
+  await loadCalendarEvents();
+  renderCalendar();
+  error ? showToast('error','Save failed', error.message) : showToast('success','Event added','On the calendar now.');
+}
+
+async function saveEditEvent(eventId){
+  const e = calendarEvents.find(x=>x.id===eventId);
+  if(!e) return;
+  const title = document.getElementById('eventTitleInput').value.trim();
+  if(!title){ showToast('error','Title required','Give the event a title first.'); return; }
+  const ts = buildEventTimestamps();
+  if(!ts){ showToast('error','Pick a date','A date is required.'); return; }
+  const description = document.getElementById('eventDescInput').value.trim();
+  const eventType = document.getElementById('eventTypeSelect').value;
+  const clientId = document.getElementById('eventClientSelect').value || null;
+
+  const { error } = await supabaseClient.from('calendar_events').update({
+    title, description, start_at: ts.startAt, end_at: ts.endAt, all_day: ts.allDay,
+    client_id: clientId, event_type: eventType
+  }).eq('id', eventId);
+  closeAppModal();
+  await loadCalendarEvents();
+  renderCalendar();
+  error ? showToast('error','Save failed', error.message) : showToast('success','Event updated','Changes saved.');
+}
+
+async function deleteCalendarEvent(eventId){
+  if(!confirm('Delete this event?')) return;
+  const { error } = await supabaseClient.from('calendar_events').delete().eq('id', eventId);
+  closeAppModal();
+  await loadCalendarEvents();
+  renderCalendar();
+  error ? showToast('error','Delete failed', error.message) : showToast('success','Event deleted','Removed from the calendar.');
+}
+
+/* ---------- Google Calendar connect / sync / disconnect (Profile page) ---------- */
+
+async function loadGoogleCalendarStatus(){
+  const el = document.getElementById('gcalStatusBox');
+  if(!el) return;
+  el.innerHTML = `<div class="empty">Checking…</div>`;
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/google-calendar-status', {
+      headers: { 'Authorization': `Bearer ${session.access_token}` }
+    });
+    const data = await response.json();
+    if(!response.ok){ el.innerHTML = `<div class="empty">Could not check status.</div>`; return; }
+
+    if(!data.googleConfigured){
+      el.innerHTML = `<p style="font-size:12.5px;color:var(--muted);line-height:1.5;">Google Calendar sync isn't configured for this deployment yet — an admin needs to set up a Google Cloud project and add the credentials. See the README for the exact steps.</p>`;
+      return;
+    }
+    if(data.connected){
+      el.innerHTML = `
+        <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 12px;">Connected as <b>${data.email||'your Google account'}</b>${data.lastSyncedAt ? ` · Last synced ${new Date(data.lastSyncedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}` : ' · Not synced yet'}</p>
+        <button class="btn btn-brand" onclick="syncGoogleCalendar()">Sync now</button>
+        <button class="btn btn-outline" onclick="disconnectGoogleCalendar()">Disconnect</button>`;
+    } else {
+      el.innerHTML = `
+        <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 12px;">Connect your Google Calendar to pull your meetings into the shared team calendar automatically.</p>
+        <button class="btn btn-brand" onclick="connectGoogleCalendar()">Connect Google Calendar</button>`;
+    }
+  }catch(e){
+    el.innerHTML = `<div class="empty">Could not check status — try again.</div>`;
+  }
+}
+
+async function connectGoogleCalendar(){
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  window.location.href = `/api/google-oauth-start?access_token=${encodeURIComponent(session.access_token)}`;
+}
+
+async function syncGoogleCalendar(){
+  showToast('info','Syncing…','Pulling events from Google Calendar.');
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/google-calendar-sync', {
+      method:'POST', headers:{ 'Authorization': `Bearer ${session.access_token}` }
+    });
+    const data = await response.json();
+    if(!response.ok){ showToast('error','Sync failed', data.error || 'Could not sync.'); return; }
+    await loadCalendarEvents();
+    renderCalendar();
+    loadGoogleCalendarStatus();
+    showToast('success','Synced', `${data.synced} event${data.synced!==1?'s':''} pulled in.`);
+  }catch(e){
+    showToast('error','Sync failed','Network error — try again.');
+  }
+}
+
+async function disconnectGoogleCalendar(){
+  if(!confirm('Disconnect Google Calendar? Previously-synced events will be removed from the calendar.')) return;
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/google-calendar-disconnect', {
+      method:'POST', headers:{ 'Authorization': `Bearer ${session.access_token}` }
+    });
+    const data = await response.json();
+    if(!response.ok){ showToast('error','Failed', data.error || 'Could not disconnect.'); return; }
+    await loadCalendarEvents();
+    renderCalendar();
+    loadGoogleCalendarStatus();
+    showToast('success','Disconnected','Google Calendar is no longer connected.');
+  }catch(e){
+    showToast('error','Failed','Network error — try again.');
+  }
 }
 
 /* ---------- Notification bell — unified inbox for tasks, email-change
@@ -4440,6 +4788,7 @@ async function logTimeEntryAsImprovement(entryId){
   c.improvements.push({ author: myName()||'Team member', text: entry.description.trim(), date: new Date().toISOString(), includeInEmail: false, source: 'time' });
   const ok = await persistClients();
   if(!ok){ showToast('error','Save failed','Could not save — try again.'); return; }
+  renderImprovementsHistory();
 
   const { error } = await supabaseClient.from('time_entries').update({ logged: true }).eq('id', entryId);
   await loadTimeEntries();
@@ -6595,8 +6944,13 @@ function renderTeam(){
           ${(settings.teamTitleOptions||[]).map(o=>`<option value="${o.replace(/"/g,'&quot;')}" ${m.title===o?'selected':''}>${o}</option>`).join('')}
         </select>`
       : (m.title ? `<span class="role-chip" style="margin-right:8px;">${m.title}</span>` : '');
+    const contactLine = [m.email, m.phone].filter(Boolean).join(' · ');
+    const actions = [];
+    if(!isSelf) actions.push(`<span class="row-link" onclick="openNewTaskModal('${m.id}')">Assign task</span>`);
+    if(m.email) actions.push(`<a class="row-link" href="mailto:${m.email}" style="text-decoration:none;">Email</a>`);
+    if(isAdmin() && !isSelf) actions.push(`<span class="row-link danger-link" onclick="adminResetPassword('${m.id}','${m.name.replace(/'/g,"\\'")}')">Reset password</span>`);
     return `<div class="integ-row">
-      <div><div class="integ-name">${m.name}</div><div class="integ-desc">${m.email}</div></div>
+      <div><div class="integ-name">${m.name}</div><div class="integ-desc">${contactLine}</div>${actions.length ? `<div style="display:flex;gap:14px;margin-top:6px;">${actions.join('')}</div>` : ''}</div>
       <div style="display:flex;align-items:center;">${titleControl}${roleControl}</div>
     </div>`;
   }).join('');
@@ -6620,6 +6974,29 @@ async function changeTeamRole(userId, newRole){
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Changed a team member's role to <b>${newRole}</b>.`});
   await persistLog(); renderLog();
   showToast('success','Role updated', 'Change is live immediately for that person.');
+}
+
+async function adminResetPassword(userId, name){
+  if(!isAdmin()) return;
+  if(!confirm(`Set a new temporary password for ${name}? Their current password stops working immediately, and you'll need to send them this new one directly.`)) return;
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/admin-reset-password', {
+      method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`},
+      body: JSON.stringify({ targetUserId: userId })
+    });
+    const data = await response.json();
+    if(!response.ok){ showToast('error','Reset failed', data.error || 'Could not reset the password.'); return; }
+    openAppModal(`
+      <div class="modal-head"><span class="panel-title">Password reset for ${name}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+      <div class="modal-body">
+        <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Send this to ${name} directly — it won't be shown again. They should change it after logging in.</p>
+        <div class="settings-field"><label>Temporary password</label><input value="${data.tempPassword}" readonly style="font-family:'IBM Plex Mono',monospace;font-weight:600;"></div>
+      </div>
+      <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 440);
+  }catch(e){
+    showToast('error','Reset failed','Network error — try again.');
+  }
 }
 
 function nowTime(){ return new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
@@ -6725,6 +7102,7 @@ async function showApp(session){
     await loadTimeEntries();
     await loadMyTasks();
     await loadNotifications();
+    await loadCalendarEvents();
     renderAll();
     updateTasksNavBadge();
     applyAppIcon();
@@ -6744,6 +7122,21 @@ async function showApp(session){
 (async function init(){
   const { data: { session } } = await supabaseClient.auth.getSession();
   if(session){ await showApp(session); } else { showLoginScreen(); }
+
+  // Google redirects back to #profile?gcal=connected|denied|error after the
+  // OAuth flow — pick that up, land on Profile, and clean the URL so a
+  // refresh doesn't re-show the same toast.
+  const hash = window.location.hash;
+  if(hash.startsWith('#profile') && hash.includes('gcal=')){
+    const outcome = new URLSearchParams(hash.split('?')[1]).get('gcal');
+    if(session){
+      await switchView('profile');
+      if(outcome==='connected') showToast('success','Google Calendar connected','Click "Sync now" to pull in your meetings.');
+      else if(outcome==='denied') showToast('info','Not connected','You can connect Google Calendar anytime from this page.');
+      else if(outcome==='error') showToast('error','Connection failed','Something went wrong connecting Google Calendar — try again.');
+    }
+    history.replaceState(null, '', window.location.pathname);
+  }
 
   // Supabase fires onAuthStateChange once immediately upon subscribing,
   // reporting whatever the current session state already is — which we just
