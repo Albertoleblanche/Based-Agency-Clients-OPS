@@ -2107,18 +2107,15 @@ async function goToClientInQueue(id, filter){
   openQueueCardModal(id);
 }
 
-let attentionShowAll = false;
-
 function renderAttentionList(){
   const el = document.getElementById('attentionList');
   if(!el) return;
   const items = activeClients().filter(c => c.danger>=4 || c.draftStatus==='pending')
     .sort((a,b)=> b.danger-a.danger || (b.draftStatus==='pending')-(a.draftStatus==='pending'));
-  if(!items.length){ el.innerHTML = `<div class="empty" style="padding:14px 0;">Nothing urgent right now.</div>`; attentionShowAll = false; return; }
+  if(!items.length){ el.innerHTML = `<div class="empty" style="padding:14px 0;">Nothing urgent right now.</div>`; return; }
 
-  const capped = attentionShowAll ? items : items.slice(0, 6);
-  const cards = capped.map(c=>{
-    const reason = c.draftStatus==='pending' ? 'Draft awaiting approval' : `Danger score ${c.danger}/5 — at risk`;
+  const cards = items.slice(0,4).map(c=>{
+    const reason = c.draftStatus==='pending' ? 'Draft awaiting approval' : 'At risk';
     const filter = c.draftStatus==='pending' ? 'pending' : 'atrisk';
     const status = statusMeta(c.draftStatus);
     return `<div class="q-card" onclick="goToClientInQueue('${c.id}','${filter}')">
@@ -2131,22 +2128,12 @@ function renderAttentionList(){
       </div>
       <div class="q-ratings">
         ${dotRating('Importance', c.importance, 'ink', 10)}
-        ${dotRating('Danger', c.danger, 'brand')}
       </div>
       <div class="q-bulk-preview" style="color:var(--red);font-weight:600;"><span class="pulse-dot pulse-red"></span>${reason}</div>
     </div>`;
   }).join('');
 
-  const toggleBtn = items.length > 6
-    ? `<button class="btn btn-outline" style="margin-top:16px;width:100%;justify-content:center;" onclick="toggleAttentionShowAll()">${attentionShowAll ? 'Show less' : `View all ${items.length} →`}</button>`
-    : '';
-
-  el.innerHTML = `<div class="queue-grid">${cards}</div>${toggleBtn}`;
-}
-
-function toggleAttentionShowAll(){
-  attentionShowAll = !attentionShowAll;
-  renderAttentionList();
+  el.innerHTML = `<div class="queue-grid">${cards}</div>`;
 }
 
 function renderClientOptionsSelects(){
@@ -2666,7 +2653,7 @@ function renderOverviewActiveQueue(){
   if(!el) return;
   const active = activeClients().filter(hasLoggedThisWeek).sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
   if(!active.length){ el.innerHTML = `<div class="empty">No clients have logged improvements this week yet.</div>`; return; }
-  el.innerHTML = active.map(c=>{
+  el.innerHTML = active.slice(0,4).map(c=>{
     const status = statusMeta(c.draftStatus);
     const recentCount = c.improvements.filter(i=>i.date && new Date(i.date) >= (()=>{const d=new Date();d.setDate(d.getDate()-7);return d;})()).length;
     return `<div class="q-card" onclick="goToClientInQueue('${c.id}','all')">
@@ -2679,7 +2666,6 @@ function renderOverviewActiveQueue(){
       </div>
       <div class="q-ratings">
         ${dotRating('Importance', c.importance, 'ink', 10)}
-        ${dotRating('Danger', c.danger, 'brand')}
       </div>
       <div class="q-bulk-preview has-logs"><span class="pulse-dot"></span>${recentCount} improvement${recentCount!==1?'s':''} logged this week</div>
     </div>`;
