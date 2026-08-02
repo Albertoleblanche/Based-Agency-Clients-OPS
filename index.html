@@ -206,18 +206,20 @@
 
   .date-filter-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:var(--muted);}
   .date-filter-row label{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.03em;color:var(--muted-lt);}
-  .date-filter-row select, .date-filter-row input[type="date"]{font-family:'DM Sans',sans-serif;font-size:12.5px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);}
+  select{appearance:none;-webkit-appearance:none;-moz-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%239AA3AF' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}
+  .date-filter-row select{font-family:'DM Sans',sans-serif;font-size:12.5px;padding:6px 28px 6px 9px;border-radius:6px;border:1px solid var(--border);background-color:var(--card);color:var(--ink);}
+  .date-filter-row input[type="date"]{font-family:'DM Sans',sans-serif;font-size:12.5px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);}
 
   .clients-filter-panel{padding:18px 20px;}
   .clients-filter-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
   .search-field{display:flex;align-items:center;gap:8px;flex:1;min-width:200px;padding:0 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);}
   .select-field{display:flex;align-items:center;gap:8px;min-width:180px;padding:0 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--muted-lt);}
-  .select-field select{border:none;background:transparent;padding:9px 0;font-family:'DM Sans',sans-serif;font-size:12.5px;color:var(--ink);width:100%;cursor:pointer;}
+  .select-field select{border:none;background-color:transparent;background-position:right 0 center;padding:9px 18px 9px 0;font-family:'DM Sans',sans-serif;font-size:12.5px;color:var(--ink);width:100%;cursor:pointer;}
   .select-field select:focus{outline:none;}
   .search-field svg{color:var(--muted-lt);flex:none;}
   .search-field input{border:none;background:transparent;padding:9px 0;font-family:'DM Sans',sans-serif;font-size:12.5px;color:var(--ink);width:100%;}
   .search-field input:focus{outline:none;}
-  .clients-filter-bar select{font-family:'DM Sans',sans-serif;font-size:12.5px;padding:9px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);min-width:150px;}
+  .clients-filter-bar select{font-family:'DM Sans',sans-serif;font-size:12.5px;padding:9px 30px 9px 12px;border-radius:6px;border:1px solid var(--border);background-color:var(--surface-2);color:var(--ink);min-width:150px;}
   .clients-filter-count{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted-lt);margin-top:10px;}
   .filter-btn{display:flex;align-items:center;white-space:nowrap;}
   .filter-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;margin-left:7px;border-radius:20px;background:var(--brand);color:#fff;font-size:10px;font-weight:700;}
@@ -263,7 +265,8 @@
   /* Add client form */
   .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
   .form-grid label{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--muted);display:block;margin-bottom:4px;}
-  .form-grid input,.form-grid select{width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);}
+  .form-grid input,.form-grid select{width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background-color:var(--surface-2);color:var(--ink);}
+  .form-grid select{padding-right:28px;}
   .form-actions{margin-top:12px;display:flex;gap:8px;}
 
   /* Log improvement drawer */
@@ -311,7 +314,7 @@
   .note-link{display:inline-block;font-size:11.5px;color:var(--brand-dark);margin-top:8px;text-decoration:none;flex:none;}
   .note-link:hover{text-decoration:underline;}
   .note-actions{display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid #F3F4F6;flex-wrap:wrap;flex:none;}
-  .note-status-select{font-family:'DM Sans',sans-serif;font-size:11.5px;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);}
+  .note-status-select{font-family:'DM Sans',sans-serif;font-size:11.5px;padding:5px 24px 5px 8px;border-radius:6px;border:1px solid var(--border);background-color:var(--surface-2);color:var(--ink);background-position:right 8px center;}
 
   .attachments-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;}
   .attachment-item{border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;background:var(--card);display:flex;flex-direction:column;}
@@ -381,7 +384,7 @@
   .kanban-column-dot{width:9px;height:9px;border-radius:50%;flex:none;}
   .kanban-column-title{font-family:'DM Sans',sans-serif;font-size:13.5px;font-weight:600;color:var(--ink);flex:1;}
   .kanban-column-count{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:700;color:var(--muted);background:var(--card);padding:2px 8px;border-radius:10px;}
-  .kanban-add-btn{width:22px;height:22px;border-radius:7px;border:none;background:var(--card);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;font-size:15px;line-height:1;transition:background .12s ease, color .12s ease;}
+  .kanban-add-btn{width:22px;height:22px;border-radius:var(--radius-sm);border:none;background:var(--card);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;font-size:15px;line-height:1;transition:background .12s ease, color .12s ease;}
   .kanban-add-btn:hover{background:var(--brand);color:#fff;}
   .kanban-cards{display:flex;flex-direction:column;gap:10px;min-height:20px;}
 
@@ -604,7 +607,8 @@
   body[data-theme="dark"] .metric-icon-purple{background:#241B38;color:#B18AF0;}
 
   /* Settings / integrations */
-  .integ-row{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid #F0F1F4;}
+  .integ-row{display:flex;justify-content:space-between;align-items:center;padding:13px 14px;margin:0 -14px;border-bottom:1px solid #F0F1F4;border-radius:var(--radius-sm);transition:background var(--duration-fast) var(--ease-out);}
+  .integ-row:hover{background:var(--surface-2);}
   .integ-row:last-child{border-bottom:none;}
   .integ-name{font-size:13px;font-weight:600;}
   .integ-desc{font-size:11.5px;color:var(--muted);margin-top:2px;}
@@ -1083,14 +1087,30 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- NOTES -->
     <div class="view" id="view-notes">
-      <div class="panel" style="margin-bottom:16px;">
-        <div class="panel-body" style="display:flex;align-items:center;gap:14px;">
-          <div class="search-field">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input id="notesSearch" placeholder="Search notes…" oninput="renderNotes()">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
+        <div class="icon-tab-group" id="noteStatusTabs" style="margin-bottom:0;flex:1;">
+          <div class="icon-tab active" data-nstatus="all" onclick="switchNoteStatusTab('all')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+            <span>All statuses</span>
           </div>
-          <button class="btn btn-brand" style="flex:none;" onclick="openNoteModal()">+ Add note</button>
+          <div class="icon-tab" data-nstatus="idea" onclick="switchNoteStatusTab('idea')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.4 1 1.2 1 2.05V17h6v-2.25c0-.85.4-1.65 1-2.05A7 7 0 0 0 12 2z"/></svg>
+            <span>Idea</span>
+          </div>
+          <div class="icon-tab" data-nstatus="planned" onclick="switchNoteStatusTab('planned')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span>Planned</span>
+          </div>
+          <div class="icon-tab" data-nstatus="in-progress" onclick="switchNoteStatusTab('in-progress')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>In progress</span>
+          </div>
+          <div class="icon-tab" data-nstatus="done" onclick="switchNoteStatusTab('done')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <span>Done</span>
+          </div>
         </div>
+        <button class="btn btn-brand" style="flex:none;" onclick="openNoteModal()">+ Add note</button>
       </div>
 
       <div class="clients-filter-bar" style="margin-bottom:8px;">
@@ -1098,17 +1118,6 @@ document.addEventListener('DOMContentLoaded', function(){
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           <select id="notesClientFilter" onchange="renderNotes()"><option value="all">All clients</option></select>
         </div>
-        <div class="select-field">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-          <select id="notesStatusFilter" onchange="renderNotes()">
-            <option value="all">All statuses</option>
-            <option value="idea">Idea</option>
-            <option value="planned">Planned</option>
-            <option value="in-progress">In progress</option>
-            <option value="done">Done</option>
-          </select>
-        </div>
-        <button class="btn btn-outline" onclick="clearNoteFilters()">Clear</button>
       </div>
 
       <div id="notesList" class="notes-grid"></div>
@@ -3858,10 +3867,11 @@ function populateNotesClientFilter(){
   if([...sel.options].some(o=>o.value===current)) sel.value = current;
 }
 
-function clearNoteFilters(){
-  const search = document.getElementById('notesSearch'); if(search) search.value = '';
-  const clientSel = document.getElementById('notesClientFilter'); if(clientSel) clientSel.value = 'all';
-  const statusSel = document.getElementById('notesStatusFilter'); if(statusSel) statusSel.value = 'all';
+let noteStatusTab = 'all';
+
+function switchNoteStatusTab(status){
+  noteStatusTab = status;
+  document.querySelectorAll('#noteStatusTabs .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.nstatus===status));
   renderNotes();
 }
 
@@ -3869,15 +3879,11 @@ function renderNotes(){
   const el = document.getElementById('notesList');
   if(!el) return;
   updateNotesBadge();
-  const search = (document.getElementById('notesSearch')?.value || '').trim().toLowerCase();
   const clientFilter = document.getElementById('notesClientFilter')?.value || 'all';
-  const statusFilter = document.getElementById('notesStatusFilter')?.value || 'all';
 
   let filtered = notes.filter(n=>{
-    const c = clients.find(x=>x.id===n.clientId);
     if(clientFilter!=='all' && n.clientId!==clientFilter) return false;
-    if(statusFilter!=='all' && n.status!==statusFilter) return false;
-    if(search && !(n.text.toLowerCase().includes(search) || (c && c.name.toLowerCase().includes(search)))) return false;
+    if(noteStatusTab!=='all' && n.status!==noteStatusTab) return false;
     return true;
   });
 
@@ -3903,7 +3909,7 @@ function renderNotes(){
         </div>
         <span class="pill ${status.cls}">${status.label}</span>
       </div>
-      <div class="note-text">${n.text}</div>
+      <div class="note-text">${escapeHtml(n.text)}</div>
       ${n.link ? `<a href="${normalizeUrl(n.link)}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${n.link.replace(/^https?:\/\//,'').slice(0,40)}</a>` : ''}
       <div class="note-actions" onclick="event.stopPropagation();">
         ${n.status!=='done' ? `<button class="btn btn-brand" style="padding:7px 12px;font-size:11.5px;" onclick="logNoteNow('${n.id}')">Log it now</button>` : ''}
@@ -4151,7 +4157,7 @@ function openTaskDetailModal(taskId){
     </div>
     <div class="modal-actions" style="justify-content:space-between;align-items:center;">
       <div>
-        ${moveOptionsHtml && t.status!=='done' ? `<select onchange="if(this.value) moveTaskToStatus('${t.id}', this.value);" style="font-family:'DM Sans',sans-serif;font-size:12.5px;padding:9px 12px;border-radius:7px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);cursor:pointer;">
+        ${moveOptionsHtml && t.status!=='done' ? `<select onchange="if(this.value) moveTaskToStatus('${t.id}', this.value);" style="font-family:'DM Sans',sans-serif;font-size:12.5px;padding:9px 30px 9px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background-color:var(--surface-2);color:var(--ink);cursor:pointer;">
           <option value="">Move to…</option>
           ${moveOptionsHtml}
         </select>` : ''}
