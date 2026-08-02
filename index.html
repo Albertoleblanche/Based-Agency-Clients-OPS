@@ -241,6 +241,15 @@
   .search-field input:focus{outline:none;}
   .clients-filter-bar select{font-family:'DM Sans',sans-serif;font-size:12.5px;padding:9px 30px 9px 12px;border-radius:6px;border:1px solid var(--border);background-color:var(--surface-2);color:var(--ink);min-width:150px;}
   .clients-filter-count{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted-lt);margin-top:10px;}
+
+  .filters-popover-wrap{position:relative;}
+  .filters-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;margin-left:7px;background:var(--brand);color:#fff;border-radius:20px;font-size:10px;font-weight:700;}
+  .filters-popover{position:absolute;top:calc(100% + 8px);left:0;width:280px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:200;animation:modalCardIn var(--duration-base) var(--ease-out);}
+  .filters-popover-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border);}
+  .filters-popover-title{font-size:13px;font-weight:600;color:var(--ink);}
+  .filters-popover-body{padding:14px 16px;display:flex;flex-direction:column;gap:12px;}
+  .filters-popover-field label{display:block;font-size:11px;color:var(--muted-lt);margin-bottom:5px;font-weight:600;}
+  .filters-popover-field select{width:100%;font-family:'DM Sans',sans-serif;font-size:12.5px;padding:8px 26px 8px 10px;border-radius:6px;border:1px solid var(--border);background-color:var(--surface-2);color:var(--ink);}
   .filter-btn{display:flex;align-items:center;white-space:nowrap;}
   .filter-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;margin-left:7px;border-radius:20px;background:var(--brand);color:#fff;font-size:10px;font-weight:700;}
 
@@ -982,41 +991,55 @@ document.addEventListener('DOMContentLoaded', function(){
         </div>
       </div>
 
-      <div class="clients-filter-bar" style="margin-bottom:8px;">
-        <div class="select-field">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-          <select id="filterService" onchange="onClientFilterChange()"></select>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+        <div class="filters-popover-wrap">
+          <button class="btn btn-outline" onclick="toggleClientFiltersPopover()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:-2px;"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            Filters
+            <span class="filters-badge" id="clientFiltersBadge" style="display:none;">0</span>
+          </button>
+          <div class="filters-popover" id="clientFiltersPopover" style="display:none;">
+            <div class="filters-popover-head">
+              <span class="filters-popover-title">Filters</span>
+              <span class="row-link" onclick="clearClientFilters()">Clear all</span>
+            </div>
+            <div class="filters-popover-body">
+              <div class="filters-popover-field">
+                <label>Service</label>
+                <select id="filterService" onchange="onClientFilterChange()"></select>
+              </div>
+              <div class="filters-popover-field">
+                <label>Status</label>
+                <select id="filterStatus" onchange="onClientFilterChange()"></select>
+              </div>
+              <div class="filters-popover-field">
+                <label>Importance</label>
+                <select id="filterImportance" onchange="onClientFilterChange()">
+                  <option value="all">Any importance</option>
+                  <option value="high">High importance (8–10)</option>
+                  <option value="mid">Medium importance (4–7)</option>
+                  <option value="low">Low importance (1–3)</option>
+                </select>
+              </div>
+              <div class="filters-popover-field">
+                <label>Danger</label>
+                <select id="filterDanger" onchange="onClientFilterChange()">
+                  <option value="all">Any danger</option>
+                  <option value="atrisk">At risk (4–5)</option>
+                  <option value="low">Low risk (1–3)</option>
+                </select>
+              </div>
+              <div class="filters-popover-field">
+                <label>Logged this week</label>
+                <select id="filterLogged" onchange="onClientFilterChange()">
+                  <option value="all">Doesn't matter</option>
+                  <option value="has">Has logs this week</option>
+                  <option value="none">No logs yet this week</option>
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="select-field">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-          <select id="filterStatus" onchange="onClientFilterChange()"></select>
-        </div>
-        <div class="select-field">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <select id="filterImportance" onchange="onClientFilterChange()">
-            <option value="all">Any importance</option>
-            <option value="high">High importance (8–10)</option>
-            <option value="mid">Medium importance (4–7)</option>
-            <option value="low">Low importance (1–3)</option>
-          </select>
-        </div>
-        <div class="select-field">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          <select id="filterDanger" onchange="onClientFilterChange()">
-            <option value="all">Any danger</option>
-            <option value="atrisk">At risk (4–5)</option>
-            <option value="low">Low risk (1–3)</option>
-          </select>
-        </div>
-        <div class="select-field">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          <select id="filterLogged" onchange="onClientFilterChange()">
-            <option value="all">Logged: doesn't matter</option>
-            <option value="has">Has logs this week</option>
-            <option value="none">No logs yet this week</option>
-          </select>
-        </div>
-        <button class="btn btn-outline" onclick="clearClientFilters()">Clear</button>
         <span class="clients-filter-count" id="clientsFilterCount" style="margin-top:0;"></span>
       </div>
 
@@ -3034,8 +3057,29 @@ function onClientFilterChange(){
   clientFilters.importance = document.getElementById('filterImportance').value;
   clientFilters.danger = document.getElementById('filterDanger').value;
   clientFilters.logged = document.getElementById('filterLogged').value;
+  updateClientFiltersBadge();
   renderClientsTable();
 }
+
+function updateClientFiltersBadge(){
+  const badge = document.getElementById('clientFiltersBadge');
+  if(!badge) return;
+  const count = ['service','status','importance','danger','logged'].filter(k=>clientFilters[k] && clientFilters[k]!=='all').length;
+  badge.textContent = count;
+  badge.style.display = count ? 'inline-flex' : 'none';
+}
+
+function toggleClientFiltersPopover(){
+  const el = document.getElementById('clientFiltersPopover');
+  if(!el) return;
+  el.style.display = el.style.display==='block' ? 'none' : 'block';
+}
+
+document.addEventListener('click', (e)=>{
+  const wrap = document.querySelector('.filters-popover-wrap');
+  const popover = document.getElementById('clientFiltersPopover');
+  if(popover && popover.style.display==='block' && wrap && !wrap.contains(e.target)) popover.style.display = 'none';
+});
 
 const SORT_ICON_UP = '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>';
 const SORT_ICON_DOWN = '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>';
@@ -3053,6 +3097,7 @@ function clearClientFilters(){
   if(searchInput) searchInput.value = '';
   clientFilters = { search:'', service:'all', status:'all', importance:'all', danger:'all', logged:'all' };
   populateClientFilterSelects();
+  updateClientFiltersBadge();
   renderClientsTable();
 }
 
