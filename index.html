@@ -264,6 +264,7 @@
   /* Table */
   table{width:100%;border-collapse:collapse;font-size:12.5px;}
   th{text-align:left;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;color:var(--muted-lt);padding:18px 14px 12px;border-bottom:1px solid #F3F4F6;}
+  #clientsTable th{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;letter-spacing:.02em;}
   th.sortable{cursor:pointer;user-select:none;transition:color .12s ease;}
   th.sortable:hover{color:var(--ink);}
   .sort-arrow{display:inline-flex;align-items:center;margin-left:4px;color:var(--brand);vertical-align:-1px;}
@@ -278,7 +279,7 @@
   .cell-service{color:var(--ink);font-weight:500;}
   .pill{font-family:'IBM Plex Mono',monospace;font-size:9.5px;padding:3px 8px;border-radius:20px;letter-spacing:.04em;font-weight:600;display:inline-block;}
   .pill-status{background:#EEF0F4;color:var(--muted);}
-  .pill-good{background:var(--green-bg);color:var(--green);}
+  .pill-good{background:var(--green-bg);color:#0E7A3D;}
   .pill-brand{background:var(--brand-bg);color:var(--brand-dark);}
   .pill-mid{background:var(--amber-bg);color:var(--amber);}
   .pill-bad{background:var(--red-bg);color:var(--red);}
@@ -315,6 +316,19 @@
   .actions-cell{position:relative;}
   .dropdown{position:relative;display:inline-block;}
   .dropdown-menu{display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(16,24,40,.14);min-width:170px;z-index:50;overflow:hidden;}
+  .icon-menu-btn{background:none;border:1px solid var(--border);color:var(--muted);cursor:pointer;padding:6px 9px;border-radius:8px;display:flex;transition:background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);}
+  .icon-menu-btn:hover{background:var(--surface-2);color:var(--ink);}
+
+  .bulk-actions-bar{display:none;align-items:center;gap:14px;background:var(--brand-bg);border:1px solid var(--brand);border-radius:var(--radius-md);padding:10px 16px;margin-bottom:12px;font-size:12.5px;color:var(--brand-dark);font-weight:600;}
+
+  .table-pagination{display:flex;justify-content:space-between;align-items:center;padding:14px 22px;border-top:1px solid var(--border);flex-wrap:wrap;gap:10px;}
+  .table-pagination-count{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted-lt);}
+  .table-pagination-pages{display:flex;align-items:center;gap:4px;}
+  .pagination-btn{min-width:28px;height:28px;padding:0 6px;border-radius:7px;border:1px solid var(--border);background:var(--card);color:var(--ink);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);}
+  .pagination-btn:hover:not(:disabled){background:var(--surface-2);border-color:#DDE0E5;}
+  .pagination-btn.active{background:var(--brand);border-color:var(--brand);color:#fff;}
+  .pagination-btn:disabled{opacity:.4;cursor:not-allowed;}
+  .pagination-ellipsis{color:var(--muted-lt);font-size:12px;padding:0 2px;}
   .dropdown-menu.open{display:block;}
   .dropdown-item{padding:10px 14px;font-size:12.5px;font-weight:500;color:var(--ink);cursor:pointer;}
   .dropdown-item:hover{background:var(--surface-2);}
@@ -603,7 +617,7 @@
   .rating-label{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.06em;color:var(--muted-lt);width:64px;flex:none;}
   .rate-dots{display:flex;gap:5px;}
   .rate-dots-compact{display:flex;align-items:center;gap:4px;}
-  .rating-pill{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;white-space:nowrap;}
+  .rating-pill{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;white-space:nowrap;}
   .rating-pill-ink{background:var(--surface-2);color:var(--ink);}
   .rating-pill-brand{background:var(--brand-bg);color:var(--brand-dark);}
   .rate-dot{width:5px;height:5px;border-radius:50%;flex:none;}
@@ -1043,9 +1057,17 @@ document.addEventListener('DOMContentLoaded', function(){
         <span class="clients-filter-count" id="clientsFilterCount" style="margin-top:0;"></span>
       </div>
 
+      <div class="bulk-actions-bar" id="clientsBulkBar" style="display:none;">
+        <span id="clientsBulkCount"></span>
+        <span class="row-link" onclick="clearClientSelection()">Clear selection</span>
+        <div style="flex:1;"></div>
+        <button class="btn btn-outline" style="color:var(--red);border-color:var(--red-bg);" onclick="bulkDeleteClients()">Delete selected</button>
+      </div>
+
       <div class="panel">
         <table id="clientsTable">
           <thead><tr>
+            <th style="width:36px;"><input type="checkbox" id="clientsSelectAll" onchange="toggleAllClientSelection(this.checked)"></th>
             <th class="sortable" onclick="setClientSort('name')">Client<span class="sort-arrow" id="sortArrow-name"></span></th>
             <th>Service</th>
             <th>Status</th>
@@ -1056,6 +1078,7 @@ document.addEventListener('DOMContentLoaded', function(){
           </tr></thead>
           <tbody id="clientsTbody"></tbody>
         </table>
+        <div class="table-pagination" id="clientsPagination"></div>
       </div>
     </div>
 
@@ -3027,9 +3050,105 @@ function renderGreeting(){
 
 let clientFilters = { search:'', service:'all', status:'all', importance:'all', danger:'all', logged:'all' };
 let clientSort = { field:'name', dir:'asc' };
+let clientsPage = 1;
+const CLIENTS_PAGE_SIZE = 10;
+let selectedClientIds = new Set();
+
+function onClientRowCheck(checkboxEl){
+  if(checkboxEl.checked) selectedClientIds.add(checkboxEl.value);
+  else selectedClientIds.delete(checkboxEl.value);
+  updateClientsBulkBar();
+  updateSelectAllCheckboxState();
+}
+
+function toggleAllClientSelection(checked){
+  document.querySelectorAll('.client-row-checkbox').forEach(cb=>{
+    cb.checked = checked;
+    if(checked) selectedClientIds.add(cb.value); else selectedClientIds.delete(cb.value);
+  });
+  updateClientsBulkBar();
+}
+
+function updateSelectAllCheckboxState(){
+  const boxes = [...document.querySelectorAll('.client-row-checkbox')];
+  const selectAll = document.getElementById('clientsSelectAll');
+  if(selectAll) selectAll.checked = boxes.length>0 && boxes.every(cb=>cb.checked);
+}
+
+function clearClientSelection(){
+  selectedClientIds.clear();
+  document.querySelectorAll('.client-row-checkbox').forEach(cb=>cb.checked=false);
+  const selectAll = document.getElementById('clientsSelectAll');
+  if(selectAll) selectAll.checked = false;
+  updateClientsBulkBar();
+}
+
+function updateClientsBulkBar(){
+  const bar = document.getElementById('clientsBulkBar');
+  const countEl = document.getElementById('clientsBulkCount');
+  if(!bar) return;
+  const n = selectedClientIds.size;
+  bar.style.display = n ? 'flex' : 'none';
+  if(countEl) countEl.textContent = `${n} client${n!==1?'s':''} selected`;
+}
+
+async function bulkDeleteClients(){
+  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can delete clients.'); return; }
+  const ids = [...selectedClientIds];
+  if(!ids.length) return;
+  if(!confirm(`Move ${ids.length} client${ids.length!==1?'s':''} to Trash? Their improvements, drafts, time entries, and notes stay intact and this can be undone from Trash.`)) return;
+  await loadAll();
+  const names = [];
+  ids.forEach(id=>{
+    const c = clients.find(x=>x.id===id);
+    if(c && !c.deletedAt){ c.deletedAt = new Date().toISOString(); names.push(c.name); }
+  });
+  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Moved ${names.length} client${names.length!==1?'s':''} to Trash.`});
+  const ok = await persistClients();
+  clearClientSelection();
+  renderAll();
+  ok ? showToast('success','Moved to Trash', `${names.length} client${names.length!==1?'s':''} can be restored from Trash.`) : showToast('error','Delete failed','Could not save — try again.');
+}
+
+function renderClientsPagination(totalItems){
+  const el = document.getElementById('clientsPagination');
+  if(!el) return;
+  const totalPages = Math.max(1, Math.ceil(totalItems / CLIENTS_PAGE_SIZE));
+  if(clientsPage > totalPages) clientsPage = totalPages;
+  if(clientsPage < 1) clientsPage = 1;
+  const start = totalItems===0 ? 0 : (clientsPage-1)*CLIENTS_PAGE_SIZE + 1;
+  const end = Math.min(clientsPage*CLIENTS_PAGE_SIZE, totalItems);
+  const countLabel = `Showing ${totalItems ? `${start}-${end}` : '0'} of ${totalItems} client${totalItems!==1?'s':''}`;
+
+  if(totalPages<=1){
+    el.innerHTML = `<span class="table-pagination-count">${countLabel}</span>`;
+    return;
+  }
+
+  const pages = [];
+  for(let p=1;p<=totalPages;p++){
+    if(p===1 || p===totalPages || Math.abs(p-clientsPage)<=1) pages.push(p);
+    else if(pages[pages.length-1]!=='…') pages.push('…');
+  }
+
+  el.innerHTML = `
+    <span class="table-pagination-count">${countLabel}</span>
+    <div class="table-pagination-pages">
+      <button class="pagination-btn" ${clientsPage===1?'disabled':''} onclick="goToClientsPage(${clientsPage-1})" aria-label="Previous page">‹</button>
+      ${pages.map(p=> p==='…' ? `<span class="pagination-ellipsis">…</span>` : `<button class="pagination-btn ${p===clientsPage?'active':''}" onclick="goToClientsPage(${p})">${p}</button>`).join('')}
+      <button class="pagination-btn" ${clientsPage===totalPages?'disabled':''} onclick="goToClientsPage(${clientsPage+1})" aria-label="Next page">›</button>
+    </div>`;
+}
+
+function goToClientsPage(p){
+  clientsPage = p;
+  renderClientsTable();
+}
+
 
 function onClientSearchInput(){
   clientFilters.search = document.getElementById('clientSearch').value.trim().toLowerCase();
+  clientsPage = 1;
   renderClientsTable();
 }
 
@@ -3058,6 +3177,7 @@ function onClientFilterChange(){
   clientFilters.danger = document.getElementById('filterDanger').value;
   clientFilters.logged = document.getElementById('filterLogged').value;
   updateClientFiltersBadge();
+  clientsPage = 1;
   renderClientsTable();
 }
 
@@ -3098,6 +3218,7 @@ function clearClientFilters(){
   clientFilters = { search:'', service:'all', status:'all', importance:'all', danger:'all', logged:'all' };
   populateClientFilterSelects();
   updateClientFiltersBadge();
+  clientsPage = 1;
   renderClientsTable();
 }
 
@@ -3130,13 +3251,14 @@ function renderClientsTable(){
   updateSortArrows();
   const ac = activeClients();
   if(!ac.length){
-    tbody.innerHTML = `<tr><td colspan="7">${emptyStateHtml(
+    tbody.innerHTML = `<tr><td colspan="8">${emptyStateHtml(
       '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
       'No clients yet',
       'This is where your whole roster lives — add your first client to start tracking their work.',
       '<button class="btn btn-brand" onclick="openAddClientForm()">+ Add client</button>'
     )}</td></tr>`;
     if(countEl) countEl.textContent = '';
+    const pag = document.getElementById('clientsPagination'); if(pag) pag.innerHTML = '';
     return;
   }
   let filtered = ac.filter(matchesClientFilters);
@@ -3152,21 +3274,32 @@ function renderClientsTable(){
     countEl.textContent = isFiltered ? `${filtered.length} of ${ac.length} shown` : '';
   }
   if(!filtered.length){
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty">No clients match these filters.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty">No clients match these filters.</div></td></tr>`;
     renderWhoAmI();
+    renderClientsPagination(0);
     return;
   }
-  tbody.innerHTML = filtered.map(c=>`
+
+  renderClientsPagination(filtered.length);
+  const pageStart = (clientsPage-1)*CLIENTS_PAGE_SIZE;
+  const pageItems = filtered.slice(pageStart, pageStart+CLIENTS_PAGE_SIZE);
+
+  tbody.innerHTML = pageItems.map(c=>`
     <tr>
-      <td style="border-left:3px solid ${c.danger>=4 ? 'var(--brand)' : 'transparent'};"><div class="client-cell"><div class="avatar-circle">${c.name.trim().charAt(0).toUpperCase()}</div><div><div class="cell-name" style="cursor:pointer;color:var(--brand-dark);" onclick="openClientDetail('${c.id}')">${c.name}</div>${c.email?`<div class="cell-email">${c.email}</div>`:''}</div></div></td>
+      <td style="border-left:3px solid ${c.danger>=4 ? 'var(--brand)' : 'transparent'};width:36px;">
+        <input type="checkbox" class="client-row-checkbox" value="${c.id}" ${selectedClientIds.has(c.id)?'checked':''} onchange="onClientRowCheck(this)">
+      </td>
+      <td><div class="client-cell"><div class="avatar-circle" style="background:${avatarColorForName(c.name)};color:#fff;border:none;box-shadow:none;">${c.name.trim().charAt(0).toUpperCase()}</div><div><div class="cell-name" style="cursor:pointer;color:var(--brand-dark);" onclick="openClientDetail('${c.id}')">${c.name}</div>${c.email?`<div class="cell-email">${c.email}</div>`:''}</div></div></td>
       <td><span class="cell-service">${c.service}</span></td>
       <td><span class="pill ${statusPillClass(c.status)}">${c.status}</span></td>
       <td>${ratingPillCompact(c.importance,'ink',10)}</td>
-      <td>${ratingPillCompact(c.danger,'brand',5)}</td>
+      <td>${dangerPillCompact(c.danger)}</td>
       <td>${loggedPill(c)}</td>
       <td class="actions-cell">
         <div class="dropdown">
-          <button class="btn btn-outline" onclick="toggleActionsMenu('${c.id}')">Actions ▾</button>
+          <button class="icon-menu-btn" onclick="toggleActionsMenu('${c.id}')" title="Actions">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+          </button>
           <div class="dropdown-menu" id="menu-${c.id}">
             <div class="dropdown-item" onclick="closeActionsMenus(); openClientDetail('${c.id}')">View details</div>
             <div class="dropdown-item" onclick="closeActionsMenus(); openEditClientForm('${c.id}')">Edit client</div>
@@ -3178,7 +3311,7 @@ function renderClientsTable(){
       </td>
     </tr>
     <tr class="drawer-row" id="drawer-${c.id}" style="display:none;">
-      <td colspan="7">
+      <td colspan="8">
         ${c.improvements.length ? `<div class="mini-improvements">${c.improvements.map((imp,idx)=>`
           <div class="mini-imp-row" id="imp-row-${c.id}-${idx}">
             <span class="mini-imp-text"><b>${imp.author}:</b> ${imp.text}</span>
@@ -3197,6 +3330,8 @@ function renderClientsTable(){
       </td>
     </tr>
   `).join('');
+  updateSelectAllCheckboxState();
+  updateClientsBulkBar();
   renderWhoAmI();
 }
 
@@ -7550,6 +7685,25 @@ function riskLabel(danger){
 function riskCaptionHtml(danger){
   const r = riskLabel(danger);
   return `<span class="q-risk-flag" style="color:${r.color};">${r.text}</span>`;
+}
+
+// Fixes a real bug: the old danger badge always used the same flat brand
+// color regardless of the actual value, so a 1/5 (low risk) looked just as
+// alarming as a 5/5. This reuses the same progressive color scale riskLabel()
+// already uses everywhere else in the app, instead of a fixed tone.
+function dangerPillCompact(danger){
+  const r = riskLabel(danger);
+  return `<span class="rating-pill" style="background:${r.color}18;color:${r.color};">${danger}/5</span>`;
+}
+
+// Deterministic per-name color so the same client always gets the same
+// avatar color across sessions, without storing anything — same pattern
+// Slack/Gmail use for initials avatars.
+const AVATAR_COLORS = ['#E8622C','#5B9BD5','#7C93B0','#C99A55','#C17A6E','#5E9E7E','#8B7FC7','#D46A9F'];
+function avatarColorForName(name){
+  let hash = 0;
+  for(let i=0;i<name.length;i++) hash = name.charCodeAt(i) + ((hash<<5)-hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
 // Compares actual logged time this calendar month against a client's set
