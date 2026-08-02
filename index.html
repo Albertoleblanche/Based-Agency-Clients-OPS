@@ -332,6 +332,24 @@
   .calendar-event-pill{font-size:10px;padding:2px 6px;border-radius:5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;}
   .calendar-more-pill{font-size:9.5px;color:var(--muted-lt);padding:2px 6px;}
 
+  .view-toggle{display:inline-flex;background:var(--surface-2);border-radius:20px;padding:3px;gap:2px;flex:none;}
+  .view-toggle-option{padding:7px 18px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;border-radius:16px;transition:all .15s ease;}
+  .view-toggle-option.active{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(16,24,40,.12);}
+
+  .cal-type-tabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px;}
+  .cal-type-tab{display:flex;align-items:center;gap:7px;padding:9px 14px;border-radius:10px;background:var(--card);border:1px solid var(--border);cursor:pointer;flex:none;font-size:12.5px;font-weight:600;color:var(--muted);transition:all .15s ease;white-space:nowrap;}
+  .cal-type-tab:hover{border-color:#DDE0E5;}
+  .cal-type-tab.active{background:var(--brand-bg);border-color:var(--brand);color:var(--ink);}
+  .cal-type-count{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:700;color:var(--muted-lt);background:var(--surface-2);padding:1px 6px;border-radius:10px;}
+  .cal-type-tab.active .cal-type-count{background:rgba(232,98,44,.15);color:var(--brand-dark);}
+
+  .cal-cards-row{display:flex;gap:14px;overflow-x:auto;padding-bottom:10px;margin-bottom:18px;}
+  .cal-event-card{min-width:230px;max-width:230px;flex:none;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:7px;cursor:pointer;transition:box-shadow .15s ease;}
+  .cal-event-card:hover{box-shadow:0 6px 16px rgba(16,24,40,.08);}
+  .cal-event-card-title{font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .cal-event-card-time{font-size:11px;color:var(--muted);}
+  .cal-event-card-status{display:flex;align-items:center;font-size:10.5px;font-weight:700;padding-top:7px;margin-top:auto;border-top:1px solid #F3F4F6;}
+
   .calendar-today-banner{display:flex;align-items:center;gap:14px;padding:16px 20px;}
   .calendar-today-icon{width:40px;height:40px;border-radius:10px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;flex:none;color:var(--ink);}
   .calendar-today-date{font-family:'Oswald',sans-serif;font-size:16px;font-weight:600;color:var(--ink);}
@@ -1013,9 +1031,9 @@ document.addEventListener('DOMContentLoaded', function(){
               <span class="date-nav-arrow" onclick="shiftCalendarPeriod(1)">›</span>
             </div>
             <button class="btn btn-outline" onclick="resetCalendarToToday()">Today</button>
-            <div class="tabs settings-tabs" style="margin:0;">
-              <div class="tab settings-tab active" data-cview="month" onclick="switchCalendarViewMode('month')">Month</div>
-              <div class="tab settings-tab" data-cview="week" onclick="switchCalendarViewMode('week')">Week</div>
+            <div class="view-toggle" id="calendarViewToggle">
+              <div class="view-toggle-option active" data-cview="month" onclick="switchCalendarViewMode('month')">Month</div>
+              <div class="view-toggle-option" data-cview="week" onclick="switchCalendarViewMode('week')">Week</div>
             </div>
             <div style="flex:1;"></div>
             <button class="btn btn-brand" style="flex:none;" onclick="openNewEventModal()">+ New event</button>
@@ -1023,15 +1041,8 @@ document.addEventListener('DOMContentLoaded', function(){
         </div>
       </div>
 
-      <div class="clients-filter-bar" style="margin-bottom:16px;">
-        <select id="calendarTypeFilter" onchange="renderCalendar()">
-          <option value="all">All event types</option>
-          <option value="meeting">Meetings</option>
-          <option value="deadline">Deadlines</option>
-          <option value="reminder">Reminders</option>
-          <option value="other">Other</option>
-        </select>
-      </div>
+      <div class="cal-type-tabs" id="calTypeTabs"></div>
+      <div class="cal-cards-row" id="calCardsRow"></div>
 
       <div id="calendarViewContainer"></div>
     </div>
@@ -4160,7 +4171,8 @@ async function loadCalendarEvents(){
     id:e.id, title:e.title, description:e.description||'', startAt:e.start_at, endAt:e.end_at,
     allDay:e.all_day, clientId:e.client_id, createdBy:e.created_by, eventType:e.event_type,
     googleEventId:e.google_event_id, googleOwner:e.google_calendar_owner,
-    location:e.location||'', attendeeIds:e.attendee_ids||[]
+    location:e.location||'', attendeeIds:e.attendee_ids||[],
+    rsvps:e.rsvps||{}, recurrenceGroupId:e.recurrence_group_id, recurrenceLabel:e.recurrence_label
   }));
   updateCalendarNavBadge();
 }
@@ -4179,10 +4191,11 @@ function updateCalendarNavBadge(){
 }
 
 let calendarViewMode = 'month'; // 'month' | 'week'
+let calendarTypeTab = 'all'; // 'all' | 'meeting' | 'deadline' | 'reminder' | 'other' | 'conflicted'
 
 function switchCalendarViewMode(mode){
   calendarViewMode = mode;
-  document.querySelectorAll('#view-calendar .settings-tab').forEach(t=>t.classList.toggle('active', t.dataset.cview===mode));
+  document.querySelectorAll('#view-calendar .view-toggle-option').forEach(t=>t.classList.toggle('active', t.dataset.cview===mode));
   renderCalendar();
 }
 
@@ -4245,12 +4258,105 @@ function renderCalendar(){
   if(!container) return;
   renderCalendarMonthLabel();
   renderCalendarTodaySummary();
+  renderCalendarTypeTabs();
+  renderCalendarCardsRow();
   if(calendarViewMode==='week') renderCalendarWeekView(container);
   else renderCalendarMonthView(container);
 }
 
+function getCalendarPeriodRange(){
+  if(calendarViewMode==='week'){
+    const start = getWeekStart(calendarAnchorDate);
+    const end = new Date(start); end.setDate(end.getDate()+7);
+    return { start, end };
+  }
+  const year = calendarAnchorDate.getFullYear(), month = calendarAnchorDate.getMonth();
+  return { start: new Date(year, month, 1), end: new Date(year, month+1, 1) };
+}
+
+const CALENDAR_TYPE_TABS = [
+  { key:'all', label:'All Scheduled', icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>' },
+  { key:'meeting', label:'Meetings', icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>' },
+  { key:'deadline', label:'Deadlines', icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' },
+  { key:'reminder', label:'Reminders', icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>' },
+  { key:'other', label:'Other', icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>' },
+  { key:'conflicted', label:'Conflicted', icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' },
+];
+
+function switchCalendarTypeTab(tab){
+  calendarTypeTab = tab;
+  renderCalendar();
+}
+
+function renderCalendarTypeTabs(){
+  const el = document.getElementById('calTypeTabs');
+  if(!el) return;
+  const { start, end } = getCalendarPeriodRange();
+  const periodEvents = calendarEvents.filter(e=>{
+    const s = new Date(e.startAt);
+    return s >= start && s < end;
+  });
+  el.innerHTML = CALENDAR_TYPE_TABS.map(t=>{
+    const count = t.key==='all' ? periodEvents.length : periodEvents.filter(e=>eventMatchesTypeTab(e, t.key)).length;
+    return `<div class="cal-type-tab ${calendarTypeTab===t.key?'active':''}" onclick="switchCalendarTypeTab('${t.key}')">
+      ${t.icon}<span>${t.label}</span><span class="cal-type-count">${count}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderCalendarCardsRow(){
+  const el = document.getElementById('calCardsRow');
+  if(!el) return;
+  const { start, end } = getCalendarPeriodRange();
+  const matching = calendarEvents
+    .filter(e=>{
+      const s = new Date(e.startAt);
+      return s >= start && s < end && eventMatchesTypeTab(e, calendarTypeTab);
+    })
+    .sort((a,b)=> new Date(a.startAt)-new Date(b.startAt))
+    .slice(0, 20);
+
+  if(!matching.length){ el.innerHTML = `<div class="empty" style="padding:14px 4px;">No events here.</div>`; return; }
+
+  const todayStr = toDateStr(new Date());
+  el.innerHTML = matching.map(e=>{
+    const meta = CALENDAR_TYPE_META[e.eventType] || CALENDAR_TYPE_META.other;
+    const isToday = toDateStr(new Date(e.startAt))===todayStr;
+    const effectiveAttendees = e.attendeeIds && e.attendeeIds.length ? e.attendeeIds : [e.createdBy];
+    const hasConflict = !e.allDay && findEventConflicts(e.startAt, e.endAt, effectiveAttendees, e.id).length > 0;
+    const timeStr = e.allDay
+      ? new Date(e.startAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})
+      : `${new Date(e.startAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})} · ${new Date(e.startAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})} – ${new Date(e.endAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`;
+    const statusHtml = hasConflict
+      ? `<span style="color:var(--red);">⚠ Conflicted</span>`
+      : isToday
+        ? `<span style="color:#2E9F5E;">● Today</span>`
+        : `<span style="color:var(--muted-lt);">${meta.label}</span>`;
+
+    return `<div class="cal-event-card" style="border-left:3px solid ${meta.color};" onclick="openEventDetailModal('${e.id}')">
+      <div class="cal-event-card-title">${e.googleEventId?'📅 ':''}${e.title}</div>
+      <div class="cal-event-card-time">${timeStr}</div>
+      ${attendeeAvatarsHtml(e.attendeeIds, 3)}
+      <div class="cal-event-card-status">${statusHtml}</div>
+    </div>`;
+  }).join('');
+}
+
+// Shared by both views (and the card row) — "conflicted" isn't a real
+// event_type, it's computed by checking each event against every other
+// event sharing an attendee, so it needs its own branch rather than a
+// simple field match.
+function eventMatchesTypeTab(e, tab){
+  if(tab==='all') return true;
+  if(tab==='conflicted'){
+    if(e.allDay) return false;
+    const effectiveAttendees = e.attendeeIds && e.attendeeIds.length ? e.attendeeIds : [e.createdBy];
+    return findEventConflicts(e.startAt, e.endAt, effectiveAttendees, e.id).length > 0;
+  }
+  return e.eventType===tab;
+}
+
 function renderCalendarMonthView(container){
-  const typeFilter = document.getElementById('calendarTypeFilter')?.value || 'all';
   const year = calendarAnchorDate.getFullYear(), month = calendarAnchorDate.getMonth();
   const firstOfMonth = new Date(year, month, 1);
   const gridStart = getWeekStart(firstOfMonth); // Monday-aligned
@@ -4258,7 +4364,7 @@ function renderCalendarMonthView(container){
 
   const eventsByDay = {};
   calendarEvents.forEach(e=>{
-    if(typeFilter!=='all' && e.eventType!==typeFilter) return;
+    if(!eventMatchesTypeTab(e, calendarTypeTab)) return;
     const d = toDateStr(new Date(e.startAt));
     if(!eventsByDay[d]) eventsByDay[d] = [];
     eventsByDay[d].push(e);
@@ -4298,7 +4404,6 @@ const WEEK_VIEW_END_HOUR = 21;
 const WEEK_VIEW_HOUR_HEIGHT = 52;
 
 function renderCalendarWeekView(container){
-  const typeFilter = document.getElementById('calendarTypeFilter')?.value || 'all';
   const weekStart = getWeekStart(calendarAnchorDate);
   const todayStr = toDateStr(new Date());
   const totalHours = WEEK_VIEW_END_HOUR - WEEK_VIEW_START_HOUR;
@@ -4323,7 +4428,7 @@ function renderCalendarWeekView(container){
   const dayColsHtml = days.map(d=>{
     const dStr = toDateStr(d);
     const dayEvents = calendarEvents.filter(e=>{
-      if(typeFilter!=='all' && e.eventType!==typeFilter) return false;
+      if(!eventMatchesTypeTab(e, calendarTypeTab)) return false;
       if(e.allDay) return false;
       return toDateStr(new Date(e.startAt))===dStr;
     });
@@ -4387,6 +4492,18 @@ function eventFormHtml(editing, presetDateStr){
       <div class="settings-field"><label><input type="checkbox" id="eventAllDayInput" ${editing && editing.allDay ? 'checked' : ''} onchange="toggleEventAllDay()" style="width:auto;margin-right:6px;">All-day event</label></div>
       <div class="settings-field"><label>Location (optional)</label><input id="eventLocationInput" placeholder="Zoom link, address, or wherever it's happening" value="${editing && editing.location ? editing.location.replace(/"/g,'&quot;') : ''}"></div>
       <div class="settings-field"><label>Related client (optional)</label><select id="eventClientSelect">${populateCalendarClientSelect(editing ? editing.clientId : null)}</select></div>
+      ${!editing ? `
+      <div class="form-grid">
+        <div><label>Repeats</label>
+          <select id="eventRepeatSelect" onchange="toggleRepeatUntilField()">
+            <option value="none">Doesn't repeat</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </div>
+        <div id="eventRepeatUntilWrap" style="display:none;"><label>Repeats until</label><input type="date" id="eventRepeatUntilInput" value="${(()=>{ const d=new Date(); d.setFullYear(d.getFullYear()+1); return toDateStr(d); })()}"></div>
+      </div>` : editing.recurrenceGroupId ? `<p style="font-size:11.5px;color:var(--muted-lt);margin:0;">🔁 ${editing.recurrenceLabel||'Recurring'} — part of a series. Editing here only changes this one occurrence.</p>` : ''}
       <div class="settings-field">
         <label>Attendees</label>
         <div style="display:flex;flex-wrap:wrap;gap:10px;padding:10px;border:1px solid var(--border);border-radius:8px;max-height:120px;overflow-y:auto;">
@@ -4400,9 +4517,15 @@ function eventFormHtml(editing, presetDateStr){
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" onclick="${editing ? `saveEditEvent('${editing.id}')` : 'saveNewEvent()'}">${editing ? 'Save changes' : 'Add event'}</button>
-      ${editing && !editing.googleEventId ? `<button class="btn btn-outline" style="color:var(--red);" onclick="deleteCalendarEvent('${editing.id}')">Delete</button>` : ''}
+      ${editing && !editing.googleEventId ? `<button class="btn btn-outline" style="color:var(--red);" onclick="${editing.recurrenceGroupId ? `openDeleteRecurringChoice('${editing.id}')` : `deleteCalendarEvent('${editing.id}')`}">Delete</button>` : ''}
       <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
     </div>`;
+}
+
+function toggleRepeatUntilField(){
+  const val = document.getElementById('eventRepeatSelect')?.value;
+  const wrap = document.getElementById('eventRepeatUntilWrap');
+  if(wrap) wrap.style.display = (val && val!=='none') ? 'block' : 'none';
 }
 
 function toggleEventAllDay(){
@@ -4418,6 +4541,13 @@ function openNewEventModal(presetDateStr){
   setTimeout(toggleEventAllDay, 0);
 }
 
+const RSVP_STATUS_META = {
+  confirmed: { label:'Confirmed', color:'#2E9F5E', icon:'✓' },
+  declined: { label:'Declined', color:'var(--red)', icon:'✕' },
+  change_requested: { label:'Change requested', color:'var(--amber)', icon:'⚠' },
+  pending: { label:'Pending', color:'var(--muted-lt)', icon:'…' },
+};
+
 function openEventDetailModal(eventId){
   const e = calendarEvents.find(x=>x.id===eventId);
   if(!e) return;
@@ -4428,25 +4558,106 @@ function openEventDetailModal(eventId){
     : `${new Date(e.startAt).toLocaleDateString('en-US',{weekday:'long', month:'long', day:'numeric'})} · ${new Date(e.startAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})} – ${new Date(e.endAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`;
   const attendeeNames = (e.attendeeIds||[]).map(id=>teamProfiles.find(p=>p.id===id)?.name).filter(Boolean);
 
+  const isCreator = e.createdBy === currentUser.id;
+  const isAttendee = (e.attendeeIds||[]).includes(currentUser.id);
+  const myRsvpStatus = (e.rsvps && e.rsvps[currentUser.id]) ? e.rsvps[currentUser.id].status : 'pending';
+
+  let rsvpSummaryHtml = '';
+  if(isCreator && e.attendeeIds && e.attendeeIds.length){
+    rsvpSummaryHtml = `<div style="margin-top:14px;padding-top:12px;border-top:1px solid #F0F1F4;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-lt);margin-bottom:8px;">RSVPs</div>
+      ${e.attendeeIds.map(id=>{
+        const p = teamProfiles.find(x=>x.id===id);
+        if(!p) return '';
+        const r = e.rsvps[id] || { status:'pending' };
+        const rMeta = RSVP_STATUS_META[r.status] || RSVP_STATUS_META.pending;
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
+          <span style="font-size:12.5px;">${p.name}</span>
+          <span style="font-size:11px;font-weight:700;color:${rMeta.color};">${rMeta.icon} ${rMeta.label}</span>
+        </div>
+        ${r.status==='change_requested' && r.message ? `<div style="font-size:11.5px;color:var(--muted);margin:-2px 0 6px;font-style:italic;">"${r.message}"</div>` : ''}`;
+      }).join('')}
+    </div>`;
+  }
+
+  let rsvpActionsHtml = '';
+  if(!isCreator && isAttendee && !e.googleEventId){
+    rsvpActionsHtml = `<button class="btn ${myRsvpStatus==='confirmed'?'btn-brand':'btn-outline'}" onclick="respondToEvent('${e.id}','confirmed')">Confirm</button>
+      <button class="btn ${myRsvpStatus==='declined'?'btn-brand':'btn-outline'}" onclick="respondToEvent('${e.id}','declined')">Decline</button>
+      <button class="btn btn-outline" onclick="openRequestChangeModal('${e.id}')">Request change</button>`;
+  }
+
   openAppModal(`
     <div class="modal-head">
       <span class="pill" style="background:${meta.color}18;color:${meta.color};font-weight:700;">${meta.label}</span>
       <span class="toast-close" onclick="closeAppModal()">✕</span>
     </div>
     <div class="modal-body">
-      <div class="q-name" style="margin-bottom:8px;">${e.title}</div>
+      <div class="q-name" style="margin-bottom:8px;">${e.title}${e.recurrenceGroupId ? ` <span style="font-size:11.5px;color:var(--muted-lt);font-weight:400;">🔁 ${e.recurrenceLabel}</span>` : ''}</div>
       <div style="font-size:13px;color:var(--ink);font-weight:600;">${dateTimeStr}</div>
       ${e.location ? `<div style="font-size:12.5px;color:var(--muted);margin-top:8px;">📍 ${e.location}</div>` : ''}
       ${attendeeNames.length ? `<div style="margin-top:12px;">${attendeeAvatarsHtml(e.attendeeIds, 8)}<div style="font-size:11.5px;color:var(--muted);margin-top:5px;">${attendeeNames.join(', ')}</div></div>` : ''}
       ${e.description ? `<div style="font-size:13px;color:var(--muted);margin-top:12px;white-space:pre-wrap;line-height:1.5;">${e.description}</div>` : ''}
       ${c ? `<div style="margin-top:12px;"><span class="row-link" onclick="closeAppModal();openClientDetail('${c.id}');">${c.name}</span></div>` : ''}
       ${e.googleEventId ? `<p style="font-size:11px;color:var(--muted-lt);margin-top:14px;">📅 Synced from Google Calendar — edit it in Google, changes appear here on next sync.</p>` : ''}
+      ${rsvpSummaryHtml}
     </div>
     <div class="modal-actions">
-      ${!e.googleEventId ? `<button class="btn btn-brand" onclick="openEditEventForm('${e.id}')">Edit</button>` : ''}
-      ${!e.googleEventId ? `<button class="btn btn-outline" style="color:var(--red);" onclick="deleteCalendarEvent('${e.id}')">Delete</button>` : ''}
+      ${isCreator && !e.googleEventId ? `<button class="btn btn-brand" onclick="openEditEventForm('${e.id}')">Edit</button>` : ''}
+      ${rsvpActionsHtml}
+      ${isCreator && !e.googleEventId ? `<button class="btn btn-outline" style="color:var(--red);" onclick="${e.recurrenceGroupId ? `openDeleteRecurringChoice('${e.id}')` : `deleteCalendarEvent('${e.id}')`}">Delete</button>` : ''}
       <button class="btn btn-outline" onclick="closeAppModal()">Close</button>
     </div>`, 480);
+}
+
+async function respondToEvent(eventId, status){
+  const e = calendarEvents.find(x=>x.id===eventId);
+  if(!e) return;
+  const updatedRsvps = { ...e.rsvps, [currentUser.id]: { status, respondedAt: new Date().toISOString() } };
+  const { error } = await supabaseClient.from('calendar_events').update({ rsvps: updatedRsvps }).eq('id', eventId);
+  if(error){ showToast('error','Failed', error.message); return; }
+  await loadCalendarEvents();
+  renderCalendar();
+  closeAppModal();
+  showToast('success', status==='confirmed' ? 'Confirmed' : 'Declined', 'The organizer will see your response.');
+  if(e.createdBy !== currentUser.id){
+    await supabaseClient.from('notifications').insert({
+      user_id: e.createdBy, type:'event_rsvp', title:`RSVP: ${status==='confirmed'?'Confirmed':'Declined'}`,
+      body:`${myName()||'Someone'} ${status==='confirmed'?'confirmed':'declined'} "${e.title}".`, target_view:'calendar'
+    });
+  }
+}
+
+function openRequestChangeModal(eventId){
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">Request a change</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <div class="settings-field"><label>What would you like changed?</label><textarea id="changeRequestInput" style="width:100%;min-height:90px;font-family:'Inter',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);" placeholder="e.g. Can we move this to 3pm instead?"></textarea></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-brand" onclick="submitChangeRequest('${eventId}')">Send request</button>
+      <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
+    </div>`, 440);
+}
+
+async function submitChangeRequest(eventId){
+  const message = document.getElementById('changeRequestInput').value.trim();
+  if(!message){ showToast('error','Say what you need','Add a quick note about the change.'); return; }
+  const e = calendarEvents.find(x=>x.id===eventId);
+  if(!e) return;
+  const updatedRsvps = { ...e.rsvps, [currentUser.id]: { status:'change_requested', message, respondedAt: new Date().toISOString() } };
+  const { error } = await supabaseClient.from('calendar_events').update({ rsvps: updatedRsvps }).eq('id', eventId);
+  if(error){ showToast('error','Failed', error.message); return; }
+  await loadCalendarEvents();
+  renderCalendar();
+  closeAppModal();
+  showToast('success','Request sent','The organizer will see your note.');
+  if(e.createdBy !== currentUser.id){
+    await supabaseClient.from('notifications').insert({
+      user_id: e.createdBy, type:'event_rsvp', title:'Change requested',
+      body:`${myName()||'Someone'} requested a change to "${e.title}": "${message}"`, target_view:'calendar'
+    });
+  }
 }
 
 function openEditEventForm(eventId){
@@ -4509,6 +4720,7 @@ async function saveNewEvent(){
   const clientId = document.getElementById('eventClientSelect').value || null;
   const location = document.getElementById('eventLocationInput').value.trim() || null;
   const attendeeIds = getSelectedAttendeeIds();
+  const repeatMode = document.getElementById('eventRepeatSelect')?.value || 'none';
 
   if(!ts.allDay){
     const conflicts = findEventConflicts(ts.startAt, ts.endAt, attendeeIds, null);
@@ -4518,15 +4730,45 @@ async function saveNewEvent(){
     }
   }
 
-  const { error } = await supabaseClient.from('calendar_events').insert({
-    title, description, start_at: ts.startAt, end_at: ts.endAt, all_day: ts.allDay,
-    client_id: clientId, created_by: currentUser.id, event_type: eventType,
-    location, attendee_ids: attendeeIds
-  });
+  const baseRow = { title, description, all_day: ts.allDay, client_id: clientId, created_by: currentUser.id, event_type: eventType, location, attendee_ids: attendeeIds };
+
+  if(repeatMode==='none'){
+    const { error } = await supabaseClient.from('calendar_events').insert({ ...baseRow, start_at: ts.startAt, end_at: ts.endAt });
+    closeAppModal();
+    await loadCalendarEvents();
+    renderCalendar();
+    error ? showToast('error','Save failed', error.message) : showToast('success','Event added','On the calendar now.');
+    return;
+  }
+
+  // Recurring — generate one row per occurrence sharing a group id, rather
+  // than a single rule expanded at render time. Capped at 366 occurrences
+  // (a year of daily) as a sane upper bound against a mistyped far-future date.
+  const untilStr = document.getElementById('eventRepeatUntilInput')?.value;
+  if(!untilStr){ showToast('error','Pick an end date','Set how far the repeat should go.'); return; }
+  const repeatLabel = { daily:'Daily', weekly:'Weekly', monthly:'Monthly' }[repeatMode] || 'Recurring';
+  const groupId = crypto.randomUUID();
+  const start0 = new Date(ts.startAt), end0 = new Date(ts.endAt);
+  const durationMs = end0 - start0;
+  const until = new Date(`${untilStr}T23:59:59`);
+
+  const rows = [];
+  let cursorStart = new Date(start0);
+  let guard = 0;
+  while(cursorStart <= until && guard < 366){
+    const cursorEnd = new Date(cursorStart.getTime() + durationMs);
+    rows.push({ ...baseRow, start_at: cursorStart.toISOString(), end_at: cursorEnd.toISOString(), recurrence_group_id: groupId, recurrence_label: repeatLabel });
+    if(repeatMode==='daily') cursorStart.setDate(cursorStart.getDate()+1);
+    else if(repeatMode==='weekly') cursorStart.setDate(cursorStart.getDate()+7);
+    else cursorStart.setMonth(cursorStart.getMonth()+1);
+    guard++;
+  }
+
+  const { error } = await supabaseClient.from('calendar_events').insert(rows);
   closeAppModal();
   await loadCalendarEvents();
   renderCalendar();
-  error ? showToast('error','Save failed', error.message) : showToast('success','Event added','On the calendar now.');
+  error ? showToast('error','Save failed', error.message) : showToast('success','Recurring event added', `${rows.length} occurrences added, ${repeatLabel.toLowerCase()} through ${new Date(untilStr+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}.`);
 }
 
 async function saveEditEvent(eventId){
@@ -4567,6 +4809,30 @@ async function deleteCalendarEvent(eventId){
   await loadCalendarEvents();
   renderCalendar();
   error ? showToast('error','Delete failed', error.message) : showToast('success','Event deleted','Removed from the calendar.');
+}
+
+function openDeleteRecurringChoice(eventId){
+  const e = calendarEvents.find(x=>x.id===eventId);
+  if(!e) return;
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">Delete recurring event</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--muted);line-height:1.5;">"${e.title}" is part of a ${(e.recurrenceLabel||'recurring').toLowerCase()} series. What do you want to delete?</p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-brand" onclick="deleteCalendarEvent('${eventId}')">Just this event</button>
+      <button class="btn btn-outline" style="color:var(--red);" onclick="deleteRecurringSeries('${e.recurrenceGroupId}')">Entire series</button>
+      <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
+    </div>`, 440);
+}
+
+async function deleteRecurringSeries(groupId){
+  if(!confirm('Delete every occurrence in this series? This can\'t be undone.')) return;
+  const { error } = await supabaseClient.from('calendar_events').delete().eq('recurrence_group_id', groupId);
+  closeAppModal();
+  await loadCalendarEvents();
+  renderCalendar();
+  error ? showToast('error','Delete failed', error.message) : showToast('success','Series deleted','All occurrences removed.');
 }
 
 /* ---------- Google Calendar connect / sync / disconnect (Profile page) ---------- */
