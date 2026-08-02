@@ -344,7 +344,7 @@
 
   .kanban-board{display:flex;gap:16px;overflow-x:auto;padding-bottom:14px;align-items:flex-start;}
   .kanban-column{min-width:270px;max-width:320px;background:#F3F4F7;border-radius:14px;padding:14px;flex:none;width:290px;}
-  .kanban-column-head{display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:0 2px;}
+  .kanban-column-head{display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:9px 10px;border-radius:10px;}
   .kanban-column-dot{width:9px;height:9px;border-radius:50%;flex:none;}
   .kanban-column-title{font-family:'Oswald',sans-serif;font-size:13.5px;font-weight:600;color:var(--ink);flex:1;}
   .kanban-column-count{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:700;color:var(--muted);background:var(--card);padding:2px 8px;border-radius:10px;}
@@ -3957,10 +3957,10 @@ function renderTasks(){
       return new Date(b.createdAt) - new Date(a.createdAt);
     });
     return `<div class="kanban-column">
-      <div class="kanban-column-head">
+      <div class="kanban-column-head" style="background:${stage.color}22;">
         <span class="kanban-column-dot" style="background:${stage.color};"></span>
-        <span class="kanban-column-title">${stage.label}</span>
-        <span class="kanban-column-count">${stageTasks.length}</span>
+        <span class="kanban-column-title" style="color:${stage.color};">${stage.label}</span>
+        <span class="kanban-column-count" style="color:${stage.color};">${stageTasks.length}</span>
         <button class="kanban-add-btn" onclick="openNewTaskModal(undefined,'${stage.key}')" title="New task in ${stage.label}">+</button>
       </div>
       <div class="kanban-cards">
@@ -4060,6 +4060,7 @@ function openTaskDetailModal(taskId){
   const c = t.clientId ? clients.find(x=>x.id===t.clientId) : null;
   const dueStr = t.dueDate ? new Date(t.dueDate+'T00:00:00').toLocaleDateString('en-US',{weekday:'long', month:'long', day:'numeric'}) : '';
   const overdue = t.status!=='done' && t.dueDate && new Date(t.dueDate+'T00:00:00') < new Date(new Date().toDateString());
+  const amAssignee = t.assigneeId===currentUser.id;
   const directionLabel = amAssigner
     ? `Assigned to ${assignee ? assignee.name : 'someone no longer on the team'}`
     : `From ${assigner ? assigner.name : 'someone no longer on the team'}`;
