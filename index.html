@@ -51,7 +51,10 @@
   .notif-panel{position:absolute;top:calc(100% + 8px);right:0;width:340px;max-height:420px;overflow-y:auto;background:var(--card);border:1px solid #EDEEF1;border-radius:12px;box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:500;}
   .sidebar-sync-status{display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted-lt);margin-top:10px;}
   .notif-panel-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;color:var(--ink);border-bottom:1px solid #F0F1F4;}
-  .notif-row{display:flex;gap:10px;padding:12px 16px;border-bottom:1px solid #F5F6F8;cursor:pointer;}
+  .notif-row{display:flex;align-items:flex-start;gap:6px;padding:12px 10px 12px 16px;border-bottom:1px solid #F5F6F8;}
+  .notif-row-delete{background:none;border:none;color:var(--muted-lt);cursor:pointer;padding:6px;border-radius:6px;flex:none;display:flex;opacity:0;transition:opacity .12s ease, color .12s ease, background .12s ease;}
+  .notif-row:hover .notif-row-delete{opacity:1;}
+  .notif-row-delete:hover{color:var(--red);background:#FFF1EE;}
   .notif-row:last-child{border-bottom:none;}
   .notif-row:hover{background:var(--surface-2);}
   .notif-row.unread{background:#FFF8F5;}
@@ -334,18 +337,18 @@
   .calendar-today-date{font-family:'Oswald',sans-serif;font-size:16px;font-weight:600;color:var(--ink);}
   .calendar-today-sub{font-size:12.5px;color:var(--muted);margin-top:2px;}
 
-  .week-grid-wrap{display:grid;grid-template-columns:56px repeat(7,1fr);border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--card);}
+  .week-grid-wrap{display:grid;grid-template-columns:64px repeat(7,1fr);border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--card);}
   .week-grid-head{display:contents;}
   .week-grid-head > div{background:var(--surface-2);padding:9px 6px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);border-left:1px solid var(--border);}
   .week-grid-head > div:first-child{border-left:none;}
   .week-grid-head .week-day-label.today{color:var(--brand);}
   .week-hour-col{position:relative;border-left:1px solid var(--border);}
   .week-hour-col:first-child{border-left:none;}
-  .week-hour-label{position:absolute;left:0;right:6px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--muted-lt);transform:translateY(-6px);}
+  .week-hour-label{position:absolute;left:0;right:8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:var(--muted);transform:translateY(-8px);}
   .week-hour-line{position:absolute;left:0;right:0;border-top:1px solid #F1F2F5;}
   .week-event-block{position:absolute;left:3px;right:3px;border-radius:6px;padding:4px 7px;overflow:hidden;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.08);}
   .week-event-title{font-size:10.5px;font-weight:700;line-height:1.25;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
-  .week-event-time{font-size:9px;opacity:.85;margin-top:1px;}
+  .week-event-time{font-size:10.5px;font-weight:600;opacity:.9;margin-top:1px;}
   .week-event-block.conflict{outline:2px solid var(--red);outline-offset:-2px;}
 
   .attendee-avatars{display:flex;align-items:center;margin-top:4px;}
@@ -653,6 +656,7 @@ document.addEventListener('DOMContentLoaded', function(){
       <div class="nav-item" data-view="calendar" onclick="switchView('calendar')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         Calendar
+        <span class="nav-badge" id="navCalendarBadge">0</span>
       </div>
       <div class="nav-item" data-view="time" onclick="switchView('time')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -714,7 +718,7 @@ document.addEventListener('DOMContentLoaded', function(){
             <span class="notif-badge" id="notifBadge" style="display:none;">0</span>
           </button>
           <div class="notif-panel" id="notifPanel" style="display:none;">
-            <div class="notif-panel-head">Notifications <span class="row-link" onclick="markAllNotificationsRead()">Mark all read</span></div>
+            <div class="notif-panel-head">Notifications <span><span class="row-link" onclick="markAllNotificationsRead()">Mark all read</span> · <span class="row-link danger-link" onclick="clearAllNotifications()">Clear all</span></span></div>
             <div id="notifPanelList"></div>
           </div>
         </div>
@@ -1921,9 +1925,22 @@ async function confirmSendEmail(){
     }
     closeAppModal();
     showToast('success','Email sent', `Delivered to ${to}.`);
+    notifyOthersOfEmailSent(to, subject);
   }catch(e){
     restoreBtn(btn);
     showToast('error','Send failed', 'Network error — try "Open in mail app instead."');
+  }
+}
+
+// Lets other admins/approvers know a client email went out, since whoever
+// clicked Send is the only one who'd otherwise know it happened.
+async function notifyOthersOfEmailSent(to, subject){
+  const recipients = teamProfiles.filter(p=> (p.role==='admin' || p.role==='approver') && p.id!==currentUser.id);
+  for(const p of recipients){
+    await supabaseClient.from('notifications').insert({
+      user_id: p.id, type:'email_sent', title:'Client email sent',
+      body:`${myName()||'Someone'} sent "${subject}" to ${to}.`, target_view:'approve'
+    });
   }
 }
 
@@ -4145,6 +4162,20 @@ async function loadCalendarEvents(){
     googleEventId:e.google_event_id, googleOwner:e.google_calendar_owner,
     location:e.location||'', attendeeIds:e.attendee_ids||[]
   }));
+  updateCalendarNavBadge();
+}
+
+function updateCalendarNavBadge(){
+  const badge = document.getElementById('navCalendarBadge');
+  if(!badge) return;
+  const weekStart = getWeekStart(new Date());
+  const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate()+7);
+  const count = calendarEvents.filter(e=>{
+    const start = new Date(e.startAt);
+    return start >= weekStart && start < weekEnd;
+  }).length;
+  badge.textContent = count > 99 ? '99+' : count;
+  badge.style.display = count ? 'inline-flex' : 'none';
 }
 
 let calendarViewMode = 'month'; // 'month' | 'week'
@@ -4390,20 +4421,37 @@ function openNewEventModal(presetDateStr){
 function openEventDetailModal(eventId){
   const e = calendarEvents.find(x=>x.id===eventId);
   if(!e) return;
-  if(e.googleEventId){
-    const c = e.clientId ? clients.find(x=>x.id===e.clientId) : null;
-    openAppModal(`
-      <div class="modal-head"><span class="panel-title">${e.title}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
-      <div class="modal-body">
-        <p style="font-size:11px;color:var(--muted-lt);margin:0 0 12px;">📅 Synced from Google Calendar — edit it in Google, changes appear here on next sync.</p>
-        <div style="font-size:13px;color:var(--ink);">${e.allDay ? 'All day' : `${new Date(e.startAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})} – ${new Date(e.endAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`}</div>
-        ${e.location ? `<div style="font-size:12.5px;color:var(--muted);margin-top:6px;">📍 ${e.location}</div>` : ''}
-        ${e.description ? `<div style="font-size:13px;color:var(--muted);margin-top:10px;white-space:pre-wrap;">${e.description}</div>` : ''}
-        ${c ? `<div style="margin-top:10px;"><span class="row-link" onclick="closeAppModal();openClientDetail('${c.id}');">${c.name}</span></div>` : ''}
-      </div>
-      <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 460);
-    return;
-  }
+  const c = e.clientId ? clients.find(x=>x.id===e.clientId) : null;
+  const meta = CALENDAR_TYPE_META[e.eventType] || CALENDAR_TYPE_META.other;
+  const dateTimeStr = e.allDay
+    ? new Date(e.startAt).toLocaleDateString('en-US',{weekday:'long', month:'long', day:'numeric'})
+    : `${new Date(e.startAt).toLocaleDateString('en-US',{weekday:'long', month:'long', day:'numeric'})} · ${new Date(e.startAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})} – ${new Date(e.endAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`;
+  const attendeeNames = (e.attendeeIds||[]).map(id=>teamProfiles.find(p=>p.id===id)?.name).filter(Boolean);
+
+  openAppModal(`
+    <div class="modal-head">
+      <span class="pill" style="background:${meta.color}18;color:${meta.color};font-weight:700;">${meta.label}</span>
+      <span class="toast-close" onclick="closeAppModal()">✕</span>
+    </div>
+    <div class="modal-body">
+      <div class="q-name" style="margin-bottom:8px;">${e.title}</div>
+      <div style="font-size:13px;color:var(--ink);font-weight:600;">${dateTimeStr}</div>
+      ${e.location ? `<div style="font-size:12.5px;color:var(--muted);margin-top:8px;">📍 ${e.location}</div>` : ''}
+      ${attendeeNames.length ? `<div style="margin-top:12px;">${attendeeAvatarsHtml(e.attendeeIds, 8)}<div style="font-size:11.5px;color:var(--muted);margin-top:5px;">${attendeeNames.join(', ')}</div></div>` : ''}
+      ${e.description ? `<div style="font-size:13px;color:var(--muted);margin-top:12px;white-space:pre-wrap;line-height:1.5;">${e.description}</div>` : ''}
+      ${c ? `<div style="margin-top:12px;"><span class="row-link" onclick="closeAppModal();openClientDetail('${c.id}');">${c.name}</span></div>` : ''}
+      ${e.googleEventId ? `<p style="font-size:11px;color:var(--muted-lt);margin-top:14px;">📅 Synced from Google Calendar — edit it in Google, changes appear here on next sync.</p>` : ''}
+    </div>
+    <div class="modal-actions">
+      ${!e.googleEventId ? `<button class="btn btn-brand" onclick="openEditEventForm('${e.id}')">Edit</button>` : ''}
+      ${!e.googleEventId ? `<button class="btn btn-outline" style="color:var(--red);" onclick="deleteCalendarEvent('${e.id}')">Delete</button>` : ''}
+      <button class="btn btn-outline" onclick="closeAppModal()">Close</button>
+    </div>`, 480);
+}
+
+function openEditEventForm(eventId){
+  const e = calendarEvents.find(x=>x.id===eventId);
+  if(!e) return;
   openAppModal(eventFormHtml(e), 480);
   setTimeout(toggleEventAllDay, 0);
 }
@@ -4635,14 +4683,33 @@ function renderNotifPanel(){
   if(!el) return;
   if(!notifications.length){ el.innerHTML = `<div class="empty" style="padding:24px;">No notifications yet.</div>`; return; }
   el.innerHTML = notifications.map(n=>`
-    <div class="notif-row ${n.read?'':'unread'}" onclick="handleNotifClick('${n.id}')">
+    <div class="notif-row ${n.read?'':'unread'}">
       <div class="notif-row-dot"></div>
-      <div>
+      <div style="flex:1;cursor:pointer;" onclick="handleNotifClick('${n.id}')">
         <div class="notif-row-title">${n.title}</div>
         ${n.body ? `<div class="notif-row-body">${n.body}</div>` : ''}
         <div class="notif-row-time">${new Date(n.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</div>
       </div>
+      <button class="notif-row-delete" onclick="event.stopPropagation();deleteNotification('${n.id}')" title="Delete">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      </button>
     </div>`).join('');
+}
+
+async function deleteNotification(id){
+  await supabaseClient.from('notifications').delete().eq('id', id);
+  notifications = notifications.filter(n=>n.id!==id);
+  updateNotifBadge();
+  renderNotifPanel();
+}
+
+async function clearAllNotifications(){
+  if(!notifications.length) return;
+  if(!confirm('Clear all notifications? This can\'t be undone.')) return;
+  await supabaseClient.from('notifications').delete().eq('user_id', currentUser.id);
+  notifications = [];
+  updateNotifBadge();
+  renderNotifPanel();
 }
 
 async function handleNotifClick(id){
