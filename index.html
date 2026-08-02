@@ -86,6 +86,7 @@
   .brand-sub{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted-lt);letter-spacing:.06em;}
   nav{display:flex;flex-direction:column;gap:2px;margin-top:6px;}
   .nav-item{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;color:#AEB9CC;}
+  .nav-section-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.04em;color:#5C6B8A;padding:16px 11px 6px;font-weight:600;}
   .nav-item svg{flex:none;opacity:.8;}
   .nav-item:hover{background:var(--sidebar-hover);color:#fff;}
   .nav-item.active{background:var(--sidebar-active);color:#fff;}
@@ -253,7 +254,11 @@
   .row-link{color:var(--brand);font-size:12px;font-weight:600;cursor:pointer;}
   .row-link:hover{text-decoration:underline;}
 
-  .empty{padding:34px 18px;text-align:center;color:var(--muted);font-size:13px;}
+  .empty{padding:34px 18px;text-align:center;color:var(--muted);font-size:var(--text-base);}
+  .empty-rich{display:flex;flex-direction:column;align-items:center;gap:10px;padding:36px 20px;text-align:center;}
+  .empty-rich-icon{width:44px;height:44px;border-radius:50%;background:var(--surface-2);display:flex;align-items:center;justify-content:center;color:var(--muted-lt);}
+  .empty-rich-title{font-size:var(--text-base);font-weight:600;color:var(--ink);}
+  .empty-rich-sub{font-size:var(--text-sm);color:var(--muted);max-width:280px;line-height:1.5;}
 
   /* Add client form */
   .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
@@ -736,6 +741,8 @@ document.addEventListener('DOMContentLoaded', function(){
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
         Overview
       </div>
+
+      <div class="nav-section-label">Client work</div>
       <div class="nav-item" data-view="clients" onclick="switchView('clients')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         Clients
@@ -754,6 +761,8 @@ document.addEventListener('DOMContentLoaded', function(){
         Notes
         <span class="nav-badge" id="navNotesBadge">0</span>
       </div>
+
+      <div class="nav-section-label">Team</div>
       <div class="nav-item" data-view="tasks" onclick="switchView('tasks')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         Tasks
@@ -772,6 +781,8 @@ document.addEventListener('DOMContentLoaded', function(){
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         Team
       </div>
+
+      <div class="nav-section-label">Admin</div>
       <div class="nav-item" data-view="trash" onclick="switchView('trash')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         Trash
@@ -2920,7 +2931,12 @@ function renderClientsTable(){
   updateSortArrows();
   const ac = activeClients();
   if(!ac.length){
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty">No clients yet. Click "+ Add client" to start the roster.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7">${emptyStateHtml(
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+      'No clients yet',
+      'This is where your whole roster lives — add your first client to start tracking their work.',
+      '<button class="btn btn-brand" onclick="openAddClientForm()">+ Add client</button>'
+    )}</td></tr>`;
     if(countEl) countEl.textContent = '';
     return;
   }
@@ -3082,7 +3098,7 @@ async function renderTrash(){
   }
 
   if(notesEl){
-    notesEl.innerHTML = `<div class="empty" style="padding:14px 0;">Loading…</div>`;
+    notesEl.innerHTML = `<div class="empty" style="padding:14px 0;"><span class="spinner"></span>Loading…</div>`;
     const trashedNotes = await loadMyTrashedNotes();
     notesEl.innerHTML = trashedNotes.length ? trashedNotes.map(n=>{
       const c = clients.find(x=>x.id===n.clientId);
@@ -3092,7 +3108,7 @@ async function renderTrash(){
   }
 
   if(timeEl){
-    timeEl.innerHTML = `<div class="empty" style="padding:14px 0;">Loading…</div>`;
+    timeEl.innerHTML = `<div class="empty" style="padding:14px 0;"><span class="spinner"></span>Loading…</div>`;
     const trashedTime = await loadTrashedTimeEntries();
     const visibleTrashedTime = trashedTime.filter(e=> isAdmin() || (currentUser && e.userId===currentUser.id));
     timeEl.innerHTML = visibleTrashedTime.length ? visibleTrashedTime.map(e=>{
@@ -3344,7 +3360,7 @@ async function markPayrollPeriodPaid(){
 async function renderPayrollHistory(){
   const el = document.getElementById('payrollHistoryList');
   if(!el) return;
-  el.innerHTML = `<div class="empty">Loading…</div>`;
+  el.innerHTML = `<div class="empty"><span class="spinner"></span>Loading…</div>`;
   const { data, error } = await supabaseClient.from('payroll_periods').select('*').order('period_start', { ascending:false }).limit(26);
   if(error){ el.innerHTML = `<div class="empty">Could not load payroll history.</div>`; return; }
   if(!data || !data.length){ el.innerHTML = `<div class="empty">No periods marked as paid yet.</div>`; return; }
@@ -3384,7 +3400,7 @@ function resetDailySummaryToToday(){
 async function loadDailySummary(){
   const el = document.getElementById('dailySummaryList');
   if(!el) return;
-  el.innerHTML = `<div class="panel"><div class="empty">Loading…</div></div>`;
+  el.innerHTML = `<div class="panel"><div class="empty"><span class="spinner"></span>Loading…</div></div>`;
   renderDailySummaryDateLabel();
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
@@ -3865,7 +3881,12 @@ function renderNotes(){
     return true;
   });
 
-  if(!notes.length){ el.innerHTML = `<div class="empty">No notes yet. Click "+ Add note" to jot down something you'd like to do for a client.</div>`; return; }
+  if(!notes.length){ el.innerHTML = emptyStateHtml(
+    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+    'No notes yet',
+    'Notes are private to you — jot down something you\'d like to do for a client, and it\'ll only ever be visible to you.',
+    '<button class="btn btn-brand" onclick="openNoteModal()">+ Add note</button>'
+  ); return; }
   if(!filtered.length){ el.innerHTML = `<div class="empty">No notes match these filters.</div>`; return; }
 
   filtered.sort((a,b)=> new Date(b.updatedAt||b.createdAt) - new Date(a.updatedAt||a.createdAt));
@@ -5472,7 +5493,7 @@ async function renderMyEmailRequests(){
 async function renderPendingEmailRequests(){
   const el = document.getElementById('pendingEmailRequestsList');
   if(!el) return;
-  el.innerHTML = `<div class="empty">Loading…</div>`;
+  el.innerHTML = `<div class="empty"><span class="spinner"></span>Loading…</div>`;
   const { data, error } = await supabaseClient.from('email_change_requests').select('*').eq('status','pending').order('created_at',{ascending:true});
   if(error){ el.innerHTML = `<div class="empty">Could not load requests.</div>`; return; }
   if(!data || !data.length){ el.innerHTML = `<div class="empty">No pending requests.</div>`; return; }
@@ -5541,6 +5562,20 @@ let timesheetAnchor = new Date();
 // exactly the kind of bug that would make some cards (and anything visually
 // "after" them in the DOM) look broken while others look fine, depending on
 // what text happens to be in them.
+// A richer empty state than the plain gray .empty text — an icon, a real
+// title, a supporting line, and an optional action, reserved for the
+// handful of places people actually land on with nothing in them yet
+// (first-run states), not the 50-odd smaller "no results for this filter"
+// spots where the plain version is the right amount of ceremony.
+function emptyStateHtml(iconSvg, title, sub, actionHtml){
+  return `<div class="empty-rich">
+    <div class="empty-rich-icon">${iconSvg}</div>
+    <div class="empty-rich-title">${title}</div>
+    ${sub ? `<div class="empty-rich-sub">${sub}</div>` : ''}
+    ${actionHtml || ''}
+  </div>`;
+}
+
 function escapeHtml(str){
   if(str===null || str===undefined) return '';
   return String(str)
@@ -5613,7 +5648,7 @@ async function removeAttachmentFromRecord(recordType, recordId, path){
 async function renderAttachmentsInModal(recordType, recordId){
   const el = document.getElementById('attachmentsList');
   if(!el) return;
-  el.innerHTML = `<div class="empty" style="padding:10px 0;">Loading…</div>`;
+  el.innerHTML = `<div class="empty" style="padding:10px 0;"><span class="spinner"></span>Loading…</div>`;
   const record = recordType==='note' ? notes.find(n=>n.id===recordId) : tasks.find(t=>t.id===recordId);
   const attachments = record?.attachments || [];
   if(!attachments.length){ el.innerHTML = `<div class="empty" style="padding:10px 0;">No files attached yet.</div>`; return; }
@@ -5752,7 +5787,7 @@ async function logClientActivity(clientId, actionType, description){
 async function loadClientActivityHistory(clientId){
   const el = document.getElementById('cdActivityHistory');
   if(!el) return;
-  el.innerHTML = `<div class="empty">Loading…</div>`;
+  el.innerHTML = `<div class="empty"><span class="spinner"></span>Loading…</div>`;
   const { data, error } = await supabaseClient
     .from('activity_log').select('*').eq('client_id', clientId).order('created_at', { ascending:false }).limit(200);
   if(error){ el.innerHTML = `<div class="empty">Could not load activity history.</div>`; return; }
