@@ -341,6 +341,38 @@
   .icon-tab:hover{border-color:#DDE0E5;}
   .icon-tab.active{background:var(--brand-bg);border-color:var(--brand);color:var(--ink);}
   .icon-tab-count{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:700;color:var(--muted-lt);background:var(--surface-2);padding:1px 6px;border-radius:10px;}
+
+  .kanban-board{display:flex;gap:16px;overflow-x:auto;padding-bottom:14px;align-items:flex-start;}
+  .kanban-column{flex:1;min-width:270px;max-width:320px;background:#F3F4F7;border-radius:14px;padding:14px;flex:none;width:290px;}
+  .kanban-column-head{display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:0 2px;}
+  .kanban-column-dot{width:9px;height:9px;border-radius:50%;flex:none;}
+  .kanban-column-title{font-family:'Oswald',sans-serif;font-size:13.5px;font-weight:600;color:var(--ink);flex:1;}
+  .kanban-column-count{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:700;color:var(--muted);background:var(--card);padding:2px 8px;border-radius:10px;}
+  .kanban-add-btn{width:22px;height:22px;border-radius:7px;border:none;background:var(--card);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;font-size:15px;line-height:1;transition:background .12s ease, color .12s ease;}
+  .kanban-add-btn:hover{background:var(--brand);color:#fff;}
+  .kanban-cards{display:flex;flex-direction:column;gap:10px;min-height:20px;}
+
+  .kanban-card{background:var(--card);border-radius:12px;padding:14px;box-shadow:0 1px 2px rgba(16,24,40,.05);cursor:pointer;transition:box-shadow .15s ease, transform .15s ease;}
+  .kanban-card:hover{box-shadow:0 8px 20px rgba(16,24,40,.1);transform:translateY(-1px);}
+  .kanban-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:9px;}
+  .kanban-card-due{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted-lt);font-weight:600;}
+  .kanban-card-menu-wrap{position:relative;flex:none;}
+  .kanban-card-menu-btn{color:var(--muted-lt);cursor:pointer;padding:2px 5px;border-radius:6px;font-weight:700;letter-spacing:1px;}
+  .kanban-card-menu-btn:hover{background:var(--surface-2);color:var(--ink);}
+  .kanban-card-menu{position:absolute;top:calc(100% + 4px);right:0;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 28px rgba(16,24,40,.16);z-index:50;min-width:170px;overflow:hidden;}
+  .kanban-card-menu-item{padding:9px 14px;font-size:12.5px;color:var(--ink);cursor:pointer;white-space:nowrap;}
+  .kanban-card-menu-item:hover{background:var(--surface-2);}
+  .kanban-card-menu-item.danger{color:var(--red);}
+  .kanban-card-menu-divider{border-top:1px solid var(--border);margin:4px 0;}
+  .kanban-card-title{font-family:'Oswald',sans-serif;font-size:13.5px;font-weight:600;color:var(--ink);line-height:1.3;}
+  .kanban-card-desc{font-size:11.5px;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .kanban-card-client{display:flex;align-items:center;gap:6px;margin-top:11px;font-size:11px;color:var(--muted-lt);}
+  .kanban-card-assigned-label{font-family:'IBM Plex Mono',monospace;font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-lt);margin-top:11px;}
+  .kanban-card-avatars{display:flex;align-items:center;margin-top:5px;}
+  .kanban-card-footer{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:11px;border-top:1px solid #F3F4F6;}
+  .kanban-priority-flag{display:flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:6px;}
+  .kanban-card-icons{display:flex;gap:12px;font-size:10.5px;color:var(--muted-lt);font-weight:600;}
+  .kanban-card-icons span{display:flex;align-items:center;gap:4px;}
   .icon-tab.active .icon-tab-count{background:rgba(232,98,44,.15);color:var(--brand-dark);}
 
   .cal-cards-row{display:flex;gap:14px;overflow-x:auto;padding-bottom:10px;margin-bottom:18px;}
@@ -1050,16 +1082,6 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
 
       <div class="clients-filter-bar" style="margin-bottom:8px;">
-        <div class="icon-tab-group" id="taskStatusTabs" style="margin:0;">
-          <div class="icon-tab active" data-ttab="open" onclick="switchTaskStatusTab('open')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            <span>Open</span><span class="icon-tab-count" id="taskOpenCount">0</span>
-          </div>
-          <div class="icon-tab" data-ttab="done" onclick="switchTaskStatusTab('done')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            <span>Done</span><span class="icon-tab-count" id="taskDoneCount">0</span>
-          </div>
-        </div>
         <div class="select-field">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           <select id="taskDirectionFilter" onchange="renderTasks()">
@@ -1071,7 +1093,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <button class="btn btn-outline" onclick="clearTaskFilters()">Clear</button>
       </div>
 
-      <div id="tasksList"></div>
+      <div class="kanban-board" id="kanbanBoard"></div>
     </div>
 
     <!-- CALENDAR -->
@@ -3866,8 +3888,6 @@ function updateNotesBadge(){
 /* ---------- Tasks — private between assigner and assignee only ---------- */
 
 let tasks = [];
-let taskStatusTab = 'open';
-
 // RLS already restricts this to rows where I'm the assigner or assignee —
 // nobody else on the team can ever see a task they're not part of, admins
 // included.
@@ -3880,43 +3900,47 @@ async function loadMyTasks(){
     assignerId:t.assigner_id, assigneeId:t.assignee_id, clientId:t.client_id, dueDate:t.due_date, link:t.link,
     createdAt:t.created_at, completedAt:t.completed_at, cancelledAt:t.cancelled_at,
     hiddenByAssigner:t.hidden_by_assigner, hiddenByAssignee:t.hidden_by_assignee,
-    assigneeNotified:t.assignee_notified, assignerNotified:t.assigner_notified
+    assigneeNotified:t.assignee_notified, assignerNotified:t.assigner_notified,
+    attachments:t.attachments||[]
   }));
-}
-
-function switchTaskStatusTab(status){
-  taskStatusTab = status;
-  document.querySelectorAll('#view-tasks .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.ttab===status));
-  renderTasks();
 }
 
 const TASK_PRIORITY_META = {
   high:   { label:'High',   color:'var(--red)',   order:0 },
   medium: { label:'Medium', color:'var(--amber)', order:1 },
-  low:    { label:'Low',    color:'var(--muted-lt)', order:2 },
+  low:    { label:'Low',    color:'#5B9BD5', order:2 },
 };
+
+const KANBAN_STAGES = [
+  { key:'todo',        label:'To Do',      color:'#5B9BD5' },
+  { key:'in_progress',  label:'On Process', color:'#E8A33D' },
+  { key:'in_review',    label:'On Review',  color:'#E85C5C' },
+  { key:'done',         label:'Completed',  color:'#2E9F5E' },
+];
+
+let newTaskPresetStatus = 'todo';
 
 function updateTasksNavBadge(){
   const badge = document.getElementById('navTasksBadge');
   if(!badge || !currentUser) return;
-  const open = tasks.filter(t=> t.status==='open' && !t.cancelledAt && t.assigneeId===currentUser.id).length;
+  const open = tasks.filter(t=> t.status!=='done' && !t.cancelledAt && t.assigneeId===currentUser.id).length;
   badge.textContent = open;
   badge.style.display = open ? 'inline-flex' : 'none';
 }
 
 function renderTasks(){
-  const el = document.getElementById('tasksList');
-  if(!el || !currentUser) return;
+  const board = document.getElementById('kanbanBoard');
+  if(!board || !currentUser) return;
   const direction = document.getElementById('taskDirectionFilter')?.value || 'all';
   const search = (document.getElementById('tasksSearch')?.value || '').trim().toLowerCase();
 
-  const matchesBaseFilters = (t, status)=>{
+  const visible = tasks.filter(t=>{
     if(t.cancelledAt) return false;
-    if(status==='open' && t.status!=='open') return false;
-    if(status==='done' && t.status!=='done') return false;
     const amAssigner = t.assignerId===currentUser.id;
     const amAssignee = t.assigneeId===currentUser.id;
-    if(status==='done'){
+    // Per-user hide only applies once a task reaches Completed — clearing
+    // it from your board there doesn't affect the other person's view.
+    if(t.status==='done'){
       if(amAssigner && t.hiddenByAssigner) return false;
       if(amAssignee && t.hiddenByAssignee) return false;
     }
@@ -3924,73 +3948,105 @@ function renderTasks(){
     if(direction==='byme' && !amAssigner) return false;
     if(search && !t.title.toLowerCase().includes(search) && !(t.description||'').toLowerCase().includes(search)) return false;
     return true;
-  };
-  const openCountEl = document.getElementById('taskOpenCount');
-  const doneCountEl = document.getElementById('taskDoneCount');
-  if(openCountEl) openCountEl.textContent = tasks.filter(t=>matchesBaseFilters(t,'open')).length;
-  if(doneCountEl) doneCountEl.textContent = tasks.filter(t=>matchesBaseFilters(t,'done')).length;
-
-  let visible = tasks.filter(t=>matchesBaseFilters(t, taskStatusTab));
-
-  visible.sort((a,b)=>{
-    const pDiff = TASK_PRIORITY_META[a.priority].order - TASK_PRIORITY_META[b.priority].order;
-    if(pDiff!==0) return pDiff;
-    return new Date(b.createdAt) - new Date(a.createdAt);
   });
 
-  if(!visible.length){
-    const reason = search ? 'No tasks match your search.' : (taskStatusTab==='open' ? 'No open tasks.' : 'No completed tasks here yet.');
-    el.innerHTML = `<div class="panel"><div class="empty">${reason}</div></div>`;
-    return;
-  }
-
-  el.innerHTML = `<div class="notes-grid">${visible.map(t=>taskCardHtml(t)).join('')}</div>`;
+  board.innerHTML = KANBAN_STAGES.map(stage=>{
+    const stageTasks = visible.filter(t=>t.status===stage.key).sort((a,b)=>{
+      const pDiff = TASK_PRIORITY_META[a.priority].order - TASK_PRIORITY_META[b.priority].order;
+      if(pDiff!==0) return pDiff;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+    return `<div class="kanban-column">
+      <div class="kanban-column-head">
+        <span class="kanban-column-dot" style="background:${stage.color};"></span>
+        <span class="kanban-column-title">${stage.label}</span>
+        <span class="kanban-column-count">${stageTasks.length}</span>
+        <button class="kanban-add-btn" onclick="openNewTaskModal(undefined,'${stage.key}')" title="New task in ${stage.label}">+</button>
+      </div>
+      <div class="kanban-cards">
+        ${stageTasks.length ? stageTasks.map(t=>kanbanCardHtml(t)).join('') : `<div class="empty" style="padding:18px 8px;font-size:11.5px;">${search ? 'No matches.' : 'Nothing here.'}</div>`}
+      </div>
+    </div>`;
+  }).join('');
 }
 
-function taskActionsHtml(t){
+function kanbanCardMenuHtml(t){
   const amAssigner = t.assignerId===currentUser.id;
   const amAssignee = t.assigneeId===currentUser.id;
-  let actions = '';
-  if(t.status==='open'){
-    if(amAssignee) actions += `<button class="btn btn-brand" onclick="markTaskDone('${t.id}')">Mark done</button>`;
-    if(amAssigner){
-      actions += `<button class="btn btn-outline" onclick="openEditTaskModal('${t.id}')">Edit</button>`;
-      actions += `<button class="btn btn-outline" style="color:var(--red);" onclick="cancelTask('${t.id}')">Cancel</button>`;
-    }
-  } else {
-    actions += `<span class="row-link" onclick="hideTaskFromMyList('${t.id}')">Remove from my list</span>`;
+  const moveOptions = KANBAN_STAGES.filter(s=>s.key!==t.status).map(s=>{
+    if(s.key==='done' && !amAssignee) return ''; // only the assignee confirms completion
+    return `<div class="kanban-card-menu-item" onclick="event.stopPropagation();moveTaskToStatus('${t.id}','${s.key}')">Move to ${s.label}</div>`;
+  }).join('');
+  let extra = '';
+  if(amAssigner){
+    extra += `<div class="kanban-card-menu-divider"></div>`;
+    extra += `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();openEditTaskModal('${t.id}')">Edit</div>`;
+    extra += `<div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();cancelTask('${t.id}')">Cancel task</div>`;
+  } else if(t.status==='done'){
+    extra += `<div class="kanban-card-menu-divider"></div>`;
+    extra += `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();hideTaskFromMyList('${t.id}')">Remove from my board</div>`;
   }
-  return actions;
+  return moveOptions + extra;
 }
 
-function taskCardHtml(t){
+function toggleKanbanCardMenu(taskId){
+  const wasOpen = document.getElementById('kanbanMenu-'+taskId)?.style.display === 'block';
+  closeKanbanMenus();
+  if(!wasOpen){
+    const menu = document.getElementById('kanbanMenu-'+taskId);
+    if(menu) menu.style.display = 'block';
+  }
+}
+
+function closeKanbanMenus(){
+  document.querySelectorAll('.kanban-card-menu').forEach(m=>m.style.display='none');
+}
+
+document.addEventListener('click', (e)=>{
+  if(!e.target.closest('.kanban-card-menu-wrap')) closeKanbanMenus();
+});
+
+function kanbanCardHtml(t){
   const amAssigner = t.assignerId===currentUser.id;
   const assigner = teamProfiles.find(p=>p.id===t.assignerId);
   const assignee = teamProfiles.find(p=>p.id===t.assigneeId);
   const pMeta = TASK_PRIORITY_META[t.priority] || TASK_PRIORITY_META.medium;
   const c = t.clientId ? clients.find(x=>x.id===t.clientId) : null;
-  const dueStr = t.dueDate ? new Date(t.dueDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
-  const overdue = t.status==='open' && t.dueDate && new Date(t.dueDate+'T00:00:00') < new Date(new Date().toDateString());
+  const dueStr = t.dueDate ? new Date(t.dueDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '';
+  const overdue = t.status!=='done' && t.dueDate && new Date(t.dueDate+'T00:00:00') < new Date(new Date().toDateString());
+  const attachCount = (t.attachments||[]).length;
 
-  const directionLabel = amAssigner
-    ? `→ ${assignee ? assignee.name : 'someone no longer on the team'}`
-    : `← ${assigner ? assigner.name : 'someone no longer on the team'}`;
-
-  let metaLine = overdue ? `<span style="color:var(--red);font-weight:700;">Overdue</span>` : dueStr ? `Due ${dueStr}` : 'No due date';
-  if(t.status==='done' && t.completedAt) metaLine = `Completed ${new Date(t.completedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})}`;
-
-  return `<div class="note-card" style="cursor:pointer;" onclick="openTaskDetailModal('${t.id}')">
-    <div class="note-card-top">
-      <div>
-        <div class="note-client" style="cursor:default;">${directionLabel}${c ? ` · ${c.name}` : ''}</div>
-        <div class="note-meta">${metaLine}</div>
+  return `<div class="kanban-card" onclick="openTaskDetailModal('${t.id}')">
+    <div class="kanban-card-top">
+      <span class="kanban-card-due" style="${overdue?'color:var(--red);':''}">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        ${overdue ? 'Overdue' : dueStr ? `Due ${dueStr}` : 'No due date'}
+      </span>
+      <div class="kanban-card-menu-wrap">
+        <span class="kanban-card-menu-btn" onclick="event.stopPropagation();toggleKanbanCardMenu('${t.id}')">⋯</span>
+        <div class="kanban-card-menu" id="kanbanMenu-${t.id}" style="display:none;">${kanbanCardMenuHtml(t)}</div>
       </div>
-      <span class="pill" style="background:${pMeta.color}18;color:${pMeta.color};font-weight:700;flex:none;">${pMeta.label}</span>
     </div>
-    <div style="font-family:'Oswald',sans-serif;font-size:14.5px;font-weight:600;color:var(--ink);margin-top:10px;line-height:1.3;">${t.title}</div>
-    <div class="note-text" style="margin-top:6px;-webkit-line-clamp:3;">${t.description || '<span style="color:var(--muted-lt);">No description added.</span>'}</div>
-    ${t.link ? `<a href="${normalizeUrl(t.link)}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${t.link.replace(/^https?:\/\//,'').slice(0,40)}</a>` : ''}
-    <div class="note-actions" onclick="event.stopPropagation();">${taskActionsHtml(t)}</div>
+    <div class="kanban-card-title">${t.title}</div>
+    ${t.description ? `<div class="kanban-card-desc">${t.description}</div>` : ''}
+    ${c ? `<div class="kanban-card-client">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+      ${c.name}
+    </div>` : ''}
+    <div class="kanban-card-assigned-label">Assigned for</div>
+    <div class="kanban-card-avatars">
+      ${personAvatarHtml(t.assignerId)}${t.assigneeId!==t.assignerId ? personAvatarHtml(t.assigneeId) : ''}
+    </div>
+    <div class="kanban-card-footer">
+      <span class="kanban-priority-flag" style="background:${pMeta.color}18;color:${pMeta.color};">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M4 2v20M4 3h14l-3 4 3 4H4"/></svg>
+        ${pMeta.label}
+      </span>
+      <div class="kanban-card-icons">
+        ${t.link ? `<span title="Has a link">🔗</span>` : ''}
+        ${attachCount ? `<span><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>${attachCount}</span>` : ''}
+      </div>
+    </div>
   </div>`;
 }
 
@@ -4003,19 +4059,28 @@ function openTaskDetailModal(taskId){
   const pMeta = TASK_PRIORITY_META[t.priority] || TASK_PRIORITY_META.medium;
   const c = t.clientId ? clients.find(x=>x.id===t.clientId) : null;
   const dueStr = t.dueDate ? new Date(t.dueDate+'T00:00:00').toLocaleDateString('en-US',{weekday:'long', month:'long', day:'numeric'}) : '';
-  const overdue = t.status==='open' && t.dueDate && new Date(t.dueDate+'T00:00:00') < new Date(new Date().toDateString());
+  const overdue = t.status!=='done' && t.dueDate && new Date(t.dueDate+'T00:00:00') < new Date(new Date().toDateString());
   const directionLabel = amAssigner
     ? `Assigned to ${assignee ? assignee.name : 'someone no longer on the team'}`
     : `From ${assigner ? assigner.name : 'someone no longer on the team'}`;
-  const statusMeta = t.status==='done'
-    ? { cls:'pill-good', label:'Done' }
-    : overdue ? { cls:'pill-bad', label:'Overdue' } : { cls:'pill-mid', label:'Open' };
+  const stageMeta = KANBAN_STAGES.find(s=>s.key===t.status) || KANBAN_STAGES[0];
+
+  let detailActionsHtml = KANBAN_STAGES.filter(s=>s.key!==t.status).map(s=>{
+    if(s.key==='done' && !amAssignee) return '';
+    return `<button class="btn btn-outline" onclick="moveTaskToStatus('${t.id}','${s.key}')">Move to ${s.label}</button>`;
+  }).join('');
+  if(amAssigner){
+    detailActionsHtml += `<button class="btn btn-outline" onclick="openEditTaskModal('${t.id}')">Edit</button>`;
+    detailActionsHtml += `<button class="btn btn-outline" style="color:var(--red);" onclick="cancelTask('${t.id}')">Cancel</button>`;
+  } else if(t.status==='done'){
+    detailActionsHtml += `<span class="row-link" style="align-self:center;" onclick="hideTaskFromMyList('${t.id}')">Remove from my board</span>`;
+  }
 
   openAppModal(`
     <div class="modal-head">
       <div>
         <span class="pill" style="background:${pMeta.color}18;color:${pMeta.color};font-weight:700;margin-right:8px;">${pMeta.label} priority</span>
-        <span class="pill ${statusMeta.cls}">${statusMeta.label}</span>
+        <span class="pill" style="background:${stageMeta.color}18;color:${stageMeta.color};font-weight:700;">${overdue ? 'Overdue' : stageMeta.label}</span>
       </div>
       <span class="toast-close" onclick="closeAppModal()">✕</span>
     </div>
@@ -4036,7 +4101,7 @@ function openTaskDetailModal(taskId){
         <div id="attachmentsList"></div>
       </div>
     </div>
-    <div class="modal-actions">${taskActionsHtml(t)}<button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 500);
+    <div class="modal-actions">${detailActionsHtml}<button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 500);
   renderAttachmentsInModal('task', t.id);
 }
 
@@ -4079,8 +4144,9 @@ function taskFormHtml(editing, presetAssigneeId){
     </div>`;
 }
 
-function openNewTaskModal(presetAssigneeId){
+function openNewTaskModal(presetAssigneeId, presetStatus){
   if(!teamProfiles.length){ showToast('error','No team members','Add team members in Team before assigning tasks.'); return; }
+  newTaskPresetStatus = presetStatus || 'todo';
   openAppModal(taskFormHtml(null, presetAssigneeId), 480);
 }
 
@@ -4103,8 +4169,9 @@ async function saveNewTask(){
 
   const { data, error } = await supabaseClient.from('tasks').insert({
     title, description, priority, assigner_id: currentUser.id, assignee_id: assigneeId,
-    client_id: clientId, due_date: dueDate, link
+    client_id: clientId, due_date: dueDate, link, status: newTaskPresetStatus
   }).select().single();
+  newTaskPresetStatus = 'todo';
   await loadMyTasks();
   renderTasks();
   updateTasksNavBadge();
@@ -4144,17 +4211,26 @@ async function saveEditTask(taskId){
   error ? showToast('error','Save failed', error.message) : showToast('success','Task updated','Changes saved.');
 }
 
-async function markTaskDone(taskId){
+async function moveTaskToStatus(taskId, newStatus){
   const t = tasks.find(x=>x.id===taskId);
-  if(!t || t.assigneeId!==currentUser.id) return;
-  const { error } = await supabaseClient.from('tasks').update({
-    status:'done', completed_at: new Date().toISOString(), assigner_notified:false
-  }).eq('id', taskId);
+  if(!t) return;
+  const amAssigner = t.assignerId===currentUser.id;
+  const amAssignee = t.assigneeId===currentUser.id;
+  if(!amAssigner && !amAssignee) return;
+  if(newStatus==='done' && !amAssignee){ showToast('error','Not allowed','Only the person assigned to this task can move it to Completed.'); return; }
+  if(newStatus===t.status){ closeKanbanMenus(); return; }
+
+  const wasAlreadyDone = t.status==='done';
+  const updatePayload = { status: newStatus };
+  if(newStatus==='done') updatePayload.completed_at = new Date().toISOString();
+  if(newStatus==='done' && !wasAlreadyDone) updatePayload.assigner_notified = false;
+  const { error } = await supabaseClient.from('tasks').update(updatePayload).eq('id', taskId);
 
   // Only tasks tied to a client have anywhere to log to — plenty of tasks
   // are internal and have no client attached, which is fine, they just
-  // don't create an improvement entry.
-  if(!error && t.clientId){
+  // don't create an improvement entry. Only logs once, the first time it
+  // reaches Completed — moving it back out and in again doesn't double-log.
+  if(!error && newStatus==='done' && !wasAlreadyDone && t.clientId){
     await loadAll();
     const c = clients.find(x=>x.id===t.clientId);
     if(c){
@@ -4174,7 +4250,14 @@ async function markTaskDone(taskId){
   renderTasks();
   updateTasksNavBadge();
   closeAppModal();
-  error ? showToast('error','Save failed', error.message) : showToast('success','Marked done', `${t.assignerId===currentUser.id ? 'You' : (teamProfiles.find(p=>p.id===t.assignerId)?.name||'They')} will see this the next time they check Tasks.${t.clientId ? ' Logged to Past Improvements.' : ''}`);
+  closeKanbanMenus();
+  const stageLabel = KANBAN_STAGES.find(s=>s.key===newStatus)?.label || newStatus;
+  if(error){ showToast('error','Save failed', error.message); return; }
+  if(newStatus==='done' && !wasAlreadyDone){
+    showToast('success','Marked complete', `${amAssigner ? 'You' : (teamProfiles.find(p=>p.id===t.assignerId)?.name||'They')} will see this the next time they check Tasks.${t.clientId ? ' Logged to Past Improvements.' : ''}`);
+  } else {
+    showToast('success','Task moved', `Moved to ${stageLabel}.`);
+  }
 }
 
 async function cancelTask(taskId){
