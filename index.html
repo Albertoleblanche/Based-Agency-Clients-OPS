@@ -4412,12 +4412,25 @@ function buildEventTimestamps(){
   const dateVal = document.getElementById('eventDateInput').value;
   const isAllDay = document.getElementById('eventAllDayInput').checked;
   if(!dateVal) return null;
+  const [year, month, day] = dateVal.split('-').map(Number);
+
   if(isAllDay){
-    return { startAt: `${dateVal}T00:00:00`, endAt: `${dateVal}T23:59:59`, allDay:true };
+    // new Date(y, m, d, ...) builds from LOCAL components, then
+    // toISOString() correctly converts to UTC for storage — this is the
+    // part the old naive-string version skipped, which is exactly what
+    // caused the timezone shift.
+    const start = new Date(year, month-1, day, 0, 0, 0);
+    const end = new Date(year, month-1, day, 23, 59, 59);
+    return { startAt: start.toISOString(), endAt: end.toISOString(), allDay:true };
   }
+
   const startTime = document.getElementById('eventStartInput').value || '09:00';
   const endTime = document.getElementById('eventEndInput').value || '10:00';
-  return { startAt: `${dateVal}T${startTime}:00`, endAt: `${dateVal}T${endTime}:00`, allDay:false };
+  const [startH, startM] = startTime.split(':').map(Number);
+  const [endH, endM] = endTime.split(':').map(Number);
+  const start = new Date(year, month-1, day, startH, startM, 0);
+  const end = new Date(year, month-1, day, endH, endM, 0);
+  return { startAt: start.toISOString(), endAt: end.toISOString(), allDay:false };
 }
 
 // All-day events don't conflict-check against anything — they're not tied
