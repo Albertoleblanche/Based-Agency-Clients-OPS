@@ -2872,8 +2872,8 @@ function onClientFilterChange(){
   renderClientsTable();
 }
 
-const SORT_ICON_UP = '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="18 15 12 9 6 15"/></svg>';
-const SORT_ICON_DOWN = '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"/></svg>';
+const SORT_ICON_UP = '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>';
+const SORT_ICON_DOWN = '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>';
 
 function updateSortArrows(){
   ['name','importance','danger'].forEach(f=>{
@@ -4054,7 +4054,7 @@ function kanbanCardHtml(t){
         Completed${t.completedAt ? ` ${new Date(t.completedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})}` : ''}
       </span>` : `
       <span class="kanban-card-due" style="${overdue?'color:var(--red);':''}">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         ${overdue ? 'Overdue' : dueStr ? `Due ${dueStr}` : 'No due date'}
       </span>`}
       <div class="kanban-card-menu-wrap">
@@ -4873,7 +4873,7 @@ function openEventDetailModal(eventId){
     <div class="event-modal-head" style="background:${meta.color}0d;">
       <span class="pill" style="background:${meta.color};color:#fff;font-weight:700;">${meta.icon} ${meta.label}</span>
       <button class="event-modal-close" onclick="closeAppModal()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
     <div class="event-modal-body">
