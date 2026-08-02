@@ -772,37 +772,37 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- CLIENTS -->
     <div class="view" id="view-clients">
-      <div class="topbar" style="justify-content:flex-end;">
-        <button class="btn btn-brand" onclick="openAddClientForm()">+ Add client</button>
-      </div>
-
-      <div class="panel clients-filter-panel">
-        <div class="clients-filter-bar">
+      <div class="panel" style="margin-bottom:16px;">
+        <div class="panel-body" style="display:flex;align-items:center;gap:14px;">
           <div class="search-field">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input id="clientSearch" placeholder="Search by name or email…" oninput="onClientSearchInput()">
           </div>
-          <select id="filterService" onchange="onClientFilterChange()"></select>
-          <select id="filterStatus" onchange="onClientFilterChange()"></select>
-          <select id="filterImportance" onchange="onClientFilterChange()">
-            <option value="all">Any importance</option>
-            <option value="high">High importance (8–10)</option>
-            <option value="mid">Medium importance (4–7)</option>
-            <option value="low">Low importance (1–3)</option>
-          </select>
-          <select id="filterDanger" onchange="onClientFilterChange()">
-            <option value="all">Any danger</option>
-            <option value="atrisk">At risk (4–5)</option>
-            <option value="low">Low risk (1–3)</option>
-          </select>
-          <select id="filterLogged" onchange="onClientFilterChange()">
-            <option value="all">Logged: doesn't matter</option>
-            <option value="has">Has logs this week</option>
-            <option value="none">No logs yet this week</option>
-          </select>
-          <button class="btn btn-outline" onclick="clearClientFilters()">Clear</button>
+          <button class="btn btn-brand" style="flex:none;" onclick="openAddClientForm()">+ Add client</button>
         </div>
-        <div class="clients-filter-count" id="clientsFilterCount"></div>
+      </div>
+
+      <div class="clients-filter-bar" style="margin-bottom:8px;">
+        <select id="filterService" onchange="onClientFilterChange()"></select>
+        <select id="filterStatus" onchange="onClientFilterChange()"></select>
+        <select id="filterImportance" onchange="onClientFilterChange()">
+          <option value="all">Any importance</option>
+          <option value="high">High importance (8–10)</option>
+          <option value="mid">Medium importance (4–7)</option>
+          <option value="low">Low importance (1–3)</option>
+        </select>
+        <select id="filterDanger" onchange="onClientFilterChange()">
+          <option value="all">Any danger</option>
+          <option value="atrisk">At risk (4–5)</option>
+          <option value="low">Low risk (1–3)</option>
+        </select>
+        <select id="filterLogged" onchange="onClientFilterChange()">
+          <option value="all">Logged: doesn't matter</option>
+          <option value="has">Has logs this week</option>
+          <option value="none">No logs yet this week</option>
+        </select>
+        <button class="btn btn-outline" onclick="clearClientFilters()">Clear</button>
+        <span class="clients-filter-count" id="clientsFilterCount" style="margin-top:0;"></span>
       </div>
 
       <div class="panel">
