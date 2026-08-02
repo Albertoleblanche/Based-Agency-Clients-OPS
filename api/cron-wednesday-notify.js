@@ -46,7 +46,7 @@ module.exports = async function handler(req, res) {
     const clients = appData.clients || [];
     const log = appData.log || [];
 
-    const pending = clients.filter(c => c.draftStatus === 'pending');
+    const pending = clients.filter(c => c.draftStatus === 'pending' && !c.deletedAt);
     if (!pending.length) {
       res.status(200).json({ skipped: true, reason: 'No pending drafts this week — nothing sent.' });
       return;
@@ -92,6 +92,18 @@ module.exports = async function handler(req, res) {
       { key: 'app-data', value: JSON.stringify({ ...appData, log }) },
       { onConflict: 'key' }
     );
+
+    // Same email-sent notification a manual send would generate — this is a
+    // cron job with no logged-in user, so it goes to every admin/approver
+    // rather than "everyone except whoever clicked send."
+    const { data: profiles } = await admin.from('team_profiles').select('id, role');
+    const notifyIds = (profiles || []).filter(p => p.role === 'admin' || p.role === 'approver').map(p => p.id);
+    if (notifyIds.length) {
+      await admin.from('notifications').insert(notifyIds.map(id => ({
+        user_id: id, type: 'email_sent', title: 'Client email sent',
+        body: `Wednesday automation sent "${subject}" to ${recipients.join(', ')}.`, target_view: 'approve',
+      })));
+    }
 
     res.status(200).json({ success: true, notified: pending.length, emailId: emailData.id });
   } catch (e) {
