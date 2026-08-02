@@ -336,12 +336,12 @@
   .view-toggle-option{padding:7px 18px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;border-radius:16px;transition:all .15s ease;}
   .view-toggle-option.active{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(16,24,40,.12);}
 
-  .cal-type-tabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px;}
-  .cal-type-tab{display:flex;align-items:center;gap:7px;padding:9px 14px;border-radius:10px;background:var(--card);border:1px solid var(--border);cursor:pointer;flex:none;font-size:12.5px;font-weight:600;color:var(--muted);transition:all .15s ease;white-space:nowrap;}
-  .cal-type-tab:hover{border-color:#DDE0E5;}
-  .cal-type-tab.active{background:var(--brand-bg);border-color:var(--brand);color:var(--ink);}
-  .cal-type-count{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:700;color:var(--muted-lt);background:var(--surface-2);padding:1px 6px;border-radius:10px;}
-  .cal-type-tab.active .cal-type-count{background:rgba(232,98,44,.15);color:var(--brand-dark);}
+  .icon-tab-group{display:flex;gap:6px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px;}
+  .icon-tab{display:flex;align-items:center;gap:7px;padding:9px 14px;border-radius:10px;background:var(--card);border:1px solid var(--border);cursor:pointer;flex:none;font-size:12.5px;font-weight:600;color:var(--muted);transition:all .15s ease;white-space:nowrap;}
+  .icon-tab:hover{border-color:#DDE0E5;}
+  .icon-tab.active{background:var(--brand-bg);border-color:var(--brand);color:var(--ink);}
+  .icon-tab-count{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:700;color:var(--muted-lt);background:var(--surface-2);padding:1px 6px;border-radius:10px;}
+  .icon-tab.active .icon-tab-count{background:rgba(232,98,44,.15);color:var(--brand-dark);}
 
   .cal-cards-row{display:flex;gap:14px;overflow-x:auto;padding-bottom:10px;margin-bottom:18px;}
   .cal-event-card{min-width:230px;max-width:230px;flex:none;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:7px;cursor:pointer;transition:box-shadow .15s ease;}
@@ -877,24 +877,39 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
 
       <div class="clients-filter-bar" style="margin-bottom:8px;">
-        <select id="filterService" onchange="onClientFilterChange()"></select>
-        <select id="filterStatus" onchange="onClientFilterChange()"></select>
-        <select id="filterImportance" onchange="onClientFilterChange()">
-          <option value="all">Any importance</option>
-          <option value="high">High importance (8–10)</option>
-          <option value="mid">Medium importance (4–7)</option>
-          <option value="low">Low importance (1–3)</option>
-        </select>
-        <select id="filterDanger" onchange="onClientFilterChange()">
-          <option value="all">Any danger</option>
-          <option value="atrisk">At risk (4–5)</option>
-          <option value="low">Low risk (1–3)</option>
-        </select>
-        <select id="filterLogged" onchange="onClientFilterChange()">
-          <option value="all">Logged: doesn't matter</option>
-          <option value="has">Has logs this week</option>
-          <option value="none">No logs yet this week</option>
-        </select>
+        <div class="select-field">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          <select id="filterService" onchange="onClientFilterChange()"></select>
+        </div>
+        <div class="select-field">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <select id="filterStatus" onchange="onClientFilterChange()"></select>
+        </div>
+        <div class="select-field">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <select id="filterImportance" onchange="onClientFilterChange()">
+            <option value="all">Any importance</option>
+            <option value="high">High importance (8–10)</option>
+            <option value="mid">Medium importance (4–7)</option>
+            <option value="low">Low importance (1–3)</option>
+          </select>
+        </div>
+        <div class="select-field">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <select id="filterDanger" onchange="onClientFilterChange()">
+            <option value="all">Any danger</option>
+            <option value="atrisk">At risk (4–5)</option>
+            <option value="low">Low risk (1–3)</option>
+          </select>
+        </div>
+        <div class="select-field">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <select id="filterLogged" onchange="onClientFilterChange()">
+            <option value="all">Logged: doesn't matter</option>
+            <option value="has">Has logs this week</option>
+            <option value="none">No logs yet this week</option>
+          </select>
+        </div>
         <button class="btn btn-outline" onclick="clearClientFilters()">Clear</button>
         <span class="clients-filter-count" id="clientsFilterCount" style="margin-top:0;"></span>
       </div>
@@ -970,13 +985,16 @@ document.addEventListener('DOMContentLoaded', function(){
 
       <div class="date-filter-row">
         <label for="dateFilterSelect">Improvements logged:</label>
-        <select id="dateFilterSelect" onchange="onDateFilterChange()">
-          <option value="all">All time</option>
-          <option value="today">Today</option>
-          <option value="7days">Last 7 days</option>
-          <option value="30days">Last 30 days</option>
-          <option value="custom">Custom range…</option>
-        </select>
+        <div class="select-field" style="min-width:150px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <select id="dateFilterSelect" onchange="onDateFilterChange()">
+            <option value="all">All time</option>
+            <option value="today">Today</option>
+            <option value="7days">Last 7 days</option>
+            <option value="30days">Last 30 days</option>
+            <option value="custom">Custom range…</option>
+          </select>
+        </div>
         <span id="customDateRange" style="display:none;">
           <input type="date" id="dateFrom"> <span style="color:var(--muted-lt);font-size:11.5px;">to</span> <input type="date" id="dateTo">
           <button class="btn btn-outline" style="padding:6px 10px;" onclick="applyCustomDateRange()">Apply</button>
@@ -999,14 +1017,20 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
 
       <div class="clients-filter-bar" style="margin-bottom:8px;">
-        <select id="notesClientFilter" onchange="renderNotes()"><option value="all">All clients</option></select>
-        <select id="notesStatusFilter" onchange="renderNotes()">
-          <option value="all">All statuses</option>
-          <option value="idea">Idea</option>
-          <option value="planned">Planned</option>
-          <option value="in-progress">In progress</option>
-          <option value="done">Done</option>
-        </select>
+        <div class="select-field">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <select id="notesClientFilter" onchange="renderNotes()"><option value="all">All clients</option></select>
+        </div>
+        <div class="select-field">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <select id="notesStatusFilter" onchange="renderNotes()">
+            <option value="all">All statuses</option>
+            <option value="idea">Idea</option>
+            <option value="planned">Planned</option>
+            <option value="in-progress">In progress</option>
+            <option value="done">Done</option>
+          </select>
+        </div>
         <button class="btn btn-outline" onclick="clearNoteFilters()">Clear</button>
       </div>
 
@@ -1026,15 +1050,24 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
 
       <div class="clients-filter-bar" style="margin-bottom:8px;">
-        <div class="tabs settings-tabs" style="margin:0;">
-          <div class="tab settings-tab active" data-ttab="open" onclick="switchTaskStatusTab('open')">Open</div>
-          <div class="tab settings-tab" data-ttab="done" onclick="switchTaskStatusTab('done')">Done</div>
+        <div class="icon-tab-group" id="taskStatusTabs" style="margin:0;">
+          <div class="icon-tab active" data-ttab="open" onclick="switchTaskStatusTab('open')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Open</span><span class="icon-tab-count" id="taskOpenCount">0</span>
+          </div>
+          <div class="icon-tab" data-ttab="done" onclick="switchTaskStatusTab('done')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <span>Done</span><span class="icon-tab-count" id="taskDoneCount">0</span>
+          </div>
         </div>
-        <select id="taskDirectionFilter" onchange="renderTasks()">
-          <option value="all">All tasks</option>
-          <option value="tome">Assigned to me</option>
-          <option value="byme">Assigned by me</option>
-        </select>
+        <div class="select-field">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <select id="taskDirectionFilter" onchange="renderTasks()">
+            <option value="all">All tasks</option>
+            <option value="tome">Assigned to me</option>
+            <option value="byme">Assigned by me</option>
+          </select>
+        </div>
         <button class="btn btn-outline" onclick="clearTaskFilters()">Clear</button>
       </div>
 
@@ -1063,7 +1096,7 @@ document.addEventListener('DOMContentLoaded', function(){
         </div>
       </div>
 
-      <div class="cal-type-tabs" id="calTypeTabs"></div>
+      <div class="icon-tab-group" id="calTypeTabs"></div>
       <div class="cal-cards-row" id="calCardsRow"></div>
 
       <div id="calendarViewContainer"></div>
@@ -1071,12 +1104,27 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- TIME TRACKER -->
     <div class="view" id="view-time">
-      <div class="tabs settings-tabs" id="timeMainTabs">
-        <div class="tab settings-tab active" data-ttab="timer" onclick="switchTimeTab('timer')">Timer</div>
-        <div class="tab settings-tab" data-ttab="timesheet" onclick="switchTimeTab('timesheet')">Timesheet</div>
-        <div class="tab settings-tab" data-ttab="reports" onclick="switchTimeTab('reports')">Reports</div>
-        <div class="tab settings-tab" data-ttab="dailysummary" id="dailySummaryTab" onclick="switchTimeTab('dailysummary')" style="display:none;">Daily Summary</div>
-        <div class="tab settings-tab" data-ttab="payroll" id="payrollTab" onclick="switchTimeTab('payroll')" style="display:none;">Payroll</div>
+      <div class="icon-tab-group" id="timeMainTabs">
+        <div class="icon-tab active" data-ttab="timer" onclick="switchTimeTab('timer')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span>Timer</span>
+        </div>
+        <div class="icon-tab" data-ttab="timesheet" onclick="switchTimeTab('timesheet')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <span>Timesheet</span>
+        </div>
+        <div class="icon-tab" data-ttab="reports" onclick="switchTimeTab('reports')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <span>Reports</span>
+        </div>
+        <div class="icon-tab" data-ttab="dailysummary" id="dailySummaryTab" onclick="switchTimeTab('dailysummary')" style="display:none;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 16l2 2 4-4"/></svg>
+          <span>Daily Summary</span>
+        </div>
+        <div class="icon-tab" data-ttab="payroll" id="payrollTab" onclick="switchTimeTab('payroll')" style="display:none;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <span>Payroll</span>
+        </div>
       </div>
 
       <!-- TIMER -->
@@ -1216,10 +1264,19 @@ document.addEventListener('DOMContentLoaded', function(){
           </div>
         </div>
 
-        <div class="tabs settings-tabs" style="margin-top:20px;">
-          <div class="tab settings-tab active" data-rtab="clients" onclick="switchReportTab('clients')">Clients</div>
-          <div class="tab settings-tab" data-rtab="services" onclick="switchReportTab('services')">Services</div>
-          <div class="tab settings-tab" data-rtab="teammates" id="teammatesReportTab" onclick="switchReportTab('teammates')">Teammates</div>
+        <div class="icon-tab-group" style="margin-top:20px;">
+          <div class="icon-tab active" data-rtab="clients" onclick="switchReportTab('clients')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span>Clients</span>
+          </div>
+          <div class="icon-tab" data-rtab="services" onclick="switchReportTab('services')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+            <span>Services</span>
+          </div>
+          <div class="icon-tab" data-rtab="teammates" id="teammatesReportTab" onclick="switchReportTab('teammates')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
+            <span>Teammates</span>
+          </div>
         </div>
 
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
@@ -1334,11 +1391,23 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- SETTINGS -->
     <div class="view" id="view-settings">
-      <div class="tabs settings-tabs">
-        <div class="tab settings-tab active" data-stab="general" onclick="switchSettingsTab('general')">General</div>
-        <div class="tab settings-tab" data-stab="fields" onclick="switchSettingsTab('fields')">Client Fields</div>
-        <div class="tab settings-tab" data-stab="ai" onclick="switchSettingsTab('ai')">AI &amp; Email</div>
-        <div class="tab settings-tab" data-stab="integrations" onclick="switchSettingsTab('integrations')">Integrations &amp; Sync</div>
+      <div class="icon-tab-group">
+        <div class="icon-tab active" data-stab="general" onclick="switchSettingsTab('general')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>General</span>
+        </div>
+        <div class="icon-tab" data-stab="fields" onclick="switchSettingsTab('fields')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          <span>Client Fields</span>
+        </div>
+        <div class="icon-tab" data-stab="ai" onclick="switchSettingsTab('ai')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <span>AI &amp; Email</span>
+        </div>
+        <div class="icon-tab" data-stab="integrations" onclick="switchSettingsTab('integrations')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          <span>Integrations &amp; Sync</span>
+        </div>
       </div>
 
       <!-- GENERAL -->
@@ -2034,7 +2103,7 @@ function applyRoleVisibility(){
   if(notifyBtn) notifyBtn.style.display = canApprove() ? 'inline-flex' : 'none';
   const teammatesTab = document.getElementById('teammatesReportTab');
   if(teammatesTab){
-    teammatesTab.style.display = isAdmin() ? 'inline-block' : 'none';
+    teammatesTab.style.display = isAdmin() ? 'flex' : 'none';
     // If a non-admin somehow had this selected (e.g. lost admin mid-session), fall back to Clients.
     if(!isAdmin() && typeof reportTab!=='undefined' && reportTab==='teammates'){ switchReportTab('clients'); }
   }
@@ -2050,12 +2119,12 @@ function applyRoleVisibility(){
   if(trashClientsPanel) trashClientsPanel.style.display = canApprove() ? 'block' : 'none';
   const payrollTab = document.getElementById('payrollTab');
   if(payrollTab){
-    payrollTab.style.display = isAdmin() ? 'inline-block' : 'none';
+    payrollTab.style.display = isAdmin() ? 'flex' : 'none';
     if(!isAdmin() && document.getElementById('ttab-payroll')?.classList.contains('active')){ switchTimeTab('timer'); }
   }
   const dailySummaryTab = document.getElementById('dailySummaryTab');
   if(dailySummaryTab){
-    dailySummaryTab.style.display = canApprove() ? 'inline-block' : 'none';
+    dailySummaryTab.style.display = canApprove() ? 'flex' : 'none';
     if(!canApprove() && document.getElementById('ttab-dailysummary')?.classList.contains('active')){ switchTimeTab('timer'); }
   }
 }
@@ -2105,7 +2174,7 @@ async function switchView(name){
 }
 
 function switchSettingsTab(name){
-  document.querySelectorAll('#view-settings .settings-tab').forEach(t=>t.classList.toggle('active', t.dataset.stab===name));
+  document.querySelectorAll('#view-settings .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.stab===name));
   document.querySelectorAll('#view-settings .settings-subview').forEach(v=>v.classList.remove('active'));
   document.getElementById('stab-'+name).classList.add('active');
 }
@@ -3817,7 +3886,7 @@ async function loadMyTasks(){
 
 function switchTaskStatusTab(status){
   taskStatusTab = status;
-  document.querySelectorAll('#view-tasks .settings-tab').forEach(t=>t.classList.toggle('active', t.dataset.ttab===status));
+  document.querySelectorAll('#view-tasks .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.ttab===status));
   renderTasks();
 }
 
@@ -3841,14 +3910,13 @@ function renderTasks(){
   const direction = document.getElementById('taskDirectionFilter')?.value || 'all';
   const search = (document.getElementById('tasksSearch')?.value || '').trim().toLowerCase();
 
-  let visible = tasks.filter(t=>{
-    if(t.cancelledAt) return false; // cancelled tasks never show anywhere
-    if(taskStatusTab==='open' && t.status!=='open') return false;
-    if(taskStatusTab==='done' && t.status!=='done') return false;
+  const matchesBaseFilters = (t, status)=>{
+    if(t.cancelledAt) return false;
+    if(status==='open' && t.status!=='open') return false;
+    if(status==='done' && t.status!=='done') return false;
     const amAssigner = t.assignerId===currentUser.id;
     const amAssignee = t.assigneeId===currentUser.id;
-    // Per-user hide — only affects the person who cleared it.
-    if(taskStatusTab==='done'){
+    if(status==='done'){
       if(amAssigner && t.hiddenByAssigner) return false;
       if(amAssignee && t.hiddenByAssignee) return false;
     }
@@ -3856,7 +3924,13 @@ function renderTasks(){
     if(direction==='byme' && !amAssigner) return false;
     if(search && !t.title.toLowerCase().includes(search) && !(t.description||'').toLowerCase().includes(search)) return false;
     return true;
-  });
+  };
+  const openCountEl = document.getElementById('taskOpenCount');
+  const doneCountEl = document.getElementById('taskDoneCount');
+  if(openCountEl) openCountEl.textContent = tasks.filter(t=>matchesBaseFilters(t,'open')).length;
+  if(doneCountEl) doneCountEl.textContent = tasks.filter(t=>matchesBaseFilters(t,'done')).length;
+
+  let visible = tasks.filter(t=>matchesBaseFilters(t, taskStatusTab));
 
   visible.sort((a,b)=>{
     const pDiff = TASK_PRIORITY_META[a.priority].order - TASK_PRIORITY_META[b.priority].order;
@@ -4306,8 +4380,8 @@ function renderCalendarTypeTabs(){
   });
   el.innerHTML = CALENDAR_TYPE_TABS.map(t=>{
     const count = t.key==='all' ? periodEvents.length : periodEvents.filter(e=>eventMatchesTypeTab(e, t.key)).length;
-    return `<div class="cal-type-tab ${calendarTypeTab===t.key?'active':''}" onclick="switchCalendarTypeTab('${t.key}')">
-      ${t.icon}<span>${t.label}</span><span class="cal-type-count">${count}</span>
+    return `<div class="icon-tab ${calendarTypeTab===t.key?'active':''}" onclick="switchCalendarTypeTab('${t.key}')">
+      ${t.icon}<span>${t.label}</span><span class="icon-tab-count">${count}</span>
     </div>`;
   }).join('');
 }
@@ -5568,7 +5642,7 @@ function wireServiceAutoSuggest(clientSelId, serviceSelId){
 }
 
 function switchTimeTab(name){
-  document.querySelectorAll('#timeMainTabs .settings-tab').forEach(t=>t.classList.toggle('active', t.dataset.ttab===name));
+  document.querySelectorAll('#timeMainTabs .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.ttab===name));
   document.querySelectorAll('#view-time > .settings-subview').forEach(v=>v.classList.remove('active'));
   document.getElementById('ttab-'+name).classList.add('active');
   if(name==='timesheet') renderTimesheet();
@@ -6042,7 +6116,7 @@ let reportTab = 'clients';
 
 function switchReportTab(name){
   reportTab = name;
-  document.querySelectorAll('#ttab-reports .settings-tab').forEach(t=>t.classList.toggle('active', t.dataset.rtab===name));
+  document.querySelectorAll('#ttab-reports .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.rtab===name));
   renderReports();
 }
 
