@@ -8,7 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#F3F4F7; --sidebar:#101B33; --sidebar-hover:#1B2A4D; --sidebar-active:#24365E;
@@ -32,7 +32,7 @@
   .login-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:2000;padding:20px;}
 
   .login-card{background:var(--card);border:1px solid #EDEEF1;border-radius:12px;box-shadow:0 24px 64px rgba(16,24,40,.12);padding:32px 30px;width:100%;max-width:340px;display:flex;flex-direction:column;align-items:center;text-align:center;}
-  .login-title{font-family:'Oswald',sans-serif;font-size:19px;font-weight:600;letter-spacing:.01em;color:var(--ink);}
+  .login-title{font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-size:19px;font-weight:600;letter-spacing:.01em;color:var(--ink);}
   .login-sub{font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-lt);margin-top:3px;}
   .login-card .settings-field{width:100%;text-align:left;margin-top:12px;}
   .login-error{width:100%;background:var(--red-bg);color:var(--red);font-size:12px;border-radius:6px;padding:9px 11px;margin-top:16px;text-align:left;}
@@ -50,7 +50,7 @@
   .notif-badge{position:absolute;top:1px;right:1px;min-width:15px;height:15px;padding:0 3px;border-radius:20px;background:var(--red);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;}
   .notif-panel{position:absolute;top:calc(100% + 8px);right:0;width:340px;max-height:420px;overflow-y:auto;background:var(--card);border:1px solid #EDEEF1;border-radius:12px;box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:500;}
   .sidebar-sync-status{display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted-lt);margin-top:10px;}
-  .notif-panel-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;color:var(--ink);border-bottom:1px solid #F0F1F4;}
+  .notif-panel-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-size:13px;font-weight:600;color:var(--ink);border-bottom:1px solid #F0F1F4;}
   .notif-row{display:flex;align-items:flex-start;gap:6px;padding:12px 10px 12px 16px;border-bottom:1px solid #F5F6F8;}
   .notif-row-delete{background:none;border:none;color:var(--muted-lt);cursor:pointer;padding:6px;border-radius:6px;flex:none;display:flex;opacity:0;transition:opacity .12s ease, color .12s ease, background .12s ease;}
   .notif-row:hover .notif-row-delete{opacity:1;}
@@ -63,8 +63,8 @@
   .notif-row-title{font-size:12.5px;font-weight:600;color:var(--ink);}
   .notif-row-body{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.4;}
   .notif-row-time{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--muted-lt);margin-top:4px;}
-  .brand-mark{width:26px;height:26px;border-radius:6px;background:var(--brand);display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;font-weight:700;font-size:13px;color:#2A1200;flex:none;overflow:hidden;}
-  .brand-name{font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:#fff;}
+  .brand-mark{width:26px;height:26px;border-radius:6px;background:var(--brand);display:flex;align-items:center;justify-content:center;font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-weight:700;font-size:13px;color:#2A1200;flex:none;overflow:hidden;}
+  .brand-name{font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-size:13px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:#fff;}
   .brand-sub{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted-lt);letter-spacing:.06em;}
   nav{display:flex;flex-direction:column;gap:2px;margin-top:6px;}
   .nav-item{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;color:#AEB9CC;}
@@ -78,7 +78,7 @@
   .sidebar-action:hover{background:var(--sidebar-hover);}
   .sidebar-profile-name{font-size:12.5px;font-weight:600;color:var(--ink);}
   .sidebar-profile-role{font-family:'IBM Plex Mono',monospace;font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-lt);margin-top:2px;}
-  .icon-preview{width:56px;height:56px;border-radius:12px;background:var(--sidebar);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;font-weight:700;font-size:18px;overflow:hidden;flex:none;}
+  .icon-preview{width:56px;height:56px;border-radius:12px;background:var(--sidebar);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-weight:700;font-size:18px;overflow:hidden;flex:none;}
   .icon-preview img{width:100%;height:100%;object-fit:cover;}
 
   /* Main */
@@ -98,7 +98,7 @@
   .settings-tab.active{color:var(--brand);border-bottom-color:var(--brand);}
   .settings-subview{display:none;}
   .settings-subview.active{display:block;}
-  .page-title{font-family:'Oswald',sans-serif;font-size:22px;font-weight:600;text-transform:uppercase;letter-spacing:.01em;}
+  .page-title{font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-size:22px;font-weight:600;text-transform:uppercase;letter-spacing:.01em;}
   .page-sub{font-size:12.5px;color:var(--muted);margin-top:3px;}
   .topbar-right{display:flex;align-items:center;gap:10px;}
   .sync-pill{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--muted);display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border);padding:6px 10px;border-radius:20px;box-shadow:var(--shadow);}
@@ -131,7 +131,7 @@
   @media (max-width:820px){.kpis{grid-template-columns:repeat(2,1fr);}}
   .kpi{background:var(--card);border:1px solid #EDEEF1;border-radius:10px;padding:20px 22px;box-shadow:0 1px 2px rgba(16,24,40,.03);}
   .kpi-label{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted-lt);}
-  .kpi-val{font-family:'Oswald',sans-serif;font-size:30px;font-weight:600;margin-top:7px;letter-spacing:.01em;}
+  .kpi-val{font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-size:30px;font-weight:600;margin-top:7px;letter-spacing:.01em;}
   .kpi-val.warn{color:var(--red);}
   .kpi-foot{font-size:11px;color:var(--muted-lt);margin-top:5px;}
   .kpi-click{cursor:pointer;transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;}
@@ -150,7 +150,7 @@
   .donut-card-head{font-size:12.5px;font-weight:600;color:var(--muted);align-self:flex-start;text-transform:capitalize;}
   .donut-wrap{position:relative;width:190px;height:190px;margin:6px 0;}
   .donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
-  .donut-center-value{font-family:'Oswald',sans-serif;font-size:34px;font-weight:600;color:var(--ink);}
+  .donut-center-value{font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-size:34px;font-weight:600;color:var(--ink);}
   .donut-center-label{font-family:'IBM Plex Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-lt);margin-top:2px;}
   .donut-legend{display:flex;flex-wrap:wrap;justify-content:center;gap:9px;margin-top:2px;}
   .donut-legend-item{font-size:10.5px;color:var(--muted);display:flex;align-items:center;gap:5px;white-space:nowrap;}
@@ -159,7 +159,7 @@
   .donut-stats{width:100%;margin-top:18px;padding-top:16px;border-top:1px solid #F3F4F6;}
   .donut-stat-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;}
   .donut-stat-label{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-lt);}
-  .donut-stat-val{font-family:'Oswald',sans-serif;font-size:15px;font-weight:600;color:var(--ink);max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
+  .donut-stat-val{font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-size:15px;font-weight:600;color:var(--ink);max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
   .metric-head{display:flex;align-items:center;gap:9px;margin-bottom:14px;}
   .metric-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex:none;}
   .metric-icon-blue{background:#E7EEFC;color:#3A63C9;}
@@ -167,7 +167,7 @@
   .metric-icon-amber{background:var(--amber-bg);color:var(--amber);}
   .metric-icon-purple{background:#EFE7FB;color:#7C4FD1;}
   .metric-label{font-size:12.5px;font-weight:600;color:var(--muted);}
-  .metric-value{font-family:'Oswald',sans-serif;font-size:28px;font-weight:600;line-height:1;letter-spacing:.01em;}
+  .metric-value{font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-size:28px;font-weight:600;line-height:1;letter-spacing:.01em;}
   .metric-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;min-height:20px;}
   .metric-caption{font-size:11px;color:var(--muted-lt);margin-top:9px;}
 
@@ -220,7 +220,7 @@
   tbody tr:hover td{background:var(--surface-2);}
   tr:last-child td{border-bottom:none;}
   .client-cell{display:flex;align-items:center;gap:11px;}
-  .avatar-circle{width:32px;height:32px;border-radius:50%;background:linear-gradient(160deg,var(--surface-2),var(--border));border:1px solid var(--border);color:var(--ink);font-family:'Oswald',sans-serif;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;flex:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.5);}
+  .avatar-circle{width:32px;height:32px;border-radius:50%;background:linear-gradient(160deg,var(--surface-2),var(--border));border:1px solid var(--border);color:var(--ink);font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;flex:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.5);}
   body[data-theme="dark"] .avatar-circle{box-shadow:none;}
   .cell-name{font-weight:600;font-size:13px;}
   .cell-email{font-size:11px;color:var(--muted-lt);margin-top:2px;}
@@ -271,7 +271,7 @@
   .notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
   .note-card{background:var(--card);border:1px solid #EDEEF1;border-radius:12px;padding:18px 20px;box-shadow:0 1px 2px rgba(16,24,40,.03);display:flex;flex-direction:column;height:270px;}
   .note-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex:none;}
-  .note-client{font-family:'Oswald',sans-serif;font-size:14.5px;font-weight:600;cursor:pointer;}
+  .note-client{font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-size:14.5px;font-weight:600;cursor:pointer;}
   .note-client:hover{color:var(--brand-dark);}
   .note-meta{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted-lt);margin-top:3px;}
   .note-text{font-size:13px;color:var(--ink);line-height:1.55;margin-top:12px;flex:1;white-space:pre-wrap;overflow:hidden;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;}
@@ -327,7 +327,7 @@
   .calendar-day.other-month{background:#FAFBFC;}
   .calendar-day.other-month .calendar-day-num{color:var(--muted-lt);}
   .calendar-day.today{background:#FFF8F5;}
-  .calendar-day-num{font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;color:var(--ink);}
+  .calendar-day-num{font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-size:13px;font-weight:600;color:var(--ink);}
   .calendar-day.today .calendar-day-num{color:var(--brand);}
   .calendar-event-pill{font-size:10px;padding:2px 6px;border-radius:5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;}
   .calendar-more-pill{font-size:9.5px;color:var(--muted-lt);padding:2px 6px;}
@@ -346,7 +346,7 @@
   .kanban-column{min-width:270px;max-width:320px;background:#F3F4F7;border-radius:14px;padding:14px;flex:none;width:290px;}
   .kanban-column-head{display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:9px 10px;border-radius:10px;}
   .kanban-column-dot{width:9px;height:9px;border-radius:50%;flex:none;}
-  .kanban-column-title{font-family:'Oswald',sans-serif;font-size:13.5px;font-weight:600;color:var(--ink);flex:1;}
+  .kanban-column-title{font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-size:13.5px;font-weight:600;color:var(--ink);flex:1;}
   .kanban-column-count{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:700;color:var(--muted);background:var(--card);padding:2px 8px;border-radius:10px;}
   .kanban-add-btn{width:22px;height:22px;border-radius:7px;border:none;background:var(--card);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;font-size:15px;line-height:1;transition:background .12s ease, color .12s ease;}
   .kanban-add-btn:hover{background:var(--brand);color:#fff;}
@@ -364,7 +364,7 @@
   .kanban-card-menu-item:hover{background:var(--surface-2);}
   .kanban-card-menu-item.danger{color:var(--red);}
   .kanban-card-menu-divider{border-top:1px solid var(--border);margin:4px 0;}
-  .kanban-card-title{font-family:'Oswald',sans-serif;font-size:13.5px;font-weight:600;color:var(--ink);line-height:1.3;}
+  .kanban-card-title{font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-size:13.5px;font-weight:600;color:var(--ink);line-height:1.3;}
   .kanban-card-desc{font-size:11.5px;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .kanban-card-client{display:flex;align-items:center;gap:6px;margin-top:11px;font-size:11px;color:var(--muted-lt);}
   .kanban-card-assigned-label{font-family:'IBM Plex Mono',monospace;font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-lt);margin-top:11px;}
@@ -378,13 +378,13 @@
   .cal-cards-row{display:flex;gap:14px;overflow-x:auto;padding-bottom:10px;margin-bottom:18px;}
   .cal-event-card{min-width:230px;max-width:230px;flex:none;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:7px;cursor:pointer;transition:box-shadow .15s ease;}
   .cal-event-card:hover{box-shadow:0 6px 16px rgba(16,24,40,.08);}
-  .cal-event-card-title{font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .cal-event-card-title{font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-size:13px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .cal-event-card-time{font-size:11px;color:var(--muted);}
   .cal-event-card-status{display:flex;align-items:center;font-size:10.5px;font-weight:700;padding-top:7px;margin-top:auto;border-top:1px solid #F3F4F6;}
 
   .calendar-today-banner{display:flex;align-items:center;gap:14px;padding:16px 20px;}
   .calendar-today-icon{width:40px;height:40px;border-radius:10px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;flex:none;color:var(--ink);}
-  .calendar-today-date{font-family:'Oswald',sans-serif;font-size:16px;font-weight:600;color:var(--ink);}
+  .calendar-today-date{font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-size:16px;font-weight:600;color:var(--ink);}
   .calendar-today-sub{font-size:12.5px;color:var(--muted);margin-top:2px;}
 
   .week-grid-wrap{display:grid;grid-template-columns:64px repeat(7,1fr);border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--card);}
@@ -445,10 +445,10 @@
   .week-strip-day.selected{background:var(--brand-bg);box-shadow:inset 0 -2px 0 var(--brand);}
   .wsd-label{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);text-transform:uppercase;line-height:1.5;}
   .week-strip-day.selected .wsd-label{color:var(--brand-dark);}
-  .wsd-total{font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;margin-top:4px;}
+  .wsd-total{font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-size:14px;font-weight:600;margin-top:4px;}
   .week-strip-total{flex:none;width:110px;text-align:center;padding:12px 10px;background:var(--surface-2);}
   .wst-label{font-family:'IBM Plex Mono',monospace;font-size:9px;text-transform:uppercase;color:var(--muted-lt);}
-  .wst-val{font-family:'Oswald',sans-serif;font-size:15px;font-weight:600;margin-top:4px;}
+  .wst-val{font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-size:15px;font-weight:600;margin-top:4px;}
 
   /* Day view: entry cards */
   .ts-entry-card{background:var(--card);border:1px solid #EDEEF1;border-radius:10px;padding:16px 18px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:16px;box-shadow:0 1px 2px rgba(16,24,40,.03);}
@@ -502,7 +502,7 @@
   .xy-chart-title{font-size:13.5px;font-weight:600;}
   .xy-chart-updated{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted-lt);margin-top:2px;}
   .xy-chart-stats{display:flex;align-items:baseline;gap:10px;margin-bottom:6px;}
-  .xy-chart-value{font-family:'Oswald',sans-serif;font-size:26px;font-weight:600;}
+  .xy-chart-value{font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-size:26px;font-weight:600;}
   .xy-chart-trend{font-size:12px;font-weight:600;display:flex;align-items:center;gap:3px;}
   .xy-chart-trend.up{color:var(--green);}
   .xy-chart-trend.down{color:#9C5C48;}
@@ -525,7 +525,7 @@
   .q-card{border:1px solid #EDEEF1;border-radius:8px;padding:22px 24px;background:var(--card);box-shadow:0 1px 2px rgba(16,24,40,.03);transition:box-shadow .18s ease, border-color .18s ease, transform .18s ease;cursor:pointer;}
   .q-card:hover{box-shadow:0 10px 28px rgba(16,24,40,.08);border-color:#DDE0E5;transform:translateY(-2px);}
   .q-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;}
-  .q-name{font-family:'Oswald',sans-serif;font-size:16.5px;font-weight:600;letter-spacing:.015em;}
+  .q-name{font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-size:16.5px;font-weight:600;letter-spacing:.015em;}
   .q-service-caption{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-lt);margin-top:4px;}
   .q-risk-flag{color:var(--red);font-weight:600;}
   .q-status-label{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;white-space:nowrap;flex:none;}
@@ -620,7 +620,7 @@
   .tour-card{position:fixed;bottom:22px;right:22px;z-index:1600;background:var(--card);color:var(--ink);border:1px solid var(--border);border-radius:14px;box-shadow:0 20px 50px rgba(16,24,40,.28);padding:20px 22px;width:320px;max-width:calc(100vw - 44px);}
   .tour-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
   .tour-step-count{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-lt);}
-  .tour-title{font-family:'Oswald',sans-serif;font-size:17px;font-weight:600;letter-spacing:.01em;margin-bottom:8px;}
+  .tour-title{font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-size:17px;font-weight:600;letter-spacing:.01em;margin-bottom:8px;}
   .tour-body{font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:16px;}
   .tour-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
   .tour-actions .btn{padding:8px 13px;font-size:12px;}
@@ -646,7 +646,7 @@
   .event-modal-close{background:none;border:none;color:var(--muted-lt);cursor:pointer;padding:5px;border-radius:8px;display:flex;transition:background .12s ease, color .12s ease;}
   .event-modal-close:hover{background:rgba(0,0,0,.05);color:var(--ink);}
   .event-modal-body{padding:2px 22px 20px;}
-  .event-modal-title{font-family:'Oswald',sans-serif;font-size:19px;font-weight:600;color:var(--ink);line-height:1.25;}
+  .event-modal-title{font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-size:19px;font-weight:600;color:var(--ink);line-height:1.25;}
   .event-modal-recur{font-size:11.5px;color:var(--muted-lt);margin-top:4px;}
   .event-meta-row{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:13px;color:var(--ink);}
   .event-meta-row svg{flex:none;color:var(--muted-lt);}
@@ -1071,26 +1071,19 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- TASKS -->
     <div class="view" id="view-tasks">
-      <div class="panel" style="margin-bottom:16px;">
-        <div class="panel-body" style="display:flex;align-items:center;gap:14px;">
-          <div class="search-field">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input id="tasksSearch" placeholder="Search tasks by title or description…" oninput="renderTasks()">
-          </div>
-          <button class="btn btn-brand" style="flex:none;" onclick="openNewTaskModal()">+ New task</button>
+      <div class="icon-tab-group" id="taskDirectionTabs">
+        <div class="icon-tab active" data-tdir="all" onclick="switchTaskDirectionTab('all')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+          <span>All Tasks</span>
         </div>
-      </div>
-
-      <div class="clients-filter-bar" style="margin-bottom:8px;">
-        <div class="select-field">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          <select id="taskDirectionFilter" onchange="renderTasks()">
-            <option value="all">All tasks</option>
-            <option value="tome">Assigned to me</option>
-            <option value="byme">Assigned by me</option>
-          </select>
+        <div class="icon-tab" data-tdir="tome" onclick="switchTaskDirectionTab('tome')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+          <span>Assigned to me</span>
         </div>
-        <button class="btn btn-outline" onclick="clearTaskFilters()">Clear</button>
+        <div class="icon-tab" data-tdir="byme" onclick="switchTaskDirectionTab('byme')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          <span>Assigned by me</span>
+        </div>
       </div>
 
       <div class="kanban-board" id="kanbanBoard"></div>
@@ -3821,12 +3814,6 @@ function clearNoteFilters(){
   renderNotes();
 }
 
-function clearTaskFilters(){
-  const search = document.getElementById('tasksSearch'); if(search) search.value = '';
-  const directionSel = document.getElementById('taskDirectionFilter'); if(directionSel) directionSel.value = 'all';
-  renderTasks();
-}
-
 function renderNotes(){
   const el = document.getElementById('notesList');
   if(!el) return;
@@ -3919,6 +3906,13 @@ const KANBAN_STAGES = [
 ];
 
 let newTaskPresetStatus = 'todo';
+let taskDirectionTab = 'all';
+
+function switchTaskDirectionTab(dir){
+  taskDirectionTab = dir;
+  document.querySelectorAll('#taskDirectionTabs .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.tdir===dir));
+  renderTasks();
+}
 
 function updateTasksNavBadge(){
   const badge = document.getElementById('navTasksBadge');
@@ -3931,8 +3925,6 @@ function updateTasksNavBadge(){
 function renderTasks(){
   const board = document.getElementById('kanbanBoard');
   if(!board || !currentUser) return;
-  const direction = document.getElementById('taskDirectionFilter')?.value || 'all';
-  const search = (document.getElementById('tasksSearch')?.value || '').trim().toLowerCase();
 
   const visible = tasks.filter(t=>{
     if(t.cancelledAt) return false;
@@ -3944,9 +3936,8 @@ function renderTasks(){
       if(amAssigner && t.hiddenByAssigner) return false;
       if(amAssignee && t.hiddenByAssignee) return false;
     }
-    if(direction==='tome' && !amAssignee) return false;
-    if(direction==='byme' && !amAssigner) return false;
-    if(search && !t.title.toLowerCase().includes(search) && !(t.description||'').toLowerCase().includes(search)) return false;
+    if(taskDirectionTab==='tome' && !amAssignee) return false;
+    if(taskDirectionTab==='byme' && !amAssigner) return false;
     return true;
   });
 
@@ -3964,7 +3955,7 @@ function renderTasks(){
         <button class="kanban-add-btn" onclick="openNewTaskModal(undefined,'${stage.key}')" title="New task in ${stage.label}">+</button>
       </div>
       <div class="kanban-cards">
-        ${stageTasks.length ? stageTasks.map(t=>kanbanCardHtml(t)).join('') : `<div class="empty" style="padding:18px 8px;font-size:11.5px;">${search ? 'No matches.' : 'Nothing here.'}</div>`}
+        ${stageTasks.length ? stageTasks.map(t=>kanbanCardHtml(t)).join('') : `<div class="empty" style="padding:18px 8px;font-size:11.5px;">Nothing here.</div>`}
       </div>
     </div>`;
   }).join('');
@@ -3973,6 +3964,14 @@ function renderTasks(){
 function kanbanCardMenuHtml(t){
   const amAssigner = t.assignerId===currentUser.id;
   const amAssignee = t.assigneeId===currentUser.id;
+
+  // Once a task is Completed, it's locked — the only things left to do are
+  // file it away or remove it, not move it around or edit it further.
+  if(t.status==='done'){
+    return `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();hideTaskFromMyList('${t.id}')">Archive</div>
+      <div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();deleteTaskPermanently('${t.id}')">Delete</div>`;
+  }
+
   const moveOptions = KANBAN_STAGES.filter(s=>s.key!==t.status).map(s=>{
     if(s.key==='done' && !amAssignee) return ''; // only the assignee confirms completion
     return `<div class="kanban-card-menu-item" onclick="event.stopPropagation();moveTaskToStatus('${t.id}','${s.key}')">Move to ${s.label}</div>`;
@@ -3982,9 +3981,6 @@ function kanbanCardMenuHtml(t){
     extra += `<div class="kanban-card-menu-divider"></div>`;
     extra += `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();openEditTaskModal('${t.id}')">Edit</div>`;
     extra += `<div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();cancelTask('${t.id}')">Cancel task</div>`;
-  } else if(t.status==='done'){
-    extra += `<div class="kanban-card-menu-divider"></div>`;
-    extra += `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();hideTaskFromMyList('${t.id}')">Remove from my board</div>`;
   }
   return moveOptions + extra;
 }
@@ -4017,10 +4013,15 @@ function kanbanCardHtml(t){
 
   return `<div class="kanban-card" onclick="openTaskDetailModal('${t.id}')">
     <div class="kanban-card-top">
+      ${t.status==='done' ? `
+      <span class="kanban-card-due" style="color:#5E9E7E;font-weight:700;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Completed${t.completedAt ? ` ${new Date(t.completedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})}` : ''}
+      </span>` : `
       <span class="kanban-card-due" style="${overdue?'color:var(--red);':''}">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         ${overdue ? 'Overdue' : dueStr ? `Due ${dueStr}` : 'No due date'}
-      </span>
+      </span>`}
       <div class="kanban-card-menu-wrap">
         <span class="kanban-card-menu-btn" onclick="event.stopPropagation();toggleKanbanCardMenu('${t.id}')">⋯</span>
         <div class="kanban-card-menu" id="kanbanMenu-${t.id}" style="display:none;">${kanbanCardMenuHtml(t)}</div>
@@ -4090,15 +4091,19 @@ function openTaskDetailModal(taskId){
     </div>
     <div class="modal-actions" style="justify-content:space-between;align-items:center;">
       <div>
-        ${moveOptionsHtml ? `<select onchange="if(this.value) moveTaskToStatus('${t.id}', this.value);" style="font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-size:12.5px;padding:9px 12px;border-radius:7px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);cursor:pointer;">
+        ${moveOptionsHtml && t.status!=='done' ? `<select onchange="if(this.value) moveTaskToStatus('${t.id}', this.value);" style="font-family:'Helvetica Neue',Helvetica,'Inter',Arial,sans-serif;font-size:12.5px;padding:9px 12px;border-radius:7px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);cursor:pointer;">
           <option value="">Move to…</option>
           ${moveOptionsHtml}
         </select>` : ''}
       </div>
       <div style="display:flex;align-items:center;gap:16px;">
-        ${!amAssigner && t.status==='done' ? `<span class="row-link" onclick="hideTaskFromMyList('${t.id}')">Remove from my board</span>` : ''}
-        ${amAssigner ? `<span class="event-delete-link" onclick="cancelTask('${t.id}')">Cancel task</span>` : ''}
-        ${amAssigner ? `<button class="btn btn-brand" onclick="openEditTaskModal('${t.id}')">Edit</button>` : ''}
+        ${t.status==='done' ? `
+          <span class="row-link" onclick="hideTaskFromMyList('${t.id}')">Archive</span>
+          <span class="event-delete-link" onclick="deleteTaskPermanently('${t.id}')">Delete</span>
+        ` : `
+          ${amAssigner ? `<span class="event-delete-link" onclick="cancelTask('${t.id}')">Cancel task</span>` : ''}
+          ${amAssigner ? `<button class="btn btn-brand" onclick="openEditTaskModal('${t.id}')">Edit</button>` : ''}
+        `}
       </div>
     </div>`, 500);
 }
@@ -4279,7 +4284,22 @@ async function hideTaskFromMyList(taskId){
   await loadMyTasks();
   renderTasks();
   closeAppModal();
-  error ? showToast('error','Save failed', error.message) : showToast('success','Removed','Cleared from your Done list — this doesn\'t affect the other person\'s view.');
+  error ? showToast('error','Save failed', error.message) : showToast('success','Archived','Cleared from your board — this doesn\'t affect the other person\'s view.');
+}
+
+// Permanent deletion is only ever offered once a task is Completed — for
+// anything still active, Cancel is the right tool (it removes it for both
+// people, same as this, but says so honestly rather than pretending
+// something in progress was ever "done").
+async function deleteTaskPermanently(taskId){
+  const t = tasks.find(x=>x.id===taskId);
+  if(!t) return;
+  if(!confirm(`Permanently delete "${t.title}"? This can't be undone.`)) return;
+  const { error } = await supabaseClient.from('tasks').delete().eq('id', taskId);
+  await loadMyTasks();
+  renderTasks();
+  closeAppModal();
+  error ? showToast('error','Delete failed', error.message) : showToast('success','Deleted','Task permanently removed.');
 }
 
 // The actual notification delivery. Runs on login and on every periodic
