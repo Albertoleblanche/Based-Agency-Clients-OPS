@@ -328,6 +328,56 @@
   .calendar-day.today .calendar-day-num{color:var(--brand);}
   .calendar-event-pill{font-size:10px;padding:2px 6px;border-radius:5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;}
   .calendar-more-pill{font-size:9.5px;color:var(--muted-lt);padding:2px 6px;}
+
+  .calendar-today-banner{display:flex;align-items:center;gap:14px;padding:16px 20px;}
+  .calendar-today-icon{width:40px;height:40px;border-radius:10px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;flex:none;color:var(--ink);}
+  .calendar-today-date{font-family:'Oswald',sans-serif;font-size:16px;font-weight:600;color:var(--ink);}
+  .calendar-today-sub{font-size:12.5px;color:var(--muted);margin-top:2px;}
+
+  .week-grid-wrap{display:grid;grid-template-columns:56px repeat(7,1fr);border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--card);}
+  .week-grid-head{display:contents;}
+  .week-grid-head > div{background:var(--surface-2);padding:9px 6px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);border-left:1px solid var(--border);}
+  .week-grid-head > div:first-child{border-left:none;}
+  .week-grid-head .week-day-label.today{color:var(--brand);}
+  .week-hour-col{position:relative;border-left:1px solid var(--border);}
+  .week-hour-col:first-child{border-left:none;}
+  .week-hour-label{position:absolute;left:0;right:6px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--muted-lt);transform:translateY(-6px);}
+  .week-hour-line{position:absolute;left:0;right:0;border-top:1px solid #F1F2F5;}
+  .week-event-block{position:absolute;left:3px;right:3px;border-radius:6px;padding:4px 7px;overflow:hidden;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.08);}
+  .week-event-title{font-size:10.5px;font-weight:700;line-height:1.25;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+  .week-event-time{font-size:9px;opacity:.85;margin-top:1px;}
+  .week-event-block.conflict{outline:2px solid var(--red);outline-offset:-2px;}
+
+  .attendee-avatars{display:flex;align-items:center;margin-top:4px;}
+  .attendee-avatar{width:19px;height:19px;border-radius:50%;object-fit:cover;border:1.5px solid var(--card);margin-left:-5px;flex:none;background:var(--surface-2);}
+  .attendee-avatar:first-child{margin-left:0;}
+  .attendee-avatar-fallback{width:19px;height:19px;border-radius:50%;border:1.5px solid var(--card);margin-left:-5px;flex:none;background:var(--brand);color:#2A1200;font-size:8.5px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+  .attendee-avatar-fallback:first-child{margin-left:0;}
+  .attendee-more-chip{font-size:9.5px;color:var(--muted-lt);margin-left:5px;}
+  .attendee-picker{display:flex;flex-wrap:wrap;gap:6px;}
+  .attendee-chip{display:flex;align-items:center;gap:5px;font-size:11.5px;padding:5px 10px 5px 6px;border-radius:20px;border:1px solid var(--border);cursor:pointer;background:var(--surface-2);color:var(--muted);transition:all .12s ease;}
+  .attendee-chip.selected{background:var(--brand-bg);border-color:var(--brand);color:var(--ink);font-weight:600;}
+  .attendee-chip img, .attendee-chip .attendee-chip-fallback{width:18px;height:18px;border-radius:50%;object-fit:cover;flex:none;background:var(--brand);color:#2A1200;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+
+  .conflict-banner{display:flex;align-items:center;gap:8px;background:#FFF1EE;border:1px solid #FFD9CE;color:var(--red);font-size:12px;font-weight:600;padding:10px 14px;border-radius:8px;margin-bottom:14px;}
+
+  .calendar-week-wrap{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--card);}
+  .calendar-week-head{display:flex;border-bottom:1px solid var(--border);}
+  .calendar-week-hour-col-head{width:52px;flex:none;}
+  .calendar-week-day-head{flex:1;text-align:center;padding:9px 4px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);border-left:1px solid var(--border);}
+  .calendar-week-day-head.today{color:var(--brand);font-weight:700;}
+  .calendar-week-body{display:flex;position:relative;overflow-x:auto;}
+  .calendar-week-hours-axis{width:52px;flex:none;}
+  .calendar-week-hour-label{height:48px;font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted-lt);text-align:right;padding:2px 6px 0 0;border-top:1px solid var(--border);box-sizing:border-box;}
+  .calendar-week-day-col{flex:1;min-width:110px;position:relative;border-left:1px solid var(--border);}
+  .calendar-week-day-col.today{background:#FFF8F5;}
+  .calendar-week-hour-slot{height:48px;border-top:1px solid var(--border);box-sizing:border-box;cursor:pointer;}
+  .calendar-week-hour-slot:hover{background:rgba(232,98,44,.06);}
+  .calendar-week-event{position:absolute;left:3px;right:3px;border-radius:5px;padding:3px 6px;font-size:10px;font-weight:600;overflow:hidden;cursor:pointer;z-index:2;box-shadow:0 1px 3px rgba(16,24,40,.15);line-height:1.35;}
+  .calendar-event-avatars{display:flex;margin-top:2px;}
+  .calendar-event-avatar{width:14px;height:14px;border-radius:50%;border:1.5px solid #fff;object-fit:cover;margin-left:-4px;flex:none;}
+  .calendar-event-avatar:first-child{margin-left:0;}
+  .calendar-event-avatar-fallback{width:14px;height:14px;border-radius:50%;border:1.5px solid #fff;margin-left:-4px;flex:none;background:var(--sidebar);color:#fff;font-size:7px;display:flex;align-items:center;justify-content:center;font-weight:700;}
   .date-nav-arrow{background:none;border:none;color:var(--muted);padding:9px 12px;cursor:pointer;display:flex;align-items:center;transition:color .12s ease, background .12s ease;}
   .date-nav-arrow:hover{color:var(--ink);background:var(--surface-2);}
   .date-nav-label{position:relative;display:flex;align-items:center;gap:7px;padding:8px 6px;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;border-left:1px solid var(--border);border-right:1px solid var(--border);white-space:nowrap;}
@@ -950,15 +1000,22 @@ document.addEventListener('DOMContentLoaded', function(){
     <!-- CALENDAR -->
     <div class="view" id="view-calendar">
       <div class="panel" style="margin-bottom:16px;">
-        <div class="panel-body" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-          <div class="date-nav">
-            <span class="date-nav-arrow" onclick="shiftCalendarMonth(-1)">‹</span>
-            <span class="date-nav-label" id="calendarMonthLabel" style="cursor:default;"></span>
-            <span class="date-nav-arrow" onclick="shiftCalendarMonth(1)">›</span>
+        <div class="panel-body">
+          <div id="calendarTodaySummary" style="font-size:12.5px;color:var(--muted);margin-bottom:14px;"></div>
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+            <div class="date-nav">
+              <span class="date-nav-arrow" onclick="shiftCalendarPeriod(-1)">‹</span>
+              <span class="date-nav-label" id="calendarMonthLabel" style="cursor:default;"></span>
+              <span class="date-nav-arrow" onclick="shiftCalendarPeriod(1)">›</span>
+            </div>
+            <button class="btn btn-outline" onclick="resetCalendarToToday()">Today</button>
+            <div class="tabs settings-tabs" style="margin:0;">
+              <div class="tab settings-tab active" data-cview="month" onclick="switchCalendarViewMode('month')">Month</div>
+              <div class="tab settings-tab" data-cview="week" onclick="switchCalendarViewMode('week')">Week</div>
+            </div>
+            <div style="flex:1;"></div>
+            <button class="btn btn-brand" style="flex:none;" onclick="openNewEventModal()">+ New event</button>
           </div>
-          <button class="btn btn-outline" onclick="resetCalendarToToday()">Today</button>
-          <div style="flex:1;"></div>
-          <button class="btn btn-brand" style="flex:none;" onclick="openNewEventModal()">+ New event</button>
         </div>
       </div>
 
@@ -972,10 +1029,7 @@ document.addEventListener('DOMContentLoaded', function(){
         </select>
       </div>
 
-      <div class="calendar-grid-head">
-        <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
-      </div>
-      <div class="calendar-grid" id="calendarGrid"></div>
+      <div id="calendarViewContainer"></div>
     </div>
 
     <!-- TIME TRACKER -->
@@ -4088,33 +4142,84 @@ async function loadCalendarEvents(){
   calendarEvents = (data||[]).map(e=>({
     id:e.id, title:e.title, description:e.description||'', startAt:e.start_at, endAt:e.end_at,
     allDay:e.all_day, clientId:e.client_id, createdBy:e.created_by, eventType:e.event_type,
-    googleEventId:e.google_event_id, googleOwner:e.google_calendar_owner
+    googleEventId:e.google_event_id, googleOwner:e.google_calendar_owner,
+    location:e.location||'', attendeeIds:e.attendee_ids||[]
   }));
 }
 
-function renderCalendarMonthLabel(){
-  const el = document.getElementById('calendarMonthLabel');
-  if(el) el.textContent = calendarAnchorDate.toLocaleDateString('en-US',{month:'long', year:'numeric'});
+let calendarViewMode = 'month'; // 'month' | 'week'
+
+function switchCalendarViewMode(mode){
+  calendarViewMode = mode;
+  document.querySelectorAll('#view-calendar .settings-tab').forEach(t=>t.classList.toggle('active', t.dataset.cview===mode));
+  renderCalendar();
 }
 
-function shiftCalendarMonth(dir){
-  calendarAnchorDate.setMonth(calendarAnchorDate.getMonth()+dir);
-  renderCalendarMonthLabel();
+function shiftCalendarPeriod(dir){
+  if(calendarViewMode==='week') calendarAnchorDate.setDate(calendarAnchorDate.getDate() + dir*7);
+  else calendarAnchorDate.setMonth(calendarAnchorDate.getMonth()+dir);
   renderCalendar();
 }
 
 function resetCalendarToToday(){
   calendarAnchorDate = new Date();
-  renderCalendarMonthLabel();
   renderCalendar();
 }
 
-function renderCalendar(){
-  const grid = document.getElementById('calendarGrid');
-  if(!grid) return;
-  renderCalendarMonthLabel();
-  const typeFilter = document.getElementById('calendarTypeFilter')?.value || 'all';
+function renderCalendarMonthLabel(){
+  const el = document.getElementById('calendarMonthLabel');
+  if(!el) return;
+  if(calendarViewMode==='week'){
+    const start = getWeekStart(calendarAnchorDate);
+    const end = new Date(start); end.setDate(end.getDate()+6);
+    el.textContent = start.getMonth()===end.getMonth()
+      ? `${start.toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${end.toLocaleDateString('en-US',{day:'numeric', year:'numeric'})}`
+      : `${start.toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${end.toLocaleDateString('en-US',{month:'short',day:'numeric', year:'numeric'})}`;
+  } else {
+    el.textContent = calendarAnchorDate.toLocaleDateString('en-US',{month:'long', year:'numeric'});
+  }
+}
 
+function renderCalendarTodaySummary(){
+  const el = document.getElementById('calendarTodaySummary');
+  if(!el) return;
+  const todayStr = toDateStr(new Date());
+  const todayEvents = calendarEvents.filter(e=> toDateStr(new Date(e.startAt))===todayStr);
+  const dateLabel = new Date().toLocaleDateString('en-US',{weekday:'long', month:'long', day:'numeric'});
+  if(!todayEvents.length){ el.textContent = `${dateLabel} — nothing on the calendar today.`; return; }
+  const meetings = todayEvents.filter(e=>e.eventType==='meeting').length;
+  const others = todayEvents.length - meetings;
+  const parts = [];
+  if(meetings) parts.push(`${meetings} meeting${meetings!==1?'s':''}`);
+  if(others) parts.push(`${others} other event${others!==1?'s':''}`);
+  el.textContent = `${dateLabel} — you have ${parts.join(' and ')} today.`;
+}
+
+function attendeeAvatarsHtml(attendeeIds, max){
+  if(!attendeeIds || !attendeeIds.length) return '';
+  const shown = attendeeIds.slice(0, max||4);
+  const extra = attendeeIds.length - shown.length;
+  const avatarsHtml = shown.map(id=>{
+    const p = teamProfiles.find(x=>x.id===id);
+    if(!p) return '';
+    return p.avatar_url
+      ? `<img class="attendee-avatar" src="${p.avatar_url}" title="${p.name}">`
+      : `<div class="attendee-avatar-fallback" title="${p.name}">${(p.name||'?').trim().charAt(0).toUpperCase()}</div>`;
+  }).join('');
+  return `<div class="attendee-avatars">${avatarsHtml}${extra>0?`<span class="attendee-more-chip">+${extra}</span>`:''}</div>`;
+}
+
+function renderCalendar(){
+  const container = document.getElementById('calendarViewContainer');
+  if(!container) return;
+  renderCalendarMonthLabel();
+  renderCalendarTodaySummary();
+  if(calendarViewMode==='week') renderCalendarWeekView(container);
+  else renderCalendarMonthView(container);
+}
+
+function renderCalendarMonthView(container){
+  const typeFilter = document.getElementById('calendarTypeFilter')?.value || 'all';
   const year = calendarAnchorDate.getFullYear(), month = calendarAnchorDate.getMonth();
   const firstOfMonth = new Date(year, month, 1);
   const gridStart = getWeekStart(firstOfMonth); // Monday-aligned
@@ -4128,7 +4233,7 @@ function renderCalendar(){
     eventsByDay[d].push(e);
   });
 
-  let html = '';
+  let daysHtml = '';
   for(let i=0;i<42;i++){
     const cellDate = new Date(gridStart);
     cellDate.setDate(cellDate.getDate()+i);
@@ -4139,7 +4244,7 @@ function renderCalendar(){
     const shown = dayEvents.slice(0,3);
     const extra = dayEvents.length - shown.length;
 
-    html += `<div class="calendar-day ${isOtherMonth?'other-month':''} ${isToday?'today':''}" onclick="openNewEventModal('${cellStr}')">
+    daysHtml += `<div class="calendar-day ${isOtherMonth?'other-month':''} ${isToday?'today':''}" onclick="openNewEventModal('${cellStr}')">
       <div class="calendar-day-num">${cellDate.getDate()}</div>
       ${shown.map(e=>{
         const meta = CALENDAR_TYPE_META[e.eventType] || CALENDAR_TYPE_META.other;
@@ -4149,7 +4254,78 @@ function renderCalendar(){
       ${extra>0 ? `<div class="calendar-more-pill">+${extra} more</div>` : ''}
     </div>`;
   }
-  grid.innerHTML = html;
+
+  container.innerHTML = `
+    <div class="calendar-grid-head">
+      <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+    </div>
+    <div class="calendar-grid">${daysHtml}</div>`;
+}
+
+const WEEK_VIEW_START_HOUR = 7;
+const WEEK_VIEW_END_HOUR = 21;
+const WEEK_VIEW_HOUR_HEIGHT = 52;
+
+function renderCalendarWeekView(container){
+  const typeFilter = document.getElementById('calendarTypeFilter')?.value || 'all';
+  const weekStart = getWeekStart(calendarAnchorDate);
+  const todayStr = toDateStr(new Date());
+  const totalHours = WEEK_VIEW_END_HOUR - WEEK_VIEW_START_HOUR;
+  const gridHeight = totalHours * WEEK_VIEW_HOUR_HEIGHT;
+
+  const days = Array.from({length:7}, (_,i)=>{ const d = new Date(weekStart); d.setDate(d.getDate()+i); return d; });
+
+  const headHtml = `<div></div>` + days.map(d=>{
+    const isToday = toDateStr(d)===todayStr;
+    return `<div class="week-day-label ${isToday?'today':''}">${d.toLocaleDateString('en-US',{weekday:'short'})} ${d.getDate()}</div>`;
+  }).join('');
+
+  const hourLines = Array.from({length: totalHours}, (_,i)=>`<div class="week-hour-line" style="top:${i*WEEK_VIEW_HOUR_HEIGHT}px;"></div>`).join('');
+
+  const hourLabelsHtml = `<div class="week-hour-col" style="height:${gridHeight}px;">` +
+    Array.from({length: totalHours}, (_,i)=>{
+      const hour = WEEK_VIEW_START_HOUR + i;
+      const label = hour<12?`${hour} AM`:hour===12?'12 PM':`${hour-12} PM`;
+      return `<div class="week-hour-label" style="top:${i*WEEK_VIEW_HOUR_HEIGHT}px;">${label}</div>`;
+    }).join('') + hourLines + `</div>`;
+
+  const dayColsHtml = days.map(d=>{
+    const dStr = toDateStr(d);
+    const dayEvents = calendarEvents.filter(e=>{
+      if(typeFilter!=='all' && e.eventType!==typeFilter) return false;
+      if(e.allDay) return false;
+      return toDateStr(new Date(e.startAt))===dStr;
+    });
+
+    const eventsHtml = dayEvents.map(e=>{
+      const meta = CALENDAR_TYPE_META[e.eventType] || CALENDAR_TYPE_META.other;
+      const start = new Date(e.startAt), end = new Date(e.endAt);
+      const startHourFloat = start.getHours() + start.getMinutes()/60;
+      const endHourFloat = end.getHours() + end.getMinutes()/60;
+      const clampedStart = Math.max(startHourFloat, WEEK_VIEW_START_HOUR);
+      const clampedEnd = Math.min(endHourFloat, WEEK_VIEW_END_HOUR);
+      if(clampedEnd <= clampedStart) return '';
+      const top = (clampedStart - WEEK_VIEW_START_HOUR) * WEEK_VIEW_HOUR_HEIGHT;
+      const height = Math.max((clampedEnd - clampedStart) * WEEK_VIEW_HOUR_HEIGHT, 22);
+      const effectiveAttendees = e.attendeeIds && e.attendeeIds.length ? e.attendeeIds : [e.createdBy];
+      const hasConflict = findEventConflicts(e.startAt, e.endAt, effectiveAttendees, e.id).length > 0;
+      const timeStr = `${start.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})} – ${end.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`;
+      return `<div class="week-event-block ${hasConflict?'conflict':''}" style="top:${top}px;height:${height}px;background:${meta.color}22;color:${meta.color};" onclick="event.stopPropagation();openEventDetailModal('${e.id}')" title="${e.title}${hasConflict?' — conflicts with another event':''}">
+        <div class="week-event-title">${e.googleEventId?'📅 ':''}${hasConflict?'⚠ ':''}${e.title}</div>
+        <div class="week-event-time">${timeStr}</div>
+        ${attendeeAvatarsHtml(e.attendeeIds, 3)}
+      </div>`;
+    }).join('');
+
+    return `<div class="week-hour-col" style="height:${gridHeight}px;cursor:pointer;" onclick="openNewEventModal('${dStr}')">${hourLines}${eventsHtml}</div>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="week-grid-wrap">
+      <div class="week-grid-head">${headHtml}</div>
+      ${hourLabelsHtml}
+      ${dayColsHtml}
+    </div>`;
 }
 
 function populateCalendarClientSelect(selectedId){
@@ -4161,6 +4337,7 @@ function eventFormHtml(editing, presetDateStr){
   const startDate = editing ? toDateStr(new Date(editing.startAt)) : (presetDateStr || toDateStr(new Date()));
   const startTime = editing && !editing.allDay ? new Date(editing.startAt).toTimeString().slice(0,5) : '09:00';
   const endTime = editing && !editing.allDay ? new Date(editing.endAt).toTimeString().slice(0,5) : '10:00';
+  const selectedAttendees = editing ? (editing.attendeeIds||[]) : [currentUser.id];
   return `
     <div class="modal-head"><span class="panel-title">${editing ? 'Edit event' : 'New event'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
@@ -4177,7 +4354,18 @@ function eventFormHtml(editing, presetDateStr){
         <div><label>End time</label><input type="time" id="eventEndInput" value="${endTime}"></div>
       </div>
       <div class="settings-field"><label><input type="checkbox" id="eventAllDayInput" ${editing && editing.allDay ? 'checked' : ''} onchange="toggleEventAllDay()" style="width:auto;margin-right:6px;">All-day event</label></div>
+      <div class="settings-field"><label>Location (optional)</label><input id="eventLocationInput" placeholder="Zoom link, address, or wherever it's happening" value="${editing && editing.location ? editing.location.replace(/"/g,'&quot;') : ''}"></div>
       <div class="settings-field"><label>Related client (optional)</label><select id="eventClientSelect">${populateCalendarClientSelect(editing ? editing.clientId : null)}</select></div>
+      <div class="settings-field">
+        <label>Attendees</label>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;padding:10px;border:1px solid var(--border);border-radius:8px;max-height:120px;overflow-y:auto;">
+          ${[...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`
+            <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;">
+              <input type="checkbox" class="event-attendee-checkbox" value="${p.id}" ${selectedAttendees.includes(p.id)?'checked':''} style="width:auto;">
+              ${p.name}${p.id===currentUser.id?' (you)':''}
+            </label>`).join('')}
+        </div>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" onclick="${editing ? `saveEditEvent('${editing.id}')` : 'saveNewEvent()'}">${editing ? 'Save changes' : 'Add event'}</button>
@@ -4209,6 +4397,7 @@ function openEventDetailModal(eventId){
       <div class="modal-body">
         <p style="font-size:11px;color:var(--muted-lt);margin:0 0 12px;">📅 Synced from Google Calendar — edit it in Google, changes appear here on next sync.</p>
         <div style="font-size:13px;color:var(--ink);">${e.allDay ? 'All day' : `${new Date(e.startAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})} – ${new Date(e.endAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`}</div>
+        ${e.location ? `<div style="font-size:12.5px;color:var(--muted);margin-top:6px;">📍 ${e.location}</div>` : ''}
         ${e.description ? `<div style="font-size:13px;color:var(--muted);margin-top:10px;white-space:pre-wrap;">${e.description}</div>` : ''}
         ${c ? `<div style="margin-top:10px;"><span class="row-link" onclick="closeAppModal();openClientDetail('${c.id}');">${c.name}</span></div>` : ''}
       </div>
@@ -4231,6 +4420,24 @@ function buildEventTimestamps(){
   return { startAt: `${dateVal}T${startTime}:00`, endAt: `${dateVal}T${endTime}:00`, allDay:false };
 }
 
+// All-day events don't conflict-check against anything — they're not tied
+// to a specific time slot, so "overlap" doesn't mean the same thing for them.
+function findEventConflicts(startAtStr, endAtStr, attendeeIds, excludeEventId){
+  if(!attendeeIds.length) return [];
+  const newStart = new Date(startAtStr), newEnd = new Date(endAtStr);
+  return calendarEvents.filter(e=>{
+    if(e.id===excludeEventId || e.allDay) return false;
+    const eStart = new Date(e.startAt), eEnd = new Date(e.endAt);
+    if(!(newStart < eEnd && newEnd > eStart)) return false;
+    const eAttendees = e.attendeeIds && e.attendeeIds.length ? e.attendeeIds : [e.createdBy];
+    return eAttendees.some(id=>attendeeIds.includes(id));
+  });
+}
+
+function getSelectedAttendeeIds(){
+  return [...document.querySelectorAll('.event-attendee-checkbox:checked')].map(cb=>cb.value);
+}
+
 async function saveNewEvent(){
   const title = document.getElementById('eventTitleInput').value.trim();
   if(!title){ showToast('error','Title required','Give the event a title first.'); return; }
@@ -4239,10 +4446,21 @@ async function saveNewEvent(){
   const description = document.getElementById('eventDescInput').value.trim();
   const eventType = document.getElementById('eventTypeSelect').value;
   const clientId = document.getElementById('eventClientSelect').value || null;
+  const location = document.getElementById('eventLocationInput').value.trim() || null;
+  const attendeeIds = getSelectedAttendeeIds();
+
+  if(!ts.allDay){
+    const conflicts = findEventConflicts(ts.startAt, ts.endAt, attendeeIds, null);
+    if(conflicts.length){
+      const names = conflicts.map(c=>`"${c.title}" (${new Date(c.startAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})})`).join(', ');
+      if(!confirm(`This overlaps with ${names} for at least one attendee. Save anyway?`)) return;
+    }
+  }
 
   const { error } = await supabaseClient.from('calendar_events').insert({
     title, description, start_at: ts.startAt, end_at: ts.endAt, all_day: ts.allDay,
-    client_id: clientId, created_by: currentUser.id, event_type: eventType
+    client_id: clientId, created_by: currentUser.id, event_type: eventType,
+    location, attendee_ids: attendeeIds
   });
   closeAppModal();
   await loadCalendarEvents();
@@ -4260,10 +4478,20 @@ async function saveEditEvent(eventId){
   const description = document.getElementById('eventDescInput').value.trim();
   const eventType = document.getElementById('eventTypeSelect').value;
   const clientId = document.getElementById('eventClientSelect').value || null;
+  const location = document.getElementById('eventLocationInput').value.trim() || null;
+  const attendeeIds = getSelectedAttendeeIds();
+
+  if(!ts.allDay){
+    const conflicts = findEventConflicts(ts.startAt, ts.endAt, attendeeIds, eventId);
+    if(conflicts.length){
+      const names = conflicts.map(c=>`"${c.title}" (${new Date(c.startAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})})`).join(', ');
+      if(!confirm(`This overlaps with ${names} for at least one attendee. Save anyway?`)) return;
+    }
+  }
 
   const { error } = await supabaseClient.from('calendar_events').update({
     title, description, start_at: ts.startAt, end_at: ts.endAt, all_day: ts.allDay,
-    client_id: clientId, event_type: eventType
+    client_id: clientId, event_type: eventType, location, attendee_ids: attendeeIds
   }).eq('id', eventId);
   closeAppModal();
   await loadCalendarEvents();
