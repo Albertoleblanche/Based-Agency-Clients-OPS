@@ -87,6 +87,26 @@
   nav{display:flex;flex-direction:column;gap:2px;margin-top:6px;}
   .nav-item{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;color:#AEB9CC;}
   .nav-section-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.04em;color:#5C6B8A;padding:16px 11px 6px;font-weight:600;}
+
+  .cmdk-trigger{display:flex;align-items:center;gap:8px;padding:9px 11px;margin-bottom:10px;border-radius:8px;background:#151F38;border:1px solid #24365E;color:#7C8AAD;font-size:12.5px;cursor:pointer;transition:border-color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);}
+  .cmdk-trigger:hover{border-color:var(--brand);background:#1B2A4D;}
+  .cmdk-trigger span:nth-child(2){flex:1;}
+  .cmdk-trigger-kbd{font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5C6B8A;background:#0B1226;border:1px solid #24365E;border-radius:4px;padding:2px 5px;}
+
+  .cmdk-overlay{position:fixed;inset:0;background:rgba(16,24,40,.5);z-index:2000;display:flex;justify-content:center;padding-top:12vh;animation:modalOverlayIn var(--duration-base) var(--ease-out);}
+  .cmdk-palette{background:var(--card);border-radius:var(--radius-lg);width:100%;max-width:560px;max-height:60vh;box-shadow:0 30px 80px rgba(16,24,40,.4);overflow:hidden;display:flex;flex-direction:column;animation:modalCardIn var(--duration-slow) var(--ease-out);height:fit-content;}
+  .cmdk-input-row{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--border);color:var(--muted-lt);flex:none;}
+  .cmdk-input-row input{flex:1;border:none;outline:none;background:none;font-family:'DM Sans',sans-serif;font-size:15px;color:var(--ink);}
+  .cmdk-esc-hint{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted-lt);border:1px solid var(--border);border-radius:4px;padding:2px 6px;flex:none;}
+  .cmdk-results{overflow-y:auto;padding:8px;}
+  .cmdk-section-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.04em;color:var(--muted-lt);padding:10px 10px 4px;font-weight:600;}
+  .cmdk-item{display:flex;align-items:center;gap:10px;padding:10px 10px;border-radius:8px;cursor:pointer;color:var(--ink);}
+  .cmdk-item svg{flex:none;color:var(--muted-lt);}
+  .cmdk-item-title{font-size:13px;font-weight:500;flex:1;}
+  .cmdk-item-sub{font-size:11.5px;color:var(--muted-lt);}
+  .cmdk-item.active{background:var(--brand-bg);}
+  .cmdk-item.active .cmdk-item-title{color:var(--brand-dark);}
+  .cmdk-empty{padding:30px 18px;text-align:center;color:var(--muted-lt);font-size:13px;}
   .nav-item svg{flex:none;opacity:.8;}
   .nav-item:hover{background:var(--sidebar-hover);color:#fff;}
   .nav-item.active{background:var(--sidebar-active);color:#fff;}
@@ -739,6 +759,11 @@ document.addEventListener('DOMContentLoaded', function(){
     <div class="brand">
       <div class="brand-mark">BA</div>
       <div><div class="brand-name">Based Agency</div><div class="brand-sub">CLIENT OPS</div></div>
+    </div>
+    <div class="cmdk-trigger" onclick="openCommandPalette()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <span>Search…</span>
+      <span class="cmdk-trigger-kbd">⌘K</span>
     </div>
     <nav>
       <div class="nav-item active" data-view="overview" onclick="switchView('overview')">
@@ -1758,6 +1783,17 @@ document.addEventListener('DOMContentLoaded', function(){
   <button class="ftp-stop" onclick="event.stopPropagation(); stopAndSaveTimer();">Stop</button>
 </div>
 
+<div class="cmdk-overlay" id="cmdkOverlay" style="display:none;" onclick="if(event.target===this) closeCommandPalette();">
+  <div class="cmdk-palette">
+    <div class="cmdk-input-row">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="cmdkInput" placeholder="Search clients, tasks, or jump to a page…" oninput="renderCommandPaletteResults()" autocomplete="off">
+      <span class="cmdk-esc-hint">Esc</span>
+    </div>
+    <div class="cmdk-results" id="cmdkResults"></div>
+  </div>
+</div>
+
 <div class="tour-card" id="tourCard" style="display:none;">
   <div class="tour-head">
     <span class="tour-step-count" id="tourStepCount"></span>
@@ -2194,6 +2230,124 @@ const VIEW_TITLES = {
   settings: ['Settings & Integrations', "What's actually connected right now — no guessing"],
   profile: ['My Profile', 'Your info, visible to the rest of the team the same way it always has been'],
 };
+
+const CMDK_PAGE_ICONS = {
+  overview: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>',
+  clients: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  improvements: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+  approve: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+  notes: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+  tasks: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+  calendar: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+  time: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+  team: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>',
+  trash: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>',
+  settings: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4"/></svg>',
+  profile: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+};
+
+let cmdkActiveIndex = 0;
+let cmdkCurrentResults = [];
+
+function openCommandPalette(){
+  const overlay = document.getElementById('cmdkOverlay');
+  const input = document.getElementById('cmdkInput');
+  if(!overlay || !input) return;
+  overlay.style.display = 'flex';
+  input.value = '';
+  cmdkActiveIndex = 0;
+  renderCommandPaletteResults();
+  setTimeout(()=>input.focus(), 10);
+}
+
+function closeCommandPalette(){
+  const overlay = document.getElementById('cmdkOverlay');
+  if(overlay) overlay.style.display = 'none';
+}
+
+function getCommandPaletteIndex(query){
+  const q = query.trim().toLowerCase();
+  const pages = Object.keys(VIEW_TITLES).map(key=>({ type:'page', key, title:VIEW_TITLES[key][0], icon:CMDK_PAGE_ICONS[key]||CMDK_PAGE_ICONS.settings }));
+  pages.unshift({ type:'page', key:'overview', title:'Overview', icon:CMDK_PAGE_ICONS.overview });
+
+  if(!q) return { pages: pages.slice(0,6), clients: [] };
+
+  const matchedPages = pages.filter(p=>p.title.toLowerCase().includes(q));
+  const matchedClients = (typeof clients!=='undefined' ? activeClients() : [])
+    .filter(c=> c.name.toLowerCase().includes(q) || (c.service||'').toLowerCase().includes(q))
+    .slice(0, 8)
+    .map(c=>({ type:'client', id:c.id, title:c.name, sub:c.service }));
+
+  return { pages: matchedPages, clients: matchedClients };
+}
+
+function renderCommandPaletteResults(){
+  const input = document.getElementById('cmdkInput');
+  const el = document.getElementById('cmdkResults');
+  if(!input || !el) return;
+  const { pages, clients: clientResults } = getCommandPaletteIndex(input.value);
+  cmdkCurrentResults = [...pages, ...clientResults];
+  cmdkActiveIndex = 0;
+
+  if(!cmdkCurrentResults.length){ el.innerHTML = `<div class="cmdk-empty">No matches for "${escapeHtml(input.value)}"</div>`; return; }
+
+  let html = '';
+  if(pages.length){
+    html += `<div class="cmdk-section-label">Go to</div>`;
+    html += pages.map((p,i)=> cmdkItemHtml(p, i)).join('');
+  }
+  if(clientResults.length){
+    html += `<div class="cmdk-section-label">Clients</div>`;
+    html += clientResults.map((c,i)=> cmdkItemHtml(c, pages.length+i)).join('');
+  }
+  el.innerHTML = html;
+}
+
+function cmdkItemHtml(item, index){
+  if(item.type==='page'){
+    return `<div class="cmdk-item ${index===cmdkActiveIndex?'active':''}" data-idx="${index}" onclick="activateCommandPaletteItem(${index})">
+      ${item.icon}<span class="cmdk-item-title">${escapeHtml(item.title)}</span>
+    </div>`;
+  }
+  return `<div class="cmdk-item ${index===cmdkActiveIndex?'active':''}" data-idx="${index}" onclick="activateCommandPaletteItem(${index})">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+    <span class="cmdk-item-title">${escapeHtml(item.title)}</span>
+    ${item.sub ? `<span class="cmdk-item-sub">${escapeHtml(item.sub)}</span>` : ''}
+  </div>`;
+}
+
+function activateCommandPaletteItem(index){
+  const item = cmdkCurrentResults[index];
+  if(!item) return;
+  closeCommandPalette();
+  if(item.type==='page') switchView(item.key);
+  else if(item.type==='client') openClientDetail(item.id);
+}
+
+document.addEventListener('keydown', (e)=>{
+  const isMac = navigator.platform.toUpperCase().includes('MAC');
+  const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+  if(cmdOrCtrl && e.key.toLowerCase()==='k'){
+    e.preventDefault();
+    const overlay = document.getElementById('cmdkOverlay');
+    if(overlay && overlay.style.display==='flex') closeCommandPalette(); else openCommandPalette();
+    return;
+  }
+  const overlay = document.getElementById('cmdkOverlay');
+  if(!overlay || overlay.style.display!=='flex') return;
+  if(e.key==='Escape'){ closeCommandPalette(); return; }
+  if(e.key==='ArrowDown'){ e.preventDefault(); cmdkActiveIndex = Math.min(cmdkActiveIndex+1, cmdkCurrentResults.length-1); cmdkRefreshActiveHighlight(); return; }
+  if(e.key==='ArrowUp'){ e.preventDefault(); cmdkActiveIndex = Math.max(cmdkActiveIndex-1, 0); cmdkRefreshActiveHighlight(); return; }
+  if(e.key==='Enter'){ e.preventDefault(); activateCommandPaletteItem(cmdkActiveIndex); return; }
+});
+
+function cmdkRefreshActiveHighlight(){
+  document.querySelectorAll('#cmdkResults .cmdk-item').forEach(el=>{
+    el.classList.toggle('active', Number(el.dataset.idx)===cmdkActiveIndex);
+  });
+  const activeEl = document.querySelector(`#cmdkResults .cmdk-item[data-idx="${cmdkActiveIndex}"]`);
+  if(activeEl) activeEl.scrollIntoView({ block:'nearest' });
+}
 
 async function switchView(name){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name));
