@@ -648,6 +648,8 @@
   .rating-num{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;color:var(--ink);margin-left:2px;}
   .q-bulk-preview{font-size:11.5px;color:var(--muted-lt);margin-top:18px;padding-top:16px;border-top:1px solid #F3F4F6;display:flex;align-items:center;gap:7px;}
   .q-bulk-preview.has-logs{color:var(--green);font-weight:600;}
+  .q-bulk-preview.has-history{color:#5B9BD5;font-weight:600;}
+  .history-dot{width:7px;height:7px;border-radius:50%;background:#5B9BD5;flex:none;}
   .pulse-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex:none;position:relative;}
   .pulse-dot::after{content:'';position:absolute;inset:0;border-radius:50%;background:var(--green);animation:pulseRing 1.8s ease-out infinite;}
   .pulse-dot.pulse-red{background:var(--red);}
@@ -1179,6 +1181,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="select-field" style="min-width:150px;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           <select id="dateFilterSelect" onchange="onDateFilterChange()">
+            <option value="thisweek" selected>This week</option>
             <option value="all">All time</option>
             <option value="today">Today</option>
             <option value="7days">Last 7 days</option>
@@ -1892,8 +1895,8 @@ let settings = {danielEmail:'', ericEmail:''};
 let team = [];
 let editingClientId = null;
 let queueFilter = 'all';
-let dateFilterMode = 'all';
-let dateFilterFrom = null; // inclusive, Date object
+let dateFilterMode = 'thisweek';
+let dateFilterFrom = getWeekStart(new Date()); // inclusive, Date object — matches the default "This week" mode
 let dateFilterTo = null;   // inclusive, Date object
 
 // ====== SUPABASE CONFIG — fill these in from Project Settings -> API ======
@@ -7531,6 +7534,7 @@ function computeDateRange(mode){
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0,0,0,0);
   const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23,59,59,999);
+  if(mode==='thisweek') return {from:getWeekStart(now), to:endOfToday};
   if(mode==='today') return {from:startOfToday, to:endOfToday};
   if(mode==='7days'){ const from = new Date(startOfToday); from.setDate(from.getDate()-6); return {from, to:endOfToday}; }
   if(mode==='30days'){ const from = new Date(startOfToday); from.setDate(from.getDate()-29); return {from, to:endOfToday}; }
@@ -7608,21 +7612,30 @@ function renderQueue(){
         ${dotRating('Importance', c.importance, 'ink', 10)}
         ${dotRating('Danger', c.danger, 'brand')}
       </div>
-      <div class="q-bulk-preview ${shownImprovements.length ? 'has-logs' : ''}">${shownImprovements.length ? '<span class="pulse-dot"></span>' : ''}${shownImprovements.length} improvement${shownImprovements.length!==1?'s':''} logged${dateFilterRangeLabel()}</div>
+      ${queueActivityBadgeHtml(c)}
     </div>`;
   }).join('') + `</div>`;
 }
 
-// Matches the actual date filter's options — was previously hardcoded to
-// say "this week" any time the filter was set to All time, which showed
-// every improvement ever logged under a label that promised something far
-// narrower.
-function dateFilterRangeLabel(){
-  if(dateFilterMode==='all') return '';
-  if(dateFilterMode==='today') return ' today';
-  if(dateFilterMode==='7days') return ' in the last 7 days';
-  if(dateFilterMode==='30days') return ' in the last 30 days';
-  return ' in range';
+// Three distinct states, not two — a client quiet this week but with real
+// history is a completely different situation from one that's never had
+// anything logged at all, and collapsing them into one "no dot" look would
+// throw that difference away.
+function queueActivityBadgeHtml(c){
+  const weekStart = getWeekStart(new Date());
+  const thisWeekCount = c.improvements.filter(i=>i.date && new Date(i.date) >= weekStart).length;
+
+  if(thisWeekCount){
+    return `<div class="q-bulk-preview has-logs"><span class="pulse-dot"></span>${thisWeekCount} improvement${thisWeekCount!==1?'s':''} logged this week</div>`;
+  }
+
+  const dated = c.improvements.filter(i=>i.date);
+  if(!dated.length){
+    return `<div class="q-bulk-preview">No improvements logged yet</div>`;
+  }
+
+  const mostRecent = dated.reduce((latest, i)=> new Date(i.date) > new Date(latest.date) ? i : latest);
+  return `<div class="q-bulk-preview has-history"><span class="history-dot"></span>Last logged ${timeAgo(mostRecent.date)}</div>`;
 }
 
 function statusMeta(draftStatus){
@@ -7813,6 +7826,22 @@ function renderServiceBreakdownDonut(entries){
 // Three-tier risk system based on danger score — always shown, not just when
 // something's wrong, so "No risk" and "Medium risk" are just as visible as
 // "At risk" instead of only flagging the bad case.
+// Readable recency, not a raw date — "3 weeks ago" tells an approver
+// something actionable (this client's gone quiet); a bare count doesn't.
+function timeAgo(dateStr){
+  const then = new Date(dateStr);
+  const diffDays = Math.floor((new Date() - then) / 86400000);
+  if(diffDays <= 0) return 'today';
+  if(diffDays === 1) return 'yesterday';
+  if(diffDays < 7) return `${diffDays} days ago`;
+  const weeks = Math.floor(diffDays/7);
+  if(weeks < 5) return weeks===1 ? '1 week ago' : `${weeks} weeks ago`;
+  const months = Math.floor(diffDays/30);
+  if(months < 12) return months===1 ? '1 month ago' : `${months} months ago`;
+  const years = Math.floor(diffDays/365);
+  return years===1 ? '1 year ago' : `${years} years ago`;
+}
+
 function riskLabel(danger){
   if(danger>=4) return { text:'At risk', color:'var(--red)' };
   if(danger===3) return { text:'Medium risk', color:'#5B9BD5' };
