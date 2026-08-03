@@ -4188,7 +4188,10 @@ async function deleteNote(id){
   const { error } = await supabaseClient.from('notes').update({ deleted_at: new Date().toISOString() }).eq('id', id).eq('user_id', currentUser.id);
   await loadMyNotes();
   renderNotes();
-  error ? showToast('error','Delete failed', error.message) : showToast('success','Note moved to Trash','Restore it anytime from Trash.');
+  if(error){ showToast('error','Delete failed', error.message); return; }
+  const stillActive = notes.some(n=>n.id===id);
+  if(stillActive){ showToast('error','Delete failed','The note is still active — you may not have permission to delete it.'); return; }
+  showToast('success','Note moved to Trash','Restore it anytime from Trash.');
 }
 
 async function changeNoteStatus(id, newStatus){
@@ -4748,7 +4751,15 @@ async function deleteTaskPermanently(taskId){
   await loadMyTasks();
   renderTasks();
   closeAppModal();
-  error ? showToast('error','Delete failed', error.message) : showToast('success','Deleted','Task permanently removed.');
+  if(error){ showToast('error','Delete failed', error.message); return; }
+  // A missing RLS policy lets a delete "succeed" with zero rows actually
+  // removed and no error raised — confirm it's actually gone rather than
+  // trusting a lack of error.
+  if(tasks.some(x=>x.id===taskId)){
+    showToast('error','Delete failed','The task is still there — you may not have permission to delete it.');
+    return;
+  }
+  showToast('success','Deleted','Task permanently removed.');
 }
 
 // The actual notification delivery. Runs on login and on every periodic
