@@ -58,7 +58,22 @@
   }
   body{margin:0;background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;transition:background .2s ease, color .2s ease;}
   body, body *{ transition: background-color .18s ease, border-color .18s ease, color .18s ease; }
-  .app{display:grid;grid-template-columns:224px 1fr;height:100vh;overflow:hidden;}
+  .app{display:grid;grid-template-columns:224px 1fr;height:100vh;overflow:hidden;transition:grid-template-columns var(--duration-base) var(--ease-out);}
+  body.sidebar-collapsed .app{grid-template-columns:60px 1fr;}
+  body.sidebar-collapsed .app-topbar{left:60px;}
+  body.sidebar-collapsed .sidebar{padding-left:0;padding-right:0;overflow:visible;}
+  body.sidebar-collapsed .brand{padding-left:0;padding-right:0;justify-content:center;}
+  body.sidebar-collapsed .brand-text, body.sidebar-collapsed .cmdk-trigger span,
+  body.sidebar-collapsed .cmdk-trigger-kbd, body.sidebar-collapsed .nav-section-label,
+  body.sidebar-collapsed .nav-item span, body.sidebar-collapsed .nav-badge,
+  body.sidebar-collapsed .sidebar-action span, body.sidebar-collapsed .sidebar-sync-status,
+  body.sidebar-collapsed .sidebar-tour-link{display:none;}
+  body.sidebar-collapsed .cmdk-trigger{justify-content:center;padding:9px;}
+  body.sidebar-collapsed .nav-item{justify-content:center;padding:9px;}
+  body.sidebar-collapsed .sidebar-action{justify-content:center;}
+  body.sidebar-collapsed .sidebar-collapse-btn{transform:rotate(180deg);}
+  body.sidebar-collapsed .sidebar-collapse-btn{position:absolute;right:-11px;top:22px;background:var(--sidebar);border:1px solid #24365E;border-radius:50%;}
+  @media (max-width:900px){ .app{grid-template-columns:1fr;} .sidebar{display:none;} body.sidebar-collapsed .app{grid-template-columns:1fr;} }
 
   .login-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:2000;padding:20px;}
 
@@ -74,7 +89,10 @@
 
   /* Sidebar */
   .sidebar{background:var(--sidebar);color:#C9D2E3;padding:18px 12px;display:flex;flex-direction:column;height:100vh;overflow-y:auto;}
-  .brand{display:flex;align-items:center;gap:9px;padding:6px 10px 20px;}
+  .brand{display:flex;align-items:center;gap:9px;padding:6px 10px 20px;position:relative;}
+  .brand-text{flex:1;min-width:0;}
+  .sidebar-collapse-btn{display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;color:var(--muted-lt);cursor:pointer;flex:none;transition:transform var(--duration-base) var(--ease-out), background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);}
+  .sidebar-collapse-btn:hover{background:var(--sidebar-hover);color:#fff;}
 
   .notif-bell-btn{background:none;border:none;color:var(--muted-lt);cursor:pointer;padding:6px;border-radius:8px;position:relative;display:flex;}
   .notif-bell-btn:hover{background:var(--surface-2);color:var(--ink);}
@@ -825,7 +843,10 @@ document.addEventListener('DOMContentLoaded', function(){
   <div class="sidebar">
     <div class="brand">
       <div class="brand-mark">BA</div>
-      <div><div class="brand-name">Based Agency</div><div class="brand-sub">CLIENT OPS</div></div>
+      <div class="brand-text"><div class="brand-name">Based Agency</div><div class="brand-sub">CLIENT OPS</div></div>
+      <span class="sidebar-collapse-btn" onclick="toggleSidebar()" title="Collapse sidebar">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </span>
     </div>
     <div class="cmdk-trigger" onclick="openCommandPalette()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -1991,6 +2012,23 @@ async function safeSetPersonal(key, value){ try{ localStorage.setItem('bda_'+key
 /* ---------- Theme (always light — the toggle was removed in favor of the tour button) ---------- */
 async function initTheme(){
   document.body.dataset.theme = 'light';
+}
+
+function toggleSidebar(){
+  const collapsed = document.body.classList.toggle('sidebar-collapsed');
+  try{ localStorage.setItem('bda_sidebar_collapsed', collapsed ? '1' : '0'); }catch(e){}
+  const btn = document.querySelector('.sidebar-collapse-btn');
+  if(btn) btn.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+}
+
+function initSidebarState(){
+  let collapsed = false;
+  try{ collapsed = localStorage.getItem('bda_sidebar_collapsed') === '1'; }catch(e){}
+  if(collapsed){
+    document.body.classList.add('sidebar-collapsed');
+    const btn = document.querySelector('.sidebar-collapse-btn');
+    if(btn) btn.title = 'Expand sidebar';
+  }
 }
 
 /* ---------- Real identity — comes from Supabase Auth + team_profiles, not self-reported ---------- */
@@ -7316,7 +7354,10 @@ function renderReports(){
   // "by the whole team" on data that's entirely their own. Swap in metrics
   // that are actually useful for a single person reviewing their own time.
   const adminView = isAdmin();
-  const thirdCard = adminView
+  const memberFilterValue = document.getElementById('reportMemberFilter')?.value || 'all';
+  const selectedMember = memberFilterValue!=='all' ? teamProfiles.find(p=>p.id===memberFilterValue) : null;
+  const entriesCaption = !adminView ? 'By you' : selectedMember ? `By ${selectedMember.name}` : 'By the whole team';
+  const thirdCard = (adminView && !selectedMember)
     ? `<div class="metric-card">
         <div class="metric-head"><span class="metric-icon metric-icon-amber"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="metric-label">Team Members</span></div>
         <div class="metric-value">${uniquePeople}</div>
@@ -7325,7 +7366,7 @@ function renderReports(){
     : `<div class="metric-card">
         <div class="metric-head"><span class="metric-icon metric-icon-amber"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span><span class="metric-label">Avg Hours/Day</span></div>
         <div class="metric-value">${uniqueDays ? formatMinutes(avgMinutesPerDay) : '—'}</div>
-        <div class="metric-caption">${uniqueDays ? `On ${uniqueDays} day${uniqueDays!==1?'s':''} you logged time` : 'No time logged yet'}</div>
+        <div class="metric-caption">${uniqueDays ? `On ${uniqueDays} day${uniqueDays!==1?'s':''} ${selectedMember ? `${selectedMember.name} logged` : 'you logged'} time` : 'No time logged yet'}</div>
       </div>`;
 
   summaryEl.innerHTML = `
@@ -7337,7 +7378,7 @@ function renderReports(){
     <div class="metric-card">
       <div class="metric-head"><span class="metric-icon metric-icon-green"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="metric-label">Entries Logged</span></div>
       <div class="metric-value">${relevant.length}</div>
-      <div class="metric-caption">${adminView ? 'By the whole team' : 'By you'}</div>
+      <div class="metric-caption">${entriesCaption}</div>
     </div>
     ${thirdCard}
     <div class="metric-card">
@@ -9170,6 +9211,7 @@ async function showApp(session){
 }
 
 (async function init(){
+  initSidebarState();
   const { data: { session } } = await supabaseClient.auth.getSession();
   if(session){ await showApp(session); } else { showLoginScreen(); }
 
