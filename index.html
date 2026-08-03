@@ -77,7 +77,7 @@
   .brand{display:flex;align-items:center;gap:9px;padding:6px 10px 20px;}
 
   .notif-bell-btn{background:none;border:none;color:var(--muted-lt);cursor:pointer;padding:6px;border-radius:8px;position:relative;display:flex;}
-  .notif-bell-btn:hover{background:rgba(255,255,255,.06);color:#fff;}
+  .notif-bell-btn:hover{background:var(--surface-2);color:var(--ink);}
   .notif-badge{position:absolute;top:1px;right:1px;min-width:15px;height:15px;padding:0 3px;border-radius:20px;background:var(--red);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;}
   .notif-panel{position:absolute;top:calc(100% + 8px);right:0;width:340px;max-height:420px;overflow-y:auto;background:var(--card);border:1px solid #EDEEF1;border-radius:12px;box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:500;}
   .sidebar-sync-status{display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted-lt);margin-top:10px;}
@@ -3020,9 +3020,8 @@ function renderKpis(){
     ? `<span class="pill pill-mid">${pending} draft${pending!==1?'s':''} ready</span>`
     : `<span class="pill pill-good">All caught up</span>`;
 
-  // --- Weekly Completion: of clients with a log in the last 7 days, how many are approved ---
-  const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate()-7);
-  const withRecentLogs = ac.filter(c=>c.improvements.some(i=>i.date && new Date(i.date) >= sevenDaysAgo));
+  // --- Weekly Completion: of clients with a log this calendar week, how many are approved ---
+  const withRecentLogs = ac.filter(hasLoggedThisWeek);
   const approvedWithLogs = withRecentLogs.filter(c=>c.draftStatus==='approved').length;
   const completionPct = withRecentLogs.length ? Math.round((approvedWithLogs/withRecentLogs.length)*100) : 0;
   document.getElementById('kpiCompletion').textContent = withRecentLogs.length ? completionPct + '%' : '—';
@@ -7819,9 +7818,14 @@ function budgetTierMeta(tier){
   return { color:'var(--green)', pill:'pill-good', label:'On track' };
 }
 
+// A real calendar week (Monday-Sunday), not a rolling 7-day lookback. The
+// old version used "improvements.date >= 7 days ago", which meant a log
+// from last Friday would still count as "this week" on the following
+// Monday — the label promised a week that resets, but the logic never
+// actually reset at any fixed point.
 function hasLoggedThisWeek(c){
-  const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate()-7);
-  return c.improvements.some(i=>i.date && new Date(i.date) >= sevenDaysAgo);
+  const weekStart = getWeekStart(new Date());
+  return c.improvements.some(i=>i.date && new Date(i.date) >= weekStart);
 }
 
 function loggedPill(c){
