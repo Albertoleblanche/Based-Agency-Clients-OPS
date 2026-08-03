@@ -8813,6 +8813,7 @@ function renderTeam(){
   if(!teamProfiles.length){ el.innerHTML = `<div class="empty" style="padding:14px 0;">No team members yet.</div>`; return; }
   el.innerHTML = teamProfiles.map(m=>{
     const isSelf = currentUser && m.id === currentUser.id;
+    const isRevoked = !!m.access_revoked;
     const roleControl = (isAdmin() && !isSelf)
       ? `<select onchange="changeTeamRole('${m.id}', this.value)" style="font-family:'DM Sans',sans-serif;font-size:12px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);">
           <option value="member" ${m.role==='member'?'selected':''}>Member</option>
@@ -8828,11 +8829,17 @@ function renderTeam(){
       : (m.title ? `<span class="role-chip" style="margin-right:8px;">${m.title}</span>` : '');
     const contactLine = [m.email, m.phone].filter(Boolean).join(' · ');
     const actions = [];
-    if(!isSelf) actions.push(`<span class="row-link" onclick="openNewTaskModal('${m.id}')">Assign task</span>`);
+    if(!isSelf && !isRevoked) actions.push(`<span class="row-link" onclick="openNewTaskModal('${m.id}')">Assign task</span>`);
     if(m.email) actions.push(`<a class="row-link" href="mailto:${m.email}" style="text-decoration:none;">Email</a>`);
-    if(isAdmin() && !isSelf) actions.push(`<span class="row-link danger-link" onclick="adminResetPassword('${m.id}','${m.name.replace(/'/g,"\\'")}')">Reset password</span>`);
+    if(isAdmin() && !isSelf){
+      actions.push(`<span class="row-link" onclick="adminResetPassword('${m.id}','${m.name.replace(/'/g,"\\'")}')">Reset password</span>`);
+      actions.push(isRevoked
+        ? `<span class="row-link" onclick="toggleUserAccess('${m.id}','${m.name.replace(/'/g,"\\'")}', false)">Restore access</span>`
+        : `<span class="row-link danger-link" onclick="toggleUserAccess('${m.id}','${m.name.replace(/'/g,"\\'")}', true)">Revoke access</span>`);
+      actions.push(`<span class="row-link danger-link" onclick="confirmDeleteUser('${m.id}','${m.name.replace(/'/g,"\\'")}')">Delete permanently</span>`);
+    }
     return `<div class="integ-row">
-      <div><div class="integ-name">${m.name}</div><div class="integ-desc">${contactLine}</div>${actions.length ? `<div style="display:flex;gap:14px;margin-top:6px;">${actions.join('')}</div>` : ''}</div>
+      <div><div class="integ-name">${m.name}${isRevoked ? `<span class="pill pill-bad" style="margin-left:8px;">Access revoked</span>` : ''}</div><div class="integ-desc">${contactLine}</div>${actions.length ? `<div style="display:flex;gap:14px;margin-top:6px;flex-wrap:wrap;">${actions.join('')}</div>` : ''}</div>
       <div style="display:flex;align-items:center;">${titleControl}${roleControl}</div>
     </div>`;
   }).join('');
@@ -8878,6 +8885,70 @@ async function adminResetPassword(userId, name){
       <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 440);
   }catch(e){
     showToast('error','Reset failed','Network error — try again.');
+  }
+}
+
+async function toggleUserAccess(userId, name, revoke){
+  if(!isAdmin()) return;
+  const msg = revoke
+    ? `Revoke ${name}'s access? They'll be immediately signed out and unable to log back in. This doesn't delete anything — their tasks, notes, and history all stay intact, and you can restore access anytime.`
+    : `Restore ${name}'s access? They'll be able to log in again immediately.`;
+  if(!confirm(msg)) return;
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/toggle-user-access', {
+      method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`},
+      body: JSON.stringify({ targetUserId: userId, revoke })
+    });
+    const data = await response.json();
+    if(!response.ok){ showToast('error', revoke?'Revoke failed':'Restore failed', data.error || 'Could not update access.'); return; }
+    await loadTeamProfiles();
+    renderTeam();
+    showToast('success', revoke?'Access revoked':'Access restored', `${name} ${revoke?'can no longer log in.':'can log in again.'}`);
+  }catch(e){
+    showToast('error','Request failed','Network error — try again.');
+  }
+}
+
+async function confirmDeleteUser(userId, name){
+  if(!isAdmin()) return;
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title" style="color:var(--red);">Permanently delete ${escapeHtml(name)}?</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--ink);line-height:1.6;margin:0 0 10px;">This can't be undone. It permanently deletes:</p>
+      <ul style="font-size:12.5px;color:var(--ink);line-height:1.7;margin:0 0 14px;padding-left:20px;">
+        <li>${name}'s account and profile</li>
+        <li>Every task where they're the assignee <b>or the assigner</b> — including tasks they assigned to other people</li>
+        <li>Their notes, calendar events, and time entries</li>
+      </ul>
+      <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 14px;">Most of the time, <b>Revoke access</b> is what you actually want — it locks them out immediately without deleting anything, and can be undone. Use delete only for genuinely permanent cleanup.</p>
+      <div class="settings-field"><label>Type "${escapeHtml(name)}" to confirm</label><input id="deleteUserConfirmInput" placeholder="${escapeHtml(name)}" oninput="document.getElementById('deleteUserConfirmBtn').disabled = this.value.trim() !== '${name.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}'"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
+      <button class="btn btn-brand" style="background:var(--red);" id="deleteUserConfirmBtn" disabled onclick="deleteUserPermanently('${userId}','${name.replace(/'/g,"\\'")}')">Delete permanently</button>
+    </div>`, 480);
+}
+
+async function deleteUserPermanently(userId, name){
+  const btn = document.getElementById('deleteUserConfirmBtn');
+  setBtnLoading(btn, 'Deleting…');
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/delete-user', {
+      method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`},
+      body: JSON.stringify({ targetUserId: userId })
+    });
+    const data = await response.json();
+    if(!response.ok){ restoreBtn(btn); showToast('error','Delete failed', data.error || 'Could not delete this account.'); return; }
+    closeAppModal();
+    await loadTeamProfiles();
+    await loadAll();
+    renderTeam(); renderClientsTable(); renderTasks();
+    showToast('success','Deleted', `${name}'s account and everything tied to it is gone.`);
+  }catch(e){
+    restoreBtn(btn);
+    showToast('error','Delete failed','Network error — try again.');
   }
 }
 
