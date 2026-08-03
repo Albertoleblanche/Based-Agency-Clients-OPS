@@ -1887,6 +1887,7 @@ let clients = [];
 function activeClients(){ return clients.filter(c=>!c.deletedAt); }
 let log = [];
 let notes = [];
+let notesDataLoaded = false;
 let settings = {danielEmail:'', ericEmail:''};
 let team = [];
 let editingClientId = null;
@@ -2274,7 +2275,7 @@ async function fullRefresh(showFeedback){
   if(syncEl) syncEl.textContent = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
   if(showFeedback && btn){ btn.disabled = false; btn.innerHTML = refreshIcon + ' Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
-function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); }
+function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); renderTasks(); renderCalendar(); }
 
 function applyRoleVisibility(){
   const notifyBtn = document.getElementById('notifyBtn');
@@ -4106,15 +4107,16 @@ function openNoteModal(noteId, presetClientId, presetStatus){
 // Loads only the current user's own notes — RLS on the notes table means this
 // query physically cannot return anyone else's rows, even if we wanted it to.
 async function loadMyNotes(){
-  if(!currentUser){ notes = []; return; }
+  if(!currentUser){ notes = []; notesDataLoaded = true; return; }
   const { data, error } = await supabaseClient
     .from('notes')
     .select('*')
     .eq('user_id', currentUser.id)
     .is('deleted_at', null)
     .order('updated_at', { ascending: false });
-  if(error){ console.error('loadMyNotes error', error); notes = []; return; }
+  if(error){ console.error('loadMyNotes error', error); notes = []; notesDataLoaded = true; return; }
   notes = (data||[]).map(n => ({ id:n.id, clientId:n.client_id, text:n.text, status:n.status, link:n.link, createdAt:n.created_at, updatedAt:n.updated_at }));
+  notesDataLoaded = true;
 }
 
 async function loadMyTrashedNotes(){
@@ -4240,6 +4242,7 @@ const NOTE_STAGES = [
 function renderNotes(){
   const board = document.getElementById('notesBoard');
   if(!board) return;
+  if(!notesDataLoaded){ board.innerHTML = loadingStateHtml('Loading notes…'); return; }
   updateNotesBadge();
   const clientFilter = document.getElementById('notesClientFilter')?.value || 'all';
 
@@ -4323,13 +4326,14 @@ function updateNotesBadge(){
 /* ---------- Tasks — private between assigner and assignee only ---------- */
 
 let tasks = [];
+let tasksDataLoaded = false;
 // RLS already restricts this to rows where I'm the assigner or assignee —
 // nobody else on the team can ever see a task they're not part of, admins
 // included.
 async function loadMyTasks(){
-  if(!currentUser){ tasks = []; return; }
+  if(!currentUser){ tasks = []; tasksDataLoaded = true; return; }
   const { data, error } = await supabaseClient.from('tasks').select('*').order('created_at', { ascending:false });
-  if(error){ console.error('loadMyTasks error', error); tasks = []; return; }
+  if(error){ console.error('loadMyTasks error', error); tasks = []; tasksDataLoaded = true; return; }
   tasks = (data||[]).map(t=>({
     id:t.id, title:t.title, description:t.description||'', priority:t.priority, status:t.status,
     assignerId:t.assigner_id, assigneeId:t.assignee_id, clientId:t.client_id, dueDate:t.due_date, link:t.link,
@@ -4338,6 +4342,7 @@ async function loadMyTasks(){
     assigneeNotified:t.assignee_notified, assignerNotified:t.assigner_notified,
     attachments:t.attachments||[]
   }));
+  tasksDataLoaded = true;
 }
 
 const TASK_PRIORITY_META = {
@@ -4373,6 +4378,7 @@ function updateTasksNavBadge(){
 function renderTasks(){
   const board = document.getElementById('kanbanBoard');
   if(!board || !currentUser) return;
+  if(!tasksDataLoaded){ board.innerHTML = loadingStateHtml('Loading tasks…'); return; }
 
   const visible = tasks.filter(t=>{
     if(t.cancelledAt) return false;
@@ -4798,6 +4804,7 @@ async function checkTaskNotifications(){
    sync alongside manually-created events. ---------- */
 
 let calendarEvents = [];
+let calendarDataLoaded = false;
 let calendarAnchorDate = new Date();
 
 const CALENDAR_TYPE_META = {
@@ -4809,7 +4816,7 @@ const CALENDAR_TYPE_META = {
 
 async function loadCalendarEvents(){
   const { data, error } = await supabaseClient.from('calendar_events').select('*').order('start_at', { ascending:true });
-  if(error){ console.error('loadCalendarEvents error', error); calendarEvents = []; return; }
+  if(error){ console.error('loadCalendarEvents error', error); calendarEvents = []; calendarDataLoaded = true; return; }
   calendarEvents = (data||[]).map(e=>({
     id:e.id, title:e.title, description:e.description||'', startAt:e.start_at, endAt:e.end_at,
     allDay:e.all_day, clientId:e.client_id, createdBy:e.created_by, eventType:e.event_type,
@@ -4818,6 +4825,7 @@ async function loadCalendarEvents(){
     rsvps:e.rsvps||{}, recurrenceGroupId:e.recurrence_group_id, recurrenceLabel:e.recurrence_label,
     relatedTaskId:e.related_task_id
   }));
+  calendarDataLoaded = true;
   updateCalendarNavBadge();
 }
 
@@ -4906,6 +4914,7 @@ function attendeeAvatarsHtml(attendeeIds, max){
 function renderCalendar(){
   const container = document.getElementById('calendarViewContainer');
   if(!container) return;
+  if(!calendarDataLoaded){ container.innerHTML = loadingStateHtml('Loading calendar…'); return; }
   renderCalendarMonthLabel();
   renderCalendarTodaySummary();
   renderCalendarTypeTabs();
@@ -5974,6 +5983,14 @@ function emptyStateHtml(iconSvg, title, sub, actionHtml){
     ${sub ? `<div class="empty-rich-sub">${sub}</div>` : ''}
     ${actionHtml || ''}
   </div>`;
+}
+
+// Used only for the brief first-load window before a view's data has
+// actually arrived — distinct from the real empty state, so someone who
+// clicks into Tasks/Notes/Calendar right after signing in sees "loading"
+// rather than what looks like a genuinely empty board.
+function loadingStateHtml(label){
+  return `<div class="empty-rich"><span class="spinner" style="width:16px;height:16px;border-width:2.5px;"></span><div class="empty-rich-sub" style="margin-top:10px;">${label||'Loading…'}</div></div>`;
 }
 
 function escapeHtml(str){
