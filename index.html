@@ -320,12 +320,19 @@
   .log-inline{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;}
   .log-inline textarea{flex:1;min-width:220px;font-family:'DM Sans',sans-serif;font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);resize:vertical;min-height:38px;}
   .log-inline input{width:130px;font-family:'DM Sans',sans-serif;font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);}
-  .mini-improvements{font-size:11.5px;color:var(--muted);margin-top:8px;}
-  .mini-improvements div{padding:2px 0;}
-  .mini-improvements b{color:var(--ink);}
-  .mini-imp-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:4px 0;}
-  .mini-imp-text{flex:1;}
-  .mini-imp-actions{display:flex;gap:8px;flex:none;white-space:nowrap;}
+  .mini-improvements{font-size:11.5px;color:var(--muted);margin-top:8px;max-height:340px;overflow-y:auto;padding-right:4px;}
+  .mini-imp-section-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.04em;color:var(--muted-lt);font-weight:600;padding:10px 2px 6px;}
+  .mini-imp-section-label:first-child{padding-top:2px;}
+  .mini-imp-row{display:flex;align-items:flex-start;gap:10px;padding:8px 2px;border-bottom:1px solid #F3F4F6;}
+  .mini-imp-avatar{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none;color:#fff;font-family:'DM Sans',sans-serif;font-weight:600;font-size:10px;margin-top:1px;}
+  .mini-imp-body{flex:1;min-width:0;}
+  .mini-imp-meta{font-size:10.5px;color:var(--muted-lt);margin-bottom:2px;}
+  .mini-imp-meta b{color:var(--ink);font-weight:600;}
+  .mini-imp-desc{color:var(--ink);line-height:1.45;}
+  .mini-imp-actions{display:flex;gap:10px;flex:none;white-space:nowrap;margin-top:2px;}
+  .mini-imp-action-link{color:var(--muted-lt);font-size:11px;font-weight:600;cursor:pointer;}
+  .mini-imp-action-link:hover{color:var(--ink);}
+  .mini-imp-action-link.danger:hover{color:var(--red);}
   .danger-link{color:var(--red);}
 
   .actions-cell{position:relative;}
@@ -3359,15 +3366,7 @@ function renderClientsTable(){
     </tr>
     <tr class="drawer-row" id="drawer-${c.id}" style="display:none;">
       <td colspan="8">
-        ${c.improvements.length ? `<div class="mini-improvements">${c.improvements.map((imp,idx)=>`
-          <div class="mini-imp-row" id="imp-row-${c.id}-${idx}">
-            <span class="mini-imp-text"><b>${imp.author}:</b> ${imp.text}</span>
-            <span class="mini-imp-actions">
-              <span class="row-link" onclick="startEditImprovement('${c.id}', ${idx})">Edit</span>
-              <span class="row-link danger-link" onclick="deleteImprovement('${c.id}', ${idx})">Delete</span>
-            </span>
-          </div>
-        `).join('')}</div>` : ''}
+        ${c.improvements.length ? miniImprovementsHtml(c) : ''}
         <div class="log-inline" style="margin-top:8px;">
           <textarea placeholder="What did you improve for this client this week?" id="imp-${c.id}"></textarea>
           <button class="btn btn-brand" onclick="logImprovement('${c.id}')">Log it</button>
@@ -4035,7 +4034,7 @@ async function saveEditImprovement(clientId, idx){
   c.improvements[idx].text = text;
   c.improvements[idx].author = author;
   const ok = await persistClients();
-  renderClientsTable(); renderKpis();
+  renderClientsTable(); renderKpis(); renderQueue();
   if(ok){
     const truncate = (s)=> s && s.length>60 ? s.slice(0,60)+'…' : (s||'—');
     const desc = oldText !== text
@@ -4055,7 +4054,7 @@ async function deleteImprovement(clientId, idx){
   const deletedText = c.improvements[idx].text;
   c.improvements.splice(idx, 1);
   const ok = await persistClients();
-  renderClientsTable(); renderKpis();
+  renderClientsTable(); renderKpis(); renderQueue();
   if(ok){
     const truncate = (s)=> s && s.length>80 ? s.slice(0,80)+'…' : (s||'—');
     logClientActivity(clientId, 'improvement_deleted', `${myName()||'Someone'} deleted an improvement — "${truncate(deletedText)}"`);
@@ -4228,11 +4227,12 @@ async function logNoteNow(id){
   const c = clients.find(x=>x.id===n.clientId);
   if(!c){ restoreBtn(btn); showToast('error','Client not found','This client may have been removed.'); return; }
   c.improvements.push({ author: myName()||'Team member', text: n.text, date: new Date().toISOString(), includeInEmail: true, source: 'note' });
+  invalidateStaleDraft(c);
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Logged a planned improvement for <b>${c.name}</b> from Notes.`});
   const ok = await persistAppData();
   const { error } = await supabaseClient.from('notes').update({ status: 'done' }).eq('id', id).eq('user_id', currentUser.id);
   await loadMyNotes();
-  renderNotes(); renderClientsTable(); renderKpis(); renderLog();
+  renderNotes(); renderClientsTable(); renderKpis(); renderQueue(); renderLog();
   (ok && !error) ? showToast('success','Logged!', `Added to ${c.name}'s improvement log this week.`) : showToast('error','Save failed','Could not save — try again.');
 }
 
@@ -4714,8 +4714,12 @@ async function moveTaskToStatus(taskId, newStatus){
         includeInEmail: false,
         source: 'task'
       });
+      invalidateStaleDraft(c);
       await persistClients();
       renderImprovementsHistory();
+      renderClientsTable();
+      renderQueue();
+      renderKpis();
     }
   }
 
@@ -6166,9 +6170,13 @@ async function logTimeEntryAsImprovement(entryId){
   const c = clients.find(x=>x.id===entry.clientId);
   if(!c){ showToast('error','Client not found','This client may have been removed.'); return; }
   c.improvements.push({ author: myName()||'Team member', text: entry.description.trim(), date: new Date().toISOString(), includeInEmail: false, source: 'time' });
+  invalidateStaleDraft(c);
   const ok = await persistClients();
   if(!ok){ showToast('error','Save failed','Could not save — try again.'); return; }
   renderImprovementsHistory();
+  renderClientsTable();
+  renderQueue();
+  renderKpis();
 
   const { error } = await supabaseClient.from('time_entries').update({ logged: true }).eq('id', entryId);
   await loadTimeEntries();
@@ -7508,6 +7516,16 @@ async function bulkDownloadSelectedClients(format){
   }
 }
 
+// A new improvement means whatever was drafted or approved before no
+// longer reflects everything that's happened for this client — an old
+// "Approved" status would otherwise silently claim work that was never
+// actually reviewed. Called every time something gets pushed onto
+// c.improvements, from any of the four places that can happen.
+function invalidateStaleDraft(c){
+  c.draftStatus = 'none';
+  c.draft = '';
+}
+
 async function logImprovement(id){
   const text = document.getElementById('imp-'+id).value.trim();
   const author = myName() || 'Team member';
@@ -7518,9 +7536,11 @@ async function logImprovement(id){
   const c = clients.find(x=>x.id===id);
   if(!c){ showToast('error','Client not found','This client may have been removed by someone else — refreshing.'); renderClientsTable(); return; }
   c.improvements.push({author, text, date: new Date().toISOString(), includeInEmail: true, source: 'manual'});
+  invalidateStaleDraft(c);
   const ok = await persistClients();
   renderClientsTable();
   renderKpis();
+  renderQueue();
   if(ok){ logClientActivity(id, 'improvement_logged', `${author} logged an improvement: "${text.length>80?text.slice(0,80)+'…':text}"`); refreshClientDetailActivityIfOpen(id); }
   ok ? showToast('success','Improvement logged', `Saved for ${c.name}.`) : showToast('error','Save failed','Could not save this entry — try again.');
 }
@@ -7912,6 +7932,40 @@ function budgetTierMeta(tier){
 function hasLoggedThisWeek(c){
   const weekStart = getWeekStart(new Date());
   return c.improvements.some(i=>i.date && new Date(i.date) >= weekStart);
+}
+
+// Preserves each improvement's original index in c.improvements before
+// sorting/grouping for display — Edit and Delete target entries by that
+// index, so losing track of it here would silently edit or delete the
+// wrong improvement.
+function miniImprovementsHtml(c){
+  const pairs = c.improvements.map((imp, idx) => ({ imp, idx }));
+  const weekStart = getWeekStart(new Date());
+  const byNewest = (a,b) => new Date(b.imp.date||0) - new Date(a.imp.date||0);
+  const thisWeek = pairs.filter(p => p.imp.date && new Date(p.imp.date) >= weekStart).sort(byNewest);
+  const earlier = pairs.filter(p => !(p.imp.date && new Date(p.imp.date) >= weekStart)).sort(byNewest);
+
+  const rowHtml = (p)=>{
+    const imp = p.imp;
+    const initial = (imp.author||'?').trim().charAt(0).toUpperCase();
+    return `<div class="mini-imp-row" id="imp-row-${c.id}-${p.idx}">
+      <div class="mini-imp-avatar" style="background:${avatarColorForName(imp.author||'?')};">${initial}</div>
+      <div class="mini-imp-body">
+        <div class="mini-imp-meta"><b>${escapeHtml(imp.author)}</b> · ${imp.date ? timeAgo(imp.date) : 'no date'}</div>
+        <div class="mini-imp-desc">${escapeHtml(imp.text)}</div>
+      </div>
+      <div class="mini-imp-actions">
+        <span class="mini-imp-action-link" onclick="startEditImprovement('${c.id}', ${p.idx})">Edit</span>
+        <span class="mini-imp-action-link danger" onclick="deleteImprovement('${c.id}', ${p.idx})">Delete</span>
+      </div>
+    </div>`;
+  };
+
+  let html = '<div class="mini-improvements">';
+  if(thisWeek.length) html += `<div class="mini-imp-section-label">This week</div>` + thisWeek.map(rowHtml).join('');
+  if(earlier.length) html += `<div class="mini-imp-section-label">Earlier</div>` + earlier.map(rowHtml).join('');
+  html += '</div>';
+  return html;
 }
 
 function loggedPill(c){
