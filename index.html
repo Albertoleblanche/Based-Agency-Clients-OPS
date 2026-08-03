@@ -435,6 +435,9 @@
   #timerToggleBtn.stop{background:var(--red);color:#fff;}
 
   .timesheet-nav{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+  .timer-quick-start-btn{width:38px;height:38px;border-radius:50%;background:var(--brand);color:#fff;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;box-shadow:0 2px 8px rgba(232,98,44,.35);transition:transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);}
+  .timer-quick-start-btn:hover{transform:scale(1.06);box-shadow:0 4px 14px rgba(232,98,44,.45);}
+  .timer-quick-start-btn:active{transform:scale(.96);}
   .date-nav{display:flex;align-items:center;border:1px solid var(--border);border-radius:20px;background:var(--card);overflow:hidden;}
 
   .calendar-grid-head{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-bottom:none;border-radius:var(--radius-lg) var(--radius-lg) 0 0;overflow:hidden;}
@@ -732,15 +735,15 @@
   /* Toasts */
   .toast-stack{position:fixed;top:18px;right:18px;z-index:999;display:flex;flex-direction:column;gap:8px;max-width:320px;}
 
-  .floating-timer-pill{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:1500;display:flex;align-items:center;gap:12px;background:var(--sidebar);color:#fff;border-radius:30px;padding:10px 10px 10px 18px;box-shadow:0 12px 32px rgba(16,24,40,.28);cursor:pointer;max-width:min(92vw,460px);}
-  .ftp-dot{width:8px;height:8px;border-radius:50%;background:var(--brand);flex:none;position:relative;}
-  .ftp-dot::after{content:'';position:absolute;inset:0;border-radius:50%;background:var(--brand);animation:pulseRing 1.8s ease-out infinite;}
+  .floating-timer-pill{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:1500;display:flex;align-items:center;gap:14px;background:#fff;color:var(--ink);border:1px solid var(--border);border-radius:30px;padding:10px 10px 10px 20px;box-shadow:0 16px 40px rgba(16,24,40,.18);cursor:pointer;max-width:min(92vw,460px);}
+  .ftp-dot{width:8px;height:8px;border-radius:50%;background:var(--red);flex:none;position:relative;animation:timerPulse 1.5s ease-in-out infinite;}
+  @keyframes timerPulse{0%,100%{opacity:1;}50%{opacity:.3;}}
   .ftp-info{min-width:0;overflow:hidden;}
-  .ftp-client{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .ftp-desc{font-size:10.5px;color:#9DAAC2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
-  .ftp-time{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--brand);flex:none;font-variant-numeric:tabular-nums;}
-  .ftp-stop{background:#fff;color:var(--ink);border:none;border-radius:20px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;flex:none;}
-  .ftp-stop:hover{opacity:.9;}
+  .ftp-client{font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ftp-desc{font-size:10.5px;color:var(--muted-lt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
+  .ftp-time{font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;color:var(--ink);flex:none;font-variant-numeric:tabular-nums;}
+  .ftp-stop{background:var(--brand);color:#fff;border:none;border-radius:20px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;flex:none;transition:opacity var(--duration-fast) var(--ease-out);}
+  .ftp-stop:hover{opacity:.88;}
 
   .tour-card{position:fixed;bottom:22px;right:22px;z-index:1600;background:var(--card);color:var(--ink);border:1px solid var(--border);border-radius:14px;box-shadow:0 20px 50px rgba(16,24,40,.28);padding:20px 22px;width:320px;max-width:calc(100vw - 44px);}
   .tour-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
@@ -1348,11 +1351,10 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="panel">
           <div class="panel-body timesheet-nav">
             <div style="display:flex;align-items:center;gap:10px;">
-              <div class="view-toggle" id="timesheetModeBar">
-                <div class="view-toggle-option active" data-mode="day" onclick="setTimesheetMode('day')">Day</div>
-                <div class="view-toggle-option" data-mode="week" onclick="setTimesheetMode('week')">Week</div>
-              </div>
-              <button class="btn btn-outline" onclick="jumpToToday()">Return to today</button>
+              <button class="timer-quick-start-btn" onclick="openTimerModal()" title="Start a timer">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              </button>
+              <button class="btn btn-outline" onclick="openManualEntryModal()">Add manual entry</button>
             </div>
             <div class="date-nav">
               <button class="date-nav-arrow" onclick="shiftTimesheet(-1)" aria-label="Previous">
@@ -1366,10 +1368,11 @@ document.addEventListener('DOMContentLoaded', function(){
               <button class="date-nav-arrow" onclick="shiftTimesheet(1)" aria-label="Next">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
               </button>
+              <button class="btn btn-outline" id="timesheetReturnToday" style="display:none;margin-left:6px;" onclick="jumpToToday()">Return to today</button>
             </div>
-            <div class="select-field">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-              <select id="timesheetClientFilter" onchange="renderTimesheet()"><option value="all">All clients</option></select>
+            <div class="view-toggle" id="timesheetModeBar">
+              <div class="view-toggle-option active" data-mode="day" onclick="setTimesheetMode('day')">Day</div>
+              <div class="view-toggle-option" data-mode="week" onclick="setTimesheetMode('week')">Week</div>
             </div>
           </div>
         </div>
@@ -3612,9 +3615,10 @@ async function restoreClient(id){
   ok ? showToast('success','Client restored', `${c.name} is back on the roster.`) : showToast('error','Restore failed','Could not save — try again.');
 }
 
-function trashRowHtml(title, subtitle, deletedAt, restoreFn, deleteFn){
+function trashRowHtml(id, type, title, subtitle, deletedAt, restoreFn, deleteFn){
   const when = deletedAt ? new Date(deletedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
   return `<div class="integ-row">
+    <input type="checkbox" class="trash-row-checkbox" data-type="${type}" value="${id}" onchange="onTrashRowCheck(this)" style="margin-right:12px;flex:none;">
     <div><div class="integ-name">${title}</div>${subtitle ? `<div class="integ-desc">${subtitle}</div>` : ''}${when ? `<div class="integ-desc" style="color:var(--muted-lt);">Deleted ${when}</div>` : ''}</div>
     <div style="display:flex;gap:14px;flex:none;">
       <span class="row-link" onclick="${restoreFn}">Restore</span>
@@ -3631,18 +3635,18 @@ async function renderTrash(){
 
   if(clientsEl){
     const trashedClients = clients.filter(c=>c.deletedAt).sort((a,b)=> new Date(b.deletedAt)-new Date(a.deletedAt));
-    clientsEl.innerHTML = trashedClients.length ? trashedClients.map(c=>
-      trashRowHtml(c.name, c.service, c.deletedAt, `restoreClient('${c.id}')`, `permanentlyDeleteClient('${c.id}')`)
+    clientsEl.innerHTML = trashedClients.length ? trashBulkBarHtml('clients') + trashedClients.map(c=>
+      trashRowHtml(c.id, 'clients', c.name, c.service, c.deletedAt, `restoreClient('${c.id}')`, `permanentlyDeleteClient('${c.id}')`)
     ).join('') : `<div class="empty" style="padding:14px 0;">Trash is empty.</div>`;
   }
 
   if(notesEl){
     notesEl.innerHTML = `<div class="empty" style="padding:14px 0;"><span class="spinner"></span>Loading…</div>`;
     const trashedNotes = await loadMyTrashedNotes();
-    notesEl.innerHTML = trashedNotes.length ? trashedNotes.map(n=>{
+    notesEl.innerHTML = trashedNotes.length ? trashBulkBarHtml('notes') + trashedNotes.map(n=>{
       const c = clients.find(x=>x.id===n.clientId);
       const snippet = n.text.length>70 ? n.text.slice(0,70)+'…' : n.text;
-      return trashRowHtml(snippet, c ? c.name : 'Unknown client', n.deletedAt, `restoreNote('${n.id}')`, `permanentlyDeleteNote('${n.id}')`);
+      return trashRowHtml(n.id, 'notes', snippet, c ? c.name : 'Unknown client', n.deletedAt, `restoreNote('${n.id}')`, `permanentlyDeleteNote('${n.id}')`);
     }).join('') : `<div class="empty" style="padding:14px 0;">Trash is empty.</div>`;
   }
 
@@ -3650,11 +3654,118 @@ async function renderTrash(){
     timeEl.innerHTML = `<div class="empty" style="padding:14px 0;"><span class="spinner"></span>Loading…</div>`;
     const trashedTime = await loadTrashedTimeEntries();
     const visibleTrashedTime = trashedTime.filter(e=> isAdmin() || (currentUser && e.userId===currentUser.id));
-    timeEl.innerHTML = visibleTrashedTime.length ? visibleTrashedTime.map(e=>{
+    timeEl.innerHTML = visibleTrashedTime.length ? trashBulkBarHtml('time') + visibleTrashedTime.map(e=>{
       const c = clients.find(x=>x.id===e.clientId);
-      return trashRowHtml(`${c?c.name:'Unknown client'} — ${formatMinutes(e.minutes)}`, e.description || e.service || '', e.deletedAt, `restoreTimeEntry('${e.id}')`, `permanentlyDeleteTimeEntry('${e.id}')`);
+      return trashRowHtml(e.id, 'time', `${c?c.name:'Unknown client'} — ${formatMinutes(e.minutes)}`, e.description || e.service || '', e.deletedAt, `restoreTimeEntry('${e.id}')`, `permanentlyDeleteTimeEntry('${e.id}')`);
     }).join('') : `<div class="empty" style="padding:14px 0;">Trash is empty.</div>`;
   }
+  selectedTrashIds = { clients:new Set(), notes:new Set(), time:new Set() };
+}
+
+const TRASH_TYPE_LABEL = { clients:'client', notes:'note', time:'time entry' };
+let selectedTrashIds = { clients:new Set(), notes:new Set(), time:new Set() };
+
+function trashBulkBarHtml(type){
+  return `<div class="integ-row" style="padding-top:0;padding-bottom:10px;">
+    <label style="display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);font-weight:600;cursor:pointer;">
+      <input type="checkbox" id="trashSelectAll-${type}" onchange="toggleAllTrashSelection('${type}', this.checked)">
+      Select all
+    </label>
+  </div>
+  <div class="bulk-actions-bar" id="trashBulkBar-${type}" style="display:none;">
+    <span id="trashBulkCount-${type}"></span>
+    <span class="row-link" onclick="clearTrashSelection('${type}')">Clear selection</span>
+    <div style="flex:1;"></div>
+    <button class="btn btn-outline" onclick="bulkRestoreTrash('${type}')">Restore selected</button>
+    <button class="btn btn-outline" style="color:var(--red);border-color:var(--red-bg);" onclick="bulkDeleteTrashPermanently('${type}')">Delete selected permanently</button>
+  </div>`;
+}
+
+function toggleAllTrashSelection(type, checked){
+  document.querySelectorAll(`.trash-row-checkbox[data-type="${type}"]`).forEach(cb=>{
+    cb.checked = checked;
+    if(checked) selectedTrashIds[type].add(cb.value); else selectedTrashIds[type].delete(cb.value);
+  });
+  updateTrashBulkBar(type);
+}
+
+function onTrashRowCheck(checkboxEl){
+  const type = checkboxEl.dataset.type;
+  if(checkboxEl.checked) selectedTrashIds[type].add(checkboxEl.value);
+  else selectedTrashIds[type].delete(checkboxEl.value);
+  updateTrashBulkBar(type);
+  const boxes = [...document.querySelectorAll(`.trash-row-checkbox[data-type="${type}"]`)];
+  const selectAll = document.getElementById('trashSelectAll-'+type);
+  if(selectAll) selectAll.checked = boxes.length>0 && boxes.every(cb=>cb.checked);
+}
+
+function clearTrashSelection(type){
+  selectedTrashIds[type].clear();
+  document.querySelectorAll(`.trash-row-checkbox[data-type="${type}"]`).forEach(cb=>cb.checked=false);
+  const selectAll = document.getElementById('trashSelectAll-'+type);
+  if(selectAll) selectAll.checked = false;
+  updateTrashBulkBar(type);
+}
+
+function updateTrashBulkBar(type){
+  const bar = document.getElementById('trashBulkBar-'+type);
+  const countEl = document.getElementById('trashBulkCount-'+type);
+  if(!bar) return;
+  const n = selectedTrashIds[type].size;
+  bar.style.display = n ? 'flex' : 'none';
+  const label = TRASH_TYPE_LABEL[type];
+  if(countEl) countEl.textContent = `${n} ${label}${n!==1?'s':''} selected`;
+}
+
+async function bulkRestoreTrash(type){
+  const ids = [...selectedTrashIds[type]];
+  if(!ids.length) return;
+  const label = TRASH_TYPE_LABEL[type];
+
+  if(type==='clients'){
+    if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can manage deleted clients.'); return; }
+    await loadAll();
+    let restored = 0;
+    ids.forEach(id=>{
+      const c = clients.find(x=>x.id===id);
+      if(c && c.deletedAt){ delete c.deletedAt; restored++; }
+    });
+    const ok = await persistClients();
+    renderAll(); await renderTrash();
+    ok ? showToast('success','Restored', `${restored} client${restored!==1?'s':''} back on the roster.`) : showToast('error','Restore failed','Could not save — try again.');
+    return;
+  }
+
+  const table = type==='notes' ? 'notes' : 'time_entries';
+  const { error } = await supabaseClient.from(table).update({ deleted_at: null }).in('id', ids);
+  if(type==='notes'){ await loadMyNotes(); populateNotesClientFilter(); renderNotes(); }
+  else { await loadTimeEntries(); renderTimesheet(); renderReports(); }
+  await renderTrash();
+  error ? showToast('error','Restore failed', error.message) : showToast('success','Restored', `${ids.length} ${label}${ids.length!==1?'s':''} restored.`);
+}
+
+async function bulkDeleteTrashPermanently(type){
+  const ids = [...selectedTrashIds[type]];
+  if(!ids.length) return;
+  const label = TRASH_TYPE_LABEL[type];
+  if(!confirm(`Permanently delete ${ids.length} ${label}${ids.length!==1?'s':''}? This can't be undone.`)) return;
+
+  if(type==='clients'){
+    if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can manage deleted clients.'); return; }
+    await loadAll();
+    clients = clients.filter(c=> !ids.includes(c.id));
+    notes = notes.filter(n=> !ids.includes(n.clientId));
+    const ok = await persistClients();
+    renderAll(); await renderTrash();
+    ok ? showToast('success','Permanently deleted', `${ids.length} client${ids.length!==1?'s':''} gone for good.`) : showToast('error','Delete failed','Could not save — try again.');
+    return;
+  }
+
+  const table = type==='notes' ? 'notes' : 'time_entries';
+  const { error } = await supabaseClient.from(table).delete().in('id', ids);
+  if(type==='time') { await loadTimeEntries(); renderTimesheet(); renderReports(); }
+  await renderTrash();
+  error ? showToast('error','Delete failed', error.message) : showToast('success','Permanently deleted', `${ids.length} ${label}${ids.length!==1?'s':''} gone for good.`);
 }
 
 /* ---------- Payroll — admin-only. Hourly rates never appear anywhere else
@@ -6410,19 +6521,14 @@ async function loadClientActivityHistory(clientId){
 function populateTimeClientSelects(){
   setupClientSearchSelect('timerClientSearch', 'timerClient', 'timerClientDropdown');
   setupClientSearchSelect('manualClientSearch', 'manualClient', 'manualClientDropdown');
+  setupClientSearchSelect('timerModalClientSearch', 'timerModalClient', 'timerModalClientDropdown');
 
-  const filterSel = document.getElementById('timesheetClientFilter');
-  if(filterSel){
-    const current = filterSel.value || 'all';
-    filterSel.innerHTML = `<option value="all">All clients</option>` + activeClients().sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
-    if([...filterSel.options].some(o=>o.value===current)) filterSel.value = current;
-  }
   const dateInput = document.getElementById('manualDate');
   if(dateInput && !dateInput.value) dateInput.value = toDateStr(new Date());
 
   // Service dropdowns — same option list as the Clients table's Service field.
   const serviceOpts = (settings.serviceOptions||[]).map(s=>`<option value="${s.replace(/"/g,'&quot;')}">${s}</option>`).join('');
-  ['timerService','manualService'].forEach(id=>{
+  ['timerService','manualService','timerModalService'].forEach(id=>{
     const sel = document.getElementById(id);
     if(!sel) return;
     const current = sel.value;
@@ -6432,6 +6538,7 @@ function populateTimeClientSelects(){
 
   wireServiceAutoSuggest('timerClient', 'timerService');
   wireServiceAutoSuggest('manualClient', 'manualService');
+  wireServiceAutoSuggest('timerModalClient', 'timerModalService');
 }
 
 // Sets a client field (search text + hidden id) programmatically — used when
@@ -6714,6 +6821,58 @@ function minutesToDurationInputStr(minutes){
   return `${m}m`;
 }
 
+function openTimerModal(){
+  if(timerState.running){
+    showToast('error','Timer already running', 'Stop the current timer before starting a new one.');
+    return;
+  }
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">Start a timer</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="client-search-wrap" style="grid-column:1/-1;"><label>Client</label>
+          <input type="text" class="client-search-input" id="timerModalClientSearch" placeholder="Search client…" autocomplete="off">
+          <input type="hidden" id="timerModalClient">
+          <div class="client-search-dropdown" id="timerModalClientDropdown"></div>
+        </div>
+        <div><label>Service</label><select id="timerModalService"></select></div>
+        <div style="grid-column:1/-1;"><label>What are you working on?</label><input id="timerModalDesc" placeholder="e.g. Updating Meta ad creative"></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
+      <button class="btn btn-brand" onclick="startTimerFromModal()">Start timer</button>
+    </div>`, 460);
+  populateTimeClientSelects();
+}
+
+function startTimerFromModal(){
+  const clientId = document.getElementById('timerModalClient').value;
+  if(!clientId){ showToast('error','Pick a client',"Select which client you're working on."); return; }
+  const service = document.getElementById('timerModalService')?.value || '';
+  const description = document.getElementById('timerModalDesc').value.trim();
+  timerState = { running:true, startedAt:Date.now(), clientId, service, description, resumeEntryId:null };
+  saveTimerState();
+  if(timerIntervalId) clearInterval(timerIntervalId);
+  timerIntervalId = setInterval(updateTimerDisplay, 1000);
+  updateTimerDisplay();
+
+  // Same sync initTimerFromStorage() does on page load — keeps the Timer
+  // tab's own fields consistent with reality, regardless of whether the
+  // timer was actually started from there or from this popup.
+  const btn = document.getElementById('timerToggleBtn');
+  if(btn){ btn.textContent = 'Stop & save'; btn.classList.add('stop'); }
+  setClientFieldValue('timerClient', 'timerClientSearch', clientId);
+  const serviceSel = document.getElementById('timerService');
+  if(serviceSel) serviceSel.value = service;
+  const descInput = document.getElementById('timerDesc');
+  if(descInput) descInput.value = description;
+
+  closeAppModal();
+  const c = clients.find(x=>x.id===clientId);
+  showToast('success','Timer started', `Tracking time for ${c ? c.name : 'this client'}.`);
+}
+
 function openManualEntryModal(){
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Add time manually</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
@@ -6792,20 +6951,24 @@ function renderTimesheet(){
   const bodyEl = document.getElementById('timesheetBody');
   const labelEl = document.getElementById('timesheetRangeLabel');
   const dateInput = document.getElementById('timesheetDateInput');
+  const returnBtn = document.getElementById('timesheetReturnToday');
   if(!bodyEl) return;
   const isToday = toDateStr(timesheetAnchor) === toDateStr(new Date());
   const todayPrefix = isToday ? `<span class="today-flag">Today</span> ` : '';
+  let onCurrentPeriod = isToday;
   if(timesheetMode==='day'){
     labelEl.innerHTML = todayPrefix + new Date(timesheetAnchor).toLocaleDateString('en-US',{weekday:'long', month:'short', day:'numeric'});
     renderTimesheetDay(bodyEl);
   } else {
     const ws=getWeekStart(timesheetAnchor); const we=new Date(ws); we.setDate(we.getDate()+6);
     const wsIsCurrentWeek = toDateStr(ws) === toDateStr(getWeekStart(new Date()));
+    onCurrentPeriod = wsIsCurrentWeek;
     const weekPrefix = wsIsCurrentWeek ? `<span class="today-flag">This week</span> ` : '';
     labelEl.innerHTML = `${weekPrefix}${ws.toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${we.toLocaleDateString('en-US',{month:'short',day:'numeric'})}`;
     renderTimesheetWeek(bodyEl);
   }
   if(dateInput) dateInput.value = toDateStr(timesheetAnchor);
+  if(returnBtn) returnBtn.style.display = onCurrentPeriod ? 'none' : 'inline-flex';
 }
 
 function openTimesheetDatePicker(){
@@ -6821,7 +6984,6 @@ function onTimesheetDatePicked(value){
 }
 
 function renderTimesheetDay(bodyEl){
-  const clientFilter = document.getElementById('timesheetClientFilter')?.value || 'all';
   const weekStart = getWeekStart(timesheetAnchor);
   const selectedStr = toDateStr(timesheetAnchor);
 
@@ -6831,7 +6993,7 @@ function renderTimesheetDay(bodyEl){
   for(let i=0;i<7;i++){
     const d = new Date(weekStart); d.setDate(d.getDate()+i);
     const dStr = toDateStr(d);
-    const dayMins = myOwnTimeEntries().filter(e=> e.date===dStr && (clientFilter==='all'||e.clientId===clientFilter)).reduce((s,e)=>s+e.minutes,0);
+    const dayMins = myOwnTimeEntries().filter(e=> e.date===dStr).reduce((s,e)=>s+e.minutes,0);
     weekTotal += dayMins;
     stripDays.push({d, dStr, dayMins});
   }
@@ -6844,7 +7006,7 @@ function renderTimesheetDay(bodyEl){
     <div class="week-strip-total"><div class="wst-label">Week total</div><div class="wst-val">${formatMinutes(weekTotal)}</div></div>
   </div>`;
 
-  const dayEntries = myOwnTimeEntries().filter(e=> e.date===selectedStr && (clientFilter==='all'||e.clientId===clientFilter)).sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
+  const dayEntries = myOwnTimeEntries().filter(e=> e.date===selectedStr).sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
 
   const cardsHtml = dayEntries.length ? dayEntries.map(e=>{
     const c = clients.find(x=>x.id===e.clientId);
@@ -6876,14 +7038,13 @@ function renderTimesheetDay(bodyEl){
 }
 
 function renderTimesheetWeek(bodyEl){
-  const clientFilter = document.getElementById('timesheetClientFilter')?.value || 'all';
   const weekStart = getWeekStart(timesheetAnchor);
   const todayStr = toDateStr(new Date());
   const days = [];
   for(let i=0;i<7;i++){ const d=new Date(weekStart); d.setDate(d.getDate()+i); days.push(d); }
   const dayStrs = days.map(toDateStr);
 
-  const relevant = myOwnTimeEntries().filter(e=> dayStrs.includes(e.date) && (clientFilter==='all'||e.clientId===clientFilter));
+  const relevant = myOwnTimeEntries().filter(e=> dayStrs.includes(e.date));
   if(!relevant.length){ bodyEl.innerHTML = `<div class="panel"><div class="empty">No time logged this week.</div></div>`; return; }
 
   // Group by client — each client with any entries this week becomes one row
@@ -6925,13 +7086,11 @@ function renderTimesheetWeek(bodyEl){
 function jumpToDate(dStr){
   timesheetAnchor = new Date(dStr+'T00:00:00');
   timesheetMode = 'day';
-  document.querySelectorAll('#timesheetModeBar .filter-pill').forEach(p=>p.classList.toggle('active', p.dataset.mode==='day'));
+  document.querySelectorAll('#timesheetModeBar .view-toggle-option').forEach(p=>p.classList.toggle('active', p.dataset.mode==='day'));
   renderTimesheet();
 }
 
 function jumpToDateClient(dStr, clientId){
-  const filterSel = document.getElementById('timesheetClientFilter');
-  if(filterSel) filterSel.value = clientId;
   jumpToDate(dStr);
 }
 
