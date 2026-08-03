@@ -80,7 +80,10 @@
   .notif-bell-btn:hover{background:var(--surface-2);color:var(--ink);}
   .notif-badge{position:absolute;top:1px;right:1px;min-width:15px;height:15px;padding:0 3px;border-radius:20px;background:var(--red);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;}
   .notif-panel{position:absolute;top:calc(100% + 8px);right:0;width:340px;max-height:420px;overflow-y:auto;background:var(--card);border:1px solid #EDEEF1;border-radius:12px;box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:500;}
-  .sidebar-sync-status{display:flex;align-items:center;gap:6px;font-family:'DM Sans',sans-serif;font-size:10px;color:var(--muted-lt);margin-top:10px;}
+  .sidebar-sync-status{display:flex;align-items:center;gap:6px;font-family:'DM Sans',sans-serif;font-size:10px;color:var(--muted-lt);}
+  .sidebar-foot-meta{display:flex;align-items:center;justify-content:space-between;margin-top:10px;}
+  .sidebar-tour-link{display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;color:var(--muted-lt);cursor:pointer;flex:none;}
+  .sidebar-tour-link:hover{background:var(--sidebar-hover);color:#fff;}
   .notif-panel-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--ink);border-bottom:1px solid #F0F1F4;}
   .notif-row{display:flex;align-items:flex-start;gap:6px;padding:12px 10px 12px 16px;border-bottom:1px solid #F5F6F8;}
   .notif-row-delete{background:none;border:none;color:var(--muted-lt);cursor:pointer;padding:6px;border-radius:6px;flex:none;display:flex;opacity:0;transition:opacity .12s ease, color .12s ease, background .12s ease;}
@@ -126,6 +129,8 @@
   .nav-item.active svg{opacity:1;}
   .nav-badge{margin-left:auto;font-family:'DM Sans',sans-serif;font-size:10px;background:var(--brand);color:#2A1200;border-radius:20px;padding:1px 7px;font-weight:600;}
   .sidebar-foot{margin-top:auto;padding:12px 11px;border-top:1px solid #24365E;font-size:11px;color:var(--muted-lt);line-height:1.5;}
+  .sidebar-foot-actions{display:flex;gap:4px;}
+  .sidebar-foot-actions .sidebar-action{flex:1;justify-content:center;}
   .sidebar-action{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:#C9D2E3;cursor:pointer;padding:8px 9px;border-radius:6px;}
   .sidebar-action:hover{background:var(--sidebar-hover);}
   .sidebar-profile-name{font-size:12.5px;font-weight:600;color:var(--ink);}
@@ -881,16 +886,16 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
     </nav>
     <div class="sidebar-foot">
-      <div class="sidebar-action" onclick="handleLogout()">
+      <div class="sidebar-action" onclick="handleLogout()" style="width:100%;">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         <span>Log out</span>
       </div>
-      <div class="sidebar-sync-status"><span class="sync-dot"></span>Synced <span id="sidebarSyncTime">—</span></div>
-      <div class="sidebar-action" onclick="startTour()">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"/></svg>
-        <span>Take a tour</span>
+      <div class="sidebar-foot-meta">
+        <div class="sidebar-sync-status"><span class="sync-dot"></span>Synced <span id="sidebarSyncTime">—</span></div>
+        <span class="sidebar-tour-link" onclick="startTour()" title="Take a tour">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"/></svg>
+        </span>
       </div>
-      <div style="margin-top:10px;">Shared workspace — data syncs across everyone using this link.</div>
     </div>
   </div>
 
@@ -1085,6 +1090,7 @@ document.addEventListener('DOMContentLoaded', function(){
                   <option value="all">Doesn't matter</option>
                   <option value="has">Has logs this week</option>
                   <option value="none">No logs yet this week</option>
+                  <option value="alltime">Has logs (all time)</option>
                 </select>
               </div>
             </div>
@@ -1126,29 +1132,42 @@ document.addEventListener('DOMContentLoaded', function(){
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input id="improvementsSearch" placeholder="Search improvement text…" oninput="renderImprovementsHistory()">
           </div>
-          <div class="select-field" style="min-width:170px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            <select id="improvementsClientFilter" onchange="renderImprovementsHistory()"><option value="all">All clients</option></select>
-          </div>
-          <div class="select-field" style="min-width:160px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            <select id="improvementsInclFilter" onchange="renderImprovementsHistory()">
-              <option value="all">Included &amp; not included</option>
-              <option value="included">Included in email</option>
-              <option value="excluded">Not in email</option>
-            </select>
-          </div>
-          <div class="date-nav">
-            <div class="date-nav-label" style="border-left:none;" onclick="document.getElementById('improvementsFromDate').showPicker ? document.getElementById('improvementsFromDate').showPicker() : document.getElementById('improvementsFromDate').focus()">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              <input type="date" id="improvementsFromDate" onchange="renderImprovementsHistory()" style="border:none;background:transparent;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink);">
+          <div class="filters-popover-wrap">
+            <button class="btn btn-outline" onclick="toggleImprovementsFiltersPopover()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:-2px;"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+              Filters
+              <span class="filters-badge" id="improvementsFiltersBadge" style="display:none;">0</span>
+            </button>
+            <div class="filters-popover" id="improvementsFiltersPopover" style="display:none;">
+              <div class="filters-popover-head">
+                <span class="filters-popover-title">Filters</span>
+                <span class="row-link" onclick="clearImprovementsFilters()">Clear all</span>
+              </div>
+              <div class="filters-popover-body">
+                <div class="filters-popover-field">
+                  <label>Client</label>
+                  <select id="improvementsClientFilter" onchange="renderImprovementsHistory()"><option value="all">All clients</option></select>
+                </div>
+                <div class="filters-popover-field">
+                  <label>Email status</label>
+                  <select id="improvementsInclFilter" onchange="renderImprovementsHistory()">
+                    <option value="all">Included &amp; not included</option>
+                    <option value="included">Included in email</option>
+                    <option value="excluded">Not in email</option>
+                  </select>
+                </div>
+                <div class="filters-popover-field">
+                  <label>Date range</label>
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <input type="date" id="improvementsFromDate" onchange="renderImprovementsHistory()" style="width:100%;font-family:'DM Sans',sans-serif;font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background-color:var(--surface-2);color:var(--ink);">
+                    <span style="color:var(--muted-lt);font-size:11.5px;flex:none;">to</span>
+                    <input type="date" id="improvementsToDate" onchange="renderImprovementsHistory()" style="width:100%;font-family:'DM Sans',sans-serif;font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background-color:var(--surface-2);color:var(--ink);">
+                  </div>
+                </div>
+              </div>
             </div>
-            <span style="padding:0 4px;color:var(--muted-lt);font-size:11.5px;">to</span>
-            <div class="date-nav-label" style="border-right:none;" onclick="document.getElementById('improvementsToDate').showPicker ? document.getElementById('improvementsToDate').showPicker() : document.getElementById('improvementsToDate').focus()">
-              <input type="date" id="improvementsToDate" onchange="renderImprovementsHistory()" style="border:none;background:transparent;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink);">
-            </div>
           </div>
-          <button class="btn btn-outline" onclick="clearImprovementsFilters()">Clear</button>
+          <button class="btn btn-outline" style="color:var(--red);border-color:var(--red-bg);" onclick="deleteAllFilteredImprovements()">Delete all</button>
         </div>
         <div class="clients-filter-count" id="improvementsFilterCount"></div>
       </div>
@@ -1697,66 +1716,108 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- TEAM -->
     <div class="view" id="view-team">
-      <div class="panel" id="addMemberPanel" style="display:none;">
-        <div class="panel-head"><span class="panel-title">Add team member</span></div>
-        <div class="panel-body">
-          <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Creates a real login for this person and assigns their role. You'll get a one-time temporary password to send them directly — they should change it after logging in.</p>
-          <div class="form-grid" style="margin-bottom:12px;">
-            <div><label>Name</label><input id="tmName" placeholder="e.g. Priya"></div>
-            <div><label>Email</label><input id="tmEmail" placeholder="priya@basedagency.com"></div>
-            <div><label>Job title</label><select id="tmTitle"></select></div>
-            <div><label>Permission role</label>
-              <select id="tmRole">
-                <option value="member">Member — can log improvements, can't approve</option>
-                <option value="approver">Approver — can approve/skip drafts</option>
-                <option value="admin">Admin — full access, can manage team &amp; roles</option>
-              </select>
+      <div class="icon-tab-group" id="teamTabsBar" style="display:none;">
+        <div class="icon-tab active" data-ttab="roster" onclick="switchTeamTab('roster')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>Team</span>
+        </div>
+        <div class="icon-tab" data-ttab="add" onclick="switchTeamTab('add')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="17" y1="11" x2="23" y2="11"/></svg>
+          <span>Add Member</span>
+        </div>
+        <div class="icon-tab" data-ttab="titles" onclick="switchTeamTab('titles')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          <span>Job Titles</span>
+        </div>
+      </div>
+
+      <div class="settings-subview active" id="teamtab-roster">
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Team</span></div>
+          <div class="panel-body">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;" id="teamPanelNote"></p>
+            <div id="teamList"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-subview" id="teamtab-add">
+        <div class="panel" id="addMemberPanel" style="display:none;">
+          <div class="panel-head"><span class="panel-title">Add team member</span></div>
+          <div class="panel-body">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Creates a real login for this person and assigns their role. You'll get a one-time temporary password to send them directly — they should change it after logging in.</p>
+            <div class="form-grid" style="margin-bottom:12px;">
+              <div><label>Name</label><input id="tmName" placeholder="e.g. Priya"></div>
+              <div><label>Email</label><input id="tmEmail" placeholder="priya@basedagency.com"></div>
+              <div><label>Job title</label><select id="tmTitle"></select></div>
+              <div><label>Permission role</label>
+                <select id="tmRole">
+                  <option value="member">Member — can log improvements, can't approve</option>
+                  <option value="approver">Approver — can approve/skip drafts</option>
+                  <option value="admin">Admin — full access, can manage team &amp; roles</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn btn-brand" onclick="addTeamMember()">Create account</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-subview" id="teamtab-titles">
+        <div class="panel" id="teamTitlesPanel" style="display:none;">
+          <div class="panel-head"><span class="panel-title">Job Titles</span></div>
+          <div class="panel-body">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Manage the job titles available when adding team members (e.g. Web Developer, SEO Specialist). Purely descriptive — doesn't affect permissions.</p>
+            <div id="titleOptionsList" class="options-list"></div>
+            <div style="display:flex;gap:8px;margin-top:10px;">
+              <input id="titleOptionInput" placeholder="New job title" style="flex:1;font-family:'DM Sans',sans-serif;font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);">
+              <button class="btn btn-outline" onclick="addFieldOption('title')">Add</button>
             </div>
           </div>
-          <button class="btn btn-brand" onclick="addTeamMember()">Create account</button>
-        </div>
-      </div>
-
-      <div class="panel" id="teamTitlesPanel" style="display:none;">
-        <div class="panel-head"><span class="panel-title">Job Titles</span></div>
-        <div class="panel-body">
-          <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Manage the job titles available when adding team members (e.g. Web Developer, SEO Specialist). Purely descriptive — doesn't affect permissions.</p>
-          <div id="titleOptionsList" class="options-list"></div>
-          <div style="display:flex;gap:8px;margin-top:10px;">
-            <input id="titleOptionInput" placeholder="New job title" style="flex:1;font-family:'DM Sans',sans-serif;font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);">
-            <button class="btn btn-outline" onclick="addFieldOption('title')">Add</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head"><span class="panel-title">Team</span></div>
-        <div class="panel-body">
-          <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;" id="teamPanelNote"></p>
-          <div id="teamList"></div>
         </div>
       </div>
     </div>
 
     <!-- TRASH -->
     <div class="view" id="view-trash">
-      <div class="panel" id="trashClientsPanel">
-        <div class="panel-head"><span class="panel-title">Deleted Clients</span></div>
-        <div class="panel-body">
-          <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Deleting a client moves it here instead of erasing it — improvements, drafts, time entries, and notes all stay intact. Restore it anytime, or delete permanently to actually remove it for good.</p>
-          <div id="trashClientsList"></div>
+      <div class="icon-tab-group" id="trashTabsBar">
+        <div class="icon-tab active" data-ttab="clients" id="trashClientsTab" onclick="switchTrashTab('clients')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>Deleted Clients</span>
+        </div>
+        <div class="icon-tab" data-ttab="notes" onclick="switchTrashTab('notes')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          <span>Deleted Notes</span>
+        </div>
+        <div class="icon-tab" data-ttab="time" onclick="switchTrashTab('time')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span>Deleted Time Entries</span>
         </div>
       </div>
-      <div class="panel">
-        <div class="panel-head"><span class="panel-title">Deleted Notes <span style="font-weight:400;color:var(--muted-lt);">(yours only — notes are private)</span></span></div>
-        <div class="panel-body">
-          <div id="trashNotesList"></div>
+
+      <div class="settings-subview active" id="trashtab-clients">
+        <div class="panel" id="trashClientsPanel">
+          <div class="panel-body">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Deleting a client moves it here instead of erasing it — improvements, drafts, time entries, and notes all stay intact. Restore it anytime, or delete permanently to actually remove it for good.</p>
+            <div id="trashClientsList"></div>
+          </div>
         </div>
       </div>
-      <div class="panel">
-        <div class="panel-head"><span class="panel-title">Deleted Time Entries</span></div>
-        <div class="panel-body">
-          <div id="trashTimeList"></div>
+
+      <div class="settings-subview" id="trashtab-notes">
+        <div class="panel">
+          <div class="panel-body">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Yours only — notes are private.</p>
+            <div id="trashNotesList"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-subview" id="trashtab-time">
+        <div class="panel">
+          <div class="panel-body">
+            <div id="trashTimeList"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -2294,6 +2355,12 @@ async function fullRefresh(showFeedback){
 }
 function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); renderTasks(); renderCalendar(); }
 
+function switchTrashTab(name){
+  document.querySelectorAll('#trashTabsBar .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.ttab===name));
+  document.querySelectorAll('#view-trash .settings-subview').forEach(v=>v.classList.remove('active'));
+  document.getElementById('trashtab-'+name).classList.add('active');
+}
+
 function applyRoleVisibility(){
   const notifyBtn = document.getElementById('notifyBtn');
   if(notifyBtn) notifyBtn.style.display = canApprove() ? 'inline-flex' : 'none';
@@ -2311,8 +2378,11 @@ function applyRoleVisibility(){
     memberFilterWrap.style.display = isAdmin() ? 'flex' : 'none';
     if(isAdmin()) populateReportMemberFilter();
   }
-  const trashClientsPanel = document.getElementById('trashClientsPanel');
-  if(trashClientsPanel) trashClientsPanel.style.display = canApprove() ? 'block' : 'none';
+  const trashClientsTab = document.getElementById('trashClientsTab');
+  if(trashClientsTab){
+    trashClientsTab.style.display = canApprove() ? 'flex' : 'none';
+    if(!canApprove() && trashClientsTab.classList.contains('active')){ switchTrashTab('notes'); }
+  }
   const payrollTab = document.getElementById('payrollTab');
   if(payrollTab){
     payrollTab.style.display = isAdmin() ? 'flex' : 'none';
@@ -2594,7 +2664,83 @@ function clearImprovementsFilters(){
   renderImprovementsHistory();
 }
 
+function toggleImprovementsFiltersPopover(){
+  const el = document.getElementById('improvementsFiltersPopover');
+  if(!el) return;
+  el.style.display = el.style.display==='block' ? 'none' : 'block';
+}
+
+document.addEventListener('click', (e)=>{
+  const popover = document.getElementById('improvementsFiltersPopover');
+  const wrap = popover?.closest('.filters-popover-wrap');
+  if(popover && popover.style.display==='block' && wrap && !wrap.contains(e.target)) popover.style.display = 'none';
+});
+
 const IMPROVEMENT_SOURCE_LABEL = { time:'From Time Tracker', note:'From Notes', manual:'Logged directly', task:'From Tasks' };
+
+// Recomputes the exact same filtered set renderImprovementsHistory() shows,
+// so "Delete all" always matches what's actually on screen — deleting the
+// full history if no filter is active, or just the narrowed subset if one is.
+function getFilteredImprovements(){
+  const all = getAllImprovementsFlat();
+  const search = (document.getElementById('improvementsSearch')?.value || '').trim().toLowerCase();
+  const clientFilter = document.getElementById('improvementsClientFilter')?.value || 'all';
+  const inclFilter = document.getElementById('improvementsInclFilter')?.value || 'all';
+  const fromVal = document.getElementById('improvementsFromDate')?.value;
+  const toVal = document.getElementById('improvementsToDate')?.value;
+  const fromDate = fromVal ? new Date(fromVal+'T00:00:00') : null;
+  const toDate = toVal ? new Date(toVal+'T23:59:59') : null;
+  return all.filter(imp=>{
+    if(clientFilter!=='all' && imp.clientId!==clientFilter) return false;
+    if(inclFilter==='included' && !imp.includeInEmail) return false;
+    if(inclFilter==='excluded' && imp.includeInEmail) return false;
+    if(search && !imp.text.toLowerCase().includes(search) && !imp.clientName.toLowerCase().includes(search)) return false;
+    if(fromDate || toDate){
+      if(!imp.date) return false;
+      const d = new Date(imp.date);
+      if(fromDate && d < fromDate) return false;
+      if(toDate && d > toDate) return false;
+    }
+    return true;
+  });
+}
+
+async function deleteAllFilteredImprovements(){
+  const filtered = getFilteredImprovements();
+  if(!filtered.length){ showToast('info','Nothing to delete','No improvements match the current filters.'); return; }
+
+  const search = document.getElementById('improvementsSearch')?.value;
+  const clientFilter = document.getElementById('improvementsClientFilter')?.value;
+  const inclFilter = document.getElementById('improvementsInclFilter')?.value;
+  const fromVal = document.getElementById('improvementsFromDate')?.value;
+  const toVal = document.getElementById('improvementsToDate')?.value;
+  const isFiltered = search || (clientFilter && clientFilter!=='all') || (inclFilter && inclFilter!=='all') || fromVal || toVal;
+  const scopeText = isFiltered
+    ? `${filtered.length} filtered improvement${filtered.length!==1?'s':''}`
+    : `ALL ${filtered.length} improvement${filtered.length!==1?'s':''} across every client`;
+  if(!confirm(`Delete ${scopeText}? This can't be undone.`)) return;
+
+  await loadAll();
+  const byClient = {};
+  filtered.forEach(imp=>{ (byClient[imp.clientId] = byClient[imp.clientId] || []).push(imp.idx); });
+  let removedCount = 0;
+  Object.keys(byClient).forEach(clientId=>{
+    const c = clients.find(x=>x.id===clientId);
+    if(!c) return;
+    // Descending order so removing one entry doesn't shift the index of
+    // the next one still waiting to be removed from the same client.
+    byClient[clientId].sort((a,b)=>b-a).forEach(idx=>{
+      if(c.improvements[idx]){ c.improvements.splice(idx,1); removedCount++; }
+    });
+    invalidateStaleDraft(c);
+  });
+
+  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Deleted ${removedCount} logged improvement${removedCount!==1?'s':''}${isFiltered?' (filtered)':' (all)'}.`});
+  const ok = await persistClients();
+  renderImprovementsHistory();
+  renderClientsTable(); renderKpis(); renderQueue(); renderLog();
+  ok ? showToast('success','Deleted', `Removed ${removedCount} improvement${removedCount!==1?'s':''}.`) : showToast('error','Delete failed','Could not save — try again.');
+}
 
 function renderImprovementsHistory(){
   const el = document.getElementById('improvementsHistoryList');
@@ -2627,6 +2773,12 @@ function renderImprovementsHistory(){
   if(countEl){
     const isFiltered = search || clientFilter!=='all' || inclFilter!=='all' || fromVal || toVal;
     countEl.textContent = isFiltered ? `${filtered.length} of ${all.length} shown` : (all.length ? `${all.length} total` : '');
+  }
+  const badge = document.getElementById('improvementsFiltersBadge');
+  if(badge){
+    const activeCount = (clientFilter!=='all'?1:0) + (inclFilter!=='all'?1:0) + (fromVal||toVal?1:0);
+    badge.textContent = activeCount;
+    badge.style.display = activeCount ? 'inline-flex' : 'none';
   }
 
   if(!all.length){ el.innerHTML = `<div class="panel"><div class="empty">No improvements logged yet.</div></div>`; return; }
@@ -3301,6 +3453,7 @@ function matchesClientFilters(c){
     const hasRecentLog = hasLoggedThisWeek(c);
     if(clientFilters.logged==='has' && !hasRecentLog) return false;
     if(clientFilters.logged==='none' && hasRecentLog) return false;
+    if(clientFilters.logged==='alltime' && !c.improvements.length) return false;
   }
   return true;
 }
@@ -4202,17 +4355,11 @@ async function saveNote(noteId){
   await loadMyNotes();
   populateNotesClientFilter();
   renderNotes();
-  if(!error && !noteId){
+  if(!error && newId){
     logClientActivity(clientId, 'note_added', `${myName()||'Someone'} added a private note (content not shared here).`);
     refreshClientDetailActivityIfOpen(clientId);
-  }
-  if(!error && newId){
-    // Attachments need the row to already exist (storage RLS checks
-    // ownership against it), so a brand-new note reopens straight into
-    // edit mode instead of making the person manually reopen it themselves
-    // just to attach a file.
-    openNoteModal(newId);
-    showToast('success','Note added','Attach a file below if you want, or close this to finish.');
+    closeAppModal();
+    showToast('success','Note added', `Saved. Open it again from the board if you want to attach a file.`);
   } else {
     closeAppModal();
     error ? showToast('error','Save failed', error.message) : showToast('success','Note updated','Changes saved.');
@@ -4673,10 +4820,8 @@ async function saveNewTask(){
   updateTasksNavBadge();
   const assignee = teamProfiles.find(p=>p.id===assigneeId);
   if(!error && data){
-    // Same reasoning as notes — attachments need the row to already exist,
-    // so reopen straight into edit mode instead of a separate manual step.
-    openTaskDetailModal(data.id);
-    showToast('success','Task assigned', `${assignee ? assignee.name : 'They'} will see it next time they check Tasks. Attach a file below if you want.`);
+    closeAppModal();
+    showToast('success','Task assigned', `${assignee ? assignee.name : 'They'} will see it next time they check Tasks.`);
   } else {
     closeAppModal();
     showToast('error','Save failed', error?.message || 'Unknown error');
@@ -8515,11 +8660,20 @@ async function addTeamMember(){
   }
 }
 
+function switchTeamTab(name){
+  document.querySelectorAll('#teamTabsBar .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.ttab===name));
+  document.querySelectorAll('#view-team .settings-subview').forEach(v=>v.classList.remove('active'));
+  document.getElementById('teamtab-'+name).classList.add('active');
+}
+
 function renderTeam(){
   const el = document.getElementById('teamList');
   const noteEl = document.getElementById('teamPanelNote');
   const addPanel = document.getElementById('addMemberPanel');
   const titlesPanel = document.getElementById('teamTitlesPanel');
+  const tabsBar = document.getElementById('teamTabsBar');
+  if(tabsBar) tabsBar.style.display = isAdmin() ? 'flex' : 'none';
+  if(!isAdmin() && document.getElementById('teamtab-roster') && !document.getElementById('teamtab-roster').classList.contains('active')){ switchTeamTab('roster'); }
   if(addPanel) addPanel.style.display = isAdmin() ? 'block' : 'none';
   if(titlesPanel) titlesPanel.style.display = isAdmin() ? 'block' : 'none';
   if(isAdmin()){ populateAddMemberTitleSelect(); renderOptionsManager('title'); }
