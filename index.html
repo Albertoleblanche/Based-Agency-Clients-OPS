@@ -2311,6 +2311,101 @@ function copyMailModalBody(){
   } else { btn.textContent = 'Select the text above (Ctrl/Cmd+C)'; }
 }
 
+/* ---------- Realtime — replaces the old 20-second poll-everything loop.
+   Instead of reloading and re-rendering the whole app on a timer regardless
+   of whether anything changed, each table gets its own subscription that
+   only fires — and only re-renders the section that data actually affects —
+   when something real happens to it. Debounced per table so a burst of
+   several quick changes (e.g. logging 3 improvements in a row) coalesces
+   into one reload instead of three. */
+let realtimeChannel = null;
+const realtimeDebounceTimers = {};
+
+function debounced(key, fn, delay){
+  return (...args)=>{
+    clearTimeout(realtimeDebounceTimers[key]);
+    realtimeDebounceTimers[key] = setTimeout(()=>fn(...args), delay);
+  };
+}
+
+// Wraps a reload+render pair with the same silent-refresh suppression the
+// old poll used, so a genuine realtime-driven update still doesn't replay
+// entrance animations on cards that were already sitting there correctly.
+async function silentSection(fn){
+  document.body.classList.add('silent-refresh');
+  try{ await fn(); }
+  finally{ setTimeout(()=> document.body.classList.remove('silent-refresh'), 200); }
+}
+
+function setupRealtimeSubscriptions(){
+  teardownRealtimeSubscriptions();
+  if(!currentUser) return;
+
+  const onAppStorageChange = debounced('appStorage', (payload)=>{
+    // app_storage holds several distinct blobs in one table, keyed by
+    // `key` — only react to the ones that actually feed rendered state.
+    const changedKey = payload?.new?.key ?? payload?.old?.key;
+    if(changedKey !== 'app-data' && changedKey !== 'settings') return;
+    silentSection(async ()=>{
+      await loadAll();
+      renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge();
+      renderAttentionList(); renderClientOptionsSelects(); renderOverviewChart();
+      renderBudgetAlerts(); renderImprovementsHistory();
+    });
+  }, 400);
+
+  const onNotesChange = debounced('notes', ()=>{
+    silentSection(async ()=>{
+      await loadMyNotes();
+      populateNotesClientFilter();
+      renderNotes();
+    });
+  }, 400);
+
+  const onTasksChange = debounced('tasks', ()=>{
+    silentSection(async ()=>{
+      await loadMyTasks();
+      renderTasks();
+      updateTasksNavBadge();
+      await checkTaskNotifications();
+    });
+  }, 400);
+
+  const onTimeEntriesChange = debounced('timeEntries', ()=>{
+    silentSection(async ()=>{
+      await loadTimeEntries();
+      populateTimeClientSelects();
+      renderTimesheet();
+      renderReports();
+    });
+  }, 400);
+
+  const onCalendarChange = debounced('calendar', ()=>{
+    silentSection(async ()=>{
+      await loadCalendarEvents();
+      renderCalendar();
+    });
+  }, 400);
+
+  const onNotificationsChange = debounced('notifications', ()=>{
+    loadNotifications().then(()=> checkForNewNotificationToasts());
+  }, 300);
+
+  realtimeChannel = supabaseClient.channel('app-realtime-'+currentUser.id)
+    .on('postgres_changes', { event:'*', schema:'public', table:'app_storage' }, onAppStorageChange)
+    .on('postgres_changes', { event:'*', schema:'public', table:'notes' }, onNotesChange)
+    .on('postgres_changes', { event:'*', schema:'public', table:'tasks' }, onTasksChange)
+    .on('postgres_changes', { event:'*', schema:'public', table:'time_entries' }, onTimeEntriesChange)
+    .on('postgres_changes', { event:'*', schema:'public', table:'calendar_events' }, onCalendarChange)
+    .on('postgres_changes', { event:'*', schema:'public', table:'notifications' }, onNotificationsChange)
+    .subscribe();
+}
+
+function teardownRealtimeSubscriptions(){
+  if(realtimeChannel){ supabaseClient.removeChannel(realtimeChannel); realtimeChannel = null; }
+  Object.values(realtimeDebounceTimers).forEach(clearTimeout);
+}
+
 async function fullRefresh(showFeedback){
   const btn = document.getElementById('refreshBtn');
   const refreshIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>';
@@ -9025,6 +9120,7 @@ async function handleLogin(){
 function showLoginScreen(){
   document.getElementById('loginOverlay').style.display = 'flex';
   document.getElementById('appRoot').style.display = 'none';
+  teardownRealtimeSubscriptions();
   currentUser = null; myProfile = null;
   restoreBtn(document.getElementById('loginBtn'));
   // Defensive reset — makes sure nothing from a previous session (e.g. an
@@ -9062,6 +9158,7 @@ async function showApp(session){
     initTimerFromStorage();
     await checkTaskNotifications();
     await checkForNewNotificationToasts();
+    setupRealtimeSubscriptions();
   }catch(e){
     console.error('showApp failed', e);
     document.getElementById('loginOverlay').style.display = 'flex';
@@ -9105,17 +9202,30 @@ async function showApp(session){
   });
 
   setInterval(renderGauge, 1000);
+
+  // Realtime subscriptions are the primary update mechanism now — this is
+  // just a safety net in case a connection silently drops and doesn't
+  // reconnect on its own, which does happen occasionally with websockets.
+  // Infrequent on purpose: if realtime is working, this rarely finds
+  // anything new to show.
   setInterval(()=>{
     if(currentUser && !isLoggingActive()){
       document.body.classList.add('silent-refresh');
       fullRefresh().finally(()=>{
-        // More headroom than a single frame — ensures the non-animated
-        // render has definitely painted before suppression lifts, even on
-        // a slower device.
         setTimeout(()=> document.body.classList.remove('silent-refresh'), 200);
       });
     }
-  }, 20000);
+  }, 180000);
+
+  // Browsers throttle background tabs, including websocket activity — catch
+  // up on anything potentially missed the moment the tab becomes visible
+  // again, rather than waiting for the next safety-net poll.
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState==='visible' && currentUser && !isLoggingActive()){
+      fullRefresh();
+      setupRealtimeSubscriptions();
+    }
+  });
 })();
 </script>
 </body>
