@@ -1298,11 +1298,7 @@ document.addEventListener('DOMContentLoaded', function(){
     <!-- TIME TRACKER -->
     <div class="view" id="view-time">
       <div class="icon-tab-group" id="timeMainTabs">
-        <div class="icon-tab active" data-ttab="timer" onclick="switchTimeTab('timer')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          <span>Timer</span>
-        </div>
-        <div class="icon-tab" data-ttab="timesheet" onclick="switchTimeTab('timesheet')">
+        <div class="icon-tab active" data-ttab="timesheet" onclick="switchTimeTab('timesheet')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
           <span>Timesheet</span>
         </div>
@@ -1310,7 +1306,7 @@ document.addEventListener('DOMContentLoaded', function(){
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           <span>Reports</span>
         </div>
-        <div class="icon-tab" data-ttab="dailysummary" id="dailySummaryTab" onclick="switchTimeTab('dailysummary')" style="display:none;">
+        <div class="icon-tab" data-ttab="dailysummary" id="dailySummaryTab" onclick="switchTimeTab('dailysummary')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 16l2 2 4-4"/></svg>
           <span>Daily Summary</span>
         </div>
@@ -1321,33 +1317,8 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
 
       <!-- TIMER -->
-      <div class="settings-subview active" id="ttab-timer">
-        <div class="panel timer-bar-panel">
-          <div class="panel-head">
-            <span class="panel-title">Live Timer</span>
-            <button class="btn btn-outline" style="padding:7px 12px;font-size:11.5px;" onclick="openManualEntryModal()">+ Add manual entry</button>
-          </div>
-          <div class="panel-body">
-            <div class="timer-bar">
-              <div class="timer-bar-field client-search-wrap">
-                <input type="text" class="client-search-input" id="timerClientSearch" placeholder="Which client?" autocomplete="off">
-                <input type="hidden" id="timerClient">
-                <div class="client-search-dropdown" id="timerClientDropdown"></div>
-              </div>
-              <select id="timerService" class="timer-bar-select"></select>
-              <input id="timerDesc" class="timer-bar-desc" placeholder="What are you working on?">
-              <div class="timer-bar-display-wrap">
-                <span class="timer-status-dot" id="timerStatusDot"></span>
-                <div class="timer-display" id="timerDisplay">00:00:00</div>
-              </div>
-              <button class="btn btn-brand timer-bar-btn" id="timerToggleBtn" onclick="toggleTimer()">Start timer</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- TIMESHEET -->
-      <div class="settings-subview" id="ttab-timesheet">
+      <div class="settings-subview active" id="ttab-timesheet">
         <div class="panel">
           <div class="panel-body timesheet-nav">
             <div style="display:flex;align-items:center;gap:10px;">
@@ -1356,19 +1327,21 @@ document.addEventListener('DOMContentLoaded', function(){
               </button>
               <button class="btn btn-outline" onclick="openManualEntryModal()">Add manual entry</button>
             </div>
-            <div class="date-nav">
-              <button class="date-nav-arrow" onclick="shiftTimesheet(-1)" aria-label="Previous">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-              </button>
-              <div class="date-nav-label" onclick="openTimesheetDatePicker()">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                <span id="timesheetRangeLabel"></span>
-                <input type="date" id="timesheetDateInput" class="date-nav-hidden-input" onchange="onTimesheetDatePicked(this.value)">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div class="date-nav">
+                <button class="date-nav-arrow" onclick="shiftTimesheet(-1)" aria-label="Previous">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <div class="date-nav-label" onclick="openTimesheetDatePicker()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <span id="timesheetRangeLabel"></span>
+                  <input type="date" id="timesheetDateInput" class="date-nav-hidden-input" onchange="onTimesheetDatePicked(this.value)">
+                </div>
+                <button class="date-nav-arrow" onclick="shiftTimesheet(1)" aria-label="Next">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
               </div>
-              <button class="date-nav-arrow" onclick="shiftTimesheet(1)" aria-label="Next">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-              </button>
-              <button class="btn btn-outline" id="timesheetReturnToday" style="display:none;margin-left:6px;" onclick="jumpToToday()">Return to today</button>
+              <button class="btn btn-outline" id="timesheetReturnToday" style="display:none;" onclick="jumpToToday()">Return to today</button>
             </div>
             <div class="view-toggle" id="timesheetModeBar">
               <div class="view-toggle-option active" data-mode="day" onclick="setTimesheetMode('day')">Day</div>
@@ -1490,7 +1463,7 @@ document.addEventListener('DOMContentLoaded', function(){
                 <span class="date-nav-arrow" onclick="shiftDailySummaryDate(1)">›</span>
               </div>
               <button class="btn btn-outline" onclick="resetDailySummaryToToday()">Today</button>
-              <button class="btn btn-brand" onclick="openSlackSummaryConfirm()">Send to Slack</button>
+              <button class="btn btn-brand" id="dailySummarySlackBtn" onclick="openSlackSummaryConfirm()">Send to Slack</button>
             </div>
           </div>
         </div>
@@ -2389,12 +2362,7 @@ function applyRoleVisibility(){
   const payrollTab = document.getElementById('payrollTab');
   if(payrollTab){
     payrollTab.style.display = isAdmin() ? 'flex' : 'none';
-    if(!isAdmin() && document.getElementById('ttab-payroll')?.classList.contains('active')){ switchTimeTab('timer'); }
-  }
-  const dailySummaryTab = document.getElementById('dailySummaryTab');
-  if(dailySummaryTab){
-    dailySummaryTab.style.display = canApprove() ? 'flex' : 'none';
-    if(!canApprove() && document.getElementById('ttab-dailysummary')?.classList.contains('active')){ switchTimeTab('timer'); }
+    if(!isAdmin() && document.getElementById('ttab-payroll')?.classList.contains('active')){ switchTimeTab('timesheet'); }
   }
 }
 
@@ -4070,7 +4038,11 @@ async function loadDailySummary(){
 function renderDailySummaryList(data){
   const el = document.getElementById('dailySummaryList');
   if(!el) return;
-  if(!data.summary.length){ el.innerHTML = `<div class="panel"><div class="empty">Nobody logged time this day.</div></div>`; return; }
+  if(!data.summary.length){
+    const msg = canApprove() ? 'Nobody logged time this day.' : "You haven't logged any time this day.";
+    el.innerHTML = `<div class="panel"><div class="empty">${msg}</div></div>`;
+    return;
+  }
   el.innerHTML = data.summary.map(person=>`
     <div class="panel" style="margin-bottom:14px;">
       <div class="panel-head"><span class="panel-title">${person.name}</span><span style="font-family:'DM Sans',sans-serif;font-size:11px;color:var(--muted-lt);">${formatMinutes(person.totalMinutes)}</span></div>
@@ -4089,7 +4061,10 @@ function renderDailySummaryList(data){
 
 function buildSlackSummaryText(data){
   const dateLabel = new Date(data.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long', month:'long', day:'numeric'});
-  if(!data.summary.length) return `*Daily Summary — ${dateLabel}*\n\nNobody logged time this day.`;
+  if(!data.summary.length){
+    const emptyMsg = canApprove() ? 'Nobody logged time this day.' : "Nothing logged this day.";
+    return `*Daily Summary — ${dateLabel}*\n\n${emptyMsg}`;
+  }
   const lines = data.summary.map(person=>{
     const entryLines = person.entries.map(e=>
       `    • ${e.client}${e.service ? ` (${e.service})` : ''} — ${formatMinutes(e.minutes)}${e.description ? `: ${e.description}` : ''}`
@@ -6653,7 +6628,7 @@ function updateFloatingTimerPill(timeStr){
 
 function switchViewIfNotOnTimer(){
   switchView('time');
-  switchTimeTab('timer');
+  switchTimeTab('timesheet');
 }
 
 /* ---------- Take a tour ---------- */
@@ -6664,7 +6639,7 @@ const tourSteps = [
   { view:'clients', title:"Client Roster", body:"Search, filter by service/status/importance/danger, and sort any column. The Actions menu on each row lets you edit the client, log an improvement, or add a private note." },
   { view:'notes', title:"Notes — private to you", body:"Jot down ideas or planned work for any client. Nobody else on the team can see your notes — real database-level privacy, not just hidden in the UI. When you do the work, hit \"Log it now\" to turn it into a real logged improvement." },
   { view:'approve', title:"Approval Queue", body:"Every client with logged work shows up here, sorted by danger score so the riskiest clients surface first. Click a card, generate an AI draft from that week's improvements, then Approve or Skip." },
-  { view:'time', timeTab:'timer', title:"Track time — live", body:"Start a timer for any client and service, or add time manually. A floating pill keeps a running timer visible on every tab — you can stop it from anywhere, not just here." },
+  { view:'time', timeTab:'timesheet', title:"Track time — live", body:"Start a timer for any client and service, or add time manually. A floating pill keeps a running timer visible on every tab — you can stop it from anywhere, not just here." },
   { view:'time', timeTab:'timesheet', title:"Your timesheet", body:"Day or week view, with real calendar navigation. Clicking Start on a past entry resumes tracking and adds to that same entry — no duplicates." },
   { view:'time', timeTab:'reports', title:"See where time goes", body:"Breaks down hours by client, service, or teammate, filterable by range — with an \"Active clients only\" option to cut the noise." },
   { view:'settings', settingsTab:'general', title:"Settings & Integrations", body:"Manage your name, approvers, client field options, AI email instructions, and Google Sheet sync here — plus custom fields if you need to track something we don't already have a spot for." },
@@ -7110,22 +7085,17 @@ function resumeEntryTimer(clientId, description, entryId){
     saveTimerState();
   }
   if(timerState.running){ showToast('error','Timer already running','Stop the current timer before starting another.'); return; }
-  switchTimeTab('timer');
-  setClientFieldValue('timerClient', 'timerClientSearch', clientId);
-  const descInput = document.getElementById('timerDesc');
-  if(descInput) descInput.value = description || '';
-  if(document.getElementById('timerClient').value !== clientId){
+  const c = clients.find(x=>x.id===clientId);
+  if(!c){
     showToast('error','Could not resume', "This client couldn't be found — try starting the timer manually.");
     return;
   }
-  toggleTimer();
-  // toggleTimer() just replaced timerState wholesale, so tag it with the
-  // entry we're resuming AFTER that call, not before.
-  if(timerState.running){
-    timerState.resumeEntryId = entryId || null;
-    saveTimerState();
-    showToast('info','Resuming', 'Time will be added to this existing entry when you stop.');
-  }
+  timerState = { running:true, startedAt:Date.now(), clientId, service:'', description: description||'', resumeEntryId: entryId||null };
+  saveTimerState();
+  if(timerIntervalId) clearInterval(timerIntervalId);
+  timerIntervalId = setInterval(updateTimerDisplay, 1000);
+  updateTimerDisplay();
+  showToast('info','Resuming', 'Time will be added to this existing entry when you stop.');
 }
 
 function openTimeEntryModal(id){
