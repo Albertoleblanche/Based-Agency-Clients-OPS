@@ -356,6 +356,7 @@
 
   @keyframes cardEnter{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
   .kanban-card, .note-card, .q-card{animation:cardEnter var(--duration-base) var(--ease-out) backwards;}
+  body.silent-refresh .kanban-card, body.silent-refresh .note-card, body.silent-refresh .q-card{animation:none;}
   .kanban-cards .kanban-card:nth-child(1), .notes-grid .note-card:nth-child(1), .queue-grid .q-card:nth-child(1){animation-delay:0ms;}
   .kanban-cards .kanban-card:nth-child(2), .notes-grid .note-card:nth-child(2), .queue-grid .q-card:nth-child(2){animation-delay:30ms;}
   .kanban-cards .kanban-card:nth-child(3), .notes-grid .note-card:nth-child(3), .queue-grid .q-card:nth-child(3){animation-delay:60ms;}
@@ -8572,7 +8573,16 @@ async function showApp(session){
   });
 
   setInterval(renderGauge, 1000);
-  setInterval(()=>{ if(currentUser && !isLoggingActive()) fullRefresh(); }, 20000);
+  setInterval(()=>{
+    if(currentUser && !isLoggingActive()){
+      document.body.classList.add('silent-refresh');
+      fullRefresh().finally(()=>{
+        // Small delay so anything still painting when the refresh finishes
+        // doesn't catch the tail end of the suppression being lifted.
+        setTimeout(()=> document.body.classList.remove('silent-refresh'), 50);
+      });
+    }
+  }, 20000);
 })();
 </script>
 </body>
