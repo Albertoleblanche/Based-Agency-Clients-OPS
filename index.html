@@ -6491,6 +6491,13 @@ function parseDurationInput(str){
   return isNaN(plain) ? null : Math.round(plain*60);
 }
 
+function minutesToDurationInputStr(minutes){
+  const h = Math.floor(minutes/60), m = minutes%60;
+  if(h && m) return `${h}h ${m}m`;
+  if(h) return `${h}h`;
+  return `${m}m`;
+}
+
 function openManualEntryModal(){
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Add time manually</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
@@ -6626,6 +6633,8 @@ function renderTimesheetDay(bodyEl){
   const cardsHtml = dayEntries.length ? dayEntries.map(e=>{
     const c = clients.find(x=>x.id===e.clientId);
     const canEdit = currentUser && (e.userId===currentUser.id || isAdmin());
+    const canLog = e.description && !e.logged;
+    const hasMenuItems = canLog || canEdit;
     return `<div class="ts-entry-card">
       <div class="ts-entry-info">
         <div class="ts-entry-title">${c ? c.name : 'Unknown client'} ${(e.service || (c && c.service)) ? `<span class="ts-entry-service">(${e.service || c.service})</span>` : ''}</div>
@@ -6633,12 +6642,16 @@ function renderTimesheetDay(bodyEl){
       </div>
       <div class="ts-entry-right">
         <div class="ts-entry-duration">${formatMinutes(e.minutes)}</div>
-        ${e.description ? (e.logged
-          ? `<span class="pill pill-good" title="Already in Past Improvements">✓ Logged</span>`
-          : `<button class="btn btn-outline" onclick="logTimeEntryAsImprovement('${e.id}')">Log as improvement</button>`
-        ) : ''}
+        ${e.logged ? `<span class="pill pill-good" title="Already in Past Improvements">✓ Logged</span>` : ''}
         <button class="btn btn-outline" data-resume-client="${e.clientId}" data-resume-desc="${encodeURIComponent(e.description||'')}" data-resume-entry="${e.id}" onclick="resumeEntryTimerFromBtn(this)">▶ Start</button>
-        ${canEdit ? `<button class="btn btn-outline" onclick="openTimeEntryModal('${e.id}')">Edit</button><button class="btn btn-outline" style="color:var(--red);" onclick="deleteTimeEntry('${e.id}')">Delete</button>` : ''}
+        ${canEdit ? `<button class="btn btn-outline" onclick="openTimeEntryModal('${e.id}')">Edit</button>` : ''}
+        ${hasMenuItems ? `<div class="kanban-card-menu-wrap">
+          <span class="kanban-card-menu-btn" onclick="event.stopPropagation();toggleKanbanCardMenu('ts-${e.id}')">⋯</span>
+          <div class="kanban-card-menu" id="kanbanMenu-ts-${e.id}" style="display:none;">
+            ${canLog ? `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();logTimeEntryAsImprovement('${e.id}')">Log as improvement</div>` : ''}
+            ${canEdit ? `<div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();deleteTimeEntry('${e.id}')">Delete</div>` : ''}
+          </div>
+        </div>` : ''}
       </div>
     </div>`;
   }).join('') : `<div class="panel"><div class="empty">Nothing logged this day.</div></div>`;
@@ -6745,17 +6758,13 @@ function openTimeEntryModal(id){
   if(!e) return;
   const clientOptions = [...clients].sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${e.clientId===c.id?'selected':''}>${c.name}</option>`).join('');
   const serviceOptions = `<option value="">No service set</option>` + (settings.serviceOptions||[]).map(s=>`<option value="${s.replace(/"/g,'&quot;')}" ${e.service===s?'selected':''}>${s}</option>`).join('');
-  const hPart = Math.floor(e.minutes/60), mPart = e.minutes%60;
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Edit time entry</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
       <div class="settings-field"><label>Client</label><select id="editEntryClient" style="width:100%;">${clientOptions}</select></div>
       <div class="settings-field"><label>Service</label><select id="editEntryService" style="width:100%;">${serviceOptions}</select></div>
       <div class="settings-field"><label>Date</label><input type="date" id="editEntryDate" value="${e.date}" style="width:100%;"></div>
-      <div style="display:flex;gap:10px;">
-        <div class="settings-field" style="flex:1;"><label>Hours</label><input type="number" id="editEntryHours" min="0" max="23" step="1" value="${hPart}" style="width:100%;"></div>
-        <div class="settings-field" style="flex:1;"><label>Minutes</label><input type="number" id="editEntryMinutes" min="0" max="59" step="5" value="${mPart}" style="width:100%;"></div>
-      </div>
+      <div class="settings-field"><label>Duration</label><input id="editEntryDuration" value="${minutesToDurationInputStr(e.minutes)}" placeholder="e.g. 1h 30m, or 1.5" style="width:100%;"></div>
       <div class="settings-field"><label>Description</label><input id="editEntryDesc" value="${(e.description||'').replace(/"/g,'&quot;')}" style="width:100%;"></div>
     </div>
     <div class="modal-actions">
@@ -6768,11 +6777,10 @@ async function saveTimeEntryEdit(id){
   const clientId = document.getElementById('editEntryClient').value;
   const service = document.getElementById('editEntryService')?.value || '';
   const dateVal = document.getElementById('editEntryDate').value;
-  const hoursPart = parseInt(document.getElementById('editEntryHours').value) || 0;
-  const minutesPart = parseInt(document.getElementById('editEntryMinutes').value) || 0;
-  const totalMinutes = hoursPart*60 + minutesPart;
+  const totalMinutes = parseDurationInput(document.getElementById('editEntryDuration').value);
   const description = document.getElementById('editEntryDesc').value.trim();
-  if(totalMinutes<=0){ showToast('error','Enter time','Hours and minutes can\'t both be zero.'); return; }
+  if(!totalMinutes || totalMinutes<=0){ showToast('error','Enter a duration','Try something like "1h 30m" or "1.5".'); return; }
+  if(totalMinutes > 960 && !confirm(`That's ${formatMinutes(totalMinutes)} for a single entry — did you mean minutes instead of hours? Click OK to save it anyway, or Cancel to fix it.`)) return;
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
   const { error } = await supabaseClient.from('time_entries').update({
