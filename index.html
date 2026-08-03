@@ -43,6 +43,19 @@
     --shadow:0 1px 2px rgba(0,0,0,.3), 0 1px 3px rgba(0,0,0,.4);
   }
   *{box-sizing:border-box;}
+
+  /* Keyboard focus — was largely missing app-wide before this. Uses
+     :focus-visible specifically so the ring only appears for keyboard
+     navigation, not every mouse click, matching how modern browsers
+     already distinguish the two. */
+  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible,
+  textarea:focus-visible, [tabindex]:focus-visible, .btn:focus-visible,
+  .icon-tab:focus-visible, .nav-item:focus-visible, .icon-menu-btn:focus-visible,
+  .pagination-btn:focus-visible, .cmdk-item:focus-visible{
+    outline:2px solid var(--brand);
+    outline-offset:2px;
+    border-radius:4px;
+  }
   body{margin:0;background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;transition:background .2s ease, color .2s ease;}
   body, body *{ transition: background-color .18s ease, border-color .18s ease, color .18s ease; }
   .app{display:grid;grid-template-columns:224px 1fr;height:100vh;overflow:hidden;}
@@ -232,8 +245,9 @@
 
   .clients-filter-panel{padding:18px 20px;}
   .clients-filter-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-  .search-field{display:flex;align-items:center;gap:8px;flex:1;min-width:200px;padding:0 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);}
-  .select-field{display:flex;align-items:center;gap:8px;min-width:180px;padding:0 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--muted-lt);}
+  .search-field{display:flex;align-items:center;gap:8px;flex:1;min-width:200px;padding:0 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);transition:border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);}
+  .select-field{display:flex;align-items:center;gap:8px;min-width:180px;padding:0 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--muted-lt);transition:border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);}
+  .select-field:focus-within, .search-field:focus-within{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-bg);}
   .select-field select{border:none;background-color:transparent;background-position:right 0 center;padding:9px 18px 9px 0;font-family:'DM Sans',sans-serif;font-size:12.5px;color:var(--ink);width:100%;cursor:pointer;}
   .select-field select:focus{outline:none;}
   .search-field svg{color:var(--muted-lt);flex:none;}
@@ -294,7 +308,7 @@
 
   /* Add client form */
   .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
-  .form-grid label{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--muted);display:block;margin-bottom:4px;}
+  .form-grid label{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;}
   .form-grid input,.form-grid select{width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background-color:var(--surface-2);color:var(--ink);}
   .form-grid select{padding-right:28px;}
   .form-actions{margin-top:12px;display:flex;gap:8px;}
@@ -376,6 +390,16 @@
   /* Time Tracker */
   .timer-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch;}
   @media (max-width:820px){.timer-row{grid-template-columns:1fr;}}
+
+  .timer-bar-panel .panel-head{display:flex;justify-content:space-between;align-items:center;}
+  .timer-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .timer-bar-field{flex:1 1 200px;min-width:160px;position:relative;}
+  .timer-bar-field input{width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);}
+  .timer-bar-select{flex:0 1 160px;font-family:'DM Sans',sans-serif;font-size:13px;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background-color:var(--surface-2);color:var(--ink);}
+  .timer-bar-desc{flex:2 1 220px;font-family:'DM Sans',sans-serif;font-size:13px;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);}
+  .timer-bar-display-wrap{display:flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:30px;padding:8px 18px;flex:none;}
+  .timer-bar-btn{flex:none;padding:10px 22px;}
+  @media (max-width:900px){.timer-bar{flex-direction:column;align-items:stretch;} .timer-bar-select, .timer-bar-desc, .timer-bar-btn{flex:none;width:100%;}}
   .timer-row .panel{display:flex;flex-direction:column;}
   .timer-row .panel-body{display:flex;flex-direction:column;flex:1;}
   .timer-display-wrap{display:flex;align-items:center;justify-content:center;gap:9px;background:var(--surface-2);border:1px solid var(--border);border-radius:30px;padding:9px 20px;margin-bottom:16px;}
@@ -392,7 +416,6 @@
   .timer-status-dot.running::after{content:'';position:absolute;inset:0;border-radius:50%;background:var(--brand);animation:pulseRing 1.8s ease-out infinite;}
   .timer-display{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;letter-spacing:.02em;font-variant-numeric:tabular-nums;color:var(--muted);}
   .timer-display.running{color:var(--brand);}
-  #timerToggleBtn{width:100%;justify-content:center;margin-top:auto;}
   #timerToggleBtn.stop{background:var(--red);color:#fff;}
 
   .timesheet-nav{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
@@ -668,7 +691,7 @@
   .custom-field-actions{display:flex;gap:12px;flex:none;}
   .integ-status.off{background:#EEF0F4;color:var(--muted);}
   .settings-field{margin-bottom:12px;}
-  .settings-field label{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);display:block;margin-bottom:5px;}
+  .settings-field label{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;}
   .settings-field input{width:280px;max-width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:9px 11px;border-radius:6px;border:1px solid var(--border);}
   .options-list{display:flex;flex-wrap:wrap;gap:8px;}
   .option-chip{display:inline-flex;align-items:center;gap:7px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:6px 8px 6px 8px;font-size:12px;color:var(--ink);}
@@ -1259,43 +1282,25 @@ document.addEventListener('DOMContentLoaded', function(){
 
       <!-- TIMER -->
       <div class="settings-subview active" id="ttab-timer">
-        <div class="timer-row">
-          <div class="panel">
-            <div class="panel-head"><span class="panel-title">Live Timer</span></div>
-            <div class="panel-body">
-              <div class="timer-display-wrap">
+        <div class="panel timer-bar-panel">
+          <div class="panel-head">
+            <span class="panel-title">Live Timer</span>
+            <button class="btn btn-outline" style="padding:7px 12px;font-size:11.5px;" onclick="openManualEntryModal()">+ Add manual entry</button>
+          </div>
+          <div class="panel-body">
+            <div class="timer-bar">
+              <div class="timer-bar-field client-search-wrap">
+                <input type="text" class="client-search-input" id="timerClientSearch" placeholder="Which client?" autocomplete="off">
+                <input type="hidden" id="timerClient">
+                <div class="client-search-dropdown" id="timerClientDropdown"></div>
+              </div>
+              <select id="timerService" class="timer-bar-select"></select>
+              <input id="timerDesc" class="timer-bar-desc" placeholder="What are you working on?">
+              <div class="timer-bar-display-wrap">
                 <span class="timer-status-dot" id="timerStatusDot"></span>
                 <div class="timer-display" id="timerDisplay">00:00:00</div>
               </div>
-              <div class="form-grid" style="margin-bottom:14px;">
-                <div class="client-search-wrap"><label>Client</label>
-                  <input type="text" class="client-search-input" id="timerClientSearch" placeholder="Search client…" autocomplete="off">
-                  <input type="hidden" id="timerClient">
-                  <div class="client-search-dropdown" id="timerClientDropdown"></div>
-                </div>
-                <div><label>Service</label><select id="timerService"></select></div>
-                <div style="grid-column:1/-1;"><label>What are you working on?</label><input id="timerDesc" placeholder="e.g. Updating Meta ad creative"></div>
-              </div>
-              <button class="btn btn-brand" id="timerToggleBtn" onclick="toggleTimer()">Start timer</button>
-            </div>
-          </div>
-
-          <div class="panel">
-            <div class="panel-head"><span class="panel-title">Add time manually</span></div>
-            <div class="panel-body">
-              <div class="form-grid">
-                <div class="client-search-wrap"><label>Client</label>
-                  <input type="text" class="client-search-input" id="manualClientSearch" placeholder="Search client…" autocomplete="off">
-                  <input type="hidden" id="manualClient">
-                  <div class="client-search-dropdown" id="manualClientDropdown"></div>
-                </div>
-                <div><label>Service</label><select id="manualService"></select></div>
-                <div><label>Date</label><input type="date" id="manualDate"></div>
-                <div><label>Hours</label><input type="number" id="manualHours" min="0" max="23" step="1" placeholder="1"></div>
-                <div><label>Minutes</label><input type="number" id="manualMinutes" min="0" max="59" step="5" placeholder="30"></div>
-                <div style="grid-column:1/-1;"><label>Description</label><input id="manualDesc" placeholder="What did you work on?"></div>
-              </div>
-              <button class="btn btn-brand" style="margin-top:12px;" onclick="addManualEntry()">Add entry</button>
+              <button class="btn btn-brand timer-bar-btn" id="timerToggleBtn" onclick="toggleTimer()">Start timer</button>
             </div>
           </div>
         </div>
@@ -2190,19 +2195,48 @@ async function notifyOthersOfEmailSent(to, subject){
 }
 
 // Generic modal shell — used for the send-email modal and the queue card detail modal.
+let modalPreviousFocus = null;
+
+function getModalFocusableElements(overlay){
+  return [...overlay.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+    .filter(el => el.offsetParent !== null);
+}
+
+function handleModalKeydown(e){
+  const overlay = document.getElementById('appModalOverlay');
+  if(!overlay) return;
+  if(e.key==='Escape'){ closeAppModal(); return; }
+  if(e.key!=='Tab') return;
+  const focusable = getModalFocusableElements(overlay);
+  if(!focusable.length) return;
+  const first = focusable[0], last = focusable[focusable.length-1];
+  if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+  else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+}
+
 function openAppModal(innerHtml, maxWidth){
   closeAppModal();
+  modalPreviousFocus = document.activeElement;
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.id = 'appModalOverlay';
   overlay.onclick = (e)=>{ if(e.target===overlay) closeAppModal(); };
+  overlay.addEventListener('keydown', handleModalKeydown);
   overlay.innerHTML = `<div class="modal-card" style="max-width:${maxWidth||520}px;">${innerHtml}</div>`;
   document.body.appendChild(overlay);
+  setTimeout(()=>{
+    const focusable = getModalFocusableElements(overlay);
+    if(focusable.length) focusable[0].focus();
+  }, 10);
 }
 
 function closeAppModal(){
   const el = document.getElementById('appModalOverlay');
   if(el) el.remove();
+  if(modalPreviousFocus && typeof modalPreviousFocus.focus==='function'){
+    modalPreviousFocus.focus();
+    modalPreviousFocus = null;
+  }
 }
 
 function copyMailModalBody(){
@@ -6442,17 +6476,56 @@ async function stopAndSaveTimer(){
 }
 
 /* --- Manual entry --- */
+// Accepts "1h 30m", "1h", "90m", "1.5", "1,5" — whatever someone naturally
+// types — rather than forcing two separate Hours/Minutes fields that need
+// their own click-and-tab for a single number.
+function parseDurationInput(str){
+  str = (str||'').trim().toLowerCase().replace(',', '.');
+  if(!str) return null;
+  const hm = str.match(/^(?:(\d+(?:\.\d+)?)\s*h)?\s*(?:(\d+(?:\.\d+)?)\s*m)?$/);
+  if(hm && (hm[1]!==undefined || hm[2]!==undefined)){
+    const h = parseFloat(hm[1]||0), m = parseFloat(hm[2]||0);
+    return Math.round(h*60 + m);
+  }
+  const plain = parseFloat(str);
+  return isNaN(plain) ? null : Math.round(plain*60);
+}
+
+function openManualEntryModal(){
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">Add time manually</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="client-search-wrap" style="grid-column:1/-1;"><label>Client</label>
+          <input type="text" class="client-search-input" id="manualClientSearch" placeholder="Search client…" autocomplete="off">
+          <input type="hidden" id="manualClient">
+          <div class="client-search-dropdown" id="manualClientDropdown"></div>
+        </div>
+        <div><label>Service</label><select id="manualService"></select></div>
+        <div><label>Date</label><input type="date" id="manualDate"></div>
+        <div style="grid-column:1/-1;"><label>Duration</label><input id="manualDuration" placeholder="e.g. 1h 30m, or 1.5"></div>
+        <div style="grid-column:1/-1;"><label>Description</label><input id="manualDesc" placeholder="What did you work on?"></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
+      <button class="btn btn-brand" onclick="addManualEntry()">Add entry</button>
+    </div>`, 460);
+  populateTimeClientSelects();
+  const dateInput = document.getElementById('manualDate');
+  if(dateInput) dateInput.value = toDateStr(new Date());
+}
+
 async function addManualEntry(){
   const clientId = document.getElementById('manualClient').value;
   const service = document.getElementById('manualService')?.value || '';
   const dateVal = document.getElementById('manualDate').value;
-  const hoursPart = parseInt(document.getElementById('manualHours').value) || 0;
-  const minutesPart = parseInt(document.getElementById('manualMinutes').value) || 0;
-  const totalMinutes = hoursPart*60 + minutesPart;
+  const totalMinutes = parseDurationInput(document.getElementById('manualDuration').value);
   const description = document.getElementById('manualDesc').value.trim();
   if(!clientId){ showToast('error','Pick a client','Select which client this time is for.'); return; }
   if(!dateVal){ showToast('error','Pick a date','Choose the date this time was worked.'); return; }
-  if(totalMinutes<=0){ showToast('error','Enter time','Add hours and/or minutes for how long you worked.'); return; }
+  if(!totalMinutes || totalMinutes<=0){ showToast('error','Enter a duration','Try something like "1h 30m" or "1.5".'); return; }
+  if(totalMinutes > 960 && !confirm(`That's ${formatMinutes(totalMinutes)} for a single entry — did you mean minutes instead of hours? Click OK to log it anyway, or Cancel to fix it.`)) return;
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
   const { error } = await supabaseClient.from('time_entries').insert({
@@ -6460,12 +6533,11 @@ async function addManualEntry(){
   });
   restoreBtn(btn);
   await loadTimeEntries();
-  document.getElementById('manualHours').value = '';
-  document.getElementById('manualMinutes').value = '';
-  document.getElementById('manualDesc').value = '';
   renderTimesheet(); renderReports();
   const c = clients.find(x=>x.id===clientId);
-  error ? showToast('error','Save failed', error.message) : showToast('success','Time added', `${formatMinutes(totalMinutes)} added for ${c?c.name:'client'}.`);
+  if(error){ showToast('error','Save failed', error.message); return; }
+  closeAppModal();
+  showToast('success','Time added', `${formatMinutes(totalMinutes)} added for ${c?c.name:'client'}.`);
 }
 
 /* --- Timesheet --- */
