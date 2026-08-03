@@ -1,6 +1,9 @@
 // Sends the daily team summary to Slack. Same philosophy as api/send-email.js
 // — this only ever runs after a human has reviewed the exact text and
-// clicked confirm; nothing here fires automatically.
+// clicked confirm; nothing here fires automatically. Available to anyone
+// signed in — the text being sent is only ever whatever get-daily-summary.js
+// already scoped them to see (their own day for regular members, the whole
+// team's for admins/approvers), so there's nothing extra to gate here.
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -44,8 +47,8 @@ module.exports = async function handler(req, res) {
     }
     const { data: callerProfile, error: profileErr } = await admin
       .from('team_profiles').select('role').eq('id', callerData.user.id).maybeSingle();
-    if (profileErr || !callerProfile || !['admin', 'approver'].includes(callerProfile.role)) {
-      res.status(403).json({ error: 'Only admins and approvers can send the daily summary to Slack' });
+    if (profileErr || !callerProfile) {
+      res.status(403).json({ error: 'Could not verify your account' });
       return;
     }
 
