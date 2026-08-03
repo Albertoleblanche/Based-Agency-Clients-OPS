@@ -1,8 +1,11 @@
 // Powers the Daily Summary tab in Time Tracker. Deliberately its own
-// narrow access path rather than a change to time_entries' RLS policy —
-// admins and approvers get visibility into everyone's day for THIS feature
+// narrow access path rather than a change to time_entries' RLS policy.
+// Admins and approvers get visibility into everyone's day for THIS feature
 // specifically, without reopening team-wide time visibility everywhere else
 // in the app (Reports and Overview stay exactly as restrictive as before).
+// Regular members can use this same endpoint too, but the underlying query
+// is scoped to only their own entries — enforced here at the query level,
+// not just filtered out of the response after the fact.
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -42,13 +45,17 @@ module.exports = async function handler(req, res) {
 
     const { data: callerProfile, error: profileErr } = await admin
       .from('team_profiles').select('role').eq('id', callerData.user.id).maybeSingle();
-    if (profileErr || !callerProfile || !['admin', 'approver'].includes(callerProfile.role)) {
-      res.status(403).json({ error: 'Only admins and approvers can view the team daily summary' });
+    if (profileErr || !callerProfile) {
+      res.status(403).json({ error: 'Could not verify your account' });
       return;
     }
+    const isTeamView = ['admin', 'approver'].includes(callerProfile.role);
+
+    let entriesQuery = admin.from('time_entries').select('*').eq('entry_date', date).is('deleted_at', null);
+    if (!isTeamView) entriesQuery = entriesQuery.eq('user_id', callerData.user.id);
 
     const [{ data: entries, error: entriesErr }, { data: profiles, error: profilesErr }, { data: appDataRow }] = await Promise.all([
-      admin.from('time_entries').select('*').eq('entry_date', date).is('deleted_at', null),
+      entriesQuery,
       admin.from('team_profiles').select('id, name'),
       admin.from('app_storage').select('value').eq('key', 'app-data').maybeSingle(),
     ]);
