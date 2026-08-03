@@ -356,7 +356,7 @@
 
   @keyframes cardEnter{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
   .kanban-card, .note-card, .q-card{animation:cardEnter var(--duration-base) var(--ease-out) backwards;}
-  body.silent-refresh .kanban-card, body.silent-refresh .note-card, body.silent-refresh .q-card{animation:none;}
+  body.silent-refresh .kanban-card, body.silent-refresh .note-card, body.silent-refresh .q-card{animation:none !important;}
   .kanban-cards .kanban-card:nth-child(1), .notes-grid .note-card:nth-child(1), .queue-grid .q-card:nth-child(1){animation-delay:0ms;}
   .kanban-cards .kanban-card:nth-child(2), .notes-grid .note-card:nth-child(2), .queue-grid .q-card:nth-child(2){animation-delay:30ms;}
   .kanban-cards .kanban-card:nth-child(3), .notes-grid .note-card:nth-child(3), .queue-grid .q-card:nth-child(3){animation-delay:60ms;}
@@ -2500,7 +2500,11 @@ function renderAttentionList(){
   if(!el) return;
   const items = activeClients().filter(c => c.danger>=4 || c.draftStatus==='pending')
     .sort((a,b)=> b.danger-a.danger || (b.draftStatus==='pending')-(a.draftStatus==='pending'));
-  if(!items.length){ el.innerHTML = `<div class="empty" style="padding:14px 0;">Nothing urgent right now.</div>`; return; }
+  if(!items.length){ el.innerHTML = emptyStateHtml(
+    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
+    'Nothing urgent right now',
+    'At-risk clients and drafts waiting on approval will show up here.'
+  ); return; }
 
   const cards = items.slice(0,4).map(c=>{
     const reason = c.draftStatus==='pending' ? 'Draft awaiting approval' : 'At risk';
@@ -3039,10 +3043,14 @@ function renderOverviewActiveQueue(){
   const el = document.getElementById('overviewActiveQueue');
   if(!el) return;
   const active = activeClients().filter(hasLoggedThisWeek).sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
-  if(!active.length){ el.innerHTML = `<div class="empty">No clients have logged improvements this week yet.</div>`; return; }
+  if(!active.length){ el.innerHTML = emptyStateHtml(
+    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+    'Nothing logged this week yet',
+    'Once someone on the team logs an improvement for a client, it\'ll show up here.'
+  ); return; }
   el.innerHTML = active.slice(0,4).map(c=>{
     const status = statusMeta(c.draftStatus);
-    const recentCount = c.improvements.filter(i=>i.date && new Date(i.date) >= (()=>{const d=new Date();d.setDate(d.getDate()-7);return d;})()).length;
+    const recentCount = c.improvements.filter(i=>i.date && new Date(i.date) >= getWeekStart(new Date())).length;
     return `<div class="q-card" onclick="goToClientInQueue('${c.id}','all')">
       <div class="q-card-top">
         <div>
@@ -7560,7 +7568,12 @@ function improvementInDateRange(imp){
 function renderQueue(){
   const el = document.getElementById('queueList');
   const ac = activeClients();
-  if(!ac.length){ el.innerHTML = `<div class="panel"><div class="empty">No clients yet — add clients in the Clients tab.</div></div>`; return; }
+  if(!ac.length){ el.innerHTML = `<div class="panel">${emptyStateHtml(
+    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+    'No clients yet',
+    'Add a client to start tracking their drafts and improvements.',
+    '<button class="btn btn-brand" onclick="switchView(\'clients\')">Go to Clients</button>'
+  )}</div>`; return; }
   let sorted = [...ac].sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
   if(queueFilter==='pending') sorted = sorted.filter(c=>c.draftStatus==='pending');
   else if(queueFilter==='approved') sorted = sorted.filter(c=>c.draftStatus==='approved');
@@ -7572,8 +7585,12 @@ function renderQueue(){
   if(dateFilterMode !== 'all') rows = rows.filter(r => r.shownImprovements.length > 0);
 
   if(!rows.length){
-    const msg = dateFilterMode!=='all' ? 'No improvements logged in this date range.' : 'No clients match this filter.';
-    el.innerHTML = `<div class="panel"><div class="empty">${msg}</div></div>`;
+    const title = dateFilterMode!=='all' ? 'No improvements in this range' : 'No clients match this filter';
+    const sub = dateFilterMode!=='all' ? 'Try a wider date range, or switch back to All time.' : 'Try a different filter, or clear it to see everyone.';
+    el.innerHTML = `<div class="panel">${emptyStateHtml(
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+      title, sub
+    )}</div>`;
     return;
   }
 
@@ -7591,9 +7608,21 @@ function renderQueue(){
         ${dotRating('Importance', c.importance, 'ink', 10)}
         ${dotRating('Danger', c.danger, 'brand')}
       </div>
-      <div class="q-bulk-preview ${shownImprovements.length ? 'has-logs' : ''}">${shownImprovements.length ? '<span class="pulse-dot"></span>' : ''}${shownImprovements.length} improvement${shownImprovements.length!==1?'s':''} logged${dateFilterMode!=='all'?' in range':' this week'}</div>
+      <div class="q-bulk-preview ${shownImprovements.length ? 'has-logs' : ''}">${shownImprovements.length ? '<span class="pulse-dot"></span>' : ''}${shownImprovements.length} improvement${shownImprovements.length!==1?'s':''} logged${dateFilterRangeLabel()}</div>
     </div>`;
   }).join('') + `</div>`;
+}
+
+// Matches the actual date filter's options — was previously hardcoded to
+// say "this week" any time the filter was set to All time, which showed
+// every improvement ever logged under a label that promised something far
+// narrower.
+function dateFilterRangeLabel(){
+  if(dateFilterMode==='all') return '';
+  if(dateFilterMode==='today') return ' today';
+  if(dateFilterMode==='7days') return ' in the last 7 days';
+  if(dateFilterMode==='30days') return ' in the last 30 days';
+  return ' in range';
 }
 
 function statusMeta(draftStatus){
@@ -8594,9 +8623,10 @@ async function showApp(session){
     if(currentUser && !isLoggingActive()){
       document.body.classList.add('silent-refresh');
       fullRefresh().finally(()=>{
-        // Small delay so anything still painting when the refresh finishes
-        // doesn't catch the tail end of the suppression being lifted.
-        setTimeout(()=> document.body.classList.remove('silent-refresh'), 50);
+        // More headroom than a single frame — ensures the non-animated
+        // render has definitely painted before suppression lifts, even on
+        // a slower device.
+        setTimeout(()=> document.body.classList.remove('silent-refresh'), 200);
       });
     }
   }, 20000);
