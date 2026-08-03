@@ -293,6 +293,7 @@
   .cell-service{color:var(--ink);font-weight:500;}
   .pill{font-family:'IBM Plex Mono',monospace;font-size:9.5px;padding:3px 8px;border-radius:20px;letter-spacing:.04em;font-weight:600;display:inline-block;}
   .pill-status{background:#EEF0F4;color:var(--muted);}
+  .pill-history{background:#5B9BD518;color:#5B9BD5;}
   .pill-good{background:var(--green-bg);color:#0E7A3D;}
   .pill-brand{background:var(--brand-bg);color:var(--brand-dark);}
   .pill-mid{background:var(--amber-bg);color:var(--amber);}
@@ -7530,6 +7531,15 @@ function setQueueFilter(f){
   renderQueue();
 }
 
+function activeDateFilterLabel(){
+  if(dateFilterMode==='thisweek') return 'this week';
+  if(dateFilterMode==='all') return '(all time)';
+  if(dateFilterMode==='today') return 'today';
+  if(dateFilterMode==='7days') return 'in the last 7 days';
+  if(dateFilterMode==='30days') return 'in the last 30 days';
+  return 'in this range';
+}
+
 function computeDateRange(mode){
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0,0,0,0);
@@ -7905,9 +7915,14 @@ function hasLoggedThisWeek(c){
 }
 
 function loggedPill(c){
-  const count = c.improvements.length;
-  if(hasLoggedThisWeek(c)) return `<span class="pill pill-good">${count} logged</span>`;
-  return `<span class="pill pill-status">${count ? count+' (older)' : 'No logs'}</span>`;
+  if(hasLoggedThisWeek(c)){
+    const count = c.improvements.filter(i=>i.date && new Date(i.date) >= getWeekStart(new Date())).length;
+    return `<span class="pill pill-good">${count} this week</span>`;
+  }
+  const dated = c.improvements.filter(i=>i.date);
+  if(!dated.length) return `<span class="pill pill-status">No logs</span>`;
+  const mostRecent = dated.reduce((latest, i)=> new Date(i.date) > new Date(latest.date) ? i : latest);
+  return `<span class="pill pill-history">${timeAgo(mostRecent.date)}</span>`;
 }
 
 function openQueueCardModal(id){
@@ -7930,7 +7945,7 @@ function openQueueCardModal(id){
     <div class="modal-body">
       <span class="q-status-label" style="color:${status.color};">${status.label}</span>
       <div class="q-bulk">
-        ${shownImprovements.length ? `<div class="q-bulk-title">Logged this week (${shownImprovements.length}) — ${shownImprovements.filter(i=>i.includeInEmail!==false).length} included in email</div><div class="q-bulk-list"><ul>${shownImprovements.map(i=>`<li style="${i.includeInEmail===false?'opacity:.55;':''}">${i.includeInEmail===false ? '<span style="color:var(--muted-lt);font-size:10px;">[not in email]</span> ' : ''}${i.text} — <span style="color:#9AA3AF;">${i.author}</span></li>`).join('')}</ul></div>` : `<i>No improvements logged this week — nothing to send.</i>`}
+        ${shownImprovements.length ? `<div class="q-bulk-title">Logged ${activeDateFilterLabel()} (${shownImprovements.length}) — ${shownImprovements.filter(i=>i.includeInEmail!==false).length} included in email</div><div class="q-bulk-list"><ul>${shownImprovements.map(i=>`<li style="${i.includeInEmail===false?'opacity:.55;':''}">${i.includeInEmail===false ? '<span style="color:var(--muted-lt);font-size:10px;">[not in email]</span> ' : ''}${i.text} — <span style="color:#9AA3AF;">${i.author}</span></li>`).join('')}</ul></div>` : `<i>No improvements logged ${activeDateFilterLabel()} — nothing to send.</i>`}
       </div>
       ${c.draft ? `<textarea class="draft" id="draft-${c.id}">${c.draft}</textarea>` : ''}
       ${c.draft && !c.email ? `<span class="warn-text">No client email on file — add one in Clients</span>` : ''}
@@ -7955,9 +7970,13 @@ async function generateDraft(id){
   if(!c) return;
   const modalCard = document.querySelector('#appModalOverlay .modal-card');
   const modalOpenForThis = modalCard && modalCard.dataset.clientId === id;
-  const includedImprovements = c.improvements.filter(i=> i.includeInEmail !== false);
+  const weekStart = getWeekStart(new Date());
+  const includedImprovements = c.improvements.filter(i=> i.includeInEmail !== false && i.date && new Date(i.date) >= weekStart);
   if(!includedImprovements.length){
-    showToast('error','Nothing to include', c.improvements.length ? `${c.name} has logged items, but none are marked "Include in email" yet — review them in Past Improvements.` : `No improvements logged yet for ${c.name}.`);
+    const hasOlderIncluded = c.improvements.some(i=> i.includeInEmail !== false && i.date && new Date(i.date) < weekStart);
+    showToast('error','Nothing to include', hasOlderIncluded
+      ? `${c.name} has older logged improvements, but nothing from this week yet.`
+      : c.improvements.length ? `${c.name} has logged items, but none are marked "Include in email" yet — review them in Past Improvements.` : `No improvements logged yet for ${c.name}.`);
     return;
   }
   const btn = document.getElementById('gen-'+id);
