@@ -7223,13 +7223,19 @@ function onTimesheetDatePicked(value){
 }
 
 // Shared by both Timesheet views (Day and Week) — one source of truth so
-// they can't drift apart. Service is a neutral tag, importance keeps its
-// label muted but bolds the actual value, and health reuses the exact same
-// pill dangerPillCompact() already renders in the Clients and Reports
-// tables — same visual language for the same concept everywhere it appears.
-function timesheetClientMetaHtml(c){
+// they can't drift apart. Importance keeps its label muted but bolds the
+// actual value, and health reuses the exact same pill dangerPillCompact()
+// already renders in the Clients and Reports tables — same visual language
+// for the same concept everywhere it appears.
+// serviceOverride: the Day view passes the specific entry's service (what
+// was actually worked on that day) since it's showing one exact entry. The
+// Week view omits this — a week can span several entries with different
+// services, so there's no single "service worked on" to show — and falls
+// back to the client's signed service instead.
+function timesheetClientMetaHtml(c, serviceOverride){
   if(!c) return '';
-  const serviceChip = c.service ? `<span class="ts-meta-chip ts-meta-chip-service">${c.service}</span>` : '';
+  const serviceToShow = serviceOverride || c.service;
+  const serviceChip = serviceToShow ? `<span class="ts-meta-chip ts-meta-chip-service">${serviceToShow}</span>` : '';
   const importanceChip = `<span class="ts-meta-chip ts-meta-chip-importance"><span>Importance</span> ${c.importance}/10</span>`;
   return `<div class="ts-entry-client-meta">${serviceChip}${importanceChip}${dangerPillCompact(c.danger)}</div>`;
 }
@@ -7266,8 +7272,8 @@ function renderTimesheetDay(bodyEl){
     const hasMenuItems = canLog || canEdit;
     return `<div class="ts-entry-card">
       <div class="ts-entry-info">
-        <div class="ts-entry-title">${c ? c.name : 'Unknown client'} ${(e.service || (c && c.service)) ? `<span class="ts-entry-service">(${e.service || c.service})</span>` : ''}</div>
-        ${timesheetClientMetaHtml(c)}
+        <div class="ts-entry-title">${c ? c.name : 'Unknown client'} ${(c && c.service) ? `<span class="ts-entry-service">(${c.service})</span>` : ''}</div>
+        ${timesheetClientMetaHtml(c, e.service)}
         ${e.description ? `<div class="ts-entry-desc">${e.description}</div>` : ''}
       </div>
       <div class="ts-entry-right">
