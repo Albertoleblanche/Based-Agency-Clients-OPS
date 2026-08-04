@@ -621,8 +621,11 @@
   .ts-entry-info{min-width:0;flex:1;}
   .ts-entry-title{font-size:13.5px;font-weight:600;}
   .ts-entry-service{font-weight:400;color:var(--muted);}
-  .ts-entry-client-meta{display:flex;align-items:center;gap:10px;margin-top:4px;flex-wrap:wrap;row-gap:2px;}
-  .ts-entry-client-service{font-size:11px;color:var(--muted-lt);}
+  .ts-entry-client-meta{display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap;row-gap:6px;}
+  .ts-meta-chip{display:inline-flex;align-items:center;gap:3px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;}
+  .ts-meta-chip-service{background:var(--surface-2);color:var(--muted);border:1px solid var(--border);font-weight:500;}
+  .ts-meta-chip-importance{background:#EEF0F4;color:var(--ink);}
+  .ts-meta-chip-importance span{color:var(--muted);font-weight:500;}
   .ts-entry-desc{font-size:12px;color:var(--muted);margin-top:4px;}
   .ts-entry-right{display:flex;align-items:center;gap:10px;flex:none;}
 
@@ -7219,6 +7222,18 @@ function onTimesheetDatePicked(value){
   renderTimesheet();
 }
 
+// Shared by both Timesheet views (Day and Week) — one source of truth so
+// they can't drift apart. Service is a neutral tag, importance keeps its
+// label muted but bolds the actual value, and health reuses the exact same
+// pill dangerPillCompact() already renders in the Clients and Reports
+// tables — same visual language for the same concept everywhere it appears.
+function timesheetClientMetaHtml(c){
+  if(!c) return '';
+  const serviceChip = c.service ? `<span class="ts-meta-chip ts-meta-chip-service">${c.service}</span>` : '';
+  const importanceChip = `<span class="ts-meta-chip ts-meta-chip-importance"><span>Importance</span> ${c.importance}/10</span>`;
+  return `<div class="ts-entry-client-meta">${serviceChip}${importanceChip}${dangerPillCompact(c.danger)}</div>`;
+}
+
 function renderTimesheetDay(bodyEl){
   const weekStart = getWeekStart(timesheetAnchor);
   const selectedStr = toDateStr(timesheetAnchor);
@@ -7252,7 +7267,7 @@ function renderTimesheetDay(bodyEl){
     return `<div class="ts-entry-card">
       <div class="ts-entry-info">
         <div class="ts-entry-title">${c ? c.name : 'Unknown client'} ${(e.service || (c && c.service)) ? `<span class="ts-entry-service">(${e.service || c.service})</span>` : ''}</div>
-        ${c ? `<div class="ts-entry-client-meta">${c.service ? `<span class="ts-entry-client-service">${c.service}</span>` : ''}<span class="ts-entry-client-service">Importance: ${c.importance}/10</span><span class="ts-entry-client-service" style="color:${riskLabel(c.danger).color};">Health: ${riskLabel(c.danger).text}</span></div>` : ''}
+        ${timesheetClientMetaHtml(c)}
         ${e.description ? `<div class="ts-entry-desc">${e.description}</div>` : ''}
       </div>
       <div class="ts-entry-right">
@@ -7294,7 +7309,7 @@ function renderTimesheetWeek(bodyEl){
     }).join('');
     const rowTotal = relevant.filter(e=>e.clientId===cid).reduce((s,e)=>s+e.minutes,0);
     return `<tr>
-      <td class="tsg-row-label"><div class="tsg-client">${c?c.name:'Unknown client'}</div>${c ? `<div class="ts-entry-client-meta">${c.service?`<span class="ts-entry-client-service">${c.service}</span>`:''}<span class="ts-entry-client-service">Importance: ${c.importance}/10</span><span class="ts-entry-client-service" style="color:${riskLabel(c.danger).color};">Health: ${riskLabel(c.danger).text}</span></div>` : ''}</td>
+      <td class="tsg-row-label"><div class="tsg-client">${c?c.name:'Unknown client'}</div>${timesheetClientMetaHtml(c)}</td>
       ${cells}
       <td class="tsg-total-cell">${formatMinutes(rowTotal)}</td>
     </tr>`;
