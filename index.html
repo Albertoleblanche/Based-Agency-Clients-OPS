@@ -67,11 +67,30 @@
   body.sidebar-collapsed .cmdk-trigger-kbd, body.sidebar-collapsed .nav-section-label,
   body.sidebar-collapsed .sidebar-action span,
   body.sidebar-collapsed .sidebar-sync-status, body.sidebar-collapsed .sidebar-tour-link{display:none;}
-  body.sidebar-collapsed .nav-item{position:relative;justify-content:center;padding:9px;font-size:0;}
+  body.sidebar-collapsed .nav-item{justify-content:center;padding:9px 0;gap:0;}
+  body.sidebar-collapsed .nav-label{opacity:0;max-width:0;}
   body.sidebar-collapsed .nav-badge{position:absolute;top:2px;right:2px;margin-left:0;font-size:9px;padding:1px 5px;min-width:14px;text-align:center;box-shadow:0 0 0 2px var(--sidebar);}
   body.sidebar-collapsed .cmdk-trigger{justify-content:center;padding:9px;}
   body.sidebar-collapsed .sidebar-action{justify-content:center;}
   body.sidebar-collapsed .sidebar-collapse-btn{position:absolute;right:-11px;top:22px;background:var(--sidebar);border:1px solid #24365E;border-radius:50%;transform:rotate(180deg);}
+
+  /* Collapsed-only hover tooltips — an icon-only nav is unusable without
+     these, not a nice-to-have. Pulls straight from data-tooltip, no JS. */
+  body.sidebar-collapsed .nav-item:hover::after{
+    content:attr(data-tooltip);
+    position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);
+    background:var(--ink);color:#fff;padding:6px 11px;border-radius:7px;
+    font-size:12px;font-weight:600;white-space:nowrap;
+    box-shadow:0 8px 20px rgba(16,24,40,.28);z-index:200;pointer-events:none;
+    animation:tooltipIn .12s var(--ease-out);
+  }
+  body.sidebar-collapsed .nav-item:hover::before{
+    content:'';position:absolute;left:calc(100% + 6px);top:50%;
+    transform:translateY(-50%);border:5px solid transparent;border-right-color:var(--ink);
+    z-index:200;pointer-events:none;
+  }
+  @keyframes tooltipIn{from{opacity:0;transform:translateY(-50%) translateX(-4px);}to{opacity:1;transform:translateY(-50%) translateX(0);}}
+
   @media (max-width:900px){ .app{grid-template-columns:1fr;} .sidebar{display:none;} body.sidebar-collapsed .app{grid-template-columns:1fr;} }
 
   .login-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:2000;padding:20px;}
@@ -118,7 +137,9 @@
   .brand-name{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;letter-spacing:.03em;color:#fff;}
   .brand-sub{font-family:'DM Sans',sans-serif;font-size:9px;color:var(--muted-lt);letter-spacing:.06em;}
   nav{display:flex;flex-direction:column;gap:2px;margin-top:6px;}
-  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;color:#AEB9CC;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;color:#AEB9CC;position:relative;transition:background var(--duration-fast) var(--ease-out), padding var(--duration-base) var(--ease-out), gap var(--duration-base) var(--ease-out);}
+  .nav-item svg{flex:none;}
+  .nav-label{white-space:nowrap;overflow:hidden;opacity:1;max-width:180px;transition:opacity var(--duration-base) var(--ease-out), max-width var(--duration-base) var(--ease-out);}
   .nav-section-label{font-family:'DM Sans',sans-serif;font-size:10px;letter-spacing:.04em;color:#5C6B8A;padding:16px 11px 6px;font-weight:600;}
 
   .cmdk-trigger{display:flex;align-items:center;gap:8px;padding:9px 11px;margin-bottom:10px;border-radius:8px;background:#151F38;border:1px solid #24365E;color:#7C8AAD;font-size:12.5px;cursor:pointer;transition:border-color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);}
@@ -853,59 +874,59 @@ document.addEventListener('DOMContentLoaded', function(){
       <span class="cmdk-trigger-kbd">⌘K</span>
     </div>
     <nav>
-      <div class="nav-item active" data-view="overview" onclick="switchView('overview')">
+      <div class="nav-item active" data-view="overview" data-tooltip="Overview" onclick="switchView('overview')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
-        Overview
+        <span class="nav-label">Overview</span>
       </div>
 
       <div class="nav-section-label">Client work</div>
-      <div class="nav-item" data-view="clients" onclick="switchView('clients')">
+      <div class="nav-item" data-view="clients" data-tooltip="Clients" onclick="switchView('clients')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        Clients
+        <span class="nav-label">Clients</span>
       </div>
-      <div class="nav-item" data-view="improvements" onclick="switchView('improvements')">
+      <div class="nav-item" data-view="improvements" data-tooltip="Past Improvements" onclick="switchView('improvements')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        Past Improvements
+        <span class="nav-label">Past Improvements</span>
       </div>
-      <div class="nav-item" data-view="approve" onclick="switchView('approve')">
+      <div class="nav-item" data-view="approve" data-tooltip="Approval Queue" onclick="switchView('approve')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        Approval Queue
+        <span class="nav-label">Approval Queue</span>
         <span class="nav-badge" id="navPendingBadge">0</span>
       </div>
-      <div class="nav-item" data-view="notes" onclick="switchView('notes')">
+      <div class="nav-item" data-view="notes" data-tooltip="Notes" onclick="switchView('notes')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        Notes
+        <span class="nav-label">Notes</span>
         <span class="nav-badge" id="navNotesBadge">0</span>
       </div>
 
       <div class="nav-section-label">Team</div>
-      <div class="nav-item" data-view="tasks" onclick="switchView('tasks')">
+      <div class="nav-item" data-view="tasks" data-tooltip="Tasks" onclick="switchView('tasks')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-        Tasks
+        <span class="nav-label">Tasks</span>
         <span class="nav-badge" id="navTasksBadge">0</span>
       </div>
-      <div class="nav-item" data-view="calendar" onclick="switchView('calendar')">
+      <div class="nav-item" data-view="calendar" data-tooltip="Calendar" onclick="switchView('calendar')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        Calendar
+        <span class="nav-label">Calendar</span>
         <span class="nav-badge" id="navCalendarBadge">0</span>
       </div>
-      <div class="nav-item" data-view="time" onclick="switchView('time')">
+      <div class="nav-item" data-view="time" data-tooltip="Time Tracker" onclick="switchView('time')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        Time Tracker
+        <span class="nav-label">Time Tracker</span>
       </div>
-      <div class="nav-item" data-view="team" onclick="switchView('team')">
+      <div class="nav-item" data-view="team" data-tooltip="Team" onclick="switchView('team')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        Team
+        <span class="nav-label">Team</span>
       </div>
 
       <div class="nav-section-label">Admin</div>
-      <div class="nav-item" data-view="trash" onclick="switchView('trash')">
+      <div class="nav-item" data-view="trash" data-tooltip="Trash" onclick="switchView('trash')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-        Trash
+        <span class="nav-label">Trash</span>
       </div>
-      <div class="nav-item" data-view="settings" onclick="switchView('settings')">
+      <div class="nav-item" data-view="settings" data-tooltip="Settings &amp; Integrations" onclick="switchView('settings')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        Settings &amp; Integrations
+        <span class="nav-label">Settings &amp; Integrations</span>
       </div>
     </nav>
     <div class="sidebar-foot">
