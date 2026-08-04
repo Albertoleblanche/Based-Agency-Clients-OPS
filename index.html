@@ -91,7 +91,39 @@
   }
   @keyframes tooltipIn{from{opacity:0;transform:translateY(-50%) translateX(-4px);}to{opacity:1;transform:translateY(-50%) translateX(0);}}
 
-  @media (max-width:900px){ .app{grid-template-columns:1fr;} .sidebar{display:none;} body.sidebar-collapsed .app{grid-template-columns:1fr;} }
+  @media (max-width:900px){
+    .mobile-nav-toggle{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;border:none;background:none;color:var(--muted);cursor:pointer;margin-right:10px;flex:none;}
+    .mobile-nav-toggle:hover{background:var(--surface-2);}
+    .app{grid-template-columns:1fr;}
+    body.sidebar-collapsed .app{grid-template-columns:1fr;}
+    .app-topbar{left:0;}
+    .sidebar{display:flex;position:fixed;top:0;left:0;bottom:0;width:260px;z-index:1000;box-shadow:0 20px 60px rgba(0,0,0,.35);transform:translateX(-100%);transition:transform var(--duration-base) var(--ease-out);}
+    body.mobile-nav-open .sidebar{transform:translateX(0);}
+    /* A temporary overlay you explicitly opened to navigate should always
+       show full labels — an icon-only rail doesn't serve its space-saving
+       purpose here the way it does as a persistent desktop state, so this
+       ignores the sidebar-collapsed preference entirely while on mobile. */
+    body.sidebar-collapsed .sidebar{padding:18px 12px;}
+    body.sidebar-collapsed .brand{padding:6px 10px 20px;justify-content:flex-start;}
+    body.sidebar-collapsed .brand-mark{cursor:default;}
+    body.sidebar-collapsed .brand-text, body.sidebar-collapsed .nav-label,
+    body.sidebar-collapsed .nav-section-label, body.sidebar-collapsed .cmdk-trigger span,
+    body.sidebar-collapsed .cmdk-trigger-kbd, body.sidebar-collapsed .sidebar-action span,
+    body.sidebar-collapsed .sidebar-sync-status, body.sidebar-collapsed .sidebar-tour-link{display:revert;opacity:1;max-width:none;}
+    body.sidebar-collapsed .nav-item{justify-content:flex-start;padding:9px 11px;gap:10px;}
+    body.sidebar-collapsed .nav-badge{position:static;margin-left:auto;font-size:10px;padding:1px 7px;box-shadow:none;}
+    body.sidebar-collapsed .cmdk-trigger{justify-content:flex-start;padding:9px 11px;}
+    body.sidebar-collapsed .sidebar-action{justify-content:flex-start;}
+    .sidebar-collapse-btn{display:none;}
+    .gauge-row{display:none;}
+    #refreshBtn{padding:8px;}
+    #refreshBtn .refresh-btn-label{display:none;}
+    .sidebar-profile-name, .sidebar-profile-role{display:none;}
+    .app-topbar-inner{padding-right:4px;}
+  }
+  .mobile-nav-scrim{display:none;position:fixed;inset:0;background:rgba(16,24,40,.5);z-index:999;animation:modalOverlayIn var(--duration-base) var(--ease-out);}
+  @media (max-width:900px){ body.mobile-nav-open .mobile-nav-scrim{display:block;} }
+  .mobile-nav-toggle{display:none;}
 
   .login-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:2000;padding:20px;}
 
@@ -103,7 +135,6 @@
   .login-footnote{font-size:11px;color:var(--muted-lt);margin-top:18px;line-height:1.5;}
 
   .role-chip{font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.04em;color:var(--muted-lt);border:1px solid var(--border);border-radius:10px;padding:1px 6px;margin-left:2px;}
-  @media (max-width:900px){ .app{grid-template-columns:1fr;} .sidebar{display:none;} }
 
   /* Sidebar */
   .sidebar{background:var(--sidebar);color:#C9D2E3;padding:18px 12px;display:flex;flex-direction:column;height:100vh;overflow-y:auto;position:relative;}
@@ -183,7 +214,6 @@
   .main > *{max-width:1240px;margin-left:auto;margin-right:auto;}
   .app-topbar{position:fixed;top:0;left:224px;right:0;height:76px;background:var(--card);display:flex;align-items:center;padding:0 28px;z-index:100;}
   .app-topbar-inner{display:flex;justify-content:space-between;align-items:center;width:100%;max-width:1240px;margin:0 auto;}
-  @media (max-width:900px){ .app-topbar{left:0;} }
   .topbar-profile{display:flex;align-items:center;gap:9px;cursor:pointer;padding:6px 8px;border-radius:8px;transition:background .15s ease;}
   .topbar-profile:hover{background:var(--surface-2);}
   #sidebarProfileAvatar{width:30px;height:30px;border-radius:50%;object-fit:cover;flex:none;}
@@ -316,6 +346,8 @@
   .q-card.highlight-flash{animation:flash 1.4s ease-out;}
 
   .panel{background:var(--card);border:1px solid #EDEEF1;border-radius:var(--radius-lg);box-shadow:0 1px 2px rgba(16,24,40,.03);margin-bottom:20px;}
+  .table-scroll-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .calendar-month-inner{min-width:700px;}
   .panel-head{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #F3F4F6;flex-wrap:wrap;gap:8px;}
   .panel-title{font-size:13.5px;font-weight:600;letter-spacing:.01em;text-transform:capitalize;}
   .panel-body{padding:18px 20px;}
@@ -548,7 +580,7 @@
   .calendar-today-date{font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;color:var(--ink);}
   .calendar-today-sub{font-size:12.5px;color:var(--muted);margin-top:2px;}
 
-  .week-grid-wrap{display:grid;grid-template-columns:64px repeat(7,1fr);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;background:var(--card);}
+  .week-grid-wrap{display:grid;grid-template-columns:64px repeat(7,1fr);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;background:var(--card);min-width:700px;}
   .week-grid-head{display:contents;}
   .week-allday-row{display:contents;}
   .week-allday-label{background:var(--surface-2);padding:8px 6px;font-family:'DM Sans',sans-serif;font-size:9px;color:var(--muted-lt);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:flex-end;}
@@ -947,6 +979,9 @@ document.addEventListener('DOMContentLoaded', function(){
 
   <div class="app-topbar" id="appTopbar">
     <div class="app-topbar-inner">
+      <button class="mobile-nav-toggle" onclick="toggleMobileNav()" title="Open menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
       <div><div class="page-title" id="topbarTitle">Overview</div><div class="page-sub" id="topbarSub"></div></div>
       <div class="topbar-right">
         <div class="clock-mini-pill gauge-row" onclick="switchView('approve')" title="Time until Wednesday auto-notification">
@@ -958,7 +993,7 @@ document.addEventListener('DOMContentLoaded', function(){
         </div>
         <button class="clock-mini-pill" id="refreshBtn" onclick="fullRefresh(true)" title="Refresh data from the team">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-          Refresh
+          <span class="refresh-btn-label">Refresh</span>
         </button>
         <div class="topbar-profile" onclick="switchView('profile')" title="My Profile">
           <img id="sidebarProfileAvatar" src="" style="display:none;">
@@ -1153,6 +1188,7 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
 
       <div class="panel">
+        <div class="table-scroll-wrap">
         <table id="clientsTable">
           <thead><tr>
             <th style="width:36px;"><input type="checkbox" id="clientsSelectAll" onchange="toggleAllClientSelection(this.checked)"></th>
@@ -1166,6 +1202,7 @@ document.addEventListener('DOMContentLoaded', function(){
           </tr></thead>
           <tbody id="clientsTbody"></tbody>
         </table>
+        </div>
         <div class="table-pagination" id="clientsPagination"></div>
       </div>
     </div>
@@ -1486,7 +1523,7 @@ document.addEventListener('DOMContentLoaded', function(){
         </div>
 
         <div class="panel">
-          <div class="panel-body" style="padding:8px 22px;">
+          <div class="panel-body table-scroll-wrap" style="padding:8px 22px;">
             <table class="report-table">
               <thead><tr id="reportTableHead"></tr></thead>
               <tbody id="reportTableBody"></tbody>
@@ -1564,7 +1601,7 @@ document.addEventListener('DOMContentLoaded', function(){
               <button class="btn btn-brand" onclick="markPayrollPeriodPaid()">Mark period as paid</button>
             </div>
           </div>
-          <div class="panel-body" style="padding:8px 22px;">
+          <div class="panel-body table-scroll-wrap" style="padding:8px 22px;">
             <table class="report-table">
               <thead><tr><th>Member</th><th class="report-th-hours">Regular Hrs</th><th class="report-th-hours">OT Hrs</th><th class="report-th-hours">Rate</th><th class="report-th-hours">Total</th></tr></thead>
               <tbody id="payrollSummaryBody"></tbody>
@@ -1949,6 +1986,8 @@ document.addEventListener('DOMContentLoaded', function(){
   <button class="ftp-stop" onclick="event.stopPropagation(); stopAndSaveTimer();">Stop</button>
 </div>
 
+<div class="mobile-nav-scrim" id="mobileNavScrim" onclick="closeMobileNav()"></div>
+
 <div class="cmdk-overlay" id="cmdkOverlay" style="display:none;" onclick="if(event.target===this) closeCommandPalette();">
   <div class="cmdk-palette">
     <div class="cmdk-input-row">
@@ -2051,6 +2090,14 @@ function initSidebarState(){
     const btn = document.querySelector('.sidebar-collapse-btn');
     if(btn) btn.title = 'Expand sidebar';
   }
+}
+
+function toggleMobileNav(){
+  document.body.classList.toggle('mobile-nav-open');
+}
+
+function closeMobileNav(){
+  document.body.classList.remove('mobile-nav-open');
 }
 
 /* ---------- Real identity — comes from Supabase Auth + team_profiles, not self-reported ---------- */
@@ -2662,6 +2709,7 @@ function cmdkRefreshActiveHighlight(){
 }
 
 async function switchView(name){
+  closeMobileNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name));
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
@@ -5493,10 +5541,14 @@ function renderCalendarMonthView(container){
   }
 
   container.innerHTML = `
+    <div class="table-scroll-wrap">
+    <div class="calendar-month-inner">
     <div class="calendar-grid-head">
       <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
     </div>
-    <div class="calendar-grid">${daysHtml}</div>`;
+    <div class="calendar-grid">${daysHtml}</div>
+    </div>
+    </div>`;
 }
 
 const WEEK_VIEW_START_HOUR = 7;
@@ -5577,11 +5629,13 @@ function renderCalendarWeekView(container){
   }).join('');
 
   container.innerHTML = `
+    <div class="table-scroll-wrap">
     <div class="week-grid-wrap">
       <div class="week-grid-head">${headHtml}</div>
       <div class="week-allday-row">${allDayRowHtml}</div>
       ${hourLabelsHtml}
       ${dayColsHtml}
+    </div>
     </div>`;
 }
 
