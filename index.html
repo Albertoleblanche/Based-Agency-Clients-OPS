@@ -61,7 +61,7 @@
   .app{display:grid;grid-template-columns:224px 1fr;height:100vh;overflow:hidden;transition:grid-template-columns var(--duration-base) var(--ease-out);}
   body.sidebar-collapsed .app{grid-template-columns:60px 1fr;}
   body.sidebar-collapsed .app-topbar{left:60px;}
-  body.sidebar-collapsed .sidebar{padding-left:0;padding-right:0;overflow:visible;}
+  body.sidebar-collapsed .sidebar{padding-left:9px;padding-right:9px;overflow:visible;}
   body.sidebar-collapsed .brand{padding-left:0;padding-right:0;justify-content:center;}
   body.sidebar-collapsed .brand-text, body.sidebar-collapsed .cmdk-trigger span,
   body.sidebar-collapsed .cmdk-trigger-kbd, body.sidebar-collapsed .nav-section-label,
@@ -72,7 +72,7 @@
   body.sidebar-collapsed .nav-badge{position:absolute;top:2px;right:2px;margin-left:0;font-size:9px;padding:1px 5px;min-width:14px;text-align:center;box-shadow:0 0 0 2px var(--sidebar);}
   body.sidebar-collapsed .cmdk-trigger{justify-content:center;padding:9px;}
   body.sidebar-collapsed .sidebar-action{justify-content:center;}
-  body.sidebar-collapsed .sidebar-collapse-btn{position:absolute;right:-11px;top:22px;background:var(--sidebar);border:1px solid #24365E;border-radius:50%;transform:rotate(180deg);}
+  body.sidebar-collapsed .sidebar-collapse-btn{top:64px;left:50%;right:auto;transform:translateX(-50%);}
 
   /* Collapsed-only hover tooltips — an icon-only nav is unusable without
      these, not a nice-to-have. Pulls straight from data-tooltip, no JS. */
@@ -106,10 +106,10 @@
   @media (max-width:900px){ .app{grid-template-columns:1fr;} .sidebar{display:none;} }
 
   /* Sidebar */
-  .sidebar{background:var(--sidebar);color:#C9D2E3;padding:18px 12px;display:flex;flex-direction:column;height:100vh;overflow-y:auto;}
+  .sidebar{background:var(--sidebar);color:#C9D2E3;padding:18px 12px;display:flex;flex-direction:column;height:100vh;overflow-y:auto;position:relative;}
   .brand{display:flex;align-items:center;gap:9px;padding:6px 10px 20px;position:relative;}
   .brand-text{flex:1;min-width:0;}
-  .sidebar-collapse-btn{display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;color:var(--muted-lt);cursor:pointer;flex:none;transition:transform var(--duration-base) var(--ease-out), background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);}
+  .sidebar-collapse-btn{position:absolute;top:20px;right:14px;display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;color:var(--muted-lt);cursor:pointer;transition:top var(--duration-base) var(--ease-out), left var(--duration-base) var(--ease-out), right var(--duration-base) var(--ease-out), background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);z-index:10;}
   .sidebar-collapse-btn:hover{background:var(--sidebar-hover);color:#fff;}
 
   .notif-bell-btn{background:none;border:none;color:var(--muted-lt);cursor:pointer;padding:6px;border-radius:8px;position:relative;display:flex;}
@@ -861,12 +861,12 @@ document.addEventListener('DOMContentLoaded', function(){
 
 <div class="app" id="appRoot" style="display:none;">
   <div class="sidebar">
+    <span class="sidebar-collapse-btn" onclick="toggleSidebar()" title="Collapse sidebar">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+    </span>
     <div class="brand">
       <div class="brand-mark">BA</div>
       <div class="brand-text"><div class="brand-name">Based Agency</div><div class="brand-sub">CLIENT OPS</div></div>
-      <span class="sidebar-collapse-btn" onclick="toggleSidebar()" title="Collapse sidebar">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-      </span>
     </div>
     <div class="cmdk-trigger" onclick="openCommandPalette()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
