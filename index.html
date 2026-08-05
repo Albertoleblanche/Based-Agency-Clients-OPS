@@ -2569,7 +2569,7 @@ function applyRoleVisibility(){
   const notifyBtn = document.getElementById('notifyBtn');
   if(notifyBtn){
     const recipient = getNotifyRecipient();
-    if(recipient){ notifyBtn.style.display = 'inline-flex'; notifyBtn.textContent = `Notify ${recipient.label}`; }
+    if(recipient){ notifyBtn.style.display = 'inline-flex'; notifyBtn.textContent = 'Ready to Notify'; }
     else { notifyBtn.style.display = 'none'; }
   }
   const queueScopeBar = document.getElementById('queueScopeBar');
@@ -9069,24 +9069,26 @@ function exportRosterCsv(){
 // Daniel/Eric addresses configured in Settings, since that's the only
 // reliable way to identify "which specific person" someone is, beyond
 // their role.
+// Members notify the approver, approvers notify the admin, and the admin —
+// being the top of the chain — has nobody left to notify. Role-based, not
+// tied to a specific named person, and deliberately never surfaces who the
+// actual recipient is anywhere the person clicking can see it.
 function getNotifyRecipient(){
-  const myEmail = (myProfile?.email || '').toLowerCase().trim();
-  const danielEmail = (settings.danielEmail || '').toLowerCase().trim();
-  const ericEmail = (settings.ericEmail || '').toLowerCase().trim();
-  if(myEmail && danielEmail && myEmail === danielEmail) return null;
-  if(myEmail && ericEmail && myEmail === ericEmail) return { email: settings.danielEmail, label: 'Daniel' };
-  return { email: settings.ericEmail, label: 'Eric' };
+  const role = myProfile?.role;
+  if(role === 'admin') return null;
+  if(role === 'approver') return { email: settings.danielEmail, configLabel: "the admin's" };
+  return { email: settings.ericEmail, configLabel: "the approver's" };
 }
 
 function notifyApprovers(){
   const recipient = getNotifyRecipient();
   if(!recipient){ showToast('info','Nobody to notify', "You're the last stop in the chain — nothing further to send."); return; }
-  if(!recipient.email){ showToast('error',`Missing ${recipient.label}'s email`, `Add ${recipient.label}'s email address in Settings first.`); return; }
+  if(!recipient.email){ showToast('error','Missing email on file', `Add ${recipient.configLabel} email address in Settings first.`); return; }
   const pending = activeClients().filter(c=>c.draftStatus==='pending');
   const subject = `${pending.length} client update${pending.length!==1?'s':''} ready for approval`;
   const bodyLines = pending.length ? pending.map(c=>`- ${c.name} (danger ${c.danger}/5, importance ${c.importance}/10)`).join('\n') : 'No drafts are ready yet.';
   const body = `This week's client update drafts are ready for review, sorted by danger score:\n\n${bodyLines}\n\nReview and approve here: ${window.location.href}`;
-  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Opened notification email to ${recipient.label} — ${pending.length} draft${pending.length!==1?'s':''} pending.`});
+  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Opened a notification email — ${pending.length} draft${pending.length!==1?'s':''} pending.`});
   persistLog().then(renderLog);
   showSendEmailConfirm(recipient.email, subject, body);
 }
