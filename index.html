@@ -1273,20 +1273,14 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- APPROVAL QUEUE -->
     <div class="view" id="view-approve">
-      <div class="icon-tab-group" id="queueScopeBar" style="margin-bottom:14px;">
-        <div class="icon-tab active" data-scope="mine" onclick="setQueueScope('mine')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          <span>My Queue</span>
-        </div>
-        <div class="icon-tab" data-scope="team" id="queueTeamScopeTab" onclick="setQueueScope('team')" style="display:none;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          <span>Team Queue</span>
-        </div>
+      <div class="view-toggle" id="queueScopeBar" style="margin-bottom:14px;display:none;">
+        <div class="view-toggle-option active" data-scope="mine" onclick="setQueueScope('mine')">My Queue</div>
+        <div class="view-toggle-option" data-scope="team" onclick="setQueueScope('team')">Team Queue</div>
       </div>
 
       <div class="topbar" style="justify-content:flex-end;">
         <button class="btn btn-outline" onclick="previewWednesdayEmail()">Preview Wednesday email</button>
-        <button class="btn btn-dark" id="notifyBtn" onclick="notifyApprovers()" style="display:none;">Notify Daniel &amp; Eric</button>
+        <button class="btn btn-dark" id="notifyBtn" onclick="notifyApprovers()"></button>
       </div>
 
       <div class="icon-tab-group" id="queueFilterBar">
@@ -2573,10 +2567,14 @@ function switchTrashTab(name){
 
 function applyRoleVisibility(){
   const notifyBtn = document.getElementById('notifyBtn');
-  if(notifyBtn) notifyBtn.style.display = (canApprove() && queueScope==='team') ? 'inline-flex' : 'none';
-  const queueTeamScopeTab = document.getElementById('queueTeamScopeTab');
-  if(queueTeamScopeTab){
-    queueTeamScopeTab.style.display = canApprove() ? 'flex' : 'none';
+  if(notifyBtn){
+    const recipient = getNotifyRecipient();
+    if(recipient){ notifyBtn.style.display = 'inline-flex'; notifyBtn.textContent = `Notify ${recipient.label}`; }
+    else { notifyBtn.style.display = 'none'; }
+  }
+  const queueScopeBar = document.getElementById('queueScopeBar');
+  if(queueScopeBar){
+    queueScopeBar.style.display = canApprove() ? 'inline-flex' : 'none';
     // If a non-approver somehow had Team Queue selected (e.g. lost approver
     // status mid-session), fall back to their own personal queue.
     if(!canApprove() && queueScope==='team'){ setQueueScope('mine'); }
@@ -3453,15 +3451,18 @@ function renderKpis(){
 function renderOverviewActiveQueue(){
   const el = document.getElementById('overviewActiveQueue');
   if(!el) return;
-  const active = activeClients().filter(hasLoggedThisWeek).sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
+  const weekStart = getWeekStart(new Date());
+  const me = myName();
+  const myThisWeek = (c)=> c.improvements.some(i=> i.date && new Date(i.date) >= weekStart && i.author === me);
+  const active = activeClients().filter(myThisWeek).sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
   if(!active.length){ el.innerHTML = emptyStateHtml(
     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
-    'Nothing logged this week yet',
-    'Once someone on the team logs an improvement for a client, it\'ll show up here.'
+    "You haven't logged anything this week yet",
+    'Log an improvement for a client and it\'ll show up here.'
   ); return; }
   el.innerHTML = active.slice(0,4).map(c=>{
     const status = statusMeta(c.draftStatus);
-    const recentCount = c.improvements.filter(i=>i.date && new Date(i.date) >= getWeekStart(new Date())).length;
+    const recentCount = c.improvements.filter(i=>i.date && new Date(i.date) >= weekStart && i.author === me).length;
     return `<div class="q-card" onclick="goToClientInQueue('${c.id}','all')">
       <div class="q-card-top">
         <div>
@@ -8185,11 +8186,9 @@ function setQueueFilter(f){
 function setQueueScope(scope){
   if(scope==='team' && !canApprove()) return;
   queueScope = scope;
-  document.querySelectorAll('#queueScopeBar .icon-tab').forEach(p=>p.classList.toggle('active', p.dataset.scope===scope));
+  document.querySelectorAll('#queueScopeBar .view-toggle-option').forEach(p=>p.classList.toggle('active', p.dataset.scope===scope));
   const memberWrap = document.getElementById('queueMemberFilterWrap');
   if(memberWrap) memberWrap.style.display = scope==='team' ? 'inline-flex' : 'none';
-  const notifyBtn = document.getElementById('notifyBtn');
-  if(notifyBtn) notifyBtn.style.display = (scope==='team' && canApprove()) ? 'inline-flex' : 'none';
   renderQueue();
 }
 
@@ -9065,17 +9064,31 @@ function exportRosterCsv(){
   showToastWithCopy('success','Roster exported', 'Downloaded as a CSV. If the download didn\'t work, copy the raw data below.', csvText);
 }
 
+// Members notify Eric, Eric notifies Daniel, and Daniel — being the top of
+// the chain — has nobody left to notify. Matched by email against the
+// Daniel/Eric addresses configured in Settings, since that's the only
+// reliable way to identify "which specific person" someone is, beyond
+// their role.
+function getNotifyRecipient(){
+  const myEmail = (myProfile?.email || '').toLowerCase().trim();
+  const danielEmail = (settings.danielEmail || '').toLowerCase().trim();
+  const ericEmail = (settings.ericEmail || '').toLowerCase().trim();
+  if(myEmail && danielEmail && myEmail === danielEmail) return null;
+  if(myEmail && ericEmail && myEmail === ericEmail) return { email: settings.danielEmail, label: 'Daniel' };
+  return { email: settings.ericEmail, label: 'Eric' };
+}
+
 function notifyApprovers(){
-  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can send this notification.'); return; }
+  const recipient = getNotifyRecipient();
+  if(!recipient){ showToast('info','Nobody to notify', "You're the last stop in the chain — nothing further to send."); return; }
+  if(!recipient.email){ showToast('error',`Missing ${recipient.label}'s email`, `Add ${recipient.label}'s email address in Settings first.`); return; }
   const pending = activeClients().filter(c=>c.draftStatus==='pending');
-  const to = [settings.danielEmail, settings.ericEmail].filter(Boolean).join(',');
-  if(!to){ showToast('error',"Missing approver emails","Add Daniel's and Eric's email addresses in Settings first."); return; }
   const subject = `${pending.length} client update${pending.length!==1?'s':''} ready for approval`;
   const bodyLines = pending.length ? pending.map(c=>`- ${c.name} (danger ${c.danger}/5, importance ${c.importance}/10)`).join('\n') : 'No drafts are ready yet.';
   const body = `This week's client update drafts are ready for review, sorted by danger score:\n\n${bodyLines}\n\nReview and approve here: ${window.location.href}`;
-  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Opened notification email to Daniel &amp; Eric — ${pending.length} draft${pending.length!==1?'s':''} pending.`});
+  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Opened notification email to ${recipient.label} — ${pending.length} draft${pending.length!==1?'s':''} pending.`});
   persistLog().then(renderLog);
-  showSendEmailConfirm(to, subject, body);
+  showSendEmailConfirm(recipient.email, subject, body);
 }
 
 // Shows exactly what the Wednesday automation would send right now — same
