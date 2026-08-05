@@ -940,6 +940,10 @@ document.addEventListener('DOMContentLoaded', function(){
         <span class="nav-label">Approval Queue</span>
         <span class="nav-badge" id="navPendingBadge">0</span>
       </div>
+      <div class="nav-item" data-view="teamqueue" data-tooltip="Team Queue" id="teamQueueNavItem" onclick="switchView('teamqueue')" style="display:none;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span class="nav-label">Team Queue</span>
+      </div>
       <div class="nav-item" data-view="notes" data-tooltip="Notes" onclick="switchView('notes')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         <span class="nav-label">Notes</span>
@@ -1273,11 +1277,6 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- APPROVAL QUEUE -->
     <div class="view" id="view-approve">
-      <div class="view-toggle" id="queueScopeBar" style="margin-bottom:14px;display:none;">
-        <div class="view-toggle-option active" data-scope="mine" onclick="setQueueScope('mine')">My Queue</div>
-        <div class="view-toggle-option" data-scope="team" onclick="setQueueScope('team')">Team Queue</div>
-      </div>
-
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;">
         <div class="icon-tab-group" id="queueFilterBar" style="margin-bottom:0;min-width:0;">
           <div class="icon-tab active" data-f="all" onclick="setQueueFilter('all')">
@@ -1325,15 +1324,50 @@ document.addEventListener('DOMContentLoaded', function(){
           <input type="date" id="dateFrom"> <span style="color:var(--muted-lt);font-size:11.5px;">to</span> <input type="date" id="dateTo">
           <button class="btn btn-outline" style="padding:6px 10px;" onclick="applyCustomDateRange()">Apply</button>
         </span>
-        <span id="queueMemberFilterWrap" style="display:none;">
-          <div class="select-field" style="min-width:170px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            <select id="queueMemberFilter" onchange="renderQueue()"><option value="all">All team members</option></select>
-          </div>
-        </span>
       </div>
 
       <div id="queueList"></div>
+    </div>
+
+    <!-- TEAM QUEUE -->
+    <div class="view" id="view-teamqueue">
+      <div class="icon-tab-group" id="teamQueueFilterBar">
+        <div class="icon-tab active" data-f="all" onclick="setTeamQueueFilter('all')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+          <span>All</span>
+        </div>
+        <div class="icon-tab" data-f="pending" onclick="setTeamQueueFilter('pending')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <span>Draft ready</span>
+        </div>
+        <div class="icon-tab" data-f="approved" onclick="setTeamQueueFilter('approved')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <span>Approved</span>
+        </div>
+        <div class="icon-tab" data-f="none" onclick="setTeamQueueFilter('none')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>No draft yet</span>
+        </div>
+        <div class="icon-tab" data-f="atrisk" onclick="setTeamQueueFilter('atrisk')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span>At risk (4–5)</span>
+        </div>
+        <div class="icon-tab" data-f="stale" onclick="setTeamQueueFilter('stale')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
+          <span>Needs re-review</span>
+        </div>
+      </div>
+
+      <div class="date-filter-row">
+        <span style="font-size:11.5px;color:var(--muted-lt);">Showing improvements logged <b id="teamQueueDateLabel" style="color:var(--ink);">this week</b> — change the range from Approval Queue, it applies here too.</span>
+        <span style="flex:1;"></span>
+        <div class="select-field" style="min-width:170px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <select id="teamQueueMemberFilter" onchange="renderTeamQueue()"><option value="all">All team members</option></select>
+        </div>
+      </div>
+
+      <div id="teamQueueList"></div>
     </div>
 
     <!-- NOTES -->
@@ -2050,7 +2084,7 @@ let settings = {danielEmail:'', ericEmail:''};
 let team = [];
 let editingClientId = null;
 let queueFilter = 'all';
-let queueScope = 'mine';
+let teamQueueFilter = 'all';
 let dateFilterMode = 'thisweek';
 let dateFilterFrom = getWeekStart(new Date()); // inclusive, Date object — matches the default "This week" mode
 let dateFilterTo = null;   // inclusive, Date object
@@ -2555,7 +2589,7 @@ async function fullRefresh(showFeedback){
   if(syncEl) syncEl.textContent = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
   if(showFeedback && btn){ btn.disabled = false; btn.innerHTML = refreshIcon + ' Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
-function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); renderTasks(); renderCalendar(); renderTimesheet(); renderTrash(); }
+function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderTeamQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); renderTasks(); renderCalendar(); renderTimesheet(); renderTrash(); }
 
 function switchTrashTab(name){
   document.querySelectorAll('#trashTabsBar .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.ttab===name));
@@ -2570,13 +2604,13 @@ function applyRoleVisibility(){
     if(recipient){ notifyBtn.style.display = 'inline-flex'; notifyBtn.textContent = 'Ready to Notify'; }
     else { notifyBtn.style.display = 'none'; }
   }
-  const queueScopeBar = document.getElementById('queueScopeBar');
-  if(queueScopeBar){
-    queueScopeBar.style.display = canApprove() ? 'inline-flex' : 'none';
-    // If a non-approver somehow had Team Queue selected (e.g. lost approver
+  const teamQueueNavItem = document.getElementById('teamQueueNavItem');
+  if(teamQueueNavItem){
+    teamQueueNavItem.style.display = canApprove() ? 'flex' : 'none';
+    // If a non-approver somehow ends up on Team Queue (e.g. lost approver
     // status mid-session), fall back to their own personal queue.
-    if(!canApprove() && queueScope==='team'){ setQueueScope('mine'); }
-    if(canApprove()) populateQueueMemberFilter();
+    if(!canApprove() && document.getElementById('view-teamqueue')?.classList.contains('active')){ switchView('approve'); }
+    if(canApprove()) populateTeamQueueMemberFilter();
   }
   const teammatesTab = document.getElementById('teammatesReportTab');
   if(teammatesTab){
@@ -2622,8 +2656,8 @@ function populateReportMemberFilter(){
   if([...sel.options].some(o=>o.value===current)) sel.value = current;
 }
 
-function populateQueueMemberFilter(){
-  const sel = document.getElementById('queueMemberFilter');
+function populateTeamQueueMemberFilter(){
+  const sel = document.getElementById('teamQueueMemberFilter');
   if(!sel) return;
   const current = sel.value || 'all';
   sel.innerHTML = `<option value="all">All team members</option>` + [...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
@@ -2634,6 +2668,7 @@ const VIEW_TITLES = {
   clients: ['Clients', "Log improvements here whenever you make one — any of the six of you, any time"],
   improvements: ['Past Improvements', 'Everything logged for every client, searchable and filterable by date'],
   approve: ['Approval Queue', 'Sorted by danger score — highest risk clients first'],
+  teamqueue: ['Team Queue', "Everyone's drafts in one place, sorted by danger score"],
   notes: ['Notes', "Private to you — improvements you're planning or want to get to. Nobody else on the team can see these."],
   tasks: ['Tasks', 'Assign tasks to anyone on the team — only you and the other person can see it'],
   calendar: ['Calendar', 'Shared team calendar — meetings, deadlines, and reminders, visible to everyone'],
@@ -2791,6 +2826,7 @@ async function switchView(name){
   if(name==='payroll') renderPayroll();
   if(name==='tasks') renderTasks();
   if(name==='calendar') renderCalendar();
+  if(name==='teamqueue') renderTeamQueue();
   if(name==='time') renderTimesheet();
   if(name==='profile'){ renderProfilePage(); loadGoogleCalendarStatus(); }
 }
@@ -8181,13 +8217,10 @@ function setQueueFilter(f){
   renderQueue();
 }
 
-function setQueueScope(scope){
-  if(scope==='team' && !canApprove()) return;
-  queueScope = scope;
-  document.querySelectorAll('#queueScopeBar .view-toggle-option').forEach(p=>p.classList.toggle('active', p.dataset.scope===scope));
-  const memberWrap = document.getElementById('queueMemberFilterWrap');
-  if(memberWrap) memberWrap.style.display = scope==='team' ? 'inline-flex' : 'none';
-  renderQueue();
+function setTeamQueueFilter(f){
+  teamQueueFilter = f;
+  document.querySelectorAll('#teamQueueFilterBar .icon-tab').forEach(p=>p.classList.toggle('active', p.dataset.f===f));
+  renderTeamQueue();
 }
 
 function activeDateFilterLabel(){
@@ -8263,33 +8296,15 @@ function renderQueue(){
   let rows = sorted.map(c => ({ c, shownImprovements: c.improvements.filter(improvementInDateRange) }));
   if(dateFilterMode !== 'all') rows = rows.filter(r => r.shownImprovements.length > 0);
 
-  // Scope: "mine" is personal to whoever's looking — only clients they
-  // themselves logged something for (within the current date filter).
-  // "team" is the full roster, admins/approvers only, optionally narrowed
-  // to one specific person's work via the member filter.
-  if(queueScope==='mine'){
-    const me = myName();
-    rows = rows.filter(r => r.shownImprovements.some(i => i.author === me));
-  } else if(queueScope==='team'){
-    const memberFilterId = document.getElementById('queueMemberFilter')?.value || 'all';
-    if(memberFilterId !== 'all'){
-      const memberName = teamProfiles.find(p=>p.id===memberFilterId)?.name;
-      rows = rows.filter(r => r.shownImprovements.some(i => i.author === memberName));
-    }
-  }
+  // Always personal — only clients the current user themselves logged
+  // something for (within the current date filter). The full team-wide
+  // view lives on its own separate Team Queue page now, not as a toggle here.
+  const me = myName();
+  rows = rows.filter(r => r.shownImprovements.some(i => i.author === me));
 
   if(!rows.length){
-    let title, sub;
-    if(queueScope==='mine'){
-      title = "You haven't logged anything yet";
-      sub = dateFilterMode==='all' ? "Log an improvement for a client to see it show up here." : "Nothing from you in this range — try All time, or switch to Team Queue to see everyone's.";
-    } else if(dateFilterMode!=='all'){
-      title = 'No improvements in this range';
-      sub = 'Try a wider date range, or switch back to All time.';
-    } else {
-      title = 'No clients match this filter';
-      sub = 'Try a different filter, or clear it to see everyone.';
-    }
+    const title = "You haven't logged anything yet";
+    const sub = dateFilterMode==='all' ? "Log an improvement for a client to see it show up here." : "Nothing from you in this range — try All time, or check Team Queue to see everyone's.";
     el.innerHTML = `<div class="panel">${emptyStateHtml(
       '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
       title, sub
@@ -8297,23 +8312,68 @@ function renderQueue(){
     return;
   }
 
-  el.innerHTML = `<div class="queue-grid">` + rows.map(({c, shownImprovements})=>{
-    const status = statusMeta(c.draftStatus);
-    return `<div class="q-card" id="q-${c.id}" onclick="openQueueCardModal('${c.id}')">
-      <div class="q-card-top">
-        <div>
-          <div class="q-name">${c.name}</div>
-          <div class="q-service-caption">${c.service} · ${riskCaptionHtml(c.danger)}</div>
-        </div>
-        <span class="q-status-label" style="color:${status.color};">${status.label}</span>
+  el.innerHTML = `<div class="queue-grid">` + rows.map(({c})=>queueCardHtml(c)).join('') + `</div>`;
+}
+
+function renderTeamQueue(){
+  const el = document.getElementById('teamQueueList');
+  if(!el) return;
+  const labelEl = document.getElementById('teamQueueDateLabel');
+  if(labelEl) labelEl.textContent = activeDateFilterLabel();
+  const ac = activeClients();
+  if(!ac.length){ el.innerHTML = `<div class="panel">${emptyStateHtml(
+    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+    'No clients yet',
+    'Add a client to start tracking their drafts and improvements.',
+    '<button class="btn btn-brand" onclick="switchView(\'clients\')">Go to Clients</button>'
+  )}</div>`; return; }
+  let sorted = [...ac].sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
+  if(teamQueueFilter==='pending') sorted = sorted.filter(c=>c.draftStatus==='pending');
+  else if(teamQueueFilter==='approved') sorted = sorted.filter(c=>c.draftStatus==='approved');
+  else if(teamQueueFilter==='none') sorted = sorted.filter(c=>c.draftStatus==='none');
+  else if(teamQueueFilter==='atrisk') sorted = sorted.filter(c=>c.danger>=4);
+  else if(teamQueueFilter==='stale') sorted = sorted.filter(c=>c.draftStatus==='approved' && hasLoggedThisWeek(c));
+
+  let rows = sorted.map(c => ({ c, shownImprovements: c.improvements.filter(improvementInDateRange) }));
+  if(dateFilterMode !== 'all') rows = rows.filter(r => r.shownImprovements.length > 0);
+
+  const memberFilterId = document.getElementById('teamQueueMemberFilter')?.value || 'all';
+  if(memberFilterId !== 'all'){
+    const memberName = teamProfiles.find(p=>p.id===memberFilterId)?.name;
+    rows = rows.filter(r => r.shownImprovements.some(i => i.author === memberName));
+  }
+
+  if(!rows.length){
+    const title = dateFilterMode!=='all' ? 'No improvements in this range' : 'No clients match this filter';
+    const sub = dateFilterMode!=='all' ? 'Try a wider date range, or switch back to All time.' : 'Try a different filter, or clear it to see everyone.';
+    el.innerHTML = `<div class="panel">${emptyStateHtml(
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+      title, sub
+    )}</div>`;
+    return;
+  }
+
+  el.innerHTML = `<div class="queue-grid">` + rows.map(({c})=>queueCardHtml(c)).join('') + `</div>`;
+}
+
+// Shared by Approval Queue and Team Queue — same card, same meaning,
+// wherever a client shows up.
+function queueCardHtml(c){
+  const status = statusMeta(c.draftStatus);
+  return `<div class="q-card" id="q-${c.id}" onclick="openQueueCardModal('${c.id}')">
+    <div class="q-card-top">
+      <div>
+        <div class="q-name">${c.name}</div>
+        <div class="q-service-caption">${c.service} · ${riskCaptionHtml(c.danger)}</div>
       </div>
-      <div class="q-ratings">
-        ${dotRating('Importance', c.importance, 'ink', 10)}
-        ${dotRating('Danger', c.danger, 'brand')}
-      </div>
-      ${queueActivityBadgeHtml(c)}
-    </div>`;
-  }).join('') + `</div>`;
+      <span class="q-status-label" style="color:${status.color};">${status.label}</span>
+    </div>
+    <div class="q-ratings">
+      ${dotRating('Importance', c.importance, 'ink', 10)}
+      ${dotRating('Danger', c.danger, 'brand')}
+    </div>
+    ${queueActivityBadgeHtml(c)}
+  </div>`;
 }
 
 // Three distinct states, not two — a client quiet this week but with real
