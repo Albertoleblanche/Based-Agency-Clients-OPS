@@ -2544,7 +2544,7 @@ async function fullRefresh(showFeedback){
   if(syncEl) syncEl.textContent = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
   if(showFeedback && btn){ btn.disabled = false; btn.innerHTML = refreshIcon + ' Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
-function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); renderTasks(); renderCalendar(); }
+function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); renderTasks(); renderCalendar(); renderTimesheet(); }
 
 function switchTrashTab(name){
   document.querySelectorAll('#trashTabsBar .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.ttab===name));
