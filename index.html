@@ -65,13 +65,12 @@
   body.sidebar-collapsed .brand{padding-left:0;padding-right:0;justify-content:center;}
   body.sidebar-collapsed .brand-text, body.sidebar-collapsed .cmdk-trigger span,
   body.sidebar-collapsed .cmdk-trigger-kbd, body.sidebar-collapsed .nav-section-label,
-  body.sidebar-collapsed .sidebar-action span,
-  body.sidebar-collapsed .sidebar-sync-status, body.sidebar-collapsed .sidebar-tour-link{display:none;}
+  body.sidebar-collapsed .sidebar-profile-info, body.sidebar-collapsed .sidebar-profile-chevron{display:none;}
   body.sidebar-collapsed .nav-item{justify-content:center;padding:9px 0;gap:0;}
   body.sidebar-collapsed .nav-label{opacity:0;max-width:0;}
   body.sidebar-collapsed .nav-badge{position:absolute;top:2px;right:2px;margin-left:0;font-size:9px;padding:1px 5px;min-width:14px;text-align:center;box-shadow:0 0 0 2px var(--sidebar);}
   body.sidebar-collapsed .cmdk-trigger{justify-content:center;padding:9px;}
-  body.sidebar-collapsed .sidebar-action{justify-content:center;}
+  body.sidebar-collapsed .sidebar-profile-trigger{justify-content:center;}
   body.sidebar-collapsed .sidebar-collapse-btn{display:none;}
 
   /* Collapsed-only hover tooltips — an icon-only nav is unusable without
@@ -116,10 +115,17 @@
   .notif-bell-btn:hover{background:var(--surface-2);color:var(--ink);}
   .notif-badge{position:absolute;top:1px;right:1px;min-width:15px;height:15px;padding:0 3px;border-radius:20px;background:var(--red);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;}
   .notif-panel{position:absolute;top:calc(100% + 8px);right:0;width:340px;max-height:420px;overflow-y:auto;background:var(--card);border:1px solid #EDEEF1;border-radius:12px;box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:500;}
-  .sidebar-sync-status{display:flex;align-items:center;gap:6px;font-family:'DM Sans',sans-serif;font-size:10px;color:var(--sidebar-muted);}
-  .sidebar-foot-meta{display:flex;align-items:center;justify-content:space-between;margin-top:10px;}
-  .sidebar-tour-link{display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;color:var(--sidebar-muted);cursor:pointer;flex:none;}
-  .sidebar-tour-link:hover{background:var(--sidebar-hover);color:#fff;}
+  .sidebar-profile-trigger{display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;cursor:pointer;transition:background var(--duration-fast) var(--ease-out);}
+  .sidebar-profile-trigger:hover{background:var(--sidebar-hover);}
+  .sidebar-profile-chevron{color:var(--sidebar-muted);flex:none;transition:transform var(--duration-fast) var(--ease-out);}
+  .sidebar-profile-trigger.open .sidebar-profile-chevron{transform:rotate(180deg);}
+  .sidebar-profile-menu{position:absolute;bottom:calc(100% + 8px);left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 -8px 28px rgba(16,24,40,.2);overflow:hidden;z-index:100;animation:modalCardIn var(--duration-base) var(--ease-out);}
+  .sidebar-profile-menu-item{display:flex;align-items:center;gap:10px;padding:11px 14px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:var(--ink);cursor:pointer;transition:background var(--duration-fast) var(--ease-out);}
+  .sidebar-profile-menu-item:hover{background:var(--surface-2);}
+  .sidebar-profile-menu-item svg{flex:none;color:var(--muted-lt);}
+  .sidebar-profile-menu-item.danger{color:var(--red);border-top:1px solid var(--border);}
+  .sidebar-profile-menu-item.danger svg{color:var(--red);}
+  .sidebar-profile-menu-sync{display:flex;align-items:center;gap:6px;padding:9px 14px;font-family:'DM Sans',sans-serif;font-size:10.5px;color:var(--muted-lt);border-top:1px solid var(--border);}
   .notif-panel-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--ink);border-bottom:1px solid #F0F1F4;}
   .notif-row{display:flex;align-items:flex-start;gap:6px;padding:12px 10px 12px 16px;border-bottom:1px solid #F5F6F8;}
   .notif-row-delete{background:none;border:none;color:var(--muted-lt);cursor:pointer;padding:6px;border-radius:6px;flex:none;display:flex;opacity:0;transition:opacity .12s ease, color .12s ease, background .12s ease;}
@@ -169,10 +175,6 @@
   .nav-item.active svg{opacity:1;}
   .nav-badge{margin-left:auto;font-family:'DM Sans',sans-serif;font-size:10px;background:var(--red);color:#fff;border-radius:20px;padding:1px 7px;font-weight:600;}
   .sidebar-foot{margin-top:auto;padding:12px 11px;border-top:1px solid #24365E;font-size:11px;color:var(--sidebar-muted);line-height:1.5;}
-  .sidebar-foot-actions{display:flex;gap:4px;}
-  .sidebar-foot-actions .sidebar-action{flex:1;justify-content:center;}
-  .sidebar-action{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:#C9D2E3;cursor:pointer;padding:8px 9px;border-radius:6px;}
-  .sidebar-action:hover{background:var(--sidebar-hover);}
   .sidebar-profile-name{font-size:12.5px;font-weight:600;color:var(--ink);}
   .sidebar-profile-role{font-family:'DM Sans',sans-serif;font-size:9.5px;letter-spacing:.04em;color:var(--muted-lt);margin-top:2px;}
   .icon-preview{width:56px;height:56px;border-radius:12px;background:var(--sidebar);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'DM Sans',sans-serif;font-weight:700;font-size:18px;overflow:hidden;flex:none;}
@@ -874,17 +876,15 @@
     body.sidebar-collapsed .brand-mark{cursor:default;}
     body.sidebar-collapsed .brand-text, body.sidebar-collapsed .nav-label,
     body.sidebar-collapsed .nav-section-label, body.sidebar-collapsed .cmdk-trigger span,
-    body.sidebar-collapsed .cmdk-trigger-kbd, body.sidebar-collapsed .sidebar-action span,
-    body.sidebar-collapsed .sidebar-sync-status, body.sidebar-collapsed .sidebar-tour-link{display:revert;opacity:1;max-width:none;}
+    body.sidebar-collapsed .cmdk-trigger-kbd, body.sidebar-collapsed .sidebar-profile-info,
+    body.sidebar-collapsed .sidebar-profile-chevron{display:revert;opacity:1;max-width:none;}
     body.sidebar-collapsed .nav-item{justify-content:flex-start;padding:9px 11px;gap:10px;}
     body.sidebar-collapsed .nav-badge{position:static;margin-left:auto;font-size:10px;padding:1px 7px;box-shadow:none;}
     body.sidebar-collapsed .cmdk-trigger{justify-content:flex-start;padding:9px 11px;}
-    body.sidebar-collapsed .sidebar-action{justify-content:flex-start;}
+    body.sidebar-collapsed .sidebar-profile-trigger{justify-content:flex-start;}
     .sidebar-collapse-btn{display:none;}
     .gauge-row{display:none;}
-    #refreshBtn{padding:8px;}
-    #refreshBtn .refresh-btn-label{display:none;}
-    .sidebar-profile-name, .sidebar-profile-role{display:none;}
+    #topbarCurrentDate{display:none;}
     .app-topbar-inner{padding-right:4px;}
   }
 </style>
@@ -985,16 +985,34 @@ document.addEventListener('DOMContentLoaded', function(){
         <span class="nav-label">Settings &amp; Integrations</span>
       </div>
     </nav>
-    <div class="sidebar-foot">
-      <div class="sidebar-action" onclick="handleLogout()" style="width:100%;">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        <span>Log out</span>
+    <div class="sidebar-foot" style="position:relative;">
+      <div class="sidebar-profile-trigger" onclick="toggleSidebarProfileMenu()">
+        <img id="sidebarProfileAvatar" src="" style="display:none;">
+        <div class="avatar-circle" id="topbarAvatarPlaceholder" style="width:32px;height:32px;font-size:13px;"></div>
+        <div class="sidebar-profile-info" style="flex:1;min-width:0;">
+          <div class="sidebar-profile-name" id="sidebarProfileName">—</div>
+          <div class="sidebar-profile-role" id="sidebarProfileRole"></div>
+        </div>
+        <svg class="sidebar-profile-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
       </div>
-      <div class="sidebar-foot-meta">
-        <div class="sidebar-sync-status"><span class="sync-dot"></span>Synced <span id="sidebarSyncTime">—</span></div>
-        <span class="sidebar-tour-link" onclick="startTour()" title="Take a tour">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"/></svg>
-        </span>
+      <div class="sidebar-profile-menu" id="sidebarProfileMenu" style="display:none;">
+        <div class="sidebar-profile-menu-item" onclick="closeSidebarProfileMenu(); switchView('profile');">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <span>My Profile</span>
+        </div>
+        <div class="sidebar-profile-menu-item" onclick="closeSidebarProfileMenu(); fullRefresh(true);">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          <span>Refresh the app</span>
+        </div>
+        <div class="sidebar-profile-menu-item" onclick="closeSidebarProfileMenu(); startTour();">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"/></svg>
+          <span>Take a tour</span>
+        </div>
+        <div class="sidebar-profile-menu-item danger" onclick="handleLogout();">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <span>Log out</span>
+        </div>
+        <div class="sidebar-profile-menu-sync"><span class="sync-dot"></span>Synced <span id="sidebarSyncTime">—</span></div>
       </div>
     </div>
   </div>
@@ -1013,18 +1031,13 @@ document.addEventListener('DOMContentLoaded', function(){
           </svg>
           <span class="clock-mini-text"><span class="gauge-d">0</span>d <span class="gauge-h">00</span>h <span class="gauge-m">00</span>m</span>
         </div>
-        <button class="clock-mini-pill" id="refreshBtn" onclick="fullRefresh(true)" title="Refresh data from the team">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-          <span class="refresh-btn-label">Refresh</span>
-        </button>
-        <div class="topbar-profile" onclick="switchView('profile')" title="My Profile">
-          <img id="sidebarProfileAvatar" src="" style="display:none;">
-          <div class="avatar-circle" id="topbarAvatarPlaceholder" style="width:30px;height:30px;font-size:12px;"></div>
-          <div>
-            <div class="sidebar-profile-name" id="sidebarProfileName">—</div>
-            <div class="sidebar-profile-role" id="sidebarProfileRole"></div>
-          </div>
+        <div class="clock-mini-pill" id="topbarCurrentDate" style="cursor:default;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span id="topbarCurrentDateText"></span>
         </div>
+        <button class="notif-bell-btn" onclick="openCommandPalette()" title="Search (⌘K)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </button>
         <div class="notif-bell-wrap" style="position:relative;">
           <button class="notif-bell-btn" onclick="toggleNotifPanel()" title="Notifications">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -2181,6 +2194,28 @@ async function loadTeamProfiles(){
   teamProfiles = data || [];
 }
 
+function toggleSidebarProfileMenu(){
+  const trigger = document.querySelector('.sidebar-profile-trigger');
+  const menu = document.getElementById('sidebarProfileMenu');
+  const isOpen = menu.style.display === 'block';
+  if(isOpen){ closeSidebarProfileMenu(); return; }
+  menu.style.display = 'block';
+  trigger.classList.add('open');
+}
+function closeSidebarProfileMenu(){
+  const menu = document.getElementById('sidebarProfileMenu');
+  if(menu) menu.style.display = 'none';
+  document.querySelector('.sidebar-profile-trigger')?.classList.remove('open');
+}
+document.addEventListener('click', function(e){
+  if(!e.target.closest('.sidebar-foot')) closeSidebarProfileMenu();
+});
+
+function renderTopbarCurrentDate(){
+  const el = document.getElementById('topbarCurrentDateText');
+  if(el) el.textContent = new Date().toLocaleDateString('en-US',{weekday:'short', month:'short', day:'numeric'});
+}
+
 function renderWhoAmI(){
   document.querySelectorAll('.who-am-i').forEach(el=>{
     if(!myProfile){ el.innerHTML = ''; return; }
@@ -2589,7 +2624,7 @@ async function fullRefresh(showFeedback){
   if(syncEl) syncEl.textContent = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
   if(showFeedback && btn){ btn.disabled = false; btn.innerHTML = refreshIcon + ' Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
-function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderTeamQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); renderTasks(); renderCalendar(); renderTimesheet(); renderTrash(); }
+function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderTeamQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderTopbarCurrentDate(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); renderTasks(); renderCalendar(); renderTimesheet(); renderTrash(); }
 
 function switchTrashTab(name){
   document.querySelectorAll('#trashTabsBar .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.ttab===name));
