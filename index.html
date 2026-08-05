@@ -406,6 +406,12 @@
 
   /* Approval queue */
   .queue-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:18px;margin-bottom:24px;}
+  .team-queue-section{margin-bottom:8px;}
+  .team-queue-member-head{display:flex;align-items:center;gap:12px;padding-bottom:14px;margin-bottom:18px;border-bottom:1px solid var(--border);}
+  .team-queue-member-name{font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;color:var(--ink);}
+  .team-queue-member-role{font-family:'DM Sans',sans-serif;font-size:11px;color:var(--muted-lt);text-transform:capitalize;margin-top:2px;}
+  .team-queue-avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;flex:none;background:var(--surface-2);}
+  .team-queue-avatar-fallback{width:40px;height:40px;border-radius:50%;flex:none;color:#fff;font-family:'DM Sans',sans-serif;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;}
 
   /* Notes */
   .notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
@@ -1332,25 +1338,13 @@ document.addEventListener('DOMContentLoaded', function(){
     <!-- TEAM QUEUE -->
     <div class="view" id="view-teamqueue">
       <div class="icon-tab-group" id="teamQueueFilterBar">
-        <div class="icon-tab active" data-f="all" onclick="setTeamQueueFilter('all')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
-          <span>All</span>
-        </div>
-        <div class="icon-tab" data-f="pending" onclick="setTeamQueueFilter('pending')">
+        <div class="icon-tab active" data-f="pending" onclick="setTeamQueueFilter('pending')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           <span>Draft ready</span>
         </div>
         <div class="icon-tab" data-f="approved" onclick="setTeamQueueFilter('approved')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
           <span>Approved</span>
-        </div>
-        <div class="icon-tab" data-f="none" onclick="setTeamQueueFilter('none')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <span>No draft yet</span>
-        </div>
-        <div class="icon-tab" data-f="atrisk" onclick="setTeamQueueFilter('atrisk')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          <span>At risk (4–5)</span>
         </div>
         <div class="icon-tab" data-f="stale" onclick="setTeamQueueFilter('stale')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
@@ -1360,11 +1354,6 @@ document.addEventListener('DOMContentLoaded', function(){
 
       <div class="date-filter-row">
         <span style="font-size:11.5px;color:var(--muted-lt);">Showing improvements logged <b id="teamQueueDateLabel" style="color:var(--ink);">this week</b> — change the range from Approval Queue, it applies here too.</span>
-        <span style="flex:1;"></span>
-        <div class="select-field" style="min-width:170px;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          <select id="teamQueueMemberFilter" onchange="renderTeamQueue()"><option value="all">All team members</option></select>
-        </div>
       </div>
 
       <div id="teamQueueList"></div>
@@ -2084,7 +2073,7 @@ let settings = {danielEmail:'', ericEmail:''};
 let team = [];
 let editingClientId = null;
 let queueFilter = 'all';
-let teamQueueFilter = 'all';
+let teamQueueFilter = 'pending';
 let dateFilterMode = 'thisweek';
 let dateFilterFrom = getWeekStart(new Date()); // inclusive, Date object — matches the default "This week" mode
 let dateFilterTo = null;   // inclusive, Date object
@@ -2610,7 +2599,6 @@ function applyRoleVisibility(){
     // If a non-approver somehow ends up on Team Queue (e.g. lost approver
     // status mid-session), fall back to their own personal queue.
     if(!canApprove() && document.getElementById('view-teamqueue')?.classList.contains('active')){ switchView('approve'); }
-    if(canApprove()) populateTeamQueueMemberFilter();
   }
   const teammatesTab = document.getElementById('teammatesReportTab');
   if(teammatesTab){
@@ -2650,14 +2638,6 @@ function applyRoleVisibility(){
 
 function populateReportMemberFilter(){
   const sel = document.getElementById('reportMemberFilter');
-  if(!sel) return;
-  const current = sel.value || 'all';
-  sel.innerHTML = `<option value="all">All team members</option>` + [...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
-  if([...sel.options].some(o=>o.value===current)) sel.value = current;
-}
-
-function populateTeamQueueMemberFilter(){
-  const sel = document.getElementById('teamQueueMemberFilter');
   if(!sel) return;
   const current = sel.value || 'all';
   sel.innerHTML = `<option value="all">All team members</option>` + [...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
@@ -8327,23 +8307,41 @@ function renderTeamQueue(){
     'Add a client to start tracking their drafts and improvements.',
     '<button class="btn btn-brand" onclick="switchView(\'clients\')">Go to Clients</button>'
   )}</div>`; return; }
-  let sorted = [...ac].sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
-  if(teamQueueFilter==='pending') sorted = sorted.filter(c=>c.draftStatus==='pending');
-  else if(teamQueueFilter==='approved') sorted = sorted.filter(c=>c.draftStatus==='approved');
-  else if(teamQueueFilter==='none') sorted = sorted.filter(c=>c.draftStatus==='none');
-  else if(teamQueueFilter==='atrisk') sorted = sorted.filter(c=>c.danger>=4);
-  else if(teamQueueFilter==='stale') sorted = sorted.filter(c=>c.draftStatus==='approved' && hasLoggedThisWeek(c));
 
-  let rows = sorted.map(c => ({ c, shownImprovements: c.improvements.filter(improvementInDateRange) }));
-  if(dateFilterMode !== 'all') rows = rows.filter(r => r.shownImprovements.length > 0);
+  const statusMatches = (c) => {
+    if(teamQueueFilter==='pending') return c.draftStatus==='pending';
+    if(teamQueueFilter==='approved') return c.draftStatus==='approved';
+    if(teamQueueFilter==='stale') return c.draftStatus==='approved' && hasLoggedThisWeek(c);
+    return true;
+  };
 
-  const memberFilterId = document.getElementById('teamQueueMemberFilter')?.value || 'all';
-  if(memberFilterId !== 'all'){
-    const memberName = teamProfiles.find(p=>p.id===memberFilterId)?.name;
-    rows = rows.filter(r => r.shownImprovements.some(i => i.author === memberName));
-  }
+  // Date-filtered improvement subset per client, kept alongside each client
+  // so each member's section below can check who actually logged what.
+  const rows = ac.filter(statusMatches)
+    .map(c => ({ c, shownImprovements: c.improvements.filter(improvementInDateRange) }))
+    .filter(r => dateFilterMode==='all' || r.shownImprovements.length > 0);
 
-  if(!rows.length){
+  const sortedMembers = [...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name));
+  const sectionsHtml = sortedMembers.map(member => {
+    const memberClients = rows
+      .filter(r => r.shownImprovements.some(i => i.author === member.name))
+      .map(r => r.c)
+      .sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
+    if(!memberClients.length) return '';
+    return `<div class="team-queue-section">
+      <div class="team-queue-member-head">
+        ${teamQueueAvatarHtml(member)}
+        <div>
+          <div class="team-queue-member-name">${member.name}</div>
+          <div class="team-queue-member-role">${member.role}</div>
+        </div>
+        <button class="btn btn-dark" style="margin-left:auto;flex:none;" onclick="notifyForMember('${member.id}')">Ready to Notify</button>
+      </div>
+      <div class="queue-grid">${memberClients.map(c=>queueCardHtml(c)).join('')}</div>
+    </div>`;
+  }).filter(Boolean).join('');
+
+  if(!sectionsHtml){
     const title = dateFilterMode!=='all' ? 'No improvements in this range' : 'No clients match this filter';
     const sub = dateFilterMode!=='all' ? 'Try a wider date range, or switch back to All time.' : 'Try a different filter, or clear it to see everyone.';
     el.innerHTML = `<div class="panel">${emptyStateHtml(
@@ -8353,7 +8351,36 @@ function renderTeamQueue(){
     return;
   }
 
-  el.innerHTML = `<div class="queue-grid">` + rows.map(({c})=>queueCardHtml(c)).join('') + `</div>`;
+  el.innerHTML = sectionsHtml;
+}
+
+// Larger avatar variant specifically for the Team Queue section headers —
+// personAvatarHtml()'s existing size (30px) reads fine inline but too small
+// as a section-level identifier here.
+function teamQueueAvatarHtml(member){
+  return member.avatar_url
+    ? `<img class="team-queue-avatar" src="${member.avatar_url}">`
+    : `<div class="team-queue-avatar-fallback" style="background:${avatarColorForName(member.name)};">${(member.name||'?').trim().charAt(0).toUpperCase()}</div>`;
+}
+
+// Scoped specifically to one member's pending drafts — same recipient
+// escalation logic as the main Notify button (based on the viewer's own
+// role, never revealing who the recipient actually is), but the email
+// content only covers this one person's ready work, not everyone's.
+function notifyForMember(memberId){
+  const recipient = getNotifyRecipient();
+  if(!recipient){ showToast('info','Nobody to notify', "You're the last stop in the chain — nothing further to send."); return; }
+  if(!recipient.email){ showToast('error','Missing email on file', `Add ${recipient.configLabel} email address in Settings first.`); return; }
+  const member = teamProfiles.find(p=>p.id===memberId);
+  if(!member) return;
+  const pending = activeClients().filter(c=>c.draftStatus==='pending' && c.improvements.some(i=>i.author===member.name));
+  if(!pending.length){ showToast('info','Nothing pending', `${member.name} has no drafts ready right now.`); return; }
+  const subject = `${pending.length} update${pending.length!==1?'s':''} from ${member.name} ready for approval`;
+  const bodyLines = pending.map(c=>`- ${c.name} (danger ${c.danger}/5, importance ${c.importance}/10)`).join('\n');
+  const body = `${member.name}'s client update drafts are ready for review, sorted by danger score:\n\n${bodyLines}\n\nReview and approve here: ${window.location.href}`;
+  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Opened a notification email for ${member.name}'s drafts — ${pending.length} pending.`});
+  persistLog().then(renderLog);
+  showSendEmailConfirm(recipient.email, subject, body);
 }
 
 // Shared by Approval Queue and Team Queue — same card, same meaning,
