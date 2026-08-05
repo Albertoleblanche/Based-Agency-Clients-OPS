@@ -6440,6 +6440,7 @@ async function resolveEmailChangeRequest(requestId, approve){
 
 /* ---------- Time Tracker ---------- */
 let timeEntries = [];
+let timeEntriesDataLoaded = false;
 
 // Defense in depth: RLS already restricts which rows the database returns
 // for non-admins, but this makes the UI itself incapable of listing another
@@ -6640,8 +6641,9 @@ function formatMinutes(mins){
 
 async function loadTimeEntries(){
   const { data, error } = await supabaseClient.from('time_entries').select('*').is('deleted_at', null).order('entry_date', { ascending:false });
-  if(error){ console.error('loadTimeEntries error', error); timeEntries = []; return; }
+  if(error){ console.error('loadTimeEntries error', error); timeEntries = []; timeEntriesDataLoaded = true; return; }
   timeEntries = (data||[]).map(e=>({ id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes, description:e.description||'', service:e.service||'', createdAt:e.created_at, logged:!!e.logged }));
+  timeEntriesDataLoaded = true;
 }
 
 // Turns one time entry's description into a real improvement log — a
@@ -7241,6 +7243,7 @@ function timesheetClientMetaHtml(c, serviceOverride){
 }
 
 function renderTimesheetDay(bodyEl){
+  if(!timeEntriesDataLoaded){ bodyEl.innerHTML = loadingStateHtml('Loading timesheet…'); return; }
   const weekStart = getWeekStart(timesheetAnchor);
   const selectedStr = toDateStr(timesheetAnchor);
 
@@ -7296,6 +7299,7 @@ function renderTimesheetDay(bodyEl){
 }
 
 function renderTimesheetWeek(bodyEl){
+  if(!timeEntriesDataLoaded){ bodyEl.innerHTML = loadingStateHtml('Loading timesheet…'); return; }
   const weekStart = getWeekStart(timesheetAnchor);
   const todayStr = toDateStr(new Date());
   const days = [];
