@@ -1273,9 +1273,20 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- APPROVAL QUEUE -->
     <div class="view" id="view-approve">
+      <div class="icon-tab-group" id="queueScopeBar" style="margin-bottom:14px;">
+        <div class="icon-tab active" data-scope="mine" onclick="setQueueScope('mine')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <span>My Queue</span>
+        </div>
+        <div class="icon-tab" data-scope="team" id="queueTeamScopeTab" onclick="setQueueScope('team')" style="display:none;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>Team Queue</span>
+        </div>
+      </div>
+
       <div class="topbar" style="justify-content:flex-end;">
         <button class="btn btn-outline" onclick="previewWednesdayEmail()">Preview Wednesday email</button>
-        <button class="btn btn-dark" id="notifyBtn" onclick="notifyApprovers()">Notify Daniel &amp; Eric</button>
+        <button class="btn btn-dark" id="notifyBtn" onclick="notifyApprovers()" style="display:none;">Notify Daniel &amp; Eric</button>
       </div>
 
       <div class="icon-tab-group" id="queueFilterBar">
@@ -1321,6 +1332,12 @@ document.addEventListener('DOMContentLoaded', function(){
         <span id="customDateRange" style="display:none;">
           <input type="date" id="dateFrom"> <span style="color:var(--muted-lt);font-size:11.5px;">to</span> <input type="date" id="dateTo">
           <button class="btn btn-outline" style="padding:6px 10px;" onclick="applyCustomDateRange()">Apply</button>
+        </span>
+        <span id="queueMemberFilterWrap" style="display:none;">
+          <div class="select-field" style="min-width:170px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <select id="queueMemberFilter" onchange="renderQueue()"><option value="all">All team members</option></select>
+          </div>
         </span>
       </div>
 
@@ -2041,6 +2058,7 @@ let settings = {danielEmail:'', ericEmail:''};
 let team = [];
 let editingClientId = null;
 let queueFilter = 'all';
+let queueScope = 'mine';
 let dateFilterMode = 'thisweek';
 let dateFilterFrom = getWeekStart(new Date()); // inclusive, Date object — matches the default "This week" mode
 let dateFilterTo = null;   // inclusive, Date object
@@ -2555,7 +2573,15 @@ function switchTrashTab(name){
 
 function applyRoleVisibility(){
   const notifyBtn = document.getElementById('notifyBtn');
-  if(notifyBtn) notifyBtn.style.display = canApprove() ? 'inline-flex' : 'none';
+  if(notifyBtn) notifyBtn.style.display = (canApprove() && queueScope==='team') ? 'inline-flex' : 'none';
+  const queueTeamScopeTab = document.getElementById('queueTeamScopeTab');
+  if(queueTeamScopeTab){
+    queueTeamScopeTab.style.display = canApprove() ? 'flex' : 'none';
+    // If a non-approver somehow had Team Queue selected (e.g. lost approver
+    // status mid-session), fall back to their own personal queue.
+    if(!canApprove() && queueScope==='team'){ setQueueScope('mine'); }
+    if(canApprove()) populateQueueMemberFilter();
+  }
   const teammatesTab = document.getElementById('teammatesReportTab');
   if(teammatesTab){
     teammatesTab.style.display = isAdmin() ? 'flex' : 'none';
@@ -2594,6 +2620,14 @@ function applyRoleVisibility(){
 
 function populateReportMemberFilter(){
   const sel = document.getElementById('reportMemberFilter');
+  if(!sel) return;
+  const current = sel.value || 'all';
+  sel.innerHTML = `<option value="all">All team members</option>` + [...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  if([...sel.options].some(o=>o.value===current)) sel.value = current;
+}
+
+function populateQueueMemberFilter(){
+  const sel = document.getElementById('queueMemberFilter');
   if(!sel) return;
   const current = sel.value || 'all';
   sel.innerHTML = `<option value="all">All team members</option>` + [...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
@@ -8148,6 +8182,17 @@ function setQueueFilter(f){
   renderQueue();
 }
 
+function setQueueScope(scope){
+  if(scope==='team' && !canApprove()) return;
+  queueScope = scope;
+  document.querySelectorAll('#queueScopeBar .icon-tab').forEach(p=>p.classList.toggle('active', p.dataset.scope===scope));
+  const memberWrap = document.getElementById('queueMemberFilterWrap');
+  if(memberWrap) memberWrap.style.display = scope==='team' ? 'inline-flex' : 'none';
+  const notifyBtn = document.getElementById('notifyBtn');
+  if(notifyBtn) notifyBtn.style.display = (scope==='team' && canApprove()) ? 'inline-flex' : 'none';
+  renderQueue();
+}
+
 function activeDateFilterLabel(){
   if(dateFilterMode==='thisweek') return 'this week';
   if(dateFilterMode==='all') return '(all time)';
@@ -8221,9 +8266,33 @@ function renderQueue(){
   let rows = sorted.map(c => ({ c, shownImprovements: c.improvements.filter(improvementInDateRange) }));
   if(dateFilterMode !== 'all') rows = rows.filter(r => r.shownImprovements.length > 0);
 
+  // Scope: "mine" is personal to whoever's looking — only clients they
+  // themselves logged something for (within the current date filter).
+  // "team" is the full roster, admins/approvers only, optionally narrowed
+  // to one specific person's work via the member filter.
+  if(queueScope==='mine'){
+    const me = myName();
+    rows = rows.filter(r => r.shownImprovements.some(i => i.author === me));
+  } else if(queueScope==='team'){
+    const memberFilterId = document.getElementById('queueMemberFilter')?.value || 'all';
+    if(memberFilterId !== 'all'){
+      const memberName = teamProfiles.find(p=>p.id===memberFilterId)?.name;
+      rows = rows.filter(r => r.shownImprovements.some(i => i.author === memberName));
+    }
+  }
+
   if(!rows.length){
-    const title = dateFilterMode!=='all' ? 'No improvements in this range' : 'No clients match this filter';
-    const sub = dateFilterMode!=='all' ? 'Try a wider date range, or switch back to All time.' : 'Try a different filter, or clear it to see everyone.';
+    let title, sub;
+    if(queueScope==='mine'){
+      title = "You haven't logged anything yet";
+      sub = dateFilterMode==='all' ? "Log an improvement for a client to see it show up here." : "Nothing from you in this range — try All time, or switch to Team Queue to see everyone's.";
+    } else if(dateFilterMode!=='all'){
+      title = 'No improvements in this range';
+      sub = 'Try a wider date range, or switch back to All time.';
+    } else {
+      title = 'No clients match this filter';
+      sub = 'Try a different filter, or clear it to see everyone.';
+    }
     el.innerHTML = `<div class="panel">${emptyStateHtml(
       '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
       title, sub
