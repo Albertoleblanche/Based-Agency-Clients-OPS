@@ -2746,6 +2746,15 @@ async function switchView(name){
     if(titleEl) titleEl.textContent = meta[0];
     if(subEl) subEl.textContent = meta[1];
   }
+  // Shown immediately, before the data load starts — the check inside
+  // renderTimesheetDay/Week() alone isn't enough, since those only run
+  // AFTER fullRefresh() below has already finished, by which point the
+  // real data is already there and there's nothing left to show a loading
+  // state for.
+  if(name==='time' && !timeEntriesDataLoaded){
+    const tb = document.getElementById('timesheetBody');
+    if(tb) tb.innerHTML = loadingStateHtml('Loading timesheet…');
+  }
   await fullRefresh();
   if(name==='trash') renderTrash();
   if(name==='payroll') renderPayroll();
