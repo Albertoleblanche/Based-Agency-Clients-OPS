@@ -1278,36 +1278,34 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="view-toggle-option" data-scope="team" onclick="setQueueScope('team')">Team Queue</div>
       </div>
 
-      <div class="topbar" style="justify-content:flex-end;">
-        <button class="btn btn-outline" onclick="previewWednesdayEmail()">Preview Wednesday email</button>
-        <button class="btn btn-dark" id="notifyBtn" onclick="notifyApprovers()"></button>
-      </div>
-
-      <div class="icon-tab-group" id="queueFilterBar">
-        <div class="icon-tab active" data-f="all" onclick="setQueueFilter('all')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
-          <span>All</span>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;">
+        <div class="icon-tab-group" id="queueFilterBar" style="margin-bottom:0;min-width:0;">
+          <div class="icon-tab active" data-f="all" onclick="setQueueFilter('all')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+            <span>All</span>
+          </div>
+          <div class="icon-tab" data-f="pending" onclick="setQueueFilter('pending')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span>Draft ready</span>
+          </div>
+          <div class="icon-tab" data-f="approved" onclick="setQueueFilter('approved')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <span>Approved</span>
+          </div>
+          <div class="icon-tab" data-f="none" onclick="setQueueFilter('none')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span>No draft yet</span>
+          </div>
+          <div class="icon-tab" data-f="atrisk" onclick="setQueueFilter('atrisk')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span>At risk (4–5)</span>
+          </div>
+          <div class="icon-tab" data-f="stale" onclick="setQueueFilter('stale')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
+            <span>Needs re-review</span>
+          </div>
         </div>
-        <div class="icon-tab" data-f="pending" onclick="setQueueFilter('pending')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          <span>Draft ready</span>
-        </div>
-        <div class="icon-tab" data-f="approved" onclick="setQueueFilter('approved')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-          <span>Approved</span>
-        </div>
-        <div class="icon-tab" data-f="none" onclick="setQueueFilter('none')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <span>No draft yet</span>
-        </div>
-        <div class="icon-tab" data-f="atrisk" onclick="setQueueFilter('atrisk')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          <span>At risk (4–5)</span>
-        </div>
-        <div class="icon-tab" data-f="stale" onclick="setQueueFilter('stale')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
-          <span>Needs re-review</span>
-        </div>
+        <button class="btn btn-dark" id="notifyBtn" onclick="notifyApprovers()" style="flex:none;"></button>
       </div>
 
       <div class="date-filter-row">
