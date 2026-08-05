@@ -8604,7 +8604,7 @@ function openQueueCardModal(id){
       <div class="q-bulk">
         ${shownImprovements.length ? `<div class="q-bulk-title">Logged ${activeDateFilterLabel()} (${shownImprovements.length}) — ${shownImprovements.filter(i=>i.includeInEmail!==false).length} included in email</div><div class="q-bulk-list"><ul>${shownImprovements.map(i=>`<li style="${i.includeInEmail===false?'opacity:.55;':''}">${i.includeInEmail===false ? '<span style="color:var(--muted-lt);font-size:10px;">[not in email]</span> ' : ''}${i.text} — <span style="color:var(--muted-lt);">${i.author}</span></li>`).join('')}</ul></div>` : `<i>No improvements logged ${activeDateFilterLabel()} — nothing to send.</i>`}
       </div>
-      ${c.draft ? `<textarea class="draft" id="draft-${c.id}">${c.draft}</textarea>` : ''}
+      ${c.draft ? `<textarea class="draft" id="draft-${c.id}">${escapeHtml(c.draft)}</textarea>` : ''}
       ${c.draft && !c.email ? `<span class="warn-text">No client email on file — add one in Clients</span>` : ''}
     </div>
     <div class="modal-actions">
@@ -8689,6 +8689,7 @@ ${contentRules}`;
     if(modalOpenForThis) openQueueCardModal(id);
     showToast('success','Draft generated', `AI wrote the update for ${c.name}.`);
   }catch(e){
+    console.error('generateDraft failed', e);
     c.draft = 'AI generation failed — you can write the draft manually here.';
     c.draftStatus = 'pending';
     await persistClients();
