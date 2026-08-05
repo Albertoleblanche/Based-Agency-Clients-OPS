@@ -8608,7 +8608,7 @@ function openQueueCardModal(id){
       ${c.draft && !c.email ? `<span class="warn-text">No client email on file — add one in Clients</span>` : ''}
     </div>
     <div class="modal-actions">
-      ${c.improvements.length ? `<button class="btn btn-dark" id="gen-${c.id}" onclick="generateDraft('${c.id}')">${c.draft?'Regenerate with AI':'Generate with AI'}</button>` : ''}
+      ${(c.improvements.length && canApprove()) ? `<button class="btn btn-dark" id="gen-${c.id}" onclick="generateDraft('${c.id}')">${c.draft?'Regenerate with AI':'Generate with AI'}</button>` : ''}
       ${c.draft && canApprove() ? `<button class="btn btn-brand" onclick="approveDraft('${c.id}')" ${c.draftStatus==='approved'?'disabled':''}>Approve &amp; open email</button>
       <button class="btn btn-outline" onclick="skipDraft('${c.id}')">Skip this week</button>` : ''}
       ${c.draft && !canApprove() ? `<span class="warn-text" style="color:var(--muted-lt);">Only admins and approvers can approve or skip drafts.</span>` : ''}
@@ -8622,6 +8622,7 @@ function openQueueCardModal(id){
 
 
 async function generateDraft(id){
+  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can generate AI drafts.'); return; }
   await loadAll();
   const c = clients.find(x=>x.id===id);
   if(!c) return;
