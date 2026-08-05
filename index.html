@@ -384,7 +384,6 @@
   .danger-link{color:var(--red);}
 
   .actions-cell{position:relative;}
-  .dropdown{position:relative;display:inline-block;}
   .dropdown-menu{display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(16,24,40,.14);min-width:170px;z-index:50;overflow:hidden;}
   .icon-menu-btn{background:none;border:1px solid var(--border);color:var(--muted);cursor:pointer;padding:6px 9px;border-radius:8px;display:flex;transition:background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);}
   .icon-menu-btn:hover{background:var(--surface-2);color:var(--ink);}
@@ -2033,6 +2032,14 @@ document.addEventListener('DOMContentLoaded', function(){
   </div>
   <div class="ftp-time" id="ftpTime">00:00:00</div>
   <button class="ftp-stop" onclick="event.stopPropagation(); stopAndSaveTimer();">Stop</button>
+</div>
+
+<div class="dropdown-menu" id="clientActionsMenu" style="position:fixed;">
+  <div class="dropdown-item" onclick="closeActionsMenus(); openClientDetail(currentActionsMenuClientId)">View details</div>
+  <div class="dropdown-item" onclick="closeActionsMenus(); openEditClientForm(currentActionsMenuClientId)">Edit client</div>
+  <div class="dropdown-item" onclick="closeActionsMenus(); toggleDrawer(currentActionsMenuClientId)">Log / view improvements</div>
+  <div class="dropdown-item" onclick="closeActionsMenus(); openNoteModal(null, currentActionsMenuClientId)">Add note</div>
+  <div class="dropdown-item danger" id="clientActionsMenuDelete" onclick="closeActionsMenus(); deleteClient(currentActionsMenuClientId)">Delete client</div>
 </div>
 
 <div class="mobile-nav-scrim" id="mobileNavScrim" onclick="closeMobileNav()"></div>
@@ -3774,18 +3781,9 @@ function renderClientsTable(){
       <td>${dangerPillCompact(c.danger)}</td>
       <td>${loggedPill(c)}</td>
       <td class="actions-cell">
-        <div class="dropdown">
-          <button class="icon-menu-btn" onclick="toggleActionsMenu('${c.id}')" title="Actions">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
-          </button>
-          <div class="dropdown-menu" id="menu-${c.id}">
-            <div class="dropdown-item" onclick="closeActionsMenus(); openClientDetail('${c.id}')">View details</div>
-            <div class="dropdown-item" onclick="closeActionsMenus(); openEditClientForm('${c.id}')">Edit client</div>
-            <div class="dropdown-item" onclick="closeActionsMenus(); toggleDrawer('${c.id}')">Log / view improvements</div>
-            <div class="dropdown-item" onclick="closeActionsMenus(); openNoteModal(null, '${c.id}')">Add note</div>
-            ${canApprove() ? `<div class="dropdown-item danger" onclick="closeActionsMenus(); deleteClient('${c.id}')">Delete client</div>` : ''}
-          </div>
-        </div>
+        <button class="icon-menu-btn" onclick="toggleActionsMenu(event, '${c.id}')" title="Actions">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+        </button>
       </td>
     </tr>
     <tr class="drawer-row" id="drawer-${c.id}" style="display:none;">
@@ -3817,19 +3815,40 @@ function isLoggingActive(){
   return !!(active && active.tagName==='TEXTAREA' && active.id && active.id.startsWith('imp-'));
 }
 
-function toggleActionsMenu(id){
-  const menu = document.getElementById('menu-'+id);
-  const wasOpen = menu.classList.contains('open');
+let currentActionsMenuClientId = null;
+
+function toggleActionsMenu(event, id){
+  event.stopPropagation();
+  const menu = document.getElementById('clientActionsMenu');
+  const wasOpenForThisRow = menu.classList.contains('open') && currentActionsMenuClientId === id;
   closeActionsMenus();
-  if(!wasOpen) menu.classList.add('open');
-  menu.closest('.dropdown').classList.toggle('force-open', !wasOpen);
+  if(wasOpenForThisRow) return;
+
+  currentActionsMenuClientId = id;
+  const deleteItem = document.getElementById('clientActionsMenuDelete');
+  if(deleteItem) deleteItem.style.display = canApprove() ? '' : 'none';
+
+  // Position relative to the viewport (not any ancestor), so it's
+  // completely unaffected by the table's own scroll/overflow clipping —
+  // this is what actually fixes the last-row-gets-cut-off issue, not a
+  // z-index or overflow tweak on the table itself.
+  const rect = event.currentTarget.getBoundingClientRect();
+  menu.style.top = (rect.bottom + 4) + 'px';
+  menu.style.left = 'auto';
+  menu.style.right = (window.innerWidth - rect.right) + 'px';
+  // Flip above the button instead, if there isn't enough room below.
+  const menuHeightEstimate = 210;
+  if(rect.bottom + menuHeightEstimate > window.innerHeight){
+    menu.style.top = (rect.top - menuHeightEstimate - 4) + 'px';
+  }
+  menu.classList.add('open');
 }
 function closeActionsMenus(){
-  document.querySelectorAll('.dropdown-menu.open').forEach(m=>m.classList.remove('open'));
-  document.querySelectorAll('.dropdown.force-open').forEach(d=>d.classList.remove('force-open'));
+  document.getElementById('clientActionsMenu')?.classList.remove('open');
+  currentActionsMenuClientId = null;
 }
 document.addEventListener('click', function(e){
-  if(!e.target.closest('.dropdown')) closeActionsMenus();
+  if(!e.target.closest('#clientActionsMenu')) closeActionsMenus();
 });
 
 async function deleteClient(id){
