@@ -2544,7 +2544,7 @@ async function fullRefresh(showFeedback){
   if(syncEl) syncEl.textContent = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
   if(showFeedback && btn){ btn.disabled = false; btn.innerHTML = refreshIcon + ' Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
-function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); renderTasks(); renderCalendar(); renderTimesheet(); }
+function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); renderTasks(); renderCalendar(); renderTimesheet(); renderTrash(); }
 
 function switchTrashTab(name){
   document.querySelectorAll('#trashTabsBar .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.ttab===name));
@@ -3823,7 +3823,7 @@ function trashRowHtml(id, type, title, subtitle, deletedAt, restoreFn, deleteFn)
   const when = deletedAt ? new Date(deletedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
   return `<div class="integ-row">
     <input type="checkbox" class="trash-row-checkbox" data-type="${type}" value="${id}" onchange="onTrashRowCheck(this)" style="margin-right:12px;flex:none;">
-    <div><div class="integ-name">${title}</div>${subtitle ? `<div class="integ-desc">${subtitle}</div>` : ''}${when ? `<div class="integ-desc" style="color:var(--muted-lt);">Deleted ${when}</div>` : ''}</div>
+    <div style="flex:1;min-width:0;"><div class="integ-name">${title}</div>${subtitle ? `<div class="integ-desc">${subtitle}</div>` : ''}${when ? `<div class="integ-desc" style="color:var(--muted-lt);">Deleted ${when}</div>` : ''}</div>
     <div style="display:flex;gap:14px;flex:none;">
       <span class="row-link" onclick="${restoreFn}">Restore</span>
       <span class="row-link danger-link" onclick="${deleteFn}">Delete permanently</span>
@@ -4740,7 +4740,7 @@ const NOTE_STAGES = [
   { key:'idea',        label:'Idea',        color:'#7C93B0' },
   { key:'planned',      label:'Planned',     color:'#C99A55' },
   { key:'in-progress',  label:'In Progress', color:'#C17A6E' },
-  { key:'done',         label:'Done',        color:'var(--green)' },
+  { key:'done',         label:'Done',        color:'#117F3A' },
 ];
 
 function renderNotes(){
@@ -4850,8 +4850,8 @@ async function loadMyTasks(){
 }
 
 const TASK_PRIORITY_META = {
-  high:   { label:'High',   color:'var(--red)',   order:0 },
-  medium: { label:'Medium', color:'var(--amber)', order:1 },
+  high:   { label:'High',   color:'#CF2424',   order:0 },
+  medium: { label:'Medium', color:'#A65B05', order:1 },
   low:    { label:'Low',    color:'#7C93B0', order:2 },
 };
 
@@ -4859,7 +4859,7 @@ const KANBAN_STAGES = [
   { key:'todo',        label:'To Do',      color:'#7C93B0' },
   { key:'in_progress',  label:'On Process', color:'#C99A55' },
   { key:'in_review',    label:'On Review',  color:'#C17A6E' },
-  { key:'done',         label:'Completed',  color:'var(--green)' },
+  { key:'done',         label:'Completed',  color:'#117F3A' },
 ];
 
 let newTaskPresetStatus = 'todo';
@@ -5315,9 +5315,9 @@ let calendarAnchorDate = new Date();
 
 const CALENDAR_TYPE_META = {
   meeting:  { label:'Meeting',  color:'#3A63C9', icon:'🗓️' },
-  deadline: { label:'Deadline', color:'var(--red)', icon:'⏱️' },
-  reminder: { label:'Reminder', color:'var(--amber)', icon:'🔔' },
-  other:    { label:'Other',    color:'var(--muted-lt)', icon:'●' },
+  deadline: { label:'Deadline', color:'#CF2424', icon:'⏱️' },
+  reminder: { label:'Reminder', color:'#A65B05', icon:'🔔' },
+  other:    { label:'Other',    color:'#696F78', icon:'●' },
 };
 
 async function loadCalendarEvents(){
@@ -5750,10 +5750,10 @@ function openNewEventModal(presetDateStr){
 }
 
 const RSVP_STATUS_META = {
-  confirmed: { label:'Confirmed', color:'var(--green)', icon:'✓' },
-  declined: { label:'Declined', color:'var(--red)', icon:'✕' },
-  change_requested: { label:'Change requested', color:'var(--amber)', icon:'⚠' },
-  pending: { label:'Pending', color:'var(--muted-lt)', icon:'…' },
+  confirmed: { label:'Confirmed', color:'#117F3A', icon:'✓' },
+  declined: { label:'Declined', color:'#CF2424', icon:'✕' },
+  change_requested: { label:'Change requested', color:'#A65B05', icon:'⚠' },
+  pending: { label:'Pending', color:'#696F78', icon:'…' },
 };
 
 function personAvatarHtml(userId){
@@ -8475,7 +8475,7 @@ function timeAgo(dateStr){
 }
 
 function riskLabel(danger){
-  if(danger>=4) return { text:'At risk', color:'var(--red)' };
+  if(danger>=4) return { text:'At risk', color:'#CF2424' };
   if(danger===3) return { text:'Medium risk', color:'#43719C' };
   return { text:'No risk', color:'#117F3A' };
 }
