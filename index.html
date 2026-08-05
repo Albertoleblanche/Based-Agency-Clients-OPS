@@ -167,7 +167,7 @@
   .nav-item:hover{background:var(--sidebar-hover);color:#fff;}
   .nav-item.active{background:var(--sidebar-active);color:#fff;}
   .nav-item.active svg{opacity:1;}
-  .nav-badge{margin-left:auto;font-family:'DM Sans',sans-serif;font-size:10px;background:var(--brand);color:#2A1200;border-radius:20px;padding:1px 7px;font-weight:600;}
+  .nav-badge{margin-left:auto;font-family:'DM Sans',sans-serif;font-size:10px;background:var(--red);color:#fff;border-radius:20px;padding:1px 7px;font-weight:600;}
   .sidebar-foot{margin-top:auto;padding:12px 11px;border-top:1px solid #24365E;font-size:11px;color:var(--sidebar-muted);line-height:1.5;}
   .sidebar-foot-actions{display:flex;gap:4px;}
   .sidebar-foot-actions .sidebar-action{flex:1;justify-content:center;}
@@ -3424,7 +3424,11 @@ function renderKpis(){
   const active = ac.filter(c=>c.status==='Active').length;
   const pending = ac.filter(c=>c.draftStatus==='pending').length;
   const approved = ac.filter(c=>c.draftStatus==='approved').length;
-  document.getElementById('navPendingBadge').textContent = pending;
+  // Approval Queue is personal now — the sidebar badge needs to match what
+  // that page actually shows, not every pending draft on the whole roster.
+  const me = myName();
+  const myPending = ac.filter(c=>c.draftStatus==='pending' && c.improvements.filter(improvementInDateRange).some(i=>i.author===me)).length;
+  document.getElementById('navPendingBadge').textContent = myPending;
 
   // --- Total Clients ---
   document.getElementById('kpiTotal').textContent = ac.length;
@@ -8333,7 +8337,7 @@ function renderTeamQueue(){
         ${teamQueueAvatarHtml(member)}
         <div>
           <div class="team-queue-member-name">${member.name}</div>
-          <div class="team-queue-member-role">${member.role}</div>
+          <div class="team-queue-member-role">${member.title || member.role}</div>
         </div>
         <button class="btn btn-dark" style="margin-left:auto;flex:none;" onclick="notifyForMember('${member.id}')">Ready to Notify</button>
       </div>
