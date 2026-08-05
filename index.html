@@ -2117,6 +2117,7 @@ function closeMobileNav(){
 let currentUser = null;   // Supabase auth user object
 let myProfile = null;     // { id, name, email, role }
 let teamProfiles = [];    // everyone's profiles, for the Team admin panel
+let currentDetailClientId = null;  // which client's detail page is open, if any
 
 function myName(){ return myProfile ? myProfile.name : ''; }
 function canApprove(){ return !!myProfile && (myProfile.role === 'admin' || myProfile.role === 'approver'); }
