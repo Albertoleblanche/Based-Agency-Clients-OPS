@@ -412,6 +412,18 @@
   .team-queue-member-name{font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;color:var(--ink);}
   .team-queue-member-role{font-family:'DM Sans',sans-serif;font-size:11px;color:var(--muted-lt);text-transform:capitalize;margin-top:2px;}
   .team-queue-avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;flex:none;background:var(--surface-2);}
+  .team-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;}
+  .team-card{position:relative;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;display:flex;flex-direction:column;align-items:center;text-align:center;transition:box-shadow var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out);}
+  .team-card:hover{box-shadow:0 4px 16px rgba(16,24,40,.08);border-color:#D8DAE0;}
+  .team-card.revoked{opacity:.6;}
+  .team-card-menu-btn{position:absolute;top:10px;right:10px;}
+  .team-card-avatar{width:56px;height:56px;border-radius:50%;object-fit:cover;background:var(--surface-2);margin-bottom:10px;}
+  .team-card-avatar-fallback{width:56px;height:56px;border-radius:50%;color:#fff;font-family:'DM Sans',sans-serif;font-weight:600;font-size:20px;display:flex;align-items:center;justify-content:center;margin-bottom:10px;}
+  .team-card-name{font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;color:var(--ink);}
+  .team-card-role{font-size:11.5px;color:var(--muted-lt);margin-top:2px;margin-bottom:14px;}
+  .team-card-actions{display:flex;gap:8px;width:100%;}
+  .team-card-actions .btn{flex:1;padding:7px 10px;font-size:12px;}
+  .team-card-view{display:block;width:100%;margin-bottom:8px;font-size:12px;padding:7px 10px;}
   .team-queue-avatar-fallback{width:40px;height:40px;border-radius:50%;flex:none;color:#fff;font-family:'DM Sans',sans-serif;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;}
 
   /* Notes */
@@ -2054,6 +2066,12 @@ document.addEventListener('DOMContentLoaded', function(){
   <div class="dropdown-item" onclick="closeActionsMenus(); toggleDrawer(currentActionsMenuClientId)">Log / view improvements</div>
   <div class="dropdown-item" onclick="closeActionsMenus(); openNoteModal(null, currentActionsMenuClientId)">Add note</div>
   <div class="dropdown-item danger" id="clientActionsMenuDelete" onclick="closeActionsMenus(); deleteClient(currentActionsMenuClientId)">Delete client</div>
+</div>
+
+<div class="dropdown-menu" id="teamActionsMenu" style="position:fixed;">
+  <div class="dropdown-item" onclick="closeTeamActionsMenu(); adminResetPassword(currentTeamActionsMember.id, currentTeamActionsMember.name)">Reset password</div>
+  <div class="dropdown-item" id="teamActionsMenuAccessToggle" onclick="closeTeamActionsMenu(); toggleUserAccess(currentTeamActionsMember.id, currentTeamActionsMember.name, !currentTeamActionsMember.revoked)">Revoke access</div>
+  <div class="dropdown-item danger" onclick="closeTeamActionsMenu(); confirmDeleteUser(currentTeamActionsMember.id, currentTeamActionsMember.name)">Delete permanently</div>
 </div>
 
 <div class="mobile-nav-scrim" id="mobileNavScrim" onclick="closeMobileNav()"></div>
@@ -3888,6 +3906,40 @@ function closeActionsMenus(){
 }
 document.addEventListener('click', function(e){
   if(!e.target.closest('#clientActionsMenu')) closeActionsMenus();
+});
+
+let currentTeamActionsMember = null;
+
+function toggleTeamActionsMenu(event, member){
+  event.stopPropagation();
+  const menu = document.getElementById('teamActionsMenu');
+  const wasOpenForThisRow = menu.classList.contains('open') && currentTeamActionsMember?.id === member.id;
+  closeTeamActionsMenu();
+  if(wasOpenForThisRow) return;
+
+  currentTeamActionsMember = { id: member.id, name: member.name, revoked: !!member.access_revoked };
+  const accessItem = document.getElementById('teamActionsMenuAccessToggle');
+  if(accessItem){
+    accessItem.textContent = currentTeamActionsMember.revoked ? 'Restore access' : 'Revoke access';
+    accessItem.classList.toggle('danger', !currentTeamActionsMember.revoked);
+  }
+
+  const rect = event.currentTarget.getBoundingClientRect();
+  menu.style.top = (rect.bottom + 4) + 'px';
+  menu.style.left = 'auto';
+  menu.style.right = (window.innerWidth - rect.right) + 'px';
+  const menuHeightEstimate = 140;
+  if(rect.bottom + menuHeightEstimate > window.innerHeight){
+    menu.style.top = (rect.top - menuHeightEstimate - 4) + 'px';
+  }
+  menu.classList.add('open');
+}
+function closeTeamActionsMenu(){
+  document.getElementById('teamActionsMenu')?.classList.remove('open');
+  currentTeamActionsMember = null;
+}
+document.addEventListener('click', function(e){
+  if(!e.target.closest('#teamActionsMenu')) closeTeamActionsMenu();
 });
 
 async function deleteClient(id){
@@ -9393,42 +9445,73 @@ function renderTeam(){
   if(titlesPanel) titlesPanel.style.display = isAdmin() ? 'block' : 'none';
   if(isAdmin()){ populateAddMemberTitleSelect(); renderOptionsManager('title'); }
   if(noteEl) noteEl.textContent = isAdmin()
-    ? 'You can change anyone\'s role or title below, except your own role.'
+    ? 'Tap View on a card to change someone\'s role or title, except your own role.'
     : 'Only admins can add members or change roles.';
   if(!el) return;
   if(!teamProfiles.length){ el.innerHTML = `<div class="empty" style="padding:14px 0;">No team members yet.</div>`; return; }
-  el.innerHTML = teamProfiles.map(m=>{
+  el.innerHTML = `<div class="team-grid">` + teamProfiles.map(m=>{
     const isSelf = currentUser && m.id === currentUser.id;
     const isRevoked = !!m.access_revoked;
-    const roleControl = (isAdmin() && !isSelf)
-      ? `<select onchange="changeTeamRole('${m.id}', this.value)" style="font-family:'DM Sans',sans-serif;font-size:12px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);">
-          <option value="member" ${m.role==='member'?'selected':''}>Member</option>
-          <option value="approver" ${m.role==='approver'?'selected':''}>Approver</option>
-          <option value="admin" ${m.role==='admin'?'selected':''}>Admin</option>
-        </select>`
-      : `<span class="role-chip">${m.role}${isSelf ? ' · you' : ''}</span>`;
-    const titleControl = isAdmin()
-      ? `<select onchange="changeTeamTitle('${m.id}', this.value)" style="font-family:'DM Sans',sans-serif;font-size:12px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);margin-right:8px;">
-          <option value="">No title</option>
-          ${(settings.teamTitleOptions||[]).map(o=>`<option value="${o.replace(/"/g,'&quot;')}" ${m.title===o?'selected':''}>${o}</option>`).join('')}
-        </select>`
-      : (m.title ? `<span class="role-chip" style="margin-right:8px;">${m.title}</span>` : '');
-    const contactLine = [m.email, m.phone].filter(Boolean).join(' · ');
-    const actions = [];
-    if(!isSelf && !isRevoked) actions.push(`<span class="row-link" onclick="openNewTaskModal('${m.id}')">Assign task</span>`);
-    if(m.email) actions.push(`<a class="row-link" href="mailto:${m.email}" style="text-decoration:none;">Email</a>`);
-    if(isAdmin() && !isSelf){
-      actions.push(`<span class="row-link" onclick="adminResetPassword('${m.id}','${m.name.replace(/'/g,"\\'")}')">Reset password</span>`);
-      actions.push(isRevoked
-        ? `<span class="row-link" onclick="toggleUserAccess('${m.id}','${m.name.replace(/'/g,"\\'")}', false)">Restore access</span>`
-        : `<span class="row-link danger-link" onclick="toggleUserAccess('${m.id}','${m.name.replace(/'/g,"\\'")}', true)">Revoke access</span>`);
-      actions.push(`<span class="row-link danger-link" onclick="confirmDeleteUser('${m.id}','${m.name.replace(/'/g,"\\'")}')">Delete permanently</span>`);
-    }
-    return `<div class="integ-row">
-      <div><div class="integ-name">${m.name}${isRevoked ? `<span class="pill pill-bad" style="margin-left:8px;">Access revoked</span>` : ''}</div><div class="integ-desc">${contactLine}</div>${actions.length ? `<div style="display:flex;gap:14px;margin-top:6px;flex-wrap:wrap;">${actions.join('')}</div>` : ''}</div>
-      <div style="display:flex;align-items:center;">${titleControl}${roleControl}</div>
+    const roleAtCompany = m.title || roleDisplayLabel(m.role);
+    return `<div class="team-card ${isRevoked?'revoked':''}">
+      ${isAdmin() ? `<button class="icon-menu-btn team-card-menu-btn" onclick='toggleTeamActionsMenu(event, ${escapeHtml(JSON.stringify({id:m.id,name:m.name,access_revoked:isRevoked}))})' title="Actions">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+      </button>` : ''}
+      ${teamCardAvatarHtml(m)}
+      <div class="team-card-name">${m.name}${isSelf?' · you':''}</div>
+      <div class="team-card-role">${roleAtCompany}${isRevoked ? ' · Access revoked' : ''}</div>
+      <button class="btn btn-outline team-card-view" onclick="openTeamMemberDetail('${m.id}')">View</button>
+      <div class="team-card-actions">
+        ${(!isSelf && !isRevoked) ? `<button class="btn btn-outline" onclick="openNewTaskModal('${m.id}')">Assign task</button>` : ''}
+        ${m.email ? `<a class="btn btn-outline" href="mailto:${m.email}" style="text-decoration:none;">Email</a>` : ''}
+      </div>
     </div>`;
-  }).join('');
+  }).join('') + `</div>`;
+}
+
+// Large avatar variant for the team grid cards — the shared 30px inline
+// version (personAvatarHtml) reads too small as the focal point of a card.
+function teamCardAvatarHtml(m){
+  return m.avatar_url
+    ? `<img class="team-card-avatar" src="${m.avatar_url}">`
+    : `<div class="team-card-avatar-fallback" style="background:${avatarColorForName(m.name)};">${(m.name||'?').trim().charAt(0).toUpperCase()}</div>`;
+}
+
+function openTeamMemberDetail(id){
+  const m = teamProfiles.find(x=>x.id===id);
+  if(!m) return;
+  const isSelf = currentUser && m.id === currentUser.id;
+  const isRevoked = !!m.access_revoked;
+  const roleControl = (isAdmin() && !isSelf)
+    ? `<select onchange="changeTeamRole('${m.id}', this.value)" style="font-family:'DM Sans',sans-serif;font-size:12px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);width:100%;">
+        <option value="member" ${m.role==='member'?'selected':''}>Member</option>
+        <option value="approver" ${m.role==='approver'?'selected':''}>Approver</option>
+        <option value="admin" ${m.role==='admin'?'selected':''}>Admin</option>
+      </select>`
+    : `<span class="role-chip">${roleDisplayLabel(m.role)}${isSelf ? ' · you' : ''}</span>`;
+  const titleControl = isAdmin()
+    ? `<select onchange="changeTeamTitle('${m.id}', this.value)" style="font-family:'DM Sans',sans-serif;font-size:12px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);width:100%;">
+        <option value="">No title</option>
+        ${(settings.teamTitleOptions||[]).map(o=>`<option value="${o.replace(/"/g,'&quot;')}" ${m.title===o?'selected':''}>${o}</option>`).join('')}
+      </select>`
+    : (m.title ? `<span class="role-chip">${m.title}</span>` : `<span style="color:var(--muted-lt);font-size:12px;">No title set</span>`);
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">${m.name}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;align-items:center;gap:14px;">
+      ${teamCardAvatarHtml(m)}
+      ${isRevoked ? `<span class="pill pill-bad">Access revoked</span>` : ''}
+      <div class="form-grid" style="width:100%;">
+        <div><label>Email</label><div style="font-size:13px;color:var(--ink);">${m.email || '—'}</div></div>
+        <div><label>Phone</label><div style="font-size:13px;color:var(--ink);">${m.phone || '—'}</div></div>
+        <div><label>Title</label>${titleControl}</div>
+        <div><label>Role</label>${roleControl}</div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      ${(!isSelf && !isRevoked) ? `<button class="btn btn-outline" onclick="closeAppModal(); openNewTaskModal('${m.id}')">Assign task</button>` : ''}
+      ${m.email ? `<a class="btn btn-outline" href="mailto:${m.email}" style="text-decoration:none;">Email</a>` : ''}
+      <button class="btn btn-brand" onclick="closeAppModal()">Done</button>
+    </div>`, 420);
 }
 
 async function changeTeamTitle(userId, newTitle){
