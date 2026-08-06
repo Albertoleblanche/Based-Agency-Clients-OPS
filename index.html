@@ -7959,7 +7959,7 @@ function renderXYChart(containerId, buckets, headlineMode){
   let trendPct = prevVal>0 ? Math.round(((lastVal-prevVal)/prevVal)*100) : (lastVal>0 ? 100 : 0);
   const trendUp = lastVal >= prevVal;
   const headlineValue = headlineMode==='latest' ? lastVal : totalHours;
-  const headlineCaption = headlineMode==='latest' ? `<div class="xy-chart-caption">${buckets[buckets.length-1].label}</div>` : '';
+  const headlineCaption = headlineMode==='latest' ? `<div class="xy-chart-caption">${buckets[buckets.length-1].label} (so far)</div>` : '';
 
   const showEvery = buckets.length<=8 ? 1 : Math.ceil(buckets.length/6);
 
