@@ -237,6 +237,13 @@
   .kpi-click:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(16,24,40,.08);border-color:#DDE0E5;}
 
   /* Metric cards — icon badge, big number, status chips, muted caption. Uniform style. */
+  .today-summary-greeting{font-family:'DM Sans',sans-serif;font-size:16px;font-weight:700;color:var(--ink);margin-bottom:12px;}
+  .today-summary-row{display:flex;gap:10px;flex-wrap:wrap;}
+  .today-summary-chip{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);cursor:pointer;transition:background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);flex:1;min-width:190px;}
+  .today-summary-chip:hover{background:var(--card);border-color:#D8DAE0;}
+  .today-summary-chip-icon{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:none;}
+  .today-summary-chip-text{font-family:'DM Sans',sans-serif;font-size:12.5px;color:var(--ink);font-weight:600;}
+  .today-summary-chip-sub{font-size:10.5px;color:var(--muted-lt);margin-top:1px;}
   .metrics-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px;}
   #cdMetrics.metrics-row{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));}
   @media (max-width:900px){.metrics-row{grid-template-columns:1fr 1fr;}}
@@ -244,7 +251,7 @@
 
   .metric-card{background:var(--card);border:1px solid #EDEEF1;border-radius:var(--radius-lg);padding:18px 20px;box-shadow:0 1px 2px rgba(16,24,40,.03);}
 
-  .donut-card{background:var(--card);border:1px solid #EDEEF1;border-radius:var(--radius-lg);padding:18px 20px;box-shadow:0 1px 2px rgba(16,24,40,.03);display:flex;flex-direction:column;align-items:center;cursor:pointer;transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;}
+  .donut-card{background:var(--card);border:1px solid #EDEEF1;border-radius:var(--radius-lg);padding:18px 20px;box-shadow:0 1px 2px rgba(16,24,40,.03);display:flex;flex-direction:column;align-items:center;}
   .donut-card:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(16,24,40,.08);border-color:#DDE0E5;}
   .donut-card-head{font-size:12.5px;font-weight:600;color:var(--muted);align-self:flex-start;text-transform:capitalize;}
   .donut-wrap{position:relative;width:190px;height:190px;margin:6px 0;}
@@ -1070,6 +1077,10 @@ document.addEventListener('DOMContentLoaded', function(){
     <!-- OVERVIEW -->
     <div class="view active" id="view-overview">
 
+      <div class="panel" id="todaySummaryPanel" style="margin-bottom:24px;">
+        <div class="panel-body" id="todaySummaryBody"></div>
+      </div>
+
       <div class="metrics-row">
         <div class="metric-card kpi-click" onclick="switchView('clients')">
           <div class="metric-head">
@@ -1091,24 +1102,38 @@ document.addEventListener('DOMContentLoaded', function(){
           <div class="metric-caption">Based on danger scores</div>
         </div>
 
-        <div class="metric-card kpi-click" onclick="goToQueueFilter('pending')">
+        <div class="metric-card kpi-click" id="kpiPendingCard" onclick="goToPendingKpi()">
           <div class="metric-head">
             <span class="metric-icon metric-icon-amber"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
-            <span class="metric-label">Pending Approval</span>
+            <span class="metric-label" id="kpiPendingLabel">Pending Approval</span>
           </div>
           <div class="metric-value" id="kpiPending">0</div>
           <div class="metric-chips" id="pendingChips"></div>
-          <div class="metric-caption">Awaiting Daniel &amp; Eric</div>
+          <div class="metric-caption" id="kpiPendingCaption">Awaiting review</div>
         </div>
 
-        <div class="metric-card kpi-click" onclick="goToQueueFilter('approved')">
+        <div class="metric-card kpi-click" id="kpiCompletionCard" onclick="goToApprovedKpi()">
           <div class="metric-head">
             <span class="metric-icon metric-icon-purple"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
-            <span class="metric-label">Weekly Completion</span>
+            <span class="metric-label" id="kpiCompletionLabel">Weekly Completion</span>
           </div>
           <div class="metric-value" id="kpiCompletion">—</div>
           <div class="metric-chips" id="completionChips"></div>
-          <div class="metric-caption">Of clients logged this week</div>
+          <div class="metric-caption" id="kpiCompletionCaption">Of clients logged this week</div>
+        </div>
+      </div>
+
+      <div class="split-row-70" style="margin-bottom:24px;">
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Needs attention</span><span class="row-link" id="attentionFilterClear" onclick="setAttentionTierFilter(null)" style="display:none;">Clear filter ×</span></div>
+          <div class="panel-body"><div id="attentionList"></div></div>
+        </div>
+
+        <div class="donut-card">
+          <div class="donut-card-head">Risk Breakdown</div>
+          <div class="donut-wrap" id="totalClientsDonut"></div>
+          <div class="donut-legend" id="totalClientsLegend"></div>
+          <div class="donut-stats" id="totalClientsStats"></div>
         </div>
       </div>
 
@@ -1117,29 +1142,22 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="panel-body"><div class="queue-grid" id="overviewActiveQueue"></div></div>
       </div>
 
-      <div class="split-row" style="margin-bottom:24px;">
-        <div class="panel">
-          <div class="panel-body">
-            <div class="xy-chart-header">
-              <div>
-                <div class="xy-chart-title" id="overviewChartTitle">Hours Logged</div>
-                <div class="xy-chart-updated" id="overviewChartUpdated"></div>
-              </div>
-              <div class="select-field" style="min-width:110px;">
-                <select id="overviewChartGranularity" onchange="renderOverviewChart()">
-                  <option value="day">Day</option>
-                  <option value="week" selected>Week</option>
-                  <option value="month">Month</option>
-                </select>
-              </div>
+      <div class="panel" style="margin-bottom:24px;">
+        <div class="panel-body">
+          <div class="xy-chart-header">
+            <div>
+              <div class="xy-chart-title" id="overviewChartTitle">Hours Logged</div>
+              <div class="xy-chart-updated" id="overviewChartUpdated"></div>
             </div>
-            <div id="overviewChart"></div>
+            <div class="select-field" style="min-width:110px;">
+              <select id="overviewChartGranularity" onchange="renderOverviewChart()">
+                <option value="day">Day</option>
+                <option value="week" selected>Week</option>
+                <option value="month">Month</option>
+              </select>
+            </div>
           </div>
-        </div>
-
-        <div class="panel">
-          <div class="panel-head"><span class="panel-title">Activity Log</span><span style="font-family:'DM Sans',sans-serif;font-size:10.5px;color:var(--muted-lt);" id="logCountOverview"></span></div>
-          <div class="panel-body"><div class="log-list" id="logListOverview"></div></div>
+          <div id="overviewChart"></div>
         </div>
       </div>
 
@@ -1148,18 +1166,15 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="panel-body"><div id="budgetAlertsList"></div></div>
       </div>
 
-      <div class="split-row-70" style="margin-bottom:24px;">
-        <div class="panel">
-          <div class="panel-head"><span class="panel-title">Needs attention</span></div>
-          <div class="panel-body"><div id="attentionList"></div></div>
+      <div class="panel" style="margin-bottom:24px;">
+        <div class="panel-head" style="cursor:pointer;" onclick="toggleOverviewActivityLog()">
+          <span class="panel-title">Activity Log</span>
+          <span style="display:flex;align-items:center;gap:8px;">
+            <span style="font-family:'DM Sans',sans-serif;font-size:10.5px;color:var(--muted-lt);" id="logCountOverview"></span>
+            <svg id="overviewActivityLogChevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--muted-lt);transition:transform var(--duration-base) var(--ease-out);"><polyline points="6 9 12 15 18 9"/></svg>
+          </span>
         </div>
-
-        <div class="donut-card kpi-click" onclick="switchView('clients')">
-          <div class="donut-card-head">Risk Breakdown</div>
-          <div class="donut-wrap" id="totalClientsDonut"></div>
-          <div class="donut-legend" id="totalClientsLegend"></div>
-          <div class="donut-stats" id="totalClientsStats"></div>
-        </div>
+        <div class="panel-body" id="overviewActivityLogBody" style="display:none;"><div class="log-list" id="logListOverview"></div></div>
       </div>
     </div>
 
@@ -2651,7 +2666,7 @@ async function fullRefresh(showFeedback){
   if(syncEl) syncEl.textContent = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
   if(showFeedback && btn){ btn.disabled = false; btn.innerHTML = refreshIcon + ' Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
-function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderTeamQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderTopbarCurrentDate(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); renderTasks(); renderCalendar(); renderTimesheet(); renderTrash(); }
+function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderTeamQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderTopbarCurrentDate(); renderTodaySummary(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); renderTasks(); renderCalendar(); renderTimesheet(); renderTrash(); }
 
 function switchTrashTab(name){
   document.querySelectorAll('#trashTabsBar .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.ttab===name));
@@ -2896,6 +2911,27 @@ async function goToQueueFilter(filter){
   setQueueFilter(filter);
 }
 
+// The Pending Approval / Weekly Completion KPI cards show a team-wide count
+// for admins but a personal one for everyone else — this routes each to
+// wherever that number actually lives, instead of always landing on the
+// personal queue regardless of which count was just shown.
+async function goToPendingKpi(){
+  if(isAdmin()){
+    await switchView('teamqueue');
+    setTeamQueueFilter('pending');
+  } else {
+    await goToQueueFilter('pending');
+  }
+}
+async function goToApprovedKpi(){
+  if(isAdmin()){
+    await switchView('teamqueue');
+    setTeamQueueFilter('approved');
+  } else {
+    await goToQueueFilter('approved');
+  }
+}
+
 async function goToClientInQueue(id, filter){
   queueFilter = filter || 'all';
   await switchView('approve');
@@ -2909,18 +2945,32 @@ async function goToClientInQueue(id, filter){
   openQueueCardModal(id);
 }
 
+let attentionTierFilter = null;
+
+function setAttentionTierFilter(tier){
+  attentionTierFilter = tier;
+  const clearBtn = document.getElementById('attentionFilterClear');
+  if(clearBtn) clearBtn.style.display = tier ? 'inline' : 'none';
+  renderAttentionList();
+  renderTotalClientsDonut();
+}
+
 function renderAttentionList(){
   const el = document.getElementById('attentionList');
   if(!el) return;
-  const items = activeClients().filter(c => c.danger>=4 || c.draftStatus==='pending')
-    .sort((a,b)=> b.danger-a.danger || (b.draftStatus==='pending')-(a.draftStatus==='pending'));
-  if(!items.length){ el.innerHTML = emptyStateHtml(
+  let items = activeClients().filter(c => c.danger>=4 || c.draftStatus==='pending');
+  if(attentionTierFilter) items = activeClients().filter(c => riskLabel(c.danger).text === attentionTierFilter);
+  items.sort((a,b)=> b.danger-a.danger || (b.draftStatus==='pending')-(a.draftStatus==='pending'));
+  if(!items.length){
+    const title = attentionTierFilter ? `No clients in "${attentionTierFilter}"` : 'Nothing urgent right now';
+    const sub = attentionTierFilter ? 'Try a different segment, or clear the filter to see everyone.' : 'At-risk clients and drafts waiting on approval will show up here.';
+    el.innerHTML = emptyStateHtml(
     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
-    'Nothing urgent right now',
-    'At-risk clients and drafts waiting on approval will show up here.'
+    title, sub
   ); return; }
 
-  const cards = items.slice(0,4).map(c=>{
+  const cap = attentionTierFilter ? 8 : 4;
+  const cards = items.slice(0,cap).map(c=>{
     const reason = c.draftStatus==='pending' ? 'Draft awaiting approval' : 'At risk';
     const filter = c.draftStatus==='pending' ? 'pending' : 'atrisk';
     const status = statusMeta(c.draftStatus);
@@ -3495,11 +3545,18 @@ function renderKpis(){
   const ac = activeClients();
   const atRisk = ac.filter(c=>c.danger>=4).length;
   const active = ac.filter(c=>c.status==='Active').length;
-  const pending = ac.filter(c=>c.draftStatus==='pending').length;
-  const approved = ac.filter(c=>c.draftStatus==='approved').length;
+  const me = myName();
+  const admin = isAdmin();
+  // Pending Approval and Weekly Completion are personal for regular members
+  // and approvers — scoped to clients they themselves logged something for —
+  // same split already established for Approval Queue and the Hours chart.
+  // Total Clients and Client Health stay roster-wide regardless of role,
+  // since this app has no "my clients" ownership concept to scope them by.
+  const pending = admin
+    ? ac.filter(c=>c.draftStatus==='pending').length
+    : ac.filter(c=>c.draftStatus==='pending' && c.improvements.some(i=>i.author===me)).length;
   // Approval Queue is personal now — the sidebar badge needs to match what
   // that page actually shows, not every pending draft on the whole roster.
-  const me = myName();
   const myPending = ac.filter(c=>c.draftStatus==='pending' && c.improvements.filter(improvementInDateRange).some(i=>i.author===me)).length;
   document.getElementById('navPendingBadge').textContent = myPending;
 
@@ -3521,15 +3578,21 @@ function renderKpis(){
   document.getElementById('healthChips').innerHTML = ac.length ? `<span class="pill ${healthTier.cls}">${healthTier.label}</span>` : '';
 
   // --- Pending Approval ---
+  document.getElementById('kpiPendingLabel').textContent = admin ? 'Pending Approval' : 'Your Drafts Ready';
+  document.getElementById('kpiPendingCaption').textContent = admin ? 'Awaiting review, team-wide' : 'Waiting on your approver';
   document.getElementById('kpiPending').textContent = pending;
   document.getElementById('pendingChips').innerHTML = pending
     ? `<span class="pill pill-mid">${pending} draft${pending!==1?'s':''} ready</span>`
     : `<span class="pill pill-good">All caught up</span>`;
 
-  // --- Weekly Completion: of clients with a log this calendar week, how many are approved ---
-  const withRecentLogs = ac.filter(hasLoggedThisWeek);
+  // --- Weekly Completion: of clients with a log this calendar week (mine, if not admin), how many are approved ---
+  const withRecentLogs = admin
+    ? ac.filter(hasLoggedThisWeek)
+    : ac.filter(c => c.improvements.some(i => i.author===me && i.date && new Date(i.date) >= getWeekStart(new Date())));
   const approvedWithLogs = withRecentLogs.filter(c=>c.draftStatus==='approved').length;
   const completionPct = withRecentLogs.length ? Math.round((approvedWithLogs/withRecentLogs.length)*100) : 0;
+  document.getElementById('kpiCompletionLabel').textContent = admin ? 'Weekly Completion' : 'Your Weekly Completion';
+  document.getElementById('kpiCompletionCaption').textContent = admin ? 'Of clients logged this week, team-wide' : 'Of clients you logged this week';
   document.getElementById('kpiCompletion').textContent = withRecentLogs.length ? completionPct + '%' : '—';
   document.getElementById('completionChips').innerHTML = withRecentLogs.length
     ? `<span class="pill pill-status">${approvedWithLogs} of ${withRecentLogs.length} updated</span>`
@@ -3570,6 +3633,86 @@ function renderOverviewActiveQueue(){
   }).join('');
 }
 
+function renderTodaySummary(){
+  const el = document.getElementById('todaySummaryBody');
+  if(!el) return;
+  const isOverviewActive = document.getElementById('view-overview')?.classList.contains('active');
+  if(!isOverviewActive) return;
+
+  const chips = [];
+  const now = new Date();
+
+  // My open tasks
+  const myTasks = tasks.filter(t => t.assigneeId===currentUser?.id && t.status!=='done' && !t.cancelledAt);
+  if(myTasks.length){
+    const overdue = myTasks.filter(t=> t.dueDate && new Date(t.dueDate) < now).length;
+    const dueToday = myTasks.filter(t=> t.dueDate && toDateStr(new Date(t.dueDate))===toDateStr(now)).length;
+    const sub = overdue ? `${overdue} overdue` : dueToday ? `${dueToday} due today` : 'None due today';
+    chips.push({
+      icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+      iconBg: overdue ? 'var(--red-bg)' : 'var(--brand-bg)', iconColor: overdue ? 'var(--red)' : 'var(--brand-dark)',
+      text: `${myTasks.length} open task${myTasks.length!==1?'s':''}`, sub, onclick: "switchView('tasks')"
+    });
+  }
+
+  // Upcoming events (next 7 days) — attending or created
+  const weekAhead = new Date(now); weekAhead.setDate(weekAhead.getDate()+7);
+  const myEvents = calendarEvents.filter(e => {
+    const start = new Date(e.startAt);
+    if(start < now || start > weekAhead) return false;
+    return (e.attendeeIds||[]).includes(currentUser?.id) || e.createdBy===currentUser?.id;
+  }).sort((a,b)=> new Date(a.startAt)-new Date(b.startAt));
+  if(myEvents.length){
+    const next = myEvents[0];
+    const nextStart = new Date(next.startAt);
+    const isToday = toDateStr(nextStart)===toDateStr(now);
+    const timeLabel = isToday ? `Today ${nextStart.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}` : nextStart.toLocaleDateString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'});
+    chips.push({
+      icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+      iconBg: 'var(--brand-bg)', iconColor: 'var(--brand-dark)',
+      text: `${myEvents.length} upcoming event${myEvents.length!==1?'s':''}`, sub: `Next: ${next.title} · ${timeLabel}`, onclick: "switchView('calendar')"
+    });
+  }
+
+  // Drafts / risk — personal for regular members, team-wide for admins, same split already used elsewhere on this page
+  const ac = activeClients();
+  const me = myName();
+  const pendingDrafts = isAdmin()
+    ? ac.filter(c=>c.draftStatus==='pending').length
+    : ac.filter(c=>c.draftStatus==='pending' && c.improvements.some(i=>i.author===me)).length;
+  const atRisk = ac.filter(c=>c.danger>=4).length;
+  if(pendingDrafts || atRisk){
+    const text = pendingDrafts ? `${pendingDrafts} draft${pendingDrafts!==1?'s':''} ready` : `${atRisk} client${atRisk!==1?'s':''} at risk`;
+    const sub = pendingDrafts && atRisk ? `${atRisk} at risk` : (isAdmin() ? 'Team-wide' : 'Yours');
+    chips.push({
+      icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+      iconBg: atRisk ? 'var(--red-bg)' : 'var(--brand-bg)', iconColor: atRisk ? 'var(--red)' : 'var(--brand-dark)',
+      text, sub, onclick: "switchView('approve')"
+    });
+  }
+
+  const chipsHtml = chips.length
+    ? chips.map(c=>`<div class="today-summary-chip" onclick="${c.onclick}">
+        <div class="today-summary-chip-icon" style="background:${c.iconBg};color:${c.iconColor};">${c.icon}</div>
+        <div><div class="today-summary-chip-text">${c.text}</div><div class="today-summary-chip-sub">${c.sub}</div></div>
+      </div>`).join('')
+    : `<div class="today-summary-chip" style="cursor:default;">
+        <div class="today-summary-chip-icon" style="background:var(--green-bg);color:var(--green);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+        <div><div class="today-summary-chip-text">All caught up</div><div class="today-summary-chip-sub">No open tasks, events, or drafts need you right now.</div></div>
+      </div>`;
+
+  el.innerHTML = `<div class="today-summary-row">${chipsHtml}</div>`;
+}
+
+function toggleOverviewActivityLog(){
+  const body = document.getElementById('overviewActivityLogBody');
+  const chevron = document.getElementById('overviewActivityLogChevron');
+  if(!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if(chevron) chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+}
+
 function renderGreeting(){
   const isOverviewActive = document.getElementById('view-overview')?.classList.contains('active');
   if(!isOverviewActive) return;
@@ -3580,18 +3723,7 @@ function renderGreeting(){
   const period = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
   const first = myProfile && myProfile.name ? myProfile.name.split(' ')[0] : '';
   titleEl.textContent = `Good ${period}${first ? ', ' + first : ''}`;
-  if(subEl){
-    const pending = activeClients().filter(c=>c.draftStatus==='pending').length;
-    const atRisk = activeClients().filter(c=>c.danger>=4).length;
-    if(pending || atRisk){
-      const parts = [];
-      if(pending) parts.push(`${pending} draft${pending!==1?'s':''} waiting on approval`);
-      if(atRisk) parts.push(`${atRisk} client${atRisk!==1?'s':''} at risk`);
-      subEl.textContent = parts.join(' · ');
-    } else {
-      subEl.textContent = "Here's what's happening with your clients today.";
-    }
-  }
+  if(subEl) subEl.textContent = "Here's what's happening with your clients today.";
 }
 
 let clientFilters = { search:'', service:'all', status:'all', importance:'all', danger:'all', logged:'all' };
@@ -8674,7 +8806,8 @@ function renderTotalClientsDonut(){
   let cumulative = 0;
   const segs = entries.map(([tier,count])=>{
     const dash = (count/total)*C;
-    const html = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${tierColor(tier)}" stroke-width="${strokeW}" stroke-dasharray="${dash.toFixed(2)} ${(C-dash).toFixed(2)}" stroke-dashoffset="${(-cumulative).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"></circle>`;
+    const dimmed = attentionTierFilter && attentionTierFilter!==tier;
+    const html = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${tierColor(tier)}" stroke-width="${strokeW}" stroke-dasharray="${dash.toFixed(2)} ${(C-dash).toFixed(2)}" stroke-dashoffset="${(-cumulative).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})" style="cursor:pointer;opacity:${dimmed?0.3:1};transition:opacity var(--duration-fast) var(--ease-out);" onclick="setAttentionTierFilter(attentionTierFilter==='${tier}'?null:'${tier}')"><title>${tier} (${count}) — click to filter Needs Attention</title></circle>`;
     cumulative += dash;
     return html;
   }).join('');
@@ -8690,9 +8823,10 @@ function renderTotalClientsDonut(){
     </div>`;
 
   if(legend){
-    legend.innerHTML = entries.map(([tier,count])=>
-      `<span class="donut-legend-item"><span class="donut-legend-dot" style="background:${tierColor(tier)};"></span>${tier} (${count})</span>`
-    ).join('');
+    legend.innerHTML = entries.map(([tier,count])=>{
+      const dimmed = attentionTierFilter && attentionTierFilter!==tier;
+      return `<span class="donut-legend-item" style="cursor:pointer;opacity:${dimmed?0.4:1};font-weight:${attentionTierFilter===tier?700:400};" onclick="setAttentionTierFilter(attentionTierFilter==='${tier}'?null:'${tier}')"><span class="donut-legend-dot" style="background:${tierColor(tier)};"></span>${tier} (${count})</span>`;
+    }).join('');
   }
 
   const statsEl = document.getElementById('totalClientsStats');
