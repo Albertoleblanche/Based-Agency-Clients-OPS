@@ -244,16 +244,17 @@
      out as a different "kind" of card. */
   .ov-grid{display:grid;grid-template-columns:1fr 2fr 1fr;gap:16px;align-items:start;}
   .ov-col{display:flex;flex-direction:column;gap:16px;min-width:0;}
-  .ov-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;box-shadow:0 1px 2px rgba(16,24,40,.03);min-width:0;}
-  .ov-card-title{font-family:'DM Sans',sans-serif;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted-lt);font-weight:700;margin-bottom:10px;}
-  .ov-card-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;}
+  .ov-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;box-shadow:0 1px 2px rgba(16,24,40,.03);min-width:0;}
+  .ov-card-title{font-family:'DM Sans',sans-serif;font-size:12.5px;text-transform:capitalize;color:var(--ink);font-weight:700;margin-bottom:10px;}
+  .ov-card-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:12px;margin-bottom:14px;border-bottom:1px solid #F0F1F4;}
   .ov-card-head-left{display:flex;align-items:center;gap:8px;min-width:0;}
-  .ov-card-icon{width:24px;height:24px;border-radius:7px;background:var(--brand-bg);color:var(--brand-dark);display:flex;align-items:center;justify-content:center;flex:none;}
+  .ov-card-icon{width:24px;height:24px;border-radius:7px;background:var(--surface-2);color:var(--ink);display:flex;align-items:center;justify-content:center;flex:none;}
   .ov-card-btn{font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:600;color:var(--ink);background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:5px 11px;cursor:pointer;white-space:nowrap;flex:none;transition:background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);}
   .ov-card-btn:hover{background:var(--card);border-color:#D8DAE0;}
   .ov-card-caption{font-size:10.5px;color:var(--muted-lt);margin-top:8px;}
   .ov-kpi-value{font-family:'DM Sans',sans-serif;font-size:30px;font-weight:600;color:var(--ink);line-height:1.1;}
   .ov-kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  .ov-tasks-notes-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
 
   /* Softer than the old solid-black track — a light neutral surface, same
      family as the rest of the app's subtle backgrounds, not the sidebar color. */
@@ -273,10 +274,22 @@
   .ov-row-sub{font-size:10.5px;color:var(--muted-lt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
   .ov-row-meta{font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:600;color:var(--muted);flex:none;white-space:nowrap;}
 
+  /* Richer row for My Notes — title, a description preview line, then a
+     bottom row pairing the stage pill with the date. */
+  .ov-note-row{padding:11px 0;border-bottom:1px solid #F0F1F4;cursor:pointer;}
+  .ov-note-row:last-child{border-bottom:none;padding-bottom:0;}
+  .ov-note-row:first-child{padding-top:0;}
+  .ov-note-row:hover .ov-note-title{color:var(--brand-dark);}
+  .ov-note-title{font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color var(--duration-fast) var(--ease-out);}
+  .ov-note-desc{font-size:11px;color:var(--muted-lt);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ov-note-meta-row{display:flex;align-items:center;justify-content:space-between;margin-top:9px;gap:8px;}
+  .ov-note-stage-pill{font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:700;padding:3px 9px;border-radius:20px;flex:none;}
+  .ov-note-date{font-family:'DM Sans',sans-serif;font-size:10px;color:var(--muted-lt);flex:none;}
+
   /* Real mini month grid — day numbers + a dot for days with something on
      them, sized for a ~25% column rather than the full Calendar page's
      700px-min-width grid, which can't fit here at all. */
-  .ov-mini-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .ov-mini-cal-head{display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;margin-bottom:14px;border-bottom:1px solid #F0F1F4;}
   .ov-mini-cal-nav{display:flex;gap:2px;}
   .ov-mini-cal-arrow{width:22px;height:22px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center;transition:background var(--duration-fast) var(--ease-out);}
   .ov-mini-cal-arrow:hover{background:var(--surface-2);color:var(--ink);}
@@ -298,6 +311,7 @@
     .ov-grid{grid-template-columns:1fr;}
     .ov-col:last-child{grid-column:auto;}
     .ov-kpi-row{grid-template-columns:1fr;}
+    .ov-tasks-notes-row{grid-template-columns:1fr;}
   }
 
   .metrics-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px;}
@@ -1179,36 +1193,38 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="ov-col">
           <div class="ov-kpi-row">
             <div class="ov-card kpi-click" id="kpiTasksCard" onclick="switchView('tasks')">
-              <div class="ov-card-head-left" style="margin-bottom:10px;"><span class="ov-card-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><span class="ov-card-title" style="margin:0;">Open Tasks</span></div>
+              <div class="ov-card-title-row"><span class="ov-card-head-left"><span class="ov-card-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><span class="ov-card-title" style="margin:0;">Open Tasks</span></span></div>
               <div class="ov-kpi-value" id="kpiTasks">0</div>
               <div class="metric-chips" id="tasksChips"></div>
             </div>
             <div class="ov-card kpi-click" id="kpiPendingCard" onclick="goToPendingKpi()">
-              <div class="ov-card-head-left" style="margin-bottom:10px;"><span class="ov-card-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span><span class="ov-card-title" style="margin:0;" id="kpiPendingLabel">Pending Approval</span></div>
+              <div class="ov-card-title-row"><span class="ov-card-head-left"><span class="ov-card-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span><span class="ov-card-title" style="margin:0;" id="kpiPendingLabel">Pending Approval</span></span></div>
               <div class="ov-kpi-value" id="kpiPending">0</div>
               <div class="metric-chips" id="pendingChips"></div>
             </div>
             <div class="ov-card kpi-click" id="kpiCompletionCard" onclick="goToApprovedKpi()">
-              <div class="ov-card-head-left" style="margin-bottom:10px;"><span class="ov-card-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span><span class="ov-card-title" style="margin:0;" id="kpiCompletionLabel">Weekly Completion</span></div>
+              <div class="ov-card-title-row"><span class="ov-card-head-left"><span class="ov-card-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span><span class="ov-card-title" style="margin:0;" id="kpiCompletionLabel">Weekly Completion</span></span></div>
               <div class="ov-kpi-value" id="kpiCompletion">—</div>
               <div class="metric-chips" id="completionChips"></div>
             </div>
           </div>
 
-          <div class="ov-card">
-            <div class="ov-card-title-row">
-              <span class="ov-card-head-left"><span class="ov-card-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><span class="ov-card-title" style="margin:0;">My Tasks</span></span>
-              <span class="ov-card-btn" onclick="switchView('tasks')">See All</span>
+          <div class="ov-tasks-notes-row">
+            <div class="ov-card">
+              <div class="ov-card-title-row">
+                <span class="ov-card-head-left"><span class="ov-card-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><span class="ov-card-title" style="margin:0;">My Tasks</span></span>
+                <span class="ov-card-btn" onclick="switchView('tasks')">See All</span>
+              </div>
+              <div id="overviewMyTasks"></div>
             </div>
-            <div id="overviewMyTasks"></div>
-          </div>
 
-          <div class="ov-card">
-            <div class="ov-card-title-row">
-              <span class="ov-card-head-left"><span class="ov-card-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span><span class="ov-card-title" style="margin:0;">My Notes</span></span>
-              <span class="ov-card-btn" onclick="switchView('notes')">+ Add Note</span>
+            <div class="ov-card">
+              <div class="ov-card-title-row">
+                <span class="ov-card-head-left"><span class="ov-card-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span><span class="ov-card-title" style="margin:0;">My Notes</span></span>
+                <span class="ov-card-btn" onclick="switchView('notes')">+ Add Note</span>
+              </div>
+              <div id="overviewMyNotes"></div>
             </div>
-            <div id="overviewMyNotes"></div>
           </div>
 
           <div class="ov-card">
@@ -3815,16 +3831,24 @@ function renderOverviewMyNotes(){
     el.innerHTML = `<div class="empty" style="padding:10px 0;">No open notes.</div>`;
     return;
   }
-  el.innerHTML = myNotes.slice(0,6).map(n=>{
+  el.innerHTML = myNotes.slice(0,5).map(n=>{
     const stage = NOTE_STAGES.find(s=>s.key===n.status) || NOTE_STAGES[0];
-    const client = clients.find(c=>c.id===n.clientId);
-    return `<div class="ov-row" onclick="openNoteModal('${n.id}')">
-      <span class="ov-row-dot" style="background:${stage.color};"></span>
-      <div class="ov-row-main">
-        <div class="ov-row-name">${escapeHtml(n.text)}</div>
-        <div class="ov-row-sub">${client ? escapeHtml(client.name) : 'No client'}</div>
+    // Notes only have one free-text field — the first line reads as the
+    // title, whatever follows (on the same line or the next) previews as
+    // the description, matching the two-line title/preview pattern notes
+    // are shown with elsewhere.
+    const raw = (n.text||'').trim();
+    const newlineIdx = raw.indexOf('\n');
+    const title = (newlineIdx===-1 ? raw : raw.slice(0,newlineIdx)).trim() || 'Untitled note';
+    const rest = (newlineIdx===-1 ? '' : raw.slice(newlineIdx+1)).trim();
+    const dateLabel = new Date(n.updatedAt).toLocaleDateString('en-US',{month:'short',day:'2-digit'});
+    return `<div class="ov-note-row" onclick="openNoteModal('${n.id}')">
+      <div class="ov-note-title">${escapeHtml(title)}</div>
+      ${rest ? `<div class="ov-note-desc">${escapeHtml(rest)}</div>` : ''}
+      <div class="ov-note-meta-row">
+        <span class="ov-note-stage-pill" style="background:${stage.color}18;color:${stage.color};">${stage.label}</span>
+        <span class="ov-note-date">${dateLabel}</span>
       </div>
-      <span class="ov-row-meta">${stage.label}</span>
     </div>`;
   }).join('');
 }
