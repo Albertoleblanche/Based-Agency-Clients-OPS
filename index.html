@@ -68,7 +68,7 @@
   body.sidebar-collapsed .sidebar-profile-info, body.sidebar-collapsed .sidebar-profile-chevron{display:none;}
   body.sidebar-collapsed .nav-item{justify-content:center;padding:9px 0;gap:0;border-left:none;}
   body.sidebar-collapsed .nav-label{opacity:0;max-width:0;}
-  body.sidebar-collapsed .nav-badge{position:absolute;top:2px;right:2px;margin-left:0;font-size:9px;padding:1px 5px;min-width:14px;text-align:center;box-shadow:0 0 0 2px var(--sidebar);}
+  body.sidebar-collapsed .nav-badge{position:absolute;top:2px;right:2px;margin-left:0;font-size:9px;padding:0 4px;min-width:14px;height:14px;box-shadow:0 0 0 2px var(--sidebar);}
   body.sidebar-collapsed .cmdk-trigger{justify-content:center;padding:9px;}
   body.sidebar-collapsed .sidebar-profile-trigger{justify-content:center;}
   body.sidebar-collapsed .sidebar-collapse-btn{display:none;}
@@ -173,7 +173,7 @@
   .nav-item:hover{background:var(--sidebar-hover);color:#fff;border-left-color:var(--brand);}
   .nav-item.active{background:var(--sidebar-active);color:#fff;border-left-color:var(--brand);}
   .nav-item.active svg{opacity:1;}
-  .nav-badge{margin-left:auto;font-family:'DM Sans',sans-serif;font-size:10px;background:var(--red);color:#fff;border-radius:20px;padding:1px 7px;font-weight:600;}
+  .nav-badge{margin-left:auto;font-family:'DM Sans',sans-serif;font-size:10px;background:var(--brand-dark);color:#fff;border-radius:20px;min-width:16px;height:16px;padding:0 4px;display:flex;align-items:center;justify-content:center;font-weight:600;}
   .sidebar-foot{margin-top:auto;padding:12px 11px;border-top:1px solid #3A3A3D;font-size:11px;color:var(--sidebar-muted);line-height:1.5;}
   .sidebar-profile-name{font-size:12.5px;font-weight:600;color:#fff !important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;}
   .sidebar-profile-role{font-family:'DM Sans',sans-serif;font-size:9.5px;letter-spacing:.04em;color:var(--sidebar-muted);line-height:1.2;margin-top:1px;}
@@ -892,7 +892,7 @@
     body.sidebar-collapsed .cmdk-trigger-kbd, body.sidebar-collapsed .sidebar-profile-info,
     body.sidebar-collapsed .sidebar-profile-chevron{display:revert;opacity:1;max-width:none;}
     body.sidebar-collapsed .nav-item{justify-content:flex-start;padding:9px 11px 9px 6px;gap:10px;}
-    body.sidebar-collapsed .nav-badge{position:static;margin-left:auto;font-size:10px;padding:1px 7px;box-shadow:none;}
+    body.sidebar-collapsed .nav-badge{position:static;margin-left:auto;font-size:10px;padding:0 4px;min-width:16px;height:16px;box-shadow:none;}
     body.sidebar-collapsed .cmdk-trigger{justify-content:flex-start;padding:9px 11px;}
     body.sidebar-collapsed .sidebar-profile-trigger{justify-content:flex-start;}
     .sidebar-collapse-btn{display:none;}
@@ -2061,17 +2061,17 @@ document.addEventListener('DOMContentLoaded', function(){
 </div>
 
 <div class="dropdown-menu" id="clientActionsMenu" style="position:fixed;">
-  <div class="dropdown-item" onclick="closeActionsMenus(); openClientDetail(currentActionsMenuClientId)">View details</div>
-  <div class="dropdown-item" onclick="closeActionsMenus(); openEditClientForm(currentActionsMenuClientId)">Edit client</div>
-  <div class="dropdown-item" onclick="closeActionsMenus(); toggleDrawer(currentActionsMenuClientId)">Log / view improvements</div>
-  <div class="dropdown-item" onclick="closeActionsMenus(); openNoteModal(null, currentActionsMenuClientId)">Add note</div>
-  <div class="dropdown-item danger" id="clientActionsMenuDelete" onclick="closeActionsMenus(); deleteClient(currentActionsMenuClientId)">Delete client</div>
+  <div class="dropdown-item" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); openClientDetail(_id);">View details</div>
+  <div class="dropdown-item" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); openEditClientForm(_id);">Edit client</div>
+  <div class="dropdown-item" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); toggleDrawer(_id);">Log / view improvements</div>
+  <div class="dropdown-item" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); openNoteModal(null, _id);">Add note</div>
+  <div class="dropdown-item danger" id="clientActionsMenuDelete" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); deleteClient(_id);">Delete client</div>
 </div>
 
 <div class="dropdown-menu" id="teamActionsMenu" style="position:fixed;">
-  <div class="dropdown-item" onclick="closeTeamActionsMenu(); adminResetPassword(currentTeamActionsMember.id, currentTeamActionsMember.name)">Reset password</div>
-  <div class="dropdown-item" id="teamActionsMenuAccessToggle" onclick="closeTeamActionsMenu(); toggleUserAccess(currentTeamActionsMember.id, currentTeamActionsMember.name, !currentTeamActionsMember.revoked)">Revoke access</div>
-  <div class="dropdown-item danger" onclick="closeTeamActionsMenu(); confirmDeleteUser(currentTeamActionsMember.id, currentTeamActionsMember.name)">Delete permanently</div>
+  <div class="dropdown-item" onclick="const _m=currentTeamActionsMember; closeTeamActionsMenu(); adminResetPassword(_m.id, _m.name);">Reset password</div>
+  <div class="dropdown-item" id="teamActionsMenuAccessToggle" onclick="const _m=currentTeamActionsMember; closeTeamActionsMenu(); toggleUserAccess(_m.id, _m.name, !_m.revoked);">Revoke access</div>
+  <div class="dropdown-item danger" onclick="const _m=currentTeamActionsMember; closeTeamActionsMenu(); confirmDeleteUser(_m.id, _m.name);">Delete permanently</div>
 </div>
 
 <div class="mobile-nav-scrim" id="mobileNavScrim" onclick="closeMobileNav()"></div>
@@ -2254,7 +2254,12 @@ function renderWhoAmI(){
       if(placeholderEl) placeholderEl.style.display = 'none';
     } else {
       avatarEl.style.display = 'none';
-      if(placeholderEl){ placeholderEl.style.display = 'flex'; placeholderEl.textContent = myProfile && myProfile.name ? myProfile.name.trim().charAt(0).toUpperCase() : '?'; }
+      if(placeholderEl){
+        placeholderEl.style.display = 'flex';
+        placeholderEl.textContent = myProfile && myProfile.name ? myProfile.name.trim().charAt(0).toUpperCase() : '?';
+        placeholderEl.style.background = myProfile && myProfile.name ? avatarColorForName(myProfile.name) : '';
+        placeholderEl.style.color = '#fff';
+      }
     }
   }
   if(nameEl && roleEl){
