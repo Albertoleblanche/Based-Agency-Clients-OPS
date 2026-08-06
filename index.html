@@ -238,7 +238,10 @@
 
   /* Metric cards — icon badge, big number, status chips, muted caption. Uniform style. */
   /* Overview: 25 / 50 / 25. Every block here is a single flat surface —
-     one border, content directly inside. No panel-inside-panel. */
+     one border, content directly inside. No panel-inside-panel. All
+     KPI-style cards (Total Clients included) share one background and one
+     value/label typography (.ov-card / .ov-kpi-value) so nothing stands
+     out as a different "kind" of card. */
   .ov-grid{display:grid;grid-template-columns:1fr 2fr 1fr;gap:16px;align-items:start;}
   .ov-col{display:flex;flex-direction:column;gap:16px;min-width:0;}
   .ov-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;box-shadow:0 1px 2px rgba(16,24,40,.03);min-width:0;}
@@ -248,17 +251,14 @@
   .ov-kpi-value{font-family:'DM Sans',sans-serif;font-size:30px;font-weight:600;color:var(--ink);line-height:1.1;}
   .ov-kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
 
-  .ov-card-dark{background:var(--sidebar);border-color:var(--sidebar);}
-  .ov-card-title-dark{color:#A8A8AC;}
-  .ov-dark-value{font-family:'DM Sans',sans-serif;font-size:38px;font-weight:600;color:#fff;line-height:1.1;}
-  .ov-dark-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
-
+  /* Softer than the old solid-black track — a light neutral surface, same
+     family as the rest of the app's subtle backgrounds, not the sidebar color. */
   .ov-health-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px;}
   .ov-health-value{font-family:'DM Sans',sans-serif;font-size:30px;font-weight:600;color:var(--ink);line-height:1;}
-  .ov-health-track{height:10px;border-radius:20px;background:var(--sidebar);overflow:hidden;}
-  .ov-health-fill{height:100%;border-radius:20px;background:linear-gradient(90deg,#E8622C,#CF2424);transition:width var(--duration-slow) var(--ease-out);}
+  .ov-health-track{height:9px;border-radius:20px;background:var(--surface-2);border:1px solid var(--border);overflow:hidden;}
+  .ov-health-fill{height:100%;border-radius:20px;transition:width var(--duration-slow) var(--ease-out), background var(--duration-slow) var(--ease-out);}
 
-  /* Compact rows used by the attention / active / upcoming lists */
+  /* Compact rows used by the attention / active / tasks / upcoming lists */
   .ov-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F0F1F4;cursor:pointer;}
   .ov-row:last-child{border-bottom:none;padding-bottom:0;}
   .ov-row:first-child{padding-top:0;}
@@ -268,6 +268,23 @@
   .ov-row-name{font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color var(--duration-fast) var(--ease-out);}
   .ov-row-sub{font-size:10.5px;color:var(--muted-lt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
   .ov-row-meta{font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:600;color:var(--muted);flex:none;white-space:nowrap;}
+
+  /* Real mini month grid — day numbers + a dot for days with something on
+     them, sized for a ~25% column rather than the full Calendar page's
+     700px-min-width grid, which can't fit here at all. */
+  .ov-mini-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .ov-mini-cal-nav{display:flex;gap:2px;}
+  .ov-mini-cal-arrow{width:22px;height:22px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center;transition:background var(--duration-fast) var(--ease-out);}
+  .ov-mini-cal-arrow:hover{background:var(--surface-2);color:var(--ink);}
+  .ov-mini-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+  .ov-mini-cal-dow{font-family:'DM Sans',sans-serif;font-size:9px;font-weight:700;color:var(--muted-lt);text-align:center;padding-bottom:4px;}
+  .ov-mini-cal-day{position:relative;aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--ink);border-radius:7px;cursor:pointer;transition:background var(--duration-fast) var(--ease-out);}
+  .ov-mini-cal-day:hover{background:var(--surface-2);}
+  .ov-mini-cal-day.other-month{color:var(--muted-lt);opacity:.4;}
+  .ov-mini-cal-day.today{background:var(--brand-dark);color:#fff;font-weight:700;}
+  .ov-mini-cal-day.today:hover{background:var(--brand-dark);}
+  .ov-mini-cal-dot{position:absolute;bottom:3px;width:4px;height:4px;border-radius:50%;background:var(--brand-dark);}
+  .ov-mini-cal-day.today .ov-mini-cal-dot{background:#fff;}
 
   @media (max-width:1200px){
     .ov-grid{grid-template-columns:1fr 1fr;}
@@ -1114,10 +1131,10 @@ document.addEventListener('DOMContentLoaded', function(){
       <div class="ov-grid">
 
         <div class="ov-col">
-          <div class="ov-card ov-card-dark kpi-click" onclick="switchView('clients')">
-            <div class="ov-card-title ov-card-title-dark">Total Clients</div>
-            <div class="ov-dark-value" id="kpiTotal">0</div>
-            <div class="ov-dark-chips" id="totalChips"></div>
+          <div class="ov-card kpi-click" onclick="switchView('clients')">
+            <div class="ov-card-title">Total Clients</div>
+            <div class="ov-kpi-value" id="kpiTotal">0</div>
+            <div class="metric-chips" id="totalChips"></div>
           </div>
 
           <div class="ov-card">
@@ -1166,10 +1183,10 @@ document.addEventListener('DOMContentLoaded', function(){
 
           <div class="ov-card">
             <div class="ov-card-title-row">
-              <span class="ov-card-title" style="margin:0;">Upcoming</span>
-              <span class="row-link" onclick="switchView('calendar')" style="font-size:11px;">Open calendar →</span>
+              <span class="ov-card-title" style="margin:0;">My Tasks</span>
+              <span class="row-link" onclick="switchView('tasks')" style="font-size:11px;">Open tasks →</span>
             </div>
-            <div id="overviewUpcoming"></div>
+            <div id="overviewMyTasks"></div>
           </div>
 
           <div class="ov-card">
@@ -1202,6 +1219,25 @@ document.addEventListener('DOMContentLoaded', function(){
               <span class="row-link" onclick="switchView('approve')" style="font-size:11px;">Queue →</span>
             </div>
             <div id="overviewActiveQueue"></div>
+          </div>
+
+          <div class="ov-card">
+            <div class="ov-mini-cal-head">
+              <span class="ov-card-title" style="margin:0;" id="ovMiniCalLabel">Calendar</span>
+              <span class="ov-mini-cal-nav">
+                <button class="ov-mini-cal-arrow" onclick="navOverviewMiniCal(-1)">‹</button>
+                <button class="ov-mini-cal-arrow" onclick="navOverviewMiniCal(1)">›</button>
+              </span>
+            </div>
+            <div id="overviewMiniCalendar"></div>
+          </div>
+
+          <div class="ov-card">
+            <div class="ov-card-title-row">
+              <span class="ov-card-title" style="margin:0;">Upcoming</span>
+              <span class="row-link" onclick="switchView('calendar')" style="font-size:11px;">Open calendar →</span>
+            </div>
+            <div id="overviewUpcoming"></div>
           </div>
 
           <div class="ov-card">
@@ -3604,10 +3640,10 @@ function renderKpis(){
     healthPct = Math.round(100 - (avgDanger/5)*100);
   }
   document.getElementById('kpiHealth').textContent = ac.length ? healthPct + '%' : '—';
-  const healthTier = healthPct>=70 ? {cls:'pill-good',label:'Healthy'} : healthPct>=40 ? {cls:'pill-mid',label:'Needs attention'} : {cls:'pill-bad',label:'Critical'};
+  const healthTier = healthPct>=70 ? {cls:'pill-good',label:'Healthy',color:'#117F3A'} : healthPct>=40 ? {cls:'pill-mid',label:'Needs attention',color:'#A65B05'} : {cls:'pill-bad',label:'Critical',color:'#CF2424'};
   document.getElementById('healthChips').innerHTML = ac.length ? `<span class="pill ${healthTier.cls}">${healthTier.label}</span>` : '';
   const healthFill = document.getElementById('healthBarFill');
-  if(healthFill) healthFill.style.width = (ac.length ? healthPct : 0) + '%';
+  if(healthFill){ healthFill.style.width = (ac.length ? healthPct : 0) + '%'; healthFill.style.background = healthTier.color; }
 
   // --- Open Tasks (always personal — tasks are assigned to a specific person) ---
   const myOpenTasks = tasks.filter(t => t.assigneeId===currentUser?.id && t.status!=='done' && !t.cancelledAt);
@@ -3639,6 +3675,8 @@ function renderKpis(){
     : `<span class="pill pill-status">No logs yet</span>`;
 
   renderOverviewUpcoming();
+  renderOverviewMyTasks();
+  renderOverviewMiniCalendar();
   renderOverviewActiveQueue();
   renderGreeting();
 }
@@ -3678,22 +3716,18 @@ function renderOverviewUpcoming(){
   const now = new Date();
   const horizon = new Date(now); horizon.setDate(horizon.getDate()+14);
 
-  const items = [];
-  calendarEvents.forEach(e=>{
+  const items = calendarEvents.filter(e=>{
     const start = new Date(e.startAt);
-    if(start < now || start > horizon) return;
-    if(!(e.attendeeIds||[]).includes(currentUser?.id) && e.createdBy!==currentUser?.id) return;
-    items.push({ when:start, title:e.title, kind:'event', color:(CALENDAR_TYPE_META[e.eventType]||CALENDAR_TYPE_META.other).color, onclick:`openEventDetailModal('${e.id}')` });
-  });
-  tasks.forEach(t=>{
-    if(t.assigneeId!==currentUser?.id || t.status==='done' || t.cancelledAt || !t.dueDate) return;
-    const due = new Date(t.dueDate);
-    if(due > horizon) return;
-    items.push({ when:due, title:t.title, kind:'task', overdue: due < now, color:(TASK_PRIORITY_META[t.priority]||TASK_PRIORITY_META.low).color, onclick:`openTaskDetailModal('${t.id}')` });
-  });
+    if(start < now || start > horizon) return false;
+    return (e.attendeeIds||[]).includes(currentUser?.id) || e.createdBy===currentUser?.id;
+  }).map(e=>({
+    when: new Date(e.startAt), title: e.title,
+    color: (CALENDAR_TYPE_META[e.eventType]||CALENDAR_TYPE_META.other).color,
+    onclick: `openEventDetailModal('${e.id}')`
+  }));
 
   if(!items.length){
-    el.innerHTML = `<div class="empty" style="padding:10px 0;">Nothing scheduled in the next two weeks.</div>`;
+    el.innerHTML = `<div class="empty" style="padding:10px 0;">Nothing on your calendar in the next two weeks.</div>`;
     return;
   }
   items.sort((a,b)=> a.when - b.when);
@@ -3703,18 +3737,98 @@ function renderOverviewUpcoming(){
     const isToday = toDateStr(it.when)===todayStr;
     const dayLabel = isToday ? 'Today' : it.when.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
     const timeLabel = it.when.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-    const sub = it.kind==='task'
-      ? (it.overdue ? 'Task · overdue' : 'Task due')
-      : `${dayLabel} · ${timeLabel}`;
     return `<div class="ov-row" onclick="${it.onclick}">
-      <span class="ov-row-dot" style="background:${it.overdue ? '#CF2424' : it.color};"></span>
+      <span class="ov-row-dot" style="background:${it.color};"></span>
       <div class="ov-row-main">
         <div class="ov-row-name">${escapeHtml(it.title)}</div>
-        <div class="ov-row-sub" style="${it.overdue?'color:var(--red);':''}">${sub}</div>
+        <div class="ov-row-sub">${dayLabel} · ${timeLabel}</div>
       </div>
       <span class="ov-row-meta">${isToday ? timeLabel : dayLabel}</span>
     </div>`;
   }).join('');
+}
+
+function renderOverviewMyTasks(){
+  const el = document.getElementById('overviewMyTasks');
+  if(!el) return;
+  const myTasks = tasks.filter(t => t.assigneeId===currentUser?.id && t.status!=='done' && !t.cancelledAt);
+  if(!myTasks.length){
+    el.innerHTML = `<div class="empty" style="padding:10px 0;">No open tasks assigned to you.</div>`;
+    return;
+  }
+  const now = new Date();
+  myTasks.sort((a,b)=>{
+    const aOverdue = a.dueDate && new Date(a.dueDate) < now, bOverdue = b.dueDate && new Date(b.dueDate) < now;
+    if(aOverdue !== bOverdue) return aOverdue ? -1 : 1;
+    if(a.dueDate && b.dueDate) return new Date(a.dueDate) - new Date(b.dueDate);
+    if(a.dueDate) return -1;
+    if(b.dueDate) return 1;
+    return (TASK_PRIORITY_META[a.priority]?.order ?? 9) - (TASK_PRIORITY_META[b.priority]?.order ?? 9);
+  });
+
+  el.innerHTML = myTasks.slice(0,7).map(t=>{
+    const pMeta = TASK_PRIORITY_META[t.priority] || TASK_PRIORITY_META.low;
+    const overdue = t.dueDate && new Date(t.dueDate) < now;
+    const sub = t.dueDate
+      ? (overdue ? 'Overdue · ' : 'Due ') + new Date(t.dueDate).toLocaleDateString('en-US',{month:'short',day:'numeric'})
+      : 'No due date';
+    return `<div class="ov-row" onclick="openTaskDetailModal('${t.id}')">
+      <span class="ov-row-dot" style="background:${overdue ? '#CF2424' : pMeta.color};"></span>
+      <div class="ov-row-main">
+        <div class="ov-row-name">${escapeHtml(t.title)}</div>
+        <div class="ov-row-sub" style="${overdue?'color:var(--red);':''}">${sub}</div>
+      </div>
+      <span class="ov-row-meta">${pMeta.label}</span>
+    </div>`;
+  }).join('');
+}
+
+let overviewMiniCalDate = new Date();
+function navOverviewMiniCal(dir){
+  overviewMiniCalDate.setMonth(overviewMiniCalDate.getMonth()+dir);
+  renderOverviewMiniCalendar();
+}
+function goToCalendarDate(dateStr){
+  switchView('calendar').then(()=> jumpToCalendarDate(dateStr));
+}
+function renderOverviewMiniCalendar(){
+  const el = document.getElementById('overviewMiniCalendar');
+  if(!el) return;
+  const labelEl = document.getElementById('ovMiniCalLabel');
+  if(labelEl) labelEl.textContent = overviewMiniCalDate.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+
+  // Same personal scope as My Tasks + Upcoming — my events, my task due
+  // dates — so the dots here agree with what those two lists already show.
+  const markedDays = new Set();
+  calendarEvents.forEach(e=>{
+    if(!(e.attendeeIds||[]).includes(currentUser?.id) && e.createdBy!==currentUser?.id) return;
+    markedDays.add(toDateStr(new Date(e.startAt)));
+  });
+  tasks.forEach(t=>{
+    if(t.assigneeId!==currentUser?.id || t.status==='done' || t.cancelledAt || !t.dueDate) return;
+    markedDays.add(toDateStr(new Date(t.dueDate)));
+  });
+
+  const year = overviewMiniCalDate.getFullYear(), month = overviewMiniCalDate.getMonth();
+  const firstOfMonth = new Date(year, month, 1);
+  const gridStart = getWeekStart(firstOfMonth);
+  const todayStr = toDateStr(new Date());
+
+  let daysHtml = '';
+  for(let i=0;i<42;i++){
+    const cellDate = new Date(gridStart);
+    cellDate.setDate(cellDate.getDate()+i);
+    const cellStr = toDateStr(cellDate);
+    const isOtherMonth = cellDate.getMonth()!==month;
+    const isToday = cellStr===todayStr;
+    const hasMark = markedDays.has(cellStr);
+    daysHtml += `<div class="ov-mini-cal-day ${isOtherMonth?'other-month':''} ${isToday?'today':''}" onclick="goToCalendarDate('${cellStr}')">${cellDate.getDate()}${hasMark ? '<span class="ov-mini-cal-dot"></span>' : ''}</div>`;
+  }
+
+  el.innerHTML = `<div class="ov-mini-cal-grid">
+    <div class="ov-mini-cal-dow">M</div><div class="ov-mini-cal-dow">T</div><div class="ov-mini-cal-dow">W</div><div class="ov-mini-cal-dow">T</div><div class="ov-mini-cal-dow">F</div><div class="ov-mini-cal-dow">S</div><div class="ov-mini-cal-dow">S</div>
+    ${daysHtml}
+  </div>`;
 }
 
 function renderGreeting(){
