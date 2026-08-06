@@ -1190,6 +1190,14 @@ document.addEventListener('DOMContentLoaded', function(){
           </div>
 
           <div class="ov-card">
+            <div class="ov-card-title-row">
+              <span class="ov-card-title" style="margin:0;">My Notes</span>
+              <span class="row-link" onclick="switchView('notes')" style="font-size:11px;">Open notes →</span>
+            </div>
+            <div id="overviewMyNotes"></div>
+          </div>
+
+          <div class="ov-card">
             <div class="xy-chart-header">
               <div>
                 <div class="xy-chart-title" id="overviewChartTitle">Hours Logged</div>
@@ -3676,6 +3684,7 @@ function renderKpis(){
 
   renderOverviewUpcoming();
   renderOverviewMyTasks();
+  renderOverviewMyNotes();
   renderOverviewMiniCalendar();
   renderOverviewActiveQueue();
   renderGreeting();
@@ -3779,6 +3788,28 @@ function renderOverviewMyTasks(){
         <div class="ov-row-sub" style="${overdue?'color:var(--red);':''}">${sub}</div>
       </div>
       <span class="ov-row-meta">${pMeta.label}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderOverviewMyNotes(){
+  const el = document.getElementById('overviewMyNotes');
+  if(!el) return;
+  const myNotes = notes.filter(n => n.status!=='done').sort((a,b)=> new Date(b.updatedAt) - new Date(a.updatedAt));
+  if(!myNotes.length){
+    el.innerHTML = `<div class="empty" style="padding:10px 0;">No open notes.</div>`;
+    return;
+  }
+  el.innerHTML = myNotes.slice(0,6).map(n=>{
+    const stage = NOTE_STAGES.find(s=>s.key===n.status) || NOTE_STAGES[0];
+    const client = clients.find(c=>c.id===n.clientId);
+    return `<div class="ov-row" onclick="openNoteModal('${n.id}')">
+      <span class="ov-row-dot" style="background:${stage.color};"></span>
+      <div class="ov-row-main">
+        <div class="ov-row-name">${escapeHtml(n.text)}</div>
+        <div class="ov-row-sub">${client ? escapeHtml(client.name) : 'No client'}</div>
+      </div>
+      <span class="ov-row-meta">${stage.label}</span>
     </div>`;
   }).join('');
 }
