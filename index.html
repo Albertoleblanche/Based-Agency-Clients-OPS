@@ -491,7 +491,8 @@
   .pagination-btn:disabled{opacity:.4;cursor:not-allowed;}
   .pagination-ellipsis{color:var(--muted-lt);font-size:12px;padding:0 2px;}
   .dropdown-menu.open{display:block;}
-  .dropdown-item{padding:10px 14px;font-size:12.5px;font-weight:500;color:var(--ink);cursor:pointer;}
+  .dropdown-item{display:flex;align-items:center;gap:9px;padding:10px 14px;font-size:12.5px;font-weight:500;color:var(--ink);cursor:pointer;}
+  .dropdown-item svg{flex:none;color:inherit;}
   .dropdown-item:hover{background:var(--surface-2);}
   .dropdown-item.danger{color:var(--red);}
 
@@ -632,7 +633,8 @@
   .kanban-card-menu-btn{color:var(--muted-lt);cursor:pointer;padding:2px 5px;border-radius:6px;font-weight:700;letter-spacing:1px;}
   .kanban-card-menu-btn:hover{background:var(--surface-2);color:var(--ink);}
   .kanban-card-menu{position:absolute;top:calc(100% + 4px);right:0;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 28px rgba(16,24,40,.16);z-index:50;min-width:170px;overflow:hidden;}
-  .kanban-card-menu-item{padding:9px 14px;font-size:12.5px;color:var(--ink);cursor:pointer;white-space:nowrap;}
+  .kanban-card-menu-item{display:flex;align-items:center;gap:9px;padding:9px 14px;font-size:12.5px;color:var(--ink);cursor:pointer;white-space:nowrap;}
+  .kanban-card-menu-item svg{flex:none;color:inherit;}
   .kanban-card-menu-item:hover{background:var(--surface-2);}
   .kanban-card-menu-item.danger{color:var(--red);}
   .kanban-card-menu-divider{border-top:1px solid var(--border);margin:4px 0;}
@@ -2211,18 +2213,18 @@ document.addEventListener('DOMContentLoaded', function(){
 </div>
 
 <div class="dropdown-menu" id="clientActionsMenu" style="position:fixed;">
-  <div class="dropdown-item" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); openClientDetail(_id);">View details</div>
-  <div class="dropdown-item" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); openEditClientForm(_id);">Edit client</div>
-  <div class="dropdown-item" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); toggleDrawer(_id);">Log / view improvements</div>
-  <div class="dropdown-item" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); openTimerModal(_id);">Track time</div>
-  <div class="dropdown-item" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); openNoteModal(null, _id);">Add note</div>
-  <div class="dropdown-item danger" id="clientActionsMenuDelete" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); deleteClient(_id);">Delete client</div>
+  <div class="dropdown-item" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); openClientDetail(_id);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>View details</div>
+  <div class="dropdown-item" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); openEditClientForm(_id);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit client</div>
+  <div class="dropdown-item" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); toggleDrawer(_id);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Log / view improvements</div>
+  <div class="dropdown-item" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); openTimerModal(_id);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Track time</div>
+  <div class="dropdown-item" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); openNoteModal(null, _id);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Add note</div>
+  <div class="dropdown-item danger" id="clientActionsMenuDelete" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); deleteClient(_id);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete client</div>
 </div>
 
 <div class="dropdown-menu" id="teamActionsMenu" style="position:fixed;">
-  <div class="dropdown-item" onclick="const _m=currentTeamActionsMember; closeTeamActionsMenu(); adminResetPassword(_m.id, _m.name);">Reset password</div>
-  <div class="dropdown-item" id="teamActionsMenuAccessToggle" onclick="const _m=currentTeamActionsMember; closeTeamActionsMenu(); toggleUserAccess(_m.id, _m.name, !_m.revoked);">Revoke access</div>
-  <div class="dropdown-item danger" onclick="const _m=currentTeamActionsMember; closeTeamActionsMenu(); confirmDeleteUser(_m.id, _m.name);">Delete permanently</div>
+  <div class="dropdown-item" onclick="const _m=currentTeamActionsMember; closeTeamActionsMenu(); adminResetPassword(_m.id, _m.name);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>Reset password</div>
+  <div class="dropdown-item" id="teamActionsMenuAccessToggle" onclick="const _m=currentTeamActionsMember; closeTeamActionsMenu(); toggleUserAccess(_m.id, _m.name, !_m.revoked);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span class="dropdown-item-label">Revoke access</span></div>
+  <div class="dropdown-item danger" onclick="const _m=currentTeamActionsMember; closeTeamActionsMenu(); confirmDeleteUser(_m.id, _m.name);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete permanently</div>
 </div>
 
 <div class="mobile-nav-scrim" id="mobileNavScrim" onclick="closeMobileNav()"></div>
@@ -4308,7 +4310,8 @@ function toggleTeamActionsMenu(event, member){
   currentTeamActionsMember = { id: member.id, name: member.name, revoked: !!member.access_revoked };
   const accessItem = document.getElementById('teamActionsMenuAccessToggle');
   if(accessItem){
-    accessItem.textContent = currentTeamActionsMember.revoked ? 'Restore access' : 'Revoke access';
+    const labelSpan = accessItem.querySelector('.dropdown-item-label');
+    if(labelSpan) labelSpan.textContent = currentTeamActionsMember.revoked ? 'Restore access' : 'Revoke access';
     accessItem.classList.toggle('danger', !currentTeamActionsMember.revoked);
   }
 
@@ -5388,12 +5391,12 @@ function renderNotes(){
 
 function noteCardMenuHtml(n){
   const moveOptions = NOTE_STAGES.filter(s=>s.key!==n.status).map(s=>
-    `<div class="kanban-card-menu-item" onclick="event.stopPropagation();changeNoteStatus('${n.id}','${s.key}')">Move to ${s.label}</div>`
+    `<div class="kanban-card-menu-item" onclick="event.stopPropagation();changeNoteStatus('${n.id}','${s.key}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>Move to ${s.label}</div>`
   ).join('');
   return moveOptions
     + `<div class="kanban-card-menu-divider"></div>`
-    + `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();openNoteModal('${n.id}')">Edit</div>`
-    + `<div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();deleteNote('${n.id}')">Delete</div>`;
+    + `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();openNoteModal('${n.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit</div>`
+    + `<div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();deleteNote('${n.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete</div>`;
 }
 
 function noteCardHtml(n){
@@ -5534,19 +5537,19 @@ function kanbanCardMenuHtml(t){
   // Once a task is Completed, it's locked — the only things left to do are
   // file it away or remove it, not move it around or edit it further.
   if(t.status==='done'){
-    return `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();hideTaskFromMyList('${t.id}')">Archive</div>
-      <div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();deleteTaskPermanently('${t.id}')">Delete</div>`;
+    return `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();hideTaskFromMyList('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>Archive</div>
+      <div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();deleteTaskPermanently('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete</div>`;
   }
 
   const moveOptions = KANBAN_STAGES.filter(s=>s.key!==t.status).map(s=>{
     if(s.key==='done' && !amAssignee) return ''; // only the assignee confirms completion
-    return `<div class="kanban-card-menu-item" onclick="event.stopPropagation();moveTaskToStatus('${t.id}','${s.key}')">Move to ${s.label}</div>`;
+    return `<div class="kanban-card-menu-item" onclick="event.stopPropagation();moveTaskToStatus('${t.id}','${s.key}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>Move to ${s.label}</div>`;
   }).join('');
   let extra = '';
   if(amAssigner){
     extra += `<div class="kanban-card-menu-divider"></div>`;
-    extra += `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();openEditTaskModal('${t.id}')">Edit</div>`;
-    extra += `<div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();cancelTask('${t.id}')">Cancel task</div>`;
+    extra += `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();openEditTaskModal('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit</div>`;
+    extra += `<div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();cancelTask('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>Cancel task</div>`;
   }
   return moveOptions + extra;
 }
@@ -7908,8 +7911,8 @@ function renderTimesheetDay(bodyEl){
         ${hasMenuItems ? `<div class="kanban-card-menu-wrap">
           <span class="kanban-card-menu-btn" onclick="event.stopPropagation();toggleKanbanCardMenu('ts-${e.id}')">⋯</span>
           <div class="kanban-card-menu" id="kanbanMenu-ts-${e.id}" style="display:none;">
-            ${canLog ? `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();logTimeEntryAsImprovement('${e.id}')">Log as improvement</div>` : ''}
-            ${canEdit ? `<div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();deleteTimeEntry('${e.id}')">Delete</div>` : ''}
+            ${canLog ? `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();logTimeEntryAsImprovement('${e.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>Log as improvement</div>` : ''}
+            ${canEdit ? `<div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();deleteTimeEntry('${e.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete</div>` : ''}
           </div>
         </div>` : ''}
       </div>
