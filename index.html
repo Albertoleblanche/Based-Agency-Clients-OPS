@@ -1939,10 +1939,10 @@ document.addEventListener('DOMContentLoaded', function(){
       <!-- AI & EMAIL -->
       <div class="settings-subview" id="stab-ai">
         <div class="panel">
-          <div class="panel-head"><span class="panel-title">Email Structure &amp; Instructions</span></div>
+          <div class="panel-head"><span class="panel-title">Your Email Structure &amp; Instructions</span></div>
           <div class="panel-body">
             <p style="font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.6;">
-              Tell the AI exactly how you want every client email structured — greeting style, paragraph order, sign-off, tone, length, anything. This applies to every draft it generates from here on. A few rules always apply no matter what you write here: every improvement must be described as a specific, measurable deliverable (never vague claims), and nothing that could make the agency look bad.
+              Tell the AI exactly how you want <b>your own</b> client emails structured — greeting style, paragraph order, sign-off, tone, length, anything. This is personal to you — it only applies to drafts you generate, and nobody else's drafts are affected by it, the same way nobody else's changes here affect yours. A few rules always apply no matter what you write here: every improvement must be described as a specific, measurable deliverable (never vague claims), and nothing that could make the agency look bad.
             </p>
             <textarea id="emailInstructions" placeholder="Example:&#10;- Open with 'Hi [Client First Name],'&#10;- First paragraph: one-sentence summary of the week&#10;- Second paragraph: bulleted list of specific deliverables completed&#10;- Third paragraph (only if relevant): what's planned next week&#10;- Close with: 'Nothing needed from you — reach out anytime with questions.'&#10;- Sign off: 'The Based Agency Team'&#10;- Keep it under 150 words total" style="width:100%;min-height:160px;font-family:'DM Sans',sans-serif;font-size:13px;padding:12px;border-radius:8px;border:1px solid var(--border);resize:vertical;"></textarea>
             <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -2525,7 +2525,6 @@ async function loadAll(){
   settings.danielEmail = settings.danielEmail || '';
   settings.ericEmail = settings.ericEmail || '';
   settings.sheetCsvUrl = settings.sheetCsvUrl || '';
-  settings.emailInstructions = settings.emailInstructions || '';
   settings.serviceOptions = (settings.serviceOptions && settings.serviceOptions.length) ? settings.serviceOptions : DEFAULT_SERVICE_OPTIONS.slice();
   settings.statusOptions = (settings.statusOptions && settings.statusOptions.length) ? settings.statusOptions : DEFAULT_STATUS_OPTIONS.slice();
   settings.teamTitleOptions = (settings.teamTitleOptions && settings.teamTitleOptions.length) ? settings.teamTitleOptions : DEFAULT_TEAM_TITLE_OPTIONS.slice();
@@ -2536,8 +2535,10 @@ async function loadAll(){
   document.getElementById('setEric').value = settings.ericEmail || '';
   const sheetInput = document.getElementById('sheetCsvUrl');
   if(sheetInput && document.activeElement !== sheetInput) sheetInput.value = settings.sheetCsvUrl || '';
+  // Personal to the viewer, not part of the shared settings blob — comes
+  // from their own profile row, not app_storage.
   const instrInput = document.getElementById('emailInstructions');
-  if(instrInput && document.activeElement !== instrInput) instrInput.value = settings.emailInstructions || '';
+  if(instrInput && document.activeElement !== instrInput) instrInput.value = (myProfile && myProfile.email_instructions) || '';
   updateEmailInstructionsStatus();
   const syncTimeEl = document.getElementById('sidebarSyncTime');
   if(syncTimeEl) syncTimeEl.textContent = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
@@ -2546,8 +2547,8 @@ async function loadAll(){
 function updateEmailInstructionsStatus(){
   const el = document.getElementById('emailInstructionsStatus');
   if(!el) return;
-  const text = (settings.emailInstructions || '').trim();
-  el.textContent = text ? `● Active — ${text.split(/\s+/).length} words, applied to every new draft` : '○ Not set — using default structure';
+  const text = ((myProfile && myProfile.email_instructions) || '').trim();
+  el.textContent = text ? `● Active — ${text.split(/\s+/).length} words, applied to your new drafts` : '○ Not set — using default structure';
   el.style.color = text ? 'var(--green)' : 'var(--muted-lt)';
 }
 let _appDataSaveInFlight = null;
@@ -9436,7 +9437,7 @@ async function generateDraft(id){
   const btn = document.getElementById('gen-'+id);
   if(btn){ btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Generating…'; }
   const bullets = includedImprovements.map(i=>'- '+i.text).join('\n');
-  const customStructure = (settings.emailInstructions || '').trim();
+  const customStructure = ((myProfile && myProfile.email_instructions) || '').trim();
   const contentRules = `Content rules that apply no matter what — never overridden by anything above:
 - Describe every improvement as a specific, measurable deliverable — a concrete action taken, a number, a metric, or a defined output. Never state it as a vague, broad claim (e.g. never say "improved performance," "made things better," "optimized the account" with nothing concrete attached).
 - If a logged improvement itself is vague or lacks a concrete detail, do not invent specifics to make it sound more impressive — describe only what was actually logged, worded as precisely as the source allows, and keep it modest rather than embellished.
@@ -9630,16 +9631,12 @@ async function saveEmailInstructions(){
   const text = document.getElementById('emailInstructions').value.trim();
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
-  await loadAll();
-  settings.emailInstructions = text;
-  const ok = await persistSettings();
-  document.getElementById('emailInstructions').value = text; // loadAll may have briefly overwritten the field — restore what was actually saved
+  const { error } = await supabaseClient.from('team_profiles').update({ email_instructions: text }).eq('id', currentUser.id);
+  if(!error && myProfile) myProfile.email_instructions = text;
+  document.getElementById('emailInstructions').value = text;
   updateEmailInstructionsStatus();
-  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:'Updated the AI email structure instructions.'});
-  await persistLog();
-  renderLog();
   restoreBtn(btn);
-  ok ? showToast('success','Instructions saved','New drafts will follow this structure.') : showToast('error','Save failed','Could not save — try again.');
+  !error ? showToast('success','Instructions saved','Your new drafts will follow this structure.') : showToast('error','Save failed','Could not save — try again.');
 }
 
 /* ---------- Google Sheet CSV sync ---------- */
