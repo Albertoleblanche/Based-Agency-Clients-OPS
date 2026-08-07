@@ -3541,7 +3541,7 @@ function clientFormHtml(title, submitLabel, customValues){
     <div class="modal-head"><span class="panel-title">${title}</span><span class="toast-close" onclick="closeClientForm()">✕</span></div>
     <div class="modal-body">
       <div class="form-grid">
-        <div><label>Client name</label><input id="ncName" placeholder="e.g. Premium Homes"></div>
+        <div><label>Client name</label><input id="ncName" placeholder="e.g. Premium Homes" oninput="checkDuplicateClientName()"><div id="ncNameWarning" style="display:none;font-size:11px;color:var(--red);margin-top:5px;"></div></div>
         <div><label>Client email</label><input id="ncEmail" placeholder="contact@client.com"></div>
         <div><label>Service</label><select id="ncService"></select></div>
         <div><label>Status</label><select id="ncStatus"></select></div>
@@ -3609,12 +3609,38 @@ function closeClientForm(){
   closeAppModal();
 }
 
+// Quick, local hint as the user types — catches the common case early,
+// before they've filled out the rest of the form. Not authoritative on its
+// own; saveClientForm() does the real check against freshly reloaded data
+// right before saving, since this only has whatever was already in memory.
+function checkDuplicateClientName(){
+  const input = document.getElementById('ncName');
+  const warningEl = document.getElementById('ncNameWarning');
+  if(!input || !warningEl) return;
+  const name = input.value.trim().toLowerCase();
+  if(!name){ warningEl.style.display = 'none'; return; }
+  const duplicate = activeClients().find(c => c.id !== editingClientId && c.name.trim().toLowerCase() === name);
+  if(duplicate){
+    warningEl.textContent = `A client named "${duplicate.name}" already exists.`;
+    warningEl.style.display = 'block';
+  } else {
+    warningEl.style.display = 'none';
+  }
+}
+
 async function saveClientForm(){
   const name = document.getElementById('ncName').value.trim();
   if(!name){ showToast('error','Client name required','Enter a name before saving.'); return; }
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
   await loadAll();
+  const normalizedName = name.toLowerCase();
+  const duplicate = activeClients().find(c => c.id !== editingClientId && c.name.trim().toLowerCase() === normalizedName);
+  if(duplicate){
+    restoreBtn(btn);
+    showToast('error','Client already exists', `${duplicate.name} is already in the system — pick a different name, or open that client instead.`);
+    return;
+  }
   const fields = {
     name,
     email:document.getElementById('ncEmail').value.trim(),
