@@ -218,6 +218,7 @@
   @media (max-width:900px){.split-row-70{grid-template-columns:1fr;}}
   .sync-dot{width:6px;height:6px;border-radius:50%;background:var(--green);}
   .btn{font-family:'DM Sans',sans-serif;font-size:var(--text-sm);font-weight:600;border:none;border-radius:var(--radius-sm);padding:var(--space-2) var(--space-4);cursor:pointer;transition:opacity var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);}
+  .btn svg{width:13px;height:13px;margin-right:6px;vertical-align:-2px;flex:none;}
   .btn:hover{opacity:.88;} .btn:active{transform:scale(.98);} .btn:disabled{opacity:.4;cursor:not-allowed;}
   .btn-brand{background:var(--brand-dark);color:#fff;}
   .btn-dark{background:var(--sidebar);color:#fff;}
@@ -829,7 +830,7 @@
   .rating-num{font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:600;color:var(--ink);margin-left:2px;}
   .q-bulk-preview{font-size:11.5px;color:var(--muted-lt);margin-top:12px;display:flex;align-items:center;gap:7px;}
   .q-card-actions{display:flex;gap:10px;margin-top:16px;}
-  .q-card-actions .btn{flex:1;justify-content:center;padding:9px 14px;font-size:12.5px;}
+  .q-card-actions .btn{display:inline-flex;align-items:center;justify-content:center;flex:1;padding:9px 14px;font-size:12.5px;}
   .q-bulk-preview.has-logs{color:var(--green);font-weight:600;}
   .q-bulk-preview.has-history{color:#43719C;font-weight:600;}
   .history-dot{width:7px;height:7px;border-radius:50%;background:#43719C;flex:none;}
@@ -3786,7 +3787,7 @@ function renderKpis(){
 
   // --- Open Tasks (always personal — tasks are assigned to a specific person) ---
   const myOpenTasks = tasks.filter(t => t.assigneeId===currentUser?.id && t.status!=='done' && !t.cancelledAt);
-  const overdueTasks = myOpenTasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date()).length;
+  const overdueTasks = myOpenTasks.filter(t => t.dueDate && t.dueDate < toDateStr(new Date())).length;
   const tasksEl = document.getElementById('kpiTasks');
   if(tasksEl) tasksEl.textContent = myOpenTasks.length;
   const tasksChips = document.getElementById('tasksChips');
@@ -3898,10 +3899,11 @@ function renderOverviewMyTasks(){
     return;
   }
   const now = new Date();
+  const todayStr = toDateStr(now);
   myTasks.sort((a,b)=>{
-    const aOverdue = a.dueDate && new Date(a.dueDate) < now, bOverdue = b.dueDate && new Date(b.dueDate) < now;
+    const aOverdue = a.dueDate && a.dueDate < todayStr, bOverdue = b.dueDate && b.dueDate < todayStr;
     if(aOverdue !== bOverdue) return aOverdue ? -1 : 1;
-    if(a.dueDate && b.dueDate) return new Date(a.dueDate) - new Date(b.dueDate);
+    if(a.dueDate && b.dueDate) return a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0;
     if(a.dueDate) return -1;
     if(b.dueDate) return 1;
     return (TASK_PRIORITY_META[a.priority]?.order ?? 9) - (TASK_PRIORITY_META[b.priority]?.order ?? 9);
@@ -3909,9 +3911,9 @@ function renderOverviewMyTasks(){
 
   el.innerHTML = myTasks.slice(0,3).map(t=>{
     const pMeta = TASK_PRIORITY_META[t.priority] || TASK_PRIORITY_META.low;
-    const overdue = t.dueDate && new Date(t.dueDate) < now;
+    const overdue = t.dueDate && t.dueDate < todayStr;
     const dateLabel = t.dueDate
-      ? (overdue ? 'Overdue' : new Date(t.dueDate).toLocaleDateString('en-US',{month:'short',day:'2-digit'}))
+      ? (overdue ? 'Overdue' : new Date(t.dueDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'2-digit'}))
       : 'No due date';
     const preview = (t.description||'').trim();
     return `<div class="ov-note-row" onclick="openTaskDetailModal('${t.id}')">
@@ -4016,7 +4018,7 @@ function renderOverviewMiniCalendar(){
   });
   tasks.forEach(t=>{
     if(t.assigneeId!==currentUser?.id || t.status==='done' || t.cancelledAt || !t.dueDate) return;
-    markedDays.add(toDateStr(new Date(t.dueDate)));
+    markedDays.add(t.dueDate);
   });
 
   const year = overviewMiniCalDate.getFullYear(), month = overviewMiniCalDate.getMonth();
@@ -9431,7 +9433,7 @@ function riskLabel(danger){
 
 function riskCaptionHtml(danger){
   const r = riskLabel(danger);
-  return `<span class="q-risk-flag" style="color:${r.color};">${r.text}</span>`;
+  return `<span class="q-risk-flag" style="color:${r.color};text-transform:capitalize;">${r.text}</span>`;
 }
 
 // Fixes a real bug: the old danger badge always used the same flat brand
@@ -9440,7 +9442,7 @@ function riskCaptionHtml(danger){
 // already uses everywhere else in the app, instead of a fixed tone.
 function dangerPillCompact(danger){
   const r = riskLabel(danger);
-  return `<span class="rating-pill" style="background:${r.color}18;color:${r.color};">${r.text}</span>`;
+  return `<span class="rating-pill" style="background:${r.color}18;color:${r.color};text-transform:capitalize;">${r.text}</span>`;
 }
 
 // Deterministic per-name color so the same client always gets the same
