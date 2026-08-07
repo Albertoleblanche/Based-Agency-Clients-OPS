@@ -9155,10 +9155,10 @@ function queueCardHtml(c){
   const status = statusMeta(c.draftStatus);
   return `<div class="q-card" id="q-${c.id}">
     <div class="q-card-top">
-      <div class="avatar-circle" style="background:${avatarColorForName(c.name)};color:#fff;border:none;box-shadow:none;">${c.name.trim().charAt(0).toUpperCase()}</div>
+      <div class="avatar-circle" style="background:${avatarColorForName(c.name)};color:#fff;border:2px solid var(--card);box-shadow:none;">${c.name.trim().charAt(0).toUpperCase()}</div>
       <div style="flex:1;min-width:0;">
         <div class="q-name">${c.name}</div>
-        <div class="q-service-caption">${c.service}</div>
+        <div class="q-service-caption" style="margin-top:2px;">${c.service} · <span style="color:${status.color};text-transform:capitalize;">${status.label}</span></div>
       </div>
       <div class="kanban-card-menu-wrap">
         <span class="kanban-card-menu-btn" onclick="toggleKanbanCardMenu('q-${c.id}')">⋯</span>
@@ -9171,13 +9171,12 @@ function queueCardHtml(c){
     </div>
     <div class="q-pill-row">
       ${dangerPillCompact(c.danger)}
-      <span class="rating-pill" style="background:${status.color}18;color:${status.color};">${status.label}</span>
       <span class="rating-pill rating-pill-ink">Importance ${c.importance}/10</span>
     </div>
     ${queueActivityBadgeHtml(c)}
     <div class="q-card-actions">
-      <button class="btn btn-brand" onclick="openQueueCardModal('${c.id}')">View details</button>
-      <button class="btn btn-outline" onclick="openQueueLogImprovementModal('${c.id}')">Log improvement</button>
+      <button class="btn btn-brand" onclick="openQueueCardModal('${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>View details</button>
+      <button class="btn btn-outline" onclick="openQueueLogImprovementModal('${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Log now</button>
     </div>
   </div>`;
 }
