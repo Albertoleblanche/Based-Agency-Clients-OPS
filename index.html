@@ -2370,6 +2370,29 @@ async function loadTeamProfiles(){
   teamProfiles = data || [];
 }
 
+let dangerHistory = [];
+async function loadDangerHistory(){
+  const { data, error } = await supabaseClient.from('client_danger_history').select('*');
+  if(error){ console.error('loadDangerHistory error', error); dangerHistory = []; return; }
+  dangerHistory = (data||[]).map(h => ({ clientId: h.client_id, danger: h.danger, recordedAt: new Date(h.recorded_at) }));
+}
+
+// One-time backfill for clients that predate this feature — gives every
+// existing active client a starting history point at their current value,
+// dated today. Admin-only: narrows (doesn't fully eliminate, but greatly
+// reduces) the odds of two people simultaneously triggering a duplicate
+// bulk-insert in the brief window right after this ships and before
+// anyone has actually seeded it yet.
+async function seedDangerHistoryIfEmpty(){
+  if(dangerHistory.length > 0 || !isAdmin()) return;
+  const ac = activeClients();
+  if(!ac.length) return;
+  const rows = ac.map(c => ({ client_id: c.id, danger: c.danger }));
+  const { error } = await supabaseClient.from('client_danger_history').insert(rows);
+  if(error){ console.error('seedDangerHistoryIfEmpty error', error); return; }
+  await loadDangerHistory();
+}
+
 function toggleSidebarProfileMenu(){
   const trigger = document.querySelector('.sidebar-profile-trigger');
   const menu = document.getElementById('sidebarProfileMenu');
@@ -3633,6 +3656,17 @@ function checkDuplicateClientName(){
   }
 }
 
+// Records a danger value with a real timestamp — the raw material the
+// Overview chart's trend line is reconstructed from later (via "most
+// recent value at or before date X" per client). Fire-and-forget, same as
+// logClientActivity() — this is secondary analytical data, not something
+// that should block or fail the actual client save if it hiccups.
+function logDangerHistory(clientId, danger){
+  supabaseClient.from('client_danger_history').insert({ client_id: clientId, danger }).then(({error})=>{
+    if(error) console.error('logDangerHistory error', error);
+  });
+}
+
 async function saveClientForm(){
   const name = document.getElementById('ncName').value.trim();
   if(!name){ showToast('error','Client name required','Enter a name before saving.'); return; }
@@ -3687,6 +3721,7 @@ async function saveClientForm(){
         : `${myName()||'Someone'} saved this client (no actual field changes).`;
       logClientActivity(loggedClientId, 'client_edited', desc);
       refreshClientDetailActivityIfOpen(loggedClientId);
+      if(before.danger !== fields.danger) logDangerHistory(loggedClientId, fields.danger);
     }
   } else {
     const newId = 'c'+Date.now();
@@ -3694,7 +3729,10 @@ async function saveClientForm(){
     ok = await persistClients();
     msg = `${name} is now on the roster.`;
     loggedClientId = newId;
-    if(ok) logClientActivity(loggedClientId, 'client_created', `${myName()||'Someone'} added this client to the roster.`);
+    if(ok){
+      logClientActivity(loggedClientId, 'client_created', `${myName()||'Someone'} added this client to the roster.`);
+      logDangerHistory(loggedClientId, fields.danger);
+    }
   }
   closeClientForm();
   restoreBtn(btn);
@@ -8468,15 +8506,37 @@ function renderOverviewChart(){
   else if(granularity==='week') start.setDate(start.getDate()-(count-1)*7);
   else start.setMonth(start.getMonth()-(count-1));
   const buckets = fillBucketsWithEntries(buildBucketsInRange(start, end, granularity, count+1), visibleTimeEntries(), granularity);
-  const ac = activeClients();
-  const avgDanger = ac.length ? ac.reduce((s,c)=>s+c.danger,0) / ac.length : null;
-  renderXYChart('overviewChart', buckets, 'latest', avgDanger);
+  const dangerSeries = buildDangerSeries(buckets);
+  renderXYChart('overviewChart', buckets, 'latest', dangerSeries);
   const updatedEl = document.getElementById('overviewChartUpdated');
   if(updatedEl) updatedEl.textContent = `Updated ${new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`;
 }
 
+// For each bucket's date, each currently-active client's most recent known
+// danger value at or before that date — carried forward from whenever it
+// was last recorded, not just "today's snapshot" repeated flat across the
+// whole chart. A client with zero history yet before a given bucket's date
+// (created after it, or never seeded) is excluded from that bucket's
+// average rather than counted as a false zero, which would otherwise drag
+// early buckets down for reasons that have nothing to do with actual risk.
+function buildDangerSeries(buckets){
+  const ac = activeClients();
+  if(!ac.length || !dangerHistory.length) return null;
+  return buckets.map(b=>{
+    const asOf = b.sortDate;
+    const values = [];
+    ac.forEach(c=>{
+      const pointsForClient = dangerHistory.filter(h => h.clientId===c.id && h.recordedAt <= asOf);
+      if(!pointsForClient.length) return; // didn't exist / no recorded value yet as of this date
+      const mostRecent = pointsForClient.reduce((latest,h)=> h.recordedAt > latest.recordedAt ? h : latest);
+      values.push(mostRecent.danger);
+    });
+    return values.length ? values.reduce((s,v)=>s+v,0)/values.length : null;
+  });
+}
+
 let xyChartUid = 0;
-function renderXYChart(containerId, buckets, headlineMode, dangerLineValue){
+function renderXYChart(containerId, buckets, headlineMode, dangerSeries){
   const el = document.getElementById(containerId);
   if(!el) return;
   if(!buckets.length){ el.innerHTML = `<div class="empty">No data for this period.</div>`; return; }
@@ -8504,16 +8564,32 @@ function renderXYChart(containerId, buckets, headlineMode, dangerLineValue){
 
   // Danger score (1-5) has its own, completely independent scale from
   // hours — plotting it on the hours axis would be meaningless, so this
-  // maps it onto the chart's height using its own fixed 5-point max,
-  // same y-formula as the hours points but a different denominator.
-  const dangerLineHtml = (dangerLineValue!=null) ? (() => {
-    const dangerY = h - padY - (dangerLineValue/5)*(h-2*padY);
-    return `<line x1="0" y1="${dangerY.toFixed(1)}" x2="${w}" y2="${dangerY.toFixed(1)}" stroke="#CF2424" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.75"></line>`;
-  })() : '';
-  const dangerLabelHtml = (dangerLineValue!=null) ? (() => {
-    const topPct = ((h - padY - (dangerLineValue/5)*(h-2*padY)) / h) * 100;
-    return `<div class="xy-chart-danger-label" style="top:${topPct.toFixed(1)}%;">Avg danger ${dangerLineValue.toFixed(1)}/5</div>`;
-  })() : '';
+  // maps each point onto the chart's height using danger's own fixed
+  // 5-point max, same y-formula as the hours points but a different
+  // denominator. Buckets with no danger data at all (null — happens for
+  // dates before any client existed) break the path rather than being
+  // plotted as a false zero.
+  let dangerLineHtml = '', dangerLabelHtml = '';
+  if(dangerSeries && dangerSeries.some(v=>v!=null)){
+    const dangerPoints = dangerSeries.map((v,i)=> v==null ? null : {
+      x: padX + i*stepX,
+      y: h - padY - (v/5)*(h-2*padY),
+      v
+    });
+    let dangerPath = '';
+    let penDown = false;
+    dangerPoints.forEach(p=>{
+      if(!p){ penDown = false; return; }
+      dangerPath += (penDown ? 'L' : 'M') + p.x.toFixed(1) + ',' + p.y.toFixed(1) + ' ';
+      penDown = true;
+    });
+    dangerLineHtml = `<path d="${dangerPath.trim()}" fill="none" stroke="#CF2424" stroke-width="1.75" stroke-dasharray="5 4" stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></path>`;
+    const lastPoint = [...dangerPoints].reverse().find(p=>p);
+    if(lastPoint){
+      const topPct = (lastPoint.y / h) * 100;
+      dangerLabelHtml = `<div class="xy-chart-danger-label" style="top:${topPct.toFixed(1)}%;">Avg danger ${lastPoint.v.toFixed(1)}/5</div>`;
+    }
+  }
 
   const totalHours = values.reduce((s,v)=>s+v,0);
   const lastVal = values[values.length-1] || 0;
@@ -10261,6 +10337,8 @@ async function showApp(session){
     await loadMyTasks();
     await loadNotifications();
     await loadCalendarEvents();
+    await loadDangerHistory();
+    await seedDangerHistoryIfEmpty();
     document.getElementById('appRoot').style.display = 'grid';
     renderAll();
     document.getElementById('loginOverlay').style.display = 'none';
