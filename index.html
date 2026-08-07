@@ -791,6 +791,7 @@
   .xy-chart-trend.up{color:var(--green);}
   .xy-chart-trend.down{color:#9C5C48;}
   .xy-chart-svg-wrap{position:relative;width:100%;}
+  .xy-chart-danger-label{position:absolute;right:2px;transform:translateY(-100%);font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:700;color:#CF2424;background:var(--card);padding:1px 5px;border-radius:4px;pointer-events:none;}
   .xy-chart-svg-wrap svg{width:100%;height:180px;display:block;overflow:visible;}
   .xy-chart-guide{stroke:var(--muted-lt);stroke-width:1;stroke-dasharray:3,3;}
   .xy-chart-dot{fill:var(--card);stroke:var(--brand);stroke-width:2.5;}
@@ -8467,13 +8468,15 @@ function renderOverviewChart(){
   else if(granularity==='week') start.setDate(start.getDate()-(count-1)*7);
   else start.setMonth(start.getMonth()-(count-1));
   const buckets = fillBucketsWithEntries(buildBucketsInRange(start, end, granularity, count+1), visibleTimeEntries(), granularity);
-  renderXYChart('overviewChart', buckets, 'latest');
+  const ac = activeClients();
+  const avgDanger = ac.length ? ac.reduce((s,c)=>s+c.danger,0) / ac.length : null;
+  renderXYChart('overviewChart', buckets, 'latest', avgDanger);
   const updatedEl = document.getElementById('overviewChartUpdated');
   if(updatedEl) updatedEl.textContent = `Updated ${new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`;
 }
 
 let xyChartUid = 0;
-function renderXYChart(containerId, buckets, headlineMode){
+function renderXYChart(containerId, buckets, headlineMode, dangerLineValue){
   const el = document.getElementById(containerId);
   if(!el) return;
   if(!buckets.length){ el.innerHTML = `<div class="empty">No data for this period.</div>`; return; }
@@ -8498,6 +8501,19 @@ function renderXYChart(containerId, buckets, headlineMode){
   const singlePointDot = points.length===1
     ? `<circle cx="${points[0].x.toFixed(1)}" cy="${points[0].y.toFixed(1)}" r="4.5" fill="var(--brand)"></circle>`
     : '';
+
+  // Danger score (1-5) has its own, completely independent scale from
+  // hours — plotting it on the hours axis would be meaningless, so this
+  // maps it onto the chart's height using its own fixed 5-point max,
+  // same y-formula as the hours points but a different denominator.
+  const dangerLineHtml = (dangerLineValue!=null) ? (() => {
+    const dangerY = h - padY - (dangerLineValue/5)*(h-2*padY);
+    return `<line x1="0" y1="${dangerY.toFixed(1)}" x2="${w}" y2="${dangerY.toFixed(1)}" stroke="#CF2424" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.75"></line>`;
+  })() : '';
+  const dangerLabelHtml = (dangerLineValue!=null) ? (() => {
+    const topPct = ((h - padY - (dangerLineValue/5)*(h-2*padY)) / h) * 100;
+    return `<div class="xy-chart-danger-label" style="top:${topPct.toFixed(1)}%;">Avg danger ${dangerLineValue.toFixed(1)}/5</div>`;
+  })() : '';
 
   const totalHours = values.reduce((s,v)=>s+v,0);
   const lastVal = values[values.length-1] || 0;
@@ -8532,12 +8548,14 @@ function renderXYChart(containerId, buckets, headlineMode){
           </linearGradient>
         </defs>
         <path d="${areaPath}" fill="url(#${uid}-grad)" stroke="none"></path>
+        ${dangerLineHtml}
         <path d="${linePath}" fill="none" stroke="var(--brand)" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"></path>
         ${singlePointDot}
         <line id="${uid}-guide" class="xy-chart-guide" x1="0" y1="${padY}" x2="0" y2="${h-padY}" style="display:none;"></line>
         <circle id="${uid}-dot" class="xy-chart-dot" r="4" style="display:none;"></circle>
         <rect x="0" y="0" width="${w}" height="${h}" fill="transparent" id="${uid}-overlay" style="cursor:crosshair;"></rect>
       </svg>
+      ${dangerLabelHtml}
       <div class="xy-chart-tooltip" id="${uid}-tooltip"></div>
     </div>
     <div class="xy-chart-labels">${buckets.map((b,i)=> (i%showEvery===0 || i===buckets.length-1) ? `<span>${b.label}</span>` : '<span></span>').join('')}</div>`;
