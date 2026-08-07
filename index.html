@@ -1253,12 +1253,10 @@ document.addEventListener('DOMContentLoaded', function(){
           <div class="ov-card">
             <div class="ov-card-title-row">
               <span class="ov-card-head-left"><span class="ov-card-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span><span class="ov-card-title" style="margin:0;" id="overviewChartTitle">Hours Logged</span></span>
-              <div class="select-field" style="min-width:110px;">
-                <select id="overviewChartGranularity" onchange="renderOverviewChart()">
-                  <option value="day">Day</option>
-                  <option value="week" selected>Week</option>
-                  <option value="month">Month</option>
-                </select>
+              <div class="view-toggle" id="overviewChartGranularityToggle">
+                <div class="view-toggle-option" data-g="day" onclick="setOverviewChartGranularity('day')">Day</div>
+                <div class="view-toggle-option active" data-g="week" onclick="setOverviewChartGranularity('week')">Week</div>
+                <div class="view-toggle-option" data-g="month" onclick="setOverviewChartGranularity('month')">Month</div>
               </div>
             </div>
             <div class="xy-chart-updated" id="overviewChartUpdated"></div>
@@ -1706,12 +1704,10 @@ document.addEventListener('DOMContentLoaded', function(){
                   <div class="xy-chart-title">Hours Over Time</div>
                   <div class="xy-chart-updated" id="reportChartUpdated"></div>
                 </div>
-                <div class="select-field" style="min-width:110px;">
-                  <select id="reportChartGranularity" onchange="renderReportChart()">
-                    <option value="day" selected>Day</option>
-                    <option value="week">Week</option>
-                    <option value="month">Month</option>
-                  </select>
+                <div class="view-toggle" id="reportChartGranularityToggle">
+                  <div class="view-toggle-option active" data-g="day" onclick="setReportChartGranularity('day')">Day</div>
+                  <div class="view-toggle-option" data-g="week" onclick="setReportChartGranularity('week')">Week</div>
+                  <div class="view-toggle-option" data-g="month" onclick="setReportChartGranularity('month')">Month</div>
                 </div>
               </div>
               <div id="reportChart"></div>
@@ -3834,7 +3830,7 @@ function renderOverviewUpcoming(){
   items.sort((a,b)=> a.when - b.when);
 
   const todayStr = toDateStr(now);
-  el.innerHTML = items.slice(0,6).map(it=>{
+  el.innerHTML = items.slice(0,3).map(it=>{
     const isToday = toDateStr(it.when)===todayStr;
     const dayLabel = isToday ? 'Today' : it.when.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
     const timeLabel = it.when.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
@@ -3867,7 +3863,7 @@ function renderOverviewMyTasks(){
     return (TASK_PRIORITY_META[a.priority]?.order ?? 9) - (TASK_PRIORITY_META[b.priority]?.order ?? 9);
   });
 
-  el.innerHTML = myTasks.slice(0,7).map(t=>{
+  el.innerHTML = myTasks.slice(0,3).map(t=>{
     const pMeta = TASK_PRIORITY_META[t.priority] || TASK_PRIORITY_META.low;
     const overdue = t.dueDate && new Date(t.dueDate) < now;
     const sub = t.dueDate
@@ -3892,7 +3888,7 @@ function renderOverviewMyNotes(){
     el.innerHTML = `<div class="empty" style="padding:10px 0;">No open notes.</div>`;
     return;
   }
-  el.innerHTML = myNotes.slice(0,5).map(n=>{
+  el.innerHTML = myNotes.slice(0,3).map(n=>{
     const stage = NOTE_STAGES.find(s=>s.key===n.status) || NOTE_STAGES[0];
     const title = n.title || 'Untitled note';
     const preview = (n.text||'').trim();
@@ -8432,8 +8428,15 @@ function getReportChartEntries(){
   });
 }
 
+let reportChartGranularity = 'day';
+function setReportChartGranularity(g){
+  reportChartGranularity = g;
+  document.querySelectorAll('#reportChartGranularityToggle .view-toggle-option').forEach(el=>el.classList.toggle('active', el.dataset.g===g));
+  renderReportChart();
+}
+
 function renderReportChart(){
-  const granularity = document.getElementById('reportChartGranularity')?.value || 'day';
+  const granularity = reportChartGranularity;
   const count = granularity==='day' ? 14 : granularity==='week' ? 8 : 6;
   const end = new Date();
   const start = new Date(end);
@@ -8446,10 +8449,17 @@ function renderReportChart(){
   if(updatedEl) updatedEl.textContent = `Updated ${new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`;
 }
 
+let overviewChartGranularity = 'week';
+function setOverviewChartGranularity(g){
+  overviewChartGranularity = g;
+  document.querySelectorAll('#overviewChartGranularityToggle .view-toggle-option').forEach(el=>el.classList.toggle('active', el.dataset.g===g));
+  renderOverviewChart();
+}
+
 function renderOverviewChart(){
   const titleEl = document.getElementById('overviewChartTitle');
   if(titleEl) titleEl.textContent = isAdmin() ? 'Hours Logged (Team)' : 'Your Hours Logged';
-  const granularity = document.getElementById('overviewChartGranularity')?.value || 'week';
+  const granularity = overviewChartGranularity;
   const count = granularity==='day' ? 14 : granularity==='week' ? 8 : 6;
   const end = new Date();
   const start = new Date(end);
