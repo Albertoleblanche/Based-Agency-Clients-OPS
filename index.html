@@ -299,6 +299,7 @@
   .dsummary-total{margin-left:auto;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;color:var(--ink);flex:none;}
   .dsummary-head .team-card-avatar, .dsummary-head .team-card-avatar-fallback{margin-bottom:0;flex:none;}
   .dsummary-preview{font-size:11.5px;color:var(--muted-lt);line-height:1.6;}
+  #overviewDailySummary{max-height:320px;overflow-y:auto;}
 
   /* Real mini month grid — day numbers + a dot for days with something on
      them, sized for a ~25% column rather than the full Calendar page's
@@ -4447,9 +4448,8 @@ async function renderTrash(){
 
   if(timeEl){
     timeEl.innerHTML = `<div class="empty" style="padding:14px 0;"><span class="spinner"></span>Loading…</div>`;
-    const trashedTime = await loadTrashedTimeEntries();
-    const visibleTrashedTime = trashedTime.filter(e=> isAdmin() || (currentUser && e.userId===currentUser.id));
-    timeEl.innerHTML = visibleTrashedTime.length ? trashBulkBarHtml('time') + visibleTrashedTime.map(e=>{
+    const trashedTime = await loadMyTrashedTimeEntries();
+    timeEl.innerHTML = trashedTime.length ? trashBulkBarHtml('time') + trashedTime.map(e=>{
       const c = clients.find(x=>x.id===e.clientId);
       return trashRowHtml(e.id, 'time', `${c?c.name:'Unknown client'} — ${formatMinutes(e.minutes)}`, e.description || e.service || '', e.deletedAt, `restoreTimeEntry('${e.id}')`, `permanentlyDeleteTimeEntry('${e.id}')`);
     }).join('') : `<div class="empty" style="padding:14px 0;">Trash is empty.</div>`;
@@ -7328,9 +7328,10 @@ async function logTimeEntryAsImprovement(entryId){
     : showToast('success','Logged', 'Added to Past Improvements — decide later if it goes in the client email.');
 }
 
-async function loadTrashedTimeEntries(){
-  const { data, error } = await supabaseClient.from('time_entries').select('*').not('deleted_at', 'is', null).order('deleted_at', { ascending:false });
-  if(error){ console.error('loadTrashedTimeEntries error', error); return []; }
+async function loadMyTrashedTimeEntries(){
+  if(!currentUser) return [];
+  const { data, error } = await supabaseClient.from('time_entries').select('*').eq('user_id', currentUser.id).not('deleted_at', 'is', null).order('deleted_at', { ascending:false });
+  if(error){ console.error('loadMyTrashedTimeEntries error', error); return []; }
   return (data||[]).map(e=>({ id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes, description:e.description||'', service:e.service||'', deletedAt:e.deleted_at }));
 }
 
@@ -8184,7 +8185,7 @@ function renderReports(){
     <div class="metric-card">
       <div class="metric-head"><span class="metric-icon metric-icon-blue"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span><span class="metric-label">Total Time</span></div>
       <div class="metric-value">${formatMinutes(totalMinutes)}</div>
-      <div class="metric-caption">Across ${uniqueClients} client${uniqueClients!==1?'s':''}</div>
+      <div class="metric-caption">${getReportRangeLabel()} · Across ${uniqueClients} client${uniqueClients!==1?'s':''}</div>
     </div>
     <div class="metric-card">
       <div class="metric-head"><span class="metric-icon metric-icon-green"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="metric-label">Entries Logged</span></div>
@@ -8494,7 +8495,16 @@ function renderXYChart(containerId, buckets, headlineMode){
   let trendPct = prevVal>0 ? Math.round(((lastVal-prevVal)/prevVal)*100) : (lastVal>0 ? 100 : 0);
   const trendUp = lastVal >= prevVal;
   const headlineValue = headlineMode==='latest' ? lastVal : totalHours;
-  const headlineCaption = headlineMode==='latest' ? `<div class="xy-chart-caption">${buckets[buckets.length-1].label} (so far)</div>` : '';
+  let headlineCaption = '';
+  if(headlineMode==='latest'){
+    const lastBucket = buckets[buckets.length-1];
+    const today = new Date();
+    const spansMultipleDays = (today - lastBucket.sortDate) > 24*60*60*1000;
+    const captionText = spansMultipleDays
+      ? `${lastBucket.sortDate.toLocaleDateString('en-US',{month:'short',day:'numeric'})}–${today.toLocaleDateString('en-US',{month:'short',day:'numeric'})} so far`
+      : `${lastBucket.label} (so far)`;
+    headlineCaption = `<div class="xy-chart-caption">${captionText}</div>`;
+  }
 
   const showEvery = buckets.length<=8 ? 1 : Math.ceil(buckets.length/6);
 
