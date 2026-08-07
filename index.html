@@ -424,6 +424,8 @@
   .pill-mid{background:var(--amber-bg);color:var(--amber);}
   .pill-bad{background:var(--red-bg);color:var(--red);}
   .row-link{color:var(--brand-dark);font-size:12px;font-weight:600;cursor:pointer;}
+  .table-name-link{color:var(--ink);font-weight:600;cursor:pointer;transition:color var(--duration-fast) var(--ease-out);}
+  .table-name-link:hover{color:var(--brand-dark);}
   .row-link:hover{text-decoration:underline;}
 
   .empty{padding:34px 18px;text-align:center;color:var(--muted);font-size:var(--text-base);}
@@ -517,7 +519,7 @@
   .kanban-cards .kanban-card:nth-child(n+6), .notes-grid .note-card:nth-child(n+6), .queue-grid .q-card:nth-child(n+6){animation-delay:150ms;}
   .note-card{background:var(--card);border:1px solid #EDEEF1;border-radius:var(--radius-lg);padding:18px 20px;box-shadow:0 1px 2px rgba(16,24,40,.03);display:flex;flex-direction:column;height:270px;}
   .note-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex:none;}
-  .note-client{font-family:'DM Sans',sans-serif;font-size:14.5px;font-weight:600;cursor:pointer;}
+  .note-client{font-family:'DM Sans',sans-serif;font-size:14.5px;font-weight:600;color:var(--ink);cursor:pointer;transition:color var(--duration-fast) var(--ease-out);}
   .note-client:hover{color:var(--brand-dark);}
   .note-meta{font-family:'DM Sans',sans-serif;font-size:10px;color:var(--muted-lt);margin-top:3px;}
   .note-text{font-size:13px;color:var(--ink);line-height:1.55;margin-top:12px;flex:1;white-space:pre-wrap;overflow:hidden;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;}
@@ -758,8 +760,8 @@
   .report-th-hours{width:90px;}
   .report-table td{padding:13px 0;border-bottom:1px solid #F3F4F6;vertical-align:middle;}
   .report-table tr:last-child td{border-bottom:none;}
-  .report-name-link{color:var(--brand-dark);font-weight:600;font-size:13px;cursor:pointer;}
-  .report-name-link:hover{text-decoration:underline;}
+  .report-name-link{color:var(--ink);font-weight:600;font-size:13px;cursor:pointer;transition:color var(--duration-fast) var(--ease-out);}
+  .report-name-link:hover{color:var(--brand-dark);text-decoration:underline;}
   .report-hours-val{font-family:'DM Sans',sans-serif;font-weight:600;font-size:13px;}
 
   .report-graphic-row{display:grid;grid-template-columns:2fr 1fr;gap:16px;align-items:stretch;}
@@ -4216,7 +4218,7 @@ function renderClientsTable(){
       <td style="border-left:3px solid ${c.danger>=4 ? 'var(--brand)' : 'transparent'};width:36px;">
         <input type="checkbox" class="client-row-checkbox" value="${c.id}" ${selectedClientIds.has(c.id)?'checked':''} onchange="onClientRowCheck(this)">
       </td>
-      <td><div class="client-cell"><div class="avatar-circle" style="background:${avatarColorForName(c.name)};color:#fff;border:none;box-shadow:none;">${c.name.trim().charAt(0).toUpperCase()}</div><div><div class="cell-name" style="cursor:pointer;color:var(--brand-dark);" onclick="openClientDetail('${c.id}')">${c.name}</div>${c.email?`<div class="cell-email">${c.email}</div>`:''}</div></div></td>
+      <td><div class="client-cell"><div class="avatar-circle" style="background:${avatarColorForName(c.name)};color:#fff;border:none;box-shadow:none;">${c.name.trim().charAt(0).toUpperCase()}</div><div><div class="cell-name table-name-link" onclick="openClientDetail('${c.id}')">${c.name}</div>${c.email?`<div class="cell-email">${c.email}</div>`:''}</div></div></td>
       <td><span class="cell-service">${c.service}</span></td>
       <td><span class="pill ${statusPillClass(c.status)}">${c.status}</span></td>
       <td>${ratingPillCompact(c.importance,'ink',10)}</td>
