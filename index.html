@@ -3659,6 +3659,7 @@ function renderKpis(){
   const ac = activeClients();
   const atRisk = ac.filter(c=>c.danger>=4).length;
   const active = ac.filter(c=>c.status==='Active').length;
+  const onboarding = ac.filter(c=>c.status==='Onboarding').length;
   const me = myName();
   const admin = isAdmin();
   // Pending Approval and Weekly Completion are personal for regular members
@@ -3677,7 +3678,7 @@ function renderKpis(){
   // --- Total Clients ---
   document.getElementById('kpiTotal').textContent = ac.length;
   document.getElementById('totalChips').innerHTML = ac.length
-    ? `<span class="pill pill-good">${active} Active</span>${atRisk ? `<span class="pill pill-bad">${atRisk} At risk</span>` : ''}`
+    ? `<span class="pill pill-good">${active} Active</span>${atRisk ? `<span class="pill pill-bad">${atRisk} At risk</span>` : ''}${onboarding ? `<span class="pill pill-mid">${onboarding} Onboarding</span>` : ''}`
     : '';
   renderTotalClientsDonut();
 
