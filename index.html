@@ -844,6 +844,7 @@
   textarea.draft{width:100%;min-height:110px;font-family:'DM Sans',sans-serif;font-size:13px;line-height:1.55;padding:12px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);resize:vertical;margin-top:10px;}
   .warn-text{font-size:11.5px;color:var(--red);display:block;margin-top:6px;}
   .spinner{display:inline-block;width:11px;height:11px;border:2px solid #E5E7EB;border-top-color:var(--brand);border-radius:50%;animation:spin .7s linear infinite;margin-right:6px;vertical-align:-1px;}
+  .app-loading-spinner{display:inline-block;width:34px;height:34px;border:3px solid #E5E7EB;border-top-color:var(--brand);border-radius:50%;animation:spin .7s linear infinite;}
   @keyframes spin{to{transform:rotate(360deg);}}
 
   body[data-theme="dark"] .pill-status, body[data-theme="dark"] .integ-status.off, body[data-theme="dark"] .tag.auto{background:#1E222C;}
@@ -998,7 +999,7 @@
 <body>
 
 <div class="login-overlay" id="loginOverlay">
-  <div class="login-card">
+  <div class="login-card" id="loginFormCard">
     <div class="brand-mark" style="width:40px;height:40px;font-size:16px;margin-bottom:16px;">BA</div>
     <div class="login-title">Based Agency</div>
     <div class="login-sub">Client Update Workflow</div>
@@ -1007,6 +1008,11 @@
     <div class="settings-field"><label>Password</label><input id="loginPassword" type="password" placeholder="••••••••" style="width:100%;"></div>
     <button class="btn btn-brand" id="loginBtn" onclick="handleLogin()" style="width:100%;justify-content:center;margin-top:6px;">Sign in</button>
     <p class="login-footnote">No account? Ask your admin to add you — this tool doesn't support self-signup.</p>
+  </div>
+  <div class="login-card" id="loginLoadingCard" style="display:none;text-align:center;">
+    <div class="brand-mark" style="width:40px;height:40px;font-size:16px;margin:0 auto 20px;">BA</div>
+    <div class="app-loading-spinner"></div>
+    <div class="login-title" style="margin-top:18px;font-size:15px;">Loading your workspace…</div>
   </div>
 </div>
 
@@ -10165,6 +10171,8 @@ async function handleLogin(){
 
 function showLoginScreen(){
   document.getElementById('loginOverlay').style.display = 'flex';
+  document.getElementById('loginLoadingCard').style.display = 'none';
+  document.getElementById('loginFormCard').style.display = 'block';
   document.getElementById('appRoot').style.display = 'none';
   teardownRealtimeSubscriptions();
   currentUser = null; myProfile = null;
@@ -10188,8 +10196,14 @@ async function showApp(session){
       await supabaseClient.auth.signOut();
       return;
     }
-    document.getElementById('loginOverlay').style.display = 'none';
-    document.getElementById('appRoot').style.display = 'grid';
+    // Swap the overlay's own content from the login form to a loading
+    // spinner — the overlay itself stays up the whole time, so there's
+    // never a gap where nothing is covering the screen. appRoot stays
+    // display:none until right before renderAll() actually populates it,
+    // so the user goes straight from "loading" to a fully-populated app —
+    // never a flash of the empty static shell underneath.
+    document.getElementById('loginFormCard').style.display = 'none';
+    document.getElementById('loginLoadingCard').style.display = 'block';
     await initTheme();
     await loadAll();
     await loadTeamProfiles();
@@ -10198,7 +10212,9 @@ async function showApp(session){
     await loadMyTasks();
     await loadNotifications();
     await loadCalendarEvents();
+    document.getElementById('appRoot').style.display = 'grid';
     renderAll();
+    document.getElementById('loginOverlay').style.display = 'none';
     updateTasksNavBadge();
     applyAppIcon();
     initTimerFromStorage();
@@ -10207,6 +10223,8 @@ async function showApp(session){
     setupRealtimeSubscriptions();
   }catch(e){
     console.error('showApp failed', e);
+    document.getElementById('loginLoadingCard').style.display = 'none';
+    document.getElementById('loginFormCard').style.display = 'block';
     document.getElementById('loginOverlay').style.display = 'flex';
     document.getElementById('appRoot').style.display = 'none';
     const errEl = document.getElementById('loginError');
