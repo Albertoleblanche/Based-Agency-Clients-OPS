@@ -338,10 +338,7 @@
   .donut-stat-val{font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;color:var(--ink);max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
   .metric-head{display:flex;align-items:center;gap:9px;margin-bottom:14px;}
   .metric-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex:none;}
-  .metric-icon-blue{background:#E7EEFC;color:#3A63C9;}
-  .metric-icon-green{background:var(--green-bg);color:var(--green);}
-  .metric-icon-amber{background:var(--amber-bg);color:var(--amber);}
-  .metric-icon-purple{background:#EFE7FB;color:#7C4FD1;}
+  .metric-icon-blue, .metric-icon-green, .metric-icon-amber, .metric-icon-purple{background:var(--surface-2);color:var(--ink);}
   .metric-label{font-size:12.5px;font-weight:600;color:var(--muted);}
   .metric-value{font-family:'DM Sans',sans-serif;font-size:28px;font-weight:600;line-height:1;letter-spacing:.01em;}
   .metric-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;min-height:20px;}
@@ -3844,18 +3841,12 @@ function renderOverviewMyNotes(){
   }
   el.innerHTML = myNotes.slice(0,5).map(n=>{
     const stage = NOTE_STAGES.find(s=>s.key===n.status) || NOTE_STAGES[0];
-    // Notes only have one free-text field — the first line reads as the
-    // title, whatever follows (on the same line or the next) previews as
-    // the description, matching the two-line title/preview pattern notes
-    // are shown with elsewhere.
-    const raw = (n.text||'').trim();
-    const newlineIdx = raw.indexOf('\n');
-    const title = (newlineIdx===-1 ? raw : raw.slice(0,newlineIdx)).trim() || 'Untitled note';
-    const rest = (newlineIdx===-1 ? '' : raw.slice(newlineIdx+1)).trim();
+    const title = n.title || 'Untitled note';
+    const preview = (n.text||'').trim();
     const dateLabel = new Date(n.updatedAt).toLocaleDateString('en-US',{month:'short',day:'2-digit'});
-    return `<div class="ov-note-row" onclick="openNoteModal('${n.id}')">
+    return `<div class="ov-note-row" onclick="openNotePreview('${n.id}')">
       <div class="ov-note-title">${escapeHtml(title)}</div>
-      ${rest ? `<div class="ov-note-desc">${escapeHtml(rest)}</div>` : ''}
+      ${preview ? `<div class="ov-note-desc">${escapeHtml(preview)}</div>` : ''}
       <div class="ov-note-meta-row">
         <span class="ov-note-stage-pill" style="background:${stage.color}18;color:${stage.color};">${stage.label}</span>
         <span class="ov-note-date">${dateLabel}</span>
@@ -4404,8 +4395,7 @@ async function renderTrash(){
     const trashedNotes = await loadMyTrashedNotes();
     notesEl.innerHTML = trashedNotes.length ? trashBulkBarHtml('notes') + trashedNotes.map(n=>{
       const c = clients.find(x=>x.id===n.clientId);
-      const snippet = n.text.length>70 ? n.text.slice(0,70)+'…' : n.text;
-      return trashRowHtml(n.id, 'notes', snippet, c ? c.name : 'Unknown client', n.deletedAt, `restoreNote('${n.id}')`, `permanentlyDeleteNote('${n.id}')`);
+      return trashRowHtml(n.id, 'notes', n.title || 'Untitled note', c ? c.name : 'Unknown client', n.deletedAt, `restoreNote('${n.id}')`, `permanentlyDeleteNote('${n.id}')`);
     }).join('') : `<div class="empty" style="padding:14px 0;">Trash is empty.</div>`;
   }
 
@@ -5029,6 +5019,7 @@ function renderClientDetail(){
           <div class="note-meta">${new Date(n.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
           <span class="pill ${noteStatus.cls}">${noteStatus.label}</span>
         </div>
+        <div style="font-weight:700;font-size:13px;color:var(--ink);margin-bottom:3px;">${escapeHtml(n.title || 'Untitled note')}</div>
         <div class="note-text">${escapeHtml(n.text)}</div>
         ${n.link ? `<a href="${normalizeUrl(n.link)}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${n.link.replace(/^https?:\/\//,'').slice(0,40)}</a>` : ''}
         <div class="note-actions">
@@ -5128,6 +5119,33 @@ function noteStatusMeta(status){
   return map[status] || map.idea;
 }
 
+// Read-only preview — what clicking a note now opens, instead of jumping
+// straight into editing. Editing is now a deliberate, separate action from
+// the Edit button here (or the kanban card's own menu), not the default
+// result of clicking a note.
+function openNotePreview(noteId){
+  const n = notes.find(x=>x.id===noteId);
+  if(!n) return;
+  const stage = NOTE_STAGES.find(s=>s.key===n.status) || NOTE_STAGES[0];
+  const client = clients.find(c=>c.id===n.clientId);
+  const updatedLabel = new Date(n.updatedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">${escapeHtml(n.title || 'Untitled note')}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+        <span class="pill" style="background:${stage.color}18;color:${stage.color};">${stage.label}</span>
+        ${client ? `<span class="row-link" onclick="closeAppModal();openClientDetail('${client.id}')">${escapeHtml(client.name)}</span>` : ''}
+        <span style="font-size:11px;color:var(--muted-lt);margin-left:auto;">Updated ${updatedLabel}</span>
+      </div>
+      <div style="white-space:pre-wrap;font-size:13.5px;line-height:1.6;color:var(--ink);">${escapeHtml(n.text)}</div>
+      ${n.link ? `<a href="${normalizeUrl(n.link)}" target="_blank" rel="noopener" class="note-link" style="margin-top:14px;display:inline-block;">🔗 ${escapeHtml(n.link.replace(/^https?:\/\//,'').slice(0,60))}</a>` : ''}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-brand" onclick="closeAppModal();openNoteModal('${n.id}')">Edit</button>
+      <button class="btn btn-outline" onclick="closeAppModal()">Close</button>
+    </div>`, 460);
+}
+
 function openNoteModal(noteId, presetClientId, presetStatus){
   const editing = noteId ? notes.find(n=>n.id===noteId) : null;
   const ac = activeClients();
@@ -5142,6 +5160,7 @@ function openNoteModal(noteId, presetClientId, presetStatus){
   openAppModal(`
     <div class="modal-head"><span class="panel-title">${editing ? 'Edit note' : 'Add note'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
+      <div class="settings-field"><label>Title</label><input id="noteTitleInput" type="text" placeholder="Short title for this note" value="${editing && editing.title ? editing.title.replace(/"/g,'&quot;') : ''}"></div>
       <div class="settings-field"><label>Client</label><select id="noteClientSelect" style="width:100%;">${clientOptions}</select></div>
       <div class="settings-field"><label>Status</label>
         <select id="noteStatusSelect" style="width:100%;">
@@ -5153,19 +5172,11 @@ function openNoteModal(noteId, presetClientId, presetStatus){
       </div>
       <div class="settings-field"><label>Note</label><textarea id="noteTextInput" style="width:100%;min-height:200px;font-family:'DM Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${editing ? editing.text : ''}</textarea></div>
       <div class="settings-field"><label>Link (optional)</label><input id="noteLinkInput" type="url" placeholder="https://…" value="${editing && editing.link ? editing.link.replace(/"/g,'&quot;') : ''}"></div>
-      ${editing ? `
-      <div class="settings-field">
-        <label>Attachments</label>
-        <input type="file" id="noteAttachmentInput" style="display:none;" onchange="addAttachmentToRecord('note','${editing.id}', this.files[0]); this.value='';">
-        <button class="btn btn-outline" style="margin-bottom:10px;" onclick="document.getElementById('noteAttachmentInput').click()">+ Add file</button>
-        <div id="attachmentsList"></div>
-      </div>` : ''}
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" onclick="saveNote(${editing ? `'${editing.id}'` : 'null'})">${editing?'Save changes':'Add note'}</button>
       <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
     </div>`, 460);
-  if(editing) renderAttachmentsInModal('note', editing.id);
 }
 
 // Loads only the current user's own notes — RLS on the notes table means this
@@ -5179,7 +5190,7 @@ async function loadMyNotes(){
     .is('deleted_at', null)
     .order('updated_at', { ascending: false });
   if(error){ console.error('loadMyNotes error', error); notes = []; notesDataLoaded = true; return; }
-  notes = (data||[]).map(n => ({ id:n.id, clientId:n.client_id, text:n.text, status:n.status, link:n.link, createdAt:n.created_at, updatedAt:n.updated_at }));
+  notes = (data||[]).map(n => ({ id:n.id, clientId:n.client_id, title:n.title, text:n.text, status:n.status, link:n.link, createdAt:n.created_at, updatedAt:n.updated_at }));
   notesDataLoaded = true;
 }
 
@@ -5192,7 +5203,7 @@ async function loadMyTrashedNotes(){
     .not('deleted_at', 'is', null)
     .order('deleted_at', { ascending: false });
   if(error){ console.error('loadMyTrashedNotes error', error); return []; }
-  return (data||[]).map(n => ({ id:n.id, clientId:n.client_id, text:n.text, status:n.status, deletedAt:n.deleted_at }));
+  return (data||[]).map(n => ({ id:n.id, clientId:n.client_id, title:n.title, text:n.text, status:n.status, deletedAt:n.deleted_at }));
 }
 
 async function restoreNote(id){
@@ -5212,19 +5223,21 @@ async function permanentlyDeleteNote(id){
 }
 
 async function saveNote(noteId){
+  const title = document.getElementById('noteTitleInput').value.trim();
   const clientId = document.getElementById('noteClientSelect').value;
   const status = document.getElementById('noteStatusSelect').value;
   const text = document.getElementById('noteTextInput').value.trim();
   const link = normalizeUrl(document.getElementById('noteLinkInput').value) || null;
+  if(!title){ showToast('error','Add a title','Give this note a short title first.'); return; }
   if(!clientId){ showToast('error','Pick a client','Select which client this note is about.'); return; }
   if(!text){ showToast('error','Nothing written','Add some note text first.'); return; }
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
   let error, newId;
   if(noteId){
-    ({ error } = await supabaseClient.from('notes').update({ client_id: clientId, status, text, link }).eq('id', noteId).eq('user_id', currentUser.id));
+    ({ error } = await supabaseClient.from('notes').update({ title, client_id: clientId, status, text, link }).eq('id', noteId).eq('user_id', currentUser.id));
   } else {
-    const { data, error: insErr } = await supabaseClient.from('notes').insert({ user_id: currentUser.id, client_id: clientId, status, text, link }).select().single();
+    const { data, error: insErr } = await supabaseClient.from('notes').insert({ user_id: currentUser.id, title, client_id: clientId, status, text, link }).select().single();
     error = insErr;
     newId = data?.id;
   }
@@ -5236,7 +5249,7 @@ async function saveNote(noteId){
     logClientActivity(clientId, 'note_added', `${myName()||'Someone'} added a private note (content not shared here).`);
     refreshClientDetailActivityIfOpen(clientId);
     closeAppModal();
-    showToast('success','Note added', `Saved. Open it again from the board if you want to attach a file.`);
+    showToast('success','Note added', `Saved.`);
   } else {
     closeAppModal();
     error ? showToast('error','Save failed', error.message) : showToast('success','Note updated','Changes saved.');
@@ -5349,7 +5362,7 @@ function noteCardHtml(n){
   const dateStr = new Date(n.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
   const isDone = n.status==='done';
 
-  return `<div class="kanban-card" onclick="openNoteModal('${n.id}')">
+  return `<div class="kanban-card" onclick="openNotePreview('${n.id}')">
     <div class="kanban-card-top">
       ${isDone
         ? `<span class="kanban-card-due" style="color:var(--green);font-weight:700;">
@@ -5365,7 +5378,8 @@ function noteCardHtml(n){
         <div class="kanban-card-menu" id="kanbanMenu-note-${n.id}" style="display:none;">${noteCardMenuHtml(n)}</div>
       </div>
     </div>
-    <div class="kanban-card-title" onclick="event.stopPropagation(); goToClientInQueue('${n.clientId}','all')">${c ? escapeHtml(c.name) : 'Unknown client'}</div>
+    <div class="kanban-card-title">${escapeHtml(n.title || 'Untitled note')}</div>
+    <div class="kanban-card-desc" style="white-space:normal;-webkit-line-clamp:1;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;color:var(--muted-lt);cursor:pointer;" onclick="event.stopPropagation(); goToClientInQueue('${n.clientId}','all')">${c ? escapeHtml(c.name) : 'Unknown client'}</div>
     <div class="kanban-card-desc" style="white-space:normal;-webkit-line-clamp:3;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtml(n.text)}</div>
     ${n.link ? `<a href="${normalizeUrl(n.link)}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${n.link.replace(/^https?:\/\//,'').slice(0,40)}</a>` : ''}
     <div class="kanban-card-footer">
