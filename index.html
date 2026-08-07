@@ -321,12 +321,14 @@
   @media (max-width:1200px){
     .ov-grid{grid-template-columns:1fr 1fr;}
     .ov-col:last-child{grid-column:1/-1;}
+    .queue-grid{grid-template-columns:repeat(2,1fr);}
   }
   @media (max-width:820px){
     .ov-grid{grid-template-columns:1fr;}
     .ov-col:last-child{grid-column:auto;}
     .ov-kpi-row{grid-template-columns:1fr;}
     .ov-tasks-notes-row{grid-template-columns:1fr;}
+    .queue-grid{grid-template-columns:1fr;}
   }
 
   .metrics-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px;}
@@ -498,7 +500,7 @@
   .dropdown-item.danger{color:var(--red);}
 
   /* Approval queue */
-  .queue-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:18px;margin-bottom:24px;}
+  .queue-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:24px;}
   .team-queue-section{margin-bottom:8px;}
   .team-queue-member-head{display:flex;align-items:center;gap:12px;padding-bottom:14px;margin-bottom:18px;border-bottom:1px solid var(--border);}
   .team-queue-member-name{font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;color:var(--ink);}
