@@ -286,6 +286,20 @@
   .ov-note-stage-pill{font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:700;padding:3px 9px;border-radius:20px;flex:none;}
   .ov-note-date{font-family:'DM Sans',sans-serif;font-size:10px;color:var(--muted-lt);flex:none;}
 
+  /* Daily Summary (Time Tracker) — one flat card per person, matching
+     Overview's card language instead of the old panel-inside-panel with
+     every entry expanded inline. Each card previews a couple of clients;
+     the full entry list opens in a modal on click. */
+  .dsummary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;}
+  .dsummary-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;cursor:pointer;transition:box-shadow var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out);}
+  .dsummary-card:hover{box-shadow:0 4px 16px rgba(16,24,40,.08);border-color:#D8DAE0;}
+  .dsummary-head{display:flex;align-items:center;gap:10px;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid #F0F1F4;}
+  .dsummary-name{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;color:var(--ink);}
+  .dsummary-role{font-size:10.5px;color:var(--muted-lt);margin-top:1px;}
+  .dsummary-total{margin-left:auto;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;color:var(--ink);flex:none;}
+  .dsummary-head .team-card-avatar, .dsummary-head .team-card-avatar-fallback{margin-bottom:0;flex:none;}
+  .dsummary-preview{font-size:11.5px;color:var(--muted-lt);line-height:1.6;}
+
   /* Real mini month grid — day numbers + a dot for days with something on
      them, sized for a ~25% column rather than the full Calendar page's
      700px-min-width grid, which can't fit here at all. */
@@ -3874,36 +3888,29 @@ async function renderOverviewDailySummary(){
       return;
     }
     if(!data.summary.length){
-      const msg = canApprove() ? 'Nobody has logged time today yet.' : "You haven't logged any time today yet.";
-      el.innerHTML = `<div class="empty" style="padding:10px 0;">${msg}</div>`;
+      el.innerHTML = `<div class="empty" style="padding:10px 0;">You haven't logged any time today yet.</div>`;
       return;
     }
-    // One person (the typical case for a regular member, since the API
-    // already scopes them to their own entries) — show their individual
-    // entries. Several people (an admin viewing the whole team) — show
-    // per-person totals instead, so the list stays a handful of rows
-    // rather than every entry from everyone stacked together.
-    if(data.summary.length===1){
-      el.innerHTML = data.summary[0].entries.map(e=>`
-        <div class="ov-row" style="cursor:default;">
-          <span class="ov-row-dot" style="background:var(--brand-dark);"></span>
-          <div class="ov-row-main">
-            <div class="ov-row-name">${escapeHtml(e.client)}${e.service?` <span style="font-weight:400;color:var(--muted-lt);">(${escapeHtml(e.service)})</span>`:''}</div>
-            ${e.description ? `<div class="ov-row-sub">${escapeHtml(e.description)}</div>` : ''}
-          </div>
-          <span class="ov-row-meta">${formatMinutes(e.minutes)}</span>
-        </div>`).join('');
-    } else {
-      el.innerHTML = data.summary.map(person=>`
-        <div class="ov-row" onclick="switchView('time');switchTimeTab('dailysummary');">
-          <span class="ov-row-dot" style="background:${avatarColorForName(person.name)};"></span>
-          <div class="ov-row-main">
-            <div class="ov-row-name">${escapeHtml(person.name)}</div>
-            <div class="ov-row-sub">${person.entries.length} client${person.entries.length!==1?'s':''}</div>
-          </div>
-          <span class="ov-row-meta">${formatMinutes(person.totalMinutes)}</span>
-        </div>`).join('');
+    // This card is personal, same as the rest of Overview — but the API
+    // itself returns everyone's entries for admins and approvers (that's
+    // correct for the Time Tracker page's own Daily Summary tab, which is
+    // meant to be team-wide for those roles). So regardless of role, find
+    // and show specifically the current user's own entry here, not
+    // whichever branch the response happened to take.
+    const mine = data.summary.find(p => p.userId === currentUser?.id);
+    if(!mine){
+      el.innerHTML = `<div class="empty" style="padding:10px 0;">You haven't logged any time today yet.</div>`;
+      return;
     }
+    el.innerHTML = mine.entries.map(e=>`
+      <div class="ov-row" style="cursor:default;">
+        <span class="ov-row-dot" style="background:var(--brand-dark);"></span>
+        <div class="ov-row-main">
+          <div class="ov-row-name">${escapeHtml(e.client)}${e.service?` <span style="font-weight:400;color:var(--muted-lt);">(${escapeHtml(e.service)})</span>`:''}</div>
+          ${e.description ? `<div class="ov-row-sub">${escapeHtml(e.description)}</div>` : ''}
+        </div>
+        <span class="ov-row-meta">${formatMinutes(e.minutes)}</span>
+      </div>`).join('');
   }catch(e){
     el.innerHTML = `<div class="empty" style="padding:10px 0;">Could not load today's summary — check your connection.</div>`;
   }
@@ -4827,20 +4834,49 @@ function renderDailySummaryList(data){
     el.innerHTML = `<div class="panel"><div class="empty">${msg}</div></div>`;
     return;
   }
-  el.innerHTML = data.summary.map(person=>`
-    <div class="panel" style="margin-bottom:14px;">
-      <div class="panel-head"><span class="panel-title">${person.name}</span><span style="font-family:'DM Sans',sans-serif;font-size:11px;color:var(--muted-lt);">${formatMinutes(person.totalMinutes)}</span></div>
-      <div class="panel-body">
-        ${person.entries.map(e=>`
-          <div class="ts-entry-card" style="margin-bottom:8px;">
-            <div class="ts-entry-info">
-              <div class="ts-entry-title">${e.client}${e.service ? ` <span class="ts-entry-service">(${e.service})</span>` : ''}</div>
-              ${e.description ? `<div class="ts-entry-desc">${e.description}</div>` : ''}
-            </div>
-            <div class="ts-entry-right"><div class="ts-entry-duration">${formatMinutes(e.minutes)}</div></div>
-          </div>`).join('')}
+  el.innerHTML = `<div class="dsummary-grid">` + data.summary.map(person=>{
+    const profile = teamProfiles.find(p=>p.id===person.userId);
+    const roleLabel = profile ? (profile.title || roleDisplayLabel(profile.role)) : '';
+    const clientNames = person.entries.map(e=>e.client);
+    const previewNames = clientNames.slice(0,3).join(', ');
+    const extra = clientNames.length>3 ? ` +${clientNames.length-3} more` : '';
+    return `<div class="dsummary-card" onclick="openDailySummaryDetail('${person.userId}')">
+      <div class="dsummary-head">
+        ${profile ? teamCardAvatarHtml(profile) : `<div class="team-card-avatar-fallback" style="background:${avatarColorForName(person.name)};">${(person.name||'?').trim().charAt(0).toUpperCase()}</div>`}
+        <div>
+          <div class="dsummary-name">${escapeHtml(person.name)}</div>
+          ${roleLabel ? `<div class="dsummary-role">${escapeHtml(roleLabel)}</div>` : ''}
+        </div>
+        <div class="dsummary-total">${formatMinutes(person.totalMinutes)}</div>
       </div>
-    </div>`).join('');
+      <div class="dsummary-preview">${person.entries.length} client${person.entries.length!==1?'s':''} — ${escapeHtml(previewNames)}${extra}</div>
+    </div>`;
+  }).join('') + `</div>`;
+}
+
+// Full per-entry breakdown for one person, on click — the card itself only
+// ever shows a compact preview.
+function openDailySummaryDetail(userId){
+  if(!lastDailySummaryData) return;
+  const person = lastDailySummaryData.summary.find(p=>p.userId===userId);
+  if(!person) return;
+  const dateLabel = new Date(lastDailySummaryData.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long', month:'long', day:'numeric'});
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">${escapeHtml(person.name)} — ${dateLabel}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <div style="font-family:'DM Sans',sans-serif;font-size:20px;font-weight:700;color:var(--ink);margin-bottom:14px;">${formatMinutes(person.totalMinutes)} <span style="font-size:11px;font-weight:500;color:var(--muted-lt);">total</span></div>
+      ${person.entries.map(e=>`
+        <div class="ts-entry-card" style="margin-bottom:8px;">
+          <div class="ts-entry-info">
+            <div class="ts-entry-title">${escapeHtml(e.client)}${e.service ? ` <span class="ts-entry-service">(${escapeHtml(e.service)})</span>` : ''}</div>
+            ${e.description ? `<div class="ts-entry-desc">${escapeHtml(e.description)}</div>` : ''}
+          </div>
+          <div class="ts-entry-right"><div class="ts-entry-duration">${formatMinutes(e.minutes)}</div></div>
+        </div>`).join('')}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeAppModal()">Close</button>
+    </div>`, 480);
 }
 
 function buildSlackSummaryText(data){
