@@ -571,6 +571,7 @@
   #timerToggleBtn.stop{background:var(--red);color:#fff;}
 
   .timesheet-nav{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+  #timesheetNavPanel{position:sticky;top:0;z-index:20;}
   .timer-quick-start-btn{width:38px;height:38px;border-radius:50%;background:var(--brand);color:#fff;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;box-shadow:0 2px 8px rgba(232,98,44,.35);transition:transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);}
   .timer-quick-start-btn:hover{transform:scale(1.06);box-shadow:0 4px 14px rgba(232,98,44,.45);}
   .timer-quick-start-btn:active{transform:scale(.96);}
@@ -1608,7 +1609,7 @@ document.addEventListener('DOMContentLoaded', function(){
       <!-- TIMER -->
       <!-- TIMESHEET -->
       <div class="settings-subview active" id="ttab-timesheet">
-        <div class="panel">
+        <div class="panel" id="timesheetNavPanel">
           <div class="panel-body timesheet-nav">
             <div style="display:flex;align-items:center;gap:10px;">
               <button class="timer-quick-start-btn" onclick="openTimerModal()" title="Start a timer">
@@ -2199,6 +2200,7 @@ document.addEventListener('DOMContentLoaded', function(){
   <div class="dropdown-item" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); openClientDetail(_id);">View details</div>
   <div class="dropdown-item" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); openEditClientForm(_id);">Edit client</div>
   <div class="dropdown-item" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); toggleDrawer(_id);">Log / view improvements</div>
+  <div class="dropdown-item" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); openTimerModal(_id);">Track time</div>
   <div class="dropdown-item" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); openNoteModal(null, _id);">Add note</div>
   <div class="dropdown-item danger" id="clientActionsMenuDelete" onclick="const _id=currentActionsMenuClientId; closeActionsMenus(); deleteClient(_id);">Delete client</div>
 </div>
@@ -7638,7 +7640,7 @@ function minutesToDurationInputStr(minutes){
   return `${m}m`;
 }
 
-function openTimerModal(){
+function openTimerModal(presetClientId){
   if(timerState.running){
     showToast('error','Timer already running', 'Stop the current timer before starting a new one.');
     return;
@@ -7661,6 +7663,10 @@ function openTimerModal(){
       <button class="btn btn-brand" onclick="startTimerFromModal()">Start timer</button>
     </div>`, 460);
   populateTimeClientSelects();
+  if(presetClientId){
+    setClientFieldValue('timerModalClient', 'timerModalClientSearch', presetClientId);
+    document.getElementById('timerModalClient').dispatchEvent(new Event('change'));
+  }
 }
 
 function startTimerFromModal(){
