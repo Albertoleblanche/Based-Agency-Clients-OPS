@@ -538,7 +538,7 @@
   .note-client:hover{color:var(--brand-dark);}
   .note-meta{font-family:'DM Sans',sans-serif;font-size:10px;color:var(--muted-lt);margin-top:3px;}
   .note-text{font-size:13px;color:var(--ink);line-height:1.55;margin-top:12px;flex:1;white-space:pre-wrap;overflow:hidden;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;}
-  .note-link{display:inline-block;font-size:11.5px;color:var(--brand-dark);margin-top:8px;text-decoration:none;flex:none;}
+  .note-link{display:inline-block;max-width:100%;overflow-wrap:anywhere;font-size:11.5px;color:var(--brand-dark);margin-top:8px;text-decoration:none;flex:none;}
   .note-link:hover{text-decoration:underline;}
   .note-actions{display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid #F3F4F6;flex-wrap:wrap;flex:none;}
   .note-status-select{font-family:'DM Sans',sans-serif;font-size:11.5px;padding:5px 24px 5px 8px;border-radius:6px;border:1px solid var(--border);background-color:var(--surface-2);color:var(--ink);background-position:right 8px center;}
@@ -3910,16 +3910,17 @@ function renderOverviewMyTasks(){
   el.innerHTML = myTasks.slice(0,3).map(t=>{
     const pMeta = TASK_PRIORITY_META[t.priority] || TASK_PRIORITY_META.low;
     const overdue = t.dueDate && new Date(t.dueDate) < now;
-    const sub = t.dueDate
-      ? (overdue ? 'Overdue · ' : 'Due ') + new Date(t.dueDate).toLocaleDateString('en-US',{month:'short',day:'numeric'})
+    const dateLabel = t.dueDate
+      ? (overdue ? 'Overdue' : new Date(t.dueDate).toLocaleDateString('en-US',{month:'short',day:'2-digit'}))
       : 'No due date';
-    return `<div class="ov-row" onclick="openTaskDetailModal('${t.id}')">
-      <span class="ov-row-dot" style="background:${overdue ? '#CF2424' : pMeta.color};"></span>
-      <div class="ov-row-main">
-        <div class="ov-row-name">${escapeHtml(t.title)}</div>
-        <div class="ov-row-sub" style="${overdue?'color:var(--red);':''}">${sub}</div>
+    const preview = (t.description||'').trim();
+    return `<div class="ov-note-row" onclick="openTaskDetailModal('${t.id}')">
+      <div class="ov-note-title">${escapeHtml(t.title)}</div>
+      ${preview ? `<div class="ov-note-desc">${escapeHtml(preview)}</div>` : ''}
+      <div class="ov-note-meta-row">
+        <span class="ov-note-stage-pill" style="background:${pMeta.color}18;color:${pMeta.color};">${pMeta.label}</span>
+        <span class="ov-note-date" style="${overdue?'color:var(--red);font-weight:600;':''}">${dateLabel}</span>
       </div>
-      <span class="ov-row-meta">${pMeta.label}</span>
     </div>`;
   }).join('');
 }
@@ -5136,7 +5137,7 @@ function renderClientDetail(){
         </div>
         <div style="font-weight:700;font-size:13px;color:var(--ink);margin-bottom:3px;">${escapeHtml(n.title || 'Untitled note')}</div>
         <div class="note-text">${escapeHtml(n.text)}</div>
-        ${n.link ? `<a href="${normalizeUrl(n.link)}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${n.link.replace(/^https?:\/\//,'').slice(0,40)}</a>` : ''}
+        ${n.link ? `<a href="${normalizeUrl(n.link)}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${truncateLinkDisplay(n.link, 40)}</a>` : ''}
         <div class="note-actions">
           ${n.status!=='done' ? `<button class="btn btn-brand" style="padding:7px 12px;font-size:11.5px;" onclick="logNoteNow('${n.id}')">Log it now</button>` : ''}
           <span class="row-link" onclick="openNoteModal('${n.id}')">Edit</span>
@@ -5253,7 +5254,7 @@ function openNotePreview(noteId){
         <span style="font-size:11px;color:var(--muted-lt);margin-left:auto;">Updated ${updatedLabel}</span>
       </div>
       <div style="white-space:pre-wrap;font-size:13.5px;line-height:1.6;color:var(--ink);">${escapeHtml(n.text)}</div>
-      ${n.link ? `<a href="${normalizeUrl(n.link)}" target="_blank" rel="noopener" class="note-link" style="margin-top:14px;display:inline-block;">🔗 ${escapeHtml(n.link.replace(/^https?:\/\//,'').slice(0,60))}</a>` : ''}
+      ${n.link ? `<a href="${normalizeUrl(n.link)}" target="_blank" rel="noopener" class="note-link" style="margin-top:14px;display:inline-block;">🔗 ${escapeHtml(truncateLinkDisplay(n.link, 60))}</a>` : ''}
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" onclick="closeAppModal();openNoteModal('${n.id}')">Edit</button>
@@ -5496,7 +5497,7 @@ function noteCardHtml(n){
     <div class="kanban-card-title">${escapeHtml(n.title || 'Untitled note')}</div>
     <div class="kanban-card-desc" style="white-space:normal;-webkit-line-clamp:1;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;color:var(--muted-lt);cursor:pointer;" onclick="event.stopPropagation(); goToClientInQueue('${n.clientId}','all')">${c ? escapeHtml(c.name) : 'Unknown client'}</div>
     <div class="kanban-card-desc" style="white-space:normal;-webkit-line-clamp:3;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtml(n.text)}</div>
-    ${n.link ? `<a href="${normalizeUrl(n.link)}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${n.link.replace(/^https?:\/\//,'').slice(0,40)}</a>` : ''}
+    ${n.link ? `<a href="${normalizeUrl(n.link)}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${truncateLinkDisplay(n.link, 40)}</a>` : ''}
     <div class="kanban-card-footer">
       ${!isDone ? `<button class="btn btn-brand" style="padding:6px 12px;font-size:11px;" onclick="event.stopPropagation();logNoteNow('${n.id}')">Log it now</button>` : `<span style="font-size:11px;color:var(--muted-lt);">Logged as an improvement</span>`}
     </div>
@@ -5730,7 +5731,7 @@ function openTaskDetailModal(taskId){
         ${c ? `<div><label style="font-family:'DM Sans',sans-serif;font-size:10px;color:var(--muted-lt);display:block;margin-bottom:4px;">Related client</label><div style="font-size:13px;"><span class="row-link" onclick="closeAppModal(); openClientDetail('${c.id}');">${c.name}</span></div></div>` : ''}
         ${t.status==='done' && t.completedAt ? `<div><label style="font-family:'DM Sans',sans-serif;font-size:10px;color:var(--muted-lt);display:block;margin-bottom:4px;">Completed</label><div style="font-size:13px;">${new Date(t.completedAt).toLocaleDateString('en-US',{month:'long',day:'numeric'})}</div></div>` : ''}
       </div>
-      ${t.link ? `<a href="${normalizeUrl(t.link)}" target="_blank" rel="noopener" class="note-link" style="display:block;margin-top:8px;">🔗 ${t.link}</a>` : ''}
+      ${t.link ? `<a href="${normalizeUrl(t.link)}" target="_blank" rel="noopener" class="note-link" style="display:block;margin-top:8px;">🔗 ${truncateLinkDisplay(t.link, 50)}</a>` : ''}
       ${t.dueDate ? (linkedEvent
         ? `<div style="margin-top:14px;font-size:12.5px;color:var(--green);font-weight:600;">✓ On the calendar — <span class="row-link" onclick="closeAppModal();switchView('calendar');jumpToCalendarDate('${t.dueDate}');">view it</span></div>`
         : `<button class="btn btn-outline" style="margin-top:14px;" onclick="addTaskToCalendar('${t.id}')">+ Add to calendar</button>`) : ''}
@@ -7206,6 +7207,18 @@ function normalizeUrl(url){
   if(!url) return '';
   if(!/^https?:\/\//i.test(url)) url = 'https://' + url;
   return url;
+}
+
+// Display text for a link — strips the protocol prefix (nobody needs to
+// see "https://" to recognize a link) and truncates with an ellipsis when
+// actually cut off, so it's clear the display text isn't the whole URL.
+// This is purely cosmetic display text; normalizeUrl() above is what
+// actually gets used as the href, so truncation here never breaks the
+// link itself.
+function truncateLinkDisplay(url, maxLen){
+  maxLen = maxLen || 45;
+  const stripped = (url||'').replace(/^https?:\/\//,'');
+  return stripped.length > maxLen ? stripped.slice(0, maxLen) + '…' : stripped;
 }
 
 /* ---------- Attachments — notes and tasks. Files live in a private
