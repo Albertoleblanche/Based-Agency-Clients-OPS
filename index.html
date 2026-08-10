@@ -5366,6 +5366,10 @@ function openNoteModal(noteId, presetClientId, presetStatus){
       </div>
       <div class="settings-field"><label>Note</label><textarea id="noteTextInput" style="width:100%;min-height:200px;font-family:'DM Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${editing ? editing.text : ''}</textarea></div>
       <div class="settings-field"><label>Link (optional)</label><input id="noteLinkInput" type="url" placeholder="https://…" value="${editing && editing.link ? editing.link.replace(/"/g,'&quot;') : ''}"></div>
+      ${!editing ? `
+      <div class="settings-field"><label>Follow-up date (optional)</label><input type="date" id="noteFollowUpInput"></div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink);cursor:pointer;margin-top:2px;"><input type="checkbox" id="noteAddToCalendarInput"> Add to calendar (needs a follow-up date)</label>
+      ` : ''}
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" onclick="saveNote(${editing ? `'${editing.id}'` : 'null'})">${editing?'Save changes':'Add note'}</button>
@@ -5384,7 +5388,7 @@ async function loadMyNotes(){
     .is('deleted_at', null)
     .order('updated_at', { ascending: false });
   if(error){ console.error('loadMyNotes error', error); notes = []; notesDataLoaded = true; return; }
-  notes = (data||[]).map(n => ({ id:n.id, clientId:n.client_id, title:n.title, text:n.text, status:n.status, link:n.link, createdAt:n.created_at, updatedAt:n.updated_at }));
+  notes = (data||[]).map(n => ({ id:n.id, clientId:n.client_id, title:n.title, text:n.text, status:n.status, link:n.link, followUpDate:n.follow_up_date, createdAt:n.created_at, updatedAt:n.updated_at }));
   notesDataLoaded = true;
 }
 
@@ -5422,16 +5426,22 @@ async function saveNote(noteId){
   const status = document.getElementById('noteStatusSelect').value;
   const text = document.getElementById('noteTextInput').value.trim();
   const link = normalizeUrl(document.getElementById('noteLinkInput').value) || null;
+  const followUpInput = document.getElementById('noteFollowUpInput');
+  const followUpDate = followUpInput ? (followUpInput.value || null) : null;
+  const addToCalendarInput = document.getElementById('noteAddToCalendarInput');
+  const addToCalendar = addToCalendarInput ? addToCalendarInput.checked : false;
   if(!title){ showToast('error','Add a title','Give this note a short title first.'); return; }
   if(!clientId){ showToast('error','Pick a client','Select which client this note is about.'); return; }
   if(!text){ showToast('error','Nothing written','Add some note text first.'); return; }
+  if(addToCalendar && !followUpDate){ showToast('error','Follow-up date required','Set a date first, or uncheck "Add to calendar".'); return; }
+  if(addToCalendar && followUpDate < toDateStr(new Date())){ showToast('error','That date has already passed','Pick a future follow-up date.'); return; }
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
   let error, newId;
   if(noteId){
     ({ error } = await supabaseClient.from('notes').update({ title, client_id: clientId, status, text, link }).eq('id', noteId).eq('user_id', currentUser.id));
   } else {
-    const { data, error: insErr } = await supabaseClient.from('notes').insert({ user_id: currentUser.id, title, client_id: clientId, status, text, link }).select().single();
+    const { data, error: insErr } = await supabaseClient.from('notes').insert({ user_id: currentUser.id, title, client_id: clientId, status, text, link, follow_up_date: followUpDate }).select().single();
     error = insErr;
     newId = data?.id;
   }
@@ -5444,6 +5454,7 @@ async function saveNote(noteId){
     refreshClientDetailActivityIfOpen(clientId);
     closeAppModal();
     showToast('success','Note added', `Saved.`);
+    if(addToCalendar) await addNoteToCalendar(newId);
   } else {
     closeAppModal();
     error ? showToast('error','Save failed', error.message) : showToast('success','Note updated','Changes saved.');
@@ -5865,6 +5876,7 @@ function taskFormHtml(editing, presetAssigneeId){
         <div><label>Related client (optional)</label><select id="taskClientSelect">${populateTaskClientSelect(editing ? editing.clientId : null)}</select></div>
       </div>
       <div class="settings-field"><label>Link (optional)</label><input id="taskLinkInput" type="url" placeholder="https://…" value="${editing && editing.link ? editing.link.replace(/"/g,'&quot;') : ''}"></div>
+      ${!editing ? `<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink);cursor:pointer;margin-top:2px;"><input type="checkbox" id="taskAddToCalendarInput"> Add to calendar (needs a due date)</label>` : ''}
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" onclick="${editing ? `saveEditTask('${editing.id}')` : 'saveNewTask()'}">${editing ? 'Save changes' : 'Assign task'}</button>
@@ -5894,6 +5906,10 @@ async function saveNewTask(){
   const dueDate = document.getElementById('taskDueInput').value || null;
   const clientId = document.getElementById('taskClientSelect').value || null;
   const link = normalizeUrl(document.getElementById('taskLinkInput').value) || null;
+  const addToCalendarInput = document.getElementById('taskAddToCalendarInput');
+  const addToCalendar = addToCalendarInput ? addToCalendarInput.checked : false;
+  if(addToCalendar && !dueDate){ showToast('error','Due date required','Set a due date first, or uncheck "Add to calendar".'); return; }
+  if(addToCalendar && dueDate < toDateStr(new Date())){ showToast('error','That date has already passed','Pick a future due date.'); return; }
 
   const { data, error } = await supabaseClient.from('tasks').insert({
     title, description, priority, assigner_id: currentUser.id, assignee_id: assigneeId,
@@ -5907,6 +5923,7 @@ async function saveNewTask(){
   if(!error && data){
     closeAppModal();
     showToast('success','Task assigned', `${assignee ? assignee.name : 'They'} will see it next time they check Tasks.`);
+    if(addToCalendar) await addTaskToCalendar(data.id);
   } else {
     closeAppModal();
     showToast('error','Save failed', error?.message || 'Unknown error');
@@ -6676,6 +6693,19 @@ function openEditEventForm(eventId){
 // due-date markers the calendar already shows for every task automatically.
 // This is the explicit, opt-in version: attendees, a real time, a location,
 // whatever the person wants to add, by editing the resulting event normally.
+async function addNoteToCalendar(noteId){
+  const n = notes.find(x=>x.id===noteId);
+  if(!n || !n.followUpDate) return;
+  const { error } = await supabaseClient.from('calendar_events').insert({
+    title: n.title || 'Note follow-up', description: n.text || null,
+    start_at: `${n.followUpDate}T00:00:00`, end_at: `${n.followUpDate}T23:59:59`, all_day: true,
+    client_id: n.clientId, created_by: currentUser.id, event_type: 'reminder'
+  });
+  await loadCalendarEvents();
+  if(error){ showToast('error','Could not add to calendar', error.message); return; }
+  showToast('success','Added to calendar', `On ${new Date(n.followUpDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}.`);
+}
+
 async function addTaskToCalendar(taskId){
   const t = tasks.find(x=>x.id===taskId);
   if(!t || !t.dueDate) return;
@@ -6749,6 +6779,11 @@ async function saveNewEvent(){
   if(!title){ showToast('error','Title required','Give the event a title first.'); return; }
   const ts = buildEventTimestamps();
   if(!ts){ showToast('error','Pick a date','A date is required.'); return; }
+  const now = new Date();
+  const isPast = ts.allDay
+    ? new Date(ts.startAt) < new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    : new Date(ts.startAt) < now;
+  if(isPast){ showToast('error','That date has already passed', 'Pick a date and time in the future.'); return; }
   const description = document.getElementById('eventDescInput').value.trim();
   const eventType = document.getElementById('eventTypeSelect').value;
   const clientId = document.getElementById('eventClientSelect').value || null;
