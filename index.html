@@ -1575,7 +1575,21 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
 
       <div class="date-filter-row">
-        <span style="font-size:15px;color:var(--muted);">Showing improvements logged <b id="teamQueueDateLabel" style="color:var(--ink);">this week</b></span>
+        <div class="select-field" style="min-width:150px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <select id="teamDateFilterSelect" onchange="onDateFilterChange('team')">
+            <option value="thisweek" selected>This week</option>
+            <option value="all">All time</option>
+            <option value="today">Today</option>
+            <option value="7days">Last 7 days</option>
+            <option value="30days">Last 30 days</option>
+            <option value="custom">Custom range…</option>
+          </select>
+        </div>
+        <span id="teamCustomDateRange" style="display:none;">
+          <input type="date" id="teamDateFrom"> <span style="color:var(--muted-lt);font-size:11.5px;">to</span> <input type="date" id="teamDateTo">
+          <button class="btn btn-outline" style="padding:6px 10px;" onclick="applyCustomDateRange('team')">Apply</button>
+        </span>
       </div>
 
       <div id="teamQueueList"></div>
@@ -9091,23 +9105,39 @@ function computeDateRange(mode){
   return {from:null, to:null};
 }
 
-function onDateFilterChange(){
-  const mode = document.getElementById('dateFilterSelect').value;
+function onDateFilterChange(prefix){
+  prefix = prefix || '';
+  const mode = document.getElementById(prefix+'dateFilterSelect').value;
   dateFilterMode = mode;
-  document.getElementById('customDateRange').style.display = mode==='custom' ? 'inline-flex' : 'none';
+  // Keep both instances in sync — same underlying state either way, so
+  // changing it on one page shouldn't leave the other showing a stale value.
+  const otherPrefix = prefix==='team' ? '' : 'team';
+  const otherSelect = document.getElementById(otherPrefix+'dateFilterSelect');
+  if(otherSelect) otherSelect.value = mode;
+  document.getElementById(prefix+'customDateRange').style.display = mode==='custom' ? 'inline-flex' : 'none';
+  const otherCustomRange = document.getElementById(otherPrefix+'customDateRange');
+  if(otherCustomRange) otherCustomRange.style.display = mode==='custom' ? 'inline-flex' : 'none';
   if(mode==='custom') return; // wait for Apply click
   const {from, to} = computeDateRange(mode);
   dateFilterFrom = from; dateFilterTo = to;
-  renderQueue();
+  renderQueue(); renderTeamQueue();
 }
 
-function applyCustomDateRange(){
-  const fromVal = document.getElementById('dateFrom').value;
-  const toVal = document.getElementById('dateTo').value;
+function applyCustomDateRange(prefix){
+  prefix = prefix || '';
+  const fromVal = document.getElementById(prefix+'dateFrom').value;
+  const toVal = document.getElementById(prefix+'dateTo').value;
   if(!fromVal && !toVal){ showToast('error','Pick at least one date','Set a start date, end date, or both.'); return; }
   dateFilterFrom = fromVal ? new Date(fromVal + 'T00:00:00') : null;
   dateFilterTo = toVal ? new Date(toVal + 'T23:59:59') : null;
-  renderQueue();
+  // Sync the other instance's raw date inputs too, so if someone switches
+  // pages mid-range it shows the same custom dates, not blank ones.
+  const otherPrefix = prefix==='team' ? '' : 'team';
+  const otherFrom = document.getElementById(otherPrefix+'dateFrom');
+  const otherTo = document.getElementById(otherPrefix+'dateTo');
+  if(otherFrom) otherFrom.value = fromVal;
+  if(otherTo) otherTo.value = toVal;
+  renderQueue(); renderTeamQueue();
 }
 
 function improvementInDateRange(imp){
@@ -9149,9 +9179,21 @@ function updateQueueFilterCounts(){
   });
 }
 
+// Keeps both date-filter dropdowns showing what's actually applied,
+// regardless of which page was used to set it — called from both render
+// functions so navigating to a page you haven't visited yet this session
+// never shows a stale value while the cards underneath are already correct.
+function syncDateFilterDropdowns(){
+  const sel = document.getElementById('dateFilterSelect');
+  if(sel && sel.value !== dateFilterMode) sel.value = dateFilterMode;
+  const teamSel = document.getElementById('teamDateFilterSelect');
+  if(teamSel && teamSel.value !== dateFilterMode) teamSel.value = dateFilterMode;
+}
+
 function renderQueue(){
   const el = document.getElementById('queueList');
   const ac = activeClients();
+  syncDateFilterDropdowns();
   updateQueueFilterCounts();
   if(!ac.length){ el.innerHTML = `<div class="panel">${emptyStateHtml(
     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
@@ -9217,9 +9259,8 @@ function updateTeamQueueFilterCounts(){
 function renderTeamQueue(){
   const el = document.getElementById('teamQueueList');
   if(!el) return;
-  const labelEl = document.getElementById('teamQueueDateLabel');
-  if(labelEl) labelEl.textContent = activeDateFilterLabel();
   const ac = activeClients();
+  syncDateFilterDropdowns();
   updateTeamQueueFilterCounts();
   if(!ac.length){ el.innerHTML = `<div class="panel">${emptyStateHtml(
     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
