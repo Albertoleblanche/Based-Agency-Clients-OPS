@@ -9105,18 +9105,24 @@ function computeDateRange(mode){
   return {from:null, to:null};
 }
 
+const DATE_FILTER_IDS = {
+  '':     { select:'dateFilterSelect',     range:'customDateRange',     from:'dateFrom',     to:'dateTo' },
+  team:   { select:'teamDateFilterSelect', range:'teamCustomDateRange', from:'teamDateFrom', to:'teamDateTo' },
+};
+
 function onDateFilterChange(prefix){
   prefix = prefix || '';
-  const mode = document.getElementById(prefix+'dateFilterSelect').value;
+  const ids = DATE_FILTER_IDS[prefix];
+  const otherIds = DATE_FILTER_IDS[prefix==='team' ? '' : 'team'];
+  const mode = document.getElementById(ids.select).value;
   dateFilterMode = mode;
   // Keep both instances in sync — same underlying state either way, so
   // changing it on one page shouldn't leave the other showing a stale value.
-  const otherPrefix = prefix==='team' ? '' : 'team';
-  const otherSelect = document.getElementById(otherPrefix+'dateFilterSelect');
+  const otherSelect = document.getElementById(otherIds.select);
   if(otherSelect) otherSelect.value = mode;
-  document.getElementById(prefix+'customDateRange').style.display = mode==='custom' ? 'inline-flex' : 'none';
-  const otherCustomRange = document.getElementById(otherPrefix+'customDateRange');
-  if(otherCustomRange) otherCustomRange.style.display = mode==='custom' ? 'inline-flex' : 'none';
+  document.getElementById(ids.range).style.display = mode==='custom' ? 'inline-flex' : 'none';
+  const otherRange = document.getElementById(otherIds.range);
+  if(otherRange) otherRange.style.display = mode==='custom' ? 'inline-flex' : 'none';
   if(mode==='custom') return; // wait for Apply click
   const {from, to} = computeDateRange(mode);
   dateFilterFrom = from; dateFilterTo = to;
@@ -9125,16 +9131,17 @@ function onDateFilterChange(prefix){
 
 function applyCustomDateRange(prefix){
   prefix = prefix || '';
-  const fromVal = document.getElementById(prefix+'dateFrom').value;
-  const toVal = document.getElementById(prefix+'dateTo').value;
+  const ids = DATE_FILTER_IDS[prefix];
+  const otherIds = DATE_FILTER_IDS[prefix==='team' ? '' : 'team'];
+  const fromVal = document.getElementById(ids.from).value;
+  const toVal = document.getElementById(ids.to).value;
   if(!fromVal && !toVal){ showToast('error','Pick at least one date','Set a start date, end date, or both.'); return; }
   dateFilterFrom = fromVal ? new Date(fromVal + 'T00:00:00') : null;
   dateFilterTo = toVal ? new Date(toVal + 'T23:59:59') : null;
   // Sync the other instance's raw date inputs too, so if someone switches
   // pages mid-range it shows the same custom dates, not blank ones.
-  const otherPrefix = prefix==='team' ? '' : 'team';
-  const otherFrom = document.getElementById(otherPrefix+'dateFrom');
-  const otherTo = document.getElementById(otherPrefix+'dateTo');
+  const otherFrom = document.getElementById(otherIds.from);
+  const otherTo = document.getElementById(otherIds.to);
   if(otherFrom) otherFrom.value = fromVal;
   if(otherTo) otherTo.value = toVal;
   renderQueue(); renderTeamQueue();
@@ -9184,10 +9191,10 @@ function updateQueueFilterCounts(){
 // functions so navigating to a page you haven't visited yet this session
 // never shows a stale value while the cards underneath are already correct.
 function syncDateFilterDropdowns(){
-  const sel = document.getElementById('dateFilterSelect');
-  if(sel && sel.value !== dateFilterMode) sel.value = dateFilterMode;
-  const teamSel = document.getElementById('teamDateFilterSelect');
-  if(teamSel && teamSel.value !== dateFilterMode) teamSel.value = dateFilterMode;
+  Object.values(DATE_FILTER_IDS).forEach(ids=>{
+    const sel = document.getElementById(ids.select);
+    if(sel && sel.value !== dateFilterMode) sel.value = dateFilterMode;
+  });
 }
 
 function renderQueue(){
