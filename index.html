@@ -1542,12 +1542,12 @@ document.addEventListener('DOMContentLoaded', function(){
     <!-- TEAM QUEUE -->
     <div class="view" id="view-teamqueue">
       <div class="icon-tab-group" id="teamQueueFilterBar">
-        <div class="icon-tab" data-f="all" onclick="setTeamQueueFilter('all')">
+        <div class="icon-tab active" data-f="all" onclick="setTeamQueueFilter('all')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
           <span>All</span>
           <span class="icon-tab-count" id="tqf-count-all">0</span>
         </div>
-        <div class="icon-tab active" data-f="pending" onclick="setTeamQueueFilter('pending')">
+        <div class="icon-tab" data-f="pending" onclick="setTeamQueueFilter('pending')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           <span>Draft ready</span>
           <span class="icon-tab-count" id="tqf-count-pending">0</span>
@@ -2339,7 +2339,7 @@ let settings = {danielEmail:'', ericEmail:''};
 let team = [];
 let editingClientId = null;
 let queueFilter = 'all';
-let teamQueueFilter = 'pending';
+let teamQueueFilter = 'all';
 let dateFilterMode = 'thisweek';
 let dateFilterFrom = getWeekStart(new Date()); // inclusive, Date object — matches the default "This week" mode
 let dateFilterTo = null;   // inclusive, Date object
@@ -2511,7 +2511,7 @@ function renderWhoAmI(){
   if(nameEl && roleEl){
     if(myProfile){
       nameEl.textContent = myProfile.name;
-      roleEl.textContent = roleDisplayLabel(myProfile.role);
+      roleEl.textContent = myProfile.title || roleDisplayLabel(myProfile.role);
     } else {
       nameEl.textContent = '—'; roleEl.textContent = '';
     }
@@ -9250,10 +9250,18 @@ function teamQueueFilterCount(filterKey){
     if(filterKey==='stale') return c.draftStatus==='approved' && hasLoggedThisWeek(c);
     return true;
   };
-  return ac.filter(statusMatches)
+  const rows = ac.filter(statusMatches)
     .map(c => ({ c, shownImprovements: c.improvements.filter(improvementInDateRange) }))
-    .filter(r => dateFilterMode==='all' || r.shownImprovements.length > 0)
-    .length;
+    .filter(r => dateFilterMode==='all' || r.shownImprovements.length > 0);
+  // A card only actually renders under a member's section if at least one
+  // of that client's date-filtered improvements was authored by them — and
+  // since the same client can legitimately show up under multiple members
+  // (if more than one person logged work for it), the true count is the
+  // total across every section combined, not the number of distinct clients.
+  return teamProfiles.reduce((total, member) => {
+    const memberCount = rows.filter(r => r.shownImprovements.some(i => i.author === member.name)).length;
+    return total + memberCount;
+  }, 0);
 }
 
 function updateTeamQueueFilterCounts(){
@@ -9362,7 +9370,7 @@ function queueCardHtml(c){
       <div class="avatar-circle" style="background:${avatarColorForName(c.name)};color:#fff;border:2px solid var(--card);box-shadow:none;">${c.name.trim().charAt(0).toUpperCase()}</div>
       <div style="flex:1;min-width:0;">
         <div class="q-name">${c.name}</div>
-        <div class="q-service-caption" style="margin-top:2px;">${c.service} · <span style="color:${status.color};text-transform:capitalize;">${status.label}</span></div>
+        <div class="q-service-caption" style="margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${c.service} · <span class="rating-pill" style="background:${status.color}18;color:${status.color};text-transform:capitalize;font-size:10px;padding:2px 8px;">${status.label}</span></div>
       </div>
       <div class="kanban-card-menu-wrap">
         <span class="kanban-card-menu-btn" onclick="toggleKanbanCardMenu('q-${c.id}')">⋯</span>
@@ -9414,7 +9422,7 @@ function queueActivityBadgeHtml(c){
 }
 
 function statusMeta(draftStatus){
-  if(draftStatus==='approved') return {label:'✓ Approved', color:'var(--ink)'};
+  if(draftStatus==='approved') return {label:'✓ Approved', color:'var(--green)'};
   if(draftStatus==='pending') return {label:'Draft ready', color:'var(--brand)'};
   return {label:'No draft yet', color:'var(--muted-lt)'};
 }
