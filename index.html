@@ -5935,6 +5935,9 @@ async function saveEditTask(taskId){
   await loadMyTasks();
   renderTasks();
   error ? showToast('error','Save failed', error.message) : showToast('success','Task updated','Changes saved.');
+  if(!error && !reassigned && assigneeId !== currentUser.id){
+    sendNotification(assigneeId, 'task_edited', 'Task updated', `${myName()||'Someone'} updated "${title}".`, 'tasks');
+  }
 }
 
 async function moveTaskToStatus(taskId, newStatus){
@@ -6000,6 +6003,9 @@ async function cancelTask(taskId){
   updateTasksNavBadge();
   closeAppModal();
   error ? showToast('error','Save failed', error.message) : showToast('success','Task cancelled','Removed for both of you.');
+  if(!error && t.assigneeId !== currentUser.id){
+    sendNotification(t.assigneeId, 'task_cancelled', 'Task cancelled', `${myName()||'Someone'} cancelled "${t.title}".`, 'tasks');
+  }
 }
 
 async function hideTaskFromMyList(taskId){
@@ -6728,6 +6734,16 @@ function getSelectedAttendeeIds(){
   return [...document.querySelectorAll('.event-attendee-checkbox:checked')].map(cb=>cb.value);
 }
 
+// Notifies a set of attendees about an event change — excludes the
+// current user (creating or editing your own event shouldn't notify
+// yourself), used for new invites, "this event changed," and cancellations.
+function notifyEventAttendees(attendeeIds, title, type, body){
+  const titleByType = { event_invited: "You're invited", event_updated: 'Event updated', event_cancelled: 'Event cancelled' };
+  attendeeIds.filter(id => id !== currentUser?.id).forEach(id => {
+    sendNotification(id, type, titleByType[type] || 'Event updated', body, 'calendar');
+  });
+}
+
 async function saveNewEvent(){
   const title = document.getElementById('eventTitleInput').value.trim();
   if(!title){ showToast('error','Title required','Give the event a title first.'); return; }
@@ -6756,6 +6772,7 @@ async function saveNewEvent(){
     await loadCalendarEvents();
     renderCalendar();
     error ? showToast('error','Save failed', error.message) : showToast('success','Event added','On the calendar now.');
+    if(!error) notifyEventAttendees(attendeeIds, title, 'event_invited', `${myName()||'Someone'} invited you to "${title}".`);
     return;
   }
 
@@ -6787,6 +6804,7 @@ async function saveNewEvent(){
   await loadCalendarEvents();
   renderCalendar();
   error ? showToast('error','Save failed', error.message) : showToast('success','Recurring event added', `${rows.length} occurrences added, ${repeatLabel.toLowerCase()} through ${new Date(untilStr+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}.`);
+  if(!error) notifyEventAttendees(attendeeIds, title, 'event_invited', `${myName()||'Someone'} invited you to "${title}" (${repeatLabel.toLowerCase()}).`);
 }
 
 async function saveEditEvent(eventId){
@@ -6801,6 +6819,7 @@ async function saveEditEvent(eventId){
   const clientId = document.getElementById('eventClientSelect').value || null;
   const location = document.getElementById('eventLocationInput').value.trim() || null;
   const attendeeIds = getSelectedAttendeeIds();
+  const previousAttendeeIds = e.attendeeIds || [];
 
   if(!ts.allDay){
     const conflicts = findEventConflicts(ts.startAt, ts.endAt, attendeeIds, eventId);
@@ -6818,15 +6837,27 @@ async function saveEditEvent(eventId){
   await loadCalendarEvents();
   renderCalendar();
   error ? showToast('error','Save failed', error.message) : showToast('success','Event updated','Changes saved.');
+  if(!error){
+    const newlyAdded = attendeeIds.filter(id => !previousAttendeeIds.includes(id));
+    const stillThere = attendeeIds.filter(id => previousAttendeeIds.includes(id));
+    const removed = previousAttendeeIds.filter(id => !attendeeIds.includes(id));
+    notifyEventAttendees(newlyAdded, title, 'event_invited', `${myName()||'Someone'} invited you to "${title}".`);
+    notifyEventAttendees(stillThere, title, 'event_updated', `${myName()||'Someone'} updated "${title}".`);
+    notifyEventAttendees(removed, title, 'event_cancelled', `${myName()||'Someone'} removed you from "${title}".`);
+  }
 }
 
 async function deleteCalendarEvent(eventId){
   if(!confirm('Delete this event?')) return;
+  const e = calendarEvents.find(x=>x.id===eventId);
   const { error } = await supabaseClient.from('calendar_events').delete().eq('id', eventId);
   closeAppModal();
   await loadCalendarEvents();
   renderCalendar();
   error ? showToast('error','Delete failed', error.message) : showToast('success','Event deleted','Removed from the calendar.');
+  if(!error && e){
+    notifyEventAttendees(e.attendeeIds||[], e.title, 'event_cancelled', `${myName()||'Someone'} cancelled "${e.title}".`);
+  }
 }
 
 function openDeleteRecurringChoice(eventId){
@@ -6940,11 +6971,18 @@ let notifications = [];
 const NOTIFICATION_TYPE_META = {
   task_assigned:           { label:'A task is assigned to you' },
   task_completed:          { label:'A task you assigned is completed' },
+  task_cancelled:          { label:'A task assigned to you is cancelled' },
+  task_edited:             { label:'A task assigned to you changes' },
   email_sent:              { label:'A client email is sent' },
   event_rsvp:              { label:'Someone RSVPs or requests a change to your event' },
+  event_invited:           { label:"You're invited to a calendar event" },
+  event_updated:           { label:'A calendar event you\'re on changes' },
+  event_cancelled:         { label:'A calendar event you\'re on is cancelled' },
   email_change_requested:  { label:'Someone requests an email change' },
   draft_ready:             { label:'A draft is ready for your approval' },
   draft_approved:          { label:'Your submitted work is approved' },
+  draft_skipped:           { label:'Your submitted draft is skipped' },
+  profile_changed:         { label:'Your role, title, or access changes' },
 };
 
 // Central place every notification insert should go through, instead of
@@ -9876,6 +9914,20 @@ function sendApprovedDraft(id){
   showSendEmailConfirm(c.email, 'Your weekly update from Based Agency', c.draft || '');
 }
 
+// Whoever's actual logged work is included in this week's draft for a
+// client — same weekStart/includeInEmail filter used to build the draft
+// itself, so this matches "whose work is actually part of it" rather than
+// "everyone who's ever logged anything for this client." Excludes the
+// current user, since notifying yourself about your own client's status
+// wouldn't make sense.
+function getIncludedAuthorProfiles(c){
+  const weekStart = getWeekStart(new Date());
+  const includedAuthors = [...new Set(
+    c.improvements.filter(i => i.includeInEmail !== false && i.date && new Date(i.date) >= weekStart).map(i=>i.author)
+  )].filter(author => author && author !== myName());
+  return includedAuthors.map(name => teamProfiles.find(p=>p.name===name)).filter(Boolean);
+}
+
 async function approveDraft(id){
   if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can approve drafts.'); return; }
   const cNow = clients.find(x=>x.id===id);
@@ -9897,16 +9949,8 @@ async function approveDraft(id){
   refreshClientDetailActivityIfOpen(id);
 
   // Notify whoever's actual logged work was included in what just got
-  // approved — same weekStart/includeInEmail filter already used to build
-  // the draft in the first place, so this matches "whose work was approved"
-  // rather than "everyone who's ever touched this client."
-  const weekStart = getWeekStart(new Date());
-  const includedAuthors = [...new Set(
-    c.improvements.filter(i => i.includeInEmail !== false && i.date && new Date(i.date) >= weekStart).map(i=>i.author)
-  )].filter(author => author && author !== myName());
-  for(const authorName of includedAuthors){
-    const authorProfile = teamProfiles.find(p=>p.name===authorName);
-    if(!authorProfile) continue;
+  // approved.
+  for(const authorProfile of getIncludedAuthorProfiles(c)){
     await sendNotification(authorProfile.id, 'draft_approved', 'Your submission was approved', `${myName()||'An approver'} approved this week's draft for ${c.name}.`, 'approve');
   }
 
@@ -9933,6 +9977,11 @@ async function skipDraft(id){
   if(ok){ logClientActivity(id, 'draft_skipped', `${myName()||'Someone'} skipped this week's update.`); refreshClientDetailActivityIfOpen(id); }
   if(modalOpenForThis) openQueueCardModal(id);
   ok ? showToast('info','Skipped', `${c.name} won't get an update this week.`) : showToast('error','Save failed','Could not save — try again.');
+  if(ok){
+    for(const authorProfile of getIncludedAuthorProfiles(c)){
+      sendNotification(authorProfile.id, 'draft_skipped', 'Draft skipped', `${myName()||'An approver'} skipped this week's draft for ${c.name} — no email was sent.`, 'approve');
+    }
+  }
 }
 
 /* ---------- App icon: upload, crop, save ---------- */
@@ -10412,6 +10461,9 @@ async function changeTeamTitle(userId, newTitle){
   await loadTeamProfiles();
   renderTeam();
   showToast('success','Title updated', 'Change is live immediately.');
+  if(userId !== currentUser?.id && newTitle){
+    sendNotification(userId, 'profile_changed', 'Your title changed', `${myName()||'An admin'} set your title to "${newTitle}".`, 'profile');
+  }
 }
 
 async function changeTeamRole(userId, newRole){
@@ -10423,6 +10475,9 @@ async function changeTeamRole(userId, newRole){
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Changed a team member's role to <b>${newRole}</b>.`});
   await persistLog(); renderLog();
   showToast('success','Role updated', 'Change is live immediately for that person.');
+  if(userId !== currentUser?.id){
+    sendNotification(userId, 'profile_changed', 'Your role changed', `${myName()||'An admin'} changed your role to ${roleDisplayLabel(newRole)}.`, 'profile');
+  }
 }
 
 async function adminResetPassword(userId, name){
@@ -10465,6 +10520,9 @@ async function toggleUserAccess(userId, name, revoke){
     await loadTeamProfiles();
     renderTeam();
     showToast('success', revoke?'Access revoked':'Access restored', `${name} ${revoke?'can no longer log in.':'can log in again.'}`);
+    if(!revoke && userId !== currentUser?.id){
+      sendNotification(userId, 'profile_changed', 'Your access was restored', `${myName()||'An admin'} restored your access — you can log in again.`, 'profile');
+    }
   }catch(e){
     showToast('error','Request failed','Network error — try again.');
   }
