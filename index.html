@@ -399,6 +399,10 @@
   .filters-popover-wrap{position:relative;}
   .filters-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;margin-left:7px;background:var(--brand-dark);color:#fff;border-radius:20px;font-size:10px;font-weight:700;}
   .filters-popover{position:absolute;top:calc(100% + 8px);left:0;width:280px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:200;animation:modalCardIn var(--duration-base) var(--ease-out);}
+  .pagination-controls{display:flex;align-items:center;justify-content:center;gap:14px;padding:16px 0 4px;}
+  .pagination-controls .btn{padding:7px 14px;font-size:12px;}
+  .pagination-controls .btn:disabled{opacity:.4;cursor:default;}
+  .pagination-label{font-family:'DM Sans',sans-serif;font-size:12px;color:var(--muted);white-space:nowrap;}
   .filters-popover-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border);}
   .filters-popover-title{font-size:13px;font-weight:600;color:var(--ink);}
   .filters-popover-body{padding:14px 16px;display:flex;flex-direction:column;gap:12px;}
@@ -1430,7 +1434,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="clients-filter-bar">
           <div class="search-field">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input id="improvementsSearch" placeholder="Search improvement text…" oninput="renderImprovementsHistory()">
+            <input id="improvementsSearch" placeholder="Search improvement text…" oninput="improvementsPage=1;renderImprovementsHistory()">
           </div>
           <div class="filters-popover-wrap">
             <button class="btn btn-outline" onclick="toggleImprovementsFiltersPopover()">
@@ -1446,11 +1450,15 @@ document.addEventListener('DOMContentLoaded', function(){
               <div class="filters-popover-body">
                 <div class="filters-popover-field">
                   <label>Client</label>
-                  <select id="improvementsClientFilter" onchange="renderImprovementsHistory()"><option value="all">All clients</option></select>
+                  <select id="improvementsClientFilter" onchange="improvementsPage=1;renderImprovementsHistory()"><option value="all">All clients</option></select>
+                </div>
+                <div class="filters-popover-field">
+                  <label>Team member</label>
+                  <select id="improvementsMemberFilter" onchange="improvementsPage=1;renderImprovementsHistory()"><option value="all">Everyone</option></select>
                 </div>
                 <div class="filters-popover-field">
                   <label>Email status</label>
-                  <select id="improvementsInclFilter" onchange="renderImprovementsHistory()">
+                  <select id="improvementsInclFilter" onchange="improvementsPage=1;renderImprovementsHistory()">
                     <option value="all">Included &amp; not included</option>
                     <option value="included">Included in email</option>
                     <option value="excluded">Not in email</option>
@@ -1459,9 +1467,9 @@ document.addEventListener('DOMContentLoaded', function(){
                 <div class="filters-popover-field">
                   <label>Date range</label>
                   <div style="display:flex;align-items:center;gap:6px;">
-                    <input type="date" id="improvementsFromDate" onchange="renderImprovementsHistory()" style="width:100%;font-family:'DM Sans',sans-serif;font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background-color:var(--surface-2);color:var(--ink);">
+                    <input type="date" id="improvementsFromDate" onchange="improvementsPage=1;renderImprovementsHistory()" style="width:100%;font-family:'DM Sans',sans-serif;font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background-color:var(--surface-2);color:var(--ink);">
                     <span style="color:var(--muted-lt);font-size:11.5px;flex:none;">to</span>
-                    <input type="date" id="improvementsToDate" onchange="renderImprovementsHistory()" style="width:100%;font-family:'DM Sans',sans-serif;font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background-color:var(--surface-2);color:var(--ink);">
+                    <input type="date" id="improvementsToDate" onchange="improvementsPage=1;renderImprovementsHistory()" style="width:100%;font-family:'DM Sans',sans-serif;font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background-color:var(--surface-2);color:var(--ink);">
                   </div>
                 </div>
               </div>
@@ -1727,20 +1735,20 @@ document.addEventListener('DOMContentLoaded', function(){
           </div>
           <div class="select-field" style="min-width:170px;" id="reportMemberFilterWrap">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            <select id="reportMemberFilter" onchange="renderReports()"><option value="all">All team members</option></select>
+            <select id="reportMemberFilter" onchange="reportsPage=1;renderReports()"><option value="all">All team members</option></select>
           </div>
           <div class="date-nav" id="reportCustomRange" style="display:none;">
             <div class="date-nav-label" style="border-left:none;" onclick="document.getElementById('reportFromDate').showPicker ? document.getElementById('reportFromDate').showPicker() : document.getElementById('reportFromDate').focus()">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              <input type="date" id="reportFromDate" onchange="renderReports()" style="border:none;background:transparent;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink);">
+              <input type="date" id="reportFromDate" onchange="reportsPage=1;renderReports()" style="border:none;background:transparent;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink);">
             </div>
             <span style="padding:0 4px;color:var(--muted-lt);font-size:11.5px;">to</span>
             <div class="date-nav-label" style="border-right:none;" onclick="document.getElementById('reportToDate').showPicker ? document.getElementById('reportToDate').showPicker() : document.getElementById('reportToDate').focus()">
-              <input type="date" id="reportToDate" onchange="renderReports()" style="border:none;background:transparent;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink);">
+              <input type="date" id="reportToDate" onchange="reportsPage=1;renderReports()" style="border:none;background:transparent;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink);">
             </div>
           </div>
           <label class="report-checkbox-label">
-            <input type="checkbox" id="reportActiveOnly" onchange="renderReports()"> Active clients only
+            <input type="checkbox" id="reportActiveOnly" onchange="reportsPage=1;renderReports()"> Active clients only
           </label>
         </div>
 
@@ -1809,6 +1817,7 @@ document.addEventListener('DOMContentLoaded', function(){
             </table>
           </div>
         </div>
+        <div id="reportPagination"></div>
       </div>
 
       <!-- DAILY SUMMARY -->
@@ -3245,9 +3254,27 @@ function renderClientOptionsSelects(){
   renderCustomFieldsManager();
   populateClientFilterSelects();
   populateImprovementsClientFilter();
+  populateImprovementsMemberFilter();
 }
 
 /* ---------- Past Improvements — every logged improvement, across every client, filterable ---------- */
+
+let improvementsPage = 1;
+const IMPROVEMENTS_PAGE_SIZE = 20;
+
+// Shared prev/next pagination controls — used by both Reports' table and
+// Past Improvements' list, rather than each building its own slightly
+// different version of the same thing. Renders nothing when everything
+// already fits on one page.
+function paginationControlsHtml(currentPage, totalItems, pageSize, onPageChangeFnName){
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  if(totalPages <= 1) return '';
+  return `<div class="pagination-controls">
+    <button class="btn btn-outline" ${currentPage<=1?'disabled':''} onclick="${onPageChangeFnName}(${currentPage-1})">‹ Prev</button>
+    <span class="pagination-label">Page ${currentPage} of ${totalPages}</span>
+    <button class="btn btn-outline" ${currentPage>=totalPages?'disabled':''} onclick="${onPageChangeFnName}(${currentPage+1})">Next ›</button>
+  </div>`;
+}
 
 function getAllImprovementsFlat(){
   const list = [];
@@ -3267,12 +3294,22 @@ function populateImprovementsClientFilter(){
   if([...sel.options].some(o=>o.value===current)) sel.value = current;
 }
 
+function populateImprovementsMemberFilter(){
+  const sel = document.getElementById('improvementsMemberFilter');
+  if(!sel) return;
+  const current = sel.value || 'all';
+  sel.innerHTML = `<option value="all">Everyone</option>` + [...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
+  if([...sel.options].some(o=>o.value===current)) sel.value = current;
+}
+
 function clearImprovementsFilters(){
   const search = document.getElementById('improvementsSearch'); if(search) search.value = '';
   const clientSel = document.getElementById('improvementsClientFilter'); if(clientSel) clientSel.value = 'all';
+  const memberSel = document.getElementById('improvementsMemberFilter'); if(memberSel) memberSel.value = 'all';
   const fromEl = document.getElementById('improvementsFromDate'); if(fromEl) fromEl.value = '';
   const toEl = document.getElementById('improvementsToDate'); if(toEl) toEl.value = '';
   const inclSel = document.getElementById('improvementsInclFilter'); if(inclSel) inclSel.value = 'all';
+  improvementsPage = 1;
   renderImprovementsHistory();
 }
 
@@ -3362,6 +3399,7 @@ function renderImprovementsHistory(){
   const all = getAllImprovementsFlat();
   const search = (document.getElementById('improvementsSearch')?.value || '').trim().toLowerCase();
   const clientFilter = document.getElementById('improvementsClientFilter')?.value || 'all';
+  const memberFilter = document.getElementById('improvementsMemberFilter')?.value || 'all';
   const inclFilter = document.getElementById('improvementsInclFilter')?.value || 'all';
   const fromVal = document.getElementById('improvementsFromDate')?.value;
   const toVal = document.getElementById('improvementsToDate')?.value;
@@ -3370,6 +3408,7 @@ function renderImprovementsHistory(){
 
   const filtered = all.filter(imp=>{
     if(clientFilter!=='all' && imp.clientId!==clientFilter) return false;
+    if(memberFilter!=='all' && imp.author!==memberFilter) return false;
     if(inclFilter==='included' && !imp.includeInEmail) return false;
     if(inclFilter==='excluded' && imp.includeInEmail) return false;
     if(search && !imp.text.toLowerCase().includes(search) && !imp.clientName.toLowerCase().includes(search)) return false;
@@ -3383,12 +3422,12 @@ function renderImprovementsHistory(){
   });
 
   if(countEl){
-    const isFiltered = search || clientFilter!=='all' || inclFilter!=='all' || fromVal || toVal;
+    const isFiltered = search || clientFilter!=='all' || memberFilter!=='all' || inclFilter!=='all' || fromVal || toVal;
     countEl.textContent = isFiltered ? `${filtered.length} of ${all.length} shown` : (all.length ? `${all.length} total` : '');
   }
   const badge = document.getElementById('improvementsFiltersBadge');
   if(badge){
-    const activeCount = (clientFilter!=='all'?1:0) + (inclFilter!=='all'?1:0) + (fromVal||toVal?1:0);
+    const activeCount = (clientFilter!=='all'?1:0) + (memberFilter!=='all'?1:0) + (inclFilter!=='all'?1:0) + (fromVal||toVal?1:0);
     badge.textContent = activeCount;
     badge.style.display = activeCount ? 'inline-flex' : 'none';
   }
@@ -3396,7 +3435,11 @@ function renderImprovementsHistory(){
   if(!all.length){ el.innerHTML = `<div class="panel"><div class="empty">No improvements logged yet.</div></div>`; return; }
   if(!filtered.length){ el.innerHTML = `<div class="panel"><div class="empty">No improvements match these filters.</div></div>`; return; }
 
-  el.innerHTML = filtered.map(imp=>`
+  const totalPages = Math.max(1, Math.ceil(filtered.length / IMPROVEMENTS_PAGE_SIZE));
+  if(improvementsPage > totalPages) improvementsPage = totalPages;
+  const pageItems = filtered.slice((improvementsPage-1)*IMPROVEMENTS_PAGE_SIZE, improvementsPage*IMPROVEMENTS_PAGE_SIZE);
+
+  el.innerHTML = pageItems.map(imp=>`
     <div class="ts-entry-card" style="margin-bottom:8px;">
       <div class="ts-entry-info">
         <div class="ts-entry-title">
@@ -3413,7 +3456,12 @@ function renderImprovementsHistory(){
           <span>${imp.includeInEmail ? 'Included in email' : 'Not in email'}</span>
         </label>
       </div>
-    </div>`).join('');
+    </div>`).join('') + paginationControlsHtml(improvementsPage, filtered.length, IMPROVEMENTS_PAGE_SIZE, 'changeImprovementsPage');
+}
+
+function changeImprovementsPage(page){
+  improvementsPage = page;
+  renderImprovementsHistory();
 }
 
 async function toggleImprovementIncludeInEmail(clientId, idx, checked){
@@ -8322,9 +8370,12 @@ async function deleteTimeEntry(id){
 
 /* --- Reports --- */
 let reportTab = 'clients';
+let reportsPage = 1;
+const REPORTS_PAGE_SIZE = 20;
 
 function switchReportTab(name){
   reportTab = name;
+  reportsPage = 1;
   document.querySelectorAll('#ttab-reports .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.rtab===name));
   renderReports();
 }
@@ -8339,6 +8390,7 @@ function onReportRangeChange(){
     if(fromEl && !fromEl.value){ const d=getWeekStart(new Date()); fromEl.value = toDateStr(d); }
     if(toEl && !toEl.value){ toEl.value = toDateStr(new Date()); }
   }
+  reportsPage = 1;
   renderReports();
 }
 
@@ -8459,18 +8511,28 @@ function renderReports(){
   renderReportChart();
   updateBulkDownloadBar();
 
+  const paginationEl = document.getElementById('reportPagination');
+
   if(!rows.length){
     tableBody.innerHTML = `<tr><td colspan="${colspan}"><div class="empty">No time logged in this range.</div></td></tr>`;
+    if(paginationEl) paginationEl.innerHTML = '';
     return;
   }
 
+  const totalPages = Math.max(1, Math.ceil(rows.length / REPORTS_PAGE_SIZE));
+  if(reportsPage > totalPages) reportsPage = totalPages;
+  const pageRows = rows.slice((reportsPage-1)*REPORTS_PAGE_SIZE, reportsPage*REPORTS_PAGE_SIZE);
+  if(paginationEl) paginationEl.innerHTML = paginationControlsHtml(reportsPage, rows.length, REPORTS_PAGE_SIZE, 'changeReportsPage');
+
   if(reportTab==='clients'){
     // Selections that no longer appear in the current filtered rows
-    // shouldn't linger as phantom "selected" state.
+    // shouldn't linger as phantom "selected" state — checked against every
+    // row across all pages, not just the current page, since a selection
+    // made on an earlier page needs to survive navigating to a different one.
     const visibleIds = new Set(rows.map(([key])=>key));
     selectedReportClientIds.forEach(id=>{ if(!visibleIds.has(id)) selectedReportClientIds.delete(id); });
 
-    tableBody.innerHTML = rows.map(([key,mins])=>{
+    tableBody.innerHTML = pageRows.map(([key,mins])=>{
       const c = clients.find(x=>x.id===key);
       const label = getLabel(key);
       const initial = label.trim().charAt(0).toUpperCase();
@@ -8493,7 +8555,7 @@ function renderReports(){
     return;
   }
 
-  tableBody.innerHTML = rows.map(([key,mins])=>{
+  tableBody.innerHTML = pageRows.map(([key,mins])=>{
     const label = getLabel(key);
     const nameEl = `<span style="font-weight:600;font-size:13px;">${label}</span>`;
     return `<tr>
@@ -8501,6 +8563,11 @@ function renderReports(){
       <td class="report-hours-val">${formatMinutes(mins)}</td>
     </tr>`;
   }).join('');
+}
+
+function changeReportsPage(page){
+  reportsPage = page;
+  renderReports();
 }
 
 // Same grouping logic as renderReports() above, factored out so CSV/PDF
