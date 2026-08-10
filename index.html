@@ -102,7 +102,7 @@
   .login-error{width:100%;background:var(--red-bg);color:var(--red);font-size:12px;border-radius:6px;padding:9px 11px;margin-top:16px;text-align:left;}
   .login-footnote{font-size:11px;color:var(--muted-lt);margin-top:18px;line-height:1.5;}
 
-  .role-chip{font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.04em;color:var(--muted-lt);border:1px solid var(--border);border-radius:10px;padding:1px 6px;margin-left:2px;}
+  .role-chip{font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.04em;color:var(--muted-lt);border:1px solid var(--border);border-radius:10px;padding:1px 6px;margin-left:2px;text-transform:capitalize;}
 
   /* Sidebar */
   .sidebar{background:var(--sidebar);color:#C9D2E3;padding:18px 12px;display:flex;flex-direction:column;height:100vh;overflow-y:auto;position:relative;}
@@ -284,7 +284,7 @@
   .ov-note-title{font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color var(--duration-fast) var(--ease-out);}
   .ov-note-desc{font-size:11px;color:var(--muted-lt);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .ov-note-meta-row{display:flex;align-items:center;justify-content:space-between;margin-top:9px;gap:8px;}
-  .ov-note-stage-pill{font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:700;padding:3px 9px;border-radius:20px;flex:none;}
+  .ov-note-stage-pill{font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:700;padding:3px 9px;border-radius:20px;flex:none;text-transform:capitalize;}
   .ov-note-date{font-family:'DM Sans',sans-serif;font-size:10px;color:var(--muted-lt);flex:none;}
 
   /* Daily Summary (Time Tracker) — one flat card per person, matching
@@ -431,7 +431,7 @@
   .cell-name{font-weight:600;font-size:13px;letter-spacing:-0.2px;}
   .cell-email{font-size:11px;color:var(--muted-lt);margin-top:2px;}
   .cell-service{color:var(--ink);font-weight:500;}
-  .pill{font-family:'DM Sans',sans-serif;font-size:9.5px;padding:3px 8px;border-radius:20px;letter-spacing:.04em;font-weight:600;display:inline-block;}
+  .pill{font-family:'DM Sans',sans-serif;font-size:9.5px;padding:3px 8px;border-radius:20px;letter-spacing:.04em;font-weight:600;display:inline-block;text-transform:capitalize;}
   .pill-status{background:#EEF0F4;color:var(--muted);}
   .pill-history{background:#5B9BD518;color:#43719C;}
   .pill-good{background:var(--green-bg);color:var(--green);}
@@ -815,14 +815,14 @@
   .q-card-top{display:flex;justify-content:space-between;align-items:center;gap:14px;}
   .q-name{font-family:'DM Sans',sans-serif;font-size:var(--text-lg);font-weight:600;letter-spacing:-0.3px;}
   .q-service-caption{font-family:'DM Sans',sans-serif;font-size:10px;letter-spacing:.06em;color:var(--muted-lt);margin-top:4px;}
-  .q-risk-flag{color:var(--red);font-weight:600;}
+  .q-risk-flag{color:var(--red);font-weight:600;text-transform:capitalize;}
   .q-status-label{font-family:'DM Sans',sans-serif;font-size:10px;letter-spacing:.05em;font-weight:600;white-space:nowrap;flex:none;}
   .q-ratings{margin-top:20px;display:flex;flex-direction:column;gap:9px;}
   .rating-row{display:flex;align-items:center;gap:10px;}
   .rating-label{font-family:'DM Sans',sans-serif;font-size:9.5px;letter-spacing:.06em;color:var(--muted-lt);width:64px;flex:none;}
   .rate-dots{display:flex;gap:5px;}
   .rate-dots-compact{display:flex;align-items:center;gap:4px;}
-  .rating-pill{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;white-space:nowrap;}
+  .rating-pill{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;white-space:nowrap;text-transform:capitalize;}
   .rating-pill-ink{background:var(--surface-2);color:var(--ink);}
   .rating-pill-brand{background:var(--brand-bg);color:var(--brand-dark);}
   .q-pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid #F0F1F4;}
@@ -9433,7 +9433,7 @@ function riskLabel(danger){
 
 function riskCaptionHtml(danger){
   const r = riskLabel(danger);
-  return `<span class="q-risk-flag" style="color:${r.color};text-transform:capitalize;">${r.text}</span>`;
+  return `<span class="q-risk-flag" style="color:${r.color};">${r.text}</span>`;
 }
 
 // Fixes a real bug: the old danger badge always used the same flat brand
@@ -9442,7 +9442,7 @@ function riskCaptionHtml(danger){
 // already uses everywhere else in the app, instead of a fixed tone.
 function dangerPillCompact(danger){
   const r = riskLabel(danger);
-  return `<span class="rating-pill" style="background:${r.color}18;color:${r.color};text-transform:capitalize;">${r.text}</span>`;
+  return `<span class="rating-pill" style="background:${r.color}18;color:${r.color};">${r.text}</span>`;
 }
 
 // Deterministic per-name color so the same client always gets the same
