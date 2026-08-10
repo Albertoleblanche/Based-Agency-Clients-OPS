@@ -6938,6 +6938,9 @@ async function handleNotifClick(id){
   if(n.target_view){
     document.getElementById('notifPanel').style.display = 'none';
     switchView(n.target_view);
+    if(n.target_view==='approve' && n.target_id && clients.find(c=>c.id===n.target_id)){
+      openQueueCardModal(n.target_id);
+    }
   }
 }
 
@@ -9572,6 +9575,20 @@ function openQueueCardModal(id){
 }
 
 
+// Tells every approver/admin a real draft is ready for their review —
+// excludes whoever generated it, since if that happens to be an approver
+// or admin themselves, notifying them about their own action is pointless.
+async function notifyApproversDraftReady(c){
+  const approvers = teamProfiles.filter(p => (p.role==='admin' || p.role==='approver') && p.id !== currentUser?.id);
+  for(const approver of approvers){
+    await supabaseClient.from('notifications').insert({
+      user_id: approver.id, type:'draft_ready', title:'Draft ready for approval',
+      body:`${myName()||'Someone'} created an improvement email draft for ${c.name}. Please review and approve it.`,
+      target_view:'approve', target_id:c.id, read:false
+    });
+  }
+}
+
 async function generateDraft(id){
   await loadAll();
   const c = clients.find(x=>x.id===id);
@@ -9639,6 +9656,10 @@ ${contentRules}`;
     refreshClientDetailActivityIfOpen(id);
     if(modalOpenForThis) openQueueCardModal(id);
     showToast('success','Draft generated', `AI wrote the update for ${c.name}.`);
+    // Only notify on an actual, real draft — an empty API response falls
+    // back to a placeholder message above, which isn't something an
+    // approver should be told is ready to review.
+    if(text) notifyApproversDraftReady(c);
   }catch(e){
     console.error('generateDraft failed', e);
     c.draft = 'AI generation failed — you can write the draft manually here.';
