@@ -7083,7 +7083,8 @@ function renderNotifPanel(){
 }
 
 async function deleteNotification(id){
-  await supabaseClient.from('notifications').delete().eq('id', id);
+  const { error } = await supabaseClient.from('notifications').delete().eq('id', id);
+  if(error){ showToast('error','Could not delete', error.message); return; }
   notifications = notifications.filter(n=>n.id!==id);
   updateNotifBadge();
   renderNotifPanel();
@@ -7092,7 +7093,8 @@ async function deleteNotification(id){
 async function clearAllNotifications(){
   if(!notifications.length) return;
   if(!confirm('Clear all notifications? This can\'t be undone.')) return;
-  await supabaseClient.from('notifications').delete().eq('user_id', currentUser.id);
+  const { error } = await supabaseClient.from('notifications').delete().eq('user_id', currentUser.id);
+  if(error){ showToast('error','Could not clear notifications', error.message); return; }
   notifications = [];
   updateNotifBadge();
   renderNotifPanel();
