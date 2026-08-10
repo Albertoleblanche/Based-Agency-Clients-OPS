@@ -619,6 +619,8 @@
   .icon-tab{display:flex;align-items:center;gap:7px;padding:9px 14px;border-radius:var(--radius-lg);background:var(--card);border:1px solid var(--border);cursor:pointer;flex:none;font-size:12.5px;font-weight:600;color:var(--muted);transition:all .15s ease;white-space:nowrap;}
   .icon-tab:hover{border-color:#DDE0E5;}
   .icon-tab.active{background:var(--brand-bg);border-color:var(--brand);color:var(--ink);}
+  .icon-tab-count{font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:700;background:var(--surface-2);color:var(--muted);border-radius:20px;min-width:17px;height:17px;padding:0 5px;display:inline-flex;align-items:center;justify-content:center;}
+  .icon-tab.active .icon-tab-count{background:var(--brand);color:#fff;}
   .icon-tab-count{font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:700;color:var(--muted-lt);background:var(--surface-2);padding:1px 6px;border-radius:10px;}
 
   .kanban-board{display:flex;gap:16px;overflow-x:auto;padding-bottom:14px;align-items:flex-start;}
@@ -1505,26 +1507,32 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="icon-tab active" data-f="all" onclick="setQueueFilter('all')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
           <span>All</span>
+          <span class="icon-tab-count" id="qf-count-all">0</span>
         </div>
         <div class="icon-tab" data-f="pending" onclick="setQueueFilter('pending')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           <span>Draft ready</span>
+          <span class="icon-tab-count" id="qf-count-pending">0</span>
         </div>
         <div class="icon-tab" data-f="approved" onclick="setQueueFilter('approved')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
           <span>Approved</span>
+          <span class="icon-tab-count" id="qf-count-approved">0</span>
         </div>
         <div class="icon-tab" data-f="none" onclick="setQueueFilter('none')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           <span>No draft yet</span>
+          <span class="icon-tab-count" id="qf-count-none">0</span>
         </div>
         <div class="icon-tab" data-f="atrisk" onclick="setQueueFilter('atrisk')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           <span>At risk (4–5)</span>
+          <span class="icon-tab-count" id="qf-count-atrisk">0</span>
         </div>
         <div class="icon-tab" data-f="stale" onclick="setQueueFilter('stale')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
           <span>Needs re-review</span>
+          <span class="icon-tab-count" id="qf-count-stale">0</span>
         </div>
       </div>
 
@@ -1537,14 +1545,17 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="icon-tab active" data-f="pending" onclick="setTeamQueueFilter('pending')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           <span>Draft ready</span>
+          <span class="icon-tab-count" id="tqf-count-pending">0</span>
         </div>
         <div class="icon-tab" data-f="approved" onclick="setTeamQueueFilter('approved')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
           <span>Approved</span>
+          <span class="icon-tab-count" id="tqf-count-approved">0</span>
         </div>
         <div class="icon-tab" data-f="stale" onclick="setTeamQueueFilter('stale')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
           <span>Needs re-review</span>
+          <span class="icon-tab-count" id="tqf-count-stale">0</span>
         </div>
       </div>
 
@@ -2559,8 +2570,16 @@ const DEFAULT_SERVICE_OPTIONS = ['Google Ads (PPC)','Meta Ads','SEO / Local Sear
 const DEFAULT_STATUS_OPTIONS = ['Active','Onboarding','At Risk','Paused'];
 const DEFAULT_TEAM_TITLE_OPTIONS = ['Web Developer','SEO Specialist','PPC Specialist','Account Manager','Designer','Client Coordinator'];
 
+let _loadAllSeq = 0;
 async function loadAll(){
+  const mySeq = ++_loadAllSeq;
   const [appData, s] = await Promise.all([safeGet('app-data'), safeGet('settings')]);
+  // A newer loadAll() call has started since this one began — its data (or
+  // data from whichever call turns out to resolve last) is what should win,
+  // not this now-superseded fetch. Applying this one anyway risks silently
+  // reverting a change that already saved correctly, purely because of
+  // which network request happened to finish first.
+  if(mySeq !== _loadAllSeq) return;
   if(appData){
     const parsed = JSON.parse(appData);
     clients = parsed.clients || [];
@@ -2779,7 +2798,7 @@ function setupRealtimeSubscriptions(){
     if(changedKey !== 'app-data' && changedKey !== 'settings') return;
     silentSection(async ()=>{
       await loadAll();
-      renderKpis(); renderClientsTable(); renderQueue(); renderLog(); renderGauge();
+      renderKpis(); renderClientsTable(); renderQueue(); renderTeamQueue(); renderLog(); renderGauge();
       renderAttentionList(); renderClientOptionsSelects(); renderOverviewChart();
       renderBudgetAlerts(); renderImprovementsHistory();
     });
@@ -9090,9 +9109,35 @@ function improvementInDateRange(imp){
   return true;
 }
 
+// Mirrors renderQueue()'s own filter chain exactly (status, date range,
+// personal author scoping) so each tab's badge always matches precisely
+// what clicking that tab would actually show — not an approximation of it.
+function queueFilterCount(filterKey){
+  const ac = activeClients();
+  let sorted = ac;
+  if(filterKey==='pending') sorted = sorted.filter(c=>c.draftStatus==='pending');
+  else if(filterKey==='approved') sorted = sorted.filter(c=>c.draftStatus==='approved');
+  else if(filterKey==='none') sorted = sorted.filter(c=>c.draftStatus==='none');
+  else if(filterKey==='atrisk') sorted = sorted.filter(c=>c.danger>=4);
+  else if(filterKey==='stale') sorted = sorted.filter(c=>c.draftStatus==='approved' && hasLoggedThisWeek(c));
+  let rows = sorted.map(c => ({ c, shownImprovements: c.improvements.filter(improvementInDateRange) }));
+  if(dateFilterMode !== 'all') rows = rows.filter(r => r.shownImprovements.length > 0);
+  const me = myName();
+  rows = rows.filter(r => r.shownImprovements.some(i => i.author === me));
+  return rows.length;
+}
+
+function updateQueueFilterCounts(){
+  ['all','pending','approved','none','atrisk','stale'].forEach(key=>{
+    const el = document.getElementById('qf-count-'+key);
+    if(el) el.textContent = queueFilterCount(key);
+  });
+}
+
 function renderQueue(){
   const el = document.getElementById('queueList');
   const ac = activeClients();
+  updateQueueFilterCounts();
   if(!ac.length){ el.innerHTML = `<div class="panel">${emptyStateHtml(
     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
     'No clients yet',
@@ -9129,12 +9174,36 @@ function renderQueue(){
   el.innerHTML = `<div class="queue-grid">` + rows.map(({c})=>queueCardHtml(c)).join('') + `</div>`;
 }
 
+// Mirrors renderTeamQueue()'s own status+date filter chain — team-wide, no
+// personal author scoping, matching what that page itself actually shows.
+function teamQueueFilterCount(filterKey){
+  const ac = activeClients();
+  const statusMatches = (c) => {
+    if(filterKey==='pending') return c.draftStatus==='pending';
+    if(filterKey==='approved') return c.draftStatus==='approved';
+    if(filterKey==='stale') return c.draftStatus==='approved' && hasLoggedThisWeek(c);
+    return true;
+  };
+  return ac.filter(statusMatches)
+    .map(c => ({ c, shownImprovements: c.improvements.filter(improvementInDateRange) }))
+    .filter(r => dateFilterMode==='all' || r.shownImprovements.length > 0)
+    .length;
+}
+
+function updateTeamQueueFilterCounts(){
+  ['pending','approved','stale'].forEach(key=>{
+    const el = document.getElementById('tqf-count-'+key);
+    if(el) el.textContent = teamQueueFilterCount(key);
+  });
+}
+
 function renderTeamQueue(){
   const el = document.getElementById('teamQueueList');
   if(!el) return;
   const labelEl = document.getElementById('teamQueueDateLabel');
   if(labelEl) labelEl.textContent = activeDateFilterLabel();
   const ac = activeClients();
+  updateTeamQueueFilterCounts();
   if(!ac.length){ el.innerHTML = `<div class="panel">${emptyStateHtml(
     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
     'No clients yet',
@@ -9702,7 +9771,7 @@ ${contentRules}`;
     c.draftStatus = 'pending';
     log.unshift({t:nowTime(), tag:'auto', text:`AI drafted the update for <b>${c.name}</b> from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''}.`});
     await persistClients();
-    renderQueue(); renderLog(); renderKpis();
+    renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
     logClientActivity(id, 'draft_generated', `AI generated a draft from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''} (of ${c.improvements.length} logged).`);
     refreshClientDetailActivityIfOpen(id);
     if(modalOpenForThis) openQueueCardModal(id);
@@ -9716,7 +9785,7 @@ ${contentRules}`;
     c.draft = 'AI generation failed — you can write the draft manually here.';
     c.draftStatus = 'pending';
     await persistClients();
-    renderQueue(); renderLog(); renderKpis();
+    renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
     if(modalOpenForThis) openQueueCardModal(id);
     showToast('error','AI generation failed', 'Write the draft manually below, or try again.');
   }
@@ -9747,7 +9816,7 @@ async function approveDraft(id){
   c.draftStatus = 'approved';
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Approved <b>${c.name}</b> — email drafted for send.`});
   const ok = await persistClients();
-  renderQueue(); renderLog(); renderKpis();
+  renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
   if(!ok){ showToast('error','Save failed','Approval may not have synced — refresh and check.'); return; }
   logClientActivity(id, 'draft_approved', `${myName()||'Someone'} approved this week's draft.`);
   refreshClientDetailActivityIfOpen(id);
@@ -9785,7 +9854,7 @@ async function skipDraft(id){
   c.draftStatus='none'; c.draft='';
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Skipped <b>${c.name}</b> this week — no email sent.`});
   const ok = await persistClients();
-  renderQueue(); renderLog(); renderKpis();
+  renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
   if(ok){ logClientActivity(id, 'draft_skipped', `${myName()||'Someone'} skipped this week's update.`); refreshClientDetailActivityIfOpen(id); }
   if(modalOpenForThis) openQueueCardModal(id);
   ok ? showToast('info','Skipped', `${c.name} won't get an update this week.`) : showToast('error','Save failed','Could not save — try again.');
