@@ -9669,10 +9669,30 @@ async function approveDraft(id){
   if(!ok){ showToast('error','Save failed','Approval may not have synced — refresh and check.'); return; }
   logClientActivity(id, 'draft_approved', `${myName()||'Someone'} approved this week's draft.`);
   refreshClientDetailActivityIfOpen(id);
+
+  // Notify whoever's actual logged work was included in what just got
+  // approved — same weekStart/includeInEmail filter already used to build
+  // the draft in the first place, so this matches "whose work was approved"
+  // rather than "everyone who's ever touched this client."
+  const weekStart = getWeekStart(new Date());
+  const includedAuthors = [...new Set(
+    c.improvements.filter(i => i.includeInEmail !== false && i.date && new Date(i.date) >= weekStart).map(i=>i.author)
+  )].filter(author => author && author !== myName());
+  for(const authorName of includedAuthors){
+    const authorProfile = teamProfiles.find(p=>p.name===authorName);
+    if(!authorProfile) continue;
+    await supabaseClient.from('notifications').insert({
+      user_id: authorProfile.id, type:'draft_approved', title:'Your submission was approved',
+      body:`${myName()||'An approver'} approved this week's draft for ${c.name}.`,
+      target_view:'approve', read:false
+    });
+  }
+
+  showToast('success','Draft approved', `${c.name}'s update was approved.`);
   if(email){
     showSendEmailConfirm(email, 'Your weekly update from Based Agency', draftText);
   } else {
-    showToast('info','Approved — no email sent', `${c.name} has no email on file. Add one in Clients to send.`);
+    showToast('info','No email sent', `${c.name} has no email on file. Add one in Clients to send.`);
   }
 }
 
