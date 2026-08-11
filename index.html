@@ -9242,6 +9242,7 @@ function openQueueLogImprovementModal(presetClientId){
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Log an improvement</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
+      ${presetClientId ? `<div id="queueModalExistingImprovements" style="margin-bottom:16px;"></div>` : ''}
       <div class="form-grid">
         <div class="client-search-wrap" style="grid-column:1/-1;"><label>Client</label>
           <input type="text" class="client-search-input" id="queueLogClientSearch" placeholder="Search client…" autocomplete="off">
@@ -9256,7 +9257,75 @@ function openQueueLogImprovementModal(presetClientId){
       <button class="btn btn-brand" onclick="saveQueueLogImprovement()">Log it</button>
     </div>`, 460);
   setupClientSearchSelect('queueLogClientSearch', 'queueLogClient', 'queueLogClientDropdown');
-  if(presetClientId) setClientFieldValue('queueLogClient', 'queueLogClientSearch', presetClientId);
+  if(presetClientId){
+    setClientFieldValue('queueLogClient', 'queueLogClientSearch', presetClientId);
+    renderQueueModalImprovementsList(presetClientId);
+  }
+}
+
+// This week's existing improvements for a client, shown above the "log
+// new" form so the same modal actually covers both halves of what its
+// menu label promises — "log or edit" — rather than only supporting new
+// entries and leaving editing an existing one to a different screen
+// entirely.
+function renderQueueModalImprovementsList(clientId){
+  const el = document.getElementById('queueModalExistingImprovements');
+  if(!el) return;
+  const c = clients.find(x=>x.id===clientId);
+  if(!c){ el.innerHTML = ''; return; }
+  const weekStart = getWeekStart(new Date());
+  const thisWeek = c.improvements
+    .map((imp,idx)=>({imp,idx}))
+    .filter(({imp})=>imp.date && new Date(imp.date) >= weekStart);
+
+  if(!thisWeek.length){ el.innerHTML = ''; return; }
+
+  el.innerHTML = `<label style="display:block;margin-bottom:6px;">Logged this week</label>` +
+    thisWeek.map(({imp,idx})=>`
+      <div class="log-inline" id="imp-row-${clientId}-${idx}" style="margin-top:0;margin-bottom:6px;width:100%;justify-content:space-between;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12.5px;color:var(--ink);">${escapeHtml(imp.text)}</div>
+          <div style="font-size:10.5px;color:var(--muted-lt);margin-top:2px;">${imp.author} · ${new Date(imp.date).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
+        </div>
+        <span class="mini-imp-action-link" onclick="startEditImprovementInQueueModal('${clientId}', ${idx})">Edit</span>
+        <span class="mini-imp-action-link danger" onclick="deleteImprovementInQueueModal('${clientId}', ${idx})">Delete</span>
+      </div>`).join('');
+}
+
+// Mirrors startEditImprovement()'s inline-edit UI, but its Cancel needs to
+// refresh this modal's own list rather than the Clients table — the
+// original function's Cancel button is hardcoded to renderClientsTable(),
+// which would leave this modal showing a stale, now-mismatched list.
+function startEditImprovementInQueueModal(clientId, idx){
+  const c = clients.find(x=>x.id===clientId);
+  if(!c || !c.improvements[idx]) return;
+  const imp = c.improvements[idx];
+  const row = document.getElementById(`imp-row-${clientId}-${idx}`);
+  if(!row) return;
+  row.innerHTML = `
+    <div class="log-inline" style="margin-top:0;width:100%;">
+      <textarea id="editimp-text-${clientId}-${idx}"></textarea>
+      <input id="editimp-author-${clientId}-${idx}" style="width:130px;">
+      <button class="btn btn-brand" onclick="saveEditImprovementInQueueModal('${clientId}', ${idx})">Save</button>
+      <button class="btn btn-outline" onclick="renderQueueModalImprovementsList('${clientId}')">Cancel</button>
+    </div>`;
+  document.getElementById(`editimp-text-${clientId}-${idx}`).value = imp.text;
+  document.getElementById(`editimp-author-${clientId}-${idx}`).value = imp.author;
+}
+
+// Reuses the real save/delete logic rather than duplicating it, then
+// refreshes this modal's own list afterward — saveEditImprovement() and
+// deleteImprovement() already handle persistence, toasts, and re-rendering
+// every other view that shows improvements, they just don't know this
+// modal exists to refresh it too.
+async function saveEditImprovementInQueueModal(clientId, idx){
+  await saveEditImprovement(clientId, idx);
+  renderQueueModalImprovementsList(clientId);
+}
+
+async function deleteImprovementInQueueModal(clientId, idx){
+  await deleteImprovement(clientId, idx);
+  renderQueueModalImprovementsList(clientId);
 }
 
 async function saveQueueLogImprovement(){
@@ -9604,7 +9673,7 @@ function queueCardHtml(c){
       <div class="kanban-card-menu-wrap">
         <span class="kanban-card-menu-btn" onclick="toggleKanbanCardMenu('q-${c.id}')">⋯</span>
         <div class="kanban-card-menu" id="kanbanMenu-q-${c.id}" style="display:none;">
-          <div class="kanban-card-menu-item" onclick="closeKanbanMenus();openQueueCardModal('${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Log / edit improvements</div>
+          <div class="kanban-card-menu-item" onclick="closeKanbanMenus();openQueueLogImprovementModal('${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Log / edit improvements</div>
           <div class="kanban-card-menu-item" onclick="closeKanbanMenus();openNoteModal(null, '${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Add note</div>
           <div class="kanban-card-menu-item" onclick="closeKanbanMenus();openTimerModal('${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Track time</div>
         </div>
