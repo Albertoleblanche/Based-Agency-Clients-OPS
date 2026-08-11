@@ -10036,6 +10036,7 @@ function queueCardHtml(c){
     <div class="q-pill-row">
       ${dangerPillCompact(c.danger)}
       <span class="rating-pill rating-pill-ink">Importance ${c.importance}/10</span>
+      ${clientReminders.some(r=>r.clientId===c.id && reminderDisplayStatus(r)==='due') ? `<span class="rating-pill" style="background:#3A63C918;color:#3A63C9;" title="A client question is overdue for a follow-up"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:3px;vertical-align:-1px;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Follow-up due</span>` : ''}
     </div>
     ${queueActivityBadgeHtml(c)}
     <div class="q-card-actions">
