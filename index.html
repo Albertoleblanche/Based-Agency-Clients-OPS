@@ -889,7 +889,8 @@
   .integ-status.off{background:#EEF0F4;color:var(--muted);}
   .settings-field{margin-bottom:12px;}
   .settings-field label{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;}
-  .settings-field input,.settings-field textarea{width:280px;max-width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:9px 11px;border-radius:6px;border:1px solid var(--border);}
+  .settings-field input,.settings-field select,.settings-field textarea{width:280px;max-width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:9px 11px;border-radius:6px;border:1px solid var(--border);}
+  .settings-field select{padding-right:30px;background-color:var(--surface-2);color:var(--ink);}
   .options-list{display:flex;flex-wrap:wrap;gap:8px;}
   .option-chip{display:inline-flex;align-items:center;gap:7px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:6px 8px 6px 8px;font-size:12px;color:var(--ink);}
   .option-chip-x{cursor:pointer;color:var(--muted-lt);font-size:11px;padding:2px 4px;}
@@ -1509,6 +1510,7 @@ document.addEventListener('DOMContentLoaded', function(){
               <button class="btn btn-outline" style="padding:6px 10px;" onclick="applyCustomDateRange()">Apply</button>
             </span>
           </div>
+          <button class="btn btn-outline" style="flex:none;" onclick="switchView('improvements')">Past Improvements</button>
           <button class="btn btn-dark" id="notifyBtn" onclick="notifyApprovers()" style="flex:none;"></button>
         </div>
       </div>
@@ -5699,7 +5701,7 @@ function openNoteModal(noteId, presetClientId, presetStatus){
           <option value="done" ${effectiveStatus==='done'?'selected':''}>Done</option>
         </select>
       </div>
-      <div class="settings-field"><label>Note</label><textarea id="noteTextInput" style="width:100%;min-height:200px;font-family:'DM Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${editing ? editing.text : ''}</textarea></div>
+      <div class="settings-field"><label>Note</label><textarea id="noteTextInput" style="width:100%;min-height:64px;font-family:'DM Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${editing ? editing.text : ''}</textarea></div>
       <div class="settings-field"><label>Link (optional)</label><input id="noteLinkInput" type="url" placeholder="https://…" value="${editing && editing.link ? editing.link.replace(/"/g,'&quot;') : ''}"></div>
       ${!editing ? `
       <div class="settings-field"><label>Follow-up date (optional)</label><input type="date" id="noteFollowUpInput"></div>
