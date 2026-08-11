@@ -1433,6 +1433,10 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- PAST IMPROVEMENTS -->
     <div class="view" id="view-improvements">
+      <button class="btn btn-outline" style="margin-bottom:14px;" onclick="switchView('approve')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:-2px;"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        Back
+      </button>
       <div class="panel clients-filter-panel">
         <div class="clients-filter-bar">
           <div class="search-field">
@@ -1510,8 +1514,10 @@ document.addEventListener('DOMContentLoaded', function(){
               <button class="btn btn-outline" style="padding:6px 10px;" onclick="applyCustomDateRange()">Apply</button>
             </span>
           </div>
-          <button class="btn btn-outline" style="flex:none;" onclick="switchView('improvements')">Past Improvements</button>
-          <button class="btn btn-dark" id="notifyBtn" onclick="notifyApprovers()" style="flex:none;"></button>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button class="btn btn-outline" style="flex:none;" onclick="switchView('improvements')">Past Improvements</button>
+            <button class="btn btn-dark" id="notifyBtn" onclick="notifyApprovers()" style="flex:none;"></button>
+          </div>
         </div>
       </div>
 
@@ -3283,7 +3289,7 @@ function renderClientOptionsSelects(){
 /* ---------- Past Improvements — every logged improvement, across every client, filterable ---------- */
 
 let improvementsPage = 1;
-const IMPROVEMENTS_PAGE_SIZE = 20;
+const IMPROVEMENTS_PAGE_SIZE = 10;
 
 // Shared prev/next pagination controls — used by both Reports' table and
 // Past Improvements' list, rather than each building its own slightly
@@ -3458,28 +3464,55 @@ function renderImprovementsHistory(){
   if(!all.length){ el.innerHTML = `<div class="panel"><div class="empty">No improvements logged yet.</div></div>`; return; }
   if(!filtered.length){ el.innerHTML = `<div class="panel"><div class="empty">No improvements match these filters.</div></div>`; return; }
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / IMPROVEMENTS_PAGE_SIZE));
-  if(improvementsPage > totalPages) improvementsPage = totalPages;
-  const pageItems = filtered.slice((improvementsPage-1)*IMPROVEMENTS_PAGE_SIZE, improvementsPage*IMPROVEMENTS_PAGE_SIZE);
+  // Grouped by client, not a flat list — each group keeps its own
+  // improvements together (sorted newest-first, matching getAllImprovementsFlat's
+  // own order), then groups themselves are sorted by their most recent
+  // improvement so the clients with the freshest activity surface first.
+  const groupsMap = new Map();
+  filtered.forEach(imp=>{
+    if(!groupsMap.has(imp.clientId)) groupsMap.set(imp.clientId, []);
+    groupsMap.get(imp.clientId).push(imp);
+  });
+  const groups = [...groupsMap.entries()]
+    .map(([clientId, imps])=>({ clientId, clientName: imps[0].clientName, improvements: imps }))
+    .sort((a,b)=> new Date(b.improvements[0].date||0) - new Date(a.improvements[0].date||0));
 
-  el.innerHTML = pageItems.map(imp=>`
-    <div class="ts-entry-card" style="margin-bottom:8px;">
-      <div class="ts-entry-info">
-        <div class="ts-entry-title">
-          <span class="report-name-link" onclick="openClientDetail('${imp.clientId}')">${imp.clientName}</span>
-          <span class="ts-entry-service">— ${imp.author}</span>
-          ${imp.source!=='manual' ? `<span class="pill pill-status" style="margin-left:6px;">${IMPROVEMENT_SOURCE_LABEL[imp.source]||imp.source}</span>` : ''}
+  // Paginate by client group, not raw improvement count — otherwise a
+  // page boundary could cut a client's history in half, showing part of
+  // it on one page and the rest on the next.
+  const totalPages = Math.max(1, Math.ceil(groups.length / IMPROVEMENTS_PAGE_SIZE));
+  if(improvementsPage > totalPages) improvementsPage = totalPages;
+  const pageGroups = groups.slice((improvementsPage-1)*IMPROVEMENTS_PAGE_SIZE, improvementsPage*IMPROVEMENTS_PAGE_SIZE);
+
+  el.innerHTML = pageGroups.map(group=>{
+    const c = clients.find(x=>x.id===group.clientId);
+    return `<div class="panel" style="margin-bottom:14px;">
+      <div class="panel-body">
+        <div class="team-queue-member-head" style="cursor:pointer;" onclick="openClientDetail('${group.clientId}')">
+          <div>
+            <div class="team-queue-member-name">${group.clientName}${c ? ` <span class="cell-service" style="margin-left:8px;">${c.service}</span>` : ''}</div>
+          </div>
         </div>
-        <div class="ts-entry-desc">${imp.text}</div>
+        ${group.improvements.map(imp=>`
+          <div class="ts-entry-card" style="margin-bottom:8px;">
+            <div class="ts-entry-info">
+              <div class="ts-entry-title">
+                <span class="ts-entry-service">${imp.author}</span>
+                <span style="color:var(--muted-lt);font-size:10.5px;margin-left:8px;">${imp.date ? new Date(imp.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : ''}</span>
+                ${imp.source!=='manual' ? `<span class="pill pill-status" style="margin-left:6px;">${IMPROVEMENT_SOURCE_LABEL[imp.source]||imp.source}</span>` : ''}
+              </div>
+              <div class="ts-entry-desc">${imp.text}</div>
+            </div>
+            <div class="ts-entry-right" style="align-items:flex-end;gap:6px;">
+              <label class="include-toggle" title="Include in the client email">
+                <input type="checkbox" ${imp.includeInEmail?'checked':''} onchange="event.stopPropagation();toggleImprovementIncludeInEmail('${imp.clientId}', ${imp.idx}, this.checked)">
+                <span>${imp.includeInEmail ? 'Included in email' : 'Not in email'}</span>
+              </label>
+            </div>
+          </div>`).join('')}
       </div>
-      <div class="ts-entry-right" style="align-items:flex-end;gap:6px;">
-        <div class="ts-entry-duration" style="font-size:10.5px;color:var(--muted-lt);">${imp.date ? new Date(imp.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : ''}</div>
-        <label class="include-toggle" title="Include in the client email">
-          <input type="checkbox" ${imp.includeInEmail?'checked':''} onchange="toggleImprovementIncludeInEmail('${imp.clientId}', ${imp.idx}, this.checked)">
-          <span>${imp.includeInEmail ? 'Included in email' : 'Not in email'}</span>
-        </label>
-      </div>
-    </div>`).join('') + paginationControlsHtml(improvementsPage, filtered.length, IMPROVEMENTS_PAGE_SIZE, 'changeImprovementsPage');
+    </div>`;
+  }).join('') + paginationControlsHtml(improvementsPage, groups.length, IMPROVEMENTS_PAGE_SIZE, 'changeImprovementsPage');
 }
 
 function changeImprovementsPage(page){
