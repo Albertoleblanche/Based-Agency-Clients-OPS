@@ -7019,7 +7019,10 @@ async function syncGoogleCalendar(){
     await loadCalendarEvents();
     renderCalendar();
     loadGoogleCalendarStatus();
-    showToast('success','Synced', `${data.synced} event${data.synced!==1?'s':''} pulled in.`);
+    const detail = data.total > data.synced
+      ? `${data.synced} of ${data.total} event${data.total!==1?'s':''} pulled in — some couldn't be saved.`
+      : `${data.synced} event${data.synced!==1?'s':''} pulled in.`;
+    showToast('success','Synced', detail);
   }catch(e){
     showToast('error','Sync failed','Network error — try again.');
   }
