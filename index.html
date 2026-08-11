@@ -281,6 +281,8 @@
      bottom row pairing the stage pill with the date. */
   .ov-note-row{padding:11px 0;border-bottom:1px solid #F0F1F4;cursor:pointer;}
   .ov-note-row:last-child{border-bottom:none;padding-bottom:0;}
+  .imp-group-row{padding:12px 0;border-bottom:1px solid #F0F1F4;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;}
+  .imp-group-row:last-child{border-bottom:none;padding-bottom:0;}
   .ov-note-row:first-child{padding-top:0;}
   .ov-note-row:hover .ov-note-title{color:var(--brand-dark);}
   .ov-note-title{font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color var(--duration-fast) var(--ease-out);}
@@ -3174,6 +3176,15 @@ async function switchView(name){
   if(name==='tasks') renderTasks();
   if(name==='calendar'){ renderCalendar(); renderCalendarGoogleSyncWidget(); }
   if(name==='reminders') renderReminders();
+  if(name==='improvements'){
+    const fromEl = document.getElementById('improvementsFromDate');
+    const toEl = document.getElementById('improvementsToDate');
+    if(fromEl && toEl && !fromEl.value && !toEl.value){
+      fromEl.value = toDateStr(getWeekStart(new Date()));
+      toEl.value = toDateStr(new Date());
+    }
+    renderImprovementsHistory();
+  }
   if(name==='teamqueue') renderTeamQueue();
   if(name==='time') renderTimesheet();
   if(name==='profile'){ renderProfilePage(); loadGoogleCalendarStatus(); }
@@ -3494,7 +3505,7 @@ function renderImprovementsHistory(){
           </div>
         </div>
         ${group.improvements.map(imp=>`
-          <div class="ts-entry-card" style="margin-bottom:8px;">
+          <div class="imp-group-row">
             <div class="ts-entry-info">
               <div class="ts-entry-title">
                 <span class="ts-entry-service">${imp.author}</span>
