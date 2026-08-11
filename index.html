@@ -1091,6 +1091,11 @@ document.addEventListener('DOMContentLoaded', function(){
         <span class="nav-label">Tasks</span>
         <span class="nav-badge" id="navTasksBadge">0</span>
       </div>
+      <div class="nav-item" data-view="reminders" data-tooltip="Reminders" onclick="switchView('reminders')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="nav-label">Reminders</span>
+        <span class="nav-badge" id="navRemindersBadge">0</span>
+      </div>
       <div class="nav-item" data-view="calendar" data-tooltip="Calendar" onclick="switchView('calendar')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         <span class="nav-label">Calendar</span>
@@ -1634,6 +1639,32 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
 
       <div class="kanban-board" id="kanbanBoard"></div>
+    </div>
+
+    <!-- REMINDERS -->
+    <div class="view" id="view-reminders">
+      <div class="panel" style="margin-bottom:16px;">
+        <div class="panel-body" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+          <div class="icon-tab-group" id="reminderFilterTabs">
+            <div class="icon-tab active" data-rfilter="active" onclick="switchReminderFilter('active')"><span>Active</span><span class="icon-tab-count" id="rf-count-active">0</span></div>
+            <div class="icon-tab" data-rfilter="due" onclick="switchReminderFilter('due')"><span>🔵 Follow-up Due</span><span class="icon-tab-count" id="rf-count-due">0</span></div>
+            <div class="icon-tab" data-rfilter="waiting" onclick="switchReminderFilter('waiting')"><span>🟡 Waiting</span><span class="icon-tab-count" id="rf-count-waiting">0</span></div>
+            <div class="icon-tab" data-rfilter="answered" onclick="switchReminderFilter('answered')"><span>🟢 Answered</span><span class="icon-tab-count" id="rf-count-answered">0</span></div>
+            <div class="icon-tab" data-rfilter="closed" onclick="switchReminderFilter('closed')"><span>⚪ Closed</span><span class="icon-tab-count" id="rf-count-closed">0</span></div>
+            <div class="icon-tab" data-rfilter="all" onclick="switchReminderFilter('all')"><span>All</span><span class="icon-tab-count" id="rf-count-all">0</span></div>
+          </div>
+          <div style="flex:1;"></div>
+          <button class="btn btn-brand" style="flex:none;" onclick="openNewReminderModal()">+ New reminder</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-body table-scroll-wrap" style="padding:8px 22px;">
+          <table class="report-table">
+            <thead><tr><th>Client</th><th>Question / Request</th><th>Owner</th><th>Status</th><th>Follow-up</th><th></th></tr></thead>
+            <tbody id="remindersTableBody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- CALENDAR -->
@@ -2272,6 +2303,11 @@ document.addEventListener('DOMContentLoaded', function(){
         </div>
       </div>
 
+      <div class="panel" style="margin-top:20px;">
+        <div class="panel-head"><span class="panel-title">Waiting on Client</span><span class="row-link" onclick="openNewReminderModal(currentDetailClientId)">+ Add</span></div>
+        <div class="panel-body"><div id="cdReminders" class="scroll-cap"></div></div>
+      </div>
+
       <div class="panel" style="margin-bottom:24px;">
         <div class="panel-head"><span class="panel-title">Activity History</span></div>
         <div class="panel-body"><div id="cdActivityHistory" class="scroll-cap"></div></div>
@@ -2906,6 +2942,7 @@ async function fullRefresh(showFeedback){
   await loadMyTasks();
   await loadNotifications();
   await loadCalendarEvents();
+  await loadClientReminders();
   renderAll();
   updateTasksNavBadge();
   await checkTaskNotifications();
@@ -2914,7 +2951,7 @@ async function fullRefresh(showFeedback){
   if(syncEl) syncEl.textContent = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
   if(showFeedback && btn){ btn.disabled = false; btn.innerHTML = refreshIcon + ' Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
-function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderTeamQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderTopbarCurrentDate(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); renderTasks(); renderCalendar(); renderTimesheet(); renderTrash(); }
+function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderTeamQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderTopbarCurrentDate(); renderClientOptionsSelects(); applyRoleVisibility(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); renderTasks(); renderCalendar(); renderTimesheet(); renderTrash(); renderReminders(); }
 
 function switchTrashTab(name){
   document.querySelectorAll('#trashTabsBar .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.ttab===name));
@@ -3146,6 +3183,7 @@ async function switchView(name){
   if(name==='payroll') renderPayroll();
   if(name==='tasks') renderTasks();
   if(name==='calendar'){ renderCalendar(); renderCalendarGoogleSyncWidget(); }
+  if(name==='reminders') renderReminders();
   if(name==='teamqueue') renderTeamQueue();
   if(name==='time') renderTimesheet();
   if(name==='profile'){ renderProfilePage(); loadGoogleCalendarStatus(); }
@@ -5272,6 +5310,31 @@ function renderClientDetail(){
       </div>`;
     }).join('')
     : `<div class="empty">No notes for this client yet. Notes are private to you.</div>`;
+
+  const cdRemindersEl = document.getElementById('cdReminders');
+  if(cdRemindersEl){
+    const activeReminders = clientReminders
+      .filter(r=>r.clientId===c.id && (r.status==='waiting'))
+      .sort((a,b)=> (a.followUpDate||'').localeCompare(b.followUpDate||''));
+    cdRemindersEl.innerHTML = activeReminders.length
+      ? activeReminders.map(r=>{
+        const display = reminderDisplayStatus(r);
+        const meta = REMINDER_STATUS_META[display];
+        const owner = teamProfiles.find(p=>p.id===r.askedBy);
+        return `<div class="note-card" style="margin-bottom:10px;">
+          <div class="note-card-top">
+            <div class="note-meta">Asked ${new Date(r.askedDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})} by ${owner ? owner.name : '—'}</div>
+            <span class="rating-pill" style="background:${meta.color}18;color:${meta.color};">${meta.icon} ${meta.label}</span>
+          </div>
+          <div class="note-text">${escapeHtml(r.question)}</div>
+          <div class="note-actions">
+            <span style="font-size:11px;color:var(--muted-lt);">Follow-up: ${reminderFollowUpLabel(r.followUpDate)}</span>
+            <span class="row-link" onclick="markReminderStatus('${r.id}','answered')">Mark answered</span>
+          </div>
+        </div>`;
+      }).join('')
+      : `<div class="empty">Nothing pending from ${c.name}.</div>`;
+  }
 }
 
 function startEditImprovement(clientId, idx){
@@ -5348,6 +5411,180 @@ async function deleteImprovement(clientId, idx){
     refreshClientDetailActivityIfOpen(clientId);
   }
   ok ? showToast('success','Improvement deleted','Removed from the log.') : showToast('error','Delete failed','Could not save — try again.');
+}
+
+/* ---------- Reminders: tracks client questions awaiting a response, team-visible ---------- */
+
+let clientReminders = [];
+let reminderFilter = 'active';
+
+async function loadClientReminders(){
+  const { data, error } = await supabaseClient.from('client_reminders').select('*').order('follow_up_date',{ascending:true});
+  if(error){ console.error('loadClientReminders error', error); clientReminders = []; return; }
+  clientReminders = (data||[]).map(r=>({
+    id:r.id, clientId:r.client_id, question:r.question, askedBy:r.asked_by,
+    askedDate:r.asked_date, followUpDate:r.follow_up_date, status:r.status, resolvedAt:r.resolved_at
+  }));
+  updateRemindersNavBadge();
+}
+
+// Only three statuses are ever actually stored — 'waiting', 'answered',
+// 'closed'. "Follow-up Due" is a derived display state, not a fourth
+// stored value: whenever a reminder is still 'waiting' and its follow-up
+// date has arrived (or passed), it displays as due. This keeps it always
+// correct against today's real date with nothing that has to actively
+// flip a stored value at the right moment.
+function reminderDisplayStatus(r){
+  if(r.status==='waiting' && r.followUpDate && r.followUpDate <= toDateStr(new Date())) return 'due';
+  return r.status;
+}
+
+const REMINDER_STATUS_META = {
+  waiting:  { label:'Waiting on Client', icon:'🟡', color:'#A65B05' },
+  due:      { label:'Follow-up Due',     icon:'🔵', color:'#3A63C9' },
+  answered: { label:'Answered',          icon:'🟢', color:'#117F3A' },
+  closed:   { label:'Closed',            icon:'⚪', color:'#696F78' },
+};
+
+function updateRemindersNavBadge(){
+  const badge = document.getElementById('navRemindersBadge');
+  if(!badge) return;
+  const dueCount = clientReminders.filter(r=>reminderDisplayStatus(r)==='due').length;
+  badge.textContent = dueCount;
+  badge.style.display = dueCount ? 'flex' : 'none';
+}
+
+function switchReminderFilter(f){
+  reminderFilter = f;
+  document.querySelectorAll('#reminderFilterTabs .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.rfilter===f));
+  renderReminders();
+}
+
+function renderReminders(){
+  const tbody = document.getElementById('remindersTableBody');
+  if(!tbody) return;
+
+  const withStatus = clientReminders.map(r=>({ r, display: reminderDisplayStatus(r) }));
+  const counts = {
+    active: withStatus.filter(x=>x.display==='waiting'||x.display==='due').length,
+    due: withStatus.filter(x=>x.display==='due').length,
+    waiting: withStatus.filter(x=>x.display==='waiting').length,
+    answered: withStatus.filter(x=>x.display==='answered').length,
+    closed: withStatus.filter(x=>x.display==='closed').length,
+    all: withStatus.length,
+  };
+  Object.entries(counts).forEach(([key,count])=>{
+    const el = document.getElementById(`rf-count-${key}`);
+    if(el) el.textContent = count;
+  });
+
+  const filtered = withStatus.filter(({display})=>{
+    if(reminderFilter==='all') return true;
+    if(reminderFilter==='active') return display==='waiting' || display==='due';
+    return display===reminderFilter;
+  }).sort((a,b)=> (a.r.followUpDate||'').localeCompare(b.r.followUpDate||''));
+
+  if(!filtered.length){
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty">Nothing here.</div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(({r,display})=>{
+    const c = clients.find(x=>x.id===r.clientId);
+    const owner = teamProfiles.find(p=>p.id===r.askedBy);
+    const meta = REMINDER_STATUS_META[display];
+    const followUpLabel = reminderFollowUpLabel(r.followUpDate);
+    return `<tr>
+      <td>${c ? `<span class="report-name-link" onclick="openClientDetail('${c.id}')">${c.name}</span>` : '<span style="color:var(--muted-lt);">Unknown client</span>'}</td>
+      <td style="max-width:320px;">${escapeHtml(r.question)}</td>
+      <td>${owner ? owner.name : '—'}</td>
+      <td><span class="rating-pill" style="background:${meta.color}18;color:${meta.color};">${meta.icon} ${meta.label}</span></td>
+      <td>${followUpLabel}</td>
+      <td style="white-space:nowrap;">
+        ${display==='waiting' || display==='due' ? `<span class="mini-imp-action-link" onclick="markReminderStatus('${r.id}','answered')">Mark answered</span>` : ''}
+        ${display==='answered' ? `<span class="mini-imp-action-link" onclick="markReminderStatus('${r.id}','closed')">Close</span>` : ''}
+        ${display==='waiting' || display==='due' ? `<span class="mini-imp-action-link" onclick="openNoteModal(null, '${r.clientId}', 'idea')" title="Start a note about this">+ Note</span>` : ''}
+        <span class="mini-imp-action-link danger" onclick="deleteReminder('${r.id}')">Delete</span>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function reminderFollowUpLabel(dateStr){
+  if(!dateStr) return '—';
+  const todayStr = toDateStr(new Date());
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
+  if(dateStr===todayStr) return 'Today';
+  if(dateStr===toDateStr(tomorrow)) return 'Tomorrow';
+  return new Date(dateStr+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+
+function openNewReminderModal(presetClientId){
+  const defaultFollowUp = new Date(); defaultFollowUp.setDate(defaultFollowUp.getDate()+3);
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">New reminder</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="client-search-wrap" style="grid-column:1/-1;"><label>Client</label>
+          <input type="text" class="client-search-input" id="reminderClientSearch" placeholder="Search client…" autocomplete="off">
+          <input type="hidden" id="reminderClient">
+          <div class="client-search-dropdown" id="reminderClientDropdown"></div>
+        </div>
+        <div style="grid-column:1/-1;"><label>Question / request</label><textarea id="reminderQuestion" placeholder="e.g. Can you send us the latest project photos?" rows="3" style="resize:vertical;min-height:64px;font-family:inherit;"></textarea></div>
+        <div><label>Follow-up date</label><input type="date" id="reminderFollowUpDate" value="${toDateStr(defaultFollowUp)}"></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
+      <button class="btn btn-brand" onclick="saveNewReminder()">Save</button>
+    </div>`, 460);
+  setupClientSearchSelect('reminderClientSearch', 'reminderClient', 'reminderClientDropdown');
+  if(presetClientId) setClientFieldValue('reminderClient', 'reminderClientSearch', presetClientId);
+}
+
+async function saveNewReminder(){
+  const clientId = document.getElementById('reminderClient').value;
+  const question = document.getElementById('reminderQuestion').value.trim();
+  const followUpDate = document.getElementById('reminderFollowUpDate').value;
+  if(!clientId){ showToast('error','Pick a client','Select which client this is about.'); return; }
+  if(!question){ showToast('error','Nothing to track','Write the question or request first.'); return; }
+  if(!followUpDate){ showToast('error','Follow-up date required','Pick a date to be reminded.'); return; }
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Saving…');
+  const { error } = await supabaseClient.from('client_reminders').insert({
+    client_id: clientId, question, asked_by: currentUser.id, follow_up_date: followUpDate, status: 'waiting'
+  });
+  restoreBtn(btn);
+  if(error){ showToast('error','Save failed', error.message); return; }
+  await loadClientReminders();
+  renderReminders();
+  closeAppModal();
+  showToast('success','Reminder created', `You'll be notified on ${reminderFollowUpLabel(followUpDate)}.`);
+  const c = clients.find(x=>x.id===clientId);
+  if(c) logClientActivity(clientId, 'reminder_created', `${myName()||'Someone'} logged a question for ${c.name}, following up ${reminderFollowUpLabel(followUpDate)}.`);
+}
+
+async function markReminderStatus(id, status){
+  const r = clientReminders.find(x=>x.id===id);
+  if(!r) return;
+  const { error } = await supabaseClient.from('client_reminders').update({
+    status, resolved_at: status==='answered' || status==='closed' ? new Date().toISOString() : null
+  }).eq('id', id);
+  if(error){ showToast('error','Could not update', error.message); return; }
+  await loadClientReminders();
+  renderReminders();
+  showToast('success', status==='answered' ? 'Marked answered' : 'Closed', '');
+  const c = clients.find(x=>x.id===r.clientId);
+  if(c) logClientActivity(r.clientId, 'reminder_resolved', `${myName()||'Someone'} marked a follow-up for ${c.name} as ${status}.`);
+}
+
+async function deleteReminder(id){
+  if(!confirm('Delete this reminder? This can\'t be undone.')) return;
+  const { error } = await supabaseClient.from('client_reminders').delete().eq('id', id);
+  if(error){ showToast('error','Delete failed', error.message); return; }
+  await loadClientReminders();
+  renderReminders();
+  showToast('success','Reminder deleted','Removed.');
 }
 
 /* ---------- Notes: plan future improvements, connected to the real logging system ---------- */
@@ -7152,6 +7389,7 @@ const NOTIFICATION_TYPE_META = {
   draft_approved:          { label:'Your submitted work is approved' },
   draft_skipped:           { label:'Your submitted draft is skipped' },
   profile_changed:         { label:'Your role, title, or access changes' },
+  reminder_follow_up_due:  { label:'A client follow-up you own comes due' },
 };
 
 // Central place every notification insert should go through, instead of
