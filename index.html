@@ -6976,7 +6976,7 @@ async function loadGoogleCalendarStatus(){
   el.innerHTML = `<div class="empty">Checking…</div>`;
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/google-calendar-status', {
+    const response = await fetch('/api/google-calendar', {
       headers: { 'Authorization': `Bearer ${session.access_token}` }
     });
     const data = await response.json();
@@ -7010,8 +7010,9 @@ async function syncGoogleCalendar(){
   showToast('info','Syncing…','Pulling events from Google Calendar.');
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/google-calendar-sync', {
-      method:'POST', headers:{ 'Authorization': `Bearer ${session.access_token}` }
+    const response = await fetch('/api/google-calendar', {
+      method:'POST', headers:{ 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action:'sync' })
     });
     const data = await response.json();
     if(!response.ok){ showToast('error','Sync failed', data.error || 'Could not sync.'); return; }
@@ -7028,8 +7029,9 @@ async function disconnectGoogleCalendar(){
   if(!confirm('Disconnect Google Calendar? Previously-synced events will be removed from the calendar.')) return;
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/google-calendar-disconnect', {
-      method:'POST', headers:{ 'Authorization': `Bearer ${session.access_token}` }
+    const response = await fetch('/api/google-calendar', {
+      method:'POST', headers:{ 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action:'disconnect' })
     });
     const data = await response.json();
     if(!response.ok){ showToast('error','Failed', data.error || 'Could not disconnect.'); return; }
@@ -7344,9 +7346,9 @@ async function resolveEmailChangeRequest(requestId, approve){
   if(!confirm(approve ? 'Approve this email change? It takes effect immediately.' : 'Deny this request?')) return;
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/approve-email-change', {
+    const response = await fetch('/api/admin-user-actions', {
       method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`},
-      body: JSON.stringify({ requestId, approve })
+      body: JSON.stringify({ action:'approve-email-change', requestId, approve })
     });
     const data = await response.json();
     if(!response.ok){ showToast('error','Failed', data.error || 'Could not process this request.'); return; }
@@ -10450,10 +10452,10 @@ async function addTeamMember(){
   setBtnLoading(btn, 'Creating…');
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/create-member', {
+    const response = await fetch('/api/admin-user-actions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-      body: JSON.stringify({ name, email, role, title }),
+      body: JSON.stringify({ action:'create-member', name, email, role, title }),
     });
     const data = await response.json();
     restoreBtn(btn);
@@ -10590,9 +10592,9 @@ async function adminResetPassword(userId, name){
   if(!confirm(`Set a new temporary password for ${name}? Their current password stops working immediately, and you'll need to send them this new one directly.`)) return;
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/admin-reset-password', {
+    const response = await fetch('/api/admin-user-actions', {
       method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`},
-      body: JSON.stringify({ targetUserId: userId })
+      body: JSON.stringify({ action:'reset-password', targetUserId: userId })
     });
     const data = await response.json();
     if(!response.ok){ showToast('error','Reset failed', data.error || 'Could not reset the password.'); return; }
@@ -10616,9 +10618,9 @@ async function toggleUserAccess(userId, name, revoke){
   if(!confirm(msg)) return;
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/toggle-user-access', {
+    const response = await fetch('/api/admin-user-actions', {
       method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`},
-      body: JSON.stringify({ targetUserId: userId, revoke })
+      body: JSON.stringify({ action:'toggle-access', targetUserId: userId, revoke })
     });
     const data = await response.json();
     if(!response.ok){ showToast('error', revoke?'Revoke failed':'Restore failed', data.error || 'Could not update access.'); return; }
@@ -10658,9 +10660,9 @@ async function deleteUserPermanently(userId, name){
   setBtnLoading(btn, 'Deleting…');
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/delete-user', {
+    const response = await fetch('/api/admin-user-actions', {
       method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`},
-      body: JSON.stringify({ targetUserId: userId })
+      body: JSON.stringify({ action:'delete-user', targetUserId: userId })
     });
     const data = await response.json();
     if(!response.ok){ restoreBtn(btn); showToast('error','Delete failed', data.error || 'Could not delete this account.'); return; }
