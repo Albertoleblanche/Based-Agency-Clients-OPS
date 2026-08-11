@@ -1020,7 +1020,7 @@
 
 <div class="login-overlay" id="loginOverlay">
   <div class="login-card" id="loginFormCard">
-    <div class="brand-mark" style="width:40px;height:40px;font-size:16px;margin-bottom:16px;">BA</div>
+    <div class="brand-mark" style="width:40px;height:40px;font-size:16px;margin:0 auto 16px;">BA</div>
     <div class="login-title">Based Agency</div>
     <div class="login-sub">Client Update Workflow</div>
     <div id="loginError" class="login-error" style="display:none;"></div>
@@ -1969,6 +1969,18 @@ document.addEventListener('DOMContentLoaded', function(){
               </div>
             </div>
             <p style="font-size:11.5px;color:var(--muted-lt);margin-top:12px;line-height:1.5;">Any image works — you'll crop it to a square next. Replaces the "BA" mark in the sidebar and the browser tab icon for everyone.</p>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">App Name & Description</span></div>
+          <div class="panel-body">
+            <div class="form-grid">
+              <div><label>App name</label><input id="appNameInput" placeholder="e.g. Based Agency"></div>
+              <div><label>Description / tagline</label><input id="appDescriptionInput" placeholder="e.g. Client Update Workflow"></div>
+            </div>
+            <button class="btn btn-brand" style="margin-top:12px;" onclick="saveAppBranding()">Save</button>
+            <p style="font-size:11.5px;color:var(--muted-lt);margin-top:12px;line-height:1.5;">Updates the sidebar, browser tab, PDF exports, AI-drafted emails, and the onboarding tour for everyone. The sign-in screen itself stays fixed — it loads before anyone's actually logged in, so it can't safely pull from account data yet.</p>
           </div>
         </div>
 
@@ -3774,7 +3786,7 @@ function clientFormHtml(title, submitLabel, customValues){
         <div><label>Service</label><select id="ncService"></select></div>
         <div><label>Status</label><select id="ncStatus"></select></div>
         <div><label>Importance (1–10)</label><select id="ncImportance"></select></div>
-        <div><label>Danger score (1–5)</label><select id="ncDanger"><option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
+        <div><label>Danger score (1–5)</label><select id="ncDanger"><option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select><div id="ncDangerNudge" style="display:none;font-size:11px;color:var(--amber);margin-top:5px;"></div></div>
         <div><label>Monthly hour budget</label><input type="number" id="ncBudget" min="0" step="0.5" placeholder="e.g. 20 (optional)"></div>
         <div style="grid-column:1/-1;"><label>SOW / scope notes</label><input id="ncSow" placeholder="Brief scope summary"></div>
         ${customFieldsFormHtml(customValues)}
@@ -3816,6 +3828,23 @@ function openEditClientForm(id){
   document.getElementById('ncDanger').value = c.danger;
   document.getElementById('ncBudget').value = c.monthlyHourBudget || '';
   document.getElementById('ncSow').value = c.sow || '';
+
+  // A soft nudge, not an automatic change — surfaces the signal so the
+  // approver can factor it in, but the actual danger score stays a human
+  // judgment call. Only shown when there's a real gap between what's
+  // happening (multiple overdue follow-ups) and what the score currently
+  // reflects (still low), so it doesn't nag someone who's already accounted
+  // for it.
+  const overdueCount = clientReminders.filter(r=>r.clientId===c.id && reminderDisplayStatus(r)==='due').length;
+  const nudgeEl = document.getElementById('ncDangerNudge');
+  if(nudgeEl){
+    if(overdueCount>=2 && c.danger<4){
+      nudgeEl.style.display = 'block';
+      nudgeEl.innerHTML = `⚠️ ${overdueCount} unanswered questions are overdue for this client — worth considering a higher score.`;
+    } else {
+      nudgeEl.style.display = 'none';
+    }
+  }
 }
 
 // If a client's current value was since removed from the managed options list,
@@ -4165,8 +4194,15 @@ async function renderOverviewDailySummary(){
       el.innerHTML = `<div class="empty" style="padding:10px 0;">Could not load today's summary.</div>`;
       return;
     }
+    const myOverdueReminders = clientReminders.filter(r=>r.askedBy===currentUser?.id && reminderDisplayStatus(r)==='due').length;
+    const overdueLine = myOverdueReminders ? `<div class="ov-row" style="cursor:pointer;" onclick="switchView('reminders')">
+      <span class="ov-row-dot" style="background:#3A63C9;"></span>
+      <div class="ov-row-main">
+        <div class="ov-row-name">${myOverdueReminders} follow-up${myOverdueReminders!==1?'s':''} due</div>
+      </div>
+    </div>` : '';
     if(!data.summary.length){
-      el.innerHTML = `<div class="empty" style="padding:10px 0;">You haven't logged any time today yet.</div>`;
+      el.innerHTML = overdueLine || `<div class="empty" style="padding:10px 0;">You haven't logged any time today yet.</div>`;
       return;
     }
     // This card is personal, same as the rest of Overview — but the API
@@ -4177,10 +4213,10 @@ async function renderOverviewDailySummary(){
     // whichever branch the response happened to take.
     const mine = data.summary.find(p => p.userId === currentUser?.id);
     if(!mine){
-      el.innerHTML = `<div class="empty" style="padding:10px 0;">You haven't logged any time today yet.</div>`;
+      el.innerHTML = overdueLine || `<div class="empty" style="padding:10px 0;">You haven't logged any time today yet.</div>`;
       return;
     }
-    el.innerHTML = mine.entries.map(e=>`
+    el.innerHTML = overdueLine + mine.entries.map(e=>`
       <div class="ov-row" style="cursor:default;">
         <span class="ov-row-dot" style="background:var(--brand-dark);"></span>
         <div class="ov-row-main">
@@ -5635,7 +5671,7 @@ async function saveNewReminder(){
   closeAppModal();
   showToast('success','Reminder created', `You'll be notified on ${reminderFollowUpLabel(followUpDate)}.`);
   const c = clients.find(x=>x.id===clientId);
-  if(c) logClientActivity(clientId, 'reminder_created', `${myName()||'Someone'} logged a question for ${c.name}, following up ${reminderFollowUpLabel(followUpDate)}.`);
+  if(c) logClientActivity(clientId, 'reminder_created', `${myName()||'Someone'} logged a question for ${c.name}: "${question.length>80?question.slice(0,80)+'…':question}" — following up ${reminderFollowUpLabel(followUpDate)}.`);
   if(addToCalendar && data) await addReminderToCalendar(data.id);
 }
 
@@ -5697,7 +5733,8 @@ async function markReminderStatus(id, status){
   renderReminders();
   showToast('success', status==='answered' ? 'Marked answered' : status==='closed' ? 'Closed' : 'Reopened', '');
   const c = clients.find(x=>x.id===r.clientId);
-  if(c) logClientActivity(r.clientId, 'reminder_resolved', `${myName()||'Someone'} marked a follow-up for ${c.name} as ${status}.`);
+  const statusLabel = status==='answered' ? 'Answered' : status==='closed' ? 'Closed' : 'Reopened';
+  if(c) logClientActivity(r.clientId, 'reminder_resolved', `${myName()||'Someone'} marked "${r.question.length>80?r.question.slice(0,80)+'…':r.question}" as ${statusLabel} for ${c.name}.`);
 }
 
 async function deleteReminder(id){
@@ -9099,7 +9136,7 @@ function exportReportPdf(){
   const totalMinutes = rows.reduce((s,r)=>s+r.minutes,0);
 
   doc.setFont('helvetica','bold'); doc.setFontSize(16);
-  doc.text('Based Agency — Time Report', 14, 18);
+  doc.text(`${settings.appName || 'Based Agency'} — Time Report`, 14, 18);
   doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(100);
   doc.text(`${tabLabel} · ${rangeLabel} · Generated ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`, 14, 25);
   doc.text(`Total: ${formatMinutes(totalMinutes)} across ${rows.length} ${tabLabel.toLowerCase()}`, 14, 31);
@@ -9514,7 +9551,7 @@ function exportSingleClientPdf(clientId){
   const rangeLabel = getReportRangeLabel();
 
   doc.setFont('helvetica','bold'); doc.setFontSize(16);
-  doc.text('Based Agency — Time Report', 14, 18);
+  doc.text(`${settings.appName || 'Based Agency'} — Time Report`, 14, 18);
   doc.setFont('helvetica','normal'); doc.setFontSize(12); doc.setTextColor(40);
   doc.text(c ? c.name : 'Unknown client', 14, 26);
   doc.setFontSize(10); doc.setTextColor(100);
@@ -10496,7 +10533,7 @@ async function generateDraft(id){
 - No subject line, no meta-commentary about the email itself — output only the email body.`;
 
   const prompt = customStructure
-    ? `Write a weekly client update email for a home-services/construction client from their marketing agency (Based Agency).
+    ? `Write a weekly client update email for a home-services/construction client from their marketing agency (${settings.appName || 'Based Agency'}).
 
 The agency has specified an exact structure below. Follow it precisely and completely — every element it describes (greeting, paragraph order, sign-off, length, tone) — and do NOT fall back to any generic or default email structure, even partially:
 
@@ -10511,7 +10548,7 @@ Improvements made this week:
 ${bullets}
 
 ${contentRules}`
-    : `Write a short, warm, professional weekly update email to a home-services/construction client from their marketing agency (Based Agency).
+    : `Write a short, warm, professional weekly update email to a home-services/construction client from their marketing agency (${settings.appName || 'Based Agency'}).
 Client: ${c.name}
 Service: ${c.service}
 Scope notes: ${c.sow || 'n/a'}
@@ -10559,7 +10596,7 @@ function sendApprovedDraft(id){
   const c = clients.find(x=>x.id===id);
   if(!c) return;
   if(!c.email){ showToast('error','No email on file', `Add an email for ${c.name} in Clients to send.`); return; }
-  showSendEmailConfirm(c.email, 'Your weekly update from Based Agency', c.draft || '');
+  showSendEmailConfirm(c.email, `Your weekly update from ${settings.appName || 'Based Agency'}`, c.draft || '');
 }
 
 // Whether the current user personally logged at least one of this week's
@@ -10620,7 +10657,7 @@ async function approveDraft(id){
 
   showToast('success','Draft approved', `${c.name}'s update was approved.`);
   if(email){
-    showSendEmailConfirm(email, 'Your weekly update from Based Agency', draftText);
+    showSendEmailConfirm(email, `Your weekly update from ${settings.appName || 'Based Agency'}`, draftText);
   } else {
     showToast('info','No email sent', `${c.name} has no email on file. Add one in Clients to send.`);
   }
@@ -10702,6 +10739,42 @@ async function removeAppIcon(){
   const ok = await persistSettings();
   applyAppIcon();
   ok ? showToast('success','Icon removed','Back to the default.') : showToast('error','Save failed','Could not save — try again.');
+}
+
+// Applies custom app name/description everywhere it's safe to — post-login
+// only. The sign-in screen itself can't be included: app_storage (where
+// this setting lives) requires an authenticated session to read under RLS,
+// and that's deliberate — opening it to unauthenticated reads would also
+// expose the full client roster stored in the same table. Falls back to
+// the original defaults when nothing custom has been set, so this changes
+// nothing until an admin actually sets a value.
+function applyAppBranding(){
+  const name = settings.appName || 'Based Agency';
+  const description = settings.appDescription || 'Client Update Workflow';
+
+  const nameEl = document.querySelector('.brand-name');
+  const subEl = document.querySelector('.brand-sub');
+  if(nameEl) nameEl.textContent = name;
+  if(subEl) subEl.textContent = description.toUpperCase();
+  document.title = `${name} — ${description}`;
+
+  const nameInput = document.getElementById('appNameInput');
+  const descInput = document.getElementById('appDescriptionInput');
+  if(nameInput) nameInput.value = settings.appName || '';
+  if(descInput) descInput.value = settings.appDescription || '';
+
+  if(tourSteps[0]) tourSteps[0].title = `Welcome to ${name} 👋`;
+}
+
+async function saveAppBranding(){
+  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  const name = document.getElementById('appNameInput').value.trim();
+  const description = document.getElementById('appDescriptionInput').value.trim();
+  if(name) settings.appName = name; else delete settings.appName;
+  if(description) settings.appDescription = description; else delete settings.appDescription;
+  const ok = await persistSettings();
+  applyAppBranding();
+  ok ? showToast('success','Saved','Updated everywhere except the sign-in screen, which stays fixed.') : showToast('error','Save failed','Could not save — try again.');
 }
 
 function applyAppIcon(){
@@ -11354,6 +11427,7 @@ async function showApp(session){
     document.getElementById('loginOverlay').style.display = 'none';
     updateTasksNavBadge();
     applyAppIcon();
+    applyAppBranding();
     initTimerFromStorage();
     await checkTaskNotifications();
     await checkForNewNotificationToasts();
