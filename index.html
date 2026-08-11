@@ -7528,6 +7528,7 @@ const NOTIFICATION_TYPE_META = {
   draft_skipped:           { label:'Your submitted draft is skipped' },
   profile_changed:         { label:'Your role, title, or access changes' },
   reminder_follow_up_due:  { label:'A client follow-up you own comes due' },
+  reminder_escalated:      { label:'A client follow-up has gone unanswered for a week' },
 };
 
 // Central place every notification insert should go through, instead of
@@ -7618,6 +7619,11 @@ async function handleNotifClick(id){
     n.read = true;
     updateNotifBadge();
     renderNotifPanel();
+  }
+  if(n.target_view==='client-detail' && n.target_id){
+    document.getElementById('notifPanel').style.display = 'none';
+    openClientDetail(n.target_id);
+    return;
   }
   if(n.target_view){
     document.getElementById('notifPanel').style.display = 'none';
