@@ -1643,28 +1643,16 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- REMINDERS -->
     <div class="view" id="view-reminders">
-      <div class="panel" style="margin-bottom:16px;">
-        <div class="panel-body" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-          <div class="icon-tab-group" id="reminderFilterTabs">
-            <div class="icon-tab active" data-rfilter="active" onclick="switchReminderFilter('active')"><span>Active</span><span class="icon-tab-count" id="rf-count-active">0</span></div>
-            <div class="icon-tab" data-rfilter="due" onclick="switchReminderFilter('due')"><span>🔵 Follow-up Due</span><span class="icon-tab-count" id="rf-count-due">0</span></div>
-            <div class="icon-tab" data-rfilter="waiting" onclick="switchReminderFilter('waiting')"><span>🟡 Waiting</span><span class="icon-tab-count" id="rf-count-waiting">0</span></div>
-            <div class="icon-tab" data-rfilter="answered" onclick="switchReminderFilter('answered')"><span>🟢 Answered</span><span class="icon-tab-count" id="rf-count-answered">0</span></div>
-            <div class="icon-tab" data-rfilter="closed" onclick="switchReminderFilter('closed')"><span>⚪ Closed</span><span class="icon-tab-count" id="rf-count-closed">0</span></div>
-            <div class="icon-tab" data-rfilter="all" onclick="switchReminderFilter('all')"><span>All</span><span class="icon-tab-count" id="rf-count-all">0</span></div>
-          </div>
-          <div style="flex:1;"></div>
-          <button class="btn btn-brand" style="flex:none;" onclick="openNewReminderModal()">+ New reminder</button>
+      <div class="clients-filter-bar" style="margin-bottom:8px;">
+        <div class="select-field">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+          <select id="remindersClientFilter" onchange="renderReminders()"><option value="all">All clients</option></select>
         </div>
+        <div style="flex:1;"></div>
+        <button class="btn btn-brand" style="flex:none;" onclick="openNewReminderModal()">+ New reminder</button>
       </div>
-      <div class="panel">
-        <div class="panel-body table-scroll-wrap" style="padding:8px 22px;">
-          <table class="report-table">
-            <thead><tr><th>Client</th><th>Question / Request</th><th>Owner</th><th>Status</th><th>Follow-up</th><th></th></tr></thead>
-            <tbody id="remindersTableBody"></tbody>
-          </table>
-        </div>
-      </div>
+
+      <div class="kanban-board" id="remindersBoard"></div>
     </div>
 
     <!-- CALENDAR -->
@@ -5416,7 +5404,6 @@ async function deleteImprovement(clientId, idx){
 /* ---------- Reminders: tracks client questions awaiting a response, team-visible ---------- */
 
 let clientReminders = [];
-let reminderFilter = 'active';
 
 async function loadClientReminders(){
   const { data, error } = await supabaseClient.from('client_reminders').select('*').order('follow_up_date',{ascending:true});
@@ -5446,6 +5433,12 @@ const REMINDER_STATUS_META = {
   closed:   { label:'Closed',            icon:'⚪', color:'#696F78' },
 };
 
+// Kanban column order — includes 'due' as its own visual column even
+// though it's derived rather than stored, since the whole point of the
+// board is seeing what needs action grouped separately from what's simply
+// still waiting.
+const REMINDER_STAGES = ['waiting','due','answered','closed'].map(key=>({ key, ...REMINDER_STATUS_META[key] }));
+
 function updateRemindersNavBadge(){
   const badge = document.getElementById('navRemindersBadge');
   if(!badge) return;
@@ -5454,60 +5447,81 @@ function updateRemindersNavBadge(){
   badge.style.display = dueCount ? 'flex' : 'none';
 }
 
-function switchReminderFilter(f){
-  reminderFilter = f;
-  document.querySelectorAll('#reminderFilterTabs .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.rfilter===f));
-  renderReminders();
+function populateRemindersClientFilter(){
+  const sel = document.getElementById('remindersClientFilter');
+  if(!sel) return;
+  const current = sel.value || 'all';
+  sel.innerHTML = `<option value="all">All clients</option>` + activeClients().sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  if([...sel.options].some(o=>o.value===current)) sel.value = current;
 }
 
 function renderReminders(){
-  const tbody = document.getElementById('remindersTableBody');
-  if(!tbody) return;
+  const board = document.getElementById('remindersBoard');
+  if(!board) return;
 
-  const withStatus = clientReminders.map(r=>({ r, display: reminderDisplayStatus(r) }));
-  const counts = {
-    active: withStatus.filter(x=>x.display==='waiting'||x.display==='due').length,
-    due: withStatus.filter(x=>x.display==='due').length,
-    waiting: withStatus.filter(x=>x.display==='waiting').length,
-    answered: withStatus.filter(x=>x.display==='answered').length,
-    closed: withStatus.filter(x=>x.display==='closed').length,
-    all: withStatus.length,
-  };
-  Object.entries(counts).forEach(([key,count])=>{
-    const el = document.getElementById(`rf-count-${key}`);
-    if(el) el.textContent = count;
-  });
+  const clientFilter = document.getElementById('remindersClientFilter')?.value || 'all';
+  const visible = clientFilter==='all' ? clientReminders : clientReminders.filter(r=>r.clientId===clientFilter);
 
-  const filtered = withStatus.filter(({display})=>{
-    if(reminderFilter==='all') return true;
-    if(reminderFilter==='active') return display==='waiting' || display==='due';
-    return display===reminderFilter;
-  }).sort((a,b)=> (a.r.followUpDate||'').localeCompare(b.r.followUpDate||''));
-
-  if(!filtered.length){
-    tbody.innerHTML = `<tr><td colspan="6"><div class="empty">Nothing here.</div></td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = filtered.map(({r,display})=>{
-    const c = clients.find(x=>x.id===r.clientId);
-    const owner = teamProfiles.find(p=>p.id===r.askedBy);
-    const meta = REMINDER_STATUS_META[display];
-    const followUpLabel = reminderFollowUpLabel(r.followUpDate);
-    return `<tr>
-      <td>${c ? `<span class="report-name-link" onclick="openClientDetail('${c.id}')">${c.name}</span>` : '<span style="color:var(--muted-lt);">Unknown client</span>'}</td>
-      <td style="max-width:320px;">${escapeHtml(r.question)}</td>
-      <td>${owner ? owner.name : '—'}</td>
-      <td><span class="rating-pill" style="background:${meta.color}18;color:${meta.color};">${meta.icon} ${meta.label}</span></td>
-      <td>${followUpLabel}</td>
-      <td style="white-space:nowrap;">
-        ${display==='waiting' || display==='due' ? `<span class="mini-imp-action-link" onclick="markReminderStatus('${r.id}','answered')">Mark answered</span>` : ''}
-        ${display==='answered' ? `<span class="mini-imp-action-link" onclick="markReminderStatus('${r.id}','closed')">Close</span>` : ''}
-        ${display==='waiting' || display==='due' ? `<span class="mini-imp-action-link" onclick="openNoteModal(null, '${r.clientId}', 'idea')" title="Start a note about this">+ Note</span>` : ''}
-        <span class="mini-imp-action-link danger" onclick="deleteReminder('${r.id}')">Delete</span>
-      </td>
-    </tr>`;
+  board.innerHTML = REMINDER_STAGES.map(stage=>{
+    const stageReminders = visible.filter(r=>reminderDisplayStatus(r)===stage.key)
+      .sort((a,b)=> (a.followUpDate||'').localeCompare(b.followUpDate||''));
+    return `<div class="kanban-column">
+      <div class="kanban-column-head" style="background:${stage.color}22;">
+        <span class="kanban-column-icon" style="color:${stage.color};">${stage.icon}</span>
+        <span class="kanban-column-title">${stage.label}</span>
+        <span class="kanban-column-count">${stageReminders.length}</span>
+        ${stage.key==='waiting' ? `<button class="kanban-add-btn" onclick="openNewReminderModal()" title="New reminder">+</button>` : ''}
+      </div>
+      <div class="kanban-cards">
+        ${stageReminders.length ? stageReminders.map(r=>reminderCardHtml(r)).join('') : `<div class="empty" style="padding:18px 8px;font-size:11.5px;">Nothing here.</div>`}
+      </div>
+    </div>`;
   }).join('');
+}
+
+function reminderCardMenuHtml(r){
+  const display = reminderDisplayStatus(r);
+  const moveOptions = [];
+  if(display!=='answered') moveOptions.push(['answered','Mark answered']);
+  if(display!=='closed') moveOptions.push(['closed','Close']);
+  if(display==='answered' || display==='closed') moveOptions.push(['waiting','Reopen']);
+  const moveHtml = moveOptions.map(([status,label])=>
+    `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();markReminderStatus('${r.id}','${status}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>${label}</div>`
+  ).join('');
+  return moveHtml
+    + `<div class="kanban-card-menu-divider"></div>`
+    + `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();openNoteModal(null, '${r.clientId}', 'idea')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Start a note</div>`
+    + `<div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();deleteReminder('${r.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete</div>`;
+}
+
+function reminderCardHtml(r){
+  const c = clients.find(x=>x.id===r.clientId);
+  const owner = teamProfiles.find(p=>p.id===r.askedBy);
+  const display = reminderDisplayStatus(r);
+  const isResolved = display==='answered' || display==='closed';
+  const followUpLabel = reminderFollowUpLabel(r.followUpDate);
+
+  return `<div class="kanban-card" onclick="openReminderDetailModal('${r.id}')">
+    <div class="kanban-card-top">
+      ${isResolved
+        ? `<span class="kanban-card-due" style="color:var(--green);font-weight:700;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            ${display==='answered' ? 'Answered' : 'Closed'}
+          </span>`
+        : `<span class="kanban-card-due" style="${display==='due'?'color:var(--brand-dark);':''}">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Follow up ${followUpLabel}
+          </span>`}
+      <div class="kanban-card-menu-wrap">
+        <span class="kanban-card-menu-btn" onclick="event.stopPropagation();toggleKanbanCardMenu('reminder-${r.id}')">⋯</span>
+        <div class="kanban-card-menu" id="kanbanMenu-reminder-${r.id}" style="display:none;">${reminderCardMenuHtml(r)}</div>
+      </div>
+    </div>
+    <div class="kanban-card-desc" style="white-space:normal;-webkit-line-clamp:1;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;color:var(--muted-lt);cursor:pointer;" onclick="event.stopPropagation();openClientDetail('${r.clientId}')">${c ? escapeHtml(c.name) : 'Unknown client'}</div>
+    <div class="kanban-card-title" style="font-size:13px;">${escapeHtml(r.question)}</div>
+    <div class="kanban-card-assigned-label">Asked by</div>
+    <div class="kanban-card-avatars">${owner ? personAvatarHtml(owner.id) : ''}</div>
+  </div>`;
 }
 
 function reminderFollowUpLabel(dateStr){
@@ -5533,6 +5547,7 @@ function openNewReminderModal(presetClientId){
         <div style="grid-column:1/-1;"><label>Question / request</label><textarea id="reminderQuestion" placeholder="e.g. Can you send us the latest project photos?" rows="3" style="resize:vertical;min-height:64px;font-family:inherit;"></textarea></div>
         <div><label>Follow-up date</label><input type="date" id="reminderFollowUpDate" value="${toDateStr(defaultFollowUp)}"></div>
       </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink);cursor:pointer;margin-top:2px;"><input type="checkbox" id="reminderAddToCalendarInput" checked> Add to calendar</label>
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
@@ -5546,14 +5561,15 @@ async function saveNewReminder(){
   const clientId = document.getElementById('reminderClient').value;
   const question = document.getElementById('reminderQuestion').value.trim();
   const followUpDate = document.getElementById('reminderFollowUpDate').value;
+  const addToCalendar = document.getElementById('reminderAddToCalendarInput')?.checked;
   if(!clientId){ showToast('error','Pick a client','Select which client this is about.'); return; }
   if(!question){ showToast('error','Nothing to track','Write the question or request first.'); return; }
   if(!followUpDate){ showToast('error','Follow-up date required','Pick a date to be reminded.'); return; }
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
-  const { error } = await supabaseClient.from('client_reminders').insert({
+  const { data, error } = await supabaseClient.from('client_reminders').insert({
     client_id: clientId, question, asked_by: currentUser.id, follow_up_date: followUpDate, status: 'waiting'
-  });
+  }).select().single();
   restoreBtn(btn);
   if(error){ showToast('error','Save failed', error.message); return; }
   await loadClientReminders();
@@ -5562,6 +5578,54 @@ async function saveNewReminder(){
   showToast('success','Reminder created', `You'll be notified on ${reminderFollowUpLabel(followUpDate)}.`);
   const c = clients.find(x=>x.id===clientId);
   if(c) logClientActivity(clientId, 'reminder_created', `${myName()||'Someone'} logged a question for ${c.name}, following up ${reminderFollowUpLabel(followUpDate)}.`);
+  if(addToCalendar && data) await addReminderToCalendar(data.id);
+}
+
+// Click-through detail view for a reminder card — mirrors
+// openTaskDetailModal()'s pattern of a read/edit modal reachable by
+// clicking the card itself, not just the 3-dot menu.
+function openReminderDetailModal(id){
+  const r = clientReminders.find(x=>x.id===id);
+  if(!r) return;
+  const c = clients.find(x=>x.id===r.clientId);
+  const owner = teamProfiles.find(p=>p.id===r.askedBy);
+  const display = reminderDisplayStatus(r);
+  const meta = REMINDER_STATUS_META[display];
+  const isResolved = display==='answered' || display==='closed';
+
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">Client follow-up</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <span class="rating-pill" style="background:${meta.color}18;color:${meta.color};">${meta.icon} ${meta.label}</span>
+        ${c ? `<span class="row-link" onclick="closeAppModal();openClientDetail('${c.id}');">${c.name}</span>` : ''}
+      </div>
+      <div class="settings-field"><label>Question / request</label><textarea id="reminderEditQuestion" rows="3" style="width:100%;resize:vertical;min-height:64px;font-family:inherit;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);">${escapeHtml(r.question)}</textarea></div>
+      <div class="form-grid">
+        <div><label>Asked by</label><div style="font-size:13px;padding:9px 0;">${owner ? owner.name : '—'} · ${new Date(r.askedDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div></div>
+        <div><label>Follow-up date</label><input type="date" id="reminderEditFollowUp" value="${r.followUpDate||''}" ${isResolved?'disabled':''}></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-brand" onclick="saveReminderEdit('${r.id}')">Save changes</button>
+      ${!isResolved ? `<button class="btn btn-outline" onclick="markReminderStatus('${r.id}','answered');closeAppModal();">Mark answered</button>` : `<button class="btn btn-outline" onclick="markReminderStatus('${r.id}','waiting');closeAppModal();">Reopen</button>`}
+      <button class="btn btn-outline" style="color:var(--red);" onclick="closeAppModal();deleteReminder('${r.id}')">Delete</button>
+    </div>`, 480);
+}
+
+async function saveReminderEdit(id){
+  const question = document.getElementById('reminderEditQuestion').value.trim();
+  const followUpEl = document.getElementById('reminderEditFollowUp');
+  const followUpDate = followUpEl ? followUpEl.value : undefined;
+  if(!question){ showToast('error','Nothing to save','The question can\'t be empty.'); return; }
+  const updates = { question };
+  if(followUpDate) updates.follow_up_date = followUpDate;
+  const { error } = await supabaseClient.from('client_reminders').update(updates).eq('id', id);
+  if(error){ showToast('error','Save failed', error.message); return; }
+  await loadClientReminders();
+  renderReminders();
+  closeAppModal();
+  showToast('success','Updated','Changes saved.');
 }
 
 async function markReminderStatus(id, status){
@@ -5573,7 +5637,7 @@ async function markReminderStatus(id, status){
   if(error){ showToast('error','Could not update', error.message); return; }
   await loadClientReminders();
   renderReminders();
-  showToast('success', status==='answered' ? 'Marked answered' : 'Closed', '');
+  showToast('success', status==='answered' ? 'Marked answered' : status==='closed' ? 'Closed' : 'Reopened', '');
   const c = clients.find(x=>x.id===r.clientId);
   if(c) logClientActivity(r.clientId, 'reminder_resolved', `${myName()||'Someone'} marked a follow-up for ${c.name} as ${status}.`);
 }
@@ -7013,6 +7077,20 @@ function openEditEventForm(eventId){
 // due-date markers the calendar already shows for every task automatically.
 // This is the explicit, opt-in version: attendees, a real time, a location,
 // whatever the person wants to add, by editing the resulting event normally.
+async function addReminderToCalendar(reminderId){
+  const r = clientReminders.find(x=>x.id===reminderId);
+  if(!r || !r.followUpDate) return;
+  const c = clients.find(x=>x.id===r.clientId);
+  const { error } = await supabaseClient.from('calendar_events').insert({
+    title: c ? `Follow up: ${c.name}` : 'Client follow-up', description: r.question || null,
+    start_at: `${r.followUpDate}T00:00:00`, end_at: `${r.followUpDate}T23:59:59`, all_day: true,
+    client_id: r.clientId, created_by: currentUser.id, event_type: 'reminder'
+  });
+  await loadCalendarEvents();
+  if(error){ showToast('error','Could not add to calendar', error.message); return; }
+  showToast('success','Added to calendar', `On ${new Date(r.followUpDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}.`);
+}
+
 async function addNoteToCalendar(noteId){
   const n = notes.find(x=>x.id===noteId);
   if(!n || !n.followUpDate) return;
