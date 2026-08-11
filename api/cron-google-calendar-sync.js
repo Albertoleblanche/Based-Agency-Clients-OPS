@@ -47,6 +47,44 @@ async function notifyDueReminders(admin) {
   return { notified: due.length };
 }
 
+async function notifyEscalatedReminders(admin) {
+  const today = new Date();
+  const sevenDaysAgo = new Date(today.getTime() - 7*24*60*60*1000).toISOString().slice(0, 10);
+  const todayStr = today.toISOString().slice(0, 10);
+
+  // Still waiting, and its follow-up date was at least 7 days ago —
+  // genuinely stale, not just "due today." escalated_at ensures this
+  // fires once per reminder, not every day it remains unanswered.
+  const { data: stale, error } = await admin
+    .from('client_reminders')
+    .select('id, client_id, question, asked_by, follow_up_date')
+    .eq('status', 'waiting')
+    .lte('follow_up_date', sevenDaysAgo)
+    .is('escalated_at', null);
+  if (error || !stale || !stale.length) return { escalated: 0 };
+
+  const { data: admins } = await admin.from('team_profiles').select('id, role').in('role', ['admin', 'approver']);
+  if (!admins || !admins.length) return { escalated: 0 };
+
+  const { data: appDataRow } = await admin.from('app_storage').select('value').eq('key', 'app-data').maybeSingle();
+  const clients = appDataRow ? (JSON.parse(appDataRow.value).clients || []) : [];
+
+  for (const r of stale) {
+    const client = clients.find(c => c.id === r.client_id);
+    const clientName = client ? client.name : 'a client';
+    const recipients = admins.filter(a => a.id !== r.asked_by);
+    for (const recipient of recipients) {
+      await admin.from('notifications').insert({
+        user_id: recipient.id, type: 'reminder_escalated', title: 'Follow-up gone quiet',
+        body: `${clientName} hasn't responded in over a week regarding: "${r.question}"`,
+        target_view: 'client-detail', target_id: r.client_id,
+      });
+    }
+    await admin.from('client_reminders').update({ escalated_at: todayStr }).eq('id', r.id);
+  }
+  return { escalated: stale.length };
+}
+
 module.exports = async function handler(req, res) {
   const authHeader = req.headers['authorization'] || '';
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -64,12 +102,18 @@ module.exports = async function handler(req, res) {
   }
 
   const admin = createClient(supabaseUrl, serviceKey);
-  const result = { calendarSync: null, reminders: null };
+  const result = { calendarSync: null, reminders: null, escalations: null };
 
   try {
     result.reminders = await notifyDueReminders(admin);
   } catch (e) {
     result.reminders = { error: String(e) };
+  }
+
+  try {
+    result.escalations = await notifyEscalatedReminders(admin);
+  } catch (e) {
+    result.escalations = { error: String(e) };
   }
 
   if (!clientId || !clientSecret) {
