@@ -9913,7 +9913,7 @@ function openQueueCardModal(id){
       ${c.draft && !c.email ? `<span class="warn-text">No client email on file — add one in Clients</span>` : ''}
     </div>
     <div class="modal-actions">
-      ${c.improvements.length && !(c.draftStatus==='approved' && !canApprove()) ? `<button class="btn btn-dark btn-icon-only" id="gen-${c.id}" onclick="generateDraft('${c.id}')" title="${c.draft?'Regenerate':'Generate'} with AI"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/></svg></button>` : ''}
+      ${c.improvements.length && !(c.draftStatus==='approved' && !canApprove()) && canGenerateOrRegenerateDraft(c) ? `<button class="btn btn-dark" id="gen-${c.id}" onclick="generateDraft('${c.id}')" title="${c.draft?'Regenerate':'Generate'} with AI"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/></svg>${c.draft?'Regenerate':'Generate'}</button>` : ''}
       ${c.draft && canApprove() ? `<button class="btn btn-brand" onclick="approveDraft('${c.id}')" ${c.draftStatus==='approved'?'disabled':''}>Approve</button>
       <button class="btn btn-outline" onclick="skipDraft('${c.id}')">Skip this week</button>` : ''}
       ${c.draft && !canApprove() && c.draftStatus!=='approved' ? `<span class="warn-text" style="color:var(--muted-lt);">Only admins and approvers can approve or skip drafts.</span>` : ''}
@@ -9940,6 +9940,12 @@ async function generateDraft(id){
   await loadAll();
   const c = clients.find(x=>x.id===id);
   if(!c) return;
+  if(!canGenerateOrRegenerateDraft(c)){
+    showToast('error','Not allowed', c.draft
+      ? 'Only admins, approvers, or contributors to this week\'s work can regenerate this draft.'
+      : 'Only someone who logged this week\'s included improvements can generate the first draft.');
+    return;
+  }
   const modalCard = document.querySelector('#appModalOverlay .modal-card');
   const modalOpenForThis = modalCard && modalCard.dataset.clientId === id;
   const weekStart = getWeekStart(new Date());
@@ -10026,6 +10032,22 @@ function sendApprovedDraft(id){
   if(!c) return;
   if(!c.email){ showToast('error','No email on file', `Add an email for ${c.name} in Clients to send.`); return; }
   showSendEmailConfirm(c.email, 'Your weekly update from Based Agency', c.draft || '');
+}
+
+// Whether the current user personally logged at least one of this week's
+// included improvements for a client — used to gate draft generation, so
+// "did I contribute" rather than "who else contributed" (the opposite
+// question getIncludedAuthorProfiles answers, which is why this is separate
+// rather than reusing that one).
+function iContributedToClientDraft(c){
+  const weekStart = getWeekStart(new Date());
+  return c.improvements.some(i => i.includeInEmail !== false && i.date && new Date(i.date) >= weekStart && i.author === myName());
+}
+
+function canGenerateOrRegenerateDraft(c){
+  if(iContributedToClientDraft(c)) return true;
+  if(c.draft) return canApprove();
+  return false;
 }
 
 // Whoever's actual logged work is included in this week's draft for a
