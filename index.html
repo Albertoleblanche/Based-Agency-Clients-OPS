@@ -5530,7 +5530,26 @@ function reminderCardMenuHtml(r){
   return moveHtml
     + `<div class="kanban-card-menu-divider"></div>`
     + `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();openNoteModal(null, '${r.clientId}', 'idea')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Start a note</div>`
+    + (display==='due' ? `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();createTaskFromReminder('${r.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>+ Task: chase this down</div>` : '')
     + `<div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();deleteReminder('${r.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete</div>`;
+}
+
+// Turns a stale reminder into an assigned task — pre-fills the client and
+// a description carrying the actual question, so whoever it lands on
+// doesn't need to go dig up context from the reminder itself. Deliberately
+// doesn't preset a due date: the reminder's own follow-up date has already
+// passed by the time this is reachable, so carrying that date over would
+// mean creating a task that's overdue the moment it's assigned — better to
+// leave that to whoever's actually assigning it.
+function createTaskFromReminder(reminderId){
+  const r = clientReminders.find(x=>x.id===reminderId);
+  if(!r) return;
+  const c = clients.find(x=>x.id===r.clientId);
+  openNewTaskModal(undefined, 'todo', {
+    title: c ? `Follow up with ${c.name}` : 'Follow up with client',
+    description: r.question,
+    clientId: r.clientId,
+  });
 }
 
 function reminderCardHtml(r){
@@ -6246,12 +6265,14 @@ function populateTaskClientSelect(selectedId){
   return options;
 }
 
-function taskFormHtml(editing, presetAssigneeId){
+function taskFormHtml(editing, presetAssigneeId, presetContext){
+  const presetTitle = !editing && presetContext?.title ? presetContext.title.replace(/"/g,'&quot;') : '';
+  const presetDesc = !editing && presetContext?.description ? presetContext.description : '';
   return `
     <div class="modal-head"><span class="panel-title">${editing ? 'Edit task' : 'New task'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
-      <div class="settings-field"><label>Title</label><input id="taskTitleInput" placeholder="e.g. Update the roofing page copy" value="${editing ? editing.title.replace(/"/g,'&quot;') : ''}"></div>
-      <div class="settings-field"><label>Description (optional)</label><textarea id="taskDescInput" style="width:100%;min-height:80px;font-family:'DM Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);">${editing ? editing.description : ''}</textarea></div>
+      <div class="settings-field"><label>Title</label><input id="taskTitleInput" placeholder="e.g. Update the roofing page copy" value="${editing ? editing.title.replace(/"/g,'&quot;') : presetTitle}"></div>
+      <div class="settings-field"><label>Description (optional)</label><textarea id="taskDescInput" style="width:100%;min-height:80px;font-family:'DM Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);">${editing ? editing.description : escapeHtml(presetDesc)}</textarea></div>
       <div class="form-grid">
         <div><label>Assign to</label><select id="taskAssigneeSelect">${populateTaskAssigneeSelect(editing ? editing.assigneeId : (presetAssigneeId || currentUser.id))}</select></div>
         <div><label>Priority</label>
@@ -6262,7 +6283,7 @@ function taskFormHtml(editing, presetAssigneeId){
           </select>
         </div>
         <div><label>Due date (optional)</label><input type="date" id="taskDueInput" value="${editing && editing.dueDate ? editing.dueDate : ''}"></div>
-        <div><label>Related client (optional)</label><select id="taskClientSelect">${populateTaskClientSelect(editing ? editing.clientId : null)}</select></div>
+        <div><label>Related client (optional)</label><select id="taskClientSelect">${populateTaskClientSelect(editing ? editing.clientId : (presetContext?.clientId || null))}</select></div>
       </div>
       <div class="settings-field"><label>Link (optional)</label><input id="taskLinkInput" type="url" placeholder="https://…" value="${editing && editing.link ? editing.link.replace(/"/g,'&quot;') : ''}"></div>
       ${!editing ? `<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink);cursor:pointer;margin-top:2px;"><input type="checkbox" id="taskAddToCalendarInput"> Add to calendar (needs a due date)</label>` : ''}
@@ -6273,10 +6294,10 @@ function taskFormHtml(editing, presetAssigneeId){
     </div>`;
 }
 
-function openNewTaskModal(presetAssigneeId, presetStatus){
+function openNewTaskModal(presetAssigneeId, presetStatus, presetContext){
   if(!teamProfiles.length){ showToast('error','No team members','Add team members in Team before assigning tasks.'); return; }
   newTaskPresetStatus = presetStatus || 'todo';
-  openAppModal(taskFormHtml(null, presetAssigneeId), 480);
+  openAppModal(taskFormHtml(null, presetAssigneeId, presetContext), 480);
 }
 
 function openEditTaskModal(taskId){
