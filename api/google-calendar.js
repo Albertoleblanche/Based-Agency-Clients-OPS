@@ -122,6 +122,7 @@ module.exports = async function handler(req, res) {
 
       const items = eventsData.items || [];
       let synced = 0;
+      let firstError = null;
       for (const ev of items) {
         if (ev.status === 'cancelled') continue;
         const startAt = ev.start?.dateTime || (ev.start?.date ? `${ev.start.date}T00:00:00Z` : null);
@@ -141,11 +142,12 @@ module.exports = async function handler(req, res) {
           google_calendar_owner: userId,
         }, { onConflict: 'google_event_id' });
         if (!upsertErr) synced++;
+        else if (!firstError) firstError = upsertErr.message;
       }
 
       await admin.from('google_calendar_connections').update({ last_synced_at: new Date().toISOString() }).eq('user_id', userId);
 
-      res.status(200).json({ success: true, synced, total: items.length });
+      res.status(200).json({ success: true, synced, total: items.length, firstError });
       return;
     }
 
