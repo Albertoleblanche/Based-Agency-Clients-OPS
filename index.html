@@ -1654,6 +1654,7 @@ document.addEventListener('DOMContentLoaded', function(){
               <div class="view-toggle-option" data-cview="week" onclick="switchCalendarViewMode('week')">Week</div>
             </div>
             <div style="flex:1;"></div>
+            <div id="calGoogleSyncStatus" style="display:none;align-items:center;gap:8px;font-size:12px;color:var(--muted-lt);"></div>
             <button class="btn btn-brand" style="flex:none;" onclick="openNewEventModal()">+ New event</button>
           </div>
         </div>
@@ -3145,7 +3146,7 @@ async function switchView(name){
   if(name==='trash') renderTrash();
   if(name==='payroll') renderPayroll();
   if(name==='tasks') renderTasks();
-  if(name==='calendar') renderCalendar();
+  if(name==='calendar'){ renderCalendar(); renderCalendarGoogleSyncWidget(); }
   if(name==='teamqueue') renderTeamQueue();
   if(name==='time') renderTimesheet();
   if(name==='profile'){ renderProfilePage(); loadGoogleCalendarStatus(); }
@@ -6155,6 +6156,31 @@ const CALENDAR_TYPE_META = {
   other:    { label:'Other',    color:'#696F78', icon:'●' },
 };
 
+// Standard options, matching Google Calendar's own — value is a string of
+// minutes-before ('' = no reminder), kept as strings throughout since HTML
+// select values are always strings and every place this gets read
+// (the form, save logic, display) compares against that same string form.
+const REMINDER_OPTIONS = [
+  ['', 'No reminder'],
+  ['0', 'At time of event'],
+  ['5', '5 minutes before'],
+  ['10', '10 minutes before'],
+  ['15', '15 minutes before'],
+  ['30', '30 minutes before'],
+  ['60', '1 hour before'],
+  ['1440', '1 day before'],
+];
+
+function reminderLabel(minutes){
+  if(minutes===null || minutes===undefined) return null;
+  const found = REMINDER_OPTIONS.find(([val])=>val===String(minutes));
+  if(found) return found[1];
+  // Google-synced events can carry values our fixed dropdown doesn't
+  // include (e.g. 45 minutes) — fall back to a generic label rather than
+  // silently showing nothing for a reminder that genuinely exists.
+  return minutes < 60 ? `${minutes} minutes before` : minutes < 1440 ? `${Math.round(minutes/60)} hour${Math.round(minutes/60)!==1?'s':''} before` : `${Math.round(minutes/1440)} day${Math.round(minutes/1440)!==1?'s':''} before`;
+}
+
 async function loadCalendarEvents(){
   const { data, error } = await supabaseClient.from('calendar_events').select('*').order('start_at', { ascending:true });
   if(error){ console.error('loadCalendarEvents error', error); calendarEvents = []; calendarDataLoaded = true; return; }
@@ -6164,7 +6190,7 @@ async function loadCalendarEvents(){
     googleEventId:e.google_event_id, googleOwner:e.google_calendar_owner,
     location:e.location||'', attendeeIds:e.attendee_ids||[],
     rsvps:e.rsvps||{}, recurrenceGroupId:e.recurrence_group_id, recurrenceLabel:e.recurrence_label,
-    relatedTaskId:e.related_task_id
+    relatedTaskId:e.related_task_id, reminderMinutes:e.reminder_minutes
   }));
   calendarDataLoaded = true;
   updateCalendarNavBadge();
@@ -6534,6 +6560,11 @@ function eventFormHtml(editing, presetDateStr){
       </div>
       <div class="settings-field"><label><input type="checkbox" id="eventAllDayInput" ${editing && editing.allDay ? 'checked' : ''} onchange="toggleEventAllDay()" style="width:auto;margin-right:6px;">All-day event</label></div>
       <div class="settings-field"><label>Location (optional)</label><input id="eventLocationInput" placeholder="Zoom link, address, or wherever it's happening" value="${editing && editing.location ? editing.location.replace(/"/g,'&quot;') : ''}"></div>
+      <div class="settings-field"><label>Reminder</label>
+        <select id="eventReminderSelect">
+          ${REMINDER_OPTIONS.map(([val,label])=>`<option value="${val}" ${String(editing ? (editing.reminderMinutes ?? '') : '')===val ? 'selected' : ''}>${label}</option>`).join('')}
+        </select>
+      </div>
       <div class="settings-field"><label>Related client (optional)</label><select id="eventClientSelect">${populateCalendarClientSelect(editing ? editing.clientId : null)}</select></div>
       ${!editing ? `
       <div class="form-grid">
@@ -6668,6 +6699,10 @@ function openEventDetailModal(eventId){
       ${c ? `<div class="event-meta-row">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
         <span class="row-link" onclick="closeAppModal();openClientDetail('${c.id}');">${c.name}</span>
+      </div>` : ''}
+      ${reminderLabel(e.reminderMinutes) ? `<div class="event-meta-row">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span>Reminder: ${reminderLabel(e.reminderMinutes)}</span>
       </div>` : ''}
 
       ${e.description ? `<div class="event-desc">${e.description}</div>` : ''}
@@ -6837,6 +6872,8 @@ async function saveNewEvent(){
   const eventType = document.getElementById('eventTypeSelect').value;
   const clientId = document.getElementById('eventClientSelect').value || null;
   const location = document.getElementById('eventLocationInput').value.trim() || null;
+  const reminderVal = document.getElementById('eventReminderSelect')?.value;
+  const reminderMinutes = reminderVal === '' || reminderVal === undefined ? null : parseInt(reminderVal, 10);
   const attendeeIds = getSelectedAttendeeIds();
   const repeatMode = document.getElementById('eventRepeatSelect')?.value || 'none';
 
@@ -6848,7 +6885,7 @@ async function saveNewEvent(){
     }
   }
 
-  const baseRow = { title, description, all_day: ts.allDay, client_id: clientId, created_by: currentUser.id, event_type: eventType, location, attendee_ids: attendeeIds };
+  const baseRow = { title, description, all_day: ts.allDay, client_id: clientId, created_by: currentUser.id, event_type: eventType, location, attendee_ids: attendeeIds, reminder_minutes: reminderMinutes };
 
   if(repeatMode==='none'){
     const { error } = await supabaseClient.from('calendar_events').insert({ ...baseRow, start_at: ts.startAt, end_at: ts.endAt });
@@ -6902,6 +6939,8 @@ async function saveEditEvent(eventId){
   const eventType = document.getElementById('eventTypeSelect').value;
   const clientId = document.getElementById('eventClientSelect').value || null;
   const location = document.getElementById('eventLocationInput').value.trim() || null;
+  const reminderVal = document.getElementById('eventReminderSelect')?.value;
+  const reminderMinutes = reminderVal === '' || reminderVal === undefined ? null : parseInt(reminderVal, 10);
   const attendeeIds = getSelectedAttendeeIds();
   const previousAttendeeIds = e.attendeeIds || [];
 
@@ -6915,7 +6954,7 @@ async function saveEditEvent(eventId){
 
   const { error } = await supabaseClient.from('calendar_events').update({
     title, description, start_at: ts.startAt, end_at: ts.endAt, all_day: ts.allDay,
-    client_id: clientId, event_type: eventType, location, attendee_ids: attendeeIds
+    client_id: clientId, event_type: eventType, location, attendee_ids: attendeeIds, reminder_minutes: reminderMinutes
   }).eq('id', eventId);
   closeAppModal();
   await loadCalendarEvents();
@@ -6970,35 +7009,73 @@ async function deleteRecurringSeries(groupId){
 
 /* ---------- Google Calendar connect / sync / disconnect (Profile page) ---------- */
 
-async function loadGoogleCalendarStatus(){
-  const el = document.getElementById('gcalStatusBox');
-  if(!el) return;
-  el.innerHTML = `<div class="empty">Checking…</div>`;
+// Shared fetch behind both the full status panel on Profile and the
+// compact widget on the Calendar tab — same underlying data, rendered two
+// different ways for two different contexts. Returns null on any failure
+// (network error or non-OK response), letting each caller decide how to
+// present that rather than duplicating the try/catch and status check twice.
+async function fetchGoogleCalendarStatus(){
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
     const response = await fetch('/api/google-calendar', {
       headers: { 'Authorization': `Bearer ${session.access_token}` }
     });
-    const data = await response.json();
-    if(!response.ok){ el.innerHTML = `<div class="empty">Could not check status.</div>`; return; }
-
-    if(!data.googleConfigured){
-      el.innerHTML = `<p style="font-size:12.5px;color:var(--muted);line-height:1.5;">Google Calendar sync isn't configured for this deployment yet — an admin needs to set up a Google Cloud project and add the credentials. See the README for the exact steps.</p>`;
-      return;
-    }
-    if(data.connected){
-      el.innerHTML = `
-        <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 12px;">Connected as <b>${data.email||'your Google account'}</b>${data.lastSyncedAt ? ` · Last synced ${new Date(data.lastSyncedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}` : ' · Not synced yet'}</p>
-        <button class="btn btn-brand" onclick="syncGoogleCalendar()">Sync now</button>
-        <button class="btn btn-outline" onclick="disconnectGoogleCalendar()">Disconnect</button>`;
-    } else {
-      el.innerHTML = `
-        <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 12px;">Connect your Google Calendar to pull your meetings into the shared team calendar automatically.</p>
-        <button class="btn btn-brand" onclick="connectGoogleCalendar()">Connect Google Calendar</button>`;
-    }
+    if(!response.ok) return null;
+    return await response.json();
   }catch(e){
-    el.innerHTML = `<div class="empty">Could not check status — try again.</div>`;
+    return null;
   }
+}
+
+async function loadGoogleCalendarStatus(){
+  const el = document.getElementById('gcalStatusBox');
+  if(!el) return;
+  el.innerHTML = `<div class="empty">Checking…</div>`;
+  const data = await fetchGoogleCalendarStatus();
+  if(!data){ el.innerHTML = `<div class="empty">Could not check status — try again.</div>`; return; }
+
+  if(!data.googleConfigured){
+    el.innerHTML = `<p style="font-size:12.5px;color:var(--muted);line-height:1.5;">Google Calendar sync isn't configured for this deployment yet — an admin needs to set up a Google Cloud project and add the credentials. See the README for the exact steps.</p>`;
+    return;
+  }
+  if(data.connected){
+    el.innerHTML = `
+      <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 12px;">Connected as <b>${data.email||'your Google account'}</b>${data.lastSyncedAt ? ` · Last synced ${new Date(data.lastSyncedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}` : ' · Not synced yet'}</p>
+      <button class="btn btn-brand" onclick="syncGoogleCalendar()">Sync now</button>
+      <button class="btn btn-outline" onclick="disconnectGoogleCalendar()">Disconnect</button>`;
+  } else {
+    el.innerHTML = `
+      <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 12px;">Connect your Google Calendar to pull your meetings into the shared team calendar automatically.</p>
+      <button class="btn btn-brand" onclick="connectGoogleCalendar()">Connect Google Calendar</button>`;
+  }
+}
+
+// Compact "Last synced X · Sync now" widget on the Calendar tab itself —
+// stays hidden entirely if the user has nothing connected (a sync button
+// with nothing to sync would just be confusing), and hidden while
+// Google Calendar isn't configured for this deployment at all.
+async function renderCalendarGoogleSyncWidget(){
+  const el = document.getElementById('calGoogleSyncStatus');
+  if(!el) return;
+  const data = await fetchGoogleCalendarStatus();
+  if(!data || !data.googleConfigured || !data.connected){
+    el.style.display = 'none';
+    el.innerHTML = '';
+    return;
+  }
+  el.style.display = 'flex';
+  const lastSynced = data.lastSyncedAt
+    ? new Date(data.lastSyncedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})
+    : 'Not synced yet';
+  el.innerHTML = `<span>Google Calendar · Last synced ${lastSynced}</span><button class="btn btn-outline" style="padding:6px 12px;font-size:11.5px;" onclick="syncGoogleCalendarFromTab()">Sync now</button>`;
+}
+
+// Same underlying sync as the Profile page button — it already reloads
+// events and re-renders the calendar itself, so this only adds the one
+// thing it doesn't already handle: refreshing this widget's own timestamp.
+async function syncGoogleCalendarFromTab(){
+  await syncGoogleCalendar();
+  renderCalendarGoogleSyncWidget();
 }
 
 async function connectGoogleCalendar(){
