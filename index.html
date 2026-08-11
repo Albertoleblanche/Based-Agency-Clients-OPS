@@ -630,7 +630,7 @@
   .kanban-board{display:flex;gap:16px;overflow-x:auto;padding-bottom:14px;align-items:flex-start;}
   .kanban-column{min-width:270px;max-width:320px;background:#F3F4F7;border-radius:var(--radius-lg);padding:14px;flex:none;width:290px;}
   .kanban-column-head{display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:9px 10px;border-radius:10px;}
-  .kanban-column-dot{width:9px;height:9px;border-radius:50%;flex:none;}
+  .kanban-column-icon{display:flex;align-items:center;flex:none;}
   .kanban-column-title{font-family:'DM Sans',sans-serif;font-size:13.5px;font-weight:600;color:var(--ink);flex:1;}
   .kanban-column-count{font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:700;color:var(--muted);background:var(--card);padding:2px 8px;border-radius:10px;}
   .kanban-add-btn{width:22px;height:22px;border-radius:var(--radius-sm);border:none;background:var(--card);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;font-size:15px;line-height:1;transition:background .12s ease, color .12s ease;}
@@ -2972,8 +2972,7 @@ function applyRoleVisibility(){
   }
   const settingsNotifTab = document.getElementById('settingsNotifTab');
   if(settingsNotifTab){
-    settingsNotifTab.style.display = isAdmin() ? 'flex' : 'none';
-    if(!isAdmin() && document.getElementById('stab-notifications')?.classList.contains('active')){ switchSettingsTab('integrations'); }
+    settingsNotifTab.style.display = 'flex';
   }
 }
 
@@ -5560,10 +5559,10 @@ function populateNotesClientFilter(){
 }
 
 const NOTE_STAGES = [
-  { key:'idea',        label:'Idea',        color:'#7C93B0' },
-  { key:'planned',      label:'Planned',     color:'#C99A55' },
-  { key:'in-progress',  label:'In Progress', color:'#C17A6E' },
-  { key:'done',         label:'Done',        color:'#117F3A' },
+  { key:'idea',        label:'Idea',        color:'#7C93B0', icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7 1 1 0 0 1 .5.8V17h7v-1.5a1 1 0 0 1 .5-.8A7 7 0 0 0 12 2z"/></svg>' },
+  { key:'planned',      label:'Planned',     color:'#C99A55', icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' },
+  { key:'in-progress',  label:'In Progress', color:'#C17A6E', icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>' },
+  { key:'done',         label:'Done',        color:'#117F3A', icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>' },
 ];
 
 function renderNotes(){
@@ -5590,7 +5589,7 @@ function renderNotes(){
       .sort((a,b)=> new Date(b.updatedAt||b.createdAt) - new Date(a.updatedAt||a.createdAt));
     return `<div class="kanban-column">
       <div class="kanban-column-head" style="background:${stage.color}22;">
-        <span class="kanban-column-dot" style="background:${stage.color};"></span>
+        <span class="kanban-column-icon" style="color:${stage.color};">${stage.icon}</span>
         <span class="kanban-column-title">${stage.label}</span>
         <span class="kanban-column-count">${stageNotes.length}</span>
         <button class="kanban-add-btn" onclick="openNoteModal(undefined,undefined,'${stage.key}')" title="New note in ${stage.label}">+</button>
@@ -5680,10 +5679,10 @@ const TASK_PRIORITY_META = {
 };
 
 const KANBAN_STAGES = [
-  { key:'todo',        label:'To Do',      color:'#7C93B0' },
-  { key:'in_progress',  label:'On Process', color:'#C99A55' },
-  { key:'in_review',    label:'On Review',  color:'#C17A6E' },
-  { key:'done',         label:'Completed',  color:'#117F3A' },
+  { key:'todo',        label:'To Do',      color:'#7C93B0', icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>' },
+  { key:'in_progress',  label:'On Process', color:'#C99A55', icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>' },
+  { key:'in_review',    label:'On Review',  color:'#C17A6E', icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' },
+  { key:'done',         label:'Completed',  color:'#117F3A', icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>' },
 ];
 
 let newTaskPresetStatus = 'todo';
@@ -5731,7 +5730,7 @@ function renderTasks(){
     });
     return `<div class="kanban-column">
       <div class="kanban-column-head" style="background:${stage.color}22;">
-        <span class="kanban-column-dot" style="background:${stage.color};"></span>
+        <span class="kanban-column-icon" style="color:${stage.color};">${stage.icon}</span>
         <span class="kanban-column-title">${stage.label}</span>
         <span class="kanban-column-count">${stageTasks.length}</span>
         <button class="kanban-add-btn" onclick="openNewTaskModal(undefined,'${stage.key}')" title="New task in ${stage.label}">+</button>
