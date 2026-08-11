@@ -3250,12 +3250,13 @@ function setAttentionTierFilter(tier){
 function renderAttentionList(){
   const el = document.getElementById('attentionList');
   if(!el) return;
-  let items = activeClients().filter(c => c.danger>=4 || c.draftStatus==='pending');
+  const hasOverdueReminder = c => clientReminders.some(r=>r.clientId===c.id && reminderDisplayStatus(r)==='due');
+  let items = activeClients().filter(c => c.danger>=4 || c.draftStatus==='pending' || hasOverdueReminder(c));
   if(attentionTierFilter) items = activeClients().filter(c => riskLabel(c.danger).text === attentionTierFilter);
   items.sort((a,b)=> b.danger-a.danger || (b.draftStatus==='pending')-(a.draftStatus==='pending'));
   if(!items.length){
     const title = attentionTierFilter ? `No clients in "${attentionTierFilter}"` : 'Nothing urgent right now';
-    const sub = attentionTierFilter ? 'Try a different segment, or clear the filter to see everyone.' : 'At-risk clients and drafts waiting on approval will show up here.';
+    const sub = attentionTierFilter ? 'Try a different segment, or clear the filter to see everyone.' : 'At-risk clients, drafts waiting on approval, and overdue follow-ups will show up here.';
     el.innerHTML = emptyStateHtml(
     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
     title, sub
@@ -3263,9 +3264,16 @@ function renderAttentionList(){
 
   const cap = attentionTierFilter ? 10 : 6;
   el.innerHTML = items.slice(0,cap).map(c=>{
-    const reason = c.draftStatus==='pending' ? 'Draft awaiting approval' : riskLabel(c.danger).text;
-    const filter = c.draftStatus==='pending' ? 'pending' : 'atrisk';
-    return `<div class="ov-row" onclick="goToClientInQueue('${c.id}','${filter}')">
+    const overdue = hasOverdueReminder(c);
+    const reason = c.draftStatus==='pending' ? 'Draft awaiting approval'
+      : c.danger>=4 ? riskLabel(c.danger).text
+      : overdue ? 'Follow-up overdue'
+      : riskLabel(c.danger).text;
+    const onclickAction = c.draftStatus==='pending' ? `goToClientInQueue('${c.id}','pending')`
+      : c.danger>=4 ? `goToClientInQueue('${c.id}','atrisk')`
+      : overdue ? `openClientDetail('${c.id}')`
+      : `goToClientInQueue('${c.id}','atrisk')`;
+    return `<div class="ov-row" onclick="${onclickAction}">
       <span class="ov-row-dot" style="background:${riskLabel(c.danger).color};"></span>
       <div class="ov-row-main">
         <div class="ov-row-name">${c.name}</div>
