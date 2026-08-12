@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>Based Agency</title>
 <link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 /* ============================================================
@@ -47,7 +49,7 @@ a{color:inherit;text-decoration:none;}
 .m-icon-btn:active{background:var(--border);}
 .m-badge{position:absolute;top:2px;right:2px;min-width:15px;height:15px;padding:0 3px;border-radius:20px;background:var(--red);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;}
 
-.m-content{padding:calc(56px + var(--safe-top)) 14px calc(84px + var(--safe-bottom));min-height:100vh;min-height:100dvh;}
+.m-content{padding:calc(72px + var(--safe-top)) 14px calc(84px + var(--safe-bottom));min-height:100vh;min-height:100dvh;}
 
 .m-tabbar{
   position:fixed;bottom:0;left:0;right:0;z-index:100;
@@ -78,7 +80,7 @@ a{color:inherit;text-decoration:none;}
 }
 .m-subscreen-header h2{margin:0;font-size:16px;font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 #mSubscreenAction .m-icon-btn{width:36px;height:36px;background:var(--brand);color:#fff;}
-.m-subscreen-content{padding:calc(56px + var(--safe-top)) 14px 24px;}
+.m-subscreen-content{padding:calc(72px + var(--safe-top)) 14px 24px;}
 
 .m-sheet-overlay{
   display:none;position:fixed;inset:0;z-index:500;background:rgba(16,24,40,.5);
@@ -524,20 +526,46 @@ function mReminderDisplayStatus(r){
    HOME — a compact, scannable summary that drills into the tabs,
    not a grid of nine desktop cards reflowed into one column.
    ================================================================ */
+function mHasLoggedThisWeek(c){
+  const weekStart = getWeekStart(new Date());
+  return (c.improvements||[]).some(i=>i.date && new Date(i.date) >= weekStart);
+}
+
 function mRenderHome(){
   document.getElementById('mHeaderTitle').textContent = mGreeting();
   const el = document.getElementById('mScreen-home');
+  const ac = clients.filter(c=>!c.deletedAt);
   const myOpenTasks = tasks.filter(t=>t.assigneeId===currentUser?.id && t.status!=='done').length;
-  const pendingDrafts = clients.filter(c=>c.draftStatus==='pending').length;
-  const atRisk = clients.filter(c=>c.status==='active' && c.danger>=4).length;
+  const pendingDrafts = ac.filter(c=>c.draftStatus==='pending').length;
+  const atRisk = ac.filter(c=>c.danger>=4).length;
   const myOverdueReminders = clientReminders.filter(r=>r.askedBy===currentUser?.id && mReminderDisplayStatus(r)==='due').length;
 
-  const attention = clients.filter(c=>c.status==='active' && (c.danger>=4 || c.draftStatus==='pending'))
+  // Same formula as desktop: inverse of average danger across the roster, as a %.
+  const healthPct = ac.length ? Math.round(100 - (ac.reduce((s,c)=>s+c.danger,0)/ac.length/5)*100) : null;
+
+  // Same formula as desktop: of clients with a log this calendar week
+  // (mine specifically, if not admin/approver — matching how desktop
+  // scopes this per role), how many already have an approved draft.
+  const withRecentLogs = canApprove()
+    ? ac.filter(mHasLoggedThisWeek)
+    : ac.filter(c => (c.improvements||[]).some(i => i.author===myName() && i.date && new Date(i.date) >= getWeekStart(new Date())));
+  const completionPct = withRecentLogs.length ? Math.round((withRecentLogs.filter(c=>c.draftStatus==='approved').length/withRecentLogs.length)*100) : null;
+
+  const activeThisWeek = ac.filter(mHasLoggedThisWeek).sort((a,b)=>b.danger-a.danger).slice(0,5);
+  const attention = ac.filter(c=>c.danger>=4 || c.draftStatus==='pending')
     .sort((a,b)=> b.danger-a.danger || (b.draftStatus==='pending')-(a.draftStatus==='pending'))
     .slice(0,5);
 
   el.innerHTML = `
     <div class="m-metric-grid">
+      <div class="m-card" onclick="mOpenClientsList()">
+        <div class="m-metric-value">${ac.length}</div>
+        <div class="m-metric-label">Active clients</div>
+      </div>
+      <div class="m-card">
+        <div class="m-metric-value">${healthPct===null?'—':healthPct+'%'}</div>
+        <div class="m-metric-label">Client health</div>
+      </div>
       <div class="m-card" onclick="mSwitchTab('tasks')">
         <div class="m-metric-value">${myOpenTasks}</div>
         <div class="m-metric-label">Open tasks</div>
@@ -550,7 +578,11 @@ function mRenderHome(){
         <div class="m-metric-value" style="color:${atRisk?'var(--red)':'var(--ink)'};">${atRisk}</div>
         <div class="m-metric-label">At-risk clients</div>
       </div>
-      <div class="m-card" onclick="mSwitchTab('reminders')">
+      <div class="m-card">
+        <div class="m-metric-value">${completionPct===null?'—':completionPct+'%'}</div>
+        <div class="m-metric-label">Weekly completion</div>
+      </div>
+      <div class="m-card" onclick="mSwitchTab('reminders')" style="grid-column:1/-1;">
         <div class="m-metric-value" style="color:${myOverdueReminders?'var(--blue)':'var(--ink)'};">${myOverdueReminders}</div>
         <div class="m-metric-label">Follow-ups due</div>
       </div>
@@ -560,11 +592,19 @@ function mRenderHome(){
       <div class="m-card-row"><h3>Needs attention</h3><button class="m-card-link" onclick="mSwitchTab('queue')">See all</button></div>
       ${attention.length ? attention.map(c=>mClientAttentionRow(c)).join('') : `<div class="m-empty" style="padding:20px 0;">Nothing urgent right now.</div>`}
     </div>
+
+    <div class="m-card">
+      <div class="m-card-row"><h3>Active this week</h3></div>
+      ${activeThisWeek.length ? activeThisWeek.map(c=>mClientAttentionRow(c, true)).join('') : `<div class="m-empty" style="padding:20px 0;">No logged work yet this week.</div>`}
+    </div>
   `;
 }
 
-function mClientAttentionRow(c){
-  const reason = c.draftStatus==='pending' ? 'Draft awaiting approval' : mRiskLabel(c.danger);
+function mClientAttentionRow(c, showServiceInstead){
+  const weekCount = (c.improvements||[]).filter(i=>i.date && new Date(i.date) >= getWeekStart(new Date())).length;
+  const reason = showServiceInstead
+    ? `${weekCount} improvement${weekCount!==1?'s':''} logged this week`
+    : c.draftStatus==='pending' ? 'Draft awaiting approval' : mRiskLabel(c.danger);
   const color = mRiskColor(c.danger);
   return `<div class="m-list-row" onclick="mOpenClientFromHome('${c.id}')">
     <div class="m-avatar" style="background:${color}22;color:${color};">${(c.name||'?').charAt(0).toUpperCase()}</div>
@@ -725,7 +765,7 @@ async function mSaveNewTask(){
    ================================================================ */
 function mRenderQueue(){
   const el = document.getElementById('mScreen-queue');
-  const active = clients.filter(c=>c.status==='active' && (c.improvements||[]).length)
+  const active = clients.filter(c=>!c.deletedAt && (c.improvements||[]).length)
     .sort((a,b)=> b.danger-a.danger);
 
   el.innerHTML = `<div class="m-card" style="padding:0 16px;">
@@ -999,7 +1039,7 @@ async function mResolveReminder(id, status){
 function mOpenNewReminderSheet(){
   const html = `
     <div class="m-field"><label>Client</label>
-      <select id="mReminderClient">${clients.filter(c=>c.status==='active').sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</select>
+      <select id="mReminderClient">${clients.filter(c=>!c.deletedAt).sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</select>
     </div>
     <div class="m-field"><label>Question / request</label><textarea id="mReminderQuestion" placeholder="e.g. Can you send us the latest project photos?"></textarea></div>
     <div class="m-field"><label>Follow-up date</label><input type="date" id="mReminderDate" value="${toDateStr(new Date(Date.now()+3*86400000))}"></div>
@@ -1048,7 +1088,7 @@ function mRenderMore(){
   el.innerHTML = `
     <div class="m-card" style="padding:0 16px;">
       <div class="m-list-row" onclick="mOpenClientsList()">
-        <div class="m-list-main"><div class="m-list-title">Clients</div><div class="m-list-sub">${clients.filter(c=>c.status==='active').length} active</div></div>
+        <div class="m-list-main"><div class="m-list-title">Clients</div><div class="m-list-sub">${clients.filter(c=>!c.deletedAt).length} active</div></div>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-lt)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
       <div class="m-list-row" onclick="mOpenNotesList()">
@@ -1076,7 +1116,7 @@ function mRenderMore(){
 }
 
 function mOpenClientsList(){
-  const active = clients.filter(c=>c.status==='active').sort((a,b)=>a.name.localeCompare(b.name));
+  const active = clients.filter(c=>!c.deletedAt).sort((a,b)=>a.name.localeCompare(b.name));
   const html = `
     <input class="m-search-input" id="mClientSearch" placeholder="Search clients…" oninput="mFilterClientsList()">
     <div id="mClientsListBody">${active.map(c=>mClientRow(c)).join('')}</div>
@@ -1141,7 +1181,7 @@ function mOpenNoteSheet(noteId){
   const html = `
     <div class="m-field"><label>Title</label><input id="mNoteTitle" placeholder="Short title" value="${n?escapeHtml(n.title||''):''}"></div>
     <div class="m-field"><label>Client</label>
-      <select id="mNoteClient"><option value="">— None —</option>${clients.filter(c=>c.status==='active').sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${n&&n.clientId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select>
+      <select id="mNoteClient"><option value="">— None —</option>${clients.filter(c=>!c.deletedAt).sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${n&&n.clientId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select>
     </div>
     <div class="m-field"><label>Note</label><textarea id="mNoteText" placeholder="What's the idea or plan?">${n?escapeHtml(n.text||''):''}</textarea></div>
   `;
@@ -1275,7 +1315,7 @@ function mOpenNewEventSheet(){
     <div class="m-field"><label>Date</label><input type="date" id="mEventDate" value="${toDateStr(new Date())}"></div>
     <div class="m-field"><label>Time (leave blank for all-day)</label><input type="time" id="mEventTime"></div>
     <div class="m-field"><label>Client (optional)</label>
-      <select id="mEventClient"><option value="">— None —</option>${clients.filter(c=>c.status==='active').sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</select>
+      <select id="mEventClient"><option value="">— None —</option>${clients.filter(c=>!c.deletedAt).sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</select>
     </div>
   `;
   const actions = `<button class="m-btn m-btn-outline" onclick="mCloseSheet()">Cancel</button><button class="m-btn m-btn-brand" onclick="mSaveNewEvent()">Save</button>`;
@@ -1407,7 +1447,7 @@ async function mOpenTimeTracker(){
 
 function mRenderTimeTracker(){
   const totalMin = todaysTimeEntries.reduce((s,e)=>s+e.minutes,0);
-  const activeClients = clients.filter(c=>c.status==='active').sort((a,b)=>a.name.localeCompare(b.name));
+  const activeClients = clients.filter(c=>!c.deletedAt).sort((a,b)=>a.name.localeCompare(b.name));
   const html = `
     <div class="m-metric-grid" style="grid-template-columns:1fr;">
       <div class="m-card"><div class="m-metric-value">${Math.floor(totalMin/60)}h ${totalMin%60}m</div><div class="m-metric-label">Logged today</div></div>
