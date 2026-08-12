@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Based Agency</title>
+<link rel="icon" href="data:,">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+/* ============================================================
+   DESIGN TOKENS — same palette/radius language as the desktop
+   app (so switching between them doesn't feel like a different
+   product), but every layout rule below is mobile-native, not
+   a shrunk desktop rule.
+   ============================================================ */
+:root{
+  --bg:#F3F4F7; --card:#FFFFFF; --surface-2:#FAFAFB; --border:#E5E7EB;
+  --ink:#151B26; --muted:#565F6D; --muted-lt:#8A93A3;
+  --brand:#E8622C; --brand-dark:#C94F1F;
+  --green:#117F3A; --green-bg:#E8F8ED; --red:#CF2424; --red-bg:#FDEAEA;
+  --amber:#A65B05; --amber-bg:#FEF3D6; --blue:#3A63C9; --blue-bg:#EAF0FC;
+  --radius-lg:16px; --radius-md:12px; --radius-sm:8px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;overflow-x:hidden;width:100%;}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;}
+button,input,select,textarea{font-family:inherit;}
+a{color:inherit;text-decoration:none;}
+
+#app{display:none;min-height:100vh;min-height:100dvh;}
+.m-header{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  background:var(--card);border-bottom:1px solid var(--border);
+  padding:calc(10px + var(--safe-top)) 14px 10px;
+  display:flex;align-items:center;gap:10px;
+}
+.m-header-title{flex:1;min-width:0;}
+.m-header-title h1{margin:0;font-size:17px;font-weight:700;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.m-header-title p{margin:0;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.m-icon-btn{
+  width:40px;height:40px;border-radius:50%;border:none;background:var(--surface-2);
+  color:var(--ink);display:flex;align-items:center;justify-content:center;flex:none;
+  position:relative;cursor:pointer;
+}
+.m-icon-btn:active{background:var(--border);}
+.m-badge{position:absolute;top:2px;right:2px;min-width:15px;height:15px;padding:0 3px;border-radius:20px;background:var(--red);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+
+.m-content{padding:calc(56px + var(--safe-top)) 14px calc(84px + var(--safe-bottom));min-height:100vh;min-height:100dvh;}
+
+.m-tabbar{
+  position:fixed;bottom:0;left:0;right:0;z-index:100;
+  background:var(--card);border-top:1px solid var(--border);
+  display:flex;padding-bottom:var(--safe-bottom);
+}
+.m-tab{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  padding:8px 4px 6px;background:none;border:none;color:var(--muted-lt);cursor:pointer;
+  min-height:56px;position:relative;
+}
+.m-tab.active{color:var(--brand);}
+.m-tab span{font-size:10.5px;font-weight:600;}
+.m-tab .m-tab-badge{position:absolute;top:2px;right:calc(50% - 20px);min-width:15px;height:15px;padding:0 3px;border-radius:20px;background:var(--red);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+
+.m-screen{display:none;}
+.m-screen.active{display:block;}
+
+.m-subscreen{
+  display:none;position:fixed;inset:0;z-index:200;background:var(--bg);
+  animation:mSlideIn .22s ease-out;
+}
+.m-subscreen.active{display:block;}
+@keyframes mSlideIn{from{transform:translateX(100%);}to{transform:translateX(0);}}
+.m-subscreen-header{
+  position:fixed;top:0;left:0;right:0;z-index:5;background:var(--card);border-bottom:1px solid var(--border);
+  padding:calc(10px + var(--safe-top)) 14px 10px;display:flex;align-items:center;gap:10px;
+}
+.m-subscreen-header h2{margin:0;font-size:16px;font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.m-subscreen-content{padding:calc(56px + var(--safe-top)) 14px 24px;}
+
+.m-sheet-overlay{
+  display:none;position:fixed;inset:0;z-index:500;background:rgba(16,24,40,.5);
+}
+.m-sheet-overlay.open{display:block;animation:mFadeIn .18s ease-out;}
+@keyframes mFadeIn{from{opacity:0;}to{opacity:1;}}
+.m-sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:501;background:var(--card);
+  border-radius:20px 20px 0 0;max-height:88vh;max-height:88dvh;
+  display:flex;flex-direction:column;transform:translateY(100%);transition:transform .25s cubic-bezier(.32,.72,0,1);
+  padding-bottom:var(--safe-bottom);
+}
+.m-sheet.open{transform:translateY(0);}
+.m-sheet-handle{width:36px;height:4px;background:var(--border);border-radius:4px;margin:10px auto;flex:none;}
+.m-sheet-head{padding:4px 18px 14px;display:flex;align-items:center;gap:10px;flex:none;border-bottom:1px solid var(--border);}
+.m-sheet-head h3{margin:0;font-size:16px;font-weight:700;flex:1;}
+.m-sheet-body{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 18px;flex:1;}
+.m-sheet-actions{padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:10px;flex:none;}
+
+.m-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:12px;}
+.m-card-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.m-card-row h3{margin:0;font-size:13px;font-weight:700;}
+.m-card-link{font-size:12px;font-weight:600;color:var(--brand);background:none;border:none;padding:0;cursor:pointer;}
+
+.m-metric-value{font-size:28px;font-weight:700;line-height:1.1;letter-spacing:-.5px;}
+.m-metric-label{font-size:12px;color:var(--muted);margin-top:2px;}
+.m-metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.m-metric-grid .m-card{margin-bottom:0;padding:14px;}
+
+.m-list-row{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer;}
+.m-list-row:last-child{border-bottom:none;}
+.m-list-row:active{background:var(--surface-2);}
+.m-list-main{flex:1;min-width:0;}
+.m-list-title{font-size:13.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.m-list-sub{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.m-list-meta{font-size:11px;color:var(--muted-lt);flex:none;text-align:right;padding-top:1px;}
+
+.m-avatar{width:34px;height:34px;border-radius:50%;background:var(--brand);color:#2A1200;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex:none;}
+
+.m-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:10.5px;font-weight:700;white-space:nowrap;}
+
+.m-empty{text-align:center;padding:36px 20px;color:var(--muted);font-size:13px;}
+.m-empty svg{color:var(--muted-lt);margin-bottom:10px;}
+
+.m-chip-row{display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;margin-bottom:14px;scrollbar-width:none;}
+.m-chip-row::-webkit-scrollbar{display:none;}
+.m-chip{flex:none;padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--card);font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;}
+.m-chip.active{background:var(--ink);border-color:var(--ink);color:#fff;}
+
+.m-fab{
+  position:fixed;right:16px;bottom:calc(84px + var(--safe-bottom));z-index:90;
+  width:56px;height:56px;border-radius:50%;background:var(--brand);color:#fff;border:none;
+  display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(232,98,44,.4);cursor:pointer;
+}
+.m-fab:active{background:var(--brand-dark);}
+
+.m-field{margin-bottom:16px;}
+.m-field label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;}
+.m-field input,.m-field select,.m-field textarea{
+  width:100%;font-size:15px;padding:12px 13px;border-radius:10px;border:1px solid var(--border);
+  background:var(--surface-2);color:var(--ink);appearance:none;
+}
+.m-field textarea{resize:vertical;min-height:80px;}
+.m-field select{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%239AA3AF' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 14px center;padding-right:34px;
+}
+
+.m-btn{
+  flex:1;padding:13px 16px;border-radius:12px;border:none;font-size:14.5px;font-weight:700;cursor:pointer;
+  min-height:48px;display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.m-btn-brand{background:var(--brand);color:#fff;}
+.m-btn-brand:active{background:var(--brand-dark);}
+.m-btn-outline{background:var(--card);color:var(--ink);border:1px solid var(--border);}
+.m-btn-outline:active{background:var(--surface-2);}
+.m-btn-full{width:100%;}
+
+.m-spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:mSpin .7s linear infinite;}
+@keyframes mSpin{to{transform:rotate(360deg);}}
+
+.m-toast-stack{position:fixed;top:calc(10px + var(--safe-top));left:14px;right:14px;z-index:900;display:flex;flex-direction:column;gap:8px;}
+.m-toast{background:var(--ink);color:#fff;border-radius:12px;padding:12px 14px;font-size:13px;font-weight:600;box-shadow:0 12px 30px rgba(0,0,0,.2);animation:mToastIn .2s ease-out;}
+.m-toast.error{background:var(--red);}
+.m-toast.success{background:var(--green);}
+@keyframes mToastIn{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:translateY(0);}}
+
+.m-search-input{
+  width:100%;padding:11px 14px 11px 40px;border-radius:12px;border:1px solid var(--border);
+  background:var(--surface-2);font-size:14px;margin-bottom:14px;background-repeat:no-repeat;background-position:12px center;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238A93A3' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+}
+
+.m-login{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;justify-content:center;padding:24px;}
+.m-login-mark{width:52px;height:52px;border-radius:14px;background:var(--brand);color:#2A1200;font-weight:700;font-size:20px;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;}
+.m-login h1{text-align:center;font-size:20px;margin:0 0 4px;}
+.m-login p.sub{text-align:center;color:var(--muted);font-size:13px;margin:0 0 28px;}
+.m-login-error{background:var(--red-bg);color:var(--red);border-radius:10px;padding:10px 12px;font-size:12.5px;margin-bottom:14px;display:none;}
+
+#mLoadingScreen{display:flex;min-height:100vh;min-height:100dvh;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
+.m-loading-spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--brand);border-radius:50%;animation:mSpin .8s linear infinite;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="m-login" id="mLoginScreen">
+  <div class="m-login-mark">BA</div>
+  <h1>Based Agency</h1>
+  <p class="sub">Sign in to continue</p>
+  <div class="m-login-error" id="mLoginError"></div>
+  <div class="m-field"><label>Email</label><input id="mLoginEmail" type="email" placeholder="you@basedagency.com" autocomplete="username"></div>
+  <div class="m-field"><label>Password</label><input id="mLoginPassword" type="password" placeholder="••••••••" autocomplete="current-password"></div>
+  <button class="m-btn m-btn-brand m-btn-full" id="mLoginBtn" onclick="mHandleLogin()">Sign in</button>
+</div>
+
+<!-- LOADING -->
+<div id="mLoadingScreen" style="display:none;">
+  <div class="m-loading-spinner"></div>
+  <div style="font-size:13px;color:var(--muted);">Loading your workspace…</div>
+</div>
+
+<!-- APP SHELL -->
+<div id="app">
+  <div class="m-header">
+    <div class="m-header-title">
+      <h1 id="mHeaderTitle">Overview</h1>
+      <p id="mHeaderSub"></p>
+    </div>
+    <button class="m-icon-btn" onclick="mOpenNotifications()" aria-label="Notifications">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span class="m-badge" id="mNotifBadge" style="display:none;">0</span>
+    </button>
+  </div>
+
+  <div class="m-content">
+    <!-- HOME -->
+    <div class="m-screen active" id="mScreen-home"></div>
+    <!-- TASKS -->
+    <div class="m-screen" id="mScreen-tasks"></div>
+    <!-- QUEUE -->
+    <div class="m-screen" id="mScreen-queue"></div>
+    <!-- REMINDERS -->
+    <div class="m-screen" id="mScreen-reminders"></div>
+    <!-- MORE -->
+    <div class="m-screen" id="mScreen-more"></div>
+  </div>
+
+  <div class="m-tabbar">
+    <button class="m-tab active" data-tab="home" onclick="mSwitchTab('home')">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>Home</span>
+    </button>
+    <button class="m-tab" data-tab="tasks" onclick="mSwitchTab('tasks')">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      <span>Tasks</span>
+      <span class="m-tab-badge" id="mTabBadgeTasks" style="display:none;">0</span>
+    </button>
+    <button class="m-tab" data-tab="queue" onclick="mSwitchTab('queue')">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      <span>Queue</span>
+      <span class="m-tab-badge" id="mTabBadgeQueue" style="display:none;">0</span>
+    </button>
+    <button class="m-tab" data-tab="reminders" onclick="mSwitchTab('reminders')">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span>Follow-ups</span>
+      <span class="m-tab-badge" id="mTabBadgeReminders" style="display:none;">0</span>
+    </button>
+    <button class="m-tab" data-tab="more" onclick="mSwitchTab('more')">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+      <span>More</span>
+    </button>
+  </div>
+</div>
+
+<div class="m-toast-stack" id="mToastStack"></div>
+
+<!-- Generic sub-screen: pushed on top for detail views (task detail, reminder detail, etc.) -->
+<div class="m-subscreen" id="mSubscreen">
+  <div class="m-subscreen-header">
+    <button class="m-icon-btn" onclick="mCloseSubscreen()" aria-label="Back">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    </button>
+    <h2 id="mSubscreenTitle">Details</h2>
+  </div>
+  <div class="m-subscreen-content" id="mSubscreenContent"></div>
+</div>
+
+<!-- Generic bottom sheet: forms, quick actions, notifications -->
+<div class="m-sheet-overlay" id="mSheetOverlay" onclick="if(event.target===this) mCloseSheet();">
+  <div class="m-sheet" id="mSheet">
+    <div class="m-sheet-handle"></div>
+    <div class="m-sheet-head"><h3 id="mSheetTitle">Title</h3>
+      <button class="m-icon-btn" onclick="mCloseSheet()" aria-label="Close" style="width:32px;height:32px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="m-sheet-body" id="mSheetBody"></div>
+    <div class="m-sheet-actions" id="mSheetActions" style="display:none;"></div>
+  </div>
+</div>
+
+<script>
+/* ================================================================
+   SUPABASE — same project, same credentials, same backend as the
+   desktop app. This file is a different UI layer over identical
+   data, not a different product.
+   ================================================================ */
+const SUPABASE_URL = 'https://rwhfddzitabeingajvuf.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3aGZkZHppdGFiZWluZ2FqdnVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUzMTQ2NDUsImV4cCI6MjEwMDg5MDY0NX0.38FIw8GJRl47FcXxHNCExTLGkKlezEItF7TFdDOwmC8';
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  global: { fetch: (url, options={}) => fetch(url, { ...options, cache: 'no-store' }) }
+});
+
+let currentUser = null;
+let myProfile = null;
+let teamProfiles = [];
+let clients = [];
+let tasks = [];
+let clientReminders = [];
+let notifications = [];
+let activeTab = 'home';
+
+function escapeHtml(str){
+  if(str===null || str===undefined) return '';
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function toDateStr(d){ const dt=new Date(d); return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`; }
+function myName(){ return myProfile ? myProfile.name : ''; }
+function isAdmin(){ return myProfile && myProfile.role==='admin'; }
+function canApprove(){ return myProfile && (myProfile.role==='admin' || myProfile.role==='approver'); }
+
+async function mHandleLogin(){
+  const email = document.getElementById('mLoginEmail').value.trim();
+  const password = document.getElementById('mLoginPassword').value;
+  const errEl = document.getElementById('mLoginError');
+  errEl.style.display = 'none';
+  if(!email || !password){ errEl.textContent = 'Enter your email and password.'; errEl.style.display = 'block'; return; }
+  const btn = document.getElementById('mLoginBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="m-spinner"></span>';
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  btn.disabled = false; btn.textContent = 'Sign in';
+  if(error){ errEl.textContent = 'Incorrect email or password.'; errEl.style.display = 'block'; return; }
+  await mBoot();
+}
+
+async function mLogout(){
+  await supabaseClient.auth.signOut();
+  location.reload();
+}
+
+async function mBoot(){
+  document.getElementById('mLoginScreen').style.display = 'none';
+  document.getElementById('mLoadingScreen').style.display = 'flex';
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if(!session){
+    document.getElementById('mLoadingScreen').style.display = 'none';
+    document.getElementById('mLoginScreen').style.display = 'flex';
+    return;
+  }
+  currentUser = session.user;
+  await mLoadAll();
+  document.getElementById('mLoadingScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  mSwitchTab('home');
+  setupMRealtime();
+}
+
+async function mLoadAll(){
+  const [profRes, teamRes, clientsRes, tasksRes, remindersRes, notifRes] = await Promise.all([
+    supabaseClient.from('team_profiles').select('*').eq('id', currentUser.id).maybeSingle(),
+    supabaseClient.from('team_profiles').select('*'),
+    supabaseClient.from('app_storage').select('value').eq('key','app-data').maybeSingle(),
+    supabaseClient.from('tasks').select('*').or(`assignee_id.eq.${currentUser.id},assigner_id.eq.${currentUser.id}`).is('cancelled_at', null),
+    supabaseClient.from('client_reminders').select('*'),
+    supabaseClient.from('notifications').select('*').eq('user_id', currentUser.id).order('created_at',{ascending:false}).limit(30),
+  ]);
+  myProfile = profRes.data || null;
+  teamProfiles = teamRes.data || [];
+  clients = clientsRes.data ? (JSON.parse(clientsRes.data.value).clients || []) : [];
+  tasks = (tasksRes.data||[]).map(t=>({
+    id:t.id, title:t.title, description:t.description, priority:t.priority, status:t.status,
+    assignerId:t.assigner_id, assigneeId:t.assignee_id, clientId:t.client_id, dueDate:t.due_date, link:t.link
+  }));
+  clientReminders = (remindersRes.data||[]).map(r=>({
+    id:r.id, clientId:r.client_id, question:r.question, askedBy:r.asked_by,
+    askedDate:r.asked_date, followUpDate:r.follow_up_date, status:r.status
+  }));
+  notifications = (notifRes.data||[]).map(n=>({
+    id:n.id, type:n.type, title:n.title, body:n.body, read:n.read, createdAt:n.created_at,
+    targetView:n.target_view, targetId:n.target_id
+  }));
+  mUpdateBadges();
+}
+
+/* ================================================================
+   TOASTS
+   ================================================================ */
+function mShowToast(type, message){
+  const stack = document.getElementById('mToastStack');
+  const el = document.createElement('div');
+  el.className = `m-toast ${type}`;
+  el.textContent = message;
+  stack.appendChild(el);
+  setTimeout(()=>el.remove(), 3200);
+}
+
+/* ================================================================
+   TAB NAVIGATION — 5 primary destinations, always visible, one
+   tap away. This replaces the desktop sidebar entirely rather
+   than hiding it in a drawer.
+   ================================================================ */
+const M_TAB_META = {
+  home: ['Overview', ''],
+  tasks: ['Tasks', 'Assigned to you and by you'],
+  queue: ['Approval Queue', 'Sorted by danger score'],
+  reminders: ['Follow-ups', 'Client questions awaiting a response'],
+  more: ['More', ''],
+};
+
+function mSwitchTab(name){
+  activeTab = name;
+  document.querySelectorAll('.m-tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  document.querySelectorAll('.m-screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('mScreen-'+name).classList.add('active');
+  const meta = M_TAB_META[name];
+  document.getElementById('mHeaderTitle').textContent = name==='home' ? mGreeting() : meta[0];
+  document.getElementById('mHeaderSub').textContent = meta[1];
+  if(name==='home') mRenderHome();
+  if(name==='tasks') mRenderTasks();
+  if(name==='queue') mRenderQueue();
+  if(name==='reminders') mRenderReminders();
+  if(name==='more') mRenderMore();
+  mRenderFab(name);
+  window.scrollTo(0,0);
+}
+
+function mGreeting(){
+  const hour = new Date().getHours();
+  const first = myName().split(' ')[0] || 'there';
+  const g = hour<12 ? 'Good morning' : hour<18 ? 'Good afternoon' : 'Good evening';
+  return `${g}, ${first}`;
+}
+
+/* ================================================================
+   SUB-SCREENS — drill-down detail views, pushed on top with a
+   slide-in transition, dismissed with Back. This is the
+   "one thing at a time" navigation model instead of a dashboard
+   grid showing everything simultaneously.
+   ================================================================ */
+function mOpenSubscreen(title, html){
+  document.getElementById('mSubscreenTitle').textContent = title;
+  document.getElementById('mSubscreenContent').innerHTML = html;
+  document.getElementById('mSubscreen').classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+function mCloseSubscreen(){
+  document.getElementById('mSubscreen').classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+/* ================================================================
+   BOTTOM SHEETS — the mobile replacement for centered desktop
+   modals. Every create/edit form and the notifications list use
+   this same component.
+   ================================================================ */
+function mOpenSheet(title, bodyHtml, actionsHtml){
+  document.getElementById('mSheetTitle').textContent = title;
+  document.getElementById('mSheetBody').innerHTML = bodyHtml;
+  const actionsEl = document.getElementById('mSheetActions');
+  if(actionsHtml){ actionsEl.innerHTML = actionsHtml; actionsEl.style.display = 'flex'; }
+  else { actionsEl.style.display = 'none'; actionsEl.innerHTML = ''; }
+  document.getElementById('mSheetOverlay').classList.add('open');
+  requestAnimationFrame(()=>document.getElementById('mSheet').classList.add('open'));
+  document.body.style.overflow = 'hidden';
+}
+function mCloseSheet(){
+  document.getElementById('mSheet').classList.remove('open');
+  document.body.style.overflow = '';
+  setTimeout(()=>{ document.getElementById('mSheetOverlay').classList.remove('open'); }, 250);
+}
+
+/* ================================================================
+   BADGES — tab bar counts + header notification badge, kept in
+   sync with the same data every screen renders from.
+   ================================================================ */
+function mUpdateBadges(){
+  const myTasks = tasks.filter(t=>t.assigneeId===currentUser?.id && t.status!=='done');
+  const tasksBadge = document.getElementById('mTabBadgeTasks');
+  tasksBadge.textContent = myTasks.length;
+  tasksBadge.style.display = myTasks.length ? 'flex' : 'none';
+
+  const pendingCount = clients.filter(c=>c.draftStatus==='pending').length;
+  const queueBadge = document.getElementById('mTabBadgeQueue');
+  queueBadge.textContent = pendingCount;
+  queueBadge.style.display = pendingCount ? 'flex' : 'none';
+
+  const dueReminders = clientReminders.filter(r=>r.askedBy===currentUser?.id && mReminderDisplayStatus(r)==='due').length;
+  const remindersBadge = document.getElementById('mTabBadgeReminders');
+  remindersBadge.textContent = dueReminders;
+  remindersBadge.style.display = dueReminders ? 'flex' : 'none';
+
+  const unread = notifications.filter(n=>!n.read).length;
+  const notifBadge = document.getElementById('mNotifBadge');
+  notifBadge.textContent = unread;
+  notifBadge.style.display = unread ? 'flex' : 'none';
+}
+
+function mReminderDisplayStatus(r){
+  if(r.status==='waiting' && r.followUpDate && r.followUpDate <= toDateStr(new Date())) return 'due';
+  return r.status;
+}
+
+/* ================================================================
+   HOME — a compact, scannable summary that drills into the tabs,
+   not a grid of nine desktop cards reflowed into one column.
+   ================================================================ */
+function mRenderHome(){
+  document.getElementById('mHeaderTitle').textContent = mGreeting();
+  const el = document.getElementById('mScreen-home');
+  const myOpenTasks = tasks.filter(t=>t.assigneeId===currentUser?.id && t.status!=='done').length;
+  const pendingDrafts = clients.filter(c=>c.draftStatus==='pending').length;
+  const atRisk = clients.filter(c=>c.status==='active' && c.danger>=4).length;
+  const myOverdueReminders = clientReminders.filter(r=>r.askedBy===currentUser?.id && mReminderDisplayStatus(r)==='due').length;
+
+  const attention = clients.filter(c=>c.status==='active' && (c.danger>=4 || c.draftStatus==='pending'))
+    .sort((a,b)=> b.danger-a.danger || (b.draftStatus==='pending')-(a.draftStatus==='pending'))
+    .slice(0,5);
+
+  el.innerHTML = `
+    <div class="m-metric-grid">
+      <div class="m-card" onclick="mSwitchTab('tasks')">
+        <div class="m-metric-value">${myOpenTasks}</div>
+        <div class="m-metric-label">Open tasks</div>
+      </div>
+      <div class="m-card" onclick="mSwitchTab('queue')">
+        <div class="m-metric-value">${pendingDrafts}</div>
+        <div class="m-metric-label">Pending approval</div>
+      </div>
+      <div class="m-card" onclick="mSwitchTab('queue')">
+        <div class="m-metric-value" style="color:${atRisk?'var(--red)':'var(--ink)'};">${atRisk}</div>
+        <div class="m-metric-label">At-risk clients</div>
+      </div>
+      <div class="m-card" onclick="mSwitchTab('reminders')">
+        <div class="m-metric-value" style="color:${myOverdueReminders?'var(--blue)':'var(--ink)'};">${myOverdueReminders}</div>
+        <div class="m-metric-label">Follow-ups due</div>
+      </div>
+    </div>
+
+    <div class="m-card">
+      <div class="m-card-row"><h3>Needs attention</h3><button class="m-card-link" onclick="mSwitchTab('queue')">See all</button></div>
+      ${attention.length ? attention.map(c=>mClientAttentionRow(c)).join('') : `<div class="m-empty" style="padding:20px 0;">Nothing urgent right now.</div>`}
+    </div>
+  `;
+}
+
+function mClientAttentionRow(c){
+  const reason = c.draftStatus==='pending' ? 'Draft awaiting approval' : mRiskLabel(c.danger);
+  const color = mRiskColor(c.danger);
+  return `<div class="m-list-row" onclick="mOpenClientFromHome('${c.id}')">
+    <div class="m-avatar" style="background:${color}22;color:${color};">${(c.name||'?').charAt(0).toUpperCase()}</div>
+    <div class="m-list-main">
+      <div class="m-list-title">${escapeHtml(c.name)}</div>
+      <div class="m-list-sub">${reason}</div>
+    </div>
+    <div class="m-list-meta">${c.importance}/10</div>
+  </div>`;
+}
+
+function mRiskLabel(danger){
+  if(danger>=5) return 'Critical risk';
+  if(danger>=4) return 'High risk';
+  if(danger>=3) return 'Medium risk';
+  if(danger>=2) return 'Low risk';
+  return 'Healthy';
+}
+function mRiskColor(danger){
+  if(danger>=4) return '#CF2424';
+  if(danger>=3) return '#A65B05';
+  if(danger>=2) return '#3A63C9';
+  return '#117F3A';
+}
+
+function mOpenClientFromHome(clientId){
+  mSwitchTab('queue');
+  setTimeout(()=>mOpenQueueDetail(clientId), 50);
+}
+
+/* ================================================================
+   TASKS — a real filterable list (not a kanban board, which
+   doesn't translate to a phone screen), with a FAB to create and
+   a slide-in sub-screen for detail/status changes.
+   ================================================================ */
+let mTaskFilter = 'mine';
+
+function mRenderTasks(){
+  const el = document.getElementById('mScreen-tasks');
+  const filtered = tasks.filter(t=>{
+    if(mTaskFilter==='mine') return t.assigneeId===currentUser?.id;
+    if(mTaskFilter==='assigned') return t.assignerId===currentUser?.id && t.assigneeId!==currentUser?.id;
+    return true;
+  }).sort((a,b)=>{
+    const order = {todo:0,in_progress:1,in_review:2,done:3};
+    return (order[a.status]??9)-(order[b.status]??9) || (a.dueDate||'9999').localeCompare(b.dueDate||'9999');
+  });
+
+  el.innerHTML = `
+    <div class="m-chip-row">
+      <div class="m-chip ${mTaskFilter==='mine'?'active':''}" onclick="mSetTaskFilter('mine')">Assigned to me</div>
+      <div class="m-chip ${mTaskFilter==='assigned'?'active':''}" onclick="mSetTaskFilter('assigned')">Assigned by me</div>
+      <div class="m-chip ${mTaskFilter==='all'?'active':''}" onclick="mSetTaskFilter('all')">All</div>
+    </div>
+    <div class="m-card" style="padding:0 16px;">
+      ${filtered.length ? filtered.map(t=>mTaskRow(t)).join('') : `<div class="m-empty">Nothing here.</div>`}
+    </div>
+  `;
+  mRenderFab('tasks');
+}
+
+function mSetTaskFilter(f){ mTaskFilter = f; mRenderTasks(); }
+
+const M_TASK_STATUS_META = {
+  todo: {label:'To Do', color:'#7C93B0'}, in_progress: {label:'In Progress', color:'#A65B05'},
+  in_review: {label:'In Review', color:'#3A63C9'}, done: {label:'Done', color:'#117F3A'},
+};
+
+function mTaskRow(t){
+  const meta = M_TASK_STATUS_META[t.status] || M_TASK_STATUS_META.todo;
+  const assignee = teamProfiles.find(p=>p.id===t.assigneeId);
+  const overdue = t.dueDate && t.dueDate < toDateStr(new Date()) && t.status!=='done';
+  return `<div class="m-list-row" onclick="mOpenTaskDetail('${t.id}')">
+    <div class="m-list-main">
+      <div class="m-list-title">${escapeHtml(t.title)}</div>
+      <div class="m-list-sub">${assignee?assignee.name:'Unassigned'}${t.dueDate ? ' · '+(overdue?'<span style="color:var(--red);">Overdue</span>':new Date(t.dueDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})) : ''}</div>
+    </div>
+    <span class="m-pill" style="background:${meta.color}18;color:${meta.color};">${meta.label}</span>
+  </div>`;
+}
+
+function mOpenTaskDetail(taskId){
+  const t = tasks.find(x=>x.id===taskId);
+  if(!t) return;
+  const assignee = teamProfiles.find(p=>p.id===t.assigneeId);
+  const assigner = teamProfiles.find(p=>p.id===t.assignerId);
+  const isMine = t.assigneeId===currentUser?.id;
+  const client = clients.find(c=>c.id===t.clientId);
+  const html = `
+    <div class="m-card">
+      <div style="font-size:17px;font-weight:700;margin-bottom:10px;">${escapeHtml(t.title)}</div>
+      ${t.description ? `<div style="font-size:13.5px;color:var(--muted);margin-bottom:14px;line-height:1.5;">${escapeHtml(t.description)}</div>` : ''}
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;">
+        <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Assigned to</span><span style="font-weight:600;">${assignee?assignee.name:'—'}</span></div>
+        <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Assigned by</span><span style="font-weight:600;">${assigner?assigner.name:'—'}</span></div>
+        ${client ? `<div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Client</span><span style="font-weight:600;">${escapeHtml(client.name)}</span></div>` : ''}
+        ${t.dueDate ? `<div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Due</span><span style="font-weight:600;">${new Date(t.dueDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span></div>` : ''}
+        <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Priority</span><span style="font-weight:600;text-transform:capitalize;">${t.priority}</span></div>
+      </div>
+    </div>
+    ${isMine ? `
+    <div class="m-card">
+      <div class="m-card-row"><h3>Update status</h3></div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${Object.entries(M_TASK_STATUS_META).map(([key,meta])=>`
+          <button class="m-btn ${t.status===key?'m-btn-brand':'m-btn-outline'} m-btn-full" style="justify-content:flex-start;" onclick="mChangeTaskStatus('${t.id}','${key}')">${meta.label}</button>
+        `).join('')}
+      </div>
+    </div>` : ''}
+  `;
+  mOpenSubscreen('Task', html);
+}
+
+async function mChangeTaskStatus(taskId, status){
+  const { error } = await supabaseClient.from('tasks').update({ status }).eq('id', taskId);
+  if(error){ mShowToast('error','Could not update task'); return; }
+  const t = tasks.find(x=>x.id===taskId);
+  if(t) t.status = status;
+  mShowToast('success','Task updated');
+  mCloseSubscreen();
+  mRenderTasks();
+  mUpdateBadges();
+}
+
+function mOpenNewTaskSheet(){
+  const html = `
+    <div class="m-field"><label>Title</label><input id="mTaskTitle" placeholder="e.g. Update the roofing page copy"></div>
+    <div class="m-field"><label>Assign to</label><select id="mTaskAssignee">${teamProfiles.map(p=>`<option value="${p.id}" ${p.id===currentUser.id?'selected':''}>${p.name}</option>`).join('')}</select></div>
+    <div class="m-field"><label>Priority</label>
+      <select id="mTaskPriority"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select>
+    </div>
+    <div class="m-field"><label>Due date (optional)</label><input type="date" id="mTaskDue"></div>
+  `;
+  const actions = `<button class="m-btn m-btn-outline" onclick="mCloseSheet()">Cancel</button><button class="m-btn m-btn-brand" onclick="mSaveNewTask()">Assign task</button>`;
+  mOpenSheet('New task', html, actions);
+}
+
+async function mSaveNewTask(){
+  const title = document.getElementById('mTaskTitle').value.trim();
+  if(!title){ mShowToast('error','Give the task a title'); return; }
+  const assigneeId = document.getElementById('mTaskAssignee').value;
+  const priority = document.getElementById('mTaskPriority').value;
+  const dueDate = document.getElementById('mTaskDue').value || null;
+  const { data, error } = await supabaseClient.from('tasks').insert({
+    title, priority, assigner_id: currentUser.id, assignee_id: assigneeId, due_date: dueDate, status:'todo'
+  }).select().single();
+  if(error){ mShowToast('error','Could not save task'); return; }
+  tasks.push({ id:data.id, title, description:'', priority, status:'todo', assignerId:currentUser.id, assigneeId, clientId:null, dueDate, link:null });
+  mCloseSheet();
+  mShowToast('success','Task assigned');
+  mRenderTasks();
+  mUpdateBadges();
+}
+
+/* ================================================================
+   APPROVAL QUEUE — sorted by danger score, tap a client to drill
+   into their draft and approve/skip from the sub-screen.
+   ================================================================ */
+function mRenderQueue(){
+  const el = document.getElementById('mScreen-queue');
+  const active = clients.filter(c=>c.status==='active' && (c.improvements||[]).length)
+    .sort((a,b)=> b.danger-a.danger);
+
+  el.innerHTML = `<div class="m-card" style="padding:0 16px;">
+    ${active.length ? active.map(c=>mQueueRow(c)).join('') : `<div class="m-empty">No clients with logged work yet.</div>`}
+  </div>`;
+}
+
+function mQueueRow(c){
+  const color = mRiskColor(c.danger);
+  const statusMeta = c.draftStatus==='approved' ? {label:'Approved',color:'#117F3A'}
+    : c.draftStatus==='pending' ? {label:'Pending',color:'#E8622C'} : {label:'Not started',color:'#8A93A3'};
+  return `<div class="m-list-row" onclick="mOpenQueueDetail('${c.id}')">
+    <div class="m-avatar" style="background:${color}22;color:${color};">${(c.name||'?').charAt(0).toUpperCase()}</div>
+    <div class="m-list-main">
+      <div class="m-list-title">${escapeHtml(c.name)}</div>
+      <div class="m-list-sub">${escapeHtml(c.service||'')} · ${mRiskLabel(c.danger)}</div>
+    </div>
+    <span class="m-pill" style="background:${statusMeta.color}18;color:${statusMeta.color};">${statusMeta.label}</span>
+  </div>`;
+}
+
+function mOpenQueueDetail(clientId){
+  const c = clients.find(x=>x.id===clientId);
+  if(!c) return;
+  const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay() + (weekStart.getDay()===0?-6:1));
+  weekStart.setHours(0,0,0,0);
+  const thisWeek = (c.improvements||[]).filter(i=>i.date && new Date(i.date) >= weekStart);
+  const html = `
+    <div class="m-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+        <div>
+          <div style="font-size:17px;font-weight:700;">${escapeHtml(c.name)}</div>
+          <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">${escapeHtml(c.service||'')}</div>
+        </div>
+        <span class="m-pill" style="background:${mRiskColor(c.danger)}18;color:${mRiskColor(c.danger)};">${mRiskLabel(c.danger)}</span>
+      </div>
+    </div>
+    <div class="m-card">
+      <div class="m-card-row"><h3>This week's improvements (${thisWeek.length})</h3></div>
+      ${thisWeek.length ? thisWeek.map(i=>`
+        <div style="padding:10px 0;border-bottom:1px solid var(--border);">
+          <div style="font-size:13px;">${escapeHtml(i.text)}</div>
+          <div style="font-size:11px;color:var(--muted-lt);margin-top:4px;">${escapeHtml(i.author||'')}</div>
+        </div>`).join('') : `<div class="m-empty" style="padding:16px 0;">Nothing logged this week yet.</div>`}
+    </div>
+    ${c.draft ? `<div class="m-card"><div class="m-card-row"><h3>Draft</h3></div><div style="font-size:13px;white-space:pre-wrap;color:var(--ink);line-height:1.5;">${escapeHtml(c.draft)}</div></div>` : ''}
+    ${canApprove() && thisWeek.length ? `
+    <div style="display:flex;gap:10px;margin-top:4px;">
+      ${!c.draft ? `<button class="m-btn m-btn-brand m-btn-full" onclick="mGenerateDraft('${c.id}')">Generate draft</button>` : `
+      <button class="m-btn m-btn-outline" onclick="mSkipDraft('${c.id}')">Skip</button>
+      <button class="m-btn m-btn-brand" onclick="mApproveDraft('${c.id}')">Approve</button>`}
+    </div>` : ''}
+  `;
+  mOpenSubscreen(c.name, html);
+}
+
+async function mGenerateDraft(clientId){
+  mShowToast('success','Open the desktop app to generate an AI draft — not built here yet.');
+}
+
+async function mApproveDraft(clientId){
+  const c = clients.find(x=>x.id===clientId);
+  if(!c) return;
+  c.draftStatus = 'approved';
+  const { data: row } = await supabaseClient.from('app_storage').select('value').eq('key','app-data').maybeSingle();
+  const appData = JSON.parse(row.value);
+  const idx = appData.clients.findIndex(x=>x.id===clientId);
+  if(idx>-1) appData.clients[idx].draftStatus = 'approved';
+  const { error } = await supabaseClient.from('app_storage').update({ value: JSON.stringify(appData) }).eq('key','app-data');
+  if(error){ mShowToast('error','Could not approve'); return; }
+  mShowToast('success','Draft approved');
+  mCloseSubscreen();
+  mRenderQueue();
+  mUpdateBadges();
+}
+
+async function mSkipDraft(clientId){
+  const c = clients.find(x=>x.id===clientId);
+  if(!c) return;
+  c.draftStatus = 'none'; c.draft = '';
+  const { data: row } = await supabaseClient.from('app_storage').select('value').eq('key','app-data').maybeSingle();
+  const appData = JSON.parse(row.value);
+  const idx = appData.clients.findIndex(x=>x.id===clientId);
+  if(idx>-1){ appData.clients[idx].draftStatus = 'none'; appData.clients[idx].draft = ''; }
+  const { error } = await supabaseClient.from('app_storage').update({ value: JSON.stringify(appData) }).eq('key','app-data');
+  if(error){ mShowToast('error','Could not skip'); return; }
+  mShowToast('info','Skipped');
+  mCloseSubscreen();
+  mRenderQueue();
+  mUpdateBadges();
+}
+
+/* ================================================================
+   FOLLOW-UPS (Reminders) — grouped by status, tap to resolve.
+   ================================================================ */
+const M_REMINDER_META = {
+  waiting: {label:'Waiting on client', color:'#A65B05'}, due: {label:'Follow-up due', color:'#3A63C9'},
+  answered: {label:'Answered', color:'#117F3A'}, closed: {label:'Closed', color:'#8A93A3'},
+};
+
+function mRenderReminders(){
+  const el = document.getElementById('mScreen-reminders');
+  const mine = clientReminders.filter(r=>r.askedBy===currentUser?.id)
+    .sort((a,b)=> (a.followUpDate||'').localeCompare(b.followUpDate||''));
+  const active = mine.filter(r=>r.status==='waiting');
+  const resolved = mine.filter(r=>r.status!=='waiting');
+
+  el.innerHTML = `
+    <div class="m-card" style="padding:0 16px;">
+      <div class="m-card-row" style="padding-top:14px;"><h3>Active</h3></div>
+      ${active.length ? active.map(r=>mReminderRow(r)).join('') : `<div class="m-empty">Nothing pending.</div>`}
+    </div>
+    ${resolved.length ? `<div class="m-card" style="padding:0 16px;">
+      <div class="m-card-row" style="padding-top:14px;"><h3>Resolved</h3></div>
+      ${resolved.slice(0,10).map(r=>mReminderRow(r)).join('')}
+    </div>` : ''}
+  `;
+  mRenderFab('reminders');
+}
+
+function mReminderRow(r){
+  const c = clients.find(x=>x.id===r.clientId);
+  const display = mReminderDisplayStatus(r);
+  const meta = M_REMINDER_META[display];
+  return `<div class="m-list-row" onclick="mOpenReminderDetail('${r.id}')">
+    <div class="m-list-main">
+      <div class="m-list-title">${c ? escapeHtml(c.name) : 'Unknown client'}</div>
+      <div class="m-list-sub">${escapeHtml(r.question)}</div>
+    </div>
+    <span class="m-pill" style="background:${meta.color}18;color:${meta.color};">${meta.label}</span>
+  </div>`;
+}
+
+function mOpenReminderDetail(id){
+  const r = clientReminders.find(x=>x.id===id);
+  if(!r) return;
+  const c = clients.find(x=>x.id===r.clientId);
+  const display = mReminderDisplayStatus(r);
+  const meta = M_REMINDER_META[display];
+  const html = `
+    <div class="m-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+        <div style="font-size:16px;font-weight:700;">${c?escapeHtml(c.name):'Unknown client'}</div>
+        <span class="m-pill" style="background:${meta.color}18;color:${meta.color};">${meta.label}</span>
+      </div>
+      <div style="font-size:13.5px;color:var(--ink);line-height:1.5;margin-bottom:10px;">${escapeHtml(r.question)}</div>
+      <div style="font-size:12px;color:var(--muted);">Follow-up: ${r.followUpDate ? new Date(r.followUpDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—'}</div>
+    </div>
+    ${r.status==='waiting' ? `
+    <div style="display:flex;gap:10px;">
+      <button class="m-btn m-btn-outline" onclick="mResolveReminder('${r.id}','closed')">Close</button>
+      <button class="m-btn m-btn-brand" onclick="mResolveReminder('${r.id}','answered')">Mark answered</button>
+    </div>` : ''}
+  `;
+  mOpenSubscreen('Follow-up', html);
+}
+
+async function mResolveReminder(id, status){
+  const { error } = await supabaseClient.from('client_reminders').update({ status, resolved_at: new Date().toISOString() }).eq('id', id);
+  if(error){ mShowToast('error','Could not update'); return; }
+  const r = clientReminders.find(x=>x.id===id);
+  if(r) r.status = status;
+  mShowToast('success', status==='answered'?'Marked answered':'Closed');
+  mCloseSubscreen();
+  mRenderReminders();
+  mUpdateBadges();
+}
+
+function mOpenNewReminderSheet(){
+  const html = `
+    <div class="m-field"><label>Client</label>
+      <select id="mReminderClient">${clients.filter(c=>c.status==='active').sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</select>
+    </div>
+    <div class="m-field"><label>Question / request</label><textarea id="mReminderQuestion" placeholder="e.g. Can you send us the latest project photos?"></textarea></div>
+    <div class="m-field"><label>Follow-up date</label><input type="date" id="mReminderDate" value="${toDateStr(new Date(Date.now()+3*86400000))}"></div>
+  `;
+  const actions = `<button class="m-btn m-btn-outline" onclick="mCloseSheet()">Cancel</button><button class="m-btn m-btn-brand" onclick="mSaveNewReminder()">Save</button>`;
+  mOpenSheet('New follow-up', html, actions);
+}
+
+async function mSaveNewReminder(){
+  const clientId = document.getElementById('mReminderClient').value;
+  const question = document.getElementById('mReminderQuestion').value.trim();
+  const followUpDate = document.getElementById('mReminderDate').value;
+  if(!question){ mShowToast('error','Write the question first'); return; }
+  const { data, error } = await supabaseClient.from('client_reminders').insert({
+    client_id: clientId, question, asked_by: currentUser.id, follow_up_date: followUpDate, status:'waiting'
+  }).select().single();
+  if(error){ mShowToast('error','Could not save'); return; }
+  clientReminders.push({ id:data.id, clientId, question, askedBy:currentUser.id, followUpDate, status:'waiting' });
+  mCloseSheet();
+  mShowToast('success','Follow-up created');
+  mRenderReminders();
+  mUpdateBadges();
+}
+
+/* Shared FAB — one add action per screen that has one, positioned
+   above the tab bar consistently. */
+function mRenderFab(context){
+  let fab = document.getElementById('mFab');
+  if(fab) fab.remove();
+  const actions = { tasks: mOpenNewTaskSheet, reminders: mOpenNewReminderSheet };
+  if(!actions[context]) return;
+  fab = document.createElement('button');
+  fab.className = 'm-fab'; fab.id = 'mFab';
+  fab.setAttribute('aria-label','Add');
+  fab.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+  fab.onclick = actions[context];
+  document.body.appendChild(fab);
+}
+
+/* ================================================================
+   MORE — everything that doesn't fit in the 4 primary tabs.
+   Kept intentionally simple in this first version; see summary.
+   ================================================================ */
+function mRenderMore(){
+  const el = document.getElementById('mScreen-more');
+  el.innerHTML = `
+    <div class="m-card" style="padding:0 16px;">
+      <div class="m-list-row" onclick="mOpenClientsList()">
+        <div class="m-list-main"><div class="m-list-title">Clients</div><div class="m-list-sub">${clients.filter(c=>c.status==='active').length} active</div></div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-lt)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="m-list-row" onclick="mShowToast('success','Open the desktop app for Notes — kept private per person, not built here yet.')">
+        <div class="m-list-main"><div class="m-list-title">Notes</div><div class="m-list-sub">Private to you</div></div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-lt)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="m-list-row" onclick="mShowToast('success','Open the desktop app for Calendar — not built here yet.')">
+        <div class="m-list-main"><div class="m-list-title">Calendar</div></div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-lt)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="m-list-row" onclick="mShowToast('success','Open the desktop app for Time Tracker — not built here yet.')">
+        <div class="m-list-main"><div class="m-list-title">Time Tracker</div></div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-lt)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>
+    <div class="m-card">
+      <div class="m-card-row"><h3>Account</h3></div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+        <div class="m-avatar" style="width:44px;height:44px;font-size:16px;">${(myName()||'?').charAt(0).toUpperCase()}</div>
+        <div><div style="font-weight:700;font-size:14px;">${escapeHtml(myName())}</div><div style="font-size:12px;color:var(--muted);text-transform:capitalize;">${myProfile?myProfile.role:''}</div></div>
+      </div>
+      <button class="m-btn m-btn-outline m-btn-full" onclick="mLogout()">Sign out</button>
+    </div>
+  `;
+}
+
+function mOpenClientsList(){
+  const active = clients.filter(c=>c.status==='active').sort((a,b)=>a.name.localeCompare(b.name));
+  const html = `
+    <input class="m-search-input" id="mClientSearch" placeholder="Search clients…" oninput="mFilterClientsList()">
+    <div id="mClientsListBody">${active.map(c=>mClientRow(c)).join('')}</div>
+  `;
+  mOpenSubscreen('Clients', html);
+}
+function mClientRow(c){
+  return `<div class="m-list-row" onclick="mOpenQueueDetail('${c.id}');setTimeout(()=>document.getElementById('mSubscreenTitle') && null,0);" data-name="${escapeHtml(c.name).toLowerCase()}">
+    <div class="m-avatar" style="background:${mRiskColor(c.danger)}22;color:${mRiskColor(c.danger)};">${(c.name||'?').charAt(0).toUpperCase()}</div>
+    <div class="m-list-main"><div class="m-list-title">${escapeHtml(c.name)}</div><div class="m-list-sub">${escapeHtml(c.service||'')}</div></div>
+  </div>`;
+}
+function mFilterClientsList(){
+  const q = document.getElementById('mClientSearch').value.trim().toLowerCase();
+  document.querySelectorAll('#mClientsListBody .m-list-row').forEach(row=>{
+    row.style.display = row.dataset.name.includes(q) ? 'flex' : 'none';
+  });
+}
+
+/* ================================================================
+   NOTIFICATIONS — opens as a sheet from the header bell.
+   ================================================================ */
+function mOpenNotifications(){
+  const html = notifications.length ? notifications.map(n=>`
+    <div class="m-list-row" onclick="mHandleNotifClick('${n.id}')" style="opacity:${n.read?0.6:1};">
+      <div class="m-list-main">
+        <div class="m-list-title">${escapeHtml(n.title)}</div>
+        <div class="m-list-sub" style="white-space:normal;">${escapeHtml(n.body)}</div>
+      </div>
+    </div>
+  `).join('') : `<div class="m-empty">No notifications.</div>`;
+  mOpenSheet('Notifications', html);
+}
+
+async function mHandleNotifClick(id){
+  const n = notifications.find(x=>x.id===id);
+  if(!n) return;
+  if(!n.read){
+    await supabaseClient.from('notifications').update({ read:true }).eq('id', id);
+    n.read = true;
+    mUpdateBadges();
+  }
+  mCloseSheet();
+  if(n.targetView==='reminders') mSwitchTab('reminders');
+  else if(n.targetView==='approve' && n.targetId){ mSwitchTab('queue'); setTimeout(()=>mOpenQueueDetail(n.targetId), 300); }
+  else if(n.targetView==='tasks') mSwitchTab('tasks');
+}
+
+/* ================================================================
+   REALTIME — same subscriptions the desktop app relies on, so a
+   change made on desktop shows up here without a manual refresh.
+   ================================================================ */
+function setupMRealtime(){
+  supabaseClient.channel('mobile-tasks').on('postgres_changes', {event:'*', schema:'public', table:'tasks'}, ()=>mLoadAll().then(()=>{ if(activeTab==='tasks') mRenderTasks(); if(activeTab==='home') mRenderHome(); })).subscribe();
+  supabaseClient.channel('mobile-reminders').on('postgres_changes', {event:'*', schema:'public', table:'client_reminders'}, ()=>mLoadAll().then(()=>{ if(activeTab==='reminders') mRenderReminders(); if(activeTab==='home') mRenderHome(); })).subscribe();
+  supabaseClient.channel('mobile-notifications').on('postgres_changes', {event:'*', schema:'public', table:'notifications', filter:`user_id=eq.${currentUser.id}`}, ()=>mLoadAll()).subscribe();
+}
+
+/* ================================================================
+   BOOTSTRAP
+   ================================================================ */
+document.getElementById('mLoginPassword')?.addEventListener('keydown', e=>{ if(e.key==='Enter') mHandleLogin(); });
+mBoot();
+</script>
+</body>
+</html>
