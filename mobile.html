@@ -329,6 +329,10 @@ let clientReminders = [];
 let notifications = [];
 let activeTab = 'home';
 let mSettings = {};
+let mDateFilterMode = 'thisweek';
+let mDateFilterFrom = null;
+let mDateFilterTo = null;
+let mQueueFilter = 'all';
 
 function escapeHtml(str){
   if(str===null || str===undefined) return '';
@@ -791,14 +795,214 @@ async function mSaveNewTask(){
    APPROVAL QUEUE — sorted by danger score, tap a client to drill
    into their draft and approve/skip from the sub-screen.
    ================================================================ */
+const M_QUEUE_FILTERS = [
+  { key:'all', label:'All' },
+  { key:'pending', label:'Draft ready' },
+  { key:'approved', label:'Approved' },
+  { key:'none', label:'No draft yet' },
+  { key:'atrisk', label:'At risk (4–5)' },
+  { key:'stale', label:'Needs re-review' },
+];
+
+function mQueueStatusMatches(c, filterKey){
+  if(filterKey==='pending') return c.draftStatus==='pending';
+  if(filterKey==='approved') return c.draftStatus==='approved';
+  if(filterKey==='none') return c.draftStatus==='none';
+  if(filterKey==='atrisk') return c.danger>=4;
+  if(filterKey==='stale') return c.draftStatus==='approved' && mHasLoggedThisWeek(c);
+  return true;
+}
+
+function mSetQueueFilter(f){
+  mQueueFilter = f;
+  mRenderQueue();
+}
+
+function mOnDateFilterChange(){
+  const mode = document.getElementById('mDateFilterSelect').value;
+  mDateFilterMode = mode;
+  document.getElementById('mCustomDateRange').style.display = mode==='custom' ? 'flex' : 'none';
+  if(mode==='custom') return;
+  const { from, to } = mComputeDateRange(mode);
+  mDateFilterFrom = from; mDateFilterTo = to;
+  mRenderQueue();
+}
+
+function mApplyCustomDateRange(){
+  const fromVal = document.getElementById('mDateFrom').value;
+  const toVal = document.getElementById('mDateTo').value;
+  if(!fromVal && !toVal){ mShowToast('error','Pick at least one date'); return; }
+  mDateFilterFrom = fromVal ? new Date(fromVal+'T00:00:00') : null;
+  mDateFilterTo = toVal ? new Date(toVal+'T23:59:59') : null;
+  mRenderQueue();
+}
+
 function mRenderQueue(){
   const el = document.getElementById('mScreen-queue');
-  const active = clients.filter(c=>!c.deletedAt && (c.improvements||[]).length)
+  const all = clients.filter(c=>!c.deletedAt);
+
+  const filtered = all
+    .filter(c => mQueueStatusMatches(c, mQueueFilter))
+    .map(c => ({ c, shownImprovements: (c.improvements||[]).filter(mImprovementInDateRange) }))
+    .filter(r => mDateFilterMode==='all' || r.shownImprovements.length > 0)
+    .map(r => r.c)
     .sort((a,b)=> b.danger-a.danger);
 
-  el.innerHTML = `<div class="m-card" style="padding:0 16px;">
-    ${active.length ? active.map(c=>mQueueRow(c)).join('') : `<div class="m-empty">No clients with logged work yet.</div>`}
-  </div>`;
+  const counts = {};
+  M_QUEUE_FILTERS.forEach(({key})=>{
+    counts[key] = all.filter(c => mQueueStatusMatches(c, key))
+      .map(c => (c.improvements||[]).filter(mImprovementInDateRange))
+      .filter(imps => mDateFilterMode==='all' || imps.length > 0)
+      .length;
+  });
+
+  el.innerHTML = `
+    <div class="m-card" style="padding:14px 16px;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <select id="mDateFilterSelect" onchange="mOnDateFilterChange()" style="flex:1;min-width:130px;font-size:13px;padding:9px 10px;border-radius:10px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);">
+          <option value="thisweek" ${mDateFilterMode==='thisweek'?'selected':''}>This week</option>
+          <option value="all" ${mDateFilterMode==='all'?'selected':''}>All time</option>
+          <option value="today" ${mDateFilterMode==='today'?'selected':''}>Today</option>
+          <option value="7days" ${mDateFilterMode==='7days'?'selected':''}>Last 7 days</option>
+          <option value="30days" ${mDateFilterMode==='30days'?'selected':''}>Last 30 days</option>
+          <option value="custom" ${mDateFilterMode==='custom'?'selected':''}>Custom range…</option>
+        </select>
+        <button class="m-btn m-btn-brand" style="flex:none;padding:9px 14px;min-height:auto;" onclick="mReadyToNotify()">Ready to Notify</button>
+      </div>
+      <div id="mCustomDateRange" style="display:${mDateFilterMode==='custom'?'flex':'none'};gap:8px;margin-top:10px;align-items:center;">
+        <input type="date" id="mDateFrom" style="flex:1;font-size:12.5px;padding:8px;border-radius:8px;border:1px solid var(--border);">
+        <span style="color:var(--muted-lt);font-size:11px;">to</span>
+        <input type="date" id="mDateTo" style="flex:1;font-size:12.5px;padding:8px;border-radius:8px;border:1px solid var(--border);">
+        <button class="m-btn m-btn-outline" style="flex:none;padding:8px 12px;min-height:auto;" onclick="mApplyCustomDateRange()">Apply</button>
+      </div>
+    </div>
+
+    <div class="m-chip-row">
+      ${M_QUEUE_FILTERS.map(({key,label})=>`<div class="m-chip ${mQueueFilter===key?'active':''}" onclick="mSetQueueFilter('${key}')">${label} <span style="opacity:.6;">${counts[key]}</span></div>`).join('')}
+    </div>
+
+    <div class="m-card" style="padding:0 16px;">
+      ${filtered.length ? filtered.map(c=>mQueueRow(c)).join('') : `<div class="m-empty">No clients match this filter.</div>`}
+    </div>
+  `;
+}
+
+// Exact match to desktop's getNotifyRecipient() — member notifies the
+// approver, approver notifies the admin, admin has nobody left in the
+// chain. Deliberately never surfaces who the actual recipient is anywhere
+// the person clicking can see it, same as desktop.
+function mGetNotifyRecipient(){
+  const role = myProfile?.role;
+  if(role === 'admin') return null;
+  if(role === 'approver') return { email: mSettings.danielEmail, configLabel: "the admin's" };
+  return { email: mSettings.ericEmail, configLabel: "the approver's" };
+}
+
+function mReadyToNotify(){
+  const recipient = mGetNotifyRecipient();
+  if(!recipient){ mShowToast('success', "You're the last stop in the chain — nothing further to send."); return; }
+  if(!recipient.email){ mShowToast('error', `Add ${recipient.configLabel} email in Settings first.`); return; }
+  const pending = clients.filter(c=>!c.deletedAt && c.draftStatus==='pending');
+  const subject = `${pending.length} client update${pending.length!==1?'s':''} ready for approval`;
+  const bodyLines = pending.length ? pending.map(c=>`- ${c.name} (danger ${c.danger}/5, importance ${c.importance}/10)`).join('\n') : 'No drafts are ready yet.';
+  const body = `This week's client update drafts are ready for review, sorted by danger score:\n\n${bodyLines}\n\nReview and approve here: ${window.location.origin}`;
+  mOpenSendEmailSheet(recipient.email, subject, body);
+}
+
+function mOpenSendEmailSheet(to, subject, body){
+  const html = `
+    <div class="m-field"><label>To</label><input value="${escapeHtml(to)}" readonly style="background:var(--border);"></div>
+    <div class="m-field"><label>Subject</label><input id="mMailSubject" value="${escapeHtml(subject)}"></div>
+    <div class="m-field" style="margin-bottom:0;"><label>Body</label><textarea id="mMailBody" style="min-height:160px;">${escapeHtml(body)}</textarea></div>
+  `;
+  const mailtoHref = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  const actions = `
+    <button class="m-btn m-btn-outline" onclick="mCloseSheet()">Cancel</button>
+    <a class="m-btn m-btn-outline" href="${mailtoHref}" style="text-decoration:none;">Open in mail app</a>
+    <button class="m-btn m-btn-brand" id="mSendEmailBtn" onclick="mConfirmSendEmail('${to}')">Send</button>
+  `;
+  mOpenSheet('Send this email?', html, actions);
+}
+
+async function mConfirmSendEmail(to){
+  const subject = document.getElementById('mMailSubject').value;
+  const body = document.getElementById('mMailBody').value;
+  const btn = document.getElementById('mSendEmailBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="m-spinner"></span>';
+  try{
+    const response = await fetch('/api/send-email', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject, body }),
+    });
+    const data = await response.json();
+    if(!response.ok){
+      mShowToast('error', (data.error || 'Could not send') + ' — try "Open in mail app" instead.');
+      btn.disabled = false; btn.textContent = 'Send';
+      return;
+    }
+    mCloseSheet();
+    mShowToast('success','Email sent', `Delivered to ${to}.`);
+    mNotifyOthersOfEmailSent(to, subject);
+  }catch(e){
+    mShowToast('error','Network error — try "Open in mail app" instead.');
+    btn.disabled = false; btn.textContent = 'Send';
+  }
+}
+
+async function mNotifyOthersOfEmailSent(to, subject){
+  const recipients = teamProfiles.filter(p=> (p.role==='admin' || p.role==='approver') && p.id!==currentUser.id);
+  for(const p of recipients){
+    await supabaseClient.from('notifications').insert({
+      user_id: p.id, type: 'email_sent', title: 'Client email sent',
+      body: `${myName()||'Someone'} sent "${subject}" to ${to}.`, target_view: 'approve',
+    });
+  }
+}
+
+function mOpenLogImprovementSheet(presetClientId){
+  const activeClientsList = clients.filter(c=>!c.deletedAt).sort((a,b)=>a.name.localeCompare(b.name));
+  const html = `
+    <div class="m-field"><label>Client</label>
+      <select id="mLogImpClient">${activeClientsList.map(c=>`<option value="${c.id}" ${presetClientId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select>
+    </div>
+    <div class="m-field" style="margin-bottom:0;"><label>What did you improve?</label><textarea id="mLogImpText" placeholder="What did you work on?"></textarea></div>
+  `;
+  const actions = `<button class="m-btn m-btn-outline" onclick="mCloseSheet()">Cancel</button><button class="m-btn m-btn-brand" onclick="mSaveQueueLogImprovement()">Log it</button>`;
+  mOpenSheet('Log an improvement', html, actions);
+}
+
+// Exact match to desktop's saveQueueLogImprovement() — invalidates a stale
+// approved draft the same way, since a draft generated before this new
+// work was logged no longer reflects everything that happened this week.
+async function mSaveQueueLogImprovement(){
+  const clientId = document.getElementById('mLogImpClient').value;
+  const text = document.getElementById('mLogImpText').value.trim();
+  if(!clientId){ mShowToast('error','Pick a client'); return; }
+  if(!text){ mShowToast('error','Write what you improved first'); return; }
+  const author = myName() || 'Team member';
+  await mLoadAll();
+  const c = clients.find(x=>x.id===clientId);
+  if(!c){ mShowToast('error','Client not found'); return; }
+  c.improvements = c.improvements || [];
+  c.improvements.push({ author, text, date: new Date().toISOString(), includeInEmail: true, source: 'manual' });
+  c.draftStatus = 'none'; c.draft = '';
+
+  const { data: row } = await supabaseClient.from('app_storage').select('value').eq('key','app-data').maybeSingle();
+  const appData = JSON.parse(row.value);
+  const idx = appData.clients.findIndex(x=>x.id===clientId);
+  if(idx>-1){
+    appData.clients[idx].improvements = appData.clients[idx].improvements || [];
+    appData.clients[idx].improvements.push({ author, text, date: new Date().toISOString(), includeInEmail: true, source: 'manual' });
+    appData.clients[idx].draftStatus = 'none';
+    appData.clients[idx].draft = '';
+  }
+  const { error } = await supabaseClient.from('app_storage').update({ value: JSON.stringify(appData) }).eq('key','app-data');
+  if(error){ mShowToast('error','Save failed'); return; }
+
+  mCloseSheet();
+  mShowToast('success','Improvement logged', `Saved for ${c.name}.`);
+  mRenderQueue();
+  mUpdateBadges();
 }
 
 function mQueueRow(c){
@@ -861,6 +1065,31 @@ function getWeekStart(d){
   date.setDate(date.getDate()-diff);
   date.setHours(0,0,0,0);
   return date;
+}
+
+function mComputeDateRange(mode){
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0,0,0,0);
+  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23,59,59,999);
+  if(mode==='thisweek') return {from:getWeekStart(now), to:endOfToday};
+  if(mode==='today') return {from:startOfToday, to:endOfToday};
+  if(mode==='7days'){ const from = new Date(startOfToday); from.setDate(from.getDate()-6); return {from, to:endOfToday}; }
+  if(mode==='30days'){ const from = new Date(startOfToday); from.setDate(from.getDate()-29); return {from, to:endOfToday}; }
+  return {from:null, to:null};
+}
+
+// Exact match to desktop's improvementInDateRange() — "This week" always
+// recomputes against the live current date rather than trusting a stored
+// range, so a session left open across a week boundary doesn't silently
+// keep comparing against last week.
+function mImprovementInDateRange(imp){
+  if(mDateFilterMode==='all') return true;
+  if(!imp.date) return false;
+  const d = new Date(imp.date);
+  if(mDateFilterMode==='thisweek') return d >= getWeekStart(new Date());
+  if(mDateFilterFrom && d < mDateFilterFrom) return false;
+  if(mDateFilterTo && d > mDateFilterTo) return false;
+  return true;
 }
 
 function mIContributedToClientDraft(c){
@@ -1104,7 +1333,7 @@ async function mSaveNewReminder(){
 function mRenderFab(context){
   let fab = document.getElementById('mFab');
   if(fab) fab.remove();
-  const actions = { tasks: mOpenNewTaskSheet, reminders: mOpenNewReminderSheet };
+  const actions = { tasks: ()=>mOpenNewTaskSheet(), reminders: ()=>mOpenNewReminderSheet(), queue: ()=>mOpenLogImprovementSheet() };
   if(!actions[context]) return;
   fab = document.createElement('button');
   fab.className = 'm-fab'; fab.id = 'mFab';
