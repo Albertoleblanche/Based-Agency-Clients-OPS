@@ -324,6 +324,7 @@ let tasks = [];
 let clientReminders = [];
 let notifications = [];
 let activeTab = 'home';
+let mSettings = {};
 
 function escapeHtml(str){
   if(str===null || str===undefined) return '';
@@ -372,13 +373,14 @@ async function mBoot(){
 }
 
 async function mLoadAll(){
-  const [profRes, teamRes, clientsRes, tasksRes, remindersRes, notifRes] = await Promise.all([
+  const [profRes, teamRes, clientsRes, tasksRes, remindersRes, notifRes, settingsRes] = await Promise.all([
     supabaseClient.from('team_profiles').select('*').eq('id', currentUser.id).maybeSingle(),
     supabaseClient.from('team_profiles').select('*'),
     supabaseClient.from('app_storage').select('value').eq('key','app-data').maybeSingle(),
     supabaseClient.from('tasks').select('*').or(`assignee_id.eq.${currentUser.id},assigner_id.eq.${currentUser.id}`).is('cancelled_at', null),
     supabaseClient.from('client_reminders').select('*'),
     supabaseClient.from('notifications').select('*').eq('user_id', currentUser.id).order('created_at',{ascending:false}).limit(30),
+    supabaseClient.from('app_storage').select('value').eq('key','settings').maybeSingle(),
   ]);
   myProfile = profRes.data || null;
   teamProfiles = teamRes.data || [];
@@ -395,6 +397,7 @@ async function mLoadAll(){
     id:n.id, type:n.type, title:n.title, body:n.body, read:n.read, createdAt:n.created_at,
     targetView:n.target_view, targetId:n.target_id
   }));
+  mSettings = settingsRes.data ? JSON.parse(settingsRes.data.value) : {};
   mUpdateBadges();
 }
 
@@ -779,8 +782,110 @@ function mOpenQueueDetail(clientId){
   mOpenSubscreen(c.name, html);
 }
 
+function getWeekStart(d){
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = (day+6)%7;
+  date.setDate(date.getDate()-diff);
+  date.setHours(0,0,0,0);
+  return date;
+}
+
+function mIContributedToClientDraft(c){
+  const weekStart = getWeekStart(new Date());
+  return (c.improvements||[]).some(i => i.includeInEmail !== false && i.date && new Date(i.date) >= weekStart && i.author === myName());
+}
+
+function mCanGenerateOrRegenerateDraft(c){
+  if(mIContributedToClientDraft(c)) return true;
+  if(c.draft) return canApprove();
+  return false;
+}
+
+async function mNotifyApproversDraftReady(c){
+  const approvers = teamProfiles.filter(p => (p.role==='admin' || p.role==='approver') && p.id !== currentUser?.id);
+  for(const approver of approvers){
+    await supabaseClient.from('notifications').insert({
+      user_id: approver.id, type: 'draft_ready', title: 'Draft ready for approval',
+      body: `${myName()||'Someone'} created an improvement email draft for ${c.name}. Please review and approve it.`,
+      target_view: 'approve', target_id: c.id,
+    });
+  }
+}
+
 async function mGenerateDraft(clientId){
-  mShowToast('success','Open the desktop app to generate an AI draft — not built here yet.');
+  const c = clients.find(x=>x.id===clientId);
+  if(!c) return;
+  if(!mCanGenerateOrRegenerateDraft(c)){
+    mShowToast('error', c.draft
+      ? 'Only admins, approvers, or contributors can regenerate this.'
+      : 'Only someone who logged this week\u2019s included improvements can generate the first draft.');
+    return;
+  }
+  const weekStart = getWeekStart(new Date());
+  const included = (c.improvements||[]).filter(i => i.includeInEmail !== false && i.date && new Date(i.date) >= weekStart);
+  if(!included.length){ mShowToast('error','Nothing to include from this week yet'); return; }
+
+  mShowToast('success','Generating draft…');
+  const bullets = included.map(i=>'- '+i.text).join('\n');
+  const customStructure = ((myProfile && myProfile.email_instructions) || '').trim();
+  const appName = mSettings.appName || 'Based Agency';
+  const contentRules = `Content rules that apply no matter what — never overridden by anything above:
+- Describe every improvement as a specific, measurable deliverable — a concrete action taken, a number, a metric, or a defined output. Never state it as a vague, broad claim.
+- If a logged improvement itself is vague, do not invent specifics — describe only what was actually logged.
+- Never say anything that could make the agency look bad.
+- No subject line, no meta-commentary about the email itself — output only the email body.`;
+  const prompt = customStructure
+    ? `Write a weekly client update email for a home-services/construction client from their marketing agency (${appName}).
+
+The agency has specified an exact structure below. Follow it precisely and completely:
+
+--- REQUIRED STRUCTURE ---
+${customStructure}
+--- END REQUIRED STRUCTURE ---
+
+Client: ${c.name}
+Service: ${c.service}
+Scope notes: ${c.sow || 'n/a'}
+Improvements made this week:
+${bullets}
+
+${contentRules}`
+    : `Write a short, warm, professional weekly update email to a home-services/construction client from their marketing agency (${appName}).
+Client: ${c.name}
+Service: ${c.service}
+Scope notes: ${c.sow || 'n/a'}
+Improvements made this week:
+${bullets}
+
+Structure: 2-4 short paragraphs max, no fluff, plain language, no subject line, no signature block. End by noting nothing is needed from them unless something explicitly requires their input.
+
+${contentRules}`;
+
+  try{
+    const response = await fetch('/api/generate-draft', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ prompt })
+    });
+    const data = await response.json();
+    const text = (data.text || '').trim();
+    if(!text){ mShowToast('error','Could not generate a draft — try again'); return; }
+
+    const { data: row } = await supabaseClient.from('app_storage').select('value').eq('key','app-data').maybeSingle();
+    const appData = JSON.parse(row.value);
+    const idx = appData.clients.findIndex(x=>x.id===clientId);
+    if(idx>-1){ appData.clients[idx].draft = text; appData.clients[idx].draftStatus = 'pending'; }
+    const { error } = await supabaseClient.from('app_storage').update({ value: JSON.stringify(appData) }).eq('key','app-data');
+    if(error){ mShowToast('error','Generated, but could not save'); return; }
+
+    c.draft = text; c.draftStatus = 'pending';
+    mShowToast('success','Draft generated');
+    await mNotifyApproversDraftReady(c);
+    mOpenQueueDetail(clientId);
+    mRenderQueue();
+    mUpdateBadges();
+  }catch(e){
+    mShowToast('error','Draft generation failed');
+  }
 }
 
 async function mApproveDraft(clientId){
