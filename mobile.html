@@ -135,6 +135,19 @@ a{color:inherit;text-decoration:none;}
 }
 .m-fab:active{background:var(--brand-dark);}
 
+.m-timer-bar{
+  display:none;position:fixed;left:14px;right:14px;top:calc(64px + var(--safe-top));z-index:95;
+  background:var(--ink);color:#fff;border-radius:14px;padding:10px 12px 10px 16px;
+  align-items:center;gap:10px;box-shadow:0 8px 20px rgba(0,0,0,.25);
+}
+.m-timer-bar.show{display:flex;}
+.m-timer-bar-dot{width:8px;height:8px;border-radius:50%;background:#4ADE80;flex:none;animation:mPulse 1.4s ease-in-out infinite;}
+@keyframes mPulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+.m-timer-bar-info{flex:1;min-width:0;}
+.m-timer-bar-client{font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.m-timer-bar-elapsed{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;}
+.m-timer-bar-stop{background:var(--red);color:#fff;border:none;border-radius:20px;padding:8px 16px;font-size:12.5px;font-weight:700;cursor:pointer;flex:none;}
+
 .m-field{margin-bottom:16px;}
 .m-field label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;}
 .m-field input,.m-field select,.m-field textarea{
@@ -212,6 +225,15 @@ a{color:inherit;text-decoration:none;}
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
       <span class="m-badge" id="mNotifBadge" style="display:none;">0</span>
     </button>
+  </div>
+
+  <div class="m-timer-bar" id="mTimerBar">
+    <span class="m-timer-bar-dot"></span>
+    <div class="m-timer-bar-info">
+      <div class="m-timer-bar-client" id="mTimerBarClient">Client</div>
+      <div class="m-timer-bar-elapsed" id="mTimerBarElapsed">00:00:00</div>
+    </div>
+    <button class="m-timer-bar-stop" onclick="mStopTimer()">Stop</button>
   </div>
 
   <div class="m-content">
@@ -342,6 +364,7 @@ async function mBoot(){
   }
   currentUser = session.user;
   await mLoadAll();
+  mInitTimerFromStorage();
   document.getElementById('mLoadingScreen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   mSwitchTab('home');
@@ -931,7 +954,7 @@ function mRenderMore(){
         <div class="m-list-main"><div class="m-list-title">Calendar</div></div>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-lt)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
-      <div class="m-list-row" onclick="mShowToast('success','Open the desktop app for Time Tracker — not built here yet.')">
+      <div class="m-list-row" onclick="mOpenTimeTracker()">
         <div class="m-list-main"><div class="m-list-title">Time Tracker</div></div>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-lt)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
@@ -1173,6 +1196,151 @@ async function mSaveNewEvent(){
   mCloseSheet();
   mShowToast('success','Event added');
   mRenderCalendarAgenda();
+}
+
+/* ================================================================
+   TIME TRACKER — a persistent timer (survives closing the app,
+   same bda_ localStorage pattern desktop already uses) with a
+   mini status bar visible across every tab while running, not
+   confined to one screen — starting a timer on a client visit
+   and then checking Tasks while it runs is the whole point.
+   ================================================================ */
+let mTimerState = { running:false, startedAt:null, clientId:'', service:'', description:'' };
+let mTimerIntervalId = null;
+let todaysTimeEntries = [];
+let timeEntriesLoaded = false;
+
+function mSaveTimerState(){
+  try{ localStorage.setItem('bda_mobile_timer', JSON.stringify(mTimerState)); }catch(e){}
+}
+function mLoadTimerStateFromStorage(){
+  try{
+    const raw = localStorage.getItem('bda_mobile_timer');
+    if(raw) mTimerState = JSON.parse(raw);
+  }catch(e){}
+}
+
+function mInitTimerFromStorage(){
+  mLoadTimerStateFromStorage();
+  if(mTimerState.running && mTimerState.startedAt){
+    mUpdateTimerBar();
+    mTimerIntervalId = setInterval(mUpdateTimerBar, 1000);
+  }
+}
+
+function mUpdateTimerBar(){
+  const bar = document.getElementById('mTimerBar');
+  if(!mTimerState.running){ bar.classList.remove('show'); return; }
+  bar.classList.add('show');
+  const c = clients.find(x=>x.id===mTimerState.clientId);
+  document.getElementById('mTimerBarClient').textContent = c ? c.name : 'Untitled';
+  const elapsedMs = Date.now() - mTimerState.startedAt;
+  const totalSec = Math.floor(elapsedMs/1000);
+  const h = String(Math.floor(totalSec/3600)).padStart(2,'0');
+  const m = String(Math.floor((totalSec%3600)/60)).padStart(2,'0');
+  const s = String(totalSec%60).padStart(2,'0');
+  document.getElementById('mTimerBarElapsed').textContent = `${h}:${m}:${s}`;
+}
+
+function mStartTimer(clientId, service, description){
+  mTimerState = { running:true, startedAt:Date.now(), clientId, service, description };
+  mSaveTimerState();
+  mUpdateTimerBar();
+  if(mTimerIntervalId) clearInterval(mTimerIntervalId);
+  mTimerIntervalId = setInterval(mUpdateTimerBar, 1000);
+  mShowToast('success','Timer started');
+}
+
+async function mStopTimer(){
+  if(mTimerIntervalId){ clearInterval(mTimerIntervalId); mTimerIntervalId = null; }
+  const elapsedMs = Date.now() - mTimerState.startedAt;
+  const minutes = Math.max(1, Math.round(elapsedMs/60000));
+  const { clientId, service, description } = mTimerState;
+  mTimerState = { running:false, startedAt:null, clientId:'', service:'', description:'' };
+  mSaveTimerState();
+  document.getElementById('mTimerBar').classList.remove('show');
+
+  const { error } = await mMergeOrInsertTimeEntry({ clientId, service, dateStr: toDateStr(new Date()), minutes, description });
+  if(error){ mShowToast('error','Could not save time entry'); return; }
+  mShowToast('success', `Logged ${minutes}m`);
+  timeEntriesLoaded = false;
+  if(document.getElementById('mSubscreenTitle').textContent==='Time Tracker') mOpenTimeTracker();
+}
+
+// Same merge behavior as desktop: accumulates into an existing entry for
+// the same user/client/service/day rather than creating a duplicate row,
+// re-fetching fresh from the database (not trusting a local cache) since
+// another entry could plausibly land in the same window.
+async function mMergeOrInsertTimeEntry({ clientId, service, dateStr, minutes, description }){
+  const { data: existing } = await supabaseClient.from('time_entries').select('id, minutes, description')
+    .eq('user_id', currentUser.id).eq('client_id', clientId).eq('service', service||'')
+    .eq('entry_date', dateStr).is('deleted_at', null).maybeSingle();
+  if(existing){
+    const newTotal = existing.minutes + minutes;
+    const newDesc = [existing.description, description].filter(Boolean).join(' · ');
+    const { error } = await supabaseClient.from('time_entries').update({ minutes: newTotal, description: newDesc }).eq('id', existing.id);
+    return { error };
+  }
+  const { error } = await supabaseClient.from('time_entries').insert({
+    user_id: currentUser.id, client_id: clientId, entry_date: dateStr, minutes, description, service
+  });
+  return { error };
+}
+
+async function mLoadTodaysTimeEntries(){
+  const { data, error } = await supabaseClient.from('time_entries').select('*')
+    .eq('user_id', currentUser.id).eq('entry_date', toDateStr(new Date())).is('deleted_at', null).order('created_at',{ascending:false});
+  if(error){ mShowToast('error','Could not load entries'); return; }
+  todaysTimeEntries = (data||[]).map(e=>({ id:e.id, clientId:e.client_id, minutes:e.minutes, description:e.description||'', service:e.service||'' }));
+  timeEntriesLoaded = true;
+}
+
+async function mOpenTimeTracker(){
+  await mLoadTodaysTimeEntries();
+  mRenderTimeTracker();
+}
+
+function mRenderTimeTracker(){
+  const totalMin = todaysTimeEntries.reduce((s,e)=>s+e.minutes,0);
+  const activeClients = clients.filter(c=>c.status==='active').sort((a,b)=>a.name.localeCompare(b.name));
+  const html = `
+    <div class="m-metric-grid" style="grid-template-columns:1fr;">
+      <div class="m-card"><div class="m-metric-value">${Math.floor(totalMin/60)}h ${totalMin%60}m</div><div class="m-metric-label">Logged today</div></div>
+    </div>
+    ${!mTimerState.running ? `
+    <div class="m-card">
+      <div class="m-card-row"><h3>Start a timer</h3></div>
+      <div class="m-field"><label>Client</label><select id="mTimerClient">${activeClients.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</select></div>
+      <div class="m-field"><label>Service (optional)</label><input id="mTimerService" placeholder="e.g. SEO, Web Design"></div>
+      <div class="m-field" style="margin-bottom:0;"><label>What are you working on?</label><input id="mTimerDesc" placeholder="Short description"></div>
+      <button class="m-btn m-btn-brand m-btn-full" style="margin-top:14px;" onclick="mStartTimerFromForm()">Start timer</button>
+    </div>` : `<div class="m-empty" style="padding:16px 0;">Timer is running — see the bar above.</div>`}
+    <div class="m-card" style="padding:0 16px;">
+      <div class="m-card-row" style="padding-top:14px;"><h3>Today's entries</h3></div>
+      ${todaysTimeEntries.length ? todaysTimeEntries.map(e=>mTimeEntryRow(e)).join('') : `<div class="m-empty">Nothing logged yet today.</div>`}
+    </div>
+  `;
+  mOpenSubscreen('Time Tracker', html);
+}
+
+function mTimeEntryRow(e){
+  const c = clients.find(x=>x.id===e.clientId);
+  const h = Math.floor(e.minutes/60), m = e.minutes%60;
+  return `<div class="m-list-row" style="cursor:default;">
+    <div class="m-list-main">
+      <div class="m-list-title">${c?escapeHtml(c.name):'—'}${e.service?' · '+escapeHtml(e.service):''}</div>
+      ${e.description ? `<div class="m-list-sub">${escapeHtml(e.description)}</div>` : ''}
+    </div>
+    <div class="m-list-meta">${h?h+'h ':''}${m}m</div>
+  </div>`;
+}
+
+function mStartTimerFromForm(){
+  const clientId = document.getElementById('mTimerClient').value;
+  const service = document.getElementById('mTimerService').value.trim();
+  const description = document.getElementById('mTimerDesc').value.trim();
+  mStartTimer(clientId, service, description);
+  mRenderTimeTracker();
 }
 
 /* ================================================================
