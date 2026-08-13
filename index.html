@@ -10236,7 +10236,7 @@ function renderTotalClientsDonut(){
 
   const r = 46, cx = 60, cy = 60, strokeW = 15;
   const C = 2*Math.PI*r;
-  const gapLen = 6; // fixed arc-length gap between segments, not proportional to segment size
+  const gapLen = strokeW + 8; // fixed arc-length gap, sized to survive round-linecap's own visual overlap (~strokeW/2 per side) and still leave a real visible separation
   let cumulative = 0;
   const segs = entries.map(([tier,count])=>{
     const dash = (count/total)*C;
