@@ -103,6 +103,14 @@ a{color:inherit;text-decoration:none;}
 .m-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:12px;}
 .m-card-clickable{cursor:pointer;}
 .m-card-clickable:active{background:var(--surface-2);}
+.m-card-menu-wrap{position:relative;flex:none;}
+.m-card-menu-btn{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted-lt);font-weight:700;letter-spacing:1px;font-size:16px;flex:none;}
+.m-card-menu-btn:active{background:var(--surface-2);}
+.m-card-menu{display:none;position:absolute;top:calc(100% + 4px);right:0;background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 28px rgba(16,24,40,.18);z-index:60;min-width:190px;overflow:hidden;}
+.m-card-menu.open{display:block;}
+.m-card-menu-item{display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;color:var(--ink);white-space:nowrap;}
+.m-card-menu-item:active{background:var(--surface-2);}
+.m-card-menu-item svg{flex:none;color:inherit;}
 .m-card-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
 .m-card-row h3{margin:0;font-size:13px;font-weight:700;}
 .m-card-link{font-size:12px;font-weight:600;color:var(--brand);background:none;border:none;padding:0;cursor:pointer;}
@@ -122,7 +130,17 @@ a{color:inherit;text-decoration:none;}
 
 .m-avatar{width:34px;height:34px;border-radius:50%;background:var(--brand);color:#2A1200;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex:none;}
 .m-list-icon{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none;}
-.m-metric-icon{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;}
+.m-metric-icon{width:24px;height:24px;border-radius:7px;background:var(--surface-2);color:var(--ink);display:flex;align-items:center;justify-content:center;flex:none;}
+.m-ov-card-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:10px;margin-bottom:12px;border-bottom:1px solid #F0F1F4;}
+.m-ov-card-head-left{display:flex;align-items:center;gap:8px;min-width:0;}
+.m-ov-card-title{font-size:12.5px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.m-ov-card-btn{font-size:10.5px;font-weight:600;color:var(--ink);background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:5px 11px;white-space:nowrap;flex:none;}
+.m-metric-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;min-height:20px;}
+.m-chip-pill{font-size:9.5px;padding:3px 8px;border-radius:20px;letter-spacing:.04em;font-weight:600;display:inline-block;}
+.m-chip-status{background:#EEF0F4;color:var(--muted);}
+.m-chip-good{background:var(--green-bg);color:var(--green);}
+.m-chip-mid{background:var(--amber-bg);color:var(--amber);}
+.m-chip-bad{background:var(--red-bg);color:var(--red);}
 
 .m-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:10.5px;font-weight:700;white-space:nowrap;}
 .m-q-pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
@@ -508,6 +526,23 @@ function mCloseSheet(){
   setTimeout(()=>{ document.getElementById('mSheetOverlay').classList.remove('open'); }, 250);
 }
 
+// Exact match to desktop's toggleKanbanCardMenu()/closeKanbanMenus() —
+// closes any other open card menu first, so only one is ever visible.
+function mToggleCardMenu(id){
+  const wasOpen = document.getElementById('cardMenu-'+id)?.classList.contains('open');
+  mCloseCardMenus();
+  if(!wasOpen){
+    const menu = document.getElementById('cardMenu-'+id);
+    if(menu) menu.classList.add('open');
+  }
+}
+function mCloseCardMenus(){
+  document.querySelectorAll('.m-card-menu').forEach(m=>m.classList.remove('open'));
+}
+document.addEventListener('click', (e)=>{
+  if(!e.target.closest('.m-card-menu-wrap')) mCloseCardMenus();
+});
+
 /* ================================================================
    BADGES — tab bar counts + header notification badge, kept in
    sync with the same data every screen renders from.
@@ -552,68 +587,93 @@ function mRenderHome(){
   document.getElementById('mHeaderTitle').textContent = mGreeting();
   const el = document.getElementById('mScreen-home');
   const ac = clients.filter(c=>!c.deletedAt);
-  const myOpenTasks = tasks.filter(t=>t.assigneeId===currentUser?.id && t.status!=='done').length;
-  const pendingDrafts = ac.filter(c=>c.draftStatus==='pending').length;
+  const me = myName();
+  const admin = isAdmin();
+
+  const active = ac.filter(c=>c.status==='Active').length;
   const atRisk = ac.filter(c=>c.danger>=4).length;
+  const onboarding = ac.filter(c=>c.status==='Onboarding').length;
+
+  const myOpenTasks = tasks.filter(t=>t.assigneeId===currentUser?.id && t.status!=='done');
+  const overdueTasks = myOpenTasks.filter(t=>t.dueDate && t.dueDate < toDateStr(new Date())).length;
+
+  // Pending Approval and Weekly Completion are personal for regular
+  // members and approvers — scoped to clients they themselves logged
+  // something for. Total Clients and Client Health stay roster-wide
+  // regardless of role. Matches desktop's exact admin-only split, not
+  // "admin or approver" — an approver still sees the personal view here.
+  const pending = admin
+    ? ac.filter(c=>c.draftStatus==='pending').length
+    : ac.filter(c=>c.draftStatus==='pending' && (c.improvements||[]).some(i=>i.author===me)).length;
+
   const myOverdueReminders = clientReminders.filter(r=>r.askedBy===currentUser?.id && mReminderDisplayStatus(r)==='due').length;
 
-  // Same formula as desktop: inverse of average danger across the roster, as a %.
-  const healthPct = ac.length ? Math.round(100 - (ac.reduce((s,c)=>s+c.danger,0)/ac.length/5)*100) : null;
+  const healthPct = ac.length ? Math.round(100 - (ac.reduce((s,c)=>s+c.danger,0)/ac.length/5)*100) : 0;
+  const healthTier = healthPct>=70 ? {cls:'m-chip-good',label:'Healthy'} : healthPct>=40 ? {cls:'m-chip-mid',label:'Needs attention'} : {cls:'m-chip-bad',label:'Critical'};
 
-  // Same formula as desktop: of clients with a log this calendar week
-  // (mine specifically, if not admin/approver — matching how desktop
-  // scopes this per role), how many already have an approved draft.
-  const withRecentLogs = canApprove()
+  const withRecentLogs = admin
     ? ac.filter(mHasLoggedThisWeek)
-    : ac.filter(c => (c.improvements||[]).some(i => i.author===myName() && i.date && new Date(i.date) >= getWeekStart(new Date())));
-  const completionPct = withRecentLogs.length ? Math.round((withRecentLogs.filter(c=>c.draftStatus==='approved').length/withRecentLogs.length)*100) : null;
+    : ac.filter(c => (c.improvements||[]).some(i => i.author===me && i.date && new Date(i.date) >= getWeekStart(new Date())));
+  const approvedWithLogs = withRecentLogs.filter(c=>c.draftStatus==='approved').length;
+  const completionPct = withRecentLogs.length ? Math.round((approvedWithLogs/withRecentLogs.length)*100) : 0;
 
   const activeThisWeek = ac.filter(mHasLoggedThisWeek).sort((a,b)=>b.danger-a.danger).slice(0,5);
   const attention = ac.filter(c=>c.danger>=4 || c.draftStatus==='pending')
     .sort((a,b)=> b.danger-a.danger || (b.draftStatus==='pending')-(a.draftStatus==='pending'))
     .slice(0,5);
 
+  const kpiCard = (icon, title, value, valueColor, chipsHtml, onclick, seeAll) => `
+    <div class="m-card"${onclick?` onclick="${onclick}"`:''}>
+      <div class="m-ov-card-title-row">
+        <span class="m-ov-card-head-left"><span class="m-metric-icon">${icon}</span><span class="m-ov-card-title">${title}</span></span>
+        ${seeAll?`<span class="m-ov-card-btn" onclick="event.stopPropagation();${seeAll}">See All</span>`:''}
+      </div>
+      <div class="m-metric-value"${valueColor?` style="color:${valueColor};"`:''}>${value}</div>
+      <div class="m-metric-chips">${chipsHtml}</div>
+    </div>`;
+
+  const icoClients = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
+  const icoHealth = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>';
+  const icoTasks = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>';
+  const icoPending = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+  const icoCompletion = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+  const icoReminders = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
+
   el.innerHTML = `
-    <div class="m-metric-grid">
-      <div class="m-card" onclick="mOpenClientsList()">
-        <div class="m-metric-icon" style="background:var(--surface-2);color:var(--ink);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-        <div class="m-metric-value">${ac.length}</div>
-        <div class="m-metric-label">Total Clients</div>
-      </div>
-      <div class="m-card">
-        <div class="m-metric-icon" style="background:var(--surface-2);color:var(--ink);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
-        <div class="m-metric-value">${healthPct===null?'—':healthPct+'%'}</div>
-        <div class="m-metric-label">Client Health</div>
-      </div>
-      <div class="m-card" onclick="mSwitchTab('tasks')">
-        <div class="m-metric-icon" style="background:var(--surface-2);color:var(--ink);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
-        <div class="m-metric-value">${myOpenTasks}</div>
-        <div class="m-metric-label">Open Tasks</div>
-      </div>
-      <div class="m-card" onclick="mSwitchTab('queue')">
-        <div class="m-metric-icon" style="background:var(--surface-2);color:var(--ink);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
-        <div class="m-metric-value">${pendingDrafts}</div>
-        <div class="m-metric-label">Pending Approval</div>
-      </div>
-      <div class="m-card" onclick="mSwitchTab('queue')">
-        <div class="m-metric-icon" style="background:var(--surface-2);color:var(--ink);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
-        <div class="m-metric-value" style="color:${atRisk?'var(--red)':'var(--ink)'};">${atRisk}</div>
-        <div class="m-metric-label">At-Risk Clients</div>
-      </div>
-      <div class="m-card">
-        <div class="m-metric-icon" style="background:var(--surface-2);color:var(--ink);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
-        <div class="m-metric-value">${completionPct===null?'—':completionPct+'%'}</div>
-        <div class="m-metric-label">Weekly Completion</div>
-      </div>
-      <div class="m-card" onclick="mSwitchTab('reminders')" style="grid-column:1/-1;">
-        <div class="m-metric-icon" style="background:var(--surface-2);color:var(--ink);margin-bottom:0;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
-        <div class="m-metric-value" style="color:${myOverdueReminders?'var(--blue)':'var(--ink)'};">${myOverdueReminders}</div>
-        <div class="m-metric-label">Follow-Ups Due</div>
-      </div>
-    </div>
+    ${kpiCard(icoClients, 'Total Clients', ac.length,
+      null,
+      ac.length ? `<span class="m-chip-pill m-chip-good">${active} Active</span>${atRisk?`<span class="m-chip-pill m-chip-bad">${atRisk} At Risk</span>`:''}${onboarding?`<span class="m-chip-pill m-chip-mid">${onboarding} Onboarding</span>`:''}` : '',
+      "mOpenClientsList()", "mOpenClientsList()")}
+
+    ${kpiCard(icoHealth, 'Client Health', ac.length ? healthPct+'%' : '—',
+      null,
+      ac.length ? `<span class="m-chip-pill ${healthTier.cls}">${healthTier.label}</span>` : '')}
+
+    ${kpiCard(icoTasks, 'Open Tasks', myOpenTasks.length,
+      null,
+      overdueTasks ? `<span class="m-chip-pill m-chip-bad">${overdueTasks} Overdue</span>` : myOpenTasks.length ? `<span class="m-chip-pill m-chip-status">None Overdue</span>` : `<span class="m-chip-pill m-chip-good">All Clear</span>`,
+      "mSwitchTab('tasks')")}
+
+    ${kpiCard(icoPending, admin ? 'Pending Approval' : 'Drafts Ready', pending,
+      null,
+      pending ? `<span class="m-chip-pill m-chip-mid">${pending} Draft${pending!==1?'s':''} Ready</span>` : `<span class="m-chip-pill m-chip-good">All Caught Up</span>`,
+      "mSwitchTab('queue')")}
+
+    ${kpiCard(icoCompletion, 'Weekly Completion', withRecentLogs.length ? completionPct+'%' : '—',
+      null,
+      withRecentLogs.length ? `<span class="m-chip-pill m-chip-status">${approvedWithLogs} Of ${withRecentLogs.length} Updated</span>` : `<span class="m-chip-pill m-chip-status">No Logs Yet</span>`,
+      "mSwitchTab('queue')")}
+
+    ${kpiCard(icoReminders, 'Follow-Ups Due', myOverdueReminders,
+      myOverdueReminders ? 'var(--blue)' : null,
+      myOverdueReminders ? `<span class="m-chip-pill" style="background:var(--blue-bg);color:var(--blue);">Needs Follow-Up</span>` : `<span class="m-chip-pill m-chip-good">All Caught Up</span>`,
+      "mSwitchTab('reminders')")}
 
     <div class="m-card">
-      <div class="m-card-row"><h3>Needs attention</h3><button class="m-card-link" onclick="mSwitchTab('queue')">See all</button></div>
+      <div class="m-ov-card-title-row">
+        <span class="m-ov-card-head-left"><span class="m-metric-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span><span class="m-ov-card-title">Needs Attention</span></span>
+        <span class="m-ov-card-btn" onclick="event.stopPropagation();mSwitchTab('queue')">See All</span>
+      </div>
       ${attention.length ? attention.map(c=>mClientAttentionRow(c)).join('') : `<div class="m-empty" style="padding:20px 0;">Nothing urgent right now.</div>`}
     </div>
 
@@ -1057,6 +1117,14 @@ function mQueueRow(c){
       <div style="flex:1;min-width:0;">
         <div style="font-size:15px;font-weight:700;">${escapeHtml(c.name)}</div>
         <div style="font-size:12px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${escapeHtml(c.service||'')} · <span class="m-pill" style="background:${statusMeta.color}18;color:${statusMeta.color};">${statusMeta.label}</span></div>
+      </div>
+      <div class="m-card-menu-wrap" onclick="event.stopPropagation();">
+        <div class="m-card-menu-btn" onclick="mToggleCardMenu('q-${c.id}')">⋯</div>
+        <div class="m-card-menu" id="cardMenu-q-${c.id}">
+          <div class="m-card-menu-item" onclick="mCloseCardMenus();mOpenLogImprovementSheet('${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Log / edit improvements</div>
+          <div class="m-card-menu-item" onclick="mCloseCardMenus();mOpenNoteSheet(null,'${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Add note</div>
+          <div class="m-card-menu-item" onclick="mCloseCardMenus();mOpenTimeTracker('${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Track time</div>
+        </div>
       </div>
     </div>
     <div class="m-q-pill-row">
@@ -1503,12 +1571,13 @@ function mNoteRow(n){
   </div>`;
 }
 
-function mOpenNoteSheet(noteId){
+function mOpenNoteSheet(noteId, presetClientId){
   const n = noteId ? notes.find(x=>x.id===noteId) : null;
+  const selectedClientId = n ? n.clientId : presetClientId;
   const html = `
     <div class="m-field"><label>Title</label><input id="mNoteTitle" placeholder="Short title" value="${n?escapeHtml(n.title||''):''}"></div>
     <div class="m-field"><label>Client</label>
-      <select id="mNoteClient"><option value="">— None —</option>${clients.filter(c=>!c.deletedAt).sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${n&&n.clientId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select>
+      <select id="mNoteClient"><option value="">— None —</option>${clients.filter(c=>!c.deletedAt).sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${selectedClientId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select>
     </div>
     <div class="m-field"><label>Note</label><textarea id="mNoteText" placeholder="What's the idea or plan?">${n?escapeHtml(n.text||''):''}</textarea></div>
   `;
@@ -1769,12 +1838,12 @@ async function mLoadTodaysTimeEntries(){
   timeEntriesLoaded = true;
 }
 
-async function mOpenTimeTracker(){
+async function mOpenTimeTracker(presetClientId){
   await mLoadTodaysTimeEntries();
-  mRenderTimeTracker();
+  mRenderTimeTracker(presetClientId);
 }
 
-function mRenderTimeTracker(){
+function mRenderTimeTracker(presetClientId){
   const totalMin = todaysTimeEntries.reduce((s,e)=>s+e.minutes,0);
   const activeClients = clients.filter(c=>!c.deletedAt).sort((a,b)=>a.name.localeCompare(b.name));
   const html = `
@@ -1784,7 +1853,7 @@ function mRenderTimeTracker(){
     ${!mTimerState.running ? `
     <div class="m-card">
       <div class="m-card-row"><h3>Start a timer</h3></div>
-      <div class="m-field"><label>Client</label><select id="mTimerClient">${activeClients.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</select></div>
+      <div class="m-field"><label>Client</label><select id="mTimerClient">${activeClients.map(c=>`<option value="${c.id}" ${presetClientId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select></div>
       <div class="m-field"><label>Service (optional)</label><input id="mTimerService" placeholder="e.g. SEO, Web Design"></div>
       <div class="m-field" style="margin-bottom:0;"><label>What are you working on?</label><input id="mTimerDesc" placeholder="Short description"></div>
       <button class="m-btn m-btn-brand m-btn-full" style="margin-top:14px;" onclick="mStartTimerFromForm()">Start timer</button>
