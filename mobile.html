@@ -244,6 +244,13 @@ a{color:inherit;text-decoration:none;}
 .m-calendar-event-dot{width:5px;height:5px;border-radius:50%;flex:none;}
 .m-calendar-more-label{font-size:8px;color:var(--muted-lt);}
 
+.m-week-strip{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:6px;}
+.m-week-strip-day{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:6px 2px;text-align:center;cursor:pointer;}
+.m-week-strip-day.selected{background:var(--brand);border-color:var(--brand);}
+.m-week-strip-day.selected .m-wsd-label,.m-week-strip-day.selected .m-wsd-total{color:#fff;}
+.m-wsd-label{font-size:9px;color:var(--muted-lt);line-height:1.3;font-weight:600;}
+.m-wsd-total{font-size:10px;color:var(--ink);font-weight:700;margin-top:3px;}
+
 .m-field{margin-bottom:16px;}
 .m-field label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;}
 .m-field input,.m-field select,.m-field textarea{
@@ -1865,7 +1872,7 @@ async function mRestoreTrashItem(type, id){
     const { error } = await supabaseClient.from('time_entries').update({ deleted_at: null }).eq('id', id);
     if(error){ mShowToast('error','Restore failed'); return; }
     mTrashedTimeEntries = mTrashedTimeEntries.filter(e=>e.id!==id);
-    timeEntriesLoaded = false;
+    mTimeEntriesLoaded = false;
     mShowToast('success','Entry restored');
   }
   mRenderTrashScreen();
@@ -2527,10 +2534,33 @@ async function mSaveNewEvent(){
    confined to one screen — starting a timer on a client visit
    and then checking Tasks while it runs is the whole point.
    ================================================================ */
+// Exact match to desktop's formatMinutes()/parseDurationInput()/minutesToDurationInputStr().
+function formatMinutes(mins){
+  const h = Math.floor(mins/60), m = mins%60;
+  if(h && m) return `${h}h ${m}m`;
+  if(h) return `${h}h`;
+  return `${m}m`;
+}
+function parseDurationInput(str){
+  str = (str||'').trim().toLowerCase().replace(',', '.');
+  if(!str) return null;
+  const hm = str.match(/^(?:(\d+(?:\.\d+)?)\s*h)?\s*(?:(\d+(?:\.\d+)?)\s*m)?$/);
+  if(hm && (hm[1]!==undefined || hm[2]!==undefined)){
+    const h = parseFloat(hm[1]||0), m = parseFloat(hm[2]||0);
+    return Math.round(h*60 + m);
+  }
+  const plain = parseFloat(str);
+  return isNaN(plain) ? null : Math.round(plain*60);
+}
+function minutesToDurationInputStr(minutes){
+  const h = Math.floor(minutes/60), m = minutes%60;
+  if(h && m) return `${h}h ${m}m`;
+  if(h) return `${h}h`;
+  return `${m}m`;
+}
+
 let mTimerState = { running:false, startedAt:null, clientId:'', service:'', description:'' };
 let mTimerIntervalId = null;
-let todaysTimeEntries = [];
-let timeEntriesLoaded = false;
 
 function mSaveTimerState(){
   try{ localStorage.setItem('bda_mobile_timer', JSON.stringify(mTimerState)); }catch(e){}
@@ -2585,7 +2615,7 @@ async function mStopTimer(){
   const { error } = await mMergeOrInsertTimeEntry({ clientId, service, dateStr: toDateStr(new Date()), minutes, description });
   if(error){ mShowToast('error','Could not save time entry'); return; }
   mShowToast('success', `Logged ${minutes}m`);
-  timeEntriesLoaded = false;
+  mTimeEntriesLoaded = false;
   if(document.getElementById('mSubscreenTitle').textContent==='Time Tracker') mOpenTimeTracker();
 }
 
@@ -2609,53 +2639,160 @@ async function mMergeOrInsertTimeEntry({ clientId, service, dateStr, minutes, de
   return { error };
 }
 
-async function mLoadTodaysTimeEntries(){
+let mTimeEntries = [];
+let mAllTimeEntries = null;
+let mTimeEntriesLoaded = false;
+let mTimeTrackerTab = 'timesheet';
+let mTimesheetAnchor = new Date();
+let mTimesheetMode = 'day';
+let mReportRange = 'week';
+let mReportFrom = null;
+let mReportTo = null;
+
+function mMyOwnTimeEntries(){
+  if(!currentUser) return [];
+  return mTimeEntries.filter(e=>e.userId===currentUser.id);
+}
+function mVisibleTimeEntries(){
+  return isAdmin() && mAllTimeEntries ? mAllTimeEntries : mMyOwnTimeEntries();
+}
+
+async function mLoadMyTimeEntries(){
   const { data, error } = await supabaseClient.from('time_entries').select('*')
-    .eq('user_id', currentUser.id).eq('entry_date', toDateStr(new Date())).is('deleted_at', null).order('created_at',{ascending:false});
-  if(error){ mShowToast('error','Could not load entries'); return; }
-  todaysTimeEntries = (data||[]).map(e=>({ id:e.id, clientId:e.client_id, minutes:e.minutes, description:e.description||'', service:e.service||'' }));
-  timeEntriesLoaded = true;
+    .eq('user_id', currentUser.id).is('deleted_at', null).order('entry_date',{ascending:false});
+  if(error){ mShowToast('error','Could not load time entries'); return; }
+  mTimeEntries = (data||[]).map(e=>({
+    id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes,
+    description:e.description||'', service:e.service||'', logged:e.logged, createdAt:e.created_at
+  }));
+  if(isAdmin()){
+    const { data: allData } = await supabaseClient.from('time_entries').select('*').is('deleted_at', null);
+    mAllTimeEntries = (allData||[]).map(e=>({
+      id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes,
+      description:e.description||'', service:e.service||'', logged:e.logged, createdAt:e.created_at
+    }));
+  }
+  mTimeEntriesLoaded = true;
 }
 
 async function mOpenTimeTracker(presetClientId){
-  await mLoadTodaysTimeEntries();
-  mRenderTimeTracker(presetClientId);
+  if(!mTimeEntriesLoaded) await mLoadMyTimeEntries();
+  mTimeTrackerTab = 'timesheet';
+  mRenderTimeTrackerMain(presetClientId);
 }
 
-function mRenderTimeTracker(presetClientId){
-  const totalMin = todaysTimeEntries.reduce((s,e)=>s+e.minutes,0);
-  const activeClients = clients.filter(c=>!c.deletedAt).sort((a,b)=>a.name.localeCompare(b.name));
+function mSwitchTimeTrackerTab(tab){
+  mTimeTrackerTab = tab;
+  mRenderTimeTrackerMain();
+}
+
+function mRenderTimeTrackerMain(presetClientId){
+  const tabs = [
+    { key:'timesheet', label:'Timesheet' },
+    { key:'reports', label:'Reports' },
+    { key:'dailysummary', label:'Daily Summary' },
+  ];
   const html = `
-    <div class="m-metric-grid" style="grid-template-columns:1fr;">
-      <div class="m-card"><div class="m-metric-value">${Math.floor(totalMin/60)}h ${totalMin%60}m</div><div class="m-metric-label">Logged today</div></div>
+    <div class="m-chip-row">
+      ${tabs.map(t=>`<div class="m-chip ${mTimeTrackerTab===t.key?'active':''}" onclick="mSwitchTimeTrackerTab('${t.key}')">${t.label}</div>`).join('')}
     </div>
+    <div id="mTimeTrackerBody"></div>
+  `;
+  const action = mTimeTrackerTab==='timesheet' ? `<button class="m-icon-btn" onclick="mOpenManualEntrySheet()" aria-label="Add manual entry">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </button>` : '';
+  mOpenSubscreen('Time Tracker', html, action);
+
+  const body = document.getElementById('mTimeTrackerBody');
+  if(mTimeTrackerTab==='timesheet') body.innerHTML = mTimesheetHtml(presetClientId);
+  else if(mTimeTrackerTab==='reports') mRenderReportsBody(body);
+  else mLoadAndRenderDailySummary(body);
+}
+
+/* --- TIMESHEET --- */
+function mShiftTimesheet(dir){
+  if(mTimesheetMode==='day') mTimesheetAnchor.setDate(mTimesheetAnchor.getDate()+dir);
+  else mTimesheetAnchor.setDate(mTimesheetAnchor.getDate()+dir*7);
+  mRenderTimeTrackerMain();
+}
+function mJumpToTimesheetDate(dateStr){
+  mTimesheetAnchor = new Date(dateStr+'T00:00:00');
+  mRenderTimeTrackerMain();
+}
+function mSetTimesheetMode(mode){
+  mTimesheetMode = mode;
+  mRenderTimeTrackerMain();
+}
+function mResetTimesheetToToday(){
+  mTimesheetAnchor = new Date();
+  mRenderTimeTrackerMain();
+}
+
+function mTimesheetHtml(presetClientId){
+  const isToday = toDateStr(mTimesheetAnchor) === toDateStr(new Date());
+  const weekStart = getWeekStart(mTimesheetAnchor);
+  let rangeLabel;
+  if(mTimesheetMode==='day'){
+    rangeLabel = (isToday ? 'Today · ' : '') + mTimesheetAnchor.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+  } else {
+    const we = new Date(weekStart); we.setDate(we.getDate()+6);
+    const isCurrentWeek = toDateStr(weekStart)===toDateStr(getWeekStart(new Date()));
+    rangeLabel = (isCurrentWeek ? 'This week · ' : '') + `${weekStart.toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${we.toLocaleDateString('en-US',{month:'short',day:'numeric'})}`;
+  }
+
+  let weekTotal = 0;
+  const stripDays = [];
+  for(let i=0;i<7;i++){
+    const d = new Date(weekStart); d.setDate(d.getDate()+i);
+    const dStr = toDateStr(d);
+    const dayMins = mMyOwnTimeEntries().filter(e=>e.date===dStr).reduce((s,e)=>s+e.minutes,0);
+    weekTotal += dayMins;
+    stripDays.push({ d, dStr, dayMins });
+  }
+  const selectedStr = toDateStr(mTimesheetAnchor);
+  const stripHtml = `<div class="m-week-strip">
+    ${stripDays.map(({d,dStr,dayMins})=>`
+      <div class="m-week-strip-day ${dStr===selectedStr?'selected':''}" onclick="mJumpToTimesheetDate('${dStr}')">
+        <div class="m-wsd-label">${d.toLocaleDateString('en-US',{weekday:'short'})}<br>${d.getDate()}</div>
+        <div class="m-wsd-total">${dayMins?formatMinutes(dayMins):'—'}</div>
+      </div>`).join('')}
+  </div>
+  <div style="text-align:right;font-size:11px;color:var(--muted-lt);margin-bottom:14px;">Week total: <b style="color:var(--ink);">${formatMinutes(weekTotal)}</b></div>`;
+
+  let entriesHtml;
+  if(mTimesheetMode==='day'){
+    const dayEntries = mMyOwnTimeEntries().filter(e=>e.date===selectedStr).sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
+    entriesHtml = dayEntries.length ? dayEntries.map(e=>mTimeEntryCard(e)).join('') : `<div class="m-empty">Nothing logged this day.</div>`;
+  } else {
+    const weekEntries = mMyOwnTimeEntries().filter(e=> e.date >= toDateStr(weekStart) && e.date <= toDateStr(stripDays[6].d))
+      .sort((a,b)=> b.date.localeCompare(a.date) || new Date(b.createdAt)-new Date(a.createdAt));
+    entriesHtml = weekEntries.length ? weekEntries.map(e=>mTimeEntryCard(e, true)).join('') : `<div class="m-empty">Nothing logged this week.</div>`;
+  }
+
+  return `
     ${!mTimerState.running ? `
     <div class="m-card">
       <div class="m-card-row"><h3>Start a timer</h3></div>
-      <div class="m-field"><label>Client</label><select id="mTimerClient">${activeClients.map(c=>`<option value="${c.id}" ${presetClientId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select></div>
+      <div class="m-field"><label>Client</label><select id="mTimerClient">${clients.filter(c=>!c.deletedAt).sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${presetClientId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select></div>
       <div class="m-field"><label>Service (optional)</label><input id="mTimerService" placeholder="e.g. SEO, Web Design"></div>
       <div class="m-field" style="margin-bottom:0;"><label>What are you working on?</label><input id="mTimerDesc" placeholder="Short description"></div>
       <button class="m-btn m-btn-brand m-btn-full" style="margin-top:14px;" onclick="mStartTimerFromForm()">Start timer</button>
-    </div>` : `<div class="m-empty" style="padding:16px 0;">Timer is running — see the bar above.</div>`}
-    <div class="m-card" style="padding:0 16px;">
-      <div class="m-card-row" style="padding-top:14px;"><h3>Today's entries</h3></div>
-      ${todaysTimeEntries.length ? todaysTimeEntries.map(e=>mTimeEntryRow(e)).join('') : `<div class="m-empty">Nothing logged yet today.</div>`}
+    </div>` : ''}
+    <div class="m-cal-nav-row" style="margin-bottom:6px;">
+      <div class="m-date-nav" style="flex:1;">
+        <button class="m-date-nav-arrow" onclick="mShiftTimesheet(-1)">‹</button>
+        <span class="m-date-nav-label" style="flex:1;text-align:center;">${rangeLabel}</span>
+        <button class="m-date-nav-arrow" onclick="mShiftTimesheet(1)">›</button>
+      </div>
+      ${!isToday && mTimesheetMode==='day' ? `<button class="m-cal-today-btn" onclick="mResetTimesheetToToday()">Today</button>` : ''}
     </div>
+    <div class="m-view-toggle" style="margin-bottom:14px;">
+      <div class="m-view-toggle-option ${mTimesheetMode==='day'?'active':''}" onclick="mSetTimesheetMode('day')">Day</div>
+      <div class="m-view-toggle-option ${mTimesheetMode==='week'?'active':''}" onclick="mSetTimesheetMode('week')">Week</div>
+    </div>
+    ${stripHtml}
+    ${entriesHtml}
   `;
-  mOpenSubscreen('Time Tracker', html);
-}
-
-function mTimeEntryRow(e){
-  const c = clients.find(x=>x.id===e.clientId);
-  const h = Math.floor(e.minutes/60), m = e.minutes%60;
-  return `<div class="m-list-row" style="cursor:default;">
-    <div class="m-list-icon" style="background:var(--surface-2);color:var(--ink);border-radius:50%;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
-    <div class="m-list-main">
-      <div class="m-list-title">${c?escapeHtml(c.name):'—'}${e.service?' · '+escapeHtml(e.service):''}</div>
-      ${e.description ? `<div class="m-list-sub">${escapeHtml(e.description)}</div>` : ''}
-    </div>
-    <div class="m-list-meta">${h?h+'h ':''}${m}m</div>
-  </div>`;
 }
 
 function mStartTimerFromForm(){
@@ -2663,8 +2800,281 @@ function mStartTimerFromForm(){
   const service = document.getElementById('mTimerService').value.trim();
   const description = document.getElementById('mTimerDesc').value.trim();
   mStartTimer(clientId, service, description);
-  mRenderTimeTracker();
+  mRenderTimeTrackerMain();
 }
+
+function mTimeEntryCard(e, showDate){
+  const c = clients.find(x=>x.id===e.clientId);
+  const risk = c ? riskLabel(c.danger) : null;
+  const canLog = e.description && !e.logged;
+  return `<div class="m-card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:700;">${c ? escapeHtml(c.name) : 'Unknown client'}${e.service ? ` <span style="font-weight:400;color:var(--muted);">(${escapeHtml(e.service)})</span>` : ''}</div>
+        ${showDate ? `<div style="font-size:11px;color:var(--muted-lt);margin-top:2px;">${new Date(e.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</div>` : ''}
+        ${c ? `<div class="m-q-pill-row" style="margin-top:8px;">
+          <span class="m-pill" style="background:${risk.color}18;color:${risk.color};">${risk.text}</span>
+          <span class="m-pill" style="background:var(--surface-2);color:var(--ink);">Importance ${c.importance}/10</span>
+        </div>` : ''}
+        ${e.description ? `<div style="font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.4;">${escapeHtml(e.description)}</div>` : ''}
+      </div>
+      <div style="text-align:right;flex:none;">
+        <div style="font-size:15px;font-weight:700;">${formatMinutes(e.minutes)}</div>
+        ${e.logged ? `<span class="m-pill" style="background:var(--green-bg);color:var(--green);margin-top:6px;">✓ Logged</span>` : ''}
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="m-btn m-btn-outline" style="flex:none;padding:8px 13px;min-height:auto;font-size:12.5px;" onclick="mOpenEditTimeEntrySheet('${e.id}')">Edit</button>
+      ${canLog ? `<button class="m-btn m-btn-outline" style="flex:none;padding:8px 13px;min-height:auto;font-size:12.5px;" onclick="mLogTimeEntryAsImprovement('${e.id}')">Log as improvement</button>` : ''}
+      <button class="m-btn m-btn-outline" style="flex:none;padding:8px 13px;min-height:auto;font-size:12.5px;color:var(--red);" onclick="mDeleteTimeEntry('${e.id}')">Delete</button>
+    </div>
+  </div>`;
+}
+
+function mOpenManualEntrySheet(){
+  const activeClients = clients.filter(c=>!c.deletedAt).sort((a,b)=>a.name.localeCompare(b.name));
+  const html = `
+    <div class="m-field"><label>Client</label><select id="mManualClient">${activeClients.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</select></div>
+    <div class="m-field"><label>Service (optional)</label><input id="mManualService" placeholder="e.g. SEO, Web Design"></div>
+    <div class="m-field"><label>Date</label><input type="date" id="mManualDate" value="${toDateStr(mTimesheetAnchor)}"></div>
+    <div class="m-field"><label>Duration</label><input id="mManualDuration" placeholder="e.g. 1h 30m, or 1.5"></div>
+    <div class="m-field" style="margin-bottom:0;"><label>Description</label><textarea id="mManualDesc" placeholder="What did you work on?"></textarea></div>
+  `;
+  const actions = `<button class="m-btn m-btn-outline" onclick="mCloseSheet()">Cancel</button><button class="m-btn m-btn-brand" onclick="mAddManualEntry()">Add entry</button>`;
+  mOpenSheet('Add time manually', html, actions);
+}
+
+async function mAddManualEntry(){
+  const clientId = document.getElementById('mManualClient').value;
+  const service = document.getElementById('mManualService').value.trim();
+  const dateVal = document.getElementById('mManualDate').value;
+  const totalMinutes = parseDurationInput(document.getElementById('mManualDuration').value);
+  const description = document.getElementById('mManualDesc').value.trim();
+  if(!dateVal){ mShowToast('error','Pick a date'); return; }
+  if(!totalMinutes || totalMinutes<=0){ mShowToast('error','Enter a duration', 'Try something like "1h 30m" or "1.5".'); return; }
+  if(totalMinutes > 960 && !confirm(`That's ${formatMinutes(totalMinutes)} for a single entry — did you mean minutes instead of hours? Tap OK to log it anyway.`)) return;
+  const { error } = await mMergeOrInsertTimeEntry({ clientId, service, dateStr: dateVal, minutes: totalMinutes, description });
+  if(error){ mShowToast('error','Save failed'); return; }
+  mTimeEntriesLoaded = false;
+  await mLoadMyTimeEntries();
+  mCloseSheet();
+  mShowToast('success','Time added');
+  mRenderTimeTrackerMain();
+}
+
+function mOpenEditTimeEntrySheet(id){
+  const e = mTimeEntries.find(x=>x.id===id);
+  if(!e) return;
+  const activeClients = clients.filter(c=>!c.deletedAt).sort((a,b)=>a.name.localeCompare(b.name));
+  const html = `
+    <div class="m-field"><label>Client</label><select id="mEditEntryClient">${activeClients.map(c=>`<option value="${c.id}" ${e.clientId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select></div>
+    <div class="m-field"><label>Service (optional)</label><input id="mEditEntryService" value="${escapeHtml(e.service||'')}"></div>
+    <div class="m-field"><label>Date</label><input type="date" id="mEditEntryDate" value="${e.date}"></div>
+    <div class="m-field"><label>Duration</label><input id="mEditEntryDuration" value="${minutesToDurationInputStr(e.minutes)}"></div>
+    <div class="m-field" style="margin-bottom:0;"><label>Description</label><textarea id="mEditEntryDesc">${escapeHtml(e.description||'')}</textarea></div>
+  `;
+  const actions = `<button class="m-btn m-btn-outline" onclick="mCloseSheet()">Cancel</button><button class="m-btn m-btn-brand" onclick="mSaveTimeEntryEdit('${id}')">Save changes</button>`;
+  mOpenSheet('Edit time entry', html, actions);
+}
+
+async function mSaveTimeEntryEdit(id){
+  const clientId = document.getElementById('mEditEntryClient').value;
+  const service = document.getElementById('mEditEntryService').value.trim();
+  const dateVal = document.getElementById('mEditEntryDate').value;
+  const totalMinutes = parseDurationInput(document.getElementById('mEditEntryDuration').value);
+  const description = document.getElementById('mEditEntryDesc').value.trim();
+  if(!totalMinutes || totalMinutes<=0){ mShowToast('error','Enter a duration'); return; }
+  const { error } = await supabaseClient.from('time_entries').update({
+    client_id: clientId, entry_date: dateVal, minutes: totalMinutes, description, service
+  }).eq('id', id);
+  if(error){ mShowToast('error','Save failed'); return; }
+  mTimeEntriesLoaded = false;
+  await mLoadMyTimeEntries();
+  mCloseSheet();
+  mShowToast('success','Entry updated');
+  mRenderTimeTrackerMain();
+}
+
+async function mDeleteTimeEntry(id){
+  if(!confirm('Move this time entry to Trash? You can restore it later.')) return;
+  const { error } = await supabaseClient.from('time_entries').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+  if(error){ mShowToast('error','Delete failed'); return; }
+  mTimeEntries = mTimeEntries.filter(x=>x.id!==id);
+  mShowToast('success','Moved to Trash');
+  mRenderTimeTrackerMain();
+}
+
+// Exact match to desktop's logTimeEntryAsImprovement() — including the
+// includeInEmail:false default, which differs deliberately from notes/queue
+// logging (both default true): time-entry descriptions aren't necessarily
+// written with a client email in mind, so whether it goes in the draft is
+// left as a later decision rather than assumed.
+async function mLogTimeEntryAsImprovement(entryId){
+  const entry = mTimeEntries.find(e=>e.id===entryId);
+  if(!entry) return;
+  if(!entry.description || !entry.description.trim()){ mShowToast('error','Nothing to log'); return; }
+  if(entry.logged){ mShowToast('error','Already logged'); return; }
+  await mLoadAll();
+  const c = clients.find(x=>x.id===entry.clientId);
+  if(!c){ mShowToast('error','Client not found'); return; }
+  const author = myName() || 'Team member';
+  c.improvements = c.improvements || [];
+  c.improvements.push({ author, text: entry.description.trim(), date: new Date().toISOString(), includeInEmail: false, source: 'time' });
+  c.draftStatus = 'none'; c.draft = '';
+
+  const { data: row } = await supabaseClient.from('app_storage').select('value').eq('key','app-data').maybeSingle();
+  const appData = JSON.parse(row.value);
+  const idx = appData.clients.findIndex(x=>x.id===c.id);
+  if(idx>-1){
+    appData.clients[idx].improvements = appData.clients[idx].improvements || [];
+    appData.clients[idx].improvements.push({ author, text: entry.description.trim(), date: new Date().toISOString(), includeInEmail: false, source: 'time' });
+    appData.clients[idx].draftStatus = 'none';
+    appData.clients[idx].draft = '';
+  }
+  const { error: saveErr } = await supabaseClient.from('app_storage').update({ value: JSON.stringify(appData) }).eq('key','app-data');
+  const { error: entryErr } = await supabaseClient.from('time_entries').update({ logged: true }).eq('id', entryId);
+  if(saveErr || entryErr){ mShowToast('error','Could not save'); return; }
+  entry.logged = true;
+  mShowToast('success','Logged', 'Added to Past Improvements.');
+  mRenderTimeTrackerMain();
+}
+
+/* --- REPORTS --- */
+function mGetReportDateBounds(){
+  const now = new Date();
+  if(mReportRange==='week') return { start:getWeekStart(now), end:null };
+  if(mReportRange==='month') return { start:new Date(now.getFullYear(), now.getMonth(), 1), end:null };
+  if(mReportRange==='custom') return { start: mReportFrom || new Date(2000,0,1), end: mReportTo };
+  return { start:new Date(2000,0,1), end:null };
+}
+function mGetReportRangeEntries(){
+  const { start, end } = mGetReportDateBounds();
+  return mVisibleTimeEntries().filter(e=>{
+    const d = new Date(e.date+'T00:00:00');
+    if(d < start) return false;
+    if(end && d > end) return false;
+    return true;
+  });
+}
+function mOnReportRangeChange(){
+  mReportRange = document.getElementById('mReportRangeSelect').value;
+  document.getElementById('mReportCustomRange').style.display = mReportRange==='custom' ? 'flex' : 'none';
+  if(mReportRange==='custom' && !mReportFrom){ mReportFrom = getWeekStart(new Date()); mReportTo = new Date(); }
+  mRenderTimeTrackerMain();
+}
+function mApplyReportCustomRange(){
+  const fromVal = document.getElementById('mReportFromDate').value;
+  const toVal = document.getElementById('mReportToDate').value;
+  mReportFrom = fromVal ? new Date(fromVal+'T00:00:00') : null;
+  mReportTo = toVal ? new Date(toVal+'T23:59:59') : null;
+  mRenderTimeTrackerMain();
+}
+
+function mRenderReportsBody(body){
+  const relevant = mGetReportRangeEntries();
+  const totalMinutes = relevant.reduce((s,e)=>s+e.minutes,0);
+  const uniqueClients = new Set(relevant.map(e=>e.clientId)).size;
+  const uniquePeople = new Set(relevant.map(e=>e.userId)).size;
+  const adminView = isAdmin();
+
+  const byClient = {};
+  relevant.forEach(e=>{
+    if(!byClient[e.clientId]) byClient[e.clientId] = 0;
+    byClient[e.clientId] += e.minutes;
+  });
+  const clientRows = Object.entries(byClient).sort((a,b)=>b[1]-a[1]).map(([clientId,mins])=>{
+    const c = clients.find(x=>x.id===clientId);
+    return `<div class="m-list-row" style="cursor:default;">
+      <div class="m-list-main"><div class="m-list-title">${c?escapeHtml(c.name):'Unknown client'}</div></div>
+      <div class="m-list-meta">${formatMinutes(mins)}</div>
+    </div>`;
+  }).join('');
+
+  body.innerHTML = `
+    <div class="m-card" style="padding:14px 16px;">
+      <select id="mReportRangeSelect" onchange="mOnReportRangeChange()" style="width:100%;font-size:13px;padding:9px 10px;border-radius:10px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);">
+        <option value="week" ${mReportRange==='week'?'selected':''}>This week</option>
+        <option value="month" ${mReportRange==='month'?'selected':''}>This month</option>
+        <option value="all" ${mReportRange==='all'?'selected':''}>All time</option>
+        <option value="custom" ${mReportRange==='custom'?'selected':''}>Custom range…</option>
+      </select>
+      <div id="mReportCustomRange" style="display:${mReportRange==='custom'?'flex':'none'};gap:8px;margin-top:10px;align-items:center;">
+        <input type="date" id="mReportFromDate" value="${mReportFrom?toDateStr(mReportFrom):''}" style="flex:1;font-size:12.5px;padding:8px;border-radius:8px;border:1px solid var(--border);">
+        <span style="color:var(--muted-lt);font-size:11px;">to</span>
+        <input type="date" id="mReportToDate" value="${mReportTo?toDateStr(mReportTo):''}" style="flex:1;font-size:12.5px;padding:8px;border-radius:8px;border:1px solid var(--border);">
+        <button class="m-btn m-btn-outline" style="flex:none;padding:8px 12px;min-height:auto;" onclick="mApplyReportCustomRange()">Apply</button>
+      </div>
+    </div>
+
+    <div class="m-metric-grid">
+      <div class="m-card"><div class="m-metric-value">${formatMinutes(totalMinutes)}</div><div class="m-metric-label">Total Time</div></div>
+      <div class="m-card"><div class="m-metric-value">${relevant.length}</div><div class="m-metric-label">Entries Logged</div></div>
+      <div class="m-card"><div class="m-metric-value">${uniqueClients}</div><div class="m-metric-label">Clients Worked</div></div>
+      ${adminView ? `<div class="m-card"><div class="m-metric-value">${uniquePeople}</div><div class="m-metric-label">Team Members</div></div>` : ''}
+    </div>
+
+    <div class="m-card">
+      <div class="m-card-row"><h3>By Client</h3></div>
+      ${clientRows || `<div class="m-empty" style="padding:16px 0;">Nothing logged in this range.</div>`}
+    </div>
+  `;
+}
+
+/* --- DAILY SUMMARY --- */
+let mDailySummaryDate = new Date();
+
+function mShiftDailySummaryDate(dir){
+  mDailySummaryDate.setDate(mDailySummaryDate.getDate()+dir);
+  mRenderTimeTrackerMain();
+}
+function mResetDailySummaryToToday(){
+  mDailySummaryDate = new Date();
+  mRenderTimeTrackerMain();
+}
+
+async function mLoadAndRenderDailySummary(body){
+  const dateLabel = mDailySummaryDate.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  body.innerHTML = `
+    <div class="m-cal-nav-row" style="margin-bottom:14px;">
+      <div class="m-date-nav" style="flex:1;">
+        <button class="m-date-nav-arrow" onclick="mShiftDailySummaryDate(-1)">‹</button>
+        <span class="m-date-nav-label" style="flex:1;text-align:center;">${dateLabel}</span>
+        <button class="m-date-nav-arrow" onclick="mShiftDailySummaryDate(1)">›</button>
+      </div>
+      <button class="m-cal-today-btn" onclick="mResetDailySummaryToToday()">Today</button>
+    </div>
+    <div id="mDailySummaryList" class="m-card"><div class="m-empty">Loading…</div></div>
+  `;
+  const listEl = document.getElementById('mDailySummaryList');
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const dateStr = toDateStr(mDailySummaryDate);
+    const response = await fetch(`/api/get-daily-summary?date=${dateStr}`, { headers:{ 'Authorization': `Bearer ${session.access_token}` } });
+    const data = await response.json();
+    if(!response.ok){ listEl.innerHTML = `<div class="m-empty">${escapeHtml(data.error || 'Could not load the summary.')}</div>`; return; }
+    if(!data.summary.length){
+      listEl.innerHTML = `<div class="m-empty">${canApprove() ? 'Nobody logged time this day.' : "You haven't logged any time this day."}</div>`;
+      return;
+    }
+    listEl.style.padding = '0 16px';
+    listEl.innerHTML = data.summary.map(person=>{
+      const clientNames = person.entries.map(e=>e.client);
+      const previewNames = clientNames.slice(0,3).join(', ');
+      const extra = clientNames.length>3 ? ` +${clientNames.length-3} more` : '';
+      return `<div class="m-list-row">
+        <div class="m-avatar" style="background:${avatarColorForName(person.name||'?')};color:#fff;">${(person.name||'?').charAt(0).toUpperCase()}</div>
+        <div class="m-list-main">
+          <div class="m-list-title">${escapeHtml(person.name)}</div>
+          <div class="m-list-sub">${person.entries.length} client${person.entries.length!==1?'s':''} — ${escapeHtml(previewNames)}${extra}</div>
+        </div>
+        <div class="m-list-meta">${formatMinutes(person.totalMinutes)}</div>
+      </div>`;
+    }).join('');
+  }catch(e){
+    listEl.innerHTML = `<div class="m-empty">Could not load the summary — check your connection.</div>`;
+  }
+}
+
 
 /* ================================================================
    NOTIFICATIONS — opens as a sheet from the header bell.
