@@ -156,6 +156,12 @@ a{color:inherit;text-decoration:none;}
 .m-metric-value{font-size:28px;font-weight:700;line-height:1.1;letter-spacing:-.5px;}
 .m-metric-label{font-size:12px;color:var(--muted);margin-top:2px;}
 .m-metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.m-kpi-scroll-row{display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;padding-bottom:2px;margin-bottom:12px;scrollbar-width:none;}
+.m-kpi-scroll-row::-webkit-scrollbar{display:none;}
+.m-kpi-scroll-row .m-card{flex:0 0 calc(50% - 5px);scroll-snap-align:start;margin-bottom:0;}
+.m-attention-scroll-row{display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;padding-bottom:2px;scrollbar-width:none;}
+.m-attention-scroll-row::-webkit-scrollbar{display:none;}
+.m-attention-card{flex:0 0 78%;scroll-snap-align:start;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;}
 .m-metric-grid .m-card{margin-bottom:0;padding:14px;}
 
 .m-list-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer;}
@@ -726,9 +732,15 @@ function mRenderHome(){
   const atRisk = ac.filter(c=>c.danger>=4).length;
   const onboarding = ac.filter(c=>c.status==='Onboarding').length;
 
-
   const healthPct = ac.length ? Math.round(100 - (ac.reduce((s,c)=>s+c.danger,0)/ac.length/5)*100) : 0;
   const healthTier = healthPct>=70 ? {cls:'m-chip-good',label:'Healthy'} : healthPct>=40 ? {cls:'m-chip-mid',label:'Needs attention'} : {cls:'m-chip-bad',label:'Critical'};
+
+  // Same admin-only split as desktop: Pending Approval and Weekly
+  // Completion are personal for regular members/approvers, scoped to
+  // clients they themselves logged something for this week.
+  const pending = admin
+    ? ac.filter(c=>c.draftStatus==='pending').length
+    : ac.filter(c=>c.draftStatus==='pending' && (c.improvements||[]).some(i=>i.author===me)).length;
 
   const withRecentLogs = admin
     ? ac.filter(mHasLoggedThisWeek)
@@ -751,6 +763,21 @@ function mRenderHome(){
     return (e.attendeeIds||[]).includes(currentUser?.id) || e.createdBy===currentUser?.id;
   }).sort((a,b)=> new Date(a.startAt) - new Date(b.startAt)).slice(0,3);
 
+  // Exact match to desktop's renderOverviewMyTasks() — overdue first, then
+  // by due date, then by priority; tasks with no due date sort after ones
+  // that have one.
+  const myOpenTasks = tasks.filter(t=>t.assigneeId===currentUser?.id && t.status!=='done')
+    .sort((a,b)=>{
+      const todayStr = toDateStr(new Date());
+      const aOverdue = a.dueDate && a.dueDate < todayStr, bOverdue = b.dueDate && b.dueDate < todayStr;
+      if(aOverdue !== bOverdue) return aOverdue ? -1 : 1;
+      if(a.dueDate && b.dueDate) return a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0;
+      if(a.dueDate) return -1;
+      if(b.dueDate) return 1;
+      const order = {high:0, medium:1, low:2};
+      return (order[a.priority]??9) - (order[b.priority]??9);
+    }).slice(0,3);
+
   const kpiCard = (icon, title, value, valueColor, chipsHtml, onclick, seeAll) => `
     <div class="m-card"${onclick?` onclick="${onclick}"`:''}>
       <div class="m-ov-card-title-row">
@@ -763,25 +790,54 @@ function mRenderHome(){
 
   const icoClients = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
   const icoHealth = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>';
+  const icoPending = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
   const icoCompletion = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
-  const icoReminders = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
+  const icoTasks = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>';
 
   el.innerHTML = `
-    <div style="grid-column:1/-1;">
+    <div class="m-kpi-scroll-row">
       ${kpiCard(icoClients, 'Total Clients', ac.length,
         null,
         ac.length ? `<span class="m-chip-pill m-chip-good">${active} Active</span>${atRisk?`<span class="m-chip-pill m-chip-bad">${atRisk} At Risk</span>`:''}${onboarding?`<span class="m-chip-pill m-chip-mid">${onboarding} Onboarding</span>`:''}` : '',
         "mOpenClientsList()", "mOpenClientsList()")}
+
+      ${kpiCard(icoHealth, 'Client Health', ac.length ? healthPct+'%' : '—',
+        null,
+        ac.length ? `<span class="m-chip-pill ${healthTier.cls}">${healthTier.label}</span>` : '')}
+
+      ${kpiCard(icoPending, admin ? 'Pending Approval' : 'Drafts Ready', pending,
+        null,
+        pending ? `<span class="m-chip-pill m-chip-mid">${pending} Draft${pending!==1?'s':''} Ready</span>` : `<span class="m-chip-pill m-chip-good">All Caught Up</span>`,
+        "mSwitchTab('queue')")}
+
+      ${kpiCard(icoCompletion, 'Weekly Completion', withRecentLogs.length ? completionPct+'%' : '—',
+        null,
+        withRecentLogs.length ? `<span class="m-chip-pill m-chip-status">${approvedWithLogs} Of ${withRecentLogs.length} Updated</span>` : `<span class="m-chip-pill m-chip-status">No Logs Yet</span>`,
+        "mSwitchTab('queue')")}
     </div>
 
-    ${kpiCard(icoHealth, 'Client Health', ac.length ? healthPct+'%' : '—',
-      null,
-      ac.length ? `<span class="m-chip-pill ${healthTier.cls}">${healthTier.label}</span>` : '')}
-
-    ${kpiCard(icoCompletion, 'Weekly Completion', withRecentLogs.length ? completionPct+'%' : '—',
-      null,
-      withRecentLogs.length ? `<span class="m-chip-pill m-chip-status">${approvedWithLogs} Of ${withRecentLogs.length} Updated</span>` : `<span class="m-chip-pill m-chip-status">No Logs Yet</span>`,
-      "mSwitchTab('queue')")}
+    <div class="m-card">
+      <div class="m-ov-card-title-row">
+        <span class="m-ov-card-head-left"><span class="m-metric-icon">${icoTasks}</span><span class="m-ov-card-title">My Tasks</span></span>
+        <span class="m-ov-card-btn" onclick="event.stopPropagation();mSwitchTab('tasks')">See All</span>
+      </div>
+      ${myOpenTasks.length ? myOpenTasks.map(t=>{
+        const pMeta = {high:{label:'High',color:'#CF2424'}, medium:{label:'Medium',color:'#A65B05'}, low:{label:'Low',color:'#7C93B0'}}[t.priority] || {label:'Low',color:'#7C93B0'};
+        const todayStr = toDateStr(new Date());
+        const overdue = t.dueDate && t.dueDate < todayStr;
+        const dateLabel = t.dueDate ? (overdue ? 'Overdue' : new Date(t.dueDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'2-digit'})) : 'No due date';
+        return `<div class="m-list-row" onclick="mOpenTaskDetail('${t.id}')">
+          <div class="m-list-main">
+            <div class="m-list-title">${escapeHtml(t.title)}</div>
+            ${t.description ? `<div class="m-list-sub" style="white-space:normal;">${escapeHtml(t.description)}</div>` : ''}
+            <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+              <span class="m-pill" style="background:${pMeta.color}18;color:${pMeta.color};">${pMeta.label}</span>
+              <span style="font-size:11px;${overdue?'color:var(--red);font-weight:700;':'color:var(--muted-lt);'}">${dateLabel}</span>
+            </div>
+          </div>
+        </div>`;
+      }).join('') : `<div class="m-empty" style="padding:20px 0;">No open tasks assigned to you.</div>`}
+    </div>
 
     <div class="m-card">
       <div class="m-ov-card-title-row">
@@ -805,12 +861,12 @@ function mRenderHome(){
       }).join('') : `<div class="m-empty" style="padding:20px 0;">Nothing on your calendar in the next two weeks.</div>`}
     </div>
 
-    <div class="m-card">
-      <div class="m-ov-card-title-row">
-        <span class="m-ov-card-head-left"><span class="m-metric-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span><span class="m-ov-card-title">Needs Attention</span></span>
-        <span class="m-ov-card-btn" onclick="event.stopPropagation();mSwitchTab('queue')">See All</span>
-      </div>
-      ${attention.length ? attention.map(c=>mClientAttentionRow(c)).join('') : `<div class="m-empty" style="padding:20px 0;">Nothing urgent right now.</div>`}
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:4px 2px 8px;">
+      <span class="m-ov-card-title" style="font-size:13px;font-weight:700;">Needs Attention</span>
+      <span class="m-ov-card-btn" onclick="mSwitchTab('queue')">See All</span>
+    </div>
+    <div class="m-attention-scroll-row" style="margin-bottom:16px;">
+      ${attention.length ? attention.map(c=>mAttentionScrollCard(c)).join('') : `<div class="m-empty" style="padding:20px 0;">Nothing urgent right now.</div>`}
     </div>
 
     <div class="m-card">
@@ -818,6 +874,21 @@ function mRenderHome(){
       ${activeThisWeek.length ? activeThisWeek.map(c=>mClientAttentionRow(c, true)).join('') : `<div class="m-empty" style="padding:20px 0;">No logged work yet this week.</div>`}
     </div>
   `;
+}
+
+function mAttentionScrollCard(c){
+  const avColor = avatarColorForName(c.name||'?');
+  const reason = c.draftStatus==='pending' ? 'Draft awaiting approval' : riskLabel(c.danger).text;
+  return `<div class="m-attention-card" onclick="mOpenClientFromHome('${c.id}')">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <div class="m-avatar" style="background:${avColor};color:#fff;">${(c.name||'?').charAt(0).toUpperCase()}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.name)}</div>
+        <div style="font-size:11.5px;color:var(--muted);">${reason}</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--muted-lt);">Importance ${c.importance}/10</div>
+  </div>`;
 }
 
 function mClientAttentionRow(c, showServiceInstead){
