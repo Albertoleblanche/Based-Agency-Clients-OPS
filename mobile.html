@@ -1560,9 +1560,330 @@ function mRenderMore(){
           : `<div class="m-avatar" style="width:44px;height:44px;font-size:16px;">${(myName()||'?').charAt(0).toUpperCase()}</div>`}
         <div><div style="font-weight:700;font-size:14px;">${escapeHtml(myName())}</div><div style="font-size:12px;color:var(--muted);text-transform:capitalize;">${myProfile?myProfile.role:''}</div></div>
       </div>
-      <button class="m-btn m-btn-outline m-btn-full" onclick="mLogout()">Sign out</button>
+      <div style="margin:0 -16px;">
+        <div class="m-list-row" style="padding-left:16px;padding-right:16px;" onclick="mOpenProfileScreen()">
+          <div class="m-list-icon" style="background:var(--surface-2);color:var(--ink);border-radius:50%;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+          <div class="m-list-main"><div class="m-list-title">My Profile</div></div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-lt)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+        <div class="m-list-row" style="padding-left:16px;padding-right:16px;" onclick="mRefreshApp()">
+          <div class="m-list-icon" style="background:var(--surface-2);color:var(--ink);border-radius:50%;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg></div>
+          <div class="m-list-main"><div class="m-list-title">Refresh App</div></div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-lt)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+        <div class="m-list-row" style="padding-left:16px;padding-right:16px;" onclick="mOpenSettingsSheet()">
+          <div class="m-list-icon" style="background:var(--surface-2);color:var(--ink);border-radius:50%;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+          <div class="m-list-main"><div class="m-list-title">Settings</div></div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-lt)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+        <div class="m-list-row" style="padding-left:16px;padding-right:16px;border-bottom:none;" onclick="mOpenTrashSheet()">
+          <div class="m-list-icon" style="background:var(--surface-2);color:var(--ink);border-radius:50%;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div>
+          <div class="m-list-main"><div class="m-list-title">Trash</div></div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-lt)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+      <button class="m-btn m-btn-outline m-btn-full" style="margin-top:14px;" onclick="mLogout()">Sign out</button>
     </div>
   `;
+}
+
+async function mRefreshApp(){
+  mShowToast('success','Refreshing…');
+  await mLoadAll();
+  if(activeTab==='home') mRenderHome();
+  else if(activeTab==='tasks') mRenderTasks();
+  else if(activeTab==='queue') mRenderQueue();
+  else if(activeTab==='reminders') mRenderReminders();
+  else if(activeTab==='more') mRenderMore();
+  mShowToast('success','Up to date');
+}
+
+// Exact match to desktop's NOTIFICATION_TYPE_META — same 16 types, same labels.
+const M_NOTIFICATION_TYPE_META = {
+  task_assigned: 'A task is assigned to you',
+  task_completed: 'A task you assigned is completed',
+  task_cancelled: 'A task assigned to you is cancelled',
+  task_edited: 'A task assigned to you changes',
+  email_sent: 'A client email is sent',
+  event_rsvp: 'Someone RSVPs or requests a change to your event',
+  event_invited: "You're invited to a calendar event",
+  event_updated: "A calendar event you're on changes",
+  event_cancelled: "A calendar event you're on is cancelled",
+  email_change_requested: 'Someone requests an email change',
+  draft_ready: 'A draft is ready for your approval',
+  draft_approved: 'Your submitted work is approved',
+  draft_skipped: 'Your submitted draft is skipped',
+  profile_changed: 'Your role, title, or access changes',
+  reminder_follow_up_due: 'A client follow-up you own comes due',
+  reminder_escalated: 'A client follow-up has gone unanswered for a week',
+};
+
+function mOpenSettingsSheet(){
+  mRenderSettingsSheetBody();
+}
+
+function mRenderSettingsSheetBody(){
+  const muted = (myProfile && myProfile.muted_notification_types) || [];
+  const html = `
+    <p style="font-size:12px;color:var(--muted);margin:0 0 4px;line-height:1.5;">Choose which notifications you want to receive. Turned off here means it's never sent to you at all — not just hidden.</p>
+    ${Object.entries(M_NOTIFICATION_TYPE_META).map(([type,label])=>`
+      <label style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
+        <input type="checkbox" ${muted.includes(type)?'':'checked'} onchange="mToggleNotificationMute('${type}', !this.checked)" style="width:18px;height:18px;flex:none;">
+        <span style="font-size:13px;color:var(--ink);">${label}</span>
+      </label>`).join('')}
+  `;
+  mOpenSheet('Notification Settings', html);
+}
+
+async function mToggleNotificationMute(type, muted){
+  if(!myProfile) return;
+  const current = myProfile.muted_notification_types || [];
+  const updated = muted ? [...new Set([...current, type])] : current.filter(t=>t!==type);
+  const { error } = await supabaseClient.from('team_profiles').update({ muted_notification_types: updated }).eq('id', currentUser.id);
+  if(error){ mShowToast('error','Could not save'); mRenderSettingsSheetBody(); return; }
+  myProfile.muted_notification_types = updated;
+  mShowToast('success', muted ? 'Notification muted' : 'Notification unmuted');
+}
+
+let mTrashTab = 'clients';
+let mTrashedNotes = null;
+let mTrashedTimeEntries = null;
+
+async function mOpenTrashSheet(){
+  mTrashTab = 'clients';
+  mTrashedNotes = null;
+  mTrashedTimeEntries = null;
+  await mRenderTrashScreen();
+}
+
+async function mSetTrashTab(tab){
+  mTrashTab = tab;
+  await mRenderTrashScreen();
+}
+
+async function mRenderTrashScreen(){
+  const tabs = [
+    { key:'clients', label:'Deleted Clients' },
+    { key:'notes', label:'Deleted Notes' },
+    { key:'time', label:'Deleted Time Entries' },
+  ];
+  let bodyHtml;
+
+  if(mTrashTab==='clients'){
+    const trashed = clients.filter(c=>c.deletedAt).sort((a,b)=> new Date(b.deletedAt)-new Date(a.deletedAt));
+    bodyHtml = trashed.length ? trashed.map(c=>mTrashRowHtml(c.id,'clients',c.name,c.service||'',c.deletedAt,canApprove())).join('') : `<div class="m-empty">Trash is empty.</div>`;
+  } else if(mTrashTab==='notes'){
+    if(mTrashedNotes===null){
+      const { data } = await supabaseClient.from('notes').select('*').eq('user_id',currentUser.id).not('deleted_at','is',null).order('deleted_at',{ascending:false});
+      mTrashedNotes = (data||[]).map(n=>({ id:n.id, clientId:n.client_id, title:n.title, deletedAt:n.deleted_at }));
+    }
+    bodyHtml = mTrashedNotes.length ? mTrashedNotes.map(n=>{
+      const c = clients.find(x=>x.id===n.clientId);
+      return mTrashRowHtml(n.id,'notes',n.title||'Untitled note',c?c.name:'',n.deletedAt,true);
+    }).join('') : `<div class="m-empty">Trash is empty.</div>`;
+  } else {
+    if(mTrashedTimeEntries===null){
+      const { data } = await supabaseClient.from('time_entries').select('*').eq('user_id',currentUser.id).not('deleted_at','is',null).order('deleted_at',{ascending:false});
+      mTrashedTimeEntries = (data||[]).map(e=>({ id:e.id, clientId:e.client_id, minutes:e.minutes, description:e.description||'', deletedAt:e.deleted_at }));
+    }
+    bodyHtml = mTrashedTimeEntries.length ? mTrashedTimeEntries.map(e=>{
+      const c = clients.find(x=>x.id===e.clientId);
+      const h = Math.floor(e.minutes/60), m = e.minutes%60;
+      return mTrashRowHtml(e.id,'time',`${c?c.name:'Unknown client'} — ${h?h+'h ':''}${m}m`,e.description,e.deletedAt,true);
+    }).join('') : `<div class="m-empty">Trash is empty.</div>`;
+  }
+
+  const html = `
+    <div class="m-chip-row">
+      ${tabs.map(t=>`<div class="m-chip ${mTrashTab===t.key?'active':''}" onclick="mSetTrashTab('${t.key}')">${t.label}</div>`).join('')}
+    </div>
+    <div class="m-card" style="padding:0 16px;">${bodyHtml}</div>
+  `;
+  mOpenSubscreen('Trash', html);
+}
+
+function mTrashRowHtml(id, type, title, subtitle, deletedAt, canRestore){
+  const when = deletedAt ? new Date(deletedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
+  return `<div class="m-list-row" style="cursor:default;">
+    <div class="m-list-main">
+      <div class="m-list-title">${escapeHtml(title)}</div>
+      ${subtitle ? `<div class="m-list-sub">${escapeHtml(subtitle)}</div>` : ''}
+      ${when ? `<div class="m-list-sub" style="color:var(--muted-lt);">Deleted ${when}</div>` : ''}
+    </div>
+    ${canRestore ? `<button class="m-btn m-btn-outline" style="flex:none;padding:8px 14px;min-height:auto;" onclick="mRestoreTrashItem('${type}','${id}')">Restore</button>` : ''}
+  </div>`;
+}
+
+async function mRestoreTrashItem(type, id){
+  if(type==='clients'){
+    if(!canApprove()){ mShowToast('error','Only admins and approvers can restore clients'); return; }
+    await mLoadAll();
+    const c = clients.find(x=>x.id===id);
+    if(!c) return;
+    delete c.deletedAt;
+    const { data: row } = await supabaseClient.from('app_storage').select('value').eq('key','app-data').maybeSingle();
+    const appData = JSON.parse(row.value);
+    const idx = appData.clients.findIndex(x=>x.id===id);
+    if(idx>-1) delete appData.clients[idx].deletedAt;
+    const { error } = await supabaseClient.from('app_storage').update({ value: JSON.stringify(appData) }).eq('key','app-data');
+    if(error){ mShowToast('error','Restore failed'); return; }
+    mShowToast('success', `${c.name} restored`);
+  } else if(type==='notes'){
+    const { error } = await supabaseClient.from('notes').update({ deleted_at: null }).eq('id', id).eq('user_id', currentUser.id);
+    if(error){ mShowToast('error','Restore failed'); return; }
+    mTrashedNotes = mTrashedNotes.filter(n=>n.id!==id);
+    notesLoaded = false;
+    mShowToast('success','Note restored');
+  } else {
+    const { error } = await supabaseClient.from('time_entries').update({ deleted_at: null }).eq('id', id);
+    if(error){ mShowToast('error','Restore failed'); return; }
+    mTrashedTimeEntries = mTrashedTimeEntries.filter(e=>e.id!==id);
+    timeEntriesLoaded = false;
+    mShowToast('success','Entry restored');
+  }
+  mRenderTrashScreen();
+}
+
+async function mOpenProfileScreen(){
+  await mRenderProfileScreen();
+}
+
+async function mRenderProfileScreen(){
+  const html = `
+    <div class="m-card">
+      <div class="m-card-row"><h3>Profile Photo</h3></div>
+      <div style="display:flex;align-items:center;gap:16px;">
+        ${myProfile && myProfile.avatar_url
+          ? `<img src="${myProfile.avatar_url}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;flex:none;" alt="">`
+          : `<div class="m-avatar" style="width:64px;height:64px;font-size:22px;">${(myName()||'?').charAt(0).toUpperCase()}</div>`}
+        <div>
+          <input type="file" id="mAvatarFileInput" accept="image/*" style="display:none;" onchange="mUploadAvatar(this.files[0])">
+          <button class="m-btn m-btn-outline" style="padding:9px 16px;min-height:auto;" onclick="document.getElementById('mAvatarFileInput').click()">Upload photo</button>
+          <p style="font-size:11px;color:var(--muted-lt);margin:8px 0 0;">JPG or PNG, under 2MB.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="m-card">
+      <div class="m-card-row"><h3>Basic Info</h3></div>
+      <div class="m-field"><label>Name</label><input id="mProfileNameInput" value="${escapeHtml(myProfile?.name||'')}"></div>
+      <div class="m-field" style="margin-bottom:0;"><label>Phone number</label><input id="mProfilePhoneInput" placeholder="e.g. (555) 123-4567" value="${escapeHtml(myProfile?.phone||'')}"></div>
+      <button class="m-btn m-btn-brand m-btn-full" style="margin-top:14px;" onclick="mSaveProfileBasicInfo()">Save</button>
+    </div>
+
+    <div class="m-card">
+      <div class="m-card-row"><h3>Google Calendar</h3></div>
+      <div id="mGcalStatusBox"><div class="m-empty" style="padding:10px 0;">Checking…</div></div>
+    </div>
+  `;
+  mOpenSubscreen('My Profile', html);
+  mLoadGoogleCalendarStatus();
+}
+
+async function mUploadAvatar(file){
+  if(!file) return;
+  if(!file.type.startsWith('image/')){ mShowToast('error','Please choose an image file'); return; }
+  if(file.size > 2*1024*1024){ mShowToast('error','Photos need to be under 2MB'); return; }
+  mShowToast('success','Uploading…');
+  const ext = file.name.split('.').pop();
+  const path = `${currentUser.id}/avatar.${ext}`;
+  const { error: uploadErr } = await supabaseClient.storage.from('avatars').upload(path, file, { upsert:true });
+  if(uploadErr){ mShowToast('error','Upload failed'); return; }
+  const { data: urlData } = supabaseClient.storage.from('avatars').getPublicUrl(path);
+  const avatarUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+  const { error: profileErr } = await supabaseClient.from('team_profiles').update({ avatar_url: avatarUrl }).eq('id', currentUser.id);
+  if(profileErr){ mShowToast('error','Save failed'); return; }
+  myProfile.avatar_url = avatarUrl;
+  const headerAvatarBtn = document.querySelector('.m-header-avatar-btn');
+  headerAvatarBtn.innerHTML = `<img src="${avatarUrl}" alt="">`;
+  mShowToast('success','Photo updated');
+  mRenderProfileScreen();
+}
+
+async function mSaveProfileBasicInfo(){
+  const name = document.getElementById('mProfileNameInput').value.trim();
+  const phone = document.getElementById('mProfilePhoneInput').value.trim();
+  if(!name){ mShowToast('error','Name cannot be empty'); return; }
+  const { error } = await supabaseClient.from('team_profiles').update({ name, phone }).eq('id', currentUser.id);
+  if(error){ mShowToast('error','Save failed'); return; }
+  myProfile.name = name; myProfile.phone = phone;
+  mShowToast('success','Profile updated');
+  mRenderMore();
+}
+
+async function mFetchGoogleCalendarStatus(){
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/google-calendar', { headers:{ 'Authorization': `Bearer ${session.access_token}` } });
+    if(!response.ok) return null;
+    return await response.json();
+  }catch(e){ return null; }
+}
+
+async function mLoadGoogleCalendarStatus(){
+  const el = document.getElementById('mGcalStatusBox');
+  if(!el) return;
+  const data = await mFetchGoogleCalendarStatus();
+  if(!data){ el.innerHTML = `<div class="m-empty" style="padding:10px 0;">Could not check status.</div>`; return; }
+  if(!data.googleConfigured){
+    el.innerHTML = `<p style="font-size:12px;color:var(--muted);line-height:1.5;margin:0;">Google Calendar sync isn't configured for this deployment yet.</p>`;
+    return;
+  }
+  if(data.connected){
+    el.innerHTML = `
+      <p style="font-size:12px;color:var(--muted);line-height:1.5;margin:0 0 12px;">Connected as <b>${escapeHtml(data.email||'your Google account')}</b>${data.lastSyncedAt ? ` · Last synced ${new Date(data.lastSyncedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}` : ' · Not synced yet'}</p>
+      <div style="display:flex;gap:10px;">
+        <button class="m-btn m-btn-brand" onclick="mSyncGoogleCalendar()">Sync now</button>
+        <button class="m-btn m-btn-outline" onclick="mDisconnectGoogleCalendar()">Disconnect</button>
+      </div>`;
+  } else {
+    el.innerHTML = `
+      <p style="font-size:12px;color:var(--muted);line-height:1.5;margin:0 0 12px;">Connect your Google Calendar to pull your meetings into the shared team calendar automatically.</p>
+      <button class="m-btn m-btn-brand m-btn-full" onclick="mConnectGoogleCalendar()">Connect Google Calendar</button>`;
+  }
+}
+
+async function mConnectGoogleCalendar(){
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  window.location.href = `/api/google-oauth-start?access_token=${encodeURIComponent(session.access_token)}`;
+}
+
+async function mSyncGoogleCalendar(){
+  mShowToast('success','Syncing…');
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/google-calendar', {
+      method:'POST', headers:{ 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action:'sync' })
+    });
+    const data = await response.json();
+    if(!response.ok){ mShowToast('error', data.error || 'Sync failed'); return; }
+    calendarLoaded = false;
+    await mLoadCalendarEvents();
+    mLoadGoogleCalendarStatus();
+    mShowToast('success', `${data.synced} event${data.synced!==1?'s':''} pulled in`);
+  }catch(e){
+    mShowToast('error','Sync failed — network error');
+  }
+}
+
+async function mDisconnectGoogleCalendar(){
+  if(!confirm('Disconnect Google Calendar? Previously-synced events will be removed from the calendar.')) return;
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/google-calendar', {
+      method:'POST', headers:{ 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action:'disconnect' })
+    });
+    const data = await response.json();
+    if(!response.ok){ mShowToast('error', data.error || 'Could not disconnect'); return; }
+    calendarLoaded = false;
+    await mLoadCalendarEvents();
+    mLoadGoogleCalendarStatus();
+    mShowToast('success','Google Calendar disconnected');
+  }catch(e){
+    mShowToast('error','Network error');
+  }
 }
 
 function mOpenClientsList(){
