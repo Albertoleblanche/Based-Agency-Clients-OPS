@@ -38,9 +38,19 @@ a{color:inherit;text-decoration:none;}
   padding:calc(10px + var(--safe-top)) 14px 10px;
   display:flex;align-items:center;gap:10px;
 }
-.m-header-title{flex:1;min-width:0;}
-.m-header-title h1{margin:0;font-size:17px;font-weight:700;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.m-header-title p{margin:0;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.m-header-avatar-btn{
+  width:36px;height:36px;border-radius:50%;border:none;background:var(--brand);color:#fff;
+  display:flex;align-items:center;justify-content:center;flex:none;font-size:13px;font-weight:700;cursor:pointer;overflow:hidden;
+}
+.m-header-avatar-btn img{width:100%;height:100%;object-fit:cover;}
+.m-header-search{
+  flex:1;min-width:0;height:38px;border-radius:20px;border:none;background:var(--surface-2);
+  display:flex;align-items:center;gap:7px;padding:0 14px;color:var(--muted-lt);cursor:pointer;
+}
+.m-header-search span{font-size:13px;color:var(--muted-lt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.m-tab-title-block{margin-bottom:16px;}
+.m-tab-title-block h1{margin:0;font-size:19px;font-weight:700;letter-spacing:-.2px;color:var(--ink);}
+.m-tab-title-block p{margin:2px 0 0;font-size:12.5px;color:var(--muted);}
 .m-icon-btn{
   width:40px;height:40px;border-radius:50%;border:none;background:var(--surface-2);
   color:var(--ink);display:flex;align-items:center;justify-content:center;flex:none;
@@ -249,10 +259,13 @@ a{color:inherit;text-decoration:none;}
 <!-- APP SHELL -->
 <div id="app">
   <div class="m-header">
-    <div class="m-header-title">
-      <h1 id="mHeaderTitle">Overview</h1>
-      <p id="mHeaderSub"></p>
-    </div>
+    <button class="m-header-avatar-btn" onclick="mSwitchTab('more')" aria-label="Account">
+      <span id="mHeaderAvatarFallback">?</span>
+    </button>
+    <button class="m-header-search" onclick="mOpenClientsList()" aria-label="Search clients">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <span>Search</span>
+    </button>
     <button class="m-icon-btn" onclick="mOpenNotifications()" aria-label="Notifications">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
       <span class="m-badge" id="mNotifBadge" style="display:none;">0</span>
@@ -269,6 +282,10 @@ a{color:inherit;text-decoration:none;}
   </div>
 
   <div class="m-content">
+    <div class="m-tab-title-block">
+      <h1 id="mHeaderTitle">Overview</h1>
+      <p id="mHeaderSub"></p>
+    </div>
     <!-- HOME -->
     <div class="m-screen active" id="mScreen-home"></div>
     <!-- TASKS -->
@@ -403,6 +420,12 @@ async function mBoot(){
   await mLoadAll();
   mInitTimerFromStorage();
   document.title = mSettings.appName || 'Based Agency';
+  const headerAvatarBtn = document.querySelector('.m-header-avatar-btn');
+  if(myProfile && myProfile.avatar_url){
+    headerAvatarBtn.innerHTML = `<img src="${myProfile.avatar_url}" alt="">`;
+  } else {
+    document.getElementById('mHeaderAvatarFallback').textContent = (myName()||'?').trim().charAt(0).toUpperCase();
+  }
   document.getElementById('mLoadingScreen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   mSwitchTab('home');
@@ -597,18 +620,6 @@ function mRenderHome(){
   const atRisk = ac.filter(c=>c.danger>=4).length;
   const onboarding = ac.filter(c=>c.status==='Onboarding').length;
 
-  const myOpenTasks = tasks.filter(t=>t.assigneeId===currentUser?.id && t.status!=='done');
-  const overdueTasks = myOpenTasks.filter(t=>t.dueDate && t.dueDate < toDateStr(new Date())).length;
-
-  // Pending Approval and Weekly Completion are personal for regular
-  // members and approvers — scoped to clients they themselves logged
-  // something for. Total Clients and Client Health stay roster-wide
-  // regardless of role. Matches desktop's exact admin-only split, not
-  // "admin or approver" — an approver still sees the personal view here.
-  const pending = admin
-    ? ac.filter(c=>c.draftStatus==='pending').length
-    : ac.filter(c=>c.draftStatus==='pending' && (c.improvements||[]).some(i=>i.author===me)).length;
-
 
   const healthPct = ac.length ? Math.round(100 - (ac.reduce((s,c)=>s+c.danger,0)/ac.length/5)*100) : 0;
   const healthTier = healthPct>=70 ? {cls:'m-chip-good',label:'Healthy'} : healthPct>=40 ? {cls:'m-chip-mid',label:'Needs attention'} : {cls:'m-chip-bad',label:'Critical'};
@@ -646,8 +657,6 @@ function mRenderHome(){
 
   const icoClients = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
   const icoHealth = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>';
-  const icoTasks = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>';
-  const icoPending = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
   const icoCompletion = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
   const icoReminders = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
 
@@ -661,20 +670,12 @@ function mRenderHome(){
       null,
       ac.length ? `<span class="m-chip-pill ${healthTier.cls}">${healthTier.label}</span>` : '')}
 
-    ${kpiCard(icoTasks, 'Open Tasks', myOpenTasks.length,
-      null,
-      overdueTasks ? `<span class="m-chip-pill m-chip-bad">${overdueTasks} Overdue</span>` : myOpenTasks.length ? `<span class="m-chip-pill m-chip-status">None Overdue</span>` : `<span class="m-chip-pill m-chip-good">All Clear</span>`,
-      "mSwitchTab('tasks')")}
-
-    ${kpiCard(icoPending, admin ? 'Pending Approval' : 'Drafts Ready', pending,
-      null,
-      pending ? `<span class="m-chip-pill m-chip-mid">${pending} Draft${pending!==1?'s':''} Ready</span>` : `<span class="m-chip-pill m-chip-good">All Caught Up</span>`,
-      "mSwitchTab('queue')")}
-
-    ${kpiCard(icoCompletion, 'Weekly Completion', withRecentLogs.length ? completionPct+'%' : '—',
-      null,
-      withRecentLogs.length ? `<span class="m-chip-pill m-chip-status">${approvedWithLogs} Of ${withRecentLogs.length} Updated</span>` : `<span class="m-chip-pill m-chip-status">No Logs Yet</span>`,
-      "mSwitchTab('queue')")}
+    <div style="grid-column:1/-1;">
+      ${kpiCard(icoCompletion, 'Weekly Completion', withRecentLogs.length ? completionPct+'%' : '—',
+        null,
+        withRecentLogs.length ? `<span class="m-chip-pill m-chip-status">${approvedWithLogs} Of ${withRecentLogs.length} Updated</span>` : `<span class="m-chip-pill m-chip-status">No Logs Yet</span>`,
+        "mSwitchTab('queue')")}
+    </div>
 
     <div class="m-card">
       <div class="m-ov-card-title-row">
