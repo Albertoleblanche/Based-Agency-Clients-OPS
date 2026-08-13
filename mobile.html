@@ -344,7 +344,7 @@ a{color:inherit;text-decoration:none;}
     </button>
     <button class="m-tab" data-tab="reminders" onclick="mSwitchTab('reminders')">
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-      <span>Follow-ups</span>
+      <span>Reminders</span>
       <span class="m-tab-badge" id="mTabBadgeReminders" style="display:none;">0</span>
     </button>
     <button class="m-tab" data-tab="more" onclick="mSwitchTab('more')">
@@ -514,8 +514,8 @@ const M_TAB_META = {
   home: ['Overview', ''],
   tasks: ['Tasks', 'Assigned to you and by you'],
   queue: ['Approval Queue', 'Sorted by danger score'],
-  reminders: ['Follow-ups', 'Client questions awaiting a response'],
-  more: ['More', ''],
+  reminders: ['Reminders', 'Client questions awaiting a response'],
+  more: ['', ''],
 };
 
 function mSwitchTab(name){
@@ -524,6 +524,8 @@ function mSwitchTab(name){
   document.querySelectorAll('.m-screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('mScreen-'+name).classList.add('active');
   const meta = M_TAB_META[name];
+  const titleBlock = document.querySelector('.m-tab-title-block');
+  titleBlock.style.display = meta[0] ? 'block' : 'none';
   document.getElementById('mHeaderTitle').textContent = name==='home' ? mGreeting() : meta[0];
   document.getElementById('mHeaderSub').textContent = meta[1];
   if(name==='home') mRenderHome();
@@ -890,14 +892,18 @@ async function mChangeTaskStatus(taskId, status){
   mUpdateBadges();
 }
 
-function mOpenNewTaskSheet(){
+function mOpenNewTaskSheet(presetTitle, presetDescription, presetClientId){
   const html = `
-    <div class="m-field"><label>Title</label><input id="mTaskTitle" placeholder="e.g. Update the roofing page copy"></div>
+    <div class="m-field"><label>Title</label><input id="mTaskTitle" placeholder="e.g. Update the roofing page copy" value="${presetTitle?escapeHtml(presetTitle):''}"></div>
+    <div class="m-field"><label>Description (optional)</label><textarea id="mTaskDescription" placeholder="Any context they'll need">${presetDescription?escapeHtml(presetDescription):''}</textarea></div>
     <div class="m-field"><label>Assign to</label><select id="mTaskAssignee">${teamProfiles.map(p=>`<option value="${p.id}" ${p.id===currentUser.id?'selected':''}>${p.name}</option>`).join('')}</select></div>
+    <div class="m-field"><label>Client (optional)</label>
+      <select id="mTaskClient"><option value="">— None —</option>${clients.filter(c=>!c.deletedAt).sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${presetClientId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select>
+    </div>
     <div class="m-field"><label>Priority</label>
       <select id="mTaskPriority"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select>
     </div>
-    <div class="m-field"><label>Due date (optional)</label><input type="date" id="mTaskDue"></div>
+    <div class="m-field" style="margin-bottom:0;"><label>Due date (optional)</label><input type="date" id="mTaskDue"></div>
   `;
   const actions = `<button class="m-btn m-btn-outline" onclick="mCloseSheet()">Cancel</button><button class="m-btn m-btn-brand" onclick="mSaveNewTask()">Assign task</button>`;
   mOpenSheet('New task', html, actions);
@@ -906,14 +912,16 @@ function mOpenNewTaskSheet(){
 async function mSaveNewTask(){
   const title = document.getElementById('mTaskTitle').value.trim();
   if(!title){ mShowToast('error','Give the task a title'); return; }
+  const description = document.getElementById('mTaskDescription').value.trim();
   const assigneeId = document.getElementById('mTaskAssignee').value;
+  const clientId = document.getElementById('mTaskClient').value || null;
   const priority = document.getElementById('mTaskPriority').value;
   const dueDate = document.getElementById('mTaskDue').value || null;
   const { data, error } = await supabaseClient.from('tasks').insert({
-    title, priority, assigner_id: currentUser.id, assignee_id: assigneeId, due_date: dueDate, status:'todo'
+    title, description, priority, assigner_id: currentUser.id, assignee_id: assigneeId, client_id: clientId, due_date: dueDate, status:'todo'
   }).select().single();
   if(error){ mShowToast('error','Could not save task'); return; }
-  tasks.push({ id:data.id, title, description:'', priority, status:'todo', assignerId:currentUser.id, assigneeId, clientId:null, dueDate, link:null });
+  tasks.push({ id:data.id, title, description, priority, status:'todo', assignerId:currentUser.id, assigneeId, clientId, dueDate, link:null });
   mCloseSheet();
   mShowToast('success','Task assigned');
   mRenderTasks();
@@ -1405,38 +1413,68 @@ const M_REMINDER_META = {
   answered: {label:'Answered', color:'#117F3A', icon:'<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'},
   closed: {label:'Closed', color:'#8A93A3', icon:'<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><line x1="10" y1="12" x2="14" y2="12"/></svg>'},
 };
+let mReminderFilter = 'all';
+
+function mSetReminderFilter(f){
+  mReminderFilter = f;
+  mRenderReminders();
+}
 
 function mRenderReminders(){
   const el = document.getElementById('mScreen-reminders');
   const mine = clientReminders.filter(r=>r.askedBy===currentUser?.id)
     .sort((a,b)=> (a.followUpDate||'').localeCompare(b.followUpDate||''));
-  const active = mine.filter(r=>r.status==='waiting');
-  const resolved = mine.filter(r=>r.status!=='waiting');
+  const visible = mReminderFilter==='all' ? mine : mine.filter(r=>mReminderDisplayStatus(r)===mReminderFilter);
+
+  const filters = [
+    { key:'all', label:'All' },
+    { key:'waiting', label:'Waiting' },
+    { key:'due', label:'Due' },
+    { key:'answered', label:'Answered' },
+    { key:'closed', label:'Closed' },
+  ];
 
   el.innerHTML = `
-    <div class="m-card" style="padding:0 16px;">
-      <div class="m-card-row" style="padding-top:14px;"><h3>Active</h3></div>
-      ${active.length ? active.map(r=>mReminderRow(r)).join('') : `<div class="m-empty">Nothing pending.</div>`}
+    <div class="m-chip-row">
+      ${filters.map(f=>{
+        const count = f.key==='all' ? mine.length : mine.filter(r=>mReminderDisplayStatus(r)===f.key).length;
+        return `<div class="m-chip ${mReminderFilter===f.key?'active':''}" onclick="mSetReminderFilter('${f.key}')">${f.label} <span style="opacity:.6;">${count}</span></div>`;
+      }).join('')}
     </div>
-    ${resolved.length ? `<div class="m-card" style="padding:0 16px;">
-      <div class="m-card-row" style="padding-top:14px;"><h3>Resolved</h3></div>
-      ${resolved.slice(0,10).map(r=>mReminderRow(r)).join('')}
-    </div>` : ''}
+    <div id="mRemindersListBody">${visible.length ? visible.map(r=>mReminderCard(r)).join('') : `<div class="m-empty">Nothing here.</div>`}</div>
   `;
   mRenderFab('reminders');
 }
 
-function mReminderRow(r){
+function mReminderCard(r){
   const c = clients.find(x=>x.id===r.clientId);
   const display = mReminderDisplayStatus(r);
   const meta = M_REMINDER_META[display];
-  return `<div class="m-list-row" onclick="mOpenReminderDetail('${r.id}')">
-    <div class="m-avatar" style="background:${avatarColorForName(c?c.name:'?')};color:#fff;">${(c?c.name:'?').charAt(0).toUpperCase()}</div>
-    <div class="m-list-main">
-      <div class="m-list-title">${c ? escapeHtml(c.name) : 'Unknown client'}</div>
-      <div class="m-list-sub">${escapeHtml(r.question)}</div>
+  const isResolved = display==='answered' || display==='closed';
+
+  const moveOptions = [];
+  if(display!=='answered') moveOptions.push(['answered','Mark answered']);
+  if(display!=='closed') moveOptions.push(['closed','Close']);
+  if(isResolved) moveOptions.push(['waiting','Reopen']);
+
+  return `<div class="m-card m-card-clickable" onclick="mOpenReminderDetail('${r.id}')">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <span class="m-pill" style="background:${meta.color}18;color:${meta.color};">${meta.icon}${meta.label}</span>
+      <div class="m-card-menu-wrap" onclick="event.stopPropagation();">
+        <div class="m-card-menu-btn" onclick="mToggleCardMenu('reminder-${r.id}')">⋯</div>
+        <div class="m-card-menu" id="cardMenu-reminder-${r.id}">
+          ${moveOptions.map(([status,label])=>`<div class="m-card-menu-item" onclick="mCloseCardMenus();mResolveReminder('${r.id}','${status}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>${label}</div>`).join('')}
+          <div class="m-card-menu-item" onclick="mCloseCardMenus();mOpenNoteSheet(null,'${r.clientId}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Start a note</div>
+          ${display==='due' ? `<div class="m-card-menu-item" onclick="mCloseCardMenus();mCreateTaskFromReminder('${r.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>+ Task: chase this down</div>` : ''}
+          <div class="m-card-menu-item" style="color:var(--red);" onclick="mCloseCardMenus();mDeleteReminder('${r.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete</div>
+        </div>
+      </div>
     </div>
-    <span class="m-pill" style="background:${meta.color}18;color:${meta.color};">${meta.icon}${meta.label}</span>
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px;">${c ? escapeHtml(c.name) : 'Unknown client'}</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.5;">${escapeHtml(r.question)}</div>
+    <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px;font-size:12px;color:var(--muted-lt);">
+      Follow-up: ${r.followUpDate ? new Date(r.followUpDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—'}
+    </div>
   </div>`;
 }
 
@@ -1459,18 +1497,45 @@ function mOpenReminderDetail(id){
     <div style="display:flex;gap:10px;">
       <button class="m-btn m-btn-outline" onclick="mResolveReminder('${r.id}','closed')">Close</button>
       <button class="m-btn m-btn-brand" onclick="mResolveReminder('${r.id}','answered')">Mark answered</button>
-    </div>` : ''}
+    </div>` : `
+    <button class="m-btn m-btn-outline m-btn-full" onclick="mResolveReminder('${r.id}','waiting')">Reopen</button>`}
   `;
-  mOpenSubscreen('Follow-up', html);
+  mOpenSubscreen('Reminder', html);
 }
 
+// Exact match to desktop's markReminderStatus() — resolved_at is set on
+// answered/closed and cleared back to null on reopen, not just always
+// stamped with the current time regardless of which status this becomes.
 async function mResolveReminder(id, status){
-  const { error } = await supabaseClient.from('client_reminders').update({ status, resolved_at: new Date().toISOString() }).eq('id', id);
+  const { error } = await supabaseClient.from('client_reminders').update({
+    status, resolved_at: (status==='answered' || status==='closed') ? new Date().toISOString() : null
+  }).eq('id', id);
   if(error){ mShowToast('error','Could not update'); return; }
   const r = clientReminders.find(x=>x.id===id);
   if(r) r.status = status;
-  mShowToast('success', status==='answered'?'Marked answered':'Closed');
+  mShowToast('success', status==='answered' ? 'Marked answered' : status==='closed' ? 'Closed' : 'Reopened');
   mCloseSubscreen();
+  mRenderReminders();
+  mUpdateBadges();
+}
+
+// Exact match to desktop's createTaskFromReminder() — deliberately doesn't
+// preset a due date, since the reminder's own follow-up date has already
+// passed by the time this is reachable (only shown when display==='due'),
+// so carrying that date over would create a task that's overdue immediately.
+function mCreateTaskFromReminder(reminderId){
+  const r = clientReminders.find(x=>x.id===reminderId);
+  if(!r) return;
+  const c = clients.find(x=>x.id===r.clientId);
+  mOpenNewTaskSheet(c ? `Follow up with ${c.name}` : 'Follow up with client', r.question, r.clientId);
+}
+
+async function mDeleteReminder(id){
+  if(!confirm("Delete this reminder? This can't be undone.")) return;
+  const { error } = await supabaseClient.from('client_reminders').delete().eq('id', id);
+  if(error){ mShowToast('error','Delete failed'); return; }
+  clientReminders = clientReminders.filter(x=>x.id!==id);
+  mShowToast('success','Reminder deleted');
   mRenderReminders();
   mUpdateBadges();
 }
@@ -1484,7 +1549,7 @@ function mOpenNewReminderSheet(){
     <div class="m-field"><label>Follow-up date</label><input type="date" id="mReminderDate" value="${toDateStr(new Date(Date.now()+3*86400000))}"></div>
   `;
   const actions = `<button class="m-btn m-btn-outline" onclick="mCloseSheet()">Cancel</button><button class="m-btn m-btn-brand" onclick="mSaveNewReminder()">Save</button>`;
-  mOpenSheet('New follow-up', html, actions);
+  mOpenSheet('New reminder', html, actions);
 }
 
 async function mSaveNewReminder(){
@@ -1498,7 +1563,7 @@ async function mSaveNewReminder(){
   if(error){ mShowToast('error','Could not save'); return; }
   clientReminders.push({ id:data.id, clientId, question, askedBy:currentUser.id, followUpDate, status:'waiting' });
   mCloseSheet();
-  mShowToast('success','Follow-up created');
+  mShowToast('success','Reminder created');
   mRenderReminders();
   mUpdateBadges();
 }
