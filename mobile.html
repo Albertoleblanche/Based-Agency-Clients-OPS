@@ -190,6 +190,32 @@ a{color:inherit;text-decoration:none;}
 .m-timer-bar-elapsed{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;}
 .m-timer-bar-stop{background:var(--red);color:#fff;border:none;border-radius:20px;padding:8px 16px;font-size:12.5px;font-weight:700;cursor:pointer;flex:none;}
 
+.m-cal-toolbar{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;}
+.m-cal-today-summary{font-size:12px;color:var(--muted);}
+.m-cal-nav-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.m-date-nav{display:flex;align-items:center;border:1px solid var(--border);border-radius:20px;background:var(--card);overflow:hidden;flex:none;}
+.m-date-nav-arrow{background:none;border:none;color:var(--muted);padding:8px 11px;font-size:15px;cursor:pointer;display:flex;align-items:center;}
+.m-date-nav-arrow:active{background:var(--surface-2);}
+.m-date-nav-label{padding:7px 8px;font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;border-left:1px solid var(--border);border-right:1px solid var(--border);}
+.m-view-toggle{display:inline-flex;background:var(--surface-2);border-radius:20px;padding:3px;gap:2px;flex:none;}
+.m-view-toggle-option{padding:7px 14px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;border-radius:16px;}
+.m-view-toggle-option.active{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(16,24,40,.12);}
+.m-cal-today-btn{padding:8px 13px;font-size:12px;font-weight:600;border-radius:20px;border:1px solid var(--border);background:var(--card);color:var(--ink);cursor:pointer;flex:none;}
+.m-cal-today-btn:active{background:var(--surface-2);}
+
+.m-calendar-grid-head{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-bottom:none;border-radius:14px 14px 0 0;overflow:hidden;}
+.m-calendar-grid-head div{background:var(--card);text-align:center;font-size:9.5px;font-weight:700;color:var(--muted-lt);padding:6px 2px;text-transform:uppercase;letter-spacing:.03em;}
+.m-calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:0 0 14px 14px;overflow:hidden;margin-bottom:14px;}
+.m-calendar-day{background:var(--card);min-height:58px;min-width:0;padding:3px;cursor:pointer;display:flex;flex-direction:column;gap:2px;overflow:hidden;}
+.m-calendar-day.other-month{background:#FAFBFC;}
+.m-calendar-day.other-month .m-calendar-day-num{color:var(--muted-lt);}
+.m-calendar-day.today{background:#FFF8F5;}
+.m-calendar-day-num{font-size:11px;font-weight:600;color:var(--ink);}
+.m-calendar-day.today .m-calendar-day-num{color:var(--brand-dark);}
+.m-calendar-dot-row{display:flex;flex-wrap:wrap;gap:2px;}
+.m-calendar-event-dot{width:5px;height:5px;border-radius:50%;flex:none;}
+.m-calendar-more-label{font-size:8px;color:var(--muted-lt);}
+
 .m-field{margin-bottom:16px;}
 .m-field label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;}
 .m-field input,.m-field select,.m-field textarea{
@@ -210,7 +236,7 @@ a{color:inherit;text-decoration:none;}
 .m-btn-brand:active{background:var(--brand-dark);}
 .m-btn-outline{background:var(--card);color:var(--ink);border:1px solid var(--border);}
 .m-btn-outline:active{background:var(--surface-2);}
-.m-btn-full{width:100%;}
+.m-btn-full{width:100%;flex:none;}
 
 .m-spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:mSpin .7s linear infinite;}
 @keyframes mSpin{to{transform:rotate(360deg);}}
@@ -1647,16 +1673,26 @@ async function mDeleteNote(noteId){
 }
 
 /* ================================================================
-   CALENDAR — agenda list (grouped by day), not a month grid. This
-   is genuinely more mobile-native, not just a space-saving
-   compromise — native mobile calendar apps default to list/agenda
-   views on small screens for the same reason: a full grid of
-   mostly-empty cells wastes the one thing a phone doesn't have
-   much of, vertical space, to show information density a list
-   conveys better here.
+   CALENDAR — full toolbar (date nav, Today, jump-to-date, Month/
+   Agenda toggle), 6 type filter tabs as horizontal-scroll pills
+   with live counts, a real month grid, and the agenda list as the
+   "Agenda" view — matching desktop's actual feature set rather
+   than a stripped-down mobile approximation of it.
    ================================================================ */
 let calendarEvents = [];
 let calendarLoaded = false;
+let mCalendarAnchorDate = new Date();
+let mCalendarTypeTab = 'all';
+let mCalendarViewMode = 'month';
+
+const M_CALENDAR_TYPE_TABS = [
+  { key:'all', label:'All' },
+  { key:'meeting', label:'Meetings' },
+  { key:'deadline', label:'Deadlines' },
+  { key:'reminder', label:'Reminders' },
+  { key:'other', label:'Other' },
+  { key:'conflicted', label:'Conflicted' },
+];
 
 async function mLoadCalendarEvents(){
   const from = new Date(); from.setDate(from.getDate()-1);
@@ -1672,32 +1708,198 @@ async function mLoadCalendarEvents(){
   calendarLoaded = true;
 }
 
-async function mOpenCalendarAgenda(){
-  if(!calendarLoaded) await mLoadCalendarEvents();
-  mRenderCalendarAgenda();
+// Exact match to desktop's findEventConflicts() — a real time-overlap
+// check against shared attendees, not a placeholder "conflicted" label.
+function mFindEventConflicts(startAtStr, endAtStr, attendeeIds, excludeEventId){
+  if(!attendeeIds.length) return [];
+  const newStart = new Date(startAtStr), newEnd = new Date(endAtStr);
+  return calendarEvents.filter(e=>{
+    if(e.id===excludeEventId || e.allDay) return false;
+    const eStart = new Date(e.startAt), eEnd = new Date(e.endAt);
+    if(!(newStart < eEnd && newEnd > eStart)) return false;
+    const eAttendees = e.attendeeIds && e.attendeeIds.length ? e.attendeeIds : [e.createdBy];
+    return eAttendees.some(id=>attendeeIds.includes(id));
+  });
 }
 
-function mRenderCalendarAgenda(){
+// "Conflicted" isn't a real event_type — it's computed per event, so it
+// needs its own branch rather than a simple field match, same as desktop.
+function mEventMatchesTypeTab(e, tab){
+  if(tab==='all') return true;
+  if(tab==='conflicted'){
+    if(e.allDay) return false;
+    const effectiveAttendees = e.attendeeIds && e.attendeeIds.length ? e.attendeeIds : [e.createdBy];
+    return mFindEventConflicts(e.startAt, e.endAt, effectiveAttendees, e.id).length > 0;
+  }
+  return e.eventType===tab;
+}
+
+function mGetCalendarPeriodRange(){
+  if(mCalendarViewMode==='agenda'){
+    const start = new Date(); start.setHours(0,0,0,0);
+    const end = new Date(start); end.setDate(end.getDate()+60);
+    return { start, end };
+  }
+  const year = mCalendarAnchorDate.getFullYear(), month = mCalendarAnchorDate.getMonth();
+  return { start: new Date(year, month, 1), end: new Date(year, month+1, 1) };
+}
+
+function mShiftCalendarPeriod(dir){
+  mCalendarAnchorDate.setMonth(mCalendarAnchorDate.getMonth()+dir);
+  mRenderCalendarMain();
+}
+function mResetCalendarToToday(){
+  mCalendarAnchorDate = new Date();
+  mRenderCalendarMain();
+}
+function mJumpToCalendarDate(dateStr){
+  if(!dateStr) return;
+  mCalendarAnchorDate = new Date(dateStr+'T00:00:00');
+  mRenderCalendarMain();
+}
+function mSwitchCalendarViewMode(mode){
+  mCalendarViewMode = mode;
+  mRenderCalendarMain();
+}
+function mSwitchCalendarTypeTab(tab){
+  mCalendarTypeTab = tab;
+  mRenderCalendarMain();
+}
+
+async function mOpenCalendarAgenda(){
+  if(!calendarLoaded) await mLoadCalendarEvents();
+  mRenderCalendarMain();
+}
+
+function mRenderCalendarMain(){
   const todayStr = toDateStr(new Date());
-  const upcoming = calendarEvents.filter(e=>toDateStr(e.startAt) >= todayStr);
+  const todayEvents = calendarEvents.filter(e=>toDateStr(new Date(e.startAt))===todayStr);
+  const todaySummary = !todayEvents.length
+    ? `${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})} — nothing on the calendar today.`
+    : (()=>{
+        const meetings = todayEvents.filter(e=>e.eventType==='meeting').length;
+        const others = todayEvents.length - meetings;
+        const parts = [];
+        if(meetings) parts.push(`${meetings} meeting${meetings!==1?'s':''}`);
+        if(others) parts.push(`${others} other event${others!==1?'s':''}`);
+        return `${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})} — you have ${parts.join(' and ')} today.`;
+      })();
+
+  const { start, end } = mGetCalendarPeriodRange();
+  const periodEvents = calendarEvents.filter(e=>{ const s = new Date(e.startAt); return s >= start && s < end; });
+  const monthLabel = mCalendarAnchorDate.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+
+  const html = `
+    <div class="m-cal-toolbar">
+      <div class="m-cal-today-summary">${todaySummary}</div>
+      <div class="m-cal-nav-row">
+        <div class="m-date-nav">
+          <button class="m-date-nav-arrow" onclick="mShiftCalendarPeriod(-1)" ${mCalendarViewMode==='agenda'?'disabled style="opacity:.35;"':''}>‹</button>
+          <span class="m-date-nav-label">${mCalendarViewMode==='agenda'?'Next 60 days':monthLabel}</span>
+          <button class="m-date-nav-arrow" onclick="mShiftCalendarPeriod(1)" ${mCalendarViewMode==='agenda'?'disabled style="opacity:.35;"':''}>›</button>
+        </div>
+        <button class="m-cal-today-btn" onclick="mResetCalendarToToday()">Today</button>
+      </div>
+      <div class="m-cal-nav-row">
+        <div class="m-view-toggle">
+          <div class="m-view-toggle-option ${mCalendarViewMode==='month'?'active':''}" onclick="mSwitchCalendarViewMode('month')">Month</div>
+          <div class="m-view-toggle-option ${mCalendarViewMode==='agenda'?'active':''}" onclick="mSwitchCalendarViewMode('agenda')">Agenda</div>
+        </div>
+        <input type="date" onchange="mJumpToCalendarDate(this.value)" style="flex:1;min-width:0;font-size:12px;padding:8px 10px;border-radius:20px;border:1px solid var(--border);background:var(--card);color:var(--ink);">
+      </div>
+    </div>
+
+    <div class="m-chip-row">
+      ${M_CALENDAR_TYPE_TABS.map(t=>{
+        const count = t.key==='all' ? periodEvents.length : periodEvents.filter(e=>mEventMatchesTypeTab(e,t.key)).length;
+        return `<div class="m-chip ${mCalendarTypeTab===t.key?'active':''}" onclick="mSwitchCalendarTypeTab('${t.key}')">${t.label} <span style="opacity:.6;">${count}</span></div>`;
+      }).join('')}
+    </div>
+
+    <div id="mCalendarBody"></div>
+  `;
+
+  const action = `<button class="m-icon-btn" onclick="mOpenNewEventSheet()" aria-label="New event">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </button>`;
+  mOpenSubscreen('Calendar', html, action);
+
+  const body = document.getElementById('mCalendarBody');
+  if(mCalendarViewMode==='month') body.innerHTML = mCalendarMonthGridHtml();
+  else body.innerHTML = mCalendarAgendaHtml();
+}
+
+// Exact match to desktop's renderCalendarMonthView() structure — a
+// Monday-aligned 42-cell grid. Full text event pills don't fit a
+// touch-sized mobile cell, so each day shows small colored dots (one per
+// event, capped) instead — tapping the day opens its full event list.
+function mCalendarMonthGridHtml(){
+  const year = mCalendarAnchorDate.getFullYear(), month = mCalendarAnchorDate.getMonth();
+  const firstOfMonth = new Date(year, month, 1);
+  const gridStart = getWeekStart(firstOfMonth);
+  const todayStr = toDateStr(new Date());
+
+  const eventsByDay = {};
+  calendarEvents.filter(e=>mEventMatchesTypeTab(e, mCalendarTypeTab)).forEach(e=>{
+    const d = toDateStr(new Date(e.startAt));
+    if(!eventsByDay[d]) eventsByDay[d] = [];
+    eventsByDay[d].push(e);
+  });
+
+  let daysHtml = '';
+  for(let i=0;i<42;i++){
+    const cellDate = new Date(gridStart);
+    cellDate.setDate(cellDate.getDate()+i);
+    const cellStr = toDateStr(cellDate);
+    const isOtherMonth = cellDate.getMonth()!==month;
+    const isToday = cellStr===todayStr;
+    const dayEvents = (eventsByDay[cellStr]||[]).sort((a,b)=> new Date(a.startAt)-new Date(b.startAt));
+    const shown = dayEvents.slice(0,4);
+    const extra = dayEvents.length - shown.length;
+
+    daysHtml += `<div class="m-calendar-day ${isOtherMonth?'other-month':''} ${isToday?'today':''}" onclick="mOpenDayEventsSheet('${cellStr}')">
+      <div class="m-calendar-day-num">${cellDate.getDate()}</div>
+      <div class="m-calendar-dot-row">
+        ${shown.map(e=>{
+          const meta = {meeting:'var(--blue)', deadline:'var(--red)', reminder:'var(--amber)', other:'var(--muted-lt)'}[e.eventType] || 'var(--muted-lt)';
+          return `<span class="m-calendar-event-dot" style="background:${meta};"></span>`;
+        }).join('')}
+      </div>
+      ${extra>0 ? `<div class="m-calendar-more-label">+${extra}</div>` : ''}
+    </div>`;
+  }
+
+  return `<div class="m-calendar-grid-head"><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div></div>
+    <div class="m-calendar-grid">${daysHtml}</div>`;
+}
+
+function mOpenDayEventsSheet(dateStr){
+  const dayEvents = calendarEvents
+    .filter(e=>mEventMatchesTypeTab(e, mCalendarTypeTab) && toDateStr(new Date(e.startAt))===dateStr)
+    .sort((a,b)=> new Date(a.startAt)-new Date(b.startAt));
+  const label = new Date(dateStr+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const html = dayEvents.length
+    ? dayEvents.map(e=>mAgendaEventRow(e)).join('')
+    : `<div class="m-empty">Nothing scheduled.</div>`;
+  const actions = `<button class="m-btn m-btn-brand m-btn-full" onclick="mOpenNewEventSheet('${dateStr}')">+ New event this day</button>`;
+  mOpenSheet(label, html, actions);
+}
+
+function mCalendarAgendaHtml(){
+  const todayStr = toDateStr(new Date());
+  const upcoming = calendarEvents.filter(e=>toDateStr(e.startAt) >= todayStr && mEventMatchesTypeTab(e, mCalendarTypeTab));
   const groups = new Map();
   upcoming.forEach(e=>{
     const day = toDateStr(e.startAt);
     if(!groups.has(day)) groups.set(day, []);
     groups.get(day).push(e);
   });
-
-  const html = groups.size ? [...groups.entries()].map(([day, events])=>`
+  return groups.size ? [...groups.entries()].map(([day, events])=>`
     <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin:18px 0 8px;">${mAgendaDayLabel(day)}</div>
     <div class="m-card" style="padding:0 16px;">
       ${events.map(e=>mAgendaEventRow(e)).join('')}
     </div>
   `).join('') : `<div class="m-empty">Nothing on the calendar in the next 60 days.</div>`;
-
-  const action = `<button class="m-icon-btn" onclick="mOpenNewEventSheet()" aria-label="New event">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-  </button>`;
-  mOpenSubscreen('Calendar', html, action);
 }
 
 function mAgendaDayLabel(dayStr){
@@ -1738,12 +1940,15 @@ function mOpenEventDetail(eventId){
   mOpenSheet('Event', html);
 }
 
-function mOpenNewEventSheet(){
+function mOpenNewEventSheet(presetDateStr){
   const html = `
     <div class="m-field"><label>Title</label><input id="mEventTitle" placeholder="e.g. Client check-in call"></div>
-    <div class="m-field"><label>Date</label><input type="date" id="mEventDate" value="${toDateStr(new Date())}"></div>
+    <div class="m-field"><label>Type</label>
+      <select id="mEventType"><option value="meeting">Meeting</option><option value="deadline">Deadline</option><option value="reminder">Reminder</option><option value="other">Other</option></select>
+    </div>
+    <div class="m-field"><label>Date</label><input type="date" id="mEventDate" value="${presetDateStr || toDateStr(new Date())}"></div>
     <div class="m-field"><label>Time (leave blank for all-day)</label><input type="time" id="mEventTime"></div>
-    <div class="m-field"><label>Client (optional)</label>
+    <div class="m-field" style="margin-bottom:0;"><label>Client (optional)</label>
       <select id="mEventClient"><option value="">— None —</option>${clients.filter(c=>!c.deletedAt).sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</select>
     </div>
   `;
@@ -1754,6 +1959,7 @@ function mOpenNewEventSheet(){
 async function mSaveNewEvent(){
   const title = document.getElementById('mEventTitle').value.trim();
   if(!title){ mShowToast('error','Give the event a title'); return; }
+  const eventType = document.getElementById('mEventType').value;
   const date = document.getElementById('mEventDate').value;
   const time = document.getElementById('mEventTime').value;
   const clientId = document.getElementById('mEventClient').value || null;
@@ -1762,14 +1968,17 @@ async function mSaveNewEvent(){
   const endAt = allDay ? `${date}T23:59:59` : `${date}T${time}:00`;
   const { data, error } = await supabaseClient.from('calendar_events').insert({
     title, start_at: startAt, end_at: endAt, all_day: allDay, client_id: clientId,
-    created_by: currentUser.id, event_type: 'meeting'
+    created_by: currentUser.id, event_type: eventType
   }).select().single();
   if(error){ mShowToast('error','Could not save event'); return; }
-  calendarEvents.push({ id:data.id, title, description:'', startAt, endAt, allDay, clientId, eventType:'meeting', location:'' });
+  calendarEvents.push({
+    id:data.id, title, description:'', startAt, endAt, allDay, clientId, eventType, location:'',
+    createdBy: currentUser.id, attendeeIds: []
+  });
   calendarEvents.sort((a,b)=> a.startAt.localeCompare(b.startAt));
   mCloseSheet();
   mShowToast('success','Event added');
-  mRenderCalendarAgenda();
+  mRenderCalendarMain();
 }
 
 /* ================================================================
