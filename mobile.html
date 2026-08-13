@@ -36,18 +36,23 @@ a{color:inherit;text-decoration:none;}
 .m-header{
   position:fixed;top:0;left:0;right:0;z-index:100;
   background:var(--sidebar);border-bottom:1px solid rgba(255,255,255,.08);
-  padding:calc(10px + var(--safe-top)) 14px 10px;
-  display:flex;align-items:center;gap:10px;
+  border-radius:0 0 20px 20px;
+  padding:calc(14px + var(--safe-top)) 16px 14px;
+  display:flex;flex-direction:column;gap:12px;
 }
+.m-header-top-row{display:flex;align-items:center;gap:10px;}
 .m-header .m-icon-btn{background:rgba(255,255,255,.1);color:#fff;}
 .m-header .m-icon-btn:active{background:rgba(255,255,255,.18);}
 .m-header-avatar-btn{
-  width:36px;height:36px;border-radius:50%;border:none;background:var(--brand);color:#fff;
-  display:flex;align-items:center;justify-content:center;flex:none;font-size:13px;font-weight:700;cursor:pointer;overflow:hidden;
+  width:42px;height:42px;border-radius:50%;border:none;background:var(--brand);color:#fff;
+  display:flex;align-items:center;justify-content:center;flex:none;font-size:15px;font-weight:700;cursor:pointer;overflow:hidden;
 }
 .m-header-avatar-btn img{width:100%;height:100%;object-fit:cover;}
+.m-header-greeting{flex:1;min-width:0;}
+.m-header-greeting-hello{font-size:15.5px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.m-header-greeting-sub{font-size:11.5px;color:var(--sidebar-muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .m-header-search{
-  flex:1;min-width:0;height:38px;border-radius:20px;border:none;background:rgba(255,255,255,.1);
+  width:100%;height:40px;border-radius:20px;border:none;background:rgba(255,255,255,.1);
   display:flex;align-items:center;gap:7px;padding:0 14px;color:var(--sidebar-muted);cursor:pointer;
 }
 .m-header-search span{font-size:13px;color:var(--sidebar-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -62,7 +67,7 @@ a{color:inherit;text-decoration:none;}
 .m-icon-btn:active{background:var(--border);}
 .m-badge{position:absolute;top:2px;right:2px;min-width:15px;height:15px;padding:0 3px;border-radius:20px;background:var(--red);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;}
 
-.m-content{padding:calc(72px + var(--safe-top)) 14px calc(84px + var(--safe-bottom));min-height:100vh;min-height:100dvh;}
+.m-content{padding:calc(134px + var(--safe-top)) 14px calc(84px + var(--safe-bottom));min-height:100vh;min-height:100dvh;}
 
 .m-tabbar{
   position:fixed;bottom:0;left:0;right:0;z-index:100;
@@ -212,7 +217,7 @@ a{color:inherit;text-decoration:none;}
 .m-fab:active{background:var(--brand-dark);}
 
 .m-timer-bar{
-  display:none;position:fixed;left:14px;right:14px;top:calc(64px + var(--safe-top));z-index:95;
+  display:none;position:fixed;left:14px;right:14px;top:calc(126px + var(--safe-top));z-index:95;
   background:var(--ink);color:#fff;border-radius:14px;padding:10px 12px 10px 16px;
   align-items:center;gap:10px;box-shadow:0 8px 20px rgba(0,0,0,.25);
 }
@@ -326,16 +331,22 @@ a{color:inherit;text-decoration:none;}
 <!-- APP SHELL -->
 <div id="app">
   <div class="m-header">
-    <button class="m-header-avatar-btn" onclick="mSwitchTab('more')" aria-label="Account">
-      <span id="mHeaderAvatarFallback">?</span>
-    </button>
+    <div class="m-header-top-row">
+      <button class="m-header-avatar-btn" onclick="mSwitchTab('more')" aria-label="Account">
+        <span id="mHeaderAvatarFallback">?</span>
+      </button>
+      <div class="m-header-greeting">
+        <div class="m-header-greeting-hello" id="mHeaderGreetingHello">Hello</div>
+        <div class="m-header-greeting-sub">Here's what's happening today</div>
+      </div>
+      <button class="m-icon-btn" onclick="mOpenNotifications()" aria-label="Notifications">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="m-badge" id="mNotifBadge" style="display:none;">0</span>
+      </button>
+    </div>
     <button class="m-header-search" onclick="mOpenClientsList()" aria-label="Search clients">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <span>Search</span>
-    </button>
-    <button class="m-icon-btn" onclick="mOpenNotifications()" aria-label="Notifications">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-      <span class="m-badge" id="mNotifBadge" style="display:none;">0</span>
     </button>
   </div>
 
@@ -521,6 +532,7 @@ async function mBoot(){
   } else {
     document.getElementById('mHeaderAvatarFallback').textContent = (myName()||'?').trim().charAt(0).toUpperCase();
   }
+  document.getElementById('mHeaderGreetingHello').textContent = `Hello, ${(myName()||'there').split(' ')[0]}`;
   document.getElementById('mLoadingScreen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   mSwitchTab('home');
@@ -577,7 +589,7 @@ function mShowToast(type, message){
    than hiding it in a drawer.
    ================================================================ */
 const M_TAB_META = {
-  home: ['Overview', ''],
+  home: ['', ''],
   tasks: ['Tasks', 'Assigned to you and by you'],
   queue: ['Approval Queue', 'Sorted by danger score'],
   more: ['', ''],
@@ -591,20 +603,13 @@ function mSwitchTab(name){
   const meta = M_TAB_META[name];
   const titleBlock = document.querySelector('.m-tab-title-block');
   titleBlock.style.display = meta[0] ? 'block' : 'none';
-  document.getElementById('mHeaderTitle').textContent = name==='home' ? mGreeting() : meta[0];
+  document.getElementById('mHeaderTitle').textContent = meta[0];
   document.getElementById('mHeaderSub').textContent = meta[1];
   if(name==='home') mRenderHome();
   if(name==='tasks') mRenderTasks();
   if(name==='queue') mRenderQueue();
   if(name==='more') mRenderMore();
   window.scrollTo(0,0);
-}
-
-function mGreeting(){
-  const hour = new Date().getHours();
-  const first = myName().split(' ')[0] || 'there';
-  const g = hour<12 ? 'Good morning' : hour<18 ? 'Good afternoon' : 'Good evening';
-  return `${g}, ${first}`;
 }
 
 /* ================================================================
@@ -722,7 +727,6 @@ function mHasLoggedThisWeek(c){
 }
 
 function mRenderHome(){
-  document.getElementById('mHeaderTitle').textContent = mGreeting();
   const el = document.getElementById('mScreen-home');
   const ac = clients.filter(c=>!c.deletedAt);
   const me = myName();
@@ -870,7 +874,9 @@ function mRenderHome(){
     </div>
 
     <div class="m-card">
-      <div class="m-card-row"><h3>Active this week</h3></div>
+      <div class="m-ov-card-title-row">
+        <span class="m-ov-card-head-left"><span class="m-metric-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span><span class="m-ov-card-title">Active This Week</span></span>
+      </div>
       ${activeThisWeek.length ? activeThisWeek.map(c=>mClientAttentionRow(c, true)).join('') : `<div class="m-empty" style="padding:20px 0;">No logged work yet this week.</div>`}
     </div>
   `;
