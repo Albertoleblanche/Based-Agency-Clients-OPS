@@ -70,7 +70,18 @@ a{color:inherit;text-decoration:none;}
 .m-badge{position:absolute;top:2px;right:2px;min-width:15px;height:15px;padding:0 3px;border-radius:20px;background:var(--red);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;animation:mBadgePop .25s cubic-bezier(.34,1.56,.64,1);}
 @keyframes mBadgePop{from{transform:scale(0);}to{transform:scale(1);}}
 
-.m-content{padding:calc(134px + var(--safe-top)) 14px calc(100px + var(--safe-bottom));min-height:100vh;min-height:100dvh;}
+.m-content{position:relative;padding:calc(134px + var(--safe-top)) 14px calc(100px + var(--safe-bottom));min-height:100vh;min-height:100dvh;}
+
+.m-ptr-indicator{
+  position:absolute;top:calc(134px + var(--safe-top));left:0;right:0;
+  display:flex;align-items:center;justify-content:center;height:0;overflow:visible;
+  transform:translateY(0);opacity:0;pointer-events:none;
+}
+.m-ptr-indicator.dragging{transition:none;}
+.m-ptr-indicator.snapping{transition:transform .25s cubic-bezier(.16,1,.3,1), opacity .2s ease-out;}
+.m-ptr-spinner{width:26px;height:26px;border-radius:50%;background:var(--card);box-shadow:0 4px 12px rgba(16,24,40,.15);display:flex;align-items:center;justify-content:center;}
+.m-ptr-spinner::before{content:'';width:14px;height:14px;border:2.5px solid var(--border);border-top-color:var(--brand);border-radius:50%;}
+.m-ptr-spinner.spinning::before{animation:mSpin .7s linear infinite;}
 
 .m-tabbar{
   position:fixed;bottom:0;left:0;right:0;z-index:100;
@@ -121,10 +132,12 @@ a{color:inherit;text-decoration:none;}
 
 .m-subscreen{
   display:none;position:fixed;inset:0;z-index:200;background:var(--bg);
-  animation:mSlideIn .22s ease-out;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
 }
-.m-subscreen.active{display:block;}
+.m-subscreen.active{display:block;animation:mSlideIn .22s cubic-bezier(.16,1,.3,1);}
+.m-subscreen.closing{display:block;animation:mSlideOut .22s cubic-bezier(.16,1,.3,1);}
 @keyframes mSlideIn{from{transform:translateX(100%);}to{transform:translateX(0);}}
+@keyframes mSlideOut{from{transform:translateX(0);}to{transform:translateX(100%);}}
 .m-subscreen-header{
   position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--border);
   padding:calc(10px + var(--safe-top)) 14px 10px;display:flex;align-items:center;gap:10px;
@@ -378,7 +391,10 @@ a{color:inherit;text-decoration:none;}
     <button class="m-timer-bar-stop" onclick="mStopTimer()">Stop</button>
   </div>
 
-  <div class="m-content">
+  <div class="m-content" id="mContent">
+    <div class="m-ptr-indicator" id="mPtrIndicator">
+      <div class="m-ptr-spinner"></div>
+    </div>
     <div class="m-tab-title-block">
       <h1 id="mHeaderTitle">Overview</h1>
       <p id="mHeaderSub"></p>
@@ -556,6 +572,7 @@ async function mBoot(){
   document.getElementById('app').style.display = 'block';
   mSwitchTab('home');
   setupMRealtime();
+  mSetupPullToRefresh();
 }
 
 async function mLoadAll(){
@@ -617,6 +634,63 @@ const M_TAB_META = {
   more: ['', ''],
 };
 
+let mPtrStartY = 0;
+let mPtrPulling = false;
+let mPtrDistance = 0;
+let mPtrRefreshing = false;
+const M_PTR_THRESHOLD = 70;
+const M_PTR_MAX = 100;
+
+function mSetupPullToRefresh(){
+  const contentEl = document.getElementById('mContent');
+  const indicator = document.getElementById('mPtrIndicator');
+
+  contentEl.addEventListener('touchstart', (e)=>{
+    if(window.scrollY > 0 || mPtrRefreshing) return;
+    mPtrStartY = e.touches[0].clientY;
+    mPtrPulling = true;
+    mPtrDistance = 0;
+    indicator.classList.remove('snapping');
+    indicator.classList.add('dragging');
+  }, { passive:true });
+
+  contentEl.addEventListener('touchmove', (e)=>{
+    if(!mPtrPulling) return;
+    const deltaY = e.touches[0].clientY - mPtrStartY;
+    if(deltaY <= 0 || window.scrollY > 0){ mPtrDistance = 0; indicator.style.transform = 'translateY(0)'; indicator.style.opacity = '0'; return; }
+    e.preventDefault();
+    mPtrDistance = Math.min(M_PTR_MAX, deltaY * 0.5);
+    indicator.style.transform = `translateY(${mPtrDistance}px)`;
+    indicator.style.opacity = Math.min(1, mPtrDistance / M_PTR_THRESHOLD);
+  }, { passive:false });
+
+  contentEl.addEventListener('touchend', ()=>{
+    if(!mPtrPulling) return;
+    mPtrPulling = false;
+    indicator.classList.remove('dragging');
+    indicator.classList.add('snapping');
+    if(mPtrDistance >= M_PTR_THRESHOLD) mPullToRefreshTrigger();
+    else { indicator.style.transform = 'translateY(0)'; indicator.style.opacity = '0'; }
+  });
+}
+
+async function mPullToRefreshTrigger(){
+  const indicator = document.getElementById('mPtrIndicator');
+  mPtrRefreshing = true;
+  indicator.style.transform = 'translateY(50px)';
+  indicator.style.opacity = '1';
+  indicator.querySelector('.m-ptr-spinner').classList.add('spinning');
+  await mLoadAll();
+  if(activeTab==='home') mRenderHome();
+  else if(activeTab==='tasks') mRenderTasks();
+  else if(activeTab==='queue') mRenderQueue();
+  else if(activeTab==='more') mRenderMore();
+  indicator.style.transform = 'translateY(0)';
+  indicator.style.opacity = '0';
+  setTimeout(()=>{ indicator.querySelector('.m-ptr-spinner').classList.remove('spinning'); mPtrRefreshing = false; }, 250);
+  mShowToast('success','Up to date');
+}
+
 function mSwitchTab(name){
   activeTab = name;
   document.querySelectorAll('.m-tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
@@ -641,15 +715,20 @@ function mSwitchTab(name){
    grid showing everything simultaneously.
    ================================================================ */
 function mOpenSubscreen(title, html, headerActionHtml){
+  const el = document.getElementById('mSubscreen');
   document.getElementById('mSubscreenTitle').textContent = title;
   document.getElementById('mSubscreenContent').innerHTML = html;
   document.getElementById('mSubscreenAction').innerHTML = headerActionHtml || '';
-  document.getElementById('mSubscreen').classList.add('active');
+  el.classList.remove('closing');
+  el.classList.add('active');
   document.body.style.overflow = 'hidden';
 }
 function mCloseSubscreen(){
-  document.getElementById('mSubscreen').classList.remove('active');
+  const el = document.getElementById('mSubscreen');
+  el.classList.remove('active');
+  el.classList.add('closing');
   document.body.style.overflow = '';
+  setTimeout(()=>{ el.classList.remove('closing'); }, 220);
 }
 
 /* ================================================================
@@ -1926,25 +2005,6 @@ function mRenderMore(){
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-lt)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
     </div>
-    <div class="m-card">
-      <div style="margin:0 -16px;">
-        <div class="m-list-row" style="padding-left:16px;padding-right:16px;" onclick="mOpenProfileScreen()">
-          <div class="m-list-icon" style="background:var(--surface-2);color:var(--ink);border-radius:50%;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
-          <div class="m-list-main"><div class="m-list-title">My Profile</div></div>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-lt)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-        </div>
-        <div class="m-list-row" style="padding-left:16px;padding-right:16px;border-bottom:none;" onclick="mRefreshApp()">
-          <div class="m-list-icon" style="background:var(--surface-2);color:var(--ink);border-radius:50%;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg></div>
-          <div class="m-list-main"><div class="m-list-title">Refresh App</div></div>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-lt)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-        </div>
-      </div>
-      <button class="m-btn m-btn-outline m-btn-full" style="margin-top:14px;" onclick="mLogout()">Sign out</button>
-      <button class="m-btn m-btn-outline m-btn-full" style="margin-top:10px;" onclick="mQuickSyncTime()">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-        Sync Time
-      </button>
-    </div>
 
     <div style="font-size:11px;font-weight:700;letter-spacing:.03em;color:var(--muted-lt);text-transform:uppercase;margin:16px 0 8px 2px;">Admin</div>
     <div class="m-card" style="padding:0 16px;">
@@ -1959,6 +2019,21 @@ function mRenderMore(){
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-lt)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
     </div>
+
+    <div class="m-card">
+      <div style="margin:0 -16px;">
+        <div class="m-list-row" style="padding-left:16px;padding-right:16px;border-bottom:none;" onclick="mOpenProfileScreen()">
+          <div class="m-list-icon" style="background:var(--surface-2);color:var(--ink);border-radius:50%;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+          <div class="m-list-main"><div class="m-list-title">My Profile</div></div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-lt)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+      <button class="m-btn m-btn-outline m-btn-full" style="margin-top:14px;" onclick="mLogout()">Sign out</button>
+      <button class="m-btn m-btn-outline m-btn-full" style="margin-top:10px;" onclick="mQuickSyncTime()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Sync Time
+      </button>
+    </div>
   `;
 }
 
@@ -1972,17 +2047,6 @@ async function mQuickSyncTime(){
   if(!data || !data.googleConfigured){ mShowToast('error',"Sync isn't configured for this deployment."); return; }
   if(!data.connected){ mShowToast('error','Not connected yet', 'Open My Profile to connect Google Calendar first.'); return; }
   await mSyncGoogleCalendar();
-}
-
-async function mRefreshApp(){
-  mShowToast('success','Refreshing…');
-  await mLoadAll();
-  if(activeTab==='home') mRenderHome();
-  else if(activeTab==='tasks') mRenderTasks();
-  else if(activeTab==='queue') mRenderQueue();
-  else if(activeTab==='reminders') mRenderReminders();
-  else if(activeTab==='more') mRenderMore();
-  mShowToast('success','Up to date');
 }
 
 // Exact match to desktop's NOTIFICATION_TYPE_META — same 16 types, same labels.
