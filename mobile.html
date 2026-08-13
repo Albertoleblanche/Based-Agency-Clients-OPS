@@ -173,7 +173,15 @@ a{color:inherit;text-decoration:none;}
 .m-kpi-scroll-row .m-card{flex:0 0 calc(50% - 5px);scroll-snap-align:start;margin-bottom:0;}
 .m-attention-scroll-row{display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;padding-bottom:2px;scrollbar-width:none;}
 .m-attention-scroll-row::-webkit-scrollbar{display:none;}
-.m-attention-card{flex:0 0 78%;scroll-snap-align:start;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;}
+.m-attention-card{flex:0 0 78%;scroll-snap-align:start;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;}
+.m-attention-card-header{background:var(--sidebar);padding:14px;display:flex;align-items:center;gap:10px;}
+.m-attention-card-action-btn{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;display:flex;align-items:center;justify-content:center;flex:none;}
+.m-attention-card-body{padding:14px;}
+.m-attention-card-pill{background:var(--surface-2);border-radius:10px;padding:9px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;}
+.m-attention-timeline-row{display:flex;align-items:flex-start;gap:10px;position:relative;padding-bottom:14px;}
+.m-attention-timeline-row:last-child{padding-bottom:0;}
+.m-attention-timeline-row:not(:last-child)::before{content:'';position:absolute;left:13px;top:28px;bottom:0;width:0;border-left:2px dotted var(--border);}
+.m-attention-timeline-icon{width:26px;height:26px;border-radius:50%;background:var(--sidebar);color:#fff;display:flex;align-items:center;justify-content:center;flex:none;position:relative;z-index:1;}
 
 .m-risk-bar{display:flex;gap:4px;height:14px;margin:14px 0 16px;}
 .m-risk-bar-seg{border-radius:7px;background-image:repeating-linear-gradient(45deg, rgba(255,255,255,0) 0, rgba(255,255,255,0) 3px, rgba(255,255,255,.45) 3px, rgba(255,255,255,.45) 6px);}
@@ -1008,16 +1016,44 @@ function mHoursChartSvg(weekDays){
 
 function mAttentionScrollCard(c){
   const avColor = avatarColorForName(c.name||'?');
-  const reason = c.draftStatus==='pending' ? 'Draft awaiting approval' : riskLabel(c.danger).text;
-  return `<div class="m-attention-card" onclick="mOpenClientFromHome('${c.id}')">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-      <div class="m-avatar" style="background:${avColor};color:#fff;">${(c.name||'?').charAt(0).toUpperCase()}</div>
+  const risk = riskLabel(c.danger);
+  const reason = c.draftStatus==='pending' ? 'Draft awaiting approval' : `Danger score ${c.danger}/5`;
+  return `<div class="m-attention-card m-card-clickable" onclick="mOpenClientFromHome('${c.id}')">
+    <div class="m-attention-card-header">
+      <div class="m-avatar" style="background:${avColor};color:#fff;flex:none;">${(c.name||'?').charAt(0).toUpperCase()}</div>
       <div style="flex:1;min-width:0;">
-        <div style="font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.name)}</div>
-        <div style="font-size:11.5px;color:var(--muted);">${reason}</div>
+        <div style="font-size:14px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.name)}</div>
+        <div style="font-size:11.5px;color:var(--sidebar-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.service||'Client')}</div>
+      </div>
+      <div class="m-card-menu-wrap" onclick="event.stopPropagation();">
+        <div class="m-attention-card-action-btn m-card-menu-btn" style="font-size:14px;" onclick="mToggleCardMenu('attn-${c.id}')">⋯</div>
+        <div class="m-card-menu" id="cardMenu-attn-${c.id}">
+          <div class="m-card-menu-item" onclick="mCloseCardMenus();mOpenLogImprovementSheet('${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Log / edit improvements</div>
+          <div class="m-card-menu-item" onclick="mCloseCardMenus();mOpenNoteSheet(null,'${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Add note</div>
+          <div class="m-card-menu-item" onclick="mCloseCardMenus();mOpenTimeTracker('${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Track time</div>
+        </div>
       </div>
     </div>
-    <div style="font-size:11px;color:var(--muted-lt);">Importance ${c.importance}/10</div>
+    <div class="m-attention-card-body">
+      <div class="m-attention-card-pill">
+        <span style="font-size:13px;font-weight:700;color:${risk.color};">${risk.text}</span>
+        <span style="font-size:11.5px;color:var(--muted-lt);">Importance ${c.importance}/10</span>
+      </div>
+      <div class="m-attention-timeline-row">
+        <div class="m-attention-timeline-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+        <div>
+          <div style="font-size:10.5px;color:var(--muted-lt);">Risk level</div>
+          <div style="font-size:12.5px;font-weight:700;color:var(--ink);">${risk.text}</div>
+        </div>
+      </div>
+      <div class="m-attention-timeline-row">
+        <div class="m-attention-timeline-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+        <div>
+          <div style="font-size:10.5px;color:var(--muted-lt);">Why it needs attention</div>
+          <div style="font-size:12.5px;font-weight:700;color:var(--ink);">${reason}</div>
+        </div>
+      </div>
+    </div>
   </div>`;
 }
 
