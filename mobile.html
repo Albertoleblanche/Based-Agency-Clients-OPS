@@ -410,14 +410,17 @@ async function mBoot(){
 }
 
 async function mLoadAll(){
-  const [profRes, teamRes, clientsRes, tasksRes, remindersRes, notifRes, settingsRes] = await Promise.all([
-    supabaseClient.from('team_profiles').select('*').eq('id', currentUser.id).maybeSingle(),
-    supabaseClient.from('team_profiles').select('*'),
-    supabaseClient.from('app_storage').select('value').eq('key','app-data').maybeSingle(),
-    supabaseClient.from('tasks').select('*').or(`assignee_id.eq.${currentUser.id},assigner_id.eq.${currentUser.id}`).is('cancelled_at', null),
-    supabaseClient.from('client_reminders').select('*'),
-    supabaseClient.from('notifications').select('*').eq('user_id', currentUser.id).order('created_at',{ascending:false}).limit(30),
-    supabaseClient.from('app_storage').select('value').eq('key','settings').maybeSingle(),
+  const [[profRes, teamRes, clientsRes, tasksRes, remindersRes, notifRes, settingsRes]] = await Promise.all([
+    Promise.all([
+      supabaseClient.from('team_profiles').select('*').eq('id', currentUser.id).maybeSingle(),
+      supabaseClient.from('team_profiles').select('*'),
+      supabaseClient.from('app_storage').select('value').eq('key','app-data').maybeSingle(),
+      supabaseClient.from('tasks').select('*').or(`assignee_id.eq.${currentUser.id},assigner_id.eq.${currentUser.id}`).is('cancelled_at', null),
+      supabaseClient.from('client_reminders').select('*'),
+      supabaseClient.from('notifications').select('*').eq('user_id', currentUser.id).order('created_at',{ascending:false}).limit(30),
+      supabaseClient.from('app_storage').select('value').eq('key','settings').maybeSingle(),
+    ]),
+    mLoadCalendarEvents(),
   ]);
   myProfile = profRes.data || null;
   teamProfiles = teamRes.data || [];
@@ -606,7 +609,6 @@ function mRenderHome(){
     ? ac.filter(c=>c.draftStatus==='pending').length
     : ac.filter(c=>c.draftStatus==='pending' && (c.improvements||[]).some(i=>i.author===me)).length;
 
-  const myOverdueReminders = clientReminders.filter(r=>r.askedBy===currentUser?.id && mReminderDisplayStatus(r)==='due').length;
 
   const healthPct = ac.length ? Math.round(100 - (ac.reduce((s,c)=>s+c.danger,0)/ac.length/5)*100) : 0;
   const healthTier = healthPct>=70 ? {cls:'m-chip-good',label:'Healthy'} : healthPct>=40 ? {cls:'m-chip-mid',label:'Needs attention'} : {cls:'m-chip-bad',label:'Critical'};
@@ -621,6 +623,16 @@ function mRenderHome(){
   const attention = ac.filter(c=>c.danger>=4 || c.draftStatus==='pending')
     .sort((a,b)=> b.danger-a.danger || (b.draftStatus==='pending')-(a.draftStatus==='pending'))
     .slice(0,5);
+
+  // Exact match to desktop's renderOverviewUpcoming() — next 14 days,
+  // scoped to events the current user is attending or created.
+  const upcomingNow = new Date();
+  const upcomingHorizon = new Date(upcomingNow); upcomingHorizon.setDate(upcomingHorizon.getDate()+14);
+  const upcomingItems = calendarEvents.filter(e=>{
+    const start = new Date(e.startAt);
+    if(start < upcomingNow || start > upcomingHorizon) return false;
+    return (e.attendeeIds||[]).includes(currentUser?.id) || e.createdBy===currentUser?.id;
+  }).sort((a,b)=> new Date(a.startAt) - new Date(b.startAt)).slice(0,3);
 
   const kpiCard = (icon, title, value, valueColor, chipsHtml, onclick, seeAll) => `
     <div class="m-card"${onclick?` onclick="${onclick}"`:''}>
@@ -664,10 +676,27 @@ function mRenderHome(){
       withRecentLogs.length ? `<span class="m-chip-pill m-chip-status">${approvedWithLogs} Of ${withRecentLogs.length} Updated</span>` : `<span class="m-chip-pill m-chip-status">No Logs Yet</span>`,
       "mSwitchTab('queue')")}
 
-    ${kpiCard(icoReminders, 'Follow-Ups Due', myOverdueReminders,
-      myOverdueReminders ? 'var(--blue)' : null,
-      myOverdueReminders ? `<span class="m-chip-pill" style="background:var(--blue-bg);color:var(--blue);">Needs Follow-Up</span>` : `<span class="m-chip-pill m-chip-good">All Caught Up</span>`,
-      "mSwitchTab('reminders')")}
+    <div class="m-card">
+      <div class="m-ov-card-title-row">
+        <span class="m-ov-card-head-left"><span class="m-metric-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span><span class="m-ov-card-title">Upcoming</span></span>
+        <span class="m-ov-card-btn" onclick="event.stopPropagation();mOpenCalendarAgenda()">See All</span>
+      </div>
+      ${upcomingItems.length ? upcomingItems.map(e=>{
+        const when = new Date(e.startAt);
+        const isToday = toDateStr(when)===toDateStr(upcomingNow);
+        const dayLabel = isToday ? 'Today' : when.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+        const timeLabel = when.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+        const dotColor = {meeting:'var(--blue)', deadline:'var(--red)', reminder:'var(--amber)', other:'var(--muted-lt)'}[e.eventType] || 'var(--muted-lt)';
+        return `<div class="m-list-row" onclick="mOpenEventDetail('${e.id}')">
+          <span style="width:7px;height:7px;border-radius:50%;background:${dotColor};flex:none;"></span>
+          <div class="m-list-main">
+            <div class="m-list-title">${escapeHtml(e.title)}</div>
+            <div class="m-list-sub">${dayLabel} · ${timeLabel}</div>
+          </div>
+          <div class="m-list-meta">${isToday ? timeLabel : dayLabel}</div>
+        </div>`;
+      }).join('') : `<div class="m-empty" style="padding:20px 0;">Nothing on your calendar in the next two weeks.</div>`}
+    </div>
 
     <div class="m-card">
       <div class="m-ov-card-title-row">
@@ -1636,7 +1665,8 @@ async function mLoadCalendarEvents(){
   if(error){ mShowToast('error','Could not load calendar'); return; }
   calendarEvents = (data||[]).map(e=>({
     id:e.id, title:e.title, description:e.description||'', startAt:e.start_at, endAt:e.end_at,
-    allDay:e.all_day, clientId:e.client_id, eventType:e.event_type, location:e.location||''
+    allDay:e.all_day, clientId:e.client_id, eventType:e.event_type, location:e.location||'',
+    createdBy:e.created_by, attendeeIds:e.attendee_ids||[]
   }));
   calendarLoaded = true;
 }
