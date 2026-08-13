@@ -174,6 +174,13 @@ a{color:inherit;text-decoration:none;}
 .m-attention-scroll-row{display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;padding-bottom:2px;scrollbar-width:none;}
 .m-attention-scroll-row::-webkit-scrollbar{display:none;}
 .m-attention-card{flex:0 0 78%;scroll-snap-align:start;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;}
+
+.m-risk-bar{display:flex;gap:4px;height:14px;margin:14px 0 16px;}
+.m-risk-bar-seg{border-radius:7px;background-image:repeating-linear-gradient(45deg, rgba(255,255,255,0) 0, rgba(255,255,255,0) 3px, rgba(255,255,255,.45) 3px, rgba(255,255,255,.45) 6px);}
+.m-risk-legend-row{display:flex;align-items:center;gap:9px;padding:8px 0;}
+.m-risk-legend-dot{width:9px;height:9px;border-radius:50%;flex:none;}
+.m-risk-legend-label{flex:1;font-size:13px;font-weight:600;color:var(--ink);}
+.m-risk-legend-count{font-size:13px;color:var(--muted);}
 .m-metric-grid .m-card{margin-bottom:0;padding:14px;}
 
 .m-list-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s ease-out;}
@@ -578,6 +585,7 @@ async function mLoadAll(){
     targetView:n.target_view, targetId:n.target_id
   }));
   mSettings = settingsRes.data ? JSON.parse(settingsRes.data.value) : {};
+  await mLoadMyTimeEntries();
   mUpdateBadges();
 }
 
@@ -748,6 +756,27 @@ function mRenderHome(){
   const atRisk = ac.filter(c=>c.danger>=4).length;
   const onboarding = ac.filter(c=>c.status==='Onboarding').length;
 
+  // Exact match to desktop's risk-tier breakdown (riskLabel(), same colors).
+  const riskColors = { 'No risk':'#117F3A', 'Medium risk':'#43719C', 'At risk':'#CF2424' };
+  const riskCounts = { 'No risk':0, 'Medium risk':0, 'At risk':0 };
+  ac.forEach(c=>{ riskCounts[riskLabel(c.danger).text]++; });
+
+  // "Your Hours Logged" — this week's daily totals plus today-vs-yesterday change.
+  const hoursWeekStart = getWeekStart(new Date());
+  const hoursTodayStr = toDateStr(new Date());
+  const hoursYesterdayStr = toDateStr(new Date(Date.now()-86400000));
+  const myTimeEntries = mMyOwnTimeEntries();
+  const todayMinutes = myTimeEntries.filter(e=>e.date===hoursTodayStr).reduce((s,e)=>s+e.minutes,0);
+  const yesterdayMinutes = myTimeEntries.filter(e=>e.date===hoursYesterdayStr).reduce((s,e)=>s+e.minutes,0);
+  const hoursChangePct = yesterdayMinutes ? Math.round(((todayMinutes-yesterdayMinutes)/yesterdayMinutes)*100) : null;
+  const weekDays = [];
+  for(let i=0;i<7;i++){
+    const d = new Date(hoursWeekStart); d.setDate(d.getDate()+i);
+    const dStr = toDateStr(d);
+    const mins = myTimeEntries.filter(e=>e.date===dStr).reduce((s,e)=>s+e.minutes,0);
+    weekDays.push({ d, dStr, hours: mins/60, isToday: dStr===hoursTodayStr });
+  }
+
   const healthPct = ac.length ? Math.round(100 - (ac.reduce((s,c)=>s+c.danger,0)/ac.length/5)*100) : 0;
   const healthTier = healthPct>=70 ? {cls:'m-chip-good',label:'Healthy'} : healthPct>=40 ? {cls:'m-chip-mid',label:'Needs attention'} : {cls:'m-chip-bad',label:'Critical'};
 
@@ -878,6 +907,29 @@ function mRenderHome(){
       }).join('') : `<div class="m-empty" style="padding:20px 0;">Nothing on your calendar in the next two weeks.</div>`}
     </div>
 
+    <div class="m-card">
+      <div class="m-ov-card-title-row" style="background:#CF242422;">
+        <span class="m-ov-card-head-left"><span class="m-metric-icon" style="background:none;color:#CF2424;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></span><span class="m-ov-card-title" style="color:#CF2424;">Risk Breakdown</span></span>
+        <span class="m-ov-card-btn" onclick="event.stopPropagation();mOpenClientsList()">View Detail</span>
+      </div>
+      <div style="font-size:11.5px;color:var(--muted);">Current total</div>
+      <div style="font-size:24px;font-weight:800;color:var(--ink);margin-top:2px;">${ac.length} Clients</div>
+      <div class="m-risk-bar">
+        ${Object.entries(riskCounts).filter(([,n])=>n>0).map(([tier,n])=>
+          `<div class="m-risk-bar-seg" style="flex:${n};background:${riskColors[tier]};"></div>`
+        ).join('') || `<div class="m-risk-bar-seg" style="flex:1;background:var(--border);"></div>`}
+      </div>
+      <div>
+        ${Object.entries(riskCounts).map(([tier,n])=>`
+          <div class="m-risk-legend-row">
+            <span class="m-risk-legend-dot" style="background:${riskColors[tier]};"></span>
+            <span class="m-risk-legend-label">${tier}</span>
+            <span class="m-risk-legend-count">${n} client${n!==1?'s':''}</span>
+          </div>`).join('')}
+      </div>
+      <button class="m-btn m-btn-outline m-btn-full" style="margin-top:8px;" onclick="mOpenClientsList()">View Detail</button>
+    </div>
+
     <div style="display:flex;align-items:center;justify-content:space-between;margin:4px 2px 8px;">
       <span class="m-ov-card-title" style="font-size:13px;font-weight:700;">Needs Attention</span>
       <span class="m-ov-card-btn" onclick="mSwitchTab('queue')">See All</span>
@@ -887,12 +939,71 @@ function mRenderHome(){
     </div>
 
     <div class="m-card">
+      <div class="m-ov-card-title-row" style="background:var(--brand)22;">
+        <span class="m-ov-card-head-left"><span class="m-metric-icon" style="background:none;color:var(--brand-dark);"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span><span class="m-ov-card-title" style="color:var(--brand-dark);">Your Hours Logged</span></span>
+        <span class="m-ov-card-btn" onclick="event.stopPropagation();mOpenTimeTracker()">View Detail</span>
+      </div>
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+        <div>
+          <div style="font-size:11.5px;color:var(--muted);">Today total time</div>
+          <div style="font-size:22px;font-weight:800;color:var(--ink);margin-top:2px;">${formatMinutes(todayMinutes)}</div>
+        </div>
+        ${hoursChangePct!==null ? `<span style="display:flex;align-items:center;gap:3px;font-size:12px;font-weight:700;color:${hoursChangePct>=0?'var(--green)':'var(--red)'};">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">${hoursChangePct>=0?'<polyline points="18 15 12 9 6 15"/>':'<polyline points="6 9 12 15 18 9"/>'}</svg>
+          ${Math.abs(hoursChangePct)}% <span style="font-weight:400;color:var(--muted-lt);">vs yesterday</span>
+        </span>` : ''}
+      </div>
+      ${mHoursChartSvg(weekDays)}
+      <div style="text-align:center;font-size:11px;color:var(--muted-lt);margin-top:6px;">Today: <b style="color:var(--ink);">${formatMinutes(todayMinutes)}</b></div>
+      <button class="m-btn m-btn-outline m-btn-full" style="margin-top:14px;" onclick="mOpenTimeTracker()">View Detail</button>
+    </div>
+
+    <div class="m-card">
       <div class="m-ov-card-title-row" style="background:#C99A5522;">
         <span class="m-ov-card-head-left"><span class="m-metric-icon" style="background:none;color:#C99A55;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span><span class="m-ov-card-title" style="color:#C99A55;">Active This Week</span></span>
       </div>
       ${activeThisWeek.length ? activeThisWeek.map(c=>mClientAttentionRow(c, true)).join('') : `<div class="m-empty" style="padding:20px 0;">No logged work yet this week.</div>`}
     </div>
   `;
+}
+
+function mHoursChartSvg(weekDays){
+  const w = 300, h = 130, padL = 24, padR = 10, padT = 14, padB = 20;
+  const plotW = w - padL - padR, plotH = h - padT - padB;
+  const rawMax = Math.max(...weekDays.map(d=>d.hours), 1);
+  const maxVal = Math.max(3, Math.ceil(rawMax/3)*3);
+  const stepX = plotW / (weekDays.length-1);
+  const yFor = (hrs)=> padT + plotH - (hrs/maxVal)*plotH;
+  const points = weekDays.map((d,i)=>({ x: padL + i*stepX, y: yFor(d.hours), ...d }));
+
+  const gridLines = [0, maxVal/2, maxVal].map(v=>{
+    const y = yFor(v);
+    return `<line x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}" stroke="var(--border)" stroke-width="1" stroke-dasharray="3 3"/>
+      <text x="2" y="${y+3}" font-size="8" fill="var(--muted-lt)">${v===0?'0h':v+'h'}</text>`;
+  }).join('');
+
+  const pathD = points.map((p,i)=> (i===0?'M':'L') + p.x.toFixed(1) + ' ' + p.y.toFixed(1)).join(' ');
+  const todayPoint = points.find(p=>p.isToday);
+
+  const dots = points.map(p=>
+    p.isToday
+      ? `<circle cx="${p.x}" cy="${p.y}" r="4.5" fill="var(--brand)" stroke="#fff" stroke-width="1.5"/>`
+      : `<circle cx="${p.x}" cy="${p.y}" r="3" fill="#fff" stroke="var(--brand)" stroke-width="1.5"/>`
+  ).join('');
+
+  const dayLabels = points.map(p=>
+    `<text x="${p.x}" y="${h-4}" font-size="8" font-weight="${p.isToday?700:400}" fill="${p.isToday?'var(--ink)':'var(--muted-lt)'}" text-anchor="middle">${p.d.toLocaleDateString('en-US',{weekday:'short'}).slice(0,3)}</text>`
+  ).join('');
+
+  const todayLine = todayPoint ? `<line x1="${todayPoint.x}" y1="${padT}" x2="${todayPoint.x}" y2="${yFor(0)}" stroke="var(--brand)" stroke-width="1" stroke-dasharray="2 3" opacity=".4"/>` : '';
+
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="130" style="overflow:visible;">
+    ${gridLines}
+    ${todayLine}
+    <path d="${pathD}" fill="none" stroke="var(--brand)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    ${dots}
+    ${dayLabels}
+  </svg>`;
 }
 
 function mAttentionScrollCard(c){
