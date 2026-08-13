@@ -49,7 +49,7 @@ a{color:inherit;text-decoration:none;}
   transition:transform .1s ease-out;
 }
 .m-header-avatar-btn:active{transform:scale(.92);}
-.m-header-avatar-btn img{width:100%;height:100%;object-fit:cover;}
+.m-header-avatar-btn img{width:100%;height:100%;object-fit:cover;display:block;}
 .m-header-greeting{flex:1;min-width:0;}
 .m-header-greeting-hello{font-size:15.5px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .m-header-greeting-sub{font-size:11.5px;color:var(--sidebar-muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -351,7 +351,7 @@ a{color:inherit;text-decoration:none;}
 <div id="app">
   <div class="m-header">
     <div class="m-header-top-row">
-      <button class="m-header-avatar-btn" onclick="mSwitchTab('more')" aria-label="Account">
+      <button class="m-header-avatar-btn" onclick="mOpenProfileScreen()" aria-label="My Profile">
         <span id="mHeaderAvatarFallback">?</span>
       </button>
       <div class="m-header-greeting">
@@ -1152,7 +1152,7 @@ function mPersonAvatarHtml(profile, size){
   size = size || 24;
   if(!profile) return `<div class="m-avatar" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.4)}px;background:var(--surface-2);color:var(--muted-lt);">?</div>`;
   return profile.avatar_url
-    ? `<img src="${profile.avatar_url}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;flex:none;" alt="">`
+    ? `<img src="${profile.avatar_url}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;display:block;flex:none;" alt="">`
     : `<div class="m-avatar" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.4)}px;background:${avatarColorForName(profile.name||'?')};color:#fff;">${(profile.name||'?').trim().charAt(0).toUpperCase()}</div>`;
 }
 
@@ -2141,7 +2141,7 @@ async function mRenderProfileScreen(){
       <div class="m-card-row"><h3>Profile Photo</h3></div>
       <div style="display:flex;align-items:center;gap:16px;">
         ${myProfile && myProfile.avatar_url
-          ? `<img src="${myProfile.avatar_url}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;flex:none;" alt="">`
+          ? `<img src="${myProfile.avatar_url}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;display:block;flex:none;" alt="">`
           : `<div class="m-avatar" style="width:64px;height:64px;font-size:22px;">${(myName()||'?').charAt(0).toUpperCase()}</div>`}
         <div>
           <input type="file" id="mAvatarFileInput" accept="image/*" style="display:none;" onchange="mUploadAvatar(this.files[0])">
@@ -2163,7 +2163,7 @@ async function mRenderProfileScreen(){
       <div id="mGcalStatusBox"><div class="m-empty" style="padding:10px 0;">Checking…</div></div>
     </div>
   `;
-  mOpenSubscreen('My Profile', html);
+  mOpenSheet('My Profile', html);
   mLoadGoogleCalendarStatus();
 }
 
