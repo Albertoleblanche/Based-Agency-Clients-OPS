@@ -1290,7 +1290,6 @@ document.addEventListener('DOMContentLoaded', function(){
               <div class="ov-card-title-row-plain"><span class="ov-card-head-left"><span class="ov-card-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span><span class="ov-card-title" style="margin:0;" id="kpiCompletionLabel">Weekly Completion</span></span></div>
               <div class="ov-kpi-value" id="kpiCompletion">—</div>
               <div class="metric-chips" id="completionChips"></div>
-              <div class="ov-health-track" style="margin-top:10px;"><div class="ov-health-fill" id="completionBarFill" style="width:0%;"></div></div>
             </div>
           </div>
 
@@ -4105,12 +4104,6 @@ function renderKpis(){
   document.getElementById('completionChips').innerHTML = withRecentLogs.length
     ? `<span class="pill pill-status">${approvedWithLogs} of ${withRecentLogs.length} updated</span>`
     : `<span class="pill pill-status">No logs yet</span>`;
-  const completionBarFillEl = document.getElementById('completionBarFill');
-  if(completionBarFillEl){
-    const completionColor = completionPct>=70 ? '#117F3A' : completionPct>=40 ? '#A65B05' : '#CF2424';
-    completionBarFillEl.style.width = (withRecentLogs.length ? completionPct : 0) + '%';
-    completionBarFillEl.style.setProperty('--health-fill-color', completionColor);
-  }
 
   renderOverviewUpcoming();
   renderOverviewMyTasks();
