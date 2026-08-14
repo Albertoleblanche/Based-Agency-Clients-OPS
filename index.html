@@ -264,6 +264,9 @@
   .ov-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;box-shadow:0 1px 2px rgba(16,24,40,.03);min-width:0;}
   .ov-card-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;text-transform:capitalize;color:var(--ink);font-weight:700;margin-bottom:10px;}
   .ov-card-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-10px -10px 14px -10px;padding:12px 18px;border-radius:7px;}
+  .ov-card-title-row-plain{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:12px;margin-bottom:14px;border-bottom:1px solid #F0F1F4;}
+  .ov-card-title-row-plain .ov-card-icon{background:var(--surface-2);color:var(--ink);}
+  .ov-card-title-row-plain .ov-card-title{color:var(--ink);}
   .ov-card-head-left{display:flex;align-items:center;gap:8px;min-width:0;}
   .ov-card-icon{width:24px;height:24px;border-radius:7px;background:none;color:var(--ink);display:flex;align-items:center;justify-content:center;flex:none;}
   .ov-card-btn{font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;font-weight:600;color:var(--ink);background:var(--card);border:1px solid var(--border);border-radius:20px;padding:5px 11px;cursor:pointer;white-space:nowrap;flex:none;transition:background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);}
@@ -278,16 +281,17 @@
      family as the rest of the app's subtle backgrounds, not the sidebar color. */
   .ov-health-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px;}
   .ov-health-value{font-family:'Plus Jakarta Sans',sans-serif;font-size:30px;font-weight:600;color:var(--ink);line-height:1;}
-  .ov-health-scale{display:flex;justify-content:space-between;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:600;color:var(--muted-lt);margin-bottom:6px;}
-  .ov-health-bars{position:relative;height:34px;}
-  .ov-health-bars-base{
-    position:absolute;left:0;bottom:0;width:100%;height:55%;border-radius:3px;
-    background-image:repeating-linear-gradient(90deg, var(--border) 0 3px, transparent 3px 6px);
+  .ov-health-track{
+    position:relative;height:11px;border-radius:20px;background:var(--surface-2);
+    box-shadow:inset 0 1px 2px rgba(16,24,40,.06);overflow:hidden;
   }
-  .ov-health-bars-fill{
-    position:absolute;left:0;bottom:0;height:100%;border-radius:3px;
-    background-image:repeating-linear-gradient(90deg, var(--health-fill-color, var(--green)) 0 3px, transparent 3px 6px);
-    transition:width var(--duration-slow) var(--ease-out), background-image var(--duration-slow) var(--ease-out);
+  .ov-health-fill{
+    position:relative;height:100%;border-radius:20px;
+    background:linear-gradient(180deg, color-mix(in srgb, var(--health-fill-color, var(--green)) 100%, white 22%) 0%, var(--health-fill-color, var(--green)) 100%);
+    box-shadow:
+      inset 0 1px 1px rgba(255,255,255,.45),
+      0 0 10px 1px color-mix(in srgb, var(--health-fill-color, var(--green)) 45%, transparent);
+    transition:width var(--duration-slow) var(--ease-out), background var(--duration-slow) var(--ease-out), box-shadow var(--duration-slow) var(--ease-out);
   }
 
   /* Compact rows used by the attention / active / tasks / upcoming lists */
@@ -1230,8 +1234,8 @@ document.addEventListener('DOMContentLoaded', function(){
 
         <div class="ov-col">
           <div class="ov-card kpi-click" onclick="switchView('clients')">
-            <div class="ov-card-title-row" style="background:#7C93B022;">
-              <span class="ov-card-head-left"><span class="ov-card-icon" style="color:#7C93B0;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="ov-card-title" style="margin:0;color:#7C93B0;">Total Clients</span></span>
+            <div class="ov-card-title-row-plain">
+              <span class="ov-card-head-left"><span class="ov-card-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="ov-card-title" style="margin:0;">Total Clients</span></span>
               <span class="ov-card-btn" onclick="event.stopPropagation();switchView('clients')">See All</span>
             </div>
             <div class="ov-kpi-value" id="kpiTotal">0</div>
@@ -1247,17 +1251,13 @@ document.addEventListener('DOMContentLoaded', function(){
               <span class="ov-health-value" id="kpiHealth">—</span>
               <span id="healthChips"></span>
             </div>
-            <div class="ov-health-scale"><span>0</span><span>50</span><span>100</span></div>
-            <div class="ov-health-bars">
-              <div class="ov-health-bars-base"></div>
-              <div class="ov-health-bars-fill" id="healthBarsFill" style="width:0%;"></div>
-            </div>
+            <div class="ov-health-track"><div class="ov-health-fill" id="healthBarsFill" style="width:0%;"></div></div>
             <div class="ov-card-caption">Inverse of average danger across the roster</div>
           </div>
 
           <div class="ov-card">
-            <div class="ov-card-title-row" style="background:#CF242422;">
-              <span class="ov-card-head-left"><span class="ov-card-icon" style="color:#CF2424;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></span><span class="ov-card-title" style="margin:0;color:#CF2424;">Risk Breakdown</span></span>
+            <div class="ov-card-title-row-plain">
+              <span class="ov-card-head-left"><span class="ov-card-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></span><span class="ov-card-title" style="margin:0;">Risk Breakdown</span></span>
               <span class="ov-card-btn" onclick="switchView('clients')">See All</span>
             </div>
             <div class="donut-wrap" id="totalClientsDonut"></div>
@@ -1277,17 +1277,17 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="ov-col">
           <div class="ov-kpi-row">
             <div class="ov-card kpi-click" id="kpiTasksCard" onclick="switchView('tasks')">
-              <div class="ov-card-title-row" style="background:#7C93B022;"><span class="ov-card-head-left"><span class="ov-card-icon" style="color:#7C93B0;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><span class="ov-card-title" style="margin:0;color:#7C93B0;">Open Tasks</span></span></div>
+              <div class="ov-card-title-row-plain"><span class="ov-card-head-left"><span class="ov-card-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><span class="ov-card-title" style="margin:0;">Open Tasks</span></span></div>
               <div class="ov-kpi-value" id="kpiTasks">0</div>
               <div class="metric-chips" id="tasksChips"></div>
             </div>
             <div class="ov-card kpi-click" id="kpiPendingCard" onclick="goToPendingKpi()">
-              <div class="ov-card-title-row" style="background:#C99A5522;"><span class="ov-card-head-left"><span class="ov-card-icon" style="color:#C99A55;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span><span class="ov-card-title" style="margin:0;color:#C99A55;" id="kpiPendingLabel">Pending Approval</span></span></div>
+              <div class="ov-card-title-row-plain"><span class="ov-card-head-left"><span class="ov-card-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span><span class="ov-card-title" style="margin:0;" id="kpiPendingLabel">Pending Approval</span></span></div>
               <div class="ov-kpi-value" id="kpiPending">0</div>
               <div class="metric-chips" id="pendingChips"></div>
             </div>
             <div class="ov-card kpi-click" id="kpiCompletionCard" onclick="goToApprovedKpi()">
-              <div class="ov-card-title-row" style="background:#776DAB22;"><span class="ov-card-head-left"><span class="ov-card-icon" style="color:#776DAB;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span><span class="ov-card-title" style="margin:0;color:#776DAB;" id="kpiCompletionLabel">Weekly Completion</span></span></div>
+              <div class="ov-card-title-row-plain"><span class="ov-card-head-left"><span class="ov-card-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span><span class="ov-card-title" style="margin:0;" id="kpiCompletionLabel">Weekly Completion</span></span></div>
               <div class="ov-kpi-value" id="kpiCompletion">—</div>
               <div class="metric-chips" id="completionChips"></div>
             </div>
