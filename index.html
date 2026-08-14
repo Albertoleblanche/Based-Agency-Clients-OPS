@@ -279,9 +279,16 @@
   .ov-health-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px;}
   .ov-health-value{font-family:'Plus Jakarta Sans',sans-serif;font-size:30px;font-weight:600;color:var(--ink);line-height:1;}
   .ov-health-scale{display:flex;justify-content:space-between;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:600;color:var(--muted-lt);margin-bottom:6px;}
-  .ov-health-bars{display:flex;align-items:flex-end;gap:3px;height:34px;}
-  .ov-health-bar{flex:1;height:55%;border-radius:3px;background:var(--surface-2);border:1px solid var(--border);transition:height var(--duration-slow) var(--ease-out), background var(--duration-slow) var(--ease-out), border-color var(--duration-slow) var(--ease-out);}
-  .ov-health-bar.filled{height:100%;border-color:transparent;}
+  .ov-health-bars{position:relative;height:34px;}
+  .ov-health-bars-base{
+    position:absolute;left:0;bottom:0;width:100%;height:55%;border-radius:3px;
+    background-image:repeating-linear-gradient(90deg, var(--border) 0 3px, transparent 3px 6px);
+  }
+  .ov-health-bars-fill{
+    position:absolute;left:0;bottom:0;height:100%;border-radius:3px;
+    background-image:repeating-linear-gradient(90deg, var(--health-fill-color, var(--green)) 0 3px, transparent 3px 6px);
+    transition:width var(--duration-slow) var(--ease-out), background-image var(--duration-slow) var(--ease-out);
+  }
 
   /* Compact rows used by the attention / active / tasks / upcoming lists */
   .ov-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F0F1F4;cursor:pointer;}
@@ -1241,7 +1248,10 @@ document.addEventListener('DOMContentLoaded', function(){
               <span id="healthChips"></span>
             </div>
             <div class="ov-health-scale"><span>0</span><span>50</span><span>100</span></div>
-            <div class="ov-health-bars" id="healthBars"></div>
+            <div class="ov-health-bars">
+              <div class="ov-health-bars-base"></div>
+              <div class="ov-health-bars-fill" id="healthBarsFill" style="width:0%;"></div>
+            </div>
             <div class="ov-card-caption">Inverse of average danger across the roster</div>
           </div>
 
@@ -4060,12 +4070,10 @@ function renderKpis(){
   document.getElementById('kpiHealth').textContent = ac.length ? healthPct + '%' : '—';
   const healthTier = healthPct>=70 ? {cls:'pill-good',label:'Healthy',color:'#117F3A'} : healthPct>=40 ? {cls:'pill-mid',label:'Needs attention',color:'#A65B05'} : {cls:'pill-bad',label:'Critical',color:'#CF2424'};
   document.getElementById('healthChips').innerHTML = ac.length ? `<span class="pill ${healthTier.cls}">${healthTier.label}</span>` : '';
-  const healthBarsEl = document.getElementById('healthBars');
-  if(healthBarsEl){
-    const filledCount = ac.length ? Math.round((healthPct/100)*20) : 0;
-    healthBarsEl.innerHTML = Array.from({length:20}, (_,i)=>
-      `<div class="ov-health-bar${i<filledCount?' filled':''}"${i<filledCount?` style="background:${healthTier.color};"`:''}></div>`
-    ).join('');
+  const healthBarsFillEl = document.getElementById('healthBarsFill');
+  if(healthBarsFillEl){
+    healthBarsFillEl.style.width = (ac.length ? healthPct : 0) + '%';
+    healthBarsFillEl.style.setProperty('--health-fill-color', healthTier.color);
   }
 
   // --- Open Tasks (always personal — tasks are assigned to a specific person) ---
