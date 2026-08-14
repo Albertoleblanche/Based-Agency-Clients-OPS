@@ -1290,6 +1290,7 @@ document.addEventListener('DOMContentLoaded', function(){
               <div class="ov-card-title-row-plain"><span class="ov-card-head-left"><span class="ov-card-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span><span class="ov-card-title" style="margin:0;" id="kpiCompletionLabel">Weekly Completion</span></span></div>
               <div class="ov-kpi-value" id="kpiCompletion">—</div>
               <div class="metric-chips" id="completionChips"></div>
+              <div class="ov-health-track" style="margin-top:10px;"><div class="ov-health-fill" id="completionBarFill" style="width:0%;"></div></div>
             </div>
           </div>
 
@@ -4104,6 +4105,12 @@ function renderKpis(){
   document.getElementById('completionChips').innerHTML = withRecentLogs.length
     ? `<span class="pill pill-status">${approvedWithLogs} of ${withRecentLogs.length} updated</span>`
     : `<span class="pill pill-status">No logs yet</span>`;
+  const completionBarFillEl = document.getElementById('completionBarFill');
+  if(completionBarFillEl){
+    const completionColor = completionPct>=70 ? '#117F3A' : completionPct>=40 ? '#A65B05' : '#CF2424';
+    completionBarFillEl.style.width = (withRecentLogs.length ? completionPct : 0) + '%';
+    completionBarFillEl.style.setProperty('--health-fill-color', completionColor);
+  }
 
   renderOverviewUpcoming();
   renderOverviewMyTasks();
@@ -10325,6 +10332,7 @@ function renderTotalClientsDonut(){
 }
 
 const SERVICE_DONUT_COLORS = ['#E8622C', '#3A63C9', '#16A34A', '#8B5CF6', '#D97706', '#EC4899'];
+const SERVICE_DONUT_COLORS_LIGHT = ['#F0966F', '#7495DD', '#4FC373', '#B39AFA', '#EDAD52', '#F386B7'];
 
 // Same visual pattern as the Risk Breakdown donut (Overview), applied to
 // service/hours instead of client/risk. entries respects whatever the
@@ -10361,19 +10369,30 @@ function renderServiceBreakdownDonut(entries){
     sorted = [...top, ['Other', otherMinutes]];
   }
   const svcColor = (i)=> SERVICE_DONUT_COLORS[i % SERVICE_DONUT_COLORS.length];
+  const svcColorLight = (i)=> SERVICE_DONUT_COLORS_LIGHT[i % SERVICE_DONUT_COLORS_LIGHT.length];
+  const svcGradId = (i)=> 'svcGrad-' + i;
 
   const r = 46, cx = 60, cy = 60, strokeW = 15;
   const C = 2*Math.PI*r;
+  const gapLen = strokeW + 8;
   let cumulative = 0;
+  const grads = sorted.map((_,i)=>
+    `<linearGradient id="${svcGradId(i)}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${svcColorLight(i)}"/>
+      <stop offset="100%" stop-color="${svcColor(i)}"/>
+    </linearGradient>`
+  ).join('');
   const segs = sorted.map(([svc,mins],i)=>{
     const dash = (mins/totalMinutes)*C;
-    const html = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${svcColor(i)}" stroke-width="${strokeW}" stroke-dasharray="${dash.toFixed(2)} ${(C-dash).toFixed(2)}" stroke-dashoffset="${(-cumulative).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"></circle>`;
+    const visibleDash = dash > 0 ? Math.max(3, dash - gapLen) : 0;
+    const html = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="url(#${svcGradId(i)})" stroke-width="${strokeW}" stroke-linecap="round" stroke-dasharray="${visibleDash.toFixed(2)} ${(C-visibleDash).toFixed(2)}" stroke-dashoffset="${(-cumulative).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})" style="filter:drop-shadow(0 0 4px ${svcColor(i)}73);"><title>${svc}</title></circle>`;
     cumulative += dash;
     return html;
   }).join('');
 
   wrap.innerHTML = `
     <svg viewBox="0 0 120 120" width="150" height="150">
+      <defs>${grads}</defs>
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#EEF0F4" stroke-width="${strokeW}"></circle>
       ${segs}
     </svg>
