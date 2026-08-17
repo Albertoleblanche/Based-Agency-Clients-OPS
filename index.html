@@ -1224,7 +1224,7 @@ document.addEventListener('DOMContentLoaded', function(){
             <div id="notifPanelList"></div>
           </div>
         </div>
-        <div id="harvestTimerWrap" style="display:flex;align-items:center;gap:6px;height:29px;padding:0 10px;background:var(--brand);border-radius:8px;color:#fff;font-size:12.5px;font-weight:600;">
+        <div id="harvestTimerWrap" onclick="if(!event.target.closest('.harvest-timer')) document.querySelector('#harvestTimerWrap .harvest-timer').click()" style="display:flex;align-items:center;gap:6px;height:29px;padding:0 10px;background:var(--brand);border-radius:8px;color:#fff;font-size:12.5px;font-weight:600;">
           <div class="harvest-timer" data-item='{"id":"global","name":"Time Entry"}' title="Start a Harvest timer"></div>
           <span>Time Tracker</span>
         </div>
