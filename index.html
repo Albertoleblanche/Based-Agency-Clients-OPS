@@ -1137,10 +1137,10 @@ document.addEventListener('DOMContentLoaded', function(){
         <span class="nav-label">Calendar</span>
         <span class="nav-badge" id="navCalendarBadge">0</span>
       </div>
-      <!-- Time Tracker tab hidden — Harvest's own widget (top nav) is now
-           the primary time-tracking entry point. switchView('time') still
-           works underneath (e.g. Daily Summary's "See All" link), this
-           just removes the tab as a discoverable, visible destination. -->
+      <div class="nav-item" data-view="time" data-tooltip="Time Tracker" onclick="switchView('time')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span class="nav-label">Time Tracker</span>
+      </div>
       <div class="nav-item" data-view="team" data-tooltip="Team" onclick="switchView('team')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         <span class="nav-label">Team</span>
