@@ -2132,6 +2132,10 @@ document.addEventListener('DOMContentLoaded', function(){
             </div>
           </div>
         </div>
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Harvest Time Sync</span></div>
+          <div class="panel-body" id="harvestPanelBody">Loading…</div>
+        </div>
       </div>
 
       <!-- NOTIFICATIONS (admin only) -->
@@ -3267,6 +3271,157 @@ function switchSettingsTab(name){
   document.querySelectorAll('#view-settings .settings-subview').forEach(v=>v.classList.remove('active'));
   document.getElementById('stab-'+name).classList.add('active');
   if(name==='notifications') renderNotificationPrefs();
+  if(name==='integrations') loadHarvestPanel();
+}
+
+async function harvestApiCall(action, body){
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  const url = action ? '/api/integrations' : '/api/integrations?provider=harvest';
+  const response = await fetch(url, {
+    method: action ? 'POST' : 'GET',
+    headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+    body: action ? JSON.stringify({ provider: 'harvest', action, ...body }) : undefined,
+  });
+  const data = await response.json();
+  if(!response.ok) throw new Error(data.error || 'Something went wrong talking to Harvest.');
+  return data;
+}
+
+async function loadHarvestPanel(){
+  const el = document.getElementById('harvestPanelBody');
+  if(!el) return;
+  el.innerHTML = 'Loading…';
+  let status;
+  try{ status = await harvestApiCall(null); }
+  catch(e){ el.innerHTML = `<p style="color:var(--red);font-size:12.5px;">${escapeHtml(e.message)}</p>`; return; }
+
+  if(!status.connected){
+    el.innerHTML = `
+      <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.6;">
+        Connect your team's Harvest account so time logged here also lands in Harvest. Generate a Personal Access Token from Harvest ID's <b>Developers</b> section — you'll get the token and your Account ID together.
+      </p>
+      <div class="settings-field"><label>Personal Access Token</label><input id="harvestPatInput" type="password" placeholder="Paste your Harvest PAT"></div>
+      <div class="settings-field"><label>Account ID</label><input id="harvestAccountIdInput" placeholder="e.g. 1234567"></div>
+      <button class="btn btn-brand" onclick="connectHarvest()" id="harvestConnectBtn">Connect Harvest</button>
+      <p id="harvestConnectError" style="font-size:11.5px;color:var(--red);margin-top:8px;"></p>
+    `;
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="integ-row">
+      <div><div class="integ-name">Harvest account</div><div class="integ-desc">Account ID ${escapeHtml(status.accountId)} · connected ${new Date(status.connectedAt).toLocaleDateString()}</div></div>
+      <span class="integ-status on">Connected</span>
+    </div>
+    <p style="font-size:11.5px;color:var(--muted-lt);margin:8px 0 14px;">
+      ${status.lastSyncedAt ? `Last catch-up sync: ${new Date(status.lastSyncedAt).toLocaleString()}` : 'No catch-up sync has run yet — new entries still sync individually as they\'re logged.'}
+    </p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
+      <button class="btn btn-outline" onclick="syncHarvestNow()" id="harvestSyncNowBtn">Sync Now</button>
+      <button class="btn btn-outline" style="color:var(--red);" onclick="disconnectHarvest()">Disconnect</button>
+    </div>
+    <p id="harvestSyncNowStatus" style="font-size:11.5px;color:var(--muted-lt);margin-bottom:16px;"></p>
+
+    <div style="padding-top:16px;border-top:1px solid #F0F1F4;">
+      <p style="font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.6;">
+        Map each client to its Harvest project, and each service to a Harvest task. Entries for anything unmapped stay queued — connecting the mapping catches them up automatically, no need to re-log anything.
+      </p>
+      <div id="harvestMappingBody">Loading projects and tasks from Harvest…</div>
+    </div>
+  `;
+  loadHarvestMappingUI();
+}
+
+async function connectHarvest(){
+  const pat = document.getElementById('harvestPatInput').value.trim();
+  const accountId = document.getElementById('harvestAccountIdInput').value.trim();
+  const errEl = document.getElementById('harvestConnectError');
+  const btn = document.getElementById('harvestConnectBtn');
+  if(!pat || !accountId){ errEl.textContent = 'Both fields are required.'; return; }
+  btn.disabled = true; btn.textContent = 'Connecting…';
+  try{
+    await harvestApiCall('connect', { pat, accountId });
+    loadHarvestPanel();
+  }catch(e){
+    errEl.textContent = e.message;
+    btn.disabled = false; btn.textContent = 'Connect Harvest';
+  }
+}
+
+async function disconnectHarvest(){
+  if(!confirm('Disconnect Harvest? Time logged here will stop syncing until reconnected. Your client/service mappings are kept.')) return;
+  try{ await harvestApiCall('disconnect'); loadHarvestPanel(); }
+  catch(e){ showToast('error','Harvest error',e.message); }
+}
+
+async function syncHarvestNow(){
+  const btn = document.getElementById('harvestSyncNowBtn');
+  const statusEl = document.getElementById('harvestSyncNowStatus');
+  btn.disabled = true; btn.textContent = 'Syncing…';
+  try{
+    const result = await harvestApiCall('sync-now');
+    statusEl.textContent = `Synced ${result.synced}, failed ${result.failed}, unmapped ${result.unmapped} (of ${result.attempted} pending).`;
+    loadHarvestPanel();
+  }catch(e){
+    statusEl.textContent = e.message;
+  }finally{
+    btn.disabled = false; btn.textContent = 'Sync Now';
+  }
+}
+
+async function loadHarvestMappingUI(){
+  const el = document.getElementById('harvestMappingBody');
+  let data;
+  try{ data = await harvestApiCall('get-projects'); }
+  catch(e){ el.innerHTML = `<p style="color:var(--red);font-size:12.5px;">${escapeHtml(e.message)}</p>`; return; }
+
+  const { data: clientMappingRows } = await supabaseClient.from('harvest_client_mappings').select('client_id, harvest_project_id');
+  const { data: serviceMappingRows } = await supabaseClient.from('harvest_service_mappings').select('service, harvest_task_id');
+  const clientMap = Object.fromEntries((clientMappingRows||[]).map(r=>[r.client_id, r.harvest_project_id]));
+  const serviceMap = Object.fromEntries((serviceMappingRows||[]).map(r=>[r.service, r.harvest_task_id]));
+
+  if(!timeEntriesDataLoaded) await loadTimeEntries();
+  const activeClients = clients.filter(c=>!c.deletedAt).sort((a,b)=>a.name.localeCompare(b.name));
+  const usedServices = [...new Set(timeEntries.map(e=>e.service).filter(Boolean))].sort();
+
+  const projectOptions = (selectedId)=> `<option value="">— Not mapped —</option>` + data.projects.map(p=>
+    `<option value="${p.id}" ${String(p.id)===String(selectedId)?'selected':''}>${escapeHtml(p.name)}${p.clientName?` (${escapeHtml(p.clientName)})`:''}</option>`
+  ).join('');
+  const taskOptions = (selectedId)=> `<option value="">— Not mapped —</option>` + data.tasks.map(t=>
+    `<option value="${t.id}" ${String(t.id)===String(selectedId)?'selected':''}>${escapeHtml(t.name)}</option>`
+  ).join('');
+
+  el.innerHTML = `
+    <div style="font-size:11.5px;font-weight:700;color:var(--muted-lt);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Clients → Harvest Projects</div>
+    ${activeClients.map(c=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F5F6F8;">
+        <span style="flex:1;font-size:13px;font-weight:600;">${escapeHtml(c.name)}</span>
+        <select style="flex:1;font-size:12.5px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);" onchange="saveHarvestClientMapping('${c.id}', this.value, this.options[this.selectedIndex].text)">
+          ${projectOptions(clientMap[c.id])}
+        </select>
+      </div>`).join('') || '<p style="font-size:12px;color:var(--muted-lt);">No active clients yet.</p>'}
+
+    <div style="font-size:11.5px;font-weight:700;color:var(--muted-lt);text-transform:uppercase;letter-spacing:.03em;margin:18px 0 8px;">Services → Harvest Tasks</div>
+    ${usedServices.map(svc=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F5F6F8;">
+        <span style="flex:1;font-size:13px;font-weight:600;">${escapeHtml(svc)}</span>
+        <select style="flex:1;font-size:12.5px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);" onchange="saveHarvestServiceMapping('${svc.replace(/'/g,"\\'")}', this.value, this.options[this.selectedIndex].text)">
+          ${taskOptions(serviceMap[svc])}
+        </select>
+      </div>`).join('') || '<p style="font-size:12px;color:var(--muted-lt);">No time entries with a service set yet — services appear here once someone logs time with one.</p>'}
+  `;
+}
+
+async function saveHarvestClientMapping(clientId, harvestProjectId, harvestProjectName){
+  if(!harvestProjectId) return; // "— Not mapped —" selected; nothing to save
+  try{ await harvestApiCall('save-client-mapping', { clientId, harvestProjectId, harvestProjectName }); }
+  catch(e){ showToast('error','Harvest error',e.message); }
+}
+
+async function saveHarvestServiceMapping(service, harvestTaskId, harvestTaskName){
+  if(!harvestTaskId) return;
+  try{ await harvestApiCall('save-service-mapping', { service, harvestTaskId, harvestTaskName }); }
+  catch(e){ showToast('error','Harvest error',e.message); }
 }
 
 async function goToQueueFilter(filter){
@@ -7491,7 +7646,7 @@ async function deleteRecurringSeries(groupId){
 async function fetchGoogleCalendarStatus(){
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/google-calendar', {
+    const response = await fetch('/api/integrations?provider=google', {
       headers: { 'Authorization': `Bearer ${session.access_token}` }
     });
     if(!response.ok) return null;
@@ -7561,9 +7716,9 @@ async function syncGoogleCalendar(){
   showToast('info','Syncing…','Pulling events from Google Calendar.');
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/google-calendar', {
+    const response = await fetch('/api/integrations', {
       method:'POST', headers:{ 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action:'sync' })
+      body: JSON.stringify({ provider:'google', action:'sync' })
     });
     const data = await response.json();
     if(!response.ok){ showToast('error','Sync failed', data.error || 'Could not sync.'); return; }
@@ -7587,9 +7742,9 @@ async function disconnectGoogleCalendar(){
   if(!confirm('Disconnect Google Calendar? Previously-synced events will be removed from the calendar.')) return;
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/google-calendar', {
+    const response = await fetch('/api/integrations', {
       method:'POST', headers:{ 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action:'disconnect' })
+      body: JSON.stringify({ provider:'google', action:'disconnect' })
     });
     const data = await response.json();
     if(!response.ok){ showToast('error','Failed', data.error || 'Could not disconnect.'); return; }
@@ -8477,14 +8632,32 @@ async function mergeOrInsertTimeEntry({ clientId, service, dateStr, minutes, des
     // loses either description.
     const newDesc = [existing.description, description].filter(Boolean).join(' · ');
     const { error } = await supabaseClient.from('time_entries')
-      .update({ minutes: newTotal, description: newDesc }).eq('id', existing.id);
-    return { error, merged: !error };
+      .update({ minutes: newTotal, description: newDesc, harvest_sync_status: 'pending' }).eq('id', existing.id);
+    return { error, merged: !error, entryId: existing.id };
   }
 
-  const { error } = await supabaseClient.from('time_entries').insert({
+  const { data, error } = await supabaseClient.from('time_entries').insert({
     user_id: currentUser.id, client_id: clientId, entry_date: dateStr, minutes, description, service
+  }).select('id').single();
+  return { error, merged: false, entryId: data?.id || null };
+}
+
+// Fire-and-forget — deliberately not awaited by any caller below, so a
+// slow or unreachable Harvest API never delays the actual time-logging
+// action a person is waiting on. Errors are stored on the row itself
+// (harvest_sync_status/harvest_sync_error) rather than surfaced as a
+// toast here, since a background sync failing isn't something that
+// needs to interrupt someone mid-task — it's visible on the Timesheet
+// row and gets retried by the daily catch-up regardless.
+function syncEntryToHarvestBackground(entryId){
+  if(!entryId) return;
+  supabaseClient.auth.getSession().then(({ data: { session } })=>{
+    fetch('/api/integrations', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'harvest', action: 'sync-entry', timeEntryId: entryId }),
+    }).catch(()=>{}); // network failure here is fine — falls to the daily catch-up
   });
-  return { error, merged: false };
 }
 
 async function stopAndSaveTimer(){
@@ -8513,19 +8686,24 @@ async function stopAndSaveTimer(){
       .from('time_entries').select('minutes').eq('id', resumeEntryId).maybeSingle();
     if(existing){
       const newTotal = existing.minutes + minutes;
-      ({ error } = await supabaseClient.from('time_entries').update({ minutes: newTotal }).eq('id', resumeEntryId));
+      ({ error } = await supabaseClient.from('time_entries').update({ minutes: newTotal, harvest_sync_status: 'pending' }).eq('id', resumeEntryId));
       mergedIntoExisting = !error;
+      if(!error) syncEntryToHarvestBackground(resumeEntryId);
     } else {
       // Original entry is gone (deleted elsewhere) — fall back to a new entry
       // rather than silently losing the tracked time.
-      ({ error } = await supabaseClient.from('time_entries').insert({
+      const { data: newRow, error: insertErr } = await supabaseClient.from('time_entries').insert({
         user_id: currentUser.id, client_id: clientId, entry_date: toDateStr(new Date()), minutes, description, service
-      }));
+      }).select('id').single();
+      error = insertErr;
+      if(newRow) syncEntryToHarvestBackground(newRow.id);
     }
   } else {
-    ({ error, merged: mergedIntoExisting } = await mergeOrInsertTimeEntry({
+    const mergeResult = await mergeOrInsertTimeEntry({
       clientId, service, dateStr: toDateStr(new Date()), minutes, description
-    }));
+    });
+    error = mergeResult.error; mergedIntoExisting = mergeResult.merged;
+    if(!error) syncEntryToHarvestBackground(mergeResult.entryId);
   }
 
   await loadTimeEntries();
@@ -8652,7 +8830,7 @@ async function addManualEntry(){
   if(totalMinutes > 960 && !confirm(`That's ${formatMinutes(totalMinutes)} for a single entry — did you mean minutes instead of hours? Click OK to log it anyway, or Cancel to fix it.`)) return;
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
-  const { error, merged } = await mergeOrInsertTimeEntry({
+  const { error, merged, entryId } = await mergeOrInsertTimeEntry({
     clientId, service, dateStr: dateVal, minutes: totalMinutes, description
   });
   restoreBtn(btn);
@@ -8660,6 +8838,7 @@ async function addManualEntry(){
   renderTimesheet(); renderReports();
   const c = clients.find(x=>x.id===clientId);
   if(error){ showToast('error','Save failed', error.message); return; }
+  syncEntryToHarvestBackground(entryId);
   closeAppModal();
   merged
     ? showToast('success','Time added', `${formatMinutes(totalMinutes)} added to today's existing entry for ${c?c.name:'client'}.`)
@@ -8919,21 +9098,33 @@ async function saveTimeEntryEdit(id){
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
   const { error } = await supabaseClient.from('time_entries').update({
-    client_id: clientId, entry_date: dateVal, minutes: totalMinutes, description, service
+    client_id: clientId, entry_date: dateVal, minutes: totalMinutes, description, service, harvest_sync_status: 'pending'
   }).eq('id', id);
   restoreBtn(btn);
   closeAppModal();
   await loadTimeEntries();
   renderTimesheet(); renderReports();
-  error ? showToast('error','Save failed', error.message) : showToast('success','Entry updated','Changes saved.');
+  if(error){ showToast('error','Save failed', error.message); return; }
+  showToast('success','Entry updated','Changes saved.');
+  syncEntryToHarvestBackground(id);
 }
 
 async function deleteTimeEntry(id){
   if(!confirm("Move this time entry to Trash? You can restore it later from Settings.")) return;
+  const { data: entry } = await supabaseClient.from('time_entries').select('harvest_entry_id').eq('id', id).maybeSingle();
   const { error } = await supabaseClient.from('time_entries').update({ deleted_at: new Date().toISOString() }).eq('id', id);
   await loadTimeEntries();
   renderTimesheet(); renderReports();
-  error ? showToast('error','Delete failed', error.message) : showToast('success','Entry moved to Trash','Restore it anytime from Trash.');
+  if(error){ showToast('error','Delete failed', error.message); return; }
+  showToast('success','Entry moved to Trash','Restore it anytime from Trash.');
+  if(entry?.harvest_entry_id){
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    fetch('/api/integrations', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'harvest', action: 'delete-entry', harvestEntryId: entry.harvest_entry_id }),
+    }).catch(()=>{});
+  }
 }
 
 /* --- Reports --- */
@@ -11589,6 +11780,55 @@ async function showApp(session){
     }
   });
 })();
+</script>
+<!-- Harvest Button — separate, additional way to start a Harvest timer
+     directly (per-person Harvest login, not the shared PAT sync built
+     earlier). Permalink deliberately points at the app's root, not a
+     deep link to the specific client/task — this SPA doesn't have
+     per-item URLs to link back to, so this is an honest limitation
+     rather than a broken link. -->
+<script>
+  (function () {
+    window._harvestPlatformConfig = {
+      applicationName: 'Based Agency',
+      permalink: window.location.origin + '/',
+    };
+    var s = document.createElement('script');
+    s.src = 'https://platform.harvestapp.com/assets/platform.js';
+    s.async = true;
+    var ph = document.getElementsByTagName('script')[0];
+    ph.parentNode.insertBefore(s, ph);
+  })();
+
+  window.harvestButtonReady = false;
+  window._harvestPendingContainers = [];
+  document.body.addEventListener('harvest-event:ready', function(){
+    window.harvestButtonReady = true;
+    window._harvestPendingContainers.forEach(registerHarvestTimerButtons);
+    window._harvestPendingContainers = [];
+  });
+
+  // Call this after rendering any HTML containing a .harvest-timer div —
+  // dynamically-inserted buttons aren't picked up automatically by
+  // platform.js (confirmed in Harvest's own docs, "Adding Buttons After
+  // Loaded"); each one needs this explicit registration event dispatched
+  // against the #harvest-messaging element the script creates. If the
+  // script hasn't finished loading yet, the container is queued and
+  // retried once harvest-event:ready fires, rather than the button
+  // silently never appearing because of a load-order race.
+  function registerHarvestTimerButtons(container){
+    if(!container) return;
+    if(!window.harvestButtonReady){
+      window._harvestPendingContainers.push(container);
+      return;
+    }
+    const messaging = document.getElementById('harvest-messaging');
+    if(!messaging) return;
+    container.querySelectorAll('.harvest-timer').forEach(function(el){
+      const event = new CustomEvent('harvest-event:timers:add', { detail: { element: el } });
+      messaging.dispatchEvent(event);
+    });
+  }
 </script>
 </body>
 </html>
