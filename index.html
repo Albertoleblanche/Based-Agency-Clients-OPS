@@ -2146,6 +2146,10 @@ document.addEventListener('DOMContentLoaded', function(){
           <div class="panel-head"><span class="panel-title">Harvest Time Sync</span></div>
           <div class="panel-body" id="harvestPanelBody">Loading…</div>
         </div>
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Slack Client Channels</span></div>
+          <div class="panel-body" id="slackChannelsPanelBody">Loading…</div>
+        </div>
       </div>
 
       <!-- NOTIFICATIONS (admin only) -->
@@ -2446,6 +2450,19 @@ let teamQueueFilter = 'all';
 let dateFilterMode = 'thisweek';
 let dateFilterFrom = getWeekStart(new Date()); // inclusive, Date object — matches the default "This week" mode
 let dateFilterTo = null;   // inclusive, Date object
+let teamDateFilterMode = 'thisweek';
+let teamDateFilterFrom = getWeekStart(new Date());
+let teamDateFilterTo = null;
+let slackClientChannels = {}; // client_id -> { channelId, channelName }
+let slackChannelsLoaded = false;
+
+async function loadSlackClientChannels(){
+  const { data, error } = await supabaseClient.from('slack_client_channels').select('client_id, slack_channel_id, slack_channel_name');
+  if(error){ slackChannelsLoaded = true; return; }
+  slackClientChannels = {};
+  (data||[]).forEach(row => { slackClientChannels[row.client_id] = { channelId: row.slack_channel_id, channelName: row.slack_channel_name }; });
+  slackChannelsLoaded = true;
+}
 
 // ====== SUPABASE CONFIG — fill these in from Project Settings -> API ======
 const SUPABASE_URL = 'https://rwhfddzitabeingajvuf.supabase.co';
@@ -3281,7 +3298,7 @@ function switchSettingsTab(name){
   document.querySelectorAll('#view-settings .settings-subview').forEach(v=>v.classList.remove('active'));
   document.getElementById('stab-'+name).classList.add('active');
   if(name==='notifications') renderNotificationPrefs();
-  if(name==='integrations') loadHarvestPanel();
+  if(name==='integrations'){ loadHarvestPanel(); loadSlackChannelsPanel(); }
 }
 
 async function harvestApiCall(action, body){
@@ -3295,6 +3312,46 @@ async function harvestApiCall(action, body){
   const data = await response.json();
   if(!response.ok) throw new Error(data.error || 'Something went wrong talking to Harvest.');
   return data;
+}
+
+async function loadSlackChannelsPanel(){
+  const el = document.getElementById('slackChannelsPanelBody');
+  if(!el) return;
+  if(!slackChannelsLoaded) await loadSlackClientChannels();
+  const sortedClients = activeClients().sort((a,b)=>a.name.localeCompare(b.name));
+  el.innerHTML = `
+    <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.6;">
+      Map each client to the Slack channel bridged to their WhatsApp group. Paste the <b>channel ID</b> (found in that channel's own details in Slack, not its name) — the bot needs to already be invited to it.
+    </p>
+    ${sortedClients.map(c=>{
+      const mapping = slackClientChannels[c.id];
+      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F5F6F8;">
+        <span style="flex:1;font-size:13px;font-weight:600;">${escapeHtml(c.name)}</span>
+        <input type="text" id="slackChanInput-${c.id}" placeholder="C0123456789" value="${mapping ? escapeHtml(mapping.channelId) : ''}" style="flex:1;font-size:12.5px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);font-family:monospace;">
+        <button class="btn btn-outline" style="flex:none;padding:6px 10px;min-height:auto;font-size:11.5px;" onclick="saveSlackChannelMapping('${c.id}')">Save</button>
+      </div>`;
+    }).join('') || '<p style="font-size:12px;color:var(--muted-lt);">No active clients yet.</p>'}
+  `;
+}
+
+async function saveSlackChannelMapping(clientId){
+  const input = document.getElementById(`slackChanInput-${clientId}`);
+  const channelId = input.value.trim();
+  if(!channelId){
+    // Empty input clears the mapping rather than saving a blank channel ID.
+    await supabaseClient.from('slack_client_channels').delete().eq('client_id', clientId);
+    delete slackClientChannels[clientId];
+    showToast('success','Mapping cleared');
+    return;
+  }
+  const { data: { user } } = await supabaseClient.auth.getUser();
+  const { error } = await supabaseClient.from('slack_client_channels').upsert({
+    client_id: clientId, slack_channel_id: channelId, updated_at: new Date().toISOString(), updated_by: user.id,
+  });
+  if(error){ showToast('error','Save failed', error.message); return; }
+  slackClientChannels[clientId] = { channelId, channelName: null };
+  showToast('success','Slack channel mapped');
+  renderQueue(); renderTeamQueue();
 }
 
 async function loadHarvestPanel(){
@@ -4211,7 +4268,7 @@ function renderKpis(){
     : ac.filter(c=>c.draftStatus==='pending' && c.improvements.some(i=>i.author===me)).length;
   // Approval Queue is personal now — the sidebar badge needs to match what
   // that page actually shows, not every pending draft on the whole roster.
-  const myPending = ac.filter(c=>c.draftStatus==='pending' && c.improvements.filter(improvementInDateRange).some(i=>i.author===me)).length;
+  const myPending = ac.filter(c=>c.draftStatus==='pending' && c.improvements.filter(i=>improvementInDateRange(i, false)).some(i=>i.author===me)).length;
   document.getElementById('navPendingBadge').textContent = myPending;
   // Team Queue shows every pending draft team-wide, not scoped by author —
   // its badge needs to match that, same way Approval Queue's badge above
@@ -5457,16 +5514,59 @@ async function confirmSendSlackSummary(){
   setBtnLoading(btn, 'Sending…');
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/send-slack-summary', {
+    const response = await fetch('/api/send-slack-message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ action: 'summary', text }),
     });
     const data = await response.json();
     restoreBtn(btn);
     if(!response.ok){ showToast('error','Send failed', data.error || 'Could not send to Slack.'); return; }
     closeAppModal();
     showToast('success','Sent to Slack','The daily summary was posted.');
+  }catch(e){
+    restoreBtn(btn);
+    showToast('error','Send failed','Network error — try again.');
+  }
+}
+
+// Sends a client's approved improvement draft directly to their own
+// mapped Slack channel — bridged to their WhatsApp group on Slack's own
+// side, so this is a real alternative delivery path to email, not a copy
+// of it. Same review-before-sending pattern as the daily summary above.
+function openSendToSlackConfirm(clientId){
+  const c = clients.find(x=>x.id===clientId);
+  const mapping = slackClientChannels[clientId];
+  if(!c || !mapping){ showToast('error','No Slack channel mapped','Map this client to a channel in Settings first.'); return; }
+  if(!c.draft){ showToast('error','Nothing to send','This client has no draft yet.'); return; }
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">Send to ${escapeHtml(c.name)}'s Slack channel?</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 12px;">Posts to ${escapeHtml(mapping.channelName || mapping.channelId)} — review before sending, this posts immediately once confirmed.</p>
+      <textarea id="slackClientMessageText" style="width:100%;min-height:220px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;padding:10px;border-radius:8px;border:1px solid var(--border);white-space:pre-wrap;">${escapeHtml(c.draft)}</textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-brand" id="sendSlackClientBtn" onclick="confirmSendToSlack('${clientId}')">Send to Slack</button>
+      <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
+    </div>`, 560);
+}
+
+async function confirmSendToSlack(clientId){
+  const text = document.getElementById('slackClientMessageText').value;
+  const btn = document.getElementById('sendSlackClientBtn');
+  setBtnLoading(btn, 'Sending…');
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/send-slack-message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ action: 'client-message', clientId, text }),
+    });
+    const data = await response.json();
+    restoreBtn(btn);
+    if(!response.ok){ showToast('error','Send failed', data.error || 'Could not send to Slack.'); return; }
+    closeAppModal();
+    showToast('success','Sent to Slack','The update was posted to their channel.');
   }catch(e){
     restoreBtn(btn);
     showToast('error','Send failed','Network error — try again.');
@@ -10125,51 +10225,54 @@ const DATE_FILTER_IDS = {
 function onDateFilterChange(prefix){
   prefix = prefix || '';
   const ids = DATE_FILTER_IDS[prefix];
-  const otherIds = DATE_FILTER_IDS[prefix==='team' ? '' : 'team'];
   const mode = document.getElementById(ids.select).value;
-  dateFilterMode = mode;
-  // Keep both instances in sync — same underlying state either way, so
-  // changing it on one page shouldn't leave the other showing a stale value.
-  const otherSelect = document.getElementById(otherIds.select);
-  if(otherSelect) otherSelect.value = mode;
   document.getElementById(ids.range).style.display = mode==='custom' ? 'inline-flex' : 'none';
-  const otherRange = document.getElementById(otherIds.range);
-  if(otherRange) otherRange.style.display = mode==='custom' ? 'inline-flex' : 'none';
-  if(mode==='custom') return; // wait for Apply click
-  const {from, to} = computeDateRange(mode);
-  dateFilterFrom = from; dateFilterTo = to;
-  renderQueue(); renderTeamQueue();
+  if(prefix==='team'){
+    teamDateFilterMode = mode;
+    if(mode==='custom') return; // wait for Apply click
+    const {from, to} = computeDateRange(mode);
+    teamDateFilterFrom = from; teamDateFilterTo = to;
+    renderTeamQueue();
+  } else {
+    dateFilterMode = mode;
+    if(mode==='custom') return; // wait for Apply click
+    const {from, to} = computeDateRange(mode);
+    dateFilterFrom = from; dateFilterTo = to;
+    renderQueue();
+  }
 }
 
 function applyCustomDateRange(prefix){
   prefix = prefix || '';
   const ids = DATE_FILTER_IDS[prefix];
-  const otherIds = DATE_FILTER_IDS[prefix==='team' ? '' : 'team'];
   const fromVal = document.getElementById(ids.from).value;
   const toVal = document.getElementById(ids.to).value;
   if(!fromVal && !toVal){ showToast('error','Pick at least one date','Set a start date, end date, or both.'); return; }
-  dateFilterFrom = fromVal ? new Date(fromVal + 'T00:00:00') : null;
-  dateFilterTo = toVal ? new Date(toVal + 'T23:59:59') : null;
-  // Sync the other instance's raw date inputs too, so if someone switches
-  // pages mid-range it shows the same custom dates, not blank ones.
-  const otherFrom = document.getElementById(otherIds.from);
-  const otherTo = document.getElementById(otherIds.to);
-  if(otherFrom) otherFrom.value = fromVal;
-  if(otherTo) otherTo.value = toVal;
-  renderQueue(); renderTeamQueue();
+  const from = fromVal ? new Date(fromVal + 'T00:00:00') : null;
+  const to = toVal ? new Date(toVal + 'T23:59:59') : null;
+  if(prefix==='team'){
+    teamDateFilterFrom = from; teamDateFilterTo = to;
+    renderTeamQueue();
+  } else {
+    dateFilterFrom = from; dateFilterTo = to;
+    renderQueue();
+  }
 }
 
-function improvementInDateRange(imp){
-  if(dateFilterMode==='all') return true;
+function improvementInDateRange(imp, isTeam){
+  const mode = isTeam ? teamDateFilterMode : dateFilterMode;
+  const from = isTeam ? teamDateFilterFrom : dateFilterFrom;
+  const to = isTeam ? teamDateFilterTo : dateFilterTo;
+  if(mode==='all') return true;
   if(!imp.date) return false; // logged before dates were tracked — excluded from specific ranges, still shown under "All time"
   const d = new Date(imp.date);
   // "This week" always recomputes fresh rather than trusting the stored
-  // dateFilterFrom — a browser tab left open across a week boundary would
+  // from/to — a browser tab left open across a week boundary would
   // otherwise keep comparing against whatever week the page happened to
   // load during, silently drifting stale the longer the session runs.
-  if(dateFilterMode==='thisweek') return d >= getWeekStart(new Date());
-  if(dateFilterFrom && d < dateFilterFrom) return false;
-  if(dateFilterTo && d > dateFilterTo) return false;
+  if(mode==='thisweek') return d >= getWeekStart(new Date());
+  if(from && d < from) return false;
+  if(to && d > to) return false;
   return true;
 }
 
@@ -10184,7 +10287,7 @@ function queueFilterCount(filterKey){
   else if(filterKey==='none') sorted = sorted.filter(c=>c.draftStatus==='none');
   else if(filterKey==='atrisk') sorted = sorted.filter(c=>c.danger>=4);
   else if(filterKey==='stale') sorted = sorted.filter(c=>c.draftStatus==='approved' && hasLoggedThisWeek(c));
-  let rows = sorted.map(c => ({ c, shownImprovements: c.improvements.filter(improvementInDateRange) }));
+  let rows = sorted.map(c => ({ c, shownImprovements: c.improvements.filter(i=>improvementInDateRange(i, false)) }));
   if(dateFilterMode !== 'all') rows = rows.filter(r => r.shownImprovements.length > 0);
   const me = myName();
   rows = rows.filter(r => r.shownImprovements.some(i => i.author === me));
@@ -10214,6 +10317,7 @@ function renderQueue(){
   const ac = activeClients();
   syncDateFilterDropdowns();
   updateQueueFilterCounts();
+  if(!slackChannelsLoaded) loadSlackClientChannels().then(renderQueue);
   if(!ac.length){ el.innerHTML = `<div class="panel">${emptyStateHtml(
     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
     'No clients yet',
@@ -10228,7 +10332,7 @@ function renderQueue(){
   else if(queueFilter==='stale') sorted = sorted.filter(c=>c.draftStatus==='approved' && hasLoggedThisWeek(c));
 
   // Attach the date-filtered improvement subset per client, and drop clients with none when a date filter is active.
-  let rows = sorted.map(c => ({ c, shownImprovements: c.improvements.filter(improvementInDateRange) }));
+  let rows = sorted.map(c => ({ c, shownImprovements: c.improvements.filter(i=>improvementInDateRange(i, false)) }));
   if(dateFilterMode !== 'all') rows = rows.filter(r => r.shownImprovements.length > 0);
 
   // Always personal — only clients the current user themselves logged
@@ -10263,8 +10367,8 @@ function teamQueueFilterCount(filterKey){
     return true;
   };
   const rows = ac.filter(statusMatches)
-    .map(c => ({ c, shownImprovements: c.improvements.filter(improvementInDateRange) }))
-    .filter(r => dateFilterMode==='all' || r.shownImprovements.length > 0);
+    .map(c => ({ c, shownImprovements: c.improvements.filter(i=>improvementInDateRange(i, true)) }))
+    .filter(r => teamDateFilterMode==='all' || r.shownImprovements.length > 0);
   // A card only actually renders under a member's section if at least one
   // of that client's date-filtered improvements was authored by them — and
   // since the same client can legitimately show up under multiple members
@@ -10289,6 +10393,7 @@ function renderTeamQueue(){
   const ac = activeClients();
   syncDateFilterDropdowns();
   updateTeamQueueFilterCounts();
+  if(!slackChannelsLoaded) loadSlackClientChannels().then(renderTeamQueue);
   if(!ac.length){ el.innerHTML = `<div class="panel">${emptyStateHtml(
     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
     'No clients yet',
@@ -10308,8 +10413,8 @@ function renderTeamQueue(){
   // Date-filtered improvement subset per client, kept alongside each client
   // so each member's section below can check who actually logged what.
   const rows = ac.filter(statusMatches)
-    .map(c => ({ c, shownImprovements: c.improvements.filter(improvementInDateRange) }))
-    .filter(r => dateFilterMode==='all' || r.shownImprovements.length > 0);
+    .map(c => ({ c, shownImprovements: c.improvements.filter(i=>improvementInDateRange(i, true)) }))
+    .filter(r => teamDateFilterMode==='all' || r.shownImprovements.length > 0);
 
   const sortedMembers = [...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name));
   const sectionsHtml = sortedMembers.map(member => {
@@ -10332,8 +10437,8 @@ function renderTeamQueue(){
   }).filter(Boolean).join('');
 
   if(!sectionsHtml){
-    const title = dateFilterMode!=='all' ? 'No improvements in this range' : 'No clients match this filter';
-    const sub = dateFilterMode!=='all' ? 'Try a wider date range, or switch back to All time.' : 'Try a different filter, or clear it to see everyone.';
+    const title = teamDateFilterMode!=='all' ? 'No improvements in this range' : 'No clients match this filter';
+    const sub = teamDateFilterMode!=='all' ? 'Try a wider date range, or switch back to All time.' : 'Try a different filter, or clear it to see everyone.';
     el.innerHTML = `<div class="panel">${emptyStateHtml(
       '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
       title, sub
@@ -10402,6 +10507,7 @@ function queueCardHtml(c){
     <div class="q-card-actions">
       ${c.draftStatus==='approved' ? (canApprove() ? `
       <button class="btn btn-brand" onclick="sendApprovedDraft('${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Send</button>
+      ${slackClientChannels[c.id] ? `<button class="btn btn-outline" onclick="openSendToSlackConfirm('${c.id}')" title="Post this update to ${escapeHtml(slackClientChannels[c.id].channelName||'their Slack channel')}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M15 3v6M9 3v6M15 15v6M9 15v6M3 9h6M15 9h6M3 15h6M15 15h6"/></svg>Slack</button>` : ''}
       <button class="btn btn-outline" onclick="openQueueCardModal('${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>View details</button>
       ` : `
       <button class="btn btn-brand" onclick="openQueueCardModal('${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>View details</button>
@@ -10774,7 +10880,7 @@ function loggedPill(c){
 function openQueueCardModal(id){
   const c = clients.find(x=>x.id===id);
   if(!c) return;
-  const shownImprovements = c.improvements.filter(improvementInDateRange);
+  const shownImprovements = c.improvements.filter(i=>improvementInDateRange(i, false));
   const status = statusMeta(c.draftStatus);
   openAppModal(`
     <div class="modal-head">
