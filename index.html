@@ -5523,7 +5523,23 @@ function renderClientDetail(){
   const myNotesForClient = notes.filter(n=>n.clientId===c.id).sort((a,b)=> new Date(b.updatedAt||b.createdAt)-new Date(a.updatedAt||a.createdAt));
   const budget = monthBudgetInfo(c);
 
-  document.getElementById('cdMetrics').innerHTML = `
+  // Single-spot test of the Harvest Button widget, gated to this one
+  // client only — deliberately not rolled out anywhere else yet, so this
+  // stays a small, easy-to-remove trial rather than a live feature. Uses
+  // this app's per-person Harvest login (separate from the shared PAT
+  // sync built earlier), so it'll prompt a login if the person viewing
+  // this page isn't already signed into Harvest in this browser.
+  const isHarvestTestClient = c.name && c.name.trim().toLowerCase() === '360 counter';
+  const harvestButtonHtml = isHarvestTestClient ? `
+    <div class="metric-card" style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+      <div>
+        <div class="metric-label" style="margin-bottom:2px;">Harvest Timer (test)</div>
+        <div style="font-size:11.5px;color:var(--muted-lt);">Starts a Harvest timer directly — requires you to already be signed into Harvest in this browser.</div>
+      </div>
+      <div class="harvest-timer" data-item='${JSON.stringify({id: c.id, name: c.name}).replace(/'/g,"&#39;")}'></div>
+    </div>` : '';
+
+  document.getElementById('cdMetrics').innerHTML = harvestButtonHtml + `
     <div class="metric-card">
       <div class="metric-head"><span class="metric-icon metric-icon-blue"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="metric-label">Status</span></div>
       <div class="metric-value" style="font-size:19px;">${c.status}</div>
@@ -5550,6 +5566,7 @@ function renderClientDetail(){
       <div class="metric-value" style="font-size:19px;">${(budget.usedMinutes/60).toFixed(1)}h <span style="color:var(--muted-lt);font-weight:400;font-size:14px;">of ${(budget.budgetMinutes/60).toFixed(1)}h</span></div>
       <div class="metric-chips"><span class="pill ${budgetTierMeta(budget.tier).pill}">${budgetTierMeta(budget.tier).label} · ${budget.pct}%</span></div>
     </div>` : ''}`;
+  if(isHarvestTestClient) registerHarvestTimerButtons(metricsEl);
 
   document.getElementById('cdImprovements').innerHTML = c.improvements.length
     ? [...c.improvements].reverse().map(imp=>`
