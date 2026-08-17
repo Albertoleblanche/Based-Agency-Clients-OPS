@@ -127,7 +127,6 @@
 
   .notif-bell-btn{background:none;border:none;color:var(--muted-lt);cursor:pointer;padding:6px;border-radius:8px;position:relative;display:flex;}
   .notif-bell-btn:hover{background:var(--surface-2);color:var(--ink);}
-  #harvestTimerWrap{cursor:pointer;}
   #harvestTimerWrap:hover{background:var(--brand-dark);}
   .notif-badge{position:absolute;top:1px;right:1px;min-width:15px;height:15px;padding:0 3px;border-radius:20px;background:var(--red);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;}
   .notif-panel{position:absolute;top:calc(100% + 8px);right:0;width:340px;max-height:420px;overflow-y:auto;background:var(--card);border:1px solid #EDEEF1;border-radius:12px;box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:500;}
@@ -1138,10 +1137,10 @@ document.addEventListener('DOMContentLoaded', function(){
         <span class="nav-label">Calendar</span>
         <span class="nav-badge" id="navCalendarBadge">0</span>
       </div>
-      <div class="nav-item" data-view="time" data-tooltip="Time Tracker" onclick="switchView('time')">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        <span class="nav-label">Time Tracker</span>
-      </div>
+      <!-- Time Tracker tab hidden — Harvest's own widget (top nav) is now
+           the primary time-tracking entry point. switchView('time') still
+           works underneath (e.g. Daily Summary's "See All" link), this
+           just removes the tab as a discoverable, visible destination. -->
       <div class="nav-item" data-view="team" data-tooltip="Team" onclick="switchView('team')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         <span class="nav-label">Team</span>
@@ -1224,9 +1223,14 @@ document.addEventListener('DOMContentLoaded', function(){
             <div id="notifPanelList"></div>
           </div>
         </div>
-        <div id="harvestTimerWrap" onclick="if(!event.target.closest('.harvest-timer')) document.querySelector('#harvestTimerWrap .harvest-timer').click()" style="display:flex;align-items:center;gap:6px;height:29px;padding:0 10px;background:var(--brand);border-radius:8px;color:#fff;font-size:12.5px;font-weight:600;">
-          <div class="harvest-timer" data-item='{"id":"global","name":"Time Entry"}' title="Start a Harvest timer"></div>
-          <span>Time Tracker</span>
+        <div class="notif-bell-wrap" id="harvestTimerBellWrap" style="position:relative;">
+          <div id="harvestTimerWrap" onclick="toggleHarvestTimerPanel()" style="display:flex;align-items:center;gap:6px;height:29px;padding:0 10px;background:var(--brand);border-radius:8px;color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Time Tracker</span>
+          </div>
+          <div class="notif-panel" id="harvestTimerPanel" style="display:none;width:340px;padding:0;overflow:hidden;">
+            <iframe id="harvestTimerIframe" style="width:100%;height:420px;border:none;display:block;"></iframe>
+          </div>
         </div>
       </div>
     </div>
@@ -7836,6 +7840,38 @@ document.addEventListener('click', (e)=>{
   if(panel && panel.style.display==='block' && wrap && !wrap.contains(e.target)) panel.style.display='none';
 });
 
+// Harvest's own Widget iframe, replacing the earlier Button approach —
+// full document isolation means nothing on this page can interfere with
+// or accidentally reset the timer mid-run, which is the class of problem
+// the Button kept running into. src is set only once on first open, not
+// on every toggle, since a running timer's actual state lives on
+// Harvest's own server regardless of what this page does locally.
+function toggleHarvestTimerPanel(){
+  const panel = document.getElementById('harvestTimerPanel');
+  if(!panel) return;
+  const opening = panel.style.display !== 'block';
+  panel.style.display = opening ? 'block' : 'none';
+  if(opening){
+    const iframe = document.getElementById('harvestTimerIframe');
+    if(iframe && !iframe.src){
+      const params = new URLSearchParams({
+        app_name: 'Based Agency',
+        closable: 'false',
+        permalink: window.location.origin + '/',
+        external_item_id: 'global',
+        external_item_name: 'Time Entry',
+      });
+      iframe.src = `https://platform.harvestapp.com/platform/timer?${params.toString()}`;
+    }
+  }
+}
+
+document.addEventListener('click', (e)=>{
+  const wrap = document.getElementById('harvestTimerBellWrap');
+  const panel = document.getElementById('harvestTimerPanel');
+  if(panel && panel.style.display==='block' && wrap && !wrap.contains(e.target)) panel.style.display='none';
+});
+
 function renderNotifPanel(){
   const el = document.getElementById('notifPanelList');
   if(!el) return;
@@ -11786,55 +11822,6 @@ async function showApp(session){
     }
   });
 })();
-</script>
-<!-- Harvest Button — separate, additional way to start a Harvest timer
-     directly (per-person Harvest login, not the shared PAT sync built
-     earlier). Permalink deliberately points at the app's root, not a
-     deep link to the specific client/task — this SPA doesn't have
-     per-item URLs to link back to, so this is an honest limitation
-     rather than a broken link. -->
-<script>
-  (function () {
-    window._harvestPlatformConfig = {
-      applicationName: 'Based Agency',
-      permalink: window.location.origin + '/',
-    };
-    var s = document.createElement('script');
-    s.src = 'https://platform.harvestapp.com/assets/platform.js';
-    s.async = true;
-    var ph = document.getElementsByTagName('script')[0];
-    ph.parentNode.insertBefore(s, ph);
-  })();
-
-  window.harvestButtonReady = false;
-  window._harvestPendingContainers = [];
-  document.body.addEventListener('harvest-event:ready', function(){
-    window.harvestButtonReady = true;
-    window._harvestPendingContainers.forEach(registerHarvestTimerButtons);
-    window._harvestPendingContainers = [];
-  });
-
-  // Call this after rendering any HTML containing a .harvest-timer div —
-  // dynamically-inserted buttons aren't picked up automatically by
-  // platform.js (confirmed in Harvest's own docs, "Adding Buttons After
-  // Loaded"); each one needs this explicit registration event dispatched
-  // against the #harvest-messaging element the script creates. If the
-  // script hasn't finished loading yet, the container is queued and
-  // retried once harvest-event:ready fires, rather than the button
-  // silently never appearing because of a load-order race.
-  function registerHarvestTimerButtons(container){
-    if(!container) return;
-    if(!window.harvestButtonReady){
-      window._harvestPendingContainers.push(container);
-      return;
-    }
-    const messaging = document.getElementById('harvest-messaging');
-    if(!messaging) return;
-    container.querySelectorAll('.harvest-timer').forEach(function(el){
-      const event = new CustomEvent('harvest-event:timers:add', { detail: { element: el } });
-      messaging.dispatchEvent(event);
-    });
-  }
 </script>
 </body>
 </html>
