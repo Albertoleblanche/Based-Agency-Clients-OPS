@@ -3534,45 +3534,5 @@ function setupMRealtime(){
 document.getElementById('mLoginPassword')?.addEventListener('keydown', e=>{ if(e.key==='Enter') mHandleLogin(); });
 mBoot();
 </script>
-
-<!-- Harvest Button — separate, additional way to start a Harvest timer
-     directly (per-person Harvest login, not the shared PAT sync built
-     earlier). Same mechanism as desktop's copy of this same block. -->
-<script>
-  (function () {
-    window._harvestPlatformConfig = {
-      applicationName: 'Based Agency',
-      permalink: window.location.origin + '/',
-      skipStyling: true,
-    };
-    var s = document.createElement('script');
-    s.src = 'https://platform.harvestapp.com/assets/platform.js';
-    s.async = true;
-    var ph = document.getElementsByTagName('script')[0];
-    ph.parentNode.insertBefore(s, ph);
-  })();
-
-  window.harvestButtonReady = false;
-  window._harvestPendingContainers = [];
-  document.body.addEventListener('harvest-event:ready', function(){
-    window.harvestButtonReady = true;
-    window._harvestPendingContainers.forEach(registerHarvestTimerButtons);
-    window._harvestPendingContainers = [];
-  });
-
-  function registerHarvestTimerButtons(container){
-    if(!container) return;
-    if(!window.harvestButtonReady){
-      window._harvestPendingContainers.push(container);
-      return;
-    }
-    const messaging = document.getElementById('harvest-messaging');
-    if(!messaging) return;
-    container.querySelectorAll('.harvest-timer').forEach(function(el){
-      const event = new CustomEvent('harvest-event:timers:add', { detail: { element: el } });
-      messaging.dispatchEvent(event);
-    });
-  }
-</script>
 </body>
 </html>
