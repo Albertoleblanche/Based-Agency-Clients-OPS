@@ -7,10 +7,6 @@
     {
       "path": "/api/cron-google-calendar-sync",
       "schedule": "0 9 * * *"
-    },
-    {
-      "path": "/api/harvest",
-      "schedule": "0 10 * * *"
     }
   ]
 }
