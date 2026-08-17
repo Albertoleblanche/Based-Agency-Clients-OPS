@@ -2274,7 +2274,7 @@ async function mSaveProfileBasicInfo(){
 async function mFetchGoogleCalendarStatus(){
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/google-calendar', { headers:{ 'Authorization': `Bearer ${session.access_token}` } });
+    const response = await fetch('/api/integrations?provider=google', { headers:{ 'Authorization': `Bearer ${session.access_token}` } });
     if(!response.ok) return null;
     return await response.json();
   }catch(e){ return null; }
@@ -2312,9 +2312,9 @@ async function mSyncGoogleCalendar(){
   mShowToast('success','Syncing…');
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/google-calendar', {
+    const response = await fetch('/api/integrations', {
       method:'POST', headers:{ 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action:'sync' })
+      body: JSON.stringify({ provider:'google', action:'sync' })
     });
     const data = await response.json();
     if(!response.ok){ mShowToast('error', data.error || 'Sync failed'); return; }
@@ -2331,9 +2331,9 @@ async function mDisconnectGoogleCalendar(){
   if(!confirm('Disconnect Google Calendar? Previously-synced events will be removed from the calendar.')) return;
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/google-calendar', {
+    const response = await fetch('/api/integrations', {
       method:'POST', headers:{ 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action:'disconnect' })
+      body: JSON.stringify({ provider:'google', action:'disconnect' })
     });
     const data = await response.json();
     if(!response.ok){ mShowToast('error', data.error || 'Could not disconnect'); return; }
@@ -3005,9 +3005,10 @@ async function mStopTimer(){
   mSaveTimerState();
   document.getElementById('mTimerBar').classList.remove('show');
 
-  const { error } = await mMergeOrInsertTimeEntry({ clientId, service, dateStr: toDateStr(new Date()), minutes, description });
+  const { error, entryId } = await mMergeOrInsertTimeEntry({ clientId, service, dateStr: toDateStr(new Date()), minutes, description });
   if(error){ mShowToast('error','Could not save time entry'); return; }
   mShowToast('success', `Logged ${minutes}m`);
+  mSyncEntryToHarvestBackground(entryId);
   mTimeEntriesLoaded = false;
   if(document.getElementById('mSubscreenTitle').textContent==='Time Tracker') mOpenTimeTracker();
 }
@@ -3023,13 +3024,29 @@ async function mMergeOrInsertTimeEntry({ clientId, service, dateStr, minutes, de
   if(existing){
     const newTotal = existing.minutes + minutes;
     const newDesc = [existing.description, description].filter(Boolean).join(' · ');
-    const { error } = await supabaseClient.from('time_entries').update({ minutes: newTotal, description: newDesc }).eq('id', existing.id);
-    return { error };
+    const { error } = await supabaseClient.from('time_entries').update({ minutes: newTotal, description: newDesc, harvest_sync_status: 'pending' }).eq('id', existing.id);
+    return { error, entryId: existing.id };
   }
-  const { error } = await supabaseClient.from('time_entries').insert({
+  const { data, error } = await supabaseClient.from('time_entries').insert({
     user_id: currentUser.id, client_id: clientId, entry_date: dateStr, minutes, description, service
+  }).select('id').single();
+  return { error, entryId: data?.id || null };
+}
+
+// Fire-and-forget, matching desktop's identical helper — never awaited,
+// so a slow or unreachable Harvest API can't delay the time-logging flow
+// someone's actually waiting on. Failures land on the row itself
+// (harvest_sync_status/harvest_sync_error) and get picked up by the
+// daily catch-up regardless.
+function mSyncEntryToHarvestBackground(entryId){
+  if(!entryId) return;
+  supabaseClient.auth.getSession().then(({ data: { session } })=>{
+    fetch('/api/integrations', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'harvest', action: 'sync-entry', timeEntryId: entryId }),
+    }).catch(()=>{});
   });
-  return { error };
 }
 
 let mTimeEntries = [];
@@ -3516,6 +3533,45 @@ function setupMRealtime(){
    ================================================================ */
 document.getElementById('mLoginPassword')?.addEventListener('keydown', e=>{ if(e.key==='Enter') mHandleLogin(); });
 mBoot();
+</script>
+
+<!-- Harvest Button — separate, additional way to start a Harvest timer
+     directly (per-person Harvest login, not the shared PAT sync built
+     earlier). Same mechanism as desktop's copy of this same block. -->
+<script>
+  (function () {
+    window._harvestPlatformConfig = {
+      applicationName: 'Based Agency',
+      permalink: window.location.origin + '/',
+    };
+    var s = document.createElement('script');
+    s.src = 'https://platform.harvestapp.com/assets/platform.js';
+    s.async = true;
+    var ph = document.getElementsByTagName('script')[0];
+    ph.parentNode.insertBefore(s, ph);
+  })();
+
+  window.harvestButtonReady = false;
+  window._harvestPendingContainers = [];
+  document.body.addEventListener('harvest-event:ready', function(){
+    window.harvestButtonReady = true;
+    window._harvestPendingContainers.forEach(registerHarvestTimerButtons);
+    window._harvestPendingContainers = [];
+  });
+
+  function registerHarvestTimerButtons(container){
+    if(!container) return;
+    if(!window.harvestButtonReady){
+      window._harvestPendingContainers.push(container);
+      return;
+    }
+    const messaging = document.getElementById('harvest-messaging');
+    if(!messaging) return;
+    container.querySelectorAll('.harvest-timer').forEach(function(el){
+      const event = new CustomEvent('harvest-event:timers:add', { detail: { element: el } });
+      messaging.dispatchEvent(event);
+    });
+  }
 </script>
 </body>
 </html>
