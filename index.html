@@ -5529,7 +5529,7 @@ function renderClientDetail(){
   // this app's per-person Harvest login (separate from the shared PAT
   // sync built earlier), so it'll prompt a login if the person viewing
   // this page isn't already signed into Harvest in this browser.
-  const isHarvestTestClient = c.name && c.name.trim().toLowerCase() === '360 counter';
+  const isHarvestTestClient = c.name && c.name.trim().toLowerCase() === '360 counters';
   const harvestButtonHtml = isHarvestTestClient ? `
     <div class="metric-card" style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px;">
       <div>
