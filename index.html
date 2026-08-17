@@ -1212,6 +1212,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <button class="notif-bell-btn" onclick="openCommandPalette()" title="Search (⌘K)">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         </button>
+        <div class="harvest-timer" data-item='{"id":"global","name":"Time Entry"}' title="Start a Harvest timer" style="display:flex;align-items:center;justify-content:center;width:29px;height:29px;background:var(--brand);color:#fff;border-radius:8px;cursor:pointer;"></div>
         <div class="notif-bell-wrap" style="position:relative;">
           <button class="notif-bell-btn" onclick="toggleNotifPanel()" title="Notifications">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -5523,23 +5524,7 @@ function renderClientDetail(){
   const myNotesForClient = notes.filter(n=>n.clientId===c.id).sort((a,b)=> new Date(b.updatedAt||b.createdAt)-new Date(a.updatedAt||a.createdAt));
   const budget = monthBudgetInfo(c);
 
-  // Single-spot test of the Harvest Button widget, gated to this one
-  // client only — deliberately not rolled out anywhere else yet, so this
-  // stays a small, easy-to-remove trial rather than a live feature. Uses
-  // this app's per-person Harvest login (separate from the shared PAT
-  // sync built earlier), so it'll prompt a login if the person viewing
-  // this page isn't already signed into Harvest in this browser.
-  const isHarvestTestClient = c.name && c.name.trim().toLowerCase() === '360 counters';
-  const harvestButtonHtml = isHarvestTestClient ? `
-    <div class="metric-card" style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px;">
-      <div>
-        <div class="metric-label" style="margin-bottom:2px;">Harvest Timer (test)</div>
-        <div style="font-size:11.5px;color:var(--muted-lt);">Starts a Harvest timer directly — requires you to already be signed into Harvest in this browser.</div>
-      </div>
-      <div class="harvest-timer" data-item='${JSON.stringify({id: c.id, name: c.name}).replace(/'/g,"&#39;")}'></div>
-    </div>` : '';
-
-  document.getElementById('cdMetrics').innerHTML = harvestButtonHtml + `
+  document.getElementById('cdMetrics').innerHTML = `
     <div class="metric-card">
       <div class="metric-head"><span class="metric-icon metric-icon-blue"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="metric-label">Status</span></div>
       <div class="metric-value" style="font-size:19px;">${c.status}</div>
@@ -5566,7 +5551,6 @@ function renderClientDetail(){
       <div class="metric-value" style="font-size:19px;">${(budget.usedMinutes/60).toFixed(1)}h <span style="color:var(--muted-lt);font-weight:400;font-size:14px;">of ${(budget.budgetMinutes/60).toFixed(1)}h</span></div>
       <div class="metric-chips"><span class="pill ${budgetTierMeta(budget.tier).pill}">${budgetTierMeta(budget.tier).label} · ${budget.pct}%</span></div>
     </div>` : ''}`;
-  if(isHarvestTestClient) registerHarvestTimerButtons(metricsEl);
 
   document.getElementById('cdImprovements').innerHTML = c.improvements.length
     ? [...c.improvements].reverse().map(imp=>`
