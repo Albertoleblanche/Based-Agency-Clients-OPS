@@ -8061,6 +8061,23 @@ async function sendNotification(userId, type, title, body, targetView, targetId,
   const row = { user_id:userId, type, title, body, target_view:targetView, read:!!alreadyToasted };
   if(targetId) row.target_id = targetId;
   await supabaseClient.from('notifications').insert(row);
+  sendPushNotification(userId, title, body);
+}
+
+// Best-effort OS push alongside the in-app notification above — never
+// awaited by the caller, and any failure here (no subscribed devices,
+// VAPID not configured, network error) is swallowed rather than
+// surfaced, since the in-app notification is the primary, reliable
+// mechanism and this is purely supplementary.
+async function sendPushNotification(userId, title, body){
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    fetch('/api/integrations', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'push', action: 'send', targetUserId: userId, title, body, url: '/' }),
+    }).catch(()=>{});
+  }catch(e){}
 }
 
 async function loadNotifications(){
