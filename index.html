@@ -10380,7 +10380,12 @@ function teamQueueFilterCount(filterKey){
     if(filterKey==='stale') return c.draftStatus==='approved' && hasLoggedThisWeek(c);
     return true;
   };
-  const rows = ac.filter(statusMatches)
+  // Pending drafts stay hidden from Team Queue (and its counts) until the
+  // owning member explicitly clicks Ready to Notify — mirrors the same
+  // gate renderTeamQueue() applies, so a count badge never shows more
+  // than what's actually visible in the cards underneath it.
+  const readyForReview = (c) => c.draftStatus !== 'pending' || c.readyToNotify === true;
+  const rows = ac.filter(statusMatches).filter(readyForReview)
     .map(c => ({ c, shownImprovements: c.improvements.filter(i=>improvementInDateRange(i, true)) }))
     .filter(r => teamDateFilterMode==='all' || r.shownImprovements.length > 0);
   // A card only actually renders under a member's section if at least one
@@ -10423,10 +10428,16 @@ function renderTeamQueue(){
     if(teamQueueFilter==='stale') return c.draftStatus==='approved' && hasLoggedThisWeek(c);
     return true;
   };
+  // Pending drafts stay hidden from Team Queue until the owning member
+  // explicitly clicks Ready to Notify — that's the actual signal that
+  // something is ready for an approver's attention, not the mere
+  // existence of a generated draft. Approved/none/other statuses aren't
+  // "awaiting review" in that sense, so they're unaffected by this flag.
+  const readyForReview = (c) => c.draftStatus !== 'pending' || c.readyToNotify === true;
 
   // Date-filtered improvement subset per client, kept alongside each client
   // so each member's section below can check who actually logged what.
-  const rows = ac.filter(statusMatches)
+  const rows = ac.filter(statusMatches).filter(readyForReview)
     .map(c => ({ c, shownImprovements: c.improvements.filter(i=>improvementInDateRange(i, true)) }))
     .filter(r => teamDateFilterMode==='all' || r.shownImprovements.length > 0);
 
@@ -10487,6 +10498,11 @@ function notifyForMember(memberId){
   const subject = `${pending.length} update${pending.length!==1?'s':''} from ${member.name} ready for approval`;
   const bodyLines = pending.map(c=>`- ${c.name} (danger ${c.danger}/5, importance ${c.importance}/10)`).join('\n');
   const body = `${member.name}'s client update drafts are ready for review, sorted by danger score:\n\n${bodyLines}\n\nReview and approve here: ${window.location.href}`;
+  // This is what actually makes these drafts show up in Team Queue —
+  // pending drafts stay hidden there until explicitly marked ready, so
+  // approvers only ever see things that genuinely need their attention.
+  pending.forEach(c => { c.readyToNotify = true; });
+  persistClients().then(()=>renderTeamQueue());
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Opened a notification email for ${member.name}'s drafts — ${pending.length} pending.`});
   persistLog().then(renderLog);
   showSendEmailConfirm(recipient.email, subject, body);
@@ -10930,16 +10946,6 @@ function openQueueCardModal(id){
 }
 
 
-// Tells every approver/admin a real draft is ready for their review —
-// excludes whoever generated it, since if that happens to be an approver
-// or admin themselves, notifying them about their own action is pointless.
-async function notifyApproversDraftReady(c){
-  const approvers = teamProfiles.filter(p => (p.role==='admin' || p.role==='approver') && p.id !== currentUser?.id);
-  for(const approver of approvers){
-    await sendNotification(approver.id, 'draft_ready', 'Draft ready for approval', `${myName()||'Someone'} created an improvement email draft for ${c.name}. Please review and approve it.`, 'approve', c.id);
-  }
-}
-
 async function generateDraft(id){
   await loadAll();
   const c = clients.find(x=>x.id===id);
@@ -11011,6 +11017,11 @@ ${contentRules}`;
     // which haven't changed, not this specific AI wording of them. A
     // fresh (never-approved) draft still becomes pending as before.
     if(!stayedApproved) c.draftStatus = 'pending';
+    // A fresh/regenerated draft was never "marked ready to notify" for
+    // this specific content — Team Queue shouldn't surface it to
+    // approvers as awaiting review until the owning member explicitly
+    // clicks Ready to Notify again.
+    c.readyToNotify = false;
     log.unshift({t:nowTime(), tag:'auto', text:`AI ${stayedApproved?'re-worded':'drafted'} the update for <b>${c.name}</b> from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''}${stayedApproved?' — stayed approved, the included improvements didn\'t change':''}.`});
     await persistClients();
     renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
@@ -11018,12 +11029,10 @@ ${contentRules}`;
     refreshClientDetailActivityIfOpen(id);
     if(modalOpenForThis) openQueueCardModal(id);
     showToast('success','Draft generated', stayedApproved ? `${c.name}'s draft was re-worded — still approved, no need to re-approve.` : `AI wrote the update for ${c.name}.`);
-    // Only notify on an actual, real draft that genuinely needs review —
-    // an empty API response falls back to a placeholder above, and a
-    // regeneration that stayed approved was never un-approved in the
-    // first place, so neither case should tell approvers something's
-    // waiting on them.
-    if(text && !stayedApproved) notifyApproversDraftReady(c);
+    // No automatic notification here at all — the only way admins/
+    // approvers get notified is the explicit "Ready to Notify" button,
+    // which is also what makes a pending draft actually visible in Team
+    // Queue (see renderTeamQueue()'s readyToNotify filter below).
   }catch(e){
     console.error('generateDraft failed', e);
     c.draft = 'AI generation failed — you can write the draft manually here.';
