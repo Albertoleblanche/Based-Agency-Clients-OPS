@@ -61,7 +61,7 @@
      !important override here is safer than editing each one individually
      (some duplicated, easy to miss one). */
   body[data-theme="dark"] .ov-card-title-row{background:transparent !important;}
-  body[data-theme="dark"] .panel-title, body[data-theme="dark"] .ov-card-title{color:#A8A8AC;}
+  body[data-theme="dark"] .panel-title, body[data-theme="dark"] .ov-card-title, body[data-theme="dark"] .ov-card-icon{color:#A8A8AC !important;}
   *{box-sizing:border-box;}
 
   /* Keyboard focus — was largely missing app-wide before this. Uses
@@ -4393,7 +4393,7 @@ function renderKpis(){
   // --- Total Clients ---
   document.getElementById('kpiTotal').textContent = ac.length;
   document.getElementById('totalChips').innerHTML = ac.length
-    ? `<span class="pill pill-good">${active} Active</span>${atRisk ? `<span class="pill pill-bad">${atRisk} At risk</span>` : ''}${onboarding ? `<span class="pill pill-mid">${onboarding} Onboarding</span>` : ''}`
+    ? `<span style="font-size:11px;color:var(--muted-lt);">${active} active</span>${atRisk ? `<span class="pill pill-bad">${atRisk} At risk</span>` : ''}${onboarding ? `<span class="pill pill-mid">${onboarding} Onboarding</span>` : ''}`
     : '';
   renderTotalClientsDonut();
 
@@ -4420,14 +4420,14 @@ function renderKpis(){
   const tasksChips = document.getElementById('tasksChips');
   if(tasksChips) tasksChips.innerHTML = overdueTasks
     ? `<span class="pill pill-bad">${overdueTasks} overdue</span>`
-    : myOpenTasks.length ? `<span class="pill pill-status">None overdue</span>` : `<span class="pill pill-good">All clear</span>`;
+    : myOpenTasks.length ? `<span class="pill pill-status">None overdue</span>` : `<span class="pill pill-status">All clear</span>`;
 
   // --- Pending Approval ---
   document.getElementById('kpiPendingLabel').textContent = admin ? 'Pending Approval' : 'Drafts Ready';
   document.getElementById('kpiPending').textContent = pending;
   document.getElementById('pendingChips').innerHTML = pending
     ? `<span class="pill pill-mid">${pending} draft${pending!==1?'s':''} ready</span>`
-    : `<span class="pill pill-good">All caught up</span>`;
+    : `<span class="pill pill-status">All caught up</span>`;
 
   // --- Weekly Completion: of clients with a log this calendar week (mine, if not admin), how many are approved ---
   const withRecentLogs = admin
