@@ -11004,19 +11004,26 @@ ${contentRules}`;
     });
     const data = await response.json();
     const text = (data.text || '').trim();
+    const stayedApproved = c.draftStatus === 'approved';
     c.draft = text || 'Could not generate a draft — try again.';
-    c.draftStatus = 'pending';
-    log.unshift({t:nowTime(), tag:'auto', text:`AI drafted the update for <b>${c.name}</b> from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''}.`});
+    // Regenerating an already-approved draft doesn't require re-approval —
+    // what was actually approved is the underlying included improvements,
+    // which haven't changed, not this specific AI wording of them. A
+    // fresh (never-approved) draft still becomes pending as before.
+    if(!stayedApproved) c.draftStatus = 'pending';
+    log.unshift({t:nowTime(), tag:'auto', text:`AI ${stayedApproved?'re-worded':'drafted'} the update for <b>${c.name}</b> from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''}${stayedApproved?' — stayed approved, the included improvements didn\'t change':''}.`});
     await persistClients();
     renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
-    logClientActivity(id, 'draft_generated', `AI generated a draft from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''} (of ${c.improvements.length} logged).`);
+    logClientActivity(id, 'draft_generated', `AI ${stayedApproved?'re-worded':'generated'} a draft from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''} (of ${c.improvements.length} logged)${stayedApproved?' — approval carried over':''}.`);
     refreshClientDetailActivityIfOpen(id);
     if(modalOpenForThis) openQueueCardModal(id);
-    showToast('success','Draft generated', `AI wrote the update for ${c.name}.`);
-    // Only notify on an actual, real draft — an empty API response falls
-    // back to a placeholder message above, which isn't something an
-    // approver should be told is ready to review.
-    if(text) notifyApproversDraftReady(c);
+    showToast('success','Draft generated', stayedApproved ? `${c.name}'s draft was re-worded — still approved, no need to re-approve.` : `AI wrote the update for ${c.name}.`);
+    // Only notify on an actual, real draft that genuinely needs review —
+    // an empty API response falls back to a placeholder above, and a
+    // regeneration that stayed approved was never un-approved in the
+    // first place, so neither case should tell approvers something's
+    // waiting on them.
+    if(text && !stayedApproved) notifyApproversDraftReady(c);
   }catch(e){
     console.error('generateDraft failed', e);
     c.draft = 'AI generation failed — you can write the draft manually here.';
