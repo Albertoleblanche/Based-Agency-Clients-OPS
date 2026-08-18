@@ -6,6 +6,7 @@
 // actually something pending, so it doesn't spam an empty email every week.
 
 const { createClient } = require('@supabase/supabase-js');
+const { sendPushToUser } = require('../lib/push-notify');
 
 module.exports = async function handler(req, res) {
   // Vercel automatically sends this header on real cron invocations — this
@@ -103,6 +104,9 @@ module.exports = async function handler(req, res) {
         user_id: id, type: 'email_sent', title: 'Client email sent',
         body: `Wednesday automation sent "${subject}" to ${recipients.join(', ')}.`, target_view: 'approve',
       })));
+      for (const id of notifyIds) {
+        try{ await sendPushToUser(admin, id, 'Client email sent', `Wednesday automation sent "${subject}" to ${recipients.join(', ')}.`); }catch(e){}
+      }
     }
 
     res.status(200).json({ success: true, notified: pending.length, emailId: emailData.id });
