@@ -21,7 +21,6 @@
 // requests from a real signed-in user's browser.
 
 const { createClient } = require('@supabase/supabase-js');
-const webpush = require('web-push');
 const { syncGoogleCalendarForUser } = require('../lib/google-calendar-sync');
 const {
   validateHarvestCredentials,
@@ -29,14 +28,7 @@ const {
   syncTimeEntryToHarvest,
   deleteTimeEntryFromHarvest,
 } = require('../lib/harvest-sync');
-
-if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT || 'https://based-agency-radar.vercel.app/',
-    process.env.VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
-  );
-}
+const { sendPushToUser } = require('../lib/push-notify');
 
 module.exports = async function handler(req, res) {
   const callerToken = (req.headers.authorization || '').replace('Bearer ', '');
@@ -271,39 +263,15 @@ module.exports = async function handler(req, res) {
     // ================= PUSH NOTIFICATIONS =================
     if (provider === 'push') {
       if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
-      const { action, targetUserId, title, body: notifBody, url } = req.body || {};
+      const { action, targetUserId, title, body: notifBody } = req.body || {};
       if (action !== 'send') { res.status(400).json({ error: `Unknown action: ${action}` }); return; }
       if (!targetUserId || !title) { res.status(400).json({ error: 'targetUserId and title are required.' }); return; }
       if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
         res.status(500).json({ error: 'Server is not configured with VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY' });
         return;
       }
-
-      const { data: subs } = await admin.from('push_subscriptions').select('*').eq('user_id', targetUserId);
-      if (!subs || !subs.length) { res.status(200).json({ sent: 0, failed: 0, reason: 'No subscribed devices for this user.' }); return; }
-
-      const payload = JSON.stringify({ title, body: notifBody || '', url: url || '/' });
-      let sent = 0, failed = 0;
-      for (const sub of subs) {
-        try {
-          await webpush.sendNotification(
-            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-            payload
-          );
-          sent++;
-        } catch (err) {
-          failed++;
-          // 404/410 means this specific subscription is permanently dead
-          // (the browser itself unsubscribed, or the push service expired
-          // the endpoint) — not a transient failure, so there's no reason
-          // to keep retrying it. Any other error is left alone, since
-          // that could be a temporary network/service issue.
-          if (err.statusCode === 404 || err.statusCode === 410) {
-            await admin.from('push_subscriptions').delete().eq('id', sub.id);
-          }
-        }
-      }
-      res.status(200).json({ sent, failed });
+      const result = await sendPushToUser(admin, targetUserId, title, notifBody);
+      res.status(200).json(result);
       return;
     }
 
