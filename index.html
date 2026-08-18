@@ -9935,6 +9935,9 @@ function renderXYChart(containerId, buckets, headlineMode, dangerSeries){
   if(!el) return;
   if(!buckets.length){ el.innerHTML = `<div class="empty">No data for this period.</div>`; return; }
 
+  const isDark = document.body.dataset.theme === 'dark';
+  const lineColor = isDark ? '#e8622c82' : 'var(--brand)';
+
   const uid = 'xy'+(xyChartUid++);
   const w = 600, h = 180, padX = 6, padY = 14;
   const values = buckets.map(b=>b.minutes/60);
@@ -9953,7 +9956,7 @@ function renderXYChart(containerId, buckets, headlineMode, dangerSeries){
   // that collapses to a single bucket under a coarser granularity (Week or
   // Month) — common right after selecting one of those from the dropdown.
   const singlePointDot = points.length===1
-    ? `<circle cx="${points[0].x.toFixed(1)}" cy="${points[0].y.toFixed(1)}" r="4.5" fill="var(--brand)"></circle>`
+    ? `<circle cx="${points[0].x.toFixed(1)}" cy="${points[0].y.toFixed(1)}" r="4.5" fill="${lineColor}"></circle>`
     : '';
 
   // Danger score (1-5) has its own, completely independent scale from
@@ -10013,13 +10016,13 @@ function renderXYChart(containerId, buckets, headlineMode, dangerSeries){
       <svg viewBox="0 0 ${w} ${h}" id="${uid}-svg" preserveAspectRatio="none">
         <defs>
           <linearGradient id="${uid}-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" style="stop-color:var(--brand);stop-opacity:0.32;"></stop>
-            <stop offset="100%" style="stop-color:var(--brand);stop-opacity:0;"></stop>
+            <stop offset="0%" style="stop-color:${lineColor};stop-opacity:0.32;"></stop>
+            <stop offset="100%" style="stop-color:${lineColor};stop-opacity:0;"></stop>
           </linearGradient>
         </defs>
         <path d="${areaPath}" fill="url(#${uid}-grad)" stroke="none"></path>
         ${dangerLineHtml}
-        <path d="${linePath}" fill="none" stroke="var(--brand)" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"></path>
+        <path d="${linePath}" fill="none" stroke="${lineColor}" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"></path>
         ${singlePointDot}
         <line id="${uid}-guide" class="xy-chart-guide" x1="0" y1="${padY}" x2="0" y2="${h-padY}" style="display:none;"></line>
         <circle id="${uid}-dot" class="xy-chart-dot" r="4" style="display:none;"></circle>
@@ -10913,15 +10916,18 @@ function renderTotalClientsDonut(){
   const counts = { 'No risk':0, 'Medium risk':0, 'At risk':0 };
   ac.forEach(c=>{ counts[riskLabel(c.danger).text]++; });
   const entries = Object.entries(counts).filter(([,count])=>count>0);
-  const tierColor = (tier)=> tier==='At risk' ? '#CF2424' : tier==='Medium risk' ? '#43719C' : '#117F3A';
+  const isDark = document.body.dataset.theme === 'dark';
+  const tierColor = isDark
+    ? (tier)=> tier==='At risk' ? '#A84942' : tier==='Medium risk' ? '#3A5A78' : '#2F6B44'
+    : (tier)=> tier==='At risk' ? '#CF2424' : tier==='Medium risk' ? '#43719C' : '#117F3A';
   const tierColorLight = (tier)=> tier==='At risk' ? '#E8807C' : tier==='Medium risk' ? '#7FA8CF' : '#4FB37D';
   const tierGradId = (tier)=> 'riskGrad-' + tier.replace(/\s+/g,'');
 
-  const r = 46, cx = 60, cy = 60, strokeW = 15;
+  const r = 46, cx = 60, cy = 60, strokeW = isDark ? 11 : 15;
   const C = 2*Math.PI*r;
   const gapLen = strokeW + 8; // fixed arc-length gap, sized to survive round-linecap's own visual overlap (~strokeW/2 per side) and still leave a real visible separation
   let cumulative = 0;
-  const grads = entries.map(([tier])=>
+  const grads = isDark ? '' : entries.map(([tier])=>
     `<linearGradient id="${tierGradId(tier)}" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="${tierColorLight(tier)}"/>
       <stop offset="100%" stop-color="${tierColor(tier)}"/>
@@ -10931,7 +10937,9 @@ function renderTotalClientsDonut(){
     const dash = (count/total)*C;
     const visibleDash = dash > 0 ? Math.max(3, dash - gapLen) : 0;
     const dimmed = attentionTierFilter && attentionTierFilter!==tier;
-    const html = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="url(#${tierGradId(tier)})" stroke-width="${strokeW}" stroke-linecap="round" stroke-dasharray="${visibleDash.toFixed(2)} ${(C-visibleDash).toFixed(2)}" stroke-dashoffset="${(-cumulative).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})" style="cursor:pointer;opacity:${dimmed?0.3:1};filter:drop-shadow(0 0 4px ${tierColor(tier)}73);transition:opacity var(--duration-fast) var(--ease-out);" onclick="setAttentionTierFilter(attentionTierFilter==='${tier}'?null:'${tier}')"><title>${tier} (${count}) — click to filter Needs Attention</title></circle>`;
+    const strokeFill = isDark ? tierColor(tier) : `url(#${tierGradId(tier)})`;
+    const glowFilter = isDark ? '' : `filter:drop-shadow(0 0 4px ${tierColor(tier)}73);`;
+    const html = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${strokeFill}" stroke-width="${strokeW}" stroke-linecap="round" stroke-dasharray="${visibleDash.toFixed(2)} ${(C-visibleDash).toFixed(2)}" stroke-dashoffset="${(-cumulative).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})" style="cursor:pointer;opacity:${dimmed?0.3:1};${glowFilter}transition:opacity var(--duration-fast) var(--ease-out);" onclick="setAttentionTierFilter(attentionTierFilter==='${tier}'?null:'${tier}')"><title>${tier} (${count}) — click to filter Needs Attention</title></circle>`;
     cumulative += dash;
     return html;
   }).join('');
