@@ -50,8 +50,8 @@
     --duration-fast:120ms; --duration-base:200ms; --duration-slow:320ms;
   }
   body[data-theme="dark"]{
-    --bg:#000000; --sidebar:#000000; --sidebar-hover:rgba(232,98,44,.14); --sidebar-active:rgba(232,98,44,.22);
-    --card:#000000; --surface-2:#141414; --border:#2E2E2E; --ink:#EDEDED; --muted:#A1A1A1; --muted-lt:#757575;
+    --bg:#0A0A0A; --sidebar:#000000; --sidebar-hover:rgba(232,98,44,.14); --sidebar-active:rgba(232,98,44,.22);
+    --card:#121212; --surface-2:#1A1A1A; --border:#2E2E2E; --ink:#EDEDED; --muted:#A1A1A1; --muted-lt:#757575;
     --brand:#E8622C; --brand-dark:#F27B49; --brand-bg:#2A1C14;
     --green:#3ECF7E; --green-bg:#12261B; --red:#F0685F; --red-bg:#2A1414; --amber:#E5B04B; --amber-bg:#2A2314;
     --shadow:0 1px 2px rgba(0,0,0,.3), 0 1px 3px rgba(0,0,0,.4);
@@ -476,6 +476,8 @@
   .client-cell{display:flex;align-items:center;gap:11px;}
   .avatar-circle{width:32px;height:32px;border-radius:50%;background:linear-gradient(160deg,var(--surface-2),var(--border));border:1px solid var(--border);color:var(--ink);font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;flex:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.5);}
   body[data-theme="dark"] .avatar-circle{box-shadow:none;}
+  body[data-theme="dark"] .sidebar{border-right:1px solid rgba(255,255,255,.08);}
+  body[data-theme="dark"] .app-topbar{border-bottom:1px solid var(--border);}
   .cell-name{font-weight:600;font-size:13px;letter-spacing:-0.2px;}
   .cell-email{font-size:11px;color:var(--muted-lt);margin-top:2px;}
   .cell-service{color:var(--ink);font-weight:500;}
