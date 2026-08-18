@@ -1627,11 +1627,6 @@ document.addEventListener('DOMContentLoaded', function(){
           <span>Approved</span>
           <span class="icon-tab-count" id="tqf-count-approved">0</span>
         </div>
-        <div class="icon-tab" data-f="none" onclick="setTeamQueueFilter('none')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <span>No draft yet</span>
-          <span class="icon-tab-count" id="tqf-count-none">0</span>
-        </div>
         <div class="icon-tab" data-f="atrisk" onclick="setTeamQueueFilter('atrisk')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           <span>At risk (4–5)</span>
@@ -2815,7 +2810,10 @@ async function persistTeam(){ return await safeSet('team-members', JSON.stringif
 // block it outright, so it can look "connected" but do nothing. Instead, show a
 // modal with a REAL, visible mailto link the person clicks themselves (which browsers
 // always honor as a genuine user action) plus a guaranteed copy-to-clipboard fallback.
-function showSendEmailConfirm(to, subject, body){
+let _emailSentCallback = null;
+
+function showSendEmailConfirm(to, subject, body, onSent){
+  _emailSentCallback = onSent || null;
   const mailtoHref = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Send this email?</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
@@ -2856,6 +2854,7 @@ async function confirmSendEmail(){
     closeAppModal();
     showToast('success','Email sent', `Delivered to ${to}.`);
     notifyOthersOfEmailSent(to, subject);
+    if(_emailSentCallback){ const cb = _emailSentCallback; _emailSentCallback = null; cb(); }
   }catch(e){
     restoreBtn(btn);
     showToast('error','Send failed', 'Network error — try "Open in mail app instead."');
@@ -10381,11 +10380,14 @@ function teamQueueFilterCount(filterKey){
     if(filterKey==='stale') return c.draftStatus==='approved' && hasLoggedThisWeek(c);
     return true;
   };
-  // Pending drafts stay hidden from Team Queue (and its counts) until the
-  // owning member explicitly clicks Ready to Notify — mirrors the same
-  // gate renderTeamQueue() applies, so a count badge never shows more
-  // than what's actually visible in the cards underneath it.
-  const readyForReview = (c) => c.draftStatus !== 'pending' || c.readyToNotify === true;
+  // A client is only ever visible in Team Queue once there's an actual
+  // draft an approver could act on — approved drafts always qualify,
+  // pending ones only once the owning member has explicitly clicked
+  // Ready to Notify and completed the actual send. Clients still at
+  // 'none' (logged but no draft generated yet) are never visible here,
+  // regardless of which filter chip is selected — that's purely a
+  // member's own, private working state until they generate and notify.
+  const readyForReview = (c) => c.draftStatus==='approved' || (c.draftStatus==='pending' && c.readyToNotify===true);
   const rows = ac.filter(statusMatches).filter(readyForReview)
     .map(c => ({ c, shownImprovements: c.improvements.filter(i=>improvementInDateRange(i, true)) }))
     .filter(r => teamDateFilterMode==='all' || r.shownImprovements.length > 0);
@@ -10430,11 +10432,12 @@ function renderTeamQueue(){
     return true;
   };
   // Pending drafts stay hidden from Team Queue until the owning member
-  // explicitly clicks Ready to Notify — that's the actual signal that
-  // something is ready for an approver's attention, not the mere
-  // existence of a generated draft. Approved/none/other statuses aren't
-  // "awaiting review" in that sense, so they're unaffected by this flag.
-  const readyForReview = (c) => c.draftStatus !== 'pending' || c.readyToNotify === true;
+  // explicitly clicks Ready to Notify and completes the actual send —
+  // that's the genuine signal something is ready for an approver's
+  // attention, not the mere existence of a generated draft. Clients
+  // still at 'none' (logged but no draft generated at all) are never
+  // visible here — that's purely a member's own private working state.
+  const readyForReview = (c) => c.draftStatus==='approved' || (c.draftStatus==='pending' && c.readyToNotify===true);
 
   // Date-filtered improvement subset per client, kept alongside each client
   // so each member's section below can check who actually logged what.
@@ -10526,13 +10529,16 @@ function notifyForMemberByEmail(memberId){
   if(!recipient.email){ showToast('error','Missing email on file', `Add ${recipient.configLabel} email address in Settings first.`); return; }
   const member = teamProfiles.find(p=>p.id===memberId);
   if(!member) return;
-  const pending = markMemberDraftsReady(member);
+  const pending = activeClients().filter(c=>c.draftStatus==='pending' && c.improvements.some(i=>i.author===member.name));
   const subject = `${pending.length} update${pending.length!==1?'s':''} from ${member.name} ready for approval`;
   const bodyLines = pending.map(c=>`- ${c.name} (danger ${c.danger}/5, importance ${c.importance}/10)`).join('\n');
   const body = `${member.name}'s client update drafts are ready for review, sorted by danger score:\n\n${bodyLines}\n\nReview and approve here: ${window.location.href}`;
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Opened a notification email for ${member.name}'s drafts — ${pending.length} pending.`});
   persistLog().then(renderLog);
-  showSendEmailConfirm(recipient.email, subject, body);
+  showSendEmailConfirm(recipient.email, subject, body, () => {
+    pending.forEach(c => { c.readyToNotify = true; });
+    persistClients().then(()=>renderTeamQueue());
+  });
 }
 
 // The new in-app alternative to email — notifies every admin/approver
@@ -11560,13 +11566,16 @@ function notifyApproversByEmail(){
   const recipient = getNotifyRecipient();
   if(!recipient){ closeAppModal(); showToast('info','Nobody to notify by email', "You're the last stop in the chain — try Send Internally instead."); return; }
   if(!recipient.email){ showToast('error','Missing email on file', `Add ${recipient.configLabel} email address in Settings first.`); return; }
-  const pending = markAllPendingDraftsReady();
+  const pending = activeClients().filter(c=>c.draftStatus==='pending');
   const subject = `${pending.length} client update${pending.length!==1?'s':''} ready for approval`;
   const bodyLines = pending.map(c=>`- ${c.name} (danger ${c.danger}/5, importance ${c.importance}/10)`).join('\n');
   const body = `This week's client update drafts are ready for review, sorted by danger score:\n\n${bodyLines}\n\nReview and approve here: ${window.location.href}`;
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Opened a notification email — ${pending.length} draft${pending.length!==1?'s':''} pending.`});
   persistLog().then(renderLog);
-  showSendEmailConfirm(recipient.email, subject, body);
+  showSendEmailConfirm(recipient.email, subject, body, () => {
+    pending.forEach(c => { c.readyToNotify = true; });
+    persistClients().then(()=>renderTeamQueue());
+  });
 }
 
 async function notifyApproversInternally(){
