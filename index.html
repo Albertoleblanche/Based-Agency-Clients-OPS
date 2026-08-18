@@ -6758,8 +6758,11 @@ async function saveNewTask(){
   const assignee = teamProfiles.find(p=>p.id===assigneeId);
   if(!error && data){
     closeAppModal();
-    showToast('success','Task assigned', `${assignee ? assignee.name : 'They'} will see it next time they check Tasks.`);
+    showToast('success','Task assigned', assigneeId===currentUser.id ? 'Added to your tasks.' : `${assignee ? assignee.name : 'They'} will be notified.`);
     if(addToCalendar) await addTaskToCalendar(data.id);
+    if(assigneeId !== currentUser.id){
+      sendNotification(assigneeId, 'task_assigned', 'New task assigned to you', `${myName()||'Someone'}: "${title}"`, 'tasks');
+    }
   } else {
     closeAppModal();
     showToast('error','Save failed', error?.message || 'Unknown error');
@@ -6840,7 +6843,10 @@ async function moveTaskToStatus(taskId, newStatus){
   const stageLabel = KANBAN_STAGES.find(s=>s.key===newStatus)?.label || newStatus;
   if(error){ showToast('error','Save failed', error.message); return; }
   if(newStatus==='done' && !wasAlreadyDone){
-    showToast('success','Marked complete', `${amAssigner ? 'You' : (teamProfiles.find(p=>p.id===t.assignerId)?.name||'They')} will see this the next time they check Tasks.${t.clientId ? ' Logged to Past Improvements.' : ''}`);
+    showToast('success','Marked complete', `${amAssigner ? 'Nice work!' : `${teamProfiles.find(p=>p.id===t.assignerId)?.name||'They'} will be notified.`}${t.clientId ? ' Logged to Past Improvements.' : ''}`);
+    if(t.assignerId !== currentUser.id){
+      sendNotification(t.assignerId, 'task_completed', 'Task completed', `${myName()||'Someone'} marked "${t.title}" as done.`, 'tasks');
+    }
   } else {
     showToast('success','Task moved', `Moved to ${stageLabel}.`);
   }
@@ -6896,11 +6902,13 @@ async function deleteTaskPermanently(taskId){
   showToast('success','Deleted','Task permanently removed.');
 }
 
-// The actual notification delivery. Runs on login and on every periodic
-// refresh, so a toast fires the first time either side's session sees the
-// event — live if they're online when it happens, or the next time they
-// load the app if they weren't. Each flag flips to true right after
-// showing, so nobody gets the same toast twice.
+// The in-app toast for whichever side's own session happens to be open —
+// runs on login and on every periodic refresh, so it fires live if
+// they're online when it happens, or the next time they load the app if
+// they weren't. The actual notification (bell entry + push) already
+// fired immediately from the source action itself — saveNewTask() for
+// assignment, moveTaskToStatus() for completion — this only adds the
+// toast on top of that for whoever's actively looking right now.
 async function checkTaskNotifications(){
   if(!currentUser || !tasks.length) return;
   const newlyAssigned = tasks.filter(t=> t.assigneeId===currentUser.id && !t.assigneeNotified && !t.cancelledAt);
@@ -6911,16 +6919,11 @@ async function checkTaskNotifications(){
     const assigner = teamProfiles.find(p=>p.id===t.assignerId);
     showToast('info','New task assigned to you', `${assigner ? assigner.name : 'Someone'}: "${t.title}"`);
     await supabaseClient.from('tasks').update({ assignee_notified:true }).eq('id', t.id);
-    // read:true — this event already delivered its own toast above, so it
-    // shouldn't also get picked up and re-toasted by the general
-    // notification poll. It still shows in the bell's history either way.
-    await sendNotification(currentUser.id, 'task_assigned', 'New task assigned to you', `${assigner?assigner.name:'Someone'}: "${t.title}"`, 'tasks', null, true);
   }
   for(const t of newlyCompleted){
     const assignee = teamProfiles.find(p=>p.id===t.assigneeId);
     showToast('success','Task completed', `${assignee ? assignee.name : 'Someone'} marked "${t.title}" as done.`);
     await supabaseClient.from('tasks').update({ assigner_notified:true }).eq('id', t.id);
-    await sendNotification(currentUser.id, 'task_completed', 'Task completed', `${assignee?assignee.name:'Someone'} marked "${t.title}" as done.`, 'tasks', null, true);
   }
   await loadMyTasks();
   renderTasks();
