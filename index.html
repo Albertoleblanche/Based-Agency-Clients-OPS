@@ -11070,10 +11070,7 @@ function getIncludedAuthorProfiles(c){
 
 async function approveDraft(id){
   if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can approve drafts.'); return; }
-  const cNow = clients.find(x=>x.id===id);
   const ta = document.getElementById('draft-'+id);
-  const draftText = ta ? ta.value : (cNow ? cNow.draft : '');
-  const email = cNow ? cNow.email : '';
   setBtnLoading(clickedBtn(), 'Approving…');
 
   await loadAll();
@@ -11081,7 +11078,7 @@ async function approveDraft(id){
   if(!c) return;
   if(ta) c.draft = ta.value;
   c.draftStatus = 'approved';
-  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Approved <b>${c.name}</b> — email drafted for send.`});
+  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Approved <b>${c.name}</b>'s draft.`});
   const ok = await persistClients();
   renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
   if(!ok){ showToast('error','Save failed','Approval may not have synced — refresh and check.'); return; }
@@ -11095,11 +11092,6 @@ async function approveDraft(id){
   }
 
   showToast('success','Draft approved', `${c.name}'s update was approved.`);
-  if(email){
-    showSendEmailConfirm(email, `Your weekly update from ${settings.appName || 'Based Agency'}`, draftText);
-  } else {
-    showToast('info','No email sent', `${c.name} has no email on file. Add one in Clients to send.`);
-  }
 }
 
 async function skipDraft(id){
