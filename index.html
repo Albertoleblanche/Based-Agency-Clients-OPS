@@ -2319,6 +2319,13 @@ document.addEventListener('DOMContentLoaded', function(){
           <div id="gcalStatusBox"></div>
         </div>
       </div>
+
+      <div class="panel" style="margin-top:24px;">
+        <div class="panel-head"><span class="panel-title">Push Notifications</span></div>
+        <div class="panel-body">
+          <div id="pushStatusBox"></div>
+        </div>
+      </div>
     </div>
 
     <!-- CLIENT DETAIL -->
@@ -3290,7 +3297,7 @@ async function switchView(name){
   }
   if(name==='teamqueue') renderTeamQueue();
   if(name==='time') renderTimesheet();
-  if(name==='profile'){ renderProfilePage(); loadGoogleCalendarStatus(); }
+  if(name==='profile'){ renderProfilePage(); loadGoogleCalendarStatus(); loadPushStatus(); }
 }
 
 function switchSettingsTab(name){
@@ -7817,6 +7824,98 @@ async function fetchGoogleCalendarStatus(){
     return await response.json();
   }catch(e){
     return null;
+  }
+}
+
+const VAPID_PUBLIC_KEY = 'BMKfTiTGaN-T9TYO-m6a1oAbIypXcS_FsPZ0ie1uIopU9wJQfOmrX7JvT_yReo8OkReAqlT-1PA8kL1m6sqII6s';
+
+// PushManager.subscribe() requires the public key as a Uint8Array, not the
+// raw base64url string it's normally shared as — this is the standard
+// conversion for that, worth getting exactly right since a subtly wrong
+// version fails in ways that are hard to diagnose from the error alone.
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+
+async function loadPushStatus(){
+  const el = document.getElementById('pushStatusBox');
+  if(!el) return;
+
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+    el.innerHTML = `<p style="font-size:12.5px;color:var(--muted);line-height:1.5;">Push notifications aren't supported in this browser. On iPhone, this only works if the app has been added to the Home Screen first — Safari alone can't receive push notifications.</p>`;
+    return;
+  }
+
+  if(Notification.permission === 'denied'){
+    el.innerHTML = `<p style="font-size:12.5px;color:var(--muted);line-height:1.5;">Notifications are blocked for this site. This can only be undone from your browser's own site settings, not from a button here — look for a lock or site-info icon in the address bar.</p>`;
+    return;
+  }
+
+  el.innerHTML = `<div class="empty">Checking…</div>`;
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if(sub){
+      el.innerHTML = `
+        <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 12px;">Push notifications are on for this device.</p>
+        <button class="btn btn-outline" onclick="disablePushNotifications()">Turn off on this device</button>`;
+    } else {
+      el.innerHTML = `
+        <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 12px;">Get notified on this device even when the app isn't open — approvals, reminders, and more.</p>
+        <button class="btn btn-brand" onclick="enablePushNotifications()">Enable Push Notifications</button>`;
+    }
+  }catch(e){
+    el.innerHTML = `<p style="font-size:12.5px;color:var(--red);line-height:1.5;">Couldn't check push status: ${escapeHtml(String(e.message||e))}</p>`;
+  }
+}
+
+async function enablePushNotifications(){
+  try{
+    const permission = await Notification.requestPermission();
+    if(permission !== 'granted'){
+      showToast('info','Not enabled', 'Notification permission was not granted.');
+      loadPushStatus();
+      return;
+    }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+    const subJson = sub.toJSON();
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    const { error } = await supabaseClient.from('push_subscriptions').upsert({
+      user_id: user.id,
+      endpoint: subJson.endpoint,
+      p256dh: subJson.keys.p256dh,
+      auth: subJson.keys.auth,
+      user_agent: navigator.userAgent,
+    }, { onConflict: 'endpoint' });
+    if(error){ showToast('error','Could not save subscription', error.message); return; }
+    showToast('success','Push notifications enabled', 'You\'ll get notified on this device.');
+    loadPushStatus();
+  }catch(e){
+    showToast('error','Could not enable push', String(e.message||e));
+    loadPushStatus();
+  }
+}
+
+async function disablePushNotifications(){
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if(sub){
+      await supabaseClient.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+      await sub.unsubscribe();
+    }
+    showToast('success','Push notifications turned off', 'This device will no longer receive them.');
+    loadPushStatus();
+  }catch(e){
+    showToast('error','Could not disable push', String(e.message||e));
+    loadPushStatus();
   }
 }
 
