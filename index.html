@@ -61,7 +61,13 @@
      !important override here is safer than editing each one individually
      (some duplicated, easy to miss one). */
   body[data-theme="dark"] .ov-card-title-row{background:transparent !important;}
+  body[data-theme="dark"] .ov-mini-cal-head{background:transparent !important;}
   body[data-theme="dark"] .panel-title, body[data-theme="dark"] .ov-card-title, body[data-theme="dark"] .ov-card-icon{color:#A8A8AC !important;}
+  body[data-theme="dark"] .ov-mini-cal-day.today{background:rgba(232,98,44,.35);color:#EDEDED;}
+  body[data-theme="dark"] .ov-mini-cal-day.today:hover{background:rgba(232,98,44,.35);}
+  body[data-theme="dark"] .ov-mini-cal-dot{background:rgba(232,98,44,.6);}
+  body[data-theme="dark"] .ov-mini-cal-day.today .ov-mini-cal-dot{background:#EDEDED;}
+  body[data-theme="dark"] .ov-row-dot{opacity:.55 !important;}
   *{box-sizing:border-box;}
 
   /* Keyboard focus — was largely missing app-wide before this. Uses
@@ -4367,9 +4373,7 @@ async function saveClientForm(){
 
 function renderKpis(){
   const ac = activeClients();
-  const atRisk = ac.filter(c=>c.danger>=4).length;
   const active = ac.filter(c=>c.status==='Active').length;
-  const onboarding = ac.filter(c=>c.status==='Onboarding').length;
   const me = myName();
   const admin = isAdmin();
   // Pending Approval and Weekly Completion are personal for regular members
@@ -4393,7 +4397,7 @@ function renderKpis(){
   // --- Total Clients ---
   document.getElementById('kpiTotal').textContent = ac.length;
   document.getElementById('totalChips').innerHTML = ac.length
-    ? `<span style="font-size:11px;color:var(--muted-lt);">${active} active</span>${atRisk ? `<span class="pill pill-bad">${atRisk} At risk</span>` : ''}${onboarding ? `<span class="pill pill-mid">${onboarding} Onboarding</span>` : ''}`
+    ? `<span style="font-size:11px;color:var(--green);font-weight:600;">${active} active</span>`
     : '';
   renderTotalClientsDonut();
 
