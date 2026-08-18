@@ -10331,6 +10331,7 @@ function renderQueue(){
   const ac = activeClients();
   syncDateFilterDropdowns();
   updateQueueFilterCounts();
+  updateNotifyBtnState();
   if(!slackChannelsLoaded) loadSlackClientChannels().then(renderQueue);
   if(!ac.length){ el.innerHTML = `<div class="panel">${emptyStateHtml(
     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
@@ -10448,6 +10449,7 @@ function renderTeamQueue(){
       .map(r => r.c)
       .sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
     if(!memberClients.length) return '';
+    const memberHasNewToNotify = activeClients().some(c => c.draftStatus==='pending' && c.readyToNotify!==true && c.improvements.some(i=>i.author===member.name));
     return `<div class="team-queue-section">
       <div class="team-queue-member-head">
         ${teamQueueAvatarHtml(member)}
@@ -10455,7 +10457,7 @@ function renderTeamQueue(){
           <div class="team-queue-member-name">${member.name}</div>
           <div class="team-queue-member-role">${member.title || member.role}</div>
         </div>
-        <button class="btn btn-dark" style="margin-left:auto;flex:none;" onclick="notifyForMember('${member.id}')">Ready to Notify</button>
+        <button class="btn btn-dark" style="margin-left:auto;flex:none;" onclick="notifyForMember('${member.id}')" ${memberHasNewToNotify ? '' : 'disabled title="Nothing new to notify — everything pending for this member has already been flagged."'}>Ready to Notify</button>
       </div>
       <div class="queue-grid">${memberClients.map(c=>queueCardHtml(c)).join('')}</div>
     </div>`;
@@ -10492,6 +10494,7 @@ function notifyForMember(memberId){
   if(!member) return;
   const pending = activeClients().filter(c=>c.draftStatus==='pending' && c.improvements.some(i=>i.author===member.name));
   if(!pending.length){ showToast('info','Nothing pending', `${member.name} has no drafts ready right now.`); return; }
+  if(!pending.some(c=>c.readyToNotify!==true)){ showToast('info','Already notified', `Everything pending for ${member.name} has already been flagged for review.`); return; }
 
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Notify about ${member.name}'s drafts</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
@@ -10995,9 +10998,11 @@ async function generateDraft(id){
   const c = clients.find(x=>x.id===id);
   if(!c) return;
   if(!canGenerateOrRegenerateDraft(c)){
-    showToast('error','Not allowed', c.draft
-      ? 'Only admins, approvers, or contributors to this week\'s work can regenerate this draft.'
-      : 'Only someone who logged this week\'s included improvements can generate the first draft.');
+    showToast('error','Not allowed', (c.draftStatus==='pending' && c.readyToNotify===true && !canApprove())
+      ? "This draft's already been marked ready for approval — an admin or approver needs to act on it before it can be regenerated."
+      : c.draft
+        ? 'Only admins, approvers, or contributors to this week\'s work can regenerate this draft.'
+        : 'Only someone who logged this week\'s included improvements can generate the first draft.');
     return;
   }
   const modalCard = document.querySelector('#appModalOverlay .modal-card');
@@ -11109,6 +11114,12 @@ function iContributedToClientDraft(c){
 }
 
 function canGenerateOrRegenerateDraft(c){
+  // Locked for the original contributor once they've told an approver
+  // it's ready — regenerating out from under someone who's actively
+  // reviewing it would silently change what they're looking at.
+  // Approvers/admins keep full control regardless, since they're the
+  // ones with authority over what happens next.
+  if(c.draftStatus==='pending' && c.readyToNotify===true && !canApprove()) return false;
   if(iContributedToClientDraft(c)) return true;
   if(c.draft) return canApprove();
   return false;
@@ -11501,9 +11512,26 @@ function getNotifyRecipient(){
   return { email: settings.ericEmail, configLabel: "the approver's" };
 }
 
+// True only if at least one pending draft hasn't been marked ready yet —
+// used to disable the Notify button once everything currently pending has
+// already been flagged, so clicking it again can't re-notify approvers
+// about the exact same drafts they already know about.
+function hasNewDraftsToNotify(){
+  return activeClients().some(c => c.draftStatus==='pending' && c.readyToNotify!==true);
+}
+
+function updateNotifyBtnState(){
+  const notifyBtn = document.getElementById('notifyBtn');
+  if(!notifyBtn) return;
+  const hasNew = hasNewDraftsToNotify();
+  notifyBtn.disabled = !hasNew;
+  notifyBtn.title = hasNew ? '' : 'Nothing new to notify — everything pending has already been flagged for review.';
+}
+
 function notifyApprovers(){
   const pending = activeClients().filter(c=>c.draftStatus==='pending');
   if(!pending.length){ showToast('info','Nothing pending', 'No drafts are ready right now.'); return; }
+  if(!hasNewDraftsToNotify()){ showToast('info','Already notified', 'Everything pending has already been flagged for review.'); return; }
 
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Notify about pending drafts</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
