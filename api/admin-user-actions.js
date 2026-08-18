@@ -14,6 +14,7 @@
 //           'create-member' | 'delete-user' | 'toggle-access', ...fields }
 
 const { createClient } = require('@supabase/supabase-js');
+const { sendPushToUser } = require('../lib/push-notify');
 
 function generateTempPassword() {
   const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz';
@@ -143,6 +144,12 @@ module.exports = async function handler(req, res) {
           : `Your request to change your email to ${reqRow.requested_email} was denied.`,
         target_view: 'profile',
       });
+      try{
+        await sendPushToUser(admin, reqRow.user_id,
+          approve ? 'Email change approved' : 'Email change request denied',
+          approve ? `Your email is now ${reqRow.requested_email}.` : `Your request to change your email was denied.`
+        );
+      }catch(e){}
       res.status(200).json({ success: true });
       return;
     }
