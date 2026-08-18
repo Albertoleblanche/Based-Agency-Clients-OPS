@@ -10320,9 +10320,10 @@ function updateQueueFilterCounts(){
 // functions so navigating to a page you haven't visited yet this session
 // never shows a stale value while the cards underneath are already correct.
 function syncDateFilterDropdowns(){
-  Object.values(DATE_FILTER_IDS).forEach(ids=>{
+  Object.entries(DATE_FILTER_IDS).forEach(([prefix, ids])=>{
+    const mode = prefix==='team' ? teamDateFilterMode : dateFilterMode;
     const sel = document.getElementById(ids.select);
-    if(sel && sel.value !== dateFilterMode) sel.value = dateFilterMode;
+    if(sel && sel.value !== mode) sel.value = mode;
   });
 }
 
