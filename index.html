@@ -68,6 +68,8 @@
   body[data-theme="dark"] .ov-mini-cal-dot{background:rgba(232,98,44,.6);}
   body[data-theme="dark"] .ov-mini-cal-day.today .ov-mini-cal-dot{background:#EDEDED;}
   body[data-theme="dark"] .ov-row-dot{opacity:.55 !important;}
+  body[data-theme="dark"] .kanban-card{border:1px solid var(--border);}
+  body[data-theme="dark"] .kanban-column-head{background:var(--bg) !important;}
   *{box-sizing:border-box;}
 
   /* Keyboard focus — was largely missing app-wide before this. Uses
@@ -945,7 +947,7 @@
   .integ-status.off{background:var(--border);color:var(--muted);}
   .settings-field{margin-bottom:12px;}
   .settings-field label{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;}
-  .settings-field input,.settings-field select,.settings-field textarea{width:280px;max-width:100%;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:9px 11px;border-radius:6px;border:1px solid var(--border);}
+  .settings-field input,.settings-field select,.settings-field textarea{width:280px;max-width:100%;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:9px 11px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);}
   .settings-field select{padding-right:30px;background-color:var(--surface-2);color:var(--ink);}
   .options-list{display:flex;flex-wrap:wrap;gap:8px;}
   .option-chip{display:inline-flex;align-items:center;gap:7px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:6px 8px 6px 8px;font-size:12px;color:var(--ink);}
