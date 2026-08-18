@@ -14,6 +14,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { syncGoogleCalendarForUser } = require('../lib/google-calendar-sync');
 const { syncTimeEntryToHarvest } = require('../lib/harvest-sync');
+const { sendPushToUser } = require('../lib/push-notify');
 
 async function notifyDueReminders(admin) {
   const today = new Date().toISOString().slice(0, 10);
@@ -41,6 +42,7 @@ async function notifyDueReminders(admin) {
       body: `You haven't received a response from ${clientName} regarding: "${r.question}"`,
       target_view: 'reminders',
     });
+    try{ await sendPushToUser(admin, r.asked_by, 'Follow-up needed', `${clientName} hasn't responded to: "${r.question}"`); }catch(e){}
     await admin.from('client_reminders').update({ reminder_notified_at: today }).eq('id', r.id);
   }
   return { notified: due.length };
@@ -78,6 +80,7 @@ async function notifyEscalatedReminders(admin) {
         body: `${clientName} hasn't responded in over a week regarding: "${r.question}"`,
         target_view: 'client-detail', target_id: r.client_id,
       });
+      try{ await sendPushToUser(admin, recipient.id, 'Follow-up gone quiet', `${clientName} hasn't responded in over a week to: "${r.question}"`); }catch(e){}
     }
     await admin.from('client_reminders').update({ escalated_at: todayStr }).eq('id', r.id);
   }
