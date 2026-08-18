@@ -10489,24 +10489,68 @@ function teamQueueAvatarHtml(member){
 // role, never revealing who the recipient actually is), but the email
 // content only covers this one person's ready work, not everyone's.
 function notifyForMember(memberId){
-  const recipient = getNotifyRecipient();
-  if(!recipient){ showToast('info','Nobody to notify', "You're the last stop in the chain — nothing further to send."); return; }
-  if(!recipient.email){ showToast('error','Missing email on file', `Add ${recipient.configLabel} email address in Settings first.`); return; }
   const member = teamProfiles.find(p=>p.id===memberId);
   if(!member) return;
   const pending = activeClients().filter(c=>c.draftStatus==='pending' && c.improvements.some(i=>i.author===member.name));
   if(!pending.length){ showToast('info','Nothing pending', `${member.name} has no drafts ready right now.`); return; }
+
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">Notify about ${member.name}'s drafts</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">${pending.length} draft${pending.length!==1?'s':''} ready for review. How do you want to let them know?</p>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="btn btn-brand" onclick="notifyForMemberByEmail('${memberId}')">Send Email</button>
+        <button class="btn btn-outline" onclick="notifyForMemberInternally('${memberId}')">Send Internally</button>
+        <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
+      </div>
+    </div>`, 420);
+}
+
+// Marks this member's pending drafts as ready — the actual signal that
+// makes them visible in Team Queue (see renderTeamQueue()'s readyToNotify
+// filter) — shared by both the email and internal notify paths below,
+// since either one represents genuine intent to notify. Not called on
+// Cancel, since nothing was actually sent in that case.
+function markMemberDraftsReady(member){
+  const pending = activeClients().filter(c=>c.draftStatus==='pending' && c.improvements.some(i=>i.author===member.name));
+  pending.forEach(c => { c.readyToNotify = true; });
+  persistClients().then(()=>renderTeamQueue());
+  return pending;
+}
+
+function notifyForMemberByEmail(memberId){
+  const recipient = getNotifyRecipient();
+  if(!recipient){ closeAppModal(); showToast('info','Nobody to notify by email', "You're the last stop in the chain — try Send Internally instead."); return; }
+  if(!recipient.email){ showToast('error','Missing email on file', `Add ${recipient.configLabel} email address in Settings first.`); return; }
+  const member = teamProfiles.find(p=>p.id===memberId);
+  if(!member) return;
+  const pending = markMemberDraftsReady(member);
   const subject = `${pending.length} update${pending.length!==1?'s':''} from ${member.name} ready for approval`;
   const bodyLines = pending.map(c=>`- ${c.name} (danger ${c.danger}/5, importance ${c.importance}/10)`).join('\n');
   const body = `${member.name}'s client update drafts are ready for review, sorted by danger score:\n\n${bodyLines}\n\nReview and approve here: ${window.location.href}`;
-  // This is what actually makes these drafts show up in Team Queue —
-  // pending drafts stay hidden there until explicitly marked ready, so
-  // approvers only ever see things that genuinely need their attention.
-  pending.forEach(c => { c.readyToNotify = true; });
-  persistClients().then(()=>renderTeamQueue());
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Opened a notification email for ${member.name}'s drafts — ${pending.length} pending.`});
   persistLog().then(renderLog);
   showSendEmailConfirm(recipient.email, subject, body);
+}
+
+// The new in-app alternative to email — notifies every admin/approver
+// directly (excluding whoever's clicking this, same reasoning as the old
+// automatic draft-ready notification: telling someone about their own
+// action is pointless), rather than the single person email escalates to.
+async function notifyForMemberInternally(memberId){
+  const member = teamProfiles.find(p=>p.id===memberId);
+  if(!member) return;
+  const pending = markMemberDraftsReady(member);
+  const approvers = teamProfiles.filter(p => (p.role==='admin' || p.role==='approver') && p.id !== currentUser?.id);
+  if(!approvers.length){ showToast('info','Nobody to notify', 'No other admins or approvers on the team yet.'); return; }
+  for(const approver of approvers){
+    await sendNotification(approver.id, 'draft_ready', `${member.name}'s drafts ready for approval`,
+      `${pending.length} client update draft${pending.length!==1?'s':''} from ${member.name} ${pending.length!==1?'are':'is'} ready for review.`, 'teamqueue');
+  }
+  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Notified the team internally about ${member.name}'s drafts — ${pending.length} pending.`});
+  persistLog().then(renderLog);
+  closeAppModal();
+  showToast('success','Team notified', `${approvers.length} admin${approvers.length!==1?'s':''}/approver${approvers.length!==1?'s':''} notified in-app.`);
 }
 
 // Shared by Approval Queue and Team Queue — same card, same meaning,
