@@ -69,7 +69,8 @@
   body[data-theme="dark"] .ov-mini-cal-day.today .ov-mini-cal-dot{background:#dbdbdb;}
   body[data-theme="dark"] .ov-row-dot{opacity:.55 !important;}
   body[data-theme="dark"] .kanban-card{border:1px solid var(--border);}
-  body[data-theme="dark"] .kanban-column-head{background:var(--bg) !important;}
+  body[data-theme="dark"] .ov-health-track{height:5.5px;}
+  body[data-theme="dark"] .ov-health-fill{background:var(--health-fill-color, var(--green)) !important;box-shadow:none !important;}
   *{box-sizing:border-box;}
 
   /* Keyboard focus — was largely missing app-wide before this. Uses
@@ -5989,7 +5990,7 @@ function renderReminders(){
     const stageReminders = visible.filter(r=>reminderDisplayStatus(r)===stage.key)
       .sort((a,b)=> (a.followUpDate||'').localeCompare(b.followUpDate||''));
     return `<div class="kanban-column">
-      <div class="kanban-column-head" style="background:${stage.color}22;">
+      <div class="kanban-column-head" style="background:${stage.color}22;border:1px solid ${stage.color}66;">
         <span class="kanban-column-icon" style="color:${stage.color};">${stage.icon}</span>
         <span class="kanban-column-title">${stage.label}</span>
         <span class="kanban-column-count">${stageReminders.length}</span>
@@ -6432,7 +6433,7 @@ function renderNotes(){
     const stageNotes = visible.filter(n=>n.status===stage.key)
       .sort((a,b)=> new Date(b.updatedAt||b.createdAt) - new Date(a.updatedAt||a.createdAt));
     return `<div class="kanban-column">
-      <div class="kanban-column-head" style="background:${stage.color}22;">
+      <div class="kanban-column-head" style="background:${stage.color}22;border:1px solid ${stage.color}66;">
         <span class="kanban-column-icon" style="color:${stage.color};">${stage.icon}</span>
         <span class="kanban-column-title">${stage.label}</span>
         <span class="kanban-column-count">${stageNotes.length}</span>
@@ -6573,7 +6574,7 @@ function renderTasks(){
       return new Date(b.createdAt) - new Date(a.createdAt);
     });
     return `<div class="kanban-column">
-      <div class="kanban-column-head" style="background:${stage.color}22;">
+      <div class="kanban-column-head" style="background:${stage.color}22;border:1px solid ${stage.color}66;">
         <span class="kanban-column-icon" style="color:${stage.color};">${stage.icon}</span>
         <span class="kanban-column-title">${stage.label}</span>
         <span class="kanban-column-count">${stageTasks.length}</span>
