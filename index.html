@@ -2530,9 +2530,12 @@ async function safeSet(key, value){
 async function safeGetPersonal(key){ try{ return localStorage.getItem('bda_'+key); }catch(e){ return null; } }
 async function safeSetPersonal(key, value){ try{ localStorage.setItem('bda_'+key, value); return true; }catch(e){ return false; } }
 
-/* ---------- Theme (always light — the toggle was removed in favor of the tour button) ---------- */
+/* ---------- Theme ---------- */
 async function initTheme(){
-  document.body.dataset.theme = 'light';
+  try{
+    if(localStorage.getItem('bda_theme') === 'dark') document.body.dataset.theme = 'dark';
+    else delete document.body.dataset.theme;
+  }catch(e){ delete document.body.dataset.theme; }
 }
 
 function toggleSidebar(){
