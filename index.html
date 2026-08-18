@@ -51,11 +51,17 @@
   }
   body[data-theme="dark"]{
     --bg:#000000; --sidebar:#000000; --sidebar-hover:rgba(232,98,44,.14); --sidebar-active:rgba(232,98,44,.22);
-    --card:#0F0F0F; --surface-2:#161616; --border:#2E2E2E; --ink:#EDEDED; --muted:#A1A1A1; --muted-lt:#757575;
+    --card:#0A0A0A; --surface-2:#161616; --border:#2E2E2E; --ink:#EDEDED; --muted:#A1A1A1; --muted-lt:#757575;
     --brand:#E8622C; --brand-dark:#F27B49; --brand-bg:#2A1C14;
     --green:#3ECF7E; --green-bg:#12261B; --red:#F0685F; --red-bg:#2A1414; --amber:#E5B04B; --amber-bg:#2A2314;
     --shadow:0 1px 2px rgba(0,0,0,.3), 0 1px 3px rgba(0,0,0,.4);
   }
+  /* Overview KPI cards use inline style="background:#COLOR22" for their
+     colored banner headers — 7 separate inline occurrences, so a single
+     !important override here is safer than editing each one individually
+     (some duplicated, easy to miss one). */
+  body[data-theme="dark"] .ov-card-title-row{background:transparent !important;}
+  body[data-theme="dark"] .panel-title, body[data-theme="dark"] .ov-card-title{color:#A8A8AC;}
   *{box-sizing:border-box;}
 
   /* Keyboard focus — was largely missing app-wide before this. Uses
