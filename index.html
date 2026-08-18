@@ -3057,9 +3057,8 @@ function switchTrashTab(name){
 function applyRoleVisibility(){
   const notifyBtn = document.getElementById('notifyBtn');
   if(notifyBtn){
-    const recipient = getNotifyRecipient();
-    if(recipient){ notifyBtn.style.display = 'inline-flex'; notifyBtn.textContent = 'Ready to Notify'; }
-    else { notifyBtn.style.display = 'none'; }
+    notifyBtn.style.display = 'inline-flex';
+    notifyBtn.textContent = 'Ready to Notify';
   }
   const teamQueueNavItem = document.getElementById('teamQueueNavItem');
   if(teamQueueNavItem){
@@ -11503,16 +11502,57 @@ function getNotifyRecipient(){
 }
 
 function notifyApprovers(){
-  const recipient = getNotifyRecipient();
-  if(!recipient){ showToast('info','Nobody to notify', "You're the last stop in the chain — nothing further to send."); return; }
-  if(!recipient.email){ showToast('error','Missing email on file', `Add ${recipient.configLabel} email address in Settings first.`); return; }
   const pending = activeClients().filter(c=>c.draftStatus==='pending');
+  if(!pending.length){ showToast('info','Nothing pending', 'No drafts are ready right now.'); return; }
+
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">Notify about pending drafts</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">${pending.length} draft${pending.length!==1?'s':''} ready for review. How do you want to let them know?</p>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="btn btn-brand" onclick="notifyApproversByEmail()">Send Email</button>
+        <button class="btn btn-outline" onclick="notifyApproversInternally()">Send Internally</button>
+        <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
+      </div>
+    </div>`, 420);
+}
+
+// Marks every currently-pending client as ready — the team-wide
+// counterpart to markMemberDraftsReady() above, used by this general
+// Notify button rather than the per-member one, since this covers
+// everyone's pending work at once, not one person's.
+function markAllPendingDraftsReady(){
+  const pending = activeClients().filter(c=>c.draftStatus==='pending');
+  pending.forEach(c => { c.readyToNotify = true; });
+  persistClients().then(()=>renderTeamQueue());
+  return pending;
+}
+
+function notifyApproversByEmail(){
+  const recipient = getNotifyRecipient();
+  if(!recipient){ closeAppModal(); showToast('info','Nobody to notify by email', "You're the last stop in the chain — try Send Internally instead."); return; }
+  if(!recipient.email){ showToast('error','Missing email on file', `Add ${recipient.configLabel} email address in Settings first.`); return; }
+  const pending = markAllPendingDraftsReady();
   const subject = `${pending.length} client update${pending.length!==1?'s':''} ready for approval`;
-  const bodyLines = pending.length ? pending.map(c=>`- ${c.name} (danger ${c.danger}/5, importance ${c.importance}/10)`).join('\n') : 'No drafts are ready yet.';
+  const bodyLines = pending.map(c=>`- ${c.name} (danger ${c.danger}/5, importance ${c.importance}/10)`).join('\n');
   const body = `This week's client update drafts are ready for review, sorted by danger score:\n\n${bodyLines}\n\nReview and approve here: ${window.location.href}`;
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Opened a notification email — ${pending.length} draft${pending.length!==1?'s':''} pending.`});
   persistLog().then(renderLog);
   showSendEmailConfirm(recipient.email, subject, body);
+}
+
+async function notifyApproversInternally(){
+  const pending = markAllPendingDraftsReady();
+  const approvers = teamProfiles.filter(p => (p.role==='admin' || p.role==='approver') && p.id !== currentUser?.id);
+  if(!approvers.length){ showToast('info','Nobody to notify', 'No other admins or approvers on the team yet.'); return; }
+  for(const approver of approvers){
+    await sendNotification(approver.id, 'draft_ready', `${pending.length} draft${pending.length!==1?'s':''} ready for approval`,
+      `${pending.length} client update draft${pending.length!==1?'s':''} ${pending.length!==1?'are':'is'} ready for review.`, 'teamqueue');
+  }
+  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Notified the team internally — ${pending.length} draft${pending.length!==1?'s':''} pending.`});
+  persistLog().then(renderLog);
+  closeAppModal();
+  showToast('success','Team notified', `${approvers.length} admin${approvers.length!==1?'s':''}/approver${approvers.length!==1?'s':''} notified in-app.`);
 }
 
 // Shows exactly what the Wednesday automation would send right now — same
