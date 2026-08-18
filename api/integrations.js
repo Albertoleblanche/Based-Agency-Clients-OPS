@@ -130,7 +130,12 @@ module.exports = async function handler(req, res) {
     if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
     const { action } = req.body || {};
 
-    const adminActions = ['connect', 'disconnect', 'get-projects', 'save-client-mapping', 'save-service-mapping', 'sync-now'];
+    const isApprover = isAdmin || profile?.role === 'approver';
+    if (action === 'get-projects' && !isApprover) {
+      res.status(403).json({ error: 'Only admins and approvers can view Harvest mappings.' });
+      return;
+    }
+    const adminActions = ['connect', 'disconnect', 'save-client-mapping', 'save-service-mapping', 'sync-now'];
     if (adminActions.includes(action) && !isAdmin) {
       res.status(403).json({ error: 'Only admins can manage the Harvest connection.' });
       return;
