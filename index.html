@@ -2142,13 +2142,15 @@ document.addEventListener('DOMContentLoaded', function(){
             </div>
           </div>
         </div>
-        <div class="panel">
-          <div class="panel-head"><span class="panel-title">Harvest Time Sync</span></div>
-          <div class="panel-body" id="harvestPanelBody">Loading…</div>
-        </div>
-        <div class="panel">
-          <div class="panel-head"><span class="panel-title">Slack Client Channels</span></div>
-          <div class="panel-body" id="slackChannelsPanelBody">Loading…</div>
+        <div id="approverOnlyIntegrations" style="display:none;">
+          <div class="panel">
+            <div class="panel-head"><span class="panel-title">Harvest Time Sync</span></div>
+            <div class="panel-body" id="harvestPanelBody">Loading…</div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><span class="panel-title">Slack Client Channels</span></div>
+            <div class="panel-body" id="slackChannelsPanelBody">Loading…</div>
+          </div>
         </div>
       </div>
 
@@ -3298,7 +3300,11 @@ function switchSettingsTab(name){
   document.querySelectorAll('#view-settings .settings-subview').forEach(v=>v.classList.remove('active'));
   document.getElementById('stab-'+name).classList.add('active');
   if(name==='notifications') renderNotificationPrefs();
-  if(name==='integrations'){ loadHarvestPanel(); loadSlackChannelsPanel(); }
+  if(name==='integrations'){
+    const approverOnly = document.getElementById('approverOnlyIntegrations');
+    if(approverOnly) approverOnly.style.display = canApprove() ? 'block' : 'none';
+    if(canApprove()){ loadHarvestPanel(); loadSlackChannelsPanel(); }
+  }
 }
 
 async function harvestApiCall(action, body){
@@ -3319,16 +3325,18 @@ async function loadSlackChannelsPanel(){
   if(!el) return;
   if(!slackChannelsLoaded) await loadSlackClientChannels();
   const sortedClients = activeClients().sort((a,b)=>a.name.localeCompare(b.name));
+  const canEdit = isAdmin();
   el.innerHTML = `
     <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.6;">
       Map each client to the Slack channel bridged to their WhatsApp group. Paste the <b>channel ID</b> (found in that channel's own details in Slack, not its name) — the bot needs to already be invited to it.
+      ${!canEdit ? '<br><br><b>Admins only can add or change mappings</b> — you can see what\'s already set up here.' : ''}
     </p>
     ${sortedClients.map(c=>{
       const mapping = slackClientChannels[c.id];
       return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F5F6F8;">
         <span style="flex:1;font-size:13px;font-weight:600;">${escapeHtml(c.name)}</span>
-        <input type="text" id="slackChanInput-${c.id}" placeholder="C0123456789" value="${mapping ? escapeHtml(mapping.channelId) : ''}" style="flex:1;font-size:12.5px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);font-family:monospace;">
-        <button class="btn btn-outline" style="flex:none;padding:6px 10px;min-height:auto;font-size:11.5px;" onclick="saveSlackChannelMapping('${c.id}')">Save</button>
+        <input type="text" id="slackChanInput-${c.id}" placeholder="C0123456789" value="${mapping ? escapeHtml(mapping.channelId) : ''}" ${canEdit ? '' : 'disabled'} style="flex:1;font-size:12.5px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);font-family:monospace;${canEdit ? '' : 'background:var(--surface-2);color:var(--muted);'}">
+        ${canEdit ? `<button class="btn btn-outline" style="flex:none;padding:6px 10px;min-height:auto;font-size:11.5px;" onclick="saveSlackChannelMapping('${c.id}')">Save</button>` : ''}
       </div>`;
     }).join('') || '<p style="font-size:12px;color:var(--muted-lt);">No active clients yet.</p>'}
   `;
@@ -3361,9 +3369,10 @@ async function loadHarvestPanel(){
   let status;
   try{ status = await harvestApiCall(null); }
   catch(e){ el.innerHTML = `<p style="color:var(--red);font-size:12.5px;">${escapeHtml(e.message)}</p>`; return; }
+  const canEdit = isAdmin();
 
   if(!status.connected){
-    el.innerHTML = `
+    el.innerHTML = canEdit ? `
       <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.6;">
         Connect your team's Harvest account so time logged here also lands in Harvest. Generate a Personal Access Token from Harvest ID's <b>Developers</b> section — you'll get the token and your Account ID together.
       </p>
@@ -3371,7 +3380,7 @@ async function loadHarvestPanel(){
       <div class="settings-field"><label>Account ID</label><input id="harvestAccountIdInput" placeholder="e.g. 1234567"></div>
       <button class="btn btn-brand" onclick="connectHarvest()" id="harvestConnectBtn">Connect Harvest</button>
       <p id="harvestConnectError" style="font-size:11.5px;color:var(--red);margin-top:8px;"></p>
-    `;
+    ` : `<p style="font-size:12px;color:var(--muted-lt);">Harvest isn't connected yet — an admin needs to set this up.</p>`;
     return;
   }
 
@@ -3383,15 +3392,18 @@ async function loadHarvestPanel(){
     <p style="font-size:11.5px;color:var(--muted-lt);margin:8px 0 14px;">
       ${status.lastSyncedAt ? `Last catch-up sync: ${new Date(status.lastSyncedAt).toLocaleString()}` : 'No catch-up sync has run yet — new entries still sync individually as they\'re logged.'}
     </p>
+    ${canEdit ? `
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
       <button class="btn btn-outline" onclick="syncHarvestNow()" id="harvestSyncNowBtn">Sync Now</button>
       <button class="btn btn-outline" style="color:var(--red);" onclick="disconnectHarvest()">Disconnect</button>
     </div>
     <p id="harvestSyncNowStatus" style="font-size:11.5px;color:var(--muted-lt);margin-bottom:16px;"></p>
+    ` : ''}
 
     <div style="padding-top:16px;border-top:1px solid #F0F1F4;">
       <p style="font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.6;">
         Map each client to its Harvest project, and each service to a Harvest task. Entries for anything unmapped stay queued — connecting the mapping catches them up automatically, no need to re-log anything.
+        ${!canEdit ? '<br><br><b>Admins only can add or change mappings</b> — you can see what\'s already set up here.' : ''}
       </p>
       <div id="harvestMappingBody">Loading projects and tasks from Harvest…</div>
     </div>
@@ -3458,12 +3470,14 @@ async function loadHarvestMappingUI(){
     `<option value="${t.id}" ${String(t.id)===String(selectedId)?'selected':''}>${escapeHtml(t.name)}</option>`
   ).join('');
 
+  const canEdit = isAdmin();
+
   el.innerHTML = `
     <div style="font-size:11.5px;font-weight:700;color:var(--muted-lt);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Clients → Harvest Projects</div>
     ${activeClients.map(c=>`
       <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F5F6F8;">
         <span style="flex:1;font-size:13px;font-weight:600;">${escapeHtml(c.name)}</span>
-        <select style="flex:1;font-size:12.5px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);" onchange="saveHarvestClientMapping('${c.id}', this.value, this.options[this.selectedIndex].text)">
+        <select ${canEdit ? '' : 'disabled'} style="flex:1;font-size:12.5px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);${canEdit ? '' : 'background:var(--surface-2);color:var(--muted);'}" onchange="saveHarvestClientMapping('${c.id}', this.value, this.options[this.selectedIndex].text)">
           ${projectOptions(clientMap[c.id])}
         </select>
       </div>`).join('') || '<p style="font-size:12px;color:var(--muted-lt);">No active clients yet.</p>'}
@@ -3472,7 +3486,7 @@ async function loadHarvestMappingUI(){
     ${usedServices.map(svc=>`
       <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F5F6F8;">
         <span style="flex:1;font-size:13px;font-weight:600;">${escapeHtml(svc)}</span>
-        <select style="flex:1;font-size:12.5px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);" onchange="saveHarvestServiceMapping('${svc.replace(/'/g,"\\'")}', this.value, this.options[this.selectedIndex].text)">
+        <select ${canEdit ? '' : 'disabled'} style="flex:1;font-size:12.5px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);${canEdit ? '' : 'background:var(--surface-2);color:var(--muted);'}" onchange="saveHarvestServiceMapping('${svc.replace(/'/g,"\\'")}', this.value, this.options[this.selectedIndex].text)">
           ${taskOptions(serviceMap[svc])}
         </select>
       </div>`).join('') || '<p style="font-size:12px;color:var(--muted-lt);">No time entries with a service set yet — services appear here once someone logs time with one.</p>'}
