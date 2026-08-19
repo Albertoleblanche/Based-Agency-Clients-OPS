@@ -114,10 +114,17 @@ async function handleTaskSlashCommand(req, res, rawBody, admin) {
   }
 
   const { assigneeSlackId, dueDate, title } = parseTaskCommandText(text);
-  if (!assigneeSlackId || !title) {
+  if (!assigneeSlackId) {
     res.status(200).json({
       response_type: 'ephemeral',
-      text: 'Usage: `/task @person the task title` — optionally add `due:2026-08-25`, `due:today`, or `due:tomorrow`.',
+      text: "I didn't find a real mention in there — type `@` and pick someone from the popup list Slack shows you, rather than typing their name as plain text. Example: `/task @ (then select someone) the task title`.",
+    });
+    return;
+  }
+  if (!title) {
+    res.status(200).json({
+      response_type: 'ephemeral',
+      text: 'Got the mention, but no task title — add some text after it, like `/task @colleague finish the client deck`.',
     });
     return;
   }
