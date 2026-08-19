@@ -63,6 +63,10 @@
   body[data-theme="dark"] .ov-card-title-row{background:transparent !important;border-bottom:1px solid var(--border);}
   body[data-theme="dark"] .ov-mini-cal-head{background:transparent !important;border-bottom:1px solid var(--border);}
   body[data-theme="dark"] .panel-title, body[data-theme="dark"] .ov-card-title, body[data-theme="dark"] .ov-card-icon{color:#A8A8AC !important;}
+  body[data-theme="dark"] .xy-chart-title, body[data-theme="dark"] .donut-card-head{color:#A8A8AC !important;}
+  body[data-theme="dark"] .donut-card-head{border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:14px;}
+  body[data-theme="dark"] .xy-chart-header{border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:14px;}
+  body[data-theme="dark"] #serviceBreakdownStats .donut-stat-label{font-size:13px;}
   body[data-theme="dark"] .ov-mini-cal-day.today{background:rgba(232,98,44,.35);color:#dbdbdb;}
   body[data-theme="dark"] .ov-mini-cal-day.today:hover{background:rgba(232,98,44,.35);}
   body[data-theme="dark"] .ov-mini-cal-dot{background:rgba(232,98,44,.6);}
@@ -399,7 +403,7 @@
 
   .donut-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px;box-shadow:0 1px 2px rgba(16,24,40,.03);display:flex;flex-direction:column;align-items:center;}
   .donut-card:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(16,24,40,.08);border-color:var(--border);}
-  .donut-card-head{font-size:12.5px;font-weight:600;color:var(--muted);align-self:flex-start;text-transform:capitalize;}
+  .donut-card-head{font-size:12.5px;font-weight:600;color:var(--muted);align-self:flex-start;text-transform:capitalize;display:flex;align-items:center;gap:10px;}
   .donut-wrap{position:relative;width:150px;height:150px;margin:6px auto;}
   /* Service Breakdown is now a bar list, not an SVG ring — needs full
      width and auto height, unlike the shared .donut-wrap default which
@@ -1882,9 +1886,12 @@ document.addEventListener('DOMContentLoaded', function(){
           <div class="panel">
             <div class="panel-body">
               <div class="xy-chart-header">
-                <div>
-                  <div class="xy-chart-title">Hours Over Time</div>
-                  <div class="xy-chart-updated" id="reportChartUpdated"></div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <span class="ov-card-icon" style="background:var(--surface-2);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span>
+                  <div>
+                    <div class="xy-chart-title">Hours Over Time</div>
+                    <div class="xy-chart-updated" id="reportChartUpdated"></div>
+                  </div>
                 </div>
                 <div class="view-toggle" id="reportChartGranularityToggle">
                   <div class="view-toggle-option active" data-g="day" onclick="setReportChartGranularity('day')">Day</div>
@@ -1898,7 +1905,10 @@ document.addEventListener('DOMContentLoaded', function(){
           </div>
 
           <div class="donut-card kpi-click" onclick="switchReportTab('services')">
-            <div class="donut-card-head">Service Breakdown</div>
+            <div class="donut-card-head">
+              <span class="ov-card-icon" style="background:var(--surface-2);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+              Service Breakdown
+            </div>
             <div class="donut-wrap" id="serviceBreakdownDonut"></div>
             <div class="donut-legend" id="serviceBreakdownLegend"></div>
             <div class="donut-stats" id="serviceBreakdownStats"></div>
@@ -11030,11 +11040,9 @@ function renderServiceBreakdownDonut(entries){
   if(legend) legend.innerHTML = '';
 
   if(statsEl){
-    const topService = sorted[0];
     const servicesTracked = Object.keys(grouped).length;
     const avgPerService = Math.round(totalMinutes / servicesTracked);
     statsEl.innerHTML = `
-      <div class="donut-stat-row"><span class="donut-stat-label">Top Service</span><span class="donut-stat-val">${topService[0]}</span></div>
       <div class="donut-stat-row"><span class="donut-stat-label">Services Tracked</span><span class="donut-stat-val">${servicesTracked}</span></div>
       <div class="donut-stat-row"><span class="donut-stat-label">Avg Hours/Service</span><span class="donut-stat-val">${formatMinutes(avgPerService)}</span></div>`;
   }
