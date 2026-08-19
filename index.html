@@ -60,8 +60,8 @@
      colored banner headers — 7 separate inline occurrences, so a single
      !important override here is safer than editing each one individually
      (some duplicated, easy to miss one). */
-  body[data-theme="dark"] .ov-card-title-row{background:transparent !important;border-bottom:1px solid var(--border);}
-  body[data-theme="dark"] .ov-mini-cal-head{background:transparent !important;border-bottom:1px solid var(--border);}
+  body[data-theme="dark"] .ov-card-title-row{background:transparent !important;border-bottom:1px solid var(--border);border-radius:0;}
+  body[data-theme="dark"] .ov-mini-cal-head{background:transparent !important;border-bottom:1px solid var(--border);border-radius:0;}
   body[data-theme="dark"] .panel-title, body[data-theme="dark"] .ov-card-title, body[data-theme="dark"] .ov-card-icon{color:#A8A8AC !important;}
   body[data-theme="dark"] .xy-chart-title, body[data-theme="dark"] .donut-card-head{color:#A8A8AC !important;}
   body[data-theme="dark"] .donut-card-head{border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:14px;}
@@ -74,6 +74,13 @@
   body[data-theme="dark"] .ov-row-dot{opacity:.55 !important;}
   body[data-theme="dark"] .kanban-card{border:1px solid var(--border);}
   body[data-theme="dark"] .q-bulk-list li{font-size:13px;color:#dbdbdb;}
+  body[data-theme="dark"] textarea{background:var(--card);color:var(--ink);}
+  body[data-theme="dark"] ::-webkit-scrollbar{width:9px;height:9px;}
+  body[data-theme="dark"] ::-webkit-scrollbar-track{background:transparent;}
+  body[data-theme="dark"] ::-webkit-scrollbar-thumb{background:#3a3a3c;border-radius:20px;border:2px solid transparent;background-clip:padding-box;}
+  body[data-theme="dark"] ::-webkit-scrollbar-thumb:hover{background:#4a4a4d;}
+  body[data-theme="dark"] ::-webkit-scrollbar-corner{background:transparent;}
+  body[data-theme="dark"]{scrollbar-width:thin;scrollbar-color:#3a3a3c transparent;}
   body[data-theme="dark"] .settings-tab.active{color:var(--brand) !important;}
   body[data-theme="dark"] .filter-pill.active{background:#dedede !important;border-color:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(0, 0, 0, 0.5) !important;}
   body[data-theme="dark"] .pagination-btn.active{background:#dedede !important;border-color:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(0, 0, 0, 0.5) !important;}
@@ -2146,7 +2153,7 @@ document.addEventListener('DOMContentLoaded', function(){
             <p style="font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.6;">
               Tell the AI exactly how you want <b>your own</b> client emails structured — greeting style, paragraph order, sign-off, tone, length, anything. This is personal to you — it only applies to drafts you generate, and nobody else's drafts are affected by it, the same way nobody else's changes here affect yours. A few rules always apply no matter what you write here: every improvement must be described as a specific, measurable deliverable (never vague claims), and nothing that could make the agency look bad.
             </p>
-            <textarea id="emailInstructions" placeholder="Example:&#10;- Open with 'Hi [Client First Name],'&#10;- First paragraph: one-sentence summary of the week&#10;- Second paragraph: bulleted list of specific deliverables completed&#10;- Third paragraph (only if relevant): what's planned next week&#10;- Close with: 'Nothing needed from you — reach out anytime with questions.'&#10;- Sign off: 'The Based Agency Team'&#10;- Keep it under 150 words total" style="width:100%;min-height:160px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:12px;border-radius:8px;border:1px solid var(--border);resize:vertical;"></textarea>
+            <textarea id="emailInstructions" placeholder="Example:&#10;- Open with 'Hi [Client First Name],'&#10;- First paragraph: one-sentence summary of the week&#10;- Second paragraph: bulleted list of specific deliverables completed&#10;- Third paragraph (only if relevant): what's planned next week&#10;- Close with: 'Nothing needed from you — reach out anytime with questions.'&#10;- Sign off: 'The Based Agency Team'&#10;- Keep it under 150 words total" style="width:100%;min-height:160px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:12px;border-radius:8px;border:1px solid var(--border);resize:vertical;background:var(--card);color:var(--ink);"></textarea>
             <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
               <button class="btn btn-brand" onclick="saveEmailInstructions()">Save instructions</button>
               <span id="emailInstructionsStatus" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;color:var(--muted-lt);"></span>
@@ -2183,7 +2190,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
             <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
               <p style="font-size:12px;color:var(--muted);margin:0 0 10px;line-height:1.5;">If publishing to web isn't an option, paste the sheet's cells directly (select all in Sheets, copy, paste here):</p>
-              <textarea id="csvPasteArea" placeholder="Name,Email,Service,Status,Importance,Danger,SOW&#10;Premium Homes,contact@premiumhomes.com,SEO,Active,4,2,Bathroom remodels" style="width:100%;min-height:90px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11.5px;padding:10px;border-radius:6px;border:1px solid var(--border);"></textarea>
+              <textarea id="csvPasteArea" placeholder="Name,Email,Service,Status,Importance,Danger,SOW&#10;Premium Homes,contact@premiumhomes.com,SEO,Active,4,2,Bathroom remodels" style="width:100%;min-height:90px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11.5px;padding:10px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);"></textarea>
               <div style="margin-top:8px;"><button class="btn btn-outline" onclick="importPastedCsv()">Import pasted data</button></div>
             </div>
 
