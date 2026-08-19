@@ -3736,7 +3736,7 @@ function setAttentionTierFilter(tier){
 function renderAttentionList(){
   const el = document.getElementById('attentionList');
   if(!el) return;
-  const hasOverdueReminder = c => clientReminders.some(r=>r.clientId===c.id && reminderDisplayStatus(r)==='due');
+  const hasOverdueReminder = c => clientReminders.some(r=>r.clientId===c.id && r.askedBy===currentUser?.id && reminderDisplayStatus(r)==='due');
   let items = attentionEligibleClients().filter(c => c.danger>=4 || c.draftStatus==='pending' || hasOverdueReminder(c));
   if(attentionTierFilter) items = attentionEligibleClients().filter(c => riskLabel(c.danger).text === attentionTierFilter);
   items.sort((a,b)=> b.danger-a.danger || (b.draftStatus==='pending')-(a.draftStatus==='pending'));
