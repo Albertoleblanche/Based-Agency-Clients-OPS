@@ -2521,6 +2521,33 @@ let clients = [];
 // trashed client's name correctly. Anywhere building a list, dropdown, or
 // aggregate for active work should use this instead.
 function activeClients(){ return clients.filter(c=>!c.deletedAt); }
+function isClientPaused(clientId){
+  const c = clients.find(x=>x.id===clientId);
+  return !!(c && c.status==='Paused');
+}
+function showPausedClientWarning(clientId){
+  const c = clients.find(x=>x.id===clientId);
+  openAppModal(`
+    <div class="modal-body" style="text-align:center;padding:8px 4px 4px;">
+      <div style="width:44px;height:44px;border-radius:50%;background:var(--amber-bg);color:var(--amber);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+      </div>
+      <div style="font-size:15px;font-weight:600;color:var(--ink);margin-bottom:6px;">${c ? c.name : 'This client'} is on pause</div>
+      <div style="font-size:13px;color:var(--muted-lt);line-height:1.5;max-width:320px;margin:0 auto;">There's nothing to log here right now — no active work means nothing to track. If that doesn't sound right, an admin can fill you in.</div>
+    </div>
+    <div class="modal-actions" style="justify-content:center;">
+      <button class="btn btn-brand" onclick="closeAppModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Sounds good</button>
+    </div>`, 380);
+}
+// Paused clients are still real clients (still listed, still selectable,
+// still editable) — they just shouldn't pull attention toward doing new
+// work on them. This is deliberately narrower than activeClients() and
+// only used at the handful of places that actually signal "you should
+// work on this" (Needs Attention, the Risk Breakdown ring, Client Health,
+// pending-approval badges) — not at the many other activeClients() call
+// sites like client-picker dropdowns or duplicate-name checks, where a
+// paused client still needs to be findable.
+function attentionEligibleClients(){ return activeClients().filter(c=>c.status!=='Paused'); }
 let log = [];
 let notes = [];
 let notesDataLoaded = false;
@@ -3719,8 +3746,8 @@ function renderAttentionList(){
   const el = document.getElementById('attentionList');
   if(!el) return;
   const hasOverdueReminder = c => clientReminders.some(r=>r.clientId===c.id && reminderDisplayStatus(r)==='due');
-  let items = activeClients().filter(c => c.danger>=4 || c.draftStatus==='pending' || hasOverdueReminder(c));
-  if(attentionTierFilter) items = activeClients().filter(c => riskLabel(c.danger).text === attentionTierFilter);
+  let items = attentionEligibleClients().filter(c => c.danger>=4 || c.draftStatus==='pending' || hasOverdueReminder(c));
+  if(attentionTierFilter) items = attentionEligibleClients().filter(c => riskLabel(c.danger).text === attentionTierFilter);
   items.sort((a,b)=> b.danger-a.danger || (b.draftStatus==='pending')-(a.draftStatus==='pending'));
   if(!items.length){
     const title = attentionTierFilter ? `No clients in "${attentionTierFilter}"` : 'Nothing urgent right now';
@@ -4428,6 +4455,12 @@ async function saveClientForm(){
 function renderKpis(){
   const ac = activeClients();
   const active = ac.filter(c=>c.status==='Active').length;
+  // Used for the metrics below that signal "you should work on this" —
+  // pending-approval badges and Client Health — so a paused client's
+  // draft or danger score doesn't nag anyone into action. Total Clients
+  // above still uses the full ac, since paused clients are still real,
+  // countable clients on the roster.
+  const aec = attentionEligibleClients();
   const me = myName();
   const admin = isAdmin();
   // Pending Approval and Weekly Completion are personal for regular members
@@ -4436,17 +4469,17 @@ function renderKpis(){
   // Total Clients and Client Health stay roster-wide regardless of role,
   // since this app has no "my clients" ownership concept to scope them by.
   const pending = admin
-    ? ac.filter(c=>c.draftStatus==='pending').length
-    : ac.filter(c=>c.draftStatus==='pending' && c.improvements.some(i=>i.author===me)).length;
+    ? aec.filter(c=>c.draftStatus==='pending').length
+    : aec.filter(c=>c.draftStatus==='pending' && c.improvements.some(i=>i.author===me)).length;
   // Approval Queue is personal now — the sidebar badge needs to match what
   // that page actually shows, not every pending draft on the whole roster.
-  const myPending = ac.filter(c=>c.draftStatus==='pending' && c.improvements.filter(i=>improvementInDateRange(i, false)).some(i=>i.author===me)).length;
+  const myPending = aec.filter(c=>c.draftStatus==='pending' && c.improvements.filter(i=>improvementInDateRange(i, false)).some(i=>i.author===me)).length;
   document.getElementById('navPendingBadge').textContent = myPending;
   // Team Queue shows every pending draft team-wide, not scoped by author —
   // its badge needs to match that, same way Approval Queue's badge above
   // matches its own personal scope.
   const teamPendingBadge = document.getElementById('navTeamPendingBadge');
-  if(teamPendingBadge) teamPendingBadge.textContent = ac.filter(c=>c.draftStatus==='pending').length;
+  if(teamPendingBadge) teamPendingBadge.textContent = aec.filter(c=>c.draftStatus==='pending').length;
 
   // --- Total Clients ---
   document.getElementById('kpiTotal').textContent = ac.length;
@@ -4455,18 +4488,20 @@ function renderKpis(){
     : '';
   renderTotalClientsDonut();
 
-  // --- Client Health: inverse of average danger score across the roster, as a % ---
+  // --- Client Health: inverse of average danger score, excluding paused clients
+  //     (a paused client's risk score shouldn't drag the whole team's health
+  //     signal down or up — no one should be acting on it either way) ---
   let healthPct = 0;
-  if(ac.length){
-    const avgDanger = ac.reduce((s,c)=>s+c.danger,0) / ac.length;
+  if(aec.length){
+    const avgDanger = aec.reduce((s,c)=>s+c.danger,0) / aec.length;
     healthPct = Math.round(100 - (avgDanger/5)*100);
   }
-  document.getElementById('kpiHealth').textContent = ac.length ? healthPct + '%' : '—';
+  document.getElementById('kpiHealth').textContent = aec.length ? healthPct + '%' : '—';
   const healthTier = healthPct>=70 ? {cls:'pill-good',label:'Healthy',color:'#117F3A'} : healthPct>=40 ? {cls:'pill-mid',label:'Needs attention',color:'#A65B05'} : {cls:'pill-bad',label:'Critical',color:'#CF2424'};
-  document.getElementById('healthChips').innerHTML = ac.length ? `<span class="pill ${healthTier.cls}">${healthTier.label}</span>` : '';
+  document.getElementById('healthChips').innerHTML = aec.length ? `<span class="pill ${healthTier.cls}">${healthTier.label}</span>` : '';
   const healthBarsFillEl = document.getElementById('healthBarsFill');
   if(healthBarsFillEl){
-    healthBarsFillEl.style.width = (ac.length ? healthPct : 0) + '%';
+    healthBarsFillEl.style.width = (aec.length ? healthPct : 0) + '%';
     healthBarsFillEl.style.setProperty('--health-fill-color', healthTier.color);
   }
 
@@ -6852,6 +6887,7 @@ async function saveNewTask(){
   const description = document.getElementById('taskDescInput').value.trim();
   const dueDate = document.getElementById('taskDueInput').value || null;
   const clientId = document.getElementById('taskClientSelect').value || null;
+  if(clientId && isClientPaused(clientId)){ showPausedClientWarning(clientId); return; }
   const link = normalizeUrl(document.getElementById('taskLinkInput').value) || null;
   const addToCalendarInput = document.getElementById('taskAddToCalendarInput');
   const addToCalendar = addToCalendarInput ? addToCalendarInput.checked : false;
@@ -9251,6 +9287,7 @@ async function addManualEntry(){
   const totalMinutes = parseDurationInput(document.getElementById('manualDuration').value);
   const description = document.getElementById('manualDesc').value.trim();
   if(!clientId){ showToast('error','Pick a client','Select which client this time is for.'); return; }
+  if(isClientPaused(clientId)){ showPausedClientWarning(clientId); return; }
   if(!dateVal){ showToast('error','Pick a date','Choose the date this time was worked.'); return; }
   if(!totalMinutes || totalMinutes<=0){ showToast('error','Enter a duration','Try something like "1h 30m" or "1.5".'); return; }
   if(totalMinutes > 960 && !confirm(`That's ${formatMinutes(totalMinutes)} for a single entry — did you mean minutes instead of hours? Click OK to log it anyway, or Cancel to fix it.`)) return;
@@ -10433,6 +10470,7 @@ async function saveQueueLogImprovement(){
   const clientId = document.getElementById('queueLogClient').value;
   const text = document.getElementById('queueLogText').value.trim();
   if(!clientId){ showToast('error','Pick a client','Select which client this is for.'); return; }
+  if(isClientPaused(clientId)){ showPausedClientWarning(clientId); return; }
   if(!text){ showToast('error','Nothing to log','Write what you improved before saving.'); return; }
   const author = myName() || 'Team member';
   const btn = clickedBtn();
@@ -10954,7 +10992,7 @@ function renderTotalClientsDonut(){
   const wrap = document.getElementById('totalClientsDonut');
   const legend = document.getElementById('totalClientsLegend');
   if(!wrap) return;
-  const ac = activeClients();
+  const ac = attentionEligibleClients();
   const total = ac.length;
   if(!total){
     wrap.innerHTML = `<div class="empty" style="padding:30px 0;">No clients yet.</div>`;
