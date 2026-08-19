@@ -8214,20 +8214,34 @@ async function sendNotification(userId, type, title, body, targetView, targetId,
   sendPushNotification(userId, title, body);
 }
 
-// Best-effort OS push alongside the in-app notification above — never
-// awaited by the caller, and any failure here (no subscribed devices,
-// VAPID not configured, network error) is swallowed rather than
-// surfaced, since the in-app notification is the primary, reliable
-// mechanism and this is purely supplementary.
+// Best-effort OS push alongside the in-app notification above — runs on
+// the sender's browser, trying to reach the recipient's device. Not
+// awaited by the caller (the in-app notification above is the primary,
+// reliable mechanism), but the response IS read now, unlike before —
+// silently discarding it made every failure mode here invisible, including
+// a fully misconfigured server. A recipient with no subscribed devices at
+// all is normal/expected (not everyone opts into push), so that case is
+// only logged, not surfaced as an error toast.
 async function sendPushNotification(userId, title, body){
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
-    fetch('/api/integrations', {
+    const res = await fetch('/api/integrations', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ provider: 'push', action: 'send', targetUserId: userId, title, body, url: '/' }),
-    }).catch(()=>{});
-  }catch(e){}
+    });
+    const result = await res.json().catch(()=>({}));
+    if(!res.ok){
+      console.error('Push notification failed:', result.error || res.status);
+      showToast('error','Push notification failed', result.error || 'Check that VAPID keys are configured on the server.');
+      return;
+    }
+    if(result.sent === 0 && result.failed === 0){
+      console.log(`Push notification: recipient has no subscribed devices (userId: ${userId}). They likely haven't enabled push notifications on any device yet.`);
+    } else if(result.failed > 0){
+      console.warn(`Push notification: ${result.failed} device(s) failed to receive it, ${result.sent} succeeded.`);
+    }
+  }catch(e){ console.error('Push notification request failed:', e); }
 }
 
 async function loadNotifications(){
