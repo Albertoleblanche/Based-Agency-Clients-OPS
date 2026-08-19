@@ -15,6 +15,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { syncGoogleCalendarForUser } = require('../lib/google-calendar-sync');
 const { syncTimeEntryToHarvest } = require('../lib/harvest-sync');
 const { sendPushToUser } = require('../lib/push-notify');
+const { sendSlackDM } = require('../lib/slack-notify');
 
 async function notifyDueReminders(admin) {
   const today = new Date().toISOString().slice(0, 10);
@@ -43,6 +44,7 @@ async function notifyDueReminders(admin) {
       target_view: 'reminders',
     });
     try{ await sendPushToUser(admin, r.asked_by, 'Follow-up needed', `${clientName} hasn't responded to: "${r.question}"`); }catch(e){}
+    try{ await sendSlackDM(admin, r.asked_by, 'reminder_follow_up_due', `*Follow-up needed*\n${clientName} hasn't responded to: "${r.question}"`); }catch(e){}
     await admin.from('client_reminders').update({ reminder_notified_at: today }).eq('id', r.id);
   }
   return { notified: due.length };
@@ -81,6 +83,7 @@ async function notifyEscalatedReminders(admin) {
         target_view: 'client-detail', target_id: r.client_id,
       });
       try{ await sendPushToUser(admin, recipient.id, 'Follow-up gone quiet', `${clientName} hasn't responded in over a week to: "${r.question}"`); }catch(e){}
+      try{ await sendSlackDM(admin, recipient.id, 'reminder_escalated', `*Follow-up gone quiet*\n${clientName} hasn't responded in over a week regarding: "${r.question}"`); }catch(e){}
     }
     await admin.from('client_reminders').update({ escalated_at: todayStr }).eq('id', r.id);
   }
