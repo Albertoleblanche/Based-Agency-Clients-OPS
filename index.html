@@ -8008,7 +8008,19 @@ async function loadPushStatus(){
   try{
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.getSubscription();
+    // A browser-level subscription existing isn't enough on its own — that's
+    // shared by whichever accounts have ever used this device, not specific
+    // to whoever's currently logged in. Only treat push as "on" if this
+    // account actually has its own saved row for it. RLS already restricts
+    // this query to rows this account owns, so a null result here correctly
+    // means "not set up for me" even if the browser itself already has
+    // permission granted from a different account's earlier setup.
+    let myRow = null;
     if(sub){
+      const { data } = await supabaseClient.from('push_subscriptions').select('id').eq('endpoint', sub.endpoint).maybeSingle();
+      myRow = data;
+    }
+    if(sub && myRow){
       el.innerHTML = `
         <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 12px;">Push notifications are on for this device.</p>
         <button class="btn btn-outline" onclick="disablePushNotifications()">Turn off on this device</button>`;
@@ -8043,7 +8055,7 @@ async function enablePushNotifications(){
       p256dh: subJson.keys.p256dh,
       auth: subJson.keys.auth,
       user_agent: navigator.userAgent,
-    }, { onConflict: 'endpoint' });
+    }, { onConflict: 'user_id,endpoint' });
     if(error){ showToast('error','Could not save subscription', error.message); return; }
     showToast('success','Push notifications enabled', 'You\'ll get notified on this device.');
     loadPushStatus();
@@ -8058,7 +8070,7 @@ async function disablePushNotifications(){
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.getSubscription();
     if(sub){
-      await supabaseClient.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+      await supabaseClient.from('push_subscriptions').delete().eq('endpoint', sub.endpoint).eq('user_id', currentUser?.id);
       await sub.unsubscribe();
     }
     showToast('success','Push notifications turned off', 'This device will no longer receive them.');
