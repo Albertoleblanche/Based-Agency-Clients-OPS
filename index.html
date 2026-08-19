@@ -74,9 +74,9 @@
   body[data-theme="dark"] .ov-row-dot{opacity:.55 !important;}
   body[data-theme="dark"] .kanban-card{border:1px solid var(--border);}
   body[data-theme="dark"] .settings-tab.active{color:var(--brand) !important;}
-  body[data-theme="dark"] .filter-pill.active{background:linear-gradient(192deg, #000000 15%, var(--brand) 100%) !important;border-color:var(--brand) !important;box-shadow:inset 0px 0px 5px 0px rgba(255, 255, 255, 0.5) !important;}
-  body[data-theme="dark"] .pagination-btn.active{background:linear-gradient(192deg, #000000 15%, var(--brand) 100%) !important;border-color:var(--brand) !important;box-shadow:inset 0px 0px 5px 0px rgba(255, 255, 255, 0.5) !important;}
-  body[data-theme="dark"] .btn-brand{background:linear-gradient(192deg, #000000 15%, var(--brand) 100%) !important;box-shadow:inset 0px 0px 5px 0px rgba(255, 255, 255, 0.5) !important;}
+  body[data-theme="dark"] .filter-pill.active{background:#dedede !important;border-color:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(255, 255, 255, 0.5) !important;}
+  body[data-theme="dark"] .pagination-btn.active{background:#dedede !important;border-color:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(255, 255, 255, 0.5) !important;}
+  body[data-theme="dark"] .btn-brand{background:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(255, 255, 255, 0.5) !important;}
   *{box-sizing:border-box;}
 
   /* Keyboard focus — was largely missing app-wide before this. Uses
@@ -1220,6 +1220,13 @@ document.addEventListener('DOMContentLoaded', function(){
         </div>
         <svg class="sidebar-profile-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
       </div>
+      <div class="clock-mini-pill gauge-row" onclick="switchView('approve')" title="Time until Wednesday auto-notification" style="margin-top:8px;justify-content:center;width:100%;">
+        <svg class="clock-ring" width="18" height="18" viewBox="0 0 20 20">
+          <circle class="ring-track" cx="10" cy="10" r="8"></circle>
+          <circle class="ring-fill gauge-ring" cx="10" cy="10" r="8"></circle>
+        </svg>
+        <span class="clock-mini-text"><span class="gauge-d">0</span>d <span class="gauge-h">00</span>h <span class="gauge-m">00</span>m</span>
+      </div>
       <div class="sidebar-profile-menu" id="sidebarProfileMenu" style="display:none;">
         <div class="sidebar-profile-menu-item" onclick="closeSidebarProfileMenu(); switchView('profile');">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -1260,13 +1267,6 @@ document.addEventListener('DOMContentLoaded', function(){
       </button>
       <div><div class="page-title" id="topbarTitle">Overview</div><div class="page-sub" id="topbarSub"></div></div>
       <div class="topbar-right">
-        <div class="clock-mini-pill gauge-row" onclick="switchView('approve')" title="Time until Wednesday auto-notification">
-          <svg class="clock-ring" width="18" height="18" viewBox="0 0 20 20">
-            <circle class="ring-track" cx="10" cy="10" r="8"></circle>
-            <circle class="ring-fill gauge-ring" cx="10" cy="10" r="8"></circle>
-          </svg>
-          <span class="clock-mini-text"><span class="gauge-d">0</span>d <span class="gauge-h">00</span>h <span class="gauge-m">00</span>m</span>
-        </div>
         <div class="clock-mini-pill" id="topbarCurrentDate" style="cursor:default;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           <span id="topbarCurrentDateText"></span>
@@ -1285,8 +1285,8 @@ document.addEventListener('DOMContentLoaded', function(){
           </div>
         </div>
         <div class="notif-bell-wrap" id="harvestTimerBellWrap" style="position:relative;">
-          <div id="harvestTimerWrap" onclick="toggleHarvestTimerPanel()" style="display:flex;align-items:center;gap:6px;height:29px;padding:0 10px;background:var(--brand);border-radius:8px;color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <div id="harvestTimerWrap" onclick="toggleHarvestTimerPanel()" style="display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;background:var(--brand);border-radius:30px;color:#fff;font-size:11px;font-weight:600;cursor:pointer;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             <span>Time Tracker</span>
           </div>
           <div class="notif-panel" id="harvestTimerPanel" style="display:none;width:340px;padding:0;overflow:hidden;">
