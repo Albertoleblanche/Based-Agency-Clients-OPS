@@ -12092,7 +12092,7 @@ function openTeamMemberDetail(id){
         <div><label>Phone</label><div style="font-size:13px;color:var(--ink);">${m.phone || '—'}</div></div>
         <div><label>Title</label>${titleControl}</div>
         <div><label>Role</label>${roleControl}</div>
-        ${isAdmin() ? `<div style="grid-column:1/-1;"><label>Slack member ID</label>${slackIdControl}<p style="font-size:10.5px;color:var(--muted-lt);margin:4px 0 0;">From their Slack profile → "..." → Copy member ID. Used to DM them notifications from this app.</p></div>` : ''}
+        ${isAdmin() ? `<div style="grid-column:1/-1;"><label>Slack member ID</label>${slackIdControl}<p style="font-size:10.5px;color:var(--muted-lt);margin:4px 0 0;">From their Slack profile → "..." → Copy member ID. Lets this app DM them notifications, and lets Slack's /task command recognize them.</p></div>` : ''}
       </div>
     </div>
     <div class="modal-actions">
