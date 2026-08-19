@@ -60,8 +60,8 @@
      colored banner headers — 7 separate inline occurrences, so a single
      !important override here is safer than editing each one individually
      (some duplicated, easy to miss one). */
-  body[data-theme="dark"] .ov-card-title-row{background:transparent !important;}
-  body[data-theme="dark"] .ov-mini-cal-head{background:transparent !important;}
+  body[data-theme="dark"] .ov-card-title-row{background:transparent !important;border-bottom:1px solid var(--border);}
+  body[data-theme="dark"] .ov-mini-cal-head{background:transparent !important;border-bottom:1px solid var(--border);}
   body[data-theme="dark"] .panel-title, body[data-theme="dark"] .ov-card-title, body[data-theme="dark"] .ov-card-icon{color:#A8A8AC !important;}
   body[data-theme="dark"] .ov-mini-cal-day.today{background:rgba(232,98,44,.35);color:#dbdbdb;}
   body[data-theme="dark"] .ov-mini-cal-day.today:hover{background:rgba(232,98,44,.35);}
@@ -69,6 +69,9 @@
   body[data-theme="dark"] .ov-mini-cal-day.today .ov-mini-cal-dot{background:#dbdbdb;}
   body[data-theme="dark"] .ov-row-dot{opacity:.55 !important;}
   body[data-theme="dark"] .kanban-card{border:1px solid var(--border);}
+  body[data-theme="dark"] .settings-tab.active{color:var(--brand) !important;}
+  body[data-theme="dark"] .filter-pill.active{background:var(--brand) !important;border-color:var(--brand) !important;}
+  body[data-theme="dark"] .pagination-btn.active{background:var(--brand) !important;border-color:var(--brand) !important;}
   *{box-sizing:border-box;}
 
   /* Keyboard focus — was largely missing app-wide before this. Uses
