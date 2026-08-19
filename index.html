@@ -73,6 +73,7 @@
   body[data-theme="dark"] .ov-mini-cal-day.today .ov-mini-cal-dot{background:#dbdbdb;}
   body[data-theme="dark"] .ov-row-dot{opacity:.55 !important;}
   body[data-theme="dark"] .kanban-card{border:1px solid var(--border);}
+  body[data-theme="dark"] .q-bulk-list li{font-size:13px;color:#dbdbdb;}
   body[data-theme="dark"] .settings-tab.active{color:var(--brand) !important;}
   body[data-theme="dark"] .filter-pill.active{background:#dedede !important;border-color:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(0, 0, 0, 0.5) !important;}
   body[data-theme="dark"] .pagination-btn.active{background:#dedede !important;border-color:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(0, 0, 0, 0.5) !important;}
@@ -935,7 +936,7 @@
   .q-bulk-list{max-height:190px;overflow-y:auto;position:relative;padding-right:4px;}
   .q-bulk-list.scrollable{mask-image:linear-gradient(to bottom, black calc(100% - 18px), transparent 100%);-webkit-mask-image:linear-gradient(to bottom, black calc(100% - 18px), transparent 100%);}
   .q-bulk-list ul{margin:0;padding-left:18px;}
-  .q-bulk-list li{padding:2px 0;}
+  .q-bulk-list li{padding:2px 0;overflow-wrap:break-word;word-break:break-word;}
   .q-bulk ul{margin:4px 0 0;padding-left:18px;}
   textarea.draft{width:100%;min-height:110px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;line-height:1.55;padding:12px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);resize:vertical;margin-top:10px;}
   textarea.draft:disabled{background:var(--border);color:var(--muted);cursor:not-allowed;resize:none;}
@@ -2586,8 +2587,16 @@ async function safeSetPersonal(key, value){ try{ localStorage.setItem('bda_'+key
 /* ---------- Theme ---------- */
 async function initTheme(){
   try{
-    if(localStorage.getItem('bda_theme') === 'dark') document.body.dataset.theme = 'dark';
+    // myProfile.theme is the real, per-account source of truth — only
+    // fall back to the localStorage guess if this account has never set
+    // a preference at all (myProfile.theme is null/undefined).
+    const pref = myProfile && myProfile.theme != null ? myProfile.theme : localStorage.getItem('bda_theme');
+    if(pref === 'dark') document.body.dataset.theme = 'dark';
     else delete document.body.dataset.theme;
+    // Keep localStorage in sync so this device's early FOUC-prevention
+    // script (which runs before login, with no access to Supabase) has
+    // an accurate guess to paint with on the next load.
+    localStorage.setItem('bda_theme', pref === 'dark' ? 'dark' : 'light');
   }catch(e){ delete document.body.dataset.theme; }
 }
 
@@ -2697,12 +2706,18 @@ function switchToMobileVersion(){
   window.location.href = '/mobile.html';
 }
 
-function toggleDarkMode(){
+async function toggleDarkMode(){
   const isDark = document.body.dataset.theme === 'dark';
+  const newTheme = isDark ? 'light' : 'dark';
   if(isDark){ delete document.body.dataset.theme; }
   else { document.body.dataset.theme = 'dark'; }
-  try{ localStorage.setItem('bda_theme', isDark ? 'light' : 'dark'); }catch(e){}
+  try{ localStorage.setItem('bda_theme', newTheme); }catch(e){}
   syncDarkModeToggleUI();
+  if(currentUser){
+    if(myProfile) myProfile.theme = newTheme;
+    const { error } = await supabaseClient.from('team_profiles').update({ theme: newTheme }).eq('id', currentUser.id);
+    if(error) console.error('toggleDarkMode save error:', error);
+  }
 }
 
 // Syncs the toggle switch's own visual .on state to match whatever the
