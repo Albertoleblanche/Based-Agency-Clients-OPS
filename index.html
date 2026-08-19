@@ -2743,7 +2743,10 @@ async function toggleDarkMode(){
   if(currentUser){
     if(myProfile) myProfile.theme = newTheme;
     const { error } = await supabaseClient.from('team_profiles').update({ theme: newTheme }).eq('id', currentUser.id);
-    if(error) console.error('toggleDarkMode save error:', error);
+    if(error){
+      console.error('toggleDarkMode save error:', error);
+      showToast('error','Preference not saved','This won\'t follow you to other devices — ask your admin to check the theme column exists on team_profiles.');
+    }
   }
 }
 
