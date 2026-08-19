@@ -1,9 +1,11 @@
 // Sends messages to Slack — the daily team summary (existing, webhook-
-// based) and now also per-client improvement updates posted directly to
-// that client's own mapped channel (new, bot-token-based). Both only
-// ever run after a human has reviewed the exact text and clicked
-// confirm — nothing here fires automatically, same philosophy as
-// api/send-email.js.
+// based), per-client improvement updates posted to that client's own
+// mapped channel (bot-token-based), and now per-person DMs mirroring the
+// app's own in-app notifications (task assigned, reminders, etc.). The
+// first two only ever run after a human has reviewed the exact text and
+// clicked confirm — same philosophy as api/send-email.js. The dm action
+// is triggered automatically alongside an in-app notification, same as
+// the existing push-notification path.
 //
 // Renamed from send-slack-summary.js now that it does more than
 // summaries — same reasoning as google-calendar.js becoming
@@ -11,8 +13,10 @@
 //
 // POST body: { action: 'summary', text }
 // POST body: { action: 'client-message', clientId, text }
+// POST body: { action: 'dm', targetUserId, notificationType, text }
 
 const { createClient } = require('@supabase/supabase-js');
+const { sendSlackDM } = require('../lib/slack-notify');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -104,6 +108,15 @@ module.exports = async function handler(req, res) {
         return;
       }
       res.status(200).json({ success: true });
+      return;
+    }
+
+    // ---- New: DM a specific team member, mirroring an in-app notification ----
+    if (action === 'dm') {
+      const { targetUserId, notificationType } = req.body;
+      if (!targetUserId || !notificationType) { res.status(400).json({ error: 'Missing targetUserId or notificationType' }); return; }
+      const result = await sendSlackDM(admin, targetUserId, notificationType, text);
+      res.status(200).json(result);
       return;
     }
 
