@@ -8224,6 +8224,36 @@ async function sendNotification(userId, type, title, body, targetView, targetId,
   if(targetId) row.target_id = targetId;
   await supabaseClient.from('notifications').insert(row);
   sendPushNotification(userId, title, body);
+  sendSlackNotification(userId, type, title, body);
+}
+
+// Best-effort Slack DM alongside the in-app notification above — same
+// "supplementary, not the source of truth" philosophy as the push
+// notification below it. The actual mute check happens server-side
+// (lib/slack-notify.js), reusing muted_notification_types — the same
+// list that already gates in-app/push — so muting a notification type
+// once mutes it everywhere, rather than needing separate Slack-specific
+// preferences.
+async function sendSlackNotification(userId, type, title, body){
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const res = await fetch('/api/send-slack-message', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'dm', targetUserId: userId, notificationType: type, text: `*${title}*\n${body||''}` }),
+    });
+    const result = await res.json().catch(()=>({}));
+    if(!res.ok || result.sent === false){
+      // no_slack_id and muted are both normal, expected states, not
+      // failures — only log those quietly. Anything else (Slack API
+      // error, bot token missing) is worth a louder signal.
+      if(result.reason === 'no_slack_id' || result.reason === 'muted' || result.reason === 'not_configured'){
+        console.log(`Slack DM skipped (${result.reason}) for userId: ${userId}`);
+      } else {
+        console.error('Slack DM failed:', result.reason || result.error || res.status);
+      }
+    }
+  }catch(e){ console.error('Slack DM request failed:', e); }
 }
 
 // Best-effort OS push alongside the in-app notification above — runs on
@@ -12050,7 +12080,9 @@ function openTeamMemberDetail(id){
         ${(settings.teamTitleOptions||[]).map(o=>`<option value="${o.replace(/"/g,'&quot;')}" ${m.title===o?'selected':''}>${o}</option>`).join('')}
       </select>`
     : (m.title ? `<span class="role-chip">${m.title}</span>` : `<span style="color:var(--muted-lt);font-size:12px;">No title set</span>`);
-  openAppModal(`
+  const slackIdControl = isAdmin()
+    ? `<input type="text" value="${(m.slack_user_id||'').replace(/"/g,'&quot;')}" placeholder="e.g. U0123ABCDEF" onblur="changeTeamSlackId('${m.id}', this.value.trim())" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);width:100%;">`
+    : '';  openAppModal(`
     <div class="modal-head"><span class="panel-title">${m.name}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body" style="display:flex;flex-direction:column;align-items:center;gap:14px;">
       ${teamCardAvatarHtml(m)}
@@ -12060,6 +12092,7 @@ function openTeamMemberDetail(id){
         <div><label>Phone</label><div style="font-size:13px;color:var(--ink);">${m.phone || '—'}</div></div>
         <div><label>Title</label>${titleControl}</div>
         <div><label>Role</label>${roleControl}</div>
+        ${isAdmin() ? `<div style="grid-column:1/-1;"><label>Slack member ID</label>${slackIdControl}<p style="font-size:10.5px;color:var(--muted-lt);margin:4px 0 0;">From their Slack profile → "..." → Copy member ID. Used to DM them notifications from this app.</p></div>` : ''}
       </div>
     </div>
     <div class="modal-actions">
@@ -12093,6 +12126,14 @@ async function changeTeamRole(userId, newRole){
   if(userId !== currentUser?.id){
     sendNotification(userId, 'profile_changed', 'Your role changed', `${myName()||'An admin'} changed your role to ${roleDisplayLabel(newRole)}.`, 'profile');
   }
+}
+
+async function changeTeamSlackId(userId, newSlackId){
+  if(!isAdmin()){ showToast('error','Not allowed','Only admins can set this.'); return; }
+  const { error } = await supabaseClient.from('team_profiles').update({ slack_user_id: newSlackId || null }).eq('id', userId);
+  if(error){ showToast('error','Could not save', error.message); await loadTeamProfiles(); return; }
+  await loadTeamProfiles();
+  showToast('success', newSlackId ? 'Slack ID saved' : 'Slack ID cleared', newSlackId ? 'They\'ll get Slack DMs for anything they don\'t have muted.' : 'They won\'t receive Slack DMs from this app anymore.');
 }
 
 async function adminResetPassword(userId, name){
