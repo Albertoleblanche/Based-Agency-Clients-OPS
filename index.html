@@ -78,6 +78,7 @@
   body[data-theme="dark"] .filter-pill.active{background:#dedede !important;border-color:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(0, 0, 0, 0.5) !important;}
   body[data-theme="dark"] .pagination-btn.active{background:#dedede !important;border-color:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(0, 0, 0, 0.5) !important;}
   body[data-theme="dark"] .btn-brand{background:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(0, 0, 0, 0.5) !important;}
+  body[data-theme="dark"] .nav-item:hover, body[data-theme="dark"] .nav-item.active{background:#ffffff17 !important;border-left-color:transparent !important;}
   *{box-sizing:border-box;}
 
   /* Keyboard focus — was largely missing app-wide before this. Uses
@@ -99,13 +100,11 @@
   body.sidebar-collapsed .app-topbar{left:60px;}
   body.sidebar-collapsed .sidebar{padding-left:9px;padding-right:9px;overflow:visible;}
   body.sidebar-collapsed .brand{padding-left:0;padding-right:0;justify-content:center;}
-  body.sidebar-collapsed .brand-text, body.sidebar-collapsed .cmdk-trigger span,
-  body.sidebar-collapsed .cmdk-trigger-kbd, body.sidebar-collapsed .nav-section-label,
+  body.sidebar-collapsed .brand-text, body.sidebar-collapsed .nav-section-label,
   body.sidebar-collapsed .sidebar-profile-info, body.sidebar-collapsed .sidebar-profile-chevron{display:none;}
   body.sidebar-collapsed .nav-item{justify-content:center;padding:9px 0;gap:0;border-left:none;}
   body.sidebar-collapsed .nav-label{opacity:0;max-width:0;}
   body.sidebar-collapsed .nav-badge{position:absolute;top:2px;right:2px;margin-left:0;font-size:9px;padding:0 4px;min-width:14px;height:14px;box-shadow:0 0 0 2px var(--sidebar);}
-  body.sidebar-collapsed .cmdk-trigger{justify-content:center;padding:9px;}
   body.sidebar-collapsed .sidebar-profile-trigger{justify-content:center;}
   body.sidebar-collapsed .sidebar-collapse-btn{display:none;}
 
@@ -155,7 +154,7 @@
   .sidebar{background:var(--sidebar);color:#C9D2E3;padding:18px 12px;display:flex;flex-direction:column;height:100vh;overflow-y:auto;position:relative;}
   .brand{display:flex;align-items:center;gap:9px;padding:6px 10px 20px;position:relative;}
   .brand-text{flex:1;min-width:0;}
-  .sidebar-collapse-btn{position:absolute;top:20px;right:14px;display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;color:var(--sidebar-muted);cursor:pointer;transition:top var(--duration-base) var(--ease-out), left var(--duration-base) var(--ease-out), right var(--duration-base) var(--ease-out), background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);z-index:10;}
+  .sidebar-collapse-btn{flex:none;margin-left:auto;display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:6px;color:var(--sidebar-muted);cursor:pointer;transition:background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);}
   .sidebar-collapse-btn:hover{background:var(--sidebar-hover);color:#fff;}
 
   .notif-bell-btn{background:none;border:none;color:var(--muted-lt);cursor:pointer;padding:6px;border-radius:8px;position:relative;display:flex;}
@@ -205,10 +204,6 @@
   .nav-label{white-space:nowrap;overflow:hidden;opacity:1;max-width:180px;transition:opacity var(--duration-base) var(--ease-out), max-width var(--duration-base) var(--ease-out);}
   .nav-section-label{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;letter-spacing:.04em;color:#8A8A8E;padding:16px 11px 6px;font-weight:600;}
 
-  .cmdk-trigger{display:flex;align-items:center;gap:8px;padding:9px 11px;margin-bottom:10px;border-radius:8px;background:#242426;border:1px solid #3A3A3D;color:#A8A8AC;font-size:12.5px;cursor:pointer;transition:border-color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);}
-  .cmdk-trigger:hover{border-color:var(--brand);background:#2E2E30;}
-  .cmdk-trigger span:nth-child(2){flex:1;}
-  .cmdk-trigger-kbd{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;color:#A8A8AC;background:#151516;border:1px solid #3A3A3D;border-radius:4px;padding:2px 5px;}
 
   .cmdk-overlay{position:fixed;inset:0;background:rgba(16,24,40,.5);z-index:2000;display:flex;justify-content:center;padding-top:12vh;animation:modalOverlayIn var(--duration-base) var(--ease-out);}
   .cmdk-palette{background:var(--card);border-radius:var(--radius-lg);width:100%;max-width:560px;max-height:60vh;box-shadow:0 30px 80px rgba(16,24,40,.4);overflow:hidden;display:flex;flex-direction:column;animation:modalCardIn var(--duration-slow) var(--ease-out);height:fit-content;}
@@ -1080,16 +1075,12 @@
     body.sidebar-collapsed .brand{padding:6px 10px 20px;justify-content:flex-start;}
     body.sidebar-collapsed .brand-mark{cursor:default;}
     body.sidebar-collapsed .brand-text, body.sidebar-collapsed .nav-label,
-    body.sidebar-collapsed .nav-section-label, body.sidebar-collapsed .cmdk-trigger span,
-    body.sidebar-collapsed .cmdk-trigger-kbd, body.sidebar-collapsed .sidebar-profile-info,
+    body.sidebar-collapsed .nav-section-label, body.sidebar-collapsed .sidebar-profile-info,
     body.sidebar-collapsed .sidebar-profile-chevron{display:revert;opacity:1;max-width:none;}
     body.sidebar-collapsed .nav-item{justify-content:flex-start;padding:9px 11px 9px 6px;gap:10px;}
     body.sidebar-collapsed .nav-badge{position:static;margin-left:auto;font-size:10px;padding:0 4px;min-width:16px;height:16px;box-shadow:none;}
-    body.sidebar-collapsed .cmdk-trigger{justify-content:flex-start;padding:9px 11px;}
     body.sidebar-collapsed .sidebar-profile-trigger{justify-content:flex-start;}
     .sidebar-collapse-btn{display:none;}
-    .gauge-row{display:none;}
-    #topbarCurrentDate{display:none;}
     .app-topbar-inner{padding-right:4px;}
     .filters-popover{width:min(280px, calc(100vw - 32px));}
     .calendar-day{min-height:64px;padding:5px;}
@@ -1137,17 +1128,12 @@ document.addEventListener('DOMContentLoaded', function(){
 
 <div class="app" id="appRoot" style="display:none;">
   <div class="sidebar" id="appSidebar" role="navigation" aria-label="Main navigation">
-    <span class="sidebar-collapse-btn" onclick="toggleSidebar()" title="Collapse sidebar">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
-    </span>
     <div class="brand">
       <div class="brand-mark" onclick="toggleSidebar()" title="Toggle sidebar">BA</div>
       <div class="brand-text"><div class="brand-name">Based Agency</div><div class="brand-sub">CLIENT OPS</div></div>
-    </div>
-    <div class="cmdk-trigger" onclick="openCommandPalette()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <span>Search…</span>
-      <span class="cmdk-trigger-kbd">⌘K</span>
+      <span class="sidebar-collapse-btn" onclick="toggleSidebar()" title="Collapse sidebar">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+      </span>
     </div>
     <nav>
       <div class="nav-item active" data-view="overview" data-tooltip="Overview" onclick="switchView('overview')">
@@ -1221,13 +1207,6 @@ document.addEventListener('DOMContentLoaded', function(){
         </div>
         <svg class="sidebar-profile-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
       </div>
-      <div class="clock-mini-pill gauge-row" onclick="switchView('approve')" title="Time until Wednesday auto-notification" style="margin-top:8px;justify-content:center;width:100%;">
-        <svg class="clock-ring" width="18" height="18" viewBox="0 0 20 20">
-          <circle class="ring-track" cx="10" cy="10" r="8"></circle>
-          <circle class="ring-fill gauge-ring" cx="10" cy="10" r="8"></circle>
-        </svg>
-        <span class="clock-mini-text"><span class="gauge-d">0</span>d <span class="gauge-h">00</span>h <span class="gauge-m">00</span>m</span>
-      </div>
       <div class="sidebar-profile-menu" id="sidebarProfileMenu" style="display:none;">
         <div class="sidebar-profile-menu-item" onclick="closeSidebarProfileMenu(); switchView('profile');">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -1268,10 +1247,6 @@ document.addEventListener('DOMContentLoaded', function(){
       </button>
       <div><div class="page-title" id="topbarTitle">Overview</div><div class="page-sub" id="topbarSub"></div></div>
       <div class="topbar-right">
-        <div class="clock-mini-pill" id="topbarCurrentDate" style="cursor:default;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          <span id="topbarCurrentDateText"></span>
-        </div>
         <button class="notif-bell-btn" onclick="openCommandPalette()" title="Search (⌘K)">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         </button>
@@ -2763,11 +2738,6 @@ document.addEventListener('click', function(e){
   if(!e.target.closest('.sidebar-foot')) closeSidebarProfileMenu();
 });
 
-function renderTopbarCurrentDate(){
-  const el = document.getElementById('topbarCurrentDateText');
-  if(el) el.textContent = new Date().toLocaleDateString('en-US',{weekday:'short', month:'short', day:'numeric'});
-}
-
 function roleDisplayLabel(role){
   return role==='admin' ? 'Admin' : role==='approver' ? 'Approver' : 'Team member';
 }
@@ -3118,7 +3088,7 @@ function setupRealtimeSubscriptions(){
     if(changedKey !== 'app-data' && changedKey !== 'settings') return;
     silentSection(async ()=>{
       await loadAll();
-      renderKpis(); renderClientsTable(); renderQueue(); renderTeamQueue(); renderLog(); renderGauge();
+      renderKpis(); renderClientsTable(); renderQueue(); renderTeamQueue(); renderLog();
       renderAttentionList(); renderClientOptionsSelects(); renderOverviewChart();
       renderBudgetAlerts(); renderImprovementsHistory();
     });
@@ -3195,7 +3165,7 @@ async function fullRefresh(showFeedback){
   if(syncEl) syncEl.textContent = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
   if(showFeedback && btn){ btn.disabled = false; btn.innerHTML = refreshIcon + ' Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
-function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderTeamQueue(); renderLog(); renderGauge(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderTopbarCurrentDate(); renderClientOptionsSelects(); applyRoleVisibility(); syncDarkModeToggleUI(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); renderTasks(); renderCalendar(); renderTimesheet(); renderTrash(); renderReminders(); }
+function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderTeamQueue(); renderLog(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); syncDarkModeToggleUI(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); renderTasks(); renderCalendar(); renderTimesheet(); renderTrash(); renderReminders(); }
 
 function switchTrashTab(name){
   document.querySelectorAll('#trashTabsBar .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.ttab===name));
