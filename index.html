@@ -74,9 +74,9 @@
   body[data-theme="dark"] .ov-row-dot{opacity:.55 !important;}
   body[data-theme="dark"] .kanban-card{border:1px solid var(--border);}
   body[data-theme="dark"] .settings-tab.active{color:var(--brand) !important;}
-  body[data-theme="dark"] .filter-pill.active{background:#dedede !important;border-color:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(255, 255, 255, 0.5) !important;}
-  body[data-theme="dark"] .pagination-btn.active{background:#dedede !important;border-color:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(255, 255, 255, 0.5) !important;}
-  body[data-theme="dark"] .btn-brand{background:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(255, 255, 255, 0.5) !important;}
+  body[data-theme="dark"] .filter-pill.active{background:#dedede !important;border-color:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(0, 0, 0, 0.5) !important;}
+  body[data-theme="dark"] .pagination-btn.active{background:#dedede !important;border-color:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(0, 0, 0, 0.5) !important;}
+  body[data-theme="dark"] .btn-brand{background:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(0, 0, 0, 0.5) !important;}
   *{box-sizing:border-box;}
 
   /* Keyboard focus — was largely missing app-wide before this. Uses
@@ -1285,7 +1285,7 @@ document.addEventListener('DOMContentLoaded', function(){
           </div>
         </div>
         <div class="notif-bell-wrap" id="harvestTimerBellWrap" style="position:relative;">
-          <div id="harvestTimerWrap" onclick="toggleHarvestTimerPanel()" style="display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;background:var(--brand);border-radius:30px;color:#fff;font-size:11px;font-weight:600;cursor:pointer;">
+          <div id="harvestTimerWrap" onclick="toggleHarvestTimerPanel()" style="display:flex;align-items:center;gap:6px;height:25px;padding:0 10px;background:var(--brand);border-radius:30px;color:#fff;font-size:11px;font-weight:600;cursor:pointer;">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             <span>Time Tracker</span>
           </div>
@@ -10868,13 +10868,14 @@ function queueCardHtml(c){
 // throw that difference away.
 function queueActivityBadgeHtml(c){
   const weekStart = getWeekStart(new Date());
-  const thisWeekCount = c.improvements.filter(i=>i.date && new Date(i.date) >= weekStart).length;
+  const emailRelevant = c.improvements.filter(i=>i.includeInEmail!==false);
+  const thisWeekCount = emailRelevant.filter(i=>i.date && new Date(i.date) >= weekStart).length;
 
   if(thisWeekCount){
     return `<div class="q-bulk-preview has-logs"><span class="pulse-dot"></span>${thisWeekCount} improvement${thisWeekCount!==1?'s':''} logged this week</div>`;
   }
 
-  const dated = c.improvements.filter(i=>i.date);
+  const dated = emailRelevant.filter(i=>i.date);
   if(!dated.length){
     return `<div class="q-bulk-preview">No improvements logged yet</div>`;
   }
@@ -11137,7 +11138,7 @@ function budgetTierMeta(tier){
 // actually reset at any fixed point.
 function hasLoggedThisWeek(c){
   const weekStart = getWeekStart(new Date());
-  return c.improvements.some(i=>i.date && new Date(i.date) >= weekStart);
+  return c.improvements.some(i=>i.date && i.includeInEmail!==false && new Date(i.date) >= weekStart);
 }
 
 // Preserves each improvement's original index in c.improvements before
