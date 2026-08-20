@@ -295,12 +295,22 @@ module.exports = async function handler(req, res) {
 
     // ---- Send each person their own personal daily summary, replacing the old shared-channel post ----
     if (action === 'personal-summaries') {
-      if (!['admin', 'approver'].includes(callerProfile.role)) {
-        res.status(403).json({ error: 'Only admins and approvers can send daily summaries.' });
-        return;
-      }
-      const { date, summary } = body;
+      let { date, summary } = body;
       if (!date || !Array.isArray(summary)) { res.status(400).json({ error: 'Missing date or summary' }); return; }
+
+      // Anyone can use this — but a regular member's request is only ever
+      // trusted for their own data, regardless of what the submitted array
+      // actually contains. This endpoint takes the summary as given by the
+      // client rather than re-querying it server-side, so without this a
+      // non-admin/approver caller could otherwise claim to be sending on
+      // behalf of someone else's userId with fabricated content. In
+      // practice a regular member's own data already only ever contains
+      // their own entry (get-daily-summary.js already scopes it that way),
+      // so this rarely changes anything for them — it just makes that the
+      // enforced rule, not an assumption.
+      if (!['admin', 'approver'].includes(callerProfile.role)) {
+        summary = summary.filter(person => person.userId === callerData.user.id);
+      }
 
       const dateLabel = new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
       const results = [];
