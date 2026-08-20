@@ -6665,16 +6665,6 @@ function renderNotes(){
 
   const visible = notes.filter(n=> clientFilter==='all' || n.clientId===clientFilter);
 
-  if(!notes.length){
-    board.innerHTML = `<div style="grid-column:1/-1;">${emptyStateHtml(
-      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
-      'No notes yet',
-      'Notes are private to you — jot down something you\'d like to do for a client, and it\'ll only ever be visible to you.',
-      '<button class="btn btn-brand" onclick="openNoteModal()">+ Add note</button>'
-    )}</div>`;
-    return;
-  }
-
   board.innerHTML = NOTE_STAGES.map(stage=>{
     const stageNotes = visible.filter(n=>n.status===stage.key)
       .sort((a,b)=> new Date(b.updatedAt||b.createdAt) - new Date(a.updatedAt||a.createdAt));
