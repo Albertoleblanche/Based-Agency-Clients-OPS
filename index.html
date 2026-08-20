@@ -2472,6 +2472,14 @@ document.addEventListener('DOMContentLoaded', function(){
           <div id="pushStatusBox"></div>
         </div>
       </div>
+
+      <div class="panel" style="margin-top:24px;">
+        <div class="panel-head"><span class="panel-title">Daily Summary Slack DM</span></div>
+        <div class="panel-body">
+          <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 12px;">When an admin sends daily summaries, this is where yours goes. Leave blank to use your regular Slack DM ID — set one here only if you want your daily hours sent somewhere different.</p>
+          <input id="dailySummarySlackIdInput" placeholder="e.g. U0123ABCDEF" style="width:280px;max-width:100%;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:9px 11px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);" onblur="saveDailySummarySlackId(this.value.trim())">
+        </div>
+      </div>
     </div>
 
     <!-- CLIENT DETAIL -->
@@ -5867,38 +5875,30 @@ function openDailySummaryDetail(userId){
     </div>`, 480);
 }
 
-function buildSlackSummaryText(data){
-  const dateLabel = new Date(data.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long', month:'long', day:'numeric'});
-  if(!data.summary.length){
-    const emptyMsg = canApprove() ? 'Nobody logged time this day.' : "Nothing logged this day.";
-    return `*Daily Summary — ${dateLabel}*\n\n${emptyMsg}`;
-  }
-  const lines = data.summary.map(person=>{
-    const entryLines = person.entries.map(e=>
-      `    • ${e.client}${e.service ? ` (${e.service})` : ''} — ${formatMinutes(e.minutes)}${e.description ? `: ${e.description}` : ''}`
-    ).join('\n');
-    return `*${person.name}* — ${formatMinutes(person.totalMinutes)}\n${entryLines}`;
-  });
-  return `*Daily Summary — ${dateLabel}*\n\n${lines.join('\n\n')}`;
-}
-
 function openSlackSummaryConfirm(){
   if(!lastDailySummaryData){ showToast('error','Nothing loaded yet','Wait for the summary to finish loading first.'); return; }
-  const text = buildSlackSummaryText(lastDailySummaryData);
+  const dateLabel = new Date(lastDailySummaryData.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long', month:'long', day:'numeric'});
+  const rows = lastDailySummaryData.summary.map(person=>{
+    const profile = teamProfiles.find(p=>p.id===person.userId);
+    const hasSlackId = !!(profile && (profile.daily_summary_slack_id || profile.slack_user_id));
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+      <span>${escapeHtml(person.name)} <span style="color:var(--muted-lt);">— ${formatMinutes(person.totalMinutes)}</span></span>
+      ${hasSlackId ? '<span style="color:var(--green);font-size:12px;">Will be sent</span>' : '<span style="color:var(--muted-lt);font-size:12px;">No Slack ID on file</span>'}
+    </div>`;
+  }).join('');
   openAppModal(`
-    <div class="modal-head"><span class="panel-title">Send this to Slack?</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-head"><span class="panel-title">Send personal summaries to Slack?</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
-      <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 12px;">Review before sending — this posts immediately once confirmed.</p>
-      <textarea id="slackSummaryText" readonly style="width:100%;min-height:260px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;padding:10px;border-radius:8px;border:1px solid var(--border);white-space:pre-wrap;">${text}</textarea>
+      <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 12px;">Each person gets their own DM with just their own hours for ${dateLabel} — nobody sees anyone else's.</p>
+      ${rows}
     </div>
     <div class="modal-actions">
-      <button class="btn btn-brand" id="sendSlackBtn" onclick="confirmSendSlackSummary()">Send to Slack</button>
+      <button class="btn btn-brand" id="sendSlackBtn" onclick="confirmSendSlackSummary()">Send</button>
       <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
-    </div>`, 560);
+    </div>`, 480);
 }
 
 async function confirmSendSlackSummary(){
-  const text = document.getElementById('slackSummaryText').value;
   const btn = document.getElementById('sendSlackBtn');
   setBtnLoading(btn, 'Sending…');
   try{
@@ -5906,13 +5906,19 @@ async function confirmSendSlackSummary(){
     const response = await fetch('/api/send-slack-message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-      body: JSON.stringify({ action: 'summary', text }),
+      body: JSON.stringify({ action: 'personal-summaries', date: lastDailySummaryData.date, summary: lastDailySummaryData.summary }),
     });
     const data = await response.json();
     restoreBtn(btn);
     if(!response.ok){ showToast('error','Send failed', data.error || 'Could not send to Slack.'); return; }
     closeAppModal();
-    showToast('success','Sent to Slack','The daily summary was posted.');
+    const sent = (data.results||[]).filter(r=>r.sent).length;
+    const skipped = (data.results||[]).filter(r=>!r.sent && r.reason==='no_slack_id').length;
+    const failed = (data.results||[]).filter(r=>!r.sent && r.reason!=='no_slack_id').length;
+    let detail = `${sent} sent`;
+    if(skipped) detail += `, ${skipped} skipped (no Slack ID)`;
+    if(failed) detail += `, ${failed} failed`;
+    showToast(failed ? 'error' : 'success', failed ? 'Some summaries failed' : 'Sent to Slack', detail);
   }catch(e){
     restoreBtn(btn);
     showToast('error','Send failed','Network error — try again.');
@@ -8768,6 +8774,8 @@ function renderProfilePage(){
   if(!myProfile) return;
   document.getElementById('profileNameInput').value = myProfile.name || '';
   document.getElementById('profilePhoneInput').value = myProfile.phone || '';
+  const dsInput = document.getElementById('dailySummarySlackIdInput');
+  if(dsInput && document.activeElement !== dsInput) dsInput.value = myProfile.daily_summary_slack_id || '';
 
   const avatarImg = document.getElementById('profileAvatarPreview');
   const avatarPlaceholder = document.getElementById('profileAvatarPlaceholder');
@@ -8821,6 +8829,13 @@ async function saveProfileBasicInfo(){
   renderWhoAmI();
   renderTeam();
   showToast('success','Saved','Your profile is updated.');
+}
+
+async function saveDailySummarySlackId(value){
+  const { error } = await supabaseClient.from('team_profiles').update({ daily_summary_slack_id: value || null }).eq('id', currentUser.id);
+  if(error){ showToast('error','Could not save', error.message); return; }
+  myProfile.daily_summary_slack_id = value || null;
+  await loadTeamProfiles();
 }
 
 function renderProfileEmailPanel(){
