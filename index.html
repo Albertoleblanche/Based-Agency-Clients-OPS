@@ -996,7 +996,7 @@
   .tag.you{background:var(--brand-bg);color:var(--brand-dark);}
 
   /* Toasts */
-  .toast-stack{position:fixed;top:18px;right:18px;z-index:999;display:flex;flex-direction:column;gap:8px;max-width:320px;}
+  .toast-stack{position:fixed;top:18px;right:18px;z-index:999;display:flex;flex-direction:column;gap:12px;max-width:320px;}
 
   .floating-timer-pill{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:1500;display:flex;align-items:center;gap:14px;background:var(--card);color:var(--ink);border:1px solid var(--border);border-radius:30px;padding:10px 10px 10px 20px;box-shadow:0 16px 40px rgba(16,24,40,.18);cursor:pointer;max-width:min(92vw,460px);}
   .ftp-dot{width:8px;height:8px;border-radius:50%;background:var(--red);flex:none;position:relative;animation:timerPulse 1.5s ease-in-out infinite;}
@@ -1016,13 +1016,12 @@
   .tour-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
   .tour-actions .btn{padding:8px 13px;font-size:12px;}
   #tourPrevBtn.hidden-btn{visibility:hidden;}
-  .toast{display:flex;align-items:flex-start;gap:9px;background:var(--card);color:var(--ink);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:var(--radius-sm);padding:11px 13px;box-shadow:0 6px 20px rgba(16,24,40,.12);font-size:var(--text-sm);line-height:1.4;animation:toastIn var(--duration-base) var(--ease-out);}
-  .toast.error{border-left-color:var(--red);}
-  .toast.info{border-left-color:var(--muted-lt);}
-  .toast-icon{flex:none;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;background:var(--green);margin-top:1px;}
-  .toast.error .toast-icon{background:var(--red);}
-  .toast.info .toast-icon{background:var(--muted-lt);}
-  .toast-text b{display:block;font-weight:600;margin-bottom:1px;}
+  .toast{position:relative;overflow:hidden;display:flex;align-items:flex-start;gap:11px;background:var(--card);color:var(--ink);border:1px solid var(--border);border-radius:12px;padding:13px 15px;box-shadow:0 1px 2px rgba(16,24,40,.04), 0 8px 24px rgba(16,24,40,.10), 0 20px 44px rgba(16,24,40,.08);font-size:var(--text-sm);line-height:1.45;animation:toastIn .32s cubic-bezier(.2,.9,.3,1.3);}
+  .toast.error{box-shadow:0 1px 2px rgba(16,24,40,.04), 0 8px 24px rgba(207,36,36,.10), 0 20px 44px rgba(16,24,40,.08);}
+  .toast-icon{flex:none;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-top:1px;background:var(--green-bg);color:var(--green);}
+  .toast.error .toast-icon{background:var(--red-bg);color:var(--red);}
+  .toast.info .toast-icon{background:var(--surface-2);color:var(--muted);}
+  .toast-text b{display:block;font-weight:600;margin-bottom:2px;}
   .toast-copy-area{width:100%;font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:4px;padding:6px 7px;margin:6px 0 4px;resize:none;height:52px;}
 
   /* Mail modal */
@@ -1056,10 +1055,16 @@
   .event-modal-actions{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-top:1px solid var(--border);flex-wrap:wrap;gap:10px;}
   .event-delete-link{font-size:12.5px;color:var(--muted-lt);cursor:pointer;transition:color .12s ease;}
   .event-delete-link:hover{color:var(--red);}
-  .toast-close{margin-left:auto;flex:none;cursor:pointer;color:var(--muted-lt);font-size:13px;line-height:1;padding:2px;}
-  .toast.leaving{animation:toastOut .18s ease-in forwards;}
-  @keyframes toastIn{from{opacity:0;transform:translateX(16px);}to{opacity:1;transform:translateX(0);}}
-  @keyframes toastOut{from{opacity:1;transform:translateX(0);}to{opacity:0;transform:translateX(16px);}}
+  .toast-close{margin-left:auto;flex:none;cursor:pointer;color:var(--muted-lt);font-size:13px;line-height:1;padding:4px;border-radius:6px;transition:background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);}
+  .toast-close:hover{background:var(--surface-2);color:var(--ink);}
+  .toast.leaving{animation:toastOut .22s cubic-bezier(.4,0,1,1) forwards;}
+  .toast-progress{position:absolute;left:0;bottom:0;height:2px;background:var(--green);width:100%;transform-origin:left;animation:toastProgress 4.2s linear forwards;}
+  .toast.error .toast-progress{background:var(--red);}
+  .toast.info .toast-progress{background:var(--muted-lt);}
+  .toast.paused .toast-progress{animation-play-state:paused;}
+  @keyframes toastIn{from{opacity:0;transform:translateX(20px) scale(.96);}to{opacity:1;transform:translateX(0) scale(1);}}
+  @keyframes toastOut{from{opacity:1;transform:scale(1);}to{opacity:0;transform:scale(.92);}}
+  @keyframes toastProgress{from{transform:scaleX(1);}to{transform:scaleX(0);}}
 
   /* Mobile nav — deliberately placed last in the stylesheet. Every rule
      here shares its selector's specificity with a desktop-default rule
@@ -2811,13 +2816,37 @@ function showToast(type, title, detail){
   const stack = document.getElementById('toastStack');
   const el = document.createElement('div');
   el.className = 'toast ' + type;
-  const icon = type==='error' ? '!' : type==='info' ? 'i' : '✓';
-  el.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-text"><b>${title}</b>${detail?detail:''}</span><span class="toast-close" onclick="this.parentElement.remove()">✕</span>`;
+  const icons = {
+    error: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+    info: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+  };
+  const icon = icons[type] || '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+  el.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-text"><b>${title}</b>${detail?detail:''}</span><span class="toast-close" onclick="this.parentElement.remove()">✕</span><span class="toast-progress"></span>`;
   stack.appendChild(el);
-  setTimeout(()=>{
+
+  // Hover pauses both the visible progress bar and the actual dismiss
+  // timer together — reading a toast shouldn't cost you the chance to
+  // finish reading it. remaining/lastStart track how much time was left
+  // so resuming continues from there instead of restarting the full 4.2s.
+  const duration = 4200;
+  let remaining = duration;
+  let lastStart = Date.now();
+  let dismissTimer = setTimeout(dismiss, duration);
+
+  function dismiss(){
     el.classList.add('leaving');
-    setTimeout(()=>el.remove(), 200);
-  }, 4200);
+    setTimeout(()=>el.remove(), 220);
+  }
+  el.addEventListener('mouseenter', ()=>{
+    clearTimeout(dismissTimer);
+    remaining -= (Date.now() - lastStart);
+    el.classList.add('paused');
+  });
+  el.addEventListener('mouseleave', ()=>{
+    lastStart = Date.now();
+    dismissTimer = setTimeout(dismiss, Math.max(remaining, 0));
+    el.classList.remove('paused');
+  });
 }
 
 // Same as showToast, but stays on screen with a "Copy" button — used as a
@@ -2827,7 +2856,11 @@ function showToastWithCopy(type, title, detail, copyText){
   const stack = document.getElementById('toastStack');
   const el = document.createElement('div');
   el.className = 'toast ' + type;
-  const icon = type==='error' ? '!' : type==='info' ? 'i' : '✓';
+  const icons = {
+    error: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+    info: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+  };
+  const icon = icons[type] || '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
   const copyId = 'copytext-' + Date.now();
   el.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-text"><b>${title}</b>${detail}<br><textarea class="toast-copy-area" id="${copyId}" readonly>${copyText}</textarea><span class="row-link" style="font-size:11.5px;" onclick="copyToastText('${copyId}', this)">Copy details</span></span><span class="toast-close" onclick="this.parentElement.remove()">✕</span>`;
   stack.appendChild(el);
