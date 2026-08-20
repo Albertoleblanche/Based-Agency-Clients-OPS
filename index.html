@@ -1768,13 +1768,68 @@ document.addEventListener('DOMContentLoaded', function(){
             <span>Assigned by me</span>
           </div>
         </div>
-        <button class="btn btn-brand" style="flex:none;margin-left:auto;" onclick="openNewTaskModal()">
+        <button class="btn btn-outline" style="flex:none;margin-left:auto;" onclick="switchView('task-archive')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M2 7l2-4h16l2 4"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+          View Archive
+        </button>
+        <button class="btn btn-brand" style="flex:none;" onclick="openNewTaskModal()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           New Task
         </button>
       </div>
 
       <div class="kanban-board" id="kanbanBoard"></div>
+    </div>
+
+    <!-- TASK ARCHIVE -->
+    <div class="view" id="view-task-archive">
+      <span class="row-link" style="display:inline-block;margin-bottom:14px;" onclick="switchView('tasks')">← Back to Tasks</span>
+
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+        <div class="icon-tab-group" id="taskArchiveScopeTabs">
+          <div class="icon-tab active" data-scope="mine" onclick="switchTaskArchiveScope('mine')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span>My Tasks</span>
+          </div>
+          <div class="icon-tab" data-scope="team" id="taskArchiveTeamScopeTab" onclick="switchTaskArchiveScope('team')" style="display:none;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span>Whole Team</span>
+          </div>
+        </div>
+        <div class="search-field" style="flex:none;width:220px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="taskArchiveSearch" placeholder="Search by title…" oninput="renderTaskArchive()">
+        </div>
+        <div class="select-field" style="flex:none;width:170px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          <select id="taskArchiveClientFilter" onchange="renderTaskArchive()"><option value="all">All clients</option></select>
+        </div>
+        <div class="select-field" style="flex:none;width:170px;display:none;" id="taskArchiveMemberFilterWrap">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <select id="taskArchiveMemberFilter" onchange="renderTaskArchive()"><option value="all">Everyone</option></select>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex:none;">
+          <input type="date" id="taskArchiveFromDate" onchange="renderTaskArchive()" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background-color:var(--surface-2);color:var(--ink);">
+          <span style="color:var(--muted-lt);font-size:12px;">to</span>
+          <input type="date" id="taskArchiveToDate" onchange="renderTaskArchive()" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background-color:var(--surface-2);color:var(--ink);">
+        </div>
+        <span class="row-link" onclick="clearTaskArchiveFilters()">Clear filters</span>
+      </div>
+
+      <div class="panel">
+        <div class="table-scroll-wrap">
+        <table>
+          <thead><tr>
+            <th>Task</th>
+            <th>Client</th>
+            <th>Assignee</th>
+            <th>Assigned by</th>
+            <th>Completed</th>
+          </tr></thead>
+          <tbody id="taskArchiveTableBody"></tbody>
+        </table>
+        </div>
+      </div>
     </div>
 
     <!-- REMINDERS -->
@@ -3327,6 +3382,7 @@ const VIEW_TITLES = {
   teamqueue: ['Team Queue', "Everyone's drafts in one place, sorted by danger score"],
   notes: ['Notes', "Private to you — improvements you're planning or want to get to. Nobody else on the team can see these."],
   tasks: ['Tasks', 'Assign tasks to anyone on the team — only you and the other person can see it'],
+  'task-archive': ['Task Archive', 'Completed tasks, searchable and filterable — a record of what\'s been done'],
   reminders: ['Reminders', "Client questions waiting on a response, visible to the whole team"],
   calendar: ['Calendar', 'Shared team calendar — meetings, deadlines, and reminders, visible to everyone'],
   time: ['Time Tracker', "Log hours per client, review the timesheet, and see where the team's time goes"],
@@ -3483,6 +3539,7 @@ async function switchView(name){
   if(name==='trash') renderTrash();
   if(name==='payroll') renderPayroll();
   if(name==='tasks') renderTasks();
+  if(name==='task-archive'){ populateTaskArchiveFilters(); renderTaskArchive(); }
   if(name==='calendar'){ renderCalendar(); renderCalendarGoogleSyncWidget(); }
   if(name==='reminders') renderReminders();
   if(name==='improvements'){
@@ -7016,6 +7073,107 @@ async function saveEditTask(taskId){
   if(!error && !reassigned && assigneeId !== currentUser.id){
     sendNotification(assigneeId, 'task_edited', 'Task updated', `${myName()||'Someone'} updated "${title}".`, 'tasks');
   }
+}
+
+let taskArchiveScope = 'mine';
+
+function switchTaskArchiveScope(scope){
+  if(scope==='team' && !canApprove()) scope = 'mine'; // defense in depth — the tab itself is already hidden for non-approvers
+  taskArchiveScope = scope;
+  document.querySelectorAll('#taskArchiveScopeTabs .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.scope===scope));
+  const memberWrap = document.getElementById('taskArchiveMemberFilterWrap');
+  if(memberWrap) memberWrap.style.display = scope==='team' ? 'flex' : 'none';
+  renderTaskArchive();
+}
+
+function clearTaskArchiveFilters(){
+  document.getElementById('taskArchiveSearch').value = '';
+  document.getElementById('taskArchiveClientFilter').value = 'all';
+  const memberEl = document.getElementById('taskArchiveMemberFilter');
+  if(memberEl) memberEl.value = 'all';
+  document.getElementById('taskArchiveFromDate').value = '';
+  document.getElementById('taskArchiveToDate').value = '';
+  renderTaskArchive();
+}
+
+// Populates the client/member filter dropdowns and reveals the "Whole
+// Team" scope tab for admin/approver — called once each time the page is
+// navigated to, since teamProfiles/clients could have changed since the
+// last visit.
+function populateTaskArchiveFilters(){
+  const teamTab = document.getElementById('taskArchiveTeamScopeTab');
+  if(teamTab) teamTab.style.display = canApprove() ? 'flex' : 'none';
+  if(!canApprove() && taskArchiveScope==='team') switchTaskArchiveScope('mine');
+
+  const clientSel = document.getElementById('taskArchiveClientFilter');
+  if(clientSel){
+    const current = clientSel.value;
+    const clientsWithDoneTasks = new Set(tasks.filter(t=>t.status==='done' && t.clientId).map(t=>t.clientId));
+    const opts = [...clients].filter(c=>clientsWithDoneTasks.has(c.id)).sort((a,b)=>a.name.localeCompare(b.name))
+      .map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    clientSel.innerHTML = `<option value="all">All clients</option>${opts}`;
+    clientSel.value = current || 'all';
+  }
+  const memberSel = document.getElementById('taskArchiveMemberFilter');
+  if(memberSel){
+    const current = memberSel.value;
+    const opts = [...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name))
+      .map(p=>`<option value="${p.id}">${p.name}${p.id===currentUser.id?' (you)':''}</option>`).join('');
+    memberSel.innerHTML = `<option value="all">Everyone</option>${opts}`;
+    memberSel.value = current || 'all';
+  }
+}
+
+function renderTaskArchive(){
+  const tbody = document.getElementById('taskArchiveTableBody');
+  if(!tbody) return;
+
+  const search = (document.getElementById('taskArchiveSearch')?.value || '').toLowerCase().trim();
+  const clientFilter = document.getElementById('taskArchiveClientFilter')?.value || 'all';
+  const memberFilter = document.getElementById('taskArchiveMemberFilter')?.value || 'all';
+  const fromDate = document.getElementById('taskArchiveFromDate')?.value || '';
+  const toDate = document.getElementById('taskArchiveToDate')?.value || '';
+
+  let rows = tasks.filter(t=>t.status==='done');
+
+  // "mine" isn't just a UI nicety here — for a regular member this is a
+  // no-op anyway, since RLS never sent anyone else's tasks to their
+  // browser in the first place. For an admin/approver who's chosen "My
+  // Tasks" specifically, this narrows their own already-broader dataset
+  // back down to just their own involvement.
+  if(taskArchiveScope==='mine'){
+    rows = rows.filter(t=>t.assigneeId===currentUser.id || t.assignerId===currentUser.id);
+  } else if(memberFilter!=='all'){
+    rows = rows.filter(t=>t.assigneeId===memberFilter || t.assignerId===memberFilter);
+  }
+
+  if(clientFilter!=='all') rows = rows.filter(t=>t.clientId===clientFilter);
+  if(search) rows = rows.filter(t=>t.title.toLowerCase().includes(search));
+  if(fromDate) rows = rows.filter(t=>t.completedAt && t.completedAt.slice(0,10) >= fromDate);
+  if(toDate) rows = rows.filter(t=>t.completedAt && t.completedAt.slice(0,10) <= toDate);
+
+  rows.sort((a,b)=> new Date(b.completedAt||0) - new Date(a.completedAt||0));
+
+  if(!rows.length){
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty" style="padding:30px 0;">No completed tasks match these filters.</div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(t=>{
+    const c = clients.find(x=>x.id===t.clientId);
+    const assignee = teamProfiles.find(p=>p.id===t.assigneeId);
+    const assigner = teamProfiles.find(p=>p.id===t.assignerId);
+    const completedStr = t.completedAt ? new Date(t.completedAt).toLocaleDateString('en-US',{month:'short', day:'numeric', year:'numeric'}) : '—';
+    return `<tr>
+      <td>
+        <div class="table-name-link" onclick="openTaskDetailModal('${t.id}')">${escapeHtml(t.title)}${(t.completionNotes || t.completionLink) ? ' 📝' : ''}</div>
+      </td>
+      <td>${c ? escapeHtml(c.name) : '<span style="color:var(--muted-lt);">—</span>'}</td>
+      <td>${assignee ? escapeHtml(assignee.name) + (assignee.id===currentUser.id ? ' (you)' : '') : '—'}</td>
+      <td>${assigner ? escapeHtml(assigner.name) + (assigner.id===currentUser.id ? ' (you)' : '') : '—'}</td>
+      <td style="color:var(--muted-lt);">${completedStr}</td>
+    </tr>`;
+  }).join('');
 }
 
 async function moveTaskToStatus(taskId, newStatus){
