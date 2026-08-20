@@ -6959,13 +6959,13 @@ async function saveNewTask(){
     client_id: clientId, due_date: dueDate, link, status: newTaskPresetStatus
   }).select().single();
   newTaskPresetStatus = 'todo';
-  await loadMyTasks();
-  renderTasks();
-  updateTasksNavBadge();
   const assignee = teamProfiles.find(p=>p.id===assigneeId);
   if(!error && data){
     closeAppModal();
     showToast('success','Task assigned', assigneeId===currentUser.id ? 'Added to your tasks.' : `${assignee ? assignee.name : 'They'} will be notified.`);
+    await loadMyTasks();
+    renderTasks();
+    updateTasksNavBadge();
     if(addToCalendar) await addTaskToCalendar(data.id);
     if(assigneeId !== currentUser.id){
       sendNotification(assigneeId, 'task_assigned', 'New task assigned to you', `${myName()||'Someone'}: "${title}"`, 'tasks');
@@ -9413,15 +9413,15 @@ async function addManualEntry(){
     clientId, service, dateStr: dateVal, minutes: totalMinutes, description
   });
   restoreBtn(btn);
-  await loadTimeEntries();
-  renderTimesheet(); renderReports();
   const c = clients.find(x=>x.id===clientId);
   if(error){ showToast('error','Save failed', error.message); return; }
-  syncEntryToHarvestBackground(entryId);
   closeAppModal();
   merged
     ? showToast('success','Time added', `${formatMinutes(totalMinutes)} added to today's existing entry for ${c?c.name:'client'}.`)
     : showToast('success','Time added', `${formatMinutes(totalMinutes)} added for ${c?c.name:'client'}.`);
+  syncEntryToHarvestBackground(entryId);
+  await loadTimeEntries();
+  renderTimesheet(); renderReports();
 }
 
 /* --- Timesheet --- */
