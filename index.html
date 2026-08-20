@@ -6668,7 +6668,7 @@ async function loadMyTasks(){
     createdAt:t.created_at, completedAt:t.completed_at, cancelledAt:t.cancelled_at,
     hiddenByAssigner:t.hidden_by_assigner, hiddenByAssignee:t.hidden_by_assignee,
     assigneeNotified:t.assignee_notified, assignerNotified:t.assigner_notified,
-    attachments:t.attachments||[]
+    attachments:t.attachments||[], completionNotes:t.completion_notes||'', completionLink:t.completion_link||''
   }));
   tasksDataLoaded = true;
 }
@@ -6826,6 +6826,7 @@ function kanbanCardHtml(t){
       </span>
       <div class="kanban-card-icons">
         ${t.link ? `<span title="Has a link">🔗</span>` : ''}
+        ${t.status==='done' && (t.completionNotes || t.completionLink) ? `<span title="Has completion notes">📝</span>` : ''}
       </div>
     </div>
   </div>`;
@@ -6871,6 +6872,12 @@ function openTaskDetailModal(taskId){
         ${t.status==='done' && t.completedAt ? `<div><label style="font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;color:var(--muted-lt);display:block;margin-bottom:4px;">Completed</label><div style="font-size:13px;">${new Date(t.completedAt).toLocaleDateString('en-US',{month:'long',day:'numeric'})}</div></div>` : ''}
       </div>
       ${t.link ? `<a href="${normalizeUrl(t.link)}" target="_blank" rel="noopener" class="note-link" style="display:block;margin-top:8px;">🔗 ${truncateLinkDisplay(t.link, 50)}</a>` : ''}
+      ${t.status==='done' && (t.completionNotes || t.completionLink) ? `
+        <div style="margin-top:14px;padding:12px;border-radius:8px;background:var(--surface-2);">
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;color:var(--muted-lt);letter-spacing:.04em;margin-bottom:6px;">FROM ${escapeHtml(teamProfiles.find(p=>p.id===t.assigneeId)?.name || 'the assignee')} ON COMPLETION</div>
+          ${t.completionNotes ? `<div style="font-size:13px;color:var(--ink);line-height:1.5;white-space:pre-wrap;">${escapeHtml(t.completionNotes)}</div>` : ''}
+          ${t.completionLink ? `<a href="${normalizeUrl(t.completionLink)}" target="_blank" rel="noopener" class="note-link" style="display:block;margin-top:${t.completionNotes?'8px':'0'};">🔗 ${truncateLinkDisplay(t.completionLink, 50)}</a>` : ''}
+        </div>` : ''}
       ${t.dueDate ? (linkedEvent
         ? `<div style="margin-top:14px;font-size:12.5px;color:var(--green);font-weight:600;">✓ On the calendar — <span class="row-link" onclick="closeAppModal();switchView('calendar');jumpToCalendarDate('${t.dueDate}');">view it</span></div>`
         : `<button class="btn btn-outline" style="margin-top:14px;" onclick="addTaskToCalendar('${t.id}')">+ Add to calendar</button>`) : ''}
@@ -7022,17 +7029,68 @@ async function moveTaskToStatus(taskId, newStatus){
   if(newStatus==='done' && !amAssignee){ showToast('error','Not allowed','Only the person assigned to this task can move it to Completed.'); return; }
   if(newStatus===t.status){ closeKanbanMenus(); return; }
 
+  if(newStatus==='done'){
+    closeKanbanMenus();
+    completeTaskModalHtml(taskId);
+    return;
+  }
+
+  const { error } = await supabaseClient.from('tasks').update({ status: newStatus }).eq('id', taskId);
+  await loadMyTasks();
+  renderTasks();
+  updateTasksNavBadge();
+  closeAppModal();
+  closeKanbanMenus();
+  const stageLabel = KANBAN_STAGES.find(s=>s.key===newStatus)?.label || newStatus;
+  if(error){ showToast('error','Save failed', error.message); return; }
+  showToast('success','Task moved', `Moved to ${stageLabel}.`);
+}
+
+function completeTaskModalHtml(taskId){
+  const t = tasks.find(x=>x.id===taskId);
+  if(!t) return '';
+  openAppModal(`
+    <div class="modal-head">
+      <span class="panel-title">Mark task complete</span>
+      <span class="toast-close" onclick="closeAppModal()">✕</span>
+    </div>
+    <div class="modal-body">
+      <div class="q-name" style="margin-bottom:14px;">${escapeHtml(t.title)}</div>
+      <div class="settings-field" style="margin-bottom:14px;">
+        <label>Notes <span style="color:var(--muted-lt);font-weight:400;">(optional)</span></label>
+        <textarea id="taskCompletionNotes" placeholder="Anything the assigner should know — what you found, decisions made, what's left, etc." style="width:100%;min-height:80px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${escapeHtml(t.completionNotes||'')}</textarea>
+      </div>
+      <div class="settings-field">
+        <label>Link <span style="color:var(--muted-lt);font-weight:400;">(optional)</span></label>
+        <input type="text" id="taskCompletionLink" value="${escapeHtml(t.completionLink||'')}" placeholder="e.g. a doc, a page you built, a file" style="width:100%;">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
+      <button class="btn btn-brand" id="taskCompletionConfirmBtn" onclick="confirmTaskCompletion('${taskId}')">Mark Complete</button>
+    </div>`, 460);
+}
+
+async function confirmTaskCompletion(taskId){
+  const t = tasks.find(x=>x.id===taskId);
+  if(!t) return;
+  const notes = document.getElementById('taskCompletionNotes').value.trim();
+  const link = normalizeUrl(document.getElementById('taskCompletionLink').value) || null;
+  const btn = document.getElementById('taskCompletionConfirmBtn');
+  setBtnLoading(btn, 'Saving…');
+
   const wasAlreadyDone = t.status==='done';
-  const updatePayload = { status: newStatus };
-  if(newStatus==='done') updatePayload.completed_at = new Date().toISOString();
-  if(newStatus==='done' && !wasAlreadyDone) updatePayload.assigner_notified = false;
+  const updatePayload = { status:'done', completed_at:new Date().toISOString(), completion_notes:notes||null, completion_link:link };
+  if(!wasAlreadyDone) updatePayload.assigner_notified = false;
   const { error } = await supabaseClient.from('tasks').update(updatePayload).eq('id', taskId);
+  restoreBtn(btn);
+  if(error){ showToast('error','Save failed', error.message); return; }
 
   // Only tasks tied to a client have anywhere to log to — plenty of tasks
   // are internal and have no client attached, which is fine, they just
   // don't create an improvement entry. Only logs once, the first time it
   // reaches Completed — moving it back out and in again doesn't double-log.
-  if(!error && newStatus==='done' && !wasAlreadyDone && t.clientId){
+  if(!wasAlreadyDone && t.clientId){
     await loadAll();
     const c = clients.find(x=>x.id===t.clientId);
     if(c){
@@ -7052,20 +7110,25 @@ async function moveTaskToStatus(taskId, newStatus){
     }
   }
 
+  closeAppModal();
+  closeKanbanMenus();
   await loadMyTasks();
   renderTasks();
   updateTasksNavBadge();
-  closeAppModal();
-  closeKanbanMenus();
-  const stageLabel = KANBAN_STAGES.find(s=>s.key===newStatus)?.label || newStatus;
-  if(error){ showToast('error','Save failed', error.message); return; }
-  if(newStatus==='done' && !wasAlreadyDone){
-    showToast('success','Marked complete', `${amAssigner ? 'Nice work!' : `${teamProfiles.find(p=>p.id===t.assignerId)?.name||'They'} will be notified.`}${t.clientId ? ' Logged to Past Improvements.' : ''}`);
-    if(t.assignerId !== currentUser.id){
-      sendNotification(t.assignerId, 'task_completed', 'Task completed', `${myName()||'Someone'} marked "${t.title}" as done.`, 'tasks');
-    }
-  } else {
-    showToast('success','Task moved', `Moved to ${stageLabel}.`);
+  showToast('success','Marked complete', `${t.assignerId===currentUser.id ? 'Nice work!' : `${teamProfiles.find(p=>p.id===t.assignerId)?.name||'They'} will be notified.`}${t.clientId ? ' Logged to Past Improvements.' : ''}`);
+
+  if(t.assignerId !== currentUser.id){
+    // Enrich the notification with a preview of what was just added —
+    // this same body text is what shows in the in-app bell AND the Slack
+    // DM (sendNotification() already fans out to both), so the assigner
+    // sees this context immediately without needing to open the task.
+    // Notes truncated here specifically to keep the notification/Slack
+    // message readable — the full text is always visible on the task
+    // itself for anyone who clicks through.
+    let notifBody = `${myName()||'Someone'} marked "${t.title}" as done.`;
+    if(notes) notifBody += ` Note: "${notes.length>100 ? notes.slice(0,100)+'…' : notes}"`;
+    if(link) notifBody += ` Link: ${link}`;
+    sendNotification(t.assignerId, 'task_completed', 'Task completed', notifBody, 'tasks');
   }
 }
 
