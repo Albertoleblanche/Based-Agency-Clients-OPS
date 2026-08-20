@@ -3435,16 +3435,16 @@ function populateReportMemberFilter(){
 
 const VIEW_TITLES = {
   clients: ['Clients', "Log improvements here whenever you make one — any of the six of you, any time"],
-  improvements: ['Past Improvements', 'Everything logged for every client, searchable and filterable by date'],
-  approve: ['Approval Queue', 'Sorted by danger score — highest risk clients first'],
-  teamqueue: ['Team Queue', "Everyone's drafts in one place, sorted by danger score"],
+  improvements: ['Past Improvements', "The team's full history of client work, searchable by date"],
+  approve: ['Approval Queue', 'The clients who need you most, sorted by risk'],
+  teamqueue: ['Team Queue', "Every draft on the team, sorted so the riskiest ones surface first"],
   notes: ['Notes', "Private to you — improvements you're planning or want to get to. Nobody else on the team can see these."],
   tasks: ['Tasks', 'Assign tasks to anyone on the team — only you and the other person can see it'],
-  'task-archive': ['Task Archive', 'Completed tasks, searchable and filterable — a record of what\'s been done'],
+  'task-archive': ['Task Archive', "A record of everything the team has finished — search or filter to find anything"],
   reminders: ['Reminders', "Client questions waiting on a response, visible to the whole team"],
-  calendar: ['Calendar', 'Shared team calendar — meetings, deadlines, and reminders, visible to everyone'],
+  calendar: ['Calendar', "The whole team's calendar in one place — meetings, deadlines, and reminders"],
   time: ['Time Tracker', "Log hours per client, review the timesheet, and see where the team's time goes"],
-  team: ['Team', "Manage who's on the team, their roles, and job titles"],
+  team: ['Team', "Everyone on the team, and what they do here"],
   trash: ['Trash', 'Deleted notes and time entries — restore anytime, or delete for good. Deleted clients are visible to admins and approvers only.'],
   settings: ['Settings & Integrations', "What's actually connected right now — no guessing"],
   profile: ['My Profile', 'Your info, visible to the rest of the team the same way it always has been'],
@@ -4148,8 +4148,8 @@ function renderImprovementsHistory(){
     badge.style.display = activeCount ? 'inline-flex' : 'none';
   }
 
-  if(!all.length){ el.innerHTML = `<div class="panel"><div class="empty">No improvements logged yet.</div></div>`; return; }
-  if(!filtered.length){ el.innerHTML = `<div class="panel"><div class="empty">No improvements match these filters.</div></div>`; return; }
+  if(!all.length){ el.innerHTML = `<div class="panel"><div class="empty">No improvements logged yet — once the team starts logging, they'll show up here.</div></div>`; return; }
+  if(!filtered.length){ el.innerHTML = `<div class="panel"><div class="empty">Nothing matches these filters — try widening the date range or clearing a filter.</div></div>`; return; }
 
   // Grouped by client, not a flat list — each group keeps its own
   // improvements together (sorted newest-first, matching getAllImprovementsFlat's
@@ -4284,7 +4284,7 @@ function renderCustomFieldsManager(){
   const el = document.getElementById('customFieldsList');
   if(!el) return;
   const fields = settings.customFields || [];
-  if(!fields.length){ el.innerHTML = `<div class="empty" style="padding:10px 0;">No custom fields yet.</div>`; return; }
+  if(!fields.length){ el.innerHTML = `<div class="empty" style="padding:10px 0;">No custom fields yet — add one to track something specific to your clients.</div>`; return; }
   el.innerHTML = fields.map((f,i)=>`
     <div class="custom-field-row">
       <div class="custom-field-arrows">
@@ -4788,7 +4788,7 @@ function renderOverviewMyTasks(){
   if(!el) return;
   const myTasks = tasks.filter(t => t.assigneeId===currentUser?.id && t.status!=='done' && !t.cancelledAt);
   if(!myTasks.length){
-    el.innerHTML = `<div class="empty" style="padding:10px 0;">No open tasks assigned to you.</div>`;
+    el.innerHTML = `<div class="empty" style="padding:10px 0;">Nothing on your plate right now.</div>`;
     return;
   }
   const now = new Date();
@@ -4825,7 +4825,7 @@ function renderOverviewMyNotes(){
   if(!el) return;
   const myNotes = notes.filter(n => n.status!=='done').sort((a,b)=> new Date(b.updatedAt) - new Date(a.updatedAt));
   if(!myNotes.length){
-    el.innerHTML = `<div class="empty" style="padding:10px 0;">No open notes.</div>`;
+    el.innerHTML = `<div class="empty" style="padding:10px 0;">Nothing open here — all caught up.</div>`;
     return;
   }
   el.innerHTML = myNotes.slice(0,3).map(n=>{
@@ -5192,7 +5192,7 @@ function renderClientsTable(){
     countEl.textContent = isFiltered ? `${filtered.length} of ${ac.length} shown` : '';
   }
   if(!filtered.length){
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty">No clients match these filters.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty">Nothing matches these filters — try adjusting or clearing them.</div></td></tr>`;
     renderWhoAmI();
     renderClientsPagination(0);
     return;
@@ -5600,7 +5600,7 @@ function setPayrollPeriodStart(val){
 function renderPayrollRatesList(){
   const el = document.getElementById('payrollRatesList');
   if(!el) return;
-  if(!teamProfiles.length){ el.innerHTML = `<div class="empty">No team members yet.</div>`; return; }
+  if(!teamProfiles.length){ el.innerHTML = `<div class="empty">Nobody on the team yet — add teammates to see them here.</div>`; return; }
   el.innerHTML = [...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>{
     const rate = payrollRates[p.id] || 0;
     return `<div class="integ-row">
@@ -5684,7 +5684,7 @@ function renderPayrollSummary(){
   const foot = document.getElementById('payrollSummaryFoot');
   if(!body) return;
   const rows = getPayrollSummary();
-  if(!rows.length){ body.innerHTML = `<tr><td colspan="5"><div class="empty">No team members yet.</div></td></tr>`; if(foot) foot.innerHTML = ''; return; }
+  if(!rows.length){ body.innerHTML = `<tr><td colspan="5"><div class="empty">Nobody on the team yet — add teammates to see them here.</div></td></tr>`; if(foot) foot.innerHTML = ''; return; }
 
   body.innerHTML = rows.map(r=>`
     <tr>
@@ -6265,7 +6265,7 @@ function renderReminders(){
         ${stage.key==='waiting' ? `<button class="kanban-add-btn" onclick="openNewReminderModal()" title="New reminder">+</button>` : ''}
       </div>
       <div class="kanban-cards">
-        ${stageReminders.length ? stageReminders.map(r=>reminderCardHtml(r)).join('') : `<div class="empty" style="padding:18px 8px;font-size:11.5px;">Nothing here.</div>`}
+        ${stageReminders.length ? stageReminders.map(r=>reminderCardHtml(r)).join('') : `<div class="empty" style="padding:18px 8px;font-size:11.5px;">Nothing here yet.</div>`}
       </div>
     </div>`;
   }).join('');
@@ -6698,7 +6698,7 @@ function renderNotes(){
         <button class="kanban-add-btn" onclick="openNoteModal(undefined,undefined,'${stage.key}')" title="New note in ${stage.label}">+</button>
       </div>
       <div class="kanban-cards">
-        ${stageNotes.length ? stageNotes.map(n=>noteCardHtml(n)).join('') : `<div class="empty" style="padding:18px 8px;font-size:11.5px;">Nothing here.</div>`}
+        ${stageNotes.length ? stageNotes.map(n=>noteCardHtml(n)).join('') : `<div class="empty" style="padding:18px 8px;font-size:11.5px;">Nothing here yet.</div>`}
       </div>
     </div>`;
   }).join('');
@@ -6839,7 +6839,7 @@ function renderTasks(){
         <button class="kanban-add-btn" onclick="openNewTaskModal(undefined,'${stage.key}')" title="New task in ${stage.label}">+</button>
       </div>
       <div class="kanban-cards">
-        ${stageTasks.length ? stageTasks.map(t=>kanbanCardHtml(t)).join('') : `<div class="empty" style="padding:18px 8px;font-size:11.5px;">Nothing here.</div>`}
+        ${stageTasks.length ? stageTasks.map(t=>kanbanCardHtml(t)).join('') : `<div class="empty" style="padding:18px 8px;font-size:11.5px;">Nothing here yet.</div>`}
       </div>
     </div>`;
   }).join('');
