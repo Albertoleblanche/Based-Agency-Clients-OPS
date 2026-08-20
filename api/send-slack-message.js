@@ -225,7 +225,7 @@ module.exports = async function handler(req, res) {
     catch (e) { res.status(400).json({ error: 'Malformed JSON body' }); return; }
 
     const { action, text } = body;
-    if (!text) { res.status(400).json({ error: 'Missing text' }); return; }
+    if (!text && action !== 'personal-summaries') { res.status(400).json({ error: 'Missing text' }); return; }
 
     // ---- Existing daily-summary flow, unchanged from before the rename ----
     if (!action || action === 'summary') {
@@ -293,8 +293,48 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    // ---- Send each person their own personal daily summary, replacing the old shared-channel post ----
+    if (action === 'personal-summaries') {
+      if (!['admin', 'approver'].includes(callerProfile.role)) {
+        res.status(403).json({ error: 'Only admins and approvers can send daily summaries.' });
+        return;
+      }
+      const { date, summary } = body;
+      if (!date || !Array.isArray(summary)) { res.status(400).json({ error: 'Missing date or summary' }); return; }
+
+      const dateLabel = new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+      const results = [];
+
+      for (const person of summary) {
+        if (!person.userId || !person.entries || !person.entries.length) continue;
+
+        const { data: profile } = await admin
+          .from('team_profiles').select('daily_summary_slack_id, slack_user_id').eq('id', person.userId).maybeSingle();
+        const overrideId = profile?.daily_summary_slack_id || null;
+
+        const entryLines = person.entries.map(e =>
+          `• ${e.client}${e.service ? ` (${e.service})` : ''} — ${formatMinutesServer(e.minutes)}${e.description ? `: ${e.description}` : ''}`
+        ).join('\n');
+        const personalText = `*Your Daily Summary — ${dateLabel}*\n\n${entryLines}\n\n*Total:* ${formatMinutesServer(person.totalMinutes)}`;
+
+        const result = await sendSlackDM(admin, person.userId, 'daily_summary', personalText, overrideId);
+        results.push({ userId: person.userId, name: person.name, ...result });
+      }
+
+      res.status(200).json({ results });
+      return;
+    }
+
     res.status(400).json({ error: `Unknown action: ${action}` });
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
 };
+
+function formatMinutesServer(minutes) {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h && m) return `${h}h ${m}m`;
+  if (h) return `${h}h`;
+  return `${m}m`;
+}
