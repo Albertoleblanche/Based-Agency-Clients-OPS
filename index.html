@@ -6814,6 +6814,12 @@ function renderTasks(){
     if(t.cancelledAt) return false;
     const amAssigner = t.assignerId===currentUser.id;
     const amAssignee = t.assigneeId===currentUser.id;
+    // This board is personal to whoever's looking at it — always, even
+    // for admin/approver, whose tasks array can otherwise legitimately
+    // contain everyone's tasks (needed for the Task Archive's separate
+    // "Whole Team" view). Without this, an admin/approver would see the
+    // whole team's tasks bleed into their own personal kanban board.
+    if(!amAssigner && !amAssignee) return false;
     // Per-user hide only applies once a task reaches Completed — clearing
     // it from your board there doesn't affect the other person's view.
     if(t.status==='done'){
@@ -6853,7 +6859,7 @@ function kanbanCardMenuHtml(t){
   // file it away or remove it, not move it around or edit it further.
   if(t.status==='done'){
     return `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();hideTaskFromMyList('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>Archive</div>
-      <div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();deleteTaskPermanently('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete</div>`;
+      ${canApprove() ? `<div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();deleteTaskPermanently('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete</div>` : ''}`;
   }
 
   const moveOptions = KANBAN_STAGES.filter(s=>s.key!==t.status).map(s=>{
@@ -6994,7 +7000,7 @@ function openTaskDetailModal(taskId){
       <div style="display:flex;align-items:center;gap:16px;">
         ${t.status==='done' ? `
           <span class="row-link" onclick="hideTaskFromMyList('${t.id}')">Archive</span>
-          <span class="event-delete-link" onclick="deleteTaskPermanently('${t.id}')">Delete</span>
+          ${canApprove() ? `<span class="event-delete-link" onclick="deleteTaskPermanently('${t.id}')">Delete</span>` : ''}
         ` : `
           ${amAssigner ? `<span class="event-delete-link" onclick="cancelTask('${t.id}')">Cancel task</span>` : ''}
           ${amAssigner ? `<button class="btn btn-brand" onclick="openEditTaskModal('${t.id}')">Edit</button>` : ''}
@@ -7367,6 +7373,7 @@ async function hideTaskFromMyList(taskId){
 // people, same as this, but says so honestly rather than pretending
 // something in progress was ever "done").
 async function deleteTaskPermanently(taskId){
+  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can permanently delete a task.'); return; }
   const t = tasks.find(x=>x.id===taskId);
   if(!t) return;
   if(!(await confirmDialog(`Permanently delete "${t.title}"? This can't be undone.`, {confirmLabel:'Delete permanently', destructive:true}))) return;
