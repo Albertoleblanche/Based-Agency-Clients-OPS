@@ -3158,42 +3158,64 @@ function closeAppModal(){
     modalPreviousFocus.focus();
     modalPreviousFocus = null;
   }
-  // Resolves any pending confirmDialog() as "cancelled" if the modal is
-  // being closed by anything other than that dialog's own buttons —
-  // backdrop click, Escape, or another modal taking over the slot.
-  // Those buttons clear this themselves before calling closeAppModal(),
-  // so by the time this runs for an explicit confirm/cancel click,
-  // there's nothing left here to resolve.
-  if(pendingConfirmResolve){ const r = pendingConfirmResolve; pendingConfirmResolve = null; r(false); }
 }
 
 // Async, in-app replacement for the browser's native confirm() — same
 // call shape (returns a boolean, "did they confirm"), but styled to match
-// the rest of the app instead of an unstyled native browser popup. Every
-// dismissal path funnels through closeAppModal() above, which is what
-// guarantees this promise always resolves eventually, however the person
-// actually closes it.
-let pendingConfirmResolve = null;
+// the rest of the app instead of an unstyled native browser popup.
+//
+// Deliberately its own, completely independent overlay — NOT built on
+// openAppModal()/closeAppModal(). Those always tear down whatever modal
+// is currently open before showing anything new, which silently destroyed
+// the parent modal for any confirmation triggered from within one (e.g.
+// deleting a row from an already-open client detail view) — the delete
+// itself was actually succeeding, but the parent modal never came back
+// afterward, which looked exactly like "nothing happened." This overlay
+// stacks visually on top (higher z-index) instead, leaving whatever was
+// already open completely untouched underneath, then simply removes
+// itself when done — the parent modal was never modified at all.
 function confirmDialog(message, options){
   options = options || {};
-  return new Promise(resolve=>{
-    pendingConfirmResolve = resolve;
-    openAppModal(`
-      <div class="modal-body" style="text-align:center;padding:8px 4px 4px;">
-        <div style="font-size:14px;color:var(--ink);line-height:1.55;white-space:pre-wrap;">${escapeHtml(message)}</div>
-      </div>
-      <div class="modal-actions" style="justify-content:center;">
-        <button class="btn btn-outline" onclick="resolveConfirmDialog(false)">${escapeHtml(options.cancelLabel || 'Cancel')}</button>
-        <button class="btn ${options.destructive ? 'btn-outline' : 'btn-brand'}" ${options.destructive ? 'style="color:var(--red);border-color:var(--red-bg);"' : ''} onclick="resolveConfirmDialog(true)">${escapeHtml(options.confirmLabel || 'OK')}</button>
-      </div>`, 420);
-  });
-}
+  const destructive = !!options.destructive;
+  const confirmLabel = options.confirmLabel || 'OK';
+  const cancelLabel = options.cancelLabel || 'Cancel';
+  const title = /\?\s*$/.test(confirmLabel) ? confirmLabel : `${confirmLabel}?`;
 
-function resolveConfirmDialog(result){
-  const resolve = pendingConfirmResolve;
-  pendingConfirmResolve = null; // cleared first, so closeAppModal()'s own resolve-as-cancelled logic sees nothing left pending
-  closeAppModal();
-  if(resolve) resolve(result);
+  return new Promise(resolve=>{
+    const previousFocus = document.activeElement;
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.zIndex = '1100'; // above the regular .modal-overlay (1000) — stacks on top rather than replacing it
+    overlay.innerHTML = `
+      <div class="modal-card" style="max-width:380px;padding:26px 24px 22px;">
+        <div style="width:44px;height:44px;border-radius:50%;background:${destructive ? 'var(--red-bg)' : 'var(--brand-bg)'};color:${destructive ? 'var(--red)' : 'var(--brand-dark)'};display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
+          ${destructive
+            ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>'
+            : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'}
+        </div>
+        <div style="text-align:center;font-size:16px;font-weight:700;color:var(--ink);margin-bottom:8px;">${escapeHtml(title)}</div>
+        <div style="text-align:center;font-size:13px;color:var(--muted-lt);line-height:1.55;white-space:pre-wrap;margin-bottom:20px;">${escapeHtml(message)}</div>
+        <div style="display:flex;gap:10px;justify-content:center;">
+          <button class="btn btn-outline" id="confirmDialogCancelBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:-2px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>${escapeHtml(cancelLabel)}</button>
+          <button class="btn ${destructive ? 'btn-outline' : 'btn-brand'}" ${destructive ? 'style="color:var(--red);border-color:var(--red-bg);"' : ''} id="confirmDialogOkBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:-2px;">${destructive ? '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>' : '<polyline points="20 6 9 17 4 12"/>'}</svg>${escapeHtml(confirmLabel)}</button>
+        </div>
+      </div>`;
+
+    function finish(result){
+      overlay.remove();
+      document.removeEventListener('keydown', onKeydown);
+      if(previousFocus && typeof previousFocus.focus==='function') previousFocus.focus();
+      resolve(result);
+    }
+    overlay.onclick = (e)=>{ if(e.target===overlay) finish(false); };
+    function onKeydown(e){ if(e.key==='Escape') finish(false); }
+    document.addEventListener('keydown', onKeydown);
+
+    document.body.appendChild(overlay);
+    document.getElementById('confirmDialogOkBtn').onclick = ()=> finish(true);
+    document.getElementById('confirmDialogCancelBtn').onclick = ()=> finish(false);
+    setTimeout(()=> document.getElementById('confirmDialogOkBtn')?.focus(), 10);
+  });
 }
 
 function copyMailModalBody(){
