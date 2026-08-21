@@ -1021,8 +1021,7 @@
   .tag.you{background:var(--brand-bg);color:var(--brand-dark);}
 
   /* Toasts */
-  .toast-stack{position:fixed;top:12px;right:18px;z-index:2100;width:320px;max-width:calc(100vw - 36px);}
-  body[data-theme="dark"] .toast-stack{top:auto;right:auto;bottom:24px;left:50%;transform:translateX(-50%);}
+  .toast-stack{position:fixed;bottom:20vh;right:18px;z-index:2100;width:320px;max-width:calc(100vw - 36px);}
 
   .floating-timer-pill{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:1500;display:flex;align-items:center;gap:14px;background:var(--card);color:var(--ink);border:1px solid var(--border);border-radius:30px;padding:10px 10px 10px 20px;box-shadow:0 16px 40px rgba(16,24,40,.18);cursor:pointer;max-width:min(92vw,460px);}
   .ftp-dot{width:8px;height:8px;border-radius:50%;background:var(--red);flex:none;position:relative;animation:timerPulse 1.5s ease-in-out infinite;}
@@ -2923,10 +2922,7 @@ function restackToasts(){
   const stack = document.getElementById('toastStack');
   if(!stack) return;
   const toasts = [...stack.children].filter(el=>el.classList.contains('toast') && !el.classList.contains('leaving'));
-  // Dark mode's stack anchors at the bottom and grows upward; light
-  // mode's anchors at the top and grows downward — same depth math,
-  // opposite offset direction.
-  const dir = document.body.dataset.theme === 'dark' ? -1 : 1;
+  const dir = -1; // both themes now anchor at the bottom — older toasts always stack upward, away from the bottom edge
   // Newest toast is always the most recently appended (last child) —
   // walk from the end backward to assign depth-from-front correctly.
   for(let i = toasts.length - 1, depthFromFront = 0; i >= 0; i--, depthFromFront++){
