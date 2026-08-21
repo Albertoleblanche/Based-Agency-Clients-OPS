@@ -2967,7 +2967,7 @@ function showToast(type, title, detail){
   // would mean the browser never paints this starting state at all, so
   // there'd be nothing for the transition to animate from.
   el.style.opacity = '0';
-  el.style.transform = 'translateX(24px) scale(.94)';
+  el.style.transform = 'scale(.94)';
   stack.appendChild(el);
   requestAnimationFrame(()=> requestAnimationFrame(restackToasts));
 
@@ -3009,7 +3009,7 @@ function showToastWithCopy(type, title, detail, copyText){
   const copyId = 'copytext-' + Date.now();
   el.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-text"><b>${title}</b>${detail}<br><textarea class="toast-copy-area" id="${copyId}" readonly>${copyText}</textarea><span class="row-link" style="font-size:11.5px;" onclick="copyToastText('${copyId}', this)">Copy details</span></span><span class="toast-close" onclick="dismissToastEl(this.parentElement)">✕</span>`;
   el.style.opacity = '0';
-  el.style.transform = 'translateX(24px) scale(.94)';
+  el.style.transform = 'scale(.94)';
   stack.appendChild(el);
   requestAnimationFrame(()=> requestAnimationFrame(restackToasts));
 }
