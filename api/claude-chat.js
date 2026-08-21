@@ -19,7 +19,7 @@
 const { createClient } = require('@supabase/supabase-js');
 
 const DAILY_MESSAGE_CAP = 40;
-const CLAUDE_MODEL = 'claude-sonnet-4-6';
+const CLAUDE_MODEL = 'claude-sonnet-5';
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
