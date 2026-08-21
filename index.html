@@ -1047,6 +1047,29 @@
   .tour-card-final .tour-title-row{flex-direction:column;align-items:center;}
   .tour-card-final .tour-actions{justify-content:center;}
   .tour-click-blocker{position:fixed;inset:0;z-index:1550;background:transparent;}
+
+  .claude-float-btn{position:fixed;bottom:22px;left:22px;z-index:1400;width:52px;height:52px;border-radius:50%;background:var(--brand);color:#fff;border:none;box-shadow:0 10px 28px rgba(16,24,40,.24);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform var(--duration-fast) var(--ease-out);}
+  .claude-float-btn:hover{transform:scale(1.06);}
+  .claude-float-panel{position:fixed;bottom:86px;left:22px;z-index:1400;width:360px;max-width:calc(100vw - 44px);height:480px;max-height:calc(100vh - 130px);background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 24px 60px rgba(16,24,40,.28);display:none;flex-direction:column;overflow:hidden;}
+  .claude-float-panel.open{display:flex;animation:claudePanelIn .25s cubic-bezier(.2,.9,.3,1.15);}
+  @keyframes claudePanelIn{from{opacity:0;transform:translateY(10px) scale(.97);}to{opacity:1;transform:translateY(0) scale(1);}}
+  .claude-chat-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);flex:none;}
+  .claude-chat-head-title{display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:600;color:var(--ink);}
+  .claude-chat-messages{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:12px;}
+  .claude-msg{max-width:88%;padding:10px 13px;border-radius:12px;font-size:13px;line-height:1.55;white-space:pre-wrap;animation:claudeMsgIn .22s ease;}
+  @keyframes claudeMsgIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+  .claude-msg-user{align-self:flex-end;background:var(--brand);color:#fff;border-bottom-right-radius:4px;}
+  .claude-msg-assistant{align-self:flex-start;background:var(--surface-2);color:var(--ink);border-bottom-left-radius:4px;}
+  .claude-msg-typing{align-self:flex-start;display:flex;gap:4px;padding:12px 14px;background:var(--surface-2);border-radius:12px;border-bottom-left-radius:4px;}
+  .claude-msg-typing span{width:6px;height:6px;border-radius:50%;background:var(--muted-lt);animation:claudeTyping 1.2s ease-in-out infinite;}
+  .claude-msg-typing span:nth-child(2){animation-delay:.15s;}
+  .claude-msg-typing span:nth-child(3){animation-delay:.3s;}
+  @keyframes claudeTyping{0%,60%,100%{opacity:.3;transform:translateY(0);}30%{opacity:1;transform:translateY(-3px);}}
+  .claude-chat-input-row{display:flex;gap:8px;padding:12px;border-top:1px solid var(--border);flex:none;}
+  .claude-chat-input{flex:1;resize:none;border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;background:var(--surface-2);color:var(--ink);max-height:90px;}
+  .claude-chat-send{flex:none;width:36px;height:36px;border-radius:10px;background:var(--brand);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:opacity var(--duration-fast) var(--ease-out);}
+  .claude-chat-send:disabled{opacity:.5;cursor:default;}
+  .claude-chat-cap{font-size:10.5px;color:var(--muted-lt);text-align:center;padding:6px 0 0;}
   .tour-spotlight{position:relative;z-index:1601;border-radius:10px;box-shadow:0 0 0 5px rgba(255,255,255,.18), 0 0 0 9999px rgba(16,24,40,.72);transition:box-shadow .35s ease;}
   .tour-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
   .tour-step-count{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;letter-spacing:.06em;color:var(--muted-lt);}
@@ -1248,6 +1271,10 @@ document.addEventListener('DOMContentLoaded', function(){
       <div class="nav-item" data-view="settings" data-tooltip="Settings &amp; Integrations" onclick="switchView('settings')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         <span class="nav-label">Settings &amp; Integrations</span>
+      </div>
+      <div class="nav-item" data-view="claude" data-tooltip="Assistant" id="claudeNavItem" onclick="switchView('claude')" style="display:none;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/></svg>
+        <span class="nav-label">Assistant</span>
       </div>
     </nav>
     <div class="sidebar-foot" style="position:relative;">
@@ -2556,7 +2583,46 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
     </div>
 
+    <!-- ASSISTANT (full tab) -->
+    <div class="view" id="view-claude">
+      <div class="panel" style="height:calc(100vh - 150px);display:flex;flex-direction:column;overflow:hidden;padding:0;">
+        <div class="claude-chat-head">
+          <div class="claude-chat-head-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="color:var(--brand-dark);"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/></svg>
+            Assistant
+          </div>
+          <span class="row-link" onclick="clearClaudeChat()">Clear chat</span>
+        </div>
+        <div class="claude-chat-messages" id="claudeTabMessages"></div>
+        <div class="claude-chat-input-row">
+          <textarea class="claude-chat-input" id="claudeTabInput" rows="1" placeholder="Ask about a client, or paste a link to review…" onkeydown="handleClaudeInputKey(event, 'tab')"></textarea>
+          <button class="claude-chat-send" id="claudeTabSendBtn" onclick="sendClaudeMessage('tab')" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+        </div>
+        <div class="claude-chat-cap" id="claudeTabCap"></div>
+      </div>
+    </div>
+
   </div>
+</div>
+
+<!-- ASSISTANT (floating button + panel) — shares the same conversation/state as the tab above -->
+<button class="claude-float-btn" id="claudeFloatBtn" style="display:none;" onclick="toggleClaudeFloatPanel()" title="Ask the assistant">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/></svg>
+</button>
+<div class="claude-float-panel" id="claudeFloatPanel">
+  <div class="claude-chat-head">
+    <div class="claude-chat-head-title">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="color:var(--brand-dark);"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/></svg>
+      Assistant
+    </div>
+    <span class="toast-close" onclick="toggleClaudeFloatPanel()">✕</span>
+  </div>
+  <div class="claude-chat-messages" id="claudeFloatMessages"></div>
+  <div class="claude-chat-input-row">
+    <textarea class="claude-chat-input" id="claudeFloatInput" rows="1" placeholder="Ask anything…" onkeydown="handleClaudeInputKey(event, 'float')"></textarea>
+    <button class="claude-chat-send" id="claudeFloatSendBtn" onclick="sendClaudeMessage('float')" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+  </div>
+  <div class="claude-chat-cap" id="claudeFloatCap"></div>
 </div>
 
 <div class="toast-stack" id="toastStack"></div>
@@ -3463,6 +3529,14 @@ function applyRoleVisibility(){
     // status mid-session), fall back to their own personal queue.
     if(!hasPermission('view_team_queue') && document.getElementById('view-teamqueue')?.classList.contains('active')){ switchView('approve'); }
   }
+  const claudeNavItem = document.getElementById('claudeNavItem');
+  const claudeFloatBtn = document.getElementById('claudeFloatBtn');
+  if(claudeNavItem) claudeNavItem.style.display = canApprove() ? 'flex' : 'none';
+  if(claudeFloatBtn) claudeFloatBtn.style.display = canApprove() ? 'flex' : 'none';
+  if(!canApprove()){
+    document.getElementById('claudeFloatPanel')?.classList.remove('open');
+    if(document.getElementById('view-claude')?.classList.contains('active')) switchView('overview');
+  }
   const clientsBulkModeBtn = document.getElementById('clientsBulkModeBtn');
   if(clientsBulkModeBtn){
     clientsBulkModeBtn.style.display = canApprove() ? 'inline-flex' : 'none';
@@ -3533,6 +3607,7 @@ const VIEW_TITLES = {
   team: ['Team', "Everyone on the team, and what they do here"],
   trash: ['Trash', 'Deleted notes and time entries — restore anytime, or delete for good. Deleted clients are visible to admins and approvers only.'],
   settings: ['Settings & Integrations', "What's actually connected right now — no guessing"],
+  claude: ['Assistant', "Ask about a client, get a recommendation, or have it check a website"],
   profile: ['My Profile', 'Your info, visible to the rest of the team the same way it always has been'],
 };
 
@@ -3685,6 +3760,7 @@ async function switchView(name){
   if(name==='task-archive'){ populateTaskArchiveFilters(); renderTaskArchive(); }
   if(name==='calendar'){ renderCalendar(); renderCalendarGoogleSyncWidget(); }
   if(name==='reminders') renderReminders();
+  if(name==='claude') renderClaudeMessages();
   if(name==='improvements'){
     const fromEl = document.getElementById('improvementsFromDate');
     const toEl = document.getElementById('improvementsToDate');
@@ -9658,6 +9734,89 @@ function endTour(){
   document.getElementById('tourCard').classList.remove('tour-card-final', 'tour-card-centered');
   clearTourSpotlight();
   document.getElementById('tourClickBlocker')?.remove();
+}
+
+/* ---------- Assistant (Claude) — floating button + its own tab, one shared conversation ---------- */
+
+let claudeConversation = []; // [{role:'user'|'assistant', content:'...'}]
+let claudeSending = false;
+
+function buildClaudeContext(){
+  const rows = activeClients().filter(c=>c.status!=='Paused').map(c=>{
+    const lastImp = [...(c.improvements||[])].sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+    const lastImpStr = lastImp ? `last logged ${new Date(lastImp.date).toLocaleDateString('en-US',{month:'short',day:'numeric'})}` : 'nothing logged yet';
+    return `- ${c.name}: risk ${riskLabel(c.danger).text}, ${lastImpStr}, draft ${c.draftStatus||'none'}`;
+  });
+  return rows.join('\n');
+}
+
+function renderClaudeMessages(){
+  const html = claudeConversation.map(m=>
+    `<div class="claude-msg claude-msg-${m.role}">${escapeHtml(m.content)}</div>`
+  ).join('') + (claudeSending ? `<div class="claude-msg-typing"><span></span><span></span><span></span></div>` : '');
+  ['claudeTabMessages','claudeFloatMessages'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.innerHTML = html || `<div style="text-align:center;color:var(--muted-lt);font-size:12.5px;margin-top:20px;">Ask about a client, get a recommendation, or paste a link to review.</div>`;
+    el.scrollTop = el.scrollHeight;
+  });
+}
+
+function handleClaudeInputKey(e, source){
+  if(e.key==='Enter' && !e.shiftKey){
+    e.preventDefault();
+    sendClaudeMessage(source);
+  }
+}
+
+async function sendClaudeMessage(source){
+  if(claudeSending) return;
+  const inputEl = document.getElementById(source==='tab' ? 'claudeTabInput' : 'claudeFloatInput');
+  const text = inputEl.value.trim();
+  if(!text) return;
+  inputEl.value = '';
+  claudeConversation.push({role:'user', content:text});
+  claudeSending = true;
+  renderClaudeMessages();
+  document.getElementById('claudeTabSendBtn').disabled = true;
+  document.getElementById('claudeFloatSendBtn').disabled = true;
+
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/claude-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ messages: claudeConversation, appContext: buildClaudeContext() }),
+    });
+    const data = await response.json();
+    claudeSending = false;
+    if(!response.ok){
+      claudeConversation.push({role:'assistant', content: `⚠️ ${data.error || 'Something went wrong.'}`});
+      renderClaudeMessages();
+      return;
+    }
+    claudeConversation.push({role:'assistant', content: data.reply || '(no response)'});
+    renderClaudeMessages();
+    const capText = data.remainingToday!=null ? `${data.remainingToday} messages left today` : '';
+    const tabCap = document.getElementById('claudeTabCap'); if(tabCap) tabCap.textContent = capText;
+    const floatCap = document.getElementById('claudeFloatCap'); if(floatCap) floatCap.textContent = capText;
+  }catch(e){
+    claudeSending = false;
+    claudeConversation.push({role:'assistant', content: '⚠️ Network error — try again.'});
+    renderClaudeMessages();
+  }finally{
+    document.getElementById('claudeTabSendBtn').disabled = false;
+    document.getElementById('claudeFloatSendBtn').disabled = false;
+  }
+}
+
+function toggleClaudeFloatPanel(){
+  document.getElementById('claudeFloatPanel').classList.toggle('open');
+}
+
+function clearClaudeChat(){
+  claudeConversation = [];
+  renderClaudeMessages();
 }
 
 function saveTimerState(){ try{ localStorage.setItem('bda_timer_state', JSON.stringify(timerState)); }catch(e){} }
