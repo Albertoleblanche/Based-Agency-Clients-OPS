@@ -96,6 +96,11 @@
   body[data-theme="dark"] .toast.info .toast-progress{background:#7CA3F0;}
 
   body[data-theme="dark"] ::-webkit-scrollbar{width:9px;height:9px;}
+  /* Native browser calendar-picker icon renders a fixed dark color by
+     default and doesn't adapt to the page theme on its own — inverting
+     it here is what actually makes it visible in dark mode. Covers every
+     date input in the app at once. */
+  body[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);}
   body[data-theme="dark"] ::-webkit-scrollbar-track{background:transparent;}
   body[data-theme="dark"] ::-webkit-scrollbar-thumb{background:#3a3a3c;border-radius:20px;border:2px solid transparent;background-clip:padding-box;}
   body[data-theme="dark"] ::-webkit-scrollbar-thumb:hover{background:#4a4a4d;}
@@ -6420,7 +6425,7 @@ function openNewReminderModal(presetClientId){
           <div class="client-search-dropdown" id="reminderClientDropdown"></div>
         </div>
         <div style="grid-column:1/-1;"><label>Question / request</label><textarea id="reminderQuestion" placeholder="e.g. Can you send us the latest project photos?" rows="3" style="resize:vertical;min-height:64px;font-family:inherit;"></textarea></div>
-        <div><label>Follow-up date</label><input type="date" id="reminderFollowUpDate" value="${toDateStr(defaultFollowUp)}"></div>
+        <div><label>Follow-up date</label><input type="date" id="reminderFollowUpDate" value="${toDateStr(defaultFollowUp)}" min="${toDateStr(new Date())}"></div>
       </div>
       <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink);cursor:pointer;margin-top:2px;"><input type="checkbox" id="reminderAddToCalendarInput" checked> Add to calendar</label>
     </div>
@@ -6440,6 +6445,7 @@ async function saveNewReminder(){
   if(!clientId){ showToast('error','Pick a client','Select which client this is about.'); return; }
   if(!question){ showToast('error','Nothing to track','Write the question or request first.'); return; }
   if(!followUpDate){ showToast('error','Follow-up date required','Pick a date to be reminded.'); return; }
+  if(followUpDate < toDateStr(new Date())){ showToast('error','Date is in the past','Pick today or a future date.'); return; }
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
   const { data, error } = await supabaseClient.from('client_reminders').insert({
@@ -6478,7 +6484,7 @@ function openReminderDetailModal(id){
       <div class="settings-field"><label>Question / request</label><textarea id="reminderEditQuestion" rows="3" style="width:100%;resize:vertical;min-height:64px;font-family:inherit;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);">${escapeHtml(r.question)}</textarea></div>
       <div class="form-grid">
         <div><label>Asked by</label><div style="font-size:13px;padding:9px 0;">${owner ? owner.name : '—'} · ${new Date(r.askedDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div></div>
-        <div><label>Follow-up date</label><input type="date" id="reminderEditFollowUp" value="${r.followUpDate||''}" ${isResolved?'disabled':''}></div>
+        <div><label>Follow-up date</label><input type="date" id="reminderEditFollowUp" value="${r.followUpDate||''}" min="${toDateStr(new Date())}" ${isResolved?'disabled':''}></div>
       </div>
     </div>
     <div class="modal-actions">
@@ -6493,6 +6499,10 @@ async function saveReminderEdit(id){
   const followUpEl = document.getElementById('reminderEditFollowUp');
   const followUpDate = followUpEl ? followUpEl.value : undefined;
   if(!question){ showToast('error','Nothing to save','The question can\'t be empty.'); return; }
+  const original = clientReminders.find(r=>r.id===id);
+  if(followUpDate && followUpDate !== original?.followUpDate && followUpDate < toDateStr(new Date())){
+    showToast('error','Date is in the past','Pick today or a future date.'); return;
+  }
   const updates = { question };
   if(followUpDate) updates.follow_up_date = followUpDate;
   const { error } = await supabaseClient.from('client_reminders').update(updates).eq('id', id);
@@ -6593,7 +6603,7 @@ function openNoteModal(noteId, presetClientId, presetStatus){
       <div class="settings-field"><label>Note</label><textarea id="noteTextInput" style="width:100%;min-height:64px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${editing ? editing.text : ''}</textarea></div>
       <div class="settings-field"><label>Link (optional)</label><input id="noteLinkInput" type="url" placeholder="https://…" value="${editing && editing.link ? editing.link.replace(/"/g,'&quot;') : ''}"></div>
       ${!editing ? `
-      <div class="settings-field"><label>Follow-up date (optional)</label><input type="date" id="noteFollowUpInput"></div>
+      <div class="settings-field"><label>Follow-up date (optional)</label><input type="date" id="noteFollowUpInput" min="${toDateStr(new Date())}"></div>
       <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink);cursor:pointer;margin-top:2px;"><input type="checkbox" id="noteAddToCalendarInput"> Add to calendar (needs a follow-up date)</label>
       ` : ''}
     </div>
@@ -6658,6 +6668,10 @@ async function saveNote(noteId){
   const addToCalendar = addToCalendarInput ? addToCalendarInput.checked : false;
   if(!title){ showToast('error','Add a title','Give this note a short title first.'); return; }
   if(!clientId){ showToast('error','Pick a client','Select which client this note is about.'); return; }
+  const originalNote = noteId ? notes.find(n=>n.id===noteId) : null;
+  if(followUpDate && followUpDate !== originalNote?.followUpDate && followUpDate < toDateStr(new Date())){
+    showToast('error','Date is in the past','Pick today or a future date.'); return;
+  }
   if(!text){ showToast('error','Nothing written','Add some note text first.'); return; }
   if(addToCalendar && !followUpDate){ showToast('error','Follow-up date required','Set a date first, or uncheck "Add to calendar".'); return; }
   if(addToCalendar && followUpDate < toDateStr(new Date())){ showToast('error','That date has already passed','Pick a future follow-up date.'); return; }
@@ -7103,7 +7117,7 @@ function taskFormHtml(editing, presetAssigneeId, presetContext){
             <option value="high" ${editing && editing.priority==='high'?'selected':''}>High</option>
           </select>
         </div>
-        <div><label>Due date (optional)</label><input type="date" id="taskDueInput" value="${editing && editing.dueDate ? editing.dueDate : ''}"></div>
+        <div><label>Due date (optional)</label><input type="date" id="taskDueInput" value="${editing && editing.dueDate ? editing.dueDate : ''}" min="${toDateStr(new Date())}"></div>
         <div><label>Related client (optional)</label><select id="taskClientSelect">${populateTaskClientSelect(editing ? editing.clientId : (presetContext?.clientId || null))}</select></div>
       </div>
       <div class="settings-field"><label>Link (optional)</label><input id="taskLinkInput" type="url" placeholder="https://…" value="${editing && editing.link ? editing.link.replace(/"/g,'&quot;') : ''}"></div>
@@ -7135,6 +7149,7 @@ async function saveNewTask(){
   const priority = document.getElementById('taskPrioritySelect').value;
   const description = document.getElementById('taskDescInput').value.trim();
   const dueDate = document.getElementById('taskDueInput').value || null;
+  if(dueDate && dueDate < toDateStr(new Date())){ showToast('error','Date is in the past','Pick today or a future date.'); return; }
   const clientId = document.getElementById('taskClientSelect').value || null;
   if(clientId && isClientPaused(clientId)){ showPausedClientWarning(clientId); return; }
   const link = normalizeUrl(document.getElementById('taskLinkInput').value) || null;
@@ -7174,6 +7189,7 @@ async function saveEditTask(taskId){
   const priority = document.getElementById('taskPrioritySelect').value;
   const description = document.getElementById('taskDescInput').value.trim();
   const dueDate = document.getElementById('taskDueInput').value || null;
+  if(dueDate && dueDate !== t.dueDate && dueDate < toDateStr(new Date())){ showToast('error','Date is in the past','Pick today or a future date.'); return; }
   const clientId = document.getElementById('taskClientSelect').value || null;
   const link = normalizeUrl(document.getElementById('taskLinkInput').value) || null;
 
@@ -12866,6 +12882,16 @@ async function showApp(session){
     if(document.visibilityState==='visible' && currentUser && !isLoggingActive()){
       fullRefresh();
       setupRealtimeSubscriptions();
+    }
+  });
+
+  // Native date inputs only open their picker when clicking the small
+  // calendar icon in most browsers — this makes the whole field
+  // clickable instead, so people don't have to aim for that one icon.
+  document.addEventListener('click', (e)=>{
+    const target = e.target.closest('input[type="date"]');
+    if(target && !target.disabled && typeof target.showPicker === 'function'){
+      try{ target.showPicker(); }catch(err){ /* e.g. already open, or a browser restriction — fine either way */ }
     }
   });
 })();
