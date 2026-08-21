@@ -2752,6 +2752,7 @@ let currentDetailClientId = null;  // which client's detail page is open, if any
 
 function myName(){ return myProfile ? myProfile.name : ''; }
 function canApprove(){ return !!myProfile && (myProfile.role === 'admin' || myProfile.role === 'approver'); }
+function hasPermission(key){ return canApprove() || !!(myProfile && (myProfile.extra_permissions||[]).includes(key)); }
 function isAdmin(){ return !!myProfile && myProfile.role === 'admin'; }
 
 let lastProfileError = null;
@@ -3380,10 +3381,10 @@ function applyRoleVisibility(){
   }
   const teamQueueNavItem = document.getElementById('teamQueueNavItem');
   if(teamQueueNavItem){
-    teamQueueNavItem.style.display = canApprove() ? 'flex' : 'none';
+    teamQueueNavItem.style.display = hasPermission('view_team_queue') ? 'flex' : 'none';
     // If a non-approver somehow ends up on Team Queue (e.g. lost approver
     // status mid-session), fall back to their own personal queue.
-    if(!canApprove() && document.getElementById('view-teamqueue')?.classList.contains('active')){ switchView('approve'); }
+    if(!hasPermission('view_team_queue') && document.getElementById('view-teamqueue')?.classList.contains('active')){ switchView('approve'); }
   }
   const clientsBulkModeBtn = document.getElementById('clientsBulkModeBtn');
   if(clientsBulkModeBtn){
@@ -3409,8 +3410,8 @@ function applyRoleVisibility(){
   }
   const trashClientsTab = document.getElementById('trashClientsTab');
   if(trashClientsTab){
-    trashClientsTab.style.display = canApprove() ? 'flex' : 'none';
-    if(!canApprove() && trashClientsTab.classList.contains('active')){ switchTrashTab('notes'); }
+    trashClientsTab.style.display = hasPermission('delete_clients') ? 'flex' : 'none';
+    if(!hasPermission('delete_clients') && trashClientsTab.classList.contains('active')){ switchTrashTab('notes'); }
   }
   const payrollTab = document.getElementById('payrollTab');
   if(payrollTab){
@@ -5347,7 +5348,7 @@ async function deleteClient(id){
 // that's already been soft-deleted. This is the only place data actually
 // gets destroyed rather than hidden.
 async function permanentlyDeleteClient(id){
-  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can manage deleted clients.'); return; }
+  if(!hasPermission('delete_clients')){ showToast('error','Not allowed','You don\'t have permission to permanently delete clients.'); return; }
   const c = clients.find(x=>x.id===id);
   if(!c) return;
   if(!(await confirmDialog(`Permanently delete ${c.name}? This cannot be undone — all improvements, drafts, and history for this client will be gone for good.`, {confirmLabel:'Delete permanently', destructive:true}))) return;
@@ -5361,7 +5362,7 @@ async function permanentlyDeleteClient(id){
 }
 
 async function restoreClient(id){
-  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can manage deleted clients.'); return; }
+  if(!hasPermission('delete_clients')){ showToast('error','Not allowed','You don\'t have permission to manage deleted clients.'); return; }
   await loadAll();
   const c = clients.find(x=>x.id===id);
   if(!c) return;
@@ -5478,7 +5479,7 @@ async function bulkRestoreTrash(type){
   const label = TRASH_TYPE_LABEL[type];
 
   if(type==='clients'){
-    if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can manage deleted clients.'); return; }
+    if(!hasPermission('delete_clients')){ showToast('error','Not allowed','You don\'t have permission to manage deleted clients.'); return; }
     await loadAll();
     let restored = 0;
     ids.forEach(id=>{
@@ -5506,7 +5507,7 @@ async function bulkDeleteTrashPermanently(type){
   if(!(await confirmDialog(`Permanently delete ${ids.length} ${label}${ids.length!==1?'s':''}? This can't be undone.`, {confirmLabel:'Delete permanently', destructive:true}))) return;
 
   if(type==='clients'){
-    if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can manage deleted clients.'); return; }
+    if(!hasPermission('delete_clients')){ showToast('error','Not allowed','You don\'t have permission to manage deleted clients.'); return; }
     await loadAll();
     clients = clients.filter(c=> !ids.includes(c.id));
     notes = notes.filter(n=> !ids.includes(n.clientId));
@@ -6865,7 +6866,7 @@ function kanbanCardMenuHtml(t){
   // file it away or remove it, not move it around or edit it further.
   if(t.status==='done'){
     return `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();hideTaskFromMyList('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>Archive</div>
-      ${canApprove() ? `<div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();deleteTaskPermanently('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete</div>` : ''}`;
+      ${hasPermission('delete_tasks') ? `<div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();deleteTaskPermanently('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete</div>` : ''}`;
   }
 
   const moveOptions = KANBAN_STAGES.filter(s=>s.key!==t.status).map(s=>{
@@ -7006,7 +7007,7 @@ function openTaskDetailModal(taskId){
       <div style="display:flex;align-items:center;gap:16px;">
         ${t.status==='done' ? `
           <span class="row-link" onclick="hideTaskFromMyList('${t.id}')">Archive</span>
-          ${canApprove() ? `<span class="event-delete-link" onclick="deleteTaskPermanently('${t.id}')">Delete</span>` : ''}
+          ${hasPermission('delete_tasks') ? `<span class="event-delete-link" onclick="deleteTaskPermanently('${t.id}')">Delete</span>` : ''}
         ` : `
           ${amAssigner ? `<span class="event-delete-link" onclick="cancelTask('${t.id}')">Cancel task</span>` : ''}
           ${amAssigner ? `<button class="btn btn-brand" onclick="openEditTaskModal('${t.id}')">Edit</button>` : ''}
@@ -7379,7 +7380,7 @@ async function hideTaskFromMyList(taskId){
 // people, same as this, but says so honestly rather than pretending
 // something in progress was ever "done").
 async function deleteTaskPermanently(taskId){
-  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can permanently delete a task.'); return; }
+  if(!hasPermission('delete_tasks')){ showToast('error','Not allowed','You don\'t have permission to permanently delete tasks.'); return; }
   const t = tasks.find(x=>x.id===taskId);
   if(!t) return;
   if(!(await confirmDialog(`Permanently delete "${t.title}"? This can't be undone.`, {confirmLabel:'Delete permanently', destructive:true}))) return;
@@ -12401,6 +12402,15 @@ function teamCardAvatarHtml(m){
     : `<div class="team-card-avatar-fallback" style="background:${avatarColorForName(m.name)};">${(m.name||'?').trim().charAt(0).toUpperCase()}</div>`;
 }
 
+// Named list rather than hardcoded checkboxes — adding a future
+// permission (the user's own "we can expand later") is one line here,
+// not new HTML in the modal below.
+const EXTRA_PERMISSIONS_META = [
+  { key:'view_team_queue', label: "See Team Queue (everyone's drafts)" },
+  { key:'delete_tasks', label: 'Permanently delete tasks' },
+  { key:'delete_clients', label: 'Manage & permanently delete clients from Trash' },
+];
+
 function openTeamMemberDetail(id){
   const m = teamProfiles.find(x=>x.id===id);
   if(!m) return;
@@ -12421,7 +12431,20 @@ function openTeamMemberDetail(id){
     : (m.title ? `<span class="role-chip">${m.title}</span>` : `<span style="color:var(--muted-lt);font-size:12px;">No title set</span>`);
   const slackIdControl = isAdmin()
     ? `<input type="text" value="${(m.slack_user_id||'').replace(/"/g,'&quot;')}" placeholder="e.g. U0123ABCDEF" onblur="changeTeamSlackId('${m.id}', this.value.trim())" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);width:100%;">`
-    : '';  openAppModal(`
+    : '';
+  const permissionsControl = (isAdmin() && m.role==='member') ? `
+    <div style="grid-column:1/-1;">
+      <label>Extra Permissions</label>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
+        ${EXTRA_PERMISSIONS_META.map(p=>`
+          <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink);cursor:pointer;font-weight:400;">
+            <input type="checkbox" ${(m.extra_permissions||[]).includes(p.key)?'checked':''} onchange="changeTeamPermission('${m.id}','${p.key}',this.checked)">
+            ${p.label}
+          </label>`).join('')}
+      </div>
+      <p style="font-size:10.5px;color:var(--muted-lt);margin:6px 0 0;">Grants specific extra access without changing their role.</p>
+    </div>` : '';
+  openAppModal(`
     <div class="modal-head"><span class="panel-title">${m.name}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body" style="display:flex;flex-direction:column;align-items:center;gap:14px;">
       ${teamCardAvatarHtml(m)}
@@ -12432,6 +12455,7 @@ function openTeamMemberDetail(id){
         <div><label>Title</label>${titleControl}</div>
         <div><label>Role</label>${roleControl}</div>
         ${isAdmin() ? `<div style="grid-column:1/-1;"><label>Slack member ID</label>${slackIdControl}<p style="font-size:10.5px;color:var(--muted-lt);margin:4px 0 0;">From their Slack profile → "..." → Copy member ID. Lets this app DM them notifications, and lets Slack's /task command recognize them.</p></div>` : ''}
+        ${permissionsControl}
       </div>
     </div>
     <div class="modal-actions">
@@ -12473,6 +12497,20 @@ async function changeTeamSlackId(userId, newSlackId){
   if(error){ showToast('error','Could not save', error.message); await loadTeamProfiles(); return; }
   await loadTeamProfiles();
   showToast('success', newSlackId ? 'Slack ID saved' : 'Slack ID cleared', newSlackId ? 'They\'ll get Slack DMs for anything they don\'t have muted.' : 'They won\'t receive Slack DMs from this app anymore.');
+}
+
+async function changeTeamPermission(userId, key, granted){
+  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  const m = teamProfiles.find(p=>p.id===userId);
+  if(!m) return;
+  const current = m.extra_permissions || [];
+  const updated = granted ? [...new Set([...current, key])] : current.filter(k=>k!==key);
+  const { error } = await supabaseClient.from('team_profiles').update({ extra_permissions: updated }).eq('id', userId);
+  if(error){ showToast('error','Could not save', error.message); await loadTeamProfiles(); return; }
+  m.extra_permissions = updated;
+  await loadTeamProfiles();
+  const label = EXTRA_PERMISSIONS_META.find(p=>p.key===key)?.label || key;
+  showToast('success', granted ? 'Permission granted' : 'Permission removed', `${label} — ${granted ? 'now allowed' : 'no longer allowed'} for ${m.name}.`);
 }
 
 async function adminResetPassword(userId, name){
