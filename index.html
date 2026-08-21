@@ -2326,6 +2326,10 @@ document.addEventListener('DOMContentLoaded', function(){
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
           <span>Job Titles</span>
         </div>
+        <div class="icon-tab" data-ttab="emailrequests" onclick="switchTeamTab('emailrequests')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          <span>Email Requests</span>
+        </div>
       </div>
 
       <div class="settings-subview active" id="teamtab-roster">
@@ -2370,6 +2374,15 @@ document.addEventListener('DOMContentLoaded', function(){
               <input id="titleOptionInput" placeholder="New job title" style="flex:1;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);">
               <button class="btn btn-outline" onclick="addFieldOption('title')">Add</button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-subview" id="teamtab-emailrequests">
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Pending Email Change Requests</span></div>
+          <div class="panel-body">
+            <div id="pendingEmailRequestsList"></div>
           </div>
         </div>
       </div>
@@ -2450,13 +2463,6 @@ document.addEventListener('DOMContentLoaded', function(){
       <div class="panel" style="margin-bottom:24px;" id="profileEmailPanel">
         <div class="panel-head"><span class="panel-title">Email &amp; Login</span></div>
         <div class="panel-body" id="profileEmailPanelBody"></div>
-      </div>
-
-      <div class="panel" id="pendingEmailRequestsPanel" style="display:none;">
-        <div class="panel-head"><span class="panel-title">Pending Email Change Requests</span></div>
-        <div class="panel-body">
-          <div id="pendingEmailRequestsList"></div>
-        </div>
       </div>
 
       <div class="panel" style="margin-top:24px;">
@@ -8793,12 +8799,6 @@ function renderProfilePage(){
   }
 
   renderProfileEmailPanel();
-  if(isAdmin()){
-    document.getElementById('pendingEmailRequestsPanel').style.display = 'block';
-    renderPendingEmailRequests();
-  } else {
-    document.getElementById('pendingEmailRequestsPanel').style.display = 'none';
-  }
 }
 
 async function uploadAvatar(file){
@@ -8925,7 +8925,7 @@ async function renderPendingEmailRequests(){
 }
 
 async function resolveEmailChangeRequest(requestId, approve){
-  if(!confirm(approve ? 'Approve this email change? It takes effect immediately.' : 'Deny this request?')) return;
+  if(!(await confirmDialog(approve ? 'Approve this email change? It takes effect immediately.' : 'Deny this request?', {confirmLabel: approve ? 'Approve' : 'Deny', destructive: !approve}))) return;
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
     const response = await fetch('/api/admin-user-actions', {
@@ -12006,11 +12006,14 @@ function renderNotificationPrefs(){
   const el = document.getElementById('notifPrefsList');
   if(!el || !myProfile) return;
   const muted = myProfile.muted_notification_types || [];
-  el.innerHTML = Object.entries(NOTIFICATION_TYPE_META).map(([type, meta])=>`
-    <label style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);cursor:pointer;">
-      <input type="checkbox" ${muted.includes(type)?'':'checked'} onchange="toggleNotificationMute('${type}', !this.checked)">
+  el.innerHTML = Object.entries(NOTIFICATION_TYPE_META).map(([type, meta])=>{
+    const isOn = !muted.includes(type);
+    return `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);">
       <span style="font-size:13px;color:var(--ink);">${meta.label}</span>
-    </label>`).join('');
+      <button class="theme-toggle-switch ${isOn?'on':''}" onclick="toggleNotificationMute('${type}', ${isOn})"></button>
+    </div>`;
+  }).join('');
 }
 
 async function toggleNotificationMute(type, muted){
@@ -12020,6 +12023,7 @@ async function toggleNotificationMute(type, muted){
   const { error } = await supabaseClient.from('team_profiles').update({ muted_notification_types: updated }).eq('id', currentUser.id);
   if(error){ showToast('error','Could not save', error.message); renderNotificationPrefs(); return; }
   myProfile.muted_notification_types = updated;
+  renderNotificationPrefs();
   showToast('success', muted ? 'Notification muted' : 'Notification unmuted', NOTIFICATION_TYPE_META[type]?.label || '');
 }
 
@@ -12372,7 +12376,7 @@ function renderTeam(){
   if(!isAdmin() && document.getElementById('teamtab-roster') && !document.getElementById('teamtab-roster').classList.contains('active')){ switchTeamTab('roster'); }
   if(addPanel) addPanel.style.display = isAdmin() ? 'block' : 'none';
   if(titlesPanel) titlesPanel.style.display = isAdmin() ? 'block' : 'none';
-  if(isAdmin()){ populateAddMemberTitleSelect(); renderOptionsManager('title'); }
+  if(isAdmin()){ populateAddMemberTitleSelect(); renderOptionsManager('title'); renderPendingEmailRequests(); }
   if(noteEl) noteEl.textContent = isAdmin()
     ? 'Tap View on a card to change someone\'s role or title, except your own role.'
     : 'Only admins can add members or change roles.';
