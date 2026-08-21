@@ -6528,8 +6528,11 @@ async function deleteReminder(id){
   if(!(await confirmDialog('Delete this reminder? This can\'t be undone.', {confirmLabel:'Delete', destructive:true}))) return;
   const { error } = await supabaseClient.from('client_reminders').delete().eq('id', id);
   if(error){ showToast('error','Delete failed', error.message); return; }
+  await supabaseClient.from('calendar_events').delete().eq('related_reminder_id', id);
   await loadClientReminders();
+  await loadCalendarEvents();
   renderReminders();
+  renderCalendar();
   showToast('success','Reminder deleted','Removed.');
 }
 
@@ -6646,8 +6649,11 @@ async function restoreNote(id){
 }
 
 async function permanentlyDeleteNote(id){
-  if(!confirm("Permanently delete this note? This cannot be undone.")) return;
+  if(!(await confirmDialog('Permanently delete this note? This cannot be undone.', {confirmLabel:'Delete permanently', destructive:true}))) return;
   const { error } = await supabaseClient.from('notes').delete().eq('id', id).eq('user_id', currentUser.id);
+  if(!error) await supabaseClient.from('calendar_events').delete().eq('related_note_id', id);
+  await loadCalendarEvents();
+  renderCalendar();
   await renderTrash();
   error ? showToast('error','Delete failed', error.message) : showToast('success','Permanently deleted','Gone for good.');
 }
@@ -6698,7 +6704,7 @@ async function saveNote(noteId){
 }
 
 async function deleteNote(id){
-  if(!confirm("Move this note to Trash? You can restore it later from Settings.")) return;
+  if(!(await confirmDialog('Move this note to Trash? You can restore it later from Settings.', {confirmLabel:'Move to Trash'}))) return;
   const { error } = await supabaseClient.from('notes').update({ deleted_at: new Date().toISOString() }).eq('id', id).eq('user_id', currentUser.id);
   await loadMyNotes();
   renderNotes();
@@ -7454,8 +7460,11 @@ async function deleteTaskPermanently(taskId){
   if(!t) return;
   if(!(await confirmDialog(`Permanently delete "${t.title}"? This can't be undone.`, {confirmLabel:'Delete permanently', destructive:true}))) return;
   const { error } = await supabaseClient.from('tasks').delete().eq('id', taskId);
+  if(!error) await supabaseClient.from('calendar_events').delete().eq('related_task_id', taskId);
   await loadMyTasks();
+  await loadCalendarEvents();
   renderTasks();
+  renderCalendar();
   closeAppModal();
   if(error){ showToast('error','Delete failed', error.message); return; }
   // A missing RLS policy lets a delete "succeed" with zero rows actually
@@ -8110,7 +8119,7 @@ async function addReminderToCalendar(reminderId){
   const { error } = await supabaseClient.from('calendar_events').insert({
     title: c ? `Follow up: ${c.name}` : 'Client follow-up', description: r.question || null,
     start_at: `${r.followUpDate}T00:00:00`, end_at: `${r.followUpDate}T23:59:59`, all_day: true,
-    client_id: r.clientId, created_by: currentUser.id, event_type: 'reminder'
+    client_id: r.clientId, created_by: currentUser.id, event_type: 'reminder', related_reminder_id: r.id
   });
   await loadCalendarEvents();
   if(error){ showToast('error','Could not add to calendar', error.message); return; }
@@ -8123,7 +8132,7 @@ async function addNoteToCalendar(noteId){
   const { error } = await supabaseClient.from('calendar_events').insert({
     title: n.title || 'Note follow-up', description: n.text || null,
     start_at: `${n.followUpDate}T00:00:00`, end_at: `${n.followUpDate}T23:59:59`, all_day: true,
-    client_id: n.clientId, created_by: currentUser.id, event_type: 'reminder'
+    client_id: n.clientId, created_by: currentUser.id, event_type: 'reminder', related_note_id: n.id
   });
   await loadCalendarEvents();
   if(error){ showToast('error','Could not add to calendar', error.message); return; }
@@ -9277,7 +9286,7 @@ async function restoreTimeEntry(id){
 }
 
 async function permanentlyDeleteTimeEntry(id){
-  if(!confirm("Permanently delete this time entry? This cannot be undone.")) return;
+  if(!(await confirmDialog('Permanently delete this time entry? This cannot be undone.', {confirmLabel:'Delete permanently', destructive:true}))) return;
   const { error } = await supabaseClient.from('time_entries').delete().eq('id', id);
   await renderTrash();
   error ? showToast('error','Delete failed', error.message) : showToast('success','Permanently deleted','Gone for good.');
@@ -10044,7 +10053,7 @@ async function saveTimeEntryEdit(id){
 }
 
 async function deleteTimeEntry(id){
-  if(!confirm("Move this time entry to Trash? You can restore it later from Settings.")) return;
+  if(!(await confirmDialog('Move this time entry to Trash? You can restore it later from Settings.', {confirmLabel:'Move to Trash'}))) return;
   const { data: entry } = await supabaseClient.from('time_entries').select('harvest_entry_id').eq('id', id).maybeSingle();
   const { error } = await supabaseClient.from('time_entries').update({ deleted_at: new Date().toISOString() }).eq('id', id);
   await loadTimeEntries();
