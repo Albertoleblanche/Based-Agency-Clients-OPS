@@ -2476,8 +2476,11 @@ document.addEventListener('DOMContentLoaded', function(){
       <div class="panel" style="margin-top:24px;">
         <div class="panel-head"><span class="panel-title">Daily Summary Slack DM</span></div>
         <div class="panel-body">
-          <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 12px;">When an admin sends daily summaries, this is where yours goes. Leave blank to use your regular Slack DM ID — set one here only if you want your daily hours sent somewhere different.</p>
-          <input id="dailySummarySlackIdInput" placeholder="e.g. U0123ABCDEF" style="width:280px;max-width:100%;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:9px 11px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);" onblur="saveDailySummarySlackId(this.value.trim())">
+          <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 12px;">Leave blank to use your regular Slack DM ID — set one here only if you want your daily hours sent somewhere different.</p>
+          <div style="display:flex;gap:8px;">
+            <input id="dailySummarySlackIdInput" placeholder="e.g. U0123ABCDEF" style="width:280px;max-width:100%;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:9px 11px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);">
+            <button class="btn btn-brand" onclick="saveDailySummarySlackId(document.getElementById('dailySummarySlackIdInput').value.trim())">Save</button>
+          </div>
         </div>
       </div>
     </div>
@@ -8837,6 +8840,7 @@ async function saveDailySummarySlackId(value){
   if(error){ showToast('error','Could not save', error.message); return; }
   myProfile.daily_summary_slack_id = value || null;
   await loadTeamProfiles();
+  showToast('success', value ? 'Saved' : 'Cleared', value ? 'Your daily summary will go there instead.' : 'Your daily summary will use your regular Slack DM ID.');
 }
 
 function renderProfileEmailPanel(){
@@ -12435,12 +12439,15 @@ function openTeamMemberDetail(id){
   const permissionsControl = (isAdmin() && m.role==='member') ? `
     <div style="grid-column:1/-1;">
       <label>Extra Permissions</label>
-      <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
-        ${EXTRA_PERMISSIONS_META.map(p=>`
-          <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink);cursor:pointer;font-weight:400;">
-            <input type="checkbox" ${(m.extra_permissions||[]).includes(p.key)?'checked':''} onchange="changeTeamPermission('${m.id}','${p.key}',this.checked)">
-            ${p.label}
-          </label>`).join('')}
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:6px;">
+        ${EXTRA_PERMISSIONS_META.map(p=>{
+          const isOn = (m.extra_permissions||[]).includes(p.key);
+          return `
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <span style="font-size:12.5px;color:var(--ink);">${p.label}</span>
+            <button class="theme-toggle-switch ${isOn?'on':''}" onclick="changeTeamPermission('${m.id}','${p.key}',${!isOn})"></button>
+          </div>`;
+        }).join('')}
       </div>
       <p style="font-size:10.5px;color:var(--muted-lt);margin:6px 0 0;">Grants specific extra access without changing their role.</p>
     </div>` : '';
@@ -12511,6 +12518,7 @@ async function changeTeamPermission(userId, key, granted){
   await loadTeamProfiles();
   const label = EXTRA_PERMISSIONS_META.find(p=>p.key===key)?.label || key;
   showToast('success', granted ? 'Permission granted' : 'Permission removed', `${label} — ${granted ? 'now allowed' : 'no longer allowed'} for ${m.name}.`);
+  if(document.getElementById('appModalOverlay')) openTeamMemberDetail(userId);
 }
 
 async function adminResetPassword(userId, name){
