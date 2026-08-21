@@ -110,6 +110,7 @@
   body[data-theme="dark"] .filter-pill.active{background:#dedede !important;border-color:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(0, 0, 0, 0.5) !important;}
   body[data-theme="dark"] .pagination-btn.active{background:#dedede !important;border-color:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(0, 0, 0, 0.5) !important;}
   body[data-theme="dark"] .btn-brand{background:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(0, 0, 0, 0.5) !important;}
+  body[data-theme="dark"] .btn-dark{background:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(0, 0, 0, 0.5) !important;}
   body[data-theme="dark"] .nav-item:hover, body[data-theme="dark"] .nav-item.active{background:#ffffff17 !important;border-left-color:transparent !important;}
   *{box-sizing:border-box;}
 
@@ -7884,7 +7885,7 @@ function eventFormHtml(editing, presetDateStr){
       <div class="settings-field"><label>Title</label><input id="eventTitleInput" placeholder="e.g. Kickoff call with Flame Auto Repair" value="${editing ? editing.title.replace(/"/g,'&quot;') : ''}"></div>
       <div class="settings-field"><label>Description (optional)</label><textarea id="eventDescInput" style="width:100%;min-height:70px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);">${editing ? editing.description : ''}</textarea></div>
       <div class="form-grid">
-        <div><label>Date</label><input type="date" id="eventDateInput" value="${startDate}"></div>
+        <div><label>Date</label><input type="date" id="eventDateInput" value="${startDate}" min="${toDateStr(new Date())}"></div>
         <div><label>Type</label>
           <select id="eventTypeSelect">
             ${Object.entries(CALENDAR_TYPE_META).map(([val,m])=>`<option value="${val}" ${editing && editing.eventType===val ? 'selected' : (!editing && val==='meeting' ? 'selected' : '')}>${m.label}</option>`).join('')}
@@ -7911,7 +7912,7 @@ function eventFormHtml(editing, presetDateStr){
             <option value="monthly">Monthly</option>
           </select>
         </div>
-        <div id="eventRepeatUntilWrap" style="display:none;"><label>Repeats until</label><input type="date" id="eventRepeatUntilInput" value="${(()=>{ const d=new Date(); d.setFullYear(d.getFullYear()+1); return toDateStr(d); })()}"></div>
+        <div id="eventRepeatUntilWrap" style="display:none;"><label>Repeats until</label><input type="date" id="eventRepeatUntilInput" value="${(()=>{ const d=new Date(); d.setFullYear(d.getFullYear()+1); return toDateStr(d); })()}" min="${toDateStr(new Date())}"></div>
       </div>` : editing.recurrenceGroupId ? `<p style="font-size:11.5px;color:var(--muted-lt);margin:0;">🔁 ${editing.recurrenceLabel||'Recurring'} — part of a series. Editing here only changes this one occurrence.</p>` : ''}
       <div class="settings-field">
         <label>Attendees</label>
@@ -8284,6 +8285,14 @@ async function saveEditEvent(eventId){
   if(!title){ showToast('error','Title required','Give the event a title first.'); return; }
   const ts = buildEventTimestamps();
   if(!ts){ showToast('error','Pick a date','A date is required.'); return; }
+  const dateChanged = document.getElementById('eventDateInput').value !== toDateStr(new Date(e.startAt));
+  if(dateChanged){
+    const now = new Date();
+    const isPast = ts.allDay
+      ? new Date(ts.startAt) < new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      : new Date(ts.startAt) < now;
+    if(isPast){ showToast('error','That date has already passed', 'Pick a date and time in the future.'); return; }
+  }
   const description = document.getElementById('eventDescInput').value.trim();
   const eventType = document.getElementById('eventTypeSelect').value;
   const clientId = document.getElementById('eventClientSelect').value || null;
