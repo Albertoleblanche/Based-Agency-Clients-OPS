@@ -2316,6 +2316,23 @@ document.addEventListener('DOMContentLoaded', function(){
 
       <!-- AI & EMAIL -->
       <div class="settings-subview" id="stab-ai">
+        <div class="panel" style="margin-bottom:24px;">
+          <div class="panel-head"><span class="panel-title">Assistant AI Provider</span></div>
+          <div class="panel-body">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.6;">Which AI actually powers the Assistant tab and floating button — this only affects the Assistant, not the email draft generation on each client. Whichever you pick needs its own API key already set up on the server; picking one without its key configured will show an error, not silently fall back to the other.</p>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--ink);">
+                <input type="radio" name="aiProvider" id="aiProviderClaude" value="claude" onchange="saveAiProvider('claude')">
+                Claude — can search the web whenever it decides it's actually needed
+              </label>
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--ink);">
+                <input type="radio" name="aiProvider" id="aiProviderOpenai" value="openai" onchange="saveAiProvider('openai')">
+                ChatGPT — same account as draft generation, but always searches the web on every message (different cost shape — a flat per-search fee rather than only-when-needed)
+              </label>
+            </div>
+          </div>
+        </div>
+
         <div class="panel">
           <div class="panel-head"><span class="panel-title">Your Email Structure &amp; Instructions</span></div>
           <div class="panel-body">
@@ -2337,7 +2354,7 @@ document.addEventListener('DOMContentLoaded', function(){
           <div class="panel-head"><span class="panel-title">Integrations</span></div>
           <div class="panel-body">
             <div class="integ-row"><div><div class="integ-name">Shared data sync</div><div class="integ-desc">Roster, improvement logs, and drafts save and sync across the team</div></div><span class="integ-status on">Connected</span></div>
-            <div class="integ-row"><div><div class="integ-name">AI email drafting</div><div class="integ-desc">Live calls to Claude to draft each client update</div></div><span class="integ-status on">Connected</span></div>
+            <div class="integ-row"><div><div class="integ-name">AI email drafting</div><div class="integ-desc">Live calls to OpenAI (gpt-4o-mini) to draft each client update</div></div><span class="integ-status on">Connected</span></div>
             <div class="integ-row"><div><div class="integ-name">Email sending</div><div class="integ-desc">Approve / Notify open a pre-filled draft in your own mail app — nothing sends without a person clicking send</div></div><span class="integ-status off">Manual step</span></div>
             <div class="integ-row"><div><div class="integ-name">Wednesday auto-trigger</div><div class="integ-desc">A scheduled Zap (Schedule by Zapier → Gmail) needs to be built in Zapier's own dashboard — this tool can't create that on its own</div></div><span class="integ-status off">Not connected</span></div>
           </div>
@@ -4202,6 +4219,7 @@ function renderClientOptionsSelects(){
   renderOptionsManager('status');
   renderCustomFieldsManager();
   renderDangerWeights();
+  renderAiProviderChoice();
   populateClientFilterSelects();
   populateImprovementsClientFilter();
   populateImprovementsMemberFilter();
@@ -12742,6 +12760,21 @@ async function toggleNotificationMute(type, muted){
   myProfile.muted_notification_types = updated;
   renderNotificationPrefs();
   showToast('success', muted ? 'Notification muted' : 'Notification unmuted', NOTIFICATION_TYPE_META[type]?.label || '');
+}
+
+async function saveAiProvider(provider){
+  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  settings.aiProvider = provider;
+  const ok = await persistSettings();
+  ok ? showToast('success','Saved', provider==='openai' ? 'The Assistant now uses ChatGPT.' : 'The Assistant now uses Claude.') : showToast('error','Save failed','Could not save — try again.');
+}
+
+function renderAiProviderChoice(){
+  const provider = settings.aiProvider === 'openai' ? 'openai' : 'claude';
+  const claudeRadio = document.getElementById('aiProviderClaude');
+  const openaiRadio = document.getElementById('aiProviderOpenai');
+  if(claudeRadio){ claudeRadio.checked = provider==='claude'; claudeRadio.disabled = !isAdmin(); }
+  if(openaiRadio){ openaiRadio.checked = provider==='openai'; openaiRadio.disabled = !isAdmin(); }
 }
 
 async function saveEmailInstructions(){
