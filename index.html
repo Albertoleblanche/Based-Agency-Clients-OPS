@@ -1074,7 +1074,8 @@
   .tour-card-final .tour-actions{justify-content:center;}
   .tour-click-blocker{position:fixed;inset:0;z-index:1550;background:transparent;}
 
-  .claude-float-btn{position:fixed;bottom:22px;left:22px;z-index:1400;width:52px;height:52px;border-radius:50%;background:var(--brand);color:#fff;border:none;box-shadow:0 10px 28px rgba(16,24,40,.24);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform var(--duration-fast) var(--ease-out);}
+  .claude-float-btn{position:fixed;bottom:22px;left:22px;z-index:1400;width:52px;height:52px;border-radius:50%;background:var(--brand);color:#fff;border:none;box-shadow:0 10px 28px rgba(16,24,40,.24);cursor:grab;display:flex;align-items:center;justify-content:center;transition:transform var(--duration-fast) var(--ease-out);touch-action:none;}
+  .claude-float-btn.dragging{cursor:grabbing;transition:none;}
   .claude-float-btn:hover{transform:scale(1.06);}
   .claude-float-panel{position:fixed;bottom:86px;left:22px;z-index:1400;width:360px;max-width:calc(100vw - 44px);height:480px;max-height:calc(100vh - 130px);background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 24px 60px rgba(16,24,40,.28);display:none;flex-direction:column;overflow:hidden;}
   .claude-float-panel.open{display:flex;animation:claudePanelIn .25s cubic-bezier(.2,.9,.3,1.15);}
@@ -2302,6 +2303,15 @@ document.addEventListener('DOMContentLoaded', function(){
             <button class="btn btn-brand" onclick="openAddCustomFieldModal()">+ Add field</button>
           </div>
         </div>
+
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Danger Score Suggestion</span></div>
+          <div class="panel-body">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 16px;line-height:1.6;">The danger score itself always stays a human call — whoever's editing a client picks the number. What these control is the nudge shown alongside it: how much weight each signal gets when suggesting a score is worth reconsidering. Set anything to 0 to ignore it entirely.</p>
+            <div id="dangerWeightsList" style="display:flex;flex-direction:column;gap:16px;"></div>
+            <button class="btn btn-brand" style="margin-top:16px;" onclick="saveDangerWeights()">Save</button>
+          </div>
+        </div>
       </div>
 
       <!-- AI & EMAIL -->
@@ -3038,11 +3048,32 @@ function clickedBtn(){
 // DOM (still running its own dismiss timer) but fully invisible until
 // it's shallow enough to actually show.
 const TOAST_STACK_MAX_VISIBLE = 3;
+let toastStackExpanded = false;
+
 function restackToasts(){
   const stack = document.getElementById('toastStack');
   if(!stack) return;
   const toasts = [...stack.children].filter(el=>el.classList.contains('toast') && !el.classList.contains('leaving'));
   const dir = -1; // both themes now anchor at the bottom — older toasts always stack upward, away from the bottom edge
+
+  if(toastStackExpanded){
+    // Every toast becomes fully visible, full size, and individually
+    // interactive — spaced out by each one's own actual measured height
+    // (not a fixed offset per position), since toasts vary in length
+    // depending on their content.
+    let cumulativeOffset = 0;
+    const gap = 10;
+    for(let i = toasts.length - 1, depthFromFront = 0; i >= 0; i--, depthFromFront++){
+      const el = toasts[i];
+      el.style.zIndex = String(1000 - depthFromFront);
+      el.style.pointerEvents = 'auto';
+      el.style.opacity = '1';
+      el.style.transform = `translateY(${dir * cumulativeOffset}px) scale(1)`;
+      cumulativeOffset += el.offsetHeight + gap;
+    }
+    return;
+  }
+
   // Newest toast is always the most recently appended (last child) —
   // walk from the end backward to assign depth-from-front correctly.
   for(let i = toasts.length - 1, depthFromFront = 0; i >= 0; i--, depthFromFront++){
@@ -3096,21 +3127,26 @@ function showToast(type, title, detail){
   // timer together — reading a toast shouldn't cost you the chance to
   // finish reading it. remaining/lastStart track how much time was left
   // so resuming continues from there instead of restarting the full 4.2s.
+  // Exposed on the element itself (not just private to this closure) so
+  // the stack-wide hover-to-expand handler can pause/resume every toast
+  // in the stack, not just whichever one the cursor happens to be over.
   const duration = 4200;
   let remaining = duration;
   let lastStart = Date.now();
   let dismissTimer = setTimeout(()=>dismissToastEl(el), duration);
 
-  el.addEventListener('mouseenter', ()=>{
+  el._pauseTimer = ()=>{
     clearTimeout(dismissTimer);
     remaining -= (Date.now() - lastStart);
     el.classList.add('paused');
-  });
-  el.addEventListener('mouseleave', ()=>{
+  };
+  el._resumeTimer = ()=>{
     lastStart = Date.now();
     dismissTimer = setTimeout(()=>dismissToastEl(el), Math.max(remaining, 0));
     el.classList.remove('paused');
-  });
+  };
+  el.addEventListener('mouseenter', el._pauseTimer);
+  el.addEventListener('mouseleave', el._resumeTimer);
 }
 
 // Same as showToast, but stays on screen with a "Copy" button — used as a
@@ -4165,6 +4201,7 @@ function renderClientOptionsSelects(){
   renderOptionsManager('service');
   renderOptionsManager('status');
   renderCustomFieldsManager();
+  renderDangerWeights();
   populateClientFilterSelects();
   populateImprovementsClientFilter();
   populateImprovementsMemberFilter();
@@ -4667,6 +4704,79 @@ function openAddClientForm(){
   resetClientFormFields();
 }
 
+// Reusable, named list — same pattern as EXTRA_PERMISSIONS_META — so
+// adding a future signal later is one entry here, not new HTML.
+const DANGER_WEIGHT_META = [
+  { key:'overdueReminders', label:'Overdue follow-ups', hint:'Unanswered client questions past due' },
+  { key:'daysSinceImprovement', label:'Time since last logged improvement', hint:'How long it\'s been since any work was logged' },
+  { key:'draftPending', label:'Draft sitting pending', hint:'How long an unapproved draft has been waiting' },
+  { key:'importance', label:'Client importance', hint:'The client\'s own importance rating' },
+];
+const DEFAULT_DANGER_WEIGHTS = { overdueReminders:4, daysSinceImprovement:3, draftPending:2, importance:1 };
+
+function renderDangerWeights(){
+  const el = document.getElementById('dangerWeightsList');
+  if(!el) return;
+  const weights = settings.dangerWeights || DEFAULT_DANGER_WEIGHTS;
+  el.innerHTML = DANGER_WEIGHT_META.map(w=>{
+    const val = weights[w.key] ?? DEFAULT_DANGER_WEIGHTS[w.key];
+    return `
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">
+        <label style="font-size:12.5px;font-weight:600;color:var(--ink);">${w.label}</label>
+        <span id="dangerWeight-${w.key}-val" style="font-size:12px;color:var(--muted);font-weight:600;">${val}</span>
+      </div>
+      <p style="font-size:11px;color:var(--muted-lt);margin:0 0 6px;">${w.hint}</p>
+      <input type="range" min="0" max="5" step="1" value="${val}" id="dangerWeight-${w.key}" oninput="document.getElementById('dangerWeight-${w.key}-val').textContent=this.value" style="width:100%;accent-color:var(--brand);">
+    </div>`;
+  }).join('');
+}
+
+async function saveDangerWeights(){
+  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  const weights = {};
+  DANGER_WEIGHT_META.forEach(w=>{ weights[w.key] = parseInt(document.getElementById(`dangerWeight-${w.key}`).value); });
+  settings.dangerWeights = weights;
+  const ok = await persistSettings();
+  ok ? showToast('success','Saved','The nudge on client forms will use these weights from now on.') : showToast('error','Save failed','Could not save — try again.');
+}
+
+// The score itself always stays a human call (per the existing nudge's
+// own design) — this only computes what the nudge suggests. Each signal
+// is normalized to a 0-1 "severity", combined by its admin-set weight,
+// then mapped onto the 1-5 scale. Returns null if every weight is
+// zeroed out, since there's nothing meaningful left to suggest.
+function computeSuggestedDanger(c){
+  const weights = settings.dangerWeights || DEFAULT_DANGER_WEIGHTS;
+  const totalWeight = DANGER_WEIGHT_META.reduce((sum,w)=> sum + (weights[w.key] ?? DEFAULT_DANGER_WEIGHTS[w.key]), 0);
+  if(totalWeight <= 0) return null;
+
+  const overdueCount = clientReminders.filter(r=>r.clientId===c.id && reminderDisplayStatus(r)==='due').length;
+  const overdueSeverity = Math.min(overdueCount/3, 1);
+
+  const lastImp = [...(c.improvements||[])].sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+  const daysSinceImp = lastImp ? (Date.now()-new Date(lastImp.date).getTime())/86400000 : 999;
+  const staleSeverity = Math.min(daysSinceImp/30, 1);
+
+  let draftSeverity = 0;
+  if(c.draftStatus==='pending' && c.draftPendingSince){
+    const daysPending = (Date.now()-new Date(c.draftPendingSince).getTime())/86400000;
+    draftSeverity = Math.min(daysPending/7, 1);
+  }
+
+  const importanceSeverity = (c.importance||5)/10;
+
+  const w = weights;
+  const weightedSum =
+    overdueSeverity * (w.overdueReminders ?? DEFAULT_DANGER_WEIGHTS.overdueReminders) +
+    staleSeverity * (w.daysSinceImprovement ?? DEFAULT_DANGER_WEIGHTS.daysSinceImprovement) +
+    draftSeverity * (w.draftPending ?? DEFAULT_DANGER_WEIGHTS.draftPending) +
+    importanceSeverity * (w.importance ?? DEFAULT_DANGER_WEIGHTS.importance);
+
+  const score01 = weightedSum / totalWeight;
+  return Math.max(1, Math.min(5, Math.round(1 + score01*4)));
+}
+
 function openEditClientForm(id){
   const c = clients.find(x=>x.id===id);
   if(!c){ showToast('error','Client not found','Someone may have removed this — refreshing.'); fullRefresh(); return; }
@@ -4684,16 +4794,15 @@ function openEditClientForm(id){
 
   // A soft nudge, not an automatic change — surfaces the signal so the
   // approver can factor it in, but the actual danger score stays a human
-  // judgment call. Only shown when there's a real gap between what's
-  // happening (multiple overdue follow-ups) and what the score currently
-  // reflects (still low), so it doesn't nag someone who's already accounted
-  // for it.
-  const overdueCount = clientReminders.filter(r=>r.clientId===c.id && reminderDisplayStatus(r)==='due').length;
+  // judgment call. Only shown when there's a real gap between what the
+  // weighted signals suggest and what the score currently reflects, so
+  // it doesn't nag someone who's already accounted for it.
+  const suggested = computeSuggestedDanger(c);
   const nudgeEl = document.getElementById('ncDangerNudge');
   if(nudgeEl){
-    if(overdueCount>=2 && c.danger<4){
+    if(suggested!==null && suggested > c.danger){
       nudgeEl.style.display = 'block';
-      nudgeEl.innerHTML = `⚠️ ${overdueCount} unanswered questions are overdue for this client — worth considering a higher score.`;
+      nudgeEl.innerHTML = `⚠️ Based on overdue follow-ups, time since last logged work, and draft status, this could be a ${suggested} — worth reconsidering.`;
     } else {
       nudgeEl.style.display = 'none';
     }
@@ -9845,8 +9954,97 @@ async function sendClaudeMessage(source){
   }
 }
 
+// Positions the panel relative to the button's current location (which
+// may have been dragged anywhere) rather than a fixed offset that only
+// ever made sense when the button was locked to the bottom-left corner.
+// Defaults to opening above the button; falls back to below it if
+// there's no room, and is clamped so it can never run off any edge.
+function positionClaudePanel(){
+  const btn = document.getElementById('claudeFloatBtn');
+  const panel = document.getElementById('claudeFloatPanel');
+  if(!btn || !panel) return;
+  const btnRect = btn.getBoundingClientRect();
+  const panelRect = panel.getBoundingClientRect();
+  const gap = 12, edge = 16;
+  const vw = window.innerWidth, vh = window.innerHeight;
+
+  let left = btnRect.left;
+  let top = btnRect.top - panelRect.height - gap;
+  if(top < edge) top = btnRect.bottom + gap;
+
+  left = Math.max(edge, Math.min(left, vw - panelRect.width - edge));
+  top = Math.max(edge, Math.min(top, vh - panelRect.height - edge));
+
+  panel.style.left = `${left}px`;
+  panel.style.top = `${top}px`;
+  panel.style.bottom = 'auto';
+  panel.style.right = 'auto';
+}
+
 function toggleClaudeFloatPanel(){
-  document.getElementById('claudeFloatPanel').classList.toggle('open');
+  if(claudeBtnJustDragged){ claudeBtnJustDragged = false; return; } // suppress the click that follows a real drag
+  const panel = document.getElementById('claudeFloatPanel');
+  const opening = !panel.classList.contains('open');
+  if(opening) positionClaudePanel();
+  panel.classList.toggle('open');
+}
+
+// Draggable floating button — pointer events unify mouse/touch/pen into
+// one API. moved (not just "did pointerdown fire") is what distinguishes
+// an actual drag from a simple click, since pointerdown+pointerup with
+// no real movement in between should still open the chat normally.
+let claudeBtnJustDragged = false;
+function initClaudeBtnDrag(){
+  const btn = document.getElementById('claudeFloatBtn');
+  if(!btn) return;
+  let dragging = false, moved = false, startX, startY, startLeft, startTop;
+
+  const saved = localStorage.getItem('claude_btn_pos');
+  if(saved){
+    try{
+      const { left, top } = JSON.parse(saved);
+      btn.style.left = `${left}px`;
+      btn.style.top = `${top}px`;
+      btn.style.right = 'auto';
+      btn.style.bottom = 'auto';
+    }catch(e){}
+  }
+
+  btn.addEventListener('pointerdown', (e)=>{
+    dragging = true; moved = false;
+    const rect = btn.getBoundingClientRect();
+    startX = e.clientX; startY = e.clientY;
+    startLeft = rect.left; startTop = rect.top;
+    btn.setPointerCapture(e.pointerId);
+    btn.classList.add('dragging');
+  });
+
+  btn.addEventListener('pointermove', (e)=>{
+    if(!dragging) return;
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    if(!moved && Math.hypot(dx,dy) > 5) moved = true;
+    if(!moved) return;
+    const size = 52, edge = 8;
+    const left = Math.max(edge, Math.min(startLeft+dx, window.innerWidth-size-edge));
+    const top = Math.max(edge, Math.min(startTop+dy, window.innerHeight-size-edge));
+    btn.style.left = `${left}px`;
+    btn.style.top = `${top}px`;
+    btn.style.right = 'auto';
+    btn.style.bottom = 'auto';
+  });
+
+  const endDrag = (e)=>{
+    if(!dragging) return;
+    dragging = false;
+    btn.classList.remove('dragging');
+    if(moved){
+      claudeBtnJustDragged = true;
+      const rect = btn.getBoundingClientRect();
+      localStorage.setItem('claude_btn_pos', JSON.stringify({ left: rect.left, top: rect.top }));
+    }
+  };
+  btn.addEventListener('pointerup', endDrag);
+  btn.addEventListener('pointercancel', endDrag);
 }
 
 function clearClaudeChat(){
@@ -12172,7 +12370,7 @@ ${contentRules}`;
     // what was actually approved is the underlying included improvements,
     // which haven't changed, not this specific AI wording of them. A
     // fresh (never-approved) draft still becomes pending as before.
-    if(!stayedApproved) c.draftStatus = 'pending';
+    if(!stayedApproved){ c.draftStatus = 'pending'; c.draftPendingSince = new Date().toISOString(); }
     // A fresh/regenerated draft was never "marked ready to notify" for
     // this specific content — Team Queue shouldn't surface it to
     // approvers as awaiting review until the owning member explicitly
@@ -12193,6 +12391,7 @@ ${contentRules}`;
     console.error('generateDraft failed', e);
     c.draft = 'AI generation failed — you can write the draft manually here.';
     c.draftStatus = 'pending';
+    c.draftPendingSince = new Date().toISOString();
     await persistClients();
     renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
     if(modalOpenForThis) openQueueCardModal(id);
@@ -13255,6 +13454,7 @@ async function showApp(session){
     applyAppIcon();
     applyAppBranding();
     initTimerFromStorage();
+    initClaudeBtnDrag();
     await checkForNewNotificationToasts();
     setupRealtimeSubscriptions();
   }catch(e){
@@ -13327,6 +13527,26 @@ async function showApp(session){
       setupRealtimeSubscriptions();
     }
   });
+
+  const toastStackEl = document.getElementById('toastStack');
+  if(toastStackEl){
+    toastStackEl.addEventListener('mouseover', (e)=>{
+      if(toastStackExpanded || !e.target.closest('.toast')) return;
+      toastStackExpanded = true;
+      toastStackEl.querySelectorAll('.toast').forEach(el=> el._pauseTimer?.());
+      restackToasts();
+    });
+    toastStackEl.addEventListener('mouseout', (e)=>{
+      if(!toastStackExpanded) return;
+      // relatedTarget is where the mouse is going — if it's still
+      // somewhere inside the stack (moving between sibling toasts),
+      // this isn't a real "leave" yet, just a move within the group.
+      if(e.relatedTarget && toastStackEl.contains(e.relatedTarget)) return;
+      toastStackExpanded = false;
+      toastStackEl.querySelectorAll('.toast').forEach(el=> el._resumeTimer?.());
+      restackToasts();
+    });
+  }
 
   // Native date inputs only open their picker when clicking the small
   // calendar icon in most browsers — this makes the whole field
