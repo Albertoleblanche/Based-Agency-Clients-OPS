@@ -15,11 +15,14 @@
 //      nudge already cover — see the system prompts below.
 //
 // Both run every invocation, independently, in their own try/catch — one
-// failing (say, the email send) shouldn't block the other. Both mutate the
-// same in-memory `clients`/`log` and get written back to app_storage in a
-// single upsert at the end, so they can't clobber each other's changes the
-// way two separate read-modify-write cycles against the same JSON blob
-// could.
+// failing (say, the email send) shouldn't block the other.
+//
+// clients/client_improvements are real tables now (see
+// schema-clients-migration.sql), not part of the app_storage JSON blob —
+// only the activity log (`log`) still lives there. Client mutations
+// (lastProactiveCheckAt) are written with a targeted per-row UPDATE the
+// moment they happen inside runProactiveInsights, not batched into one
+// end-of-run blob rewrite the way the old app-data.clients array was.
 
 const { createClient } = require('@supabase/supabase-js');
 const { sendPushToUser } = require('../lib/push-notify');
@@ -36,6 +39,23 @@ const NOTHING_NOTEWORTHY = 'NOTHING_NOTEWORTHY';
 
 function isNothingNoteworthy(reply) {
   return !reply || reply.trim().toUpperCase().startsWith(NOTHING_NOTEWORTHY);
+}
+
+// snake_case (Postgres) -> camelCase (this file's working shape) — same
+// mapping convention as index.html's clientRowFromDb/improvementRowFromDb,
+// duplicated here rather than shared since this is a Node file and those
+// live in frontend-only code.
+function clientRowFromDb(r) {
+  return {
+    id: r.id, name: r.name, email: r.email || '', website: r.website || '',
+    service: r.service, status: r.status, importance: r.importance, danger: r.danger,
+    draft: r.draft || '', draftStatus: r.draft_status || 'none',
+    lastProactiveCheckAt: r.last_proactive_check_at, deletedAt: r.deleted_at || undefined,
+    improvements: [],
+  };
+}
+function improvementRowFromDb(r) {
+  return { id: r.id, clientId: r.client_id, author: r.author, text: r.text, date: r.date };
 }
 
 // Notifies every admin/approver the same three ways the rest of this
@@ -160,8 +180,12 @@ async function runProactiveInsights(admin, clients, log, settings) {
       const result = await checkClientWebsite(provider, client);
       if (result.ok) {
         // Only advance the rotation on a genuinely successful call — a
-        // transient API error shouldn't cost this client its turn.
-        client.lastProactiveCheckAt = new Date().toISOString();
+        // transient API error shouldn't cost this client its turn. Real
+        // per-row update the moment it happens, not batched into an
+        // end-of-run blob rewrite.
+        const nowIso = new Date().toISOString();
+        const { error: updErr } = await admin.from('clients').update({ last_proactive_check_at: nowIso }).eq('id', client.id);
+        if (!updErr) client.lastProactiveCheckAt = nowIso;
         if (!isNothingNoteworthy(result.reply)) {
           findings.push({ title: `Possible issue on ${client.name}'s website`, body: result.reply, targetId: client.id });
           log.unshift({
@@ -235,19 +259,34 @@ module.exports = async function handler(req, res) {
   const admin = createClient(supabaseUrl, serviceKey);
 
   try {
-    const [{ data: appDataRow, error: appDataErr }, { data: settingsRow, error: settingsErr }] = await Promise.all([
+    const [
+      { data: appDataRow, error: appDataErr },
+      { data: settingsRow, error: settingsErr },
+      { data: clientsData, error: clientsErr },
+      { data: impData, error: impErr },
+    ] = await Promise.all([
       admin.from('app_storage').select('value').eq('key', 'app-data').maybeSingle(),
       admin.from('app_storage').select('value').eq('key', 'settings').maybeSingle(),
+      admin.from('clients').select('*'),
+      admin.from('client_improvements').select('id, client_id, author, text, date'),
     ]);
-    if (appDataErr || settingsErr) {
-      res.status(500).json({ error: (appDataErr || settingsErr).message });
+    if (appDataErr || settingsErr || clientsErr || impErr) {
+      res.status(500).json({ error: (appDataErr || settingsErr || clientsErr || impErr).message });
       return;
     }
 
-    const appData = appDataRow ? JSON.parse(appDataRow.value) : { clients: [], log: [] };
+    // `log` is still the only thing left in the app_storage blob — clients
+    // moved to a real table (see schema-clients-migration.sql).
+    const appData = appDataRow ? JSON.parse(appDataRow.value) : { log: [] };
     const settings = settingsRow ? JSON.parse(settingsRow.value) : {};
-    const clients = appData.clients || [];
     const log = appData.log || [];
+
+    const clients = (clientsData || []).map(clientRowFromDb);
+    const improvementsByClient = {};
+    (impData || []).forEach(r => {
+      (improvementsByClient[r.client_id] = improvementsByClient[r.client_id] || []).push(improvementRowFromDb(r));
+    });
+    clients.forEach(c => { c.improvements = improvementsByClient[c.id] || []; });
 
     const result = { emailDigest: null, proactiveInsights: null };
 
@@ -263,13 +302,12 @@ module.exports = async function handler(req, res) {
       result.proactiveInsights = { error: String(e) };
     }
 
-    // Single write-back covering both responsibilities' changes (log
-    // entries from either, plus lastProactiveCheckAt on `clients`) — so
-    // they can't overwrite each other the way two separate upserts against
-    // the same JSON blob could.
+    // Only `log` needs writing back here — client changes
+    // (lastProactiveCheckAt) already wrote themselves via targeted
+    // per-row updates inside runProactiveInsights.
     if (log.length > 60) log.length = 60;
     await admin.from('app_storage').upsert(
-      { key: 'app-data', value: JSON.stringify({ ...appData, clients, log }) },
+      { key: 'app-data', value: JSON.stringify({ ...appData, log }) },
       { onConflict: 'key' }
     );
 
