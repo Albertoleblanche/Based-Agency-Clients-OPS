@@ -35,17 +35,23 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const [{ data: appDataRow }, { data: settingsRow }] = await Promise.all([
-      admin.from('app_storage').select('value').eq('key', 'app-data').maybeSingle(),
+    const [{ data: clientsData }, { data: settingsRow }, { data: profiles }] = await Promise.all([
+      admin.from('clients').select('name, danger, importance, draft_status, deleted_at'),
       admin.from('app_storage').select('value').eq('key', 'settings').maybeSingle(),
+      admin.from('team_profiles').select('role, email'),
     ]);
 
-    const appData = appDataRow ? JSON.parse(appDataRow.value) : { clients: [] };
     const settings = settingsRow ? JSON.parse(settingsRow.value) : {};
-    const clients = appData.clients || [];
+    const clients = (clientsData || []).map(c => ({
+      name: c.name, danger: c.danger, importance: c.importance,
+      draftStatus: c.draft_status, deletedAt: c.deleted_at,
+    }));
 
-    const pending = clients.filter(c => c.draftStatus === 'pending');
-    const to = [settings.danielEmail, settings.ericEmail].filter(Boolean).join(',');
+    const pending = clients.filter(c => c.draftStatus === 'pending' && !c.deletedAt);
+    // Role-based against team_profiles — see the matching comment in
+    // cron-wednesday-notify.js's runEmailDigest() for why this replaced
+    // settings.danielEmail/settings.ericEmail.
+    const to = (profiles || []).filter(p => (p.role === 'admin' || p.role === 'approver') && p.email).map(p => p.email).join(',');
     const appUrl = process.env.APP_URL || '';
 
     if (!pending.length) {
@@ -53,7 +59,7 @@ module.exports = async function handler(req, res) {
       return;
     }
     if (!to) {
-      res.status(200).json({ wouldSend: false, reason: 'No approver emails set in Settings — the automation would skip sending until that\'s filled in.' });
+      res.status(200).json({ wouldSend: false, reason: 'No admin/approver has an email on file — the automation would skip sending until one does.' });
       return;
     }
 
