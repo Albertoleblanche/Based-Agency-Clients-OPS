@@ -8,7 +8,7 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const { prompt } = req.body || {};
+  const { prompt, model } = req.body || {};
   if (!prompt || typeof prompt !== 'string') {
     res.status(400).json({ error: 'Missing "prompt" in request body' });
     return;
@@ -28,7 +28,11 @@ module.exports = async function handler(req, res) {
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini', // swap to 'gpt-4o' for higher quality at higher cost
+        // Caller passes settings.openaiModel (admin-editable in Settings ->
+        // AI & Email, shared with the Assistant's OpenAI path — see that
+        // panel's copy) — falls back to gpt-4o-mini if not sent, so this
+        // stays backward-compatible with any caller that doesn't pass one.
+        model: (typeof model === 'string' && model.trim()) || 'gpt-4o-mini',
         max_tokens: 1000,
         messages: [{ role: 'user', content: prompt }],
       }),
