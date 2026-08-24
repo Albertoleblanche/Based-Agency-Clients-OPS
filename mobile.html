@@ -510,6 +510,7 @@ let currentUser = null;
 let myProfile = null;
 let teamProfiles = [];
 let clients = [];
+let clientImprovements = []; // flat table — hydrated onto each client's .improvements after loading, same convention as desktop
 let tasks = [];
 let clientReminders = [];
 let notifications = [];
@@ -575,22 +576,76 @@ async function mBoot(){
   mSetupPullToRefresh();
 }
 
+// ---- clients / client_improvements: real per-row tables (migrated off the
+// app_storage JSON blob — see schema-clients-migration.sql). Same mapping
+// convention as index.html's desktop app (a separate standalone app, not
+// shared code, so this is duplicated rather than imported).
+const M_CLIENT_FIELD_DB_MAP = {
+  name:'name', email:'email', website:'website', service:'service', status:'status',
+  importance:'importance', danger:'danger', monthlyHourBudget:'monthly_hour_budget',
+  sow:'sow', draft:'draft', draftStatus:'draft_status', draftPendingSince:'draft_pending_since',
+  lastProactiveCheckAt:'last_proactive_check_at', customFieldValues:'custom_field_values',
+  deletedAt:'deleted_at', readyToNotify:'ready_to_notify',
+};
+function mClientFieldsToDb(fields){
+  const out = {};
+  Object.keys(fields).forEach(k=>{ const col = M_CLIENT_FIELD_DB_MAP[k]; if(col) out[col] = fields[k]; });
+  return out;
+}
+function mClientRowFromDb(r){
+  return {
+    id:r.id, name:r.name, email:r.email||'', website:r.website||'', service:r.service, status:r.status,
+    importance:r.importance, danger:r.danger, monthlyHourBudget:r.monthly_hour_budget||0, sow:r.sow||'',
+    draft:r.draft||'', draftStatus:r.draft_status||'none', draftPendingSince:r.draft_pending_since,
+    lastProactiveCheckAt:r.last_proactive_check_at, customFieldValues:r.custom_field_values||{},
+    deletedAt:r.deleted_at||undefined, readyToNotify:!!r.ready_to_notify, improvements:[],
+  };
+}
+function mImprovementRowFromDb(r){
+  return { id:r.id, clientId:r.client_id, author:r.author||'', text:r.text, date:r.date, includeInEmail:r.include_in_email, source:r.source };
+}
+async function mUpdateClientRow(id, fields){
+  const { error } = await supabaseClient.from('clients').update(mClientFieldsToDb(fields)).eq('id', id);
+  if(error){ console.error('mUpdateClientRow failed', id, error); return false; }
+  return true;
+}
+async function mInsertImprovementRow(clientId, {author, text, includeInEmail=true, source}){
+  const { data, error } = await supabaseClient.from('client_improvements')
+    .insert({ client_id:clientId, author, text, include_in_email:includeInEmail, source })
+    .select().single();
+  if(error){ console.error('mInsertImprovementRow failed', clientId, error); return null; }
+  const entry = mImprovementRowFromDb(data);
+  clientImprovements.push(entry);
+  const c = clients.find(x=>x.id===clientId);
+  if(c){ c.improvements = c.improvements || []; c.improvements.push(entry); }
+  return entry;
+}
+
 async function mLoadAll(){
-  const [[profRes, teamRes, clientsRes, tasksRes, remindersRes, notifRes, settingsRes]] = await Promise.all([
+  const [[profRes, teamRes, tasksRes, remindersRes, notifRes, settingsRes, clientsRes, impRes]] = await Promise.all([
     Promise.all([
       supabaseClient.from('team_profiles').select('*').eq('id', currentUser.id).maybeSingle(),
       supabaseClient.from('team_profiles').select('*'),
-      supabaseClient.from('app_storage').select('value').eq('key','app-data').maybeSingle(),
       supabaseClient.from('tasks').select('*').or(`assignee_id.eq.${currentUser.id},assigner_id.eq.${currentUser.id}`).is('cancelled_at', null),
       supabaseClient.from('client_reminders').select('*'),
       supabaseClient.from('notifications').select('*').eq('user_id', currentUser.id).order('created_at',{ascending:false}).limit(30),
       supabaseClient.from('app_storage').select('value').eq('key','settings').maybeSingle(),
+      supabaseClient.from('clients').select('*'),
+      supabaseClient.from('client_improvements').select('*').order('date', { ascending:true }),
     ]),
     mLoadCalendarEvents(),
   ]);
   myProfile = profRes.data || null;
   teamProfiles = teamRes.data || [];
-  clients = clientsRes.data ? (JSON.parse(clientsRes.data.value).clients || []) : [];
+  // clients/client_improvements: real tables now, not part of the app-data
+  // JSON blob (see schema-clients-migration.sql) — hydrate .improvements
+  // from the flat table so every existing c.improvements read site here
+  // keeps working unchanged.
+  if(clientsRes.error) console.error('mLoadAll: clients fetch failed', clientsRes.error);
+  if(impRes.error) console.error('mLoadAll: client_improvements fetch failed', impRes.error);
+  clients = (clientsRes.data || []).map(mClientRowFromDb);
+  clientImprovements = (impRes.data || []).map(mImprovementRowFromDb);
+  clients.forEach(c => { c.improvements = clientImprovements.filter(i => i.clientId === c.id); });
   tasks = (tasksRes.data||[]).map(t=>({
     id:t.id, title:t.title, description:t.description, priority:t.priority, status:t.status,
     assignerId:t.assigner_id, assigneeId:t.assignee_id, clientId:t.client_id, dueDate:t.due_date, link:t.link
@@ -1504,21 +1559,12 @@ async function mSaveQueueLogImprovement(){
   await mLoadAll();
   const c = clients.find(x=>x.id===clientId);
   if(!c){ mShowToast('error','Client not found'); return; }
-  c.improvements = c.improvements || [];
-  c.improvements.push({ author, text, date: new Date().toISOString(), includeInEmail: true, source: 'manual' });
-  c.draftStatus = 'none'; c.draft = '';
 
-  const { data: row } = await supabaseClient.from('app_storage').select('value').eq('key','app-data').maybeSingle();
-  const appData = JSON.parse(row.value);
-  const idx = appData.clients.findIndex(x=>x.id===clientId);
-  if(idx>-1){
-    appData.clients[idx].improvements = appData.clients[idx].improvements || [];
-    appData.clients[idx].improvements.push({ author, text, date: new Date().toISOString(), includeInEmail: true, source: 'manual' });
-    appData.clients[idx].draftStatus = 'none';
-    appData.clients[idx].draft = '';
-  }
-  const { error } = await supabaseClient.from('app_storage').update({ value: JSON.stringify(appData) }).eq('key','app-data');
-  if(error){ mShowToast('error','Save failed'); return; }
+  const imp = await mInsertImprovementRow(clientId, { author, text, includeInEmail:true, source:'manual' });
+  if(!imp){ mShowToast('error','Save failed'); return; }
+  const ok = await mUpdateClientRow(clientId, { draftStatus:'none', draft:'' });
+  if(ok){ c.draftStatus = 'none'; c.draft = ''; }
+  if(!ok){ mShowToast('error','Save failed'); return; }
 
   mCloseSheet();
   mShowToast('success','Improvement logged', `Saved for ${c.name}.`);
@@ -1740,12 +1786,8 @@ ${contentRules}`;
     const text = (data.text || '').trim();
     if(!text){ mShowToast('error','Could not generate a draft — try again'); return; }
 
-    const { data: row } = await supabaseClient.from('app_storage').select('value').eq('key','app-data').maybeSingle();
-    const appData = JSON.parse(row.value);
-    const idx = appData.clients.findIndex(x=>x.id===clientId);
-    if(idx>-1){ appData.clients[idx].draft = text; appData.clients[idx].draftStatus = 'pending'; }
-    const { error } = await supabaseClient.from('app_storage').update({ value: JSON.stringify(appData) }).eq('key','app-data');
-    if(error){ mShowToast('error','Generated, but could not save'); return; }
+    const ok = await mUpdateClientRow(clientId, { draft:text, draftStatus:'pending' });
+    if(!ok){ mShowToast('error','Generated, but could not save'); return; }
 
     c.draft = text; c.draftStatus = 'pending';
     mShowToast('success','Draft generated');
@@ -1761,13 +1803,9 @@ ${contentRules}`;
 async function mApproveDraft(clientId){
   const c = clients.find(x=>x.id===clientId);
   if(!c) return;
+  const ok = await mUpdateClientRow(clientId, { draftStatus:'approved' });
+  if(!ok){ mShowToast('error','Could not approve'); return; }
   c.draftStatus = 'approved';
-  const { data: row } = await supabaseClient.from('app_storage').select('value').eq('key','app-data').maybeSingle();
-  const appData = JSON.parse(row.value);
-  const idx = appData.clients.findIndex(x=>x.id===clientId);
-  if(idx>-1) appData.clients[idx].draftStatus = 'approved';
-  const { error } = await supabaseClient.from('app_storage').update({ value: JSON.stringify(appData) }).eq('key','app-data');
-  if(error){ mShowToast('error','Could not approve'); return; }
   mShowToast('success','Draft approved');
   mCloseSubscreen();
   mRenderQueue();
@@ -1777,13 +1815,9 @@ async function mApproveDraft(clientId){
 async function mSkipDraft(clientId){
   const c = clients.find(x=>x.id===clientId);
   if(!c) return;
+  const ok = await mUpdateClientRow(clientId, { draftStatus:'none', draft:'' });
+  if(!ok){ mShowToast('error','Could not skip'); return; }
   c.draftStatus = 'none'; c.draft = '';
-  const { data: row } = await supabaseClient.from('app_storage').select('value').eq('key','app-data').maybeSingle();
-  const appData = JSON.parse(row.value);
-  const idx = appData.clients.findIndex(x=>x.id===clientId);
-  if(idx>-1){ appData.clients[idx].draftStatus = 'none'; appData.clients[idx].draft = ''; }
-  const { error } = await supabaseClient.from('app_storage').update({ value: JSON.stringify(appData) }).eq('key','app-data');
-  if(error){ mShowToast('error','Could not skip'); return; }
   mShowToast('info','Skipped');
   mCloseSubscreen();
   mRenderQueue();
@@ -2180,13 +2214,9 @@ async function mRestoreTrashItem(type, id){
     await mLoadAll();
     const c = clients.find(x=>x.id===id);
     if(!c) return;
+    const ok = await mUpdateClientRow(id, { deletedAt: null });
+    if(!ok){ mShowToast('error','Restore failed'); return; }
     delete c.deletedAt;
-    const { data: row } = await supabaseClient.from('app_storage').select('value').eq('key','app-data').maybeSingle();
-    const appData = JSON.parse(row.value);
-    const idx = appData.clients.findIndex(x=>x.id===id);
-    if(idx>-1) delete appData.clients[idx].deletedAt;
-    const { error } = await supabaseClient.from('app_storage').update({ value: JSON.stringify(appData) }).eq('key','app-data');
-    if(error){ mShowToast('error','Restore failed'); return; }
     mShowToast('success', `${c.name} restored`);
   } else if(type==='notes'){
     const { error } = await supabaseClient.from('notes').update({ deleted_at: null }).eq('id', id).eq('user_id', currentUser.id);
@@ -2539,22 +2569,12 @@ async function mLogNoteNow(noteId){
   const c = clients.find(x=>x.id===n.clientId);
   if(!c){ mShowToast('error','Client not found'); return; }
   const author = myName() || 'Team member';
-  c.improvements = c.improvements || [];
-  c.improvements.push({ author, text: n.text, date: new Date().toISOString(), includeInEmail: true, source: 'note' });
-  c.draftStatus = 'none'; c.draft = '';
 
-  const { data: row } = await supabaseClient.from('app_storage').select('value').eq('key','app-data').maybeSingle();
-  const appData = JSON.parse(row.value);
-  const idx = appData.clients.findIndex(x=>x.id===c.id);
-  if(idx>-1){
-    appData.clients[idx].improvements = appData.clients[idx].improvements || [];
-    appData.clients[idx].improvements.push({ author, text: n.text, date: new Date().toISOString(), includeInEmail: true, source: 'note' });
-    appData.clients[idx].draftStatus = 'none';
-    appData.clients[idx].draft = '';
-  }
-  const { error: saveErr } = await supabaseClient.from('app_storage').update({ value: JSON.stringify(appData) }).eq('key','app-data');
+  const imp = await mInsertImprovementRow(c.id, { author, text: n.text, includeInEmail:true, source:'note' });
+  const saveOk = !!imp && await mUpdateClientRow(c.id, { draftStatus:'none', draft:'' });
   const { error: noteErr } = await supabaseClient.from('notes').update({ status:'done' }).eq('id', noteId).eq('user_id', currentUser.id);
-  if(saveErr || noteErr){ mShowToast('error','Could not save'); return; }
+  if(!saveOk || noteErr){ mShowToast('error','Could not save'); return; }
+  c.draftStatus = 'none'; c.draft = '';
   n.status = 'done';
   mShowToast('success','Logged!', `Added to ${c.name}'s improvement log this week.`);
   mRenderNotesList();
@@ -3328,22 +3348,12 @@ async function mLogTimeEntryAsImprovement(entryId){
   const c = clients.find(x=>x.id===entry.clientId);
   if(!c){ mShowToast('error','Client not found'); return; }
   const author = myName() || 'Team member';
-  c.improvements = c.improvements || [];
-  c.improvements.push({ author, text: entry.description.trim(), date: new Date().toISOString(), includeInEmail: false, source: 'time' });
-  c.draftStatus = 'none'; c.draft = '';
 
-  const { data: row } = await supabaseClient.from('app_storage').select('value').eq('key','app-data').maybeSingle();
-  const appData = JSON.parse(row.value);
-  const idx = appData.clients.findIndex(x=>x.id===c.id);
-  if(idx>-1){
-    appData.clients[idx].improvements = appData.clients[idx].improvements || [];
-    appData.clients[idx].improvements.push({ author, text: entry.description.trim(), date: new Date().toISOString(), includeInEmail: false, source: 'time' });
-    appData.clients[idx].draftStatus = 'none';
-    appData.clients[idx].draft = '';
-  }
-  const { error: saveErr } = await supabaseClient.from('app_storage').update({ value: JSON.stringify(appData) }).eq('key','app-data');
+  const imp = await mInsertImprovementRow(c.id, { author, text: entry.description.trim(), includeInEmail:false, source:'time' });
+  const saveOk = !!imp && await mUpdateClientRow(c.id, { draftStatus:'none', draft:'' });
   const { error: entryErr } = await supabaseClient.from('time_entries').update({ logged: true }).eq('id', entryId);
-  if(saveErr || entryErr){ mShowToast('error','Could not save'); return; }
+  if(!saveOk || entryErr){ mShowToast('error','Could not save'); return; }
+  c.draftStatus = 'none'; c.draft = '';
   entry.logged = true;
   mShowToast('success','Logged', 'Added to Past Improvements.');
   mRenderTimeTrackerMain();
