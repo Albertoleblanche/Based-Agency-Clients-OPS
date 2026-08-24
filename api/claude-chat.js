@@ -14,15 +14,11 @@
 // app itself, since a secret typed into the browser would defeat the
 // entire point of keeping it server-side.
 //
-// Note on OpenAI + web search specifically: this uses the Responses API
-// (POST /v1/responses), not Chat Completions — the older Chat
-// Completions "-search-preview" models (which an earlier version of
-// this file used) were deprecated by OpenAI shortly after, shutting
-// down 2026-07-23. The Responses API's web_search tool works with the
-// regular gpt-4o-mini model directly — genuinely the same model draft
-// generation uses elsewhere in this app, not just the same account —
-// and the model decides case-by-case whether a search is actually
-// needed, rather than always searching on every message.
+// The actual Claude/OpenAI calling logic (model names, tool config,
+// response parsing) lives in lib/ai-client.js now, shared with
+// api/cron-wednesday-notify.js's weekly proactive-insights job — see
+// that file's header comment for why this was pulled out rather than
+// hand-copied a second time.
 //
 // The daily cap exists because, unlike almost everything else in this
 // app, every message here costs real money. DAILY_MESSAGE_CAP is
@@ -37,69 +33,9 @@
 // context.
 
 const { createClient } = require('@supabase/supabase-js');
+const { callAI } = require('../lib/ai-client');
 
 const DAILY_MESSAGE_CAP = 40;
-const CLAUDE_MODEL = 'claude-sonnet-5';
-const OPENAI_MODEL = 'gpt-4o-mini';
-
-async function callClaude(messages, systemPrompt) {
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (!anthropicKey) return { ok: false, error: 'Missing ANTHROPIC_API_KEY' };
-
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': anthropicKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: CLAUDE_MODEL,
-      max_tokens: 1500,
-      system: systemPrompt,
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
-      tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-    }),
-  });
-  const data = await res.json();
-  if (!res.ok) return { ok: false, error: data?.error?.message || 'Claude request failed' };
-  const textBlocks = (data.content || []).filter(b => b.type === 'text').map(b => b.text);
-  return { ok: true, reply: textBlocks.join('\n\n') };
-}
-
-async function callOpenAI(messages, systemPrompt) {
-  const openaiKey = process.env.OPENAI_API_KEY;
-  if (!openaiKey) return { ok: false, error: 'Missing OPENAI_API_KEY' };
-
-  // Responses API, not Chat Completions — the older Chat Completions
-  // "-search-preview" models are deprecated (shutdown 2026-07-23 per
-  // OpenAI's own docs). The current, correct way to get web search with
-  // a regular model is the Responses API's web_search tool, where the
-  // model decides for itself whether a search is actually needed per
-  // message, rather than always searching on every single one.
-  const res = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${openaiKey}`,
-    },
-    body: JSON.stringify({
-      model: OPENAI_MODEL,
-      tools: [{ type: 'web_search' }],
-      input: [{ role: 'system', content: systemPrompt }, ...messages.map(m => ({ role: m.role, content: m.content }))],
-    }),
-  });
-  const data = await res.json();
-  if (!res.ok) return { ok: false, error: data?.error?.message || 'OpenAI request failed' };
-  // The output array can contain a web_search_call item alongside the
-  // actual message item (mirroring how Claude interleaves tool-use
-  // blocks with text) — filter for the message item's own text content
-  // rather than assume a single flat field.
-  const textParts = (data.output || [])
-    .filter(item => item.type === 'message')
-    .flatMap(item => (item.content || []).filter(c => c.type === 'output_text').map(c => c.text));
-  return { ok: true, reply: textParts.join('\n\n').trim() };
-}
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -160,9 +96,7 @@ module.exports = async function handler(req, res) {
 Current client data:
 ${appContext || '(no client data provided)'}`;
 
-    const result = provider === 'openai'
-      ? await callOpenAI(messages, systemPrompt)
-      : await callClaude(messages, systemPrompt);
+    const result = await callAI(provider, messages, systemPrompt);
 
     if (!result.ok) {
       res.status(502).json({ error: result.error });
