@@ -776,7 +776,7 @@
   .kanban-add-btn:hover{background:var(--brand);color:#fff;}
   .kanban-cards{display:flex;flex-direction:column;gap:10px;min-height:300px;}
 
-  .kanban-card{background:var(--card);border-radius:var(--radius-lg);padding:14px;box-shadow:0 1px 2px rgba(16,24,40,.05);cursor:pointer;transition:box-shadow .15s ease, transform .15s ease;}
+  .kanban-card{background:var(--card);border-radius:var(--radius-lg);padding:14px;box-shadow:0 1px 2px rgba(16,24,40,.05);cursor:pointer;transition:box-shadow .15s ease, transform .15s ease;min-width:0;}
   .kanban-card:hover{box-shadow:0 8px 20px rgba(16,24,40,.1);transform:translateY(-1px);}
   .kanban-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:9px;}
   .kanban-card-due{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted-lt);font-weight:600;}
@@ -2334,7 +2334,7 @@ document.addEventListener('DOMContentLoaded', function(){
             <p style="font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.6;">
               Tell the AI exactly how you want <b>your own</b> client emails structured — greeting style, paragraph order, sign-off, tone, length, anything. This is personal to you — it only applies to drafts you generate, and nobody else's drafts are affected by it, the same way nobody else's changes here affect yours. A few rules always apply no matter what you write here: every improvement must be described as a specific, measurable deliverable (never vague claims), and nothing that could make the agency look bad.
             </p>
-            <textarea id="emailInstructions" placeholder="Example:&#10;- Open with 'Hi [Client First Name],'&#10;- First paragraph: one-sentence summary of the week&#10;- Second paragraph: bulleted list of specific deliverables completed&#10;- Third paragraph (only if relevant): what's planned next week&#10;- Close with: 'Nothing needed from you — reach out anytime with questions.'&#10;- Sign off: 'The Based Agency Team'&#10;- Keep it under 150 words total" style="width:100%;min-height:160px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:12px;border-radius:8px;border:1px solid var(--border);resize:vertical;background:var(--card);color:var(--ink);"></textarea>
+            <textarea spellcheck="true" id="emailInstructions" placeholder="Example:&#10;- Open with 'Hi [Client First Name],'&#10;- First paragraph: one-sentence summary of the week&#10;- Second paragraph: bulleted list of specific deliverables completed&#10;- Third paragraph (only if relevant): what's planned next week&#10;- Close with: 'Nothing needed from you — reach out anytime with questions.'&#10;- Sign off: 'The Based Agency Team'&#10;- Keep it under 150 words total" style="width:100%;min-height:160px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:12px;border-radius:8px;border:1px solid var(--border);resize:vertical;background:var(--card);color:var(--ink);"></textarea>
             <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
               <button class="btn btn-brand" onclick="saveEmailInstructions()">Save instructions</button>
               <span id="emailInstructionsStatus" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;color:var(--muted-lt);"></span>
@@ -2652,7 +2652,7 @@ document.addEventListener('DOMContentLoaded', function(){
         </div>
         <div class="claude-chat-messages" id="claudeTabMessages"></div>
         <div class="claude-chat-input-row">
-          <textarea class="claude-chat-input" id="claudeTabInput" rows="1" placeholder="Ask about a client, or paste a link to review…" onkeydown="handleClaudeInputKey(event, 'tab')"></textarea>
+          <textarea spellcheck="true" class="claude-chat-input" id="claudeTabInput" rows="1" placeholder="Ask about a client, or paste a link to review…" onkeydown="handleClaudeInputKey(event, 'tab')"></textarea>
           <button class="claude-chat-send" id="claudeTabSendBtn" onclick="sendClaudeMessage('tab')" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
         </div>
         <div class="claude-chat-cap" id="claudeTabCap"></div>
@@ -2676,7 +2676,7 @@ document.addEventListener('DOMContentLoaded', function(){
   </div>
   <div class="claude-chat-messages" id="claudeFloatMessages"></div>
   <div class="claude-chat-input-row">
-    <textarea class="claude-chat-input" id="claudeFloatInput" rows="1" placeholder="Ask anything…" onkeydown="handleClaudeInputKey(event, 'float')"></textarea>
+    <textarea spellcheck="true" class="claude-chat-input" id="claudeFloatInput" rows="1" placeholder="Ask anything…" onkeydown="handleClaudeInputKey(event, 'float')"></textarea>
     <button class="claude-chat-send" id="claudeFloatSendBtn" onclick="sendClaudeMessage('float')" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
   </div>
   <div class="claude-chat-cap" id="claudeFloatCap"></div>
@@ -3389,7 +3389,7 @@ function showSendEmailConfirm(to, subject, body, onSent){
     <div class="modal-body">
       <div class="settings-field"><label>To</label><input id="mailModalTo" value="${to}" readonly></div>
       <div class="settings-field"><label>Subject</label><input id="mailModalSubject" readonly></div>
-      <div class="settings-field"><label>Body</label><textarea id="mailModalBody" style="min-height:150px;width:100%;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:6px;border:1px solid var(--border);"></textarea></div>
+      <div class="settings-field"><label>Body</label><textarea spellcheck="true" id="mailModalBody" style="min-height:150px;width:100%;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:6px;border:1px solid var(--border);"></textarea></div>
       <p style="font-size:11.5px;color:var(--muted-lt);margin:8px 0 0;line-height:1.5;">Review the text above — clicking Send delivers it immediately from the app, no further confirmation.</p>
     </div>
     <div class="modal-actions">
@@ -4750,7 +4750,7 @@ function customFieldInputHtml(field, value){
     return `<div><label>${field.label}</label><select id="${id}">${opts}</select></div>`;
   }
   if(field.type==='textarea'){
-    return `<div style="grid-column:1/-1;"><label>${field.label}</label><textarea id="${id}" style="width:100%;min-height:70px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:9px 11px;border-radius:6px;border:1px solid var(--border);box-sizing:border-box;">${val}</textarea></div>`;
+    return `<div style="grid-column:1/-1;"><label>${field.label}</label><textarea spellcheck="true" id="${id}" style="width:100%;min-height:70px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:9px 11px;border-radius:6px;border:1px solid var(--border);box-sizing:border-box;">${val}</textarea></div>`;
   }
   const htmlType = { text:'text', url:'url', email:'email', phone:'tel', number:'number' }[field.type] || 'text';
   return `<div><label>${field.label}</label><input type="${htmlType}" id="${id}" value="${escVal}" placeholder="${field.label}"></div>`;
@@ -4777,7 +4777,7 @@ function clientFormHtml(title, submitLabel, customValues){
         <div><label>Danger score (1–5)</label><select id="ncDanger"><option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select><div id="ncDangerNudge" style="display:none;font-size:11px;color:var(--amber);margin-top:5px;"></div></div>
         <div><label>Monthly hour budget</label><input type="number" id="ncBudget" min="0" step="0.5" placeholder="e.g. 20 (optional)"></div>
         <div><label>Start date <span style="font-weight:400;color:var(--muted-lt);">(optional)</span></label><input type="date" id="ncStartDate" max="${toDateStr(new Date())}"></div>
-        <div style="grid-column:1/-1;"><label>SOW / scope notes</label><input id="ncSow" placeholder="Brief scope summary"></div>
+        <div style="grid-column:1/-1;"><label>SOW / scope notes</label><input id="ncSow" spellcheck="true" placeholder="Brief scope summary"></div>
         ${customFieldsFormHtml(customValues)}
       </div>
     </div>
@@ -5638,7 +5638,7 @@ function renderClientsTable(){
       <td colspan="8">
         ${c.improvements.length ? miniImprovementsHtml(c) : ''}
         <div class="log-inline" style="margin-top:8px;">
-          <textarea placeholder="What did you improve for this client this week?" id="imp-${c.id}"></textarea>
+          <textarea spellcheck="true" placeholder="What did you improve for this client this week?" id="imp-${c.id}"></textarea>
           <button class="btn btn-brand" onclick="logImprovement('${c.id}')">Log it</button>
           <button class="btn btn-outline" onclick="toggleDrawer('${c.id}')">Cancel</button>
         </div>
@@ -6367,7 +6367,7 @@ function openSendToSlackConfirm(clientId){
     <div class="modal-head"><span class="panel-title">Send to ${escapeHtml(c.name)}'s Slack channel?</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
       <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 12px;">Posts to ${escapeHtml(mapping.channelName || mapping.channelId)} — review before sending, this posts immediately once confirmed.</p>
-      <textarea id="slackClientMessageText" style="width:100%;min-height:220px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;padding:10px;border-radius:8px;border:1px solid var(--border);white-space:pre-wrap;">${escapeHtml(c.draft)}</textarea>
+      <textarea spellcheck="true" id="slackClientMessageText" style="width:100%;min-height:220px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;padding:10px;border-radius:8px;border:1px solid var(--border);white-space:pre-wrap;">${escapeHtml(c.draft)}</textarea>
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" id="sendSlackClientBtn" onclick="confirmSendToSlack('${clientId}')">Send to Slack</button>
@@ -6582,7 +6582,7 @@ function startEditImprovement(clientId, idx){
   if(!row) return;
   row.innerHTML = `
     <div class="log-inline" style="margin-top:0;width:100%;">
-      <textarea id="editimp-text-${clientId}-${idx}"></textarea>
+      <textarea spellcheck="true" id="editimp-text-${clientId}-${idx}"></textarea>
       <input id="editimp-author-${clientId}-${idx}" style="width:130px;">
       <button class="btn btn-brand" onclick="saveEditImprovement('${clientId}', ${idx})">Save</button>
       <button class="btn btn-outline" onclick="renderClientsTable()">Cancel</button>
@@ -6807,7 +6807,7 @@ function openNewReminderModal(presetClientId){
           <input type="hidden" id="reminderClient">
           <div class="client-search-dropdown" id="reminderClientDropdown"></div>
         </div>
-        <div style="grid-column:1/-1;"><label>Question / request</label><textarea id="reminderQuestion" placeholder="e.g. Can you send us the latest project photos?" rows="3" style="resize:vertical;min-height:64px;font-family:inherit;"></textarea></div>
+        <div style="grid-column:1/-1;"><label>Question / request</label><textarea spellcheck="true" id="reminderQuestion" placeholder="e.g. Can you send us the latest project photos?" rows="3" style="resize:vertical;min-height:64px;font-family:inherit;"></textarea></div>
         <div><label>Follow-up date</label><input type="date" id="reminderFollowUpDate" value="${toDateStr(defaultFollowUp)}" min="${toDateStr(new Date())}"></div>
       </div>
       <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink);cursor:pointer;margin-top:2px;"><input type="checkbox" id="reminderAddToCalendarInput" checked> Add to calendar</label>
@@ -6864,7 +6864,7 @@ function openReminderDetailModal(id){
         <span class="rating-pill" style="background:${meta.color}18;color:${meta.color};">${meta.icon} ${meta.label}</span>
         ${c ? `<span class="row-link" onclick="closeAppModal();openClientDetail('${c.id}');">${c.name}</span>` : ''}
       </div>
-      <div class="settings-field"><label>Question / request</label><textarea id="reminderEditQuestion" rows="3" style="width:100%;resize:vertical;min-height:64px;font-family:inherit;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);">${escapeHtml(r.question)}</textarea></div>
+      <div class="settings-field"><label>Question / request</label><textarea spellcheck="true" id="reminderEditQuestion" rows="3" style="width:100%;resize:vertical;min-height:64px;font-family:inherit;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);">${escapeHtml(r.question)}</textarea></div>
       <div class="form-grid">
         <div><label>Asked by</label><div style="font-size:13px;padding:9px 0;">${owner ? owner.name : '—'} · ${new Date(r.askedDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div></div>
         <div><label>Follow-up date</label><input type="date" id="reminderEditFollowUp" value="${r.followUpDate||''}" min="${toDateStr(new Date())}" ${isResolved?'disabled':''}></div>
@@ -6986,7 +6986,7 @@ function openNoteModal(noteId, presetClientId, presetStatus){
           <option value="done" ${effectiveStatus==='done'?'selected':''}>Done</option>
         </select>
       </div>
-      <div class="settings-field"><label>Note</label><textarea id="noteTextInput" style="width:100%;min-height:64px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${editing ? editing.text : ''}</textarea></div>
+      <div class="settings-field"><label>Note</label><textarea spellcheck="true" id="noteTextInput" style="width:100%;min-height:64px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${editing ? editing.text : ''}</textarea></div>
       <div class="settings-field"><label>Link (optional)</label><input id="noteLinkInput" type="url" placeholder="https://…" value="${editing && editing.link ? editing.link.replace(/"/g,'&quot;') : ''}"></div>
       ${!editing ? `
       <div class="settings-field"><label>Follow-up date (optional)</label><input type="date" id="noteFollowUpInput" min="${toDateStr(new Date())}"></div>
@@ -7439,7 +7439,7 @@ function openTaskDetailModal(taskId){
     </div>
     <div class="modal-body">
       <div class="q-name" style="margin-bottom:10px;">${escapeHtml(t.title)}</div>
-      ${t.description ? `<div style="font-size:13px;color:var(--ink);line-height:1.6;white-space:pre-wrap;margin-bottom:14px;">${escapeHtml(t.description)}</div>` : `<div style="font-size:12.5px;color:var(--muted-lt);margin-bottom:14px;">No description added.</div>`}
+      ${t.description ? `<div style="font-size:13px;color:var(--ink);line-height:1.6;white-space:pre-wrap;overflow-wrap:break-word;word-break:break-word;margin-bottom:14px;">${escapeHtml(t.description)}</div>` : `<div style="font-size:12.5px;color:var(--muted-lt);margin-bottom:14px;">No description added.</div>`}
       <div class="form-grid" style="margin-bottom:6px;">
         <div><label style="font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;color:var(--muted-lt);display:block;margin-bottom:4px;">Direction</label><div style="font-size:13px;">${directionLabel}</div></div>
         ${dueStr ? `<div><label style="font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;color:var(--muted-lt);display:block;margin-bottom:4px;">Due</label><div style="font-size:13px;${overdue?'color:var(--red);font-weight:700;':''}">${dueStr}</div></div>` : ''}
@@ -7489,14 +7489,26 @@ function populateTaskClientSelect(selectedId){
   return options;
 }
 
+// Blocks pasting a link straight into the task description — there's a
+// dedicated Link field right below it for that. Only intercepts the paste
+// when the clipboard content actually looks like a URL; ordinary prose
+// (even text that happens to include a period) pastes through normally.
+function handleTaskDescPaste(event){
+  const pasted = (event.clipboardData || window.clipboardData)?.getData('text') || '';
+  if(containsUrl(pasted)){
+    event.preventDefault();
+    showToast('error','Links go in the Link field', 'Paste it in the "Link" field below instead — the description is for plain text.');
+  }
+}
+
 function taskFormHtml(editing, presetAssigneeId, presetContext){
   const presetTitle = !editing && presetContext?.title ? presetContext.title.replace(/"/g,'&quot;') : '';
   const presetDesc = !editing && presetContext?.description ? presetContext.description : '';
   return `
     <div class="modal-head"><span class="panel-title">${editing ? 'Edit task' : 'New task'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
-      <div class="settings-field"><label>Title</label><input id="taskTitleInput" placeholder="e.g. Update the roofing page copy" value="${editing ? editing.title.replace(/"/g,'&quot;') : presetTitle}"></div>
-      <div class="settings-field"><label>Description (optional)</label><textarea id="taskDescInput" style="width:100%;min-height:80px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);">${editing ? editing.description : escapeHtml(presetDesc)}</textarea></div>
+      <div class="settings-field"><label>Title</label><input id="taskTitleInput" spellcheck="true" placeholder="e.g. Update the roofing page copy" value="${editing ? editing.title.replace(/"/g,'&quot;') : presetTitle}"></div>
+      <div class="settings-field"><label>Description (optional)</label><textarea spellcheck="true" id="taskDescInput" onpaste="handleTaskDescPaste(event)" style="width:100%;min-height:80px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);overflow-wrap:break-word;word-break:break-word;">${editing ? editing.description : escapeHtml(presetDesc)}</textarea></div>
       <div class="form-grid">
         <div><label>Assign to</label><select id="taskAssigneeSelect">${populateTaskAssigneeSelect(editing ? editing.assigneeId : (presetAssigneeId || currentUser.id))}</select></div>
         <div><label>Priority</label>
@@ -7537,6 +7549,7 @@ async function saveNewTask(){
   const assigneeId = document.getElementById('taskAssigneeSelect').value;
   const priority = document.getElementById('taskPrioritySelect').value;
   const description = document.getElementById('taskDescInput').value.trim();
+  if(containsUrl(description)){ showToast('error','No links in the description', 'Move the link to the "Link" field below and try again.'); return; }
   const dueDate = document.getElementById('taskDueInput').value || null;
   if(dueDate && dueDate < toDateStr(new Date())){ showToast('error','Date is in the past','Pick today or a future date.'); return; }
   const clientId = document.getElementById('taskClientSelect').value || null;
@@ -7577,6 +7590,7 @@ async function saveEditTask(taskId){
   const assigneeId = document.getElementById('taskAssigneeSelect').value;
   const priority = document.getElementById('taskPrioritySelect').value;
   const description = document.getElementById('taskDescInput').value.trim();
+  if(containsUrl(description)){ showToast('error','No links in the description', 'Move the link to the "Link" field below and try again.'); return; }
   const dueDate = document.getElementById('taskDueInput').value || null;
   if(dueDate && dueDate !== t.dueDate && dueDate < toDateStr(new Date())){ showToast('error','Date is in the past','Pick today or a future date.'); return; }
   const clientId = document.getElementById('taskClientSelect').value || null;
@@ -7736,7 +7750,7 @@ function completeTaskModalHtml(taskId){
       <div class="q-name" style="margin-bottom:14px;">${escapeHtml(t.title)}</div>
       <div class="settings-field" style="margin-bottom:14px;">
         <label>Notes <span style="color:var(--muted-lt);font-weight:400;">(optional)</span></label>
-        <textarea id="taskCompletionNotes" placeholder="Anything the assigner should know — what you found, decisions made, what's left, etc." style="width:100%;min-height:80px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${escapeHtml(t.completionNotes||'')}</textarea>
+        <textarea spellcheck="true" id="taskCompletionNotes" placeholder="Anything the assigner should know — what you found, decisions made, what's left, etc." style="width:100%;min-height:80px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${escapeHtml(t.completionNotes||'')}</textarea>
       </div>
       <div class="settings-field">
         <label>Link <span style="color:var(--muted-lt);font-weight:400;">(optional)</span></label>
@@ -8268,7 +8282,7 @@ function eventFormHtml(editing, presetDateStr){
     <div class="modal-head"><span class="panel-title">${editing ? 'Edit event' : 'New event'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
       <div class="settings-field"><label>Title</label><input id="eventTitleInput" placeholder="e.g. Kickoff call with Flame Auto Repair" value="${editing ? editing.title.replace(/"/g,'&quot;') : ''}"></div>
-      <div class="settings-field"><label>Description (optional)</label><textarea id="eventDescInput" style="width:100%;min-height:70px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);">${editing ? editing.description : ''}</textarea></div>
+      <div class="settings-field"><label>Description (optional)</label><textarea spellcheck="true" id="eventDescInput" style="width:100%;min-height:70px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);">${editing ? editing.description : ''}</textarea></div>
       <div class="form-grid">
         <div><label>Date</label><input type="date" id="eventDateInput" value="${startDate}" min="${toDateStr(new Date())}"></div>
         <div><label>Type</label>
@@ -8461,7 +8475,7 @@ function openRequestChangeModal(eventId){
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Request a change</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
-      <div class="settings-field"><label>What would you like changed?</label><textarea id="changeRequestInput" style="width:100%;min-height:90px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);" placeholder="e.g. Can we move this to 3pm instead?"></textarea></div>
+      <div class="settings-field"><label>What would you like changed?</label><textarea spellcheck="true" id="changeRequestInput" style="width:100%;min-height:90px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);" placeholder="e.g. Can we move this to 3pm instead?"></textarea></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" onclick="submitChangeRequest('${eventId}')">Send request</button>
@@ -8985,24 +8999,27 @@ let notifications = [];
 // notification type added elsewhere — it's the single source both the
 // settings UI and (indirectly, since sendNotification() checks against it)
 // enforcement rely on.
+// section groups the Notification Preferences panel into headed groups
+// instead of one long flat list — order here also controls display order,
+// both of sections (first-seen order) and rows within each section.
 const NOTIFICATION_TYPE_META = {
-  task_assigned:           { label:'A task is assigned to you' },
-  task_completed:          { label:'A task you assigned is completed' },
-  task_cancelled:          { label:'A task assigned to you is cancelled' },
-  task_edited:             { label:'A task assigned to you changes' },
-  email_sent:              { label:'A client email is sent' },
-  event_rsvp:              { label:'Someone RSVPs or requests a change to your event' },
-  event_invited:           { label:"You're invited to a calendar event" },
-  event_updated:           { label:'A calendar event you\'re on changes' },
-  event_cancelled:         { label:'A calendar event you\'re on is cancelled' },
-  email_change_requested:  { label:'Someone requests an email change' },
-  draft_ready:             { label:'A draft is ready for your approval' },
-  draft_approved:          { label:'Your submitted work is approved' },
-  draft_skipped:           { label:'Your submitted draft is skipped' },
-  profile_changed:         { label:'Your role, title, or access changes' },
-  reminder_follow_up_due:  { label:'A client follow-up you own comes due' },
-  reminder_escalated:      { label:'A client follow-up has gone unanswered for a week' },
-  proactive_insight:       { label:'The Assistant surfaces a proactive insight (weekly)' },
+  task_assigned:           { label:'A task is assigned to you', section:'Tasks' },
+  task_completed:          { label:'A task you assigned is completed', section:'Tasks' },
+  task_cancelled:          { label:'A task assigned to you is cancelled', section:'Tasks' },
+  task_edited:             { label:'A task assigned to you changes', section:'Tasks' },
+  draft_ready:             { label:'A draft is ready for your approval', section:'Client Work' },
+  draft_approved:          { label:'Your submitted work is approved', section:'Client Work' },
+  draft_skipped:           { label:'Your submitted draft is skipped', section:'Client Work' },
+  email_sent:              { label:'A client email is sent', section:'Client Work' },
+  reminder_follow_up_due:  { label:'A client follow-up you own comes due', section:'Client Work' },
+  reminder_escalated:      { label:'A client follow-up has gone unanswered for a week', section:'Client Work' },
+  proactive_insight:       { label:'The Assistant surfaces a proactive insight (weekly)', section:'Client Work' },
+  event_rsvp:              { label:'Someone RSVPs or requests a change to your event', section:'Calendar' },
+  event_invited:           { label:"You're invited to a calendar event", section:'Calendar' },
+  event_updated:           { label:'A calendar event you\'re on changes', section:'Calendar' },
+  event_cancelled:         { label:'A calendar event you\'re on is cancelled', section:'Calendar' },
+  email_change_requested:  { label:'Someone requests an email change', section:'Account' },
+  profile_changed:         { label:'Your role, title, or access changes', section:'Account' },
 };
 
 // Central place every notification insert should go through, instead of
@@ -9491,6 +9508,19 @@ function normalizeUrl(url){
   if(!url) return '';
   if(!/^https?:\/\//i.test(url)) url = 'https://' + url;
   return url;
+}
+
+// Used to keep links out of free-text fields that have their own dedicated
+// Link field right below them (e.g. task description) — pasting a raw URL
+// into prose broke that field's display wherever it got rendered elsewhere
+// (kanban cards, the task detail modal), since a single long unbroken
+// token doesn't wrap or ellipsis-truncate the way real sentences do.
+// Matches explicit http(s)/www links unconditionally, and bare
+// domain-looking text only when it ends in a recognizable TLD, to avoid
+// false positives on ordinary text like "e.g." or a version number.
+function containsUrl(text){
+  if(!text) return false;
+  return /(https?:\/\/|www\.)\S+|\b[a-z0-9-]+\.(com|net|org|io|co|dev|app|xyz|info|biz|gov|edu|me|ai|so)(\/\S*)?\b/i.test(text);
 }
 
 // Display text for a link — strips the protocol prefix (nobody needs to
@@ -10435,7 +10465,7 @@ function openManualEntryModal(){
         <div><label>Service</label><select id="manualService"></select></div>
         <div><label>Date</label><input type="date" id="manualDate"></div>
         <div style="grid-column:1/-1;"><label>Duration</label><input id="manualDuration" placeholder="e.g. 1h 30m, or 1.5"></div>
-        <div style="grid-column:1/-1;"><label>Description</label><textarea id="manualDesc" placeholder="What did you work on?" rows="3" style="resize:vertical;min-height:64px;font-family:inherit;"></textarea></div>
+        <div style="grid-column:1/-1;"><label>Description</label><textarea spellcheck="true" id="manualDesc" placeholder="What did you work on?" rows="3" style="resize:vertical;min-height:64px;font-family:inherit;"></textarea></div>
       </div>
     </div>
     <div class="modal-actions">
@@ -10709,7 +10739,7 @@ function openTimeEntryModal(id){
       <div class="settings-field"><label>Service</label><select id="editEntryService" style="width:100%;">${serviceOptions}</select></div>
       <div class="settings-field"><label>Date</label><input type="date" id="editEntryDate" value="${e.date}" style="width:100%;"></div>
       <div class="settings-field"><label>Duration</label><input id="editEntryDuration" value="${minutesToDurationInputStr(e.minutes)}" placeholder="e.g. 1h 30m, or 1.5" style="width:100%;"></div>
-      <div class="settings-field"><label>Description</label><textarea id="editEntryDesc" rows="3" style="width:100%;resize:vertical;min-height:64px;">${escapeHtml(e.description||'')}</textarea></div>
+      <div class="settings-field"><label>Description</label><textarea spellcheck="true" id="editEntryDesc" rows="3" style="width:100%;resize:vertical;min-height:64px;">${escapeHtml(e.description||'')}</textarea></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" onclick="saveTimeEntryEdit('${id}')">Save changes</button>
@@ -11554,7 +11584,7 @@ function openQueueLogImprovementModal(presetClientId){
           <input type="hidden" id="queueLogClient">
           <div class="client-search-dropdown" id="queueLogClientDropdown"></div>
         </div>
-        <div style="grid-column:1/-1;"><label>What did you improve?</label><textarea id="queueLogText" placeholder="What did you work on?" rows="3" style="resize:vertical;min-height:64px;font-family:inherit;"></textarea></div>
+        <div style="grid-column:1/-1;"><label>What did you improve?</label><textarea spellcheck="true" id="queueLogText" placeholder="What did you work on?" rows="3" style="resize:vertical;min-height:64px;font-family:inherit;"></textarea></div>
       </div>
     </div>
     <div class="modal-actions">
@@ -11609,7 +11639,7 @@ function startEditImprovementInQueueModal(clientId, idx){
   if(!row) return;
   row.innerHTML = `
     <div class="log-inline" style="margin-top:0;width:100%;">
-      <textarea id="editimp-text-${clientId}-${idx}"></textarea>
+      <textarea spellcheck="true" id="editimp-text-${clientId}-${idx}"></textarea>
       <input id="editimp-author-${clientId}-${idx}" style="width:130px;">
       <button class="btn btn-brand" onclick="saveEditImprovementInQueueModal('${clientId}', ${idx})">Save</button>
       <button class="btn btn-outline" onclick="renderQueueModalImprovementsList('${clientId}')">Cancel</button>
@@ -12444,7 +12474,7 @@ function openQueueCardModal(id){
       <div class="q-bulk">
         ${shownImprovements.length ? `<div class="q-bulk-title">Logged ${activeDateFilterLabel()} (${shownImprovements.length}) — ${shownImprovements.filter(i=>i.includeInEmail!==false).length} included in email</div><div class="q-bulk-list"><ul>${shownImprovements.map(i=>`<li style="${i.includeInEmail===false?'opacity:.55;':''}">${i.includeInEmail===false ? '<span style="color:var(--muted-lt);font-size:10px;">[not in email]</span> ' : ''}${i.text} — <span style="color:var(--muted-lt);">${i.author}</span></li>`).join('')}</ul></div>` : `<i>No improvements logged ${activeDateFilterLabel()} — nothing to send.</i>`}
       </div>
-      ${c.draft ? `<textarea class="draft" id="draft-${c.id}" ${c.draftStatus==='approved' && !canApprove() ? 'disabled' : ''}>${escapeHtml(c.draft)}</textarea>` : ''}
+      ${c.draft ? `<textarea spellcheck="true" class="draft" id="draft-${c.id}" ${c.draftStatus==='approved' && !canApprove() ? 'disabled' : ''}>${escapeHtml(c.draft)}</textarea>` : ''}
       ${c.draft && !c.email ? `<span class="warn-text">No client email on file — add one in Clients</span>` : ''}
     </div>
     <div class="modal-actions">
@@ -12876,14 +12906,30 @@ function renderNotificationPrefs(){
   const el = document.getElementById('notifPrefsList');
   if(!el || !myProfile) return;
   const muted = myProfile.muted_notification_types || [];
-  el.innerHTML = Object.entries(NOTIFICATION_TYPE_META).map(([type, meta])=>{
-    const isOn = !muted.includes(type);
-    return `
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);">
-      <span style="font-size:13px;color:var(--ink);">${meta.label}</span>
-      <button class="theme-toggle-switch ${isOn?'on':''}" onclick="toggleNotificationMute('${type}', ${isOn})"></button>
-    </div>`;
-  }).join('');
+
+  // Grouped by section (Tasks / Client Work / Calendar / Account) instead
+  // of one long flat list of 17 toggles — section order follows first
+  // appearance in NOTIFICATION_TYPE_META, rows keep their existing order
+  // within each section.
+  const sections = new Map();
+  Object.entries(NOTIFICATION_TYPE_META).forEach(([type, meta])=>{
+    const section = meta.section || 'Other';
+    if(!sections.has(section)) sections.set(section, []);
+    sections.get(section).push([type, meta]);
+  });
+
+  el.innerHTML = [...sections.entries()].map(([section, rows], i)=>`
+    <div style="${i>0?'margin-top:22px;':''}">
+      <div style="font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--muted-lt);margin-bottom:2px;">${section}</div>
+      ${rows.map(([type, meta])=>{
+        const isOn = !muted.includes(type);
+        return `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:13px;color:var(--ink);">${meta.label}</span>
+          <button class="theme-toggle-switch ${isOn?'on':''}" onclick="toggleNotificationMute('${type}', ${isOn})"></button>
+        </div>`;
+      }).join('')}
+    </div>`).join('');
 }
 
 async function toggleNotificationMute(type, muted){
