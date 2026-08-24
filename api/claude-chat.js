@@ -90,13 +90,18 @@ module.exports = async function handler(req, res) {
     const { data: settingsRow } = await admin.from('app_storage').select('value').eq('key', 'settings').maybeSingle();
     const settings = settingsRow ? JSON.parse(settingsRow.value) : {};
     const provider = settings.aiProvider === 'openai' ? 'openai' : 'claude';
+    // settings.claudeModel/settings.openaiModel are admin-editable in
+    // Settings -> AI & Email — callAI falls back to its own hardcoded
+    // default if unset, so this is safe even before an admin has ever
+    // touched those fields.
+    const model = provider === 'openai' ? settings.openaiModel : settings.claudeModel;
 
     const systemPrompt = `You're a helpful assistant built into Based Agency's internal client-work dashboard, talking with ${callerProfile.name || 'a team member'}. You can see a live snapshot of the team's current client data below — use it for anything specific to their clients, and use web search for anything else, including looking up a specific client's actual website when asked to check it or propose improvements.
 
 Current client data:
 ${appContext || '(no client data provided)'}`;
 
-    const result = await callAI(provider, messages, systemPrompt);
+    const result = await callAI(provider, messages, systemPrompt, { model });
 
     if (!result.ok) {
       res.status(502).json({ error: result.error });
