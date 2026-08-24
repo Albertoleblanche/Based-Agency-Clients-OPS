@@ -1013,7 +1013,7 @@ function mRenderHome(){
         return `<div class="m-list-row" onclick="mOpenTaskDetail('${t.id}')">
           <div class="m-list-main">
             <div class="m-list-title">${escapeHtml(t.title)}</div>
-            ${t.description ? `<div class="m-list-sub" style="white-space:normal;">${escapeHtml(t.description)}</div>` : ''}
+            ${t.description ? `<div class="m-list-sub" style="white-space:normal;overflow-wrap:break-word;word-break:break-word;">${escapeHtml(t.description)}</div>` : ''}
             <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
               <span class="m-pill" style="background:${pMeta.color}18;color:${pMeta.color};">${pMeta.label}</span>
               <span style="font-size:11px;${overdue?'color:var(--red);font-weight:700;':'color:var(--muted-lt);'}">${dateLabel}</span>
@@ -1300,7 +1300,7 @@ function mOpenTaskDetail(taskId){
   const html = `
     <div class="m-card">
       <div style="font-size:17px;font-weight:700;margin-bottom:10px;">${escapeHtml(t.title)}</div>
-      ${t.description ? `<div style="font-size:13.5px;color:var(--muted);margin-bottom:14px;line-height:1.5;">${escapeHtml(t.description)}</div>` : ''}
+      ${t.description ? `<div style="font-size:13.5px;color:var(--muted);margin-bottom:14px;line-height:1.5;overflow-wrap:break-word;word-break:break-word;">${escapeHtml(t.description)}</div>` : ''}
       <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;">
         <div style="display:flex;justify-content:space-between;align-items:center;"><span style="color:var(--muted);">Assigned to</span><span style="display:flex;align-items:center;gap:8px;font-weight:600;">${mPersonAvatarHtml(assignee)}${assignee?assignee.name:'—'}</span></div>
         <div style="display:flex;justify-content:space-between;align-items:center;"><span style="color:var(--muted);">Assigned by</span><span style="display:flex;align-items:center;gap:8px;font-weight:600;">${mPersonAvatarHtml(assigner)}${assigner?assigner.name:'—'}</span></div>
@@ -1336,7 +1336,7 @@ async function mChangeTaskStatus(taskId, status){
 function mOpenNewTaskSheet(presetTitle, presetDescription, presetClientId){
   const html = `
     <div class="m-field"><label>Title</label><input id="mTaskTitle" placeholder="e.g. Update the roofing page copy" value="${presetTitle?escapeHtml(presetTitle):''}"></div>
-    <div class="m-field"><label>Description (optional)</label><textarea id="mTaskDescription" placeholder="Any context they'll need">${presetDescription?escapeHtml(presetDescription):''}</textarea></div>
+    <div class="m-field"><label>Description (optional)</label><textarea spellcheck="true" id="mTaskDescription" placeholder="Any context they'll need">${presetDescription?escapeHtml(presetDescription):''}</textarea></div>
     <div class="m-field"><label>Assign to</label><select id="mTaskAssignee">${teamProfiles.map(p=>`<option value="${p.id}" ${p.id===currentUser.id?'selected':''}>${p.name}</option>`).join('')}</select></div>
     <div class="m-field"><label>Client (optional)</label>
       <select id="mTaskClient"><option value="">— None —</option>${clients.filter(c=>!c.deletedAt).sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${presetClientId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select>
@@ -1490,7 +1490,7 @@ function mOpenSendEmailSheet(to, subject, body){
   const html = `
     <div class="m-field"><label>To</label><input value="${escapeHtml(to)}" readonly style="background:var(--border);"></div>
     <div class="m-field"><label>Subject</label><input id="mMailSubject" value="${escapeHtml(subject)}"></div>
-    <div class="m-field" style="margin-bottom:0;"><label>Body</label><textarea id="mMailBody" style="min-height:160px;">${escapeHtml(body)}</textarea></div>
+    <div class="m-field" style="margin-bottom:0;"><label>Body</label><textarea spellcheck="true" id="mMailBody" style="min-height:160px;">${escapeHtml(body)}</textarea></div>
   `;
   const mailtoHref = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   const actions = `
@@ -1542,7 +1542,7 @@ function mOpenLogImprovementSheet(presetClientId){
     <div class="m-field"><label>Client</label>
       <select id="mLogImpClient">${activeClientsList.map(c=>`<option value="${c.id}" ${presetClientId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select>
     </div>
-    <div class="m-field" style="margin-bottom:0;"><label>What did you improve?</label><textarea id="mLogImpText" placeholder="What did you work on?"></textarea></div>
+    <div class="m-field" style="margin-bottom:0;"><label>What did you improve?</label><textarea spellcheck="true" id="mLogImpText" placeholder="What did you work on?"></textarea></div>
   `;
   const actions = `<button class="m-btn m-btn-outline" onclick="mCloseSheet()">Cancel</button><button class="m-btn m-btn-brand" onclick="mSaveQueueLogImprovement()">Log it</button>`;
   mOpenSheet('Log an improvement', html, actions);
@@ -1968,7 +1968,7 @@ function mOpenNewReminderSheet(){
     <div class="m-field"><label>Client</label>
       <select id="mReminderClient">${clients.filter(c=>!c.deletedAt).sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</select>
     </div>
-    <div class="m-field"><label>Question / request</label><textarea id="mReminderQuestion" placeholder="e.g. Can you send us the latest project photos?"></textarea></div>
+    <div class="m-field"><label>Question / request</label><textarea spellcheck="true" id="mReminderQuestion" placeholder="e.g. Can you send us the latest project photos?"></textarea></div>
     <div class="m-field"><label>Follow-up date</label><input type="date" id="mReminderDate" value="${toDateStr(new Date(Date.now()+3*86400000))}"></div>
   `;
   const actions = `<button class="m-btn m-btn-outline" onclick="mCloseSheet()">Cancel</button><button class="m-btn m-btn-brand" onclick="mSaveNewReminder()">Save</button>`;
@@ -2592,7 +2592,7 @@ function mOpenNoteSheet(noteId, presetClientId){
     <div class="m-field"><label>Status</label>
       <select id="mNoteStatus">${M_NOTE_STAGES.map(s=>`<option value="${s.key}" ${(n?n.status:'idea')===s.key?'selected':''}>${s.label}</option>`).join('')}</select>
     </div>
-    <div class="m-field"><label>Note</label><textarea id="mNoteText" placeholder="What's the idea or plan?">${n?escapeHtml(n.text||''):''}</textarea></div>
+    <div class="m-field"><label>Note</label><textarea spellcheck="true" id="mNoteText" placeholder="What's the idea or plan?">${n?escapeHtml(n.text||''):''}</textarea></div>
     <div class="m-field" style="margin-bottom:0;"><label>Link (optional)</label><input id="mNoteLink" type="url" placeholder="https://…" value="${n&&n.link?escapeHtml(n.link):''}"></div>
   `;
   const actions = n
@@ -3269,7 +3269,7 @@ function mOpenManualEntrySheet(){
     <div class="m-field"><label>Service (optional)</label><input id="mManualService" placeholder="e.g. SEO, Web Design"></div>
     <div class="m-field"><label>Date</label><input type="date" id="mManualDate" value="${toDateStr(mTimesheetAnchor)}"></div>
     <div class="m-field"><label>Duration</label><input id="mManualDuration" placeholder="e.g. 1h 30m, or 1.5"></div>
-    <div class="m-field" style="margin-bottom:0;"><label>Description</label><textarea id="mManualDesc" placeholder="What did you work on?"></textarea></div>
+    <div class="m-field" style="margin-bottom:0;"><label>Description</label><textarea spellcheck="true" id="mManualDesc" placeholder="What did you work on?"></textarea></div>
   `;
   const actions = `<button class="m-btn m-btn-outline" onclick="mCloseSheet()">Cancel</button><button class="m-btn m-btn-brand" onclick="mAddManualEntry()">Add entry</button>`;
   mOpenSheet('Add time manually', html, actions);
@@ -3302,7 +3302,7 @@ function mOpenEditTimeEntrySheet(id){
     <div class="m-field"><label>Service (optional)</label><input id="mEditEntryService" value="${escapeHtml(e.service||'')}"></div>
     <div class="m-field"><label>Date</label><input type="date" id="mEditEntryDate" value="${e.date}"></div>
     <div class="m-field"><label>Duration</label><input id="mEditEntryDuration" value="${minutesToDurationInputStr(e.minutes)}"></div>
-    <div class="m-field" style="margin-bottom:0;"><label>Description</label><textarea id="mEditEntryDesc">${escapeHtml(e.description||'')}</textarea></div>
+    <div class="m-field" style="margin-bottom:0;"><label>Description</label><textarea spellcheck="true" id="mEditEntryDesc">${escapeHtml(e.description||'')}</textarea></div>
   `;
   const actions = `<button class="m-btn m-btn-outline" onclick="mCloseSheet()">Cancel</button><button class="m-btn m-btn-brand" onclick="mSaveTimeEntryEdit('${id}')">Save changes</button>`;
   mOpenSheet('Edit time entry', html, actions);
