@@ -82,8 +82,14 @@ async function runEmailDigest(admin, clients, log, settings, resendKey) {
   const pending = clients.filter(c => c.draftStatus === 'pending' && !c.deletedAt);
   if (!pending.length) return { skipped: true, reason: 'No pending drafts this week — nothing sent.' };
 
-  const to = [settings.danielEmail, settings.ericEmail].filter(Boolean).join(',');
-  if (!to) return { skipped: true, reason: 'No approver emails configured in Settings — nothing sent.' };
+  // Role-based against team_profiles, not two named settings fields — see
+  // getNotifyRecipient()'s comment in index.html for why (this used to be
+  // settings.danielEmail/settings.ericEmail, which broke the moment either
+  // named person changed role or left).
+  const { data: profiles } = await admin.from('team_profiles').select('id, role, email');
+  const approverProfiles = (profiles || []).filter(p => (p.role === 'admin' || p.role === 'approver') && p.email);
+  const to = approverProfiles.map(p => p.email).join(',');
+  if (!to) return { skipped: true, reason: 'No admin/approver has an email on file — nothing sent.' };
 
   const appUrl = process.env.APP_URL || '';
   const subject = `${pending.length} client update${pending.length !== 1 ? 's' : ''} ready for approval`;
@@ -107,11 +113,12 @@ async function runEmailDigest(admin, clients, log, settings, resendKey) {
   log.unshift({
     t: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' }) + ' UTC',
     tag: 'auto',
-    text: `Auto-notified Daniel &amp; Eric — ${pending.length} draft${pending.length !== 1 ? 's' : ''} pending (Wednesday automation).`,
+    text: `Auto-notified admins &amp; approvers — ${pending.length} draft${pending.length !== 1 ? 's' : ''} pending (Wednesday automation).`,
   });
 
-  const { data: profiles } = await admin.from('team_profiles').select('id, role');
-  const notifyIds = (profiles || []).filter(p => p.role === 'admin' || p.role === 'approver').map(p => p.id);
+  // Reuses the same profiles fetched above rather than querying team_profiles
+  // a second time — notifyIds is the same admin/approver set the email itself went to.
+  const notifyIds = approverProfiles.map(p => p.id);
   if (notifyIds.length) {
     await admin.from('notifications').insert(notifyIds.map(id => ({
       user_id: id, type: 'email_sent', title: 'Client email sent',
@@ -138,10 +145,10 @@ function pickWebsiteCheckCandidates(clients) {
     .slice(0, WEBSITE_CHECK_COUNT);
 }
 
-async function checkClientWebsite(provider, client) {
+async function checkClientWebsite(provider, model, client) {
   const systemPrompt = `You're doing a quick automated weekly health check on a marketing agency client's live website. Use web search to actually load and look at the site. Only flag things that are objectively wrong or clearly stale — a broken link, a 404, an obviously outdated copyright year or expired promotion, wrong/missing contact info, a page that looks broken. Do not comment on subjective design choices, copywriting style, or minor nitpicks. If you find nothing worth flagging, respond with exactly the single word ${NOTHING_NOTEWORTHY} and nothing else. Otherwise respond in 1-3 short plain-text sentences describing what you found — no markdown, no preamble.`;
   const messages = [{ role: 'user', content: `Check ${client.name}'s website: ${client.website}` }];
-  return callAI(provider, messages, systemPrompt, { maxTokens: 400, webSearch: true });
+  return callAI(provider, messages, systemPrompt, { maxTokens: 400, webSearch: true, model });
 }
 
 // Summarizes the full active roster for the pattern-detection call. Kept
@@ -157,7 +164,7 @@ function buildPatternDataSummary(clients, reminderCountByClient) {
   }).join('\n');
 }
 
-async function detectCrossClientPatterns(provider, clients, reminderCountByClient) {
+async function detectCrossClientPatterns(provider, model, clients, reminderCountByClient) {
   const dataSummary = buildPatternDataSummary(clients, reminderCountByClient);
   if (!dataSummary) return { ok: true, reply: NOTHING_NOTEWORTHY };
 
@@ -165,11 +172,12 @@ async function detectCrossClientPatterns(provider, clients, reminderCountByClien
 
 The team already has, for every individual client: a 1-5 danger score, an overdue-follow-up count, and a stale-work nudge. Do NOT restate or rediscover any of that on a per-client basis — only surface something that is genuinely a cross-client or cross-time pattern, not visible from looking at one client's numbers alone. If nothing in the data below rises above normal week-to-week noise, respond with exactly the single word ${NOTHING_NOTEWORTHY} and nothing else. Otherwise respond with one short synthesized paragraph (2-4 sentences), plain text, no markdown, no bullet points.`;
   const messages = [{ role: 'user', content: `Current roster:\n${dataSummary}` }];
-  return callAI(provider, messages, systemPrompt, { maxTokens: 400, webSearch: false });
+  return callAI(provider, messages, systemPrompt, { maxTokens: 400, webSearch: false, model });
 }
 
 async function runProactiveInsights(admin, clients, log, settings) {
   const provider = settings.aiProvider === 'openai' ? 'openai' : 'claude';
+  const model = provider === 'openai' ? settings.openaiModel : settings.claudeModel;
   const findings = []; // [{title, body, targetId}]
   const errors = [];
 
@@ -177,7 +185,7 @@ async function runProactiveInsights(admin, clients, log, settings) {
   const candidates = pickWebsiteCheckCandidates(clients);
   for (const client of candidates) {
     try {
-      const result = await checkClientWebsite(provider, client);
+      const result = await checkClientWebsite(provider, model, client);
       if (result.ok) {
         // Only advance the rotation on a genuinely successful call — a
         // transient API error shouldn't cost this client its turn. Real
@@ -207,7 +215,7 @@ async function runProactiveInsights(admin, clients, log, settings) {
   (reminders || []).forEach(r => { reminderCountByClient[r.client_id] = (reminderCountByClient[r.client_id] || 0) + 1; });
 
   try {
-    const patternResult = await detectCrossClientPatterns(provider, clients, reminderCountByClient);
+    const patternResult = await detectCrossClientPatterns(provider, model, clients, reminderCountByClient);
     if (patternResult.ok && !isNothingNoteworthy(patternResult.reply)) {
       findings.push({ title: 'Pattern worth a look', body: patternResult.reply, targetId: null });
       log.unshift({
