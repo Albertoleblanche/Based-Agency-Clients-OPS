@@ -585,7 +585,7 @@ const M_CLIENT_FIELD_DB_MAP = {
   importance:'importance', danger:'danger', monthlyHourBudget:'monthly_hour_budget',
   sow:'sow', draft:'draft', draftStatus:'draft_status', draftPendingSince:'draft_pending_since',
   lastProactiveCheckAt:'last_proactive_check_at', customFieldValues:'custom_field_values',
-  deletedAt:'deleted_at', readyToNotify:'ready_to_notify',
+  deletedAt:'deleted_at', readyToNotify:'ready_to_notify', startDate:'start_date',
 };
 function mClientFieldsToDb(fields){
   const out = {};
@@ -598,7 +598,7 @@ function mClientRowFromDb(r){
     importance:r.importance, danger:r.danger, monthlyHourBudget:r.monthly_hour_budget||0, sow:r.sow||'',
     draft:r.draft||'', draftStatus:r.draft_status||'none', draftPendingSince:r.draft_pending_since,
     lastProactiveCheckAt:r.last_proactive_check_at, customFieldValues:r.custom_field_values||{},
-    deletedAt:r.deleted_at||undefined, readyToNotify:!!r.ready_to_notify, improvements:[],
+    deletedAt:r.deleted_at||undefined, readyToNotify:!!r.ready_to_notify, startDate:r.start_date||'', improvements:[],
   };
 }
 function mImprovementRowFromDb(r){
