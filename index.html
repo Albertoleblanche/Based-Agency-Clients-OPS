@@ -2748,6 +2748,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
 <script>
 let clients = [];
+let clientImprovements = []; // flat table now — hydrated onto each client's .improvements in loadAll()
 
 // clients[] stays the full list (including soft-deleted) so historical
 // lookups by id — old time entries, notes, activity log — still resolve a
@@ -2820,6 +2821,76 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
     fetch: (url, options={}) => fetch(url, { ...options, cache: 'no-store' }),
   },
 });
+
+// ---- clients / client_improvements: real per-row tables (migrated off the
+// app_storage JSON blob) — see schema-clients-migration.sql. Every other
+// table already keyed off a client's id (notes, activity_log,
+// client_reminders, etc.) still just stores that same text id, unchanged.
+const CLIENT_FIELD_DB_MAP = {
+  name:'name', email:'email', website:'website', service:'service', status:'status',
+  importance:'importance', danger:'danger', monthlyHourBudget:'monthly_hour_budget',
+  sow:'sow', draft:'draft', draftStatus:'draft_status', draftPendingSince:'draft_pending_since',
+  lastProactiveCheckAt:'last_proactive_check_at', customFieldValues:'custom_field_values',
+  deletedAt:'deleted_at', readyToNotify:'ready_to_notify',
+};
+function clientFieldsToDb(fields){
+  const out = {};
+  Object.keys(fields).forEach(k=>{ const col = CLIENT_FIELD_DB_MAP[k]; if(col) out[col] = fields[k]; });
+  return out;
+}
+function clientRowFromDb(r){
+  return {
+    id:r.id, name:r.name, email:r.email||'', website:r.website||'', service:r.service, status:r.status,
+    importance:r.importance, danger:r.danger, monthlyHourBudget:r.monthly_hour_budget||0, sow:r.sow||'',
+    draft:r.draft||'', draftStatus:r.draft_status||'none', draftPendingSince:r.draft_pending_since,
+    lastProactiveCheckAt:r.last_proactive_check_at, customFieldValues:r.custom_field_values||{},
+    deletedAt:r.deleted_at||undefined, readyToNotify:!!r.ready_to_notify,
+    improvements:[], // hydrated separately from clientImprovements
+  };
+}
+function improvementRowFromDb(r){
+  return { id:r.id, clientId:r.client_id, author:r.author||'', text:r.text, date:r.date, includeInEmail:r.include_in_email, source:r.source };
+}
+
+// Real per-row update — replaces the old "mutate the roster array, then
+// rewrite the whole app_storage blob" pattern. Only ever touches the one
+// client row being changed, so two people editing two different clients at
+// once can no longer silently clobber each other.
+async function updateClientRow(id, fields){
+  const { error } = await supabaseClient.from('clients').update(clientFieldsToDb(fields)).eq('id', id);
+  if(error){ console.error('updateClientRow failed', id, error); return false; }
+  return true;
+}
+
+// Inserts a real improvement row and keeps in-memory state (both the flat
+// clientImprovements array and the hydrated c.improvements convenience
+// array) in sync with what was actually persisted, rather than optimistically
+// pushing a locally-built object that might not match what the DB assigned
+// (e.g. its real id, its server-side default date). Named insertImprovementRow,
+// not logImprovement — that name is already taken by the existing per-client
+// "Log improvement" UI handler below.
+async function insertImprovementRow(clientId, {author, text, includeInEmail=true, source}){
+  const { data, error } = await supabaseClient.from('client_improvements')
+    .insert({ client_id:clientId, author, text, include_in_email:includeInEmail, source })
+    .select().single();
+  if(error){ console.error('logImprovement failed', clientId, error); return null; }
+  const entry = improvementRowFromDb(data);
+  clientImprovements.push(entry);
+  const c = clients.find(x=>x.id===clientId);
+  if(c){ c.improvements = c.improvements || []; c.improvements.push(entry); }
+  return entry;
+}
+
+// Real per-id delete — replaces splice-by-array-index (which needed a
+// descending sort to avoid shifting indices mid-batch-delete, since the old
+// JSON array entries had no stable id of their own).
+async function deleteImprovementRow(id){
+  const { error } = await supabaseClient.from('client_improvements').delete().eq('id', id);
+  if(error){ console.error('deleteImprovementRow failed', id, error); return false; }
+  clientImprovements = clientImprovements.filter(i=>i.id!==id);
+  clients.forEach(c=>{ if(c.improvements) c.improvements = c.improvements.filter(i=>i.id!==id); });
+  return true;
+}
 
 // Shared (team-wide) storage — backed by Supabase, replaces window.storage.
 async function safeGet(key){
@@ -3224,7 +3295,12 @@ const DEFAULT_TEAM_TITLE_OPTIONS = ['Web Developer','SEO Specialist','PPC Specia
 let _loadAllSeq = 0;
 async function loadAll(){
   const mySeq = ++_loadAllSeq;
-  const [appData, s] = await Promise.all([safeGet('app-data'), safeGet('settings')]);
+  const [appData, s, clientsRes, impRes] = await Promise.all([
+    safeGet('app-data'),
+    safeGet('settings'),
+    supabaseClient.from('clients').select('*'),
+    supabaseClient.from('client_improvements').select('*').order('date', { ascending:true }),
+  ]);
   // A newer loadAll() call has started since this one began — its data (or
   // data from whichever call turns out to resolve last) is what should win,
   // not this now-superseded fetch. Applying this one anyway risks silently
@@ -3233,17 +3309,25 @@ async function loadAll(){
   if(mySeq !== _loadAllSeq) return;
   if(appData){
     const parsed = JSON.parse(appData);
-    clients = parsed.clients || [];
     log = parsed.log || [];
   } else {
     // One-time migration from the old two-key layout (clients-roster + activity-log),
     // which doubled write volume on every action and was the actual cause of the
     // "rate limit exceeded" error. New saves go through the combined key below.
-    const [c, l] = await Promise.all([safeGet('clients-roster'), safeGet('activity-log')]);
-    clients = c ? JSON.parse(c) : [];
+    const l = await safeGet('activity-log');
     log = l ? JSON.parse(l) : [];
-    if(clients.length || log.length) await persistAppData();
+    if(log.length) await persistAppData();
   }
+  // clients/client_improvements: real tables now (see
+  // schema-clients-migration.sql), not part of the app-data JSON blob —
+  // hydrate each client's .improvements from the flat table so the ~100+
+  // existing read sites (c.improvements, activeClients(), etc.) keep
+  // working completely unchanged. Only the write paths changed.
+  if(clientsRes.error) console.error('loadAll: clients fetch failed', clientsRes.error);
+  if(impRes.error) console.error('loadAll: client_improvements fetch failed', impRes.error);
+  clients = (clientsRes.data || []).map(clientRowFromDb);
+  clientImprovements = (impRes.data || []).map(improvementRowFromDb);
+  clients.forEach(c => { c.improvements = clientImprovements.filter(i => i.clientId === c.id); });
   settings = s ? JSON.parse(s) : {};
   settings.danielEmail = settings.danielEmail || '';
   settings.ericEmail = settings.ericEmail || '';
@@ -3278,15 +3362,15 @@ let _appDataSaveInFlight = null;
 async function persistAppData(){
   if(log.length>60) log=log.slice(0,60);
   // If a save is already in progress, wait for it, then send one more with current
-  // state — this coalesces rapid consecutive calls (e.g. persistClients immediately
-  // followed by persistLog) into far fewer actual network requests.
+  // state — this coalesces rapid consecutive log.unshift()+persistLog() calls into
+  // far fewer actual network requests. clients no longer lives in this blob (see
+  // schema-clients-migration.sql) — only the activity log does now.
   if(_appDataSaveInFlight){ await _appDataSaveInFlight.catch(()=>{}); }
-  _appDataSaveInFlight = safeSet('app-data', JSON.stringify({clients, log}));
+  _appDataSaveInFlight = safeSet('app-data', JSON.stringify({log}));
   const result = await _appDataSaveInFlight;
   _appDataSaveInFlight = null;
   return result;
 }
-async function persistClients(){ return await persistAppData(); }
 async function persistLog(){ return await persistAppData(); }
 async function persistSettings(){ return await safeSet('settings', JSON.stringify(settings)); }
 async function persistTeam(){ return await safeSet('team-members', JSON.stringify(team)); }
@@ -4247,8 +4331,8 @@ function paginationControlsHtml(currentPage, totalItems, pageSize, onPageChangeF
 function getAllImprovementsFlat(){
   const list = [];
   activeClients().forEach(c=>{
-    (c.improvements||[]).forEach((imp,idx)=>{
-      list.push({ clientId:c.id, clientName:c.name, idx, author:imp.author||'Team member', text:imp.text, date:imp.date, includeInEmail: imp.includeInEmail!==false, source: imp.source||'manual' });
+    (c.improvements||[]).forEach(imp=>{
+      list.push({ id:imp.id, clientId:c.id, clientName:c.name, author:imp.author||'Team member', text:imp.text, date:imp.date, includeInEmail: imp.includeInEmail!==false, source: imp.source||'manual' });
     });
   });
   return list.sort((a,b)=> new Date(b.date||0) - new Date(a.date||0));
@@ -4338,22 +4422,15 @@ async function deleteAllFilteredImprovements(){
   if(!(await confirmDialog(`Delete ${scopeText}? This can't be undone.`, {confirmLabel:'Delete', destructive:true}))) return;
 
   await loadAll();
-  const byClient = {};
-  filtered.forEach(imp=>{ (byClient[imp.clientId] = byClient[imp.clientId] || []).push(imp.idx); });
-  let removedCount = 0;
-  Object.keys(byClient).forEach(clientId=>{
-    const c = clients.find(x=>x.id===clientId);
-    if(!c) return;
-    // Descending order so removing one entry doesn't shift the index of
-    // the next one still waiting to be removed from the same client.
-    byClient[clientId].sort((a,b)=>b-a).forEach(idx=>{
-      if(c.improvements[idx]){ c.improvements.splice(idx,1); removedCount++; }
-    });
-    invalidateStaleDraft(c);
-  });
+  // Real ids now (client_improvements.id) — no more index-shift juggling,
+  // each row is deleted independently by its own stable id.
+  const results = await Promise.all(filtered.map(imp => deleteImprovementRow(imp.id)));
+  const removedCount = results.filter(Boolean).length;
+  const touchedClientIds = new Set(filtered.map(imp=>imp.clientId));
+  touchedClientIds.forEach(clientId=>{ const c = clients.find(x=>x.id===clientId); if(c) invalidateStaleDraft(c); });
 
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Deleted ${removedCount} logged improvement${removedCount!==1?'s':''}${isFiltered?' (filtered)':' (all)'}.`});
-  const ok = await persistClients();
+  const ok = await persistLog();
   renderImprovementsHistory();
   renderClientsTable(); renderKpis(); renderQueue(); renderLog();
   ok ? showToast('success','Deleted', `Removed ${removedCount} improvement${removedCount!==1?'s':''}.`) : showToast('error','Delete failed','Could not save — try again.');
@@ -4444,7 +4521,7 @@ function renderImprovementsHistory(){
             </div>
             <div class="ts-entry-right" style="align-items:flex-end;gap:6px;">
               <label class="include-toggle" title="Include in the client email">
-                <input type="checkbox" ${imp.includeInEmail?'checked':''} onchange="event.stopPropagation();toggleImprovementIncludeInEmail('${imp.clientId}', ${imp.idx}, this.checked)">
+                <input type="checkbox" ${imp.includeInEmail?'checked':''} onchange="event.stopPropagation();toggleImprovementIncludeInEmail('${imp.clientId}', '${imp.id}', this.checked)">
                 <span>${imp.includeInEmail ? 'Included in email' : 'Not in email'}</span>
               </label>
             </div>
@@ -4459,12 +4536,14 @@ function changeImprovementsPage(page){
   renderImprovementsHistory();
 }
 
-async function toggleImprovementIncludeInEmail(clientId, idx, checked){
+async function toggleImprovementIncludeInEmail(clientId, impId, checked){
   await loadAll();
   const c = clients.find(x=>x.id===clientId);
-  if(!c || !c.improvements[idx]) return;
-  c.improvements[idx].includeInEmail = checked;
-  const ok = await persistClients();
+  const imp = c && c.improvements.find(i=>i.id===impId);
+  if(!imp) return;
+  const { error } = await supabaseClient.from('client_improvements').update({ include_in_email: checked }).eq('id', impId);
+  const ok = !error;
+  if(ok) imp.includeInEmail = checked;
   renderImprovementsHistory();
   if(!ok) showToast('error','Save failed','Could not save — try again.');
 }
@@ -4914,8 +4993,8 @@ async function saveClientForm(){
     const c = clients.find(x=>x.id===editingClientId);
     if(!c){ showToast('error','Client not found','This client may have been removed — refreshing.'); closeClientForm(); restoreBtn(btn); await fullRefresh(); return; }
     const before = { ...c };
-    Object.assign(c, fields);
-    ok = await persistClients();
+    ok = await updateClientRow(editingClientId, fields);
+    if(ok) Object.assign(c, fields);
     msg = `${name} updated.`;
     loggedClientId = editingClientId;
     if(ok){
@@ -4938,8 +5017,9 @@ async function saveClientForm(){
     }
   } else {
     const newId = 'c'+Date.now();
-    clients.push({ id:newId, ...fields, improvements:[], draft:'', draftStatus:'none' });
-    ok = await persistClients();
+    const { error: insertErr } = await supabaseClient.from('clients').insert({ id:newId, ...clientFieldsToDb(fields), draft:'', draft_status:'none' });
+    ok = !insertErr;
+    if(ok) clients.push({ id:newId, ...fields, improvements:[], draft:'', draftStatus:'none' });
     msg = `${name} is now on the roster.`;
     loggedClientId = newId;
     if(ok){
@@ -5344,12 +5424,15 @@ async function bulkDeleteClients(){
   if(!(await confirmDialog(`Move ${ids.length} client${ids.length!==1?'s':''} to Trash? Their improvements, drafts, time entries, and notes stay intact and this can be undone from Trash.`, {confirmLabel:'Move to Trash'}))) return;
   await loadAll();
   const names = [];
+  const toDelete = [];
   ids.forEach(id=>{
     const c = clients.find(x=>x.id===id);
-    if(c && !c.deletedAt){ c.deletedAt = new Date().toISOString(); names.push(c.name); }
+    if(c && !c.deletedAt){ toDelete.push({ c, deletedAt: new Date().toISOString() }); names.push(c.name); }
   });
+  const results = await Promise.all(toDelete.map(({c, deletedAt}) => updateClientRow(c.id, { deletedAt })));
+  toDelete.forEach(({c, deletedAt}, i)=>{ if(results[i]) c.deletedAt = deletedAt; });
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Moved ${names.length} client${names.length!==1?'s':''} to Trash.`});
-  const ok = await persistClients();
+  const ok = await persistLog();
   clearClientSelection();
   renderAll();
   ok ? showToast('success','Moved to Trash', `${names.length} client${names.length!==1?'s':''} can be restored from Trash.`) : showToast('error','Delete failed','Could not save — try again.');
@@ -5655,9 +5738,11 @@ async function deleteClient(id){
   await loadAll();
   const stillThere = clients.find(x=>x.id===id);
   if(!stillThere){ showToast('info','Already gone', `${c.name} was already removed.`); renderAll(); return; }
-  stillThere.deletedAt = new Date().toISOString();
+  const deletedAt = new Date().toISOString();
+  const ok = await updateClientRow(id, { deletedAt });
+  if(ok) stillThere.deletedAt = deletedAt;
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Moved client <b>${c.name}</b> to Trash.`});
-  const ok = await persistClients();
+  if(ok) await persistLog();
   renderAll();
   if(ok) logClientActivity(id, 'client_deleted', `${myName()||'Someone'} moved this client (${c.name}) to Trash.`);
   ok ? showToast('success','Moved to Trash', `${c.name} can be restored from Trash.`) : showToast('error','Delete failed','Could not save — try again.');
@@ -5672,9 +5757,20 @@ async function permanentlyDeleteClient(id){
   if(!c) return;
   if(!(await confirmDialog(`Permanently delete ${c.name}? This cannot be undone — all improvements, drafts, and history for this client will be gone for good.`, {confirmLabel:'Delete permanently', destructive:true}))) return;
   await loadAll();
-  clients = clients.filter(x=>x.id!==id);
-  notes = notes.filter(n=>n.clientId!==id);
-  const ok = await persistClients();
+  // A real DELETE now — client_improvements rows are removed automatically
+  // via ON DELETE CASCADE (schema-clients-migration.sql). This also now
+  // actually deletes the client's notes from the notes table itself,
+  // rather than only hiding them from the local array — previously
+  // permanentlyDeleteClient() left those notes rows orphaned in Supabase
+  // (client_id pointing at a client that no longer existed anywhere else).
+  const { error: delErr } = await supabaseClient.from('clients').delete().eq('id', id);
+  const ok = !delErr;
+  if(ok){
+    await supabaseClient.from('notes').delete().eq('client_id', id);
+    clients = clients.filter(x=>x.id!==id);
+    clientImprovements = clientImprovements.filter(i=>i.clientId!==id);
+    notes = notes.filter(n=>n.clientId!==id);
+  }
   renderAll();
   renderTrash();
   ok ? showToast('success','Permanently deleted', `${c.name} is gone for good.`) : showToast('error','Delete failed','Could not save — try again.');
@@ -5685,8 +5781,8 @@ async function restoreClient(id){
   await loadAll();
   const c = clients.find(x=>x.id===id);
   if(!c) return;
-  delete c.deletedAt;
-  const ok = await persistClients();
+  const ok = await updateClientRow(id, { deletedAt: null });
+  if(ok) delete c.deletedAt;
   renderAll();
   renderTrash();
   ok ? showToast('success','Client restored', `${c.name} is back on the roster.`) : showToast('error','Restore failed','Could not save — try again.');
@@ -5800,12 +5896,13 @@ async function bulkRestoreTrash(type){
   if(type==='clients'){
     if(!hasPermission('delete_clients')){ showToast('error','Not allowed','You don\'t have permission to manage deleted clients.'); return; }
     await loadAll();
+    const { error } = await supabaseClient.from('clients').update({ deleted_at: null }).in('id', ids);
+    const ok = !error;
     let restored = 0;
-    ids.forEach(id=>{
+    if(ok) ids.forEach(id=>{
       const c = clients.find(x=>x.id===id);
       if(c && c.deletedAt){ delete c.deletedAt; restored++; }
     });
-    const ok = await persistClients();
     renderAll(); await renderTrash();
     ok ? showToast('success','Restored', `${restored} client${restored!==1?'s':''} back on the roster.`) : showToast('error','Restore failed','Could not save — try again.');
     return;
@@ -5828,9 +5925,17 @@ async function bulkDeleteTrashPermanently(type){
   if(type==='clients'){
     if(!hasPermission('delete_clients')){ showToast('error','Not allowed','You don\'t have permission to manage deleted clients.'); return; }
     await loadAll();
-    clients = clients.filter(c=> !ids.includes(c.id));
-    notes = notes.filter(n=> !ids.includes(n.clientId));
-    const ok = await persistClients();
+    // client_improvements cascade-deletes automatically; notes doesn't have
+    // a real FK (see schema-clients-migration.sql), so cleaned up by hand
+    // here too, same reasoning as permanentlyDeleteClient() above.
+    const { error: delErr } = await supabaseClient.from('clients').delete().in('id', ids);
+    const ok = !delErr;
+    if(ok){
+      await supabaseClient.from('notes').delete().in('client_id', ids);
+      clients = clients.filter(c=> !ids.includes(c.id));
+      clientImprovements = clientImprovements.filter(i=> !ids.includes(i.clientId));
+      notes = notes.filter(n=> !ids.includes(n.clientId));
+    }
     renderAll(); await renderTrash();
     ok ? showToast('success','Permanently deleted', `${ids.length} client${ids.length!==1?'s':''} gone for good.`) : showToast('error','Delete failed','Could not save — try again.');
     return;
@@ -6480,9 +6585,10 @@ async function saveEditImprovement(clientId, idx){
   const c = clients.find(x=>x.id===clientId);
   if(!c || !c.improvements[idx]){ showToast('error','Entry not found','This may have changed elsewhere — refreshing.'); renderAll(); return; }
   const oldText = c.improvements[idx].text;
-  c.improvements[idx].text = text;
-  c.improvements[idx].author = author;
-  const ok = await persistClients();
+  const impId = c.improvements[idx].id;
+  const { error } = await supabaseClient.from('client_improvements').update({ text, author }).eq('id', impId);
+  const ok = !error;
+  if(ok){ c.improvements[idx].text = text; c.improvements[idx].author = author; }
   renderClientsTable(); renderKpis(); renderQueue();
   if(ok){
     const truncate = (s)=> s && s.length>60 ? s.slice(0,60)+'…' : (s||'—');
@@ -6501,9 +6607,11 @@ async function deleteAllImprovements(clientId){
   if(!c || !c.improvements.length){ showToast('info','Nothing to delete','No logged improvements for this client.'); return; }
   const count = c.improvements.length;
   if(!(await confirmDialog(`Delete all ${count} logged improvement${count!==1?'s':''} for ${c.name}? This can't be undone.`, {confirmLabel:'Delete all', destructive:true}))) return;
-  c.improvements = [];
+  const { error: delErr } = await supabaseClient.from('client_improvements').delete().eq('client_id', clientId);
+  const okDel = !delErr;
+  if(okDel){ c.improvements = []; clientImprovements = clientImprovements.filter(i=>i.clientId!==clientId); }
   invalidateStaleDraft(c);
-  const ok = await persistClients();
+  const ok = okDel && await updateClientRow(clientId, { draftStatus:c.draftStatus, draft:c.draft });
   renderClientsTable(); renderKpis(); renderQueue();
   if(ok){
     logClientActivity(clientId, 'improvement_deleted', `${myName()||'Someone'} deleted all ${count} logged improvements.`);
@@ -6518,8 +6626,9 @@ async function deleteImprovement(clientId, idx){
   const c = clients.find(x=>x.id===clientId);
   if(!c || !c.improvements[idx]){ showToast('info','Already gone','This entry was already removed.'); renderAll(); return; }
   const deletedText = c.improvements[idx].text;
-  c.improvements.splice(idx, 1);
-  const ok = await persistClients();
+  const impId = c.improvements[idx].id;
+  const ok = await deleteImprovementRow(impId);
+  if(ok) c.improvements.splice(idx, 1);
   renderClientsTable(); renderKpis(); renderQueue();
   if(ok){
     const truncate = (s)=> s && s.length>80 ? s.slice(0,80)+'…' : (s||'—');
@@ -7647,15 +7756,14 @@ async function confirmTaskCompletion(taskId){
     await loadAll();
     const c = clients.find(x=>x.id===t.clientId);
     if(c){
-      c.improvements.push({
+      await insertImprovementRow(t.clientId, {
         author: myName()||'Team member',
         text: t.description ? `${t.title} — ${t.description}` : t.title,
-        date: new Date().toISOString(),
         includeInEmail: false,
         source: 'task'
       });
       invalidateStaleDraft(c);
-      await persistClients();
+      await updateClientRow(t.clientId, { draftStatus:c.draftStatus, draft:c.draft });
       renderImprovementsHistory();
       renderClientsTable();
       renderQueue();
@@ -9524,9 +9632,9 @@ async function logTimeEntryAsImprovement(entryId){
   await loadAll();
   const c = clients.find(x=>x.id===entry.clientId);
   if(!c){ showToast('error','Client not found','This client may have been removed.'); return; }
-  c.improvements.push({ author: myName()||'Team member', text: entry.description.trim(), date: new Date().toISOString(), includeInEmail: false, source: 'time' });
+  const imp = await insertImprovementRow(entry.clientId, { author: myName()||'Team member', text: entry.description.trim(), includeInEmail: false, source: 'time' });
   invalidateStaleDraft(c);
-  const ok = await persistClients();
+  const ok = !!imp && await updateClientRow(entry.clientId, { draftStatus:c.draftStatus, draft:c.draft });
   if(!ok){ showToast('error','Save failed','Could not save — try again.'); return; }
   renderImprovementsHistory();
   renderClientsTable();
@@ -11521,9 +11629,9 @@ async function saveQueueLogImprovement(){
   await loadAll();
   const c = clients.find(x=>x.id===clientId);
   if(!c){ showToast('error','Client not found','This client may have been removed by someone else.'); restoreBtn(btn); return; }
-  c.improvements.push({author, text, date: new Date().toISOString(), includeInEmail: true, source: 'manual'});
+  const imp = await insertImprovementRow(clientId, {author, text, includeInEmail: true, source: 'manual'});
   invalidateStaleDraft(c);
-  const ok = await persistClients();
+  const ok = !!imp && await updateClientRow(clientId, { draftStatus:c.draftStatus, draft:c.draft });
   renderClientsTable(); renderKpis(); renderQueue(); renderTeamQueue();
   restoreBtn(btn);
   if(ok){
@@ -11543,9 +11651,9 @@ async function logImprovement(id){
   await loadAll();
   const c = clients.find(x=>x.id===id);
   if(!c){ showToast('error','Client not found','This client may have been removed by someone else — refreshing.'); renderClientsTable(); return; }
-  c.improvements.push({author, text, date: new Date().toISOString(), includeInEmail: true, source: 'manual'});
+  const imp = await insertImprovementRow(id, {author, text, includeInEmail: true, source: 'manual'});
   invalidateStaleDraft(c);
-  const ok = await persistClients();
+  const ok = !!imp && await updateClientRow(id, { draftStatus:c.draftStatus, draft:c.draft });
   renderClientsTable();
   renderKpis();
   renderQueue();
@@ -11875,7 +11983,7 @@ function notifyForMember(memberId){
 function markMemberDraftsReady(member){
   const pending = activeClients().filter(c=>c.draftStatus==='pending' && c.improvements.some(i=>i.author===member.name));
   pending.forEach(c => { c.readyToNotify = true; });
-  persistClients().then(()=>renderTeamQueue());
+  Promise.all(pending.map(c=>updateClientRow(c.id, { readyToNotify:true }))).then(()=>renderTeamQueue());
   return pending;
 }
 
@@ -11893,7 +12001,7 @@ function notifyForMemberByEmail(memberId){
   persistLog().then(renderLog);
   showSendEmailConfirm(recipient.email, subject, body, () => {
     pending.forEach(c => { c.readyToNotify = true; });
-    persistClients().then(()=>renderTeamQueue());
+    Promise.all(pending.map(c=>updateClientRow(c.id, { readyToNotify:true }))).then(()=>renderTeamQueue());
   });
 }
 
@@ -12401,7 +12509,8 @@ ${contentRules}`;
     // clicks Ready to Notify again.
     c.readyToNotify = false;
     log.unshift({t:nowTime(), tag:'auto', text:`AI ${stayedApproved?'re-worded':'drafted'} the update for <b>${c.name}</b> from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''}${stayedApproved?' — stayed approved, the included improvements didn\'t change':''}.`});
-    await persistClients();
+    await updateClientRow(id, { draft:c.draft, draftStatus:c.draftStatus, draftPendingSince:c.draftPendingSince, readyToNotify:false });
+    await persistLog();
     renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
     logClientActivity(id, 'draft_generated', `AI ${stayedApproved?'re-worded':'generated'} a draft from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''} (of ${c.improvements.length} logged)${stayedApproved?' — approval carried over':''}.`);
     refreshClientDetailActivityIfOpen(id);
@@ -12416,7 +12525,7 @@ ${contentRules}`;
     c.draft = 'AI generation failed — you can write the draft manually here.';
     c.draftStatus = 'pending';
     c.draftPendingSince = new Date().toISOString();
-    await persistClients();
+    await updateClientRow(id, { draft:c.draft, draftStatus:c.draftStatus, draftPendingSince:c.draftPendingSince });
     renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
     if(modalOpenForThis) openQueueCardModal(id);
     showToast('error','AI generation failed', 'Write the draft manually below, or try again.');
@@ -12482,7 +12591,8 @@ async function approveDraft(id){
   if(ta) c.draft = ta.value;
   c.draftStatus = 'approved';
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Approved <b>${c.name}</b>'s draft.`});
-  const ok = await persistClients();
+  const ok = await updateClientRow(id, { draft:c.draft, draftStatus:c.draftStatus });
+  if(ok) await persistLog();
   renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
   if(modalOpenForThis) openQueueCardModal(id);
   if(!ok){ showToast('error','Save failed','Approval may not have synced — refresh and check.'); return; }
@@ -12508,7 +12618,8 @@ async function skipDraft(id){
   const modalOpenForThis = modalCard && modalCard.dataset.clientId === id;
   c.draftStatus='none'; c.draft='';
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Skipped <b>${c.name}</b> this week — no email sent.`});
-  const ok = await persistClients();
+  const ok = await updateClientRow(id, { draftStatus:c.draftStatus, draft:c.draft });
+  if(ok) await persistLog();
   renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
   if(ok){ logClientActivity(id, 'draft_skipped', `${myName()||'Someone'} skipped this week's update.`); refreshClientDetailActivityIfOpen(id); }
   if(modalOpenForThis) openQueueCardModal(id);
@@ -12854,6 +12965,7 @@ async function applyCsvRows(rows){
 
   await loadAll();
   let added = 0, updated = 0;
+  const upsertRows = [];
   for(let i=1; i<rows.length; i++){
     const r = rows[i];
     const name = (r[map.name]||'').trim();
@@ -12872,19 +12984,26 @@ async function applyCsvRows(rows){
     const existing = clients.find(c => c.name.trim().toLowerCase() === name.toLowerCase());
     if(existing){
       Object.assign(existing, fields);
+      upsertRows.push({ id: existing.id, ...clientFieldsToDb(fields) });
       updated++;
     } else {
-      clients.push({
+      const newClient = {
         id:'c'+Date.now()+Math.floor(Math.random()*1000),
         name, email:'', service:'Google Ads (PPC)', status:'Active', importance:5, danger:1, sow:'',
         improvements:[], draft:'', draftStatus:'none',
         ...fields
-      });
+      };
+      clients.push(newClient);
+      upsertRows.push({ id:newClient.id, ...clientFieldsToDb(newClient) });
       added++;
     }
   }
+  // One batched upsert for the whole sheet, not a save-per-row loop — a
+  // partial upsert like this only SETs the columns actually present in
+  // each row, so it can't blank out fields the sheet doesn't map.
+  const { error: upsertErr } = upsertRows.length ? await supabaseClient.from('clients').upsert(upsertRows) : { error:null };
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Synced from Google Sheet — ${added} added, ${updated} updated.`});
-  const ok = await persistClients();
+  const ok = !upsertErr && await persistLog();
   renderAll();
   const statusEl = document.getElementById('sheetSyncStatus');
   if(statusEl) statusEl.textContent = `Last synced ${nowTime()} — ${added} added, ${updated} updated.`;
@@ -13001,7 +13120,7 @@ function notifyApprovers(){
 function markAllPendingDraftsReady(){
   const pending = activeClients().filter(c=>c.draftStatus==='pending');
   pending.forEach(c => { c.readyToNotify = true; });
-  persistClients().then(()=>renderTeamQueue());
+  Promise.all(pending.map(c=>updateClientRow(c.id, { readyToNotify:true }))).then(()=>renderTeamQueue());
   return pending;
 }
 
@@ -13017,7 +13136,7 @@ function notifyApproversByEmail(){
   persistLog().then(renderLog);
   showSendEmailConfirm(recipient.email, subject, body, () => {
     pending.forEach(c => { c.readyToNotify = true; });
-    persistClients().then(()=>renderTeamQueue());
+    Promise.all(pending.map(c=>updateClientRow(c.id, { readyToNotify:true }))).then(()=>renderTeamQueue());
   });
 }
 
