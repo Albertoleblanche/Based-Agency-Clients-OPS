@@ -8,5 +8,10 @@
       "path": "/api/cron-google-calendar-sync",
       "schedule": "0 9 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "api/cron-wednesday-notify.js": {
+      "maxDuration": 60
+    }
+  }
 }
