@@ -1464,20 +1464,21 @@ function mRenderQueue(){
 }
 
 // Exact match to desktop's getNotifyRecipient() — member notifies the
-// approver, approver notifies the admin, admin has nobody left in the
-// chain. Deliberately never surfaces who the actual recipient is anywhere
-// the person clicking can see it, same as desktop.
+// approver(s), approver notifies the admin(s), admin has nobody left in
+// the chain. Role-based against team_profiles, not two named settings
+// fields — see the matching comment in index.html for why.
 function mGetNotifyRecipient(){
   const role = myProfile?.role;
   if(role === 'admin') return null;
-  if(role === 'approver') return { email: mSettings.danielEmail, configLabel: "the admin's" };
-  return { email: mSettings.ericEmail, configLabel: "the approver's" };
+  const targetRole = role === 'approver' ? 'admin' : 'approver';
+  const withEmail = teamProfiles.filter(p => p.role === targetRole && p.email);
+  return { email: withEmail.map(p=>p.email).join(','), hasEmail: withEmail.length>0, configLabel: targetRole==='admin' ? 'an admin' : 'an approver' };
 }
 
 function mReadyToNotify(){
   const recipient = mGetNotifyRecipient();
   if(!recipient){ mShowToast('success', "You're the last stop in the chain — nothing further to send."); return; }
-  if(!recipient.email){ mShowToast('error', `Add ${recipient.configLabel} email in Settings first.`); return; }
+  if(!recipient.hasEmail){ mShowToast('error', `No ${recipient.configLabel} has an email on file.`); return; }
   const pending = clients.filter(c=>!c.deletedAt && c.draftStatus==='pending');
   const subject = `${pending.length} client update${pending.length!==1?'s':''} ready for approval`;
   const bodyLines = pending.length ? pending.map(c=>`- ${c.name} (danger ${c.danger}/5, importance ${c.importance}/10)`).join('\n') : 'No drafts are ready yet.';
@@ -1780,7 +1781,7 @@ ${contentRules}`;
 
   try{
     const response = await fetch('/api/generate-draft', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ prompt })
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ prompt, model: mSettings.openaiModel })
     });
     const data = await response.json();
     const text = (data.text || '').trim();
