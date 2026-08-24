@@ -2260,14 +2260,6 @@ document.addEventListener('DOMContentLoaded', function(){
           </div>
         </div>
 
-        <div class="panel">
-          <div class="panel-head"><span class="panel-title">Approvers</span></div>
-          <div class="panel-body">
-            <div class="settings-field"><label>Daniel's email</label><input id="setDaniel" placeholder="daniel@basedagency.com"></div>
-            <div class="settings-field"><label>Eric's email</label><input id="setEric" placeholder="eric@basedagency.com"></div>
-            <button class="btn btn-brand" onclick="saveSettingsInline()">Save</button>
-          </div>
-        </div>
       </div>
 
       <!-- CLIENT FIELDS -->
@@ -2330,6 +2322,9 @@ document.addEventListener('DOMContentLoaded', function(){
                 ChatGPT — same account and model already used for draft generation
               </label>
             </div>
+            <p style="font-size:12px;color:var(--muted);margin:16px 0 10px;line-height:1.6;">Exact model string sent to each provider — the Assistant's weekly proactive-insights check (and, for OpenAI, per-client draft generation too) uses whichever is set here. Update this instead of redeploying code when a provider deprecates or renames a model.</p>
+            <div class="settings-field"><label>Claude model</label><input id="setClaudeModel" placeholder="${DEFAULT_CLAUDE_MODEL}" onchange="saveAiModel('claude', this.value)"></div>
+            <div class="settings-field"><label>OpenAI model</label><input id="setOpenaiModel" placeholder="${DEFAULT_OPENAI_MODEL}" onchange="saveAiModel('openai', this.value)"></div>
           </div>
         </div>
 
@@ -2785,7 +2780,7 @@ function attentionEligibleClients(){ return activeClients().filter(c=>c.status!=
 let log = [];
 let notes = [];
 let notesDataLoaded = false;
-let settings = {danielEmail:'', ericEmail:''};
+let settings = {};
 let team = [];
 let editingClientId = null;
 let queueFilter = 'all';
@@ -3291,6 +3286,13 @@ function copyToastText(id, linkEl){
 const DEFAULT_SERVICE_OPTIONS = ['Google Ads (PPC)','Meta Ads','SEO / Local Search','AI Domination Framework','Full Framework'];
 const DEFAULT_STATUS_OPTIONS = ['Active','Onboarding','At Risk','Paused'];
 const DEFAULT_TEAM_TITLE_OPTIONS = ['Web Developer','SEO Specialist','PPC Specialist','Account Manager','Designer','Client Coordinator'];
+// Fallback defaults only — the actual configured values live in
+// settings.claudeModel/settings.openaiModel (admin-editable in Settings ->
+// AI & Email), not hardcoded in api/*.js, so a model deprecation/upgrade
+// (this has already happened once — see lib/ai-client.js's history) is a
+// Settings change, not a redeploy.
+const DEFAULT_CLAUDE_MODEL = 'claude-sonnet-5';
+const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 
 let _loadAllSeq = 0;
 async function loadAll(){
@@ -3329,8 +3331,6 @@ async function loadAll(){
   clientImprovements = (impRes.data || []).map(improvementRowFromDb);
   clients.forEach(c => { c.improvements = clientImprovements.filter(i => i.clientId === c.id); });
   settings = s ? JSON.parse(s) : {};
-  settings.danielEmail = settings.danielEmail || '';
-  settings.ericEmail = settings.ericEmail || '';
   settings.sheetCsvUrl = settings.sheetCsvUrl || '';
   settings.serviceOptions = (settings.serviceOptions && settings.serviceOptions.length) ? settings.serviceOptions : DEFAULT_SERVICE_OPTIONS.slice();
   settings.statusOptions = (settings.statusOptions && settings.statusOptions.length) ? settings.statusOptions : DEFAULT_STATUS_OPTIONS.slice();
@@ -3338,8 +3338,8 @@ async function loadAll(){
   settings.customFields = settings.customFields || [];
   settings.overtimeThresholdHours = settings.overtimeThresholdHours ?? 40;
   settings.overtimeMultiplier = settings.overtimeMultiplier ?? 1.5;
-  document.getElementById('setDaniel').value = settings.danielEmail || '';
-  document.getElementById('setEric').value = settings.ericEmail || '';
+  settings.claudeModel = settings.claudeModel || DEFAULT_CLAUDE_MODEL;
+  settings.openaiModel = settings.openaiModel || DEFAULT_OPENAI_MODEL;
   const sheetInput = document.getElementById('sheetCsvUrl');
   if(sheetInput && document.activeElement !== sheetInput) sheetInput.value = settings.sheetCsvUrl || '';
   // Personal to the viewer, not part of the shared settings blob — comes
@@ -11990,7 +11990,7 @@ function markMemberDraftsReady(member){
 function notifyForMemberByEmail(memberId){
   const recipient = getNotifyRecipient();
   if(!recipient){ closeAppModal(); showToast('info','Nobody to notify by email', "You're the last stop in the chain — try Send Internally instead."); return; }
-  if(!recipient.email){ showToast('error','Missing email on file', `Add ${recipient.configLabel} email address in Settings first.`); return; }
+  if(!recipient.hasEmail){ showToast('error','Missing email on file', `No ${recipient.configLabel} has an email on file — add one under Team.`); return; }
   const member = teamProfiles.find(p=>p.id===memberId);
   if(!member) return;
   const pending = activeClients().filter(c=>c.draftStatus==='pending' && c.improvements.some(i=>i.author===member.name));
@@ -12492,7 +12492,7 @@ ${contentRules}`;
   try{
     const response = await fetch("/api/generate-draft", {
       method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ prompt })
+      body: JSON.stringify({ prompt, model: settings.openaiModel })
     });
     const data = await response.json();
     const text = (data.text || '').trim();
@@ -12838,19 +12838,6 @@ function applyAppIcon(){
   }
 }
 
-async function saveSettingsInline(){
-  const btn = clickedBtn();
-  setBtnLoading(btn, 'Saving…');
-  settings.danielEmail = document.getElementById('setDaniel').value.trim();
-  settings.ericEmail = document.getElementById('setEric').value.trim();
-  const ok = await persistSettings();
-  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:'Updated approver email addresses.'});
-  await persistLog();
-  renderLog();
-  restoreBtn(btn);
-  ok ? showToast('success','Settings saved','Approver emails updated.') : showToast('error','Save failed','Could not save settings — try again.');
-}
-
 // Reads from myProfile directly — matches the exact same field
 // sendNotification() checks against, so what's shown here and what's
 // actually enforced can never drift apart.
@@ -12892,6 +12879,25 @@ function renderAiProviderChoice(){
   const openaiRadio = document.getElementById('aiProviderOpenai');
   if(claudeRadio){ claudeRadio.checked = provider==='claude'; claudeRadio.disabled = !isAdmin(); }
   if(openaiRadio){ openaiRadio.checked = provider==='openai'; openaiRadio.disabled = !isAdmin(); }
+  const claudeModelInput = document.getElementById('setClaudeModel');
+  const openaiModelInput = document.getElementById('setOpenaiModel');
+  if(claudeModelInput && document.activeElement !== claudeModelInput){ claudeModelInput.value = settings.claudeModel || ''; claudeModelInput.disabled = !isAdmin(); }
+  if(openaiModelInput && document.activeElement !== openaiModelInput){ openaiModelInput.value = settings.openaiModel || ''; openaiModelInput.disabled = !isAdmin(); }
+}
+
+// Lets a redeployment-free response to a provider deprecating/renaming a
+// model (this has already happened once for real — see lib/ai-client.js's
+// header comment on OpenAI deprecating gpt-4o-mini-search-preview).
+// Falls back to the hardcoded DEFAULT_*_MODEL constant if cleared, rather
+// than storing an empty string that every downstream caller would need to
+// separately guard against.
+async function saveAiModel(which, value){
+  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  const trimmed = value.trim();
+  if(which === 'claude') settings.claudeModel = trimmed || DEFAULT_CLAUDE_MODEL;
+  else settings.openaiModel = trimmed || DEFAULT_OPENAI_MODEL;
+  const ok = await persistSettings();
+  ok ? showToast('success','Saved', `${which==='claude'?'Claude':'OpenAI'} model updated.`) : showToast('error','Save failed','Could not save — try again.');
 }
 
 async function saveEmailInstructions(){
@@ -13064,20 +13070,19 @@ function exportRosterCsv(){
   showToastWithCopy('success','Roster exported', 'Downloaded as a CSV. If the download didn\'t work, copy the raw data below.', csvText);
 }
 
-// Members notify Eric, Eric notifies Daniel, and Daniel — being the top of
-// the chain — has nobody left to notify. Matched by email against the
-// Daniel/Eric addresses configured in Settings, since that's the only
-// reliable way to identify "which specific person" someone is, beyond
-// their role.
-// Members notify the approver, approvers notify the admin, and the admin —
-// being the top of the chain — has nobody left to notify. Role-based, not
-// tied to a specific named person, and deliberately never surfaces who the
-// actual recipient is anywhere the person clicking can see it.
+// Members notify the approver(s), approvers notify the admin(s), and an
+// admin — being the top of the chain — has nobody left to notify.
+// Role-based against team_profiles, not tied to specific named people —
+// so this stays correct as admins/approvers come and go, rather than
+// requiring someone to remember to update a settings field. If more than
+// one person holds the target role, all of their emails go in "to"
+// (send-email.js already handles a comma-separated recipient list).
 function getNotifyRecipient(){
   const role = myProfile?.role;
   if(role === 'admin') return null;
-  if(role === 'approver') return { email: settings.danielEmail, configLabel: "the admin's" };
-  return { email: settings.ericEmail, configLabel: "the approver's" };
+  const targetRole = role === 'approver' ? 'admin' : 'approver';
+  const withEmail = teamProfiles.filter(p => p.role === targetRole && p.email);
+  return { email: withEmail.map(p=>p.email).join(','), hasEmail: withEmail.length>0, configLabel: targetRole==='admin' ? 'an admin' : 'an approver' };
 }
 
 // True only if at least one pending draft hasn't been marked ready yet —
@@ -13127,7 +13132,7 @@ function markAllPendingDraftsReady(){
 function notifyApproversByEmail(){
   const recipient = getNotifyRecipient();
   if(!recipient){ closeAppModal(); showToast('info','Nobody to notify by email', "You're the last stop in the chain — try Send Internally instead."); return; }
-  if(!recipient.email){ showToast('error','Missing email on file', `Add ${recipient.configLabel} email address in Settings first.`); return; }
+  if(!recipient.hasEmail){ showToast('error','Missing email on file', `No ${recipient.configLabel} has an email on file — add one under Team.`); return; }
   const pending = activeClients().filter(c=>c.draftStatus==='pending');
   const subject = `${pending.length} client update${pending.length!==1?'s':''} ready for approval`;
   const bodyLines = pending.map(c=>`- ${c.name} (danger ${c.danger}/5, importance ${c.importance}/10)`).join('\n');
@@ -13531,7 +13536,7 @@ function renderGauge(){
   const mins = Math.floor((msLeft%3600000)/60000);
   const secs = Math.floor((msLeft%60000)/1000);
   const isCrit = msLeft < 6*3600000; // under 6 hours left
-  const caption = isCrit ? 'Auto-notification firing soon' : 'Until Daniel & Eric are notified';
+  const caption = isCrit ? 'Auto-notification firing soon' : 'Until admins & approvers are notified';
 
   document.querySelectorAll('.gauge-fill').forEach(e=> e.style.width = pct+'%');
   document.querySelectorAll('.gauge-ring').forEach(e=>{
