@@ -4691,6 +4691,7 @@ function clientFormHtml(title, submitLabel, customValues){
       <div class="form-grid">
         <div><label>Client name</label><input id="ncName" placeholder="e.g. Premium Homes" oninput="checkDuplicateClientName()"><div id="ncNameWarning" style="display:none;font-size:11px;color:var(--red);margin-top:5px;"></div></div>
         <div><label>Client email</label><input id="ncEmail" placeholder="contact@client.com"></div>
+        <div><label>Website <span style="font-weight:400;color:var(--muted-lt);">(optional)</span></label><input id="ncWebsite" placeholder="https://client.com"></div>
         <div><label>Service</label><select id="ncService"></select></div>
         <div><label>Status</label><select id="ncStatus"></select></div>
         <div><label>Importance (1–10)</label><select id="ncImportance"></select></div>
@@ -4709,6 +4710,7 @@ function clientFormHtml(title, submitLabel, customValues){
 function resetClientFormFields(){
   document.getElementById('ncName').value='';
   document.getElementById('ncEmail').value='';
+  document.getElementById('ncWebsite').value='';
   renderClientOptionsSelects();
   document.getElementById('ncImportance').value='5';
   document.getElementById('ncDanger').value='1';
@@ -4802,6 +4804,7 @@ function openEditClientForm(id){
   openAppModal(clientFormHtml('Edit client', 'Save changes', c.customFieldValues), 560);
   document.getElementById('ncName').value = c.name;
   document.getElementById('ncEmail').value = c.email || '';
+  document.getElementById('ncWebsite').value = c.website || '';
   renderClientOptionsSelects();
   ensureSelectHasValue('ncService', c.service);
   ensureSelectHasValue('ncStatus', c.status);
@@ -4892,6 +4895,7 @@ async function saveClientForm(){
   const fields = {
     name,
     email:document.getElementById('ncEmail').value.trim(),
+    website:document.getElementById('ncWebsite').value.trim(),
     service:document.getElementById('ncService').value,
     status:document.getElementById('ncStatus').value,
     importance:parseInt(document.getElementById('ncImportance').value),
@@ -4915,7 +4919,7 @@ async function saveClientForm(){
     msg = `${name} updated.`;
     loggedClientId = editingClientId;
     if(ok){
-      const fieldLabels = { name:'Name', email:'Email', service:'Service', status:'Status', importance:'Importance', danger:'Danger', monthlyHourBudget:'Monthly budget', sow:'SOW' };
+      const fieldLabels = { name:'Name', email:'Email', website:'Website', service:'Service', status:'Status', importance:'Importance', danger:'Danger', monthlyHourBudget:'Monthly budget', sow:'SOW' };
       const changes = Object.keys(fields)
         .filter(key => key!=='customFieldValues' && String(before[key]||'') !== String(fields[key]||''))
         .map(key => `${fieldLabels[key]||key}: "${before[key]||'—'}" → "${fields[key]||'—'}"`);
@@ -6319,7 +6323,8 @@ function renderClientDetail(){
   }
 
   if(titleEl) titleEl.textContent = c.name;
-  if(subEl) subEl.innerHTML = `${c.email ? c.email+' · ' : ''}${c.service} · ${riskCaptionHtml(c.danger)}`;
+  const websiteLinkHtml = c.website ? `<a href="${c.website.startsWith('http')?c.website:'https://'+c.website}" target="_blank" style="color:inherit;text-decoration:underline;">${c.website.replace(/^https?:\/\//,'')}</a> · ` : '';
+  if(subEl) subEl.innerHTML = `${c.email ? c.email+' · ' : ''}${websiteLinkHtml}${c.service} · ${riskCaptionHtml(c.danger)}`;
 
   const customFieldsPanel = document.getElementById('cdCustomFieldsPanel');
   const customFieldsEl = document.getElementById('cdCustomFields');
@@ -8873,6 +8878,7 @@ const NOTIFICATION_TYPE_META = {
   profile_changed:         { label:'Your role, title, or access changes' },
   reminder_follow_up_due:  { label:'A client follow-up you own comes due' },
   reminder_escalated:      { label:'A client follow-up has gone unanswered for a week' },
+  proactive_insight:       { label:'The Assistant surfaces a proactive insight (weekly)' },
 };
 
 // Central place every notification insert should go through, instead of
@@ -9907,7 +9913,7 @@ function buildClaudeContext(){
   const rows = activeClients().filter(c=>c.status!=='Paused').map(c=>{
     const lastImp = [...(c.improvements||[])].sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
     const lastImpStr = lastImp ? `last logged ${new Date(lastImp.date).toLocaleDateString('en-US',{month:'short',day:'numeric'})}` : 'nothing logged yet';
-    return `- ${c.name}: risk ${riskLabel(c.danger).text}, ${lastImpStr}, draft ${c.draftStatus||'none'}`;
+    return `- ${c.name}${c.website ? ` (${c.website})` : ''}: risk ${riskLabel(c.danger).text}, ${lastImpStr}, draft ${c.draftStatus||'none'}`;
   });
   return rows.join('\n');
 }
