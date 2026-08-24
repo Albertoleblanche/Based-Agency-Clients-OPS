@@ -2826,7 +2826,7 @@ const CLIENT_FIELD_DB_MAP = {
   importance:'importance', danger:'danger', monthlyHourBudget:'monthly_hour_budget',
   sow:'sow', draft:'draft', draftStatus:'draft_status', draftPendingSince:'draft_pending_since',
   lastProactiveCheckAt:'last_proactive_check_at', customFieldValues:'custom_field_values',
-  deletedAt:'deleted_at', readyToNotify:'ready_to_notify',
+  deletedAt:'deleted_at', readyToNotify:'ready_to_notify', startDate:'start_date',
 };
 function clientFieldsToDb(fields){
   const out = {};
@@ -2839,7 +2839,7 @@ function clientRowFromDb(r){
     importance:r.importance, danger:r.danger, monthlyHourBudget:r.monthly_hour_budget||0, sow:r.sow||'',
     draft:r.draft||'', draftStatus:r.draft_status||'none', draftPendingSince:r.draft_pending_since,
     lastProactiveCheckAt:r.last_proactive_check_at, customFieldValues:r.custom_field_values||{},
-    deletedAt:r.deleted_at||undefined, readyToNotify:!!r.ready_to_notify,
+    deletedAt:r.deleted_at||undefined, readyToNotify:!!r.ready_to_notify, startDate:r.start_date||'',
     improvements:[], // hydrated separately from clientImprovements
   };
 }
@@ -4776,6 +4776,7 @@ function clientFormHtml(title, submitLabel, customValues){
         <div><label>Importance (1–10)</label><select id="ncImportance"></select></div>
         <div><label>Danger score (1–5)</label><select id="ncDanger"><option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select><div id="ncDangerNudge" style="display:none;font-size:11px;color:var(--amber);margin-top:5px;"></div></div>
         <div><label>Monthly hour budget</label><input type="number" id="ncBudget" min="0" step="0.5" placeholder="e.g. 20 (optional)"></div>
+        <div><label>Start date <span style="font-weight:400;color:var(--muted-lt);">(optional)</span></label><input type="date" id="ncStartDate" max="${toDateStr(new Date())}"></div>
         <div style="grid-column:1/-1;"><label>SOW / scope notes</label><input id="ncSow" placeholder="Brief scope summary"></div>
         ${customFieldsFormHtml(customValues)}
       </div>
@@ -4790,6 +4791,7 @@ function resetClientFormFields(){
   document.getElementById('ncName').value='';
   document.getElementById('ncEmail').value='';
   document.getElementById('ncWebsite').value='';
+  document.getElementById('ncStartDate').value='';
   renderClientOptionsSelects();
   document.getElementById('ncImportance').value='5';
   document.getElementById('ncDanger').value='1';
@@ -4884,6 +4886,7 @@ function openEditClientForm(id){
   document.getElementById('ncName').value = c.name;
   document.getElementById('ncEmail').value = c.email || '';
   document.getElementById('ncWebsite').value = c.website || '';
+  document.getElementById('ncStartDate').value = c.startDate || '';
   renderClientOptionsSelects();
   ensureSelectHasValue('ncService', c.service);
   ensureSelectHasValue('ncStatus', c.status);
@@ -4981,6 +4984,7 @@ async function saveClientForm(){
     danger:parseInt(document.getElementById('ncDanger').value),
     monthlyHourBudget: parseFloat(document.getElementById('ncBudget').value) || 0,
     sow:document.getElementById('ncSow').value.trim(),
+    startDate: document.getElementById('ncStartDate').value || null,
   };
   const customFieldValues = {};
   (settings.customFields||[]).forEach(f=>{
@@ -4998,7 +5002,7 @@ async function saveClientForm(){
     msg = `${name} updated.`;
     loggedClientId = editingClientId;
     if(ok){
-      const fieldLabels = { name:'Name', email:'Email', website:'Website', service:'Service', status:'Status', importance:'Importance', danger:'Danger', monthlyHourBudget:'Monthly budget', sow:'SOW' };
+      const fieldLabels = { name:'Name', email:'Email', website:'Website', service:'Service', status:'Status', importance:'Importance', danger:'Danger', monthlyHourBudget:'Monthly budget', sow:'SOW', startDate:'Start date' };
       const changes = Object.keys(fields)
         .filter(key => key!=='customFieldValues' && String(before[key]||'') !== String(fields[key]||''))
         .map(key => `${fieldLabels[key]||key}: "${before[key]||'—'}" → "${fields[key]||'—'}"`);
@@ -6435,13 +6439,19 @@ function renderClientDetail(){
   const customFieldsEl = document.getElementById('cdCustomFields');
   if(customFieldsPanel && customFieldsEl){
     const fields = settings.customFields || [];
-    if(fields.length){
+    const hasWebsite = !!c.website;
+    if(fields.length || hasWebsite){
       customFieldsPanel.style.display = 'block';
       const values = c.customFieldValues || {};
-      customFieldsEl.innerHTML = `<div class="form-grid">${fields.map(f=>{
+      // Website gets its own real button (not a plain link like custom
+      // URL-type fields below) — shown only when the client actually has
+      // one set, since not every client does.
+      const websiteHtml = hasWebsite ? `<div><label style="font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;color:var(--muted-lt);display:block;margin-bottom:4px;">Website</label><div style="font-size:13px;"><a href="${c.website.startsWith('http')?c.website:'https://'+c.website}" target="_blank" rel="noopener" class="btn btn-outline" style="display:inline-flex;padding:7px 14px;min-height:auto;font-size:12px;text-decoration:none;">View website ↗</a></div></div>` : '';
+      const fieldsHtml = fields.map(f=>{
         const val = values[f.id];
         return `<div><label style="font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;color:var(--muted-lt);display:block;margin-bottom:4px;">${f.label}</label><div style="font-size:13px;">${val ? (f.type==='url' ? `<a href="${val.startsWith('http')?val:'https://'+val}" target="_blank" style="color:var(--brand-dark);">${val}</a>` : val) : '<span style="color:var(--muted-lt);">—</span>'}</div></div>`;
-      }).join('')}</div>`;
+      }).join('');
+      customFieldsEl.innerHTML = `<div class="form-grid">${websiteHtml}${fieldsHtml}</div>`;
     } else {
       customFieldsPanel.style.display = 'none';
     }
@@ -6453,12 +6463,18 @@ function renderClientDetail(){
   const totalMinutes = myTimeEntries.reduce((s,e)=>s+e.minutes,0);
   const myNotesForClient = notes.filter(n=>n.clientId===c.id).sort((a,b)=> new Date(b.updatedAt||b.createdAt)-new Date(a.updatedAt||a.createdAt));
   const budget = monthBudgetInfo(c);
+  const monthsActive = monthsActiveFor(c);
 
   document.getElementById('cdMetrics').innerHTML = `
     <div class="metric-card">
       <div class="metric-head"><span class="metric-icon metric-icon-blue"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="metric-label">Status</span></div>
       <div class="metric-value" style="font-size:19px;">${c.status}</div>
       <div class="metric-chips"><span class="pill ${statusPillClass(c.status)}">${c.status}</span></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-head"><span class="metric-icon metric-icon-blue"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span><span class="metric-label">Months Active</span></div>
+      <div class="metric-value" style="font-size:19px;">${monthsActive===null ? '—' : monthsActive}</div>
+      <div class="metric-caption">${monthsActive===null ? 'Set a start date to track this' : `Since ${new Date(c.startDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`}</div>
     </div>
     <div class="metric-card">
       <div class="metric-head"><span class="metric-icon metric-icon-purple"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span><span class="metric-label">Importance / Danger</span></div>
@@ -12311,6 +12327,21 @@ function avatarColorForName(name){
   let hash = 0;
   for(let i=0;i<name.length;i++) hash = name.charCodeAt(i) + ((hash<<5)-hash);
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+// Whole completed months since a client's start date — auto-calculated so
+// it can't go stale the way a manually-typed number would (this replaces
+// hand-entering "months active" as a plain field). Returns null when no
+// start date is set, so callers can show "set a start date" rather than a
+// misleading 0.
+function monthsActiveFor(c){
+  if(!c.startDate) return null;
+  const start = new Date(c.startDate+'T00:00:00');
+  if(isNaN(start.getTime())) return null;
+  const now = new Date();
+  let months = (now.getFullYear()-start.getFullYear())*12 + (now.getMonth()-start.getMonth());
+  if(now.getDate() < start.getDate()) months--;
+  return Math.max(0, months);
 }
 
 // Compares actual logged time this calendar month against a client's set
