@@ -3619,6 +3619,22 @@ function setupRealtimeSubscriptions(){
     });
   }, 400);
 
+  // clients/client_improvements used to be part of app_storage's app-data
+  // blob (caught by onAppStorageChange above) before the migration to real
+  // tables — this handler is what replaces that coverage. Without it, a
+  // browser tab that was already open misses live updates entirely (a
+  // teammate's new draft, a Ready to Notify click, an edited client) until
+  // something else forces a reload, which is exactly why a stale
+  // Team Queue badge could disagree with what the page actually shows.
+  const onClientsChange = debounced('clients', ()=>{
+    silentSection(async ()=>{
+      await loadAll();
+      renderKpis(); renderClientsTable(); renderQueue(); renderTeamQueue(); renderLog();
+      renderAttentionList(); renderClientOptionsSelects(); renderOverviewChart();
+      renderBudgetAlerts(); renderImprovementsHistory();
+    });
+  }, 400);
+
   const onTasksChange = debounced('tasks', ()=>{
     silentSection(async ()=>{
       await loadMyTasks();
@@ -3650,6 +3666,8 @@ function setupRealtimeSubscriptions(){
   let realtimeErrorToastShown = false;
   realtimeChannel = supabaseClient.channel('app-realtime-'+currentUser.id)
     .on('postgres_changes', { event:'*', schema:'public', table:'app_storage' }, onAppStorageChange)
+    .on('postgres_changes', { event:'*', schema:'public', table:'clients' }, onClientsChange)
+    .on('postgres_changes', { event:'*', schema:'public', table:'client_improvements' }, onClientsChange)
     .on('postgres_changes', { event:'*', schema:'public', table:'notes' }, onNotesChange)
     .on('postgres_changes', { event:'*', schema:'public', table:'tasks' }, onTasksChange)
     .on('postgres_changes', { event:'*', schema:'public', table:'time_entries' }, onTimeEntriesChange)
@@ -12716,7 +12734,14 @@ ${contentRules}`;
     c.draft = 'AI generation failed — you can write the draft manually here.';
     c.draftStatus = 'pending';
     c.draftPendingSince = new Date().toISOString();
-    await updateClientRow(id, { draft:c.draft, draftStatus:c.draftStatus, draftPendingSince:c.draftPendingSince });
+    // Same reasoning as the success path above — a failed generation still
+    // starts a fresh pending cycle that hasn't been marked ready for
+    // review by anyone yet. Missing this reset was a real gap: a client
+    // that had previously been marked Ready to Notify (then regenerated,
+    // then hit this failure branch) would keep showing up in Team Queue —
+    // and in its badge count — for a draft nobody had actually flagged.
+    c.readyToNotify = false;
+    await updateClientRow(id, { draft:c.draft, draftStatus:c.draftStatus, draftPendingSince:c.draftPendingSince, readyToNotify:false });
     renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
     if(modalOpenForThis) openQueueCardModal(id);
     showToast('error','AI generation failed', 'Write the draft manually below, or try again.');
