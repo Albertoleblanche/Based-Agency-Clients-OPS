@@ -9812,7 +9812,8 @@ async function refreshWeeklyFocusReportBanner(){
   if(!banner) return;
   const { data: row, error } = await supabaseClient
     .from('weekly_focus_reports').select('generated_at').order('generated_at', { ascending:false }).limit(1).maybeSingle();
-  if(error || !row){ banner.style.display = 'none'; return; }
+  if(error){ console.error('refreshWeeklyFocusReportBanner error', error); banner.style.display = 'none'; return; }
+  if(!row){ banner.style.display = 'none'; return; }
   const dateEl = document.getElementById('weeklyFocusReportBannerDate');
   if(dateEl) dateEl.textContent = new Date(row.generated_at).toLocaleDateString('en-US',{weekday:'long', month:'short', day:'numeric'});
   banner.style.display = 'block';
