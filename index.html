@@ -3819,9 +3819,14 @@ function applyRoleVisibility(){
   }
   const claudeNavItem = document.getElementById('claudeNavItem');
   const claudeFloatBtn = document.getElementById('claudeFloatBtn');
-  if(claudeNavItem) claudeNavItem.style.display = canApprove() ? 'flex' : 'none';
-  if(claudeFloatBtn) claudeFloatBtn.style.display = canApprove() ? 'flex' : 'none';
-  if(!canApprove()){
+  // A real per-person toggle now (see each team card's "AI Assistant
+  // access" switch), not a blanket admin/approver check — an admin can
+  // grant this to a specific member or revoke it from a specific
+  // admin/approver.
+  const aiChatAllowed = !!myProfile?.ai_chat_enabled;
+  if(claudeNavItem) claudeNavItem.style.display = aiChatAllowed ? 'flex' : 'none';
+  if(claudeFloatBtn) claudeFloatBtn.style.display = aiChatAllowed ? 'flex' : 'none';
+  if(!aiChatAllowed){
     document.getElementById('claudeFloatPanel')?.classList.remove('open');
     if(document.getElementById('view-claude')?.classList.contains('active')) switchView('overview');
   }
@@ -14108,6 +14113,10 @@ function renderTeam(){
       ${teamCardAvatarHtml(m)}
       <div class="team-card-name">${m.name}${isSelf?' · you':''}</div>
       <div class="team-card-role">${roleAtCompany}${isRevoked ? ' · Access revoked' : ''}</div>
+      ${isAdmin() ? `<div style="display:flex;align-items:center;justify-content:center;gap:7px;margin:6px 0 2px;" onclick="event.stopPropagation();">
+        <span style="font-size:10.5px;color:var(--muted-lt);">AI Assistant</span>
+        <button class="theme-toggle-switch ${m.ai_chat_enabled?'on':''}" onclick="toggleMemberAiChatEnabled('${m.id}', ${!!m.ai_chat_enabled})" title="Enable or disable this person's AI Assistant access"></button>
+      </div>` : ''}
       <button class="btn btn-outline team-card-view" onclick="openTeamMemberDetail('${m.id}')">View</button>
       <div class="team-card-actions">
         ${(!isSelf && !isRevoked) ? `<button class="btn btn-outline" onclick="openNewTaskModal('${m.id}')">Assign task</button>` : ''}
@@ -14223,6 +14232,25 @@ async function changeTeamSlackId(userId, newSlackId){
   if(error){ showToast('error','Could not save', error.message); await loadTeamProfiles(); return; }
   await loadTeamProfiles();
   showToast('success', newSlackId ? 'Slack ID saved' : 'Slack ID cleared', newSlackId ? 'They\'ll get Slack DMs for anything they don\'t have muted.' : 'They won\'t receive Slack DMs from this app anymore.');
+}
+
+async function toggleMemberAiChatEnabled(userId, currentlyEnabled){
+  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  const newValue = !currentlyEnabled;
+  const { error } = await supabaseClient.from('team_profiles').update({ ai_chat_enabled: newValue }).eq('id', userId);
+  if(error){ showToast('error','Could not update', error.message); return; }
+  await loadTeamProfiles();
+  renderTeam();
+  const m = teamProfiles.find(x=>x.id===userId);
+  // If an admin toggles their OWN access (e.g. testing what a member
+  // sees), reflect it immediately in their own session too — myProfile is
+  // a separate fetch from teamProfiles, so it wouldn't otherwise update
+  // until their next reload.
+  if(userId === currentUser?.id){ myProfile.ai_chat_enabled = newValue; applyRoleVisibility(); }
+  showToast('success', newValue ? 'Enabled' : 'Disabled', `AI Assistant access ${newValue?'enabled for':'disabled for'} ${m?.name||'this person'}.`);
+  if(userId !== currentUser?.id){
+    sendNotification(userId, 'profile_changed', newValue ? 'Assistant access enabled' : 'Assistant access disabled', `${myName()||'An admin'} ${newValue?'turned on':'turned off'} your AI Assistant access.`, 'profile');
+  }
 }
 
 async function changeTeamPermission(userId, key, granted){
