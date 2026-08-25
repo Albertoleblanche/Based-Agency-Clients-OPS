@@ -319,11 +319,11 @@ a{color:inherit;text-decoration:none;}
 .m-spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:mSpin .7s linear infinite;}
 @keyframes mSpin{to{transform:rotate(360deg);}}
 
-.m-toast-stack{position:fixed;top:calc(10px + var(--safe-top));left:14px;right:14px;z-index:900;display:flex;flex-direction:column;gap:8px;}
+.m-toast-stack{position:fixed;bottom:calc(5vh + 88px + var(--safe-bottom));left:14px;right:14px;z-index:900;display:flex;flex-direction:column-reverse;gap:8px;}
 .m-toast{background:var(--ink);color:#fff;border-radius:12px;padding:12px 14px;font-size:13px;font-weight:600;box-shadow:0 12px 30px rgba(0,0,0,.2);animation:mToastIn .2s ease-out;}
 .m-toast.error{background:var(--red);}
 .m-toast.success{background:var(--green);}
-@keyframes mToastIn{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:translateY(0);}}
+@keyframes mToastIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
 
 .m-search-input{
   width:100%;padding:11px 14px 11px 40px;border-radius:12px;border:1px solid var(--border);
