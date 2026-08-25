@@ -1133,6 +1133,9 @@
 
   /* Mail modal */
   .modal-overlay{position:fixed;inset:0;background:rgba(16,24,40,.55);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;animation:modalOverlayIn var(--duration-base) var(--ease-out);}
+  .modal-overlay.docked{background:transparent;pointer-events:none;align-items:flex-end;justify-content:flex-end;animation:none;}
+  .modal-overlay.docked .modal-card{pointer-events:auto;max-width:320px;max-height:56vh;box-shadow:0 16px 44px rgba(16,24,40,.35);animation:none;}
+  .modal-overlay.docked .modal-head{cursor:pointer;}
   .modal-card{background:var(--card);color:var(--ink);border-radius:var(--radius-lg);max-width:520px;width:100%;box-shadow:0 24px 64px rgba(16,24,40,.32);max-height:88vh;overflow-y:auto;animation:modalCardIn var(--duration-slow) var(--ease-out);}
   @keyframes modalOverlayIn{from{opacity:0;}to{opacity:1;}}
   @keyframes modalCardIn{from{opacity:0;transform:translateY(14px) scale(.97);}to{opacity:1;transform:translateY(0) scale(1);}}
@@ -9650,7 +9653,7 @@ function weeklyReportEmptyState(text){
 // differs between the two callers.
 function buildWeeklyFocusReportSteps(r, coverNote){
   const attentionHtml = (r.attentionClients||[]).map(c=>`
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="closeAppModal();openClientDetail('${c.id}')">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="dockWeeklyFocusReportModal();openClientDetail('${c.id}')">
       <span style="font-size:13.5px;color:var(--ink);">${escapeHtml(c.name)}</span>
       <span style="display:flex;align-items:center;gap:8px;flex:none;">
         <span class="pill ${c.danger>=5?'pill-bad':'pill-mid'}">Danger ${c.danger}/5</span>
@@ -9659,19 +9662,19 @@ function buildWeeklyFocusReportSteps(r, coverNote){
     </div>`).join('');
 
   const overdueHtml = (r.overdueFollowUps||[]).map(f=>`
-    <div style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="closeAppModal();openClientDetail('${f.clientId}')">
+    <div style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="dockWeeklyFocusReportModal();openClientDetail('${f.clientId}')">
       <div style="font-size:13.5px;color:var(--ink);">${escapeHtml(f.clientName)}</div>
       <div style="font-size:11.5px;color:var(--muted-lt);">"${escapeHtml(f.question||'')}" — was due ${new Date(f.followUpDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
     </div>`).join('');
 
   const staleHtml = (r.staleClients||[]).map(c=>`
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="closeAppModal();openClientDetail('${c.id}')">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="dockWeeklyFocusReportModal();openClientDetail('${c.id}')">
       <span style="font-size:13.5px;color:var(--ink);">${escapeHtml(c.name)}</span>
       <span style="font-size:11.5px;color:var(--muted-lt);">${c.daysSinceImprovement==null?'never logged':c.daysSinceImprovement+' days quiet'}</span>
     </div>`).join('');
 
   const draftsHtml = (r.pendingDrafts||[]).map(c=>`
-    <div style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="closeAppModal();openClientDetail('${c.id}')">
+    <div style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="dockWeeklyFocusReportModal();openClientDetail('${c.id}')">
       <span style="font-size:13.5px;color:var(--ink);">${escapeHtml(c.name)}</span>
     </div>`).join('');
 
@@ -9755,12 +9758,29 @@ function weeklyFocusReportPrev(){
 
 function openWeeklyFocusReportShell(){
   openAppModal(`
-    <div class="modal-head"><span class="panel-title">This week's focus report</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-head" onclick="undockWeeklyFocusReportIfNeeded()"><span class="panel-title">This week's focus report</span><span class="toast-close" onclick="event.stopPropagation();closeAppModal()">✕</span></div>
     <div class="modal-body" id="weeklyFocusReportBody"><p style="font-size:13px;color:var(--muted);text-align:center;">Loading…</p></div>
     <div class="modal-actions" style="justify-content:space-between;">
       <button class="btn btn-outline" id="weeklyFocusReportPrevBtn" onclick="weeklyFocusReportPrev()">Back</button>
       <button class="btn btn-brand" id="weeklyFocusReportNextBtn" onclick="weeklyFocusReportNext()">Next</button>
     </div>`, 560);
+}
+
+// Instead of closing the report when you click through to a client, this
+// docks it to a corner (transparent, click-through overlay behind it) so
+// the client detail page underneath becomes visible and usable, and the
+// report is still right there — no need to regenerate it to see more,
+// which matters a lot for the Preview version specifically since that one
+// costs real API money to run again. Clicking the docked card's header
+// restores it to the full centered view.
+function dockWeeklyFocusReportModal(){
+  const overlay = document.getElementById('appModalOverlay');
+  if(overlay) overlay.classList.add('docked');
+}
+
+function undockWeeklyFocusReportIfNeeded(){
+  const overlay = document.getElementById('appModalOverlay');
+  if(overlay && overlay.classList.contains('docked')) overlay.classList.remove('docked');
 }
 
 function showWeeklyFocusReportLoadError(){
