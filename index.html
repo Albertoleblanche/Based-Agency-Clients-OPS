@@ -14113,10 +14113,6 @@ function renderTeam(){
       ${teamCardAvatarHtml(m)}
       <div class="team-card-name">${m.name}${isSelf?' · you':''}</div>
       <div class="team-card-role">${roleAtCompany}${isRevoked ? ' · Access revoked' : ''}</div>
-      ${isAdmin() ? `<div style="display:flex;align-items:center;justify-content:center;gap:7px;margin:6px 0 2px;" onclick="event.stopPropagation();">
-        <span style="font-size:10.5px;color:var(--muted-lt);">AI Assistant</span>
-        <button class="theme-toggle-switch ${m.ai_chat_enabled?'on':''}" onclick="toggleMemberAiChatEnabled('${m.id}', ${!!m.ai_chat_enabled})" title="Enable or disable this person's AI Assistant access"></button>
-      </div>` : ''}
       <button class="btn btn-outline team-card-view" onclick="openTeamMemberDetail('${m.id}')">View</button>
       <div class="team-card-actions">
         ${(!isSelf && !isRevoked) ? `<button class="btn btn-outline" onclick="openNewTaskModal('${m.id}')">Assign task</button>` : ''}
@@ -14164,32 +14160,49 @@ function openTeamMemberDetail(id){
   const slackIdControl = isAdmin()
     ? `<input type="text" value="${(m.slack_user_id||'').replace(/"/g,'&quot;')}" placeholder="e.g. U0123ABCDEF" onblur="changeTeamSlackId('${m.id}', this.value.trim())" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);width:100%;">`
     : '';
-  const permissionsControl = (isAdmin() && m.role==='member') ? `
-    <div style="grid-column:1/-1;">
-      <label>Extra Permissions</label>
-      <div style="display:flex;flex-direction:column;gap:10px;margin-top:6px;">
-        ${EXTRA_PERMISSIONS_META.map(p=>{
-          const isOn = (m.extra_permissions||[]).includes(p.key);
-          return `
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-            <span style="font-size:12.5px;color:var(--ink);">${p.label}</span>
-            <button class="theme-toggle-switch ${isOn?'on':''}" onclick="changeTeamPermission('${m.id}','${p.key}',${!isOn})"></button>
-          </div>`;
-        }).join('')}
-      </div>
-      <p style="font-size:10.5px;color:var(--muted-lt);margin:6px 0 0;">Grants specific extra access without changing their role.</p>
+
+  // A real section header, not a plain field <label> (11px, muted) — the
+  // toggle rows underneath read at 12.5px in --ink, which is visually
+  // louder than that default label style, making it look like the section
+  // heading was smaller than its own contents. This matches the section
+  // header treatment already used elsewhere (Additional Info, weekly
+  // report steps).
+  const sectionHeadingStyle = 'font-family:\'Plus Jakarta Sans\',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink);display:block;margin-bottom:2px;';
+  const toggleRow = (label, isOn, onclickJs, showDivider) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;${showDivider?'border-bottom:1px solid var(--border);':''}">
+      <span style="font-size:12.5px;color:var(--ink);">${label}</span>
+      <button class="theme-toggle-switch ${isOn?'on':''}" onclick="${onclickJs}"></button>
+    </div>`;
+
+  // AI Assistant access now shows for every role, not just members —
+  // unlike the three extra_permissions below (which only ever matter for
+  // members, since admins/approvers already have those by role), an
+  // admin needs to be able to revoke Assistant access from a specific
+  // admin/approver too, not just grant it to a member.
+  const memberOnlyPermissionRows = m.role==='member'
+    ? EXTRA_PERMISSIONS_META.map((p,i)=> toggleRow(p.label, (m.extra_permissions||[]).includes(p.key), `changeTeamPermission('${m.id}','${p.key}',${!(m.extra_permissions||[]).includes(p.key)})`, true))
+    : [];
+  const allToggleRows = [ toggleRow('AI Assistant access', !!m.ai_chat_enabled, `toggleMemberAiChatEnabled('${m.id}', ${!!m.ai_chat_enabled})`, true), ...memberOnlyPermissionRows ];
+  // Strip the trailing divider off the last row in the list so the
+  // section doesn't end on a stray line right before its own caption.
+  const permissionsHtml = allToggleRows.map((row,i)=> i===allToggleRows.length-1 ? row.replace('border-bottom:1px solid var(--border);','') : row).join('');
+  const permissionsControl = isAdmin() ? `
+    <div style="grid-column:1/-1;padding-top:14px;margin-top:2px;border-top:1px solid var(--border);">
+      <span style="${sectionHeadingStyle}">Extra Permissions</span>
+      <div style="margin-top:8px;">${permissionsHtml}</div>
+      <p style="font-size:10.5px;color:var(--muted-lt);margin:8px 0 0;">${m.role==='member' ? 'Grants specific extra access without changing their role.' : 'Admin/approver already covers everything else here by role — this is the one thing worth adjusting per person regardless of role.'}</p>
     </div>` : '';
   openAppModal(`
     <div class="modal-head"><span class="panel-title">${m.name}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
-    <div class="modal-body" style="display:flex;flex-direction:column;align-items:center;gap:14px;">
+    <div class="modal-body" style="display:flex;flex-direction:column;align-items:center;gap:16px;">
       ${teamCardAvatarHtml(m)}
       ${isRevoked ? `<span class="pill pill-bad">Access revoked</span>` : ''}
-      <div class="form-grid" style="width:100%;">
+      <div class="form-grid" style="width:100%;row-gap:16px;">
         <div><label>Email</label><div style="font-size:13px;color:var(--ink);">${m.email || '—'}</div></div>
         <div><label>Phone</label><div style="font-size:13px;color:var(--ink);">${m.phone || '—'}</div></div>
         <div><label>Title</label>${titleControl}</div>
         <div><label>Role</label>${roleControl}</div>
-        ${isAdmin() ? `<div style="grid-column:1/-1;"><label>Slack member ID</label>${slackIdControl}<p style="font-size:10.5px;color:var(--muted-lt);margin:4px 0 0;">From their Slack profile → "..." → Copy member ID. Lets this app DM them notifications, and lets Slack's /task command recognize them.</p></div>` : ''}
+        ${isAdmin() ? `<div style="grid-column:1/-1;padding-top:14px;border-top:1px solid var(--border);"><label>Slack member ID</label>${slackIdControl}<p style="font-size:10.5px;color:var(--muted-lt);margin:6px 0 0;">From their Slack profile → "..." → Copy member ID. Lets this app DM them notifications, and lets Slack's /task command recognize them.</p></div>` : ''}
         ${permissionsControl}
       </div>
     </div>
@@ -14251,6 +14264,7 @@ async function toggleMemberAiChatEnabled(userId, currentlyEnabled){
   if(userId !== currentUser?.id){
     sendNotification(userId, 'profile_changed', newValue ? 'Assistant access enabled' : 'Assistant access disabled', `${myName()||'An admin'} ${newValue?'turned on':'turned off'} your AI Assistant access.`, 'profile');
   }
+  if(document.getElementById('appModalOverlay')) openTeamMemberDetail(userId);
 }
 
 async function changeTeamPermission(userId, key, granted){
