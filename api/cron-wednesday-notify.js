@@ -1,20 +1,29 @@
-// Runs automatically every Wednesday via Vercel Cron (see vercel.json). Two
-// genuinely separate responsibilities live here, same "bundle it into an
-// existing file" discipline as cron-google-calendar-sync.js — there's no
-// spare function slot for a second cron job:
+// Runs DAILY via Vercel Cron (see vercel.json) — not weekly. Two genuinely
+// separate responsibilities live here, same "bundle it into an existing
+// file" discipline as cron-google-calendar-sync.js — there's no spare
+// function slot for a second cron job, and Vercel Cron schedules are fixed
+// at deploy time in vercel.json, so there's no way for a database setting
+// to change WHEN this function actually gets invoked. Instead, this runs
+// every day and each responsibility decides for itself whether today is
+// its day to actually do anything:
 //
-//   1. The original pending-drafts email digest — the fully hands-off
-//      version of clicking "Notify Daniel & Eric."
-//   2. Proactive insights from the Assistant — see
-//      lib/proactive-insights.js for the actual logic (website spot-checks
-//      on a rotating subset of clients, plus cross-client pattern
-//      detection). That file is shared with
-//      api/preview-wednesday-notify.js's 'proactive' action, an
-//      admin-only on-demand preview — kept in one place so the preview can
-//      never silently drift from what this real run actually does.
+//   1. The pending-drafts email digest — hardcoded to Wednesdays only,
+//      unchanged from before. (This file is still named
+//      cron-wednesday-notify.js because of this, even though it's no
+//      longer a weekly invocation.)
+//   2. Proactive insights from the Assistant — now genuinely admin
+//      day-configurable via settings.proactiveInsightsDayOfWeek (0=Sunday
+//      ... 6=Saturday, default 3=Wednesday), checked below. See
+//      lib/proactive-insights.js for the actual logic (website
+//      spot-checks, cross-client pattern detection, and the real computed
+//      metrics that make up the weekly focus report). That file is shared
+//      with api/preview-wednesday-notify.js's 'proactive' action, an
+//      admin-only on-demand preview — kept in one place so the preview
+//      can never silently drift from what this real run actually does.
 //
-// Both responsibilities run every invocation, independently, in their own
-// try/catch — one failing (say, the email send) shouldn't block the other.
+// Both responsibilities run every invocation (after their own day-check
+// passes), independently, in their own try/catch — one failing (say, the
+// email send) shouldn't block the other.
 //
 // clients/client_improvements are real tables now (see
 // schema-clients-migration.sql), not part of the app_storage JSON blob —
@@ -26,6 +35,8 @@
 const { createClient } = require('@supabase/supabase-js');
 const { sendPushToUser } = require('../lib/push-notify');
 const { clientRowFromDb, improvementRowFromDb, runProactiveInsights } = require('../lib/proactive-insights');
+
+const EMAIL_DIGEST_DAY_OF_WEEK = 3; // Wednesday, hardcoded — not admin-configurable, unlike proactive insights
 
 async function runEmailDigest(admin, clients, log, settings, resendKey) {
   if (!resendKey) return { skipped: true, reason: 'Missing RESEND_API_KEY' };
@@ -132,25 +143,37 @@ module.exports = async function handler(req, res) {
     });
     clients.forEach(c => { c.improvements = improvementsByClient[c.id] || []; });
 
+    // UTC day-of-week — this cron's schedule (vercel.json) fires at a
+    // fixed UTC hour, so comparing against UTC here keeps "which day is
+    // it" consistent with when the function actually runs, rather than
+    // drifting by timezone.
+    const todayDow = new Date().getUTCDay();
     const result = { emailDigest: null, proactiveInsights: null };
 
-    try {
-      result.emailDigest = await runEmailDigest(admin, clients, log, settings, process.env.RESEND_API_KEY);
-    } catch (e) {
-      result.emailDigest = { error: String(e) };
+    if (todayDow === EMAIL_DIGEST_DAY_OF_WEEK) {
+      try {
+        result.emailDigest = await runEmailDigest(admin, clients, log, settings, process.env.RESEND_API_KEY);
+      } catch (e) {
+        result.emailDigest = { error: String(e) };
+      }
+    } else {
+      result.emailDigest = { skipped: true, reason: 'Not Wednesday — this part of the automation only runs on Wednesdays.' };
     }
 
-    try {
-      // undefined means enabled — this feature predates the Settings
-      // toggle, so an existing deployment that's never touched it keeps
-      // running exactly as before rather than silently going quiet.
-      if (settings.proactiveInsightsEnabled === false) {
-        result.proactiveInsights = { skipped: true, reason: 'Disabled in Settings -> AI & Email.' };
-      } else {
+    // undefined means Wednesday (3) — this setting is new, so an existing
+    // deployment that's never touched it keeps running on the same day it
+    // always did rather than silently going quiet or jumping to Sunday.
+    const proactiveDayOfWeek = settings.proactiveInsightsDayOfWeek ?? 3;
+    if (settings.proactiveInsightsEnabled === false) {
+      result.proactiveInsights = { skipped: true, reason: 'Disabled in Settings -> AI & Email.' };
+    } else if (todayDow !== proactiveDayOfWeek) {
+      result.proactiveInsights = { skipped: true, reason: `Not the configured day (day ${proactiveDayOfWeek}) — nothing to do today.` };
+    } else {
+      try {
         result.proactiveInsights = await runProactiveInsights(admin, clients, log, settings);
+      } catch (e) {
+        result.proactiveInsights = { error: String(e) };
       }
-    } catch (e) {
-      result.proactiveInsights = { error: String(e) };
     }
 
     // Only `log` needs writing back here — client changes
