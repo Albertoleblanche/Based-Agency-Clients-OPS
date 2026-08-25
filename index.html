@@ -539,6 +539,9 @@
   .dp-calendar-day.selected{background:var(--brand);color:#fff;}
   .dp-calendar-day.selected:hover{background:var(--brand-dark);}
   .dp-calendar-day.today:not(.selected){box-shadow:inset 0 0 0 1px var(--brand);}
+  .time-picker-option{display:block;width:100%;text-align:left;padding:8px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;border:none;background:transparent;color:var(--ink);cursor:pointer;}
+  .time-picker-option:hover{background:var(--surface-2);}
+  .time-picker-option.selected{background:var(--brand);color:#fff;}
   .pagination-controls{display:flex;align-items:center;justify-content:center;gap:14px;padding:16px 0 4px;}
   .pagination-controls .btn{padding:7px 14px;font-size:12px;}
   .pagination-controls .btn:disabled{opacity:.4;cursor:default;}
@@ -5056,6 +5059,86 @@ document.addEventListener('click', (e)=>{
   });
 });
 
+// Time picker — same button+hidden-input shape and same visual language
+// as the date picker above (so "the style we're going for" is genuinely
+// one style, not two similar-but-different ones), and deliberately reuses
+// its dropdown ID convention ("{id}Calendar") on purpose: the outside-click
+// listener above, and closeAppModal()'s .calendar-dropdown cleanup, both
+// already work on any element matching that pattern regardless of
+// content, so the time picker gets both of those for free without
+// duplicating that logic a third time. A plain type="time" input only
+// reliably opens its native picker when you click exactly on the small
+// clock icon in most browsers — this makes the entire field clickable.
+function formatTimeDisplay(val){
+  if(!val) return '';
+  const [h,m] = val.split(':').map(Number);
+  const period = h>=12 ? 'PM' : 'AM';
+  const h12 = h%12===0 ? 12 : h%12;
+  return `${h12}:${String(m).padStart(2,'0')} ${period}`;
+}
+
+function timePickerFieldHtml(id, opts={}){
+  const { value='09:00', disabled=false } = opts;
+  return `
+    <input type="hidden" id="${id}" value="${value}">
+    <button type="button" id="${id}Btn" onclick="toggleTimePickerDropdown('${id}', event)" ${disabled?'disabled':''} style="width:100%;text-align:left;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--ink);cursor:${disabled?'not-allowed':'pointer'};display:flex;align-items:center;justify-content:space-between;${disabled?'opacity:.6;':''}">
+      <span id="${id}Display">${formatTimeDisplay(value)}</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    </button>
+    <div class="calendar-dropdown" id="${id}Calendar" style="display:none;width:150px;max-height:240px;overflow-y:auto;"></div>`;
+}
+
+function renderTimePickerDropdown(id){
+  const el = document.getElementById(id+'Calendar');
+  const input = document.getElementById(id);
+  if(!el || !input) return;
+  const selected = input.value;
+  let itemsHtml = '';
+  for(let h=0; h<24; h++){
+    for(let m=0; m<60; m+=15){
+      const val = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+      itemsHtml += `<button type="button" class="time-picker-option${val===selected?' selected':''}" onclick="event.stopPropagation();selectTimePickerValue('${id}','${val}')">${formatTimeDisplay(val)}</button>`;
+    }
+  }
+  el.innerHTML = itemsHtml;
+}
+
+function toggleTimePickerDropdown(id, event){
+  event?.stopPropagation();
+  const el = document.getElementById(id+'Calendar');
+  if(!el) return;
+  const opening = el.style.display !== 'block';
+  el.style.display = opening ? 'block' : 'none';
+  if(opening){
+    if(el.parentElement !== document.body) document.body.appendChild(el);
+    renderTimePickerDropdown(id);
+    positionDatePickerCalendar(id); // generic — works off {id}Btn/{id}Calendar regardless of content
+    const selectedEl = el.querySelector('.time-picker-option.selected');
+    if(selectedEl) selectedEl.scrollIntoView({ block:'center' });
+  }
+}
+
+function selectTimePickerValue(id, val){
+  const input = document.getElementById(id);
+  if(!input) return;
+  input.value = val;
+  const displayEl = document.getElementById(id+'Display');
+  if(displayEl) displayEl.textContent = formatTimeDisplay(val);
+  document.getElementById(id+'Calendar').style.display = 'none';
+  input.dispatchEvent(new Event('change', { bubbles:true }));
+}
+
+// Shared by both picker types — toggles the trigger button's actual
+// disabled state/styling, since disabling a hidden input alone (the old
+// native-input approach) has no visible effect once the real control is
+// the button in front of it.
+function setPickerDisabled(id, disabled){
+  const btn = document.getElementById(id+'Btn');
+  const input = document.getElementById(id);
+  if(btn){ btn.disabled = disabled; btn.style.cursor = disabled?'not-allowed':'pointer'; btn.style.opacity = disabled?'.6':'1'; }
+  if(input) input.disabled = disabled;
+}
+
 function resetClientFormFields(){
   document.getElementById('ncName').value='';
   document.getElementById('ncEmail').value='';
@@ -7263,7 +7346,7 @@ function openNoteModal(noteId, presetClientId, presetStatus){
   openAppModal(`
     <div class="modal-head"><span class="panel-title">${editing ? 'Edit note' : 'Add note'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
-      <div class="settings-field"><label>Title</label><input id="noteTitleInput" type="text" placeholder="Short title for this note" value="${editing && editing.title ? editing.title.replace(/"/g,'&quot;') : ''}"></div>
+      <div class="settings-field"><label>Title</label><input id="noteTitleInput" type="text" style="width:100%;" placeholder="Short title for this note" value="${editing && editing.title ? editing.title.replace(/"/g,'&quot;') : ''}"></div>
       <div class="settings-field"><label>Note</label><textarea spellcheck="true" id="noteTextInput" style="width:100%;min-height:64px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${editing ? editing.text : ''}</textarea></div>
       <div class="form-grid">
         <div class="settings-field"><label>Client</label><select id="noteClientSelect" style="width:100%;">${clientOptions}</select></div>
@@ -8583,19 +8666,21 @@ function eventFormHtml(editing, presetDateStr){
             ${Object.entries(CALENDAR_TYPE_META).map(([val,m])=>`<option value="${val}" ${editing && editing.eventType===val ? 'selected' : (!editing && val==='meeting' ? 'selected' : '')}>${m.label}</option>`).join('')}
           </select>
         </div>
-        <div><label>Start time</label><input type="time" id="eventStartInput" value="${startTime}"></div>
-        <div><label>End time</label><input type="time" id="eventEndInput" value="${endTime}"></div>
+        <div style="position:relative;"><label>Start time</label>${timePickerFieldHtml('eventStartInput', { value: startTime })}</div>
+        <div style="position:relative;"><label>End time</label>${timePickerFieldHtml('eventEndInput', { value: endTime })}</div>
       </div>
       <div class="settings-field"><label><input type="checkbox" id="eventAllDayInput" ${editing && editing.allDay ? 'checked' : ''} onchange="toggleEventAllDay()" style="width:auto;margin-right:6px;">All-day event</label></div>
-      <div class="settings-field"><label>Location (optional)</label><input id="eventLocationInput" placeholder="Zoom link, address, or wherever it's happening" value="${editing && editing.location ? editing.location.replace(/"/g,'&quot;') : ''}"></div>
-      <div class="settings-field"><label>Reminder</label>
-        <select id="eventReminderSelect">
-          ${REMINDER_OPTIONS.map(([val,label])=>`<option value="${val}" ${String(editing ? (editing.reminderMinutes ?? '') : '')===val ? 'selected' : ''}>${label}</option>`).join('')}
-        </select>
+      <div class="form-grid">
+        <div class="settings-field"><label>Location (optional)</label><input id="eventLocationInput" placeholder="Zoom link, address, or wherever it's happening" value="${editing && editing.location ? editing.location.replace(/"/g,'&quot;') : ''}"></div>
+        <div><label>Reminder</label>
+          <select id="eventReminderSelect">
+            ${REMINDER_OPTIONS.map(([val,label])=>`<option value="${val}" ${String(editing ? (editing.reminderMinutes ?? '') : '')===val ? 'selected' : ''}>${label}</option>`).join('')}
+          </select>
+        </div>
       </div>
-      <div class="settings-field"><label>Related client (optional)</label><select id="eventClientSelect">${populateCalendarClientSelect(editing ? editing.clientId : null)}</select></div>
       ${!editing ? `
       <div class="form-grid">
+        <div class="settings-field"><label>Related client (optional)</label><select id="eventClientSelect" style="width:100%;">${populateCalendarClientSelect(editing ? editing.clientId : null)}</select></div>
         <div><label>Repeats</label>
           <select id="eventRepeatSelect" onchange="toggleRepeatUntilField()">
             <option value="none">Doesn't repeat</option>
@@ -8604,8 +8689,12 @@ function eventFormHtml(editing, presetDateStr){
             <option value="monthly">Monthly</option>
           </select>
         </div>
-        <div id="eventRepeatUntilWrap" style="display:none;position:relative;"><label>Repeats until</label>${datePickerFieldHtml('eventRepeatUntilInput', { value: (()=>{ const d=new Date(); d.setFullYear(d.getFullYear()+1); return toDateStr(d); })(), minDate: toDateStr(new Date()) })}</div>
-      </div>` : editing.recurrenceGroupId ? `<p style="font-size:11.5px;color:var(--muted-lt);margin:0;">🔁 ${editing.recurrenceLabel||'Recurring'} — part of a series. Editing here only changes this one occurrence.</p>` : ''}
+      </div>
+      <div id="eventRepeatUntilWrap" style="display:none;position:relative;"><label>Repeats until</label>${datePickerFieldHtml('eventRepeatUntilInput', { value: (()=>{ const d=new Date(); d.setFullYear(d.getFullYear()+1); return toDateStr(d); })(), minDate: toDateStr(new Date()) })}</div>
+      ` : `
+      <div class="settings-field"><label>Related client (optional)</label><select id="eventClientSelect" style="width:100%;">${populateCalendarClientSelect(editing ? editing.clientId : null)}</select></div>
+      ${editing.recurrenceGroupId ? `<p style="font-size:11.5px;color:var(--muted-lt);margin:0;">🔁 ${editing.recurrenceLabel||'Recurring'} — part of a series. Editing here only changes this one occurrence.</p>` : ''}
+      `}
       <div class="settings-field">
         <label>Attendees</label>
         <div style="display:flex;flex-wrap:wrap;gap:10px;padding:10px;border:1px solid var(--border);border-radius:8px;max-height:120px;overflow-y:auto;">
@@ -8632,10 +8721,8 @@ function toggleRepeatUntilField(){
 
 function toggleEventAllDay(){
   const isAllDay = document.getElementById('eventAllDayInput').checked;
-  const startEl = document.getElementById('eventStartInput');
-  const endEl = document.getElementById('eventEndInput');
-  if(startEl) startEl.disabled = isAllDay;
-  if(endEl) endEl.disabled = isAllDay;
+  setPickerDisabled('eventStartInput', isAllDay);
+  setPickerDisabled('eventEndInput', isAllDay);
 }
 
 function openNewEventModal(presetDateStr){
