@@ -8657,7 +8657,7 @@ function eventFormHtml(editing, presetDateStr){
   return `
     <div class="modal-head"><span class="panel-title">${editing ? 'Edit event' : 'New event'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
-      <div class="settings-field"><label>Title</label><input id="eventTitleInput" placeholder="e.g. Kickoff call with Flame Auto Repair" value="${editing ? editing.title.replace(/"/g,'&quot;') : ''}"></div>
+      <div class="settings-field"><label>Title</label><input id="eventTitleInput" style="width:100%;" placeholder="e.g. Kickoff call with Flame Auto Repair" value="${editing ? editing.title.replace(/"/g,'&quot;') : ''}"></div>
       <div class="settings-field"><label>Description (optional)</label><textarea spellcheck="true" id="eventDescInput" style="width:100%;min-height:70px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);">${editing ? editing.description : ''}</textarea></div>
       <div class="form-grid">
         <div style="position:relative;"><label>Date</label>${datePickerFieldHtml('eventDateInput', { value: startDate, minDate: toDateStr(new Date()) })}</div>
@@ -10141,7 +10141,7 @@ function populateTimeClientSelects(){
   setupClientSearchSelect('timerModalClientSearch', 'timerModalClient', 'timerModalClientDropdown');
 
   const dateInput = document.getElementById('manualDate');
-  if(dateInput && !dateInput.value) dateInput.value = toDateStr(new Date());
+  if(dateInput && !dateInput.value) setDatePickerValue('manualDate', toDateStr(new Date()));
 
   // Service dropdowns — same option list as the Clients table's Service field.
   const serviceOpts = (settings.serviceOptions||[]).map(s=>`<option value="${s.replace(/"/g,'&quot;')}">${s}</option>`).join('');
@@ -10907,7 +10907,7 @@ function openManualEntryModal(){
           <div class="client-search-dropdown" id="manualClientDropdown"></div>
         </div>
         <div><label>Service</label><select id="manualService"></select></div>
-        <div><label>Date</label><input type="date" id="manualDate"></div>
+        <div style="position:relative;"><label>Date</label>${datePickerFieldHtml('manualDate', {})}</div>
         <div style="grid-column:1/-1;"><label>Duration</label><input id="manualDuration" placeholder="e.g. 1h 30m, or 1.5"></div>
         <div style="grid-column:1/-1;"><label>Description</label><textarea spellcheck="true" id="manualDesc" placeholder="What did you work on?" rows="3" style="resize:vertical;min-height:64px;font-family:inherit;"></textarea></div>
       </div>
@@ -10918,7 +10918,7 @@ function openManualEntryModal(){
     </div>`, 460);
   populateTimeClientSelects();
   const dateInput = document.getElementById('manualDate');
-  if(dateInput) dateInput.value = toDateStr(new Date());
+  if(dateInput) setDatePickerValue('manualDate', toDateStr(new Date()));
 }
 
 async function addManualEntry(){
@@ -11181,7 +11181,7 @@ function openTimeEntryModal(id){
     <div class="modal-body">
       <div class="settings-field"><label>Client</label><select id="editEntryClient" style="width:100%;">${clientOptions}</select></div>
       <div class="settings-field"><label>Service</label><select id="editEntryService" style="width:100%;">${serviceOptions}</select></div>
-      <div class="settings-field"><label>Date</label><input type="date" id="editEntryDate" value="${e.date}" style="width:100%;"></div>
+      <div class="settings-field" style="position:relative;"><label>Date</label>${datePickerFieldHtml('editEntryDate', { value: e.date })}</div>
       <div class="settings-field"><label>Duration</label><input id="editEntryDuration" value="${minutesToDurationInputStr(e.minutes)}" placeholder="e.g. 1h 30m, or 1.5" style="width:100%;"></div>
       <div class="settings-field"><label>Description</label><textarea spellcheck="true" id="editEntryDesc" rows="3" style="width:100%;resize:vertical;min-height:64px;">${escapeHtml(e.description||'')}</textarea></div>
     </div>
