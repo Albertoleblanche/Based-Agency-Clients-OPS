@@ -7264,21 +7264,27 @@ function openNoteModal(noteId, presetClientId, presetStatus){
     <div class="modal-head"><span class="panel-title">${editing ? 'Edit note' : 'Add note'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
       <div class="settings-field"><label>Title</label><input id="noteTitleInput" type="text" placeholder="Short title for this note" value="${editing && editing.title ? editing.title.replace(/"/g,'&quot;') : ''}"></div>
-      <div class="settings-field"><label>Client</label><select id="noteClientSelect" style="width:100%;">${clientOptions}</select></div>
-      <div class="settings-field"><label>Status</label>
-        <select id="noteStatusSelect" style="width:100%;">
-          <option value="idea" ${effectiveStatus==='idea'?'selected':''}>Idea</option>
-          <option value="planned" ${effectiveStatus==='planned'?'selected':''}>Planned</option>
-          <option value="in-progress" ${effectiveStatus==='in-progress'?'selected':''}>In progress</option>
-          <option value="done" ${effectiveStatus==='done'?'selected':''}>Done</option>
-        </select>
-      </div>
       <div class="settings-field"><label>Note</label><textarea spellcheck="true" id="noteTextInput" style="width:100%;min-height:64px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${editing ? editing.text : ''}</textarea></div>
-      <div class="settings-field"><label>Link (optional)</label><input id="noteLinkInput" type="url" placeholder="https://…" value="${editing && editing.link ? editing.link.replace(/"/g,'&quot;') : ''}"></div>
+      <div class="form-grid">
+        <div class="settings-field"><label>Client</label><select id="noteClientSelect" style="width:100%;">${clientOptions}</select></div>
+        <div class="settings-field"><label>Status</label>
+          <select id="noteStatusSelect" style="width:100%;">
+            <option value="idea" ${effectiveStatus==='idea'?'selected':''}>Idea</option>
+            <option value="planned" ${effectiveStatus==='planned'?'selected':''}>Planned</option>
+            <option value="in-progress" ${effectiveStatus==='in-progress'?'selected':''}>In progress</option>
+            <option value="done" ${effectiveStatus==='done'?'selected':''}>Done</option>
+          </select>
+        </div>
+      </div>
       ${!editing ? `
-      <div class="settings-field"><label>Follow-up date (optional)</label><input type="date" id="noteFollowUpInput" min="${toDateStr(new Date())}"></div>
+      <div class="form-grid">
+        <div class="settings-field"><label>Link (optional)</label><input id="noteLinkInput" type="url" placeholder="https://…" value="${editing && editing.link ? editing.link.replace(/"/g,'&quot;') : ''}"></div>
+        <div class="settings-field" style="position:relative;"><label>Follow-up date (optional)</label>${datePickerFieldHtml('noteFollowUpInput', { minDate: toDateStr(new Date()) })}</div>
+      </div>
       <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink);cursor:pointer;margin-top:2px;"><input type="checkbox" id="noteAddToCalendarInput"> Add to calendar (needs a follow-up date)</label>
-      ` : ''}
+      ` : `
+      <div class="settings-field"><label>Link (optional)</label><input id="noteLinkInput" type="url" placeholder="https://…" value="${editing && editing.link ? editing.link.replace(/"/g,'&quot;') : ''}"></div>
+      `}
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" onclick="saveNote(${editing ? `'${editing.id}'` : 'null'})">${editing?'Save changes':'Add note'}</button>
