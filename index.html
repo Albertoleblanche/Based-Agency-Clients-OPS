@@ -2353,12 +2353,27 @@ document.addEventListener('DOMContentLoaded', function(){
             <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
               <div style="flex:1;">
                 <div style="font-size:13px;color:var(--ink);font-weight:600;margin-bottom:3px;">Enable weekly proactive insights</div>
-                <div style="font-size:12px;color:var(--muted);line-height:1.5;">Each Wednesday, the Assistant spot-checks a couple of client websites and looks for cross-client patterns — costs a few real API calls per run. Turning this off skips that part of the automation entirely; the pending-drafts email digest still runs either way.</div>
+                <div style="font-size:12px;color:var(--muted);line-height:1.5;">Once a week, the Assistant spot-checks a couple of client websites, looks for cross-client patterns, and combines that with real metrics (clients needing attention, overdue follow-ups, stale clients) into one focus report sent to everyone on the team — costs a few real API calls per run. Turning this off skips it entirely; the pending-drafts email digest (still Wednesdays only) runs either way.</div>
               </div>
               <button class="theme-toggle-switch" id="proactiveInsightsToggle" onclick="toggleProactiveInsightsEnabled()"></button>
             </div>
             <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;">
-              <div style="font-size:12px;color:var(--muted);line-height:1.5;flex:1;">See what this week's run would currently find — this actually runs the real website checks and pattern detection (same as Wednesday), so it costs real API calls. It won't send anyone a notification or use up a client's turn in the rotation.</div>
+              <div>
+                <div style="font-size:13px;color:var(--ink);font-weight:600;margin-bottom:3px;">Which day it runs</div>
+                <div style="font-size:12px;color:var(--muted);line-height:1.5;">The underlying automation still checks in daily and only actually runs on this day — so a change here takes effect the very next time that day comes around, no redeploy needed.</div>
+              </div>
+              <select id="proactiveInsightsDaySelect" onchange="saveProactiveInsightsDay(this.value)" style="flex:none;">
+                <option value="0">Sunday</option>
+                <option value="1">Monday</option>
+                <option value="2">Tuesday</option>
+                <option value="3">Wednesday</option>
+                <option value="4">Thursday</option>
+                <option value="5">Friday</option>
+                <option value="6">Saturday</option>
+              </select>
+            </div>
+            <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;">
+              <div style="font-size:12px;color:var(--muted);line-height:1.5;flex:1;">See what this week's report would currently look like — this actually runs the real website checks and pattern detection, so it costs real API calls. It won't notify anyone or use up a client's turn in the rotation.</div>
               <button class="btn btn-outline" style="flex:none;" onclick="previewProactiveInsights()">Preview now</button>
             </div>
           </div>
@@ -9400,7 +9415,7 @@ const NOTIFICATION_TYPE_META = {
   email_sent:              { label:'A client email is sent', section:'Client Work', visibleTo:'approver' },
   reminder_follow_up_due:  { label:'A client follow-up you own comes due', section:'Client Work' },
   reminder_escalated:      { label:'A client follow-up has gone unanswered for a week', section:'Client Work', visibleTo:'approver' },
-  proactive_insight:       { label:'The Assistant surfaces a proactive insight (weekly)', section:'Client Work', visibleTo:'approver' },
+  weekly_focus_report:     { label:'The weekly focus report is ready', section:'Client Work' },
   event_rsvp:              { label:'Someone RSVPs or requests a change to your event', section:'Calendar' },
   event_invited:           { label:"You're invited to a calendar event", section:'Calendar' },
   event_updated:           { label:'A calendar event you\'re on changes', section:'Calendar' },
@@ -9596,6 +9611,11 @@ async function handleNotifClick(id){
     openClientDetail(n.target_id);
     return;
   }
+  if(n.target_view==='weekly-focus-report'){
+    document.getElementById('notifPanel').style.display = 'none';
+    openWeeklyFocusReportModal(n.target_id);
+    return;
+  }
   if(n.target_view){
     document.getElementById('notifPanel').style.display = 'none';
     switchView(n.target_view);
@@ -9603,6 +9623,85 @@ async function handleNotifClick(id){
       openQueueCardModal(n.target_id);
     }
   }
+}
+
+// Renders the consolidated weekly focus report — real computed metrics
+// (clients needing attention, overdue follow-ups, stale clients, pending
+// drafts) plus whatever the Assistant's website checks/pattern detection
+// found, all in one place rather than as separate text-only alerts. Pass
+// a specific reportId (from a notification's target_id) to open that
+// exact one, or omit it to show the most recent report generated so far.
+// Shared by openWeeklyFocusReportModal() (the real, already-generated
+// report) and previewProactiveInsights() (a fresh dry-run result with the
+// exact same shape) — one renderer so the preview can never visually
+// drift from what the real report actually looks like.
+function weeklyFocusReportSectionsHtml(r){
+  const section = (title, itemsHtml, emptyText) => `
+    <div style="margin-bottom:18px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:0.03em;text-transform:uppercase;color:var(--muted-lt);margin-bottom:8px;">${title}</div>
+      ${itemsHtml || `<p style="font-size:12.5px;color:var(--muted-lt);margin:0;">${emptyText}</p>`}
+    </div>`;
+
+  const attentionHtml = (r.attentionClients||[]).map(c=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="closeAppModal();openClientDetail('${c.id}')">
+      <span style="font-size:13px;color:var(--ink);">${escapeHtml(c.name)}</span>
+      <span style="display:flex;align-items:center;gap:8px;flex:none;">
+        <span class="pill ${c.danger>=5?'pill-bad':'pill-mid'}">Danger ${c.danger}/5</span>
+        <span style="font-size:11.5px;color:var(--muted-lt);white-space:nowrap;">${c.daysSinceImprovement==null?'never logged':c.daysSinceImprovement+'d since update'}</span>
+      </span>
+    </div>`).join('');
+
+  const overdueHtml = (r.overdueFollowUps||[]).map(f=>`
+    <div style="padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="closeAppModal();openClientDetail('${f.clientId}')">
+      <div style="font-size:13px;color:var(--ink);">${escapeHtml(f.clientName)}</div>
+      <div style="font-size:11.5px;color:var(--muted-lt);">"${escapeHtml(f.question||'')}" — was due ${new Date(f.followUpDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
+    </div>`).join('');
+
+  const staleHtml = (r.staleClients||[]).map(c=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="closeAppModal();openClientDetail('${c.id}')">
+      <span style="font-size:13px;color:var(--ink);">${escapeHtml(c.name)}</span>
+      <span style="font-size:11.5px;color:var(--muted-lt);">${c.daysSinceImprovement==null?'never logged':c.daysSinceImprovement+' days quiet'}</span>
+    </div>`).join('');
+
+  const draftsHtml = (r.pendingDrafts||[]).length ? `<p style="font-size:13px;color:var(--ink);margin:0;line-height:1.6;">${r.pendingDrafts.map(c=>escapeHtml(c.name)).join(', ')}</p>` : '';
+
+  const aiHtml = (r.aiFindings||[]).map(f=>`
+    <div style="padding:10px 0;border-bottom:1px solid var(--border);">
+      <div style="font-size:13px;font-weight:600;color:var(--ink);margin-bottom:3px;">${escapeHtml(f.title)}</div>
+      <div style="font-size:12.5px;color:var(--muted);line-height:1.5;">${escapeHtml(f.body)}</div>
+    </div>`).join('');
+
+  return `
+    ${section('Needs attention', attentionHtml, 'No high-danger clients right now.')}
+    ${section('Overdue follow-ups', overdueHtml, 'Nothing overdue.')}
+    ${section('Gone quiet (14+ days)', staleHtml, 'Everyone active has logged something recently.')}
+    ${section(`Pending drafts${(r.pendingDrafts||[]).length ? ' ('+r.pendingDrafts.length+')' : ''}`, draftsHtml, 'Nothing pending.')}
+    ${section('From the Assistant', aiHtml, 'Nothing flagged this week.')}
+    ${(r.errors||[]).length ? `<p style="font-size:11px;color:var(--red);margin-top:4px;">${r.errors.length} check${r.errors.length!==1?'s':''} failed while generating this report.</p>` : ''}
+  `;
+}
+
+async function openWeeklyFocusReportModal(reportId){
+  openAppModal(`<div class="modal-head"><span class="panel-title">This week's focus report</span><span class="toast-close" onclick="closeAppModal()">✕</span></div><div class="modal-body" id="weeklyFocusReportBody"><p style="font-size:13px;color:var(--muted);">Loading…</p></div>`, 560);
+
+  let query = supabaseClient.from('weekly_focus_reports').select('generated_at, data');
+  query = reportId ? query.eq('id', reportId).maybeSingle() : query.order('generated_at', { ascending:false }).limit(1).maybeSingle();
+  const { data: row, error } = await query;
+
+  const bodyEl = document.getElementById('weeklyFocusReportBody');
+  if(!bodyEl) return; // modal was closed again before this finished loading
+  if(error || !row){
+    bodyEl.innerHTML = `<p style="font-size:13px;color:var(--muted);">Could not load this report — it may have been generated before this feature existed, or something went wrong.</p>`;
+    return;
+  }
+
+  const r = row.data || {};
+  const genDate = new Date(row.generated_at).toLocaleDateString('en-US',{weekday:'long', month:'short', day:'numeric'});
+
+  bodyEl.innerHTML = `
+    <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 16px;">Generated ${genDate}</p>
+    ${weeklyFocusReportSectionsHtml(r)}
+  `;
 }
 
 async function markAllNotificationsRead(){
@@ -13421,6 +13520,22 @@ function renderAiProviderChoice(){
     proactiveToggle.classList.toggle('on', enabled);
     proactiveToggle.disabled = !isAdmin();
   }
+  const daySelect = document.getElementById('proactiveInsightsDaySelect');
+  if(daySelect){
+    // Undefined means Wednesday (3) — matches the cron's own fallback, so
+    // an existing deployment that's never touched this shows the day it's
+    // actually already running on, not a misleading blank/default.
+    daySelect.value = String(settings.proactiveInsightsDayOfWeek ?? 3);
+    daySelect.disabled = !isAdmin();
+  }
+}
+
+async function saveProactiveInsightsDay(value){
+  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  settings.proactiveInsightsDayOfWeek = parseInt(value);
+  const ok = await persistSettings();
+  const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][settings.proactiveInsightsDayOfWeek];
+  ok ? showToast('success','Saved', `Weekly focus reports will now go out on ${dayName}s.`) : showToast('error','Save failed','Could not save — try again.');
 }
 
 async function toggleProactiveInsightsEnabled(){
@@ -13430,7 +13545,7 @@ async function toggleProactiveInsightsEnabled(){
   const ok = await persistSettings();
   if(!ok){ settings.proactiveInsightsEnabled = currentlyEnabled; showToast('error','Save failed','Could not save — try again.'); return; }
   renderAiProviderChoice();
-  showToast('success', settings.proactiveInsightsEnabled ? 'Enabled' : 'Disabled', settings.proactiveInsightsEnabled ? 'Weekly proactive insights will run this Wednesday.' : 'The Wednesday automation will skip proactive insights until re-enabled.');
+  showToast('success', settings.proactiveInsightsEnabled ? 'Enabled' : 'Disabled', settings.proactiveInsightsEnabled ? 'The weekly focus report is back on.' : 'The weekly focus report is paused until re-enabled.');
 }
 
 // Lets a redeployment-free response to a provider deprecating/renaming a
@@ -13753,7 +13868,7 @@ async function previewWednesdayEmail(){
 // reason; the email preview above needs no such confirmation since it's
 // just reading data already sitting in the database.
 async function previewProactiveInsights(){
-  if(!(await confirmDialog('This actually runs the real website checks and pattern detection — it costs real API calls, the same as Wednesday\'s automatic run. Continue?', {confirmLabel:'Run preview'}))) return;
+  if(!(await confirmDialog('This actually runs the real website checks and pattern detection — it costs real API calls, the same as a real run. Continue?', {confirmLabel:'Run preview'}))) return;
   const btn = clickedBtn();
   setBtnLoading(btn, 'Checking…');
   try{
@@ -13769,32 +13884,21 @@ async function previewProactiveInsights(){
 
     if(!data.ran){
       openAppModal(`
-        <div class="modal-head"><span class="panel-title">Proactive insights preview</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+        <div class="modal-head"><span class="panel-title">Weekly focus report preview</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
         <div class="modal-body"><p style="font-size:13px;color:var(--muted);line-height:1.5;">${data.reason}</p></div>
         <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 460);
       return;
     }
 
     const checkedNames = (data.websiteChecksCandidates||[]).map(c=>c.name).join(', ') || 'none (no client has a website on file yet)';
-    const findingsHtml = (data.findings||[]).length
-      ? data.findings.map(f=>`
-        <div style="padding:12px 0;border-bottom:1px solid var(--border);">
-          <div style="font-size:13px;font-weight:600;color:var(--ink);margin-bottom:4px;">${f.title}</div>
-          <div style="font-size:12.5px;color:var(--muted);line-height:1.5;">${f.body}</div>
-        </div>`).join('')
-      : `<p style="font-size:13px;color:var(--muted);">Nothing worth flagging right now — this run would be silent.</p>`;
-    const errorsHtml = (data.errors||[]).length
-      ? `<p style="font-size:11.5px;color:var(--red);margin-top:12px;">${data.errors.length} check${data.errors.length!==1?'s':''} failed: ${data.errors.join(' · ')}</p>`
-      : '';
 
     openAppModal(`
-      <div class="modal-head"><span class="panel-title">This is what a run would currently find</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+      <div class="modal-head"><span class="panel-title">This is what this week's report would look like</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
       <div class="modal-body">
-        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 12px;">Preview only — nothing was sent, and no client's rotation turn was used. Websites checked this run: ${checkedNames}.</p>
-        ${findingsHtml}
-        ${errorsHtml}
+        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 16px;">Preview only — nobody was notified, nothing was saved, and no client's rotation turn was used. Websites checked this run: ${checkedNames}.</p>
+        ${weeklyFocusReportSectionsHtml(data)}
       </div>
-      <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 520);
+      <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 560);
   }catch(e){
     restoreBtn(btn);
     showToast('error','Could not load preview', String(e));
