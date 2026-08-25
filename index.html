@@ -8997,23 +8997,29 @@ let notifications = [];
 // section groups the Notification Preferences panel into headed groups
 // instead of one long flat list — order here also controls display order,
 // both of sections (first-seen order) and rows within each section.
+// visibleTo restricts which roles even see a toggle for a type — most
+// types are omitted here (meaning everyone sees them), but a few only
+// ever get sent to a subset of roles (e.g. email_change_requested only
+// ever goes to admins — see submitEmailChangeRequest()), so showing a
+// mute toggle for those to someone who could never receive them is just
+// confusing clutter, not a real preference.
 const NOTIFICATION_TYPE_META = {
   task_assigned:           { label:'A task is assigned to you', section:'Tasks' },
   task_completed:          { label:'A task you assigned is completed', section:'Tasks' },
   task_cancelled:          { label:'A task assigned to you is cancelled', section:'Tasks' },
   task_edited:             { label:'A task assigned to you changes', section:'Tasks' },
-  draft_ready:             { label:'A draft is ready for your approval', section:'Client Work' },
+  draft_ready:             { label:'A draft is ready for your approval', section:'Client Work', visibleTo:'approver' },
   draft_approved:          { label:'Your submitted work is approved', section:'Client Work' },
   draft_skipped:           { label:'Your submitted draft is skipped', section:'Client Work' },
-  email_sent:              { label:'A client email is sent', section:'Client Work' },
+  email_sent:              { label:'A client email is sent', section:'Client Work', visibleTo:'approver' },
   reminder_follow_up_due:  { label:'A client follow-up you own comes due', section:'Client Work' },
-  reminder_escalated:      { label:'A client follow-up has gone unanswered for a week', section:'Client Work' },
-  proactive_insight:       { label:'The Assistant surfaces a proactive insight (weekly)', section:'Client Work' },
+  reminder_escalated:      { label:'A client follow-up has gone unanswered for a week', section:'Client Work', visibleTo:'approver' },
+  proactive_insight:       { label:'The Assistant surfaces a proactive insight (weekly)', section:'Client Work', visibleTo:'approver' },
   event_rsvp:              { label:'Someone RSVPs or requests a change to your event', section:'Calendar' },
   event_invited:           { label:"You're invited to a calendar event", section:'Calendar' },
   event_updated:           { label:'A calendar event you\'re on changes', section:'Calendar' },
   event_cancelled:         { label:'A calendar event you\'re on is cancelled', section:'Calendar' },
-  email_change_requested:  { label:'Someone requests an email change', section:'Account' },
+  email_change_requested:  { label:'Someone requests an email change', section:'Account', visibleTo:'admin' },
   profile_changed:         { label:'Your role, title, or access changes', section:'Account' },
 };
 
@@ -12905,9 +12911,13 @@ function renderNotificationPrefs(){
   // Grouped by section (Tasks / Client Work / Calendar / Account) instead
   // of one long flat list of 17 toggles — section order follows first
   // appearance in NOTIFICATION_TYPE_META, rows keep their existing order
-  // within each section.
+  // within each section. Types with a visibleTo restriction (see the
+  // registry's comment) are skipped entirely for anyone who could never
+  // actually receive them, rather than showing a toggle that does nothing.
   const sections = new Map();
   Object.entries(NOTIFICATION_TYPE_META).forEach(([type, meta])=>{
+    if(meta.visibleTo === 'admin' && !isAdmin()) return;
+    if(meta.visibleTo === 'approver' && !canApprove()) return;
     const section = meta.section || 'Other';
     if(!sections.has(section)) sections.set(section, []);
     sections.get(section).push([type, meta]);
