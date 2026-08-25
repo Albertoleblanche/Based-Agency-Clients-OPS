@@ -3659,6 +3659,34 @@ function setupRealtimeSubscriptions(){
     });
   }, 400);
 
+  // Waiting on Client / overdue-follow-up badges live here — client_id,
+  // clients table row, Team Queue cards, and the client-detail panel all
+  // read from this same array, so a teammate resolving or adding a
+  // reminder needs a fairly wide re-render, same reasoning as clients.
+  const onRemindersChange = debounced('reminders', ()=>{
+    silentSection(async ()=>{
+      await loadClientReminders();
+      renderReminders();
+      renderClientsTable(); renderQueue(); renderTeamQueue();
+      if(currentDetailClientId) renderClientDetail();
+    });
+  }, 400);
+
+  // Roles, extra_permissions, names, avatars, mute preferences — none of
+  // this was covered by realtime before, so a role/permission change (or
+  // even just someone editing their own name) needed a manual reload to
+  // show up anywhere, including for the person it happened to: their own
+  // isAdmin()/canApprove()/hasPermission() checks stayed stale until then,
+  // since those read myProfile, not teamProfiles.
+  const onTeamProfilesChange = debounced('teamProfiles', ()=>{
+    silentSection(async ()=>{
+      await Promise.all([loadMyProfile(), loadTeamProfiles()]);
+      applyRoleVisibility();
+      renderTeam(); renderTeamQueue(); renderTasks(); renderNotificationPrefs();
+      renderClientOptionsSelects();
+    });
+  }, 400);
+
   const onNotificationsChange = debounced('notifications', ()=>{
     loadNotifications().then(()=> checkForNewNotificationToasts());
   }, 300);
@@ -3668,6 +3696,8 @@ function setupRealtimeSubscriptions(){
     .on('postgres_changes', { event:'*', schema:'public', table:'app_storage' }, onAppStorageChange)
     .on('postgres_changes', { event:'*', schema:'public', table:'clients' }, onClientsChange)
     .on('postgres_changes', { event:'*', schema:'public', table:'client_improvements' }, onClientsChange)
+    .on('postgres_changes', { event:'*', schema:'public', table:'client_reminders' }, onRemindersChange)
+    .on('postgres_changes', { event:'*', schema:'public', table:'team_profiles' }, onTeamProfilesChange)
     .on('postgres_changes', { event:'*', schema:'public', table:'notes' }, onNotesChange)
     .on('postgres_changes', { event:'*', schema:'public', table:'tasks' }, onTasksChange)
     .on('postgres_changes', { event:'*', schema:'public', table:'time_entries' }, onTimeEntriesChange)
