@@ -1048,7 +1048,7 @@
   .tag.you{background:var(--brand-bg);color:var(--brand-dark);}
 
   /* Toasts */
-  .toast-stack{position:fixed;bottom:8vh;right:18px;z-index:2100;width:320px;max-width:calc(100vw - 36px);}
+  .toast-stack{position:fixed;bottom:5vh;right:18px;z-index:2100;width:320px;max-width:calc(100vw - 36px);}
 
   .floating-timer-pill{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:1500;display:flex;align-items:center;gap:14px;background:var(--card);color:var(--ink);border:1px solid var(--border);border-radius:30px;padding:10px 10px 10px 20px;box-shadow:0 16px 40px rgba(16,24,40,.18);cursor:pointer;max-width:min(92vw,460px);}
   .ftp-dot{width:8px;height:8px;border-radius:50%;background:var(--red);flex:none;position:relative;animation:timerPulse 1.5s ease-in-out infinite;}
@@ -2395,15 +2395,10 @@ document.addEventListener('DOMContentLoaded', function(){
 
       <!-- NOTIFICATIONS (admin only) -->
       <div class="settings-subview" id="stab-notifications">
-        <div class="panel">
-          <div class="panel-head"><span class="panel-title">Notification Preferences</span></div>
-          <div class="panel-body">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.6;">
-              Choose which notifications you personally receive — this only affects your own toasts and bell, nobody else's. Muting a type here stops it at the source: it's never even sent to you, not just hidden after the fact.
-            </p>
-            <div id="notifPrefsList"></div>
-          </div>
-        </div>
+        <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.6;">
+          Choose which notifications you personally receive — this only affects your own toasts and bell, nobody else's. Muting a type here stops it at the source: it's never even sent to you, not just hidden after the fact.
+        </p>
+        <div id="notifPrefsList"></div>
       </div>
 
       <!-- TEAM -->
@@ -12918,9 +12913,10 @@ function renderNotificationPrefs(){
     sections.get(section).push([type, meta]);
   });
 
-  el.innerHTML = [...sections.entries()].map(([section, rows], i)=>`
-    <div style="${i>0?'margin-top:22px;':''}">
-      <div style="font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--muted-lt);margin-bottom:2px;">${section}</div>
+  el.innerHTML = [...sections.entries()].map(([section, rows])=>`
+    <div class="panel" style="margin-bottom:24px;">
+      <div class="panel-head"><span class="panel-title">${section}</span></div>
+      <div class="panel-body">
       ${rows.map(([type, meta])=>{
         const isOn = !muted.includes(type);
         return `
@@ -12929,6 +12925,7 @@ function renderNotificationPrefs(){
           <button class="theme-toggle-switch ${isOn?'on':''}" onclick="toggleNotificationMute('${type}', ${isOn})"></button>
         </div>`;
       }).join('')}
+      </div>
     </div>`).join('');
 }
 
