@@ -305,7 +305,14 @@ module.exports = async function handler(req, res) {
     }
 
     try {
-      result.proactiveInsights = await runProactiveInsights(admin, clients, log, settings);
+      // undefined means enabled — this feature predates the Settings
+      // toggle, so an existing deployment that's never touched it keeps
+      // running exactly as before rather than silently going quiet.
+      if (settings.proactiveInsightsEnabled === false) {
+        result.proactiveInsights = { skipped: true, reason: 'Disabled in Settings -> AI & Email.' };
+      } else {
+        result.proactiveInsights = await runProactiveInsights(admin, clients, log, settings);
+      }
     } catch (e) {
       result.proactiveInsights = { error: String(e) };
     }
