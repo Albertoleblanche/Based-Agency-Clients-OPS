@@ -59,13 +59,18 @@ module.exports = async function handler(req, res) {
       return;
     }
     const { data: callerProfile, error: profileErr } = await admin
-      .from('team_profiles').select('role, name').eq('id', callerData.user.id).maybeSingle();
+      .from('team_profiles').select('role, name, ai_chat_enabled').eq('id', callerData.user.id).maybeSingle();
     if (profileErr || !callerProfile) {
       res.status(403).json({ error: 'Could not verify your account' });
       return;
     }
-    if (!['admin', 'approver'].includes(callerProfile.role)) {
-      res.status(403).json({ error: 'The assistant is only available to admins and approvers right now.' });
+    // A real per-person toggle now, not a blanket role check — an admin
+    // can grant this to a specific member or revoke it from a specific
+    // admin/approver from that person's team card. Enforced here
+    // server-side, not just hidden in the UI, same reasoning as
+    // everything else this endpoint already checks.
+    if (!callerProfile.ai_chat_enabled) {
+      res.status(403).json({ error: 'The assistant isn\'t enabled for your account — ask an admin to turn it on.' });
       return;
     }
 
