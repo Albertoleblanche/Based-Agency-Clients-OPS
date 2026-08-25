@@ -602,6 +602,11 @@
 
   /* Add client form */
   .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
+  .info-grid{display:flex;flex-wrap:wrap;gap:22px 40px;}
+  .info-grid-item{flex:1 1 180px;min-width:180px;}
+  .info-grid-item.info-grid-full{flex-basis:100%;}
+  .info-grid-label{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--muted);display:block;margin-bottom:7px;}
+  .info-grid-value{font-size:14px;color:var(--ink);line-height:1.5;}
   .form-grid label{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;}
   .form-grid input,.form-grid select,.form-grid textarea{width:100%;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background-color:var(--surface-2);color:var(--ink);}
   .form-grid select{padding-right:28px;}
@@ -6556,18 +6561,24 @@ function renderClientDetail(){
     // existed for optional website/custom-field data.
     customFieldsPanel.style.display = 'block';
     const values = c.customFieldValues || {};
-    const fieldLabelStyle = 'font-family:\'Plus Jakarta Sans\',sans-serif;font-size:10px;color:var(--muted-lt);display:block;margin-bottom:4px;';
-    const serviceHtml = `<div><label style="${fieldLabelStyle}">Service</label><div style="font-size:13px;">${c.service ? escapeHtml(c.service) : '<span style="color:var(--muted-lt);">—</span>'}</div></div>`;
-    const sowHtml = `<div style="grid-column:1/-1;"><label style="${fieldLabelStyle}">SOW / scope notes</label><div style="font-size:13px;white-space:pre-wrap;line-height:1.5;">${c.sow ? escapeHtml(c.sow) : '<span style="color:var(--muted-lt);">—</span>'}</div></div>`;
+    // Flex-based, not the reused .form-grid — that's an auto-fit CSS grid,
+    // and SOW's grid-column:1/-1 span was forcing extra empty tracks to
+    // stay alive next to Service/Website (auto-fit only collapses a track
+    // that's empty in EVERY row, and SOW's spanning row touched all of
+    // them), which is exactly the big dead gap in the screenshot. Flex-wrap
+    // has no such artifact — compact fields sit side by side and wrap
+    // naturally, full-width ones just break to their own line.
+    const serviceHtml = `<div class="info-grid-item"><label class="info-grid-label">Service</label><div class="info-grid-value">${c.service ? escapeHtml(c.service) : '<span style="color:var(--muted-lt);">—</span>'}</div></div>`;
+    const sowHtml = `<div class="info-grid-item info-grid-full"><label class="info-grid-label">SOW / Scope Notes</label><div class="info-grid-value" style="white-space:pre-wrap;">${c.sow ? escapeHtml(c.sow) : '<span style="color:var(--muted-lt);">—</span>'}</div></div>`;
     // Website gets its own real button (not a plain link like custom
     // URL-type fields below) — shown only when the client actually has
     // one set, since not every client does.
-    const websiteHtml = hasWebsite ? `<div><label style="${fieldLabelStyle}">Website</label><div style="font-size:13px;"><a href="${c.website.startsWith('http')?c.website:'https://'+c.website}" target="_blank" rel="noopener" class="btn btn-outline" style="display:inline-flex;padding:7px 14px;min-height:auto;font-size:12px;text-decoration:none;">View website ↗</a></div></div>` : '';
+    const websiteHtml = hasWebsite ? `<div class="info-grid-item"><label class="info-grid-label">Website</label><div class="info-grid-value"><a href="${c.website.startsWith('http')?c.website:'https://'+c.website}" target="_blank" rel="noopener" class="btn btn-outline" style="display:inline-flex;padding:7px 14px;min-height:auto;font-size:12px;text-decoration:none;">View website ↗</a></div></div>` : '';
     const fieldsHtml = fields.map(f=>{
       const val = values[f.id];
-      return `<div><label style="${fieldLabelStyle}">${f.label}</label><div style="font-size:13px;">${val ? (f.type==='url' ? `<a href="${val.startsWith('http')?val:'https://'+val}" target="_blank" style="color:var(--brand-dark);">${val}</a>` : escapeHtml(val)) : '<span style="color:var(--muted-lt);">—</span>'}</div></div>`;
+      return `<div class="info-grid-item"><label class="info-grid-label">${f.label}</label><div class="info-grid-value">${val ? (f.type==='url' ? `<a href="${val.startsWith('http')?val:'https://'+val}" target="_blank" style="color:var(--brand-dark);">${val}</a>` : escapeHtml(val)) : '<span style="color:var(--muted-lt);">—</span>'}</div></div>`;
     }).join('');
-    customFieldsEl.innerHTML = `<div class="form-grid">${serviceHtml}${websiteHtml}${fieldsHtml}${sowHtml}</div>`;
+    customFieldsEl.innerHTML = `<div class="info-grid">${serviceHtml}${websiteHtml}${fieldsHtml}${sowHtml}</div>`;
   }
 
   const myTimeEntries = visibleTimeEntries().filter(e=>e.clientId===c.id).sort((a,b)=> new Date(b.date)-new Date(a.date) || new Date(b.createdAt)-new Date(a.createdAt));
