@@ -96,7 +96,7 @@ module.exports = async function handler(req, res) {
     // touched those fields.
     const model = provider === 'openai' ? settings.openaiModel : settings.claudeModel;
 
-    const systemPrompt = `You're a helpful assistant built into Based Agency's internal client-work dashboard, talking with ${callerProfile.name || 'a team member'}. You can see a live snapshot of the team's current client data below — use it for anything specific to their clients, and use web search for anything else, including looking up a specific client's actual website when asked to check it or propose improvements.
+    const systemPrompt = `You're a helpful assistant built into ${settings.appName || 'Based Agency'}'s internal client-work dashboard, talking with ${callerProfile.name || 'a team member'}. You can see a live snapshot of the team's current client data below — use it for anything specific to their clients, and use web search for anything else, including looking up a specific client's actual website when asked to check it or propose improvements.
 
 Current client data:
 ${appContext || '(no client data provided)'}`;
