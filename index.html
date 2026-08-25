@@ -532,6 +532,13 @@
   .filters-popover-wrap{position:relative;}
   .filters-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;margin-left:7px;background:var(--brand-dark);color:#fff;border-radius:20px;font-size:10px;font-weight:700;}
   .filters-popover{position:absolute;top:calc(100% + 8px);left:0;width:280px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:200;animation:modalCardIn var(--duration-base) var(--ease-out);}
+  .calendar-dropdown{position:absolute;top:calc(100% + 6px);left:0;width:240px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:250;animation:modalCardIn var(--duration-base) var(--ease-out);}
+  .calendar-day{width:28px;height:28px;border:none;border-radius:6px;font-size:12px;font-family:'Plus Jakarta Sans',sans-serif;background:transparent;color:var(--ink);cursor:pointer;}
+  .calendar-day:hover:not(:disabled){background:var(--surface-2);}
+  .calendar-day:disabled{color:var(--muted-lt);cursor:not-allowed;}
+  .calendar-day.selected{background:var(--brand);color:#fff;}
+  .calendar-day.selected:hover{background:var(--brand-dark);}
+  .calendar-day.today:not(.selected){box-shadow:inset 0 0 0 1px var(--brand);}
   .pagination-controls{display:flex;align-items:center;justify-content:center;gap:14px;padding:16px 0 4px;}
   .pagination-controls .btn{padding:7px 14px;font-size:12px;}
   .pagination-controls .btn:disabled{opacity:.4;cursor:default;}
@@ -580,6 +587,9 @@
   .pill-mid{background:var(--amber-bg);color:var(--amber);}
   .pill-bad{background:var(--red-bg);color:var(--red);}
   .row-link{color:var(--brand-dark);font-size:12px;font-weight:600;cursor:pointer;}
+  .back-btn{display:inline-flex;align-items:center;gap:6px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;font-weight:600;color:var(--muted);background:transparent;border:none;border-radius:var(--radius-sm);padding:7px 10px 7px 8px;cursor:pointer;transition:background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);}
+  .back-btn:hover{background:var(--surface-2);color:var(--ink);}
+  .back-btn svg{flex:none;}
   .table-name-link{color:var(--ink);font-weight:600;cursor:pointer;transition:color var(--duration-fast) var(--ease-out);}
   .table-name-link:hover{color:var(--brand-dark);}
   .row-link:hover{text-decoration:underline;}
@@ -2588,7 +2598,7 @@ document.addEventListener('DOMContentLoaded', function(){
     <!-- CLIENT DETAIL -->
     <div class="view" id="view-clientdetail">
       <div class="topbar">
-        <span class="row-link" onclick="switchView('clients')">← Back to Clients</span>
+        <button type="button" class="back-btn" onclick="switchView('clients')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><polyline points="15 18 9 12 15 6"/></svg>Back to Clients</button>
         <div class="topbar-right">
           <button class="btn btn-outline" onclick="openEditClientFormFromDetail()">Edit client</button>
           <button class="btn btn-brand" onclick="openNoteModalFromDetail()">+ Add note</button>
@@ -4771,7 +4781,15 @@ function clientFormHtml(title, submitLabel, customValues){
         <div><label>Importance (1–10)</label><select id="ncImportance"></select></div>
         <div><label>Danger score (1–5)</label><select id="ncDanger"><option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select><div id="ncDangerNudge" style="display:none;font-size:11px;color:var(--amber);margin-top:5px;"></div></div>
         <div><label>Monthly hour budget</label><input type="number" id="ncBudget" min="0" step="0.5" placeholder="e.g. 20 (optional)"></div>
-        <div><label>Start date <span style="font-weight:400;color:var(--muted-lt);">(optional)</span></label><input type="date" id="ncStartDate" max="${toDateStr(new Date())}"></div>
+        <div style="position:relative;">
+          <label>Start date <span style="font-weight:400;color:var(--muted-lt);">(optional)</span></label>
+          <button type="button" id="ncStartDateBtn" onclick="toggleStartDateCalendar(event)" style="width:100%;text-align:left;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+            <span id="ncStartDateDisplay" style="color:var(--muted-lt);">Select a date</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </button>
+          <input type="hidden" id="ncStartDate" value="">
+          <div class="calendar-dropdown" id="ncStartDateCalendar" style="display:none;"></div>
+        </div>
         <div style="grid-column:1/-1;"><label>SOW / scope notes</label><input id="ncSow" spellcheck="true" placeholder="Brief scope summary"></div>
         ${customFieldsFormHtml(customValues)}
       </div>
@@ -4782,11 +4800,104 @@ function clientFormHtml(title, submitLabel, customValues){
     </div>`;
 }
 
+// Self-contained calendar dropdown for the Start date field — a plain
+// type="date" input's picker looks and behaves differently across
+// browsers/OSes, so this renders a consistent one in the app's own style
+// instead. Writes into a hidden #ncStartDate input, so saveClientForm()
+// and everything else that reads its .value needed zero changes.
+let ncStartDateViewDate = new Date();
+
+function toggleStartDateCalendar(event){
+  event?.stopPropagation();
+  const el = document.getElementById('ncStartDateCalendar');
+  if(!el) return;
+  const opening = el.style.display !== 'block';
+  el.style.display = opening ? 'block' : 'none';
+  if(opening){
+    const current = document.getElementById('ncStartDate').value;
+    ncStartDateViewDate = current ? new Date(current+'T00:00:00') : new Date();
+    renderStartDateCalendar();
+  }
+}
+
+function shiftStartDateMonth(delta){
+  ncStartDateViewDate = new Date(ncStartDateViewDate.getFullYear(), ncStartDateViewDate.getMonth()+delta, 1);
+  renderStartDateCalendar();
+}
+
+function renderStartDateCalendar(){
+  const el = document.getElementById('ncStartDateCalendar');
+  if(!el) return;
+  const selected = document.getElementById('ncStartDate').value;
+  const year = ncStartDateViewDate.getFullYear();
+  const month = ncStartDateViewDate.getMonth();
+  const todayStr = toDateStr(new Date());
+  const firstOfMonth = new Date(year, month, 1);
+  const startWeekday = firstOfMonth.getDay();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const monthLabel = firstOfMonth.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+
+  let cells = '';
+  for(let i=0;i<startWeekday;i++) cells += `<div></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    // Can't be in the future — a client's start date is always today or earlier.
+    const isFuture = dateStr > todayStr;
+    const isSelected = dateStr === selected;
+    const isToday = dateStr === todayStr;
+    cells += `<button type="button" class="calendar-day${isSelected?' selected':''}${isToday?' today':''}" ${isFuture?'disabled':''} onclick="selectStartDate('${dateStr}')">${d}</button>`;
+  }
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);">
+      <button type="button" onclick="shiftStartDateMonth(-1)" style="border:none;background:none;cursor:pointer;color:var(--muted);padding:4px;font-size:14px;">‹</button>
+      <span style="font-size:12.5px;font-weight:600;color:var(--ink);">${monthLabel}</span>
+      <button type="button" onclick="shiftStartDateMonth(1)" style="border:none;background:none;cursor:pointer;color:var(--muted);padding:4px;font-size:14px;">›</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;padding:10px 12px;justify-items:center;">
+      ${['S','M','T','W','T','F','S'].map(d=>`<div style="font-size:10px;color:var(--muted-lt);text-align:center;font-weight:600;width:28px;">${d}</div>`).join('')}
+      ${cells}
+    </div>
+    <div style="padding:8px 12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;">
+      <button type="button" onclick="selectStartDate('')" style="font-size:11.5px;color:var(--muted);background:none;border:none;cursor:pointer;">Clear</button>
+      <button type="button" onclick="selectStartDate('${todayStr}')" style="font-size:11.5px;color:var(--brand-dark);background:none;border:none;cursor:pointer;font-weight:600;">Today</button>
+    </div>
+  `;
+}
+
+function selectStartDate(dateStr){
+  document.getElementById('ncStartDate').value = dateStr;
+  syncStartDateDisplay();
+  document.getElementById('ncStartDateCalendar').style.display = 'none';
+}
+
+function syncStartDateDisplay(){
+  const displayEl = document.getElementById('ncStartDateDisplay');
+  if(!displayEl) return;
+  const val = document.getElementById('ncStartDate')?.value;
+  if(val){
+    displayEl.textContent = new Date(val+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    displayEl.style.color = 'var(--ink)';
+  } else {
+    displayEl.textContent = 'Select a date';
+    displayEl.style.color = 'var(--muted-lt)';
+  }
+}
+
+document.addEventListener('click', (e)=>{
+  const calendarEl = document.getElementById('ncStartDateCalendar');
+  const btn = document.getElementById('ncStartDateBtn');
+  if(calendarEl && calendarEl.style.display==='block' && !calendarEl.contains(e.target) && e.target!==btn){
+    calendarEl.style.display = 'none';
+  }
+});
+
 function resetClientFormFields(){
   document.getElementById('ncName').value='';
   document.getElementById('ncEmail').value='';
   document.getElementById('ncWebsite').value='';
   document.getElementById('ncStartDate').value='';
+  syncStartDateDisplay();
   renderClientOptionsSelects();
   document.getElementById('ncImportance').value='5';
   document.getElementById('ncDanger').value='1';
@@ -4882,6 +4993,7 @@ function openEditClientForm(id){
   document.getElementById('ncEmail').value = c.email || '';
   document.getElementById('ncWebsite').value = c.website || '';
   document.getElementById('ncStartDate').value = c.startDate || '';
+  syncStartDateDisplay();
   renderClientOptionsSelects();
   ensureSelectHasValue('ncService', c.service);
   ensureSelectHasValue('ncStatus', c.status);
@@ -6435,21 +6547,23 @@ function renderClientDetail(){
   if(customFieldsPanel && customFieldsEl){
     const fields = settings.customFields || [];
     const hasWebsite = !!c.website;
-    if(fields.length || hasWebsite){
-      customFieldsPanel.style.display = 'block';
-      const values = c.customFieldValues || {};
-      // Website gets its own real button (not a plain link like custom
-      // URL-type fields below) — shown only when the client actually has
-      // one set, since not every client does.
-      const websiteHtml = hasWebsite ? `<div><label style="font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;color:var(--muted-lt);display:block;margin-bottom:4px;">Website</label><div style="font-size:13px;"><a href="${c.website.startsWith('http')?c.website:'https://'+c.website}" target="_blank" rel="noopener" class="btn btn-outline" style="display:inline-flex;padding:7px 14px;min-height:auto;font-size:12px;text-decoration:none;">View website ↗</a></div></div>` : '';
-      const fieldsHtml = fields.map(f=>{
-        const val = values[f.id];
-        return `<div><label style="font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;color:var(--muted-lt);display:block;margin-bottom:4px;">${f.label}</label><div style="font-size:13px;">${val ? (f.type==='url' ? `<a href="${val.startsWith('http')?val:'https://'+val}" target="_blank" style="color:var(--brand-dark);">${val}</a>` : val) : '<span style="color:var(--muted-lt);">—</span>'}</div></div>`;
-      }).join('');
-      customFieldsEl.innerHTML = `<div class="form-grid">${websiteHtml}${fieldsHtml}</div>`;
-    } else {
-      customFieldsPanel.style.display = 'none';
-    }
+    // Always shown now — Service is always set on every client, so there's
+    // always at least one row here, unlike before when this panel only
+    // existed for optional website/custom-field data.
+    customFieldsPanel.style.display = 'block';
+    const values = c.customFieldValues || {};
+    const fieldLabelStyle = 'font-family:\'Plus Jakarta Sans\',sans-serif;font-size:10px;color:var(--muted-lt);display:block;margin-bottom:4px;';
+    const serviceHtml = `<div><label style="${fieldLabelStyle}">Service</label><div style="font-size:13px;">${c.service ? escapeHtml(c.service) : '<span style="color:var(--muted-lt);">—</span>'}</div></div>`;
+    const sowHtml = `<div style="grid-column:1/-1;"><label style="${fieldLabelStyle}">SOW / scope notes</label><div style="font-size:13px;white-space:pre-wrap;line-height:1.5;">${c.sow ? escapeHtml(c.sow) : '<span style="color:var(--muted-lt);">—</span>'}</div></div>`;
+    // Website gets its own real button (not a plain link like custom
+    // URL-type fields below) — shown only when the client actually has
+    // one set, since not every client does.
+    const websiteHtml = hasWebsite ? `<div><label style="${fieldLabelStyle}">Website</label><div style="font-size:13px;"><a href="${c.website.startsWith('http')?c.website:'https://'+c.website}" target="_blank" rel="noopener" class="btn btn-outline" style="display:inline-flex;padding:7px 14px;min-height:auto;font-size:12px;text-decoration:none;">View website ↗</a></div></div>` : '';
+    const fieldsHtml = fields.map(f=>{
+      const val = values[f.id];
+      return `<div><label style="${fieldLabelStyle}">${f.label}</label><div style="font-size:13px;">${val ? (f.type==='url' ? `<a href="${val.startsWith('http')?val:'https://'+val}" target="_blank" style="color:var(--brand-dark);">${val}</a>` : escapeHtml(val)) : '<span style="color:var(--muted-lt);">—</span>'}</div></div>`;
+    }).join('');
+    customFieldsEl.innerHTML = `<div class="form-grid">${serviceHtml}${websiteHtml}${fieldsHtml}${sowHtml}</div>`;
   }
 
   const myTimeEntries = visibleTimeEntries().filter(e=>e.clientId===c.id).sort((a,b)=> new Date(b.date)-new Date(a.date) || new Date(b.createdAt)-new Date(a.createdAt));
