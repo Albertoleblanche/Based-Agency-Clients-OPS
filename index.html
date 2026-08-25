@@ -5167,11 +5167,15 @@ function renderKpis(){
   // that page actually shows, not every pending draft on the whole roster.
   const myPending = aec.filter(c=>c.draftStatus==='pending' && c.improvements.filter(i=>improvementInDateRange(i, false)).some(i=>i.author===me)).length;
   document.getElementById('navPendingBadge').textContent = myPending;
-  // Team Queue shows every pending draft team-wide, not scoped by author —
-  // its badge needs to match that, same way Approval Queue's badge above
-  // matches its own personal scope.
+  // Team Queue shows every APPROVED draft, plus pending drafts the owning
+  // member has explicitly marked Ready to Notify — not every pending draft
+  // team-wide (a draft just sitting generated-but-unsent is still that
+  // member's private working state). This badge has to match that exact
+  // rule, or it counts things the page itself won't show — see
+  // readyForReview() in renderTeamQueue() for the canonical version of
+  // this same check.
   const teamPendingBadge = document.getElementById('navTeamPendingBadge');
-  if(teamPendingBadge) teamPendingBadge.textContent = aec.filter(c=>c.draftStatus==='pending').length;
+  if(teamPendingBadge) teamPendingBadge.textContent = aec.filter(c=>c.draftStatus==='approved' || (c.draftStatus==='pending' && c.readyToNotify===true)).length;
 
   // --- Total Clients ---
   document.getElementById('kpiTotal').textContent = ac.length;
