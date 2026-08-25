@@ -533,12 +533,12 @@
   .filters-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;margin-left:7px;background:var(--brand-dark);color:#fff;border-radius:20px;font-size:10px;font-weight:700;}
   .filters-popover{position:absolute;top:calc(100% + 8px);left:0;width:280px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:200;animation:modalCardIn var(--duration-base) var(--ease-out);}
   .calendar-dropdown{position:absolute;top:calc(100% + 6px);left:0;width:240px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:250;animation:modalCardIn var(--duration-base) var(--ease-out);}
-  .calendar-day{width:28px;height:28px;border:none;border-radius:6px;font-size:12px;font-family:'Plus Jakarta Sans',sans-serif;background:transparent;color:var(--ink);cursor:pointer;}
-  .calendar-day:hover:not(:disabled){background:var(--surface-2);}
-  .calendar-day:disabled{color:var(--muted-lt);cursor:not-allowed;}
-  .calendar-day.selected{background:var(--brand);color:#fff;}
-  .calendar-day.selected:hover{background:var(--brand-dark);}
-  .calendar-day.today:not(.selected){box-shadow:inset 0 0 0 1px var(--brand);}
+  .dp-calendar-day{width:28px;height:28px;border:none;border-radius:6px;font-size:12px;font-family:'Plus Jakarta Sans',sans-serif;background:transparent;color:var(--ink);cursor:pointer;}
+  .dp-calendar-day:hover:not(:disabled){background:var(--surface-2);}
+  .dp-calendar-day:disabled{color:var(--muted-lt);cursor:not-allowed;}
+  .dp-calendar-day.selected{background:var(--brand);color:#fff;}
+  .dp-calendar-day.selected:hover{background:var(--brand-dark);}
+  .dp-calendar-day.today:not(.selected){box-shadow:inset 0 0 0 1px var(--brand);}
   .pagination-controls{display:flex;align-items:center;justify-content:center;gap:14px;padding:16px 0 4px;}
   .pagination-controls .btn{padding:7px 14px;font-size:12px;}
   .pagination-controls .btn:disabled{opacity:.4;cursor:default;}
@@ -4868,7 +4868,7 @@ function renderStartDateCalendar(){
     const isFuture = dateStr > todayStr;
     const isSelected = dateStr === selected;
     const isToday = dateStr === todayStr;
-    cells += `<button type="button" class="calendar-day${isSelected?' selected':''}${isToday?' today':''}" ${isFuture?'disabled':''} onclick="selectStartDate('${dateStr}')">${d}</button>`;
+    cells += `<button type="button" class="dp-calendar-day${isSelected?' selected':''}${isToday?' today':''}" ${isFuture?'disabled':''} onclick="selectStartDate('${dateStr}')">${d}</button>`;
   }
 
   el.innerHTML = `
