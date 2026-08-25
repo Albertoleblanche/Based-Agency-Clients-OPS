@@ -2343,6 +2343,19 @@ document.addEventListener('DOMContentLoaded', function(){
           </div>
         </div>
 
+        <div class="panel" style="margin-bottom:24px;">
+          <div class="panel-head"><span class="panel-title">Weekly Proactive Insights</span></div>
+          <div class="panel-body">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+              <div style="flex:1;">
+                <div style="font-size:13px;color:var(--ink);font-weight:600;margin-bottom:3px;">Enable weekly proactive insights</div>
+                <div style="font-size:12px;color:var(--muted);line-height:1.5;">Each Wednesday, the Assistant spot-checks a couple of client websites and looks for cross-client patterns — costs a few real API calls per run. Turning this off skips that part of the automation entirely; the pending-drafts email digest still runs either way.</div>
+              </div>
+              <button class="theme-toggle-switch" id="proactiveInsightsToggle" onclick="toggleProactiveInsightsEnabled()"></button>
+            </div>
+          </div>
+        </div>
+
         <div class="panel">
           <div class="panel-head"><span class="panel-title">Your Email Structure &amp; Instructions</span></div>
           <div class="panel-body">
@@ -13151,6 +13164,25 @@ function renderAiProviderChoice(){
   const openaiModelInput = document.getElementById('setOpenaiModel');
   if(claudeModelInput && document.activeElement !== claudeModelInput){ claudeModelInput.value = settings.claudeModel || ''; claudeModelInput.disabled = !isAdmin(); }
   if(openaiModelInput && document.activeElement !== openaiModelInput){ openaiModelInput.value = settings.openaiModel || ''; openaiModelInput.disabled = !isAdmin(); }
+  // Undefined means enabled — this feature predates the toggle, so an
+  // existing deployment that's never touched this setting keeps working
+  // exactly as before rather than silently going quiet.
+  const proactiveToggle = document.getElementById('proactiveInsightsToggle');
+  if(proactiveToggle){
+    const enabled = settings.proactiveInsightsEnabled !== false;
+    proactiveToggle.classList.toggle('on', enabled);
+    proactiveToggle.disabled = !isAdmin();
+  }
+}
+
+async function toggleProactiveInsightsEnabled(){
+  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  const currentlyEnabled = settings.proactiveInsightsEnabled !== false;
+  settings.proactiveInsightsEnabled = !currentlyEnabled;
+  const ok = await persistSettings();
+  if(!ok){ settings.proactiveInsightsEnabled = currentlyEnabled; showToast('error','Save failed','Could not save — try again.'); return; }
+  renderAiProviderChoice();
+  showToast('success', settings.proactiveInsightsEnabled ? 'Enabled' : 'Disabled', settings.proactiveInsightsEnabled ? 'Weekly proactive insights will run this Wednesday.' : 'The Wednesday automation will skip proactive insights until re-enabled.');
 }
 
 // Lets a redeployment-free response to a provider deprecating/renaming a
