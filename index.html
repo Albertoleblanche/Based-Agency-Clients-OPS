@@ -2353,6 +2353,10 @@ document.addEventListener('DOMContentLoaded', function(){
               </div>
               <button class="theme-toggle-switch" id="proactiveInsightsToggle" onclick="toggleProactiveInsightsEnabled()"></button>
             </div>
+            <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;">
+              <div style="font-size:12px;color:var(--muted);line-height:1.5;flex:1;">See what this week's run would currently find — this actually runs the real website checks and pattern detection (same as Wednesday), so it costs real API calls. It won't send anyone a notification or use up a client's turn in the rotation.</div>
+              <button class="btn btn-outline" style="flex:none;" onclick="previewProactiveInsights()">Preview now</button>
+            </div>
           </div>
         </div>
 
@@ -4003,7 +4007,7 @@ async function switchView(name){
   if(name==='task-archive'){ populateTaskArchiveFilters(); renderTaskArchive(); }
   if(name==='calendar'){ renderCalendar(); renderCalendarGoogleSyncWidget(); }
   if(name==='reminders') renderReminders();
-  if(name==='claude') renderClaudeMessages();
+  if(name==='claude'){ await loadClaudeHistory(); renderClaudeMessages(); }
   if(name==='improvements'){
     const fromEl = document.getElementById('improvementsFromDate');
     const toEl = document.getElementById('improvementsToDate');
@@ -4694,7 +4698,7 @@ function renderCustomFieldsManager(){
         <span class="custom-field-arrow ${i===fields.length-1?'disabled':''}" onclick="moveCustomField('${f.id}',1)">▼</span>
       </div>
       <div class="custom-field-info">
-        <div class="integ-name">${f.label} <span class="pill pill-status">${CUSTOM_FIELD_TYPE_LABELS[f.type]||f.type}</span></div>
+        <div class="integ-name">${f.label} <span class="pill pill-status">${CUSTOM_FIELD_TYPE_LABELS[f.type]||f.type}</span>${f.required?' <span class="pill pill-bad">Required</span>':''}</div>
         ${f.type==='select' ? `<div class="integ-desc">${(f.options||[]).length} option${(f.options||[]).length!==1?'s':''}</div>` : ''}
       </div>
       <div class="custom-field-actions">
@@ -4735,6 +4739,10 @@ function customFieldModalHtml(editing){
           <button class="btn btn-outline" onclick="addCustomFieldOptionDraft()">Add</button>
         </div>
       </div>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--ink);margin-top:16px;">
+        <input type="checkbox" id="cfRequired" ${editing&&editing.required?'checked':''}>
+        Required — can't save a client without this filled in
+      </label>
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" onclick="saveCustomField()">Save field</button>
@@ -4783,6 +4791,7 @@ function removeCustomFieldOptionDraft(val){
 async function saveCustomField(){
   const label = document.getElementById('cfLabel').value.trim();
   const type = document.getElementById('cfType').value;
+  const required = document.getElementById('cfRequired').checked;
   if(!label){ showToast('error','Name required','Give the field a label first.'); return; }
   if(type==='select' && !customFieldDraftOptions.length){ showToast('error','Add options','A dropdown field needs at least one option.'); return; }
   const btn = clickedBtn();
@@ -4790,9 +4799,9 @@ async function saveCustomField(){
   await loadAll();
   if(editingCustomFieldId){
     const f = settings.customFields.find(x=>x.id===editingCustomFieldId);
-    if(f){ f.label = label; f.type = type; f.options = type==='select' ? [...customFieldDraftOptions] : undefined; }
+    if(f){ f.label = label; f.type = type; f.required = required; f.options = type==='select' ? [...customFieldDraftOptions] : undefined; }
   } else {
-    settings.customFields.push({ id:'cf'+Date.now(), label, type, options: type==='select' ? [...customFieldDraftOptions] : undefined });
+    settings.customFields.push({ id:'cf'+Date.now(), label, type, required, options: type==='select' ? [...customFieldDraftOptions] : undefined });
   }
   const ok = await persistSettings();
   restoreBtn(btn);
@@ -4816,15 +4825,16 @@ function customFieldInputHtml(field, value){
   const val = value!=null ? String(value) : '';
   const escVal = val.replace(/"/g,'&quot;');
   const id = 'ncCustom_'+field.id;
+  const labelHtml = field.required ? `${field.label} <span style="color:var(--red);">*</span>` : field.label;
   if(field.type==='select'){
     const opts = `<option value="">—</option>` + (field.options||[]).map(o=>`<option value="${o.replace(/"/g,'&quot;')}" ${val===o?'selected':''}>${o}</option>`).join('');
-    return `<div><label>${field.label}</label><select id="${id}">${opts}</select></div>`;
+    return `<div><label>${labelHtml}</label><select id="${id}">${opts}</select></div>`;
   }
   if(field.type==='textarea'){
-    return `<div style="grid-column:1/-1;"><label>${field.label}</label><textarea spellcheck="true" id="${id}" style="width:100%;min-height:70px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:9px 11px;border-radius:6px;border:1px solid var(--border);box-sizing:border-box;">${val}</textarea></div>`;
+    return `<div style="grid-column:1/-1;"><label>${labelHtml}</label><textarea spellcheck="true" id="${id}" style="width:100%;min-height:70px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:9px 11px;border-radius:6px;border:1px solid var(--border);box-sizing:border-box;">${val}</textarea></div>`;
   }
   const htmlType = { text:'text', url:'url', email:'email', phone:'tel', number:'number' }[field.type] || 'text';
-  return `<div><label>${field.label}</label><input type="${htmlType}" id="${id}" value="${escVal}" placeholder="${field.label}"></div>`;
+  return `<div><label>${labelHtml}</label><input type="${htmlType}" id="${id}" value="${escVal}" placeholder="${field.label}"></div>`;
 }
 
 function customFieldsFormHtml(existingValues){
@@ -5164,6 +5174,12 @@ async function saveClientForm(){
     const el = document.getElementById('ncCustom_'+f.id);
     if(el) customFieldValues[f.id] = el.value.trim();
   });
+  const missingRequired = (settings.customFields||[]).find(f => f.required && !customFieldValues[f.id]);
+  if(missingRequired){
+    restoreBtn(btn);
+    showToast('error','Missing required field', `"${missingRequired.label}" is required — fill it in before saving.`);
+    return;
+  }
   fields.customFieldValues = customFieldValues;
   let ok, msg, loggedClientId;
   if(editingClientId){
@@ -10253,6 +10269,41 @@ function endTour(){
 
 let claudeConversation = []; // [{role:'user'|'assistant', content:'...'}]
 let claudeSending = false;
+let claudeHistoryLoaded = false;
+// How many past messages get displayed vs. actually sent as context to the
+// AI on each new message — kept separate on purpose. Displaying more is
+// free (just reading rows already fetched); SENDING more costs real
+// tokens on every single future message for the rest of the
+// conversation's life, so that stays bounded regardless of how long the
+// conversation grows over weeks of use.
+const CLAUDE_HISTORY_DISPLAY_LIMIT = 60;
+const CLAUDE_CONTEXT_WINDOW = 20;
+
+// Loads this person's own past Assistant messages once per session (not
+// once per open — switching between the floating button and the full tab
+// shouldn't re-fetch). Previously the conversation was in-memory only and
+// lost on every reload; this is what actually persists it now — see
+// schema-clients-migration-addendum-6.sql.
+async function loadClaudeHistory(){
+  if(claudeHistoryLoaded || !currentUser) return;
+  claudeHistoryLoaded = true; // set eagerly so a near-simultaneous second call (tab and float opened together) can't double-fetch
+  const { data, error } = await supabaseClient
+    .from('claude_chat_messages').select('role, content')
+    .eq('user_id', currentUser.id).order('created_at', { ascending:true }).limit(CLAUDE_HISTORY_DISPLAY_LIMIT);
+  if(error){ console.error('loadClaudeHistory error', error); return; }
+  claudeConversation = (data||[]).map(m=>({ role:m.role, content:m.content }));
+  renderClaudeMessages();
+}
+
+// Fire-and-forget, same reasoning as logDangerHistory()/logClientActivity()
+// elsewhere — this is the persistence layer for a conversation that's
+// already fully functional in memory; a save hiccup shouldn't block or
+// visibly interrupt the chat itself.
+function persistClaudeMessage(role, content){
+  supabaseClient.from('claude_chat_messages').insert({ user_id: currentUser.id, role, content }).then(({error})=>{
+    if(error) console.error('persistClaudeMessage error', error);
+  });
+}
 
 function buildClaudeContext(){
   const rows = activeClients().filter(c=>c.status!=='Paused').map(c=>{
@@ -10289,6 +10340,7 @@ async function sendClaudeMessage(source){
   if(!text) return;
   inputEl.value = '';
   claudeConversation.push({role:'user', content:text});
+  persistClaudeMessage('user', text);
   claudeSending = true;
   renderClaudeMessages();
   document.getElementById('claudeTabSendBtn').disabled = true;
@@ -10296,26 +10348,38 @@ async function sendClaudeMessage(source){
 
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
+    // Only the last CLAUDE_CONTEXT_WINDOW messages go to the API — the
+    // full claudeConversation can be much longer (up to
+    // CLAUDE_HISTORY_DISPLAY_LIMIT) once persisted history is loaded, and
+    // sending all of it as context on every single future message would
+    // make cost grow unboundedly the longer someone's been using the
+    // Assistant, not just with this one exchange.
     const response = await fetch('/api/claude-chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-      body: JSON.stringify({ messages: claudeConversation, appContext: buildClaudeContext() }),
+      body: JSON.stringify({ messages: claudeConversation.slice(-CLAUDE_CONTEXT_WINDOW), appContext: buildClaudeContext() }),
     });
     const data = await response.json();
     claudeSending = false;
     if(!response.ok){
-      claudeConversation.push({role:'assistant', content: `⚠️ ${data.error || 'Something went wrong.'}`});
+      const errText = `⚠️ ${data.error || 'Something went wrong.'}`;
+      claudeConversation.push({role:'assistant', content: errText});
+      persistClaudeMessage('assistant', errText);
       renderClaudeMessages();
       return;
     }
-    claudeConversation.push({role:'assistant', content: data.reply || '(no response)'});
+    const replyText = data.reply || '(no response)';
+    claudeConversation.push({role:'assistant', content: replyText});
+    persistClaudeMessage('assistant', replyText);
     renderClaudeMessages();
     const capText = data.remainingToday!=null ? `${data.remainingToday} messages left today` : '';
     const tabCap = document.getElementById('claudeTabCap'); if(tabCap) tabCap.textContent = capText;
     const floatCap = document.getElementById('claudeFloatCap'); if(floatCap) floatCap.textContent = capText;
   }catch(e){
     claudeSending = false;
-    claudeConversation.push({role:'assistant', content: '⚠️ Network error — try again.'});
+    const errText = '⚠️ Network error — try again.';
+    claudeConversation.push({role:'assistant', content: errText});
+    persistClaudeMessage('assistant', errText);
     renderClaudeMessages();
   }finally{
     document.getElementById('claudeTabSendBtn').disabled = false;
@@ -10354,7 +10418,10 @@ function toggleClaudeFloatPanel(){
   if(claudeBtnJustDragged){ claudeBtnJustDragged = false; return; } // suppress the click that follows a real drag
   const panel = document.getElementById('claudeFloatPanel');
   const opening = !panel.classList.contains('open');
-  if(opening) positionClaudePanel();
+  if(opening){
+    positionClaudePanel();
+    loadClaudeHistory().then(renderClaudeMessages);
+  }
   panel.classList.toggle('open');
 }
 
@@ -10416,7 +10483,14 @@ function initClaudeBtnDrag(){
   btn.addEventListener('pointercancel', endDrag);
 }
 
-function clearClaudeChat(){
+async function clearClaudeChat(){
+  // Now a real, permanent delete of persisted history (see
+  // schema-clients-migration-addendum-6.sql) — previously this only reset
+  // an in-memory array that would've vanished on the next reload anyway,
+  // so it didn't need confirming. It does now.
+  if(!(await confirmDialog('Clear your conversation with the Assistant? This deletes your message history for good.', {confirmLabel:'Clear', destructive:true}))) return;
+  const { error } = await supabaseClient.from('claude_chat_messages').delete().eq('user_id', currentUser.id);
+  if(error){ showToast('error','Could not clear','Something went wrong — try again.'); return; }
   claudeConversation = [];
   renderClaudeMessages();
 }
@@ -13492,6 +13566,61 @@ async function previewWednesdayEmail(){
         <div class="settings-field"><label>Body</label><textarea readonly style="min-height:150px;width:100%;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:6px;border:1px solid var(--border);">${data.body}</textarea></div>
       </div>
       <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 500);
+  }catch(e){
+    restoreBtn(btn);
+    showToast('error','Could not load preview', String(e));
+  }
+}
+
+// Unlike previewWednesdayEmail() above, this one is NOT free to run — it
+// has to actually perform the real website checks and pattern-detection
+// call to show what they'd currently find, so it costs real AI API money
+// every single click. Confirmed explicitly before running for that
+// reason; the email preview above needs no such confirmation since it's
+// just reading data already sitting in the database.
+async function previewProactiveInsights(){
+  if(!(await confirmDialog('This actually runs the real website checks and pattern detection — it costs real API calls, the same as Wednesday\'s automatic run. Continue?', {confirmLabel:'Run preview'}))) return;
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Checking…');
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/preview-wednesday-notify?action=proactive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ action: 'proactive' }),
+    });
+    const data = await response.json();
+    restoreBtn(btn);
+    if(!response.ok){ showToast('error','Preview failed', data.error || 'Unknown error'); return; }
+
+    if(!data.ran){
+      openAppModal(`
+        <div class="modal-head"><span class="panel-title">Proactive insights preview</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+        <div class="modal-body"><p style="font-size:13px;color:var(--muted);line-height:1.5;">${data.reason}</p></div>
+        <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 460);
+      return;
+    }
+
+    const checkedNames = (data.websiteChecksCandidates||[]).map(c=>c.name).join(', ') || 'none (no client has a website on file yet)';
+    const findingsHtml = (data.findings||[]).length
+      ? data.findings.map(f=>`
+        <div style="padding:12px 0;border-bottom:1px solid var(--border);">
+          <div style="font-size:13px;font-weight:600;color:var(--ink);margin-bottom:4px;">${f.title}</div>
+          <div style="font-size:12.5px;color:var(--muted);line-height:1.5;">${f.body}</div>
+        </div>`).join('')
+      : `<p style="font-size:13px;color:var(--muted);">Nothing worth flagging right now — this run would be silent.</p>`;
+    const errorsHtml = (data.errors||[]).length
+      ? `<p style="font-size:11.5px;color:var(--red);margin-top:12px;">${data.errors.length} check${data.errors.length!==1?'s':''} failed: ${data.errors.join(' · ')}</p>`
+      : '';
+
+    openAppModal(`
+      <div class="modal-head"><span class="panel-title">This is what a run would currently find</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+      <div class="modal-body">
+        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 12px;">Preview only — nothing was sent, and no client's rotation turn was used. Websites checked this run: ${checkedNames}.</p>
+        ${findingsHtml}
+        ${errorsHtml}
+      </div>
+      <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 520);
   }catch(e){
     restoreBtn(btn);
     showToast('error','Could not load preview', String(e));
