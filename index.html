@@ -532,7 +532,7 @@
   .filters-popover-wrap{position:relative;}
   .filters-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;margin-left:7px;background:var(--brand-dark);color:#fff;border-radius:20px;font-size:10px;font-weight:700;}
   .filters-popover{position:absolute;top:calc(100% + 8px);left:0;width:280px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:200;animation:modalCardIn var(--duration-base) var(--ease-out);}
-  .calendar-dropdown{position:absolute;top:calc(100% + 6px);left:0;width:240px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:250;animation:modalCardIn var(--duration-base) var(--ease-out);}
+  .calendar-dropdown{position:fixed;width:240px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:1100;animation:modalCardIn var(--duration-base) var(--ease-out);}
   .dp-calendar-day{width:28px;height:28px;border:none;border-radius:6px;font-size:12px;font-family:'Plus Jakarta Sans',sans-serif;background:transparent;color:var(--ink);cursor:pointer;}
   .dp-calendar-day:hover:not(:disabled){background:var(--surface-2);}
   .dp-calendar-day:disabled{color:var(--muted-lt);cursor:not-allowed;}
@@ -3505,6 +3505,15 @@ function openAppModal(innerHtml, maxWidth){
 function closeAppModal(){
   const el = document.getElementById('appModalOverlay');
   if(el) el.remove();
+  // The Start date calendar dropdown gets moved to document.body when
+  // opened (see toggleStartDateCalendar) so position:fixed can escape
+  // .modal-card's overflow-y:auto cleanly in every browser — some
+  // browsers still clip a fixed-position element that's nested inside a
+  // scrolling ancestor, even though the spec says they shouldn't. Once
+  // moved, it's no longer inside appModalOverlay and wouldn't get cleaned
+  // up by the .remove() above, so it needs its own explicit removal here.
+  const orphanedCalendar = document.getElementById('ncStartDateCalendar');
+  if(orphanedCalendar && orphanedCalendar.parentElement === document.body) orphanedCalendar.remove();
   if(modalPreviousFocus && typeof modalPreviousFocus.focus==='function'){
     modalPreviousFocus.focus();
     modalPreviousFocus = null;
@@ -4883,6 +4892,32 @@ function clientFormHtml(title, submitLabel, customValues){
 // and everything else that reads its .value needed zero changes.
 let ncStartDateViewDate = new Date();
 
+// Positions the dropdown relative to the button's actual on-screen
+// location (like positionClaudePanel() does for the floating Assistant
+// panel), clamped so it can't run off any edge — fixed positioning means
+// it renders above the modal card entirely, not clipped by
+// .modal-card's overflow-y:auto the way an absolutely-positioned child
+// confined to the modal's own bounds would be.
+function positionStartDateCalendar(){
+  const btn = document.getElementById('ncStartDateBtn');
+  const el = document.getElementById('ncStartDateCalendar');
+  if(!btn || !el) return;
+  const btnRect = btn.getBoundingClientRect();
+  const elRect = el.getBoundingClientRect();
+  const gap = 6, edge = 12;
+  const vw = window.innerWidth, vh = window.innerHeight;
+
+  let left = btnRect.left;
+  let top = btnRect.bottom + gap;
+  if(top + elRect.height > vh - edge) top = btnRect.top - elRect.height - gap; // flip above if no room below
+
+  left = Math.max(edge, Math.min(left, vw - elRect.width - edge));
+  top = Math.max(edge, Math.min(top, vh - elRect.height - edge));
+
+  el.style.left = `${left}px`;
+  el.style.top = `${top}px`;
+}
+
 function toggleStartDateCalendar(event){
   event?.stopPropagation();
   const el = document.getElementById('ncStartDateCalendar');
@@ -4890,15 +4925,27 @@ function toggleStartDateCalendar(event){
   const opening = el.style.display !== 'block';
   el.style.display = opening ? 'block' : 'none';
   if(opening){
+    // Moved to document.body, out of .modal-card's DOM subtree entirely —
+    // not just visually escaping it via position:fixed. Some browsers
+    // still clip a fixed-position element nested inside a scrolling
+    // ancestor despite the spec saying they shouldn't; actually removing
+    // it from that ancestor's subtree sidesteps the question rather than
+    // depending on every browser getting the edge case right.
+    // closeAppModal() removes it again when the modal closes, since it's
+    // no longer a descendant that gets cleaned up automatically with the
+    // rest of the modal.
+    if(el.parentElement !== document.body) document.body.appendChild(el);
     const current = document.getElementById('ncStartDate').value;
     ncStartDateViewDate = current ? new Date(current+'T00:00:00') : new Date();
     renderStartDateCalendar();
+    positionStartDateCalendar();
   }
 }
 
 function shiftStartDateMonth(delta){
   ncStartDateViewDate = new Date(ncStartDateViewDate.getFullYear(), ncStartDateViewDate.getMonth()+delta, 1);
   renderStartDateCalendar();
+  positionStartDateCalendar(); // grid row count (5 vs 6 weeks) can shift height between months
 }
 
 function renderStartDateCalendar(){
