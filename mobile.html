@@ -2093,24 +2093,28 @@ async function mQuickSyncTime(){
   await mSyncGoogleCalendar();
 }
 
-// Exact match to desktop's NOTIFICATION_TYPE_META — same 16 types, same labels.
+// Exact match to desktop's NOTIFICATION_TYPE_META — same types, same
+// labels, same visibleTo restrictions (a few types only ever get sent to
+// admins/approvers — e.g. email_change_requested only ever goes to
+// admins — so a toggle for those is hidden here too for anyone who could
+// never actually receive them).
 const M_NOTIFICATION_TYPE_META = {
-  task_assigned: 'A task is assigned to you',
-  task_completed: 'A task you assigned is completed',
-  task_cancelled: 'A task assigned to you is cancelled',
-  task_edited: 'A task assigned to you changes',
-  email_sent: 'A client email is sent',
-  event_rsvp: 'Someone RSVPs or requests a change to your event',
-  event_invited: "You're invited to a calendar event",
-  event_updated: "A calendar event you're on changes",
-  event_cancelled: "A calendar event you're on is cancelled",
-  email_change_requested: 'Someone requests an email change',
-  draft_ready: 'A draft is ready for your approval',
-  draft_approved: 'Your submitted work is approved',
-  draft_skipped: 'Your submitted draft is skipped',
-  profile_changed: 'Your role, title, or access changes',
-  reminder_follow_up_due: 'A client follow-up you own comes due',
-  reminder_escalated: 'A client follow-up has gone unanswered for a week',
+  task_assigned: { label:'A task is assigned to you' },
+  task_completed: { label:'A task you assigned is completed' },
+  task_cancelled: { label:'A task assigned to you is cancelled' },
+  task_edited: { label:'A task assigned to you changes' },
+  email_sent: { label:'A client email is sent', visibleTo:'approver' },
+  event_rsvp: { label:'Someone RSVPs or requests a change to your event' },
+  event_invited: { label:"You're invited to a calendar event" },
+  event_updated: { label:"A calendar event you're on changes" },
+  event_cancelled: { label:"A calendar event you're on is cancelled" },
+  email_change_requested: { label:'Someone requests an email change', visibleTo:'admin' },
+  draft_ready: { label:'A draft is ready for your approval', visibleTo:'approver' },
+  draft_approved: { label:'Your submitted work is approved' },
+  draft_skipped: { label:'Your submitted draft is skipped' },
+  profile_changed: { label:'Your role, title, or access changes' },
+  reminder_follow_up_due: { label:'A client follow-up you own comes due' },
+  reminder_escalated: { label:'A client follow-up has gone unanswered for a week', visibleTo:'approver' },
 };
 
 function mOpenSettingsSheet(){
@@ -2121,10 +2125,14 @@ function mRenderSettingsSheetBody(){
   const muted = (myProfile && myProfile.muted_notification_types) || [];
   const html = `
     <p style="font-size:12px;color:var(--muted);margin:0 0 4px;line-height:1.5;">Choose which notifications you want to receive. Turned off here means it's never sent to you at all — not just hidden.</p>
-    ${Object.entries(M_NOTIFICATION_TYPE_META).map(([type,label])=>`
+    ${Object.entries(M_NOTIFICATION_TYPE_META).filter(([type,meta])=>{
+      if(meta.visibleTo === 'admin' && !isAdmin()) return false;
+      if(meta.visibleTo === 'approver' && !canApprove()) return false;
+      return true;
+    }).map(([type,meta])=>`
       <label style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
         <input type="checkbox" ${muted.includes(type)?'':'checked'} onchange="mToggleNotificationMute('${type}', !this.checked)" style="width:18px;height:18px;flex:none;">
-        <span style="font-size:13px;color:var(--ink);">${label}</span>
+        <span style="font-size:13px;color:var(--ink);">${meta.label}</span>
       </label>`).join('')}
   `;
   mOpenSheet('Notification Settings', html);
