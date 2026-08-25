@@ -115,7 +115,13 @@ module.exports = async function handler(req, res) {
         email, password: tempPassword, email_confirm: true, // skip email verification, since there may be no SMTP configured
       });
       if (createErr) { res.status(400).json({ error: createErr.message }); return; }
-      const { error: insertErr } = await admin.from('team_profiles').insert({ id: newUser.user.id, email, name, role, title: title || null });
+      const { error: insertErr } = await admin.from('team_profiles').insert({
+        id: newUser.user.id, email, name, role, title: title || null,
+        // Matches the current default expectation — admins/approvers start
+        // with Assistant access, members start without it. Either can be
+        // flipped per-person afterward from their team card.
+        ai_chat_enabled: role === 'admin' || role === 'approver',
+      });
       if (insertErr) { res.status(400).json({ error: insertErr.message }); return; }
       res.status(200).json({ success: true, email, tempPassword });
       return;
