@@ -1117,8 +1117,6 @@
   .claude-chat-send:disabled{opacity:.5;cursor:default;}
   .claude-chat-cap{font-size:10.5px;color:var(--muted-lt);text-align:center;padding:6px 0 0;}
   .claude-empty-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;}
-  .claude-clear-chat-btn{position:absolute;top:0;right:0;z-index:2;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;cursor:pointer;transition:background var(--duration-fast) var(--ease-out);}
-  .claude-clear-chat-btn:hover{background:var(--border);}
   .claude-quick-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;width:100%;max-width:520px;}
   .claude-quick-action{background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;color:var(--ink);text-align:left;cursor:pointer;transition:background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);}
   .claude-quick-action:hover{background:var(--border);border-color:var(--brand);}
@@ -1129,9 +1127,15 @@
   .claude-chat-input-row.pill-mode .claude-chat-input{border:none;background:transparent;padding:9px 6px;font-size:14.5px;max-height:120px;}
   .claude-chat-input-row.pill-mode .claude-chat-send{border-radius:50%;}
   /* Tab's input keeps a theme-adaptive fill, just with a persistent brand-colored glow border regardless of empty/active state (ID selector so it can't be affected by the shared .pill-mode rule above). */
-  #claudeTabInputRow{background:#000;border:1.5px solid var(--brand);border-radius:16px;box-shadow:0 0 18px color-mix(in srgb, var(--brand) 40%, transparent), 0 0 40px color-mix(in srgb, var(--brand) 18%, transparent);}
-  #claudeTabInputRow .claude-chat-input{background:transparent;color:#fff;border:none;outline:none;}
+  #claudeTabInputRow{display:flex;flex-direction:column;gap:8px;padding:10px 12px 8px;background:#000;border:1.5px solid var(--brand);border-radius:16px;box-shadow:0 0 18px color-mix(in srgb, var(--brand) 40%, transparent), 0 0 40px color-mix(in srgb, var(--brand) 18%, transparent);}
+  #claudeTabInputRow.claude-input-active{background:#171717;border-color:#313030;box-shadow:none;}
+  #claudeTabInputRow .claude-chat-input{background:transparent;color:#fff;border:none;outline:none;flex:none;width:100%;}
   #claudeTabInputRow .claude-chat-input::placeholder{color:rgba(255,255,255,.5);}
+  .claude-input-toolbar{display:flex;align-items:center;gap:8px;}
+  .claude-input-icon-btn{flex:none;width:32px;height:32px;border-radius:8px;border:1px solid rgba(255,255,255,.16);background:transparent;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background var(--duration-fast) var(--ease-out);}
+  .claude-input-icon-btn:hover{background:rgba(255,255,255,.08);}
+  .claude-clear-chat-inline{font-family:'Plus Jakarta Sans',sans-serif;font-size:11.5px;font-weight:600;color:rgba(255,255,255,.55);background:none;border:none;cursor:pointer;padding:0 2px;}
+  .claude-clear-chat-inline:hover{color:#fff;}
   .tour-spotlight{position:relative;z-index:1601;border-radius:10px;box-shadow:0 0 0 5px rgba(255,255,255,.18), 0 0 0 9999px rgba(16,24,40,.72);transition:box-shadow .35s ease;}
   .tour-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
   .tour-step-count{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;letter-spacing:.06em;color:var(--muted-lt);}
@@ -2720,8 +2724,7 @@ document.addEventListener('DOMContentLoaded', function(){
     <!-- ASSISTANT (full tab) -->
     <div class="view" id="view-claude">
       <div style="position:relative;height:calc(100vh - 150px);display:flex;flex-direction:column;overflow:hidden;">
-        <button class="claude-clear-chat-btn" onclick="clearClaudeChat()">Clear chat</button>
-        <div class="claude-chat-messages" id="claudeTabMessages" style="padding-top:44px;"></div>
+        <div class="claude-chat-messages" id="claudeTabMessages"></div>
         <div class="claude-empty-hero" id="claudeTabEmptyHero" style="display:none;">
           <div class="claude-empty-greeting" id="claudeTabGreeting"></div>
           <div class="claude-empty-inputwrap" id="claudeTabInputSlot"></div>
@@ -2735,7 +2738,14 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="claude-chat-input-dock" id="claudeTabInputDock" style="max-width:600px;margin:0 auto;width:100%;">
           <div class="claude-chat-input-row" id="claudeTabInputRow">
             <textarea spellcheck="true" class="claude-chat-input" id="claudeTabInput" rows="1" placeholder="Ask about a client, or paste a link to review…" onkeydown="handleClaudeInputKey(event, 'tab')" oninput="autoGrowClaudeInput(this)"></textarea>
-            <button class="claude-chat-send" id="claudeTabSendBtn" onclick="sendClaudeMessage('tab')" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+            <div class="claude-input-toolbar">
+              <button type="button" class="claude-input-icon-btn" onclick="handleClaudeImageButtonClick()" title="Add images">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              </button>
+              <div style="flex:1;"></div>
+              <button type="button" class="claude-clear-chat-inline" onclick="clearClaudeChat()">Clear chat</button>
+              <button class="claude-chat-send" id="claudeTabSendBtn" onclick="sendClaudeMessage('tab')" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+            </div>
           </div>
           <div class="claude-chat-cap" id="claudeTabCap"></div>
         </div>
@@ -10791,15 +10801,20 @@ function layoutClaudeSurface(prefix){
     dockEl.style.display = 'none';
     heroEl.style.display = 'flex';
     rowEl.classList.add('pill-mode');
+    // Only meaningful for the tab (see #claudeTabInputRow.claude-input-active
+    // in CSS) — harmless no-op on the float's row, which has no matching rule.
+    rowEl.classList.remove('claude-input-active');
     if(rowEl.parentElement !== slotEl) slotEl.appendChild(rowEl);
   } else {
     heroEl.style.display = 'none';
     messagesEl.style.display = 'flex';
     dockEl.style.display = 'block';
-    // The tab's input keeps its glow-rectangle look either way (see
-    // #claudeTabInputRow in CSS — it's not gated on .pill-mode); only the
-    // floating panel's plain input actually changes shape here.
     rowEl.classList.remove('pill-mode');
+    // Once a conversation is actually underway, the tab's input drops the
+    // glow and switches to a flatter, calmer dark look — the glow is a
+    // "start typing" invitation on the empty screen, not something that
+    // needs to keep drawing the eye once you're mid-conversation.
+    rowEl.classList.add('claude-input-active');
     if(rowEl.parentElement !== dockEl) dockEl.insertBefore(rowEl, dockEl.firstChild);
   }
 }
@@ -10821,6 +10836,13 @@ function renderClaudeMessages(){
 // Grows the textarea as you type, up to 6 lines' worth of height (the CSS
 // max-height on .claude-chat-input), then lets it scroll internally
 // beyond that instead of growing further.
+// Not wired to a real feature yet — claude-chat.js only accepts text
+// today, so this is honest about that rather than silently doing nothing
+// when clicked (which would just look broken).
+function handleClaudeImageButtonClick(){
+  showToast('info','Coming soon','Image uploads for the Assistant aren\'t available yet.');
+}
+
 function autoGrowClaudeInput(el){
   el.style.height = 'auto';
   el.style.height = el.scrollHeight + 'px';
