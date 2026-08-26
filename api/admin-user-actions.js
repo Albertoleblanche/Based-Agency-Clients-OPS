@@ -27,6 +27,35 @@ function generateTempPassword() {
   return pw.split('').sort(() => Math.random() - 0.5).join('');
 }
 
+// Validates a key against the real provider before it's ever saved — same
+// "test before storing" reasoning as validateHarvestCredentials() in
+// lib/harvest-sync.js. Uses the actually-configured model (falling back to
+// the same default the rest of the app uses) so the test reflects real
+// usage, not just "is this well-formed" — a key with access to some
+// models but not the one this deployment is set to use should fail here,
+// not on the first real message someone sends.
+async function validateAnthropicKey(apiKey, model) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: model || 'claude-sonnet-5', max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
+  });
+  if (res.ok) return { ok: true };
+  const data = await res.json().catch(() => null);
+  return { ok: false, error: data?.error?.message || `Anthropic rejected the request (${res.status})` };
+}
+
+// Listing models is a genuinely free OpenAI call — confirms the key
+// actually authenticates without spending anything on a real completion.
+async function validateOpenAIKey(apiKey) {
+  const res = await fetch('https://api.openai.com/v1/models', {
+    headers: { 'Authorization': `Bearer ${apiKey}` },
+  });
+  if (res.ok) return { ok: true };
+  const data = await res.json().catch(() => null);
+  return { ok: false, error: data?.error?.message || `OpenAI rejected the request (${res.status})` };
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
@@ -156,6 +185,56 @@ module.exports = async function handler(req, res) {
           approve ? `Your email is now ${reqRow.requested_email}.` : `Your request to change your email was denied.`
         );
       }catch(e){}
+      res.status(200).json({ success: true });
+      return;
+    }
+
+    if (action === 'get-ai-connections') {
+      // Never returns api_key — only whether something's connected and
+      // when, plus whether a Vercel environment variable is ALSO/instead
+      // configured (the old way), so the admin sees the complete picture
+      // regardless of which method set it up.
+      const { data: rows } = await admin.from('ai_provider_connections').select('provider, connected_at');
+      const byProvider = {};
+      (rows || []).forEach(r => { byProvider[r.provider] = r.connected_at; });
+      res.status(200).json({
+        claude: { connected: !!byProvider.claude, connectedAt: byProvider.claude || null, envConfigured: !!process.env.ANTHROPIC_API_KEY },
+        openai: { connected: !!byProvider.openai, connectedAt: byProvider.openai || null, envConfigured: !!process.env.OPENAI_API_KEY },
+      });
+      return;
+    }
+
+    if (action === 'connect-ai-provider') {
+      const { provider, apiKey } = req.body || {};
+      if (!['claude', 'openai'].includes(provider)) { res.status(400).json({ error: 'provider must be "claude" or "openai"' }); return; }
+      if (!apiKey || typeof apiKey !== 'string' || !apiKey.trim()) { res.status(400).json({ error: 'Missing apiKey' }); return; }
+      const trimmedKey = apiKey.trim();
+
+      // Tested against the real provider before it's ever saved — same
+      // reasoning as validateHarvestCredentials() elsewhere in this app.
+      let validation;
+      if (provider === 'claude') {
+        const { data: settingsRow } = await admin.from('app_storage').select('value').eq('key', 'settings').maybeSingle();
+        const settings = settingsRow ? JSON.parse(settingsRow.value) : {};
+        validation = await validateAnthropicKey(trimmedKey, settings.claudeModel);
+      } else {
+        validation = await validateOpenAIKey(trimmedKey);
+      }
+      if (!validation.ok) { res.status(400).json({ error: `Couldn't connect: ${validation.error}` }); return; }
+
+      const { error: upsertErr } = await admin.from('ai_provider_connections').upsert({
+        provider, api_key: trimmedKey, connected_at: new Date().toISOString(), connected_by: callerId,
+      });
+      if (upsertErr) { res.status(500).json({ error: upsertErr.message }); return; }
+      res.status(200).json({ success: true });
+      return;
+    }
+
+    if (action === 'disconnect-ai-provider') {
+      const { provider } = req.body || {};
+      if (!['claude', 'openai'].includes(provider)) { res.status(400).json({ error: 'provider must be "claude" or "openai"' }); return; }
+      const { error: deleteErr } = await admin.from('ai_provider_connections').delete().eq('provider', provider);
+      if (deleteErr) { res.status(500).json({ error: deleteErr.message }); return; }
       res.status(200).json({ success: true });
       return;
     }
