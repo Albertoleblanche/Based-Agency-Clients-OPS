@@ -1155,8 +1155,9 @@
   .claude-chat-cap{font-size:10.5px;color:var(--muted-lt);text-align:center;padding:6px 0 0;}
   .claude-empty-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;}
   .claude-sidebar{width:220px;flex:none;border-right:1px solid var(--border);display:flex;flex-direction:column;padding:12px;overflow-y:auto;}
-  .claude-sidebar-new-btn{display:flex;align-items:center;gap:8px;width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;margin-bottom:14px;flex:none;transition:background var(--duration-fast) var(--ease-out);}
-  .claude-sidebar-new-btn:hover{background:var(--border);}
+  .claude-sidebar-new-btn{display:flex;align-items:center;gap:8px;width:100%;padding:9px 12px;border-radius:6px;border:none;background:none;color:#A8A8AC;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;flex:none;transition:background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);}
+  .claude-sidebar-new-btn:hover{background:#ffffff17;color:#fff;}
+  .claude-sidebar-btn-group{display:flex;flex-direction:column;gap:2px;margin-bottom:26px;}
   .claude-sidebar-heading{font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--muted-lt);padding:0 4px 8px;flex:none;}
   .claude-projects-view{flex:1;display:flex;flex-direction:column;overflow:hidden;}
   .claude-projects-header{display:flex;align-items:center;gap:12px;padding:18px 24px;border-bottom:1px solid var(--border);flex:none;}
@@ -1212,6 +1213,9 @@
   .claude-provider-option.selected{background:var(--brand-bg);}
   .claude-provider-option-name{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--ink);}
   .claude-provider-option-desc{display:block;font-size:11px;color:var(--muted);margin-top:2px;line-height:1.4;}
+  .claude-popup-menu-btn{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:7px 9px;border-radius:7px;border:none;background:none;color:var(--ink);font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;cursor:pointer;}
+  .claude-popup-menu-btn:hover{background:var(--surface-2);}
+  #claudePlusSubmenu{position:absolute;left:calc(100% + 6px);top:-6px;bottom:auto;width:190px;max-height:220px;overflow-y:auto;}
   .claude-clear-chat-inline{font-family:'Plus Jakarta Sans',sans-serif;font-size:11.5px;font-weight:600;color:rgba(255,255,255,.55);background:none;border:none;cursor:pointer;padding:0 2px;}
   .claude-clear-chat-inline:hover{color:#fff;}
   .tour-spotlight{position:relative;z-index:1601;border-radius:10px;box-shadow:0 0 0 5px rgba(255,255,255,.18), 0 0 0 9999px rgba(16,24,40,.72);transition:box-shadow .35s ease;}
@@ -2826,18 +2830,20 @@ document.addEventListener('DOMContentLoaded', function(){
     <div class="view" id="view-claude">
       <div style="height:calc(100vh - 150px);display:flex;overflow:hidden;">
         <div class="claude-sidebar">
-          <button type="button" class="claude-sidebar-new-btn" onclick="startNewClaudeConversation()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            New chat
-          </button>
-          <button type="button" class="claude-sidebar-new-btn" onclick="openClaudeProjectsView()" style="margin-bottom:20px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>
-            Projects
-          </button>
+          <div class="claude-sidebar-btn-group">
+            <button type="button" class="claude-sidebar-new-btn" onclick="startNewClaudeConversation()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New chat
+            </button>
+            <button type="button" class="claude-sidebar-new-btn" onclick="openClaudeProjectsView()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>
+              Projects
+            </button>
+          </div>
+          <div class="claude-sidebar-heading">Projects</div>
+          <div class="claude-sidebar-list" id="claudeSidebarProjectsList" style="margin-bottom:26px;"></div>
           <div class="claude-sidebar-heading">Chats and Tasks</div>
           <div class="claude-sidebar-list" id="claudeSidebarList"></div>
-          <div class="claude-sidebar-heading" style="margin-top:20px;">Projects</div>
-          <div class="claude-sidebar-list" id="claudeSidebarProjectsList"></div>
         </div>
         <div style="position:relative;flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;">
         <div class="claude-chat-messages" id="claudeTabMessages"></div>
@@ -2856,9 +2862,12 @@ document.addEventListener('DOMContentLoaded', function(){
           <div class="claude-chat-input-row" id="claudeTabInputRow">
             <textarea spellcheck="true" class="claude-chat-input" id="claudeTabInput" rows="1" placeholder="Ask about a client, or paste a link to review…" onkeydown="handleClaudeInputKey(event, 'tab')" oninput="autoGrowClaudeInput(this)"></textarea>
             <div class="claude-input-toolbar">
-              <button type="button" class="claude-input-icon-btn" onclick="handleClaudeImageButtonClick()" title="Add images">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              </button>
+              <div style="position:relative;">
+                <button type="button" class="claude-input-icon-btn" id="claudePlusBtn" onclick="toggleClaudePlusMenu(event)" title="Add">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                </button>
+                <div class="claude-provider-menu" id="claudePlusMenu" style="display:none;width:200px;"></div>
+              </div>
               <div style="position:relative;">
                 <button type="button" class="claude-provider-btn" id="claudeProviderBtn" onclick="toggleClaudeProviderMenu(event)" title="Which AI answers your messages — just for you, this conversation">
                   <span id="claudeProviderBtnLabel">ChatGPT</span>
@@ -10900,7 +10909,7 @@ async function loadClaudeHistory(){
 async function loadClaudeConversationsList(){
   if(!currentUser) return;
   const { data, error } = await supabaseClient
-    .from('claude_conversations').select('id, title, updated_at, pinned')
+    .from('claude_conversations').select('id, title, updated_at, pinned, project_id')
     .eq('user_id', currentUser.id).order('pinned', { ascending:false }).order('updated_at', { ascending:false });
   if(error){ console.error('loadClaudeConversationsList error', error); return; }
   claudeConversationsList = data || [];
@@ -11522,6 +11531,94 @@ document.addEventListener('click', (e)=>{
 function handleClaudeImageButtonClick(){
   showToast('info','Coming soon','Image uploads for the Assistant aren\'t available yet.');
 }
+
+// The "+" button's pop-up menu — Add image (placeholder, see above) and
+// Add to project, which opens a submenu of this person's projects.
+// Re-rendered fresh every time it opens, since the "Add to project" row's
+// own label depends on whether the currently open conversation already
+// belongs to one.
+function toggleClaudePlusMenu(event){
+  event.stopPropagation();
+  const menu = document.getElementById('claudePlusMenu');
+  if(!menu) return;
+  const opening = menu.style.display !== 'block';
+  menu.style.display = opening ? 'block' : 'none';
+  if(opening) renderClaudePlusMenu();
+}
+
+function renderClaudePlusMenu(){
+  const menuEl = document.getElementById('claudePlusMenu');
+  if(!menuEl) return;
+  const currentConv = claudeConversationsList.find(c=>c.id===claudeConversationId);
+  const currentProject = currentConv?.project_id ? claudeProjectsList.find(p=>p.id===currentConv.project_id) : null;
+  menuEl.innerHTML = `
+    <button type="button" class="claude-popup-menu-btn" onclick="handleClaudeImageButtonClick()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+      Add image
+    </button>
+    <div style="position:relative;">
+      <button type="button" class="claude-popup-menu-btn" onclick="toggleClaudePlusSubmenu(event)" style="justify-content:space-between;">
+        <span style="display:flex;align-items:center;gap:8px;min-width:0;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex:none;"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${currentProject ? `In ${escapeHtml(currentProject.name)}` : 'Add to project'}</span>
+        </span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex:none;"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <div class="claude-provider-menu" id="claudePlusSubmenu" style="display:none;"></div>
+    </div>`;
+}
+
+function toggleClaudePlusSubmenu(event){
+  event.stopPropagation();
+  const submenu = document.getElementById('claudePlusSubmenu');
+  if(!submenu) return;
+  const opening = submenu.style.display !== 'block';
+  submenu.style.display = opening ? 'block' : 'none';
+  if(opening) renderClaudePlusSubmenu();
+}
+
+function renderClaudePlusSubmenu(){
+  const el = document.getElementById('claudePlusSubmenu');
+  if(!el) return;
+  if(!claudeConversationId){
+    el.innerHTML = `<p style="font-size:11px;color:var(--muted-lt);padding:8px 10px;margin:0;">Send a message first.</p>`;
+    return;
+  }
+  if(!claudeProjectsList.length){
+    el.innerHTML = `<p style="font-size:11px;color:var(--muted-lt);padding:8px 10px;margin:0;">No projects yet — create one from the Projects tab.</p>`;
+    return;
+  }
+  const currentConv = claudeConversationsList.find(c=>c.id===claudeConversationId);
+  const currentProjectId = currentConv?.project_id || null;
+  el.innerHTML = claudeProjectsList.map(p=>`
+      <button type="button" class="claude-popup-menu-btn" onclick="assignClaudeConversationToProject('${p.id}')">${p.id===currentProjectId?'✓ ':''}${escapeHtml(p.name)}</button>
+    `).join('') + (currentProjectId
+      ? `<button type="button" class="claude-popup-menu-btn" style="color:var(--muted);" onclick="assignClaudeConversationToProject(null)">Remove from project</button>`
+      : '');
+}
+
+// Retroactively assigns the currently open conversation to a project —
+// complements startNewClaudeConversationInProject(), which only covers a
+// conversation created FROM a project; this is the other direction, for
+// something already underway that you decide should belong to one.
+async function assignClaudeConversationToProject(projectId){
+  document.getElementById('claudePlusMenu').style.display = 'none';
+  if(!claudeConversationId) return;
+  const { error } = await supabaseClient.from('claude_conversations').update({ project_id: projectId }).eq('id', claudeConversationId);
+  if(error){ showToast('error','Could not update','Try again.'); return; }
+  await loadClaudeConversationsList();
+  renderClaudeConversationsSidebar();
+  const projectName = projectId ? (claudeProjectsList.find(p=>p.id===projectId)?.name || 'the project') : null;
+  showToast('success', projectId ? 'Added to project' : 'Removed from project', projectId ? `This chat is now part of "${projectName}".` : 'This chat is no longer part of a project.');
+}
+
+document.addEventListener('click', (e)=>{
+  const menu = document.getElementById('claudePlusMenu');
+  const btn = document.getElementById('claudePlusBtn');
+  if(menu && menu.style.display==='block' && !menu.contains(e.target) && e.target!==btn && !btn?.contains(e.target)){
+    menu.style.display = 'none';
+  }
+});
 
 function autoGrowClaudeInput(el){
   el.style.height = 'auto';
