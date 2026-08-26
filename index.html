@@ -1116,12 +1116,24 @@
   .claude-chat-send:disabled{opacity:.5;cursor:default;}
   .claude-chat-cap{font-size:10.5px;color:var(--muted-lt);text-align:center;padding:6px 0 0;}
   .claude-empty-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;}
-  .claude-hero-glow{position:absolute;inset:0;z-index:0;pointer-events:none;background:radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--brand) 32%, transparent) 0%, transparent 65%);filter:blur(70px);}
+  .claude-hero-glow{position:absolute;inset:0;z-index:0;pointer-events:none;background:radial-gradient(at top center, #000000 64%, var(--brand) 100%);}
+  .claude-clear-chat-btn{position:absolute;top:16px;right:20px;z-index:2;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:rgba(255,255,255,.75);background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:6px 12px;cursor:pointer;transition:background var(--duration-fast) var(--ease-out);}
+  .claude-clear-chat-btn:hover{background:rgba(255,255,255,.16);}
+  .claude-quick-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;width:100%;max-width:520px;}
+  .claude-quick-action{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:12px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;color:rgba(255,255,255,.88);text-align:left;cursor:pointer;transition:background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);}
+  .claude-quick-action:hover{background:rgba(255,255,255,.12);border-color:var(--brand);}
   .claude-empty-greeting{font-size:23px;font-weight:600;color:var(--ink);text-align:center;}
+  #claudeTabEmptyHero .claude-empty-greeting{color:#fff;}
   .claude-empty-inputwrap{width:100%;max-width:520px;}
+  /* Floating panel's centered empty-state input — original light pill look, unaffected by the tab's redesign below. */
   .claude-chat-input-row.pill-mode{border-top:none;background:var(--surface-2);border-radius:999px;padding:6px 6px 6px 20px;border:1px solid var(--border);}
   .claude-chat-input-row.pill-mode .claude-chat-input{border:none;background:transparent;padding:9px 6px;font-size:14.5px;max-height:120px;}
   .claude-chat-input-row.pill-mode .claude-chat-send{border-radius:50%;}
+  /* Tab's input — a persistent glow-rectangle look regardless of empty/active state, matching its own dark background (ID selector so it can't be affected by the shared .pill-mode rule above). */
+  #claudeTabInputRow{border-top:none;background:rgba(20,20,20,.72);backdrop-filter:blur(12px);border-radius:16px;border:1.5px solid var(--brand);box-shadow:0 0 22px color-mix(in srgb, var(--brand) 55%, transparent), 0 0 50px color-mix(in srgb, var(--brand) 25%, transparent);}
+  #claudeTabInputRow .claude-chat-input{color:#fff;}
+  #claudeTabInputRow .claude-chat-input::placeholder{color:rgba(255,255,255,.55);}
+  #claudeTabInputRow.pill-mode{padding:14px 16px;}
   .tour-spotlight{position:relative;z-index:1601;border-radius:10px;box-shadow:0 0 0 5px rgba(255,255,255,.18), 0 0 0 9999px rgba(16,24,40,.72);transition:box-shadow .35s ease;}
   .tour-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
   .tour-step-count{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;letter-spacing:.06em;color:var(--muted-lt);}
@@ -2711,18 +2723,18 @@ document.addEventListener('DOMContentLoaded', function(){
     <div class="view" id="view-claude">
       <div style="position:relative;height:calc(100vh - 150px);display:flex;flex-direction:column;overflow:hidden;">
         <div class="claude-hero-glow"></div>
+        <button class="claude-clear-chat-btn" onclick="clearClaudeChat()">Clear chat</button>
         <div style="position:relative;z-index:1;display:flex;flex-direction:column;height:100%;overflow:hidden;">
-          <div class="claude-chat-head">
-            <div class="claude-chat-head-title">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="color:var(--brand-dark);"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/></svg>
-              <span class="claude-assistant-name-label">Assistant</span>
-            </div>
-            <span class="row-link" onclick="clearClaudeChat()">Clear chat</span>
-          </div>
           <div class="claude-chat-messages" id="claudeTabMessages"></div>
           <div class="claude-empty-hero" id="claudeTabEmptyHero" style="display:none;">
             <div class="claude-empty-greeting" id="claudeTabGreeting"></div>
             <div class="claude-empty-inputwrap" id="claudeTabInputSlot"></div>
+            <div class="claude-quick-actions">
+              <button class="claude-quick-action" onclick="sendClaudeQuickAction(this)">What needs my attention this week?</button>
+              <button class="claude-quick-action" onclick="sendClaudeQuickAction(this)">Which clients have gone quiet lately?</button>
+              <button class="claude-quick-action" onclick="sendClaudeQuickAction(this)">Help me draft a client update</button>
+              <button class="claude-quick-action" onclick="sendClaudeQuickAction(this)">Check a client's website for issues</button>
+            </div>
           </div>
           <div class="claude-chat-input-dock" id="claudeTabInputDock">
             <div class="claude-chat-input-row" id="claudeTabInputRow">
@@ -10782,6 +10794,9 @@ function layoutClaudeSurface(prefix){
     heroEl.style.display = 'none';
     messagesEl.style.display = 'flex';
     dockEl.style.display = 'block';
+    // The tab's input keeps its glow-rectangle look either way (see
+    // #claudeTabInputRow in CSS — it's not gated on .pill-mode); only the
+    // floating panel's plain input actually changes shape here.
     rowEl.classList.remove('pill-mode');
     if(rowEl.parentElement !== dockEl) dockEl.insertBefore(rowEl, dockEl.firstChild);
   }
@@ -10806,6 +10821,16 @@ function handleClaudeInputKey(e, source){
     e.preventDefault();
     sendClaudeMessage(source);
   }
+}
+
+// Quick-action chips on the tab's empty-state screen — reads the button's
+// own label as the query, fills the (single, real — not duplicated)
+// input element with it, and sends immediately, matching how suggested
+// prompts behave in other AI chat products.
+function sendClaudeQuickAction(btnEl){
+  const inputEl = document.getElementById('claudeTabInput');
+  if(inputEl) inputEl.value = btnEl.textContent.trim();
+  sendClaudeMessage('tab');
 }
 
 async function sendClaudeMessage(source){
@@ -10959,6 +10984,11 @@ function initClaudeBtnDrag(){
 }
 
 async function clearClaudeChat(){
+  // The button is now always visible (moved off the removed header into
+  // its own persistent corner control), so it can be clicked with
+  // nothing to clear — a real early-return here avoids prompting a
+  // confirm dialog for a no-op.
+  if(!claudeConversation.length){ showToast('info','Nothing to clear','Your conversation is already empty.'); return; }
   // Now a real, permanent delete of persisted history (see
   // schema-clients-migration-addendum-6.sql) — previously this only reset
   // an in-memory array that would've vanished on the next reload anyway,
