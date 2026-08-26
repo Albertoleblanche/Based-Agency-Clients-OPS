@@ -1141,6 +1141,8 @@
   .claude-msg-assistant hr{border:none;border-top:1px solid var(--border);margin:12px 0;}
   .claude-msg-assistant table{border-collapse:collapse;margin:0 0 10px;font-size:12.5px;}
   .claude-msg-assistant th,.claude-msg-assistant td{border:1px solid var(--border);padding:5px 8px;text-align:left;}
+  .claude-reveal-item{opacity:0;transform:translateY(4px);transition:opacity .32s ease, transform .32s ease;}
+  .claude-reveal-item.claude-reveal-in{opacity:1;transform:translateY(0);}
   .claude-msg-typing{align-self:flex-start;display:flex;gap:4px;padding:12px 14px;background:var(--surface-2);border-radius:12px;border-bottom-left-radius:4px;}
   .claude-msg-typing span{width:6px;height:6px;border-radius:50%;background:var(--muted-lt);animation:claudeTyping 1.2s ease-in-out infinite;}
   .claude-msg-typing span:nth-child(2){animation-delay:.15s;}
@@ -1152,6 +1154,13 @@
   .claude-chat-send:disabled{opacity:.5;cursor:default;}
   .claude-chat-cap{font-size:10.5px;color:var(--muted-lt);text-align:center;padding:6px 0 0;}
   .claude-empty-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;}
+  .claude-sidebar{width:220px;flex:none;border-right:1px solid var(--border);display:flex;flex-direction:column;padding:12px;overflow-y:auto;}
+  .claude-sidebar-new-btn{display:flex;align-items:center;gap:8px;width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;margin-bottom:12px;flex:none;transition:background var(--duration-fast) var(--ease-out);}
+  .claude-sidebar-new-btn:hover{background:var(--border);}
+  .claude-sidebar-list{display:flex;flex-direction:column;gap:2px;overflow-y:auto;}
+  .claude-sidebar-item{display:block;width:100%;text-align:left;padding:8px 10px;border-radius:8px;border:none;background:none;color:var(--ink);font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background var(--duration-fast) var(--ease-out);}
+  .claude-sidebar-item:hover{background:var(--surface-2);}
+  .claude-sidebar-item.active{background:var(--brand-bg);color:var(--brand-dark);font-weight:600;}
   .claude-quick-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;width:100%;max-width:520px;}
   .claude-quick-action{background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;color:var(--ink);text-align:left;cursor:pointer;transition:background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);}
   .claude-quick-action:hover{background:var(--border);border-color:var(--brand);}
@@ -2787,7 +2796,15 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- ASSISTANT (full tab) -->
     <div class="view" id="view-claude">
-      <div style="position:relative;height:calc(100vh - 150px);display:flex;flex-direction:column;overflow:hidden;">
+      <div style="height:calc(100vh - 150px);display:flex;overflow:hidden;">
+        <div class="claude-sidebar">
+          <button type="button" class="claude-sidebar-new-btn" onclick="startNewClaudeConversation()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New chat
+          </button>
+          <div class="claude-sidebar-list" id="claudeSidebarList"></div>
+        </div>
+        <div style="position:relative;flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;">
         <div class="claude-chat-messages" id="claudeTabMessages"></div>
         <div class="claude-empty-hero" id="claudeTabEmptyHero" style="display:none;">
           <div class="claude-empty-greeting" id="claudeTabGreeting"></div>
@@ -2814,11 +2831,12 @@ document.addEventListener('DOMContentLoaded', function(){
                 <div class="claude-provider-menu" id="claudeProviderMenu" style="display:none;"></div>
               </div>
               <div style="flex:1;"></div>
-              <button type="button" class="claude-clear-chat-inline" onclick="clearClaudeChat()">Clear chat</button>
+              <button type="button" class="claude-clear-chat-inline" onclick="clearClaudeChat()">Delete chat</button>
               <button class="claude-chat-send" id="claudeTabSendBtn" onclick="sendClaudeMessage('tab')" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
             </div>
           </div>
           <div class="claude-chat-cap" id="claudeTabCap"></div>
+        </div>
         </div>
       </div>
     </div>
@@ -10803,9 +10821,11 @@ function endTour(){
 
 /* ---------- Assistant (Claude) — floating button + its own tab, one shared conversation ---------- */
 
-let claudeConversation = []; // [{role:'user'|'assistant', content:'...'}]
+let claudeConversation = []; // [{role:'user'|'assistant', content:'...'}] — messages in the currently open conversation
 let claudeSending = false;
 let claudeHistoryLoaded = false;
+let claudeConversationId = null; // the currently open conversation's id, or null before the first message of a new one is sent
+let claudeConversationsList = []; // [{id, title, updated_at}] — sidebar cache, most-recently-updated first
 // How many past messages get displayed vs. actually sent as context to the
 // AI on each new message — kept separate on purpose. Displaying more is
 // free (just reading rows already fetched); SENDING more costs real
@@ -10815,29 +10835,102 @@ let claudeHistoryLoaded = false;
 const CLAUDE_HISTORY_DISPLAY_LIMIT = 60;
 const CLAUDE_CONTEXT_WINDOW = 20;
 
-// Loads this person's own past Assistant messages once per session (not
+// Loads this person's list of past conversations once per session (not
 // once per open — switching between the floating button and the full tab
-// shouldn't re-fetch). Previously the conversation was in-memory only and
-// lost on every reload; this is what actually persists it now — see
-// schema-clients-migration-addendum-6.sql.
+// shouldn't re-fetch) and opens the most recently active one, matching
+// how Claude.ai itself resumes where you left off. See
+// schema-clients-migration-addendum-10.sql for the underlying
+// multi-conversation schema.
 async function loadClaudeHistory(){
   if(claudeHistoryLoaded || !currentUser) return;
   claudeHistoryLoaded = true; // set eagerly so a near-simultaneous second call (tab and float opened together) can't double-fetch
+  await loadClaudeConversationsList();
+  if(claudeConversationsList.length){
+    await openClaudeConversation(claudeConversationsList[0].id);
+  } else {
+    renderClaudeConversationsSidebar();
+  }
+}
+
+async function loadClaudeConversationsList(){
+  if(!currentUser) return;
+  const { data, error } = await supabaseClient
+    .from('claude_conversations').select('id, title, updated_at')
+    .eq('user_id', currentUser.id).order('updated_at', { ascending:false });
+  if(error){ console.error('loadClaudeConversationsList error', error); return; }
+  claudeConversationsList = data || [];
+}
+
+async function openClaudeConversation(id){
   const { data, error } = await supabaseClient
     .from('claude_chat_messages').select('role, content')
-    .eq('user_id', currentUser.id).order('created_at', { ascending:true }).limit(CLAUDE_HISTORY_DISPLAY_LIMIT);
-  if(error){ console.error('loadClaudeHistory error', error); return; }
+    .eq('conversation_id', id).order('created_at', { ascending:true }).limit(CLAUDE_HISTORY_DISPLAY_LIMIT);
+  if(error){ console.error('openClaudeConversation error', error); return; }
+  claudeConversationId = id;
   claudeConversation = (data||[]).map(m=>({ role:m.role, content:m.content }));
+  resetClaudeTabInput();
+  renderClaudeConversationsSidebar();
   renderClaudeMessages();
+}
+
+// Doesn't create a row in claude_conversations yet — matching Claude.ai's
+// own behavior, an empty "New chat" you never actually send anything in
+// shouldn't clutter the sidebar. The real row gets created by
+// ensureClaudeConversation() the moment the first message actually sends.
+function startNewClaudeConversation(){
+  claudeConversationId = null;
+  claudeConversation = [];
+  resetClaudeTabInput();
+  renderClaudeConversationsSidebar();
+  renderClaudeMessages();
+}
+
+// A half-typed draft from the conversation you're leaving shouldn't
+// silently carry over into whichever one you switch to.
+function resetClaudeTabInput(){
+  const inputEl = document.getElementById('claudeTabInput');
+  if(inputEl){ inputEl.value = ''; inputEl.style.height = 'auto'; }
+}
+
+function renderClaudeConversationsSidebar(){
+  const el = document.getElementById('claudeSidebarList');
+  if(!el) return;
+  el.innerHTML = claudeConversationsList.length
+    ? claudeConversationsList.map(c=>`
+        <button type="button" class="claude-sidebar-item${c.id===claudeConversationId?' active':''}" onclick="openClaudeConversation('${c.id}')" title="${escapeHtml(c.title)}">${escapeHtml(c.title)}</button>
+      `).join('')
+    : `<p style="font-size:11.5px;color:var(--muted-lt);padding:8px 10px;margin:0;">No conversations yet.</p>`;
+}
+
+// Creates the real claude_conversations row on the first message of a new
+// chat — everything after that just reuses claudeConversationId. Title is
+// a short truncation of that first message, matching how Claude.ai titles
+// a new chat from what you actually asked.
+async function ensureClaudeConversation(firstMessageText){
+  if(claudeConversationId) return claudeConversationId;
+  const title = (firstMessageText || 'New chat').trim().slice(0, 60) || 'New chat';
+  const { data, error } = await supabaseClient
+    .from('claude_conversations').insert({ user_id: currentUser.id, title }).select('id').single();
+  if(error){ console.error('ensureClaudeConversation error', error); return null; }
+  claudeConversationId = data.id;
+  await loadClaudeConversationsList();
+  renderClaudeConversationsSidebar();
+  return claudeConversationId;
 }
 
 // Fire-and-forget, same reasoning as logDangerHistory()/logClientActivity()
 // elsewhere — this is the persistence layer for a conversation that's
 // already fully functional in memory; a save hiccup shouldn't block or
-// visibly interrupt the chat itself.
+// visibly interrupt the chat itself. Also bumps the conversation's
+// updated_at so the sidebar's most-recent-first ordering stays accurate.
 function persistClaudeMessage(role, content){
-  supabaseClient.from('claude_chat_messages').insert({ user_id: currentUser.id, role, content }).then(({error})=>{
+  if(!claudeConversationId) return; // ensureClaudeConversation() should always run first — see sendClaudeMessage
+  supabaseClient.from('claude_chat_messages').insert({ user_id: currentUser.id, conversation_id: claudeConversationId, role, content }).then(({error})=>{
     if(error) console.error('persistClaudeMessage error', error);
+  });
+  supabaseClient.from('claude_conversations').update({ updated_at: new Date().toISOString() }).eq('id', claudeConversationId).then(({error})=>{
+    if(error) console.error('persistClaudeMessage updated_at error', error);
+    else { loadClaudeConversationsList().then(renderClaudeConversationsSidebar); }
   });
 }
 
@@ -10912,18 +11005,57 @@ function renderClaudeMessageContent(role, content){
   return escapeHtml(content);
 }
 
-function renderClaudeMessages(){
-  const html = claudeConversation.map(m=>
-    `<div class="claude-msg claude-msg-${m.role}">${renderClaudeMessageContent(m.role, m.content)}</div>`
+function renderClaudeMessages(animateLatest){
+  const html = claudeConversation.map((m,i)=>
+    `<div class="claude-msg claude-msg-${m.role}" data-msg-idx="${i}">${renderClaudeMessageContent(m.role, m.content)}</div>`
   ).join('') + (claudeSending ? `<div class="claude-msg-typing"><span></span><span></span><span></span></div>` : '');
+  const lastIdx = claudeConversation.length - 1;
+  const shouldAnimate = animateLatest && lastIdx >= 0 && claudeConversation[lastIdx].role === 'assistant';
   ['claudeTabMessages','claudeFloatMessages'].forEach(id=>{
     const el = document.getElementById(id);
     if(!el) return;
     el.innerHTML = html;
     el.scrollTop = el.scrollHeight;
+    if(shouldAnimate){
+      const lastMsgEl = el.querySelector(`.claude-msg[data-msg-idx="${lastIdx}"]`);
+      if(lastMsgEl) revealClaudeMessage(lastMsgEl);
+    }
   });
   layoutClaudeSurface('claudeTab');
   layoutClaudeSurface('claudeFloat');
+}
+
+// Reveals a freshly-arrived assistant reply element by element (paragraphs,
+// headings, list items) with a short stagger between each, instead of the
+// whole response just popping in as one block. Only ever applied to the
+// single newest message right when it arrives (see renderClaudeMessages'
+// animateLatest param) — never to history being loaded or a conversation
+// being switched to, which should just appear normally, not replay an
+// entrance animation every time.
+function revealClaudeMessage(msgEl){
+  const targets = [];
+  msgEl.querySelectorAll(':scope > *').forEach(child=>{
+    if(child.tagName === 'UL' || child.tagName === 'OL'){
+      child.querySelectorAll(':scope > li').forEach(li => targets.push(li));
+    } else {
+      targets.push(child);
+    }
+  });
+  if(!targets.length) return; // plain-text content with no block elements — nothing to stagger
+  targets.forEach((el,i)=>{
+    el.classList.add('claude-reveal-item');
+    el.style.transitionDelay = `${i*55}ms`;
+  });
+  // Two rAFs, not one — the browser needs a full paint with the item still
+  // at opacity:0 before the .claude-reveal-in class is added, or the
+  // transition can get skipped entirely (the "before" and "after" states
+  // both get set in the same frame, so there's nothing to visually
+  // transition between).
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
+      targets.forEach(el=>el.classList.add('claude-reveal-in'));
+    });
+  });
 }
 
 // Grows the textarea as you type, up to 6 lines' worth of height (the CSS
@@ -11025,6 +11157,7 @@ async function sendClaudeMessage(source){
   if(!text) return;
   inputEl.value = '';
   inputEl.style.height = 'auto';
+  await ensureClaudeConversation(text);
   claudeConversation.push({role:'user', content:text});
   persistClaudeMessage('user', text);
   claudeSending = true;
@@ -11054,13 +11187,13 @@ async function sendClaudeMessage(source){
       const errText = `⚠️ ${data.error || 'Something went wrong.'}`;
       claudeConversation.push({role:'assistant', content: errText});
       persistClaudeMessage('assistant', errText);
-      renderClaudeMessages();
+      renderClaudeMessages(true);
       return;
     }
     const replyText = data.reply || '(no response)';
     claudeConversation.push({role:'assistant', content: replyText});
     persistClaudeMessage('assistant', replyText);
-    renderClaudeMessages();
+    renderClaudeMessages(true);
     const capText = data.remainingToday!=null ? `${data.remainingToday} messages left today` : '';
     const tabCap = document.getElementById('claudeTabCap'); if(tabCap) tabCap.textContent = capText;
     const floatCap = document.getElementById('claudeFloatCap'); if(floatCap) floatCap.textContent = capText;
@@ -11069,7 +11202,7 @@ async function sendClaudeMessage(source){
     const errText = '⚠️ Network error — try again.';
     claudeConversation.push({role:'assistant', content: errText});
     persistClaudeMessage('assistant', errText);
-    renderClaudeMessages();
+    renderClaudeMessages(true);
   }finally{
     document.getElementById('claudeTabSendBtn').disabled = false;
     document.getElementById('claudeFloatSendBtn').disabled = false;
@@ -11173,19 +11306,22 @@ function initClaudeBtnDrag(){
 }
 
 async function clearClaudeChat(){
-  // The button is now always visible (moved off the removed header into
-  // its own persistent corner control), so it can be clicked with
-  // nothing to clear — a real early-return here avoids prompting a
-  // confirm dialog for a no-op.
-  if(!claudeConversation.length){ showToast('info','Nothing to clear','Your conversation is already empty.'); return; }
-  // Now a real, permanent delete of persisted history (see
-  // schema-clients-migration-addendum-6.sql) — previously this only reset
-  // an in-memory array that would've vanished on the next reload anyway,
-  // so it didn't need confirming. It does now.
-  if(!(await confirmDialog('Clear your conversation with the Assistant? This deletes your message history for good.', {confirmLabel:'Clear', destructive:true}))) return;
-  const { error } = await supabaseClient.from('claude_chat_messages').delete().eq('user_id', currentUser.id);
-  if(error){ showToast('error','Could not clear','Something went wrong — try again.'); return; }
+  // Now scoped to the currently OPEN conversation, not every conversation
+  // this person has ever had — with real separate conversations in the
+  // sidebar, "clear" reads as "delete this one," matching how deleting a
+  // chat works in Claude.ai's own sidebar. The button is always visible,
+  // so it can be clicked with nothing open yet — a real early-return here
+  // avoids prompting a confirm dialog for a no-op.
+  if(!claudeConversationId){ showToast('info','Nothing to clear','Start a conversation first.'); return; }
+  if(!(await confirmDialog('Delete this conversation? This deletes it for good, including its message history.', {confirmLabel:'Delete', destructive:true}))) return;
+  // conversation_id has ON DELETE CASCADE — deleting the conversation row
+  // takes its messages with it, no separate delete needed.
+  const { error } = await supabaseClient.from('claude_conversations').delete().eq('id', claudeConversationId);
+  if(error){ showToast('error','Could not delete','Something went wrong — try again.'); return; }
+  claudeConversationId = null;
   claudeConversation = [];
+  await loadClaudeConversationsList();
+  renderClaudeConversationsSidebar();
   renderClaudeMessages();
 }
 
