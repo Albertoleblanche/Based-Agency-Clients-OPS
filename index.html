@@ -2422,6 +2422,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
       <!-- AI & EMAIL -->
       <div class="settings-subview" id="stab-ai">
+        <div id="adminOnlyAiSettings" style="display:none;">
         <div class="panel" style="margin-bottom:24px;">
           <div class="panel-head"><span class="panel-title">Assistant AI Provider</span></div>
           <div class="panel-body">
@@ -2494,6 +2495,7 @@ document.addEventListener('DOMContentLoaded', function(){
               <button class="btn btn-outline" style="flex:none;" onclick="previewProactiveInsights()">Preview now</button>
             </div>
           </div>
+        </div>
         </div>
 
         <div class="panel">
@@ -4222,7 +4224,11 @@ function switchSettingsTab(name){
   document.querySelectorAll('#view-settings .settings-subview').forEach(v=>v.classList.remove('active'));
   document.getElementById('stab-'+name).classList.add('active');
   if(name==='notifications') renderNotificationPrefs();
-  if(name==='ai' && isAdmin()) loadAiProviderConnectionStatus();
+  if(name==='ai'){
+    const adminOnly = document.getElementById('adminOnlyAiSettings');
+    if(adminOnly) adminOnly.style.display = isAdmin() ? 'block' : 'none';
+    if(isAdmin()) loadAiProviderConnectionStatus();
+  }
   if(name==='integrations'){
     const approverOnly = document.getElementById('approverOnlyIntegrations');
     if(approverOnly) approverOnly.style.display = canApprove() ? 'block' : 'none';
@@ -14145,6 +14151,11 @@ async function saveAiProvider(provider){
 }
 
 function renderAiProviderChoice(){
+  // The whole section is admin-only, not just individually disabled
+  // inputs — a non-admin shouldn't see connection status, model strings,
+  // or the proactive-insights controls at all.
+  const adminOnly = document.getElementById('adminOnlyAiSettings');
+  if(adminOnly) adminOnly.style.display = isAdmin() ? 'block' : 'none';
   const provider = settings.aiProvider === 'openai' ? 'openai' : 'claude';
   const claudeRadio = document.getElementById('aiProviderClaude');
   const openaiRadio = document.getElementById('aiProviderOpenai');
