@@ -1134,7 +1134,14 @@
   .claude-input-toolbar{display:flex;align-items:center;gap:8px;}
   .claude-input-icon-btn{flex:none;width:32px;height:32px;border-radius:8px;border:1px solid rgba(255,255,255,.16);background:transparent;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background var(--duration-fast) var(--ease-out);}
   .claude-input-icon-btn:hover{background:rgba(255,255,255,.08);}
-  .claude-provider-select{flex:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:11.5px;font-weight:600;color:#fff;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:0 8px;height:32px;cursor:pointer;}
+  .claude-provider-btn{flex:none;display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-radius:8px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.08);color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:11.5px;font-weight:600;cursor:pointer;transition:background var(--duration-fast) var(--ease-out);}
+  .claude-provider-btn:hover{background:rgba(255,255,255,.14);}
+  .claude-provider-menu{position:absolute;bottom:calc(100% + 8px);left:0;width:240px;background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 16px 40px rgba(16,24,40,.28);padding:6px;z-index:20;animation:modalCardIn var(--duration-base) var(--ease-out);}
+  .claude-provider-option{display:block;width:100%;text-align:left;padding:8px 10px;border-radius:8px;border:none;background:none;cursor:pointer;}
+  .claude-provider-option:hover{background:var(--surface-2);}
+  .claude-provider-option.selected{background:var(--brand-bg);}
+  .claude-provider-option-name{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--ink);}
+  .claude-provider-option-desc{display:block;font-size:11px;color:var(--muted);margin-top:2px;line-height:1.4;}
   .claude-clear-chat-inline{font-family:'Plus Jakarta Sans',sans-serif;font-size:11.5px;font-weight:600;color:rgba(255,255,255,.55);background:none;border:none;cursor:pointer;padding:0 2px;}
   .claude-clear-chat-inline:hover{color:#fff;}
   .tour-spotlight{position:relative;z-index:1601;border-radius:10px;box-shadow:0 0 0 5px rgba(255,255,255,.18), 0 0 0 9999px rgba(16,24,40,.72);transition:box-shadow .35s ease;}
@@ -2366,7 +2373,19 @@ document.addEventListener('DOMContentLoaded', function(){
           <div class="panel-head"><span class="panel-title">Assistant AI Provider</span></div>
           <div class="panel-body">
             <div class="settings-field"><label>Assistant name</label><input id="setAssistantName" style="width:100%;" placeholder="Assistant" onchange="saveAssistantName(this.value)"></div>
-            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.6;">Which AI actually powers the Assistant tab and floating button — this only affects the Assistant, not the email draft generation on each client. Whichever you pick needs its own API key already set up on the server; picking one without its key configured will show an error, not silently fall back to the other.</p>
+            <div style="margin:16px 0;padding:14px;border:1px solid var(--border);border-radius:10px;">
+              <div style="font-size:11px;font-weight:700;letter-spacing:0.03em;text-transform:uppercase;color:var(--muted-lt);margin-bottom:10px;">Connections</div>
+              <p style="font-size:11.5px;color:var(--muted);margin:0 0 12px;line-height:1.5;">Connect an API key directly here — no Vercel environment variable or redeploy needed. A key is tested against the real provider before it's saved, and is never shown again afterward, even to you.</p>
+              <div id="aiConnectionRow-claude" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+                <div><div style="font-size:13px;font-weight:600;color:var(--ink);">Claude</div><div class="ai-connection-status" style="font-size:11.5px;color:var(--muted-lt);">Checking…</div></div>
+                <button class="btn btn-outline ai-connection-btn" style="flex:none;" onclick="openAiProviderConnectModal('claude')">Connect</button>
+              </div>
+              <div id="aiConnectionRow-openai" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0 0;">
+                <div><div style="font-size:13px;font-weight:600;color:var(--ink);">ChatGPT</div><div class="ai-connection-status" style="font-size:11.5px;color:var(--muted-lt);">Checking…</div></div>
+                <button class="btn btn-outline ai-connection-btn" style="flex:none;" onclick="openAiProviderConnectModal('openai')">Connect</button>
+              </div>
+            </div>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.6;">Which AI actually powers the Assistant tab and floating button — this only affects the Assistant, not the email draft generation on each client. Whichever you pick needs its own API key connected above (or set as a Vercel environment variable); picking one without a key configured will show an error, not silently fall back to the other.</p>
             <div style="display:flex;flex-direction:column;gap:10px;">
               <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--ink);">
                 <input type="radio" name="aiProvider" id="aiProviderClaude" value="claude" onchange="saveAiProvider('claude')">
@@ -2743,11 +2762,13 @@ document.addEventListener('DOMContentLoaded', function(){
               <button type="button" class="claude-input-icon-btn" onclick="handleClaudeImageButtonClick()" title="Add images">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               </button>
-              <select id="claudeProviderSelect" class="claude-provider-select" onchange="saveClaudeProviderOverride(this.value)" title="Which AI answers your messages — just for you, this conversation">
-                <option value="">Default</option>
-                <option value="claude">Claude</option>
-                <option value="openai">ChatGPT</option>
-              </select>
+              <div style="position:relative;">
+                <button type="button" class="claude-provider-btn" id="claudeProviderBtn" onclick="toggleClaudeProviderMenu(event)" title="Which AI answers your messages — just for you, this conversation">
+                  <span id="claudeProviderBtnLabel">ChatGPT</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="claude-provider-menu" id="claudeProviderMenu" style="display:none;"></div>
+              </div>
               <div style="flex:1;"></div>
               <button type="button" class="claude-clear-chat-inline" onclick="clearClaudeChat()">Clear chat</button>
               <button class="claude-chat-send" id="claudeTabSendBtn" onclick="sendClaudeMessage('tab')" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
@@ -4129,6 +4150,7 @@ function switchSettingsTab(name){
   document.querySelectorAll('#view-settings .settings-subview').forEach(v=>v.classList.remove('active'));
   document.getElementById('stab-'+name).classList.add('active');
   if(name==='notifications') renderNotificationPrefs();
+  if(name==='ai' && isAdmin()) loadAiProviderConnectionStatus();
   if(name==='integrations'){
     const approverOnly = document.getElementById('approverOnlyIntegrations');
     if(approverOnly) approverOnly.style.display = canApprove() ? 'block' : 'none';
@@ -10799,10 +10821,9 @@ function layoutClaudeSurface(prefix){
   const greetingEl = document.getElementById(prefix+'Greeting');
   if(!messagesEl || !heroEl || !dockEl || !slotEl || !rowEl) return;
 
-  // Tab-only control (the dropdown only exists in that surface's markup),
-  // synced here since this already runs on every render — cheap to repeat.
-  const providerSelect = document.getElementById('claudeProviderSelect');
-  if(providerSelect && document.activeElement !== providerSelect) providerSelect.value = loadClaudeProviderOverride();
+  // Tab-only control (only exists in that surface's markup), synced here
+  // since this already runs on every render — cheap to repeat.
+  syncClaudeProviderBtnLabel();
 
   const isEmpty = claudeConversation.length===0 && !claudeSending;
   if(isEmpty){
@@ -10852,15 +10873,63 @@ function renderClaudeMessages(){
 // when clicked (which would just look broken).
 // Per-person, per-device override of which AI answers — stored locally
 // (like the floating button's dragged position elsewhere in this file),
-// not synced anywhere, since it's a personal preference for trying the
-// other provider, not a team-wide setting. Empty string means "use
-// whatever the admin configured" (the <option value=""> Default choice).
+// not synced anywhere, since it's a personal preference, not a team-wide
+// setting. No "Default"/admin-follows-Settings option — always resolves
+// to a real provider, defaulting to ChatGPT the first time.
+const CLAUDE_PROVIDER_OPTIONS = [
+  { value:'openai', name:'ChatGPT', desc:'Fast and versatile — great for everyday questions and quick drafts.' },
+  { value:'claude', name:'Claude', desc:'Strong reasoning — great for nuanced writing and careful analysis.' },
+];
+
 function loadClaudeProviderOverride(){
-  try { return localStorage.getItem('claude_provider_override') || ''; } catch(e) { return ''; }
+  try { return localStorage.getItem('claude_provider_override') || 'openai'; } catch(e) { return 'openai'; }
 }
 function saveClaudeProviderOverride(value){
   try { localStorage.setItem('claude_provider_override', value); } catch(e) {}
 }
+
+function syncClaudeProviderBtnLabel(){
+  const labelEl = document.getElementById('claudeProviderBtnLabel');
+  if(!labelEl) return;
+  const current = loadClaudeProviderOverride();
+  const opt = CLAUDE_PROVIDER_OPTIONS.find(o=>o.value===current) || CLAUDE_PROVIDER_OPTIONS[0];
+  labelEl.textContent = opt.name;
+}
+
+function renderClaudeProviderMenu(){
+  const menu = document.getElementById('claudeProviderMenu');
+  if(!menu) return;
+  const current = loadClaudeProviderOverride();
+  menu.innerHTML = CLAUDE_PROVIDER_OPTIONS.map(o=>`
+    <button type="button" class="claude-provider-option${o.value===current?' selected':''}" onclick="selectClaudeProviderOverride('${o.value}')">
+      <span class="claude-provider-option-name">${o.value===current?'✓ ':''}${o.name}</span>
+      <span class="claude-provider-option-desc">${o.desc}</span>
+    </button>`).join('');
+}
+
+function toggleClaudeProviderMenu(event){
+  event?.stopPropagation();
+  const menu = document.getElementById('claudeProviderMenu');
+  if(!menu) return;
+  const opening = menu.style.display !== 'block';
+  menu.style.display = opening ? 'block' : 'none';
+  if(opening) renderClaudeProviderMenu();
+}
+
+function selectClaudeProviderOverride(value){
+  saveClaudeProviderOverride(value);
+  const menu = document.getElementById('claudeProviderMenu');
+  if(menu) menu.style.display = 'none';
+  syncClaudeProviderBtnLabel();
+}
+
+document.addEventListener('click', (e)=>{
+  const menu = document.getElementById('claudeProviderMenu');
+  const btn = document.getElementById('claudeProviderBtn');
+  if(menu && menu.style.display==='block' && !menu.contains(e.target) && e.target!==btn && !btn?.contains(e.target)){
+    menu.style.display = 'none';
+  }
+});
 
 function handleClaudeImageButtonClick(){
   showToast('info','Coming soon','Image uploads for the Assistant aren\'t available yet.');
@@ -13848,6 +13917,86 @@ async function saveAiModel(which, value){
   else settings.openaiModel = trimmed || DEFAULT_OPENAI_MODEL;
   const ok = await persistSettings();
   ok ? showToast('success','Saved', `${which==='claude'?'Claude':'OpenAI'} model updated.`) : showToast('error','Save failed','Could not save — try again.');
+}
+
+async function adminActionCall(action, body){
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  const response = await fetch('/api/admin-user-actions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+    body: JSON.stringify({ action, ...body }),
+  });
+  const data = await response.json();
+  if(!response.ok) throw new Error(data.error || 'Something went wrong.');
+  return data;
+}
+
+// Never receives the actual key back — get-ai-connections only ever
+// returns whether something's connected and when, by design (see
+// schema-clients-migration-addendum-9.sql).
+async function loadAiProviderConnectionStatus(){
+  try{
+    const data = await adminActionCall('get-ai-connections');
+    ['claude','openai'].forEach(provider=>{
+      const info = data[provider];
+      const row = document.getElementById('aiConnectionRow-'+provider);
+      if(!row) return;
+      const statusEl = row.querySelector('.ai-connection-status');
+      const btnEl = row.querySelector('.ai-connection-btn');
+      if(statusEl){
+        statusEl.textContent = info.connected
+          ? `Connected — added ${new Date(info.connectedAt).toLocaleDateString()}`
+          : (info.envConfigured ? 'Configured via Vercel environment variable' : 'Not connected');
+      }
+      if(btnEl) btnEl.textContent = info.connected ? 'Reconnect' : 'Connect';
+    });
+  }catch(e){
+    console.error('loadAiProviderConnectionStatus error', e);
+  }
+}
+
+function openAiProviderConnectModal(provider){
+  if(!isAdmin()){ showToast('error','Not allowed','Only admins can connect a provider.'); return; }
+  const label = provider==='claude' ? 'Claude (Anthropic)' : 'ChatGPT (OpenAI)';
+  const keyHint = provider==='claude' ? 'sk-ant-…' : 'sk-…';
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">Connect ${label}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;line-height:1.6;">Paste an API key from your ${label} account. It's tested against the real provider before saving, and won't be shown again after this — not even to you.</p>
+      <div class="settings-field"><label>API key</label><input type="password" id="aiProviderKeyInput" placeholder="${keyHint}" style="width:100%;" autocomplete="off"></div>
+      <p style="margin:10px 0 0;"><span class="row-link" onclick="closeAppModal();disconnectAiProvider('${provider}')">Disconnect instead</span></p>
+    </div>
+    <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Cancel</button><button class="btn btn-brand" onclick="submitAiProviderConnect('${provider}')">Connect</button></div>`, 460);
+}
+
+async function submitAiProviderConnect(provider){
+  const input = document.getElementById('aiProviderKeyInput');
+  const key = input ? input.value.trim() : '';
+  if(!key){ showToast('error','Missing key','Paste an API key first.'); return; }
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Connecting…');
+  try{
+    await adminActionCall('connect-ai-provider', { provider, apiKey: key });
+    closeAppModal();
+    showToast('success','Connected', `${provider==='claude'?'Claude':'ChatGPT'} is now connected.`);
+    loadAiProviderConnectionStatus();
+  }catch(e){
+    restoreBtn(btn);
+    showToast('error','Could not connect', e.message || 'The key was rejected.');
+  }
+}
+
+async function disconnectAiProvider(provider){
+  if(!isAdmin()){ showToast('error','Not allowed','Only admins can disconnect a provider.'); return; }
+  const label = provider==='claude' ? 'Claude' : 'ChatGPT';
+  if(!(await confirmDialog(`Disconnect ${label}? The Assistant won't be able to use it until reconnected (or until a Vercel environment variable is set instead).`, {confirmLabel:'Disconnect', destructive:true}))) return;
+  try{
+    await adminActionCall('disconnect-ai-provider', { provider });
+    showToast('success','Disconnected', `${label} disconnected.`);
+    loadAiProviderConnectionStatus();
+  }catch(e){
+    showToast('error','Could not disconnect', e.message || 'Try again.');
+  }
 }
 
 async function saveAssistantName(value){
