@@ -1116,25 +1116,19 @@
   .claude-chat-send:disabled{opacity:.5;cursor:default;}
   .claude-chat-cap{font-size:10.5px;color:var(--muted-lt);text-align:center;padding:6px 0 0;}
   .claude-empty-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;}
-  .claude-hero-glow{position:absolute;inset:0;z-index:0;pointer-events:none;background:radial-gradient(at top center, #000000 64%, var(--brand) 100%);}
-  #view-claude{margin:-98px -28px -60px;}
-  .claude-clear-chat-btn{position:absolute;top:16px;right:20px;z-index:2;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:rgba(255,255,255,.75);background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:6px 12px;cursor:pointer;transition:background var(--duration-fast) var(--ease-out);}
-  .claude-clear-chat-btn:hover{background:rgba(255,255,255,.16);}
+  .claude-clear-chat-btn{position:absolute;top:0;right:0;z-index:2;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;cursor:pointer;transition:background var(--duration-fast) var(--ease-out);}
+  .claude-clear-chat-btn:hover{background:var(--border);}
   .claude-quick-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;width:100%;max-width:520px;}
-  .claude-quick-action{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:12px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;color:rgba(255,255,255,.88);text-align:left;cursor:pointer;transition:background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);}
-  .claude-quick-action:hover{background:rgba(255,255,255,.12);border-color:var(--brand);}
+  .claude-quick-action{background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;color:var(--ink);text-align:left;cursor:pointer;transition:background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);}
+  .claude-quick-action:hover{background:var(--border);border-color:var(--brand);}
   .claude-empty-greeting{font-size:23px;font-weight:600;color:var(--ink);text-align:center;}
-  #claudeTabEmptyHero .claude-empty-greeting{color:#fff;}
   .claude-empty-inputwrap{width:100%;max-width:520px;}
-  /* Floating panel's centered empty-state input — original light pill look, unaffected by the tab's redesign below. */
+  /* Floating panel's centered empty-state input — original light pill look. */
   .claude-chat-input-row.pill-mode{border-top:none;background:var(--surface-2);border-radius:999px;padding:6px 6px 6px 20px;border:1px solid var(--border);}
   .claude-chat-input-row.pill-mode .claude-chat-input{border:none;background:transparent;padding:9px 6px;font-size:14.5px;max-height:120px;}
   .claude-chat-input-row.pill-mode .claude-chat-send{border-radius:50%;}
-  /* Tab's input — a persistent glow-rectangle look regardless of empty/active state, matching its own dark background (ID selector so it can't be affected by the shared .pill-mode rule above). */
-  #claudeTabInputRow{border-top:none;background:rgba(20,20,20,.72);backdrop-filter:blur(12px);border-radius:16px;border:1.5px solid var(--brand);box-shadow:0 0 22px color-mix(in srgb, var(--brand) 55%, transparent), 0 0 50px color-mix(in srgb, var(--brand) 25%, transparent);}
-  #claudeTabInputRow .claude-chat-input{color:#fff;}
-  #claudeTabInputRow .claude-chat-input::placeholder{color:rgba(255,255,255,.55);}
-  #claudeTabInputRow.pill-mode{padding:14px 16px;}
+  /* Tab's input keeps a theme-adaptive fill, just with a persistent brand-colored glow border regardless of empty/active state (ID selector so it can't be affected by the shared .pill-mode rule above). */
+  #claudeTabInputRow{border:1.5px solid var(--brand);border-radius:16px;box-shadow:0 0 18px color-mix(in srgb, var(--brand) 40%, transparent), 0 0 40px color-mix(in srgb, var(--brand) 18%, transparent);}
   .tour-spotlight{position:relative;z-index:1601;border-radius:10px;box-shadow:0 0 0 5px rgba(255,255,255,.18), 0 0 0 9999px rgba(16,24,40,.72);transition:box-shadow .35s ease;}
   .tour-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
   .tour-step-count{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;letter-spacing:.06em;color:var(--muted-lt);}
@@ -2722,28 +2716,25 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- ASSISTANT (full tab) -->
     <div class="view" id="view-claude">
-      <div style="position:relative;width:100%;height:100vh;display:flex;flex-direction:column;overflow:hidden;">
-        <div class="claude-hero-glow"></div>
+      <div style="position:relative;max-width:760px;margin:0 auto;height:calc(100vh - 150px);display:flex;flex-direction:column;overflow:hidden;">
         <button class="claude-clear-chat-btn" onclick="clearClaudeChat()">Clear chat</button>
-        <div style="position:relative;z-index:1;display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden;">
-          <div class="claude-chat-messages" id="claudeTabMessages"></div>
-          <div class="claude-empty-hero" id="claudeTabEmptyHero" style="display:none;">
-            <div class="claude-empty-greeting" id="claudeTabGreeting"></div>
-            <div class="claude-empty-inputwrap" id="claudeTabInputSlot"></div>
-            <div class="claude-quick-actions">
-              <button class="claude-quick-action" onclick="sendClaudeQuickAction(this)">What needs my attention this week?</button>
-              <button class="claude-quick-action" onclick="sendClaudeQuickAction(this)">Which clients have gone quiet lately?</button>
-              <button class="claude-quick-action" onclick="sendClaudeQuickAction(this)">Help me draft a client update</button>
-              <button class="claude-quick-action" onclick="sendClaudeQuickAction(this)">Check a client's website for issues</button>
-            </div>
+        <div class="claude-chat-messages" id="claudeTabMessages"></div>
+        <div class="claude-empty-hero" id="claudeTabEmptyHero" style="display:none;">
+          <div class="claude-empty-greeting" id="claudeTabGreeting"></div>
+          <div class="claude-empty-inputwrap" id="claudeTabInputSlot"></div>
+          <div class="claude-quick-actions">
+            <button class="claude-quick-action" onclick="sendClaudeQuickAction(this)">What needs my attention this week?</button>
+            <button class="claude-quick-action" onclick="sendClaudeQuickAction(this)">Which clients have gone quiet lately?</button>
+            <button class="claude-quick-action" onclick="sendClaudeQuickAction(this)">Help me draft a client update</button>
+            <button class="claude-quick-action" onclick="sendClaudeQuickAction(this)">Check a client's website for issues</button>
           </div>
-          <div class="claude-chat-input-dock" id="claudeTabInputDock">
-            <div class="claude-chat-input-row" id="claudeTabInputRow">
-              <textarea spellcheck="true" class="claude-chat-input" id="claudeTabInput" rows="1" placeholder="Ask about a client, or paste a link to review…" onkeydown="handleClaudeInputKey(event, 'tab')"></textarea>
-              <button class="claude-chat-send" id="claudeTabSendBtn" onclick="sendClaudeMessage('tab')" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
-            </div>
-            <div class="claude-chat-cap" id="claudeTabCap"></div>
+        </div>
+        <div class="claude-chat-input-dock" id="claudeTabInputDock">
+          <div class="claude-chat-input-row" id="claudeTabInputRow">
+            <textarea spellcheck="true" class="claude-chat-input" id="claudeTabInput" rows="1" placeholder="Ask about a client, or paste a link to review…" onkeydown="handleClaudeInputKey(event, 'tab')"></textarea>
+            <button class="claude-chat-send" id="claudeTabSendBtn" onclick="sendClaudeMessage('tab')" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
           </div>
+          <div class="claude-chat-cap" id="claudeTabCap"></div>
         </div>
       </div>
     </div>
