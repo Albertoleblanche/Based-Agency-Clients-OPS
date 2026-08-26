@@ -1116,6 +1116,7 @@
   .claude-chat-send:disabled{opacity:.5;cursor:default;}
   .claude-chat-cap{font-size:10.5px;color:var(--muted-lt);text-align:center;padding:6px 0 0;}
   .claude-empty-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;}
+  .claude-hero-glow{position:absolute;inset:0;z-index:0;pointer-events:none;background:radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--brand) 32%, transparent) 0%, transparent 65%);filter:blur(70px);}
   .claude-empty-greeting{font-size:23px;font-weight:600;color:var(--ink);text-align:center;}
   .claude-empty-inputwrap{width:100%;max-width:520px;}
   .claude-chat-input-row.pill-mode{border-top:none;background:var(--surface-2);border-radius:999px;padding:6px 6px 6px 20px;border:1px solid var(--border);}
@@ -2708,25 +2709,28 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- ASSISTANT (full tab) -->
     <div class="view" id="view-claude">
-      <div class="panel" style="height:calc(100vh - 150px);display:flex;flex-direction:column;overflow:hidden;padding:0;">
-        <div class="claude-chat-head">
-          <div class="claude-chat-head-title">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="color:var(--brand-dark);"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/></svg>
-            <span class="claude-assistant-name-label">Assistant</span>
+      <div style="position:relative;height:calc(100vh - 150px);display:flex;flex-direction:column;overflow:hidden;">
+        <div class="claude-hero-glow"></div>
+        <div style="position:relative;z-index:1;display:flex;flex-direction:column;height:100%;overflow:hidden;">
+          <div class="claude-chat-head">
+            <div class="claude-chat-head-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="color:var(--brand-dark);"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/></svg>
+              <span class="claude-assistant-name-label">Assistant</span>
+            </div>
+            <span class="row-link" onclick="clearClaudeChat()">Clear chat</span>
           </div>
-          <span class="row-link" onclick="clearClaudeChat()">Clear chat</span>
-        </div>
-        <div class="claude-chat-messages" id="claudeTabMessages"></div>
-        <div class="claude-empty-hero" id="claudeTabEmptyHero" style="display:none;">
-          <div class="claude-empty-greeting" id="claudeTabGreeting"></div>
-          <div class="claude-empty-inputwrap" id="claudeTabInputSlot"></div>
-        </div>
-        <div class="claude-chat-input-dock" id="claudeTabInputDock">
-          <div class="claude-chat-input-row" id="claudeTabInputRow">
-            <textarea spellcheck="true" class="claude-chat-input" id="claudeTabInput" rows="1" placeholder="Ask about a client, or paste a link to review…" onkeydown="handleClaudeInputKey(event, 'tab')"></textarea>
-            <button class="claude-chat-send" id="claudeTabSendBtn" onclick="sendClaudeMessage('tab')" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+          <div class="claude-chat-messages" id="claudeTabMessages"></div>
+          <div class="claude-empty-hero" id="claudeTabEmptyHero" style="display:none;">
+            <div class="claude-empty-greeting" id="claudeTabGreeting"></div>
+            <div class="claude-empty-inputwrap" id="claudeTabInputSlot"></div>
           </div>
-          <div class="claude-chat-cap" id="claudeTabCap"></div>
+          <div class="claude-chat-input-dock" id="claudeTabInputDock">
+            <div class="claude-chat-input-row" id="claudeTabInputRow">
+              <textarea spellcheck="true" class="claude-chat-input" id="claudeTabInput" rows="1" placeholder="Ask about a client, or paste a link to review…" onkeydown="handleClaudeInputKey(event, 'tab')"></textarea>
+              <button class="claude-chat-send" id="claudeTabSendBtn" onclick="sendClaudeMessage('tab')" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+            </div>
+            <div class="claude-chat-cap" id="claudeTabCap"></div>
+          </div>
         </div>
       </div>
     </div>
