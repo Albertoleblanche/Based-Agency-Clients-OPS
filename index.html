@@ -2725,7 +2725,7 @@ document.addEventListener('DOMContentLoaded', function(){
       <div style="position:relative;width:100%;height:100vh;display:flex;flex-direction:column;overflow:hidden;">
         <div class="claude-hero-glow"></div>
         <button class="claude-clear-chat-btn" onclick="clearClaudeChat()">Clear chat</button>
-        <div style="position:relative;z-index:1;display:flex;flex-direction:column;height:100%;overflow:hidden;">
+        <div style="position:relative;z-index:1;display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden;">
           <div class="claude-chat-messages" id="claudeTabMessages"></div>
           <div class="claude-empty-hero" id="claudeTabEmptyHero" style="display:none;">
             <div class="claude-empty-greeting" id="claudeTabGreeting"></div>
@@ -4066,6 +4066,13 @@ async function switchView(name){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name));
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
+  // The floating "open the Assistant" button is redundant (and visually
+  // odd sitting on top of the tab's own dark background) while you're
+  // already looking at the Assistant tab itself — hidden here rather than
+  // in applyRoleVisibility(), since that only re-runs on permission
+  // changes, not on every navigation.
+  const claudeFloatBtn = document.getElementById('claudeFloatBtn');
+  if(claudeFloatBtn && myProfile?.ai_chat_enabled){ claudeFloatBtn.style.display = name==='claude' ? 'none' : 'flex'; }
   // Overview and Client Detail aren't in this lookup — their titles are
   // dynamic (greeting text, client name) and get set by renderGreeting()
   // and renderClientDetail() respectively, moments later in this same flow.
