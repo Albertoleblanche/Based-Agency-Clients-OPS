@@ -74,7 +74,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const { messages, appContext } = req.body || {};
+    const { messages, appContext, providerOverride } = req.body || {};
     if (!Array.isArray(messages) || !messages.length) {
       res.status(400).json({ error: 'Missing messages' });
       return;
@@ -94,7 +94,14 @@ module.exports = async function handler(req, res) {
 
     const { data: settingsRow } = await admin.from('app_storage').select('value').eq('key', 'settings').maybeSingle();
     const settings = settingsRow ? JSON.parse(settingsRow.value) : {};
-    const provider = settings.aiProvider === 'openai' ? 'openai' : 'claude';
+    const defaultProvider = settings.aiProvider === 'openai' ? 'openai' : 'claude';
+    // A per-person, per-conversation override from the model picker next
+    // to the chat input — lets someone try the other provider for their
+    // own messages without changing the admin's team-wide default in
+    // Settings. Only used if it's a recognized value; anything else (or
+    // the "Default" option, sent as empty/missing) falls back to the
+    // admin's own setting.
+    const provider = ['claude', 'openai'].includes(providerOverride) ? providerOverride : defaultProvider;
     // settings.claudeModel/settings.openaiModel are admin-editable in
     // Settings -> AI & Email — callAI falls back to its own hardcoded
     // default if unset, so this is safe even before an admin has ever
@@ -114,7 +121,20 @@ ${appContext || '(no client data provided)'}`;
     const result = await callAI(provider, messages, systemPrompt, { model });
 
     if (!result.ok) {
-      res.status(502).json({ error: result.error });
+      // A friendlier message specifically when it's the person's OWN
+      // override that's missing its key (not the admin's own default, and
+      // not some unrelated failure like a rate limit) — the raw
+      // "Missing X_API_KEY" is fine for an admin debugging Settings, but
+      // confusing for a teammate who just picked an option from a
+      // dropdown. Checked against the exact string lib/ai-client.js
+      // returns for a missing key, not just "any failure while overriding",
+      // so an unrelated error (rate limit, network issue) still shows its
+      // real message instead of a misleading "not configured" one.
+      const isMissingKeyFailure = typeof result.error === 'string' && result.error.startsWith('Missing ');
+      const friendlyError = (provider !== defaultProvider && isMissingKeyFailure)
+        ? `${provider === 'openai' ? 'ChatGPT' : 'Claude'} isn't set up on this server yet — switch back to "Default" in the model picker, or ask an admin to add the API key.`
+        : result.error;
+      res.status(502).json({ error: friendlyError });
       return;
     }
 
