@@ -1159,15 +1159,18 @@
   .claude-sidebar-new-btn:hover{background:var(--border);}
   .claude-sidebar-heading{font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--muted-lt);padding:0 4px 8px;flex:none;}
   .claude-sidebar-list{display:flex;flex-direction:column;gap:6px;overflow-y:auto;}
-  .claude-sidebar-row{position:relative;display:flex;align-items:center;gap:2px;background:#161616;border:1px solid #1e1d1d;border-radius:8px;transition:border-color var(--duration-fast) var(--ease-out);}
-  .claude-sidebar-row.active{border-color:var(--brand);}
-  .claude-sidebar-item{display:flex;align-items:center;gap:6px;flex:1;min-width:0;text-align:left;padding:8px 4px 8px 10px;border-radius:8px 0 0 8px;border:none;background:none;color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;cursor:pointer;}
-  .claude-sidebar-row.active .claude-sidebar-item{color:var(--brand);font-weight:600;}
+  .claude-sidebar-row{position:relative;display:flex;align-items:center;gap:2px;border-radius:6px;transition:background var(--duration-fast) var(--ease-out);}
+  .claude-sidebar-row:hover{background:#ffffff17;}
+  .claude-sidebar-row.active{background:#ffffff17;}
+  .claude-sidebar-item{display:flex;align-items:center;gap:6px;flex:1;min-width:0;text-align:left;padding:8px 4px 8px 10px;border-radius:6px;border:none;background:none;color:#A8A8AC;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;cursor:pointer;}
+  .claude-sidebar-row:hover .claude-sidebar-item,.claude-sidebar-row.active .claude-sidebar-item{color:#fff;}
+  .claude-sidebar-row.active .claude-sidebar-item{font-weight:600;}
   .claude-sidebar-item-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
-  .claude-sidebar-pin-icon{flex:none;color:var(--brand);}
+  .claude-sidebar-pin-icon{flex:none;color:#A8A8AC;}
+  .claude-sidebar-row:hover .claude-sidebar-pin-icon,.claude-sidebar-row.active .claude-sidebar-pin-icon{color:#fff;}
   .claude-sidebar-menu-btn{flex:none;width:26px;height:26px;border-radius:6px;border:none;background:none;color:rgba(255,255,255,.6);cursor:pointer;display:flex;align-items:center;justify-content:center;margin-right:4px;transition:background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);}
   .claude-sidebar-menu-btn:hover{background:rgba(255,255,255,.1);color:#fff;}
-  .claude-sidebar-menu{position:absolute;top:calc(100% + 4px);right:0;width:150px;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 16px 40px rgba(16,24,40,.28);padding:5px;z-index:15;animation:modalCardIn var(--duration-base) var(--ease-out);}
+  .claude-sidebar-menu{position:fixed;width:150px;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 16px 40px rgba(16,24,40,.28);padding:5px;z-index:1200;animation:modalCardIn var(--duration-base) var(--ease-out);}
   .claude-sidebar-menu button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:7px 9px;border-radius:7px;border:none;background:none;color:var(--ink);font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;cursor:pointer;}
   .claude-sidebar-menu button:hover{background:var(--surface-2);}
   .claude-quick-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;width:100%;max-width:520px;}
@@ -10916,6 +10919,11 @@ const CLAUDE_SIDEBAR_ICONS = {
 function renderClaudeConversationsSidebar(){
   const el = document.getElementById('claudeSidebarList');
   if(!el) return;
+  // Any menu currently open got moved to document.body by
+  // toggleClaudeSidebarMenu() below — it's about to be replaced by a
+  // fresh one with the same id anyway, so the orphaned copy needs
+  // cleaning up explicitly or it'd sit invisible in the DOM forever.
+  document.querySelectorAll('body > .claude-sidebar-menu').forEach(m=>m.remove());
   el.innerHTML = claudeConversationsList.length
     ? claudeConversationsList.map(c=>`
         <div class="claude-sidebar-row${c.id===claudeConversationId?' active':''}">
@@ -10923,7 +10931,7 @@ function renderClaudeConversationsSidebar(){
             ${c.pinned ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none" class="claude-sidebar-pin-icon">${CLAUDE_SIDEBAR_ICONS.pin}</svg>` : ''}
             <span class="claude-sidebar-item-label">${escapeHtml(c.title)}</span>
           </button>
-          <button type="button" class="claude-sidebar-menu-btn" onclick="toggleClaudeSidebarMenu(event,'${c.id}')" title="More">
+          <button type="button" class="claude-sidebar-menu-btn" id="claudeSidebarMenuBtn-${c.id}" onclick="toggleClaudeSidebarMenu(event,'${c.id}')" title="More">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
           </button>
           <div class="claude-sidebar-menu" id="claudeSidebarMenu-${c.id}" style="display:none;">
@@ -10935,15 +10943,49 @@ function renderClaudeConversationsSidebar(){
     : `<p style="font-size:11.5px;color:var(--muted-lt);padding:8px 10px;margin:0;">No conversations yet.</p>`;
 }
 
+// Moved to document.body when opened, same reasoning as the calendar
+// dropdown elsewhere in this file — .claude-sidebar/.claude-sidebar-list
+// both scroll (overflow-y:auto), which would silently clip this menu
+// against their bounds if it stayed positioned relative to its row.
+// Escaping to body with real computed viewport coordinates sidesteps
+// that entirely instead of depending on any ancestor's overflow setting.
 function toggleClaudeSidebarMenu(event, id){
   event.stopPropagation();
   document.querySelectorAll('.claude-sidebar-menu').forEach(m=>{ if(m.id !== 'claudeSidebarMenu-'+id) m.style.display = 'none'; });
   const menu = document.getElementById('claudeSidebarMenu-'+id);
-  if(menu) menu.style.display = menu.style.display==='block' ? 'none' : 'block';
+  const btn = document.getElementById('claudeSidebarMenuBtn-'+id);
+  if(!menu || !btn) return;
+  const opening = menu.style.display !== 'block';
+  menu.style.display = opening ? 'block' : 'none';
+  if(opening){
+    if(menu.parentElement !== document.body) document.body.appendChild(menu);
+    positionClaudeSidebarMenu(btn, menu);
+  }
 }
 
-document.addEventListener('click', ()=>{
-  document.querySelectorAll('.claude-sidebar-menu').forEach(m=>m.style.display = 'none');
+function positionClaudeSidebarMenu(btnEl, menuEl){
+  const btnRect = btnEl.getBoundingClientRect();
+  const menuRect = menuEl.getBoundingClientRect();
+  const gap = 4, edge = 12;
+  const vw = window.innerWidth, vh = window.innerHeight;
+
+  let left = btnRect.right - menuRect.width; // right-aligned to the 3-dot button
+  let top = btnRect.bottom + gap;
+  if(top + menuRect.height > vh - edge) top = btnRect.top - menuRect.height - gap; // flip above if no room below
+
+  left = Math.max(edge, Math.min(left, vw - menuRect.width - edge));
+  top = Math.max(edge, Math.min(top, vh - menuRect.height - edge));
+
+  menuEl.style.left = `${left}px`;
+  menuEl.style.top = `${top}px`;
+}
+
+document.addEventListener('click', (e)=>{
+  document.querySelectorAll('.claude-sidebar-menu').forEach(m=>{
+    if(m.style.display !== 'block') return;
+    const btn = document.getElementById('claudeSidebarMenuBtn-'+m.id.replace('claudeSidebarMenu-',''));
+    if(!m.contains(e.target) && e.target !== btn && !btn?.contains(e.target)) m.style.display = 'none';
+  });
 });
 
 function renameClaudeConversation(id){
