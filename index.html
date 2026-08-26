@@ -1134,6 +1134,7 @@
   .claude-input-toolbar{display:flex;align-items:center;gap:8px;}
   .claude-input-icon-btn{flex:none;width:32px;height:32px;border-radius:8px;border:1px solid rgba(255,255,255,.16);background:transparent;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background var(--duration-fast) var(--ease-out);}
   .claude-input-icon-btn:hover{background:rgba(255,255,255,.08);}
+  .claude-provider-select{flex:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:11.5px;font-weight:600;color:#fff;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:0 8px;height:32px;cursor:pointer;}
   .claude-clear-chat-inline{font-family:'Plus Jakarta Sans',sans-serif;font-size:11.5px;font-weight:600;color:rgba(255,255,255,.55);background:none;border:none;cursor:pointer;padding:0 2px;}
   .claude-clear-chat-inline:hover{color:#fff;}
   .tour-spotlight{position:relative;z-index:1601;border-radius:10px;box-shadow:0 0 0 5px rgba(255,255,255,.18), 0 0 0 9999px rgba(16,24,40,.72);transition:box-shadow .35s ease;}
@@ -2742,6 +2743,11 @@ document.addEventListener('DOMContentLoaded', function(){
               <button type="button" class="claude-input-icon-btn" onclick="handleClaudeImageButtonClick()" title="Add images">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               </button>
+              <select id="claudeProviderSelect" class="claude-provider-select" onchange="saveClaudeProviderOverride(this.value)" title="Which AI answers your messages — just for you, this conversation">
+                <option value="">Default</option>
+                <option value="claude">Claude</option>
+                <option value="openai">ChatGPT</option>
+              </select>
               <div style="flex:1;"></div>
               <button type="button" class="claude-clear-chat-inline" onclick="clearClaudeChat()">Clear chat</button>
               <button class="claude-chat-send" id="claudeTabSendBtn" onclick="sendClaudeMessage('tab')" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
@@ -10793,6 +10799,11 @@ function layoutClaudeSurface(prefix){
   const greetingEl = document.getElementById(prefix+'Greeting');
   if(!messagesEl || !heroEl || !dockEl || !slotEl || !rowEl) return;
 
+  // Tab-only control (the dropdown only exists in that surface's markup),
+  // synced here since this already runs on every render — cheap to repeat.
+  const providerSelect = document.getElementById('claudeProviderSelect');
+  if(providerSelect && document.activeElement !== providerSelect) providerSelect.value = loadClaudeProviderOverride();
+
   const isEmpty = claudeConversation.length===0 && !claudeSending;
   if(isEmpty){
     const firstName = (myProfile?.name||'').trim().split(/\s+/)[0];
@@ -10839,6 +10850,18 @@ function renderClaudeMessages(){
 // Not wired to a real feature yet — claude-chat.js only accepts text
 // today, so this is honest about that rather than silently doing nothing
 // when clicked (which would just look broken).
+// Per-person, per-device override of which AI answers — stored locally
+// (like the floating button's dragged position elsewhere in this file),
+// not synced anywhere, since it's a personal preference for trying the
+// other provider, not a team-wide setting. Empty string means "use
+// whatever the admin configured" (the <option value=""> Default choice).
+function loadClaudeProviderOverride(){
+  try { return localStorage.getItem('claude_provider_override') || ''; } catch(e) { return ''; }
+}
+function saveClaudeProviderOverride(value){
+  try { localStorage.setItem('claude_provider_override', value); } catch(e) {}
+}
+
 function handleClaudeImageButtonClick(){
   showToast('info','Coming soon','Image uploads for the Assistant aren\'t available yet.');
 }
@@ -10890,7 +10913,10 @@ async function sendClaudeMessage(source){
     const response = await fetch('/api/claude-chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-      body: JSON.stringify({ messages: claudeConversation.slice(-CLAUDE_CONTEXT_WINDOW), appContext: buildClaudeContext() }),
+      // providerOverride is tab-only (the picker doesn't exist in the
+      // floating panel's markup) — empty/missing means "use whatever the
+      // admin configured," matching claude-chat.js's own fallback.
+      body: JSON.stringify({ messages: claudeConversation.slice(-CLAUDE_CONTEXT_WINDOW), appContext: buildClaudeContext(), providerOverride: source==='tab' ? loadClaudeProviderOverride() : null }),
     });
     const data = await response.json();
     claudeSending = false;
