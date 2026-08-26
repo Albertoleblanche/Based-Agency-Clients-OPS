@@ -1102,8 +1102,6 @@
   .claude-chat-head-title{display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:600;color:var(--ink);}
   .claude-chat-messages{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:12px;}
   .claude-msg{max-width:88%;padding:10px 13px;border-radius:12px;font-size:13px;line-height:1.55;white-space:pre-wrap;animation:claudeMsgIn .22s ease;}
-  .claude-msg.collapsed{max-height:9.3em;overflow:hidden;} /* line-height 1.55em × 6 lines */
-  .claude-msg-expand{align-self:flex-start;font-size:11.5px;font-weight:700;color:var(--muted);cursor:pointer;text-decoration:underline;margin-top:-6px;}
   @keyframes claudeMsgIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
   .claude-msg-user{align-self:flex-end;background:var(--brand);color:#fff;border-bottom-right-radius:4px;}
   .claude-msg-assistant{align-self:flex-start;background:var(--surface-2);color:var(--ink);border-bottom-left-radius:4px;}
@@ -1113,7 +1111,7 @@
   .claude-msg-typing span:nth-child(3){animation-delay:.3s;}
   @keyframes claudeTyping{0%,60%,100%{opacity:.3;transform:translateY(0);}30%{opacity:1;transform:translateY(-3px);}}
   .claude-chat-input-row{display:flex;gap:8px;padding:12px;border-top:1px solid var(--border);flex:none;}
-  .claude-chat-input{flex:1;resize:none;border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;background:var(--surface-2);color:var(--ink);max-height:90px;}
+  .claude-chat-input{flex:1;resize:none;border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;line-height:1.4;background:var(--surface-2);color:var(--ink);max-height:130px;overflow-y:auto;}
   .claude-chat-send{flex:none;width:36px;height:36px;border-radius:10px;background:var(--brand);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:opacity var(--duration-fast) var(--ease-out);}
   .claude-chat-send:disabled{opacity:.5;cursor:default;}
   .claude-chat-cap{font-size:10.5px;color:var(--muted-lt);text-align:center;padding:6px 0 0;}
@@ -2720,7 +2718,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- ASSISTANT (full tab) -->
     <div class="view" id="view-claude">
-      <div style="position:relative;max-width:600px;margin:0 auto;height:calc(100vh - 150px);display:flex;flex-direction:column;overflow:hidden;">
+      <div style="position:relative;height:calc(100vh - 150px);display:flex;flex-direction:column;overflow:hidden;">
         <button class="claude-clear-chat-btn" onclick="clearClaudeChat()">Clear chat</button>
         <div class="claude-chat-messages" id="claudeTabMessages" style="padding-top:44px;"></div>
         <div class="claude-empty-hero" id="claudeTabEmptyHero" style="display:none;">
@@ -2733,9 +2731,9 @@ document.addEventListener('DOMContentLoaded', function(){
             <button class="claude-quick-action" onclick="sendClaudeQuickAction(this)">Check a client's website for issues</button>
           </div>
         </div>
-        <div class="claude-chat-input-dock" id="claudeTabInputDock">
+        <div class="claude-chat-input-dock" id="claudeTabInputDock" style="max-width:600px;margin:0 auto;width:100%;">
           <div class="claude-chat-input-row" id="claudeTabInputRow">
-            <textarea spellcheck="true" class="claude-chat-input" id="claudeTabInput" rows="1" placeholder="Ask about a client, or paste a link to review…" onkeydown="handleClaudeInputKey(event, 'tab')"></textarea>
+            <textarea spellcheck="true" class="claude-chat-input" id="claudeTabInput" rows="1" placeholder="Ask about a client, or paste a link to review…" onkeydown="handleClaudeInputKey(event, 'tab')" oninput="autoGrowClaudeInput(this)"></textarea>
             <button class="claude-chat-send" id="claudeTabSendBtn" onclick="sendClaudeMessage('tab')" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
           </div>
           <div class="claude-chat-cap" id="claudeTabCap"></div>
@@ -2765,7 +2763,7 @@ document.addEventListener('DOMContentLoaded', function(){
   </div>
   <div class="claude-chat-input-dock" id="claudeFloatInputDock">
     <div class="claude-chat-input-row" id="claudeFloatInputRow">
-      <textarea spellcheck="true" class="claude-chat-input" id="claudeFloatInput" rows="1" placeholder="Ask anything…" onkeydown="handleClaudeInputKey(event, 'float')"></textarea>
+      <textarea spellcheck="true" class="claude-chat-input" id="claudeFloatInput" rows="1" placeholder="Ask anything…" onkeydown="handleClaudeInputKey(event, 'float')" oninput="autoGrowClaudeInput(this)"></textarea>
       <button class="claude-chat-send" id="claudeFloatSendBtn" onclick="sendClaudeMessage('float')" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
     </div>
     <div class="claude-chat-cap" id="claudeFloatCap"></div>
@@ -10807,34 +10805,24 @@ function layoutClaudeSurface(prefix){
 
 function renderClaudeMessages(){
   const html = claudeConversation.map(m=>
-    `<div class="claude-msg claude-msg-${m.role} collapsed">${escapeHtml(m.content)}</div>`
+    `<div class="claude-msg claude-msg-${m.role}">${escapeHtml(m.content)}</div>`
   ).join('') + (claudeSending ? `<div class="claude-msg-typing"><span></span><span></span><span></span></div>` : '');
   ['claudeTabMessages','claudeFloatMessages'].forEach(id=>{
     const el = document.getElementById(id);
     if(!el) return;
     el.innerHTML = html;
-    // Only messages that actually overflow 6 lines get a "Show more"
-    // toggle — a short message's max-height never kicks in, so checking
-    // scrollHeight vs clientHeight after insertion (rather than guessing
-    // from character count, which can't predict real wrapped line count)
-    // correctly targets only the ones that need it. Inserted as a SIBLING
-    // right after the bubble, not a child of it — appending inside a
-    // collapsed, overflow:hidden bubble risks the toggle itself getting
-    // clipped if the message sits right at the 6-line boundary.
-    el.querySelectorAll('.claude-msg.collapsed').forEach(msgEl=>{
-      if(msgEl.scrollHeight > msgEl.clientHeight + 2){
-        const expandBtn = document.createElement('span');
-        expandBtn.className = 'claude-msg-expand';
-        expandBtn.style.alignSelf = msgEl.classList.contains('claude-msg-user') ? 'flex-end' : 'flex-start';
-        expandBtn.textContent = 'Show more';
-        expandBtn.onclick = ()=>{ msgEl.classList.remove('collapsed'); expandBtn.remove(); };
-        msgEl.insertAdjacentElement('afterend', expandBtn);
-      }
-    });
     el.scrollTop = el.scrollHeight;
   });
   layoutClaudeSurface('claudeTab');
   layoutClaudeSurface('claudeFloat');
+}
+
+// Grows the textarea as you type, up to 6 lines' worth of height (the CSS
+// max-height on .claude-chat-input), then lets it scroll internally
+// beyond that instead of growing further.
+function autoGrowClaudeInput(el){
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
 }
 
 function handleClaudeInputKey(e, source){
@@ -10860,6 +10848,7 @@ async function sendClaudeMessage(source){
   const text = inputEl.value.trim();
   if(!text) return;
   inputEl.value = '';
+  inputEl.style.height = 'auto';
   claudeConversation.push({role:'user', content:text});
   persistClaudeMessage('user', text);
   claudeSending = true;
