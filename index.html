@@ -1102,6 +1102,8 @@
   .claude-chat-head-title{display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:600;color:var(--ink);}
   .claude-chat-messages{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:12px;}
   .claude-msg{max-width:88%;padding:10px 13px;border-radius:12px;font-size:13px;line-height:1.55;white-space:pre-wrap;animation:claudeMsgIn .22s ease;}
+  .claude-msg.collapsed{max-height:9.3em;overflow:hidden;} /* line-height 1.55em × 6 lines */
+  .claude-msg-expand{align-self:flex-start;font-size:11.5px;font-weight:700;color:var(--muted);cursor:pointer;text-decoration:underline;margin-top:-6px;}
   @keyframes claudeMsgIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
   .claude-msg-user{align-self:flex-end;background:var(--brand);color:#fff;border-bottom-right-radius:4px;}
   .claude-msg-assistant{align-self:flex-start;background:var(--surface-2);color:var(--ink);border-bottom-left-radius:4px;}
@@ -1128,7 +1130,9 @@
   .claude-chat-input-row.pill-mode .claude-chat-input{border:none;background:transparent;padding:9px 6px;font-size:14.5px;max-height:120px;}
   .claude-chat-input-row.pill-mode .claude-chat-send{border-radius:50%;}
   /* Tab's input keeps a theme-adaptive fill, just with a persistent brand-colored glow border regardless of empty/active state (ID selector so it can't be affected by the shared .pill-mode rule above). */
-  #claudeTabInputRow{border:1.5px solid var(--brand);border-radius:16px;box-shadow:0 0 18px color-mix(in srgb, var(--brand) 40%, transparent), 0 0 40px color-mix(in srgb, var(--brand) 18%, transparent);}
+  #claudeTabInputRow{background:#000;border:1.5px solid var(--brand);border-radius:16px;box-shadow:0 0 18px color-mix(in srgb, var(--brand) 40%, transparent), 0 0 40px color-mix(in srgb, var(--brand) 18%, transparent);}
+  #claudeTabInputRow .claude-chat-input{background:transparent;color:#fff;}
+  #claudeTabInputRow .claude-chat-input::placeholder{color:rgba(255,255,255,.5);}
   .tour-spotlight{position:relative;z-index:1601;border-radius:10px;box-shadow:0 0 0 5px rgba(255,255,255,.18), 0 0 0 9999px rgba(16,24,40,.72);transition:box-shadow .35s ease;}
   .tour-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
   .tour-step-count{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;letter-spacing:.06em;color:var(--muted-lt);}
@@ -2716,9 +2720,9 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- ASSISTANT (full tab) -->
     <div class="view" id="view-claude">
-      <div style="position:relative;max-width:760px;margin:0 auto;height:calc(100vh - 150px);display:flex;flex-direction:column;overflow:hidden;">
+      <div style="position:relative;max-width:600px;margin:0 auto;height:calc(100vh - 150px);display:flex;flex-direction:column;overflow:hidden;">
         <button class="claude-clear-chat-btn" onclick="clearClaudeChat()">Clear chat</button>
-        <div class="claude-chat-messages" id="claudeTabMessages"></div>
+        <div class="claude-chat-messages" id="claudeTabMessages" style="padding-top:44px;"></div>
         <div class="claude-empty-hero" id="claudeTabEmptyHero" style="display:none;">
           <div class="claude-empty-greeting" id="claudeTabGreeting"></div>
           <div class="claude-empty-inputwrap" id="claudeTabInputSlot"></div>
@@ -10803,12 +10807,30 @@ function layoutClaudeSurface(prefix){
 
 function renderClaudeMessages(){
   const html = claudeConversation.map(m=>
-    `<div class="claude-msg claude-msg-${m.role}">${escapeHtml(m.content)}</div>`
+    `<div class="claude-msg claude-msg-${m.role} collapsed">${escapeHtml(m.content)}</div>`
   ).join('') + (claudeSending ? `<div class="claude-msg-typing"><span></span><span></span><span></span></div>` : '');
   ['claudeTabMessages','claudeFloatMessages'].forEach(id=>{
     const el = document.getElementById(id);
     if(!el) return;
     el.innerHTML = html;
+    // Only messages that actually overflow 6 lines get a "Show more"
+    // toggle — a short message's max-height never kicks in, so checking
+    // scrollHeight vs clientHeight after insertion (rather than guessing
+    // from character count, which can't predict real wrapped line count)
+    // correctly targets only the ones that need it. Inserted as a SIBLING
+    // right after the bubble, not a child of it — appending inside a
+    // collapsed, overflow:hidden bubble risks the toggle itself getting
+    // clipped if the message sits right at the 6-line boundary.
+    el.querySelectorAll('.claude-msg.collapsed').forEach(msgEl=>{
+      if(msgEl.scrollHeight > msgEl.clientHeight + 2){
+        const expandBtn = document.createElement('span');
+        expandBtn.className = 'claude-msg-expand';
+        expandBtn.style.alignSelf = msgEl.classList.contains('claude-msg-user') ? 'flex-end' : 'flex-start';
+        expandBtn.textContent = 'Show more';
+        expandBtn.onclick = ()=>{ msgEl.classList.remove('collapsed'); expandBtn.remove(); };
+        msgEl.insertAdjacentElement('afterend', expandBtn);
+      }
+    });
     el.scrollTop = el.scrollHeight;
   });
   layoutClaudeSurface('claudeTab');
