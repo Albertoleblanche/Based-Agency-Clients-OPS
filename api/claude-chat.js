@@ -107,6 +107,12 @@ module.exports = async function handler(req, res) {
     // default if unset, so this is safe even before an admin has ever
     // touched those fields.
     const model = provider === 'openai' ? settings.openaiModel : settings.claudeModel;
+    // An admin-connected key from Settings -> AI & Email's Connect flow
+    // (ai_provider_connections), if one exists — callAI falls back to the
+    // Vercel environment variable when this is null, so a deployment
+    // that's never used Connect keeps working exactly as before.
+    const { data: connectionRow } = await admin.from('ai_provider_connections').select('api_key').eq('provider', provider).maybeSingle();
+    const apiKey = connectionRow?.api_key || null;
 
     const assistantName = settings.assistantName || 'Assistant';
     const userFirstName = (callerProfile.name || '').trim().split(/\s+/)[0] || null;
@@ -118,7 +124,7 @@ Don't just answer the literal question and stop there — the way a genuinely us
 Current client data:
 ${appContext || '(no client data provided)'}`;
 
-    const result = await callAI(provider, messages, systemPrompt, { model });
+    const result = await callAI(provider, messages, systemPrompt, { model, apiKey });
 
     if (!result.ok) {
       // A friendlier message specifically when it's the person's OWN
