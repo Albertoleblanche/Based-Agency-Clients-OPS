@@ -1155,12 +1155,21 @@
   .claude-chat-cap{font-size:10.5px;color:var(--muted-lt);text-align:center;padding:6px 0 0;}
   .claude-empty-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;}
   .claude-sidebar{width:220px;flex:none;border-right:1px solid var(--border);display:flex;flex-direction:column;padding:12px;overflow-y:auto;}
-  .claude-sidebar-new-btn{display:flex;align-items:center;gap:8px;width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;margin-bottom:12px;flex:none;transition:background var(--duration-fast) var(--ease-out);}
+  .claude-sidebar-new-btn{display:flex;align-items:center;gap:8px;width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;margin-bottom:14px;flex:none;transition:background var(--duration-fast) var(--ease-out);}
   .claude-sidebar-new-btn:hover{background:var(--border);}
-  .claude-sidebar-list{display:flex;flex-direction:column;gap:2px;overflow-y:auto;}
-  .claude-sidebar-item{display:block;width:100%;text-align:left;padding:8px 10px;border-radius:8px;border:none;background:none;color:var(--ink);font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background var(--duration-fast) var(--ease-out);}
-  .claude-sidebar-item:hover{background:var(--surface-2);}
-  .claude-sidebar-item.active{background:var(--brand-bg);color:var(--brand-dark);font-weight:600;}
+  .claude-sidebar-heading{font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--muted-lt);padding:0 4px 8px;flex:none;}
+  .claude-sidebar-list{display:flex;flex-direction:column;gap:6px;overflow-y:auto;}
+  .claude-sidebar-row{position:relative;display:flex;align-items:center;gap:2px;background:#161616;border:1px solid #1e1d1d;border-radius:8px;transition:border-color var(--duration-fast) var(--ease-out);}
+  .claude-sidebar-row.active{border-color:var(--brand);}
+  .claude-sidebar-item{display:flex;align-items:center;gap:6px;flex:1;min-width:0;text-align:left;padding:8px 4px 8px 10px;border-radius:8px 0 0 8px;border:none;background:none;color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;cursor:pointer;}
+  .claude-sidebar-row.active .claude-sidebar-item{color:var(--brand);font-weight:600;}
+  .claude-sidebar-item-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+  .claude-sidebar-pin-icon{flex:none;color:var(--brand);}
+  .claude-sidebar-menu-btn{flex:none;width:26px;height:26px;border-radius:6px;border:none;background:none;color:rgba(255,255,255,.6);cursor:pointer;display:flex;align-items:center;justify-content:center;margin-right:4px;transition:background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);}
+  .claude-sidebar-menu-btn:hover{background:rgba(255,255,255,.1);color:#fff;}
+  .claude-sidebar-menu{position:absolute;top:calc(100% + 4px);right:0;width:150px;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 16px 40px rgba(16,24,40,.28);padding:5px;z-index:15;animation:modalCardIn var(--duration-base) var(--ease-out);}
+  .claude-sidebar-menu button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:7px 9px;border-radius:7px;border:none;background:none;color:var(--ink);font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;cursor:pointer;}
+  .claude-sidebar-menu button:hover{background:var(--surface-2);}
   .claude-quick-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;width:100%;max-width:520px;}
   .claude-quick-action{background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;color:var(--ink);text-align:left;cursor:pointer;transition:background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);}
   .claude-quick-action:hover{background:var(--border);border-color:var(--brand);}
@@ -1171,7 +1180,7 @@
   .claude-chat-input-row.pill-mode .claude-chat-input{border:none;background:transparent;padding:9px 6px;font-size:14.5px;max-height:120px;}
   .claude-chat-input-row.pill-mode .claude-chat-send{border-radius:50%;}
   /* Tab's input keeps a theme-adaptive fill, just with a persistent brand-colored glow border regardless of empty/active state (ID selector so it can't be affected by the shared .pill-mode rule above). */
-  #claudeTabInputRow{display:flex;flex-direction:column;gap:8px;padding:10px 12px 8px;background:#000;border:1.5px solid var(--brand);border-radius:16px;box-shadow:0 0 18px color-mix(in srgb, var(--brand) 40%, transparent), 0 0 40px color-mix(in srgb, var(--brand) 18%, transparent);}
+  #claudeTabInputRow{display:flex;flex-direction:column;gap:8px;padding:10px 12px 8px;background:#000;border:1.5px solid color-mix(in srgb, var(--brand) 55%, black);border-radius:16px;box-shadow:0 0 18px color-mix(in srgb, var(--brand) 40%, transparent), 0 0 40px color-mix(in srgb, var(--brand) 18%, transparent);}
   #claudeTabInputRow.claude-input-active{background:#171717;border-color:#313030;box-shadow:none;}
   #claudeTabInputRow .claude-chat-input{background:transparent;color:#fff;border:none;outline:none;flex:none;width:100%;}
   #claudeTabInputRow .claude-chat-input::placeholder{color:rgba(255,255,255,.5);}
@@ -2802,6 +2811,7 @@ document.addEventListener('DOMContentLoaded', function(){
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             New chat
           </button>
+          <div class="claude-sidebar-heading">Chats and Tasks</div>
           <div class="claude-sidebar-list" id="claudeSidebarList"></div>
         </div>
         <div style="position:relative;flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;">
@@ -10855,8 +10865,8 @@ async function loadClaudeHistory(){
 async function loadClaudeConversationsList(){
   if(!currentUser) return;
   const { data, error } = await supabaseClient
-    .from('claude_conversations').select('id, title, updated_at')
-    .eq('user_id', currentUser.id).order('updated_at', { ascending:false });
+    .from('claude_conversations').select('id, title, updated_at, pinned')
+    .eq('user_id', currentUser.id).order('pinned', { ascending:false }).order('updated_at', { ascending:false });
   if(error){ console.error('loadClaudeConversationsList error', error); return; }
   claudeConversationsList = data || [];
 }
@@ -10892,20 +10902,91 @@ function resetClaudeTabInput(){
   if(inputEl){ inputEl.value = ''; inputEl.style.height = 'auto'; }
 }
 
+const CLAUDE_SIDEBAR_ICONS = {
+  pin: '<line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>',
+  rename: '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>',
+};
+
 function renderClaudeConversationsSidebar(){
   const el = document.getElementById('claudeSidebarList');
   if(!el) return;
   el.innerHTML = claudeConversationsList.length
     ? claudeConversationsList.map(c=>`
-        <button type="button" class="claude-sidebar-item${c.id===claudeConversationId?' active':''}" onclick="openClaudeConversation('${c.id}')" title="${escapeHtml(c.title)}">${escapeHtml(c.title)}</button>
+        <div class="claude-sidebar-row${c.id===claudeConversationId?' active':''}">
+          <button type="button" class="claude-sidebar-item" onclick="openClaudeConversation('${c.id}')" title="${escapeHtml(c.title)}">
+            ${c.pinned ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none" class="claude-sidebar-pin-icon">${CLAUDE_SIDEBAR_ICONS.pin}</svg>` : ''}
+            <span class="claude-sidebar-item-label">${escapeHtml(c.title)}</span>
+          </button>
+          <button type="button" class="claude-sidebar-menu-btn" onclick="toggleClaudeSidebarMenu(event,'${c.id}')" title="More">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+          </button>
+          <div class="claude-sidebar-menu" id="claudeSidebarMenu-${c.id}" style="display:none;">
+            <button type="button" onclick="renameClaudeConversation('${c.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${CLAUDE_SIDEBAR_ICONS.rename}</svg> Rename</button>
+            <button type="button" onclick="togglePinClaudeConversation('${c.id}', ${!c.pinned})"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${CLAUDE_SIDEBAR_ICONS.pin}</svg> ${c.pinned?'Unpin':'Pin'}</button>
+          </div>
+        </div>
       `).join('')
     : `<p style="font-size:11.5px;color:var(--muted-lt);padding:8px 10px;margin:0;">No conversations yet.</p>`;
 }
 
+function toggleClaudeSidebarMenu(event, id){
+  event.stopPropagation();
+  document.querySelectorAll('.claude-sidebar-menu').forEach(m=>{ if(m.id !== 'claudeSidebarMenu-'+id) m.style.display = 'none'; });
+  const menu = document.getElementById('claudeSidebarMenu-'+id);
+  if(menu) menu.style.display = menu.style.display==='block' ? 'none' : 'block';
+}
+
+document.addEventListener('click', ()=>{
+  document.querySelectorAll('.claude-sidebar-menu').forEach(m=>m.style.display = 'none');
+});
+
+function renameClaudeConversation(id){
+  document.getElementById('claudeSidebarMenu-'+id) && (document.getElementById('claudeSidebarMenu-'+id).style.display = 'none');
+  const current = claudeConversationsList.find(c=>c.id===id);
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">Rename conversation</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <div class="settings-field"><label>Title</label><input id="claudeRenameInput" style="width:100%;" value="${(current?.title||'').replace(/"/g,'&quot;')}" onkeydown="if(event.key==='Enter')submitClaudeRename('${id}')"></div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Cancel</button><button class="btn btn-brand" onclick="submitClaudeRename('${id}')">Save</button></div>`, 420);
+  setTimeout(()=>{ const el = document.getElementById('claudeRenameInput'); if(el){ el.focus(); el.select(); } }, 50);
+}
+
+async function submitClaudeRename(id){
+  const input = document.getElementById('claudeRenameInput');
+  const trimmed = input ? input.value.trim() : '';
+  if(!trimmed){ showToast('error','Missing title','Give it a title first.'); return; }
+  const { error } = await supabaseClient.from('claude_conversations').update({ title: trimmed }).eq('id', id);
+  if(error){ showToast('error','Could not rename','Try again.'); return; }
+  closeAppModal();
+  await loadClaudeConversationsList();
+  renderClaudeConversationsSidebar();
+}
+
+async function togglePinClaudeConversation(id, pin){
+  document.getElementById('claudeSidebarMenu-'+id) && (document.getElementById('claudeSidebarMenu-'+id).style.display = 'none');
+  const { error } = await supabaseClient.from('claude_conversations').update({ pinned: pin }).eq('id', id);
+  if(error){ showToast('error','Could not update','Try again.'); return; }
+  await loadClaudeConversationsList();
+  renderClaudeConversationsSidebar();
+}
+
+// Called once the AI-generated title comes back from claude-chat.js,
+// replacing the placeholder truncated-text title ensureClaudeConversation()
+// had to use immediately (a real row was needed right away to persist
+// messages against, before any AI reply — let alone a title — existed).
+async function updateClaudeConversationTitle(id, title){
+  const { error } = await supabaseClient.from('claude_conversations').update({ title }).eq('id', id);
+  if(error){ console.error('updateClaudeConversationTitle error', error); return; }
+  await loadClaudeConversationsList();
+  renderClaudeConversationsSidebar();
+}
+
 // Creates the real claude_conversations row on the first message of a new
-// chat — everything after that just reuses claudeConversationId. Title is
-// a short truncation of that first message, matching how Claude.ai titles
-// a new chat from what you actually asked.
+// chat — everything after that just reuses claudeConversationId. Title
+// starts as a short truncation of that first message (a real row needs
+// SOME title immediately); sendClaudeMessage() swaps in the AI-generated
+// one once the reply actually comes back.
 async function ensureClaudeConversation(firstMessageText){
   if(claudeConversationId) return claudeConversationId;
   const title = (firstMessageText || 'New chat').trim().slice(0, 60) || 'New chat';
@@ -11157,6 +11238,7 @@ async function sendClaudeMessage(source){
   if(!text) return;
   inputEl.value = '';
   inputEl.style.height = 'auto';
+  const isFirstMessage = !claudeConversationId; // before ensureClaudeConversation sets it
   await ensureClaudeConversation(text);
   claudeConversation.push({role:'user', content:text});
   persistClaudeMessage('user', text);
@@ -11179,7 +11261,10 @@ async function sendClaudeMessage(source){
       // providerOverride is tab-only (the picker doesn't exist in the
       // floating panel's markup) — empty/missing means "use whatever the
       // admin configured," matching claude-chat.js's own fallback.
-      body: JSON.stringify({ messages: claudeConversation.slice(-CLAUDE_CONTEXT_WINDOW), appContext: buildClaudeContext(), providerOverride: source==='tab' ? loadClaudeProviderOverride() : null }),
+      // needsTitle asks the backend to also generate a short AI title for
+      // this conversation, alongside the reply — only worth doing once,
+      // on the very first message of a new chat.
+      body: JSON.stringify({ messages: claudeConversation.slice(-CLAUDE_CONTEXT_WINDOW), appContext: buildClaudeContext(), providerOverride: source==='tab' ? loadClaudeProviderOverride() : null, needsTitle: isFirstMessage }),
     });
     const data = await response.json();
     claudeSending = false;
@@ -11193,6 +11278,13 @@ async function sendClaudeMessage(source){
     const replyText = data.reply || '(no response)';
     claudeConversation.push({role:'assistant', content: replyText});
     persistClaudeMessage('assistant', replyText);
+    // The conversation was created with a placeholder title (a truncation
+    // of the raw first message) the moment it was ensured above, since a
+    // real row was needed right away to persist messages against — this
+    // swaps in the AI-generated one once it's actually back.
+    if(isFirstMessage && data.suggestedTitle){
+      updateClaudeConversationTitle(claudeConversationId, data.suggestedTitle);
+    }
     renderClaudeMessages(true);
     const capText = data.remainingToday!=null ? `${data.remainingToday} messages left today` : '';
     const tabCap = document.getElementById('claudeTabCap'); if(tabCap) tabCap.textContent = capText;
