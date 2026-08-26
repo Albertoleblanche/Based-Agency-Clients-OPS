@@ -1173,6 +1173,13 @@
   .claude-project-detail-body{flex:1;overflow-y:auto;padding:22px 24px;}
   .claude-project-detail-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:21px;font-weight:700;color:var(--ink);margin-bottom:8px;}
   .claude-project-detail-desc{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:18px;}
+  .claude-project-chat-input-slot{max-width:600px;margin:0 0 22px;}
+  .claude-project-conv-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:11px 4px;border:none;border-bottom:1px solid var(--border);background:none;color:var(--ink);font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;transition:background var(--duration-fast) var(--ease-out);}
+  .claude-project-conv-row:hover{background:var(--surface-2);}
+  .claude-project-conv-row.claude-project-conv-row-last{border-bottom:none;}
+  .claude-project-conv-icon{flex:none;color:var(--muted-lt);}
+  .claude-project-conv-title{flex:1;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .claude-project-conv-date{flex:none;font-size:11px;color:var(--muted-lt);}
   .claude-sidebar-list{display:flex;flex-direction:column;gap:6px;overflow-y:auto;}
   .claude-sidebar-row{position:relative;display:flex;align-items:center;gap:2px;border-radius:6px;transition:background var(--duration-fast) var(--ease-out);}
   .claude-sidebar-row:hover{background:#ffffff17;}
@@ -11017,7 +11024,20 @@ function renderClaudeProjectsMain(){
 // Header (search + New project) and grid are rendered separately —
 // filterClaudeProjects() only ever touches the grid afterward, so typing
 // in the search box never rebuilds (and un-focuses) the input itself.
+// Rescues the one real chat input element before any innerHTML rewrite
+// that might currently contain it as a descendant — used before
+// re-rendering either Projects screen, since the input can be embedded
+// inside a project's detail view (see renderClaudeProjectDetailView) and
+// blindly replacing that container's innerHTML would otherwise destroy
+// the actual singleton textarea, not just move it.
+function rescueClaudeInputRow(){
+  const inputRow = document.getElementById('claudeTabInputRow');
+  const dock = document.getElementById('claudeTabInputDock');
+  if(inputRow && dock && inputRow.parentElement !== dock) dock.appendChild(inputRow);
+}
+
 function renderClaudeProjectsListView(el){
+  rescueClaudeInputRow();
   el.innerHTML = `
     <div class="claude-projects-header">
       <div class="claude-search-wrap">
@@ -11049,12 +11069,22 @@ function filterClaudeProjects(value){
   renderClaudeProjectsGrid();
 }
 
+// Viewing a project's detail always represents "start something new in
+// this project" — the real chat input gets embedded directly here (moved
+// in, not duplicated) instead of requiring an extra "+ New chat" click
+// first. Sending from here works exactly like sendClaudeMessage() always
+// has; it just switches the view to the normal chat surface the moment a
+// message actually goes out (see sendClaudeMessage's projects-view check).
 function renderClaudeProjectDetailView(el){
   const project = claudeProjectsList.find(p=>p.id===claudeCurrentProjectId);
   if(!project){ claudeCurrentProjectId = null; renderClaudeProjectsListView(el); return; }
+  rescueClaudeInputRow();
+  claudeConversationId = null;
+  claudeConversation = [];
+  claudePendingProjectId = project.id;
   el.innerHTML = `
     <div class="claude-project-detail-head">
-      <span class="row-link" onclick="openClaudeProjectsView()">← All projects</span>
+      <div></div>
       <div style="display:flex;align-items:center;gap:8px;">
         <button class="btn btn-outline" onclick="openEditClaudeProjectModal('${project.id}')">Edit</button>
         <button class="btn btn-outline" style="color:var(--red);" onclick="deleteClaudeProject('${project.id}')">Delete</button>
@@ -11063,10 +11093,14 @@ function renderClaudeProjectDetailView(el){
     <div class="claude-project-detail-body">
       <div class="claude-project-detail-title">${escapeHtml(project.name)}</div>
       <p class="claude-project-detail-desc">${project.description ? escapeHtml(project.description) : 'No description.'}</p>
-      <button class="btn btn-brand" style="margin-bottom:18px;" onclick="startNewClaudeConversationInProject('${project.id}')">+ New chat in this project</button>
-      <div class="claude-sidebar-heading">Conversations in this project</div>
+      <div class="claude-project-chat-input-slot" id="claudeProjectInputSlot"></div>
+      <div class="claude-sidebar-heading" style="margin-top:22px;">Recent</div>
       <div id="claudeProjectConversationsList"></div>
     </div>`;
+  resetClaudeTabInput();
+  const inputRow = document.getElementById('claudeTabInputRow');
+  const slot = document.getElementById('claudeProjectInputSlot');
+  if(inputRow && slot) slot.appendChild(inputRow);
   loadClaudeProjectConversations(project.id);
 }
 
@@ -11078,21 +11112,13 @@ async function loadClaudeProjectConversations(projectId){
   if(!listEl) return;
   if(error){ console.error('loadClaudeProjectConversations error', error); listEl.innerHTML = ''; return; }
   listEl.innerHTML = (data && data.length)
-    ? data.map(c=>`<button type="button" class="claude-sidebar-item" style="width:100%;padding:9px 10px;" onclick="openClaudeConversation('${c.id}')" title="${escapeHtml(c.title)}"><span class="claude-sidebar-item-label">${escapeHtml(c.title)}</span></button>`).join('')
+    ? data.map((c,i)=>`
+        <button type="button" class="claude-project-conv-row${i===data.length-1?' claude-project-conv-row-last':''}" onclick="openClaudeConversation('${c.id}')" title="${escapeHtml(c.title)}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="claude-project-conv-icon"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span class="claude-project-conv-title">${escapeHtml(c.title)}</span>
+          <span class="claude-project-conv-date">${new Date(c.updated_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
+        </button>`).join('')
     : `<p style="font-size:12px;color:var(--muted-lt);">No conversations in this project yet.</p>`;
-}
-
-// Same as startNewClaudeConversation(), but tags the eventual new row with
-// this project — ensureClaudeConversation() reads and consumes
-// claudePendingProjectId the moment it actually creates that row.
-function startNewClaudeConversationInProject(projectId){
-  claudeConversationId = null;
-  claudeConversation = [];
-  claudePendingProjectId = projectId;
-  resetClaudeTabInput();
-  showClaudeMainArea('chat');
-  renderClaudeConversationsSidebar();
-  renderClaudeMessages();
 }
 
 function openNewClaudeProjectModal(){
@@ -11163,6 +11189,8 @@ const CLAUDE_SIDEBAR_ICONS = {
   pin: '<line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>',
   rename: '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>',
   trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+  folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>',
+  chevronRight: '<polyline points="9 18 15 12 9 6"/>',
 };
 
 function renderClaudeConversationsSidebar(){
@@ -11186,6 +11214,24 @@ function renderClaudeConversationsSidebar(){
           <div class="claude-sidebar-menu" id="claudeSidebarMenu-${c.id}" style="display:none;">
             <button type="button" onclick="renameClaudeConversation('${c.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${CLAUDE_SIDEBAR_ICONS.rename}</svg> Rename</button>
             <button type="button" onclick="togglePinClaudeConversation('${c.id}', ${!c.pinned})"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${CLAUDE_SIDEBAR_ICONS.pin}</svg> ${c.pinned?'Unpin':'Pin'}</button>
+            ${c.project_id ? `
+            <div style="position:relative;">
+              <button type="button" onclick="toggleClaudeSidebarProjectSubmenu(event,'${c.id}')" style="justify-content:space-between;">
+                <span style="display:flex;align-items:center;gap:8px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${CLAUDE_SIDEBAR_ICONS.folder}</svg> Change project</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${CLAUDE_SIDEBAR_ICONS.chevronRight}</svg>
+              </button>
+              <div class="claude-provider-menu" id="claudeSidebarProjectSubmenu-${c.id}" style="display:none;left:calc(100% + 6px);top:-6px;bottom:auto;width:180px;"></div>
+            </div>
+            <button type="button" style="color:var(--muted);" onclick="removeClaudeConversationFromProjectMenu('${c.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${CLAUDE_SIDEBAR_ICONS.folder}</svg> Remove from project</button>
+            ` : `
+            <div style="position:relative;">
+              <button type="button" onclick="toggleClaudeSidebarProjectSubmenu(event,'${c.id}')" style="justify-content:space-between;">
+                <span style="display:flex;align-items:center;gap:8px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${CLAUDE_SIDEBAR_ICONS.folder}</svg> Add to project</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${CLAUDE_SIDEBAR_ICONS.chevronRight}</svg>
+              </button>
+              <div class="claude-provider-menu" id="claudeSidebarProjectSubmenu-${c.id}" style="display:none;left:calc(100% + 6px);top:-6px;bottom:auto;width:180px;"></div>
+            </div>
+            `}
             <button type="button" style="color:var(--red);" onclick="deleteClaudeConversationFromMenu('${c.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${CLAUDE_SIDEBAR_ICONS.trash}</svg> Delete</button>
           </div>
         </div>
@@ -11287,6 +11333,54 @@ async function deleteClaudeConversationFromMenu(id){
   }
   await loadClaudeConversationsList();
   renderClaudeConversationsSidebar();
+}
+
+// The sidebar 3-dot menu's project submenu — "Add to project" if the
+// conversation isn't in one yet, "Change project" if it already is
+// (Remove from project sits as its own direct action next to it, no
+// submenu needed for that one).
+function toggleClaudeSidebarProjectSubmenu(event, id){
+  event.stopPropagation();
+  const submenu = document.getElementById('claudeSidebarProjectSubmenu-'+id);
+  if(!submenu) return;
+  const opening = submenu.style.display !== 'block';
+  submenu.style.display = opening ? 'block' : 'none';
+  if(opening) renderClaudeSidebarProjectSubmenu(id);
+}
+
+function renderClaudeSidebarProjectSubmenu(id){
+  const el = document.getElementById('claudeSidebarProjectSubmenu-'+id);
+  if(!el) return;
+  if(!claudeProjectsList.length){
+    el.innerHTML = `<p style="font-size:11px;color:var(--muted-lt);padding:8px 10px;margin:0;">No projects yet.</p>`;
+    return;
+  }
+  const conv = claudeConversationsList.find(c=>c.id===id);
+  const currentProjectId = conv?.project_id || null;
+  el.innerHTML = claudeProjectsList.map(p=>`
+    <button type="button" class="claude-popup-menu-btn" onclick="assignClaudeConversationToProjectFromSidebar('${id}','${p.id}')">${p.id===currentProjectId?'✓ ':''}${escapeHtml(p.name)}</button>
+  `).join('');
+}
+
+async function assignClaudeConversationToProjectFromSidebar(convId, projectId){
+  const menu = document.getElementById('claudeSidebarMenu-'+convId);
+  if(menu) menu.style.display = 'none';
+  const { error } = await supabaseClient.from('claude_conversations').update({ project_id: projectId }).eq('id', convId);
+  if(error){ showToast('error','Could not update','Try again.'); return; }
+  await loadClaudeConversationsList();
+  renderClaudeConversationsSidebar();
+  const projectName = claudeProjectsList.find(p=>p.id===projectId)?.name || 'the project';
+  showToast('success','Added to project', `This chat is now part of "${projectName}".`);
+}
+
+async function removeClaudeConversationFromProjectMenu(id){
+  const menu = document.getElementById('claudeSidebarMenu-'+id);
+  if(menu) menu.style.display = 'none';
+  const { error } = await supabaseClient.from('claude_conversations').update({ project_id: null }).eq('id', id);
+  if(error){ showToast('error','Could not update','Try again.'); return; }
+  await loadClaudeConversationsList();
+  renderClaudeConversationsSidebar();
+  showToast('success','Removed from project','This chat is no longer part of a project.');
 }
 
 // Called once the AI-generated title comes back from claude-chat.js,
@@ -11598,7 +11692,8 @@ function renderClaudePlusSubmenu(){
 }
 
 // Retroactively assigns the currently open conversation to a project —
-// complements startNewClaudeConversationInProject(), which only covers a
+// complements the embedded chat input on a project's detail view (see
+// renderClaudeProjectDetailView), which only covers a
 // conversation created FROM a project; this is the other direction, for
 // something already underway that you decide should belong to one.
 async function assignClaudeConversationToProject(projectId){
@@ -11650,6 +11745,16 @@ async function sendClaudeMessage(source){
   inputEl.value = '';
   inputEl.style.height = 'auto';
   const isFirstMessage = !claudeConversationId; // before ensureClaudeConversation sets it
+  // If this input was embedded in a project's detail screen, sending
+  // switches to the normal chat view first — layoutClaudeSurface()
+  // (triggered by renderClaudeMessages() below) would otherwise try to
+  // dock this same input element while the Projects screen is still the
+  // visible one, making it silently vanish from view instead of showing
+  // the reply.
+  if(source==='tab'){
+    const projectsView = document.getElementById('claudeProjectsView');
+    if(projectsView && projectsView.style.display !== 'none') showClaudeMainArea('chat');
+  }
   await ensureClaudeConversation(text);
   claudeConversation.push({role:'user', content:text});
   persistClaudeMessage('user', text);
