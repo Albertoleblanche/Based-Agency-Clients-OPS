@@ -1115,6 +1115,12 @@
   .claude-chat-send{flex:none;width:36px;height:36px;border-radius:10px;background:var(--brand);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:opacity var(--duration-fast) var(--ease-out);}
   .claude-chat-send:disabled{opacity:.5;cursor:default;}
   .claude-chat-cap{font-size:10.5px;color:var(--muted-lt);text-align:center;padding:6px 0 0;}
+  .claude-empty-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;}
+  .claude-empty-greeting{font-size:23px;font-weight:600;color:var(--ink);text-align:center;}
+  .claude-empty-inputwrap{width:100%;max-width:520px;}
+  .claude-chat-input-row.pill-mode{border-top:none;background:var(--surface-2);border-radius:999px;padding:6px 6px 6px 20px;border:1px solid var(--border);}
+  .claude-chat-input-row.pill-mode .claude-chat-input{border:none;background:transparent;padding:9px 6px;font-size:14.5px;max-height:120px;}
+  .claude-chat-input-row.pill-mode .claude-chat-send{border-radius:50%;}
   .tour-spotlight{position:relative;z-index:1601;border-radius:10px;box-shadow:0 0 0 5px rgba(255,255,255,.18), 0 0 0 9999px rgba(16,24,40,.72);transition:box-shadow .35s ease;}
   .tour-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
   .tour-step-count{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;letter-spacing:.06em;color:var(--muted-lt);}
@@ -2343,6 +2349,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="panel" style="margin-bottom:24px;">
           <div class="panel-head"><span class="panel-title">Assistant AI Provider</span></div>
           <div class="panel-body">
+            <div class="settings-field"><label>Assistant name</label><input id="setAssistantName" style="width:100%;" placeholder="Assistant" onchange="saveAssistantName(this.value)"></div>
             <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.6;">Which AI actually powers the Assistant tab and floating button — this only affects the Assistant, not the email draft generation on each client. Whichever you pick needs its own API key already set up on the server; picking one without its key configured will show an error, not silently fall back to the other.</p>
             <div style="display:flex;flex-direction:column;gap:10px;">
               <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--ink);">
@@ -2705,16 +2712,22 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="claude-chat-head">
           <div class="claude-chat-head-title">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="color:var(--brand-dark);"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/></svg>
-            Assistant
+            <span class="claude-assistant-name-label">Assistant</span>
           </div>
           <span class="row-link" onclick="clearClaudeChat()">Clear chat</span>
         </div>
         <div class="claude-chat-messages" id="claudeTabMessages"></div>
-        <div class="claude-chat-input-row">
-          <textarea spellcheck="true" class="claude-chat-input" id="claudeTabInput" rows="1" placeholder="Ask about a client, or paste a link to review…" onkeydown="handleClaudeInputKey(event, 'tab')"></textarea>
-          <button class="claude-chat-send" id="claudeTabSendBtn" onclick="sendClaudeMessage('tab')" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+        <div class="claude-empty-hero" id="claudeTabEmptyHero" style="display:none;">
+          <div class="claude-empty-greeting" id="claudeTabGreeting"></div>
+          <div class="claude-empty-inputwrap" id="claudeTabInputSlot"></div>
         </div>
-        <div class="claude-chat-cap" id="claudeTabCap"></div>
+        <div class="claude-chat-input-dock" id="claudeTabInputDock">
+          <div class="claude-chat-input-row" id="claudeTabInputRow">
+            <textarea spellcheck="true" class="claude-chat-input" id="claudeTabInput" rows="1" placeholder="Ask about a client, or paste a link to review…" onkeydown="handleClaudeInputKey(event, 'tab')"></textarea>
+            <button class="claude-chat-send" id="claudeTabSendBtn" onclick="sendClaudeMessage('tab')" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+          </div>
+          <div class="claude-chat-cap" id="claudeTabCap"></div>
+        </div>
       </div>
     </div>
 
@@ -2729,16 +2742,22 @@ document.addEventListener('DOMContentLoaded', function(){
   <div class="claude-chat-head">
     <div class="claude-chat-head-title">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="color:var(--brand-dark);"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/></svg>
-      Assistant
+      <span class="claude-assistant-name-label">Assistant</span>
     </div>
     <span class="toast-close" onclick="toggleClaudeFloatPanel()">✕</span>
   </div>
   <div class="claude-chat-messages" id="claudeFloatMessages"></div>
-  <div class="claude-chat-input-row">
-    <textarea spellcheck="true" class="claude-chat-input" id="claudeFloatInput" rows="1" placeholder="Ask anything…" onkeydown="handleClaudeInputKey(event, 'float')"></textarea>
-    <button class="claude-chat-send" id="claudeFloatSendBtn" onclick="sendClaudeMessage('float')" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+  <div class="claude-empty-hero" id="claudeFloatEmptyHero" style="display:none;">
+    <div class="claude-empty-greeting" id="claudeFloatGreeting"></div>
+    <div class="claude-empty-inputwrap" id="claudeFloatInputSlot"></div>
   </div>
-  <div class="claude-chat-cap" id="claudeFloatCap"></div>
+  <div class="claude-chat-input-dock" id="claudeFloatInputDock">
+    <div class="claude-chat-input-row" id="claudeFloatInputRow">
+      <textarea spellcheck="true" class="claude-chat-input" id="claudeFloatInput" rows="1" placeholder="Ask anything…" onkeydown="handleClaudeInputKey(event, 'float')"></textarea>
+      <button class="claude-chat-send" id="claudeFloatSendBtn" onclick="sendClaudeMessage('float')" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+    </div>
+    <div class="claude-chat-cap" id="claudeFloatCap"></div>
+  </div>
 </div>
 
 <div class="toast-stack" id="toastStack"></div>
@@ -3399,6 +3418,8 @@ async function loadAll(){
   settings.overtimeMultiplier = settings.overtimeMultiplier ?? 1.5;
   settings.claudeModel = settings.claudeModel || DEFAULT_CLAUDE_MODEL;
   settings.openaiModel = settings.openaiModel || DEFAULT_OPENAI_MODEL;
+  settings.assistantName = settings.assistantName || 'Assistant';
+  applyAssistantName();
   const sheetInput = document.getElementById('sheetCsvUrl');
   if(sheetInput && document.activeElement !== sheetInput) sheetInput.value = settings.sheetCsvUrl || '';
   // Personal to the viewer, not part of the shared settings blob — comes
@@ -10729,6 +10750,39 @@ function buildClaudeContext(){
   return rows.join('\n');
 }
 
+// Moves the real input+send-button pair (there's only ever one per
+// surface — no duplicated elements to keep in sync) between two homes:
+// centered in the empty-state hero (Gemini-style: big greeting, big pill
+// input) when there's no conversation yet, or docked at the bottom once
+// messages exist. Same "move the real DOM node, don't duplicate it"
+// technique already used for the calendar dropdown elsewhere in this file.
+function layoutClaudeSurface(prefix){
+  const messagesEl = document.getElementById(prefix+'Messages');
+  const heroEl = document.getElementById(prefix+'EmptyHero');
+  const dockEl = document.getElementById(prefix+'InputDock');
+  const slotEl = document.getElementById(prefix+'InputSlot');
+  const rowEl = document.getElementById(prefix+'InputRow');
+  const greetingEl = document.getElementById(prefix+'Greeting');
+  if(!messagesEl || !heroEl || !dockEl || !slotEl || !rowEl) return;
+
+  const isEmpty = claudeConversation.length===0 && !claudeSending;
+  if(isEmpty){
+    const firstName = (myProfile?.name||'').trim().split(/\s+/)[0];
+    if(greetingEl) greetingEl.textContent = firstName ? `It's your turn, ${firstName}!` : `What can I help with?`;
+    messagesEl.style.display = 'none';
+    dockEl.style.display = 'none';
+    heroEl.style.display = 'flex';
+    rowEl.classList.add('pill-mode');
+    if(rowEl.parentElement !== slotEl) slotEl.appendChild(rowEl);
+  } else {
+    heroEl.style.display = 'none';
+    messagesEl.style.display = 'flex';
+    dockEl.style.display = 'block';
+    rowEl.classList.remove('pill-mode');
+    if(rowEl.parentElement !== dockEl) dockEl.insertBefore(rowEl, dockEl.firstChild);
+  }
+}
+
 function renderClaudeMessages(){
   const html = claudeConversation.map(m=>
     `<div class="claude-msg claude-msg-${m.role}">${escapeHtml(m.content)}</div>`
@@ -10736,9 +10790,11 @@ function renderClaudeMessages(){
   ['claudeTabMessages','claudeFloatMessages'].forEach(id=>{
     const el = document.getElementById(id);
     if(!el) return;
-    el.innerHTML = html || `<div style="text-align:center;color:var(--muted-lt);font-size:12.5px;margin-top:20px;">Ask about a client, get a recommendation, or paste a link to review.</div>`;
+    el.innerHTML = html;
     el.scrollTop = el.scrollHeight;
   });
+  layoutClaudeSurface('claudeTab');
+  layoutClaudeSurface('claudeFloat');
 }
 
 function handleClaudeInputKey(e, source){
@@ -13643,6 +13699,8 @@ function renderAiProviderChoice(){
   const openaiRadio = document.getElementById('aiProviderOpenai');
   if(claudeRadio){ claudeRadio.checked = provider==='claude'; claudeRadio.disabled = !isAdmin(); }
   if(openaiRadio){ openaiRadio.checked = provider==='openai'; openaiRadio.disabled = !isAdmin(); }
+  const nameInput = document.getElementById('setAssistantName');
+  if(nameInput && document.activeElement !== nameInput){ nameInput.value = settings.assistantName || ''; nameInput.disabled = !isAdmin(); }
   const claudeModelInput = document.getElementById('setClaudeModel');
   const openaiModelInput = document.getElementById('setOpenaiModel');
   if(claudeModelInput && document.activeElement !== claudeModelInput){ claudeModelInput.value = settings.claudeModel || ''; claudeModelInput.disabled = !isAdmin(); }
@@ -13697,6 +13755,30 @@ async function saveAiModel(which, value){
   else settings.openaiModel = trimmed || DEFAULT_OPENAI_MODEL;
   const ok = await persistSettings();
   ok ? showToast('success','Saved', `${which==='claude'?'Claude':'OpenAI'} model updated.`) : showToast('error','Save failed','Could not save — try again.');
+}
+
+async function saveAssistantName(value){
+  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  settings.assistantName = value.trim() || 'Assistant';
+  const ok = await persistSettings();
+  if(ok) applyAssistantName();
+  ok ? showToast('success','Saved', `The Assistant is now called "${settings.assistantName}".`) : showToast('error','Save failed','Could not save — try again.');
+}
+
+// Updates every place the Assistant's name shows in the live UI — the tab
+// header, the floating panel header, and the sidebar nav tooltip. The
+// system prompt itself (so the AI introduces itself with this name, not
+// just the UI chrome) is handled server-side in claude-chat.js, which
+// reads the same settings.assistantName value.
+function applyAssistantName(){
+  const name = settings.assistantName || 'Assistant';
+  document.querySelectorAll('.claude-assistant-name-label').forEach(el => el.textContent = name);
+  const navItem = document.getElementById('claudeNavItem');
+  if(navItem) navItem.setAttribute('data-tooltip', name);
+  const tabInput = document.getElementById('claudeTabInput');
+  if(tabInput) tabInput.placeholder = `Ask ${name} about a client, or paste a link to review…`;
+  const floatInput = document.getElementById('claudeFloatInput');
+  if(floatInput) floatInput.placeholder = `Ask ${name} anything…`;
 }
 
 async function saveEmailInstructions(){
