@@ -1158,6 +1158,20 @@
   .claude-sidebar-new-btn{display:flex;align-items:center;gap:8px;width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;margin-bottom:14px;flex:none;transition:background var(--duration-fast) var(--ease-out);}
   .claude-sidebar-new-btn:hover{background:var(--border);}
   .claude-sidebar-heading{font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--muted-lt);padding:0 4px 8px;flex:none;}
+  .claude-projects-view{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+  .claude-projects-header{display:flex;align-items:center;gap:12px;padding:18px 24px;border-bottom:1px solid var(--border);flex:none;}
+  .claude-search-wrap{position:relative;flex:1;max-width:340px;}
+  .claude-search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted-lt);pointer-events:none;}
+  .claude-search-wrap input{width:100%;padding:8px 12px 8px 33px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--ink);font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;}
+  .claude-projects-grid{flex:1;overflow-y:auto;padding:22px 24px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;align-content:start;}
+  .claude-project-card{border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:border-color var(--duration-fast) var(--ease-out);}
+  .claude-project-card:hover{border-color:var(--brand);}
+  .claude-project-card-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;color:var(--ink);margin-bottom:6px;}
+  .claude-project-card-desc{font-size:12px;color:var(--muted);line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+  .claude-project-detail-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 24px;border-bottom:1px solid var(--border);flex:none;}
+  .claude-project-detail-body{flex:1;overflow-y:auto;padding:22px 24px;}
+  .claude-project-detail-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:21px;font-weight:700;color:var(--ink);margin-bottom:8px;}
+  .claude-project-detail-desc{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:18px;}
   .claude-sidebar-list{display:flex;flex-direction:column;gap:6px;overflow-y:auto;}
   .claude-sidebar-row{position:relative;display:flex;align-items:center;gap:2px;border-radius:6px;transition:background var(--duration-fast) var(--ease-out);}
   .claude-sidebar-row:hover{background:#ffffff17;}
@@ -2816,8 +2830,14 @@ document.addEventListener('DOMContentLoaded', function(){
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             New chat
           </button>
+          <button type="button" class="claude-sidebar-new-btn" onclick="openClaudeProjectsView()" style="margin-bottom:20px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>
+            Projects
+          </button>
           <div class="claude-sidebar-heading">Chats and Tasks</div>
           <div class="claude-sidebar-list" id="claudeSidebarList"></div>
+          <div class="claude-sidebar-heading" style="margin-top:20px;">Projects</div>
+          <div class="claude-sidebar-list" id="claudeSidebarProjectsList"></div>
         </div>
         <div style="position:relative;flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;">
         <div class="claude-chat-messages" id="claudeTabMessages"></div>
@@ -2831,6 +2851,7 @@ document.addEventListener('DOMContentLoaded', function(){
             <button class="claude-quick-action" onclick="sendClaudeQuickAction(this)">Check a client's website for issues</button>
           </div>
         </div>
+        <div class="claude-projects-view" id="claudeProjectsView" style="display:none;"></div>
         <div class="claude-chat-input-dock" id="claudeTabInputDock" style="max-width:600px;margin:0 auto;width:100%;">
           <div class="claude-chat-input-row" id="claudeTabInputRow">
             <textarea spellcheck="true" class="claude-chat-input" id="claudeTabInput" rows="1" placeholder="Ask about a client, or paste a link to review…" onkeydown="handleClaudeInputKey(event, 'tab')" oninput="autoGrowClaudeInput(this)"></textarea>
@@ -10844,7 +10865,11 @@ let claudeConversation = []; // [{role:'user'|'assistant', content:'...'}] — m
 let claudeSending = false;
 let claudeHistoryLoaded = false;
 let claudeConversationId = null; // the currently open conversation's id, or null before the first message of a new one is sent
-let claudeConversationsList = []; // [{id, title, updated_at}] — sidebar cache, most-recently-updated first
+let claudeConversationsList = []; // [{id, title, updated_at, pinned}] — sidebar cache, most-recently-updated first
+let claudeProjectsList = []; // [{id, name, description, updated_at}]
+let claudeCurrentProjectId = null; // set while viewing a specific project's detail screen; null on the projects list screen
+let claudeProjectsSearchQuery = '';
+let claudePendingProjectId = null; // set by "New chat in this project"; consumed once by ensureClaudeConversation() to tag the new row
 // How many past messages get displayed vs. actually sent as context to the
 // AI on each new message — kept separate on purpose. Displaying more is
 // free (just reading rows already fetched); SENDING more costs real
@@ -10854,16 +10879,17 @@ let claudeConversationsList = []; // [{id, title, updated_at}] — sidebar cache
 const CLAUDE_HISTORY_DISPLAY_LIMIT = 60;
 const CLAUDE_CONTEXT_WINDOW = 20;
 
-// Loads this person's list of past conversations once per session (not
-// once per open — switching between the floating button and the full tab
-// shouldn't re-fetch) and opens the most recently active one, matching
-// how Claude.ai itself resumes where you left off. See
-// schema-clients-migration-addendum-10.sql for the underlying
-// multi-conversation schema.
+// Loads this person's list of past conversations AND projects once per
+// session (not once per open — switching between the floating button and
+// the full tab shouldn't re-fetch) and opens the most recently active
+// conversation, matching how Claude.ai itself resumes where you left off.
+// See schema-clients-migration-addendum-10.sql and addendum-12.sql for
+// the underlying schema.
 async function loadClaudeHistory(){
   if(claudeHistoryLoaded || !currentUser) return;
   claudeHistoryLoaded = true; // set eagerly so a near-simultaneous second call (tab and float opened together) can't double-fetch
-  await loadClaudeConversationsList();
+  await Promise.all([loadClaudeConversationsList(), loadClaudeProjectsList()]);
+  renderClaudeSidebarProjects();
   if(claudeConversationsList.length){
     await openClaudeConversation(claudeConversationsList[0].id);
   } else {
@@ -10888,6 +10914,7 @@ async function openClaudeConversation(id){
   claudeConversationId = id;
   claudeConversation = (data||[]).map(m=>({ role:m.role, content:m.content }));
   resetClaudeTabInput();
+  showClaudeMainArea('chat');
   renderClaudeConversationsSidebar();
   renderClaudeMessages();
 }
@@ -10899,7 +10926,9 @@ async function openClaudeConversation(id){
 function startNewClaudeConversation(){
   claudeConversationId = null;
   claudeConversation = [];
+  claudePendingProjectId = null; // an unrelated "New chat" click shouldn't inherit a leftover project tag from a previous "New chat in this project" action
   resetClaudeTabInput();
+  showClaudeMainArea('chat');
   renderClaudeConversationsSidebar();
   renderClaudeMessages();
 }
@@ -10911,9 +10940,220 @@ function resetClaudeTabInput(){
   if(inputEl){ inputEl.value = ''; inputEl.style.height = 'auto'; }
 }
 
+// Swaps the tab's main content area between the normal chat surface
+// (messages/empty-hero/input-dock) and the Projects screen — they share
+// the same space rather than living side by side, since only one is ever
+// relevant at a time.
+function showClaudeMainArea(mode){
+  const messagesEl = document.getElementById('claudeTabMessages');
+  const heroEl = document.getElementById('claudeTabEmptyHero');
+  const dockEl = document.getElementById('claudeTabInputDock');
+  const projectsEl = document.getElementById('claudeProjectsView');
+  if(!messagesEl || !heroEl || !dockEl || !projectsEl) return;
+  if(mode === 'projects'){
+    messagesEl.style.display = 'none';
+    heroEl.style.display = 'none';
+    dockEl.style.display = 'none';
+    projectsEl.style.display = 'flex';
+  } else {
+    projectsEl.style.display = 'none';
+    layoutClaudeSurface('claudeTab'); // restores whichever of messages/hero + dock actually applies
+  }
+}
+
+async function loadClaudeProjectsList(){
+  if(!currentUser) return;
+  const { data, error } = await supabaseClient
+    .from('claude_projects').select('id, name, description, updated_at')
+    .eq('user_id', currentUser.id).order('name', { ascending:true });
+  if(error){ console.error('loadClaudeProjectsList error', error); return; }
+  claudeProjectsList = data || [];
+}
+
+function renderClaudeSidebarProjects(){
+  const el = document.getElementById('claudeSidebarProjectsList');
+  if(!el) return;
+  el.innerHTML = claudeProjectsList.length
+    ? claudeProjectsList.map(p=>`
+        <div class="claude-sidebar-row${p.id===claudeCurrentProjectId?' active':''}">
+          <button type="button" class="claude-sidebar-item" onclick="openClaudeProjectDetail('${p.id}')" title="${escapeHtml(p.name)}">
+            <span class="claude-sidebar-item-label">${escapeHtml(p.name)}</span>
+          </button>
+        </div>
+      `).join('')
+    : `<p style="font-size:11.5px;color:var(--muted-lt);padding:8px 10px;margin:0;">No projects yet.</p>`;
+}
+
+function openClaudeProjectsView(){
+  claudeCurrentProjectId = null;
+  showClaudeMainArea('projects');
+  renderClaudeSidebarProjects();
+  renderClaudeProjectsMain();
+}
+
+function openClaudeProjectDetail(id){
+  claudeCurrentProjectId = id;
+  showClaudeMainArea('projects');
+  renderClaudeSidebarProjects();
+  renderClaudeProjectsMain();
+}
+
+function renderClaudeProjectsMain(){
+  const el = document.getElementById('claudeProjectsView');
+  if(!el) return;
+  if(claudeCurrentProjectId) renderClaudeProjectDetailView(el);
+  else renderClaudeProjectsListView(el);
+}
+
+// Header (search + New project) and grid are rendered separately —
+// filterClaudeProjects() only ever touches the grid afterward, so typing
+// in the search box never rebuilds (and un-focuses) the input itself.
+function renderClaudeProjectsListView(el){
+  el.innerHTML = `
+    <div class="claude-projects-header">
+      <div class="claude-search-wrap">
+        <svg class="claude-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="claudeProjectsSearchInput" placeholder="Search projects…" value="${escapeHtml(claudeProjectsSearchQuery)}" oninput="filterClaudeProjects(this.value)">
+      </div>
+      <button class="btn btn-brand" style="flex:none;" onclick="openNewClaudeProjectModal()">+ New project</button>
+    </div>
+    <div class="claude-projects-grid" id="claudeProjectsGrid"></div>`;
+  renderClaudeProjectsGrid();
+}
+
+function renderClaudeProjectsGrid(){
+  const gridEl = document.getElementById('claudeProjectsGrid');
+  if(!gridEl) return;
+  const q = claudeProjectsSearchQuery.trim().toLowerCase();
+  const filtered = q ? claudeProjectsList.filter(p=>p.name.toLowerCase().includes(q)) : claudeProjectsList;
+  gridEl.innerHTML = filtered.length
+    ? filtered.map(p=>`
+        <div class="claude-project-card" onclick="openClaudeProjectDetail('${p.id}')">
+          <div class="claude-project-card-name">${escapeHtml(p.name)}</div>
+          <div class="claude-project-card-desc">${p.description ? escapeHtml(p.description) : '<span style="color:var(--muted-lt);">No description</span>'}</div>
+        </div>`).join('')
+    : `<p style="font-size:12.5px;color:var(--muted-lt);grid-column:1/-1;">${q ? 'No projects match your search.' : 'No projects yet — create one to get started.'}</p>`;
+}
+
+function filterClaudeProjects(value){
+  claudeProjectsSearchQuery = value;
+  renderClaudeProjectsGrid();
+}
+
+function renderClaudeProjectDetailView(el){
+  const project = claudeProjectsList.find(p=>p.id===claudeCurrentProjectId);
+  if(!project){ claudeCurrentProjectId = null; renderClaudeProjectsListView(el); return; }
+  el.innerHTML = `
+    <div class="claude-project-detail-head">
+      <span class="row-link" onclick="openClaudeProjectsView()">← All projects</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="btn btn-outline" onclick="openEditClaudeProjectModal('${project.id}')">Edit</button>
+        <button class="btn btn-outline" style="color:var(--red);" onclick="deleteClaudeProject('${project.id}')">Delete</button>
+      </div>
+    </div>
+    <div class="claude-project-detail-body">
+      <div class="claude-project-detail-title">${escapeHtml(project.name)}</div>
+      <p class="claude-project-detail-desc">${project.description ? escapeHtml(project.description) : 'No description.'}</p>
+      <button class="btn btn-brand" style="margin-bottom:18px;" onclick="startNewClaudeConversationInProject('${project.id}')">+ New chat in this project</button>
+      <div class="claude-sidebar-heading">Conversations in this project</div>
+      <div id="claudeProjectConversationsList"></div>
+    </div>`;
+  loadClaudeProjectConversations(project.id);
+}
+
+async function loadClaudeProjectConversations(projectId){
+  const { data, error } = await supabaseClient
+    .from('claude_conversations').select('id, title, updated_at')
+    .eq('project_id', projectId).order('updated_at', { ascending:false });
+  const listEl = document.getElementById('claudeProjectConversationsList');
+  if(!listEl) return;
+  if(error){ console.error('loadClaudeProjectConversations error', error); listEl.innerHTML = ''; return; }
+  listEl.innerHTML = (data && data.length)
+    ? data.map(c=>`<button type="button" class="claude-sidebar-item" style="width:100%;padding:9px 10px;" onclick="openClaudeConversation('${c.id}')" title="${escapeHtml(c.title)}"><span class="claude-sidebar-item-label">${escapeHtml(c.title)}</span></button>`).join('')
+    : `<p style="font-size:12px;color:var(--muted-lt);">No conversations in this project yet.</p>`;
+}
+
+// Same as startNewClaudeConversation(), but tags the eventual new row with
+// this project — ensureClaudeConversation() reads and consumes
+// claudePendingProjectId the moment it actually creates that row.
+function startNewClaudeConversationInProject(projectId){
+  claudeConversationId = null;
+  claudeConversation = [];
+  claudePendingProjectId = projectId;
+  resetClaudeTabInput();
+  showClaudeMainArea('chat');
+  renderClaudeConversationsSidebar();
+  renderClaudeMessages();
+}
+
+function openNewClaudeProjectModal(){
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">New project</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <div class="settings-field"><label>Name</label><input id="claudeProjectNameInput" style="width:100%;" placeholder="e.g. Q3 Client Campaigns"></div>
+      <div class="settings-field"><label>Description <span style="font-weight:400;color:var(--muted-lt);">(optional)</span></label><textarea id="claudeProjectDescInput" style="width:100%;min-height:80px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="What's this project about?"></textarea></div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Cancel</button><button class="btn btn-brand" onclick="submitNewClaudeProject()">Create</button></div>`, 460);
+  setTimeout(()=>{ document.getElementById('claudeProjectNameInput')?.focus(); }, 50);
+}
+
+async function submitNewClaudeProject(){
+  const name = document.getElementById('claudeProjectNameInput').value.trim();
+  const description = document.getElementById('claudeProjectDescInput').value.trim();
+  if(!name){ showToast('error','Missing name','Give the project a name first.'); return; }
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Creating…');
+  const { error } = await supabaseClient.from('claude_projects').insert({ user_id: currentUser.id, name, description: description || null });
+  restoreBtn(btn);
+  if(error){ showToast('error','Could not create','Try again.'); return; }
+  closeAppModal();
+  await loadClaudeProjectsList();
+  renderClaudeSidebarProjects();
+  if(document.getElementById('claudeProjectsView')?.style.display !== 'none') renderClaudeProjectsMain();
+}
+
+function openEditClaudeProjectModal(id){
+  const project = claudeProjectsList.find(p=>p.id===id);
+  if(!project) return;
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">Edit project</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <div class="settings-field"><label>Name</label><input id="claudeProjectNameInput" style="width:100%;" value="${(project.name||'').replace(/"/g,'&quot;')}"></div>
+      <div class="settings-field"><label>Description</label><textarea id="claudeProjectDescInput" style="width:100%;min-height:80px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${escapeHtml(project.description||'')}</textarea></div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Cancel</button><button class="btn btn-brand" onclick="submitEditClaudeProject('${id}')">Save</button></div>`, 460);
+  setTimeout(()=>{ document.getElementById('claudeProjectNameInput')?.focus(); }, 50);
+}
+
+async function submitEditClaudeProject(id){
+  const name = document.getElementById('claudeProjectNameInput').value.trim();
+  const description = document.getElementById('claudeProjectDescInput').value.trim();
+  if(!name){ showToast('error','Missing name','Give the project a name first.'); return; }
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Saving…');
+  const { error } = await supabaseClient.from('claude_projects').update({ name, description: description || null, updated_at: new Date().toISOString() }).eq('id', id);
+  restoreBtn(btn);
+  if(error){ showToast('error','Could not save','Try again.'); return; }
+  closeAppModal();
+  await loadClaudeProjectsList();
+  renderClaudeSidebarProjects();
+  renderClaudeProjectsMain();
+}
+
+async function deleteClaudeProject(id){
+  if(!(await confirmDialog('Delete this project? Its conversations stay — they just get unlinked from it.', {confirmLabel:'Delete', destructive:true}))) return;
+  const { error } = await supabaseClient.from('claude_projects').delete().eq('id', id);
+  if(error){ showToast('error','Could not delete','Try again.'); return; }
+  claudeCurrentProjectId = null;
+  await loadClaudeProjectsList();
+  renderClaudeSidebarProjects();
+  openClaudeProjectsView();
+}
+
 const CLAUDE_SIDEBAR_ICONS = {
   pin: '<line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>',
   rename: '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
 };
 
 function renderClaudeConversationsSidebar(){
@@ -10937,6 +11177,7 @@ function renderClaudeConversationsSidebar(){
           <div class="claude-sidebar-menu" id="claudeSidebarMenu-${c.id}" style="display:none;">
             <button type="button" onclick="renameClaudeConversation('${c.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${CLAUDE_SIDEBAR_ICONS.rename}</svg> Rename</button>
             <button type="button" onclick="togglePinClaudeConversation('${c.id}', ${!c.pinned})"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${CLAUDE_SIDEBAR_ICONS.pin}</svg> ${c.pinned?'Unpin':'Pin'}</button>
+            <button type="button" style="color:var(--red);" onclick="deleteClaudeConversationFromMenu('${c.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${CLAUDE_SIDEBAR_ICONS.trash}</svg> Delete</button>
           </div>
         </div>
       `).join('')
@@ -11019,6 +11260,26 @@ async function togglePinClaudeConversation(id, pin){
   renderClaudeConversationsSidebar();
 }
 
+// Deletes any conversation directly from the sidebar's 3-dot menu, not
+// just the currently open one — clearClaudeChat() (the toolbar "Delete
+// chat" button) only ever handles the open conversation, this handles
+// any of them without needing to open it first.
+async function deleteClaudeConversationFromMenu(id){
+  const menu = document.getElementById('claudeSidebarMenu-'+id);
+  if(menu) menu.style.display = 'none';
+  if(!(await confirmDialog('Delete this conversation? This deletes it for good, including its message history.', {confirmLabel:'Delete', destructive:true}))) return;
+  const { error } = await supabaseClient.from('claude_conversations').delete().eq('id', id);
+  if(error){ showToast('error','Could not delete','Try again.'); return; }
+  if(claudeConversationId === id){
+    claudeConversationId = null;
+    claudeConversation = [];
+    resetClaudeTabInput();
+    renderClaudeMessages();
+  }
+  await loadClaudeConversationsList();
+  renderClaudeConversationsSidebar();
+}
+
 // Called once the AI-generated title comes back from claude-chat.js,
 // replacing the placeholder truncated-text title ensureClaudeConversation()
 // had to use immediately (a real row was needed right away to persist
@@ -11034,12 +11295,17 @@ async function updateClaudeConversationTitle(id, title){
 // chat — everything after that just reuses claudeConversationId. Title
 // starts as a short truncation of that first message (a real row needs
 // SOME title immediately); sendClaudeMessage() swaps in the AI-generated
-// one once the reply actually comes back.
+// one once the reply actually comes back. Tags the row with
+// claudePendingProjectId if "New chat in this project" set one — consumed
+// (reset to null) here regardless of outcome, so it can never leak into
+// some later unrelated conversation.
 async function ensureClaudeConversation(firstMessageText){
   if(claudeConversationId) return claudeConversationId;
   const title = (firstMessageText || 'New chat').trim().slice(0, 60) || 'New chat';
+  const projectId = claudePendingProjectId;
+  claudePendingProjectId = null;
   const { data, error } = await supabaseClient
-    .from('claude_conversations').insert({ user_id: currentUser.id, title }).select('id').single();
+    .from('claude_conversations').insert({ user_id: currentUser.id, title, project_id: projectId }).select('id').single();
   if(error){ console.error('ensureClaudeConversation error', error); return null; }
   claudeConversationId = data.id;
   await loadClaudeConversationsList();
