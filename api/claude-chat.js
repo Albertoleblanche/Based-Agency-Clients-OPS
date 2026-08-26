@@ -74,7 +74,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const { messages, appContext, providerOverride } = req.body || {};
+    const { messages, appContext, providerOverride, needsTitle } = req.body || {};
     if (!Array.isArray(messages) || !messages.length) {
       res.status(400).json({ error: 'Missing messages' });
       return;
@@ -127,7 +127,27 @@ STRICT FORMATTING RULE: Do NOT use Markdown formatting symbols like hashtags (##
 Current client data:
 ${appContext || '(no client data provided)'}`;
 
-    const result = await callAI(provider, messages, systemPrompt, { model, apiKey });
+    // Kicked off at the same time as the main reply, not after it — a
+    // second sequential call just to name the chat would add real latency
+    // to every first message of a new conversation. Only fired when the
+    // frontend flags this as a brand-new conversation (needsTitle) —
+    // every later message in the same conversation skips this entirely.
+    // A failure here just means no suggested title comes back; the
+    // frontend already has its own truncated-text fallback for that.
+    const resultPromise = callAI(provider, messages, systemPrompt, { model, apiKey });
+
+    let titlePromise = Promise.resolve(null);
+    if (needsTitle && Array.isArray(messages) && messages.length) {
+      const firstUserMessage = messages.find(m => m.role === 'user')?.content || '';
+      if (firstUserMessage) {
+        titlePromise = callAI(provider, [{ role: 'user', content: firstUserMessage }],
+          'Generate a short title (3-6 words, no quotes, no trailing punctuation) summarizing what this chat is about, based on the person\'s message. Respond with ONLY the title text and nothing else.',
+          { maxTokens: 20, webSearch: false, model, apiKey }
+        ).catch(() => null);
+      }
+    }
+
+    const [result, titleResult] = await Promise.all([resultPromise, titlePromise]);
 
     if (!result.ok) {
       // A friendlier message specifically when it's the person's OWN
@@ -154,7 +174,12 @@ ${appContext || '(no client data provided)'}`;
       { onConflict: 'user_id,usage_date' }
     );
 
-    res.status(200).json({ reply: result.reply, remainingToday: DAILY_MESSAGE_CAP - (usedToday + 1), provider });
+    res.status(200).json({
+      reply: result.reply,
+      remainingToday: DAILY_MESSAGE_CAP - (usedToday + 1),
+      provider,
+      suggestedTitle: (titleResult && titleResult.ok && titleResult.reply) ? titleResult.reply.trim() : null,
+    });
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
