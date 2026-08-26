@@ -1101,10 +1101,11 @@
   .claude-chat-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);flex:none;}
   .claude-chat-head-title{display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:600;color:var(--ink);}
   .claude-chat-messages{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:12px;}
+  #claudeTabMessages{width:800px;max-width:100%;margin:0 auto;}
   .claude-msg{max-width:88%;padding:10px 13px;border-radius:12px;font-size:13px;line-height:1.55;white-space:pre-wrap;animation:claudeMsgIn .22s ease;}
   @keyframes claudeMsgIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
-  .claude-msg-user{align-self:flex-end;background:var(--brand);color:#fff;border-bottom-right-radius:4px;}
-  .claude-msg-assistant{align-self:flex-start;background:var(--surface-2);color:var(--ink);border-bottom-left-radius:4px;}
+  .claude-msg-user{align-self:flex-end;background:#ffffff17;color:#fff;font-size:15px;border-bottom-right-radius:4px;}
+  .claude-msg-assistant{align-self:flex-start;color:var(--ink);font-size:15px;border-bottom-left-radius:4px;}
   .claude-msg-typing{align-self:flex-start;display:flex;gap:4px;padding:12px 14px;background:var(--surface-2);border-radius:12px;border-bottom-left-radius:4px;}
   .claude-msg-typing span{width:6px;height:6px;border-radius:50%;background:var(--muted-lt);animation:claudeTyping 1.2s ease-in-out infinite;}
   .claude-msg-typing span:nth-child(2){animation-delay:.15s;}
@@ -1129,7 +1130,7 @@
   .claude-chat-input-row.pill-mode .claude-chat-send{border-radius:50%;}
   /* Tab's input keeps a theme-adaptive fill, just with a persistent brand-colored glow border regardless of empty/active state (ID selector so it can't be affected by the shared .pill-mode rule above). */
   #claudeTabInputRow{background:#000;border:1.5px solid var(--brand);border-radius:16px;box-shadow:0 0 18px color-mix(in srgb, var(--brand) 40%, transparent), 0 0 40px color-mix(in srgb, var(--brand) 18%, transparent);}
-  #claudeTabInputRow .claude-chat-input{background:transparent;color:#fff;}
+  #claudeTabInputRow .claude-chat-input{background:transparent;color:#fff;border:none;outline:none;}
   #claudeTabInputRow .claude-chat-input::placeholder{color:rgba(255,255,255,.5);}
   .tour-spotlight{position:relative;z-index:1601;border-radius:10px;box-shadow:0 0 0 5px rgba(255,255,255,.18), 0 0 0 9999px rgba(16,24,40,.72);transition:box-shadow .35s ease;}
   .tour-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
