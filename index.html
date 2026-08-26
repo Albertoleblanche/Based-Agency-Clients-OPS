@@ -589,6 +589,18 @@
   .pill-brand{background:var(--brand-bg);color:var(--brand-dark);}
   .pill-mid{background:var(--amber-bg);color:var(--amber);}
   .pill-bad{background:var(--red-bg);color:var(--red);}
+  .ai-provider-card{border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;transition:border-color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);}
+  .ai-provider-card.active{border-color:var(--brand);background:var(--brand-bg);}
+  .ai-provider-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+  .ai-provider-radio{display:flex;align-items:flex-start;gap:10px;cursor:pointer;flex:1;min-width:0;}
+  .ai-provider-radio input[type="radio"]{margin-top:3px;flex:none;}
+  .ai-provider-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;color:var(--ink);}
+  .ai-provider-desc{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.4;}
+  .ai-connection-status{flex:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(--surface-2);color:var(--muted);}
+  .ai-connection-status.connected{background:var(--green-bg);color:var(--green);}
+  .ai-connection-status.none{background:var(--red-bg);color:var(--red);}
+  .ai-provider-card-footer{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
+  .ai-provider-model-input{flex:1;min-width:0;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;padding:7px 10px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);}
   .row-link{color:var(--brand-dark);font-size:12px;font-weight:600;cursor:pointer;}
   .back-btn{display:inline-flex;align-items:center;gap:6px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;font-weight:600;color:var(--muted);background:transparent;border:none;border-radius:var(--radius-sm);padding:7px 10px 7px 8px;cursor:pointer;transition:background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);}
   .back-btn:hover{background:var(--surface-2);color:var(--ink);}
@@ -2373,32 +2385,41 @@ document.addEventListener('DOMContentLoaded', function(){
           <div class="panel-head"><span class="panel-title">Assistant AI Provider</span></div>
           <div class="panel-body">
             <div class="settings-field"><label>Assistant name</label><input id="setAssistantName" style="width:100%;" placeholder="Assistant" onchange="saveAssistantName(this.value)"></div>
-            <div style="margin:16px 0;padding:14px;border:1px solid var(--border);border-radius:10px;">
-              <div style="font-size:11px;font-weight:700;letter-spacing:0.03em;text-transform:uppercase;color:var(--muted-lt);margin-bottom:10px;">Connections</div>
-              <p style="font-size:11.5px;color:var(--muted);margin:0 0 12px;line-height:1.5;">Connect an API key directly here — no Vercel environment variable or redeploy needed. A key is tested against the real provider before it's saved, and is never shown again afterward, even to you.</p>
-              <div id="aiConnectionRow-claude" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
-                <div><div style="font-size:13px;font-weight:600;color:var(--ink);">Claude</div><div class="ai-connection-status" style="font-size:11.5px;color:var(--muted-lt);">Checking…</div></div>
-                <button class="btn btn-outline ai-connection-btn" style="flex:none;" onclick="openAiProviderConnectModal('claude')">Connect</button>
+            <p style="font-size:12px;color:var(--muted);margin:14px 0 12px;line-height:1.6;">Pick which one actually answers in the Assistant tab — needs a key connected below first, or it'll show an error instead of silently using the other.</p>
+
+            <div class="ai-provider-card" id="aiProviderCard-claude">
+              <div class="ai-provider-card-head">
+                <label class="ai-provider-radio">
+                  <input type="radio" name="aiProvider" id="aiProviderClaude" value="claude" onchange="saveAiProvider('claude')">
+                  <div>
+                    <div class="ai-provider-name">Claude</div>
+                    <div class="ai-provider-desc">Separate account/billing from the rest of the app</div>
+                  </div>
+                </label>
+                <span class="ai-connection-status" id="aiConnectionStatus-claude">Checking…</span>
               </div>
-              <div id="aiConnectionRow-openai" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0 0;">
-                <div><div style="font-size:13px;font-weight:600;color:var(--ink);">ChatGPT</div><div class="ai-connection-status" style="font-size:11.5px;color:var(--muted-lt);">Checking…</div></div>
-                <button class="btn btn-outline ai-connection-btn" style="flex:none;" onclick="openAiProviderConnectModal('openai')">Connect</button>
+              <div class="ai-provider-card-footer">
+                <input id="setClaudeModel" class="ai-provider-model-input" placeholder="${DEFAULT_CLAUDE_MODEL}" onchange="saveAiModel('claude', this.value)" title="Exact model string sent to Claude">
+                <button class="btn btn-outline ai-connection-btn" id="aiConnectionBtn-claude" onclick="openAiProviderConnectModal('claude')">Connect</button>
               </div>
             </div>
-            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.6;">Which AI actually powers the Assistant tab and floating button — this only affects the Assistant, not the email draft generation on each client. Whichever you pick needs its own API key connected above (or set as a Vercel environment variable); picking one without a key configured will show an error, not silently fall back to the other.</p>
-            <div style="display:flex;flex-direction:column;gap:10px;">
-              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--ink);">
-                <input type="radio" name="aiProvider" id="aiProviderClaude" value="claude" onchange="saveAiProvider('claude')">
-                Claude — separate account/billing from the rest of the app
-              </label>
-              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--ink);">
-                <input type="radio" name="aiProvider" id="aiProviderOpenai" value="openai" onchange="saveAiProvider('openai')">
-                ChatGPT — same account and model already used for draft generation
-              </label>
+
+            <div class="ai-provider-card" id="aiProviderCard-openai">
+              <div class="ai-provider-card-head">
+                <label class="ai-provider-radio">
+                  <input type="radio" name="aiProvider" id="aiProviderOpenai" value="openai" onchange="saveAiProvider('openai')">
+                  <div>
+                    <div class="ai-provider-name">ChatGPT</div>
+                    <div class="ai-provider-desc">Same account and model already used for draft generation</div>
+                  </div>
+                </label>
+                <span class="ai-connection-status" id="aiConnectionStatus-openai">Checking…</span>
+              </div>
+              <div class="ai-provider-card-footer">
+                <input id="setOpenaiModel" class="ai-provider-model-input" placeholder="${DEFAULT_OPENAI_MODEL}" onchange="saveAiModel('openai', this.value)" title="Exact model string sent to OpenAI">
+                <button class="btn btn-outline ai-connection-btn" id="aiConnectionBtn-openai" onclick="openAiProviderConnectModal('openai')">Connect</button>
+              </div>
             </div>
-            <p style="font-size:12px;color:var(--muted);margin:16px 0 10px;line-height:1.6;">Exact model string sent to each provider — the Assistant's weekly proactive-insights check (and, for OpenAI, per-client draft generation too) uses whichever is set here. Update this instead of redeploying code when a provider deprecates or renames a model.</p>
-            <div class="settings-field"><label>Claude model</label><input id="setClaudeModel" placeholder="${DEFAULT_CLAUDE_MODEL}" onchange="saveAiModel('claude', this.value)"></div>
-            <div class="settings-field"><label>OpenAI model</label><input id="setOpenaiModel" placeholder="${DEFAULT_OPENAI_MODEL}" onchange="saveAiModel('openai', this.value)"></div>
           </div>
         </div>
 
@@ -13861,6 +13882,8 @@ function renderAiProviderChoice(){
   const openaiRadio = document.getElementById('aiProviderOpenai');
   if(claudeRadio){ claudeRadio.checked = provider==='claude'; claudeRadio.disabled = !isAdmin(); }
   if(openaiRadio){ openaiRadio.checked = provider==='openai'; openaiRadio.disabled = !isAdmin(); }
+  document.getElementById('aiProviderCard-claude')?.classList.toggle('active', provider==='claude');
+  document.getElementById('aiProviderCard-openai')?.classList.toggle('active', provider==='openai');
   const nameInput = document.getElementById('setAssistantName');
   if(nameInput && document.activeElement !== nameInput){ nameInput.value = settings.assistantName || ''; nameInput.disabled = !isAdmin(); }
   const claudeModelInput = document.getElementById('setClaudeModel');
@@ -13939,14 +13962,19 @@ async function loadAiProviderConnectionStatus(){
     const data = await adminActionCall('get-ai-connections');
     ['claude','openai'].forEach(provider=>{
       const info = data[provider];
-      const row = document.getElementById('aiConnectionRow-'+provider);
-      if(!row) return;
-      const statusEl = row.querySelector('.ai-connection-status');
-      const btnEl = row.querySelector('.ai-connection-btn');
+      const statusEl = document.getElementById('aiConnectionStatus-'+provider);
+      const btnEl = document.getElementById('aiConnectionBtn-'+provider);
       if(statusEl){
-        statusEl.textContent = info.connected
-          ? `Connected — added ${new Date(info.connectedAt).toLocaleDateString()}`
-          : (info.envConfigured ? 'Configured via Vercel environment variable' : 'Not connected');
+        statusEl.classList.remove('connected','none');
+        if(info.connected){
+          statusEl.textContent = `Connected · ${new Date(info.connectedAt).toLocaleDateString()}`;
+          statusEl.classList.add('connected');
+        } else if(info.envConfigured){
+          statusEl.textContent = 'Via Vercel env var';
+        } else {
+          statusEl.textContent = 'Not connected';
+          statusEl.classList.add('none');
+        }
       }
       if(btnEl) btnEl.textContent = info.connected ? 'Reconnect' : 'Connect';
     });
