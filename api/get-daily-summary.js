@@ -54,18 +54,24 @@ module.exports = async function handler(req, res) {
     let entriesQuery = admin.from('time_entries').select('*').eq('entry_date', date).is('deleted_at', null);
     if (!isTeamView) entriesQuery = entriesQuery.eq('user_id', callerData.user.id);
 
-    const [{ data: entries, error: entriesErr }, { data: profiles, error: profilesErr }, { data: appDataRow }] = await Promise.all([
+    // clients moved to a real table in schema-clients-migration.sql — this
+    // file was missed during that migration's ~150-call-site refactor and
+    // kept reading from the old app_storage JSON blob, which no longer
+    // has any client data in it at all. That's why client_id never
+    // resolved to a real name here. Not filtering out trashed clients —
+    // a time entry logged against a client that's since been moved to
+    // Trash should still show its real name, not "Unknown client".
+    const [{ data: entries, error: entriesErr }, { data: profiles, error: profilesErr }, { data: clientsData, error: clientsErr }] = await Promise.all([
       entriesQuery,
       admin.from('team_profiles').select('id, name'),
-      admin.from('app_storage').select('value').eq('key', 'app-data').maybeSingle(),
+      admin.from('clients').select('id, name'),
     ]);
-    if (entriesErr || profilesErr) {
-      res.status(500).json({ error: (entriesErr || profilesErr).message });
+    if (entriesErr || profilesErr || clientsErr) {
+      res.status(500).json({ error: (entriesErr || profilesErr || clientsErr).message });
       return;
     }
 
-    const appData = appDataRow ? JSON.parse(appDataRow.value) : { clients: [] };
-    const clients = appData.clients || [];
+    const clients = clientsData || [];
     const nameOf = (id) => profiles?.find(p => p.id === id)?.name || 'Someone no longer on the team';
     const clientNameOf = (id) => clients.find(c => c.id === id)?.name || 'Unknown client';
 
