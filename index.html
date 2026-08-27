@@ -2494,6 +2494,11 @@ document.addEventListener('DOMContentLoaded', function(){
               </div>
             </div>
             </div>
+            <div class="settings-field" style="margin-top:18px;">
+              <label>Custom instructions <span style="font-weight:400;color:var(--muted-lt);">(optional)</span></label>
+              <textarea id="setAssistantInstructions" style="width:100%;min-height:100px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="e.g. Always mention the danger score when discussing a client. Keep responses under 150 words unless asked for more detail." onchange="saveAssistantInstructions(this.value)"></textarea>
+              <p style="font-size:11px;color:var(--muted-lt);margin:6px 0 0;line-height:1.5;">Added on top of what the Assistant already knows on its own (its name, your live client data) — this is the place to tweak its tone, add specific rules, or give it standing context that should apply to every conversation, without needing to edit code.</p>
+            </div>
           </div>
         </div>
 
@@ -14728,6 +14733,8 @@ function renderAiProviderChoice(){
   }
   const nameInput = document.getElementById('setAssistantName');
   if(nameInput && document.activeElement !== nameInput){ nameInput.value = settings.assistantName || ''; nameInput.disabled = !isAdmin(); }
+  const instructionsInput = document.getElementById('setAssistantInstructions');
+  if(instructionsInput && document.activeElement !== instructionsInput){ instructionsInput.value = settings.assistantCustomInstructions || ''; instructionsInput.disabled = !isAdmin(); }
   const claudeModelInput = document.getElementById('setClaudeModel');
   const openaiModelInput = document.getElementById('setOpenaiModel');
   if(claudeModelInput && document.activeElement !== claudeModelInput){ claudeModelInput.value = settings.claudeModel || ''; claudeModelInput.disabled = !isAdmin(); }
@@ -14875,6 +14882,13 @@ async function saveAssistantName(value){
   const ok = await persistSettings();
   if(ok) applyAssistantName();
   ok ? showToast('success','Saved', `The Assistant is now called "${settings.assistantName}".`) : showToast('error','Save failed','Could not save — try again.');
+}
+
+async function saveAssistantInstructions(value){
+  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  settings.assistantCustomInstructions = value.trim();
+  const ok = await persistSettings();
+  ok ? showToast('success','Saved','Custom instructions updated — they apply to the Assistant\'s next reply onward.') : showToast('error','Save failed','Could not save — try again.');
 }
 
 // Updates every place the Assistant's name shows in the live UI — the tab
