@@ -612,6 +612,8 @@
   .row-link:hover{text-decoration:underline;}
 
   .empty{padding:34px 18px;text-align:center;color:var(--muted);font-size:var(--text-base);}
+  .skeleton-block{display:inline-block;border-radius:5px;background:linear-gradient(90deg, var(--border) 25%, var(--surface-2) 50%, var(--border) 75%);background-size:200% 100%;animation:skeletonShimmer 1.5s ease-in-out infinite;}
+  @keyframes skeletonShimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
   .empty-rich{display:flex;flex-direction:column;align-items:center;gap:10px;padding:36px 20px;text-align:center;}
   .empty-rich-icon{width:44px;height:44px;border-radius:50%;background:var(--surface-2);display:flex;align-items:center;justify-content:center;color:var(--muted-lt);}
   .empty-rich-title{font-size:var(--text-base);font-weight:600;color:var(--ink);}
@@ -3019,6 +3021,12 @@ document.addEventListener('DOMContentLoaded', function(){
 <script>
 let clients = [];
 let clientImprovements = []; // flat table now — hydrated onto each client's .improvements in loadAll()
+// Distinguishes "genuinely zero clients" from "the initial fetch just
+// hasn't come back yet" — without this, renderClientsTable() couldn't
+// tell the two apart, since clients starts as an empty array either way,
+// and would show the misleading "No clients yet, add your first one"
+// empty state during the loading window instead of a loading indicator.
+let clientsDataLoaded = false;
 
 // clients[] stays the full list (including soft-deleted) so historical
 // lookups by id — old time entries, notes, activity log — still resolve a
@@ -3605,6 +3613,7 @@ async function loadAll(){
   clients = (clientsRes.data || []).map(clientRowFromDb);
   clientImprovements = (impRes.data || []).map(improvementRowFromDb);
   clients.forEach(c => { c.improvements = clientImprovements.filter(i => i.clientId === c.id); });
+  clientsDataLoaded = true;
   settings = s ? JSON.parse(s) : {};
   settings.sheetCsvUrl = settings.sheetCsvUrl || '';
   settings.serviceOptions = (settings.serviceOptions && settings.serviceOptions.length) ? settings.serviceOptions : DEFAULT_SERVICE_OPTIONS.slice();
@@ -6214,10 +6223,41 @@ function matchesClientFilters(c){
   return true;
 }
 
+// One skeleton row's worth of placeholder shapes, matching the real
+// table's actual columns (avatar+name, service, status, importance,
+// danger, logged, actions) so the loading state doesn't visually jump
+// once real rows replace it.
+function clientsSkeletonRowHtml(){
+  return `<tr class="skeleton-row">
+    <td class="client-bulk-checkbox-cell" style="width:36px;display:none;"></td>
+    <td>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="skeleton-block" style="width:34px;height:34px;border-radius:50%;flex:none;"></div>
+        <div style="flex:1;min-width:0;">
+          <div class="skeleton-block" style="width:70%;max-width:140px;height:13px;margin-bottom:6px;"></div>
+          <div class="skeleton-block" style="width:45%;max-width:100px;height:10px;"></div>
+        </div>
+      </div>
+    </td>
+    <td><div class="skeleton-block" style="width:70px;height:12px;"></div></td>
+    <td><div class="skeleton-block" style="width:64px;height:20px;border-radius:999px;"></div></td>
+    <td><div class="skeleton-block" style="width:36px;height:12px;"></div></td>
+    <td><div class="skeleton-block" style="width:36px;height:12px;"></div></td>
+    <td><div class="skeleton-block" style="width:64px;height:20px;border-radius:999px;"></div></td>
+    <td></td>
+  </tr>`;
+}
+
 function renderClientsTable(){
   const tbody = document.getElementById('clientsTbody');
   const countEl = document.getElementById('clientsFilterCount');
   updateSortArrows();
+  if(!clientsDataLoaded){
+    tbody.innerHTML = Array.from({ length: 6 }).map(clientsSkeletonRowHtml).join('');
+    if(countEl) countEl.textContent = '';
+    const pag = document.getElementById('clientsPagination'); if(pag) pag.innerHTML = '';
+    return;
+  }
   const ac = activeClients();
   if(!ac.length){
     tbody.innerHTML = `<tr><td colspan="8">${emptyStateHtml(
