@@ -4023,7 +4023,7 @@ async function fullRefresh(showFeedback){
   if(syncEl) syncEl.textContent = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
   if(showFeedback && btn){ btn.disabled = false; btn.innerHTML = refreshIcon + ' Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
-function renderAll(){ renderKpis(); renderClientsTable(); renderQueue(); renderTeamQueue(); renderLog(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); syncDarkModeToggleUI(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); renderTasks(); renderCalendar(); renderTimesheet(); renderTrash(); renderReminders(); }
+function renderAll(){ renderKpis(); renderClientsTable(); renderClientDetail(); renderQueue(); renderTeamQueue(); renderLog(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); syncDarkModeToggleUI(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); renderTasks(); renderCalendar(); renderTimesheet(); renderTrash(); renderReminders(); }
 
 function switchTrashTab(name){
   document.querySelectorAll('#trashTabsBar .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.ttab===name));
@@ -7095,10 +7095,37 @@ function openNoteModalFromDetail(){
 }
 
 function renderClientDetail(){
+  // Only meaningful — and only safe — when this view is actually the one
+  // currently showing. Unlike most other renderAll() functions, which
+  // write into view-specific elements that are simply invisible
+  // otherwise, this one writes into topbarTitle/topbarSub, which are
+  // shared and reused by every single page. Running this unconditionally
+  // would stomp over whatever title the page you're actually looking at
+  // had legitimately set, every time renderAll() runs in the background.
+  if(!document.getElementById('view-clientdetail')?.classList.contains('active')) return;
   const metricsEl = document.getElementById('cdMetrics');
   if(!metricsEl) return;
   const titleEl = document.getElementById('topbarTitle');
   const subEl = document.getElementById('topbarSub');
+  // Distinguishes "the initial fetch hasn't come back yet" from "this
+  // client genuinely doesn't exist" — without this check, opening a
+  // client's page before clients has loaded (a deep link, a bookmark, or
+  // just a fast click right after login) showed "Client not found — this
+  // client may have been removed," which is simply false. Worse, since
+  // nothing ever re-rendered this page once loading actually finished, it
+  // stayed stuck on that false message until manually navigating away and
+  // back — see the renderAll() fix alongside this one.
+  if(!clientsDataLoaded){
+    if(titleEl) titleEl.innerHTML = `<span class="skeleton-block" style="width:160px;height:16px;"></span>`;
+    if(subEl) subEl.innerHTML = `<span class="skeleton-block" style="width:220px;height:11px;"></span>`;
+    const skeletonCard = () => `<div class="metric-card"><div class="skeleton-block" style="width:70px;height:10px;margin-bottom:10px;"></div><div class="skeleton-block" style="width:50px;height:19px;"></div></div>`;
+    metricsEl.innerHTML = Array.from({ length: 4 }).map(skeletonCard).join('');
+    ['cdImprovements','cdDraftStatus','cdTimeEntries','cdNotes'].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.innerHTML = `<div class="empty"><span class="spinner"></span>Loading…</div>`;
+    });
+    return;
+  }
   const c = clients.find(x=>x.id===currentDetailClientId);
   if(!c){
     if(titleEl) titleEl.textContent = 'Client not found';
