@@ -2491,7 +2491,7 @@ document.addEventListener('DOMContentLoaded', function(){
                   <input type="radio" name="aiProvider" id="aiProviderOpenai" value="openai" onchange="saveAiProvider('openai')">
                   <div>
                     <div class="ai-provider-name">ChatGPT</div>
-                    <div class="ai-provider-desc">Same account and model already used for draft generation</div>
+                    <div class="ai-provider-desc">Same account used for draft generation — or any OpenAI-compatible endpoint</div>
                   </div>
                 </label>
                 <span class="ai-connection-status" id="aiConnectionStatus-openai">Checking…</span>
@@ -14902,7 +14902,8 @@ async function loadAiProviderConnectionStatus(){
       if(statusEl){
         statusEl.classList.remove('connected','none');
         if(info.connected){
-          statusEl.textContent = `Connected · ${new Date(info.connectedAt).toLocaleDateString()}`;
+          statusEl.textContent = info.baseUrl ? `Connected · custom endpoint · ${new Date(info.connectedAt).toLocaleDateString()}` : `Connected · ${new Date(info.connectedAt).toLocaleDateString()}`;
+          statusEl.title = info.baseUrl ? info.baseUrl : '';
           statusEl.classList.add('connected');
         } else if(info.envConfigured){
           statusEl.textContent = 'Via Vercel env var';
@@ -14922,11 +14923,19 @@ function openAiProviderConnectModal(provider){
   if(!isAdmin()){ showToast('error','Not allowed','Only admins can connect a provider.'); return; }
   const label = provider==='claude' ? 'Claude (Anthropic)' : 'ChatGPT (OpenAI)';
   const keyHint = provider==='claude' ? 'sk-ant-…' : 'sk-…';
+  // Only the openai slot supports a custom endpoint — Claude's API shape
+  // is Anthropic-specific, there's no equivalent "Claude-compatible"
+  // convention other providers implement the way there is for OpenAI's
+  // format (see lib/ai-client.js's callOpenAI for why).
+  const baseUrlField = provider==='openai' ? `
+      <div class="settings-field"><label>Base URL <span style="font-weight:400;color:var(--muted-lt);">(optional)</span></label><input type="text" id="aiProviderBaseUrlInput" placeholder="https://api.openai.com/v1" style="width:100%;" autocomplete="off"></div>
+      <p style="font-size:11px;color:var(--muted-lt);margin:-4px 0 12px;line-height:1.5;">Leave blank for OpenAI itself. Set this to point at any other OpenAI-compatible endpoint instead — Azure OpenAI, Mistral, Groq, OpenRouter, a self-hosted model, etc. Note: web search (used for website checks) only works against OpenAI itself, not a custom endpoint.</p>` : '';
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Connect ${label}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
       <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;line-height:1.6;">Paste an API key from your ${label} account. It's tested against the real provider before saving, and won't be shown again after this — not even to you.</p>
       <div class="settings-field"><label>API key</label><input type="password" id="aiProviderKeyInput" placeholder="${keyHint}" style="width:100%;" autocomplete="off"></div>
+      ${baseUrlField}
       <p style="margin:10px 0 0;"><span class="row-link" onclick="closeAppModal();disconnectAiProvider('${provider}')">Disconnect instead</span></p>
     </div>
     <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Cancel</button><button class="btn btn-brand" onclick="submitAiProviderConnect('${provider}')">Connect</button></div>`, 460);
@@ -14936,12 +14945,14 @@ async function submitAiProviderConnect(provider){
   const input = document.getElementById('aiProviderKeyInput');
   const key = input ? input.value.trim() : '';
   if(!key){ showToast('error','Missing key','Paste an API key first.'); return; }
+  const baseUrlInput = document.getElementById('aiProviderBaseUrlInput');
+  const baseUrl = baseUrlInput ? baseUrlInput.value.trim() : '';
   const btn = clickedBtn();
   setBtnLoading(btn, 'Connecting…');
   try{
-    await adminActionCall('connect-ai-provider', { provider, apiKey: key });
+    await adminActionCall('connect-ai-provider', { provider, apiKey: key, baseUrl });
     closeAppModal();
-    showToast('success','Connected', `${provider==='claude'?'Claude':'ChatGPT'} is now connected.`);
+    showToast('success','Connected', `${provider==='claude'?'Claude':'ChatGPT'} is now connected${baseUrl?' to your custom endpoint':''}.`);
     loadAiProviderConnectionStatus();
   }catch(e){
     restoreBtn(btn);
