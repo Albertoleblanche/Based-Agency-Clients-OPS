@@ -1154,12 +1154,12 @@
   .claude-chat-send:disabled{opacity:.5;cursor:default;}
   .claude-chat-cap{font-size:10.5px;color:var(--muted-lt);text-align:center;padding:6px 0 0;}
   .claude-empty-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;}
-  .claude-sidebar{width:220px;flex:none;background:#000;border-right:1px solid rgba(255,255,255,.12);display:flex;flex-direction:column;padding:12px;overflow-y:auto;}
-  .claude-sidebar-new-btn{display:flex;align-items:center;gap:8px;width:100%;padding:9px 12px;border-radius:6px;border:none;background:none;color:#A8A8AC;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;flex:none;transition:background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);}
-  .claude-sidebar-new-btn:hover{background:#ffffff17;color:#fff;}
+  .claude-sidebar{width:220px;flex:none;border-right:1px solid rgb(47 45 45 / 30%);display:flex;flex-direction:column;padding:12px;overflow-y:auto;}
+  .claude-sidebar-new-btn{display:flex;align-items:center;gap:8px;width:100%;padding:9px 12px;border-radius:6px;border:1px solid transparent;background:none;color:#000;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;flex:none;transition:background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);}
+  .claude-sidebar-new-btn:hover{background:#fff;border-color:rgb(47 45 45 / 30%);color:#000;}
   .claude-sidebar-btn-group{display:flex;flex-direction:column;gap:2px;margin-bottom:26px;}
-  .claude-sidebar-footer{margin-top:auto;padding-top:14px;border-top:1px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:space-between;gap:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;color:#A8A8AC;flex:none;}
-  .claude-sidebar-heading{font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:rgba(255,255,255,.45);padding:0 4px 8px;flex:none;}
+  .claude-sidebar-footer{margin-top:auto;padding-top:14px;border-top:1px solid rgb(47 45 45 / 30%);display:flex;align-items:center;justify-content:space-between;gap:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;color:#000;flex:none;}
+  .claude-sidebar-heading{font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:rgba(0,0,0,.45);padding:0 4px 8px;flex:none;}
   .claude-projects-view{flex:1;display:flex;flex-direction:column;overflow:hidden;}
   .claude-projects-header{display:flex;align-items:center;gap:12px;padding:18px 24px;border-bottom:1px solid var(--border);flex:none;}
   .claude-search-wrap{position:relative;flex:1;max-width:340px;}
@@ -1182,20 +1182,37 @@
   .claude-project-conv-title{flex:1;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .claude-project-conv-date{flex:none;font-size:11px;color:var(--muted-lt);}
   .claude-sidebar-list{display:flex;flex-direction:column;gap:6px;overflow-y:auto;}
-  .claude-sidebar-row{position:relative;display:flex;align-items:center;gap:2px;border-radius:6px;transition:background var(--duration-fast) var(--ease-out);}
-  .claude-sidebar-row:hover{background:#ffffff17;}
-  .claude-sidebar-row.active{background:#ffffff17;}
-  .claude-sidebar-item{display:flex;align-items:center;gap:6px;flex:1;min-width:0;text-align:left;padding:8px 4px 8px 10px;border-radius:6px;border:none;background:none;color:#A8A8AC;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;cursor:pointer;}
-  .claude-sidebar-row:hover .claude-sidebar-item,.claude-sidebar-row.active .claude-sidebar-item{color:#fff;}
+  .claude-sidebar-row{position:relative;display:flex;align-items:center;gap:2px;border-radius:6px;border:1px solid transparent;transition:background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);}
+  .claude-sidebar-row:hover{background:#fff;border-color:rgb(47 45 45 / 30%);}
+  .claude-sidebar-row.active{background:#fff;border-color:rgb(47 45 45 / 30%);}
+  .claude-sidebar-item{display:flex;align-items:center;gap:6px;flex:1;min-width:0;text-align:left;padding:8px 4px 8px 10px;border-radius:6px;border:none;background:none;color:#000;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;cursor:pointer;}
+  .claude-sidebar-row:hover .claude-sidebar-item,.claude-sidebar-row.active .claude-sidebar-item{color:#000;}
   .claude-sidebar-row.active .claude-sidebar-item{font-weight:600;}
   .claude-sidebar-item-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
-  .claude-sidebar-pin-icon{flex:none;color:#A8A8AC;}
-  .claude-sidebar-row:hover .claude-sidebar-pin-icon,.claude-sidebar-row.active .claude-sidebar-pin-icon{color:#fff;}
-  .claude-sidebar-menu-btn{flex:none;width:26px;height:26px;border-radius:6px;border:none;background:none;color:rgba(255,255,255,.6);cursor:pointer;display:flex;align-items:center;justify-content:center;margin-right:4px;transition:background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);}
-  .claude-sidebar-menu-btn:hover{background:rgba(255,255,255,.1);color:#fff;}
+  .claude-sidebar-pin-icon{flex:none;color:#000;}
+  .claude-sidebar-row:hover .claude-sidebar-pin-icon,.claude-sidebar-row.active .claude-sidebar-pin-icon{color:#000;}
+  .claude-sidebar-menu-btn{flex:none;width:26px;height:26px;border-radius:6px;border:none;background:none;color:rgba(0,0,0,.6);cursor:pointer;display:flex;align-items:center;justify-content:center;margin-right:4px;transition:background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);}
+  .claude-sidebar-menu-btn:hover{background:rgba(0,0,0,.08);color:#000;}
   .claude-sidebar-menu{position:fixed;width:200px;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 16px 40px rgba(16,24,40,.28);padding:5px;z-index:1200;animation:modalCardIn var(--duration-base) var(--ease-out);}
   .claude-sidebar-menu button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:7px 9px;border-radius:7px;border:none;background:none;color:var(--ink);font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;cursor:pointer;}
   .claude-sidebar-menu button:hover{background:var(--surface-2);}
+  /* Dark mode keeps its own distinct look (black sidebar, light-gray/white
+     text) — everything above is now the light-mode default instead, so
+     this is what restores dark mode's existing appearance exactly as it
+     was, rather than the other way around. */
+  body[data-theme="dark"] .claude-sidebar{background:#000;border-right-color:rgba(255,255,255,.12);}
+  body[data-theme="dark"] .claude-sidebar-new-btn{color:#A8A8AC;}
+  body[data-theme="dark"] .claude-sidebar-new-btn:hover{background:#ffffff17;border-color:transparent;color:#fff;}
+  body[data-theme="dark"] .claude-sidebar-footer{border-top-color:rgba(255,255,255,.12);color:#A8A8AC;}
+  body[data-theme="dark"] .claude-sidebar-heading{color:rgba(255,255,255,.45);}
+  body[data-theme="dark"] .claude-sidebar-row:hover{background:#ffffff17;border-color:transparent;}
+  body[data-theme="dark"] .claude-sidebar-row.active{background:#ffffff17;border-color:transparent;}
+  body[data-theme="dark"] .claude-sidebar-item{color:#A8A8AC;}
+  body[data-theme="dark"] .claude-sidebar-row:hover .claude-sidebar-item,body[data-theme="dark"] .claude-sidebar-row.active .claude-sidebar-item{color:#fff;}
+  body[data-theme="dark"] .claude-sidebar-pin-icon{color:#A8A8AC;}
+  body[data-theme="dark"] .claude-sidebar-row:hover .claude-sidebar-pin-icon,body[data-theme="dark"] .claude-sidebar-row.active .claude-sidebar-pin-icon{color:#fff;}
+  body[data-theme="dark"] .claude-sidebar-menu-btn{color:rgba(255,255,255,.6);}
+  body[data-theme="dark"] .claude-sidebar-menu-btn:hover{background:rgba(255,255,255,.1);color:#fff;}
   .claude-quick-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;width:100%;max-width:520px;}
   .claude-quick-action{display:flex;align-items:center;gap:9px;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;color:var(--ink);text-align:left;cursor:pointer;transition:background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);}
   .claude-quick-action-icon{flex:none;color:var(--muted-lt);transition:color var(--duration-fast) var(--ease-out);}
