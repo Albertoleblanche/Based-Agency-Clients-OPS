@@ -186,7 +186,7 @@
   .role-chip{font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;letter-spacing:.04em;color:var(--muted-lt);border:1px solid var(--border);border-radius:10px;padding:1px 6px;margin-left:2px;text-transform:capitalize;}
 
   /* Sidebar */
-  .sidebar{background:var(--sidebar);color:#C9D2E3;padding:18px 12px;display:flex;flex-direction:column;height:100vh;overflow-y:auto;position:relative;}
+  .sidebar{background:#000;color:#C9D2E3;padding:18px 12px;display:flex;flex-direction:column;height:100vh;overflow-y:auto;position:relative;}
   .brand{display:flex;align-items:center;gap:9px;padding:6px 10px 20px;position:relative;}
   .brand-text{flex:1;min-width:0;}
   .sidebar-collapse-btn{flex:none;margin-left:auto;display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;color:var(--sidebar-muted);cursor:pointer;transition:background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);}
@@ -2393,6 +2393,14 @@ document.addEventListener('DOMContentLoaded', function(){
             </div>
             <button class="btn btn-brand" style="margin-top:14px;" onclick="saveAppBranding()">Save</button>
             <p style="font-size:11.5px;color:var(--muted-lt);margin-top:12px;line-height:1.5;">Updates the sidebar, browser tab, PDF exports, AI-drafted emails, and the onboarding tour for everyone. The sign-in screen itself stays fixed — it loads before anyone's actually logged in, so it can't safely pull from account data yet.</p>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Sidebar Tab Names</span></div>
+          <div class="panel-body">
+            <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;line-height:1.5;">Rename any of the sidebar's tabs for everyone — leave a field blank to reset it back to the default name. The Assistant's name has its own field in Settings → AI &amp; Email, since it also controls what the Assistant calls itself.</p>
+            <div class="form-grid" id="navLabelsGrid"></div>
           </div>
         </div>
 
@@ -14632,6 +14640,63 @@ function applyAppBranding(){
   if(tourSteps[0]) tourSteps[0].title = `Welcome to ${name} 👋`;
 }
 
+// Default labels match each tab's original hardcoded text exactly — the
+// Assistant tab ('claude') is deliberately excluded here since it already
+// has its own dedicated "Assistant name" field in Settings -> AI & Email,
+// which also controls what the Assistant calls itself in conversation;
+// duplicating that as a second editable field here would just be
+// confusing about which one actually takes effect.
+const NAV_LABEL_DEFAULTS = {
+  overview: 'Overview', clients: 'Clients', approve: 'Approval Queue', teamqueue: 'Team Queue',
+  notes: 'Notes', tasks: 'Tasks', reminders: 'Reminders', calendar: 'Calendar',
+  time: 'Time Tracker', team: 'Team', trash: 'Trash', settings: 'Settings & Integrations',
+};
+
+// Updates both the visible expanded-sidebar label AND the collapsed-
+// sidebar tooltip (data-tooltip) together, so they can never drift out of
+// sync with each other. Also applies the Assistant's own name setting to
+// ITS nav item's visible label — previously only its tooltip got updated
+// when that name changed, leaving the actual on-screen text stuck on
+// "Assistant" regardless of what admins renamed it to.
+function applyNavLabels(){
+  const labels = settings.navLabels || {};
+  Object.keys(NAV_LABEL_DEFAULTS).forEach(view=>{
+    const navItem = document.querySelector(`.nav-item[data-view="${view}"]`);
+    if(!navItem) return;
+    const label = (labels[view] || NAV_LABEL_DEFAULTS[view]).trim() || NAV_LABEL_DEFAULTS[view];
+    const labelSpan = navItem.querySelector('.nav-label');
+    if(labelSpan) labelSpan.textContent = label;
+    navItem.setAttribute('data-tooltip', label);
+  });
+  const claudeNavItem = document.getElementById('claudeNavItem');
+  if(claudeNavItem){
+    const assistantLabel = settings.assistantName || 'Assistant';
+    const claudeLabelSpan = claudeNavItem.querySelector('.nav-label');
+    if(claudeLabelSpan) claudeLabelSpan.textContent = assistantLabel;
+  }
+  renderNavLabelsSettings();
+}
+
+function renderNavLabelsSettings(){
+  const grid = document.getElementById('navLabelsGrid');
+  if(!grid) return;
+  const labels = settings.navLabels || {};
+  grid.innerHTML = Object.entries(NAV_LABEL_DEFAULTS).map(([view, defaultLabel])=>`
+    <div><label>${defaultLabel}</label><input value="${(labels[view]||'').replace(/"/g,'&quot;')}" placeholder="${defaultLabel}" onchange="saveNavLabel('${view}', this.value)" ${isAdmin()?'':'disabled'}></div>
+  `).join('');
+}
+
+async function saveNavLabel(view, value){
+  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  settings.navLabels = settings.navLabels || {};
+  const trimmed = value.trim();
+  if(trimmed) settings.navLabels[view] = trimmed;
+  else delete settings.navLabels[view];
+  const ok = await persistSettings();
+  if(ok) applyNavLabels();
+  ok ? showToast('success','Saved', `Sidebar tab renamed to "${trimmed || NAV_LABEL_DEFAULTS[view]}".`) : showToast('error','Save failed','Could not save — try again.');
+}
+
 async function saveAppBranding(){
   if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
   const name = document.getElementById('appNameInput').value.trim();
@@ -14901,7 +14966,7 @@ async function saveAssistantName(value){
   if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
   settings.assistantName = value.trim() || 'Assistant';
   const ok = await persistSettings();
-  if(ok) applyAssistantName();
+  if(ok){ applyAssistantName(); applyNavLabels(); }
   ok ? showToast('success','Saved', `The Assistant is now called "${settings.assistantName}".`) : showToast('error','Save failed','Could not save — try again.');
 }
 
@@ -15733,6 +15798,7 @@ async function showApp(session){
     updateTasksNavBadge();
     applyAppIcon();
     applyAppBranding();
+    applyNavLabels();
     initTimerFromStorage();
     initClaudeBtnDrag();
     // Pre-loads the Assistant's history and lays out its empty/active
