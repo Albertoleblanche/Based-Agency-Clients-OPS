@@ -1118,7 +1118,7 @@
   #claudeTabMessages{width:800px;max-width:100%;margin:0 auto;}
   .claude-msg{max-width:88%;padding:10px 13px;border-radius:12px;font-size:13px;line-height:1.55;animation:claudeMsgIn .22s ease;}
   @keyframes claudeMsgIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
-  .claude-msg-user{align-self:flex-end;background:#ffffff17;color:#fff;font-size:15px;border-bottom-right-radius:4px;white-space:pre-wrap;}
+  .claude-msg-user{align-self:flex-end;background:#0000000f;color:#000;font-size:15px;border-bottom-right-radius:4px;white-space:pre-wrap;}
   .claude-msg-assistant{align-self:flex-start;color:var(--ink);font-size:15px;border-bottom-left-radius:4px;}
   .claude-msg-assistant p{margin:0 0 10px;}
   .claude-msg-assistant p:last-child{margin-bottom:0;}
@@ -1154,11 +1154,11 @@
   .claude-chat-send:disabled{opacity:.5;cursor:default;}
   .claude-chat-cap{font-size:10.5px;color:var(--muted-lt);text-align:center;padding:6px 0 0;}
   .claude-empty-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;}
-  .claude-sidebar{width:220px;flex:none;border-right:1px solid rgb(47 45 45 / 30%);display:flex;flex-direction:column;padding:12px;overflow-y:auto;}
-  .claude-sidebar-new-btn{display:flex;align-items:center;gap:8px;width:100%;padding:9px 12px;border-radius:6px;border:1px solid transparent;background:none;color:#000;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;flex:none;transition:background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);}
-  .claude-sidebar-new-btn:hover{background:#fff;border-color:rgb(47 45 45 / 30%);color:#000;}
+  .claude-sidebar{width:220px;flex:none;border-left:1px solid rgb(47 45 45 / 14%);border-right:1px solid rgb(47 45 45 / 14%);display:flex;flex-direction:column;padding:12px;overflow-y:auto;}
+  .claude-sidebar-new-btn{display:flex;align-items:center;gap:8px;width:100%;padding:9px 12px;border-radius:6px;border:1px solid transparent;background:none;color:#000;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;flex:none;transition:background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);}
+  .claude-sidebar-new-btn:hover{background:#0000000f;border-color:transparent;color:#000;}
   .claude-sidebar-btn-group{display:flex;flex-direction:column;gap:2px;margin-bottom:26px;}
-  .claude-sidebar-footer{margin-top:auto;padding-top:14px;border-top:1px solid rgb(47 45 45 / 30%);display:flex;align-items:center;justify-content:space-between;gap:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;color:#000;flex:none;}
+  .claude-sidebar-footer{margin-top:auto;padding-top:14px;border-top:1px solid rgb(47 45 45 / 14%);display:flex;align-items:center;justify-content:space-between;gap:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;color:#000;flex:none;}
   .claude-sidebar-heading{font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:rgba(0,0,0,.45);padding:0 4px 8px;flex:none;}
   .claude-projects-view{flex:1;display:flex;flex-direction:column;overflow:hidden;}
   .claude-projects-header{display:flex;align-items:center;gap:12px;padding:18px 24px;border-bottom:1px solid var(--border);flex:none;}
@@ -1183,8 +1183,8 @@
   .claude-project-conv-date{flex:none;font-size:11px;color:var(--muted-lt);}
   .claude-sidebar-list{display:flex;flex-direction:column;gap:6px;overflow-y:auto;}
   .claude-sidebar-row{position:relative;display:flex;align-items:center;gap:2px;border-radius:6px;border:1px solid transparent;transition:background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);}
-  .claude-sidebar-row:hover{background:#fff;border-color:rgb(47 45 45 / 30%);}
-  .claude-sidebar-row.active{background:#fff;border-color:rgb(47 45 45 / 30%);}
+  .claude-sidebar-row:hover{background:#0000000f;border-color:transparent;}
+  .claude-sidebar-row.active{background:#0000000f;border-color:transparent;}
   .claude-sidebar-item{display:flex;align-items:center;gap:6px;flex:1;min-width:0;text-align:left;padding:8px 4px 8px 10px;border-radius:6px;border:none;background:none;color:#000;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;cursor:pointer;}
   .claude-sidebar-row:hover .claude-sidebar-item,.claude-sidebar-row.active .claude-sidebar-item{color:#000;}
   .claude-sidebar-row.active .claude-sidebar-item{font-weight:600;}
@@ -1200,7 +1200,7 @@
      text) — everything above is now the light-mode default instead, so
      this is what restores dark mode's existing appearance exactly as it
      was, rather than the other way around. */
-  body[data-theme="dark"] .claude-sidebar{background:#000;border-right-color:rgba(255,255,255,.12);}
+  body[data-theme="dark"] .claude-sidebar{background:#000;border-left-color:rgba(255,255,255,.12);border-right-color:rgba(255,255,255,.12);}
   body[data-theme="dark"] .claude-sidebar-new-btn{color:#A8A8AC;}
   body[data-theme="dark"] .claude-sidebar-new-btn:hover{background:#ffffff17;border-color:transparent;color:#fff;}
   body[data-theme="dark"] .claude-sidebar-footer{border-top-color:rgba(255,255,255,.12);color:#A8A8AC;}
@@ -1213,6 +1213,7 @@
   body[data-theme="dark"] .claude-sidebar-row:hover .claude-sidebar-pin-icon,body[data-theme="dark"] .claude-sidebar-row.active .claude-sidebar-pin-icon{color:#fff;}
   body[data-theme="dark"] .claude-sidebar-menu-btn{color:rgba(255,255,255,.6);}
   body[data-theme="dark"] .claude-sidebar-menu-btn:hover{background:rgba(255,255,255,.1);color:#fff;}
+  body[data-theme="dark"] .claude-msg-user{background:#ffffff17;color:#fff;}
   .claude-quick-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;width:100%;max-width:520px;}
   .claude-quick-action{display:flex;align-items:center;gap:9px;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;color:var(--ink);text-align:left;cursor:pointer;transition:background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);}
   .claude-quick-action-icon{flex:none;color:var(--muted-lt);transition:color var(--duration-fast) var(--ease-out);}
