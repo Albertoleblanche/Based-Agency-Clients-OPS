@@ -47,13 +47,34 @@ async function validateAnthropicKey(apiKey, model) {
 
 // Listing models is a genuinely free OpenAI call — confirms the key
 // actually authenticates without spending anything on a real completion.
-async function validateOpenAIKey(apiKey) {
-  const res = await fetch('https://api.openai.com/v1/models', {
-    headers: { 'Authorization': `Bearer ${apiKey}` },
-  });
-  if (res.ok) return { ok: true };
-  const data = await res.json().catch(() => null);
-  return { ok: false, error: data?.error?.message || `OpenAI rejected the request (${res.status})` };
+// A custom baseUrl (a third-party OpenAI-compatible endpoint) is instead
+// validated with a minimal real chat completion, since not every provider
+// implements a models-list endpoint the same way OpenAI does, but
+// virtually all of them implement /chat/completions if they claim
+// compatibility at all — and that's the actual endpoint that matters.
+async function validateOpenAIKey(apiKey, baseUrl, model) {
+  const cleanUrl = (baseUrl || '').replace(/\/+$/, '');
+  const isOfficial = !cleanUrl || cleanUrl === 'https://api.openai.com/v1';
+
+  if (isOfficial) {
+    const res = await fetch('https://api.openai.com/v1/models', { headers: { 'Authorization': `Bearer ${apiKey}` } });
+    if (res.ok) return { ok: true };
+    const data = await res.json().catch(() => null);
+    return { ok: false, error: data?.error?.message || `OpenAI rejected the request (${res.status})` };
+  }
+
+  try {
+    const res = await fetch(`${cleanUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: model || 'gpt-4o-mini', messages: [{ role: 'user', content: 'hi' }], max_tokens: 1 }),
+    });
+    if (res.ok) return { ok: true };
+    const data = await res.json().catch(() => null);
+    return { ok: false, error: data?.error?.message || `The endpoint rejected the request (${res.status})` };
+  } catch (e) {
+    return { ok: false, error: `Could not reach that endpoint — check the URL. (${e.message})` };
+  }
 }
 
 module.exports = async function handler(req, res) {
@@ -194,36 +215,38 @@ module.exports = async function handler(req, res) {
       // when, plus whether a Vercel environment variable is ALSO/instead
       // configured (the old way), so the admin sees the complete picture
       // regardless of which method set it up.
-      const { data: rows } = await admin.from('ai_provider_connections').select('provider, connected_at');
+      const { data: rows } = await admin.from('ai_provider_connections').select('provider, connected_at, base_url');
       const byProvider = {};
-      (rows || []).forEach(r => { byProvider[r.provider] = r.connected_at; });
+      (rows || []).forEach(r => { byProvider[r.provider] = r; });
       res.status(200).json({
-        claude: { connected: !!byProvider.claude, connectedAt: byProvider.claude || null, envConfigured: !!process.env.ANTHROPIC_API_KEY },
-        openai: { connected: !!byProvider.openai, connectedAt: byProvider.openai || null, envConfigured: !!process.env.OPENAI_API_KEY },
+        claude: { connected: !!byProvider.claude, connectedAt: byProvider.claude?.connected_at || null, envConfigured: !!process.env.ANTHROPIC_API_KEY },
+        openai: { connected: !!byProvider.openai, connectedAt: byProvider.openai?.connected_at || null, envConfigured: !!process.env.OPENAI_API_KEY, baseUrl: byProvider.openai?.base_url || null },
       });
       return;
     }
 
     if (action === 'connect-ai-provider') {
-      const { provider, apiKey } = req.body || {};
+      const { provider, apiKey, baseUrl } = req.body || {};
       if (!['claude', 'openai'].includes(provider)) { res.status(400).json({ error: 'provider must be "claude" or "openai"' }); return; }
       if (!apiKey || typeof apiKey !== 'string' || !apiKey.trim()) { res.status(400).json({ error: 'Missing apiKey' }); return; }
       const trimmedKey = apiKey.trim();
+      const trimmedBaseUrl = (provider === 'openai' && typeof baseUrl === 'string') ? baseUrl.trim() || null : null;
+      if (trimmedBaseUrl && !/^https?:\/\//i.test(trimmedBaseUrl)) { res.status(400).json({ error: 'Base URL must start with http:// or https://' }); return; }
 
       // Tested against the real provider before it's ever saved — same
       // reasoning as validateHarvestCredentials() elsewhere in this app.
       let validation;
+      const { data: settingsRow } = await admin.from('app_storage').select('value').eq('key', 'settings').maybeSingle();
+      const settings = settingsRow ? JSON.parse(settingsRow.value) : {};
       if (provider === 'claude') {
-        const { data: settingsRow } = await admin.from('app_storage').select('value').eq('key', 'settings').maybeSingle();
-        const settings = settingsRow ? JSON.parse(settingsRow.value) : {};
         validation = await validateAnthropicKey(trimmedKey, settings.claudeModel);
       } else {
-        validation = await validateOpenAIKey(trimmedKey);
+        validation = await validateOpenAIKey(trimmedKey, trimmedBaseUrl, settings.openaiModel);
       }
       if (!validation.ok) { res.status(400).json({ error: `Couldn't connect: ${validation.error}` }); return; }
 
       const { error: upsertErr } = await admin.from('ai_provider_connections').upsert({
-        provider, api_key: trimmedKey, connected_at: new Date().toISOString(), connected_by: callerId,
+        provider, api_key: trimmedKey, base_url: trimmedBaseUrl, connected_at: new Date().toISOString(), connected_by: callerId,
       });
       if (upsertErr) { res.status(500).json({ error: upsertErr.message }); return; }
       res.status(200).json({ success: true });
