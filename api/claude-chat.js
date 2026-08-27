@@ -111,8 +111,12 @@ module.exports = async function handler(req, res) {
     // (ai_provider_connections), if one exists — callAI falls back to the
     // Vercel environment variable when this is null, so a deployment
     // that's never used Connect keeps working exactly as before.
-    const { data: connectionRow } = await admin.from('ai_provider_connections').select('api_key').eq('provider', provider).maybeSingle();
+    // base_url, if set, points this provider at a custom OpenAI-compatible
+    // endpoint (Azure OpenAI, Mistral, a self-hosted model, etc.) instead
+    // of the real provider — only ever meaningful for openai.
+    const { data: connectionRow } = await admin.from('ai_provider_connections').select('api_key, base_url').eq('provider', provider).maybeSingle();
     const apiKey = connectionRow?.api_key || null;
+    const baseUrl = connectionRow?.base_url || null;
 
     const assistantName = settings.assistantName || 'Assistant';
     const userFirstName = (callerProfile.name || '').trim().split(/\s+/)[0] || null;
@@ -137,7 +141,7 @@ ${appContext || '(no client data provided)'}`;
     // every later message in the same conversation skips this entirely.
     // A failure here just means no suggested title comes back; the
     // frontend already has its own truncated-text fallback for that.
-    const resultPromise = callAI(provider, messages, systemPrompt, { model, apiKey });
+    const resultPromise = callAI(provider, messages, systemPrompt, { model, apiKey, baseUrl });
 
     let titlePromise = Promise.resolve(null);
     if (needsTitle && Array.isArray(messages) && messages.length) {
@@ -145,7 +149,7 @@ ${appContext || '(no client data provided)'}`;
       if (firstUserMessage) {
         titlePromise = callAI(provider, [{ role: 'user', content: firstUserMessage }],
           'Generate a short title (3-6 words, no quotes, no trailing punctuation) summarizing what this chat is about, based on the person\'s message. Respond with ONLY the title text and nothing else.',
-          { maxTokens: 20, webSearch: false, model, apiKey }
+          { maxTokens: 20, webSearch: false, model, apiKey, baseUrl }
         ).catch(() => null);
       }
     }
