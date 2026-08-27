@@ -1154,11 +1154,12 @@
   .claude-chat-send:disabled{opacity:.5;cursor:default;}
   .claude-chat-cap{font-size:10.5px;color:var(--muted-lt);text-align:center;padding:6px 0 0;}
   .claude-empty-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;}
-  .claude-sidebar{width:220px;flex:none;border-right:1px solid var(--border);display:flex;flex-direction:column;padding:12px;overflow-y:auto;}
+  .claude-sidebar{width:220px;flex:none;background:#000;border-right:1px solid rgba(255,255,255,.12);display:flex;flex-direction:column;padding:12px;overflow-y:auto;}
   .claude-sidebar-new-btn{display:flex;align-items:center;gap:8px;width:100%;padding:9px 12px;border-radius:6px;border:none;background:none;color:#A8A8AC;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;flex:none;transition:background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);}
   .claude-sidebar-new-btn:hover{background:#ffffff17;color:#fff;}
   .claude-sidebar-btn-group{display:flex;flex-direction:column;gap:2px;margin-bottom:26px;}
-  .claude-sidebar-heading{font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--muted-lt);padding:0 4px 8px;flex:none;}
+  .claude-sidebar-footer{margin-top:auto;padding-top:14px;border-top:1px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:space-between;gap:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;color:#A8A8AC;flex:none;}
+  .claude-sidebar-heading{font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:rgba(255,255,255,.45);padding:0 4px 8px;flex:none;}
   .claude-projects-view{flex:1;display:flex;flex-direction:column;overflow:hidden;}
   .claude-projects-header{display:flex;align-items:center;gap:12px;padding:18px 24px;border-bottom:1px solid var(--border);flex:none;}
   .claude-search-wrap{position:relative;flex:1;max-width:340px;}
@@ -2507,13 +2508,6 @@ document.addEventListener('DOMContentLoaded', function(){
               <textarea id="setAssistantInstructions" style="width:100%;min-height:100px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="e.g. Always mention the danger score when discussing a client. Keep responses under 150 words unless asked for more detail." onchange="saveAssistantInstructions(this.value)"></textarea>
               <p style="font-size:11px;color:var(--muted-lt);margin:6px 0 0;line-height:1.5;">Added on top of what the Assistant already knows on its own (its name, your live client data) — this is the place to tweak its tone, add specific rules, or give it standing context that should apply to every conversation, without needing to edit code.</p>
             </div>
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:18px;padding-top:16px;border-top:1px solid var(--border);">
-              <div>
-                <div style="font-size:13px;color:var(--ink);font-weight:600;margin-bottom:3px;">Floating Assistant button</div>
-                <div style="font-size:12px;color:var(--muted);line-height:1.5;">The small button that floats over every page for quick access. Turning this off doesn't affect the Assistant tab itself — people with access still see that in the sidebar either way.</div>
-              </div>
-              <button class="theme-toggle-switch" id="assistantFloatButtonToggle" onclick="toggleAssistantFloatButton()"></button>
-            </div>
           </div>
         </div>
 
@@ -2875,6 +2869,10 @@ document.addEventListener('DOMContentLoaded', function(){
           <div class="claude-sidebar-list" id="claudeSidebarProjectsList" style="margin-bottom:26px;"></div>
           <div class="claude-sidebar-heading">Chats and Tasks</div>
           <div class="claude-sidebar-list" id="claudeSidebarList"></div>
+          <div class="claude-sidebar-footer">
+            <span>Floating button</span>
+            <button class="theme-toggle-switch" id="claudeFloatButtonToggle" onclick="toggleClaudeFloatButtonPref()" title="Just for you — shows or hides the floating Assistant button on every page"></button>
+          </div>
         </div>
         <div style="position:relative;flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;">
         <div class="claude-chat-messages" id="claudeTabMessages"></div>
@@ -4026,13 +4024,12 @@ function applyRoleVisibility(){
   // grant this to a specific member or revoke it from a specific
   // admin/approver.
   const aiChatAllowed = !!myProfile?.ai_chat_enabled;
-  // The floating button specifically has its own separate admin-wide
-  // on/off switch (Settings -> AI & Email) — someone can have full
-  // Assistant access via the tab while the floating button itself stays
-  // off app-wide, e.g. if admins find it visually intrusive. Undefined
-  // means enabled, matching every other settings toggle's convention of
-  // not silently going quiet for a deployment that's never touched it.
-  const floatBtnAllowed = aiChatAllowed && settings.assistantFloatButtonEnabled !== false;
+  // The floating button specifically has its own separate personal
+  // preference (stored per-device, not an admin setting) — someone can
+  // have full Assistant access via the tab while still hiding the
+  // floating button just for themselves, e.g. if they find it visually
+  // intrusive. Doesn't affect anyone else's session.
+  const floatBtnAllowed = aiChatAllowed && loadClaudeFloatButtonPref();
   if(claudeNavItem) claudeNavItem.style.display = aiChatAllowed ? 'flex' : 'none';
   if(claudeFloatBtn) claudeFloatBtn.style.display = floatBtnAllowed ? 'flex' : 'none';
   if(!floatBtnAllowed){
@@ -4245,7 +4242,7 @@ async function switchView(name){
   // in applyRoleVisibility(), since that only re-runs on permission
   // changes, not on every navigation.
   const claudeFloatBtn = document.getElementById('claudeFloatBtn');
-  if(claudeFloatBtn && myProfile?.ai_chat_enabled && settings.assistantFloatButtonEnabled !== false){ claudeFloatBtn.style.display = name==='claude' ? 'none' : 'flex'; }
+  if(claudeFloatBtn && myProfile?.ai_chat_enabled && loadClaudeFloatButtonPref()){ claudeFloatBtn.style.display = name==='claude' ? 'none' : 'flex'; }
   // Overview and Client Detail aren't in this lookup — their titles are
   // dynamic (greeting text, client name) and get set by renderGreeting()
   // and renderClientDetail() respectively, moments later in this same flow.
@@ -11227,6 +11224,7 @@ const CLAUDE_SIDEBAR_ICONS = {
 function renderClaudeConversationsSidebar(){
   const el = document.getElementById('claudeSidebarList');
   if(!el) return;
+  syncClaudeFloatButtonToggle();
   // Any menu currently open got moved to document.body by
   // toggleClaudeSidebarMenu() below — it's about to be replaced by a
   // fresh one with the same id anyway, so the orphaned copy needs
@@ -14816,11 +14814,6 @@ function renderAiProviderChoice(){
   if(nameInput && document.activeElement !== nameInput){ nameInput.value = settings.assistantName || ''; nameInput.disabled = !isAdmin(); }
   const instructionsInput = document.getElementById('setAssistantInstructions');
   if(instructionsInput && document.activeElement !== instructionsInput){ instructionsInput.value = settings.assistantCustomInstructions || ''; instructionsInput.disabled = !isAdmin(); }
-  const floatBtnToggle = document.getElementById('assistantFloatButtonToggle');
-  if(floatBtnToggle){
-    floatBtnToggle.classList.toggle('on', settings.assistantFloatButtonEnabled !== false);
-    floatBtnToggle.disabled = !isAdmin();
-  }
   const claudeModelInput = document.getElementById('setClaudeModel');
   const openaiModelInput = document.getElementById('setOpenaiModel');
   if(claudeModelInput && document.activeElement !== claudeModelInput){ claudeModelInput.value = settings.claudeModel || ''; claudeModelInput.disabled = !isAdmin(); }
@@ -14988,15 +14981,27 @@ async function saveAssistantInstructions(value){
   ok ? showToast('success','Saved','Custom instructions updated — they apply to the Assistant\'s next reply onward.') : showToast('error','Save failed','Could not save — try again.');
 }
 
-async function toggleAssistantFloatButton(){
-  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
-  const currentlyEnabled = settings.assistantFloatButtonEnabled !== false;
-  settings.assistantFloatButtonEnabled = !currentlyEnabled;
-  const ok = await persistSettings();
-  if(!ok){ settings.assistantFloatButtonEnabled = currentlyEnabled; showToast('error','Save failed','Could not save — try again.'); return; }
+// A personal, per-device preference (like the AI provider override and
+// the floating button's own dragged position elsewhere in this file) —
+// not an admin-wide setting. Everyone with Assistant access controls
+// this for themselves; it's about whether THEY find the floating button
+// useful or intrusive, not a team-wide policy. Defaults to shown.
+function loadClaudeFloatButtonPref(){
+  try { return localStorage.getItem('claude_float_button_enabled') !== 'false'; } catch(e) { return true; }
+}
+function saveClaudeFloatButtonPref(enabled){
+  try { localStorage.setItem('claude_float_button_enabled', enabled ? 'true' : 'false'); } catch(e) {}
+}
+function syncClaudeFloatButtonToggle(){
+  const toggle = document.getElementById('claudeFloatButtonToggle');
+  if(toggle) toggle.classList.toggle('on', loadClaudeFloatButtonPref());
+}
+function toggleClaudeFloatButtonPref(){
+  const newValue = !loadClaudeFloatButtonPref();
+  saveClaudeFloatButtonPref(newValue);
+  syncClaudeFloatButtonToggle();
   applyRoleVisibility();
-  renderAiProviderChoice();
-  showToast('success', settings.assistantFloatButtonEnabled ? 'Enabled' : 'Disabled', settings.assistantFloatButtonEnabled ? 'The floating button is back on for everyone with Assistant access.' : 'The floating button is now off app-wide — the Assistant tab still works as usual.');
+  showToast('success', newValue ? 'Enabled' : 'Disabled', newValue ? 'The floating button will show for you.' : 'The floating button is now hidden — just for you, on this device.');
 }
 
 // Updates every place the Assistant's name shows in the live UI — the tab
