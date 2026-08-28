@@ -3260,6 +3260,13 @@ function myName(){ return myProfile ? myProfile.name : ''; }
 function canApprove(){ return !!myProfile && (myProfile.role === 'admin' || myProfile.role === 'approver'); }
 function hasPermission(key){ return canApprove() || !!(myProfile && (myProfile.extra_permissions||[]).includes(key)); }
 function isAdmin(){ return !!myProfile && myProfile.role === 'admin'; }
+// Deliberately NOT built on hasPermission()/canApprove() — those treat
+// "approver or admin" as the same automatic base tier, but this one is
+// admin-only by default, with a specific per-person override (see the
+// "Lower a client's danger score" toggle on the team card) rather than a
+// role-wide grant. An approver doesn't get this just for being an
+// approver, unlike everything hasPermission() covers.
+function canLowerDangerScore(){ return isAdmin() || !!(myProfile && (myProfile.extra_permissions||[]).includes('lower_danger_score')); }
 
 let lastProfileError = null;
 async function loadMyProfile(){
@@ -5598,6 +5605,7 @@ function logDangerHistory(clientId, danger, previousDanger){
     if(error) console.error('logDangerHistory error', error);
   });
   if(danger === 5 && previousDanger !== 5) alertClientDangerMaxed(clientId);
+  else if(previousDanger != null && danger < previousDanger) alertClientDangerDecreased(clientId, previousDanger, danger);
 }
 
 // Real-time alert the moment a client's danger score maxes out, rather
@@ -5614,6 +5622,21 @@ async function alertClientDangerMaxed(clientId){
   const recipients = teamProfiles.filter(p=>p.id !== currentUser?.id);
   for(const p of recipients){
     sendNotification(p.id, 'client_danger_maxed', title, body, 'client-detail', clientId);
+  }
+}
+
+// The other direction — someone (an admin, or a person specifically
+// granted the ability) judged the situation resolved enough to lower the
+// score. Worth knowing in real time too, same as the score climbing —
+// same "everyone except whoever just did it" recipient logic.
+async function alertClientDangerDecreased(clientId, previousDanger, newDanger){
+  const c = clients.find(x=>x.id===clientId);
+  if(!c) return;
+  const title = `${c.name}'s danger score went down`;
+  const body = `${myName()||'Someone'} lowered ${c.name}'s danger from ${previousDanger}/5 to ${newDanger}/5.`;
+  const recipients = teamProfiles.filter(p=>p.id !== currentUser?.id);
+  for(const p of recipients){
+    sendNotification(p.id, 'client_danger_decreased', title, body, 'client-detail', clientId);
   }
 }
 
@@ -5659,6 +5682,17 @@ async function saveClientForm(){
     const c = clients.find(x=>x.id===editingClientId);
     if(!c){ showToast('error','Client not found','This client may have been removed — refreshing.'); closeClientForm(); restoreBtn(btn); await fullRefresh(); return; }
     const before = { ...c };
+    // Anyone can raise a client's danger score — flagging a client as
+    // riskier than before should never be gate-kept. Lowering it back
+    // down is different: that's a judgment call about whether a concern
+    // has actually been resolved, so it's admin-only by default, with a
+    // specific per-person override on the team card for anyone who
+    // needs it without making them a full admin.
+    if(Number(fields.danger) < Number(before.danger) && !canLowerDangerScore()){
+      showToast('error','Not allowed','Only admins can lower a client\'s danger score — ask one to adjust it, or to grant you that permission.');
+      restoreBtn(btn);
+      return;
+    }
     ok = await updateClientRow(editingClientId, fields);
     if(ok) Object.assign(c, fields);
     msg = `${name} updated.`;
@@ -9778,6 +9812,7 @@ const NOTIFICATION_TYPE_META = {
   reminder_escalated:      { label:'A client follow-up has gone unanswered for a week', section:'Client Work', visibleTo:'approver' },
   weekly_focus_report:     { label:'The weekly focus report is ready', section:'Client Work' },
   client_danger_maxed:     { label:'A client\'s danger score hits 5/5', section:'Client Work' },
+  client_danger_decreased: { label:'A client\'s danger score goes down', section:'Client Work' },
   event_rsvp:              { label:'Someone RSVPs or requests a change to your event', section:'Calendar' },
   event_invited:           { label:"You're invited to a calendar event", section:'Calendar' },
   event_updated:           { label:'A calendar event you\'re on changes', section:'Calendar' },
@@ -15212,7 +15247,7 @@ async function applyCsvRows(rows){
   if(map.name === undefined){ showToast('error','No "Name" column found','Add a Name column so rows can be matched to clients.'); return; }
 
   await loadAll();
-  let added = 0, updated = 0;
+  let added = 0, updated = 0, skippedDangerLowers = 0;
   const upsertRows = [];
   for(let i=1; i<rows.length; i++){
     const r = rows[i];
@@ -15231,8 +15266,19 @@ async function applyCsvRows(rows){
 
     const existing = clients.find(c => c.name.trim().toLowerCase() === name.toLowerCase());
     if(existing){
+      // Same rule as the regular edit form — a bulk import shouldn't be
+      // a back door around it. Skips just the danger field for this row
+      // rather than the whole row, so an import someone's actually
+      // allowed to run doesn't get derailed by one client's number
+      // needing an admin's say-so.
+      const previousDanger = existing.danger;
+      if(fields.danger !== undefined && fields.danger < previousDanger && !canLowerDangerScore()){
+        delete fields.danger;
+        skippedDangerLowers++;
+      }
       Object.assign(existing, fields);
       upsertRows.push({ id: existing.id, ...clientFieldsToDb(fields) });
+      if(fields.danger !== undefined && fields.danger !== previousDanger) logDangerHistory(existing.id, fields.danger, previousDanger);
       updated++;
     } else {
       const newClient = {
@@ -15250,12 +15296,13 @@ async function applyCsvRows(rows){
   // partial upsert like this only SETs the columns actually present in
   // each row, so it can't blank out fields the sheet doesn't map.
   const { error: upsertErr } = upsertRows.length ? await supabaseClient.from('clients').upsert(upsertRows) : { error:null };
-  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Synced from Google Sheet — ${added} added, ${updated} updated.`});
+  const skippedNote = skippedDangerLowers ? ` (${skippedDangerLowers} danger-score decrease${skippedDangerLowers!==1?'s':''} skipped — you don't have permission to lower it)` : '';
+  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Synced from Google Sheet — ${added} added, ${updated} updated.${skippedNote}`});
   const ok = !upsertErr && await persistLog();
   renderAll();
   const statusEl = document.getElementById('sheetSyncStatus');
-  if(statusEl) statusEl.textContent = `Last synced ${nowTime()} — ${added} added, ${updated} updated.`;
-  ok ? showToast('success','Sheet synced', `${added} client${added!==1?'s':''} added, ${updated} updated.`) : showToast('error','Sync partially failed','Data was read but saving failed — try again.');
+  if(statusEl) statusEl.textContent = `Last synced ${nowTime()} — ${added} added, ${updated} updated.${skippedNote}`;
+  ok ? showToast('success','Sheet synced', `${added} client${added!==1?'s':''} added, ${updated} updated.${skippedNote}`) : showToast('error','Sync partially failed','Data was read but saving failed — try again.');
 }
 
 async function syncFromSheetUrl(){
@@ -15580,6 +15627,7 @@ const EXTRA_PERMISSIONS_META = [
   { key:'view_team_queue', label: "See Team Queue (everyone's drafts)" },
   { key:'delete_tasks', label: 'Permanently delete tasks' },
   { key:'delete_clients', label: 'Manage & permanently delete clients from Trash' },
+  { key:'lower_danger_score', label: "Lower a client's danger score" },
 ];
 
 function openTeamMemberDetail(id){
@@ -15622,10 +15670,18 @@ function openTeamMemberDetail(id){
   // members, since admins/approvers already have those by role), an
   // admin needs to be able to revoke Assistant access from a specific
   // admin/approver too, not just grant it to a member.
+  // lower_danger_score is admin-only by default (canLowerDangerScore()
+  // doesn't extend it to approvers the way hasPermission() does for the
+  // three below) — so unlike those, granting it to an approver is
+  // meaningful, not redundant. Shown for anyone who isn't already an
+  // admin, not just members.
+  const lowerDangerRow = m.role !== 'admin'
+    ? toggleRow(EXTRA_PERMISSIONS_META.find(p=>p.key==='lower_danger_score').label, (m.extra_permissions||[]).includes('lower_danger_score'), `changeTeamPermission('${m.id}','lower_danger_score',${!(m.extra_permissions||[]).includes('lower_danger_score')})`, true)
+    : '';
   const memberOnlyPermissionRows = m.role==='member'
-    ? EXTRA_PERMISSIONS_META.map((p,i)=> toggleRow(p.label, (m.extra_permissions||[]).includes(p.key), `changeTeamPermission('${m.id}','${p.key}',${!(m.extra_permissions||[]).includes(p.key)})`, true))
+    ? EXTRA_PERMISSIONS_META.filter(p=>p.key!=='lower_danger_score').map((p,i)=> toggleRow(p.label, (m.extra_permissions||[]).includes(p.key), `changeTeamPermission('${m.id}','${p.key}',${!(m.extra_permissions||[]).includes(p.key)})`, true))
     : [];
-  const allToggleRows = [ toggleRow('AI Assistant access', !!m.ai_chat_enabled, `toggleMemberAiChatEnabled('${m.id}', ${!!m.ai_chat_enabled})`, true), ...memberOnlyPermissionRows ];
+  const allToggleRows = [ toggleRow('AI Assistant access', !!m.ai_chat_enabled, `toggleMemberAiChatEnabled('${m.id}', ${!!m.ai_chat_enabled})`, true), ...(lowerDangerRow ? [lowerDangerRow] : []), ...memberOnlyPermissionRows ];
   // Strip the trailing divider off the last row in the list so the
   // section doesn't end on a stray line right before its own caption.
   const permissionsHtml = allToggleRows.map((row,i)=> i===allToggleRows.length-1 ? row.replace('border-bottom:1px solid var(--border);','') : row).join('');
@@ -15633,7 +15689,7 @@ function openTeamMemberDetail(id){
     <div style="grid-column:1/-1;padding-top:14px;margin-top:2px;border-top:1px solid var(--border);">
       <span style="${sectionHeadingStyle}">Extra Permissions</span>
       <div style="margin-top:8px;">${permissionsHtml}</div>
-      <p style="font-size:10.5px;color:var(--muted-lt);margin:8px 0 0;">${m.role==='member' ? 'Grants specific extra access without changing their role.' : 'Admin/approver already covers everything else here by role — this is the one thing worth adjusting per person regardless of role.'}</p>
+      <p style="font-size:10.5px;color:var(--muted-lt);margin:8px 0 0;">${m.role==='member' ? 'Grants specific extra access without changing their role.' : 'Everything else here is already covered automatically by role — these are the specific things worth adjusting per person instead.'}</p>
     </div>` : '';
   openAppModal(`
     <div class="modal-head"><span class="panel-title">${m.name}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
