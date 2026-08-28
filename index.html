@@ -5589,10 +5589,32 @@ function checkDuplicateClientName(){
 // recent value at or before date X" per client). Fire-and-forget, same as
 // logClientActivity() — this is secondary analytical data, not something
 // that should block or fail the actual client save if it hiccups.
-function logDangerHistory(clientId, danger){
+// previousDanger lets this tell "just crossed into 5/5" apart from
+// "already was at 5/5, someone just re-saved the client" — without it,
+// every unrelated edit to a client already at max danger would re-fire
+// the alert below, which would train people to ignore it.
+function logDangerHistory(clientId, danger, previousDanger){
   supabaseClient.from('client_danger_history').insert({ client_id: clientId, danger }).then(({error})=>{
     if(error) console.error('logDangerHistory error', error);
   });
+  if(danger === 5 && previousDanger !== 5) alertClientDangerMaxed(clientId);
+}
+
+// Real-time alert the moment a client's danger score maxes out, rather
+// than waiting for it to surface in the weekly focus report's "needs
+// attention" section days later. Everyone on the team gets it, matching
+// the same "useful to whoever's actually doing the client work, not just
+// admins" reasoning as the weekly report itself — except the person who
+// just set it, since they obviously already know.
+async function alertClientDangerMaxed(clientId){
+  const c = clients.find(x=>x.id===clientId);
+  if(!c) return;
+  const title = `${c.name} just hit max danger (5/5)`;
+  const body = `${myName()||'Someone'} flagged ${c.name} at the highest danger level — might be worth a look before it waits for the weekly report.`;
+  const recipients = teamProfiles.filter(p=>p.id !== currentUser?.id);
+  for(const p of recipients){
+    sendNotification(p.id, 'client_danger_maxed', title, body, 'client-detail', clientId);
+  }
 }
 
 async function saveClientForm(){
@@ -5657,7 +5679,7 @@ async function saveClientForm(){
         : `${myName()||'Someone'} saved this client (no actual field changes).`;
       logClientActivity(loggedClientId, 'client_edited', desc);
       refreshClientDetailActivityIfOpen(loggedClientId);
-      if(before.danger !== fields.danger) logDangerHistory(loggedClientId, fields.danger);
+      if(before.danger !== fields.danger) logDangerHistory(loggedClientId, fields.danger, before.danger);
     }
   } else {
     const newId = 'c'+Date.now();
@@ -5668,7 +5690,7 @@ async function saveClientForm(){
     loggedClientId = newId;
     if(ok){
       logClientActivity(loggedClientId, 'client_created', `${myName()||'Someone'} added this client to the roster.`);
-      logDangerHistory(loggedClientId, fields.danger);
+      logDangerHistory(loggedClientId, fields.danger, null);
     }
   }
   closeClientForm();
@@ -7081,7 +7103,15 @@ function refreshClientDetailActivityIfOpen(clientId){
 
 async function openClientDetail(clientId){
   currentDetailClientId = clientId;
-  await switchView('clientdetail');
+  // switchView() marks the view active synchronously, before its own
+  // internal fullRefresh() chain (7 sequential network requests) even
+  // starts — starting it without awaiting yet lets that synchronous part
+  // run first, so the skeleton below paints into a view that's already
+  // visible, instead of sitting queued behind the whole slow chain with
+  // nothing shown in the meantime.
+  const switchPromise = switchView('clientdetail');
+  renderClientDetailSkeleton();
+  await switchPromise;
   renderClientDetail();
   loadClientActivityHistory(clientId);
 }
@@ -7092,6 +7122,30 @@ function openEditClientFormFromDetail(){
 
 function openNoteModalFromDetail(){
   if(currentDetailClientId) openNoteModal(null, currentDetailClientId);
+}
+
+// Shown the instant you click into a client — before switchView's own
+// fullRefresh() chain (loadAll, notes, time entries, tasks,
+// notifications, calendar, reminders — all sequential, all real network
+// round-trips) resolves. That chain runs on EVERY navigation, not just
+// the first one, which is the actual reason this page could sit blank
+// (or worse, still showing the PREVIOUS client's data) for a real,
+// noticeable moment on every single click — clients being loaded or not
+// was never the relevant signal for that; the elements just weren't
+// being touched at all until the whole refresh finished.
+function renderClientDetailSkeleton(){
+  const metricsEl = document.getElementById('cdMetrics');
+  if(!metricsEl) return;
+  const titleEl = document.getElementById('topbarTitle');
+  const subEl = document.getElementById('topbarSub');
+  if(titleEl) titleEl.innerHTML = `<span class="skeleton-block" style="width:160px;height:16px;"></span>`;
+  if(subEl) subEl.innerHTML = `<span class="skeleton-block" style="width:220px;height:11px;"></span>`;
+  const skeletonCard = () => `<div class="metric-card"><div class="skeleton-block" style="width:70px;height:10px;margin-bottom:10px;"></div><div class="skeleton-block" style="width:50px;height:19px;"></div></div>`;
+  metricsEl.innerHTML = Array.from({ length: 4 }).map(skeletonCard).join('');
+  ['cdImprovements','cdDraftStatus','cdTimeEntries','cdNotes'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.innerHTML = `<div class="empty"><span class="spinner"></span>Loading…</div>`;
+  });
 }
 
 function renderClientDetail(){
@@ -7107,25 +7161,7 @@ function renderClientDetail(){
   if(!metricsEl) return;
   const titleEl = document.getElementById('topbarTitle');
   const subEl = document.getElementById('topbarSub');
-  // Distinguishes "the initial fetch hasn't come back yet" from "this
-  // client genuinely doesn't exist" — without this check, opening a
-  // client's page before clients has loaded (a deep link, a bookmark, or
-  // just a fast click right after login) showed "Client not found — this
-  // client may have been removed," which is simply false. Worse, since
-  // nothing ever re-rendered this page once loading actually finished, it
-  // stayed stuck on that false message until manually navigating away and
-  // back — see the renderAll() fix alongside this one.
-  if(!clientsDataLoaded){
-    if(titleEl) titleEl.innerHTML = `<span class="skeleton-block" style="width:160px;height:16px;"></span>`;
-    if(subEl) subEl.innerHTML = `<span class="skeleton-block" style="width:220px;height:11px;"></span>`;
-    const skeletonCard = () => `<div class="metric-card"><div class="skeleton-block" style="width:70px;height:10px;margin-bottom:10px;"></div><div class="skeleton-block" style="width:50px;height:19px;"></div></div>`;
-    metricsEl.innerHTML = Array.from({ length: 4 }).map(skeletonCard).join('');
-    ['cdImprovements','cdDraftStatus','cdTimeEntries','cdNotes'].forEach(id=>{
-      const el = document.getElementById(id);
-      if(el) el.innerHTML = `<div class="empty"><span class="spinner"></span>Loading…</div>`;
-    });
-    return;
-  }
+  if(!clientsDataLoaded){ renderClientDetailSkeleton(); return; }
   const c = clients.find(x=>x.id===currentDetailClientId);
   if(!c){
     if(titleEl) titleEl.textContent = 'Client not found';
@@ -9741,6 +9777,7 @@ const NOTIFICATION_TYPE_META = {
   reminder_follow_up_due:  { label:'A client follow-up you own comes due', section:'Client Work' },
   reminder_escalated:      { label:'A client follow-up has gone unanswered for a week', section:'Client Work', visibleTo:'approver' },
   weekly_focus_report:     { label:'The weekly focus report is ready', section:'Client Work' },
+  client_danger_maxed:     { label:'A client\'s danger score hits 5/5', section:'Client Work' },
   event_rsvp:              { label:'Someone RSVPs or requests a change to your event', section:'Calendar' },
   event_invited:           { label:"You're invited to a calendar event", section:'Calendar' },
   event_updated:           { label:'A calendar event you\'re on changes', section:'Calendar' },
