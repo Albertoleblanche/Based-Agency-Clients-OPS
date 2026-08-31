@@ -603,13 +603,13 @@
   .ai-connection-status.none{background:var(--red-bg);color:var(--red);}
   .ai-provider-card-footer{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
   .ai-provider-model-input{flex:1;min-width:0;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;padding:7px 10px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);}
-  .row-link{color:var(--brand-dark);font-size:12px;font-weight:600;cursor:pointer;}
+  .row-link{display:inline-flex;align-items:center;gap:4px;color:var(--ink);background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;transition:background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);}
   .back-btn{display:inline-flex;align-items:center;gap:6px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;font-weight:600;color:var(--muted);background:transparent;border:none;border-radius:var(--radius-sm);padding:7px 10px 7px 8px;cursor:pointer;transition:background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);}
   .back-btn:hover{background:var(--surface-2);color:var(--ink);}
   .back-btn svg{flex:none;}
   .table-name-link{color:var(--ink);font-weight:600;cursor:pointer;transition:color var(--duration-fast) var(--ease-out);}
   .table-name-link:hover{color:var(--brand-dark);}
-  .row-link:hover{text-decoration:underline;}
+  .row-link:hover{background:var(--border);}
 
   .empty{padding:34px 18px;text-align:center;color:var(--muted);font-size:var(--text-base);}
   .skeleton-block{display:inline-block;border-radius:5px;background:linear-gradient(90deg, var(--border) 25%, var(--surface-2) 50%, var(--border) 75%);background-size:200% 100%;animation:skeletonShimmer 1.5s ease-in-out infinite;}
@@ -652,7 +652,8 @@
   .mini-imp-action-link{color:var(--muted-lt);font-size:11px;font-weight:600;cursor:pointer;}
   .mini-imp-action-link:hover{color:var(--ink);}
   .mini-imp-action-link.danger:hover{color:var(--red);}
-  .danger-link{color:var(--red);}
+  .danger-link{color:var(--red);border-color:var(--red-bg);}
+  .danger-link:hover{background:var(--red-bg);}
 
   .actions-cell{position:relative;}
   .dropdown-menu{display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(16,24,40,.14);min-width:170px;z-index:50;overflow:hidden;}
@@ -1253,6 +1254,7 @@
   .claude-provider-option-desc{display:block;font-size:11px;color:var(--muted);margin-top:2px;line-height:1.4;}
   .claude-popup-menu-btn{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:7px 9px;border-radius:7px;border:none;background:none;color:var(--ink);font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;cursor:pointer;}
   .claude-popup-menu-btn:hover{background:var(--surface-2);}
+  .focus-report-row{border-bottom:1px solid var(--border);}
   #claudePlusSubmenu{position:absolute;left:calc(100% + 6px);top:-6px;bottom:auto;width:190px;max-height:220px;overflow-y:auto;}
   .claude-clear-chat-inline{font-family:'Plus Jakarta Sans',sans-serif;font-size:11.5px;font-weight:600;color:rgba(255,255,255,.55);background:none;border:none;cursor:pointer;padding:0 2px;}
   .claude-clear-chat-inline:hover{color:#fff;}
@@ -1405,6 +1407,11 @@ document.addEventListener('DOMContentLoaded', function(){
         <span class="nav-label">Overview</span>
       </div>
 
+      <div class="nav-item" data-view="focusreports" data-tooltip="Past Reports" onclick="switchView('focusreports')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+        <span class="nav-label">Past Reports</span>
+      </div>
+
       <div class="nav-section-label">Client work</div>
       <div class="nav-item" data-view="clients" data-tooltip="Clients" onclick="switchView('clients')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -1525,7 +1532,7 @@ document.addEventListener('DOMContentLoaded', function(){
             <span class="notif-badge" id="notifBadge" style="display:none;">0</span>
           </button>
           <div class="notif-panel" id="notifPanel" style="display:none;">
-            <div class="notif-panel-head">Notifications <span><span class="row-link" onclick="markAllNotificationsRead()">Mark all read</span> · <span class="row-link danger-link" onclick="clearAllNotifications()">Clear all</span></span></div>
+            <div class="notif-panel-head">Notifications <span style="display:inline-flex;gap:6px;"><span class="row-link" onclick="markAllNotificationsRead()">Mark all read</span><span class="row-link danger-link" onclick="clearAllNotifications()">Clear all</span></span></div>
             <div id="notifPanelList"></div>
           </div>
         </div>
@@ -1710,6 +1717,13 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
     </div>
 
+    <!-- PAST REPORTS -->
+    <div class="view" id="view-focusreports">
+      <div class="panel">
+        <div class="panel-body" id="focusReportsListBody"></div>
+      </div>
+    </div>
+
     <!-- CLIENTS -->
     <div class="view" id="view-clients">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
@@ -1770,7 +1784,7 @@ document.addEventListener('DOMContentLoaded', function(){
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input id="clientSearch" placeholder="Search by name or email…" oninput="onClientSearchInput()">
         </div>
-        <button class="btn btn-brand" style="flex:none;" onclick="openAddClientForm()">+ Add client</button>
+        <button class="btn btn-brand" id="addClientBtn" style="flex:none;" onclick="openAddClientForm()">+ Add client</button>
         <span class="clients-filter-count" id="clientsFilterCount" style="margin-top:0;"></span>
       </div>
 
@@ -2837,7 +2851,7 @@ document.addEventListener('DOMContentLoaded', function(){
       <div class="topbar">
         <button type="button" class="back-btn" onclick="switchView('clients')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><polyline points="15 18 9 12 15 6"/></svg>Back to Clients</button>
         <div class="topbar-right">
-          <button class="btn btn-outline" onclick="openEditClientFormFromDetail()">Edit client</button>
+          <button class="btn btn-outline" id="editClientDetailBtn" onclick="openEditClientFormFromDetail()">Edit client</button>
           <button class="btn btn-brand" onclick="openNoteModalFromDetail()">+ Add note</button>
         </div>
       </div>
@@ -4059,6 +4073,10 @@ function applyRoleVisibility(){
     notifyBtn.style.display = 'inline-flex';
     notifyBtn.textContent = 'Ready to Notify';
   }
+  const addClientBtn = document.getElementById('addClientBtn');
+  if(addClientBtn) addClientBtn.style.display = canApprove() ? 'inline-flex' : 'none';
+  const editClientDetailBtn = document.getElementById('editClientDetailBtn');
+  if(editClientDetailBtn) editClientDetailBtn.style.display = canApprove() ? 'inline-flex' : 'none';
   const teamQueueNavItem = document.getElementById('teamQueueNavItem');
   if(teamQueueNavItem){
     teamQueueNavItem.style.display = hasPermission('view_team_queue') ? 'flex' : 'none';
@@ -4144,6 +4162,7 @@ function populateReportMemberFilter(){
 }
 
 const VIEW_TITLES = {
+  focusreports: ['Past Reports', "Every weekly focus report the team has generated, browsable anytime"],
   clients: ['Clients', "Log improvements here whenever you make one — any of the six of you, any time"],
   improvements: ['Past Improvements', "The team's full history of client work, searchable by date"],
   approve: ['Approval Queue', 'The clients who need you most, sorted by risk'],
@@ -4311,6 +4330,17 @@ async function switchView(name){
     const tb = document.getElementById('timesheetBody');
     if(tb) tb.innerHTML = loadingStateHtml('Loading timesheet…');
   }
+  // Profile doesn't actually need fullRefresh() at all — myProfile is
+  // already loaded from login (fullRefresh()'s chain never touches it;
+  // that's a separate loadMyProfile() call), and its own sub-panels
+  // (Google Calendar, push, email) each do their own independent fetch.
+  // Called here, ahead of 7 unrelated network requests, instead of after
+  // them — there was never a reason for this page specifically to wait.
+  if(name==='profile'){ renderProfilePage(); loadGoogleCalendarStatus(); loadPushStatus(); }
+  // weekly_focus_reports is a completely independent table — none of the
+  // 7 requests in fullRefresh() below touch it, so this page gains
+  // nothing from waiting behind them either.
+  if(name==='focusreports') renderFocusReportsPage();
   await fullRefresh();
   if(name==='trash') renderTrash();
   if(name==='payroll') renderPayroll();
@@ -4330,7 +4360,6 @@ async function switchView(name){
   }
   if(name==='teamqueue') renderTeamQueue();
   if(name==='time') renderTimesheet();
-  if(name==='profile'){ renderProfilePage(); loadGoogleCalendarStatus(); loadPushStatus(); }
 }
 
 function switchSettingsTab(name){
@@ -5456,6 +5485,7 @@ function resetClientFormFields(){
 }
 
 function openAddClientForm(){
+  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can add clients.'); return; }
   editingClientId = null;
   openAppModal(clientFormHtml('Add client', 'Save client'), 560);
   resetClientFormFields();
@@ -5535,6 +5565,7 @@ function computeSuggestedDanger(c){
 }
 
 function openEditClientForm(id){
+  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can edit clients.'); return; }
   const c = clients.find(x=>x.id===id);
   if(!c){ showToast('error','Client not found','Someone may have removed this — refreshing.'); fullRefresh(); return; }
   editingClientId = id;
@@ -5656,6 +5687,11 @@ async function alertClientDangerDecreased(clientId, previousDanger, newDanger){
 }
 
 async function saveClientForm(){
+  // Defense in depth — openAddClientForm()/openEditClientForm() already
+  // block reaching this form at all for a member, but this covers the
+  // edge case of the modal already being open when a role changes
+  // mid-session, or the function being called directly some other way.
+  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can add or edit clients.'); return; }
   const name = document.getElementById('ncName').value.trim();
   if(!name){ showToast('error','Client name required','Enter a name before saving.'); return; }
   const btn = clickedBtn();
@@ -6334,8 +6370,8 @@ function renderClientsTable(){
     tbody.innerHTML = `<tr><td colspan="8">${emptyStateHtml(
       '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
       'No clients yet',
-      'This is where your whole roster lives — add your first client to start tracking their work.',
-      '<button class="btn btn-brand" onclick="openAddClientForm()">+ Add client</button>'
+      canApprove() ? 'This is where your whole roster lives — add your first client to start tracking their work.' : 'This is where your whole roster lives — ask an admin or approver to add the first client.',
+      canApprove() ? '<button class="btn btn-brand" onclick="openAddClientForm()">+ Add client</button>' : ''
     )}</td></tr>`;
     if(countEl) countEl.textContent = '';
     const pag = document.getElementById('clientsPagination'); if(pag) pag.innerHTML = '';
@@ -10208,6 +10244,36 @@ async function openWeeklyFocusReportHistory(){
   `).join('');
 }
 
+// The dedicated sidebar page version — same underlying query and the
+// same openWeeklyFocusReportModal(reportId) viewer as the modal-based
+// history list above, just with the extra room a full page has over a
+// 440px modal, and reachable directly from the sidebar rather than only
+// via the Overview banner or an already-open report.
+async function renderFocusReportsPage(){
+  const el = document.getElementById('focusReportsListBody');
+  if(!el) return;
+  el.innerHTML = loadingStateHtml('Loading past reports…');
+  const { data: rows, error } = await supabaseClient
+    .from('weekly_focus_reports').select('id, generated_at').order('generated_at', { ascending:false });
+  if(!document.getElementById('focusReportsListBody')) return; // navigated away before this resolved
+  if(error){ el.innerHTML = `<p class="empty">Couldn't load past reports — try again.</p>`; return; }
+  if(!rows || !rows.length){
+    el.innerHTML = emptyStateHtml(
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>',
+      'No reports yet',
+      'Weekly focus reports will show up here once the first one generates.',
+      ''
+    );
+    return;
+  }
+  el.innerHTML = rows.map((r,i)=>`
+    <button type="button" class="claude-popup-menu-btn${i===rows.length-1?'':' focus-report-row'}" style="justify-content:space-between;padding:13px 10px;font-size:14px;border-radius:0;" onclick="openWeeklyFocusReportModal('${r.id}')">
+      <span>${new Date(r.generated_at).toLocaleDateString('en-US',{weekday:'long', month:'short', day:'numeric', year:'numeric'})}</span>
+      ${i===0 ? `<span class="pill pill-good">Latest</span>` : `<span style="color:var(--muted-lt);">View →</span>`}
+    </button>
+  `).join('');
+}
+
 // Instead of closing the report when you click through to a client, this
 // docks it to a corner (transparent, click-through overlay behind it) so
 // the client detail page underneath becomes visible and usable, and the
@@ -10310,8 +10376,10 @@ async function checkForNewNotificationToasts(){
 
 function renderProfilePage(){
   if(!myProfile) return;
-  document.getElementById('profileNameInput').value = myProfile.name || '';
-  document.getElementById('profilePhoneInput').value = myProfile.phone || '';
+  const nameInput = document.getElementById('profileNameInput');
+  const phoneInput = document.getElementById('profilePhoneInput');
+  if(nameInput && document.activeElement !== nameInput) nameInput.value = myProfile.name || '';
+  if(phoneInput && document.activeElement !== phoneInput) phoneInput.value = myProfile.phone || '';
   const dsInput = document.getElementById('dailySummarySlackIdInput');
   if(dsInput && document.activeElement !== dsInput) dsInput.value = myProfile.daily_summary_slack_id || '';
 
@@ -14959,7 +15027,7 @@ function applyAppBranding(){
 // duplicating that as a second editable field here would just be
 // confusing about which one actually takes effect.
 const NAV_LABEL_DEFAULTS = {
-  overview: 'Overview', clients: 'Clients', approve: 'Approval Queue', teamqueue: 'Team Queue',
+  overview: 'Overview', focusreports: 'Past Reports', clients: 'Clients', approve: 'Approval Queue', teamqueue: 'Team Queue',
   notes: 'Notes', tasks: 'Tasks', reminders: 'Reminders', calendar: 'Calendar',
   time: 'Time Tracker', team: 'Team', trash: 'Trash', settings: 'Settings & Integrations',
 };
