@@ -829,6 +829,8 @@
   .kanban-card-client{display:flex;align-items:center;gap:6px;margin-top:11px;font-size:11px;color:var(--muted-lt);}
   .kanban-card-assigned-label{font-family:'Plus Jakarta Sans',sans-serif;font-size:9.5px;letter-spacing:.04em;color:var(--muted-lt);margin-top:11px;}
   .kanban-card-avatars{display:flex;align-items:center;margin-top:5px;}
+  .kanban-card-logtime-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:10px;padding:7px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--ink);font-family:'Plus Jakarta Sans',sans-serif;font-size:11.5px;font-weight:700;cursor:pointer;transition:background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);}
+  .kanban-card-logtime-btn:hover{background:var(--brand-bg);border-color:var(--brand);color:var(--brand-dark);}
   .kanban-card-footer{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:11px;border-top:1px solid var(--border);}
   .kanban-priority-flag{display:flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:6px;}
   .kanban-card-icons{display:flex;gap:12px;font-size:10.5px;color:var(--muted-lt);font-weight:600;}
@@ -8286,6 +8288,10 @@ function kanbanCardHtml(t){
     <div class="kanban-card-avatars">
       ${personAvatarHtml(t.assignerId)}${t.assigneeId!==t.assignerId ? personAvatarHtml(t.assigneeId) : ''}
     </div>
+    <button type="button" class="kanban-card-logtime-btn" onclick="event.stopPropagation();openManualEntryFromTask('${t.id}')">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Log time
+    </button>
     <div class="kanban-card-footer">
       <span class="kanban-priority-flag" style="background:${pMeta.color}18;color:${pMeta.color};">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M4 2v20M4 3h14l-3 4 3 4H4"/></svg>
