@@ -3161,7 +3161,7 @@ const CLIENT_FIELD_DB_MAP = {
   sow:'sow', draft:'draft', draftStatus:'draft_status', draftPendingSince:'draft_pending_since',
   lastProactiveCheckAt:'last_proactive_check_at', customFieldValues:'custom_field_values',
   deletedAt:'deleted_at', readyToNotify:'ready_to_notify', startDate:'start_date',
-  draftImprovementIds:'draft_improvement_ids',
+  draftImprovementIds:'draft_improvement_ids', draftSentAt:'draft_sent_at', draftSentBy:'draft_sent_by',
 };
 function clientFieldsToDb(fields){
   const out = {};
@@ -3180,6 +3180,10 @@ function clientRowFromDb(r){
     // heuristic), read at approval time to know which specific rows to
     // flip include_in_email off for. See addendum-14.sql.
     draftImprovementIds: r.draft_improvement_ids || [],
+    // Whether (and by whom) this approved draft has already been emailed
+    // to the client — sendApprovedDraft() uses this to require an
+    // explicit confirmation before sending it again. See addendum-15.sql.
+    draftSentAt: r.draft_sent_at || null, draftSentBy: r.draft_sent_by || '',
     improvements:[], // hydrated separately from clientImprovements
   };
 }
@@ -8206,11 +8210,14 @@ function renderTasks(){
 function kanbanCardMenuHtml(t){
   const amAssigner = t.assignerId===currentUser.id;
   const amAssignee = t.assigneeId===currentUser.id;
+  // Available regardless of status or role — logging time against a task
+  // isn't limited to whoever assigned or was assigned it.
+  const logTimeItem = `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();openManualEntryFromTask('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Log time</div>`;
 
   // Once a task is Completed, it's locked — the only things left to do are
   // file it away or remove it, not move it around or edit it further.
   if(t.status==='done'){
-    return `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();hideTaskFromMyList('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>Archive</div>
+    return `${logTimeItem}<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();hideTaskFromMyList('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>Archive</div>
       ${hasPermission('delete_tasks') ? `<div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();deleteTaskPermanently('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete</div>` : ''}`;
   }
 
@@ -8224,7 +8231,7 @@ function kanbanCardMenuHtml(t){
     extra += `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();openEditTaskModal('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit</div>`;
     extra += `<div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();cancelTask('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>Cancel task</div>`;
   }
-  return moveOptions + extra;
+  return logTimeItem + moveOptions + extra;
 }
 
 function toggleKanbanCardMenu(taskId){
@@ -12756,6 +12763,25 @@ function openManualEntryModal(){
   if(dateInput) setDatePickerValue('manualDate', toDateStr(new Date()));
 }
 
+// Opens the same manual-entry form, pre-filled from a task — its client
+// (if it has one) and its title as a starting description, both still
+// freely editable. Reuses setClientFieldValue() rather than setting the
+// hidden input directly, and fires a real change event afterward so
+// wireServiceAutoSuggest()'s listener (wired by populateTimeClientSelects()
+// inside openManualEntryModal(), just called above) still auto-fills the
+// Service field exactly as it would for a manually-picked client.
+function openManualEntryFromTask(taskId){
+  const t = tasks.find(x=>x.id===taskId);
+  if(!t) return;
+  openManualEntryModal();
+  if(t.clientId){
+    setClientFieldValue('manualClient', 'manualClientSearch', t.clientId);
+    document.getElementById('manualClient')?.dispatchEvent(new Event('change'));
+  }
+  const descInput = document.getElementById('manualDesc');
+  if(descInput) descInput.value = t.title || '';
+}
+
 async function addManualEntry(){
   const clientId = document.getElementById('manualClient').value;
   const service = document.getElementById('manualService')?.value || '';
@@ -14878,7 +14904,16 @@ ${contentRules}`;
     // what was actually approved is the underlying included improvements,
     // which haven't changed, not this specific AI wording of them. A
     // fresh (never-approved) draft still becomes pending as before.
-    if(!stayedApproved){ c.draftStatus = 'pending'; c.draftPendingSince = new Date().toISOString(); }
+    if(!stayedApproved){
+      c.draftStatus = 'pending'; c.draftPendingSince = new Date().toISOString();
+      // A genuinely new cycle means different underlying content — the
+      // "already sent" record from whatever was sent before no longer
+      // applies to this draft. Deliberately NOT cleared in the
+      // stayedApproved branch above — reording an already-approved draft
+      // is still the same underlying work, so sendApprovedDraft() should
+      // keep warning about it.
+      c.draftSentAt = null; c.draftSentBy = '';
+    }
     // A fresh/regenerated draft was never "marked ready to notify" for
     // this specific content — Team Queue shouldn't surface it to
     // approvers as awaiting review until the owning member explicitly
@@ -14889,7 +14924,7 @@ ${contentRules}`;
     // know precisely which rows to flip include_in_email off for.
     c.draftImprovementIds = checkedIds;
     log.unshift({t:nowTime(), tag:'auto', text:`AI ${stayedApproved?'re-worded':'drafted'} the update for <b>${c.name}</b> from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''}${stayedApproved?' — stayed approved, the included improvements didn\'t change':''}.`});
-    await updateClientRow(id, { draft:c.draft, draftStatus:c.draftStatus, draftPendingSince:c.draftPendingSince, readyToNotify:false, draftImprovementIds: checkedIds });
+    await updateClientRow(id, { draft:c.draft, draftStatus:c.draftStatus, draftPendingSince:c.draftPendingSince, readyToNotify:false, draftImprovementIds: checkedIds, draftSentAt: c.draftSentAt, draftSentBy: c.draftSentBy });
     await persistLog();
     renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
     logClientActivity(id, 'draft_generated', `AI ${stayedApproved?'re-worded':'generated'} a draft from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''} (of ${c.improvements.length} logged)${stayedApproved?' — approval carried over':''}.`);
@@ -14923,11 +14958,37 @@ ${contentRules}`;
 // The Send button on an already-approved card — same confirmation flow
 // approveDraft() itself uses when it opens the email right after approving,
 // for the case where that got dismissed earlier without actually sending.
-function sendApprovedDraft(id){
+async function sendApprovedDraft(id){
   const c = clients.find(x=>x.id===id);
   if(!c) return;
   if(!c.email){ showToast('error','No email on file', `Add an email for ${c.name} in Clients to send.`); return; }
-  showSendEmailConfirm(c.email, `Your weekly update from ${settings.appName || 'Based Agency'}`, c.draft || '');
+  // Already sent this exact draft once — require an explicit
+  // confirmation naming who sent it and when, rather than silently
+  // allowing (or silently blocking) a second send. A genuinely new draft
+  // cycle clears this automatically (see confirmGenerateDraftSelection());
+  // reaching here with draftSentAt still set means this is the same
+  // underlying content being sent again.
+  if(c.draftSentAt){
+    const who = c.draftSentBy && c.draftSentBy === myName() ? 'You' : (c.draftSentBy || 'Someone');
+    const sentDate = new Date(c.draftSentAt).toLocaleDateString('en-US',{month:'long', day:'numeric', year:'numeric'});
+    const confirmed = await confirmDialog(
+      `${who} sent this improvement to ${c.name} (${c.email}) on ${sentDate}. Are you sure you want to send it again?`,
+      { confirmLabel:'Send again' }
+    );
+    if(!confirmed) return;
+  }
+  showSendEmailConfirm(c.email, `Your weekly update from ${settings.appName || 'Based Agency'}`, c.draft || '', () => recordDraftSent(id));
+}
+
+// Called only once the email actually, successfully sends (via
+// showSendEmailConfirm's onSent callback) — never on a failed or
+// cancelled attempt, so draftSentAt always reflects a real delivery.
+async function recordDraftSent(id){
+  const c = clients.find(x=>x.id===id);
+  if(!c) return;
+  c.draftSentAt = new Date().toISOString();
+  c.draftSentBy = myName() || 'Someone';
+  await updateClientRow(id, { draftSentAt: c.draftSentAt, draftSentBy: c.draftSentBy });
 }
 
 // Whether the current user personally logged at least one improvement
@@ -15028,8 +15089,12 @@ async function skipDraft(id){
   // this abandoned draft stay eligible (include_in_email is untouched) —
   // this just clears the now-stale "what's in the current draft" record.
   c.draftImprovementIds = [];
+  // A full reset back to square one — any prior "already sent" record
+  // belongs to this now-abandoned cycle, not whatever draft eventually
+  // gets generated next for this client.
+  c.draftSentAt = null; c.draftSentBy = '';
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Skipped <b>${c.name}</b> this week — no email sent.`});
-  const ok = await updateClientRow(id, { draftStatus:c.draftStatus, draft:c.draft, draftImprovementIds: [] });
+  const ok = await updateClientRow(id, { draftStatus:c.draftStatus, draft:c.draft, draftImprovementIds: [], draftSentAt: null, draftSentBy: '' });
   if(ok) await persistLog();
   renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
   if(ok){ logClientActivity(id, 'draft_skipped', `${myName()||'Someone'} skipped this week's update.`); refreshClientDetailActivityIfOpen(id); }
