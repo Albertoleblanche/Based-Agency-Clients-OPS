@@ -1161,6 +1161,14 @@
   .claude-sidebar-new-btn:hover{background:#0000000f;border-color:transparent;color:#000;}
   .claude-sidebar-btn-group{display:flex;flex-direction:column;gap:2px;margin-bottom:26px;}
   .claude-sidebar-footer{margin-top:auto;padding-top:14px;border-top:1px solid rgb(47 45 45 / 14%);display:flex;align-items:center;justify-content:space-between;gap:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;color:#000;flex:none;}
+  .claude-sidebar-heading-row{display:flex;align-items:center;justify-content:space-between;padding:0 4px 8px;}
+  .claude-sidebar-heading-row .claude-sidebar-heading{padding:0;}
+  .claude-bulk-select-link{font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;font-weight:600;color:#000;cursor:pointer;text-decoration:underline;flex:none;}
+  .claude-sidebar-checkbox-wrap{flex:none;display:flex;align-items:center;padding:0 2px 0 6px;}
+  .claude-bulk-bar{background:#0000000f;border-radius:8px;padding:10px;margin-bottom:8px;flex:none;}
+  .claude-bulk-bar-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  .claude-bulk-bar-count{font-family:'Plus Jakarta Sans',sans-serif;font-size:11.5px;font-weight:700;color:#000;}
+  .claude-bulk-bar-actions{display:flex;flex-direction:column;gap:2px;}
   .claude-sidebar-heading{font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:rgba(0,0,0,.45);padding:0 4px 8px;flex:none;}
   .claude-projects-view{flex:1;display:flex;flex-direction:column;overflow:hidden;}
   .claude-projects-header{display:flex;align-items:center;gap:12px;padding:18px 24px;border-bottom:1px solid var(--border);flex:none;}
@@ -1545,7 +1553,10 @@ document.addEventListener('DOMContentLoaded', function(){
             <span style="font-size:13px;font-weight:600;color:var(--ink);">This week's focus report</span>
             <span id="weeklyFocusReportBannerDate" style="font-size:11.5px;color:var(--muted-lt);"></span>
           </div>
-          <span class="row-link">View →</span>
+          <div style="display:flex;align-items:center;gap:16px;">
+            <span class="row-link" onclick="event.stopPropagation();openWeeklyFocusReportHistory()">Past reports</span>
+            <span class="row-link">View →</span>
+          </div>
         </div>
       </div>
       <div class="ov-grid">
@@ -2887,7 +2898,11 @@ document.addEventListener('DOMContentLoaded', function(){
           </div>
           <div class="claude-sidebar-heading">Projects</div>
           <div class="claude-sidebar-list" id="claudeSidebarProjectsList" style="margin-bottom:26px;"></div>
-          <div class="claude-sidebar-heading">Chats and Tasks</div>
+          <div class="claude-sidebar-heading-row">
+            <div class="claude-sidebar-heading">Chats and Tasks</div>
+            <span class="claude-bulk-select-link" id="claudeBulkSelectLink" onclick="toggleClaudeBulkMode()">Select</span>
+          </div>
+          <div class="claude-bulk-bar" id="claudeBulkBar" style="display:none;"></div>
           <div class="claude-sidebar-list" id="claudeSidebarList"></div>
           <div class="claude-sidebar-footer">
             <span>Floating button</span>
@@ -10152,12 +10167,45 @@ function weeklyFocusReportPrev(){
 
 function openWeeklyFocusReportShell(){
   openAppModal(`
-    <div class="modal-head" onclick="undockWeeklyFocusReportIfNeeded()"><span class="panel-title">This week's focus report</span><span class="toast-close" onclick="event.stopPropagation();closeAppModal()">✕</span></div>
+    <div class="modal-head" onclick="undockWeeklyFocusReportIfNeeded()">
+      <span class="panel-title">This week's focus report</span>
+      <div style="display:flex;align-items:center;gap:14px;">
+        <span class="row-link" style="font-size:12px;" onclick="event.stopPropagation();openWeeklyFocusReportHistory()">Past reports</span>
+        <span class="toast-close" onclick="event.stopPropagation();closeAppModal()">✕</span>
+      </div>
+    </div>
     <div class="modal-body" id="weeklyFocusReportBody"><p style="font-size:13px;color:var(--muted);text-align:center;">Loading…</p></div>
     <div class="modal-actions" style="justify-content:space-between;">
       <button class="btn btn-outline" id="weeklyFocusReportPrevBtn" onclick="weeklyFocusReportPrev()">Back</button>
       <button class="btn btn-brand" id="weeklyFocusReportNextBtn" onclick="weeklyFocusReportNext()">Next</button>
     </div>`, 560);
+}
+
+// Lists every past report (they've all existed in the database all
+// along — nothing to generate here, just to browse). Reuses
+// openWeeklyFocusReportModal(reportId), which already supported opening
+// any specific report by id; the only missing piece was actually a way
+// to see the list and pick one.
+async function openWeeklyFocusReportHistory(){
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">Past focus reports</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <div id="weeklyFocusReportHistoryList" style="display:flex;flex-direction:column;gap:2px;max-height:360px;overflow-y:auto;">
+        <div class="empty"><span class="spinner"></span>Loading…</div>
+      </div>
+    </div>`, 440);
+  const { data: rows, error } = await supabaseClient
+    .from('weekly_focus_reports').select('id, generated_at').order('generated_at', { ascending:false });
+  const listEl = document.getElementById('weeklyFocusReportHistoryList');
+  if(!listEl) return; // modal was closed again before this resolved
+  if(error){ listEl.innerHTML = `<p class="empty">Couldn't load past reports — try again.</p>`; return; }
+  if(!rows || !rows.length){ listEl.innerHTML = `<p class="empty">No reports yet.</p>`; return; }
+  listEl.innerHTML = rows.map((r,i)=>`
+    <button type="button" class="claude-popup-menu-btn" style="justify-content:space-between;" onclick="openWeeklyFocusReportModal('${r.id}')">
+      <span>${new Date(r.generated_at).toLocaleDateString('en-US',{weekday:'long', month:'short', day:'numeric', year:'numeric'})}</span>
+      ${i===0 ? `<span style="font-size:10.5px;color:var(--muted-lt);">Latest</span>` : ''}
+    </button>
+  `).join('');
 }
 
 // Instead of closing the report when you click through to a client, this
@@ -11068,6 +11116,8 @@ let claudeProjectsList = []; // [{id, name, description, updated_at}]
 let claudeCurrentProjectId = null; // set while viewing a specific project's detail screen; null on the projects list screen
 let claudeProjectsSearchQuery = '';
 let claudePendingProjectId = null; // set by "New chat in this project"; consumed once by ensureClaudeConversation() to tag the new row
+let claudeBulkMode = false;
+let claudeBulkSelected = new Set();
 // How many past messages get displayed vs. actually sent as context to the
 // AI on each new message — kept separate on purpose. Displaying more is
 // free (just reading rows already fetched); SENDING more costs real
@@ -11382,6 +11432,7 @@ function renderClaudeConversationsSidebar(){
   const el = document.getElementById('claudeSidebarList');
   if(!el) return;
   syncClaudeFloatButtonToggle();
+  renderClaudeBulkBar();
   // Any menu currently open got moved to document.body by
   // toggleClaudeSidebarMenu() below — it's about to be replaced by a
   // fresh one with the same id anyway, so the orphaned copy needs
@@ -11390,12 +11441,17 @@ function renderClaudeConversationsSidebar(){
   el.innerHTML = claudeConversationsList.length
     ? claudeConversationsList.map(c=>`
         <div class="claude-sidebar-row${c.id===claudeConversationId?' active':''}">
-          <button type="button" class="claude-sidebar-item" onclick="openClaudeConversation('${c.id}')" title="${escapeHtml(c.title)}">
+          ${claudeBulkMode ? `
+          <label class="claude-sidebar-checkbox-wrap">
+            <input type="checkbox" ${claudeBulkSelected.has(c.id)?'checked':''} onchange="toggleClaudeBulkSelect('${c.id}')">
+          </label>` : ''}
+          <button type="button" class="claude-sidebar-item" onclick="${claudeBulkMode ? `toggleClaudeBulkSelect('${c.id}')` : `openClaudeConversation('${c.id}')`}" title="${escapeHtml(c.title)}">
             ${c.pinned
               ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none" class="claude-sidebar-pin-icon">${CLAUDE_SIDEBAR_ICONS.pin}</svg>`
               : `<svg width="7" height="7" viewBox="0 0 24 24" fill="currentColor" stroke="none" class="claude-sidebar-pin-icon">${CLAUDE_SIDEBAR_ICONS.dot}</svg>`}
             <span class="claude-sidebar-item-label">${escapeHtml(c.title)}</span>
           </button>
+          ${claudeBulkMode ? '' : `
           <button type="button" class="claude-sidebar-menu-btn" id="claudeSidebarMenuBtn-${c.id}" onclick="toggleClaudeSidebarMenu(event,'${c.id}')" title="More">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
           </button>
@@ -11421,10 +11477,111 @@ function renderClaudeConversationsSidebar(){
             </div>
             `}
             <button type="button" style="color:var(--red);" onclick="deleteClaudeConversationFromMenu('${c.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${CLAUDE_SIDEBAR_ICONS.trash}</svg> Delete</button>
-          </div>
+          </div>`}
         </div>
       `).join('')
     : `<p style="font-size:11.5px;color:var(--muted-lt);padding:8px 10px;margin:0;">No conversations yet.</p>`;
+}
+
+// Bulk actions on Assistant conversations — select multiple, then pin,
+// unpin, move to a project, or delete them together, instead of needing
+// the 3-dot menu once per conversation.
+function toggleClaudeBulkMode(){
+  claudeBulkMode = !claudeBulkMode;
+  claudeBulkSelected.clear();
+  const link = document.getElementById('claudeBulkSelectLink');
+  if(link) link.textContent = claudeBulkMode ? 'Cancel' : 'Select';
+  renderClaudeConversationsSidebar();
+}
+
+function toggleClaudeBulkSelect(id){
+  if(claudeBulkSelected.has(id)) claudeBulkSelected.delete(id);
+  else claudeBulkSelected.add(id);
+  renderClaudeConversationsSidebar();
+}
+
+function renderClaudeBulkBar(){
+  const link = document.getElementById('claudeBulkSelectLink');
+  if(link) link.textContent = claudeBulkMode ? 'Cancel' : 'Select';
+  const bar = document.getElementById('claudeBulkBar');
+  if(!bar) return;
+  if(!claudeBulkMode){ bar.style.display = 'none'; return; }
+  bar.style.display = 'block';
+  const n = claudeBulkSelected.size;
+  bar.innerHTML = `
+    <div class="claude-bulk-bar-head">
+      <span class="claude-bulk-bar-count">${n} selected</span>
+      <span class="claude-bulk-select-link" onclick="toggleClaudeBulkMode()">Done</span>
+    </div>
+    <div class="claude-bulk-bar-actions">
+      <button type="button" class="claude-popup-menu-btn" ${n?'':'disabled'} onclick="bulkPinClaudeConversations(true)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${CLAUDE_SIDEBAR_ICONS.pin}</svg> Pin selected</button>
+      <button type="button" class="claude-popup-menu-btn" ${n?'':'disabled'} onclick="bulkPinClaudeConversations(false)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${CLAUDE_SIDEBAR_ICONS.pin}</svg> Unpin selected</button>
+      <button type="button" class="claude-popup-menu-btn" ${n?'':'disabled'} onclick="openClaudeBulkAddToProjectModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${CLAUDE_SIDEBAR_ICONS.folder}</svg> Add to project</button>
+      <button type="button" class="claude-popup-menu-btn" style="color:var(--red);" ${n?'':'disabled'} onclick="bulkDeleteClaudeConversations()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${CLAUDE_SIDEBAR_ICONS.trash}</svg> Delete selected</button>
+    </div>`;
+}
+
+async function bulkPinClaudeConversations(pin){
+  const ids = [...claudeBulkSelected];
+  if(!ids.length) return;
+  const { error } = await supabaseClient.from('claude_conversations').update({ pinned: pin }).in('id', ids);
+  if(error){ showToast('error','Could not update','Try again.'); return; }
+  showToast('success', pin?'Pinned':'Unpinned', `${ids.length} conversation${ids.length!==1?'s':''} ${pin?'pinned':'unpinned'}.`);
+  claudeBulkSelected.clear();
+  claudeBulkMode = false;
+  await loadClaudeConversationsList();
+  renderClaudeConversationsSidebar();
+}
+
+async function bulkDeleteClaudeConversations(){
+  const ids = [...claudeBulkSelected];
+  if(!ids.length) return;
+  if(!(await confirmDialog(`Delete ${ids.length} conversation${ids.length!==1?'s':''}? This deletes them for good, including their message history.`, {confirmLabel:'Delete', destructive:true}))) return;
+  const { error } = await supabaseClient.from('claude_conversations').delete().in('id', ids);
+  if(error){ showToast('error','Could not delete','Try again.'); return; }
+  if(ids.includes(claudeConversationId)){
+    claudeConversationId = null;
+    claudeConversation = [];
+    resetClaudeTabInput();
+    renderClaudeMessages();
+  }
+  showToast('success','Deleted', `${ids.length} conversation${ids.length!==1?'s':''} deleted.`);
+  claudeBulkSelected.clear();
+  claudeBulkMode = false;
+  await loadClaudeConversationsList();
+  renderClaudeConversationsSidebar();
+}
+
+// A modal rather than a hover-out submenu (unlike the single-item 3-dot
+// menu's "Add to project") — the sidebar's own scroll clipping would
+// need the same document.body portal trick to pop a submenu out of it,
+// and a bulk action affecting several conversations at once is worth a
+// deliberate, clearly-labeled picker anyway rather than a quick inline menu.
+function openClaudeBulkAddToProjectModal(){
+  const n = claudeBulkSelected.size;
+  if(!n) return;
+  if(!claudeProjectsList.length){ showToast('info','No projects yet','Create one from the Projects tab first.'); return; }
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">Add ${n} chat${n!==1?'s':''} to a project</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <div style="display:flex;flex-direction:column;gap:2px;max-height:280px;overflow-y:auto;">
+        ${claudeProjectsList.map(p=>`<button type="button" class="claude-popup-menu-btn" onclick="bulkAssignClaudeConversationsToProject('${p.id}','${(p.name||'').replace(/"/g,'&quot;')}')">${escapeHtml(p.name)}</button>`).join('')}
+      </div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Cancel</button></div>`, 420);
+}
+
+async function bulkAssignClaudeConversationsToProject(projectId, projectName){
+  const ids = [...claudeBulkSelected];
+  if(!ids.length) return;
+  const { error } = await supabaseClient.from('claude_conversations').update({ project_id: projectId }).in('id', ids);
+  if(error){ showToast('error','Could not update','Try again.'); return; }
+  closeAppModal();
+  showToast('success','Added to project', `${ids.length} conversation${ids.length!==1?'s':''} added to "${projectName}".`);
+  claudeBulkSelected.clear();
+  claudeBulkMode = false;
+  await loadClaudeConversationsList();
+  renderClaudeConversationsSidebar();
 }
 
 // Moved to document.body when opened, same reasoning as the calendar
@@ -15953,6 +16110,16 @@ function showLoginScreen(){
   // admin's team-wide time entries) can render even briefly for whoever
   // logs in next on this same tab, before their own fresh data loads in.
   clients = []; notes = []; timeEntries = []; teamProfiles = []; log = [];
+  // The Assistant's own state was missing from this reset entirely — its
+  // conversations are personal, but claudeHistoryLoaded staying true
+  // across a logout meant loadClaudeHistory() would permanently skip
+  // re-fetching for whoever logged in next on the same tab, silently
+  // leaving the PREVIOUS person's already-loaded conversations and
+  // projects on screen instead of ever loading the new person's own.
+  claudeConversation = []; claudeConversationId = null; claudeConversationsList = [];
+  claudeHistoryLoaded = false; claudeSending = false;
+  claudeProjectsList = []; claudeCurrentProjectId = null; claudeProjectsSearchQuery = ''; claudePendingProjectId = null;
+  claudeQuickActionsPicked = [];
 }
 
 async function showApp(session){
