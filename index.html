@@ -5235,7 +5235,6 @@ function clientFormHtml(title, submitLabel, customValues){
     <div class="modal-body">
       <div class="form-grid">
         <div><label>Client name</label><input id="ncName" placeholder="e.g. Premium Homes" oninput="checkDuplicateClientName()"><div id="ncNameWarning" style="display:none;font-size:11px;color:var(--red);margin-top:5px;"></div></div>
-        <div><label>Client email <span style="font-weight:400;color:var(--muted-lt);">(comma-separated for more than one)</span></label><input id="ncEmail" placeholder="contact@client.com, billing@client.com"></div>
         <div><label>Website <span style="font-weight:400;color:var(--muted-lt);">(optional)</span></label><input id="ncWebsite" placeholder="https://client.com"></div>
         <div><label>Service</label><select id="ncService"></select></div>
         <div><label>Status</label><select id="ncStatus"></select></div>
@@ -5245,6 +5244,11 @@ function clientFormHtml(title, submitLabel, customValues){
         <div style="position:relative;">
           <label>Start date <span style="font-weight:400;color:var(--muted-lt);">(optional)</span></label>
           ${datePickerFieldHtml('ncStartDate', { maxDate: toDateStr(new Date()) })}
+        </div>
+        <div style="grid-column:1/-1;">
+          <label>Client email</label>
+          <input id="ncEmail" style="width:100%;" placeholder="contact@client.com, billing@client.com">
+          <p style="font-size:11.5px;color:var(--muted-lt);margin:6px 0 0;line-height:1.5;">Add more than one address by separating them with commas — updates will go to everyone listed here.</p>
         </div>
         <div style="grid-column:1/-1;"><label>SOW / scope notes</label><input id="ncSow" spellcheck="true" placeholder="Brief scope summary"></div>
         ${customFieldsFormHtml(customValues)}
@@ -5658,6 +5662,20 @@ function closeClientForm(){
   closeAppModal();
 }
 
+// Allows one or several comma-separated addresses (a client with more than
+// one contact) — empty is fine too, since email isn't a required field.
+// Simple shape check (name@domain.tld), not full RFC 5322 validation —
+// enough to catch someone typing a name or a note into this field by
+// mistake, without being pedantic about edge-case address formats.
+function isValidEmailList(value){
+  const trimmed = (value||'').trim();
+  if(!trimmed) return true;
+  const parts = trimmed.split(',').map(s=>s.trim()).filter(Boolean);
+  if(!parts.length) return true;
+  const emailShape = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return parts.every(p => emailShape.test(p));
+}
+
 // Quick, local hint as the user types — catches the common case early,
 // before they've filled out the rest of the form. Not authoritative on its
 // own; saveClientForm() does the real check against freshly reloaded data
@@ -5734,6 +5752,11 @@ async function saveClientForm(){
   if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can add or edit clients.'); return; }
   const name = document.getElementById('ncName').value.trim();
   if(!name){ showToast('error','Client name required','Enter a name before saving.'); return; }
+  const emailValue = document.getElementById('ncEmail').value.trim();
+  if(emailValue && !isValidEmailList(emailValue)){
+    showToast('error','Check the email field','Make sure each address looks like a real email (name@domain.com), separated by commas.');
+    return;
+  }
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
   await loadAll();
@@ -5746,7 +5769,7 @@ async function saveClientForm(){
   }
   const fields = {
     name,
-    email:document.getElementById('ncEmail').value.trim(),
+    email: emailValue,
     website:document.getElementById('ncWebsite').value.trim(),
     service:document.getElementById('ncService').value,
     status:document.getElementById('ncStatus').value,
