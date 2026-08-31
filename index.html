@@ -5833,7 +5833,11 @@ function renderKpis(){
     : aec.filter(c=>c.draftStatus==='pending' && c.improvements.some(i=>i.author===me)).length;
   // Approval Queue is personal now — the sidebar badge needs to match what
   // that page actually shows, not every pending draft on the whole roster.
-  const myPending = aec.filter(c=>c.draftStatus==='pending' && c.improvements.filter(i=>improvementInDateRange(i, false)).some(i=>i.author===me)).length;
+  // Also requires includeInEmail!==false on the matching improvement,
+  // matching renderQueue()'s own shownImprovements check — otherwise this
+  // could count a client whose only improvements from "me" are marked
+  // "not in email," which the page itself would never show a card for.
+  const myPending = aec.filter(c=>c.draftStatus==='pending' && c.improvements.filter(i=>improvementInDateRange(i, false) && i.includeInEmail!==false).some(i=>i.author===me)).length;
   document.getElementById('navPendingBadge').textContent = myPending;
   // Team Queue shows every APPROVED draft, plus pending drafts the owning
   // member has explicitly marked Ready to Notify — not every pending draft
@@ -5842,8 +5846,21 @@ function renderKpis(){
   // rule, or it counts things the page itself won't show — see
   // readyForReview() in renderTeamQueue() for the canonical version of
   // this same check.
+  // Also requires at least one improvement actually marked "include in
+  // email" — matching renderTeamQueue()'s own shownImprovements check.
+  // Without this, a client could pass readyForReview() (e.g. approved)
+  // while every one of its improvements has since been excluded (see
+  // approveDraft(), which clears include_in_email for whatever was
+  // actually part of that approval) — counted here, but showing no card
+  // on the page itself, which is exactly the mismatch this comment
+  // originally warned about. Deliberately ignores the Team Queue page's
+  // own date filter dropdown — a persistent nav badge shouldn't silently
+  // change count based on a filter state that lives on a different page.
   const teamPendingBadge = document.getElementById('navTeamPendingBadge');
-  if(teamPendingBadge) teamPendingBadge.textContent = aec.filter(c=>c.draftStatus==='approved' || (c.draftStatus==='pending' && c.readyToNotify===true)).length;
+  if(teamPendingBadge){
+    const readyForReview = (c) => c.draftStatus==='approved' || (c.draftStatus==='pending' && c.readyToNotify===true);
+    teamPendingBadge.textContent = aec.filter(c => readyForReview(c) && c.improvements.some(i=>i.includeInEmail!==false)).length;
+  }
 
   // --- Total Clients ---
   document.getElementById('kpiTotal').textContent = ac.length;
