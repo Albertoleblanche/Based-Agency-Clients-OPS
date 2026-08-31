@@ -3161,6 +3161,7 @@ const CLIENT_FIELD_DB_MAP = {
   sow:'sow', draft:'draft', draftStatus:'draft_status', draftPendingSince:'draft_pending_since',
   lastProactiveCheckAt:'last_proactive_check_at', customFieldValues:'custom_field_values',
   deletedAt:'deleted_at', readyToNotify:'ready_to_notify', startDate:'start_date',
+  draftImprovementIds:'draft_improvement_ids',
 };
 function clientFieldsToDb(fields){
   const out = {};
@@ -3174,6 +3175,11 @@ function clientRowFromDb(r){
     draft:r.draft||'', draftStatus:r.draft_status||'none', draftPendingSince:r.draft_pending_since,
     lastProactiveCheckAt:r.last_proactive_check_at, customFieldValues:r.custom_field_values||{},
     deletedAt:r.deleted_at||undefined, readyToNotify:!!r.ready_to_notify, startDate:r.start_date||'',
+    // Exactly which improvements are part of the CURRENT draft cycle —
+    // set explicitly at generation time (from a picker, not a date
+    // heuristic), read at approval time to know which specific rows to
+    // flip include_in_email off for. See addendum-14.sql.
+    draftImprovementIds: r.draft_improvement_ids || [],
     improvements:[], // hydrated separately from clientImprovements
   };
 }
@@ -14759,23 +14765,55 @@ async function generateDraft(id){
     showToast('error','Not allowed', (c.draftStatus==='pending' && c.readyToNotify===true && !canApprove())
       ? "This draft's already been marked ready for approval — an admin or approver needs to act on it before it can be regenerated."
       : c.draft
-        ? 'Only admins, approvers, or contributors to this week\'s work can regenerate this draft.'
-        : 'Only someone who logged this week\'s included improvements can generate the first draft.');
+        ? 'Only admins, approvers, or contributors to this client\'s pending work can regenerate this draft.'
+        : 'Only someone who logged this client\'s included improvements can generate the first draft.');
     return;
   }
   const modalCard = document.querySelector('#appModalOverlay .modal-card');
   const modalOpenForThis = modalCard && modalCard.dataset.clientId === id;
-  const weekStart = getWeekStart(new Date());
-  const includedImprovements = c.improvements.filter(i=> i.includeInEmail !== false && i.date && new Date(i.date) >= weekStart);
-  if(!includedImprovements.length){
-    const hasOlderIncluded = c.improvements.some(i=> i.includeInEmail !== false && i.date && new Date(i.date) < weekStart);
-    showToast('error','Nothing to include', hasOlderIncluded
-      ? `${c.name} has older logged improvements, but nothing from this week yet.`
-      : c.improvements.length ? `${c.name} has logged items, but none are marked "Include in email" yet — review them in Past Improvements.` : `No improvements logged yet for ${c.name}.`);
+  // No longer restricted to "this week" — an improvement now stays
+  // eligible for a draft indefinitely until it's actually approved
+  // (which is what clears include_in_email for whichever ones ended up
+  // included — see approveDraft()), instead of silently falling out of
+  // consideration the moment the calendar rolls over to a new week.
+  const eligibleImprovements = c.improvements.filter(i => i.includeInEmail !== false)
+    .sort((a,b) => new Date(a.date||0) - new Date(b.date||0)); // oldest first — easy to miss otherwise
+  if(!eligibleImprovements.length){
+    showToast('error','Nothing to include', c.improvements.length
+      ? `${c.name} has logged items, but none are marked "Include in email" yet — review them in Past Improvements.`
+      : `No improvements logged yet for ${c.name}.`);
     return;
   }
-  const btn = document.getElementById('gen-'+id);
-  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Generating…'; }
+  // A picker rather than auto-including everything eligible — lets
+  // someone hold specific logged work back for a later draft instead of
+  // it being all-or-nothing.
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">Select improvements to include</span><span class="toast-close" onclick="${modalOpenForThis ? `openQueueCardModal('${id}')` : 'closeAppModal()'}">✕</span></div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">Everything checked below will go into this draft for ${escapeHtml(c.name)}. Uncheck anything you'd rather hold back for a later one.</p>
+      <div style="display:flex;flex-direction:column;gap:2px;max-height:340px;overflow-y:auto;">
+        ${eligibleImprovements.map(i=>`
+          <label style="display:flex;align-items:flex-start;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border);cursor:pointer;">
+            <input type="checkbox" class="draft-select-checkbox" value="${i.id}" checked style="margin-top:3px;flex:none;">
+            <span style="flex:1;font-size:13px;color:var(--ink);">${escapeHtml(i.text)}<br><span style="font-size:11px;color:var(--muted-lt);">${escapeHtml(i.author||'')} — ${i.date ? new Date(i.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : 'no date'}</span></span>
+          </label>
+        `).join('')}
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="${modalOpenForThis ? `openQueueCardModal('${id}')` : 'closeAppModal()'}">Cancel</button>
+      <button class="btn btn-brand" onclick="confirmGenerateDraftSelection('${id}')">Generate draft</button>
+    </div>`, 520);
+}
+
+async function confirmGenerateDraftSelection(id){
+  const c = clients.find(x=>x.id===id);
+  if(!c) return;
+  const checkedIds = [...document.querySelectorAll('.draft-select-checkbox:checked')].map(el=>el.value);
+  if(!checkedIds.length){ showToast('error','Nothing selected','Check at least one improvement to include.'); return; }
+  const includedImprovements = c.improvements.filter(i => checkedIds.includes(i.id));
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Generating…');
   const bullets = includedImprovements.map(i=>'- '+i.text).join('\n');
   const customStructure = ((myProfile && myProfile.email_instructions) || '').trim();
   const contentRules = `Content rules that apply no matter what — never overridden by anything above:
@@ -14829,13 +14867,17 @@ ${contentRules}`;
     // approvers as awaiting review until the owning member explicitly
     // clicks Ready to Notify again.
     c.readyToNotify = false;
+    // Exactly what's in this draft cycle, from the picker's selection —
+    // not re-derived from a date range. Read back by approveDraft() to
+    // know precisely which rows to flip include_in_email off for.
+    c.draftImprovementIds = checkedIds;
     log.unshift({t:nowTime(), tag:'auto', text:`AI ${stayedApproved?'re-worded':'drafted'} the update for <b>${c.name}</b> from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''}${stayedApproved?' — stayed approved, the included improvements didn\'t change':''}.`});
-    await updateClientRow(id, { draft:c.draft, draftStatus:c.draftStatus, draftPendingSince:c.draftPendingSince, readyToNotify:false });
+    await updateClientRow(id, { draft:c.draft, draftStatus:c.draftStatus, draftPendingSince:c.draftPendingSince, readyToNotify:false, draftImprovementIds: checkedIds });
     await persistLog();
     renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
     logClientActivity(id, 'draft_generated', `AI ${stayedApproved?'re-worded':'generated'} a draft from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''} (of ${c.improvements.length} logged)${stayedApproved?' — approval carried over':''}.`);
     refreshClientDetailActivityIfOpen(id);
-    if(modalOpenForThis) openQueueCardModal(id);
+    openQueueCardModal(id);
     showToast('success','Draft generated', stayedApproved ? `${c.name}'s draft was re-worded — still approved, no need to re-approve.` : `AI wrote the update for ${c.name}.`);
     // No automatic notification here at all — the only way admins/
     // approvers get notified is the explicit "Ready to Notify" button,
@@ -14853,9 +14895,10 @@ ${contentRules}`;
     // then hit this failure branch) would keep showing up in Team Queue —
     // and in its badge count — for a draft nobody had actually flagged.
     c.readyToNotify = false;
-    await updateClientRow(id, { draft:c.draft, draftStatus:c.draftStatus, draftPendingSince:c.draftPendingSince, readyToNotify:false });
+    c.draftImprovementIds = checkedIds;
+    await updateClientRow(id, { draft:c.draft, draftStatus:c.draftStatus, draftPendingSince:c.draftPendingSince, readyToNotify:false, draftImprovementIds: checkedIds });
     renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
-    if(modalOpenForThis) openQueueCardModal(id);
+    openQueueCardModal(id);
     showToast('error','AI generation failed', 'Write the draft manually below, or try again.');
   }
 }
@@ -14870,14 +14913,15 @@ function sendApprovedDraft(id){
   showSendEmailConfirm(c.email, `Your weekly update from ${settings.appName || 'Based Agency'}`, c.draft || '');
 }
 
-// Whether the current user personally logged at least one of this week's
-// included improvements for a client — used to gate draft generation, so
-// "did I contribute" rather than "who else contributed" (the opposite
-// question getIncludedAuthorProfiles answers, which is why this is separate
-// rather than reusing that one).
+// Whether the current user personally logged at least one improvement
+// that's currently eligible to be drafted for a client — used to gate
+// draft generation, so "did I contribute" rather than "who else
+// contributed" (the opposite question getIncludedAuthorProfiles answers,
+// which is why this is separate rather than reusing that one). No longer
+// restricted to "this week" — matches generateDraft()'s own eligibility
+// check (include_in_email !== false, regardless of date).
 function iContributedToClientDraft(c){
-  const weekStart = getWeekStart(new Date());
-  return c.improvements.some(i => i.includeInEmail !== false && i.date && new Date(i.date) >= weekStart && i.author === myName());
+  return c.improvements.some(i => i.includeInEmail !== false && i.author === myName());
 }
 
 function canGenerateOrRegenerateDraft(c){
@@ -14892,16 +14936,16 @@ function canGenerateOrRegenerateDraft(c){
   return false;
 }
 
-// Whoever's actual logged work is included in this week's draft for a
-// client — same weekStart/includeInEmail filter used to build the draft
-// itself, so this matches "whose work is actually part of it" rather than
-// "everyone who's ever logged anything for this client." Excludes the
+// Whoever's actual logged work is included in this draft for a client —
+// reads the exact selection from generateDraft()'s picker
+// (c.draftImprovementIds), not a re-derived date heuristic, so this
+// matches "whose work is actually part of it" precisely. Excludes the
 // current user, since notifying yourself about your own client's status
 // wouldn't make sense.
 function getIncludedAuthorProfiles(c){
-  const weekStart = getWeekStart(new Date());
+  const includedIds = new Set(c.draftImprovementIds || []);
   const includedAuthors = [...new Set(
-    c.improvements.filter(i => i.includeInEmail !== false && i.date && new Date(i.date) >= weekStart).map(i=>i.author)
+    c.improvements.filter(i => includedIds.has(i.id)).map(i=>i.author)
   )].filter(author => author && author !== myName());
   return includedAuthors.map(name => teamProfiles.find(p=>p.name===name)).filter(Boolean);
 }
@@ -14918,8 +14962,23 @@ async function approveDraft(id){
   const modalOpenForThis = modalCard && modalCard.dataset.clientId === id;
   if(ta) c.draft = ta.value;
   c.draftStatus = 'approved';
+  // Captured before draftImprovementIds gets cleared below —
+  // getIncludedAuthorProfiles() needs it.
+  const includedAuthorProfiles = getIncludedAuthorProfiles(c);
+  const includedIds = c.draftImprovementIds || [];
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Approved <b>${c.name}</b>'s draft.`});
-  const ok = await updateClientRow(id, { draft:c.draft, draftStatus:c.draftStatus });
+  // Once approved, the specific improvements that were part of THIS
+  // draft are considered communicated — flipping include_in_email off
+  // for exactly those is what naturally keeps them from being offered
+  // again in a future draft, without needing any date-based heuristic.
+  if(includedIds.length){
+    c.improvements.forEach(i => { if(includedIds.includes(i.id)) i.includeInEmail = false; });
+  }
+  c.draftImprovementIds = [];
+  const ok = await updateClientRow(id, { draft:c.draft, draftStatus:c.draftStatus, draftImprovementIds: [] });
+  if(ok && includedIds.length){
+    await supabaseClient.from('client_improvements').update({ include_in_email: false }).in('id', includedIds);
+  }
   if(ok) await persistLog();
   renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
   if(modalOpenForThis) openQueueCardModal(id);
@@ -14929,7 +14988,7 @@ async function approveDraft(id){
 
   // Notify whoever's actual logged work was included in what just got
   // approved.
-  for(const authorProfile of getIncludedAuthorProfiles(c)){
+  for(const authorProfile of includedAuthorProfiles){
     await sendNotification(authorProfile.id, 'draft_approved', 'Your submission was approved', `${myName()||'An approver'} approved this week's draft for ${c.name}.`, 'approve');
   }
 
@@ -14944,16 +15003,23 @@ async function skipDraft(id){
   if(!c) return;
   const modalCard = document.querySelector('#appModalOverlay .modal-card');
   const modalOpenForThis = modalCard && modalCard.dataset.clientId === id;
+  // Captured before draftImprovementIds gets cleared below — used by the
+  // notification loop at the end of this function.
+  const includedAuthorProfiles = getIncludedAuthorProfiles(c);
   c.draftStatus='none'; c.draft='';
+  // Nothing was actually sent, so the improvements that were part of
+  // this abandoned draft stay eligible (include_in_email is untouched) —
+  // this just clears the now-stale "what's in the current draft" record.
+  c.draftImprovementIds = [];
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Skipped <b>${c.name}</b> this week — no email sent.`});
-  const ok = await updateClientRow(id, { draftStatus:c.draftStatus, draft:c.draft });
+  const ok = await updateClientRow(id, { draftStatus:c.draftStatus, draft:c.draft, draftImprovementIds: [] });
   if(ok) await persistLog();
   renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
   if(ok){ logClientActivity(id, 'draft_skipped', `${myName()||'Someone'} skipped this week's update.`); refreshClientDetailActivityIfOpen(id); }
   if(modalOpenForThis) openQueueCardModal(id);
   ok ? showToast('info','Skipped', `${c.name} won't get an update this week.`) : showToast('error','Save failed','Could not save — try again.');
   if(ok){
-    for(const authorProfile of getIncludedAuthorProfiles(c)){
+    for(const authorProfile of includedAuthorProfiles){
       sendNotification(authorProfile.id, 'draft_skipped', 'Draft skipped', `${myName()||'An approver'} skipped this week's draft for ${c.name} — no email was sent.`, 'approve');
     }
   }
