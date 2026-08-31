@@ -3739,7 +3739,13 @@ let _emailSentCallback = null;
 
 function showSendEmailConfirm(to, subject, body, onSent){
   _emailSentCallback = onSent || null;
-  const mailtoHref = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  // "to" may be several comma-separated addresses (a client with more
+  // than one contact) — cleaned up here specifically for the mailto: URI,
+  // since stray whitespace around commas is more likely to trip up some
+  // mail clients' URI parsing than it is to bother the actual send-email
+  // API call below, which handles it fine either way.
+  const cleanedTo = to.split(',').map(a=>a.trim()).filter(Boolean).join(',');
+  const mailtoHref = `mailto:${cleanedTo}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Send this email?</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
@@ -5229,7 +5235,7 @@ function clientFormHtml(title, submitLabel, customValues){
     <div class="modal-body">
       <div class="form-grid">
         <div><label>Client name</label><input id="ncName" placeholder="e.g. Premium Homes" oninput="checkDuplicateClientName()"><div id="ncNameWarning" style="display:none;font-size:11px;color:var(--red);margin-top:5px;"></div></div>
-        <div><label>Client email</label><input id="ncEmail" placeholder="contact@client.com"></div>
+        <div><label>Client email <span style="font-weight:400;color:var(--muted-lt);">(comma-separated for more than one)</span></label><input id="ncEmail" placeholder="contact@client.com, billing@client.com"></div>
         <div><label>Website <span style="font-weight:400;color:var(--muted-lt);">(optional)</span></label><input id="ncWebsite" placeholder="https://client.com"></div>
         <div><label>Service</label><select id="ncService"></select></div>
         <div><label>Status</label><select id="ncStatus"></select></div>
