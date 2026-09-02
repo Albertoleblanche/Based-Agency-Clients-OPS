@@ -1414,6 +1414,11 @@ document.addEventListener('DOMContentLoaded', function(){
         <span class="nav-label">Past Reports</span>
       </div>
 
+      <div class="nav-item" id="navAiVisibility" data-view="aivisibility" data-tooltip="AI Visibility" onclick="switchView('aivisibility')" style="display:none;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/></svg>
+        <span class="nav-label">AI Visibility</span>
+      </div>
+
       <div class="nav-section-label">Client work</div>
       <div class="nav-item" data-view="clients" data-tooltip="Clients" onclick="switchView('clients')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -1747,6 +1752,11 @@ document.addEventListener('DOMContentLoaded', function(){
           </table>
         </div>
       </div>
+    </div>
+
+    <!-- AI VISIBILITY REPORTING ENGINE (admin-only) -->
+    <div class="view" id="view-aivisibility">
+      <div id="aiVisibilityMain"></div>
     </div>
 
     <!-- CLIENTS -->
@@ -4115,6 +4125,8 @@ function applyRoleVisibility(){
     notifyBtn.textContent = 'Ready to Notify';
   }
   const addClientBtn = document.getElementById('addClientBtn');
+  const navAiVisibility = document.getElementById('navAiVisibility');
+  if(navAiVisibility) navAiVisibility.style.display = isAdmin() ? 'flex' : 'none';
   if(addClientBtn) addClientBtn.style.display = canApprove() ? 'inline-flex' : 'none';
   const editClientDetailBtn = document.getElementById('editClientDetailBtn');
   if(editClientDetailBtn) editClientDetailBtn.style.display = canApprove() ? 'inline-flex' : 'none';
@@ -4382,6 +4394,14 @@ async function switchView(name){
   // 7 requests in fullRefresh() below touch it, so this page gains
   // nothing from waiting behind them either.
   if(name==='focusreports') renderFocusReportsPage();
+  // Same reasoning — ai_visibility_reports is its own independent table.
+  // Admin-only redirect happens here rather than earlier, since it needs
+  // isAdmin() reading a myProfile that's reliably loaded by this point in
+  // the app's lifecycle.
+  if(name==='aivisibility'){
+    if(!isAdmin()){ switchView('overview'); showToast('error','Not allowed','AI Visibility Reports are admin-only for now.'); return; }
+    renderAiVisibilityMain();
+  }
   await fullRefresh();
   if(name==='trash') renderTrash();
   if(name==='payroll') renderPayroll();
@@ -10336,6 +10356,509 @@ async function openWeeklyFocusReportHistory(){
 // 440px modal, and reachable directly from the sidebar rather than only
 // via the Overview banner or an already-open report.
 let focusReportsCache = []; // populated by renderFocusReportsPage(); downloadFocusReport()/emailFocusReportToTeam() read from this instead of re-fetching
+
+// ---- Page 2: Quick Metrics — pure arithmetic, no AI involved, fully reliable ----
+function computeAiVisibilityQuickMetrics(d){
+  const beforePct = d.before_total_prompts ? Math.round((d.before_recommended_count / d.before_total_prompts) * 100) : null;
+  const afterPct = d.after_total_prompts ? Math.round((d.after_recommended_count / d.after_total_prompts) * 100) : null;
+  const promptGain = (d.after_recommended_count!=null && d.before_recommended_count!=null) ? d.after_recommended_count - d.before_recommended_count : null;
+  const positionGain = (d.before_avg_position!=null && d.after_avg_position!=null) ? Math.round((d.before_avg_position - d.after_avg_position)*10)/10 : null;
+  let summary = '';
+  if(beforePct!=null && afterPct!=null && promptGain!=null && positionGain!=null){
+    const promptDirection = promptGain > 0 ? 'rose' : promptGain < 0 ? 'fell' : 'held steady';
+    const positionDirection = positionGain > 0 ? 'improved' : positionGain < 0 ? 'worsened' : 'held steady';
+    summary = `Recommendation frequency ${promptDirection} from ${d.before_recommended_count}/${d.before_total_prompts} prompts (${beforePct}%) to ${d.after_recommended_count}/${d.after_total_prompts} (${afterPct}%)${promptGain!==0?`, a ${promptGain>0?'gain':'drop'} of ${Math.abs(promptGain)} prompt${Math.abs(promptGain)!==1?'s':''}`:''}. Average ranking position ${positionDirection} from ${d.before_avg_position} to ${d.after_avg_position}${positionGain!==0?`, a ${Math.abs(positionGain)}-position ${positionGain>0?'gain':'drop'} (lower is better)`:''}.`;
+  }
+  return { beforePct, afterPct, promptGain, positionGain, summary };
+}
+
+// ---- Page 3: Platform/Prompt Visibility Matrix — net gainers/losers, also
+// pure arithmetic over the prompt x platform grid, matching the exact
+// phrasing style of the sample report (e.g. "ChatGPT picked up 3 new
+// mentions it didn't have before"). ----
+function computeAiVisibilityMatrixSummary(d){
+  const stats = {};
+  AI_VISIBILITY_PLATFORMS.forEach(p => stats[p] = { gained:0, lost:0 });
+  (d.prompts||[]).forEach(prompt => {
+    AI_VISIBILITY_PLATFORMS.forEach(p => {
+      const cell = (prompt.platforms||{})[aiVisibilityPlatformKey(p)];
+      if(!cell) return;
+      if(!cell.before && cell.after) stats[p].gained++;
+      if(cell.before && !cell.after) stats[p].lost++;
+    });
+  });
+  const gainers = [], losers = [];
+  AI_VISIBILITY_PLATFORMS.forEach(p=>{
+    const s = stats[p];
+    if(s.gained > 0 && s.lost === 0) gainers.push(`${p} picked up ${s.gained} new mention${s.gained!==1?'s':''} it didn't have before`);
+    else if(s.gained > 0 && s.lost > 0) gainers.push(`${p} gained ${s.gained} mention${s.gained!==1?'s':''} but lost ${s.lost}`);
+    else if(s.gained === 0 && s.lost > 0) losers.push(`${p} lost visibility on ${s.lost} prompt${s.lost!==1?'s':''}`);
+  });
+  return { stats, gainers, losers };
+}
+
+// ---- AI-assisted narrative sections — drafted from the structured data
+// already entered, always human-reviewed before saving. Reuses the same
+// generic /api/generate-draft endpoint the client-update drafts already
+// use (arbitrary prompt in, text out) rather than a new backend function. ----
+function buildAiVisibilityContext(d){
+  const qm = computeAiVisibilityQuickMetrics(d);
+  const matrix = computeAiVisibilityMatrixSummary(d);
+  return `Client: ${d.client_name_snapshot || 'n/a'}
+Target keyword: ${d.target_keyword || 'n/a'}
+Quick metrics: ${qm.summary || 'not yet entered'}
+Platform changes: ${matrix.gainers.concat(matrix.losers).join('; ') || 'not yet entered'}
+Competitors: ${(d.competitors||[]).map(c=>`${c.name} (visibility ${c.visibilityPct}%, sentiment ${c.sentimentPct}%)`).join('; ') || 'none entered'}
+Concerns raised by AI platforms: ${(d.concerns||[]).map(c=>`${c.platform}: "${c.quote}"`).join('; ') || 'none entered'}`;
+}
+
+function buildAiVisibilityPrompt(fieldName){
+  const context = buildAiVisibilityContext(aiVisibilityDraft);
+  const prompts = {
+    executive_summary: `Write a concise (3-5 sentence) executive summary for a client-facing AI Visibility Report, based on this data:\n${context}\n\nTone: confident, factual, agency-to-client. No fluff, no bullet points, no heading — just the paragraph.`,
+    ai_says_about_you_summary: `Write a short (2-4 sentence) narrative paragraph summarizing what AI models (ChatGPT, Gemini, etc.) are currently saying about this client, based on:\n${context}\n\nFocus on tone and overall impression, not a list of individual phrases. No heading.`,
+    competitive_intelligence_summary: `Write a short (3-5 sentence) narrative analyzing this client's competitive position among AI-recommended competitors, based on:\n${context}\n\nBe specific about where they rank and what's driving that. No heading.`,
+    ai_opportunities: `Based on this data:\n${context}\n\nList 3-5 specific, actionable opportunities to improve this client's AI visibility. Format as a short bulleted list (plain text, use "- " for bullets), each one concrete and specific to what's in the data above — not generic SEO advice.`,
+    recommended_campaign: `Based on this data:\n${context}\n\nRecommend ONE specific next campaign or content piece (e.g. a listicle, a press release, a comparison page) that would most directly close the biggest gap identified. Write 2-4 sentences explaining what it is and why it's the right next move.`,
+    domination_score_rationale: `Based on this data:\n${context}\n\nWrite a 2-3 sentence rationale explaining why this client's "AI Domination Score" is what it is (the score itself is entered separately, alongside this) — reference the specific metrics above that justify it.`,
+  };
+  return prompts[fieldName] || null;
+}
+
+async function generateAiVisibilitySection(fieldName){
+  const prompt = buildAiVisibilityPrompt(fieldName);
+  if(!prompt) return;
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Generating…');
+  try{
+    const response = await fetch('/api/generate-draft', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ prompt, model: settings.openaiModel })
+    });
+    const data = await response.json();
+    if(!response.ok) throw new Error(data.error || 'Generation failed');
+    aiVisibilityDraft[fieldName] = (data.text || '').trim();
+    const textarea = document.getElementById('av_'+fieldName);
+    if(textarea) textarea.value = aiVisibilityDraft[fieldName];
+    showToast('success','Generated','Review and edit before saving — this is a first draft, not a final answer.');
+  }catch(e){
+    showToast('error','Generation failed', e.message || 'Try again.');
+  }finally{
+    restoreBtn(btn);
+  }
+}
+
+
+const AI_VISIBILITY_PLATFORMS = ['ChatGPT','Claude','Gemini','AI Overview','AI Mode','Copilot','Grok','Perplexity','Deepseek','Meta'];
+const aiVisibilityPlatformKey = (label) => label.toLowerCase().replace(/\s+/g,'');
+let aiVisibilityReports = []; // list cache
+let aiVisibilityCurrentReportId = null; // null = list mode; 'new' or a real id = detail mode
+let aiVisibilityDraft = null; // the in-progress report object while in detail mode
+
+function renderAiVisibilityMain(){
+  const el = document.getElementById('aiVisibilityMain');
+  if(!el) return;
+  if(aiVisibilityCurrentReportId === null) renderAiVisibilityList(el);
+  else renderAiVisibilityDetail(el);
+}
+
+async function renderAiVisibilityList(el){
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:16px;">
+      <button class="btn btn-brand" onclick="openNewAiVisibilityReport()">+ New report</button>
+    </div>
+    <div class="panel">
+      <div class="table-scroll-wrap">
+        <table>
+          <thead><tr><th>Client</th><th>Target keyword</th><th>Date</th><th>Domination score</th><th style="text-align:right;">Actions</th></tr></thead>
+          <tbody id="aiVisibilityTbody"><tr><td colspan="5">${loadingStateHtml('Loading reports…')}</td></tr></tbody>
+        </table>
+      </div>
+    </div>`;
+  const { data: rows, error } = await supabaseClient
+    .from('ai_visibility_reports').select('id, client_name_snapshot, target_keyword, report_date, domination_score')
+    .order('report_date', { ascending:false });
+  const tbody = document.getElementById('aiVisibilityTbody');
+  if(!tbody) return;
+  if(error){ tbody.innerHTML = `<tr><td colspan="5"><p class="empty">Couldn't load reports — try again.</p></td></tr>`; return; }
+  aiVisibilityReports = rows || [];
+  if(!aiVisibilityReports.length){
+    tbody.innerHTML = `<tr><td colspan="5">${emptyStateHtml(
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/></svg>',
+      'No reports yet', 'Create your first AI Visibility Report to get started.',
+      '<button class="btn btn-brand" onclick="openNewAiVisibilityReport()">+ New report</button>'
+    )}</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = aiVisibilityReports.map(r=>`
+    <tr style="cursor:pointer;" onclick="openAiVisibilityReport('${r.id}')">
+      <td>${escapeHtml(r.client_name_snapshot||'—')}</td>
+      <td>${escapeHtml(r.target_keyword||'—')}</td>
+      <td>${new Date(r.report_date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td>
+      <td>${r.domination_score!=null ? `<span class="pill pill-good">${r.domination_score}/100</span>` : '<span style="color:var(--muted-lt);">—</span>'}</td>
+      <td style="text-align:right;"><span class="row-link" style="color:var(--red);" onclick="event.stopPropagation();deleteAiVisibilityReport('${r.id}')">Delete</span></td>
+    </tr>
+  `).join('');
+}
+
+function emptyAiVisibilityDraft(){
+  return {
+    id: null, client_id: null, client_name_snapshot: '', target_keyword: '', report_date: toDateStr(new Date()),
+    before_recommended_count: null, before_total_prompts: null, before_avg_position: null,
+    after_recommended_count: null, after_total_prompts: null, after_avg_position: null,
+    prompts: [], competitors: [], keywords: { positive:{}, neutral:{}, negative:{} }, concerns: [],
+    links: { pressRelease:'', prPlacementReport:'', screenshotsFolder:'' },
+    executive_summary:'', ai_says_about_you_summary:'', competitive_intelligence_summary:'',
+    ai_opportunities:'', recommended_campaign:'', domination_score:null, domination_score_rationale:'',
+  };
+}
+
+function openNewAiVisibilityReport(){
+  aiVisibilityDraft = emptyAiVisibilityDraft();
+  aiVisibilityCurrentReportId = 'new';
+  renderAiVisibilityMain();
+}
+
+async function openAiVisibilityReport(id){
+  const { data, error } = await supabaseClient.from('ai_visibility_reports').select('*').eq('id', id).maybeSingle();
+  if(error || !data){ showToast('error','Could not load','Try again.'); return; }
+  aiVisibilityDraft = {
+    id: data.id, client_id: data.client_id, client_name_snapshot: data.client_name_snapshot||'',
+    target_keyword: data.target_keyword||'', report_date: data.report_date,
+    before_recommended_count: data.before_recommended_count, before_total_prompts: data.before_total_prompts, before_avg_position: data.before_avg_position,
+    after_recommended_count: data.after_recommended_count, after_total_prompts: data.after_total_prompts, after_avg_position: data.after_avg_position,
+    prompts: data.prompts || [], competitors: data.competitors || [],
+    keywords: data.keywords && Object.keys(data.keywords).length ? data.keywords : { positive:{}, neutral:{}, negative:{} },
+    concerns: data.concerns || [], links: data.links || { pressRelease:'', prPlacementReport:'', screenshotsFolder:'' },
+    executive_summary: data.executive_summary||'', ai_says_about_you_summary: data.ai_says_about_you_summary||'',
+    competitive_intelligence_summary: data.competitive_intelligence_summary||'', ai_opportunities: data.ai_opportunities||'',
+    recommended_campaign: data.recommended_campaign||'', domination_score: data.domination_score, domination_score_rationale: data.domination_score_rationale||'',
+  };
+  aiVisibilityCurrentReportId = id;
+  renderAiVisibilityMain();
+}
+
+function closeAiVisibilityDetail(){
+  aiVisibilityCurrentReportId = null;
+  aiVisibilityDraft = null;
+  renderAiVisibilityMain();
+}
+
+async function deleteAiVisibilityReport(id){
+  if(!(await confirmDialog('Delete this report? This cannot be undone.', {confirmLabel:'Delete', destructive:true}))) return;
+  const { error } = await supabaseClient.from('ai_visibility_reports').delete().eq('id', id);
+  if(error){ showToast('error','Could not delete','Try again.'); return; }
+  showToast('success','Deleted','Report deleted.');
+  renderAiVisibilityMain();
+}
+
+async function saveAiVisibilityReport(){
+  const d = aiVisibilityDraft;
+  if(!d) return;
+  if(!d.client_name_snapshot.trim()){ showToast('error','Missing client','Pick or enter a client name first.'); return; }
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Saving…');
+  const payload = {
+    client_id: d.client_id, client_name_snapshot: d.client_name_snapshot.trim(), target_keyword: d.target_keyword.trim(), report_date: d.report_date,
+    before_recommended_count: d.before_recommended_count, before_total_prompts: d.before_total_prompts, before_avg_position: d.before_avg_position,
+    after_recommended_count: d.after_recommended_count, after_total_prompts: d.after_total_prompts, after_avg_position: d.after_avg_position,
+    prompts: d.prompts, competitors: d.competitors, keywords: d.keywords, concerns: d.concerns, links: d.links,
+    executive_summary: d.executive_summary, ai_says_about_you_summary: d.ai_says_about_you_summary,
+    competitive_intelligence_summary: d.competitive_intelligence_summary, ai_opportunities: d.ai_opportunities,
+    recommended_campaign: d.recommended_campaign, domination_score: d.domination_score, domination_score_rationale: d.domination_score_rationale,
+    updated_at: new Date().toISOString(),
+  };
+  const result = d.id
+    ? await supabaseClient.from('ai_visibility_reports').update(payload).eq('id', d.id).select('id').maybeSingle()
+    : await supabaseClient.from('ai_visibility_reports').insert({ ...payload, created_by: currentUser.id }).select('id').maybeSingle();
+  restoreBtn(btn);
+  if(result.error){ showToast('error','Save failed', result.error.message || 'Try again.'); return; }
+  d.id = result.data.id;
+  aiVisibilityCurrentReportId = d.id;
+  showToast('success','Saved','Report saved.');
+}
+
+// ---- Prompt matrix mutators (Page 3) — each re-renders the whole detail
+// view; simplest correct approach for an infrequent admin data-entry task,
+// at the acceptable cost of resetting scroll position on each edit. ----
+function addAiVisibilityPrompt(){
+  aiVisibilityDraft.prompts.push({ text:'', platforms:{} });
+  renderAiVisibilityMain();
+}
+function removeAiVisibilityPrompt(i){
+  aiVisibilityDraft.prompts.splice(i,1);
+  renderAiVisibilityMain();
+}
+function updateAiVisibilityPromptText(i, value){
+  aiVisibilityDraft.prompts[i].text = value;
+}
+function updateAiVisibilityCell(i, platformKey, phase, checked){
+  const prompt = aiVisibilityDraft.prompts[i];
+  if(!prompt.platforms[platformKey]) prompt.platforms[platformKey] = { before:false, after:false };
+  prompt.platforms[platformKey][phase] = checked;
+  renderAiVisibilityMain();
+}
+
+// ---- Competitor table mutators (Page 6) ----
+function addAiVisibilityCompetitor(){
+  aiVisibilityDraft.competitors.push({ rank: aiVisibilityDraft.competitors.length+1, name:'', position:'', top3Pct:'', sentimentPct:'', mentions:'', citations:'', visibilityPct:'' });
+  renderAiVisibilityMain();
+}
+function removeAiVisibilityCompetitor(i){
+  aiVisibilityDraft.competitors.splice(i,1);
+  renderAiVisibilityMain();
+}
+function updateAiVisibilityCompetitorField(i, field, value){
+  aiVisibilityDraft.competitors[i][field] = value;
+}
+
+// ---- Keyword list helpers (Page 5) — stored as {sentiment: {platform: "one phrase (count) per line"}} while editing, parsed into arrays only when needed for the AI context builder ----
+function updateAiVisibilityKeywords(sentiment, platform, value){
+  if(!aiVisibilityDraft.keywords[sentiment]) aiVisibilityDraft.keywords[sentiment] = {};
+  aiVisibilityDraft.keywords[sentiment][platform] = value;
+}
+
+// ---- Concerns list mutators (Page "Concerns", low priority per the sample report) ----
+function addAiVisibilityConcern(){
+  aiVisibilityDraft.concerns.push({ platform:'', quote:'', source:'' });
+  renderAiVisibilityMain();
+}
+function removeAiVisibilityConcern(i){
+  aiVisibilityDraft.concerns.splice(i,1);
+  renderAiVisibilityMain();
+}
+function updateAiVisibilityConcernField(i, field, value){
+  aiVisibilityDraft.concerns[i][field] = value;
+}
+
+function narrativeSectionHtml(fieldName, title, placeholder){
+  const d = aiVisibilityDraft;
+  return `
+    <div class="panel" style="margin-bottom:20px;">
+      <div class="panel-head"><span class="panel-title">${title}</span><button class="btn btn-outline" onclick="generateAiVisibilitySection('${fieldName}')">✨ Generate with AI</button></div>
+      <div class="panel-body">
+        <textarea id="av_${fieldName}" style="width:100%;min-height:110px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="${placeholder}" onchange="aiVisibilityDraft.${fieldName}=this.value">${escapeHtml(d[fieldName]||'')}</textarea>
+      </div>
+    </div>`;
+}
+
+function renderAiVisibilityDetail(el){
+  const d = aiVisibilityDraft;
+  const qm = computeAiVisibilityQuickMetrics(d);
+  const matrix = computeAiVisibilityMatrixSummary(d);
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <span class="row-link" onclick="closeAiVisibilityDetail()">← All reports</span>
+      <div style="display:flex;gap:10px;">
+        ${d.id ? `<button class="btn btn-outline" onclick="downloadAiVisibilityReport()">Download</button>` : ''}
+        <button class="btn btn-brand" onclick="saveAiVisibilityReport()">Save report</button>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:20px;">
+      <div class="panel-head"><span class="panel-title">Report details</span></div>
+      <div class="panel-body">
+        <div class="form-grid">
+          <div style="position:relative;">
+            <label>Client</label>
+            <input type="text" class="client-search-input" id="avClientSearch" placeholder="Search client…" autocomplete="off" value="${(d.client_name_snapshot||'').replace(/"/g,'&quot;')}">
+            <input type="hidden" id="avClientId" value="${d.client_id||''}">
+            <div class="client-search-dropdown" id="avClientDropdown"></div>
+          </div>
+          <div><label>Target keyword</label><input id="avKeyword" value="${(d.target_keyword||'').replace(/"/g,'&quot;')}" onchange="aiVisibilityDraft.target_keyword=this.value"></div>
+          <div style="position:relative;"><label>Report date</label>${datePickerFieldHtml('avReportDate', { value: d.report_date })}</div>
+        </div>
+        <div class="form-grid" style="margin-top:14px;">
+          <div><label>Press release link</label><input id="avLinkPr" value="${(d.links.pressRelease||'').replace(/"/g,'&quot;')}" onchange="aiVisibilityDraft.links.pressRelease=this.value" placeholder="Google Drive link"></div>
+          <div><label>PR placement report link</label><input id="avLinkPlacement" value="${(d.links.prPlacementReport||'').replace(/"/g,'&quot;')}" onchange="aiVisibilityDraft.links.prPlacementReport=this.value" placeholder="Google Drive link"></div>
+          <div><label>Screenshots folder link</label><input id="avLinkScreenshots" value="${(d.links.screenshotsFolder||'').replace(/"/g,'&quot;')}" onchange="aiVisibilityDraft.links.screenshotsFolder=this.value" placeholder="Google Drive link"></div>
+        </div>
+      </div>
+    </div>
+
+    ${narrativeSectionHtml('executive_summary', 'Page 1 — Executive Summary', 'The high-level takeaway a client reads first...')}
+
+    <div class="panel" style="margin-bottom:20px;">
+      <div class="panel-head"><span class="panel-title">Page 2 — Quick Metrics</span><span class="pill pill-good">Automated</span></div>
+      <div class="panel-body">
+        <div class="form-grid">
+          <div><label>Before — recommended in (of total prompts)</label><div style="display:flex;gap:6px;align-items:center;"><input type="number" min="0" style="width:80px;" value="${d.before_recommended_count??''}" onchange="aiVisibilityDraft.before_recommended_count=this.value?Number(this.value):null;renderAiVisibilityMain();"><span>/</span><input type="number" min="0" style="width:80px;" value="${d.before_total_prompts??''}" onchange="aiVisibilityDraft.before_total_prompts=this.value?Number(this.value):null;renderAiVisibilityMain();"></div></div>
+          <div><label>Before — average ranking position</label><input type="number" min="0" step="0.1" value="${d.before_avg_position??''}" onchange="aiVisibilityDraft.before_avg_position=this.value?Number(this.value):null;renderAiVisibilityMain();"></div>
+          <div><label>After — recommended in (of total prompts)</label><div style="display:flex;gap:6px;align-items:center;"><input type="number" min="0" style="width:80px;" value="${d.after_recommended_count??''}" onchange="aiVisibilityDraft.after_recommended_count=this.value?Number(this.value):null;renderAiVisibilityMain();"><span>/</span><input type="number" min="0" style="width:80px;" value="${d.after_total_prompts??''}" onchange="aiVisibilityDraft.after_total_prompts=this.value?Number(this.value):null;renderAiVisibilityMain();"></div></div>
+          <div><label>After — average ranking position</label><input type="number" min="0" step="0.1" value="${d.after_avg_position??''}" onchange="aiVisibilityDraft.after_avg_position=this.value?Number(this.value):null;renderAiVisibilityMain();"></div>
+        </div>
+        ${qm.summary ? `<p style="font-size:13px;color:var(--ink);line-height:1.6;margin:16px 0 0;padding:12px;background:var(--surface-2);border-radius:8px;">${escapeHtml(qm.summary)}</p>` : `<p style="font-size:12px;color:var(--muted-lt);margin:16px 0 0;">Fill in all four before/after fields to generate the summary automatically.</p>`}
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:20px;">
+      <div class="panel-head"><span class="panel-title">Page 3 — Platform/Prompt Visibility Matrix</span><span class="pill pill-good">Summary automated</span></div>
+      <div class="panel-body">
+        <div class="table-scroll-wrap">
+          <table>
+            <thead><tr><th>Prompt</th>${AI_VISIBILITY_PLATFORMS.map(p=>`<th style="text-align:center;">${p}</th>`).join('')}<th></th></tr></thead>
+            <tbody>
+              ${d.prompts.map((prompt,i)=>`
+                <tr>
+                  <td><input type="text" value="${(prompt.text||'').replace(/"/g,'&quot;')}" onchange="updateAiVisibilityPromptText(${i},this.value)" style="width:100%;min-width:200px;" placeholder="e.g. Best window replacement contractor Seattle"></td>
+                  ${AI_VISIBILITY_PLATFORMS.map(p=>{
+                    const key = aiVisibilityPlatformKey(p);
+                    const cell = prompt.platforms[key] || { before:false, after:false };
+                    return `<td style="text-align:center;white-space:nowrap;font-size:10px;">
+                      <label title="Before" style="display:block;color:var(--muted-lt);"><input type="checkbox" ${cell.before?'checked':''} onchange="updateAiVisibilityCell(${i},'${key}','before',this.checked)"> B</label>
+                      <label title="After" style="display:block;color:var(--muted-lt);"><input type="checkbox" ${cell.after?'checked':''} onchange="updateAiVisibilityCell(${i},'${key}','after',this.checked)"> A</label>
+                    </td>`;
+                  }).join('')}
+                  <td><span class="row-link" style="color:var(--red);" onclick="removeAiVisibilityPrompt(${i})">✕</span></td>
+                </tr>
+              `).join('') || `<tr><td colspan="${AI_VISIBILITY_PLATFORMS.length+2}" style="color:var(--muted-lt);font-size:12px;">No prompts added yet.</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+        <button class="btn btn-outline" style="margin-top:10px;" onclick="addAiVisibilityPrompt()">+ Add prompt</button>
+        ${(matrix.gainers.length || matrix.losers.length) ? `
+          <div style="margin-top:16px;padding:12px;background:var(--surface-2);border-radius:8px;font-size:13px;line-height:1.7;">
+            ${matrix.gainers.length ? `<div><strong>Net gainers:</strong><ul style="margin:4px 0 10px;padding-left:20px;">${matrix.gainers.map(g=>`<li>${escapeHtml(g)}</li>`).join('')}</ul></div>` : ''}
+            ${matrix.losers.length ? `<div><strong>Net losers / concerning:</strong><ul style="margin:4px 0 0;padding-left:20px;">${matrix.losers.map(l=>`<li>${escapeHtml(l)}</li>`).join('')}</ul></div>` : ''}
+          </div>` : `<p style="font-size:12px;color:var(--muted-lt);margin:14px 0 0;">Add prompts and toggle Before/After per platform above to generate this summary automatically.</p>`}
+      </div>
+    </div>
+
+    ${narrativeSectionHtml('ai_says_about_you_summary', 'Page 4 — What AI Says About You', 'A narrative overview of tone and impression across AI platforms...')}
+
+    <div class="panel" style="margin-bottom:20px;">
+      <div class="panel-head"><span class="panel-title">Page 5 — Positive / Neutral / Negative Associations</span></div>
+      <div class="panel-body">
+        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;">One phrase per line, optionally ending in a count like "(2)" — matching how these get pulled from RankScale.</p>
+        ${['positive','neutral','negative'].map(sentiment=>`
+          <div style="margin-bottom:16px;">
+            <div style="font-size:12.5px;font-weight:700;text-transform:capitalize;color:var(--ink);margin-bottom:8px;">${sentiment}</div>
+            <div class="form-grid">
+              ${AI_VISIBILITY_PLATFORMS.map(p=>`
+                <div><label style="font-size:11px;">${p}</label><textarea style="width:100%;min-height:70px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;padding:8px;border-radius:6px;border:1px solid var(--border);resize:vertical;" onchange="updateAiVisibilityKeywords('${sentiment}','${p}',this.value)">${escapeHtml((d.keywords[sentiment]||{})[p]||'')}</textarea></div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:20px;">
+      <div class="panel-head"><span class="panel-title">Page 6 — Competitive Intelligence</span></div>
+      <div class="panel-body">
+        <div class="table-scroll-wrap">
+          <table>
+            <thead><tr><th>Rank</th><th>Competitor</th><th>Position</th><th>Top 3%</th><th>Sentiment%</th><th>Mentions</th><th>Citations</th><th>Visibility%</th><th></th></tr></thead>
+            <tbody>
+              ${d.competitors.map((c,i)=>`
+                <tr>
+                  <td><input type="number" style="width:50px;" value="${c.rank??''}" onchange="updateAiVisibilityCompetitorField(${i},'rank',this.value)"></td>
+                  <td><input type="text" style="width:100%;min-width:140px;" value="${(c.name||'').replace(/"/g,'&quot;')}" onchange="updateAiVisibilityCompetitorField(${i},'name',this.value)"></td>
+                  <td><input type="text" style="width:60px;" value="${(c.position||'').toString().replace(/"/g,'&quot;')}" onchange="updateAiVisibilityCompetitorField(${i},'position',this.value)" placeholder="#1.0"></td>
+                  <td><input type="text" style="width:60px;" value="${(c.top3Pct||'').toString().replace(/"/g,'&quot;')}" onchange="updateAiVisibilityCompetitorField(${i},'top3Pct',this.value)" placeholder="71.9%"></td>
+                  <td><input type="text" style="width:60px;" value="${(c.sentimentPct||'').toString().replace(/"/g,'&quot;')}" onchange="updateAiVisibilityCompetitorField(${i},'sentimentPct',this.value)" placeholder="91.7%"></td>
+                  <td><input type="number" style="width:60px;" value="${c.mentions??''}" onchange="updateAiVisibilityCompetitorField(${i},'mentions',this.value)"></td>
+                  <td><input type="number" style="width:60px;" value="${c.citations??''}" onchange="updateAiVisibilityCompetitorField(${i},'citations',this.value)"></td>
+                  <td><input type="text" style="width:60px;" value="${(c.visibilityPct||'').toString().replace(/"/g,'&quot;')}" onchange="updateAiVisibilityCompetitorField(${i},'visibilityPct',this.value)" placeholder="81.8%"></td>
+                  <td><span class="row-link" style="color:var(--red);" onclick="removeAiVisibilityCompetitor(${i})">✕</span></td>
+                </tr>
+              `).join('') || `<tr><td colspan="9" style="color:var(--muted-lt);font-size:12px;">No competitors added yet.</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+        <button class="btn btn-outline" style="margin:10px 0 18px;" onclick="addAiVisibilityCompetitor()">+ Add competitor</button>
+        <textarea id="av_competitive_intelligence_summary" style="width:100%;min-height:110px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="Narrative analysis of competitive position..." onchange="aiVisibilityDraft.competitive_intelligence_summary=this.value">${escapeHtml(d.competitive_intelligence_summary||'')}</textarea>
+        <button class="btn btn-outline" style="margin-top:8px;" onclick="generateAiVisibilitySection('competitive_intelligence_summary')">✨ Generate with AI</button>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:20px;">
+      <div class="panel-head"><span class="panel-title">Special Concerns <span style="font-weight:400;color:var(--muted-lt);font-size:11px;">(optional — usually only for notable callouts)</span></span></div>
+      <div class="panel-body">
+        ${d.concerns.map((c,i)=>`
+          <div style="display:flex;gap:8px;margin-bottom:8px;align-items:flex-start;">
+            <input type="text" style="width:140px;flex:none;" placeholder="Platform" value="${(c.platform||'').replace(/"/g,'&quot;')}" onchange="updateAiVisibilityConcernField(${i},'platform',this.value)">
+            <textarea style="flex:1;min-height:44px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;padding:8px;border-radius:6px;border:1px solid var(--border);resize:vertical;" placeholder="Quoted concern" onchange="updateAiVisibilityConcernField(${i},'quote',this.value)">${escapeHtml(c.quote||'')}</textarea>
+            <span class="row-link" style="color:var(--red);flex:none;margin-top:8px;" onclick="removeAiVisibilityConcern(${i})">✕</span>
+          </div>
+        `).join('')}
+        <button class="btn btn-outline" onclick="addAiVisibilityConcern()">+ Add concern</button>
+      </div>
+    </div>
+
+    ${narrativeSectionHtml('ai_opportunities', 'Page 7 — AI Opportunities', 'Specific, actionable next steps based on the data above...')}
+    ${narrativeSectionHtml('recommended_campaign', 'Page 8 — Recommended Next Campaign', 'The single next content piece or campaign that closes the biggest gap...')}
+
+    <div class="panel" style="margin-bottom:20px;">
+      <div class="panel-head"><span class="panel-title">Page 9 — AI Domination Score</span></div>
+      <div class="panel-body">
+        <div style="max-width:200px;margin-bottom:14px;">
+          <label>Score (0–100)</label>
+          <input type="number" min="0" max="100" value="${d.domination_score??''}" onchange="aiVisibilityDraft.domination_score=this.value?Number(this.value):null;">
+        </div>
+        <textarea id="av_domination_score_rationale" style="width:100%;min-height:100px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="Why this score — reference the specific metrics that justify it..." onchange="aiVisibilityDraft.domination_score_rationale=this.value">${escapeHtml(d.domination_score_rationale||'')}</textarea>
+        <button class="btn btn-outline" style="margin-top:8px;" onclick="generateAiVisibilitySection('domination_score_rationale')">✨ Generate rationale with AI</button>
+        <p style="font-size:11px;color:var(--muted-lt);margin:10px 0 0;line-height:1.5;">The score itself is a judgment call — AI can draft the rationale, but not the number. This is the page that turns "here's what happened" into "here's where you stand and what's next."</p>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:40px;">
+      ${d.id ? `<button class="btn btn-outline" onclick="downloadAiVisibilityReport()">Download</button>` : ''}
+      <button class="btn btn-brand" onclick="saveAiVisibilityReport()">Save report</button>
+    </div>`;
+
+  setupClientSearchSelect('avClientSearch', 'avClientId', 'avClientDropdown');
+  document.getElementById('avClientId')?.addEventListener('change', function(){
+    const c = clients.find(x=>x.id===this.value);
+    aiVisibilityDraft.client_id = this.value || null;
+    aiVisibilityDraft.client_name_snapshot = c ? c.name : aiVisibilityDraft.client_name_snapshot;
+  });
+  const dateInput = document.getElementById('avReportDate');
+  if(dateInput) dateInput.addEventListener('change', function(){ aiVisibilityDraft.report_date = this.value; });
+}
+
+function downloadAiVisibilityReport(){
+  const d = aiVisibilityDraft;
+  if(!d) return;
+  const qm = computeAiVisibilityQuickMetrics(d);
+  const matrix = computeAiVisibilityMatrixSummary(d);
+  const lines = [];
+  lines.push(`AI VISIBILITY REPORT — ${d.client_name_snapshot}`, '='.repeat(50));
+  lines.push(`Target keyword: ${d.target_keyword || 'n/a'}`, `Date: ${new Date(d.report_date+'T00:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}`, '');
+  if(d.links.pressRelease) lines.push(`Press release: ${d.links.pressRelease}`);
+  if(d.links.prPlacementReport) lines.push(`PR placement report: ${d.links.prPlacementReport}`);
+  if(d.links.screenshotsFolder) lines.push(`Screenshots folder: ${d.links.screenshotsFolder}`);
+  lines.push('');
+  lines.push('EXECUTIVE SUMMARY', '-'.repeat(30), d.executive_summary || '(not written yet)', '');
+  lines.push('QUICK METRICS', '-'.repeat(30));
+  lines.push(`Before: Recommended in ${d.before_recommended_count??'—'}/${d.before_total_prompts??'—'} prompts (${qm.beforePct??'—'}%), Average Ranking Position: ${d.before_avg_position??'—'}`);
+  lines.push(`After: Recommended in ${d.after_recommended_count??'—'}/${d.after_total_prompts??'—'} prompts (${qm.afterPct??'—'}%), Average Ranking Position: ${d.after_avg_position??'—'}`);
+  if(qm.summary) lines.push('', qm.summary);
+  lines.push('');
+  lines.push('PLATFORM VISIBILITY CHANGES', '-'.repeat(30));
+  if(matrix.gainers.length){ lines.push('Net gainers:'); matrix.gainers.forEach(g=>lines.push(`  - ${g}`)); }
+  if(matrix.losers.length){ lines.push('Net losers / concerning:'); matrix.losers.forEach(l=>lines.push(`  - ${l}`)); }
+  lines.push('');
+  lines.push('WHAT AI SAYS ABOUT YOU', '-'.repeat(30), d.ai_says_about_you_summary || '(not written yet)', '');
+  lines.push('COMPETITIVE INTELLIGENCE', '-'.repeat(30));
+  if(d.competitors.length){
+    d.competitors.forEach(c=>lines.push(`  #${c.rank} ${c.name} — Position ${c.position}, Visibility ${c.visibilityPct}%, Sentiment ${c.sentimentPct}%, Mentions ${c.mentions}, Citations ${c.citations}`));
+    lines.push('');
+  }
+  lines.push(d.competitive_intelligence_summary || '(not written yet)', '');
+  lines.push('AI OPPORTUNITIES', '-'.repeat(30), d.ai_opportunities || '(not written yet)', '');
+  lines.push('RECOMMENDED NEXT CAMPAIGN', '-'.repeat(30), d.recommended_campaign || '(not written yet)', '');
+  lines.push('AI DOMINATION SCORE', '-'.repeat(30), `${d.domination_score ?? '—'}/100`, d.domination_score_rationale || '(not written yet)');
+  const text = lines.join('\n');
+  const blob = new Blob([text], { type:'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ai-visibility-${(d.client_name_snapshot||'report').toLowerCase().replace(/[^a-z0-9]+/g,'-')}-${d.report_date}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 function clearFocusReportsDateFilter(){
   const fromEl = document.getElementById('focusReportsFromDate');
