@@ -91,6 +91,38 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    // ---- AI Visibility Reporting Engine's "Overview" section — reads an
+    // uploaded screenshot from the team's external visibility tool
+    // directly (vision), instead of requiring the same data to be
+    // manually re-entered into the Platform Matrix's checkboxes. Same
+    // admin-only gating and reasoning as visibility-test above. Never
+    // uses a custom base_url here (unlike visibility-test) — third-party
+    // "OpenAI-compatible" endpoints support vision inconsistently, so
+    // this always goes through the real provider APIs rather than
+    // silently failing or misbehaving on some custom endpoint.
+    if (mode === 'vision-analyze') {
+      const { data: callerProfile } = await admin.from('team_profiles').select('role').eq('id', callerData.user.id).maybeSingle();
+      if (!callerProfile || callerProfile.role !== 'admin') {
+        res.status(403).json({ error: 'AI Visibility Reports are admin-only' });
+        return;
+      }
+      const { prompt: visionPrompt, images, provider: visionProvider } = req.body || {};
+      if (!visionPrompt || typeof visionPrompt !== 'string') { res.status(400).json({ error: 'Missing prompt' }); return; }
+      if (!Array.isArray(images) || !images.length) { res.status(400).json({ error: 'Missing images' }); return; }
+      const useVisionProvider = visionProvider === 'openai' ? 'openai' : 'claude';
+      const { data: settingsRow } = await admin.from('app_storage').select('value').eq('key', 'settings').maybeSingle();
+      const visionSettings = settingsRow ? JSON.parse(settingsRow.value) : {};
+      const visionModel = useVisionProvider === 'openai' ? visionSettings.openaiModel : visionSettings.claudeModel;
+      const { data: connectionRow } = await admin.from('ai_provider_connections').select('api_key').eq('provider', useVisionProvider).maybeSingle();
+      const visionResult = await callAI(useVisionProvider, [{ role: 'user', content: visionPrompt }],
+        'You are analyzing a screenshot for a marketing agency\'s internal reporting.',
+        { model: visionModel, apiKey: connectionRow?.api_key || null, webSearch: false, images }
+      );
+      if (!visionResult.ok) { res.status(502).json({ error: visionResult.error }); return; }
+      res.status(200).json({ reply: visionResult.reply });
+      return;
+    }
+
     // ---- Existing Assistant chat flow below, unchanged ----
     const { data: callerProfile, error: profileErr } = await admin
       .from('team_profiles').select('role, name, ai_chat_enabled').eq('id', callerData.user.id).maybeSingle();
