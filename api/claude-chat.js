@@ -58,6 +58,40 @@ module.exports = async function handler(req, res) {
       res.status(401).json({ error: 'Invalid or expired session — please log in again' });
       return;
     }
+    const { mode } = req.body || {};
+
+    // ---- AI Visibility Reporting Engine's "run this prompt live" feature —
+    // a fundamentally different use case from the Assistant chat below: no
+    // agency system prompt (this needs to see exactly what a real member of
+    // the public would get from Claude/ChatGPT directly, not a persona
+    // wrapped around it), no daily cap (that control is specifically about
+    // Assistant usage), admin-only rather than ai_chat_enabled (a
+    // different permission entirely, matching that whole feature's own
+    // gating). Kept in this same file/function rather than a new one, same
+    // Vercel Hobby 12-function ceiling as everything else here.
+    if (mode === 'visibility-test') {
+      const { data: callerProfile } = await admin.from('team_profiles').select('role').eq('id', callerData.user.id).maybeSingle();
+      if (!callerProfile || callerProfile.role !== 'admin') {
+        res.status(403).json({ error: 'AI Visibility Reports are admin-only' });
+        return;
+      }
+      const { prompt, provider: testProvider } = req.body || {};
+      if (!prompt || typeof prompt !== 'string') { res.status(400).json({ error: 'Missing prompt' }); return; }
+      const useProvider = testProvider === 'openai' ? 'openai' : 'claude';
+      const { data: settingsRow } = await admin.from('app_storage').select('value').eq('key', 'settings').maybeSingle();
+      const testSettings = settingsRow ? JSON.parse(settingsRow.value) : {};
+      const testModel = useProvider === 'openai' ? testSettings.openaiModel : testSettings.claudeModel;
+      const { data: connectionRow } = await admin.from('ai_provider_connections').select('api_key, base_url').eq('provider', useProvider).maybeSingle();
+      const testResult = await callAI(useProvider, [{ role: 'user', content: prompt }],
+        'Answer the following question naturally and directly, exactly as you normally would if a member of the public asked you this.',
+        { model: testModel, apiKey: connectionRow?.api_key || null, baseUrl: connectionRow?.base_url || null, webSearch: true }
+      );
+      if (!testResult.ok) { res.status(502).json({ error: testResult.error }); return; }
+      res.status(200).json({ reply: testResult.reply });
+      return;
+    }
+
+    // ---- Existing Assistant chat flow below, unchanged ----
     const { data: callerProfile, error: profileErr } = await admin
       .from('team_profiles').select('role, name, ai_chat_enabled').eq('id', callerData.user.id).maybeSingle();
     if (profileErr || !callerProfile) {
