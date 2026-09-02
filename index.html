@@ -10372,42 +10372,16 @@ function computeAiVisibilityQuickMetrics(d){
   return { beforePct, afterPct, promptGain, positionGain, summary };
 }
 
-// ---- Page 3: Platform/Prompt Visibility Matrix — net gainers/losers, also
-// pure arithmetic over the prompt x platform grid, matching the exact
-// phrasing style of the sample report (e.g. "ChatGPT picked up 3 new
-// mentions it didn't have before"). ----
-function computeAiVisibilityMatrixSummary(d){
-  const stats = {};
-  AI_VISIBILITY_PLATFORMS.forEach(p => stats[p] = { gained:0, lost:0 });
-  (d.prompts||[]).forEach(prompt => {
-    AI_VISIBILITY_PLATFORMS.forEach(p => {
-      const cell = (prompt.platforms||{})[aiVisibilityPlatformKey(p)];
-      if(!cell) return;
-      if(!cell.before && cell.after) stats[p].gained++;
-      if(cell.before && !cell.after) stats[p].lost++;
-    });
-  });
-  const gainers = [], losers = [];
-  AI_VISIBILITY_PLATFORMS.forEach(p=>{
-    const s = stats[p];
-    if(s.gained > 0 && s.lost === 0) gainers.push(`${p} picked up ${s.gained} new mention${s.gained!==1?'s':''} it didn't have before`);
-    else if(s.gained > 0 && s.lost > 0) gainers.push(`${p} gained ${s.gained} mention${s.gained!==1?'s':''} but lost ${s.lost}`);
-    else if(s.gained === 0 && s.lost > 0) losers.push(`${p} lost visibility on ${s.lost} prompt${s.lost!==1?'s':''}`);
-  });
-  return { stats, gainers, losers };
-}
-
 // ---- AI-assisted narrative sections — drafted from the structured data
 // already entered, always human-reviewed before saving. Reuses the same
 // generic /api/generate-draft endpoint the client-update drafts already
 // use (arbitrary prompt in, text out) rather than a new backend function. ----
 function buildAiVisibilityContext(d){
   const qm = computeAiVisibilityQuickMetrics(d);
-  const matrix = computeAiVisibilityMatrixSummary(d);
   return `Client: ${d.client_name_snapshot || 'n/a'}
 Target keyword: ${d.target_keyword || 'n/a'}
 Quick metrics: ${qm.summary || 'not yet entered'}
-Platform changes: ${matrix.gainers.concat(matrix.losers).join('; ') || 'not yet entered'}
+Overview (platform visibility changes): ${d.overview_summary || 'not yet entered'}
 Competitors: ${(d.competitors||[]).map(c=>`${c.name} (visibility ${c.visibilityPct}%, sentiment ${c.sentimentPct}%)`).join('; ') || 'none entered'}
 Concerns raised by AI platforms: ${(d.concerns||[]).map(c=>`${c.platform}: "${c.quote}"`).join('; ') || 'none entered'}`;
 }
@@ -10416,10 +10390,7 @@ function buildAiVisibilityPrompt(fieldName){
   const context = buildAiVisibilityContext(aiVisibilityDraft);
   const prompts = {
     executive_summary: `Write a concise (3-5 sentence) executive summary for a client-facing AI Visibility Report, based on this data:\n${context}\n\nTone: confident, factual, agency-to-client. No fluff, no bullet points, no heading — just the paragraph.`,
-    ai_says_about_you_summary: `Write a short (2-4 sentence) narrative paragraph summarizing what AI models (ChatGPT, Gemini, etc.) are currently saying about this client, based on:\n${context}\n\nFocus on tone and overall impression, not a list of individual phrases. No heading.`,
     competitive_intelligence_summary: `Write a short (3-5 sentence) narrative analyzing this client's competitive position among AI-recommended competitors, based on:\n${context}\n\nBe specific about where they rank and what's driving that. No heading.`,
-    ai_opportunities: `Based on this data:\n${context}\n\nList 3-5 specific, actionable opportunities to improve this client's AI visibility. Format as a short bulleted list (plain text, use "- " for bullets), each one concrete and specific to what's in the data above — not generic SEO advice.`,
-    recommended_campaign: `Based on this data:\n${context}\n\nRecommend ONE specific next campaign or content piece (e.g. a listicle, a press release, a comparison page) that would most directly close the biggest gap identified. Write 2-4 sentences explaining what it is and why it's the right next move.`,
     domination_score_rationale: `Based on this data:\n${context}\n\nWrite a 2-3 sentence rationale explaining why this client's "AI Domination Score" is what it is (the score itself is entered separately, alongside this) — reference the specific metrics above that justify it.`,
   };
   return prompts[fieldName] || null;
@@ -10450,7 +10421,6 @@ async function generateAiVisibilitySection(fieldName){
 
 
 const AI_VISIBILITY_PLATFORMS = ['ChatGPT','Claude','Gemini','AI Overview','AI Mode','Copilot','Grok','Perplexity','Deepseek','Meta'];
-const aiVisibilityPlatformKey = (label) => label.toLowerCase().replace(/\s+/g,'');
 let aiVisibilityReports = []; // list cache
 let aiVisibilityCurrentReportId = null; // null = list mode; 'new' or a real id = detail mode
 let aiVisibilityDraft = null; // the in-progress report object while in detail mode
@@ -10506,11 +10476,10 @@ function emptyAiVisibilityDraft(){
     id: null, client_id: null, client_name_snapshot: '', target_keyword: '', report_date: toDateStr(new Date()),
     before_recommended_count: null, before_total_prompts: null, before_avg_position: null,
     after_recommended_count: null, after_total_prompts: null, after_avg_position: null,
-    prompts: [], competitors: [], keywords: { positive:{}, neutral:{}, negative:{} }, concerns: [],
+    competitors: [], keywords: { positive:{}, neutral:{}, negative:{} }, concerns: [],
     links: { pressRelease:'', prPlacementReport:'', screenshotsFolder:'' },
-    executive_summary:'', ai_says_about_you_summary:'', competitive_intelligence_summary:'',
-    ai_opportunities:'', recommended_campaign:'', domination_score:null, domination_score_rationale:'',
-    suggestedCompetitors: [], // ephemeral working aid from live-testing, never persisted
+    executive_summary:'', competitive_intelligence_summary:'',
+    domination_score:null, domination_score_rationale:'',
     overview_before_screenshot_path: null, overview_after_screenshot_path: null, overview_summary: '',
   };
 }
@@ -10531,16 +10500,12 @@ async function openAiVisibilityReport(id){
     target_keyword: data.target_keyword||'', report_date: data.report_date,
     before_recommended_count: data.before_recommended_count, before_total_prompts: data.before_total_prompts, before_avg_position: data.before_avg_position,
     after_recommended_count: data.after_recommended_count, after_total_prompts: data.after_total_prompts, after_avg_position: data.after_avg_position,
-    // testedPhases defaults in for any prompt saved before that field
-    // existed — treated as "never live-tested", which is accurate.
-    prompts: (data.prompts || []).map(p => ({ ...p, testedPhases: p.testedPhases || { before:false, after:false } })),
     competitors: data.competitors || [],
     keywords: data.keywords && Object.keys(data.keywords).length ? data.keywords : { positive:{}, neutral:{}, negative:{} },
     concerns: data.concerns || [], links: data.links || { pressRelease:'', prPlacementReport:'', screenshotsFolder:'' },
-    executive_summary: data.executive_summary||'', ai_says_about_you_summary: data.ai_says_about_you_summary||'',
-    competitive_intelligence_summary: data.competitive_intelligence_summary||'', ai_opportunities: data.ai_opportunities||'',
-    recommended_campaign: data.recommended_campaign||'', domination_score: data.domination_score, domination_score_rationale: data.domination_score_rationale||'',
-    suggestedCompetitors: [],
+    executive_summary: data.executive_summary||'',
+    competitive_intelligence_summary: data.competitive_intelligence_summary||'',
+    domination_score: data.domination_score, domination_score_rationale: data.domination_score_rationale||'',
     overview_before_screenshot_path: data.overview_before_screenshot_path||null, overview_after_screenshot_path: data.overview_after_screenshot_path||null,
     overview_summary: data.overview_summary||'',
   };
@@ -10573,10 +10538,10 @@ async function saveAiVisibilityReport(){
     client_id: d.client_id, client_name_snapshot: d.client_name_snapshot.trim(), target_keyword: d.target_keyword.trim(), report_date: d.report_date,
     before_recommended_count: d.before_recommended_count, before_total_prompts: d.before_total_prompts, before_avg_position: d.before_avg_position,
     after_recommended_count: d.after_recommended_count, after_total_prompts: d.after_total_prompts, after_avg_position: d.after_avg_position,
-    prompts: d.prompts, competitors: d.competitors, keywords: d.keywords, concerns: d.concerns, links: d.links,
-    executive_summary: d.executive_summary, ai_says_about_you_summary: d.ai_says_about_you_summary,
-    competitive_intelligence_summary: d.competitive_intelligence_summary, ai_opportunities: d.ai_opportunities,
-    recommended_campaign: d.recommended_campaign, domination_score: d.domination_score, domination_score_rationale: d.domination_score_rationale,
+    competitors: d.competitors, keywords: d.keywords, concerns: d.concerns, links: d.links,
+    executive_summary: d.executive_summary,
+    competitive_intelligence_summary: d.competitive_intelligence_summary,
+    domination_score: d.domination_score, domination_score_rationale: d.domination_score_rationale,
     overview_before_screenshot_path: d.overview_before_screenshot_path, overview_after_screenshot_path: d.overview_after_screenshot_path,
     overview_summary: d.overview_summary,
     updated_at: new Date().toISOString(),
@@ -10596,7 +10561,6 @@ async function saveAiVisibilityReport(){
   if(wasNew) renderAiVisibilityMain();
 }
 
-let aiVisibilityTestPhase = 'before'; // which phase a live test run writes its result into
 let aiVisibilityScreenshotFiles = { before: null, after: null }; // ephemeral, freshly-selected File objects (cleared on report switch) — used for immediate analysis without a Storage round-trip
 
 function fileToBase64(file){
@@ -10708,173 +10672,6 @@ async function analyzeAiVisibilityOverview(){
 
 
 
-function setAiVisibilityTestPhase(phase){
-  aiVisibilityTestPhase = phase;
-  renderAiVisibilityMain();
-}
-
-// Runs one prompt against both ChatGPT and Claude for real, via the same
-// /api/claude-chat endpoint the Assistant uses (mode:'visibility-test'
-// branch — no agency persona, no daily cap, admin-only instead of
-// ai_chat_enabled). Detects a mention via a simple case-insensitive
-// substring match on the client's name — not perfect (won't catch a
-// misspelling or a partial name), but a reasonable, transparent heuristic
-// that's easy to verify by eye against the raw response.
-async function runAiVisibilityPromptTest(promptIndex, extractExtras){
-  const prompt = aiVisibilityDraft.prompts[promptIndex];
-  if(!prompt || !prompt.text.trim() || !aiVisibilityDraft.client_name_snapshot.trim()) return;
-  const phase = aiVisibilityTestPhase;
-  const clientNameLower = aiVisibilityDraft.client_name_snapshot.trim().toLowerCase();
-  for(const provider of ['chatgpt','claude']){
-    try{
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      const response = await fetch('/api/claude-chat', {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
-        body: JSON.stringify({ mode:'visibility-test', prompt: prompt.text, provider: provider==='chatgpt' ? 'openai' : 'claude' }),
-      });
-      const data = await response.json();
-      if(!response.ok) throw new Error(data.error || 'Request failed');
-      const reply = data.reply || '';
-      const mentioned = reply.toLowerCase().includes(clientNameLower);
-      if(!prompt.platforms[provider]) prompt.platforms[provider] = { before:false, after:false };
-      prompt.platforms[provider][phase] = mentioned;
-      // Run regardless of whether the client itself was mentioned —
-      // competitor intel matters most exactly when your client ISN'T the
-      // one showing up, so gating this on "mentioned" would hide the
-      // most useful signal.
-      if(extractExtras){
-        const platformLabel = AI_VISIBILITY_PLATFORMS.find(p=>aiVisibilityPlatformKey(p)===provider);
-        await extractAiVisibilityKeywordsAndCompetitors(reply, platformLabel, mentioned);
-      }
-    }catch(e){
-      console.error('runAiVisibilityPromptTest error', provider, e);
-    }
-  }
-  if(!prompt.testedPhases) prompt.testedPhases = { before:false, after:false };
-  prompt.testedPhases[phase] = true;
-}
-
-// A second, separate call per platform response — classifying the raw
-// answer rather than trying to get one call to both answer naturally AND
-// return structured output, which tends to contaminate the "what would a
-// real customer actually see" simulation the first call is for. Combined
-// into ONE call for both keywords and competitor names (rather than two)
-// to keep the added cost to a single extra request per platform, not two.
-async function extractAiVisibilityKeywordsAndCompetitors(responseText, platformLabel, clientMentioned){
-  const clientName = aiVisibilityDraft.client_name_snapshot;
-  const classifyPrompt = `Below is an AI assistant's response to a question about local contractors:\n\n"""\n${responseText}\n"""\n\nDo two things:\n1. ${clientMentioned ? `Extract every distinct phrase in this response that describes "${clientName}" specifically (not competitors), and classify each as positive, neutral, or negative in sentiment toward "${clientName}".` : `"${clientName}" is not mentioned in this response, so skip this part.`}\n2. List the names of any OTHER contractor/company names mentioned in this response (not "${clientName}" itself) — these are competitors.\n\nIf neither part has anything to report, respond with exactly "NONE".\n\nFormat your response as plain text, grouped under exactly these headers (omit any header with nothing to report):\nPOSITIVE:\n- phrase\nNEUTRAL:\n- phrase\nNEGATIVE:\n- phrase\nCOMPETITORS:\n- Company Name\n\nKeep phrases short (a few words each), and competitor entries to just the company name.`;
-  try{
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/claude-chat', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
-      body: JSON.stringify({ mode:'visibility-test', prompt: classifyPrompt, provider:'openai' }),
-    });
-    const data = await response.json();
-    if(!response.ok || !data.reply || data.reply.trim().toUpperCase()==='NONE') return;
-    const sections = { positive:[], neutral:[], negative:[], competitors:[] };
-    let current = null;
-    data.reply.split('\n').forEach(line=>{
-      const trimmed = line.trim();
-      if(/^POSITIVE:?$/i.test(trimmed)) current = 'positive';
-      else if(/^NEUTRAL:?$/i.test(trimmed)) current = 'neutral';
-      else if(/^NEGATIVE:?$/i.test(trimmed)) current = 'negative';
-      else if(/^COMPETITORS:?$/i.test(trimmed)) current = 'competitors';
-      else if(current && trimmed.startsWith('-')) sections[current].push(trimmed.replace(/^-\s*/,'').trim());
-    });
-    ['positive','neutral','negative'].forEach(sentiment=>{
-      const phrases = sections[sentiment].filter(Boolean);
-      if(!phrases.length) return;
-      if(!aiVisibilityDraft.keywords[sentiment]) aiVisibilityDraft.keywords[sentiment] = {};
-      const existing = (aiVisibilityDraft.keywords[sentiment][platformLabel] || '').trim();
-      const newLines = phrases.join('\n');
-      aiVisibilityDraft.keywords[sentiment][platformLabel] = existing ? `${existing}\n${newLines}` : newLines;
-    });
-    // Suggestions only, never auto-added — a casual mention isn't enough
-    // to confidently populate a full competitor row (position, visibility%,
-    // sentiment% all need the same dedicated research the client's own
-    // numbers do), so these surface as chips to review and add, or dismiss.
-    sections.competitors.filter(Boolean).forEach(name=>{
-      const alreadyInTable = aiVisibilityDraft.competitors.some(c=>(c.name||'').trim().toLowerCase()===name.toLowerCase());
-      const alreadySuggested = aiVisibilityDraft.suggestedCompetitors.some(n=>n.toLowerCase()===name.toLowerCase());
-      if(!alreadyInTable && !alreadySuggested) aiVisibilityDraft.suggestedCompetitors.push(name);
-    });
-  }catch(e){
-    console.error('extractAiVisibilityKeywordsAndCompetitors error', e);
-  }
-}
-
-function addSuggestedAiVisibilityCompetitor(name){
-  aiVisibilityDraft.competitors.push({ rank: aiVisibilityDraft.competitors.length+1, name, position:'', top3Pct:'', sentimentPct:'', mentions:'', citations:'', visibilityPct:'' });
-  aiVisibilityDraft.suggestedCompetitors = aiVisibilityDraft.suggestedCompetitors.filter(n=>n!==name);
-  renderAiVisibilityMain();
-}
-
-function dismissSuggestedAiVisibilityCompetitor(name){
-  aiVisibilityDraft.suggestedCompetitors = aiVisibilityDraft.suggestedCompetitors.filter(n=>n!==name);
-  renderAiVisibilityMain();
-}
-
-async function runSingleAiVisibilityPromptTest(promptIndex){
-  const btn = clickedBtn();
-  setBtnLoading(btn, '…');
-  await runAiVisibilityPromptTest(promptIndex, true);
-  restoreBtn(btn);
-  renderAiVisibilityMain();
-  showToast('success','Tested','Checkboxes and any detected keywords updated.');
-}
-
-// forceRetest lets someone deliberately re-run everything (a "Re-test all,
-// including already-tested" option), overriding the default skip-what's-
-// done behavior below.
-async function runAllAiVisibilityPromptTests(forceRetest){
-  if(!aiVisibilityDraft.client_name_snapshot.trim()){ showToast('error','Missing client','Pick or enter a client name first — needed to detect mentions.'); return; }
-  const phase = aiVisibilityTestPhase;
-  const withText = aiVisibilityDraft.prompts.map((p,i)=>i).filter(i=>aiVisibilityDraft.prompts[i].text.trim());
-  if(!withText.length){ showToast('error','No prompts yet','Add at least one prompt first.'); return; }
-  // Skips prompts already tested for this phase by default — no reason to
-  // re-pay for an answer that's already sitting there, unless explicitly
-  // asked to refresh it.
-  const toRun = forceRetest ? withText : withText.filter(i => !aiVisibilityDraft.prompts[i].testedPhases?.[phase]);
-  const alreadyDoneCount = withText.length - toRun.length;
-  if(!toRun.length){
-    showToast('info','Nothing new to run', `All ${withText.length} prompt${withText.length!==1?'s are':' is'} already tested for "${phase}" — use "Re-test all" to refresh them anyway.`);
-    return;
-  }
-  const confirmed = await confirmDialog(
-    `This will make ${toRun.length * 2}+ real API calls (${toRun.length} prompt${toRun.length!==1?'s':''} × ChatGPT + Claude, plus more for any keyword/competitor extraction) — same cost as any Assistant usage.${alreadyDoneCount ? ` ${alreadyDoneCount} prompt${alreadyDoneCount!==1?'s are':' is'} already tested for "${phase}" and will be skipped.` : ''} Continue?`,
-    { confirmLabel:'Run tests' }
-  );
-  if(!confirmed) return;
-  const btn = clickedBtn();
-  for(let idx=0; idx<toRun.length; idx++){
-    setBtnLoading(btn, `Testing ${idx+1}/${toRun.length}…`);
-    await runAiVisibilityPromptTest(toRun[idx], true);
-  }
-  restoreBtn(btn);
-  renderAiVisibilityMain();
-  showToast('success','Done', `Tested ${toRun.length} prompt${toRun.length!==1?'s':''} against ChatGPT and Claude for the "${phase}" phase.`);
-}
-
-
-function addAiVisibilityPrompt(){
-  aiVisibilityDraft.prompts.push({ text:'', platforms:{}, testedPhases: { before:false, after:false } });
-  renderAiVisibilityMain();
-}
-function removeAiVisibilityPrompt(i){
-  aiVisibilityDraft.prompts.splice(i,1);
-  renderAiVisibilityMain();
-}
-function updateAiVisibilityPromptText(i, value){
-  aiVisibilityDraft.prompts[i].text = value;
-}
-function updateAiVisibilityCell(i, platformKey, phase, checked){
-  const prompt = aiVisibilityDraft.prompts[i];
-  if(!prompt.platforms[platformKey]) prompt.platforms[platformKey] = { before:false, after:false };
-  prompt.platforms[platformKey][phase] = checked;
-  renderAiVisibilityMain();
-}
 
 // ---- Competitor table mutators (Page 6) ----
 function addAiVisibilityCompetitor(){
@@ -10922,7 +10719,6 @@ function narrativeSectionHtml(fieldName, title, placeholder){
 function renderAiVisibilityDetail(el){
   const d = aiVisibilityDraft;
   const qm = computeAiVisibilityQuickMetrics(d);
-  const matrix = computeAiVisibilityMatrixSummary(d);
 
   el.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
@@ -10996,61 +10792,6 @@ function renderAiVisibilityDetail(el){
     </div>
 
     <div class="panel" style="margin-bottom:20px;">
-      <div class="panel-head"><span class="panel-title">Page 3 — Platform/Prompt Visibility Matrix</span><span class="pill pill-good">Summary automated</span></div>
-      <div class="panel-body">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;padding:12px;background:var(--surface-2);border-radius:8px;">
-          <div style="display:flex;align-items:center;gap:10px;">
-            <span style="font-size:12px;font-weight:600;color:var(--ink);">Live-testing ChatGPT and Claude for:</span>
-            <div style="display:flex;border-radius:6px;border:1px solid var(--border);overflow:hidden;">
-              <button type="button" class="btn ${aiVisibilityTestPhase==='before'?'btn-brand':'btn-outline'}" style="border-radius:0;" onclick="setAiVisibilityTestPhase('before')">Before</button>
-              <button type="button" class="btn ${aiVisibilityTestPhase==='after'?'btn-brand':'btn-outline'}" style="border-radius:0;" onclick="setAiVisibilityTestPhase('after')">After</button>
-            </div>
-          </div>
-          <div style="display:flex;gap:8px;">
-            <button class="btn btn-outline" onclick="runAllAiVisibilityPromptTests(true)" title="Re-run every prompt for this phase, even ones already tested">↻ Re-test all</button>
-            <button class="btn btn-brand" onclick="runAllAiVisibilityPromptTests()">▶ Run all prompts</button>
-          </div>
-        </div>
-        <p style="font-size:11px;color:var(--muted-lt);margin:0 0 14px;line-height:1.5;">Runs each prompt against ChatGPT and Claude for real (actual API calls, same cost as any Assistant usage) and checks whether the client's name appears in the response — filling in ${aiVisibilityTestPhase} for those two platforms and extracting any keywords and competitor names found. "Run all" skips prompts already tested for this phase automatically; use "Re-test all" to refresh everything anyway. The other 8 platforms shown below still need manual entry from screenshots, same as before.</p>
-        <div class="table-scroll-wrap">
-          <table>
-            <thead><tr><th>Prompt</th>${AI_VISIBILITY_PLATFORMS.map(p=>`<th style="text-align:center;">${p}</th>`).join('')}<th></th></tr></thead>
-            <tbody>
-              ${d.prompts.map((prompt,i)=>`
-                <tr>
-                  <td>
-                    <input type="text" value="${(prompt.text||'').replace(/"/g,'&quot;')}" onchange="updateAiVisibilityPromptText(${i},this.value)" style="width:100%;min-width:200px;" placeholder="e.g. Best window replacement contractor Seattle">
-                    ${prompt.testedPhases?.[aiVisibilityTestPhase] ? `<span style="font-size:10px;color:var(--green);">✓ Tested for ${aiVisibilityTestPhase}</span>` : ''}
-                  </td>
-                  ${AI_VISIBILITY_PLATFORMS.map(p=>{
-                    const key = aiVisibilityPlatformKey(p);
-                    const cell = prompt.platforms[key] || { before:false, after:false };
-                    return `<td style="text-align:center;white-space:nowrap;font-size:10px;">
-                      <label title="Before" style="display:block;color:var(--muted-lt);"><input type="checkbox" ${cell.before?'checked':''} onchange="updateAiVisibilityCell(${i},'${key}','before',this.checked)"> B</label>
-                      <label title="After" style="display:block;color:var(--muted-lt);"><input type="checkbox" ${cell.after?'checked':''} onchange="updateAiVisibilityCell(${i},'${key}','after',this.checked)"> A</label>
-                    </td>`;
-                  }).join('')}
-                  <td style="white-space:nowrap;">
-                    <span class="row-link" onclick="runSingleAiVisibilityPromptTest(${i})" title="Run just this prompt">▶</span>
-                    <span class="row-link" style="color:var(--red);" onclick="removeAiVisibilityPrompt(${i})">✕</span>
-                  </td>
-                </tr>
-              `).join('') || `<tr><td colspan="${AI_VISIBILITY_PLATFORMS.length+2}" style="color:var(--muted-lt);font-size:12px;">No prompts added yet.</td></tr>`}
-            </tbody>
-          </table>
-        </div>
-        <button class="btn btn-outline" style="margin-top:10px;" onclick="addAiVisibilityPrompt()">+ Add prompt</button>
-        ${(matrix.gainers.length || matrix.losers.length) ? `
-          <div style="margin-top:16px;padding:12px;background:var(--surface-2);border-radius:8px;font-size:13px;line-height:1.7;">
-            ${matrix.gainers.length ? `<div><strong>Net gainers:</strong><ul style="margin:4px 0 10px;padding-left:20px;">${matrix.gainers.map(g=>`<li>${escapeHtml(g)}</li>`).join('')}</ul></div>` : ''}
-            ${matrix.losers.length ? `<div><strong>Net losers / concerning:</strong><ul style="margin:4px 0 0;padding-left:20px;">${matrix.losers.map(l=>`<li>${escapeHtml(l)}</li>`).join('')}</ul></div>` : ''}
-          </div>` : `<p style="font-size:12px;color:var(--muted-lt);margin:14px 0 0;">Add prompts and toggle Before/After per platform above to generate this summary automatically.</p>`}
-      </div>
-    </div>
-
-    ${narrativeSectionHtml('ai_says_about_you_summary', 'Page 4 — What AI Says About You', 'A narrative overview of tone and impression across AI platforms...')}
-
-    <div class="panel" style="margin-bottom:20px;">
       <div class="panel-head"><span class="panel-title">Page 5 — Positive / Neutral / Negative Associations</span></div>
       <div class="panel-body">
         <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;">One phrase per line, optionally ending in a count like "(2)" — matching how these get pulled from RankScale.</p>
@@ -11070,19 +10811,6 @@ function renderAiVisibilityDetail(el){
     <div class="panel" style="margin-bottom:20px;">
       <div class="panel-head"><span class="panel-title">Page 6 — Competitive Intelligence</span></div>
       <div class="panel-body">
-        ${d.suggestedCompetitors.length ? `
-          <div style="margin-bottom:16px;padding:12px;background:var(--surface-2);border-radius:8px;">
-            <div style="font-size:11.5px;font-weight:600;color:var(--ink);margin-bottom:8px;">Suggested from live-tested responses — review before adding:</div>
-            <div style="display:flex;flex-wrap:wrap;gap:8px;">
-              ${d.suggestedCompetitors.map(name=>`
-                <span style="display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:999px;padding:5px 6px 5px 12px;font-size:12px;">
-                  ${escapeHtml(name)}
-                  <span class="row-link" style="padding:2px 6px;" onclick="addSuggestedAiVisibilityCompetitor('${name.replace(/'/g,"\\'")}')">+ Add</span>
-                  <span class="row-link" style="padding:2px 6px;color:var(--muted-lt);" onclick="dismissSuggestedAiVisibilityCompetitor('${name.replace(/'/g,"\\'")}')">✕</span>
-                </span>
-              `).join('')}
-            </div>
-          </div>` : ''}
         <div class="table-scroll-wrap">
           <table>
             <thead><tr><th>Rank</th><th>Competitor</th><th>Position</th><th>Top 3%</th><th>Sentiment%</th><th>Mentions</th><th>Citations</th><th>Visibility%</th><th></th></tr></thead>
@@ -11122,9 +10850,6 @@ function renderAiVisibilityDetail(el){
         <button class="btn btn-outline" onclick="addAiVisibilityConcern()">+ Add concern</button>
       </div>
     </div>
-
-    ${narrativeSectionHtml('ai_opportunities', 'Page 7 — AI Opportunities', 'Specific, actionable next steps based on the data above...')}
-    ${narrativeSectionHtml('recommended_campaign', 'Page 8 — Recommended Next Campaign', 'The single next content piece or campaign that closes the biggest gap...')}
 
     <div class="panel" style="margin-bottom:20px;">
       <div class="panel-head"><span class="panel-title">Page 9 — AI Domination Score</span></div>
@@ -11258,40 +10983,6 @@ function downloadAiVisibilityReportPdf(){
   sectionHeader('Overview');
   bodyText(d.overview_summary || 'Not yet written.');
 
-  // ---- Page 3: Platform/Prompt Visibility Matrix ----
-  // Listed per-prompt rather than a wide grid — 10 platform columns don't
-  // fit a portrait page at a readable size, and a per-prompt summary
-  // communicates the same information more clearly in this format anyway.
-  doc.addPage(); y = 20;
-  sectionHeader('Platform / Prompt Visibility Matrix');
-  const promptsWithText = d.prompts.filter(p=>p.text.trim());
-  if(!promptsWithText.length){
-    bodyText('No prompts added yet.');
-  } else {
-    promptsWithText.forEach((prompt,i)=>{
-      bodyText(`${i+1}. ${prompt.text}`, { bold:true, size:10, color:[30,30,30], lineHeight:5 });
-      const beforeList = AI_VISIBILITY_PLATFORMS.filter(p=>prompt.platforms[aiVisibilityPlatformKey(p)]?.before).join(', ') || 'none';
-      const afterList = AI_VISIBILITY_PLATFORMS.filter(p=>prompt.platforms[aiVisibilityPlatformKey(p)]?.after).join(', ') || 'none';
-      bodyText(`Before: ${beforeList}`, { size:9, color:[100,100,100], indent:4, lineHeight:4.5 });
-      bodyText(`After: ${afterList}`, { size:9, color:[100,100,100], indent:4, lineHeight:4.5 });
-    });
-  }
-  const matrix = computeAiVisibilityMatrixSummary(d);
-  if(matrix.gainers.length || matrix.losers.length) y += 2;
-  if(matrix.gainers.length){
-    bodyText('Net gainers:', { bold:true, size:10, color:[30,30,30] });
-    matrix.gainers.forEach(g=>bodyText(`• ${g}`, { size:9.5, color:[60,60,60], indent:3, lineHeight:5 }));
-  }
-  if(matrix.losers.length){
-    bodyText('Net losers / concerning:', { bold:true, size:10, color:[30,30,30] });
-    matrix.losers.forEach(l=>bodyText(`• ${l}`, { size:9.5, color:[60,60,60], indent:3, lineHeight:5 }));
-  }
-
-  // ---- Page 4: What AI Says About You ----
-  doc.addPage(); y = 20;
-  sectionHeader('What AI Says About You');
-  bodyText(d.ai_says_about_you_summary || 'Not yet written.');
-
   // ---- Page 5: Positive/Neutral/Negative Associations ----
   doc.addPage(); y = 20;
   sectionHeader('Positive / Neutral / Negative Associations');
@@ -11321,16 +11012,6 @@ function downloadAiVisibilityReportPdf(){
   }
   bodyText(d.competitive_intelligence_summary || 'Not yet written.');
 
-  // ---- Page 7: AI Opportunities ----
-  doc.addPage(); y = 20;
-  sectionHeader('AI Opportunities');
-  bodyText(d.ai_opportunities || 'Not yet written.');
-
-  // ---- Page 8: Recommended Next Campaign ----
-  doc.addPage(); y = 20;
-  sectionHeader('Recommended Next Campaign');
-  bodyText(d.recommended_campaign || 'Not yet written.');
-
   // ---- Page 9: AI Domination Score ----
   doc.addPage(); y = 20;
   sectionHeader('AI Domination Score');
@@ -11348,7 +11029,6 @@ function downloadAiVisibilityReport(){
   const d = aiVisibilityDraft;
   if(!d) return;
   const qm = computeAiVisibilityQuickMetrics(d);
-  const matrix = computeAiVisibilityMatrixSummary(d);
   const lines = [];
   lines.push(`AI VISIBILITY REPORT — ${d.client_name_snapshot}`, '='.repeat(50));
   lines.push(`Target keyword: ${d.target_keyword || 'n/a'}`, `Date: ${new Date(d.report_date+'T00:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}`, '');
@@ -11363,19 +11043,12 @@ function downloadAiVisibilityReport(){
   if(qm.summary) lines.push('', qm.summary);
   lines.push('');
   lines.push('OVERVIEW', '-'.repeat(30), d.overview_summary || '(not written yet)', '');
-  lines.push('PLATFORM VISIBILITY CHANGES', '-'.repeat(30));
-  if(matrix.gainers.length){ lines.push('Net gainers:'); matrix.gainers.forEach(g=>lines.push(`  - ${g}`)); }
-  if(matrix.losers.length){ lines.push('Net losers / concerning:'); matrix.losers.forEach(l=>lines.push(`  - ${l}`)); }
-  lines.push('');
-  lines.push('WHAT AI SAYS ABOUT YOU', '-'.repeat(30), d.ai_says_about_you_summary || '(not written yet)', '');
   lines.push('COMPETITIVE INTELLIGENCE', '-'.repeat(30));
   if(d.competitors.length){
     d.competitors.forEach(c=>lines.push(`  #${c.rank} ${c.name} — Position ${c.position}, Visibility ${c.visibilityPct}%, Sentiment ${c.sentimentPct}%, Mentions ${c.mentions}, Citations ${c.citations}`));
     lines.push('');
   }
   lines.push(d.competitive_intelligence_summary || '(not written yet)', '');
-  lines.push('AI OPPORTUNITIES', '-'.repeat(30), d.ai_opportunities || '(not written yet)', '');
-  lines.push('RECOMMENDED NEXT CAMPAIGN', '-'.repeat(30), d.recommended_campaign || '(not written yet)', '');
   lines.push('AI DOMINATION SCORE', '-'.repeat(30), `${d.domination_score ?? '—'}/100`, d.domination_score_rationale || '(not written yet)');
   const text = lines.join('\n');
   const blob = new Blob([text], { type:'text/plain' });
