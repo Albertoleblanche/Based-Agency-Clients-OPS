@@ -10578,9 +10578,111 @@ async function saveAiVisibilityReport(){
   showToast('success','Saved','Report saved.');
 }
 
-// ---- Prompt matrix mutators (Page 3) — each re-renders the whole detail
-// view; simplest correct approach for an infrequent admin data-entry task,
-// at the acceptable cost of resetting scroll position on each edit. ----
+let aiVisibilityTestPhase = 'before'; // which phase a live test run writes its result into
+
+function setAiVisibilityTestPhase(phase){
+  aiVisibilityTestPhase = phase;
+  renderAiVisibilityMain();
+}
+
+// Runs one prompt against both ChatGPT and Claude for real, via the same
+// /api/claude-chat endpoint the Assistant uses (mode:'visibility-test'
+// branch — no agency persona, no daily cap, admin-only instead of
+// ai_chat_enabled). Detects a mention via a simple case-insensitive
+// substring match on the client's name — not perfect (won't catch a
+// misspelling or a partial name), but a reasonable, transparent heuristic
+// that's easy to verify by eye against the raw response.
+async function runAiVisibilityPromptTest(promptIndex, extractKeywords){
+  const prompt = aiVisibilityDraft.prompts[promptIndex];
+  if(!prompt || !prompt.text.trim() || !aiVisibilityDraft.client_name_snapshot.trim()) return;
+  const phase = aiVisibilityTestPhase;
+  const clientNameLower = aiVisibilityDraft.client_name_snapshot.trim().toLowerCase();
+  for(const provider of ['chatgpt','claude']){
+    try{
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      const response = await fetch('/api/claude-chat', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ mode:'visibility-test', prompt: prompt.text, provider: provider==='chatgpt' ? 'openai' : 'claude' }),
+      });
+      const data = await response.json();
+      if(!response.ok) throw new Error(data.error || 'Request failed');
+      const reply = data.reply || '';
+      const mentioned = reply.toLowerCase().includes(clientNameLower);
+      if(!prompt.platforms[provider]) prompt.platforms[provider] = { before:false, after:false };
+      prompt.platforms[provider][phase] = mentioned;
+      if(extractKeywords && mentioned){
+        const platformLabel = AI_VISIBILITY_PLATFORMS.find(p=>aiVisibilityPlatformKey(p)===provider);
+        await extractAiVisibilityKeywordsFromResponse(reply, platformLabel);
+      }
+    }catch(e){
+      console.error('runAiVisibilityPromptTest error', provider, e);
+    }
+  }
+}
+
+// A second, separate call per mentioned platform — classifying the raw
+// answer rather than trying to get one call to both answer naturally AND
+// return structured output, which tends to contaminate the "what would a
+// real customer actually see" simulation the first call is for.
+async function extractAiVisibilityKeywordsFromResponse(responseText, platformLabel){
+  const clientName = aiVisibilityDraft.client_name_snapshot;
+  const classifyPrompt = `Below is an AI assistant's response to a question about local contractors:\n\n"""\n${responseText}\n"""\n\nExtract every distinct phrase in this response that describes "${clientName}" specifically (not competitors), and classify each as positive, neutral, or negative in sentiment toward "${clientName}". Only include phrases if "${clientName}" is actually mentioned — if not mentioned at all, respond with exactly "NONE".\n\nFormat your response as plain text, one short phrase per line (a few words each, not full sentences), grouped under exactly these headers:\nPOSITIVE:\n- phrase\nNEUTRAL:\n- phrase\nNEGATIVE:\n- phrase\n\nOmit a header entirely if it has no phrases for that section.`;
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/claude-chat', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ mode:'visibility-test', prompt: classifyPrompt, provider:'openai' }),
+    });
+    const data = await response.json();
+    if(!response.ok || !data.reply || data.reply.trim().toUpperCase()==='NONE') return;
+    const sections = { positive:[], neutral:[], negative:[] };
+    let current = null;
+    data.reply.split('\n').forEach(line=>{
+      const trimmed = line.trim();
+      if(/^POSITIVE:?$/i.test(trimmed)) current = 'positive';
+      else if(/^NEUTRAL:?$/i.test(trimmed)) current = 'neutral';
+      else if(/^NEGATIVE:?$/i.test(trimmed)) current = 'negative';
+      else if(current && trimmed.startsWith('-')) sections[current].push(trimmed.replace(/^-\s*/,'').trim());
+    });
+    ['positive','neutral','negative'].forEach(sentiment=>{
+      const phrases = sections[sentiment].filter(Boolean);
+      if(!phrases.length) return;
+      if(!aiVisibilityDraft.keywords[sentiment]) aiVisibilityDraft.keywords[sentiment] = {};
+      const existing = (aiVisibilityDraft.keywords[sentiment][platformLabel] || '').trim();
+      const newLines = phrases.join('\n');
+      aiVisibilityDraft.keywords[sentiment][platformLabel] = existing ? `${existing}\n${newLines}` : newLines;
+    });
+  }catch(e){
+    console.error('extractAiVisibilityKeywordsFromResponse error', e);
+  }
+}
+
+async function runSingleAiVisibilityPromptTest(promptIndex){
+  const btn = clickedBtn();
+  setBtnLoading(btn, '…');
+  await runAiVisibilityPromptTest(promptIndex, true);
+  restoreBtn(btn);
+  renderAiVisibilityMain();
+  showToast('success','Tested','Checkboxes and any detected keywords updated.');
+}
+
+async function runAllAiVisibilityPromptTests(){
+  if(!aiVisibilityDraft.client_name_snapshot.trim()){ showToast('error','Missing client','Pick or enter a client name first — needed to detect mentions.'); return; }
+  const withText = aiVisibilityDraft.prompts.map((p,i)=>i).filter(i=>aiVisibilityDraft.prompts[i].text.trim());
+  if(!withText.length){ showToast('error','No prompts yet','Add at least one prompt first.'); return; }
+  const btn = clickedBtn();
+  for(let idx=0; idx<withText.length; idx++){
+    setBtnLoading(btn, `Testing ${idx+1}/${withText.length}…`);
+    await runAiVisibilityPromptTest(withText[idx], true);
+  }
+  restoreBtn(btn);
+  renderAiVisibilityMain();
+  showToast('success','Done', `Tested ${withText.length} prompt${withText.length!==1?'s':''} against ChatGPT and Claude for the "${aiVisibilityTestPhase}" phase.`);
+}
+
+
 function addAiVisibilityPrompt(){
   aiVisibilityDraft.prompts.push({ text:'', platforms:{} });
   renderAiVisibilityMain();
@@ -10695,6 +10797,17 @@ function renderAiVisibilityDetail(el){
     <div class="panel" style="margin-bottom:20px;">
       <div class="panel-head"><span class="panel-title">Page 3 — Platform/Prompt Visibility Matrix</span><span class="pill pill-good">Summary automated</span></div>
       <div class="panel-body">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;padding:12px;background:var(--surface-2);border-radius:8px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:12px;font-weight:600;color:var(--ink);">Live-testing ChatGPT and Claude for:</span>
+            <div style="display:flex;border-radius:6px;border:1px solid var(--border);overflow:hidden;">
+              <button type="button" class="btn ${aiVisibilityTestPhase==='before'?'btn-brand':'btn-outline'}" style="border-radius:0;" onclick="setAiVisibilityTestPhase('before')">Before</button>
+              <button type="button" class="btn ${aiVisibilityTestPhase==='after'?'btn-brand':'btn-outline'}" style="border-radius:0;" onclick="setAiVisibilityTestPhase('after')">After</button>
+            </div>
+          </div>
+          <button class="btn btn-brand" onclick="runAllAiVisibilityPromptTests()">▶ Run all prompts</button>
+        </div>
+        <p style="font-size:11px;color:var(--muted-lt);margin:0 0 14px;line-height:1.5;">Runs each prompt against ChatGPT and Claude for real (actual API calls, same cost as any Assistant usage) and checks whether the client's name appears in the response — filling in ${aiVisibilityTestPhase} for those two platforms and extracting any keywords found into Page 5. The other 8 platforms shown below still need manual entry from screenshots, same as before.</p>
         <div class="table-scroll-wrap">
           <table>
             <thead><tr><th>Prompt</th>${AI_VISIBILITY_PLATFORMS.map(p=>`<th style="text-align:center;">${p}</th>`).join('')}<th></th></tr></thead>
@@ -10710,7 +10823,10 @@ function renderAiVisibilityDetail(el){
                       <label title="After" style="display:block;color:var(--muted-lt);"><input type="checkbox" ${cell.after?'checked':''} onchange="updateAiVisibilityCell(${i},'${key}','after',this.checked)"> A</label>
                     </td>`;
                   }).join('')}
-                  <td><span class="row-link" style="color:var(--red);" onclick="removeAiVisibilityPrompt(${i})">✕</span></td>
+                  <td style="white-space:nowrap;">
+                    <span class="row-link" onclick="runSingleAiVisibilityPromptTest(${i})" title="Run just this prompt">▶</span>
+                    <span class="row-link" style="color:var(--red);" onclick="removeAiVisibilityPrompt(${i})">✕</span>
+                  </td>
                 </tr>
               `).join('') || `<tr><td colspan="${AI_VISIBILITY_PLATFORMS.length+2}" style="color:var(--muted-lt);font-size:12px;">No prompts added yet.</td></tr>`}
             </tbody>
