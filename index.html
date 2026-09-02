@@ -10511,18 +10511,21 @@ function emptyAiVisibilityDraft(){
     executive_summary:'', ai_says_about_you_summary:'', competitive_intelligence_summary:'',
     ai_opportunities:'', recommended_campaign:'', domination_score:null, domination_score_rationale:'',
     suggestedCompetitors: [], // ephemeral working aid from live-testing, never persisted
+    overview_before_screenshot_path: null, overview_after_screenshot_path: null, overview_summary: '',
   };
 }
 
 function openNewAiVisibilityReport(){
   aiVisibilityDraft = emptyAiVisibilityDraft();
   aiVisibilityCurrentReportId = 'new';
+  aiVisibilityScreenshotFiles = { before: null, after: null };
   renderAiVisibilityMain();
 }
 
 async function openAiVisibilityReport(id){
   const { data, error } = await supabaseClient.from('ai_visibility_reports').select('*').eq('id', id).maybeSingle();
   if(error || !data){ showToast('error','Could not load','Try again.'); return; }
+  aiVisibilityScreenshotFiles = { before: null, after: null };
   aiVisibilityDraft = {
     id: data.id, client_id: data.client_id, client_name_snapshot: data.client_name_snapshot||'',
     target_keyword: data.target_keyword||'', report_date: data.report_date,
@@ -10538,6 +10541,8 @@ async function openAiVisibilityReport(id){
     competitive_intelligence_summary: data.competitive_intelligence_summary||'', ai_opportunities: data.ai_opportunities||'',
     recommended_campaign: data.recommended_campaign||'', domination_score: data.domination_score, domination_score_rationale: data.domination_score_rationale||'',
     suggestedCompetitors: [],
+    overview_before_screenshot_path: data.overview_before_screenshot_path||null, overview_after_screenshot_path: data.overview_after_screenshot_path||null,
+    overview_summary: data.overview_summary||'',
   };
   aiVisibilityCurrentReportId = id;
   renderAiVisibilityMain();
@@ -10546,6 +10551,7 @@ async function openAiVisibilityReport(id){
 function closeAiVisibilityDetail(){
   aiVisibilityCurrentReportId = null;
   aiVisibilityDraft = null;
+  aiVisibilityScreenshotFiles = { before: null, after: null };
   renderAiVisibilityMain();
 }
 
@@ -10571,6 +10577,8 @@ async function saveAiVisibilityReport(){
     executive_summary: d.executive_summary, ai_says_about_you_summary: d.ai_says_about_you_summary,
     competitive_intelligence_summary: d.competitive_intelligence_summary, ai_opportunities: d.ai_opportunities,
     recommended_campaign: d.recommended_campaign, domination_score: d.domination_score, domination_score_rationale: d.domination_score_rationale,
+    overview_before_screenshot_path: d.overview_before_screenshot_path, overview_after_screenshot_path: d.overview_after_screenshot_path,
+    overview_summary: d.overview_summary,
     updated_at: new Date().toISOString(),
   };
   const result = d.id
@@ -10578,12 +10586,127 @@ async function saveAiVisibilityReport(){
     : await supabaseClient.from('ai_visibility_reports').insert({ ...payload, created_by: currentUser.id }).select('id').maybeSingle();
   restoreBtn(btn);
   if(result.error){ showToast('error','Save failed', result.error.message || 'Try again.'); return; }
+  const wasNew = !d.id;
   d.id = result.data.id;
   aiVisibilityCurrentReportId = d.id;
   showToast('success','Saved','Report saved.');
+  // A brand-new report just got its real id for the first time — anyone
+  // about to upload an Overview screenshot needs that id for the Storage
+  // path, so refresh the screen now that it exists.
+  if(wasNew) renderAiVisibilityMain();
 }
 
 let aiVisibilityTestPhase = 'before'; // which phase a live test run writes its result into
+let aiVisibilityScreenshotFiles = { before: null, after: null }; // ephemeral, freshly-selected File objects (cleared on report switch) — used for immediate analysis without a Storage round-trip
+
+function fileToBase64(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]); // strip the data: prefix, keep just the base64 payload
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Overview screenshots — same 'attachments' Storage bucket notes/tasks
+// already use, path scoped by report id and phase.
+async function uploadAiVisibilityScreenshot(phase, fileInput){
+  const file = fileInput.files[0];
+  if(!file) return;
+  const d = aiVisibilityDraft;
+  if(!d.id){
+    showToast('error','Save first','Save the report once (even blank) before uploading screenshots — they need a real report to attach to.');
+    fileInput.value = '';
+    return;
+  }
+  if(file.size > 10*1024*1024){ showToast('error','Too large','Screenshots need to be under 10MB.'); fileInput.value = ''; return; }
+  aiVisibilityScreenshotFiles[phase] = file;
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  const path = `ai-visibility/${d.id}/${phase}-${Date.now()}-${safeName}`;
+  const { error } = await supabaseClient.storage.from('attachments').upload(path, file, { upsert:true });
+  if(error){ showToast('error','Upload failed', error.message); return; }
+  // The old screenshot for this phase (if any) gets cleaned up rather
+  // than left orphaned in Storage once replaced.
+  const oldPath = phase==='before' ? d.overview_before_screenshot_path : d.overview_after_screenshot_path;
+  if(oldPath && oldPath !== path) supabaseClient.storage.from('attachments').remove([oldPath]).catch(()=>{});
+  if(phase==='before') d.overview_before_screenshot_path = path;
+  else d.overview_after_screenshot_path = path;
+  await saveAiVisibilityReport();
+  renderAiVisibilityMain();
+  showToast('success','Uploaded', `${phase==='before'?'Before':'After'} screenshot saved.`);
+}
+
+async function removeAiVisibilityScreenshot(phase){
+  const d = aiVisibilityDraft;
+  const path = phase==='before' ? d.overview_before_screenshot_path : d.overview_after_screenshot_path;
+  if(path) supabaseClient.storage.from('attachments').remove([path]).catch(()=>{});
+  aiVisibilityScreenshotFiles[phase] = null;
+  if(phase==='before') d.overview_before_screenshot_path = null;
+  else d.overview_after_screenshot_path = null;
+  await saveAiVisibilityReport();
+  renderAiVisibilityMain();
+}
+
+async function viewAiVisibilityScreenshot(phase){
+  const path = phase==='before' ? aiVisibilityDraft.overview_before_screenshot_path : aiVisibilityDraft.overview_after_screenshot_path;
+  if(!path) return;
+  const { data, error } = await supabaseClient.storage.from('attachments').createSignedUrl(path, 300);
+  if(error || !data?.signedUrl){ showToast('error','Could not open','Try again.'); return; }
+  window.open(data.signedUrl, '_blank');
+}
+
+// Prefers a freshly-selected file still in memory (no round-trip needed);
+// falls back to fetching the stored screenshot via a signed URL when
+// re-analyzing a report opened from a previous session, where only the
+// Storage path — not the original file — is available.
+async function getAiVisibilityScreenshotBase64(phase){
+  const file = aiVisibilityScreenshotFiles[phase];
+  if(file) return { base64: await fileToBase64(file), mimeType: file.type || 'image/png' };
+  const path = phase==='before' ? aiVisibilityDraft.overview_before_screenshot_path : aiVisibilityDraft.overview_after_screenshot_path;
+  if(!path) return null;
+  const { data } = await supabaseClient.storage.from('attachments').createSignedUrl(path, 300);
+  if(!data?.signedUrl) return null;
+  const res = await fetch(data.signedUrl);
+  const blob = await res.blob();
+  const base64 = await new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+  return { base64, mimeType: blob.type || 'image/png' };
+}
+
+async function analyzeAiVisibilityOverview(){
+  const d = aiVisibilityDraft;
+  const beforeImg = await getAiVisibilityScreenshotBase64('before');
+  const afterImg = await getAiVisibilityScreenshotBase64('after');
+  const images = [beforeImg, afterImg].filter(Boolean);
+  if(!images.length){ showToast('error','Nothing to analyze','Upload at least one screenshot first.'); return; }
+  const prompt = `This screenshot is from an AI visibility tracking tool showing which AI platforms (ChatGPT, Claude, Gemini, etc.) recommend a business for various search prompts. ${images.length===2 ? 'Two images are attached: the first is the "before" state, the second is the "after" state — compare them.' : 'One image is attached, which may already encode a before/after comparison via color (e.g. dark green = gained visibility, dark red = lost visibility).'}\n\nIdentify:\n1. "Net gainers" — which platforms picked up new mentions/visibility, and how many.\n2. "Net losers / concerning" — which platforms lost visibility, and how many.\n\nWrite this as two short bulleted lists (plain text, use "- " for bullets) under the headers "Net gainers:" and "Net losers / concerning:", matching this style:\n- ChatGPT picked up 3 new mentions it didn't have before\n- Claude gained two mentions but lost 1\n\nBe specific about platform names and counts based on what's actually visible in the image. If a section has nothing to report, write "None" under that header.`;
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Analyzing…');
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/claude-chat', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ mode:'vision-analyze', prompt, images, provider: settings.aiProvider==='openai' ? 'openai' : 'claude' }),
+    });
+    const data = await response.json();
+    if(!response.ok) throw new Error(data.error || 'Analysis failed');
+    d.overview_summary = (data.reply||'').trim();
+    const textarea = document.getElementById('av_overview_summary');
+    if(textarea) textarea.value = d.overview_summary;
+    showToast('success','Analyzed','Review and edit before saving — this is a first draft, not a final answer.');
+  }catch(e){
+    showToast('error','Analysis failed', e.message || 'Try again.');
+  }finally{
+    restoreBtn(btn);
+  }
+}
+
+
 
 function setAiVisibilityTestPhase(phase){
   aiVisibilityTestPhase = phase;
@@ -10848,6 +10971,31 @@ function renderAiVisibilityDetail(el){
     </div>
 
     <div class="panel" style="margin-bottom:20px;">
+      <div class="panel-head"><span class="panel-title">Overview</span></div>
+      <div class="panel-body">
+        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;line-height:1.5;">Upload the before/after screenshot straight from your visibility tool — AI reads it directly and drafts the Net Gainers / Net Losers summary, no need to re-enter the same data into the Platform Matrix below.</p>
+        ${!d.id ? `<p style="font-size:12px;color:var(--amber);margin:0 0 14px;">Save the report once first — screenshots need a real report to attach to.</p>` : ''}
+        <div class="form-grid" style="margin-bottom:14px;">
+          ${['before','after'].map(phase=>{
+            const path = phase==='before' ? d.overview_before_screenshot_path : d.overview_after_screenshot_path;
+            return `<div>
+              <label>${phase==='before'?'Before':'After'} screenshot</label>
+              ${path ? `
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
+                  <span style="font-size:12px;color:var(--green);flex:1;">✓ Uploaded</span>
+                  <span class="row-link" onclick="viewAiVisibilityScreenshot('${phase}')">View</span>
+                  <span class="row-link" style="color:var(--red);" onclick="removeAiVisibilityScreenshot('${phase}')">Remove</span>
+                </div>
+              ` : `<input type="file" accept="image/*" ${!d.id?'disabled':''} onchange="uploadAiVisibilityScreenshot('${phase}', this)">`}
+            </div>`;
+          }).join('')}
+        </div>
+        <button class="btn btn-brand" style="margin-bottom:14px;" onclick="analyzeAiVisibilityOverview()" ${(!d.overview_before_screenshot_path && !d.overview_after_screenshot_path) ? 'disabled' : ''}>✨ Analyze with AI</button>
+        <textarea id="av_overview_summary" style="width:100%;min-height:130px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="Net gainers:&#10;- ...&#10;&#10;Net losers / concerning:&#10;- ..." onchange="aiVisibilityDraft.overview_summary=this.value">${escapeHtml(d.overview_summary||'')}</textarea>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:20px;">
       <div class="panel-head"><span class="panel-title">Page 3 — Platform/Prompt Visibility Matrix</span><span class="pill pill-good">Summary automated</span></div>
       <div class="panel-body">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;padding:12px;background:var(--surface-2);border-radius:8px;">
@@ -11105,6 +11253,11 @@ function downloadAiVisibilityReportPdf(){
   y += 36;
   bodyText(qm.summary || 'Fill in all four before/after fields in the report to generate this summary.');
 
+  // ---- Overview (Net Gainers / Net Losers, from the uploaded screenshot) ----
+  doc.addPage(); y = 20;
+  sectionHeader('Overview');
+  bodyText(d.overview_summary || 'Not yet written.');
+
   // ---- Page 3: Platform/Prompt Visibility Matrix ----
   // Listed per-prompt rather than a wide grid — 10 platform columns don't
   // fit a portrait page at a readable size, and a per-prompt summary
@@ -11209,6 +11362,7 @@ function downloadAiVisibilityReport(){
   lines.push(`After: Recommended in ${d.after_recommended_count??'—'}/${d.after_total_prompts??'—'} prompts (${qm.afterPct??'—'}%), Average Ranking Position: ${d.after_avg_position??'—'}`);
   if(qm.summary) lines.push('', qm.summary);
   lines.push('');
+  lines.push('OVERVIEW', '-'.repeat(30), d.overview_summary || '(not written yet)', '');
   lines.push('PLATFORM VISIBILITY CHANGES', '-'.repeat(30));
   if(matrix.gainers.length){ lines.push('Net gainers:'); matrix.gainers.forEach(g=>lines.push(`  - ${g}`)); }
   if(matrix.losers.length){ lines.push('Net losers / concerning:'); matrix.losers.forEach(l=>lines.push(`  - ${l}`)); }
