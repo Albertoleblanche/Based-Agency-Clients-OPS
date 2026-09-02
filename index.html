@@ -10805,7 +10805,8 @@ function renderAiVisibilityDetail(el){
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
       <span class="row-link" onclick="closeAiVisibilityDetail()">← All reports</span>
       <div style="display:flex;gap:10px;">
-        ${d.id ? `<button class="btn btn-outline" onclick="downloadAiVisibilityReport()">Download</button>` : ''}
+        ${d.id ? `<button class="btn btn-outline" onclick="downloadAiVisibilityReport()">Download .txt</button>` : ''}
+        ${d.id ? `<button class="btn btn-outline" onclick="downloadAiVisibilityReportPdf()">Download PDF</button>` : ''}
         <button class="btn btn-brand" onclick="saveAiVisibilityReport()">Save report</button>
       </div>
     </div>
@@ -10991,7 +10992,8 @@ function renderAiVisibilityDetail(el){
     </div>
 
     <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:40px;">
-      ${d.id ? `<button class="btn btn-outline" onclick="downloadAiVisibilityReport()">Download</button>` : ''}
+      ${d.id ? `<button class="btn btn-outline" onclick="downloadAiVisibilityReport()">Download .txt</button>` : ''}
+        ${d.id ? `<button class="btn btn-outline" onclick="downloadAiVisibilityReportPdf()">Download PDF</button>` : ''}
       <button class="btn btn-brand" onclick="saveAiVisibilityReport()">Save report</button>
     </div>`;
 
@@ -11003,6 +11005,190 @@ function renderAiVisibilityDetail(el){
   });
   const dateInput = document.getElementById('avReportDate');
   if(dateInput) dateInput.addEventListener('change', function(){ aiVisibilityDraft.report_date = this.value; });
+}
+
+// Same manual-drawing jsPDF pattern already established by
+// exportReportPdf() elsewhere in this file (no autotable plugin loaded) —
+// consistent with the rest of this app rather than introducing a second
+// PDF-building approach. Deliberately not trying to replicate the
+// original report's heavy red-bordered box style — clean section headers
+// in the brand color, generous whitespace, one section per page.
+function extractImageFormatFromDataUrl(dataUrl){
+  const match = /^data:image\/(\w+);base64,/.exec(dataUrl||'');
+  if(!match) return 'PNG';
+  const fmt = match[1].toUpperCase();
+  return fmt === 'JPG' ? 'JPEG' : fmt;
+}
+
+function downloadAiVisibilityReportPdf(){
+  const d = aiVisibilityDraft;
+  if(!d) return;
+  if(!window.jspdf){ showToast('error','PDF library not loaded','Check your connection and try again.'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginX = 14;
+  const brand = [232, 98, 44]; // approximates this app's brand orange
+  let y = 20;
+
+  const sectionHeader = (title) => {
+    if(y > 260){ doc.addPage(); y = 20; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(brand[0],brand[1],brand[2]);
+    doc.text(title, marginX, y); y += 2;
+    doc.setDrawColor(brand[0],brand[1],brand[2]); doc.setLineWidth(0.5);
+    doc.line(marginX, y, pageWidth-marginX, y);
+    y += 7;
+  };
+  const bodyText = (text, opts={}) => {
+    doc.setFont('helvetica', opts.bold?'bold':'normal'); doc.setFontSize(opts.size||10);
+    doc.setTextColor(...(opts.color||[50,50,50]));
+    const lines = doc.splitTextToSize(text || '', pageWidth - marginX*2 - (opts.indent||0));
+    lines.forEach(line=>{
+      if(y > 280){ doc.addPage(); y = 20; }
+      doc.text(line, marginX + (opts.indent||0), y);
+      y += (opts.lineHeight || 5.5);
+    });
+    y += 3;
+  };
+
+  // ---- Header: Based Agency branding ----
+  let brandingDrawn = false;
+  if(settings.appIcon){
+    try{
+      doc.addImage(settings.appIcon, extractImageFormatFromDataUrl(settings.appIcon), marginX, 10, 14, 14);
+      doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(20);
+      doc.text(settings.appName || 'Based Agency', marginX + 18, 19);
+      brandingDrawn = true;
+    }catch(e){ /* falls through to text-only branding below */ }
+  }
+  if(!brandingDrawn){
+    doc.setFont('helvetica','bold'); doc.setFontSize(17); doc.setTextColor(brand[0],brand[1],brand[2]);
+    doc.text((settings.appName || 'Based Agency').toUpperCase(), marginX, 19);
+  }
+  doc.setDrawColor(brand[0],brand[1],brand[2]); doc.setLineWidth(0.8);
+  doc.line(marginX, 26, pageWidth-marginX, 26);
+  y = 40;
+
+  // ---- Title block ----
+  doc.setFont('helvetica','bold'); doc.setFontSize(21); doc.setTextColor(20);
+  doc.text('AI Visibility Report', marginX, y); y += 10;
+  doc.setFont('helvetica','normal'); doc.setFontSize(14); doc.setTextColor(70);
+  doc.text(d.client_name_snapshot || 'Untitled client', marginX, y); y += 8;
+  doc.setFontSize(10); doc.setTextColor(120);
+  doc.text(`Target keyword: ${d.target_keyword || 'n/a'}`, marginX, y); y += 5;
+  doc.text(`Report date: ${new Date(d.report_date+'T00:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}`, marginX, y); y += 5;
+  if(d.links.pressRelease) { doc.text(`Press release: ${d.links.pressRelease}`, marginX, y); y += 5; }
+  if(d.links.prPlacementReport) { doc.text(`PR placement report: ${d.links.prPlacementReport}`, marginX, y); y += 5; }
+  if(d.links.screenshotsFolder) { doc.text(`Screenshots folder: ${d.links.screenshotsFolder}`, marginX, y); y += 5; }
+  y += 6;
+
+  // ---- Page 1: Executive Summary ----
+  sectionHeader('Executive Summary');
+  bodyText(d.executive_summary || 'Not yet written.');
+
+  // ---- Page 2: Quick Metrics ----
+  doc.addPage(); y = 20;
+  sectionHeader('Quick Metrics');
+  const qm = computeAiVisibilityQuickMetrics(d);
+  const drawMetricsBox = (x, label, recommended, total, pct, avgPos) => {
+    doc.setDrawColor(220); doc.setLineWidth(0.3);
+    doc.roundedRect(x, y, (pageWidth-marginX*2-6)/2, 28, 2, 2);
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(120);
+    doc.text(label.toUpperCase(), x+6, y+8);
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(40);
+    doc.text(`Recommended: ${recommended??'—'}/${total??'—'}${pct!=null?` (${pct}%)`:''}`, x+6, y+16);
+    doc.text(`Avg. ranking position: ${avgPos??'—'}`, x+6, y+23);
+  };
+  const boxWidth = (pageWidth-marginX*2-6)/2;
+  drawMetricsBox(marginX, 'Before', d.before_recommended_count, d.before_total_prompts, qm.beforePct, d.before_avg_position);
+  drawMetricsBox(marginX+boxWidth+6, 'After', d.after_recommended_count, d.after_total_prompts, qm.afterPct, d.after_avg_position);
+  y += 36;
+  bodyText(qm.summary || 'Fill in all four before/after fields in the report to generate this summary.');
+
+  // ---- Page 3: Platform/Prompt Visibility Matrix ----
+  // Listed per-prompt rather than a wide grid — 10 platform columns don't
+  // fit a portrait page at a readable size, and a per-prompt summary
+  // communicates the same information more clearly in this format anyway.
+  doc.addPage(); y = 20;
+  sectionHeader('Platform / Prompt Visibility Matrix');
+  const promptsWithText = d.prompts.filter(p=>p.text.trim());
+  if(!promptsWithText.length){
+    bodyText('No prompts added yet.');
+  } else {
+    promptsWithText.forEach((prompt,i)=>{
+      bodyText(`${i+1}. ${prompt.text}`, { bold:true, size:10, color:[30,30,30], lineHeight:5 });
+      const beforeList = AI_VISIBILITY_PLATFORMS.filter(p=>prompt.platforms[aiVisibilityPlatformKey(p)]?.before).join(', ') || 'none';
+      const afterList = AI_VISIBILITY_PLATFORMS.filter(p=>prompt.platforms[aiVisibilityPlatformKey(p)]?.after).join(', ') || 'none';
+      bodyText(`Before: ${beforeList}`, { size:9, color:[100,100,100], indent:4, lineHeight:4.5 });
+      bodyText(`After: ${afterList}`, { size:9, color:[100,100,100], indent:4, lineHeight:4.5 });
+    });
+  }
+  const matrix = computeAiVisibilityMatrixSummary(d);
+  if(matrix.gainers.length || matrix.losers.length) y += 2;
+  if(matrix.gainers.length){
+    bodyText('Net gainers:', { bold:true, size:10, color:[30,30,30] });
+    matrix.gainers.forEach(g=>bodyText(`• ${g}`, { size:9.5, color:[60,60,60], indent:3, lineHeight:5 }));
+  }
+  if(matrix.losers.length){
+    bodyText('Net losers / concerning:', { bold:true, size:10, color:[30,30,30] });
+    matrix.losers.forEach(l=>bodyText(`• ${l}`, { size:9.5, color:[60,60,60], indent:3, lineHeight:5 }));
+  }
+
+  // ---- Page 4: What AI Says About You ----
+  doc.addPage(); y = 20;
+  sectionHeader('What AI Says About You');
+  bodyText(d.ai_says_about_you_summary || 'Not yet written.');
+
+  // ---- Page 5: Positive/Neutral/Negative Associations ----
+  doc.addPage(); y = 20;
+  sectionHeader('Positive / Neutral / Negative Associations');
+  ['positive','neutral','negative'].forEach(sentiment=>{
+    const platformEntries = AI_VISIBILITY_PLATFORMS
+      .map(p=>({ platform:p, text:(d.keywords[sentiment]||{})[p] }))
+      .filter(e=>e.text && e.text.trim());
+    if(!platformEntries.length) return;
+    bodyText(sentiment.charAt(0).toUpperCase()+sentiment.slice(1), { bold:true, size:11.5, color:[30,30,30] });
+    platformEntries.forEach(({platform, text})=>{
+      bodyText(platform, { bold:true, size:9.5, color:[100,100,100], indent:3, lineHeight:4.5 });
+      text.split('\n').map(s=>s.trim()).filter(Boolean).forEach(phrase=>{
+        bodyText(`• ${phrase}`, { size:9.5, color:[60,60,60], indent:6, lineHeight:4.5 });
+      });
+    });
+  });
+
+  // ---- Page 6: Competitive Intelligence ----
+  doc.addPage(); y = 20;
+  sectionHeader('Competitive Intelligence');
+  if(d.competitors.length){
+    d.competitors.forEach(c=>{
+      bodyText(`#${c.rank||'—'}  ${c.name||'Unnamed'}`, { bold:true, size:10, color:[30,30,30], lineHeight:5 });
+      bodyText(`Position ${c.position||'—'}  ·  Visibility ${c.visibilityPct||'—'}  ·  Sentiment ${c.sentimentPct||'—'}  ·  Mentions ${c.mentions??'—'}  ·  Citations ${c.citations??'—'}`, { size:9, color:[100,100,100], indent:4, lineHeight:4.5 });
+    });
+    y += 2;
+  }
+  bodyText(d.competitive_intelligence_summary || 'Not yet written.');
+
+  // ---- Page 7: AI Opportunities ----
+  doc.addPage(); y = 20;
+  sectionHeader('AI Opportunities');
+  bodyText(d.ai_opportunities || 'Not yet written.');
+
+  // ---- Page 8: Recommended Next Campaign ----
+  doc.addPage(); y = 20;
+  sectionHeader('Recommended Next Campaign');
+  bodyText(d.recommended_campaign || 'Not yet written.');
+
+  // ---- Page 9: AI Domination Score ----
+  doc.addPage(); y = 20;
+  sectionHeader('AI Domination Score');
+  doc.setFont('helvetica','bold'); doc.setFontSize(36); doc.setTextColor(brand[0],brand[1],brand[2]);
+  doc.text(`${d.domination_score ?? '—'}`, marginX, y+14);
+  doc.setFont('helvetica','normal'); doc.setFontSize(14); doc.setTextColor(150);
+  doc.text('/ 100', marginX + doc.getTextWidth(`${d.domination_score ?? '—'}`) + 3, y+14);
+  y += 26;
+  bodyText(d.domination_score_rationale || 'Not yet written.');
+
+  doc.save(`ai-visibility-${(d.client_name_snapshot||'report').toLowerCase().replace(/[^a-z0-9]+/g,'-')}-${d.report_date}.pdf`);
 }
 
 function downloadAiVisibilityReport(){
