@@ -11075,6 +11075,97 @@ function parseAiVisibilityKeywordExtraction(reply){
   return { extracted, unmatchedPlatforms };
 }
 
+// ---- RankScale CSV/Sheet import for Page 5 — a much cleaner data source
+// than screenshots (structured columns, no vision ambiguity, no hidden
+// "Show more" rows). Reuses parseCsv() from the client CSV-sync feature
+// rather than adding a parsing library. Column names below match the
+// exact RankScale export header row confirmed directly, not guessed. ----
+const RANKSCALE_ENGINE_MAP = {
+  'Bing Copilot': 'Copilot',
+  'ChatGPT': 'ChatGPT',
+  'DeepSeek V3': 'Deepseek',
+  'Google AI Mode': 'AI Mode',
+  'Google AI Overview': 'AI Overview',
+  'Google Gemini': 'Gemini',
+  'Perplexity': 'Perplexity',
+};
+
+function findRankscaleColumnIndex(headerRow, columnName){
+  return headerRow.findIndex(h => h.trim().toLowerCase() === columnName.trim().toLowerCase());
+}
+
+// The exact delimiter RankScale uses within a multi-phrase cell isn't
+// confirmed (no sample data row was available, only headers) — this tries
+// semicolon first since it's the most common choice for multi-value CSV
+// cells (commas inside a cell are usually reserved for CSV structure,
+// not content), falling back to comma-splitting if no semicolon is found.
+// Worth checking the imported result looks right the first time this runs.
+function splitRankscaleKeywordCell(value){
+  if(!value || !value.trim()) return [];
+  const trimmed = value.trim();
+  if(trimmed.includes(';')) return trimmed.split(';').map(s=>s.trim()).filter(Boolean);
+  return trimmed.split(',').map(s=>s.trim()).filter(Boolean);
+}
+
+async function importRankscaleCsvForKeywords(){
+  const d = aiVisibilityDraft;
+  const textarea = document.getElementById('rankscaleCsvPasteInput');
+  const text = textarea?.value.trim();
+  if(!text){ showToast('error','Paste the CSV first','Copy the full CSV export (including the header row) and paste it in.'); return; }
+  const rows = parseCsv(text);
+  if(rows.length < 2){ showToast('error','No data found','Need a header row plus at least one data row.'); return; }
+  const headerRow = rows[0];
+  const brandNameIdx = findRankscaleColumnIndex(headerRow, 'Brand Name');
+  const isOwnBrandIdx = findRankscaleColumnIndex(headerRow, 'Is Own Brand');
+  if(brandNameIdx === -1){ showToast('error','Unrecognized format','Could not find a "Brand Name" column — is this the right export?'); return; }
+
+  // Prefer the row RankScale itself flags as the agency's own brand —
+  // this is why the whole "filter out competitors" problem has a clean
+  // answer here, unlike the screenshot approach where every brand's data
+  // looks the same visually. Falls back to matching the client's name if
+  // that flag column isn't present or isn't set on any row.
+  let targetRow = null;
+  if(isOwnBrandIdx !== -1){
+    targetRow = rows.slice(1).find(r => /^(true|yes|1)$/i.test((r[isOwnBrandIdx]||'').trim()));
+  }
+  if(!targetRow && d.client_name_snapshot){
+    const clientNameLower = d.client_name_snapshot.trim().toLowerCase();
+    targetRow = rows.slice(1).find(r => (r[brandNameIdx]||'').trim().toLowerCase() === clientNameLower);
+  }
+  if(!targetRow){
+    showToast('error',"Could not find the client's row", `Looked for "Is Own Brand" = true, then for a Brand Name matching "${d.client_name_snapshot}" — neither matched. Check the client name or the CSV.`);
+    return;
+  }
+
+  let mergedCount = 0;
+  Object.keys(RANKSCALE_ENGINE_MAP).forEach(rankscaleEngine=>{
+    const appPlatform = RANKSCALE_ENGINE_MAP[rankscaleEngine];
+    ['positive','neutral','negative'].forEach(sentiment=>{
+      const sentimentLabel = sentiment.charAt(0).toUpperCase()+sentiment.slice(1);
+      const wgIdx = findRankscaleColumnIndex(headerRow, `WG ${rankscaleEngine} - ${sentimentLabel} Keywords`);
+      const tdIdx = findRankscaleColumnIndex(headerRow, `TD ${rankscaleEngine} - ${sentimentLabel} Keywords`);
+      const phrases = [];
+      if(wgIdx !== -1) phrases.push(...splitRankscaleKeywordCell(targetRow[wgIdx]));
+      if(tdIdx !== -1) phrases.push(...splitRankscaleKeywordCell(targetRow[tdIdx]));
+      if(!phrases.length) return;
+      if(!d.keywords[sentiment]) d.keywords[sentiment] = {};
+      const existingLines = (d.keywords[sentiment][appPlatform] || '').split('\n').map(s=>s.trim()).filter(Boolean);
+      const newLines = phrases.filter(p => !existingLines.includes(p));
+      if(newLines.length){
+        d.keywords[sentiment][appPlatform] = existingLines.concat(newLines).join('\n');
+        mergedCount += newLines.length;
+      }
+    });
+  });
+
+  if(!mergedCount){
+    showToast('error','Nothing new added',"Found the client's row, but no new phrases — check the CSV has data in the keyword columns, or everything is already entered.");
+    return;
+  }
+  renderAiVisibilityMain();
+  showToast('success','Imported', `Added ${mergedCount} phrase${mergedCount!==1?'s':''} from the CSV. Review before saving.`);
+}
+
 
 
 
@@ -11213,6 +11304,12 @@ function renderAiVisibilityDetail(el){
         </div>
         <button class="btn btn-brand" style="margin-bottom:16px;" onclick="analyzeAiVisibilityKeywords()" ${!d.keywords_screenshot_paths.length ? 'disabled' : ''}>✨ Analyze with AI${d.keywords_screenshot_paths.length>1 ? ` (${d.keywords_screenshot_paths.length} screenshots)` : ''}</button>
         <div id="aiVisibilityKeywordsRawReply"></div>
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);margin-bottom:20px;">
+          <label style="font-size:12.5px;font-weight:700;color:var(--ink);display:block;margin-bottom:8px;">Or import from a RankScale CSV/Sheet export</label>
+          <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 10px;line-height:1.5;">Paste the full CSV (including the header row) — this pulls out only the client's own row (using RankScale's "Is Own Brand" column, or matching the client name), so competitor rows in the same export are ignored automatically.</p>
+          <textarea id="rankscaleCsvPasteInput" style="width:100%;min-height:100px;font-family:monospace;font-size:11px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="Paste the full CSV here, including the header row..."></textarea>
+          <button class="btn btn-outline" style="margin-top:8px;" onclick="importRankscaleCsvForKeywords()">Import from CSV</button>
+        </div>
         <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;">One phrase per line below, optionally ending in a count like "(2)" — still editable by hand at any time.</p>
         ${['positive','neutral','negative'].map(sentiment=>`
           <div style="margin-bottom:16px;">
