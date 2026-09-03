@@ -10433,8 +10433,118 @@ function renderAiVisibilityMain(){
   else renderAiVisibilityDetail(el);
 }
 
+// ---- Rankscale connection panel (experimental — see admin-user-actions.js
+// for why this uses a best-effort probe rather than a documented API call) ----
+function toggleAiVisibilityRankscalePanel(){
+  const body = document.getElementById('rankscalePanelBody');
+  const toggle = document.getElementById('rankscalePanelToggle');
+  if(!body) return;
+  const showing = body.style.display !== 'none';
+  body.style.display = showing ? 'none' : 'block';
+  if(toggle) toggle.textContent = showing ? 'Show' : 'Hide';
+}
+
+async function loadRankscaleConnectionStatus(){
+  const statusEl = document.getElementById('rankscaleConnectionStatus');
+  if(!statusEl) return;
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/admin-user-actions', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ action:'get-rankscale-connection' }),
+    });
+    const data = await response.json();
+    if(!response.ok) throw new Error(data.error || 'Could not check status');
+    if(data.connected){
+      statusEl.innerHTML = `<span style="color:var(--green);">✓ Connected</span> — connector ID ${escapeHtml((data.connectorId||'').slice(0,20))}…`;
+      const connectorInput = document.getElementById('rankscaleConnectorIdInput');
+      if(connectorInput && data.connectorId) connectorInput.placeholder = data.connectorId;
+    } else {
+      statusEl.innerHTML = `<span style="color:var(--muted-lt);">Not connected yet</span>`;
+    }
+  }catch(e){
+    statusEl.innerHTML = `<span style="color:var(--red);">Could not check status — ${escapeHtml(e.message||'try again')}</span>`;
+  }
+}
+
+async function saveRankscaleConnection(){
+  const apiKey = document.getElementById('rankscaleApiKeyInput')?.value.trim();
+  const connectorId = document.getElementById('rankscaleConnectorIdInput')?.value.trim();
+  if(!apiKey || !connectorId){ showToast('error','Missing info','Enter both the API key and the connector ID.'); return; }
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Saving…');
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/admin-user-actions', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ action:'save-rankscale-connection', apiKey, connectorId }),
+    });
+    const data = await response.json();
+    if(!response.ok) throw new Error(data.error || 'Save failed');
+    showToast('success','Saved','Rankscale connection saved.');
+    loadRankscaleConnectionStatus();
+  }catch(e){
+    showToast('error','Save failed', e.message || 'Try again.');
+  }finally{
+    restoreBtn(btn);
+  }
+}
+
+async function testFetchRankscaleSearchTerms(){
+  const resultEl = document.getElementById('rankscaleFetchResult');
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Testing…');
+  if(resultEl) resultEl.innerHTML = '';
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/admin-user-actions', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ action:'fetch-rankscale-search-terms' }),
+    });
+    const data = await response.json();
+    if(!response.ok) throw new Error(data.error || 'Fetch failed');
+    if(resultEl){
+      resultEl.innerHTML = `
+        <p style="font-size:12.5px;font-weight:700;color:${data.success?'var(--green)':'var(--red)'};margin:0 0 10px;">${data.success ? '✓ At least one attempt succeeded' : '✕ Neither attempt succeeded — raw responses below'}</p>
+        ${(data.attempts||[]).map(a=>`
+          <div style="margin-bottom:12px;padding:10px;background:var(--surface-2);border-radius:8px;font-size:11.5px;">
+            <div style="font-weight:600;margin-bottom:4px;">${escapeHtml(a.method)}</div>
+            ${a.status!=null ? `<div style="color:var(--muted-lt);margin-bottom:4px;">Status: ${a.status} ${a.ok?'(ok)':'(not ok)'}</div>` : ''}
+            ${a.error ? `<div style="color:var(--red);margin-bottom:4px;">Error: ${escapeHtml(a.error)}</div>` : ''}
+            ${a.bodyPreview ? `<pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;margin:0;max-height:200px;overflow:auto;background:var(--card);padding:8px;border-radius:6px;">${escapeHtml(a.bodyPreview)}</pre>` : ''}
+          </div>
+        `).join('')}`;
+    }
+  }catch(e){
+    if(resultEl) resultEl.innerHTML = `<p style="color:var(--red);font-size:12.5px;">${escapeHtml(e.message||'Test failed')}</p>`;
+  }finally{
+    restoreBtn(btn);
+  }
+}
+
 async function renderAiVisibilityList(el){
   el.innerHTML = `
+    <div class="panel" style="margin-bottom:20px;">
+      <div class="panel-head" style="cursor:pointer;" onclick="toggleAiVisibilityRankscalePanel()">
+        <span class="panel-title">Rankscale connection <span style="font-weight:400;color:var(--muted-lt);font-size:11px;">(experimental)</span></span>
+        <span id="rankscalePanelToggle" style="font-size:12px;color:var(--muted-lt);">Show</span>
+      </div>
+      <div class="panel-body" id="rankscalePanelBody" style="display:none;">
+        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;line-height:1.5;">Attempts to pull Page 5's data directly from Rankscale's "Search Term Execution Records" connector, using the same API key and connector ID from Rankscale's Data Studio integration settings. This isn't a documented public API — it's experimental, and may not return usable data.</p>
+        <div id="rankscaleConnectionStatus" style="margin-bottom:14px;font-size:12.5px;color:var(--muted-lt);">Checking connection…</div>
+        <div class="form-grid" style="margin-bottom:14px;">
+          <div><label>Rankscale API key</label><input type="password" id="rankscaleApiKeyInput" placeholder="Paste your Data Studio API key" autocomplete="off"></div>
+          <div><label>Connector ID</label><input type="text" id="rankscaleConnectorIdInput" placeholder="AKfycb... (Search Term Execution Records)" autocomplete="off"></div>
+        </div>
+        <button class="btn btn-outline" onclick="saveRankscaleConnection()">Save connection</button>
+        <button class="btn btn-brand" style="margin-left:8px;" onclick="testFetchRankscaleSearchTerms()">Test fetch</button>
+        <div id="rankscaleFetchResult" style="margin-top:16px;"></div>
+      </div>
+    </div>
+
     <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:16px;">
       <button class="btn btn-brand" onclick="openNewAiVisibilityReport()">+ New report</button>
     </div>
@@ -10446,6 +10556,7 @@ async function renderAiVisibilityList(el){
         </table>
       </div>
     </div>`;
+  loadRankscaleConnectionStatus();
   const { data: rows, error } = await supabaseClient
     .from('ai_visibility_reports').select('id, client_name_snapshot, target_keyword, report_date, domination_score')
     .order('report_date', { ascending:false });
