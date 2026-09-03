@@ -10383,6 +10383,7 @@ Target keyword: ${d.target_keyword || 'n/a'}
 Quick metrics: ${qm.summary || 'not yet entered'}
 Overview (platform visibility changes): ${d.overview_summary || 'not yet entered'}
 Competitors: ${(d.competitors||[]).map(c=>`${c.name} (visibility ${c.visibilityPct}%, sentiment ${c.sentimentPct}%)`).join('; ') || 'none entered'}
+What AIs value in this category: ${d.what_ai_values || 'not yet entered'}
 Concerns raised by AI platforms: ${(d.concerns||[]).map(c=>`${c.platform}: "${c.quote}"`).join('; ') || 'none entered'}`;
 }
 
@@ -10481,20 +10482,21 @@ function emptyAiVisibilityDraft(){
     executive_summary:'', competitive_intelligence_summary:'',
     domination_score:null, domination_score_rationale:'',
     overview_before_screenshot_path: null, overview_after_screenshot_path: null, overview_summary: '',
+    competitive_research_screenshot_path: null, what_ai_values: '',
   };
 }
 
 function openNewAiVisibilityReport(){
   aiVisibilityDraft = emptyAiVisibilityDraft();
   aiVisibilityCurrentReportId = 'new';
-  aiVisibilityScreenshotFiles = { before: null, after: null };
+  aiVisibilityScreenshotFiles = { before: null, after: null, competitive: null };
   renderAiVisibilityMain();
 }
 
 async function openAiVisibilityReport(id){
   const { data, error } = await supabaseClient.from('ai_visibility_reports').select('*').eq('id', id).maybeSingle();
   if(error || !data){ showToast('error','Could not load','Try again.'); return; }
-  aiVisibilityScreenshotFiles = { before: null, after: null };
+  aiVisibilityScreenshotFiles = { before: null, after: null, competitive: null };
   aiVisibilityDraft = {
     id: data.id, client_id: data.client_id, client_name_snapshot: data.client_name_snapshot||'',
     target_keyword: data.target_keyword||'', report_date: data.report_date,
@@ -10508,6 +10510,7 @@ async function openAiVisibilityReport(id){
     domination_score: data.domination_score, domination_score_rationale: data.domination_score_rationale||'',
     overview_before_screenshot_path: data.overview_before_screenshot_path||null, overview_after_screenshot_path: data.overview_after_screenshot_path||null,
     overview_summary: data.overview_summary||'',
+    competitive_research_screenshot_path: data.competitive_research_screenshot_path||null, what_ai_values: data.what_ai_values||'',
   };
   aiVisibilityCurrentReportId = id;
   renderAiVisibilityMain();
@@ -10516,7 +10519,7 @@ async function openAiVisibilityReport(id){
 function closeAiVisibilityDetail(){
   aiVisibilityCurrentReportId = null;
   aiVisibilityDraft = null;
-  aiVisibilityScreenshotFiles = { before: null, after: null };
+  aiVisibilityScreenshotFiles = { before: null, after: null, competitive: null };
   renderAiVisibilityMain();
 }
 
@@ -10544,6 +10547,7 @@ async function saveAiVisibilityReport(){
     domination_score: d.domination_score, domination_score_rationale: d.domination_score_rationale,
     overview_before_screenshot_path: d.overview_before_screenshot_path, overview_after_screenshot_path: d.overview_after_screenshot_path,
     overview_summary: d.overview_summary,
+    competitive_research_screenshot_path: d.competitive_research_screenshot_path, what_ai_values: d.what_ai_values,
     updated_at: new Date().toISOString(),
   };
   const result = d.id
@@ -10561,7 +10565,7 @@ async function saveAiVisibilityReport(){
   if(wasNew) renderAiVisibilityMain();
 }
 
-let aiVisibilityScreenshotFiles = { before: null, after: null }; // ephemeral, freshly-selected File objects (cleared on report switch) — used for immediate analysis without a Storage round-trip
+let aiVisibilityScreenshotFiles = { before: null, after: null, competitive: null }; // ephemeral, freshly-selected File objects (cleared on report switch) — used for immediate analysis without a Storage round-trip
 
 function fileToBase64(file){
   return new Promise((resolve, reject) => {
@@ -10572,47 +10576,58 @@ function fileToBase64(file){
   });
 }
 
-// Overview screenshots — same 'attachments' Storage bucket notes/tasks
-// already use, path scoped by report id and phase.
-async function uploadAiVisibilityScreenshot(phase, fileInput){
+// Maps a short slot key (used for the ephemeral in-memory file cache and
+// the Storage path prefix) to the actual draft field storing its path —
+// one generic set of upload/view/remove/analyze functions serving every
+// screenshot slot in this report, rather than a separate copy per slot.
+const AI_VISIBILITY_SCREENSHOT_SLOTS = {
+  before: 'overview_before_screenshot_path',
+  after: 'overview_after_screenshot_path',
+  competitive: 'competitive_research_screenshot_path',
+};
+
+// Same 'attachments' Storage bucket notes/tasks already use, path scoped
+// by report id and slot.
+async function uploadAiVisibilityScreenshot(slot, fileInput){
   const file = fileInput.files[0];
   if(!file) return;
   const d = aiVisibilityDraft;
+  const fieldName = AI_VISIBILITY_SCREENSHOT_SLOTS[slot];
   if(!d.id){
     showToast('error','Save first','Save the report once (even blank) before uploading screenshots — they need a real report to attach to.');
     fileInput.value = '';
     return;
   }
   if(file.size > 10*1024*1024){ showToast('error','Too large','Screenshots need to be under 10MB.'); fileInput.value = ''; return; }
-  aiVisibilityScreenshotFiles[phase] = file;
+  aiVisibilityScreenshotFiles[slot] = file;
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-  const path = `ai-visibility/${d.id}/${phase}-${Date.now()}-${safeName}`;
+  const path = `ai-visibility/${d.id}/${slot}-${Date.now()}-${safeName}`;
   const { error } = await supabaseClient.storage.from('attachments').upload(path, file, { upsert:true });
   if(error){ showToast('error','Upload failed', error.message); return; }
-  // The old screenshot for this phase (if any) gets cleaned up rather
-  // than left orphaned in Storage once replaced.
-  const oldPath = phase==='before' ? d.overview_before_screenshot_path : d.overview_after_screenshot_path;
+  // The old screenshot for this slot (if any) gets cleaned up rather than
+  // left orphaned in Storage once replaced.
+  const oldPath = d[fieldName];
   if(oldPath && oldPath !== path) supabaseClient.storage.from('attachments').remove([oldPath]).catch(()=>{});
-  if(phase==='before') d.overview_before_screenshot_path = path;
-  else d.overview_after_screenshot_path = path;
+  d[fieldName] = path;
   await saveAiVisibilityReport();
   renderAiVisibilityMain();
-  showToast('success','Uploaded', `${phase==='before'?'Before':'After'} screenshot saved.`);
+  showToast('success','Uploaded','Screenshot saved.');
 }
 
-async function removeAiVisibilityScreenshot(phase){
+async function removeAiVisibilityScreenshot(slot){
   const d = aiVisibilityDraft;
-  const path = phase==='before' ? d.overview_before_screenshot_path : d.overview_after_screenshot_path;
+  const fieldName = AI_VISIBILITY_SCREENSHOT_SLOTS[slot];
+  const path = d[fieldName];
   if(path) supabaseClient.storage.from('attachments').remove([path]).catch(()=>{});
-  aiVisibilityScreenshotFiles[phase] = null;
-  if(phase==='before') d.overview_before_screenshot_path = null;
-  else d.overview_after_screenshot_path = null;
+  aiVisibilityScreenshotFiles[slot] = null;
+  d[fieldName] = null;
   await saveAiVisibilityReport();
   renderAiVisibilityMain();
 }
 
-async function viewAiVisibilityScreenshot(phase){
-  const path = phase==='before' ? aiVisibilityDraft.overview_before_screenshot_path : aiVisibilityDraft.overview_after_screenshot_path;
+async function viewAiVisibilityScreenshot(slot){
+  const fieldName = AI_VISIBILITY_SCREENSHOT_SLOTS[slot];
+  const path = aiVisibilityDraft[fieldName];
   if(!path) return;
   const { data, error } = await supabaseClient.storage.from('attachments').createSignedUrl(path, 300);
   if(error || !data?.signedUrl){ showToast('error','Could not open','Try again.'); return; }
@@ -10623,10 +10638,11 @@ async function viewAiVisibilityScreenshot(phase){
 // falls back to fetching the stored screenshot via a signed URL when
 // re-analyzing a report opened from a previous session, where only the
 // Storage path — not the original file — is available.
-async function getAiVisibilityScreenshotBase64(phase){
-  const file = aiVisibilityScreenshotFiles[phase];
+async function getAiVisibilityScreenshotBase64(slot){
+  const file = aiVisibilityScreenshotFiles[slot];
   if(file) return { base64: await fileToBase64(file), mimeType: file.type || 'image/png' };
-  const path = phase==='before' ? aiVisibilityDraft.overview_before_screenshot_path : aiVisibilityDraft.overview_after_screenshot_path;
+  const fieldName = AI_VISIBILITY_SCREENSHOT_SLOTS[slot];
+  const path = aiVisibilityDraft[fieldName];
   if(!path) return null;
   const { data } = await supabaseClient.storage.from('attachments').createSignedUrl(path, 300);
   if(!data?.signedUrl) return null;
@@ -10669,6 +10685,76 @@ async function analyzeAiVisibilityOverview(){
     restoreBtn(btn);
   }
 }
+
+// Reads the Competitive Research screenshot (the "Top Competitors" table +
+// "What AIs Value" list from the same external tool) and extracts both
+// into structured form — the table replaces d.competitors entirely (this
+// screenshot is treated as the authoritative current snapshot, not
+// something to merge with manual entries), and the values list fills a
+// dedicated field. Asks for a strict, parseable format specifically so
+// the table extraction doesn't depend on freeform narrative parsing.
+async function analyzeAiVisibilityCompetitiveResearch(){
+  const d = aiVisibilityDraft;
+  const img = await getAiVisibilityScreenshotBase64('competitive');
+  if(!img){ showToast('error','Nothing to analyze','Upload the competitive research screenshot first.'); return; }
+  if(d.competitors.length){
+    const confirmed = await confirmDialog(
+      `This will replace the ${d.competitors.length} competitor${d.competitors.length!==1?'s':''} already in the table with what's extracted from the screenshot. Continue?`,
+      { confirmLabel:'Replace' }
+    );
+    if(!confirmed) return;
+  }
+  const prompt = `This screenshot shows a "Top Competitors" table and possibly a "What AIs Value" list from an AI visibility tracking tool.\n\nExtract the following and respond in EXACTLY this format, nothing else — no extra commentary, no markdown:\n\nTABLE:\nrank|name|position|top3pct|sentimentpct|mentions|citations|visibilitypct\n(one line per competitor row shown in the table, using the exact values as displayed — keep % signs, keep # signs on position if shown)\n\nWHAT_AI_VALUES:\n- factor one\n- factor two\n\nIf the "What AIs Value" section isn't visible in the image, write "NONE" under that header. If the table has no rows, write "NONE" under TABLE.`;
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Analyzing…');
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/claude-chat', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ mode:'vision-analyze', prompt, images:[img], provider: settings.aiProvider==='openai' ? 'openai' : 'claude' }),
+    });
+    const data = await response.json();
+    if(!response.ok) throw new Error(data.error || 'Analysis failed');
+    const extracted = parseAiVisibilityCompetitiveExtraction(data.reply || '');
+    if(!extracted.competitors.length && !extracted.whatAiValues){
+      showToast('error','Nothing extracted','The screenshot may be unclear — try a higher-resolution capture, or enter this manually.');
+      return;
+    }
+    if(extracted.competitors.length) d.competitors = extracted.competitors;
+    if(extracted.whatAiValues) d.what_ai_values = extracted.whatAiValues;
+    renderAiVisibilityMain();
+    showToast('success','Analyzed','Review the extracted table and list before saving — this is a first draft, not a final answer.');
+  }catch(e){
+    showToast('error','Analysis failed', e.message || 'Try again.');
+  }finally{
+    restoreBtn(btn);
+  }
+}
+
+function parseAiVisibilityCompetitiveExtraction(reply){
+  const lines = reply.split('\n');
+  let section = null;
+  const competitors = [];
+  const values = [];
+  lines.forEach(line=>{
+    const trimmed = line.trim();
+    if(/^TABLE:?$/i.test(trimmed)){ section = 'table'; return; }
+    if(/^WHAT_AI_VALUES:?$/i.test(trimmed)){ section = 'values'; return; }
+    if(!trimmed || trimmed.toUpperCase()==='NONE') return;
+    if(section === 'table' && trimmed.includes('|')){
+      const parts = trimmed.split('|').map(s=>s.trim());
+      if(parts.length >= 8 && parts[1]){
+        competitors.push({ rank: parts[0], name: parts[1], position: parts[2], top3Pct: parts[3], sentimentPct: parts[4], mentions: parts[5], citations: parts[6], visibilityPct: parts[7] });
+      }
+    } else if(section === 'values' && trimmed.startsWith('-')){
+      values.push(trimmed.replace(/^-\s*/,'').trim());
+    }
+  });
+  return { competitors, whatAiValues: values.length ? values.map(v=>`- ${v}`).join('\n') : '' };
+}
+
+
 
 
 
@@ -10811,6 +10897,18 @@ function renderAiVisibilityDetail(el){
     <div class="panel" style="margin-bottom:20px;">
       <div class="panel-head"><span class="panel-title">Page 6 — Competitive Intelligence</span></div>
       <div class="panel-body">
+        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;line-height:1.5;">Upload the "Top Competitors" screenshot from your visibility tool — AI reads the table and the "What AIs Value" list directly, instead of typing every row by hand.</p>
+        ${!d.id ? `<p style="font-size:12px;color:var(--amber);margin:0 0 14px;">Save the report once first — screenshots need a real report to attach to.</p>` : ''}
+        <div style="margin-bottom:14px;">
+          ${d.competitive_research_screenshot_path ? `
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;max-width:320px;">
+              <span style="font-size:12px;color:var(--green);flex:1;">✓ Uploaded</span>
+              <span class="row-link" onclick="viewAiVisibilityScreenshot('competitive')">View</span>
+              <span class="row-link" style="color:var(--red);" onclick="removeAiVisibilityScreenshot('competitive')">Remove</span>
+            </div>
+          ` : `<input type="file" accept="image/*" ${!d.id?'disabled':''} onchange="uploadAiVisibilityScreenshot('competitive', this)">`}
+        </div>
+        <button class="btn btn-brand" style="margin-bottom:16px;" onclick="analyzeAiVisibilityCompetitiveResearch()" ${!d.competitive_research_screenshot_path ? 'disabled' : ''}>✨ Analyze with AI</button>
         <div class="table-scroll-wrap">
           <table>
             <thead><tr><th>Rank</th><th>Competitor</th><th>Position</th><th>Top 3%</th><th>Sentiment%</th><th>Mentions</th><th>Citations</th><th>Visibility%</th><th></th></tr></thead>
@@ -10834,6 +10932,11 @@ function renderAiVisibilityDetail(el){
         <button class="btn btn-outline" style="margin:10px 0 18px;" onclick="addAiVisibilityCompetitor()">+ Add competitor</button>
         <textarea id="av_competitive_intelligence_summary" style="width:100%;min-height:110px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="Narrative analysis of competitive position..." onchange="aiVisibilityDraft.competitive_intelligence_summary=this.value">${escapeHtml(d.competitive_intelligence_summary||'')}</textarea>
         <button class="btn btn-outline" style="margin-top:8px;" onclick="generateAiVisibilitySection('competitive_intelligence_summary')">✨ Generate with AI</button>
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+          <label style="font-size:12.5px;font-weight:700;color:var(--ink);display:block;margin-bottom:8px;">What AIs Value</label>
+          <textarea id="av_what_ai_values" style="width:100%;min-height:130px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="- Location&#10;- Family owned businesses&#10;- Establishment / age&#10;- ..." onchange="aiVisibilityDraft.what_ai_values=this.value">${escapeHtml(d.what_ai_values||'')}</textarea>
+          <p style="font-size:11px;color:var(--muted-lt);margin:6px 0 0;">Filled in automatically by "Analyze with AI" above if the screenshot includes a "What AIs Value" list — otherwise editable by hand.</p>
+        </div>
       </div>
     </div>
 
@@ -11011,6 +11114,13 @@ function downloadAiVisibilityReportPdf(){
     y += 2;
   }
   bodyText(d.competitive_intelligence_summary || 'Not yet written.');
+  if(d.what_ai_values){
+    y += 2;
+    bodyText('What AIs Value:', { bold:true, size:10.5, color:[30,30,30] });
+    d.what_ai_values.split('\n').map(s=>s.trim()).filter(Boolean).forEach(line=>{
+      bodyText(`• ${line.replace(/^-\s*/,'')}`, { size:9.5, color:[60,60,60], indent:3, lineHeight:5 });
+    });
+  }
 
   // ---- Page 9: AI Domination Score ----
   doc.addPage(); y = 20;
@@ -11049,6 +11159,7 @@ function downloadAiVisibilityReport(){
     lines.push('');
   }
   lines.push(d.competitive_intelligence_summary || '(not written yet)', '');
+  if(d.what_ai_values){ lines.push('What AIs Value:', d.what_ai_values, ''); }
   lines.push('AI DOMINATION SCORE', '-'.repeat(30), `${d.domination_score ?? '—'}/100`, d.domination_score_rationale || '(not written yet)');
   const text = lines.join('\n');
   const blob = new Blob([text], { type:'text/plain' });
