@@ -10492,6 +10492,162 @@ async function saveRankscaleConnection(){
   }
 }
 
+function toggleInhouseMetricsPanel(){
+  const body = document.getElementById('inhousePanelBody');
+  const toggle = document.getElementById('inhousePanelToggle');
+  if(!body) return;
+  const showing = body.style.display !== 'none';
+  body.style.display = showing ? 'none' : 'block';
+  if(toggle) toggle.textContent = showing ? 'Show' : 'Hide';
+}
+
+async function loadInhouseMetricsConnectionStatus(){
+  const statusEl = document.getElementById('inhouseConnectionStatus');
+  if(!statusEl) return;
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/admin-user-actions', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ action:'get-inhouse-metrics-connection' }),
+    });
+    const data = await response.json();
+    if(!response.ok) throw new Error(data.error || 'Could not check status');
+    if(data.connected){
+      statusEl.innerHTML = `<span style="color:var(--green);">✓ Connected</span> — ${escapeHtml(data.projectUrl||'')}`;
+      const urlInput = document.getElementById('inhouseProjectUrlInput');
+      if(urlInput && data.projectUrl) urlInput.placeholder = data.projectUrl;
+    } else {
+      statusEl.innerHTML = `<span style="color:var(--muted-lt);">Not connected yet</span>`;
+    }
+  }catch(e){
+    statusEl.innerHTML = `<span style="color:var(--red);">Could not check status — ${escapeHtml(e.message||'try again')}</span>`;
+  }
+}
+
+async function saveInhouseMetricsConnection(){
+  const projectUrl = document.getElementById('inhouseProjectUrlInput')?.value.trim();
+  const anonKey = document.getElementById('inhouseAnonKeyInput')?.value.trim();
+  if(!projectUrl || !anonKey){ showToast('error','Missing info','Enter both the project URL and the anon key.'); return; }
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Saving…');
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/admin-user-actions', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ action:'save-inhouse-metrics-connection', projectUrl, anonKey }),
+    });
+    const data = await response.json();
+    if(!response.ok) throw new Error(data.error || 'Save failed');
+    showToast('success','Saved','In-house tool connection saved.');
+    loadInhouseMetricsConnectionStatus();
+  }catch(e){
+    showToast('error','Save failed', e.message || 'Try again.');
+  }finally{
+    restoreBtn(btn);
+  }
+}
+
+// ---- Pulling Quick Metrics + the Overview matrix directly from the
+// in-house tool, from within the report editor. A three-step picker
+// (client -> before scan -> after scan) since scans are only meaningful
+// once scoped to a client, and the two scan dropdowns share the same
+// list of that client's scans. ----
+let inhouseMetricsClients = [];
+
+function toggleInhousePullPanel(){
+  const body = document.getElementById('inhousePullPanelBody');
+  const toggle = document.getElementById('inhousePullPanelToggle');
+  if(!body) return;
+  const showing = body.style.display !== 'none';
+  body.style.display = showing ? 'none' : 'block';
+  if(toggle) toggle.textContent = showing ? 'Show' : 'Hide';
+  if(!showing && !inhouseMetricsClients.length) loadInhouseMetricsClientsForPicker();
+}
+
+async function loadInhouseMetricsClientsForPicker(){
+  const selectEl = document.getElementById('inhouseClientSelect');
+  if(selectEl) selectEl.innerHTML = '<option>Loading…</option>';
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/admin-user-actions', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ action:'list-inhouse-clients' }),
+    });
+    const data = await response.json();
+    if(!response.ok) throw new Error(data.error || 'Could not load clients');
+    inhouseMetricsClients = data.clients || [];
+    if(selectEl) selectEl.innerHTML = '<option value="">Select a client…</option>' + inhouseMetricsClients.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  }catch(e){
+    if(selectEl) selectEl.innerHTML = '<option value="">Error loading clients</option>';
+    showToast('error','Could not load clients', e.message||'Save the connection first.');
+  }
+}
+
+async function onInhouseClientSelected(clientId){
+  const beforeSelect = document.getElementById('inhouseBeforeScanSelect');
+  const afterSelect = document.getElementById('inhouseAfterScanSelect');
+  if(!clientId){
+    if(beforeSelect) beforeSelect.innerHTML = '<option value="">Pick a client first</option>';
+    if(afterSelect) afterSelect.innerHTML = '<option value="">Pick a client first</option>';
+    return;
+  }
+  if(beforeSelect) beforeSelect.innerHTML = '<option>Loading…</option>';
+  if(afterSelect) afterSelect.innerHTML = '<option>Loading…</option>';
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/admin-user-actions', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ action:'list-inhouse-scans', clientId }),
+    });
+    const data = await response.json();
+    if(!response.ok) throw new Error(data.error || 'Could not load scans');
+    const scans = data.scans || [];
+    const optionsHtml = '<option value="">Select a scan…</option>' + scans.map(s=>`<option value="${s.id}">${new Date(s.started_at).toLocaleString()} (${escapeHtml(s.mode||'')})</option>`).join('');
+    if(beforeSelect) beforeSelect.innerHTML = optionsHtml;
+    if(afterSelect) afterSelect.innerHTML = optionsHtml;
+  }catch(e){
+    showToast('error','Could not load scans', e.message||'Try again.');
+  }
+}
+
+async function pullInhouseMetrics(){
+  const clientId = document.getElementById('inhouseClientSelect')?.value;
+  const beforeScanId = document.getElementById('inhouseBeforeScanSelect')?.value;
+  const afterScanId = document.getElementById('inhouseAfterScanSelect')?.value;
+  if(!clientId || !beforeScanId || !afterScanId){ showToast('error','Missing selection','Pick a client, a before scan, and an after scan.'); return; }
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Pulling…');
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/admin-user-actions', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ action:'fetch-inhouse-metrics', clientId, beforeScanId, afterScanId }),
+    });
+    const data = await response.json();
+    if(!response.ok) throw new Error(data.error || 'Pull failed');
+    if(data.error){ showToast('error','Nothing pulled', data.error); return; }
+    const d = aiVisibilityDraft;
+    d.before_avg_position = data.beforeAvgPosition;
+    d.after_avg_position = data.afterAvgPosition;
+    d.before_recommended_count = data.beforeRecommendedCount;
+    d.before_total_prompts = data.beforeTotalPrompts;
+    d.after_recommended_count = data.afterRecommendedCount;
+    d.after_total_prompts = data.afterTotalPrompts;
+    d.overview_matrix_data = data.matrixRows || [];
+    renderAiVisibilityMain();
+    showToast('success','Pulled', `Quick Metrics and the Overview matrix (${(data.matrixRows||[]).length} prompts) populated from the in-house tool. Review before saving.`);
+  }catch(e){
+    showToast('error','Pull failed', e.message || 'Try again.');
+  }finally{
+    restoreBtn(btn);
+  }
+}
+
 async function testFetchRankscaleSearchTerms(){
   const resultEl = document.getElementById('rankscaleFetchResult');
   const btn = clickedBtn();
@@ -10545,6 +10701,22 @@ async function renderAiVisibilityList(el){
       </div>
     </div>
 
+    <div class="panel" style="margin-bottom:20px;">
+      <div class="panel-head" style="cursor:pointer;" onclick="toggleInhouseMetricsPanel()">
+        <span class="panel-title">In-house metrics tool connection</span>
+        <span id="inhousePanelToggle" style="font-size:12px;color:var(--muted-lt);">Show</span>
+      </div>
+      <div class="panel-body" id="inhousePanelBody" style="display:none;">
+        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;line-height:1.5;">Pulls Quick Metrics and the Overview matrix directly from the in-house tracking tool's own database — a real connection against a confirmed schema, not a screenshot or a probe.</p>
+        <div id="inhouseConnectionStatus" style="margin-bottom:14px;font-size:12.5px;color:var(--muted-lt);">Checking connection…</div>
+        <div class="form-grid" style="margin-bottom:14px;">
+          <div><label>Supabase project URL</label><input type="text" id="inhouseProjectUrlInput" placeholder="https://xxxxx.supabase.co" autocomplete="off"></div>
+          <div><label>Anon key</label><input type="password" id="inhouseAnonKeyInput" placeholder="Paste the anon key" autocomplete="off"></div>
+        </div>
+        <button class="btn btn-outline" onclick="saveInhouseMetricsConnection()">Save connection</button>
+      </div>
+    </div>
+
     <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:16px;">
       <button class="btn btn-brand" onclick="openNewAiVisibilityReport()">+ New report</button>
     </div>
@@ -10557,6 +10729,7 @@ async function renderAiVisibilityList(el){
       </div>
     </div>`;
   loadRankscaleConnectionStatus();
+  loadInhouseMetricsConnectionStatus();
   const { data: rows, error } = await supabaseClient
     .from('ai_visibility_reports').select('id, client_name_snapshot, target_keyword, report_date, domination_score')
     .order('report_date', { ascending:false });
@@ -11115,6 +11288,21 @@ function renderAiVisibilityDetail(el){
     <div class="panel" style="margin-bottom:20px;">
       <div class="panel-head"><span class="panel-title">Quick Metrics</span><span class="pill pill-good">Automated</span></div>
       <div class="panel-body">
+        <div style="margin-bottom:16px;padding:12px;background:var(--surface-2);border-radius:8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="toggleInhousePullPanel()">
+            <span style="font-size:12.5px;font-weight:700;color:var(--ink);">Pull from in-house tool</span>
+            <span id="inhousePullPanelToggle" style="font-size:12px;color:var(--muted-lt);">Show</span>
+          </div>
+          <div id="inhousePullPanelBody" style="display:none;margin-top:12px;">
+            <p style="font-size:11px;color:var(--muted-lt);margin:0 0 10px;">Populates Quick Metrics AND the Overview matrix together, directly from real data — no screenshot needed.</p>
+            <div class="form-grid" style="margin-bottom:10px;">
+              <div><label style="font-size:11px;">Client</label><select id="inhouseClientSelect" onchange="onInhouseClientSelected(this.value)"><option value="">Loading…</option></select></div>
+              <div><label style="font-size:11px;">Before scan</label><select id="inhouseBeforeScanSelect"><option value="">Pick a client first</option></select></div>
+              <div><label style="font-size:11px;">After scan</label><select id="inhouseAfterScanSelect"><option value="">Pick a client first</option></select></div>
+            </div>
+            <button class="btn btn-brand" onclick="pullInhouseMetrics()">Pull data</button>
+          </div>
+        </div>
         <div class="form-grid">
           <div><label>Before — recommended in (of total prompts)</label><div style="display:flex;gap:6px;align-items:center;"><input type="number" min="0" style="width:80px;" value="${d.before_recommended_count??''}" onchange="aiVisibilityDraft.before_recommended_count=this.value?Number(this.value):null;renderAiVisibilityMain();"><span>/</span><input type="number" min="0" style="width:80px;" value="${d.before_total_prompts??''}" onchange="aiVisibilityDraft.before_total_prompts=this.value?Number(this.value):null;renderAiVisibilityMain();"></div></div>
           <div><label>Before — average ranking position</label><input type="number" min="0" step="0.1" value="${d.before_avg_position??''}" onchange="aiVisibilityDraft.before_avg_position=this.value?Number(this.value):null;renderAiVisibilityMain();"></div>
@@ -11363,12 +11551,13 @@ function downloadAiVisibilityReportPdf(){
   };
   const drawColorMatrix = (matrixRows) => {
     if(!matrixRows.length) return;
-    const promptColWidth = 40;
+    const promptColWidth = 50;
     const platformColWidth = (pageWidth - marginX*2 - promptColWidth) / AI_VISIBILITY_PLATFORMS.length;
-    const rowHeight = 8;
+    const promptLineHeight = 3.3;
+    const minRowHeight = 8;
     const drawHeaderRow = () => {
       doc.setFillColor(245,245,245);
-      doc.rect(marginX, y, pageWidth-marginX*2, rowHeight, 'F');
+      doc.rect(marginX, y, pageWidth-marginX*2, minRowHeight, 'F');
       doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(40,40,40);
       doc.text('Prompt', marginX+2, y+5.5);
       let x = marginX+promptColWidth;
@@ -11377,17 +11566,21 @@ function downloadAiVisibilityReportPdf(){
         doc.text(lines[0]||'', x+1, y+5.5);
         x += platformColWidth;
       });
-      y += rowHeight;
+      y += minRowHeight;
     };
-    if(y + rowHeight > 265){ doc.addPage(); y = 20; }
+    if(y + minRowHeight > 260){ doc.addPage(); y = 20; }
     drawHeaderRow();
     matrixRows.forEach(row=>{
-      if(y + rowHeight > 280){ doc.addPage(); y = 20; drawHeaderRow(); }
+      doc.setFont('helvetica','normal'); doc.setFontSize(6);
+      // Full prompt text, wrapped across as many lines as it needs — the
+      // row itself grows to fit, rather than truncating to one line.
+      const promptLines = doc.splitTextToSize(row.prompt||'', promptColWidth-4);
+      const rowHeight = Math.max(minRowHeight, promptLines.length*promptLineHeight + 4);
+      if(y + rowHeight > 280){ doc.addPage(); y = 20; drawHeaderRow(); doc.setFont('helvetica','normal'); doc.setFontSize(6); }
       doc.setFillColor(250,250,250);
       doc.rect(marginX, y, promptColWidth, rowHeight, 'F');
-      doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(40,40,40);
-      const promptLines = doc.splitTextToSize(row.prompt||'', promptColWidth-4);
-      doc.text(promptLines[0]||'', marginX+2, y+5.5);
+      doc.setTextColor(40,40,40);
+      promptLines.forEach((line,li)=>{ doc.text(line, marginX+2, y+promptLineHeight*(li+1)+1); });
       let x = marginX + promptColWidth;
       AI_VISIBILITY_PLATFORMS.forEach(p=>{
         const cell = row.cells[p] || { value:'—', color:'notrun' };
@@ -11399,13 +11592,58 @@ function downloadAiVisibilityReportPdf(){
         doc.setFontSize(7);
         const val = String(cell.value||'—');
         const textW = doc.getTextWidth(val);
-        doc.text(val, x + platformColWidth/2 - textW/2, y+5.5);
+        doc.text(val, x + platformColWidth/2 - textW/2, y + rowHeight/2 + 1.5);
         x += platformColWidth;
       });
       y += rowHeight;
     });
     doc.setDrawColor(255); doc.setLineWidth(0.3);
     y += 6;
+  };
+  // Parses the plain-text overview_summary (its "Net gainers:"/"Net
+  // losers / concerning:" sub-headers) into two arrays, so each can be
+  // drawn in its own separate, colored box rather than as one undifferentiated
+  // block of text.
+  const parseOverviewSummaryForPdf = (summary) => {
+    const lines = (summary||'').split('\n');
+    let section = null;
+    const gainers = [], losers = [];
+    lines.forEach(line=>{
+      const trimmed = line.trim();
+      if(!trimmed) return;
+      if(/^net gainers:?$/i.test(trimmed)){ section = 'gainers'; return; }
+      if(/^net losers/i.test(trimmed)){ section = 'losers'; return; }
+      if(trimmed.startsWith('-')){
+        const item = trimmed.replace(/^-\s*/,'').trim();
+        if(section === 'gainers') gainers.push(item);
+        else if(section === 'losers') losers.push(item);
+      }
+    });
+    return { gainers, losers };
+  };
+  // One box per section (gainers / losers) — bordered, with a colored left
+  // edge and an orange heading, so the two are visually distinct instead
+  // of running together as plain text.
+  const drawGainersLosersBox = (title, items, accentColor) => {
+    const boxWidth = pageWidth - marginX*2;
+    const padding = 5;
+    const lineHeight = 4.3;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+    const displayItems = items.length ? items : ['None'];
+    const itemLines = displayItems.map(item => doc.splitTextToSize(`•  ${item}`, boxWidth - padding*2));
+    const totalLines = itemLines.reduce((sum,lines)=>sum+lines.length, 0);
+    const boxHeight = 13 + totalLines*lineHeight + 3;
+    if(y + boxHeight > 280){ doc.addPage(); y = 20; }
+    doc.setDrawColor(225); doc.setLineWidth(0.3);
+    doc.roundedRect(marginX, y, boxWidth, boxHeight, 2, 2);
+    doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
+    doc.rect(marginX, y, 2.2, boxHeight, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(10.5); doc.setTextColor(brand[0],brand[1],brand[2]);
+    doc.text(title, marginX+padding, y+8);
+    let itemY = y+15;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(60,60,60);
+    itemLines.forEach(lines=>{ lines.forEach(line=>{ doc.text(line, marginX+padding, itemY); itemY += lineHeight; }); });
+    y += boxHeight + 6;
   };
 
   // ---- Header: Based Agency branding ----
@@ -11462,11 +11700,18 @@ function downloadAiVisibilityReportPdf(){
   y += 36;
   bodyText(qm.summary || 'Fill in all four before/after fields in the report to generate this summary.');
 
-  // ---- Overview (Net Gainers / Net Losers, from the uploaded screenshot) ----
+  // ---- Overview: matrix first, then Net Gainers/Losers below it in
+  // their own colored boxes (from the uploaded screenshot) ----
   doc.addPage(); y = 20;
   sectionHeader('Overview');
-  bodyText(d.overview_summary || 'Not yet written.');
   if(d.overview_matrix_data && d.overview_matrix_data.length) drawColorMatrix(d.overview_matrix_data);
+  if(d.overview_summary && d.overview_summary.trim()){
+    const { gainers, losers } = parseOverviewSummaryForPdf(d.overview_summary);
+    drawGainersLosersBox('Net Gainers', gainers, AI_VISIBILITY_MATRIX_COLORS.gained);
+    drawGainersLosersBox('Net Losers / Concerning', losers, AI_VISIBILITY_MATRIX_COLORS.regression);
+  } else {
+    bodyText('Not yet written.');
+  }
 
   // ---- Positive/Neutral/Negative Associations ----
   doc.addPage(); y = 20;
