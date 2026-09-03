@@ -11107,17 +11107,18 @@ function splitRankscaleKeywordCell(value){
   return trimmed.split(',').map(s=>s.trim()).filter(Boolean);
 }
 
-async function importRankscaleCsvForKeywords(){
+async function importRankscaleCsvForKeywords(fileInput){
   const d = aiVisibilityDraft;
-  const textarea = document.getElementById('rankscaleCsvPasteInput');
-  const text = textarea?.value.trim();
-  if(!text){ showToast('error','Paste the CSV first','Copy the full CSV export (including the header row) and paste it in.'); return; }
+  const file = fileInput.files[0];
+  if(!file) return;
+  const text = await file.text();
+  if(!text.trim()){ showToast('error','Empty file','That CSV file looks empty.'); fileInput.value=''; return; }
   const rows = parseCsv(text);
-  if(rows.length < 2){ showToast('error','No data found','Need a header row plus at least one data row.'); return; }
+  if(rows.length < 2){ showToast('error','No data found','Need a header row plus at least one data row.'); fileInput.value=''; return; }
   const headerRow = rows[0];
   const brandNameIdx = findRankscaleColumnIndex(headerRow, 'Brand Name');
   const isOwnBrandIdx = findRankscaleColumnIndex(headerRow, 'Is Own Brand');
-  if(brandNameIdx === -1){ showToast('error','Unrecognized format','Could not find a "Brand Name" column — is this the right export?'); return; }
+  if(brandNameIdx === -1){ showToast('error','Unrecognized format','Could not find a "Brand Name" column — is this the right export?'); fileInput.value=''; return; }
 
   // Prefer the row RankScale itself flags as the agency's own brand —
   // this is why the whole "filter out competitors" problem has a clean
@@ -11134,6 +11135,7 @@ async function importRankscaleCsvForKeywords(){
   }
   if(!targetRow){
     showToast('error',"Could not find the client's row", `Looked for "Is Own Brand" = true, then for a Brand Name matching "${d.client_name_snapshot}" — neither matched. Check the client name or the CSV.`);
+    fileInput.value='';
     return;
   }
 
@@ -11160,6 +11162,7 @@ async function importRankscaleCsvForKeywords(){
 
   if(!mergedCount){
     showToast('error','Nothing new added',"Found the client's row, but no new phrases — check the CSV has data in the keyword columns, or everything is already entered.");
+    fileInput.value='';
     return;
   }
   renderAiVisibilityMain();
@@ -11306,9 +11309,8 @@ function renderAiVisibilityDetail(el){
         <div id="aiVisibilityKeywordsRawReply"></div>
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);margin-bottom:20px;">
           <label style="font-size:12.5px;font-weight:700;color:var(--ink);display:block;margin-bottom:8px;">Or import from a RankScale CSV/Sheet export</label>
-          <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 10px;line-height:1.5;">Paste the full CSV (including the header row) — this pulls out only the client's own row (using RankScale's "Is Own Brand" column, or matching the client name), so competitor rows in the same export are ignored automatically.</p>
-          <textarea id="rankscaleCsvPasteInput" style="width:100%;min-height:100px;font-family:monospace;font-size:11px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="Paste the full CSV here, including the header row..."></textarea>
-          <button class="btn btn-outline" style="margin-top:8px;" onclick="importRankscaleCsvForKeywords()">Import from CSV</button>
+          <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 10px;line-height:1.5;">Upload the exported CSV file — this pulls out only the client's own row (using RankScale's "Is Own Brand" column, or matching the client name), so competitor rows in the same export are ignored automatically.</p>
+          <input type="file" accept=".csv,text/csv" onchange="importRankscaleCsvForKeywords(this)">
         </div>
         <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;">One phrase per line below, optionally ending in a count like "(2)" — still editable by hand at any time.</p>
         ${['positive','neutral','negative'].map(sentiment=>`
