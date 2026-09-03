@@ -10594,21 +10594,21 @@ function emptyAiVisibilityDraft(){
     domination_score:null, domination_score_rationale:'',
     overview_before_screenshot_path: null, overview_after_screenshot_path: null, overview_summary: '',
     competitive_research_screenshot_path: null, what_ai_values: '',
-    keywords_screenshot_path: null,
+    keywords_screenshot_paths: [],
   };
 }
 
 function openNewAiVisibilityReport(){
   aiVisibilityDraft = emptyAiVisibilityDraft();
   aiVisibilityCurrentReportId = 'new';
-  aiVisibilityScreenshotFiles = { before: null, after: null, competitive: null, keywords: null };
+  aiVisibilityScreenshotFiles = { before: null, after: null, competitive: null };
   renderAiVisibilityMain();
 }
 
 async function openAiVisibilityReport(id){
   const { data, error } = await supabaseClient.from('ai_visibility_reports').select('*').eq('id', id).maybeSingle();
   if(error || !data){ showToast('error','Could not load','Try again.'); return; }
-  aiVisibilityScreenshotFiles = { before: null, after: null, competitive: null, keywords: null };
+  aiVisibilityScreenshotFiles = { before: null, after: null, competitive: null };
   aiVisibilityDraft = {
     id: data.id, client_id: data.client_id, client_name_snapshot: data.client_name_snapshot||'',
     target_keyword: data.target_keyword||'', report_date: data.report_date,
@@ -10623,7 +10623,7 @@ async function openAiVisibilityReport(id){
     overview_before_screenshot_path: data.overview_before_screenshot_path||null, overview_after_screenshot_path: data.overview_after_screenshot_path||null,
     overview_summary: data.overview_summary||'',
     competitive_research_screenshot_path: data.competitive_research_screenshot_path||null, what_ai_values: data.what_ai_values||'',
-    keywords_screenshot_path: data.keywords_screenshot_path||null,
+    keywords_screenshot_paths: data.keywords_screenshot_paths || [],
   };
   aiVisibilityCurrentReportId = id;
   renderAiVisibilityMain();
@@ -10632,7 +10632,7 @@ async function openAiVisibilityReport(id){
 function closeAiVisibilityDetail(){
   aiVisibilityCurrentReportId = null;
   aiVisibilityDraft = null;
-  aiVisibilityScreenshotFiles = { before: null, after: null, competitive: null, keywords: null };
+  aiVisibilityScreenshotFiles = { before: null, after: null, competitive: null };
   renderAiVisibilityMain();
 }
 
@@ -10661,7 +10661,7 @@ async function saveAiVisibilityReport(){
     overview_before_screenshot_path: d.overview_before_screenshot_path, overview_after_screenshot_path: d.overview_after_screenshot_path,
     overview_summary: d.overview_summary,
     competitive_research_screenshot_path: d.competitive_research_screenshot_path, what_ai_values: d.what_ai_values,
-    keywords_screenshot_path: d.keywords_screenshot_path,
+    keywords_screenshot_paths: d.keywords_screenshot_paths,
     updated_at: new Date().toISOString(),
   };
   const result = d.id
@@ -10679,7 +10679,7 @@ async function saveAiVisibilityReport(){
   if(wasNew) renderAiVisibilityMain();
 }
 
-let aiVisibilityScreenshotFiles = { before: null, after: null, competitive: null, keywords: null }; // ephemeral, freshly-selected File objects (cleared on report switch) — used for immediate analysis without a Storage round-trip
+let aiVisibilityScreenshotFiles = { before: null, after: null, competitive: null }; // ephemeral, freshly-selected File objects (cleared on report switch) — used for immediate analysis without a Storage round-trip
 
 function fileToBase64(file){
   return new Promise((resolve, reject) => {
@@ -10693,12 +10693,14 @@ function fileToBase64(file){
 // Maps a short slot key (used for the ephemeral in-memory file cache and
 // the Storage path prefix) to the actual draft field storing its path —
 // one generic set of upload/view/remove/analyze functions serving every
-// screenshot slot in this report, rather than a separate copy per slot.
+// SINGLE-screenshot slot in this report. 'keywords' isn't here — Page 5
+// needs multiple accumulating screenshots (see the dedicated
+// uploadAiVisibilityKeywordsScreenshot() family below), not a single
+// replace-on-upload slot like these three.
 const AI_VISIBILITY_SCREENSHOT_SLOTS = {
   before: 'overview_before_screenshot_path',
   after: 'overview_after_screenshot_path',
   competitive: 'competitive_research_screenshot_path',
-  keywords: 'keywords_screenshot_path',
 };
 
 // Same 'attachments' Storage bucket notes/tasks already use, path scoped
@@ -10770,6 +10772,74 @@ async function getAiVisibilityScreenshotBase64(slot){
     reader.readAsDataURL(blob);
   });
   return { base64, mimeType: blob.type || 'image/png' };
+}
+
+// ---- Page 5's screenshots — deliberately separate from the generic
+// single-slot functions above. RankScale's own keyword export spans
+// several screenshots, so uploads here ACCUMULATE in an array rather than
+// replacing a single slot — always uploaded straight to Storage (no
+// ephemeral in-memory file cache), since with multiple files there's no
+// single "current" one worth optimizing a round-trip away for. ----
+async function uploadAiVisibilityKeywordsScreenshot(fileInput){
+  const file = fileInput.files[0];
+  if(!file) return;
+  const d = aiVisibilityDraft;
+  if(!d.id){
+    showToast('error','Save first','Save the report once (even blank) before uploading screenshots — they need a real report to attach to.');
+    fileInput.value = '';
+    return;
+  }
+  if(file.size > 10*1024*1024){ showToast('error','Too large','Screenshots need to be under 10MB.'); fileInput.value = ''; return; }
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  const path = `ai-visibility/${d.id}/keywords-${Date.now()}-${safeName}`;
+  const { error } = await supabaseClient.storage.from('attachments').upload(path, file);
+  if(error){ showToast('error','Upload failed', error.message); return; }
+  if(!d.keywords_screenshot_paths) d.keywords_screenshot_paths = [];
+  d.keywords_screenshot_paths.push(path);
+  await saveAiVisibilityReport();
+  renderAiVisibilityMain();
+  showToast('success','Uploaded','Screenshot added.');
+}
+
+async function removeAiVisibilityKeywordsScreenshot(index){
+  const d = aiVisibilityDraft;
+  const path = d.keywords_screenshot_paths[index];
+  if(path) supabaseClient.storage.from('attachments').remove([path]).catch(()=>{});
+  d.keywords_screenshot_paths.splice(index,1);
+  await saveAiVisibilityReport();
+  renderAiVisibilityMain();
+}
+
+async function viewAiVisibilityKeywordsScreenshot(index){
+  const path = aiVisibilityDraft.keywords_screenshot_paths[index];
+  if(!path) return;
+  const { data, error } = await supabaseClient.storage.from('attachments').createSignedUrl(path, 300);
+  if(error || !data?.signedUrl){ showToast('error','Could not open','Try again.'); return; }
+  window.open(data.signedUrl, '_blank');
+}
+
+// Fetches every uploaded keyword screenshot as base64, all analyzed
+// together in one vision call — RankScale's export is one cohesive
+// dataset across several images, so analyzing them together (rather than
+// one call per screenshot) gives the model the full picture at once and
+// costs fewer API calls.
+async function getAllAiVisibilityKeywordsScreenshotsBase64(){
+  const paths = aiVisibilityDraft.keywords_screenshot_paths || [];
+  const images = [];
+  for(const path of paths){
+    const { data } = await supabaseClient.storage.from('attachments').createSignedUrl(path, 300);
+    if(!data?.signedUrl) continue;
+    const res = await fetch(data.signedUrl);
+    const blob = await res.blob();
+    const base64 = await new Promise((resolve,reject)=>{
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+    images.push({ base64, mimeType: blob.type || 'image/png' });
+  }
+  return images;
 }
 
 async function analyzeAiVisibilityOverview(){
@@ -10912,10 +10982,10 @@ function parseAiVisibilityCompetitiveExtraction(reply){
 // up the full picture, not one screenshot replacing everything each time.
 async function analyzeAiVisibilityKeywords(){
   const d = aiVisibilityDraft;
-  const img = await getAiVisibilityScreenshotBase64('keywords');
-  if(!img){ showToast('error','Nothing to analyze','Upload the keywords screenshot first.'); return; }
+  const images = await getAllAiVisibilityKeywordsScreenshotsBase64();
+  if(!images.length){ showToast('error','Nothing to analyze','Upload at least one keywords screenshot first.'); return; }
   const platformList = AI_VISIBILITY_PLATFORMS.join(', ');
-  const prompt = `This screenshot shows AI-generated keyword/phrase associations about a business, broken down by sentiment (positive, neutral, negative) and by AI platform (e.g. Google Gemini, ChatGPT, Google AI Mode).\n\nUse ONLY these exact platform names, mapping what's shown to the closest match (e.g. "Google Gemini" → "Gemini", "Google AI Mode" → "AI Mode"): ${platformList}.\n\nRespond in EXACTLY this format, nothing else — no extra commentary, no markdown:\n\nPOSITIVE:\n[PlatformName]\n- phrase one\n- phrase two (2)\n\nNEUTRAL:\n[PlatformName]\n- phrase one\n\nNEGATIVE:\n[PlatformName]\n- phrase one\n\nKeep any count shown in parentheses next to the phrase, e.g. "end-to-end service (2)". Omit a header entirely if it has nothing under it, and omit a platform block if it has no phrases for that sentiment. If nothing is extractable at all, respond with exactly "NONE".`;
+  const prompt = `These screenshot(s) show AI-generated keyword/phrase associations about a business, broken down by sentiment (positive, neutral, negative) and by AI platform (e.g. Google Gemini, ChatGPT, Google AI Mode). ${images.length>1 ? `There are ${images.length} screenshots attached, together covering the full export — combine everything from all of them into one result.` : ''}\n\nUse ONLY these exact platform names, mapping what's shown to the closest match (e.g. "Google Gemini" → "Gemini", "Google AI Mode" → "AI Mode"): ${platformList}.\n\nRespond in EXACTLY this format, nothing else — no extra commentary, no markdown:\n\nPOSITIVE:\n[PlatformName]\n- phrase one\n- phrase two (2)\n\nNEUTRAL:\n[PlatformName]\n- phrase one\n\nNEGATIVE:\n[PlatformName]\n- phrase one\n\nKeep any count shown in parentheses next to the phrase, e.g. "end-to-end service (2)". Omit a header entirely if it has nothing under it, and omit a platform block if it has no phrases for that sentiment. If nothing is extractable at all, respond with exactly "NONE".`;
   const btn = clickedBtn();
   setBtnLoading(btn, 'Analyzing…');
   try{
@@ -10923,7 +10993,7 @@ async function analyzeAiVisibilityKeywords(){
     const response = await fetch('/api/claude-chat', {
       method:'POST',
       headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
-      body: JSON.stringify({ mode:'vision-analyze', prompt, images:[img], provider: settings.aiProvider==='openai' ? 'openai' : 'claude' }),
+      body: JSON.stringify({ mode:'vision-analyze', prompt, images, provider: settings.aiProvider==='openai' ? 'openai' : 'claude' }),
     });
     const data = await response.json();
     if(!response.ok) throw new Error(data.error || 'Analysis failed');
@@ -11109,18 +11179,19 @@ function renderAiVisibilityDetail(el){
     <div class="panel" style="margin-bottom:20px;">
       <div class="panel-head"><span class="panel-title">Page 5 — Positive / Neutral / Negative Associations</span></div>
       <div class="panel-body">
-        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;line-height:1.5;">Upload a screenshot from RankScale (or wherever these come from) — AI reads the phrases per platform directly. Since that export often spans several screenshots, analyzing adds newly-found phrases to what's already here rather than replacing it, so you can upload and analyze more than once.</p>
+        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;line-height:1.5;">Upload screenshots from RankScale (or wherever these come from) — AI reads the phrases per platform directly. Since that export often spans several screenshots, you can upload as many as needed; "Analyze with AI" reads all of them together and adds newly-found phrases to what's already here.</p>
         ${!d.id ? `<p style="font-size:12px;color:var(--amber);margin:0 0 14px;">Save the report once first — screenshots need a real report to attach to.</p>` : ''}
         <div style="margin-bottom:14px;">
-          ${d.keywords_screenshot_path ? `
-            <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;max-width:320px;">
-              <span style="font-size:12px;color:var(--green);flex:1;">✓ Uploaded</span>
-              <span class="row-link" onclick="viewAiVisibilityScreenshot('keywords')">View</span>
-              <span class="row-link" style="color:var(--red);" onclick="removeAiVisibilityScreenshot('keywords')">Remove</span>
+          ${d.keywords_screenshot_paths.map((path,i)=>`
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;max-width:320px;margin-bottom:8px;">
+              <span style="font-size:12px;color:var(--green);flex:1;">✓ Screenshot ${i+1}</span>
+              <span class="row-link" onclick="viewAiVisibilityKeywordsScreenshot(${i})">View</span>
+              <span class="row-link" style="color:var(--red);" onclick="removeAiVisibilityKeywordsScreenshot(${i})">Remove</span>
             </div>
-          ` : `<input type="file" accept="image/*" ${!d.id?'disabled':''} onchange="uploadAiVisibilityScreenshot('keywords', this)">`}
+          `).join('')}
+          <input type="file" accept="image/*" ${!d.id?'disabled':''} onchange="uploadAiVisibilityKeywordsScreenshot(this)" value="">
         </div>
-        <button class="btn btn-brand" style="margin-bottom:16px;" onclick="analyzeAiVisibilityKeywords()" ${!d.keywords_screenshot_path ? 'disabled' : ''}>✨ Analyze with AI</button>
+        <button class="btn btn-brand" style="margin-bottom:16px;" onclick="analyzeAiVisibilityKeywords()" ${!d.keywords_screenshot_paths.length ? 'disabled' : ''}>✨ Analyze with AI${d.keywords_screenshot_paths.length>1 ? ` (${d.keywords_screenshot_paths.length} screenshots)` : ''}</button>
         <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;">One phrase per line below, optionally ending in a count like "(2)" — still editable by hand at any time.</p>
         ${['positive','neutral','negative'].map(sentiment=>`
           <div style="margin-bottom:16px;">
