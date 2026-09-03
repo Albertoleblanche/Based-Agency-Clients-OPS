@@ -10708,7 +10708,11 @@ async function analyzeAiVisibilityCompetitiveResearch(){
     );
     if(!confirmed) return;
   }
-  const prompt = `This screenshot shows a "Top Competitors" table and possibly a "What AIs Value" list from an AI visibility tracking tool.\n\nExtract the following and respond in EXACTLY this format, nothing else — no extra commentary, no markdown:\n\nTABLE:\nrank|name|position|top3pct|sentimentpct|mentions|citations|visibilitypct\n(one line per competitor row shown in the table, using the exact values as displayed — keep % signs, keep # signs on position if shown)\n\nWHAT_AI_VALUES:\n- factor one\n- factor two\n\nIf the "What AIs Value" section isn't visible in the image, write "NONE" under that header. If the table has no rows, write "NONE" under TABLE.`;
+  // Only the table — "What AIs Value" isn't reliably present in this
+  // screenshot, and is handled separately by actually researching the
+  // extracted competitors online (see researchAiVisibilityWhatAiValues()),
+  // not by trying to read it off this image.
+  const prompt = `This screenshot shows a "Top Competitors" table from an AI visibility tracking tool.\n\nExtract the table and respond in EXACTLY this format, nothing else — no extra commentary, no markdown:\n\nTABLE:\nrank|name|position|top3pct|sentimentpct|mentions|citations|visibilitypct\n(one line per competitor row shown in the table, using the exact values as displayed — keep % signs, keep # signs on position if shown)\n\nIf the table has no rows, write "NONE" under TABLE.`;
   const btn = clickedBtn();
   setBtnLoading(btn, 'Analyzing…');
   try{
@@ -10720,15 +10724,14 @@ async function analyzeAiVisibilityCompetitiveResearch(){
     });
     const data = await response.json();
     if(!response.ok) throw new Error(data.error || 'Analysis failed');
-    const extracted = parseAiVisibilityCompetitiveExtraction(data.reply || '');
-    if(!extracted.competitors.length && !extracted.whatAiValues){
+    const competitors = parseAiVisibilityCompetitiveExtraction(data.reply || '');
+    if(!competitors.length){
       showToast('error','Nothing extracted','The screenshot may be unclear — try a higher-resolution capture, or enter this manually.');
       return;
     }
-    if(extracted.competitors.length) d.competitors = extracted.competitors;
-    if(extracted.whatAiValues) d.what_ai_values = extracted.whatAiValues;
+    d.competitors = competitors;
     renderAiVisibilityMain();
-    showToast('success','Analyzed','Review the extracted table and list before saving — this is a first draft, not a final answer.');
+    showToast('success','Analyzed','Review the extracted table before saving — this is a first draft, not a final answer.');
   }catch(e){
     showToast('error','Analysis failed', e.message || 'Try again.');
   }finally{
@@ -10736,26 +10739,56 @@ async function analyzeAiVisibilityCompetitiveResearch(){
   }
 }
 
+// "What AIs Value" is filled in by actually researching the extracted
+// competitors online — real web search via the same claude-chat.js
+// endpoint's competitive-research mode — not by reading it off the
+// uploaded screenshot, which doesn't reliably contain this section at all.
+async function researchAiVisibilityWhatAiValues(){
+  const d = aiVisibilityDraft;
+  if(!d.competitors.length){ showToast('error','No competitors yet','Extract or add competitors first — this researches the businesses in that table.'); return; }
+  const competitorNames = d.competitors.map(c=>c.name).filter(Boolean);
+  if(!competitorNames.length){ showToast('error','No competitor names','The competitor table needs names before this can research them.'); return; }
+  const prompt = `I'm researching why AI platforms (ChatGPT, Gemini, etc.) recommend certain local businesses over others for the search "${aiVisibilityDraft.target_keyword || 'this service'}".\n\nHere are the top-recommended competitors, based on AI visibility research:\n${competitorNames.map((n,i)=>`${i+1}. ${n}`).join('\n')}\n\nLook up these businesses online (their websites, reviews, what's written about them) and identify the COMMON FACTORS that seem to drive AI platforms to recommend businesses like these in this category — e.g. things like location, years in business, review volume/quality, pricing, warranty terms, service scope, or other attributes actually present across these specific businesses.\n\nWrite your findings as a short bulleted list (plain text, use "- " for bullets) of the factors themselves — no explanation per bullet, just the factor names, matching this style:\n- Location\n- Family owned businesses\n- Establishment / Age\n- Reviews (Quality and Quantity)\n- Price\n\nBase this on what you actually find about these specific businesses, not generic assumptions about the industry.`;
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Researching…');
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/claude-chat', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ mode:'competitive-research', prompt, provider: settings.aiProvider==='openai' ? 'openai' : 'claude' }),
+    });
+    const data = await response.json();
+    if(!response.ok) throw new Error(data.error || 'Research failed');
+    d.what_ai_values = (data.reply || '').trim();
+    const textarea = document.getElementById('av_what_ai_values');
+    if(textarea) textarea.value = d.what_ai_values;
+    showToast('success','Researched','Review before saving — this is a first draft based on real web search, not a final answer.');
+  }catch(e){
+    showToast('error','Research failed', e.message || 'Try again.');
+  }finally{
+    restoreBtn(btn);
+  }
+}
+
+
+
 function parseAiVisibilityCompetitiveExtraction(reply){
   const lines = reply.split('\n');
   let section = null;
   const competitors = [];
-  const values = [];
   lines.forEach(line=>{
     const trimmed = line.trim();
     if(/^TABLE:?$/i.test(trimmed)){ section = 'table'; return; }
-    if(/^WHAT_AI_VALUES:?$/i.test(trimmed)){ section = 'values'; return; }
     if(!trimmed || trimmed.toUpperCase()==='NONE') return;
     if(section === 'table' && trimmed.includes('|')){
       const parts = trimmed.split('|').map(s=>s.trim());
       if(parts.length >= 8 && parts[1]){
         competitors.push({ rank: parts[0], name: parts[1], position: parts[2], top3Pct: parts[3], sentimentPct: parts[4], mentions: parts[5], citations: parts[6], visibilityPct: parts[7] });
       }
-    } else if(section === 'values' && trimmed.startsWith('-')){
-      values.push(trimmed.replace(/^-\s*/,'').trim());
     }
   });
-  return { competitors, whatAiValues: values.length ? values.map(v=>`- ${v}`).join('\n') : '' };
+  return competitors;
 }
 
 // Reads a Positive/Neutral/Negative Associations screenshot (from the same
@@ -10924,8 +10957,6 @@ function renderAiVisibilityDetail(el){
       </div>
     </div>
 
-    ${narrativeSectionHtml('executive_summary', 'Page 1 — Executive Summary', 'The high-level takeaway a client reads first...')}
-
     <div class="panel" style="margin-bottom:20px;">
       <div class="panel-head"><span class="panel-title">Page 2 — Quick Metrics</span><span class="pill pill-good">Automated</span></div>
       <div class="panel-body">
@@ -10996,7 +11027,7 @@ function renderAiVisibilityDetail(el){
     <div class="panel" style="margin-bottom:20px;">
       <div class="panel-head"><span class="panel-title">Page 6 — Competitive Intelligence</span></div>
       <div class="panel-body">
-        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;line-height:1.5;">Upload the "Top Competitors" screenshot from your visibility tool — AI reads the table and the "What AIs Value" list directly, instead of typing every row by hand.</p>
+        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;line-height:1.5;">Upload the "Top Competitors" screenshot from your visibility tool — AI reads the table directly, instead of typing every row by hand.</p>
         ${!d.id ? `<p style="font-size:12px;color:var(--amber);margin:0 0 14px;">Save the report once first — screenshots need a real report to attach to.</p>` : ''}
         <div style="margin-bottom:14px;">
           ${d.competitive_research_screenshot_path ? `
@@ -11033,8 +11064,10 @@ function renderAiVisibilityDetail(el){
         <button class="btn btn-outline" style="margin-top:8px;" onclick="generateAiVisibilitySection('competitive_intelligence_summary')">✨ Generate with AI</button>
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
           <label style="font-size:12.5px;font-weight:700;color:var(--ink);display:block;margin-bottom:8px;">What AIs Value</label>
+          <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 10px;line-height:1.5;">Not read off the screenshot — this comes from actually researching the competitors above online (their websites, reviews, what's said about them) to identify what's really driving AI recommendations in this category.</p>
+          <button class="btn btn-brand" style="margin-bottom:10px;" onclick="researchAiVisibilityWhatAiValues()" ${!d.competitors.length ? 'disabled' : ''}>🔍 Research competitors &amp; fill in</button>
           <textarea id="av_what_ai_values" style="width:100%;min-height:130px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="- Location&#10;- Family owned businesses&#10;- Establishment / age&#10;- ..." onchange="aiVisibilityDraft.what_ai_values=this.value">${escapeHtml(d.what_ai_values||'')}</textarea>
-          <p style="font-size:11px;color:var(--muted-lt);margin:6px 0 0;">Filled in automatically by "Analyze with AI" above if the screenshot includes a "What AIs Value" list — otherwise editable by hand.</p>
+          <p style="font-size:11px;color:var(--muted-lt);margin:6px 0 0;">Real web search, not a guess — still editable by hand, and worth reviewing before saving.</p>
         </div>
       </div>
     </div>
@@ -11063,6 +11096,15 @@ function renderAiVisibilityDetail(el){
         <textarea id="av_domination_score_rationale" style="width:100%;min-height:100px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="Why this score — reference the specific metrics that justify it..." onchange="aiVisibilityDraft.domination_score_rationale=this.value">${escapeHtml(d.domination_score_rationale||'')}</textarea>
         <button class="btn btn-outline" style="margin-top:8px;" onclick="generateAiVisibilitySection('domination_score_rationale')">✨ Generate rationale with AI</button>
         <p style="font-size:11px;color:var(--muted-lt);margin:10px 0 0;line-height:1.5;">The score itself is a judgment call — AI can draft the rationale, but not the number. This is the page that turns "here's what happened" into "here's where you stand and what's next."</p>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:20px;">
+      <div class="panel-head"><span class="panel-title">Page 1 — Executive Summary</span></div>
+      <div class="panel-body">
+        <p style="font-size:11px;color:var(--muted-lt);margin:0 0 12px;line-height:1.5;">Saved last in this editor on purpose — it summarizes everything above, so it reads better written (or generated) once the rest of the report actually has content. It still appears first in the downloaded report itself.</p>
+        <textarea id="av_executive_summary" style="width:100%;min-height:110px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="The high-level takeaway a client reads first..." onchange="aiVisibilityDraft.executive_summary=this.value">${escapeHtml(d.executive_summary||'')}</textarea>
+        <button class="btn btn-outline" style="margin-top:8px;" onclick="generateAiVisibilitySection('executive_summary')">✨ Generate with AI</button>
       </div>
     </div>
 
