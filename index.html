@@ -10592,7 +10592,7 @@ function emptyAiVisibilityDraft(){
     links: { pressRelease:'', prPlacementReport:'', screenshotsFolder:'' },
     executive_summary:'', competitive_intelligence_summary:'',
     domination_score:null, domination_score_rationale:'',
-    overview_before_screenshot_path: null, overview_after_screenshot_path: null, overview_summary: '',
+    overview_before_screenshot_path: null, overview_after_screenshot_path: null, overview_summary: '', overview_matrix_data: [],
     competitive_research_screenshot_path: null, what_ai_values: '',
   };
 }
@@ -10620,7 +10620,7 @@ async function openAiVisibilityReport(id){
     competitive_intelligence_summary: data.competitive_intelligence_summary||'',
     domination_score: data.domination_score, domination_score_rationale: data.domination_score_rationale||'',
     overview_before_screenshot_path: data.overview_before_screenshot_path||null, overview_after_screenshot_path: data.overview_after_screenshot_path||null,
-    overview_summary: data.overview_summary||'',
+    overview_summary: data.overview_summary||'', overview_matrix_data: data.overview_matrix_data||[],
     competitive_research_screenshot_path: data.competitive_research_screenshot_path||null, what_ai_values: data.what_ai_values||'',
   };
   aiVisibilityCurrentReportId = id;
@@ -10657,7 +10657,7 @@ async function saveAiVisibilityReport(){
     competitive_intelligence_summary: d.competitive_intelligence_summary,
     domination_score: d.domination_score, domination_score_rationale: d.domination_score_rationale,
     overview_before_screenshot_path: d.overview_before_screenshot_path, overview_after_screenshot_path: d.overview_after_screenshot_path,
-    overview_summary: d.overview_summary,
+    overview_summary: d.overview_summary, overview_matrix_data: d.overview_matrix_data,
     competitive_research_screenshot_path: d.competitive_research_screenshot_path, what_ai_values: d.what_ai_values,
     updated_at: new Date().toISOString(),
   };
@@ -10776,7 +10776,8 @@ async function analyzeAiVisibilityOverview(){
   const afterImg = await getAiVisibilityScreenshotBase64('after');
   const images = [beforeImg, afterImg].filter(Boolean);
   if(!images.length){ showToast('error','Nothing to analyze','Upload at least one screenshot first.'); return; }
-  const prompt = `This screenshot is from an AI visibility tracking tool showing which AI platforms (ChatGPT, Claude, Gemini, etc.) recommend a business for various search prompts. ${images.length===2 ? 'Two images are attached: the first is the "before" state, the second is the "after" state — compare them.' : 'One image is attached, which may already encode a before/after comparison via color (e.g. dark green = gained visibility, dark red = lost visibility).'}\n\nIdentify:\n1. "Net gainers" — which platforms picked up new mentions/visibility, and how many.\n2. "Net losers / concerning" — which platforms lost visibility, and how many.\n\nWrite this as two short bulleted lists (plain text, use "- " for bullets) under the headers "Net gainers:" and "Net losers / concerning:", matching this style:\n- ChatGPT picked up 3 new mentions it didn't have before\n- Claude gained two mentions but lost 1\n\nBe specific about platform names and counts based on what's actually visible in the image. If a section has nothing to report, write "None" under that header.`;
+  const platformList = AI_VISIBILITY_PLATFORMS.join(', ');
+  const prompt = `This screenshot is from an AI visibility tracking tool showing which AI platforms (ChatGPT, Claude, Gemini, etc.) recommend a business for various search prompts, color-coded per cell (e.g. dark green = gained visibility, light green = sustained presence, light red/pink = no change and not mentioned, dark red = regression/lost visibility, gray = needs re-run, light gray = not yet run). ${images.length===2 ? 'Two images are attached: the first is the "before" state, the second is the "after" state — compare them.' : 'One image is attached, which may already encode a before/after comparison via cell color.'}\n\nDo two things and respond in EXACTLY this format, nothing else:\n\nSUMMARY:\nWrite two short bulleted lists (plain text, use "- " for bullets) under sub-headers "Net gainers:" and "Net losers / concerning:", identifying which platforms picked up or lost visibility and by how much, matching this style:\n- ChatGPT picked up 3 new mentions it didn't have before\n- Claude gained two mentions but lost 1\nIf a sub-header has nothing to report, write "None" under it.\n\nMATRIX:\nThe full table, one row per prompt, in this exact format:\nPrompt text|Platform:value:color|Platform:value:color|...\nUse ONLY these exact platform names, mapping what's shown to the closest match: ${platformList}. "value" is the number shown in that cell, or "—" if empty. "color" is exactly one of: gained, sustained, nochange, regression, rerun, notrun — matching that cell's actual color in the image. Include every prompt row and every platform column visible. If no matrix table is visible at all, write "NONE" under this header instead.`;
   const btn = clickedBtn();
   setBtnLoading(btn, 'Analyzing…');
   try{
@@ -10788,16 +10789,50 @@ async function analyzeAiVisibilityOverview(){
     });
     const data = await response.json();
     if(!response.ok) throw new Error(data.error || 'Analysis failed');
-    d.overview_summary = (data.reply||'').trim();
+    const { summary, matrixRows } = parseAiVisibilityOverviewExtraction(data.reply || '');
+    d.overview_summary = summary;
+    d.overview_matrix_data = matrixRows;
     const textarea = document.getElementById('av_overview_summary');
     if(textarea) textarea.value = d.overview_summary;
-    showToast('success','Analyzed','Review and edit before saving — this is a first draft, not a final answer.');
+    renderAiVisibilityMain();
+    showToast('success','Analyzed', `Review and edit before saving — this is a first draft, not a final answer.${matrixRows.length ? ` Extracted ${matrixRows.length} matrix row${matrixRows.length!==1?'s':''} too.` : ''}`);
   }catch(e){
     showToast('error','Analysis failed', e.message || 'Try again.');
   }finally{
     restoreBtn(btn);
   }
 }
+
+function parseAiVisibilityOverviewExtraction(reply){
+  const lines = reply.split('\n');
+  let section = null;
+  const summaryLines = [];
+  const matrixRows = [];
+  lines.forEach(line=>{
+    const trimmed = line.trim();
+    if(/^SUMMARY:?$/i.test(trimmed)){ section = 'summary'; return; }
+    if(/^MATRIX:?$/i.test(trimmed)){ section = 'matrix'; return; }
+    if(section === 'summary'){
+      if(trimmed) summaryLines.push(trimmed);
+      return;
+    }
+    if(section === 'matrix'){
+      if(!trimmed || trimmed.toUpperCase()==='NONE' || !trimmed.includes('|')) return;
+      const parts = trimmed.split('|');
+      const promptText = parts[0].trim();
+      const cells = {};
+      parts.slice(1).forEach(cellStr=>{
+        const bits = cellStr.split(':').map(s=>s.trim());
+        const platform = bits[0], value = bits[1], color = bits[2];
+        const match = AI_VISIBILITY_PLATFORMS.find(p=>p.toLowerCase()===((platform||'').toLowerCase()));
+        if(match) cells[match] = { value: value || '—', color: color || 'notrun' };
+      });
+      if(promptText) matrixRows.push({ prompt: promptText, cells });
+    }
+  });
+  return { summary: summaryLines.join('\n'), matrixRows };
+}
+
 
 // Reads the Competitive Research screenshot (the "Top Competitors" table +
 // "What AIs Value" list from the same external tool) and extracts both
@@ -11316,6 +11351,62 @@ function downloadAiVisibilityReportPdf(){
     });
     y += 6;
   };
+  // Color-coded prompt x platform matrix, matching the visibility tool's
+  // own legend — dark green/red for gained/regression, light green/pink
+  // for sustained/no-change, gray for needs-rerun/not-run. Stays in
+  // portrait rather than switching page orientation mid-document; with 10
+  // platform columns the cells are narrow but a bare number or "—" still
+  // reads fine at that width.
+  const AI_VISIBILITY_MATRIX_COLORS = {
+    gained: [27,94,32], sustained: [200,230,201], nochange: [248,215,218],
+    regression: [183,28,28], rerun: [158,158,158], notrun: [224,224,224],
+  };
+  const drawColorMatrix = (matrixRows) => {
+    if(!matrixRows.length) return;
+    const promptColWidth = 40;
+    const platformColWidth = (pageWidth - marginX*2 - promptColWidth) / AI_VISIBILITY_PLATFORMS.length;
+    const rowHeight = 8;
+    const drawHeaderRow = () => {
+      doc.setFillColor(245,245,245);
+      doc.rect(marginX, y, pageWidth-marginX*2, rowHeight, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(40,40,40);
+      doc.text('Prompt', marginX+2, y+5.5);
+      let x = marginX+promptColWidth;
+      AI_VISIBILITY_PLATFORMS.forEach(p=>{
+        const lines = doc.splitTextToSize(p, platformColWidth-2);
+        doc.text(lines[0]||'', x+1, y+5.5);
+        x += platformColWidth;
+      });
+      y += rowHeight;
+    };
+    if(y + rowHeight > 265){ doc.addPage(); y = 20; }
+    drawHeaderRow();
+    matrixRows.forEach(row=>{
+      if(y + rowHeight > 280){ doc.addPage(); y = 20; drawHeaderRow(); }
+      doc.setFillColor(250,250,250);
+      doc.rect(marginX, y, promptColWidth, rowHeight, 'F');
+      doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(40,40,40);
+      const promptLines = doc.splitTextToSize(row.prompt||'', promptColWidth-4);
+      doc.text(promptLines[0]||'', marginX+2, y+5.5);
+      let x = marginX + promptColWidth;
+      AI_VISIBILITY_PLATFORMS.forEach(p=>{
+        const cell = row.cells[p] || { value:'—', color:'notrun' };
+        const rgb = AI_VISIBILITY_MATRIX_COLORS[cell.color] || AI_VISIBILITY_MATRIX_COLORS.notrun;
+        doc.setFillColor(rgb[0], rgb[1], rgb[2]);
+        doc.rect(x, y, platformColWidth, rowHeight, 'F');
+        const isDark = cell.color==='gained' || cell.color==='regression';
+        doc.setTextColor(isDark?255:40, isDark?255:40, isDark?255:40);
+        doc.setFontSize(7);
+        const val = String(cell.value||'—');
+        const textW = doc.getTextWidth(val);
+        doc.text(val, x + platformColWidth/2 - textW/2, y+5.5);
+        x += platformColWidth;
+      });
+      y += rowHeight;
+    });
+    doc.setDrawColor(255); doc.setLineWidth(0.3);
+    y += 6;
+  };
 
   // ---- Header: Based Agency branding ----
   let brandingDrawn = false;
@@ -11375,6 +11466,7 @@ function downloadAiVisibilityReportPdf(){
   doc.addPage(); y = 20;
   sectionHeader('Overview');
   bodyText(d.overview_summary || 'Not yet written.');
+  if(d.overview_matrix_data && d.overview_matrix_data.length) drawColorMatrix(d.overview_matrix_data);
 
   // ---- Positive/Neutral/Negative Associations ----
   doc.addPage(); y = 20;
