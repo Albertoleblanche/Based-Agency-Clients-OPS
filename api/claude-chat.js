@@ -123,6 +123,35 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    // ---- AI Visibility Reporting Engine's "What AIs Value" research —
+    // genuinely different from vision-analyze above: this needs real web
+    // search to look up the extracted competitors, not image reading. Same
+    // admin-only gating. Unlike visibility-test, this DOES allow a custom
+    // base_url — the model just needs to reason over search results and
+    // write findings, which custom OpenAI-compatible endpoints handle
+    // fine, unlike vision which they handle inconsistently.
+    if (mode === 'competitive-research') {
+      const { data: callerProfile } = await admin.from('team_profiles').select('role').eq('id', callerData.user.id).maybeSingle();
+      if (!callerProfile || callerProfile.role !== 'admin') {
+        res.status(403).json({ error: 'AI Visibility Reports are admin-only' });
+        return;
+      }
+      const { prompt: researchPrompt, provider: researchProvider } = req.body || {};
+      if (!researchPrompt || typeof researchPrompt !== 'string') { res.status(400).json({ error: 'Missing prompt' }); return; }
+      const useResearchProvider = researchProvider === 'openai' ? 'openai' : 'claude';
+      const { data: settingsRow } = await admin.from('app_storage').select('value').eq('key', 'settings').maybeSingle();
+      const researchSettings = settingsRow ? JSON.parse(settingsRow.value) : {};
+      const researchModel = useResearchProvider === 'openai' ? researchSettings.openaiModel : researchSettings.claudeModel;
+      const { data: connectionRow } = await admin.from('ai_provider_connections').select('api_key, base_url').eq('provider', useResearchProvider).maybeSingle();
+      const researchResult = await callAI(useResearchProvider, [{ role: 'user', content: researchPrompt }],
+        'You are a marketing research analyst helping an agency understand what makes competing local businesses successful in AI-generated recommendations. Use web search to ground your findings in real, current information about the specific businesses named, rather than generic guesses.',
+        { model: researchModel, apiKey: connectionRow?.api_key || null, baseUrl: connectionRow?.base_url || null, webSearch: true }
+      );
+      if (!researchResult.ok) { res.status(502).json({ error: researchResult.error }); return; }
+      res.status(200).json({ reply: researchResult.reply });
+      return;
+    }
+
     // ---- Existing Assistant chat flow below, unchanged ----
     const { data: callerProfile, error: profileErr } = await admin
       .from('team_profiles').select('role, name, ai_chat_enabled').eq('id', callerData.user.id).maybeSingle();
