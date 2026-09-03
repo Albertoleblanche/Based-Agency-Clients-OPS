@@ -10980,14 +10980,19 @@ function parseAiVisibilityCompetitiveExtraction(reply){
 // screenshots (positive/neutral/negative each their own page), so the
 // realistic workflow is uploading and analyzing more than once to build
 // up the full picture, not one screenshot replacing everything each time.
+let aiVisibilityLastKeywordsRawReply = ''; // shown when extraction yields nothing, so a parsing/format mismatch is visible instead of a dead-end "nothing found" message
+
 async function analyzeAiVisibilityKeywords(){
   const d = aiVisibilityDraft;
   const images = await getAllAiVisibilityKeywordsScreenshotsBase64();
   if(!images.length){ showToast('error','Nothing to analyze','Upload at least one keywords screenshot first.'); return; }
   const platformList = AI_VISIBILITY_PLATFORMS.join(', ');
-  const prompt = `These screenshot(s) show AI-generated keyword/phrase associations about a business, broken down by sentiment (positive, neutral, negative) and by AI platform (e.g. Google Gemini, ChatGPT, Google AI Mode). ${images.length>1 ? `There are ${images.length} screenshots attached, together covering the full export — combine everything from all of them into one result.` : ''}\n\nUse ONLY these exact platform names, mapping what's shown to the closest match (e.g. "Google Gemini" → "Gemini", "Google AI Mode" → "AI Mode"): ${platformList}.\n\nRespond in EXACTLY this format, nothing else — no extra commentary, no markdown:\n\nPOSITIVE:\n[PlatformName]\n- phrase one\n- phrase two (2)\n\nNEUTRAL:\n[PlatformName]\n- phrase one\n\nNEGATIVE:\n[PlatformName]\n- phrase one\n\nKeep any count shown in parentheses next to the phrase, e.g. "end-to-end service (2)". Omit a header entirely if it has nothing under it, and omit a platform block if it has no phrases for that sentiment. If nothing is extractable at all, respond with exactly "NONE".`;
+  const prompt = `These screenshot(s) show AI-generated keyword/phrase associations about a business, broken down by sentiment (positive, neutral, negative) and by AI platform (e.g. Google Gemini, ChatGPT, Google AI Mode). ${images.length>1 ? `There are ${images.length} screenshots attached, together covering the full export — combine everything from all of them into one result.` : ''}\n\nUse ONLY these exact platform names, mapping what's shown to the closest match (e.g. "Google Gemini" → "Gemini", "Google AI Mode" → "AI Mode", "Bing Copilot" → "Copilot"): ${platformList}.\n\nRespond in EXACTLY this format, nothing else — no extra commentary, no markdown:\n\nPOSITIVE:\n[PlatformName]\n- phrase one\n- phrase two (2)\n\nNEUTRAL:\n[PlatformName]\n- phrase one\n\nNEGATIVE:\n[PlatformName]\n- phrase one\n\nKeep any count shown in parentheses next to the phrase, e.g. "end-to-end service (2)". Omit a header entirely if it has nothing under it, and omit a platform block if it has no phrases for that sentiment. If nothing is extractable at all, respond with exactly "NONE".`;
   const btn = clickedBtn();
   setBtnLoading(btn, 'Analyzing…');
+  aiVisibilityLastKeywordsRawReply = '';
+  const rawReplyEl = document.getElementById('aiVisibilityKeywordsRawReply');
+  if(rawReplyEl) rawReplyEl.innerHTML = '';
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
     const response = await fetch('/api/claude-chat', {
@@ -10997,6 +11002,7 @@ async function analyzeAiVisibilityKeywords(){
     });
     const data = await response.json();
     if(!response.ok) throw new Error(data.error || 'Analysis failed');
+    aiVisibilityLastKeywordsRawReply = data.reply || '';
     const { extracted, unmatchedPlatforms } = parseAiVisibilityKeywordExtraction(data.reply || '');
     let mergedCount = 0;
     ['positive','neutral','negative'].forEach(sentiment=>{
@@ -11011,7 +11017,14 @@ async function analyzeAiVisibilityKeywords(){
       });
     });
     if(!mergedCount && !unmatchedPlatforms.length){
-      showToast('error','Nothing new extracted','The screenshot may be unclear, or everything in it is already entered.');
+      showToast('error','Nothing new extracted','The screenshot may be unclear, or everything in it is already entered — see the raw AI response below to check which.');
+      if(rawReplyEl){
+        rawReplyEl.innerHTML = `
+          <div style="margin-top:12px;padding:10px;background:var(--surface-2);border-radius:8px;">
+            <div style="font-size:11.5px;font-weight:600;color:var(--ink);margin-bottom:6px;">Raw AI response (nothing was extracted from this):</div>
+            <pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;margin:0;max-height:300px;overflow:auto;background:var(--card);padding:8px;border-radius:6px;">${escapeHtml(aiVisibilityLastKeywordsRawReply || '(empty response)')}</pre>
+          </div>`;
+      }
       return;
     }
     renderAiVisibilityMain();
@@ -11038,18 +11051,25 @@ function parseAiVisibilityKeywordExtraction(reply){
     if(/^NEUTRAL:?$/i.test(trimmed)){ sentiment = 'neutral'; platform = null; return; }
     if(/^NEGATIVE:?$/i.test(trimmed)){ sentiment = 'negative'; platform = null; return; }
     if(!trimmed || trimmed.toUpperCase()==='NONE') return;
-    const platformMatch = /^\[(.+)\]$/.exec(trimmed);
-    if(platformMatch){
-      const raw = platformMatch[1].trim();
-      const match = AI_VISIBILITY_PLATFORMS.find(p => p.toLowerCase() === raw.toLowerCase());
-      platform = match || null;
-      if(!match && !unmatchedPlatforms.includes(raw)) unmatchedPlatforms.push(raw);
+    if(trimmed.startsWith('-')){
+      if(sentiment && platform){
+        const phrase = trimmed.replace(/^-\s*/,'').trim();
+        if(!extracted[sentiment][platform]) extracted[sentiment][platform] = [];
+        extracted[sentiment][platform].push(phrase);
+      }
       return;
     }
-    if(sentiment && platform && trimmed.startsWith('-')){
-      const phrase = trimmed.replace(/^-\s*/,'').trim();
-      if(!extracted[sentiment][platform]) extracted[sentiment][platform] = [];
-      extracted[sentiment][platform].push(phrase);
+    // Any other non-blank, non-bullet, non-sentiment-header line is
+    // treated as a platform label — tolerating [Bracket], a trailing
+    // colon, or just the bare name, since models don't always follow the
+    // exact bracket format asked for in the prompt even when told to.
+    const raw = trimmed.replace(/^\[|\]$/g,'').replace(/:$/,'').trim();
+    const match = AI_VISIBILITY_PLATFORMS.find(p => p.toLowerCase() === raw.toLowerCase());
+    if(match){
+      platform = match;
+    } else if(raw){
+      platform = null;
+      if(!unmatchedPlatforms.includes(raw)) unmatchedPlatforms.push(raw);
     }
   });
   return { extracted, unmatchedPlatforms };
@@ -11192,6 +11212,7 @@ function renderAiVisibilityDetail(el){
           <input type="file" accept="image/*" ${!d.id?'disabled':''} onchange="uploadAiVisibilityKeywordsScreenshot(this)" value="">
         </div>
         <button class="btn btn-brand" style="margin-bottom:16px;" onclick="analyzeAiVisibilityKeywords()" ${!d.keywords_screenshot_paths.length ? 'disabled' : ''}>✨ Analyze with AI${d.keywords_screenshot_paths.length>1 ? ` (${d.keywords_screenshot_paths.length} screenshots)` : ''}</button>
+        <div id="aiVisibilityKeywordsRawReply"></div>
         <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;">One phrase per line below, optionally ending in a count like "(2)" — still editable by hand at any time.</p>
         ${['positive','neutral','negative'].map(sentiment=>`
           <div style="margin-bottom:16px;">
