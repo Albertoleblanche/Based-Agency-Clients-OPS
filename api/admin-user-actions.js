@@ -262,6 +262,75 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    // ---- Rankscale connection, for the AI Visibility Reporting Engine's
+    // Page 5 automation. Reuses the ai_provider_connections table with
+    // provider='rankscale' rather than a new table — api_key holds the
+    // Rankscale Data Studio API key, base_url is repurposed to hold the
+    // connector ID (the "AKfycb..." Apps Script deployment ID shown on
+    // Rankscale's Integrations page), since the table is already generic
+    // key-value shaped and a new table for one row of config felt like
+    // more migration than this deserves.
+    if (action === 'save-rankscale-connection') {
+      const { apiKey, connectorId } = req.body || {};
+      if (!apiKey || typeof apiKey !== 'string' || !apiKey.trim()) { res.status(400).json({ error: 'Missing apiKey' }); return; }
+      if (!connectorId || typeof connectorId !== 'string' || !connectorId.trim()) { res.status(400).json({ error: 'Missing connectorId' }); return; }
+      const { error: upsertErr } = await admin.from('ai_provider_connections').upsert({
+        provider: 'rankscale', api_key: apiKey.trim(), base_url: connectorId.trim(), connected_at: new Date().toISOString(), connected_by: callerId,
+      });
+      if (upsertErr) { res.status(500).json({ error: upsertErr.message }); return; }
+      res.status(200).json({ success: true });
+      return;
+    }
+
+    if (action === 'get-rankscale-connection') {
+      // Never returns the api_key itself, matching get-ai-connections above.
+      const { data: row } = await admin.from('ai_provider_connections').select('connected_at, base_url').eq('provider', 'rankscale').maybeSingle();
+      res.status(200).json({ connected: !!row, connectedAt: row?.connected_at || null, connectorId: row?.base_url || null });
+      return;
+    }
+
+    // Experimental — this is Google's Data Studio Community Connector
+    // protocol (an Apps Script Web App deployment), not a documented public
+    // REST API, so the exact request shape it expects is genuinely unknown.
+    // Tries two plausible request shapes and returns whatever came back
+    // from BOTH — including raw error bodies — rather than a single
+    // pass/fail, since even a failed attempt's response can reveal what
+    // the endpoint actually expects.
+    if (action === 'fetch-rankscale-search-terms') {
+      const { data: connRow } = await admin.from('ai_provider_connections').select('api_key, base_url').eq('provider', 'rankscale').maybeSingle();
+      if (!connRow || !connRow.api_key || !connRow.base_url) {
+        res.status(400).json({ error: 'Save your Rankscale API key and connector ID first.' });
+        return;
+      }
+      const scriptUrl = `https://script.google.com/macros/s/${connRow.base_url}/exec`;
+      const attempts = [];
+
+      try {
+        const url = `${scriptUrl}?apiKey=${encodeURIComponent(connRow.api_key)}`;
+        const r = await fetch(url, { method: 'GET' });
+        const bodyText = await r.text();
+        attempts.push({ method: 'GET with apiKey query param', status: r.status, ok: r.ok, bodyPreview: bodyText.slice(0, 3000) });
+      } catch (e) {
+        attempts.push({ method: 'GET with apiKey query param', error: String(e) });
+      }
+
+      try {
+        const r = await fetch(scriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${connRow.api_key}` },
+          body: JSON.stringify({ requestType: 'getData', configParams: { apiKey: connRow.api_key } }),
+        });
+        const bodyText = await r.text();
+        attempts.push({ method: 'POST getData (Data Studio connector shape) with Bearer auth', status: r.status, ok: r.ok, bodyPreview: bodyText.slice(0, 3000) });
+      } catch (e) {
+        attempts.push({ method: 'POST getData (Data Studio connector shape) with Bearer auth', error: String(e) });
+      }
+
+      const anySucceeded = attempts.some(a => a.ok);
+      res.status(200).json({ success: anySucceeded, attempts });
+      return;
+    }
+
     res.status(400).json({ error: `Unknown action: ${action}` });
   } catch (e) {
     res.status(500).json({ error: String(e) });
