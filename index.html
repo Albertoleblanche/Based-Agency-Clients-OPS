@@ -10533,7 +10533,7 @@ async function renderAiVisibilityList(el){
         <span id="rankscalePanelToggle" style="font-size:12px;color:var(--muted-lt);">Show</span>
       </div>
       <div class="panel-body" id="rankscalePanelBody" style="display:none;">
-        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;line-height:1.5;">Attempts to pull Page 5's data directly from Rankscale's "Search Term Execution Records" connector, using the same API key and connector ID from Rankscale's Data Studio integration settings. This isn't a documented public API — it's experimental, and may not return usable data.</p>
+        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;line-height:1.5;">Attempts to pull the Positive/Neutral/Negative Associations data directly from Rankscale's "Search Term Execution Records" connector, using the same API key and connector ID from Rankscale's Data Studio integration settings. This isn't a documented public API — it's experimental, and may not return usable data.</p>
         <div id="rankscaleConnectionStatus" style="margin-bottom:14px;font-size:12.5px;color:var(--muted-lt);">Checking connection…</div>
         <div class="form-grid" style="margin-bottom:14px;">
           <div><label>Rankscale API key</label><input type="password" id="rankscaleApiKeyInput" placeholder="Paste your Data Studio API key" autocomplete="off"></div>
@@ -10594,7 +10594,6 @@ function emptyAiVisibilityDraft(){
     domination_score:null, domination_score_rationale:'',
     overview_before_screenshot_path: null, overview_after_screenshot_path: null, overview_summary: '',
     competitive_research_screenshot_path: null, what_ai_values: '',
-    keywords_screenshot_paths: [],
   };
 }
 
@@ -10623,7 +10622,6 @@ async function openAiVisibilityReport(id){
     overview_before_screenshot_path: data.overview_before_screenshot_path||null, overview_after_screenshot_path: data.overview_after_screenshot_path||null,
     overview_summary: data.overview_summary||'',
     competitive_research_screenshot_path: data.competitive_research_screenshot_path||null, what_ai_values: data.what_ai_values||'',
-    keywords_screenshot_paths: data.keywords_screenshot_paths || [],
   };
   aiVisibilityCurrentReportId = id;
   renderAiVisibilityMain();
@@ -10661,7 +10659,6 @@ async function saveAiVisibilityReport(){
     overview_before_screenshot_path: d.overview_before_screenshot_path, overview_after_screenshot_path: d.overview_after_screenshot_path,
     overview_summary: d.overview_summary,
     competitive_research_screenshot_path: d.competitive_research_screenshot_path, what_ai_values: d.what_ai_values,
-    keywords_screenshot_paths: d.keywords_screenshot_paths,
     updated_at: new Date().toISOString(),
   };
   const result = d.id
@@ -10693,10 +10690,9 @@ function fileToBase64(file){
 // Maps a short slot key (used for the ephemeral in-memory file cache and
 // the Storage path prefix) to the actual draft field storing its path —
 // one generic set of upload/view/remove/analyze functions serving every
-// SINGLE-screenshot slot in this report. 'keywords' isn't here — Page 5
-// needs multiple accumulating screenshots (see the dedicated
-// uploadAiVisibilityKeywordsScreenshot() family below), not a single
-// replace-on-upload slot like these three.
+// single-screenshot slot in this report. Positive/Neutral/Negative
+// Associations (Page 5) isn't here — that section imports from a
+// RankScale CSV/Sheet export instead (see importRankscaleCsvForKeywords()).
 const AI_VISIBILITY_SCREENSHOT_SLOTS = {
   before: 'overview_before_screenshot_path',
   after: 'overview_after_screenshot_path',
@@ -10772,74 +10768,6 @@ async function getAiVisibilityScreenshotBase64(slot){
     reader.readAsDataURL(blob);
   });
   return { base64, mimeType: blob.type || 'image/png' };
-}
-
-// ---- Page 5's screenshots — deliberately separate from the generic
-// single-slot functions above. RankScale's own keyword export spans
-// several screenshots, so uploads here ACCUMULATE in an array rather than
-// replacing a single slot — always uploaded straight to Storage (no
-// ephemeral in-memory file cache), since with multiple files there's no
-// single "current" one worth optimizing a round-trip away for. ----
-async function uploadAiVisibilityKeywordsScreenshot(fileInput){
-  const file = fileInput.files[0];
-  if(!file) return;
-  const d = aiVisibilityDraft;
-  if(!d.id){
-    showToast('error','Save first','Save the report once (even blank) before uploading screenshots — they need a real report to attach to.');
-    fileInput.value = '';
-    return;
-  }
-  if(file.size > 10*1024*1024){ showToast('error','Too large','Screenshots need to be under 10MB.'); fileInput.value = ''; return; }
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-  const path = `ai-visibility/${d.id}/keywords-${Date.now()}-${safeName}`;
-  const { error } = await supabaseClient.storage.from('attachments').upload(path, file);
-  if(error){ showToast('error','Upload failed', error.message); return; }
-  if(!d.keywords_screenshot_paths) d.keywords_screenshot_paths = [];
-  d.keywords_screenshot_paths.push(path);
-  await saveAiVisibilityReport();
-  renderAiVisibilityMain();
-  showToast('success','Uploaded','Screenshot added.');
-}
-
-async function removeAiVisibilityKeywordsScreenshot(index){
-  const d = aiVisibilityDraft;
-  const path = d.keywords_screenshot_paths[index];
-  if(path) supabaseClient.storage.from('attachments').remove([path]).catch(()=>{});
-  d.keywords_screenshot_paths.splice(index,1);
-  await saveAiVisibilityReport();
-  renderAiVisibilityMain();
-}
-
-async function viewAiVisibilityKeywordsScreenshot(index){
-  const path = aiVisibilityDraft.keywords_screenshot_paths[index];
-  if(!path) return;
-  const { data, error } = await supabaseClient.storage.from('attachments').createSignedUrl(path, 300);
-  if(error || !data?.signedUrl){ showToast('error','Could not open','Try again.'); return; }
-  window.open(data.signedUrl, '_blank');
-}
-
-// Fetches every uploaded keyword screenshot as base64, all analyzed
-// together in one vision call — RankScale's export is one cohesive
-// dataset across several images, so analyzing them together (rather than
-// one call per screenshot) gives the model the full picture at once and
-// costs fewer API calls.
-async function getAllAiVisibilityKeywordsScreenshotsBase64(){
-  const paths = aiVisibilityDraft.keywords_screenshot_paths || [];
-  const images = [];
-  for(const path of paths){
-    const { data } = await supabaseClient.storage.from('attachments').createSignedUrl(path, 300);
-    if(!data?.signedUrl) continue;
-    const res = await fetch(data.signedUrl);
-    const blob = await res.blob();
-    const base64 = await new Promise((resolve,reject)=>{
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(',')[1]);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-    images.push({ base64, mimeType: blob.type || 'image/png' });
-  }
-  return images;
 }
 
 async function analyzeAiVisibilityOverview(){
@@ -10970,109 +10898,6 @@ function parseAiVisibilityCompetitiveExtraction(reply){
     }
   });
   return competitors;
-}
-
-// Reads a Positive/Neutral/Negative Associations screenshot (from the same
-// external tool — RankScale, per the sample report) and extracts phrases
-// per platform per sentiment directly into d.keywords. Unlike the
-// Competitive Research table, this MERGES into whatever's already there
-// rather than replacing it — RankScale's own export often spans several
-// screenshots (positive/neutral/negative each their own page), so the
-// realistic workflow is uploading and analyzing more than once to build
-// up the full picture, not one screenshot replacing everything each time.
-let aiVisibilityLastKeywordsRawReply = ''; // shown when extraction yields nothing, so a parsing/format mismatch is visible instead of a dead-end "nothing found" message
-
-async function analyzeAiVisibilityKeywords(){
-  const d = aiVisibilityDraft;
-  const images = await getAllAiVisibilityKeywordsScreenshotsBase64();
-  if(!images.length){ showToast('error','Nothing to analyze','Upload at least one keywords screenshot first.'); return; }
-  const platformList = AI_VISIBILITY_PLATFORMS.join(', ');
-  const prompt = `These screenshot(s) show AI-generated keyword/phrase associations about a business, broken down by sentiment (positive, neutral, negative) and by AI platform (e.g. Google Gemini, ChatGPT, Google AI Mode). ${images.length>1 ? `There are ${images.length} screenshots attached, together covering the full export — combine everything from all of them into one result.` : ''}\n\nUse ONLY these exact platform names, mapping what's shown to the closest match (e.g. "Google Gemini" → "Gemini", "Google AI Mode" → "AI Mode", "Bing Copilot" → "Copilot"): ${platformList}.\n\nRespond in EXACTLY this format, nothing else — no extra commentary, no markdown:\n\nPOSITIVE:\n[PlatformName]\n- phrase one\n- phrase two (2)\n\nNEUTRAL:\n[PlatformName]\n- phrase one\n\nNEGATIVE:\n[PlatformName]\n- phrase one\n\nKeep any count shown in parentheses next to the phrase, e.g. "end-to-end service (2)". Omit a header entirely if it has nothing under it, and omit a platform block if it has no phrases for that sentiment. If nothing is extractable at all, respond with exactly "NONE".`;
-  const btn = clickedBtn();
-  setBtnLoading(btn, 'Analyzing…');
-  aiVisibilityLastKeywordsRawReply = '';
-  const rawReplyEl = document.getElementById('aiVisibilityKeywordsRawReply');
-  if(rawReplyEl) rawReplyEl.innerHTML = '';
-  try{
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/claude-chat', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
-      body: JSON.stringify({ mode:'vision-analyze', prompt, images, provider: settings.aiProvider==='openai' ? 'openai' : 'claude' }),
-    });
-    const data = await response.json();
-    if(!response.ok) throw new Error(data.error || 'Analysis failed');
-    aiVisibilityLastKeywordsRawReply = data.reply || '';
-    const { extracted, unmatchedPlatforms } = parseAiVisibilityKeywordExtraction(data.reply || '');
-    let mergedCount = 0;
-    ['positive','neutral','negative'].forEach(sentiment=>{
-      Object.keys(extracted[sentiment]).forEach(platform=>{
-        if(!d.keywords[sentiment]) d.keywords[sentiment] = {};
-        const existingLines = (d.keywords[sentiment][platform] || '').split('\n').map(s=>s.trim()).filter(Boolean);
-        const newLines = extracted[sentiment][platform].filter(p => !existingLines.includes(p));
-        if(newLines.length){
-          d.keywords[sentiment][platform] = existingLines.concat(newLines).join('\n');
-          mergedCount += newLines.length;
-        }
-      });
-    });
-    if(!mergedCount && !unmatchedPlatforms.length){
-      showToast('error','Nothing new extracted','The screenshot may be unclear, or everything in it is already entered — see the raw AI response below to check which.');
-      if(rawReplyEl){
-        rawReplyEl.innerHTML = `
-          <div style="margin-top:12px;padding:10px;background:var(--surface-2);border-radius:8px;">
-            <div style="font-size:11.5px;font-weight:600;color:var(--ink);margin-bottom:6px;">Raw AI response (nothing was extracted from this):</div>
-            <pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;margin:0;max-height:300px;overflow:auto;background:var(--card);padding:8px;border-radius:6px;">${escapeHtml(aiVisibilityLastKeywordsRawReply || '(empty response)')}</pre>
-          </div>`;
-      }
-      return;
-    }
-    renderAiVisibilityMain();
-    const parts = [];
-    if(mergedCount) parts.push(`Added ${mergedCount} phrase${mergedCount!==1?'s':''}`);
-    if(unmatchedPlatforms.length) parts.push(`couldn't match platform${unmatchedPlatforms.length!==1?'s':''}: ${unmatchedPlatforms.join(', ')} — add those by hand`);
-    showToast('success','Analyzed', `${parts.join('; ')}. Review before saving — this is a first draft, not a final answer.`);
-  }catch(e){
-    showToast('error','Analysis failed', e.message || 'Try again.');
-  }finally{
-    restoreBtn(btn);
-  }
-}
-
-function parseAiVisibilityKeywordExtraction(reply){
-  const lines = reply.split('\n');
-  let sentiment = null;
-  let platform = null;
-  const extracted = { positive:{}, neutral:{}, negative:{} };
-  const unmatchedPlatforms = [];
-  lines.forEach(line=>{
-    const trimmed = line.trim();
-    if(/^POSITIVE:?$/i.test(trimmed)){ sentiment = 'positive'; platform = null; return; }
-    if(/^NEUTRAL:?$/i.test(trimmed)){ sentiment = 'neutral'; platform = null; return; }
-    if(/^NEGATIVE:?$/i.test(trimmed)){ sentiment = 'negative'; platform = null; return; }
-    if(!trimmed || trimmed.toUpperCase()==='NONE') return;
-    if(trimmed.startsWith('-')){
-      if(sentiment && platform){
-        const phrase = trimmed.replace(/^-\s*/,'').trim();
-        if(!extracted[sentiment][platform]) extracted[sentiment][platform] = [];
-        extracted[sentiment][platform].push(phrase);
-      }
-      return;
-    }
-    // Any other non-blank, non-bullet, non-sentiment-header line is
-    // treated as a platform label — tolerating [Bracket], a trailing
-    // colon, or just the bare name, since models don't always follow the
-    // exact bracket format asked for in the prompt even when told to.
-    const raw = trimmed.replace(/^\[|\]$/g,'').replace(/:$/,'').trim();
-    const match = AI_VISIBILITY_PLATFORMS.find(p => p.toLowerCase() === raw.toLowerCase());
-    if(match){
-      platform = match;
-    } else if(raw){
-      platform = null;
-      if(!unmatchedPlatforms.includes(raw)) unmatchedPlatforms.push(raw);
-    }
-  });
-  return { extracted, unmatchedPlatforms };
 }
 
 // ---- RankScale CSV/Sheet import for Page 5 — a much cleaner data source
@@ -11253,7 +11078,7 @@ function renderAiVisibilityDetail(el){
     </div>
 
     <div class="panel" style="margin-bottom:20px;">
-      <div class="panel-head"><span class="panel-title">Page 2 — Quick Metrics</span><span class="pill pill-good">Automated</span></div>
+      <div class="panel-head"><span class="panel-title">Quick Metrics</span><span class="pill pill-good">Automated</span></div>
       <div class="panel-body">
         <div class="form-grid">
           <div><label>Before — recommended in (of total prompts)</label><div style="display:flex;gap:6px;align-items:center;"><input type="number" min="0" style="width:80px;" value="${d.before_recommended_count??''}" onchange="aiVisibilityDraft.before_recommended_count=this.value?Number(this.value):null;renderAiVisibilityMain();"><span>/</span><input type="number" min="0" style="width:80px;" value="${d.before_total_prompts??''}" onchange="aiVisibilityDraft.before_total_prompts=this.value?Number(this.value):null;renderAiVisibilityMain();"></div></div>
@@ -11291,28 +11116,12 @@ function renderAiVisibilityDetail(el){
     </div>
 
     <div class="panel" style="margin-bottom:20px;">
-      <div class="panel-head"><span class="panel-title">Page 5 — Positive / Neutral / Negative Associations</span></div>
+      <div class="panel-head"><span class="panel-title">Positive / Neutral / Negative Associations</span></div>
       <div class="panel-body">
-        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;line-height:1.5;">Upload screenshots from RankScale (or wherever these come from) — AI reads the phrases per platform directly. Since that export often spans several screenshots, you can upload as many as needed; "Analyze with AI" reads all of them together and adds newly-found phrases to what's already here.</p>
-        ${!d.id ? `<p style="font-size:12px;color:var(--amber);margin:0 0 14px;">Save the report once first — screenshots need a real report to attach to.</p>` : ''}
-        <div style="margin-bottom:14px;">
-          ${d.keywords_screenshot_paths.map((path,i)=>`
-            <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;max-width:320px;margin-bottom:8px;">
-              <span style="font-size:12px;color:var(--green);flex:1;">✓ Screenshot ${i+1}</span>
-              <span class="row-link" onclick="viewAiVisibilityKeywordsScreenshot(${i})">View</span>
-              <span class="row-link" style="color:var(--red);" onclick="removeAiVisibilityKeywordsScreenshot(${i})">Remove</span>
-            </div>
-          `).join('')}
-          <input type="file" accept="image/*" ${!d.id?'disabled':''} onchange="uploadAiVisibilityKeywordsScreenshot(this)" value="">
-        </div>
-        <button class="btn btn-brand" style="margin-bottom:16px;" onclick="analyzeAiVisibilityKeywords()" ${!d.keywords_screenshot_paths.length ? 'disabled' : ''}>✨ Analyze with AI${d.keywords_screenshot_paths.length>1 ? ` (${d.keywords_screenshot_paths.length} screenshots)` : ''}</button>
-        <div id="aiVisibilityKeywordsRawReply"></div>
-        <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);margin-bottom:20px;">
-          <label style="font-size:12.5px;font-weight:700;color:var(--ink);display:block;margin-bottom:8px;">Or import from a RankScale CSV/Sheet export</label>
-          <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 10px;line-height:1.5;">Upload the exported CSV file — this pulls out only the client's own row (using RankScale's "Is Own Brand" column, or matching the client name), so competitor rows in the same export are ignored automatically.</p>
-          <input type="file" accept=".csv,text/csv" onchange="importRankscaleCsvForKeywords(this)">
-        </div>
-        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;">One phrase per line below, optionally ending in a count like "(2)" — still editable by hand at any time.</p>
+        <label style="font-size:12.5px;font-weight:700;color:var(--ink);display:block;margin-bottom:8px;">Import from a RankScale CSV/Sheet export</label>
+        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 10px;line-height:1.5;">Upload the exported CSV file — this pulls out only the client's own row (using RankScale's "Is Own Brand" column, or matching the client name), so competitor rows in the same export are ignored automatically.</p>
+        <input type="file" accept=".csv,text/csv" onchange="importRankscaleCsvForKeywords(this)">
+        <p style="font-size:11.5px;color:var(--muted-lt);margin:16px 0 14px;">One phrase per line below, optionally ending in a count like "(2)" — still editable by hand at any time.</p>
         ${['positive','neutral','negative'].map(sentiment=>`
           <div style="margin-bottom:16px;">
             <div style="font-size:12.5px;font-weight:700;text-transform:capitalize;color:var(--ink);margin-bottom:8px;">${sentiment}</div>
@@ -11327,7 +11136,7 @@ function renderAiVisibilityDetail(el){
     </div>
 
     <div class="panel" style="margin-bottom:20px;">
-      <div class="panel-head"><span class="panel-title">Page 6 — Competitive Intelligence</span></div>
+      <div class="panel-head"><span class="panel-title">Competitive Intelligence</span></div>
       <div class="panel-body">
         <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;line-height:1.5;">Upload the "Top Competitors" screenshot from your visibility tool — AI reads the table directly, instead of typing every row by hand.</p>
         ${!d.id ? `<p style="font-size:12px;color:var(--amber);margin:0 0 14px;">Save the report once first — screenshots need a real report to attach to.</p>` : ''}
@@ -11389,7 +11198,7 @@ function renderAiVisibilityDetail(el){
     </div>
 
     <div class="panel" style="margin-bottom:20px;">
-      <div class="panel-head"><span class="panel-title">Page 9 — AI Domination Score</span></div>
+      <div class="panel-head"><span class="panel-title">AI Domination Score</span></div>
       <div class="panel-body">
         <div style="max-width:200px;margin-bottom:14px;">
           <label>Score (0–100)</label>
@@ -11402,7 +11211,7 @@ function renderAiVisibilityDetail(el){
     </div>
 
     <div class="panel" style="margin-bottom:20px;">
-      <div class="panel-head"><span class="panel-title">Page 1 — Executive Summary</span></div>
+      <div class="panel-head"><span class="panel-title">Executive Summary</span></div>
       <div class="panel-body">
         <p style="font-size:11px;color:var(--muted-lt);margin:0 0 12px;line-height:1.5;">Saved last in this editor on purpose — it summarizes everything above, so it reads better written (or generated) once the rest of the report actually has content. It still appears first in the downloaded report itself.</p>
         <textarea id="av_executive_summary" style="width:100%;min-height:110px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="The high-level takeaway a client reads first..." onchange="aiVisibilityDraft.executive_summary=this.value">${escapeHtml(d.executive_summary||'')}</textarea>
