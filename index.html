@@ -11278,6 +11278,44 @@ function downloadAiVisibilityReportPdf(){
     });
     y += 3;
   };
+  // Manual table drawing — no autotable plugin loaded in this app, so this
+  // handles its own column layout, text wrapping within cells (computing
+  // each row's height from its tallest cell), and re-drawing the header
+  // row when a table spans a page break.
+  const drawTable = (headers, colWidths, rows) => {
+    const totalWidth = colWidths.reduce((a,b)=>a+b,0);
+    const lineHeight = 4;
+    const cellPad = 2.5;
+    const drawHeaderRow = () => {
+      doc.setFillColor(245,245,245);
+      doc.rect(marginX, y, totalWidth, 7, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(40,40,40);
+      let x = marginX;
+      headers.forEach((h,i)=>{ doc.text(h, x+cellPad, y+5); x += colWidths[i]; });
+      y += 7;
+      doc.setDrawColor(200); doc.setLineWidth(0.3);
+      doc.line(marginX, y, marginX+totalWidth, y);
+    };
+    if(y + 7 > 275){ doc.addPage(); y = 20; }
+    drawHeaderRow();
+    doc.setFont('helvetica','normal'); doc.setFontSize(8);
+    rows.forEach(row=>{
+      const cellLines = row.map((cell,i)=>doc.splitTextToSize(String(cell??'—'), colWidths[i]-cellPad*2));
+      const maxLines = Math.max(...cellLines.map(l=>l.length), 1);
+      const rowHeight = maxLines*lineHeight + 3;
+      if(y + rowHeight > 280){ doc.addPage(); y = 20; drawHeaderRow(); doc.setFont('helvetica','normal'); doc.setFontSize(8); }
+      let x = marginX;
+      doc.setTextColor(60,60,60);
+      cellLines.forEach((lines,i)=>{
+        lines.forEach((line,li)=>{ doc.text(line, x+cellPad, y+lineHeight*(li+1)); });
+        x += colWidths[i];
+      });
+      y += rowHeight;
+      doc.setDrawColor(230); doc.setLineWidth(0.15);
+      doc.line(marginX, y, marginX+totalWidth, y);
+    });
+    y += 6;
+  };
 
   // ---- Header: Based Agency branding ----
   let brandingDrawn = false;
@@ -11338,32 +11376,33 @@ function downloadAiVisibilityReportPdf(){
   sectionHeader('Overview');
   bodyText(d.overview_summary || 'Not yet written.');
 
-  // ---- Page 5: Positive/Neutral/Negative Associations ----
+  // ---- Positive/Neutral/Negative Associations ----
   doc.addPage(); y = 20;
   sectionHeader('Positive / Neutral / Negative Associations');
+  const keywordRows = [];
   ['positive','neutral','negative'].forEach(sentiment=>{
-    const platformEntries = AI_VISIBILITY_PLATFORMS
-      .map(p=>({ platform:p, text:(d.keywords[sentiment]||{})[p] }))
-      .filter(e=>e.text && e.text.trim());
-    if(!platformEntries.length) return;
-    bodyText(sentiment.charAt(0).toUpperCase()+sentiment.slice(1), { bold:true, size:11.5, color:[30,30,30] });
-    platformEntries.forEach(({platform, text})=>{
-      bodyText(platform, { bold:true, size:9.5, color:[100,100,100], indent:3, lineHeight:4.5 });
-      text.split('\n').map(s=>s.trim()).filter(Boolean).forEach(phrase=>{
-        bodyText(`• ${phrase}`, { size:9.5, color:[60,60,60], indent:6, lineHeight:4.5 });
-      });
+    AI_VISIBILITY_PLATFORMS.forEach(platform=>{
+      const text = (d.keywords[sentiment]||{})[platform];
+      const phrases = (text||'').split('\n').map(s=>s.trim()).filter(Boolean);
+      if(!phrases.length) return; // skip empty combinations entirely, per request
+      keywordRows.push([sentiment.charAt(0).toUpperCase()+sentiment.slice(1), platform, phrases.join(', ')]);
     });
   });
+  if(keywordRows.length){
+    drawTable(['Sentiment','Platform','Phrases'], [22,26,134], keywordRows);
+  } else {
+    bodyText('Nothing entered yet.');
+  }
 
-  // ---- Page 6: Competitive Intelligence ----
+  // ---- Competitive Intelligence ----
   doc.addPage(); y = 20;
   sectionHeader('Competitive Intelligence');
   if(d.competitors.length){
-    d.competitors.forEach(c=>{
-      bodyText(`#${c.rank||'—'}  ${c.name||'Unnamed'}`, { bold:true, size:10, color:[30,30,30], lineHeight:5 });
-      bodyText(`Position ${c.position||'—'}  ·  Visibility ${c.visibilityPct||'—'}  ·  Sentiment ${c.sentimentPct||'—'}  ·  Mentions ${c.mentions??'—'}  ·  Citations ${c.citations??'—'}`, { size:9, color:[100,100,100], indent:4, lineHeight:4.5 });
-    });
-    y += 2;
+    const competitorRows = d.competitors.map(c=>[
+      c.rank ?? '—', c.name || 'Unnamed', c.position || '—', c.top3Pct || '—',
+      c.sentimentPct || '—', c.mentions ?? '—', c.citations ?? '—', c.visibilityPct || '—',
+    ]);
+    drawTable(['Rank','Competitor','Position','Top 3%','Sentiment%','Mentions','Citations','Visibility%'], [12,42,18,18,22,18,18,20], competitorRows);
   }
   bodyText(d.competitive_intelligence_summary || 'Not yet written.');
   if(d.what_ai_values){
