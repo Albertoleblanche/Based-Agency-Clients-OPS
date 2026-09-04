@@ -10392,7 +10392,6 @@ function buildAiVisibilityPrompt(fieldName){
   const prompts = {
     executive_summary: `Write a concise (3-5 sentence) executive summary for a client-facing AI Visibility Report, based on this data:\n${context}\n\nTone: confident, factual, agency-to-client. No fluff, no bullet points, no heading — just the paragraph.`,
     competitive_intelligence_summary: `Write a short (3-5 sentence) narrative analyzing this client's competitive position among AI-recommended competitors, based on:\n${context}\n\nBe specific about where they rank and what's driving that. No heading.`,
-    domination_score_rationale: `Based on this data:\n${context}\n\nWrite a 2-3 sentence rationale explaining why this client's "AI Domination Score" is what it is (the score itself is entered separately, alongside this) — reference the specific metrics above that justify it.`,
   };
   return prompts[fieldName] || null;
 }
@@ -10433,64 +10432,6 @@ function renderAiVisibilityMain(){
   else renderAiVisibilityDetail(el);
 }
 
-// ---- Rankscale connection panel (experimental — see admin-user-actions.js
-// for why this uses a best-effort probe rather than a documented API call) ----
-function toggleAiVisibilityRankscalePanel(){
-  const body = document.getElementById('rankscalePanelBody');
-  const toggle = document.getElementById('rankscalePanelToggle');
-  if(!body) return;
-  const showing = body.style.display !== 'none';
-  body.style.display = showing ? 'none' : 'block';
-  if(toggle) toggle.textContent = showing ? 'Show' : 'Hide';
-}
-
-async function loadRankscaleConnectionStatus(){
-  const statusEl = document.getElementById('rankscaleConnectionStatus');
-  if(!statusEl) return;
-  try{
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/admin-user-actions', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
-      body: JSON.stringify({ action:'get-rankscale-connection' }),
-    });
-    const data = await response.json();
-    if(!response.ok) throw new Error(data.error || 'Could not check status');
-    if(data.connected){
-      statusEl.innerHTML = `<span style="color:var(--green);">✓ Connected</span> — connector ID ${escapeHtml((data.connectorId||'').slice(0,20))}…`;
-      const connectorInput = document.getElementById('rankscaleConnectorIdInput');
-      if(connectorInput && data.connectorId) connectorInput.placeholder = data.connectorId;
-    } else {
-      statusEl.innerHTML = `<span style="color:var(--muted-lt);">Not connected yet</span>`;
-    }
-  }catch(e){
-    statusEl.innerHTML = `<span style="color:var(--red);">Could not check status — ${escapeHtml(e.message||'try again')}</span>`;
-  }
-}
-
-async function saveRankscaleConnection(){
-  const apiKey = document.getElementById('rankscaleApiKeyInput')?.value.trim();
-  const connectorId = document.getElementById('rankscaleConnectorIdInput')?.value.trim();
-  if(!apiKey || !connectorId){ showToast('error','Missing info','Enter both the API key and the connector ID.'); return; }
-  const btn = clickedBtn();
-  setBtnLoading(btn, 'Saving…');
-  try{
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/admin-user-actions', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
-      body: JSON.stringify({ action:'save-rankscale-connection', apiKey, connectorId }),
-    });
-    const data = await response.json();
-    if(!response.ok) throw new Error(data.error || 'Save failed');
-    showToast('success','Saved','Rankscale connection saved.');
-    loadRankscaleConnectionStatus();
-  }catch(e){
-    showToast('error','Save failed', e.message || 'Try again.');
-  }finally{
-    restoreBtn(btn);
-  }
-}
 
 function toggleInhouseMetricsPanel(){
   const body = document.getElementById('inhousePanelBody');
@@ -10740,59 +10681,8 @@ async function pullInhouseKeywords(){
   }
 }
 
-async function testFetchRankscaleSearchTerms(){
-  const resultEl = document.getElementById('rankscaleFetchResult');
-  const btn = clickedBtn();
-  setBtnLoading(btn, 'Testing…');
-  if(resultEl) resultEl.innerHTML = '';
-  try{
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/admin-user-actions', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
-      body: JSON.stringify({ action:'fetch-rankscale-search-terms' }),
-    });
-    const data = await response.json();
-    if(!response.ok) throw new Error(data.error || 'Fetch failed');
-    if(resultEl){
-      resultEl.innerHTML = `
-        <p style="font-size:12.5px;font-weight:700;color:${data.success?'var(--green)':'var(--red)'};margin:0 0 10px;">${data.success ? '✓ At least one attempt succeeded' : '✕ Neither attempt succeeded — raw responses below'}</p>
-        ${(data.attempts||[]).map(a=>`
-          <div style="margin-bottom:12px;padding:10px;background:var(--surface-2);border-radius:8px;font-size:11.5px;">
-            <div style="font-weight:600;margin-bottom:4px;">${escapeHtml(a.method)}</div>
-            ${a.status!=null ? `<div style="color:var(--muted-lt);margin-bottom:4px;">Status: ${a.status} ${a.ok?'(ok)':'(not ok)'}</div>` : ''}
-            ${a.error ? `<div style="color:var(--red);margin-bottom:4px;">Error: ${escapeHtml(a.error)}</div>` : ''}
-            ${a.bodyPreview ? `<pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;margin:0;max-height:200px;overflow:auto;background:var(--card);padding:8px;border-radius:6px;">${escapeHtml(a.bodyPreview)}</pre>` : ''}
-          </div>
-        `).join('')}`;
-    }
-  }catch(e){
-    if(resultEl) resultEl.innerHTML = `<p style="color:var(--red);font-size:12.5px;">${escapeHtml(e.message||'Test failed')}</p>`;
-  }finally{
-    restoreBtn(btn);
-  }
-}
-
 async function renderAiVisibilityList(el){
   el.innerHTML = `
-    <div class="panel" style="margin-bottom:20px;">
-      <div class="panel-head" style="cursor:pointer;" onclick="toggleAiVisibilityRankscalePanel()">
-        <span class="panel-title">Rankscale connection <span style="font-weight:400;color:var(--muted-lt);font-size:11px;">(experimental)</span></span>
-        <span id="rankscalePanelToggle" style="font-size:12px;color:var(--muted-lt);">Show</span>
-      </div>
-      <div class="panel-body" id="rankscalePanelBody" style="display:none;">
-        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;line-height:1.5;">Attempts to pull the Positive/Neutral/Negative Associations data directly from Rankscale's "Search Term Execution Records" connector, using the same API key and connector ID from Rankscale's Data Studio integration settings. This isn't a documented public API — it's experimental, and may not return usable data.</p>
-        <div id="rankscaleConnectionStatus" style="margin-bottom:14px;font-size:12.5px;color:var(--muted-lt);">Checking connection…</div>
-        <div class="form-grid" style="margin-bottom:14px;">
-          <div><label>Rankscale API key</label><input type="password" id="rankscaleApiKeyInput" placeholder="Paste your Data Studio API key" autocomplete="off"></div>
-          <div><label>Connector ID</label><input type="text" id="rankscaleConnectorIdInput" placeholder="AKfycb... (Search Term Execution Records)" autocomplete="off"></div>
-        </div>
-        <button class="btn btn-outline" onclick="saveRankscaleConnection()">Save connection</button>
-        <button class="btn btn-brand" style="margin-left:8px;" onclick="testFetchRankscaleSearchTerms()">Test fetch</button>
-        <div id="rankscaleFetchResult" style="margin-top:16px;"></div>
-      </div>
-    </div>
-
     <div class="panel" style="margin-bottom:20px;">
       <div class="panel-head" style="cursor:pointer;" onclick="toggleInhouseMetricsPanel()">
         <span class="panel-title">In-house metrics tool connection</span>
@@ -10815,15 +10705,14 @@ async function renderAiVisibilityList(el){
     <div class="panel">
       <div class="table-scroll-wrap">
         <table>
-          <thead><tr><th>Client</th><th>Target keyword</th><th>Date</th><th>Domination score</th><th style="text-align:right;">Actions</th></tr></thead>
+          <thead><tr><th>Client</th><th>Target keyword</th><th>Date</th><th style="text-align:right;">Actions</th></tr></thead>
           <tbody id="aiVisibilityTbody"><tr><td colspan="5">${loadingStateHtml('Loading reports…')}</td></tr></tbody>
         </table>
       </div>
     </div>`;
-  loadRankscaleConnectionStatus();
   loadInhouseMetricsConnectionStatus();
   const { data: rows, error } = await supabaseClient
-    .from('ai_visibility_reports').select('id, client_name_snapshot, target_keyword, report_date, domination_score')
+    .from('ai_visibility_reports').select('id, client_name_snapshot, target_keyword, report_date')
     .order('report_date', { ascending:false });
   const tbody = document.getElementById('aiVisibilityTbody');
   if(!tbody) return;
@@ -10842,7 +10731,6 @@ async function renderAiVisibilityList(el){
       <td>${escapeHtml(r.client_name_snapshot||'—')}</td>
       <td>${escapeHtml(r.target_keyword||'—')}</td>
       <td>${new Date(r.report_date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td>
-      <td>${r.domination_score!=null ? `<span class="pill pill-good">${r.domination_score}/100</span>` : '<span style="color:var(--muted-lt);">—</span>'}</td>
       <td style="text-align:right;"><span class="row-link" style="color:var(--red);" onclick="event.stopPropagation();deleteAiVisibilityReport('${r.id}')">Delete</span></td>
     </tr>
   `).join('');
@@ -10856,7 +10744,6 @@ function emptyAiVisibilityDraft(){
     competitors: [], keywords: { positive:{}, neutral:{}, negative:{} }, concerns: [],
     links: { pressRelease:'', prPlacementReport:'', screenshotsFolder:'' },
     executive_summary:'', competitive_intelligence_summary:'',
-    domination_score:null, domination_score_rationale:'',
     overview_before_screenshot_path: null, overview_after_screenshot_path: null, overview_summary: '', overview_matrix_data: [],
     what_ai_values: '',
   };
@@ -10883,7 +10770,6 @@ async function openAiVisibilityReport(id){
     concerns: data.concerns || [], links: data.links || { pressRelease:'', prPlacementReport:'', screenshotsFolder:'' },
     executive_summary: data.executive_summary||'',
     competitive_intelligence_summary: data.competitive_intelligence_summary||'',
-    domination_score: data.domination_score, domination_score_rationale: data.domination_score_rationale||'',
     overview_before_screenshot_path: data.overview_before_screenshot_path||null, overview_after_screenshot_path: data.overview_after_screenshot_path||null,
     overview_summary: data.overview_summary||'', overview_matrix_data: data.overview_matrix_data||[],
     what_ai_values: data.what_ai_values||'',
@@ -10920,7 +10806,6 @@ async function saveAiVisibilityReport(){
     competitors: d.competitors, keywords: d.keywords, concerns: d.concerns, links: d.links,
     executive_summary: d.executive_summary,
     competitive_intelligence_summary: d.competitive_intelligence_summary,
-    domination_score: d.domination_score, domination_score_rationale: d.domination_score_rationale,
     overview_before_screenshot_path: d.overview_before_screenshot_path, overview_after_screenshot_path: d.overview_after_screenshot_path,
     overview_summary: d.overview_summary, overview_matrix_data: d.overview_matrix_data,
     what_ai_values: d.what_ai_values,
@@ -11495,19 +11380,6 @@ function renderAiVisibilityDetail(el){
     </div>
 
     <div class="panel" style="margin-bottom:20px;">
-      <div class="panel-head"><span class="panel-title">AI Domination Score</span></div>
-      <div class="panel-body">
-        <div style="max-width:200px;margin-bottom:14px;">
-          <label>Score (0–100)</label>
-          <input type="number" min="0" max="100" value="${d.domination_score??''}" onchange="aiVisibilityDraft.domination_score=this.value?Number(this.value):null;">
-        </div>
-        <textarea id="av_domination_score_rationale" style="width:100%;min-height:100px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="Why this score — reference the specific metrics that justify it..." onchange="aiVisibilityDraft.domination_score_rationale=this.value">${escapeHtml(d.domination_score_rationale||'')}</textarea>
-        <button class="btn btn-outline" style="margin-top:8px;" onclick="generateAiVisibilitySection('domination_score_rationale')">✨ Generate rationale with AI</button>
-        <p style="font-size:11px;color:var(--muted-lt);margin:10px 0 0;line-height:1.5;">The score itself is a judgment call — AI can draft the rationale, but not the number. This is the page that turns "here's what happened" into "here's where you stand and what's next."</p>
-      </div>
-    </div>
-
-    <div class="panel" style="margin-bottom:20px;">
       <div class="panel-head"><span class="panel-title">Executive Summary</span></div>
       <div class="panel-body">
         <p style="font-size:11px;color:var(--muted-lt);margin:0 0 12px;line-height:1.5;">Saved last in this editor on purpose — it summarizes everything above, so it reads better written (or generated) once the rest of the report actually has content. It still appears first in the downloaded report itself.</p>
@@ -11824,16 +11696,6 @@ function downloadAiVisibilityReportPdf(){
     });
   }
 
-  // ---- Page 9: AI Domination Score ----
-  doc.addPage(); y = 20;
-  sectionHeader('AI Domination Score');
-  doc.setFont('helvetica','bold'); doc.setFontSize(36); doc.setTextColor(brand[0],brand[1],brand[2]);
-  doc.text(`${d.domination_score ?? '—'}`, marginX, y+14);
-  doc.setFont('helvetica','normal'); doc.setFontSize(14); doc.setTextColor(150);
-  doc.text('/ 100', marginX + doc.getTextWidth(`${d.domination_score ?? '—'}`) + 3, y+14);
-  y += 26;
-  bodyText(d.domination_score_rationale || 'Not yet written.');
-
   doc.save(`ai-visibility-${(d.client_name_snapshot||'report').toLowerCase().replace(/[^a-z0-9]+/g,'-')}-${d.report_date}.pdf`);
 }
 
@@ -11862,7 +11724,6 @@ function downloadAiVisibilityReport(){
   }
   lines.push(d.competitive_intelligence_summary || '(not written yet)', '');
   if(d.what_ai_values){ lines.push('What AIs Value:', d.what_ai_values, ''); }
-  lines.push('AI DOMINATION SCORE', '-'.repeat(30), `${d.domination_score ?? '—'}/100`, d.domination_score_rationale || '(not written yet)');
   const text = lines.join('\n');
   const blob = new Blob([text], { type:'text/plain' });
   const url = URL.createObjectURL(blob);
