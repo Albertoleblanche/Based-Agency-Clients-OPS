@@ -381,7 +381,19 @@ module.exports = async function handler(req, res) {
       const { clientId } = req.body || {};
       if (!clientId) { res.status(400).json({ error: 'Missing clientId' }); return; }
       try {
-        const scans = await inhouseFetch(`scans?client_id=eq.${encodeURIComponent(clientId)}&select=id,started_at,mode&order=started_at.desc&limit=30`);
+        // scans.client_id isn't reliably populated for older rows —
+        // confirmed directly from real exported data, where many historical
+        // scans had a null client_id despite clearly belonging to a
+        // specific client. Deriving the relevant scan ids via runs ->
+        // prompts.client_id instead is robust regardless of whether
+        // scans.client_id was ever set correctly.
+        const prompts = await inhouseFetch(`prompts?client_id=eq.${encodeURIComponent(clientId)}&select=id`);
+        const promptIds = prompts.map(p => p.id);
+        if (!promptIds.length) { res.status(200).json({ scans: [] }); return; }
+        const runs = await inhouseFetch(`runs?prompt_id=in.(${promptIds.join(',')})&select=scan_id`);
+        const scanIds = [...new Set(runs.map(r => r.scan_id).filter(Boolean))];
+        if (!scanIds.length) { res.status(200).json({ scans: [] }); return; }
+        const scans = await inhouseFetch(`scans?id=in.(${scanIds.join(',')})&select=id,started_at,mode&order=started_at.desc&limit=50`);
         res.status(200).json({ scans });
       } catch (e) { res.status(500).json({ error: String(e.message || e) }); }
       return;
@@ -479,6 +491,47 @@ module.exports = async function handler(req, res) {
           afterTotalPrompts: afterEligible,
           matrixRows,
         });
+      } catch (e) {
+        res.status(500).json({ error: String(e.message || e) });
+      }
+      return;
+    }
+
+    // Positive/Neutral/Negative Associations, pulled from a single scan's
+    // client-entity mentions (excerpt + sentiment) — a point-in-time
+    // snapshot of what AI actually said, not a before/after comparison,
+    // so this only needs one scan rather than two. Returns raw platform
+    // names as stored in the in-house tool (e.g. "DeepSeek") rather than
+    // normalizing here — the frontend already has AI_VISIBILITY_PLATFORMS
+    // and does case-insensitive matching against it for the CSV/vision
+    // paths, so the same logic handles this consistently in one place.
+    if (action === 'fetch-inhouse-keywords') {
+      const { clientId, scanId } = req.body || {};
+      if (!clientId || !scanId) { res.status(400).json({ error: 'Missing clientId or scanId' }); return; }
+      try {
+        const prompts = await inhouseFetch(`prompts?client_id=eq.${encodeURIComponent(clientId)}&select=id`);
+        const promptIds = prompts.map(p => p.id);
+        if (!promptIds.length) { res.status(200).json({ error: 'No prompts found for this client.' }); return; }
+        const runs = await inhouseFetch(`runs?scan_id=eq.${encodeURIComponent(scanId)}&prompt_id=in.(${promptIds.join(',')})&select=platform_id,mentions(entity_type,sentiment,excerpt)`);
+        const platformIds = [...new Set(runs.map(r => r.platform_id))];
+        const platforms = platformIds.length ? await inhouseFetch(`platforms?id=in.(${platformIds.join(',')})&select=id,name`) : [];
+        const platformNameById = Object.fromEntries(platforms.map(p => [p.id, p.name]));
+
+        const keywords = { positive: {}, neutral: {}, negative: {} };
+        let count = 0;
+        runs.forEach(run => {
+          const platformName = platformNameById[run.platform_id];
+          if (!platformName) return;
+          (run.mentions || []).forEach(m => {
+            if (m.entity_type !== 'client') return;
+            if (!['positive','neutral','negative'].includes(m.sentiment)) return;
+            if (!m.excerpt || !m.excerpt.trim()) return;
+            if (!keywords[m.sentiment][platformName]) keywords[m.sentiment][platformName] = [];
+            keywords[m.sentiment][platformName].push(m.excerpt.trim());
+            count++;
+          });
+        });
+        res.status(200).json({ keywords, count });
       } catch (e) {
         res.status(500).json({ error: String(e.message || e) });
       }
