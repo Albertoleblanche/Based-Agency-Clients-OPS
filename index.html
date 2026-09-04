@@ -10491,11 +10491,78 @@ async function saveInhouseMetricsConnection(){
 }
 
 // ---- Pulling Quick Metrics + the Overview matrix directly from the
-// in-house tool, from within the report editor. A three-step picker
-// (client -> before scan -> after scan) since scans are only meaningful
-// once scoped to a client, and the two scan dropdowns share the same
-// list of that client's scans. ----
+// in-house tool, from within the report editor. The client itself is no
+// longer picked separately here — it's auto-matched by name against the
+// report's own client selection (see syncInhouseClientMatch() below) —
+// only the scan picker(s) remain manual. ----
 let inhouseMetricsClients = [];
+
+// Called whenever the report's own client selection changes. Matches by
+// name (case-insensitive, trimmed) against the in-house tool's own client
+// list — the two systems have entirely separate client tables with
+// different ids, so this is the only practical link between them without
+// requiring the two names to be manually kept in sync somewhere. If no
+// match is found, inhouse_client_id stays null and the pull panels show
+// a clear "no match" state with a manual fallback picker, rather than
+// silently failing.
+async function syncInhouseClientMatch(){
+  const d = aiVisibilityDraft;
+  if(!d.client_name_snapshot){ d.inhouse_client_id = null; renderAiVisibilityMain(); return; }
+  if(!inhouseMetricsClients.length){
+    try{
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      const response = await fetch('/api/admin-user-actions', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ action:'list-inhouse-clients' }),
+      });
+      const data = await response.json();
+      if(response.ok) inhouseMetricsClients = data.clients || [];
+    }catch(e){ /* connection may not be set up yet — pull panels handle showing "no match" either way */ }
+  }
+  const nameLower = d.client_name_snapshot.trim().toLowerCase();
+  const match = inhouseMetricsClients.find(c => (c.name||'').trim().toLowerCase() === nameLower);
+  d.inhouse_client_id = match ? String(match.id) : null;
+  if(match) onInhouseClientMatched(); // pre-populate both scan pickers now that a client is known
+  renderAiVisibilityMain();
+}
+
+// Once a match is known, both scan pickers (Quick Metrics' before/after,
+// Page 5's single scan) can load their scan lists immediately — no need
+// to wait for the admin to interact with a client dropdown that no
+// longer exists.
+async function onInhouseClientMatched(){
+  const d = aiVisibilityDraft;
+  if(!d.inhouse_client_id) return;
+  await Promise.all([
+    onInhouseClientSelected(d.inhouse_client_id),
+    onInhouseKeywordsClientSelected(d.inhouse_client_id),
+  ]);
+}
+
+// Shared markup for both pull panels — a single dropdown pre-selected to
+// the auto-matched client (if found), with a clear warning when nothing
+// matched. idSuffix keeps the two panels' dropdown ids distinct since
+// they're separate DOM locations for the same underlying report-level
+// field (aiVisibilityDraft.inhouse_client_id).
+function inhouseClientLinkHtml(idSuffix){
+  const d = aiVisibilityDraft;
+  return `
+    <div style="margin-bottom:10px;">
+      <label style="font-size:11px;">In-house client${d.inhouse_client_id ? ' (auto-matched)' : ''}</label>
+      <select id="inhouseLinkedClientSelect_${idSuffix}" onchange="manuallySetInhouseClient(this.value)">
+        <option value="">${inhouseMetricsClients.length ? 'No match — select manually' : 'Loading…'}</option>
+        ${inhouseMetricsClients.map(c=>`<option value="${c.id}" ${String(c.id)===d.inhouse_client_id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+      </select>
+      ${!d.inhouse_client_id && d.client_name_snapshot ? `<p style="font-size:10.5px;color:var(--amber);margin:4px 0 0;">No automatic match for "${escapeHtml(d.client_name_snapshot)}" — pick the right one above.</p>` : ''}
+    </div>`;
+}
+
+async function manuallySetInhouseClient(clientId){
+  aiVisibilityDraft.inhouse_client_id = clientId || null;
+  if(clientId) await onInhouseClientMatched();
+  renderAiVisibilityMain();
+}
 
 function toggleInhousePullPanel(){
   const body = document.getElementById('inhousePullPanelBody');
@@ -10507,9 +10574,21 @@ function toggleInhousePullPanel(){
   if(!showing && !inhouseMetricsClients.length) loadInhouseMetricsClientsForPicker();
 }
 
+// Targeted update of both panels' client-link dropdowns, deliberately
+// NOT a full renderAiVisibilityMain() — that would reset the panel's own
+// open/closed display state back to its default (closed), collapsing
+// whichever panel just triggered this load.
+function refreshInhouseClientLinkDropdowns(){
+  const d = aiVisibilityDraft;
+  ['metrics','keywords'].forEach(suffix=>{
+    const selectEl = document.getElementById(`inhouseLinkedClientSelect_${suffix}`);
+    if(!selectEl) return;
+    selectEl.innerHTML = `<option value="">${inhouseMetricsClients.length ? 'No match — select manually' : 'Loading…'}</option>` +
+      inhouseMetricsClients.map(c=>`<option value="${c.id}" ${String(c.id)===d.inhouse_client_id?'selected':''}>${escapeHtml(c.name)}</option>`).join('');
+  });
+}
+
 async function loadInhouseMetricsClientsForPicker(){
-  const selectEl = document.getElementById('inhouseClientSelect');
-  if(selectEl) selectEl.innerHTML = '<option>Loading…</option>';
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
     const response = await fetch('/api/admin-user-actions', {
@@ -10520,9 +10599,8 @@ async function loadInhouseMetricsClientsForPicker(){
     const data = await response.json();
     if(!response.ok) throw new Error(data.error || 'Could not load clients');
     inhouseMetricsClients = data.clients || [];
-    if(selectEl) selectEl.innerHTML = '<option value="">Select a client…</option>' + inhouseMetricsClients.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+    refreshInhouseClientLinkDropdowns();
   }catch(e){
-    if(selectEl) selectEl.innerHTML = '<option value="">Error loading clients</option>';
     showToast('error','Could not load clients', e.message||'Save the connection first.');
   }
 }
@@ -10555,11 +10633,42 @@ async function onInhouseClientSelected(clientId){
   }
 }
 
+// Net Gainers/Losers, computed directly from the matrix data already
+// pulled from the in-house tool — no AI call needed at all, since the
+// color category (gained/sustained/nochange/regression/rerun) is already
+// determined server-side in fetch-inhouse-metrics. Purely counting cells
+// per platform, matching the exact phrasing style the vision-based
+// extraction used to produce, but fully deterministic and instant.
+function computeOverviewGainersLosersFromMatrix(matrixRows){
+  const stats = {};
+  (matrixRows||[]).forEach(row=>{
+    Object.keys(row.cells||{}).forEach(platform=>{
+      const cell = row.cells[platform];
+      if(!stats[platform]) stats[platform] = { gained:0, lost:0 };
+      if(cell.color === 'gained') stats[platform].gained++;
+      if(cell.color === 'regression') stats[platform].lost++;
+    });
+  });
+  const gainers = [], losers = [];
+  Object.keys(stats).forEach(platform=>{
+    const s = stats[platform];
+    if(s.gained > 0 && s.lost === 0) gainers.push(`${platform} picked up ${s.gained} new mention${s.gained!==1?'s':''} it didn't have before`);
+    else if(s.gained > 0 && s.lost > 0) gainers.push(`${platform} gained ${s.gained} mention${s.gained!==1?'s':''} but lost ${s.lost}`);
+    else if(s.gained === 0 && s.lost > 0) losers.push(`${platform} lost visibility on ${s.lost} prompt${s.lost!==1?'s':''}`);
+  });
+  const lines = ['Net gainers:'];
+  lines.push(...(gainers.length ? gainers.map(g=>`- ${g}`) : ['- None']));
+  lines.push('Net losers / concerning:');
+  lines.push(...(losers.length ? losers.map(l=>`- ${l}`) : ['- None']));
+  return lines.join('\n');
+}
+
 async function pullInhouseMetrics(){
-  const clientId = document.getElementById('inhouseClientSelect')?.value;
+  const clientId = aiVisibilityDraft.inhouse_client_id;
   const beforeScanId = document.getElementById('inhouseBeforeScanSelect')?.value;
   const afterScanId = document.getElementById('inhouseAfterScanSelect')?.value;
-  if(!clientId || !beforeScanId || !afterScanId){ showToast('error','Missing selection','Pick a client, a before scan, and an after scan.'); return; }
+  if(!clientId){ showToast('error','No linked client','Pick a client for this report first, or select an in-house client manually above.'); return; }
+  if(!beforeScanId || !afterScanId){ showToast('error','Missing selection','Pick a before scan and an after scan.'); return; }
   const btn = clickedBtn();
   setBtnLoading(btn, 'Pulling…');
   try{
@@ -10580,8 +10689,9 @@ async function pullInhouseMetrics(){
     d.after_recommended_count = data.afterRecommendedCount;
     d.after_total_prompts = data.afterTotalPrompts;
     d.overview_matrix_data = data.matrixRows || [];
+    d.overview_summary = computeOverviewGainersLosersFromMatrix(data.matrixRows || []);
     renderAiVisibilityMain();
-    showToast('success','Pulled', `Quick Metrics and the Overview matrix (${(data.matrixRows||[]).length} prompts) populated from the in-house tool. Review before saving.`);
+    showToast('success','Pulled', `Quick Metrics, the Overview matrix, and Net Gainers/Losers (${(data.matrixRows||[]).length} prompts) populated from the in-house tool. Review before saving.`);
   }catch(e){
     showToast('error','Pull failed', e.message || 'Try again.');
   }finally{
@@ -10602,15 +10712,7 @@ function toggleInhouseKeywordsPullPanel(){
   const showing = body.style.display !== 'none';
   body.style.display = showing ? 'none' : 'block';
   if(toggle) toggle.textContent = showing ? 'Show' : 'Hide';
-  if(!showing){
-    if(inhouseMetricsClients.length) populateInhouseKeywordsClientSelect();
-    else loadInhouseMetricsClientsForPicker().then(populateInhouseKeywordsClientSelect);
-  }
-}
-
-function populateInhouseKeywordsClientSelect(){
-  const selectEl = document.getElementById('inhouseKeywordsClientSelect');
-  if(selectEl) selectEl.innerHTML = '<option value="">Select a client…</option>' + inhouseMetricsClients.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  if(!showing && !inhouseMetricsClients.length) loadInhouseMetricsClientsForPicker();
 }
 
 async function onInhouseKeywordsClientSelected(clientId){
@@ -10635,9 +10737,10 @@ async function onInhouseKeywordsClientSelected(clientId){
 
 async function pullInhouseKeywords(){
   const d = aiVisibilityDraft;
-  const clientId = document.getElementById('inhouseKeywordsClientSelect')?.value;
+  const clientId = d.inhouse_client_id;
   const scanId = document.getElementById('inhouseKeywordsScanSelect')?.value;
-  if(!clientId || !scanId){ showToast('error','Missing selection','Pick a client and a scan.'); return; }
+  if(!clientId){ showToast('error','No linked client','Pick a client for this report first, or select an in-house client manually above.'); return; }
+  if(!scanId){ showToast('error','Missing selection','Pick a scan.'); return; }
   const btn = clickedBtn();
   setBtnLoading(btn, 'Pulling…');
   try{
@@ -10744,22 +10847,21 @@ function emptyAiVisibilityDraft(){
     competitors: [], keywords: { positive:{}, neutral:{}, negative:{} }, concerns: [],
     links: { pressRelease:'', prPlacementReport:'', screenshotsFolder:'' },
     executive_summary:'', competitive_intelligence_summary:'',
-    overview_before_screenshot_path: null, overview_after_screenshot_path: null, overview_summary: '', overview_matrix_data: [],
+    overview_summary: '', overview_matrix_data: [],
     what_ai_values: '',
+    inhouse_client_id: null, // auto-matched by name against the in-house tool's own client list; see syncInhouseClientMatch()
   };
 }
 
 function openNewAiVisibilityReport(){
   aiVisibilityDraft = emptyAiVisibilityDraft();
   aiVisibilityCurrentReportId = 'new';
-  aiVisibilityScreenshotFiles = { before: null, after: null, competitive: null };
   renderAiVisibilityMain();
 }
 
 async function openAiVisibilityReport(id){
   const { data, error } = await supabaseClient.from('ai_visibility_reports').select('*').eq('id', id).maybeSingle();
   if(error || !data){ showToast('error','Could not load','Try again.'); return; }
-  aiVisibilityScreenshotFiles = { before: null, after: null, competitive: null };
   aiVisibilityDraft = {
     id: data.id, client_id: data.client_id, client_name_snapshot: data.client_name_snapshot||'',
     target_keyword: data.target_keyword||'', report_date: data.report_date,
@@ -10770,9 +10872,9 @@ async function openAiVisibilityReport(id){
     concerns: data.concerns || [], links: data.links || { pressRelease:'', prPlacementReport:'', screenshotsFolder:'' },
     executive_summary: data.executive_summary||'',
     competitive_intelligence_summary: data.competitive_intelligence_summary||'',
-    overview_before_screenshot_path: data.overview_before_screenshot_path||null, overview_after_screenshot_path: data.overview_after_screenshot_path||null,
     overview_summary: data.overview_summary||'', overview_matrix_data: data.overview_matrix_data||[],
     what_ai_values: data.what_ai_values||'',
+    inhouse_client_id: data.inhouse_client_id||null,
   };
   aiVisibilityCurrentReportId = id;
   renderAiVisibilityMain();
@@ -10781,7 +10883,6 @@ async function openAiVisibilityReport(id){
 function closeAiVisibilityDetail(){
   aiVisibilityCurrentReportId = null;
   aiVisibilityDraft = null;
-  aiVisibilityScreenshotFiles = { before: null, after: null, competitive: null };
   renderAiVisibilityMain();
 }
 
@@ -10806,9 +10907,9 @@ async function saveAiVisibilityReport(){
     competitors: d.competitors, keywords: d.keywords, concerns: d.concerns, links: d.links,
     executive_summary: d.executive_summary,
     competitive_intelligence_summary: d.competitive_intelligence_summary,
-    overview_before_screenshot_path: d.overview_before_screenshot_path, overview_after_screenshot_path: d.overview_after_screenshot_path,
     overview_summary: d.overview_summary, overview_matrix_data: d.overview_matrix_data,
     what_ai_values: d.what_ai_values,
+    inhouse_client_id: d.inhouse_client_id,
     updated_at: new Date().toISOString(),
   };
   const result = d.id
@@ -10824,163 +10925,6 @@ async function saveAiVisibilityReport(){
   // about to upload an Overview screenshot needs that id for the Storage
   // path, so refresh the screen now that it exists.
   if(wasNew) renderAiVisibilityMain();
-}
-
-let aiVisibilityScreenshotFiles = { before: null, after: null, competitive: null }; // ephemeral, freshly-selected File objects (cleared on report switch) — used for immediate analysis without a Storage round-trip
-
-function fileToBase64(file){
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(',')[1]); // strip the data: prefix, keep just the base64 payload
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-// Maps a short slot key (used for the ephemeral in-memory file cache and
-// the Storage path prefix) to the actual draft field storing its path —
-// one generic set of upload/view/remove/analyze functions serving every
-// single-screenshot slot in this report. Neither Page 5 (Positive/Neutral/
-// Negative Associations) nor Competitive Intelligence is here — both
-// import from RankScale CSV/Sheet exports instead (see
-// importRankscaleCsvForKeywords() and importRankscaleCsvForCompetitors()).
-const AI_VISIBILITY_SCREENSHOT_SLOTS = {
-  before: 'overview_before_screenshot_path',
-  after: 'overview_after_screenshot_path',
-};
-
-// Same 'attachments' Storage bucket notes/tasks already use, path scoped
-// by report id and slot.
-async function uploadAiVisibilityScreenshot(slot, fileInput){
-  const file = fileInput.files[0];
-  if(!file) return;
-  const d = aiVisibilityDraft;
-  const fieldName = AI_VISIBILITY_SCREENSHOT_SLOTS[slot];
-  if(!d.id){
-    showToast('error','Save first','Save the report once (even blank) before uploading screenshots — they need a real report to attach to.');
-    fileInput.value = '';
-    return;
-  }
-  if(file.size > 10*1024*1024){ showToast('error','Too large','Screenshots need to be under 10MB.'); fileInput.value = ''; return; }
-  aiVisibilityScreenshotFiles[slot] = file;
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-  const path = `ai-visibility/${d.id}/${slot}-${Date.now()}-${safeName}`;
-  const { error } = await supabaseClient.storage.from('attachments').upload(path, file, { upsert:true });
-  if(error){ showToast('error','Upload failed', error.message); return; }
-  // The old screenshot for this slot (if any) gets cleaned up rather than
-  // left orphaned in Storage once replaced.
-  const oldPath = d[fieldName];
-  if(oldPath && oldPath !== path) supabaseClient.storage.from('attachments').remove([oldPath]).catch(()=>{});
-  d[fieldName] = path;
-  await saveAiVisibilityReport();
-  renderAiVisibilityMain();
-  showToast('success','Uploaded','Screenshot saved.');
-}
-
-async function removeAiVisibilityScreenshot(slot){
-  const d = aiVisibilityDraft;
-  const fieldName = AI_VISIBILITY_SCREENSHOT_SLOTS[slot];
-  const path = d[fieldName];
-  if(path) supabaseClient.storage.from('attachments').remove([path]).catch(()=>{});
-  aiVisibilityScreenshotFiles[slot] = null;
-  d[fieldName] = null;
-  await saveAiVisibilityReport();
-  renderAiVisibilityMain();
-}
-
-async function viewAiVisibilityScreenshot(slot){
-  const fieldName = AI_VISIBILITY_SCREENSHOT_SLOTS[slot];
-  const path = aiVisibilityDraft[fieldName];
-  if(!path) return;
-  const { data, error } = await supabaseClient.storage.from('attachments').createSignedUrl(path, 300);
-  if(error || !data?.signedUrl){ showToast('error','Could not open','Try again.'); return; }
-  window.open(data.signedUrl, '_blank');
-}
-
-// Prefers a freshly-selected file still in memory (no round-trip needed);
-// falls back to fetching the stored screenshot via a signed URL when
-// re-analyzing a report opened from a previous session, where only the
-// Storage path — not the original file — is available.
-async function getAiVisibilityScreenshotBase64(slot){
-  const file = aiVisibilityScreenshotFiles[slot];
-  if(file) return { base64: await fileToBase64(file), mimeType: file.type || 'image/png' };
-  const fieldName = AI_VISIBILITY_SCREENSHOT_SLOTS[slot];
-  const path = aiVisibilityDraft[fieldName];
-  if(!path) return null;
-  const { data } = await supabaseClient.storage.from('attachments').createSignedUrl(path, 300);
-  if(!data?.signedUrl) return null;
-  const res = await fetch(data.signedUrl);
-  const blob = await res.blob();
-  const base64 = await new Promise((resolve,reject)=>{
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-  return { base64, mimeType: blob.type || 'image/png' };
-}
-
-async function analyzeAiVisibilityOverview(){
-  const d = aiVisibilityDraft;
-  const beforeImg = await getAiVisibilityScreenshotBase64('before');
-  const afterImg = await getAiVisibilityScreenshotBase64('after');
-  const images = [beforeImg, afterImg].filter(Boolean);
-  if(!images.length){ showToast('error','Nothing to analyze','Upload at least one screenshot first.'); return; }
-  const platformList = AI_VISIBILITY_PLATFORMS.join(', ');
-  const prompt = `This screenshot is from an AI visibility tracking tool showing which AI platforms (ChatGPT, Claude, Gemini, etc.) recommend a business for various search prompts, color-coded per cell (e.g. dark green = gained visibility, light green = sustained presence, light red/pink = no change and not mentioned, dark red = regression/lost visibility, gray = needs re-run, light gray = not yet run). ${images.length===2 ? 'Two images are attached: the first is the "before" state, the second is the "after" state — compare them.' : 'One image is attached, which may already encode a before/after comparison via cell color.'}\n\nDo two things and respond in EXACTLY this format, nothing else:\n\nSUMMARY:\nWrite two short bulleted lists (plain text, use "- " for bullets) under sub-headers "Net gainers:" and "Net losers / concerning:", identifying which platforms picked up or lost visibility and by how much, matching this style:\n- ChatGPT picked up 3 new mentions it didn't have before\n- Claude gained two mentions but lost 1\nIf a sub-header has nothing to report, write "None" under it.\n\nMATRIX:\nThe full table, one row per prompt, in this exact format:\nPrompt text|Platform:value:color|Platform:value:color|...\nUse ONLY these exact platform names, mapping what's shown to the closest match: ${platformList}. "value" is the number shown in that cell, or "—" if empty. "color" is exactly one of: gained, sustained, nochange, regression, rerun, notrun — matching that cell's actual color in the image. Include every prompt row and every platform column visible. If no matrix table is visible at all, write "NONE" under this header instead.`;
-  const btn = clickedBtn();
-  setBtnLoading(btn, 'Analyzing…');
-  try{
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/claude-chat', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
-      body: JSON.stringify({ mode:'vision-analyze', prompt, images, provider: settings.aiProvider==='openai' ? 'openai' : 'claude' }),
-    });
-    const data = await response.json();
-    if(!response.ok) throw new Error(data.error || 'Analysis failed');
-    const { summary, matrixRows } = parseAiVisibilityOverviewExtraction(data.reply || '');
-    d.overview_summary = summary;
-    d.overview_matrix_data = matrixRows;
-    const textarea = document.getElementById('av_overview_summary');
-    if(textarea) textarea.value = d.overview_summary;
-    renderAiVisibilityMain();
-    showToast('success','Analyzed', `Review and edit before saving — this is a first draft, not a final answer.${matrixRows.length ? ` Extracted ${matrixRows.length} matrix row${matrixRows.length!==1?'s':''} too.` : ''}`);
-  }catch(e){
-    showToast('error','Analysis failed', e.message || 'Try again.');
-  }finally{
-    restoreBtn(btn);
-  }
-}
-
-function parseAiVisibilityOverviewExtraction(reply){
-  const lines = reply.split('\n');
-  let section = null;
-  const summaryLines = [];
-  const matrixRows = [];
-  lines.forEach(line=>{
-    const trimmed = line.trim();
-    if(/^SUMMARY:?$/i.test(trimmed)){ section = 'summary'; return; }
-    if(/^MATRIX:?$/i.test(trimmed)){ section = 'matrix'; return; }
-    if(section === 'summary'){
-      if(trimmed) summaryLines.push(trimmed);
-      return;
-    }
-    if(section === 'matrix'){
-      if(!trimmed || trimmed.toUpperCase()==='NONE' || !trimmed.includes('|')) return;
-      const parts = trimmed.split('|');
-      const promptText = parts[0].trim();
-      const cells = {};
-      parts.slice(1).forEach(cellStr=>{
-        const bits = cellStr.split(':').map(s=>s.trim());
-        const platform = bits[0], value = bits[1], color = bits[2];
-        const match = AI_VISIBILITY_PLATFORMS.find(p=>p.toLowerCase()===((platform||'').toLowerCase()));
-        if(match) cells[match] = { value: value || '—', color: color || 'notrun' };
-      });
-      if(promptText) matrixRows.push({ prompt: promptText, cells });
-    }
-  });
-  return { summary: summaryLines.join('\n'), matrixRows };
 }
 
 // "What AIs Value" is filled in by actually researching the extracted
@@ -11249,8 +11193,8 @@ function renderAiVisibilityDetail(el){
           </div>
           <div id="inhousePullPanelBody" style="display:none;margin-top:12px;">
             <p style="font-size:11px;color:var(--muted-lt);margin:0 0 10px;">Populates Quick Metrics AND the Overview matrix together, directly from real data — no screenshot needed.</p>
+            ${inhouseClientLinkHtml('metrics')}
             <div class="form-grid" style="margin-bottom:10px;">
-              <div><label style="font-size:11px;">Client</label><select id="inhouseClientSelect" onchange="onInhouseClientSelected(this.value)"><option value="">Loading…</option></select></div>
               <div><label style="font-size:11px;">Before scan</label><select id="inhouseBeforeScanSelect"><option value="">Pick a client first</option></select></div>
               <div><label style="font-size:11px;">After scan</label><select id="inhouseAfterScanSelect"><option value="">Pick a client first</option></select></div>
             </div>
@@ -11270,24 +11214,7 @@ function renderAiVisibilityDetail(el){
     <div class="panel" style="margin-bottom:20px;">
       <div class="panel-head"><span class="panel-title">Overview</span></div>
       <div class="panel-body">
-        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;line-height:1.5;">Upload the before/after screenshot straight from your visibility tool — AI reads it directly and drafts the Net Gainers / Net Losers summary, no need to re-enter the same data into the Platform Matrix below.</p>
-        ${!d.id ? `<p style="font-size:12px;color:var(--amber);margin:0 0 14px;">Save the report once first — screenshots need a real report to attach to.</p>` : ''}
-        <div class="form-grid" style="margin-bottom:14px;">
-          ${['before','after'].map(phase=>{
-            const path = phase==='before' ? d.overview_before_screenshot_path : d.overview_after_screenshot_path;
-            return `<div>
-              <label>${phase==='before'?'Before':'After'} screenshot</label>
-              ${path ? `
-                <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
-                  <span style="font-size:12px;color:var(--green);flex:1;">✓ Uploaded</span>
-                  <span class="row-link" onclick="viewAiVisibilityScreenshot('${phase}')">View</span>
-                  <span class="row-link" style="color:var(--red);" onclick="removeAiVisibilityScreenshot('${phase}')">Remove</span>
-                </div>
-              ` : `<input type="file" accept="image/*" ${!d.id?'disabled':''} onchange="uploadAiVisibilityScreenshot('${phase}', this)">`}
-            </div>`;
-          }).join('')}
-        </div>
-        <button class="btn btn-brand" style="margin-bottom:14px;" onclick="analyzeAiVisibilityOverview()" ${(!d.overview_before_screenshot_path && !d.overview_after_screenshot_path) ? 'disabled' : ''}>✨ Analyze with AI</button>
+        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;line-height:1.5;">Filled in automatically by "Pull data" above — computed directly from real before/after position data, not read off a screenshot. Still editable by hand if anything needs adjusting.</p>
         <textarea id="av_overview_summary" style="width:100%;min-height:130px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="Net gainers:&#10;- ...&#10;&#10;Net losers / concerning:&#10;- ..." onchange="aiVisibilityDraft.overview_summary=this.value">${escapeHtml(d.overview_summary||'')}</textarea>
       </div>
     </div>
@@ -11302,8 +11229,8 @@ function renderAiVisibilityDetail(el){
           </div>
           <div id="inhouseKeywordsPullPanelBody" style="display:none;margin-top:12px;">
             <p style="font-size:11px;color:var(--muted-lt);margin:0 0 10px;">Pulls real excerpts and sentiment directly from a single scan — a point-in-time snapshot, not a before/after comparison.</p>
+            ${inhouseClientLinkHtml('keywords')}
             <div class="form-grid" style="margin-bottom:10px;">
-              <div><label style="font-size:11px;">Client</label><select id="inhouseKeywordsClientSelect" onchange="onInhouseKeywordsClientSelected(this.value)"><option value="">Loading…</option></select></div>
               <div><label style="font-size:11px;">Scan</label><select id="inhouseKeywordsScanSelect"><option value="">Pick a client first</option></select></div>
             </div>
             <button class="btn btn-brand" onclick="pullInhouseKeywords()">Pull data</button>
@@ -11399,6 +11326,7 @@ function renderAiVisibilityDetail(el){
     const c = clients.find(x=>x.id===this.value);
     aiVisibilityDraft.client_id = this.value || null;
     aiVisibilityDraft.client_name_snapshot = c ? c.name : aiVisibilityDraft.client_name_snapshot;
+    syncInhouseClientMatch();
   });
   const dateInput = document.getElementById('avReportDate');
   if(dateInput) dateInput.addEventListener('change', function(){ aiVisibilityDraft.report_date = this.value; });
