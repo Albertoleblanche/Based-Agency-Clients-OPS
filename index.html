@@ -3756,23 +3756,38 @@ function showSendEmailConfirm(to, subject, body, onSent){
   // mail clients' URI parsing than it is to bother the actual send-email
   // API call below, which handles it fine either way.
   const cleanedTo = to.split(',').map(a=>a.trim()).filter(Boolean).join(',');
-  const mailtoHref = `mailto:${cleanedTo}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Send this email?</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
       <div class="settings-field"><label>To</label><input id="mailModalTo" value="${to}" readonly></div>
-      <div class="settings-field"><label>Subject</label><input id="mailModalSubject" readonly></div>
-      <div class="settings-field"><label>Body</label><textarea spellcheck="true" id="mailModalBody" style="min-height:150px;width:100%;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:6px;border:1px solid var(--border);"></textarea></div>
+      <div class="settings-field"><label>Subject</label><input id="mailModalSubject" oninput="updateMailtoHref()"></div>
+      <div class="settings-field"><label>Body</label><textarea spellcheck="true" id="mailModalBody" style="min-height:150px;width:100%;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:6px;border:1px solid var(--border);" oninput="updateMailtoHref()"></textarea></div>
       <p style="font-size:11.5px;color:var(--muted-lt);margin:8px 0 0;line-height:1.5;">Review the text above — clicking Send delivers it immediately from the app, no further confirmation.</p>
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" id="sendEmailConfirmBtn" onclick="confirmSendEmail()">Send Email</button>
-      <a class="btn btn-outline" href="${mailtoHref}" target="_blank" rel="noopener">Open in mail app instead</a>
+      <a class="btn btn-outline" id="mailModalMailtoLink" href="mailto:${cleanedTo}" target="_blank" rel="noopener">Open in mail app instead</a>
       <button class="btn btn-outline" id="mailModalCopyBtn" onclick="copyMailModalBody()">Copy details</button>
       <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
     </div>`, 500);
   document.getElementById('mailModalSubject').value = subject;
   document.getElementById('mailModalBody').value = body;
+  updateMailtoHref();
+}
+
+// Keeps the "Open in mail app instead" link in sync with whatever's
+// currently in the (now-editable) Subject and Body fields, rather than
+// the mailto: URI staying frozen at whatever the AI originally drafted —
+// otherwise editing the subject before sending would silently leave that
+// fallback link pointing at the old, unedited text.
+function updateMailtoHref(){
+  const link = document.getElementById('mailModalMailtoLink');
+  if(!link) return;
+  const to = document.getElementById('mailModalTo')?.value || '';
+  const subject = document.getElementById('mailModalSubject')?.value || '';
+  const body = document.getElementById('mailModalBody')?.value || '';
+  const cleanedTo = to.split(',').map(a=>a.trim()).filter(Boolean).join(',');
+  link.href = `mailto:${cleanedTo}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
 async function confirmSendEmail(){
