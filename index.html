@@ -10648,6 +10648,98 @@ async function pullInhouseMetrics(){
   }
 }
 
+// ---- Page 5 (Positive/Neutral/Negative) pull from the same in-house
+// tool — a single-scan snapshot rather than before/after, since this is
+// "what did AI actually say" at one point in time, not a comparison.
+// Reuses the inhouseMetricsClients cache from the Quick Metrics picker
+// above rather than re-fetching, since the client list is identical
+// regardless of which section is pulling. ----
+function toggleInhouseKeywordsPullPanel(){
+  const body = document.getElementById('inhouseKeywordsPullPanelBody');
+  const toggle = document.getElementById('inhouseKeywordsPullPanelToggle');
+  if(!body) return;
+  const showing = body.style.display !== 'none';
+  body.style.display = showing ? 'none' : 'block';
+  if(toggle) toggle.textContent = showing ? 'Show' : 'Hide';
+  if(!showing){
+    if(inhouseMetricsClients.length) populateInhouseKeywordsClientSelect();
+    else loadInhouseMetricsClientsForPicker().then(populateInhouseKeywordsClientSelect);
+  }
+}
+
+function populateInhouseKeywordsClientSelect(){
+  const selectEl = document.getElementById('inhouseKeywordsClientSelect');
+  if(selectEl) selectEl.innerHTML = '<option value="">Select a client…</option>' + inhouseMetricsClients.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+}
+
+async function onInhouseKeywordsClientSelected(clientId){
+  const scanSelect = document.getElementById('inhouseKeywordsScanSelect');
+  if(!clientId){ if(scanSelect) scanSelect.innerHTML = '<option value="">Pick a client first</option>'; return; }
+  if(scanSelect) scanSelect.innerHTML = '<option>Loading…</option>';
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/admin-user-actions', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ action:'list-inhouse-scans', clientId }),
+    });
+    const data = await response.json();
+    if(!response.ok) throw new Error(data.error || 'Could not load scans');
+    const scans = data.scans || [];
+    if(scanSelect) scanSelect.innerHTML = '<option value="">Select a scan…</option>' + scans.map(s=>`<option value="${s.id}">${new Date(s.started_at).toLocaleString()} (${escapeHtml(s.mode||'')})</option>`).join('');
+  }catch(e){
+    showToast('error','Could not load scans', e.message||'Try again.');
+  }
+}
+
+async function pullInhouseKeywords(){
+  const d = aiVisibilityDraft;
+  const clientId = document.getElementById('inhouseKeywordsClientSelect')?.value;
+  const scanId = document.getElementById('inhouseKeywordsScanSelect')?.value;
+  if(!clientId || !scanId){ showToast('error','Missing selection','Pick a client and a scan.'); return; }
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Pulling…');
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const response = await fetch('/api/admin-user-actions', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ action:'fetch-inhouse-keywords', clientId, scanId }),
+    });
+    const data = await response.json();
+    if(!response.ok) throw new Error(data.error || 'Pull failed');
+    if(data.error){ showToast('error','Nothing pulled', data.error); return; }
+    let mergedCount = 0;
+    const unmatchedPlatforms = [];
+    ['positive','neutral','negative'].forEach(sentiment=>{
+      Object.keys(data.keywords[sentiment]||{}).forEach(rawPlatform=>{
+        const match = AI_VISIBILITY_PLATFORMS.find(p=>p.toLowerCase()===rawPlatform.toLowerCase());
+        if(!match){ if(!unmatchedPlatforms.includes(rawPlatform)) unmatchedPlatforms.push(rawPlatform); return; }
+        if(!d.keywords[sentiment]) d.keywords[sentiment] = {};
+        const existingLines = (d.keywords[sentiment][match] || '').split('\n').map(s=>s.trim()).filter(Boolean);
+        const newLines = data.keywords[sentiment][rawPlatform].filter(p => !existingLines.includes(p));
+        if(newLines.length){
+          d.keywords[sentiment][match] = existingLines.concat(newLines).join('\n');
+          mergedCount += newLines.length;
+        }
+      });
+    });
+    if(!mergedCount && !unmatchedPlatforms.length){
+      showToast('error','Nothing new added','No new excerpts found — check the scan has scored mentions for this client, or everything is already entered.');
+      return;
+    }
+    renderAiVisibilityMain();
+    const parts = [];
+    if(mergedCount) parts.push(`Added ${mergedCount} excerpt${mergedCount!==1?'s':''}`);
+    if(unmatchedPlatforms.length) parts.push(`couldn't match platform${unmatchedPlatforms.length!==1?'s':''}: ${unmatchedPlatforms.join(', ')}`);
+    showToast('success','Pulled', `${parts.join('; ')}. Review before saving.`);
+  }catch(e){
+    showToast('error','Pull failed', e.message || 'Try again.');
+  }finally{
+    restoreBtn(btn);
+  }
+}
+
 async function testFetchRankscaleSearchTerms(){
   const resultEl = document.getElementById('rankscaleFetchResult');
   const btn = clickedBtn();
@@ -11318,7 +11410,21 @@ function renderAiVisibilityDetail(el){
     <div class="panel" style="margin-bottom:20px;">
       <div class="panel-head"><span class="panel-title">Positive / Neutral / Negative Associations</span></div>
       <div class="panel-body">
-        <label style="font-size:12.5px;font-weight:700;color:var(--ink);display:block;margin-bottom:8px;">Import from a RankScale CSV/Sheet export</label>
+        <div style="margin-bottom:16px;padding:12px;background:var(--surface-2);border-radius:8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="toggleInhouseKeywordsPullPanel()">
+            <span style="font-size:12.5px;font-weight:700;color:var(--ink);">Pull from in-house tool</span>
+            <span id="inhouseKeywordsPullPanelToggle" style="font-size:12px;color:var(--muted-lt);">Show</span>
+          </div>
+          <div id="inhouseKeywordsPullPanelBody" style="display:none;margin-top:12px;">
+            <p style="font-size:11px;color:var(--muted-lt);margin:0 0 10px;">Pulls real excerpts and sentiment directly from a single scan — a point-in-time snapshot, not a before/after comparison.</p>
+            <div class="form-grid" style="margin-bottom:10px;">
+              <div><label style="font-size:11px;">Client</label><select id="inhouseKeywordsClientSelect" onchange="onInhouseKeywordsClientSelected(this.value)"><option value="">Loading…</option></select></div>
+              <div><label style="font-size:11px;">Scan</label><select id="inhouseKeywordsScanSelect"><option value="">Pick a client first</option></select></div>
+            </div>
+            <button class="btn btn-brand" onclick="pullInhouseKeywords()">Pull data</button>
+          </div>
+        </div>
+        <label style="font-size:12.5px;font-weight:700;color:var(--ink);display:block;margin-bottom:8px;">Or import from a RankScale CSV/Sheet export</label>
         <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 10px;line-height:1.5;">Upload the exported CSV file — this pulls out only the client's own row (using RankScale's "Is Own Brand" column, or matching the client name), so competitor rows in the same export are ignored automatically.</p>
         <input type="file" accept=".csv,text/csv" onchange="importRankscaleCsvForKeywords(this)">
         <p style="font-size:11.5px;color:var(--muted-lt);margin:16px 0 14px;">One phrase per line below, optionally ending in a count like "(2)" — still editable by hand at any time.</p>
