@@ -16281,7 +16281,20 @@ ${contentRules}`;
     // know precisely which rows to flip include_in_email off for.
     c.draftImprovementIds = checkedIds;
     log.unshift({t:nowTime(), tag:'auto', text:`AI ${stayedApproved?'re-worded':'drafted'} the update for <b>${c.name}</b> from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''}${stayedApproved?' — stayed approved, the included improvements didn\'t change':''}.`});
-    await updateClientRow(id, { draft:c.draft, draftStatus:c.draftStatus, draftPendingSince:c.draftPendingSince, readyToNotify:false, draftImprovementIds: checkedIds, draftSentAt: c.draftSentAt, draftSentBy: c.draftSentBy });
+    const saved = await updateClientRow(id, { draft:c.draft, draftStatus:c.draftStatus, draftPendingSince:c.draftPendingSince, readyToNotify:false, draftImprovementIds: checkedIds, draftSentAt: c.draftSentAt, draftSentBy: c.draftSentBy });
+    if(!saved){
+      // The draft text and status are already updated in memory above, so
+      // the modal shows the generated text either way — but if this save
+      // failed, that text only exists on this screen right now. A reload,
+      // or another team member opening this client, would show the old
+      // state, since nothing actually reached the database. A silent
+      // "Draft generated" success toast here would be actively misleading
+      // in exactly the way that's easy to mistake for "it's not saving."
+      renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
+      openQueueCardModal(id);
+      showToast('error','Draft generated, but not saved', 'The AI wrote it, but saving to the database failed — check that all schema migrations have been run, then try again.');
+      return;
+    }
     await persistLog();
     renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
     logClientActivity(id, 'draft_generated', `AI ${stayedApproved?'re-worded':'generated'} a draft from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''} (of ${c.improvements.length} logged)${stayedApproved?' — approval carried over':''}.`);
@@ -16305,10 +16318,10 @@ ${contentRules}`;
     // and in its badge count — for a draft nobody had actually flagged.
     c.readyToNotify = false;
     c.draftImprovementIds = checkedIds;
-    await updateClientRow(id, { draft:c.draft, draftStatus:c.draftStatus, draftPendingSince:c.draftPendingSince, readyToNotify:false, draftImprovementIds: checkedIds });
+    const saved = await updateClientRow(id, { draft:c.draft, draftStatus:c.draftStatus, draftPendingSince:c.draftPendingSince, readyToNotify:false, draftImprovementIds: checkedIds });
     renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
     openQueueCardModal(id);
-    showToast('error','AI generation failed', 'Write the draft manually below, or try again.');
+    showToast('error', saved ? 'AI generation failed' : 'AI generation failed, and the fallback state failed to save too', saved ? 'Write the draft manually below, or try again.' : 'Try refreshing before writing a draft manually — this client\'s saved state may be stale.');
   }
 }
 
