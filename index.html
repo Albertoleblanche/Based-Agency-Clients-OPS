@@ -10766,7 +10766,7 @@ function emptyAiVisibilityDraft(){
     executive_summary:'', competitive_intelligence_summary:'',
     domination_score:null, domination_score_rationale:'',
     overview_before_screenshot_path: null, overview_after_screenshot_path: null, overview_summary: '', overview_matrix_data: [],
-    competitive_research_screenshot_path: null, what_ai_values: '',
+    what_ai_values: '',
   };
 }
 
@@ -10794,7 +10794,7 @@ async function openAiVisibilityReport(id){
     domination_score: data.domination_score, domination_score_rationale: data.domination_score_rationale||'',
     overview_before_screenshot_path: data.overview_before_screenshot_path||null, overview_after_screenshot_path: data.overview_after_screenshot_path||null,
     overview_summary: data.overview_summary||'', overview_matrix_data: data.overview_matrix_data||[],
-    competitive_research_screenshot_path: data.competitive_research_screenshot_path||null, what_ai_values: data.what_ai_values||'',
+    what_ai_values: data.what_ai_values||'',
   };
   aiVisibilityCurrentReportId = id;
   renderAiVisibilityMain();
@@ -10831,7 +10831,7 @@ async function saveAiVisibilityReport(){
     domination_score: d.domination_score, domination_score_rationale: d.domination_score_rationale,
     overview_before_screenshot_path: d.overview_before_screenshot_path, overview_after_screenshot_path: d.overview_after_screenshot_path,
     overview_summary: d.overview_summary, overview_matrix_data: d.overview_matrix_data,
-    competitive_research_screenshot_path: d.competitive_research_screenshot_path, what_ai_values: d.what_ai_values,
+    what_ai_values: d.what_ai_values,
     updated_at: new Date().toISOString(),
   };
   const result = d.id
@@ -10863,13 +10863,13 @@ function fileToBase64(file){
 // Maps a short slot key (used for the ephemeral in-memory file cache and
 // the Storage path prefix) to the actual draft field storing its path —
 // one generic set of upload/view/remove/analyze functions serving every
-// single-screenshot slot in this report. Positive/Neutral/Negative
-// Associations (Page 5) isn't here — that section imports from a
-// RankScale CSV/Sheet export instead (see importRankscaleCsvForKeywords()).
+// single-screenshot slot in this report. Neither Page 5 (Positive/Neutral/
+// Negative Associations) nor Competitive Intelligence is here — both
+// import from RankScale CSV/Sheet exports instead (see
+// importRankscaleCsvForKeywords() and importRankscaleCsvForCompetitors()).
 const AI_VISIBILITY_SCREENSHOT_SLOTS = {
   before: 'overview_before_screenshot_path',
   after: 'overview_after_screenshot_path',
-  competitive: 'competitive_research_screenshot_path',
 };
 
 // Same 'attachments' Storage bucket notes/tasks already use, path scoped
@@ -11006,60 +11006,10 @@ function parseAiVisibilityOverviewExtraction(reply){
   return { summary: summaryLines.join('\n'), matrixRows };
 }
 
-
-// Reads the Competitive Research screenshot (the "Top Competitors" table +
-// "What AIs Value" list from the same external tool) and extracts both
-// into structured form — the table replaces d.competitors entirely (this
-// screenshot is treated as the authoritative current snapshot, not
-// something to merge with manual entries), and the values list fills a
-// dedicated field. Asks for a strict, parseable format specifically so
-// the table extraction doesn't depend on freeform narrative parsing.
-async function analyzeAiVisibilityCompetitiveResearch(){
-  const d = aiVisibilityDraft;
-  const img = await getAiVisibilityScreenshotBase64('competitive');
-  if(!img){ showToast('error','Nothing to analyze','Upload the competitive research screenshot first.'); return; }
-  if(d.competitors.length){
-    const confirmed = await confirmDialog(
-      `This will replace the ${d.competitors.length} competitor${d.competitors.length!==1?'s':''} already in the table with what's extracted from the screenshot. Continue?`,
-      { confirmLabel:'Replace' }
-    );
-    if(!confirmed) return;
-  }
-  // Only the table — "What AIs Value" isn't reliably present in this
-  // screenshot, and is handled separately by actually researching the
-  // extracted competitors online (see researchAiVisibilityWhatAiValues()),
-  // not by trying to read it off this image.
-  const prompt = `This screenshot shows a "Top Competitors" table from an AI visibility tracking tool.\n\nExtract the table and respond in EXACTLY this format, nothing else — no extra commentary, no markdown:\n\nTABLE:\nrank|name|position|top3pct|sentimentpct|mentions|citations|visibilitypct\n(one line per competitor row shown in the table, using the exact values as displayed — keep % signs, keep # signs on position if shown)\n\nIf the table has no rows, write "NONE" under TABLE.`;
-  const btn = clickedBtn();
-  setBtnLoading(btn, 'Analyzing…');
-  try{
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/claude-chat', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
-      body: JSON.stringify({ mode:'vision-analyze', prompt, images:[img], provider: settings.aiProvider==='openai' ? 'openai' : 'claude' }),
-    });
-    const data = await response.json();
-    if(!response.ok) throw new Error(data.error || 'Analysis failed');
-    const competitors = parseAiVisibilityCompetitiveExtraction(data.reply || '');
-    if(!competitors.length){
-      showToast('error','Nothing extracted','The screenshot may be unclear — try a higher-resolution capture, or enter this manually.');
-      return;
-    }
-    d.competitors = competitors;
-    renderAiVisibilityMain();
-    showToast('success','Analyzed','Review the extracted table before saving — this is a first draft, not a final answer.');
-  }catch(e){
-    showToast('error','Analysis failed', e.message || 'Try again.');
-  }finally{
-    restoreBtn(btn);
-  }
-}
-
 // "What AIs Value" is filled in by actually researching the extracted
 // competitors online — real web search via the same claude-chat.js
-// endpoint's competitive-research mode — not by reading it off the
-// uploaded screenshot, which doesn't reliably contain this section at all.
+// endpoint's competitive-research mode — not by reading it off a
+// screenshot, which doesn't reliably contain this section at all.
 async function researchAiVisibilityWhatAiValues(){
   const d = aiVisibilityDraft;
   if(!d.competitors.length){ showToast('error','No competitors yet','Extract or add competitors first — this researches the businesses in that table.'); return; }
@@ -11086,26 +11036,6 @@ async function researchAiVisibilityWhatAiValues(){
   }finally{
     restoreBtn(btn);
   }
-}
-
-
-
-function parseAiVisibilityCompetitiveExtraction(reply){
-  const lines = reply.split('\n');
-  let section = null;
-  const competitors = [];
-  lines.forEach(line=>{
-    const trimmed = line.trim();
-    if(/^TABLE:?$/i.test(trimmed)){ section = 'table'; return; }
-    if(!trimmed || trimmed.toUpperCase()==='NONE') return;
-    if(section === 'table' && trimmed.includes('|')){
-      const parts = trimmed.split('|').map(s=>s.trim());
-      if(parts.length >= 8 && parts[1]){
-        competitors.push({ rank: parts[0], name: parts[1], position: parts[2], top3Pct: parts[3], sentimentPct: parts[4], mentions: parts[5], citations: parts[6], visibilityPct: parts[7] });
-      }
-    }
-  });
-  return competitors;
 }
 
 // ---- RankScale CSV/Sheet import for Page 5 — a much cleaner data source
@@ -11200,6 +11130,53 @@ async function importRankscaleCsvForKeywords(fileInput){
   }
   renderAiVisibilityMain();
   showToast('success','Imported', `Added ${mergedCount} phrase${mergedCount!==1?'s':''} from the CSV. Review before saving.`);
+}
+
+// ---- RankScale CSV import for Competitive Intelligence — a different
+// export from the keywords one above: semicolon-delimited (RankScale
+// includes a "sep=;" hint line for Excel, stripped before parsing), and
+// includes the client's OWN row alongside competitors (Is Own Brand
+// column) rather than filtering it out — matching how the original
+// sample report displayed the client ranked among its competitors in one
+// table, unlike Page 5 which is specifically about the client alone. ----
+async function importRankscaleCsvForCompetitors(fileInput){
+  const d = aiVisibilityDraft;
+  const file = fileInput.files[0];
+  if(!file) return;
+  let text = await file.text();
+  text = text.replace(/^\uFEFF?sep=.\r?\n/, ''); // strip the Excel delimiter-hint line, not real data
+  if(!text.trim()){ showToast('error','Empty file','That CSV file looks empty.'); fileInput.value=''; return; }
+  const rows = parseCsv(text, ';');
+  if(rows.length < 2){ showToast('error','No data found','Need a header row plus at least one data row.'); fileInput.value=''; return; }
+  const headerRow = rows[0];
+  const nameIdx = findRankscaleColumnIndex(headerRow, 'Brand');
+  if(nameIdx === -1){ showToast('error','Unrecognized format','Could not find a "Brand" column — is this the right export?'); fileInput.value=''; return; }
+  const positionIdx = findRankscaleColumnIndex(headerRow, 'Position (Average Rank)');
+  const top3Idx = findRankscaleColumnIndex(headerRow, 'Top 3 Rate (%)');
+  const sentimentIdx = findRankscaleColumnIndex(headerRow, 'Sentiment (%)');
+  const mentionsIdx = findRankscaleColumnIndex(headerRow, 'Mentions');
+  const citationsIdx = findRankscaleColumnIndex(headerRow, 'Citations');
+  const visibilityIdx = findRankscaleColumnIndex(headerRow, 'Visibility Score (%)');
+
+  const competitors = rows.slice(1).map((r,i) => ({
+    rank: i+1, // RankScale's export is already rank-ordered; no explicit rank column to read
+    name: (r[nameIdx]||'').trim(),
+    position: positionIdx!==-1 && r[positionIdx] ? `#${r[positionIdx].trim()}` : '',
+    top3Pct: top3Idx!==-1 && r[top3Idx] ? `${r[top3Idx].trim()}%` : '',
+    sentimentPct: sentimentIdx!==-1 && r[sentimentIdx] ? `${r[sentimentIdx].trim()}%` : '',
+    mentions: mentionsIdx!==-1 ? r[mentionsIdx].trim() : '',
+    citations: citationsIdx!==-1 ? r[citationsIdx].trim() : '',
+    visibilityPct: visibilityIdx!==-1 && r[visibilityIdx] ? `${r[visibilityIdx].trim()}%` : '',
+  })).filter(c => c.name);
+
+  if(!competitors.length){ showToast('error','No rows found','The CSV had no usable competitor rows.'); fileInput.value=''; return; }
+  if(d.competitors.length){
+    const confirmed = await confirmDialog(`This will replace the ${d.competitors.length} competitor${d.competitors.length!==1?'s':''} already in the table with the ${competitors.length} from this CSV. Continue?`, { confirmLabel:'Replace' });
+    if(!confirmed){ fileInput.value=''; return; }
+  }
+  d.competitors = competitors;
+  renderAiVisibilityMain();
+  showToast('success','Imported', `Added ${competitors.length} competitor${competitors.length!==1?'s':''} from the CSV.`);
 }
 
 
@@ -11361,19 +11338,10 @@ function renderAiVisibilityDetail(el){
     <div class="panel" style="margin-bottom:20px;">
       <div class="panel-head"><span class="panel-title">Competitive Intelligence</span></div>
       <div class="panel-body">
-        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;line-height:1.5;">Upload the "Top Competitors" screenshot from your visibility tool — AI reads the table directly, instead of typing every row by hand.</p>
-        ${!d.id ? `<p style="font-size:12px;color:var(--amber);margin:0 0 14px;">Save the report once first — screenshots need a real report to attach to.</p>` : ''}
-        <div style="margin-bottom:14px;">
-          ${d.competitive_research_screenshot_path ? `
-            <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;max-width:320px;">
-              <span style="font-size:12px;color:var(--green);flex:1;">✓ Uploaded</span>
-              <span class="row-link" onclick="viewAiVisibilityScreenshot('competitive')">View</span>
-              <span class="row-link" style="color:var(--red);" onclick="removeAiVisibilityScreenshot('competitive')">Remove</span>
-            </div>
-          ` : `<input type="file" accept="image/*" ${!d.id?'disabled':''} onchange="uploadAiVisibilityScreenshot('competitive', this)">`}
-        </div>
-        <button class="btn btn-brand" style="margin-bottom:16px;" onclick="analyzeAiVisibilityCompetitiveResearch()" ${!d.competitive_research_screenshot_path ? 'disabled' : ''}>✨ Analyze with AI</button>
-        <div class="table-scroll-wrap">
+        <label style="font-size:12.5px;font-weight:700;color:var(--ink);display:block;margin-bottom:8px;">Import from a RankScale CSV export</label>
+        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 10px;line-height:1.5;">Upload the competitors export — includes the client's own row alongside competitors (matching how it displays in the final report), so nothing needs filtering out.</p>
+        <input type="file" accept=".csv,text/csv" onchange="importRankscaleCsvForCompetitors(this)">
+        <div class="table-scroll-wrap" style="margin-top:16px;">
           <table>
             <thead><tr><th>Rank</th><th>Competitor</th><th>Position</th><th>Top 3%</th><th>Sentiment%</th><th>Mentions</th><th>Citations</th><th>Visibility%</th><th></th></tr></thead>
             <tbody>
@@ -17173,7 +17141,11 @@ async function saveEmailInstructions(){
 /* ---------- Google Sheet CSV sync ---------- */
 
 // Minimal but quote-aware CSV parser — handles commas and newlines inside "quoted" cells.
-function parseCsv(text){
+// delimiter defaults to comma so every existing caller (client CSV
+// import, the keywords CSV import) is completely unaffected — only
+// callers that explicitly pass a different delimiter (like RankScale's
+// semicolon-delimited competitors export) get different behavior.
+function parseCsv(text, delimiter=','){
   const rows = [];
   let row = [], field = '', inQuotes = false;
   for(let i=0; i<text.length; i++){
@@ -17184,7 +17156,7 @@ function parseCsv(text){
       else { field += ch; }
     } else {
       if(ch === '"'){ inQuotes = true; }
-      else if(ch === ','){ row.push(field); field=''; }
+      else if(ch === delimiter){ row.push(field); field=''; }
       else if(ch === '\n'){ row.push(field); rows.push(row); row=[]; field=''; }
       else if(ch === '\r'){ /* skip */ }
       else { field += ch; }
