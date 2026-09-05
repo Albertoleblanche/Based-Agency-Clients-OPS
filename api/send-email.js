@@ -2,13 +2,65 @@
 // runs after the person has reviewed the message and clicked "Send Email" in
 // the confirmation popup; nothing here fires automatically on its own.
 
+const { createClient } = require('@supabase/supabase-js');
+
+// Escapes plain text for safe inclusion in HTML, then converts line breaks
+// to <br> and blank lines to paragraph spacing — the body itself was
+// written as plain text (that's still what shows in the "text" version and
+// the modal the person reviewed), so this is just making it presentable as
+// HTML too, not reformatting the actual content.
+function plainTextToHtml(text) {
+  const escaped = String(text)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return escaped.split('\n\n').map(para =>
+    `<p style="margin:0 0 14px;">${para.replace(/\n/g, '<br>')}</p>`
+  ).join('');
+}
+
+// Table-based layout with inline styles throughout — standard practice for
+// HTML email specifically because flexbox/grid and <style> blocks aren't
+// reliably supported across mail clients, unlike in this app's own UI.
+function buildSignatureHtml(sig) {
+  if (!sig || !(sig.companyName || sig.phone || sig.email || sig.website || sig.address || sig.logoUrl)) return '';
+  const brand = '#E8622C';
+  const teamLines = String(sig.teamLine || '').split('\n').map(l => l.trim()).filter(Boolean);
+  const contactRow = (icon, text, href) => {
+    if (!text) return '';
+    const inner = href ? `<a href="${href}" style="color:#333333;text-decoration:underline;">${text}</a>` : text;
+    return `<tr><td style="padding:0 0 6px;font-size:13px;color:#333333;font-family:Arial,Helvetica,sans-serif;"><span style="color:${brand};margin-right:6px;">${icon}</span>${inner}</td></tr>`;
+  };
+  const websiteHref = sig.website ? (sig.website.startsWith('http') ? sig.website : `https://${sig.website}`) : null;
+  const phoneHref = sig.phone ? `tel:${sig.phone.replace(/[^0-9+]/g, '')}` : null;
+  return `
+    <table cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;font-family:Arial,Helvetica,sans-serif;">
+      <tr><td style="font-weight:bold;font-size:14px;color:#1a1a1a;padding-bottom:12px;">Thank you,</td></tr>
+      <tr><td>
+        <table cellpadding="0" cellspacing="0" border="0"><tr>
+          <td style="vertical-align:top;padding-right:20px;">
+            ${sig.companyName ? `<div style="font-weight:bold;font-size:16px;color:#1a1a1a;margin-bottom:4px;">${sig.companyName}</div>` : ''}
+            ${teamLines.map(l => `<div style="font-size:12px;color:#666666;line-height:1.5;">${l}</div>`).join('')}
+          </td>
+          <td style="border-left:2px solid ${brand};padding-left:20px;vertical-align:top;">
+            <table cellpadding="0" cellspacing="0" border="0">
+              ${contactRow('&#9742;', sig.phone, phoneHref)}
+              ${contactRow('&#9993;', sig.email, sig.email ? `mailto:${sig.email}` : null)}
+              ${contactRow('&#127760;', sig.website, websiteHref)}
+              ${contactRow('&#128205;', sig.address, null)}
+            </table>
+          </td>
+        </tr></table>
+      </td></tr>
+      ${sig.logoUrl ? `<tr><td style="border-top:2px solid ${brand};padding-top:16px;"><img src="${sig.logoUrl}" alt="${sig.companyName || 'Logo'}" style="height:40px;width:auto;display:block;"></td></tr>` : ''}
+    </table>`;
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
 
-  const { to, subject, body } = req.body || {};
+  const { to, subject, body, includeSignature } = req.body || {};
   if (!to || !subject || !body) {
     res.status(400).json({ error: 'Missing to, subject, or body' });
     return;
@@ -34,6 +86,34 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  const emailPayload = { from, to: recipients, subject, text: body };
+
+  // Only client update/improvement emails ask for this — internal
+  // notifications (Notify Approvers, daily summaries, etc.) never pass
+  // includeSignature, so they stay plain text exactly as before. Signature
+  // content itself lives in admin Settings, not here, so it can be updated
+  // without touching this file.
+  if (includeSignature) {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (supabaseUrl && serviceKey) {
+      try {
+        const admin = createClient(supabaseUrl, serviceKey);
+        const { data: settingsRow } = await admin.from('app_storage').select('value').eq('key', 'settings').maybeSingle();
+        const settings = settingsRow ? JSON.parse(settingsRow.value) : {};
+        const signatureHtml = buildSignatureHtml(settings.emailSignature);
+        if (signatureHtml) {
+          emailPayload.html = plainTextToHtml(body) + signatureHtml;
+        }
+      } catch (e) {
+        // A signature failing to load is not worth blocking the send over —
+        // falls through to a plain-text send below instead of erroring out
+        // on something the person already reviewed and approved.
+        console.error('Could not build email signature, sending without it', e);
+      }
+    }
+  }
+
   try {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -41,12 +121,7 @@ module.exports = async function handler(req, res) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        from,
-        to: recipients,
-        subject,
-        text: body,
-      }),
+      body: JSON.stringify(emailPayload),
     });
 
     const data = await response.json();
