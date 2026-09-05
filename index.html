@@ -2622,6 +2622,28 @@ document.addEventListener('DOMContentLoaded', function(){
             </div>
           </div>
         </div>
+        <div class="panel" style="margin-bottom:24px;">
+          <div class="panel-head"><span class="panel-title">Client Email Signature</span></div>
+          <div class="panel-body">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.6;">Appended to client update/improvement emails specifically — not internal notifications like Notify Approvers. Needs a real, hosted logo image; email clients don't reliably render embedded images the way this app's own UI does.</p>
+            <div style="display:flex;align-items:center;gap:16px;margin-bottom:18px;">
+              <div style="width:130px;height:60px;display:flex;align-items:center;justify-content:center;background:var(--surface-2);border-radius:8px;padding:8px;flex:none;">
+                <img id="emailSignatureLogoImg" src="" alt="Logo" style="max-width:100%;max-height:100%;display:none;">
+                <span id="emailSignatureLogoPlaceholder" style="font-size:11px;color:var(--muted-lt);">No logo yet</span>
+              </div>
+              <div>
+                <input type="file" accept="image/*" onchange="uploadEmailSignatureLogo(this.files[0])">
+                <p style="font-size:11px;color:var(--muted-lt);margin:6px 0 0;">PNG with a transparent background works best.</p>
+              </div>
+            </div>
+            <div class="settings-field"><label>Company name</label><input id="setSignatureCompanyName" style="width:100%;" placeholder="Based Agency" onchange="saveEmailSignatureField('companyName', this.value)"></div>
+            <div class="settings-field" style="margin-top:12px;"><label>Team / role line <span style="font-weight:400;color:var(--muted-lt);">(one per line)</span></label><textarea id="setSignatureTeamLine" style="width:100%;min-height:50px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="Based Agency Team&#10;Development | Helpdesk" onchange="saveEmailSignatureField('teamLine', this.value)"></textarea></div>
+            <div class="settings-field" style="margin-top:12px;"><label>Phone</label><input id="setSignaturePhone" style="width:100%;" placeholder="(859) 300-0690" onchange="saveEmailSignatureField('phone', this.value)"></div>
+            <div class="settings-field" style="margin-top:12px;"><label>Email</label><input id="setSignatureEmail" style="width:100%;" placeholder="dev@based-agency.com" onchange="saveEmailSignatureField('email', this.value)"></div>
+            <div class="settings-field" style="margin-top:12px;"><label>Website</label><input id="setSignatureWebsite" style="width:100%;" placeholder="based-agency.com" onchange="saveEmailSignatureField('website', this.value)"></div>
+            <div class="settings-field" style="margin-top:12px;"><label>Address</label><input id="setSignatureAddress" style="width:100%;" placeholder="110 W Vine Street, Lexington KY 40507" onchange="saveEmailSignatureField('address', this.value)"></div>
+          </div>
+        </div>
         </div>
 
         <div class="panel">
@@ -3747,9 +3769,14 @@ async function persistTeam(){ return await safeSet('team-members', JSON.stringif
 // modal with a REAL, visible mailto link the person clicks themselves (which browsers
 // always honor as a genuine user action) plus a guaranteed copy-to-clipboard fallback.
 let _emailSentCallback = null;
+let _emailIncludeSignature = false;
 
-function showSendEmailConfirm(to, subject, body, onSent){
+function showSendEmailConfirm(to, subject, body, onSent, includeSignature){
   _emailSentCallback = onSent || null;
+  // Stored the same way as _emailSentCallback above — confirmSendEmail()
+  // runs later, from its own button click, with no direct access to
+  // whatever arguments this call was made with.
+  _emailIncludeSignature = !!includeSignature;
   // "to" may be several comma-separated addresses (a client with more
   // than one contact) — cleaned up here specifically for the mailto: URI,
   // since stray whitespace around commas is more likely to trip up some
@@ -3762,6 +3789,7 @@ function showSendEmailConfirm(to, subject, body, onSent){
       <div class="settings-field"><label>To</label><input id="mailModalTo" value="${to}" readonly></div>
       <div class="settings-field"><label>Subject</label><input id="mailModalSubject" oninput="updateMailtoHref()"></div>
       <div class="settings-field"><label>Body</label><textarea spellcheck="true" id="mailModalBody" style="min-height:150px;width:100%;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:6px;border:1px solid var(--border);" oninput="updateMailtoHref()"></textarea></div>
+      ${includeSignature ? `<p style="font-size:11px;color:var(--muted-lt);margin:8px 0 0;">Your configured client email signature will be appended automatically — not shown above, since it's the same on every send.</p>` : ''}
       <p style="font-size:11.5px;color:var(--muted-lt);margin:8px 0 0;line-height:1.5;">Review the text above — clicking Send delivers it immediately from the app, no further confirmation.</p>
     </div>
     <div class="modal-actions">
@@ -3800,7 +3828,7 @@ async function confirmSendEmail(){
     const response = await fetch('/api/send-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to, subject, body }),
+      body: JSON.stringify({ to, subject, body, includeSignature: _emailIncludeSignature }),
     });
     const data = await response.json();
     restoreBtn(btn);
@@ -3811,6 +3839,7 @@ async function confirmSendEmail(){
     closeAppModal();
     showToast('success','Email sent', `Delivered to ${to}.`);
     notifyOthersOfEmailSent(to, subject);
+    _emailIncludeSignature = false;
     if(_emailSentCallback){ const cb = _emailSentCallback; _emailSentCallback = null; cb(); }
   }catch(e){
     restoreBtn(btn);
@@ -10519,10 +10548,7 @@ let inhouseMetricsClients = [];
 async function onInhouseClientMatched(){
   const d = aiVisibilityDraft;
   if(!d.inhouse_client_id) return;
-  await Promise.all([
-    onInhouseClientSelected(d.inhouse_client_id),
-    onInhouseKeywordsClientSelected(d.inhouse_client_id),
-  ]);
+  await onInhouseClientSelected(d.inhouse_client_id);
 }
 
 // Targeted update of the report's own Client field once the in-house
@@ -10666,80 +10692,6 @@ async function pullInhouseMetrics(){
   }
 }
 
-// ---- Page 5 (Positive/Neutral/Negative) pull from the same in-house
-// tool — a single-scan snapshot rather than before/after, since this is
-// "what did AI actually say" at one point in time, not a comparison.
-// Reuses the inhouseMetricsClients cache from the Quick Metrics picker
-// above rather than re-fetching, since the client list is identical
-// regardless of which section is pulling. ----
-async function onInhouseKeywordsClientSelected(clientId){
-  const scanSelect = document.getElementById('inhouseKeywordsScanSelect');
-  if(!clientId){ if(scanSelect) scanSelect.innerHTML = '<option value="">Pick a client first</option>'; return; }
-  if(scanSelect) scanSelect.innerHTML = '<option>Loading…</option>';
-  try{
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/admin-user-actions', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
-      body: JSON.stringify({ action:'list-inhouse-scans', clientId }),
-    });
-    const data = await response.json();
-    if(!response.ok) throw new Error(data.error || 'Could not load scans');
-    const scans = data.scans || [];
-    if(scanSelect) scanSelect.innerHTML = '<option value="">Select a scan…</option>' + scans.map(s=>`<option value="${s.id}">${new Date(s.started_at).toLocaleString()} (${escapeHtml(s.mode||'')})</option>`).join('');
-  }catch(e){
-    showToast('error','Could not load scans', e.message||'Try again.');
-  }
-}
-
-async function pullInhouseKeywords(){
-  const d = aiVisibilityDraft;
-  const clientId = d.inhouse_client_id;
-  const scanSelect = document.getElementById('inhouseKeywordsScanSelect');
-  const scanId = scanSelect?.value;
-  if(!clientId){ showToast('error','No linked client','Pick a client for this report first.'); return; }
-  if(!scanId) return; // auto-triggered on scan selection
-  if(scanSelect) scanSelect.disabled = true;
-  try{
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/admin-user-actions', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
-      body: JSON.stringify({ action:'fetch-inhouse-keywords', clientId, scanId }),
-    });
-    const data = await response.json();
-    if(!response.ok) throw new Error(data.error || 'Pull failed');
-    if(data.error){ showToast('error','Nothing pulled', data.error); return; }
-    let mergedCount = 0;
-    const unmatchedPlatforms = [];
-    ['positive','neutral','negative'].forEach(sentiment=>{
-      Object.keys(data.keywords[sentiment]||{}).forEach(rawPlatform=>{
-        const match = AI_VISIBILITY_PLATFORMS.find(p=>p.toLowerCase()===rawPlatform.toLowerCase());
-        if(!match){ if(!unmatchedPlatforms.includes(rawPlatform)) unmatchedPlatforms.push(rawPlatform); return; }
-        if(!d.keywords[sentiment]) d.keywords[sentiment] = {};
-        const existingLines = (d.keywords[sentiment][match] || '').split('\n').map(s=>s.trim()).filter(Boolean);
-        const newLines = data.keywords[sentiment][rawPlatform].filter(p => !existingLines.includes(p));
-        if(newLines.length){
-          d.keywords[sentiment][match] = existingLines.concat(newLines).join('\n');
-          mergedCount += newLines.length;
-        }
-      });
-    });
-    if(!mergedCount && !unmatchedPlatforms.length){
-      showToast('error','Nothing new added','No new excerpts found — check the scan has scored mentions for this client, or everything is already entered.');
-      return;
-    }
-    renderAiVisibilityMain();
-    const parts = [];
-    if(mergedCount) parts.push(`Added ${mergedCount} excerpt${mergedCount!==1?'s':''}`);
-    if(unmatchedPlatforms.length) parts.push(`couldn't match platform${unmatchedPlatforms.length!==1?'s':''}: ${unmatchedPlatforms.join(', ')}`);
-    showToast('success','Pulled', `${parts.join('; ')}. Review before saving.`);
-  }catch(e){
-    showToast('error','Pull failed', e.message || 'Try again.');
-  }finally{
-    if(scanSelect) scanSelect.disabled = false;
-  }
-}
 
 async function renderAiVisibilityList(el){
   el.innerHTML = `
@@ -11174,14 +11126,7 @@ function renderAiVisibilityDetail(el){
     <div class="panel" style="margin-bottom:20px;">
       <div class="panel-head"><span class="panel-title">Positive / Neutral / Negative Associations</span></div>
       <div class="panel-body">
-        <div style="margin-bottom:16px;padding:12px;background:var(--surface-2);border-radius:8px;">
-          <div style="font-size:12.5px;font-weight:700;color:var(--ink);margin-bottom:10px;">Pull from in-house tool</div>
-          <p style="font-size:11px;color:var(--muted-lt);margin:0 0 10px;">Pulls real excerpts and sentiment directly from a single scan — a point-in-time snapshot, not a before/after comparison. Pulls automatically once a scan is selected below.</p>
-          <div class="form-grid">
-            <div><label style="font-size:11px;">Scan</label><select id="inhouseKeywordsScanSelect" onchange="if(this.value) pullInhouseKeywords();"><option value="">${d.inhouse_client_id ? 'Pick a scan' : 'Pick a client above first'}</option></select></div>
-          </div>
-        </div>
-        <label style="font-size:12.5px;font-weight:700;color:var(--ink);display:block;margin-bottom:8px;">Or import from a RankScale CSV/Sheet export</label>
+        <label style="font-size:12.5px;font-weight:700;color:var(--ink);display:block;margin-bottom:8px;">Import from a RankScale CSV/Sheet export</label>
         <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 10px;line-height:1.5;">Upload the exported CSV file — this pulls out only the client's own row (using RankScale's "Is Own Brand" column, or matching the client name), so competitor rows in the same export are ignored automatically.</p>
         <input type="file" accept=".csv,text/csv" onchange="importRankscaleCsvForKeywords(this)">
         <p style="font-size:11.5px;color:var(--muted-lt);margin:16px 0 14px;">One phrase per line per cell below, optionally ending in a count like "(2)" — still editable by hand at any time.</p>
@@ -16323,7 +16268,7 @@ async function sendApprovedDraft(id){
     );
     if(!confirmed) return;
   }
-  showSendEmailConfirm(c.email, `Your weekly update from ${settings.appName || 'Based Agency'}`, c.draft || '', () => recordDraftSent(id));
+  showSendEmailConfirm(c.email, `Your weekly update from ${settings.appName || 'Based Agency'}`, c.draft || '', () => recordDraftSent(id), true);
 }
 
 // Called only once the email actually, successfully sends (via
@@ -16808,6 +16753,21 @@ function renderAiProviderChoice(){
   const openaiModelInput = document.getElementById('setOpenaiModel');
   if(claudeModelInput && document.activeElement !== claudeModelInput){ claudeModelInput.value = settings.claudeModel || ''; claudeModelInput.disabled = !isAdmin(); }
   if(openaiModelInput && document.activeElement !== openaiModelInput){ openaiModelInput.value = settings.openaiModel || ''; openaiModelInput.disabled = !isAdmin(); }
+  // Client email signature fields — same focus-guard pattern as the
+  // fields above, so this doesn't clobber whatever's mid-edit on a
+  // realtime update or an unrelated renderAll() pass.
+  const sig = settings.emailSignature || {};
+  if(sig.logoUrl){
+    const logoImg = document.getElementById('emailSignatureLogoImg');
+    const logoPlaceholder = document.getElementById('emailSignatureLogoPlaceholder');
+    if(logoImg && logoImg.src !== sig.logoUrl){ logoImg.src = sig.logoUrl; logoImg.style.display = 'block'; }
+    if(logoPlaceholder) logoPlaceholder.style.display = 'none';
+  }
+  const sigFieldMap = { setSignatureCompanyName:'companyName', setSignatureTeamLine:'teamLine', setSignaturePhone:'phone', setSignatureEmail:'email', setSignatureWebsite:'website', setSignatureAddress:'address' };
+  Object.keys(sigFieldMap).forEach(elId=>{
+    const el = document.getElementById(elId);
+    if(el && document.activeElement !== el){ el.value = sig[sigFieldMap[elId]] || ''; el.disabled = !isAdmin(); }
+  });
   // Undefined means enabled — this feature predates the toggle, so an
   // existing deployment that's never touched this setting keeps working
   // exactly as before rather than silently going quiet.
@@ -16969,6 +16929,47 @@ async function saveAssistantInstructions(value){
   settings.assistantCustomInstructions = value.trim();
   const ok = await persistSettings();
   ok ? showToast('success','Saved','Custom instructions updated — they apply to the Assistant\'s next reply onward.') : showToast('error','Save failed','Could not save — try again.');
+}
+
+// The client email signature's logo needs a real, publicly-hosted URL —
+// email clients don't reliably render embedded/data-URL images the way
+// this app's own UI does. Reuses the same public 'avatars' Storage
+// bucket (and getPublicUrl pattern) already used for profile photos,
+// rather than a data URL that would silently fail to display for
+// clients reading the email in most mail apps.
+async function uploadEmailSignatureLogo(file){
+  if(!file) return;
+  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  if(!file.type.startsWith('image/')){ showToast('error','Not an image','Please choose an image file.'); return; }
+  if(file.size > 2*1024*1024){ showToast('error','Too large','Logo needs to be under 2MB.'); return; }
+  const ext = file.name.split('.').pop();
+  const path = `email-signature/logo.${ext}`;
+  const { error: uploadErr } = await supabaseClient.storage.from('avatars').upload(path, file, { upsert:true });
+  if(uploadErr){ showToast('error','Upload failed', uploadErr.message); return; }
+  const { data: urlData } = supabaseClient.storage.from('avatars').getPublicUrl(path);
+  // Cache-bust so a replaced logo shows immediately in this settings
+  // panel instead of a stale cached version — doesn't affect emails
+  // already sent, only future ones and this preview.
+  if(!settings.emailSignature) settings.emailSignature = {};
+  settings.emailSignature.logoUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+  const ok = await persistSettings();
+  if(ok){
+    const img = document.getElementById('emailSignatureLogoImg');
+    const placeholder = document.getElementById('emailSignatureLogoPlaceholder');
+    if(img){ img.src = settings.emailSignature.logoUrl; img.style.display = 'block'; }
+    if(placeholder) placeholder.style.display = 'none';
+    showToast('success','Logo saved','Will appear on client update emails going forward.');
+  } else {
+    showToast('error','Save failed','The image uploaded, but saving the setting failed — try again.');
+  }
+}
+
+async function saveEmailSignatureField(key, value){
+  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  if(!settings.emailSignature) settings.emailSignature = {};
+  settings.emailSignature[key] = value.trim();
+  const ok = await persistSettings();
+  ok ? showToast('success','Saved','Signature updated.') : showToast('error','Save failed','Could not save — try again.');
 }
 
 // A personal, per-device preference (like the AI provider override and
