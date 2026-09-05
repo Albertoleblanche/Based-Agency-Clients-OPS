@@ -16943,7 +16943,15 @@ async function uploadEmailSignatureLogo(file){
   if(!file.type.startsWith('image/')){ showToast('error','Not an image','Please choose an image file.'); return; }
   if(file.size > 2*1024*1024){ showToast('error','Too large','Logo needs to be under 2MB.'); return; }
   const ext = file.name.split('.').pop();
-  const path = `email-signature/logo.${ext}`;
+  // Path scoped under the uploader's own user id, matching uploadAvatar()'s
+  // existing, working pattern for this same bucket — the 'avatars' bucket's
+  // RLS policy most likely checks that the first path segment matches
+  // auth.uid(), so a shared path like 'email-signature/logo.png' (no user
+  // id at all) would fail that check even though the upload itself is
+  // otherwise perfectly valid. This is a real, agency-wide setting despite
+  // living under one admin's folder — any admin can still overwrite it,
+  // since the setting itself (not the file owner) is what the app reads.
+  const path = `${currentUser.id}/email-signature-logo.${ext}`;
   const { error: uploadErr } = await supabaseClient.storage.from('avatars').upload(path, file, { upsert:true });
   if(uploadErr){ showToast('error','Upload failed', uploadErr.message); return; }
   const { data: urlData } = supabaseClient.storage.from('avatars').getPublicUrl(path);
