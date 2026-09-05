@@ -10579,16 +10579,6 @@ async function manuallySetInhouseClient(clientId){
   renderAiVisibilityMain();
 }
 
-function toggleInhousePullPanel(){
-  const body = document.getElementById('inhousePullPanelBody');
-  const toggle = document.getElementById('inhousePullPanelToggle');
-  if(!body) return;
-  const showing = body.style.display !== 'none';
-  body.style.display = showing ? 'none' : 'block';
-  if(toggle) toggle.textContent = showing ? 'Show' : 'Hide';
-  if(!showing && !inhouseMetricsClients.length) loadInhouseMetricsClientsForPicker();
-}
-
 // Targeted update of both panels' client-link dropdowns, deliberately
 // NOT a full renderAiVisibilityMain() — that would reset the panel's own
 // open/closed display state back to its default (closed), collapsing
@@ -10720,16 +10710,6 @@ async function pullInhouseMetrics(){
 // Reuses the inhouseMetricsClients cache from the Quick Metrics picker
 // above rather than re-fetching, since the client list is identical
 // regardless of which section is pulling. ----
-function toggleInhouseKeywordsPullPanel(){
-  const body = document.getElementById('inhouseKeywordsPullPanelBody');
-  const toggle = document.getElementById('inhouseKeywordsPullPanelToggle');
-  if(!body) return;
-  const showing = body.style.display !== 'none';
-  body.style.display = showing ? 'none' : 'block';
-  if(toggle) toggle.textContent = showing ? 'Show' : 'Hide';
-  if(!showing && !inhouseMetricsClients.length) loadInhouseMetricsClientsForPicker();
-}
-
 async function onInhouseKeywordsClientSelected(clientId){
   const scanSelect = document.getElementById('inhouseKeywordsScanSelect');
   if(!clientId){ if(scanSelect) scanSelect.innerHTML = '<option value="">Pick a client first</option>'; return; }
@@ -11202,19 +11182,14 @@ function renderAiVisibilityDetail(el){
       <div class="panel-head"><span class="panel-title">Quick Metrics</span><span class="pill pill-good">Automated</span></div>
       <div class="panel-body">
         <div style="margin-bottom:16px;padding:12px;background:var(--surface-2);border-radius:8px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="toggleInhousePullPanel()">
-            <span style="font-size:12.5px;font-weight:700;color:var(--ink);">Pull from in-house tool</span>
-            <span id="inhousePullPanelToggle" style="font-size:12px;color:var(--muted-lt);">Show</span>
+          <div style="font-size:12.5px;font-weight:700;color:var(--ink);margin-bottom:10px;">Pull from in-house tool</div>
+          <p style="font-size:11px;color:var(--muted-lt);margin:0 0 10px;">Populates Quick Metrics AND the Overview matrix together, directly from real data — no screenshot needed.</p>
+          ${inhouseClientLinkHtml('metrics')}
+          <div class="form-grid" style="margin-bottom:10px;">
+            <div><label style="font-size:11px;">Before scan</label><select id="inhouseBeforeScanSelect"><option value="">Pick a client first</option></select></div>
+            <div><label style="font-size:11px;">After scan</label><select id="inhouseAfterScanSelect"><option value="">Pick a client first</option></select></div>
           </div>
-          <div id="inhousePullPanelBody" style="display:none;margin-top:12px;">
-            <p style="font-size:11px;color:var(--muted-lt);margin:0 0 10px;">Populates Quick Metrics AND the Overview matrix together, directly from real data — no screenshot needed.</p>
-            ${inhouseClientLinkHtml('metrics')}
-            <div class="form-grid" style="margin-bottom:10px;">
-              <div><label style="font-size:11px;">Before scan</label><select id="inhouseBeforeScanSelect"><option value="">Pick a client first</option></select></div>
-              <div><label style="font-size:11px;">After scan</label><select id="inhouseAfterScanSelect"><option value="">Pick a client first</option></select></div>
-            </div>
-            <button class="btn btn-brand" onclick="pullInhouseMetrics()">Pull data</button>
-          </div>
+          <button class="btn btn-brand" onclick="pullInhouseMetrics()">Pull data</button>
         </div>
         <div class="form-grid">
           <div><label>Before — recommended in (of total prompts)</label><div style="display:flex;gap:6px;align-items:center;"><input type="number" min="0" style="width:80px;" value="${d.before_recommended_count??''}" onchange="aiVisibilityDraft.before_recommended_count=this.value?Number(this.value):null;renderAiVisibilityMain();"><span>/</span><input type="number" min="0" style="width:80px;" value="${d.before_total_prompts??''}" onchange="aiVisibilityDraft.before_total_prompts=this.value?Number(this.value):null;renderAiVisibilityMain();"></div></div>
@@ -11238,33 +11213,34 @@ function renderAiVisibilityDetail(el){
       <div class="panel-head"><span class="panel-title">Positive / Neutral / Negative Associations</span></div>
       <div class="panel-body">
         <div style="margin-bottom:16px;padding:12px;background:var(--surface-2);border-radius:8px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="toggleInhouseKeywordsPullPanel()">
-            <span style="font-size:12.5px;font-weight:700;color:var(--ink);">Pull from in-house tool</span>
-            <span id="inhouseKeywordsPullPanelToggle" style="font-size:12px;color:var(--muted-lt);">Show</span>
+          <div style="font-size:12.5px;font-weight:700;color:var(--ink);margin-bottom:10px;">Pull from in-house tool</div>
+          <p style="font-size:11px;color:var(--muted-lt);margin:0 0 10px;">Pulls real excerpts and sentiment directly from a single scan — a point-in-time snapshot, not a before/after comparison.</p>
+          ${inhouseClientLinkHtml('keywords')}
+          <div class="form-grid" style="margin-bottom:10px;">
+            <div><label style="font-size:11px;">Scan</label><select id="inhouseKeywordsScanSelect"><option value="">Pick a client first</option></select></div>
           </div>
-          <div id="inhouseKeywordsPullPanelBody" style="display:none;margin-top:12px;">
-            <p style="font-size:11px;color:var(--muted-lt);margin:0 0 10px;">Pulls real excerpts and sentiment directly from a single scan — a point-in-time snapshot, not a before/after comparison.</p>
-            ${inhouseClientLinkHtml('keywords')}
-            <div class="form-grid" style="margin-bottom:10px;">
-              <div><label style="font-size:11px;">Scan</label><select id="inhouseKeywordsScanSelect"><option value="">Pick a client first</option></select></div>
-            </div>
-            <button class="btn btn-brand" onclick="pullInhouseKeywords()">Pull data</button>
-          </div>
+          <button class="btn btn-brand" onclick="pullInhouseKeywords()">Pull data</button>
         </div>
         <label style="font-size:12.5px;font-weight:700;color:var(--ink);display:block;margin-bottom:8px;">Or import from a RankScale CSV/Sheet export</label>
         <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 10px;line-height:1.5;">Upload the exported CSV file — this pulls out only the client's own row (using RankScale's "Is Own Brand" column, or matching the client name), so competitor rows in the same export are ignored automatically.</p>
         <input type="file" accept=".csv,text/csv" onchange="importRankscaleCsvForKeywords(this)">
-        <p style="font-size:11.5px;color:var(--muted-lt);margin:16px 0 14px;">One phrase per line below, optionally ending in a count like "(2)" — still editable by hand at any time.</p>
-        ${['positive','neutral','negative'].map(sentiment=>`
-          <div style="margin-bottom:16px;">
-            <div style="font-size:12.5px;font-weight:700;text-transform:capitalize;color:var(--ink);margin-bottom:8px;">${sentiment}</div>
-            <div class="form-grid">
-              ${AI_VISIBILITY_PLATFORMS.map(p=>`
-                <div><label style="font-size:11px;">${p}</label><textarea style="width:100%;min-height:70px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;padding:8px;border-radius:6px;border:1px solid var(--border);resize:vertical;" onchange="updateAiVisibilityKeywords('${sentiment}','${p}',this.value)">${escapeHtml((d.keywords[sentiment]||{})[p]||'')}</textarea></div>
-              `).join('')}
-            </div>
-          </div>
-        `).join('')}
+        <p style="font-size:11.5px;color:var(--muted-lt);margin:16px 0 14px;">One phrase per line per cell below, optionally ending in a count like "(2)" — still editable by hand at any time.</p>
+        <div class="table-scroll-wrap">
+          <table>
+            <thead><tr><th style="width:90px;">Sentiment</th><th style="width:110px;">Platform</th><th>Phrases</th></tr></thead>
+            <tbody>
+              ${['positive','neutral','negative'].flatMap(sentiment=>
+                AI_VISIBILITY_PLATFORMS.map((p,i)=>`
+                  <tr>
+                    ${i===0 ? `<td rowspan="${AI_VISIBILITY_PLATFORMS.length}" style="text-transform:capitalize;font-weight:700;vertical-align:top;">${sentiment}</td>` : ''}
+                    <td style="white-space:nowrap;">${p}</td>
+                    <td><textarea style="width:100%;min-height:44px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);resize:vertical;" onchange="updateAiVisibilityKeywords('${sentiment}','${p}',this.value)">${escapeHtml((d.keywords[sentiment]||{})[p]||'')}</textarea></td>
+                  </tr>
+                `)
+              ).join('')}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -11345,6 +11321,18 @@ function renderAiVisibilityDetail(el){
   });
   const dateInput = document.getElementById('avReportDate');
   if(dateInput) dateInput.addEventListener('change', function(){ aiVisibilityDraft.report_date = this.value; });
+
+  // Both in-house pull panels are always visible now (no toggle to
+  // trigger loading on demand), so this has to happen on every render
+  // instead: load the client list if it isn't cached yet, then — whether
+  // it was just loaded or already cached — populate the scan dropdowns if
+  // a client is already linked. Necessary because this function rebuilds
+  // the whole panel's HTML from scratch each time, which resets those
+  // dropdowns back to their placeholder state.
+  (async () => {
+    if(!inhouseMetricsClients.length) await loadInhouseMetricsClientsForPicker();
+    if(d.inhouse_client_id) onInhouseClientMatched();
+  })();
 }
 
 // Same manual-drawing jsPDF pattern already established by
