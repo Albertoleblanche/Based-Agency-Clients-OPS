@@ -3269,8 +3269,17 @@ async function insertImprovementRow(clientId, {author, text, includeInEmail=true
 // descending sort to avoid shifting indices mid-batch-delete, since the old
 // JSON array entries had no stable id of their own).
 async function deleteImprovementRow(id){
-  const { error } = await supabaseClient.from('client_improvements').delete().eq('id', id);
+  // .select() after .delete() specifically to get back the row(s) that
+  // were actually deleted — checking only `error` isn't enough here.
+  // When an RLS policy silently blocks a delete, PostgREST doesn't return
+  // an error at all: the request succeeds having affected zero rows. That
+  // combination (no error, but nothing deleted) was going undetected here,
+  // reporting success and removing the item locally while the row stayed
+  // in the database — invisible until whatever fetched it fresh again
+  // (a reload, the Team Queue) brought it right back.
+  const { data, error } = await supabaseClient.from('client_improvements').delete().eq('id', id).select();
   if(error){ console.error('deleteImprovementRow failed', id, error); return false; }
+  if(!data || !data.length){ console.error('deleteImprovementRow: delete affected 0 rows (likely blocked by RLS)', id); return false; }
   clientImprovements = clientImprovements.filter(i=>i.id!==id);
   clients.forEach(c=>{ if(c.improvements) c.improvements = c.improvements.filter(i=>i.id!==id); });
   return true;
@@ -7612,12 +7621,19 @@ async function deleteAllImprovements(clientId){
   if(!c || !c.improvements.length){ showToast('info','Nothing to delete','No logged improvements for this client.'); return; }
   const count = c.improvements.length;
   if(!(await confirmDialog(`Delete all ${count} logged improvement${count!==1?'s':''} for ${c.name}? This can't be undone.`, {confirmLabel:'Delete all', destructive:true}))) return;
-  const { error: delErr } = await supabaseClient.from('client_improvements').delete().eq('client_id', clientId);
-  const okDel = !delErr;
+  // .select() after .delete() to confirm rows were actually affected —
+  // same reasoning as deleteImprovementRow() above: an RLS policy that
+  // silently blocks some or all of these rows would otherwise report
+  // success (no error) while deleting nothing, or fewer than expected.
+  const { data: deletedRows, error: delErr } = await supabaseClient.from('client_improvements').delete().eq('client_id', clientId).select();
+  const actuallyDeletedCount = deletedRows ? deletedRows.length : 0;
+  const okDel = !delErr && actuallyDeletedCount === count;
+  if(delErr) console.error('deleteAllImprovements failed', clientId, delErr);
+  else if(actuallyDeletedCount !== count) console.error(`deleteAllImprovements: expected to delete ${count} rows, only ${actuallyDeletedCount} were actually deleted (likely blocked by RLS for the rest)`, clientId);
   if(okDel){ c.improvements = []; clientImprovements = clientImprovements.filter(i=>i.clientId!==clientId); }
   invalidateStaleDraft(c);
   const ok = okDel && await updateClientRow(clientId, { draftStatus:c.draftStatus, draft:c.draft });
-  renderClientsTable(); renderKpis(); renderQueue();
+  renderClientsTable(); renderKpis(); renderQueue(); renderTeamQueue(); renderImprovementsHistory();
   if(ok){
     logClientActivity(clientId, 'improvement_deleted', `${myName()||'Someone'} deleted all ${count} logged improvements.`);
     refreshClientDetailActivityIfOpen(clientId);
@@ -7634,7 +7650,14 @@ async function deleteImprovement(clientId, idx){
   const impId = c.improvements[idx].id;
   const ok = await deleteImprovementRow(impId);
   if(ok) c.improvements.splice(idx, 1);
-  renderClientsTable(); renderKpis(); renderQueue();
+  // Missing renderTeamQueue() here was the actual bug behind "deleted
+  // improvements keep showing on the Approval Queue" — the underlying
+  // data (c.improvements) was already correctly updated above, but the
+  // Team Queue's rendered HTML was never refreshed to reflect it, so a
+  // stale card just sat there until something else happened to trigger a
+  // re-render. Also adding renderImprovementsHistory() for the same
+  // reason, in case that page is what's currently on screen.
+  renderClientsTable(); renderKpis(); renderQueue(); renderTeamQueue(); renderImprovementsHistory();
   if(ok){
     const truncate = (s)=> s && s.length>80 ? s.slice(0,80)+'…' : (s||'—');
     logClientActivity(clientId, 'improvement_deleted', `${myName()||'Someone'} deleted an improvement — "${truncate(deletedText)}"`);
