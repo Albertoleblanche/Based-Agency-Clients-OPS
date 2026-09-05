@@ -10525,49 +10525,17 @@ async function onInhouseClientMatched(){
   ]);
 }
 
-// Shared markup for both pull panels — reflects the client already
-// picked in the Report Details "Client" field above (which now pulls
-// directly from this same in-house list — see onReportClientChanged()),
-// but still overridable per-panel in case a report ever needs to pull
-// data for a different in-house client than the one it's otherwise
-// linked to. idSuffix keeps the two panels' dropdown ids distinct since
-// they're separate DOM locations for the same underlying report-level
-// field (aiVisibilityDraft.inhouse_client_id).
-function inhouseClientLinkHtml(idSuffix){
-  const d = aiVisibilityDraft;
-  return `
-    <div style="margin-bottom:10px;">
-      <label style="font-size:11px;">In-house client</label>
-      <select id="inhouseLinkedClientSelect_${idSuffix}" onchange="manuallySetInhouseClient(this.value)">
-        <option value="">${inhouseMetricsClients.length ? 'Select a client…' : 'Loading…'}</option>
-        ${inhouseMetricsClients.map(c=>`<option value="${c.id}" ${String(c.id)===d.inhouse_client_id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
-      </select>
-      ${!d.inhouse_client_id ? `<p style="font-size:10.5px;color:var(--amber);margin:4px 0 0;">No client linked yet — pick one above in Report Details, or here.</p>` : ''}
-    </div>`;
-}
-
-async function manuallySetInhouseClient(clientId){
-  aiVisibilityDraft.inhouse_client_id = clientId || null;
-  if(clientId) await onInhouseClientMatched();
-  renderAiVisibilityMain();
-}
-
-// Targeted update of all three client dropdowns tied to the in-house
-// tool's client list — the report's own Client field plus both pull
-// panels' client-link fields. Deliberately NOT a full renderAiVisibilityMain()
-// here: this runs after an async fetch, and a full re-render at that
-// point could disrupt focus or scroll position if the admin is already
-// interacting with something else on the page.
+// Targeted update of the report's own Client field once the in-house
+// client list finishes loading. Deliberately NOT a full
+// renderAiVisibilityMain() here: this runs after an async fetch, and a
+// full re-render at that point could disrupt focus or scroll position if
+// the admin is already interacting with something else on the page.
 function refreshInhouseClientLinkDropdowns(){
   const d = aiVisibilityDraft;
-  const optionsHtml = (placeholder) => `<option value="">${inhouseMetricsClients.length ? placeholder : 'Loading…'}</option>` +
-    inhouseMetricsClients.map(c=>`<option value="${c.id}" ${String(c.id)===d.inhouse_client_id?'selected':''}>${escapeHtml(c.name)}</option>`).join('');
-  ['metrics','keywords'].forEach(suffix=>{
-    const selectEl = document.getElementById(`inhouseLinkedClientSelect_${suffix}`);
-    if(selectEl) selectEl.innerHTML = optionsHtml('No match — select manually');
-  });
   const clientSelectEl = document.getElementById('avClientId');
-  if(clientSelectEl) clientSelectEl.innerHTML = optionsHtml('Select a client…');
+  if(!clientSelectEl) return;
+  clientSelectEl.innerHTML = `<option value="">${inhouseMetricsClients.length ? 'Select a client…' : 'Loading…'}</option>` +
+    inhouseMetricsClients.map(c=>`<option value="${c.id}" ${String(c.id)===d.inhouse_client_id?'selected':''}>${escapeHtml(c.name)}</option>`).join('');
 }
 
 async function loadInhouseMetricsClientsForPicker(){
@@ -10645,14 +10613,30 @@ function computeOverviewGainersLosersFromMatrix(matrixRows){
   return lines.join('\n');
 }
 
+// Quick Metrics needs BOTH scans picked before there's anything
+// meaningful to pull (a before/after comparison needs both sides) —
+// unlike Page 5's single-scan pull, which can fire the moment its one
+// dropdown has a value.
+function onInhouseMetricsScanSelectionChanged(){
+  const before = document.getElementById('inhouseBeforeScanSelect')?.value;
+  const after = document.getElementById('inhouseAfterScanSelect')?.value;
+  if(before && after) pullInhouseMetrics();
+}
+
 async function pullInhouseMetrics(){
   const clientId = aiVisibilityDraft.inhouse_client_id;
-  const beforeScanId = document.getElementById('inhouseBeforeScanSelect')?.value;
-  const afterScanId = document.getElementById('inhouseAfterScanSelect')?.value;
-  if(!clientId){ showToast('error','No linked client','Pick a client for this report first, or select an in-house client manually above.'); return; }
-  if(!beforeScanId || !afterScanId){ showToast('error','Missing selection','Pick a before scan and an after scan.'); return; }
-  const btn = clickedBtn();
-  setBtnLoading(btn, 'Pulling…');
+  const beforeSelect = document.getElementById('inhouseBeforeScanSelect');
+  const afterSelect = document.getElementById('inhouseAfterScanSelect');
+  const beforeScanId = beforeSelect?.value;
+  const afterScanId = afterSelect?.value;
+  if(!clientId){ showToast('error','No linked client','Pick a client for this report first.'); return; }
+  if(!beforeScanId || !afterScanId) return; // auto-triggered on scan selection — silently wait for both rather than nagging before either is picked
+  // Disabling the dropdowns directly, rather than clickedBtn()/setBtnLoading —
+  // there's no button here anymore now that this fires automatically off
+  // the <select> changing, so this is the only visible feedback that a
+  // pull is actually happening.
+  if(beforeSelect) beforeSelect.disabled = true;
+  if(afterSelect) afterSelect.disabled = true;
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
     const response = await fetch('/api/admin-user-actions', {
@@ -10677,7 +10661,8 @@ async function pullInhouseMetrics(){
   }catch(e){
     showToast('error','Pull failed', e.message || 'Try again.');
   }finally{
-    restoreBtn(btn);
+    if(beforeSelect) beforeSelect.disabled = false;
+    if(afterSelect) afterSelect.disabled = false;
   }
 }
 
@@ -10710,11 +10695,11 @@ async function onInhouseKeywordsClientSelected(clientId){
 async function pullInhouseKeywords(){
   const d = aiVisibilityDraft;
   const clientId = d.inhouse_client_id;
-  const scanId = document.getElementById('inhouseKeywordsScanSelect')?.value;
-  if(!clientId){ showToast('error','No linked client','Pick a client for this report first, or select an in-house client manually above.'); return; }
-  if(!scanId){ showToast('error','Missing selection','Pick a scan.'); return; }
-  const btn = clickedBtn();
-  setBtnLoading(btn, 'Pulling…');
+  const scanSelect = document.getElementById('inhouseKeywordsScanSelect');
+  const scanId = scanSelect?.value;
+  if(!clientId){ showToast('error','No linked client','Pick a client for this report first.'); return; }
+  if(!scanId) return; // auto-triggered on scan selection
+  if(scanSelect) scanSelect.disabled = true;
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
     const response = await fetch('/api/admin-user-actions', {
@@ -10752,7 +10737,7 @@ async function pullInhouseKeywords(){
   }catch(e){
     showToast('error','Pull failed', e.message || 'Try again.');
   }finally{
-    restoreBtn(btn);
+    if(scanSelect) scanSelect.disabled = false;
   }
 }
 
@@ -11162,13 +11147,11 @@ function renderAiVisibilityDetail(el){
       <div class="panel-body">
         <div style="margin-bottom:16px;padding:12px;background:var(--surface-2);border-radius:8px;">
           <div style="font-size:12.5px;font-weight:700;color:var(--ink);margin-bottom:10px;">Pull from in-house tool</div>
-          <p style="font-size:11px;color:var(--muted-lt);margin:0 0 10px;">Populates Quick Metrics AND the Overview matrix together, directly from real data — no screenshot needed.</p>
-          ${inhouseClientLinkHtml('metrics')}
-          <div class="form-grid" style="margin-bottom:10px;">
-            <div><label style="font-size:11px;">Before scan</label><select id="inhouseBeforeScanSelect"><option value="">Pick a client first</option></select></div>
-            <div><label style="font-size:11px;">After scan</label><select id="inhouseAfterScanSelect"><option value="">Pick a client first</option></select></div>
+          <p style="font-size:11px;color:var(--muted-lt);margin:0 0 10px;">Populates Quick Metrics AND the Overview matrix together, directly from real data — no screenshot needed. Pulls automatically once both scans below are selected.</p>
+          <div class="form-grid">
+            <div><label style="font-size:11px;">Before scan</label><select id="inhouseBeforeScanSelect" onchange="onInhouseMetricsScanSelectionChanged()"><option value="">${d.inhouse_client_id ? 'Pick a scan' : 'Pick a client above first'}</option></select></div>
+            <div><label style="font-size:11px;">After scan</label><select id="inhouseAfterScanSelect" onchange="onInhouseMetricsScanSelectionChanged()"><option value="">${d.inhouse_client_id ? 'Pick a scan' : 'Pick a client above first'}</option></select></div>
           </div>
-          <button class="btn btn-brand" onclick="pullInhouseMetrics()">Pull data</button>
         </div>
         <div class="form-grid">
           <div><label>Before — recommended in (of total prompts)</label><div style="display:flex;gap:6px;align-items:center;"><input type="number" min="0" style="width:80px;" value="${d.before_recommended_count??''}" onchange="aiVisibilityDraft.before_recommended_count=this.value?Number(this.value):null;renderAiVisibilityMain();"><span>/</span><input type="number" min="0" style="width:80px;" value="${d.before_total_prompts??''}" onchange="aiVisibilityDraft.before_total_prompts=this.value?Number(this.value):null;renderAiVisibilityMain();"></div></div>
@@ -11193,12 +11176,10 @@ function renderAiVisibilityDetail(el){
       <div class="panel-body">
         <div style="margin-bottom:16px;padding:12px;background:var(--surface-2);border-radius:8px;">
           <div style="font-size:12.5px;font-weight:700;color:var(--ink);margin-bottom:10px;">Pull from in-house tool</div>
-          <p style="font-size:11px;color:var(--muted-lt);margin:0 0 10px;">Pulls real excerpts and sentiment directly from a single scan — a point-in-time snapshot, not a before/after comparison.</p>
-          ${inhouseClientLinkHtml('keywords')}
-          <div class="form-grid" style="margin-bottom:10px;">
-            <div><label style="font-size:11px;">Scan</label><select id="inhouseKeywordsScanSelect"><option value="">Pick a client first</option></select></div>
+          <p style="font-size:11px;color:var(--muted-lt);margin:0 0 10px;">Pulls real excerpts and sentiment directly from a single scan — a point-in-time snapshot, not a before/after comparison. Pulls automatically once a scan is selected below.</p>
+          <div class="form-grid">
+            <div><label style="font-size:11px;">Scan</label><select id="inhouseKeywordsScanSelect" onchange="if(this.value) pullInhouseKeywords();"><option value="">${d.inhouse_client_id ? 'Pick a scan' : 'Pick a client above first'}</option></select></div>
           </div>
-          <button class="btn btn-brand" onclick="pullInhouseKeywords()">Pull data</button>
         </div>
         <label style="font-size:12.5px;font-weight:700;color:var(--ink);display:block;margin-bottom:8px;">Or import from a RankScale CSV/Sheet export</label>
         <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 10px;line-height:1.5;">Upload the exported CSV file — this pulls out only the client's own row (using RankScale's "Is Own Brand" column, or matching the client name), so competitor rows in the same export are ignored automatically.</p>
