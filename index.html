@@ -6038,7 +6038,7 @@ function renderOverviewActiveQueue(){
     'Log an improvement for a client and it\'ll show up here.'
   ); return; }
   el.innerHTML = active.slice(0,7).map(c=>{
-    const status = statusMeta(c.draftStatus);
+    const status = statusMeta(c);
     const recentCount = c.improvements.filter(i=>i.date && new Date(i.date) >= weekStart && i.author === me).length;
     return `<div class="ov-row" onclick="goToClientInQueue('${c.id}','all')">
       <span class="ov-row-dot" style="background:${riskLabel(c.danger).color};"></span>
@@ -7488,7 +7488,7 @@ function renderClientDetail(){
       </div>`).join('')
     : `<div class="empty">No improvements logged yet.</div>`;
 
-  const status = statusMeta(c.draftStatus);
+  const status = statusMeta(c);
   document.getElementById('cdDraftStatus').innerHTML = `
     <p style="font-size:13px;margin:0 0 10px;">Status: <b style="color:${status.color};">${status.label}</b></p>
     ${c.draft ? `<div class="ts-entry-desc" style="white-space:pre-wrap;line-height:1.5;">${c.draft}</div>` : `<div class="empty">No draft generated yet.</div>`}
@@ -15661,7 +15661,7 @@ async function notifyForMemberInternally(memberId){
 // Shared by Approval Queue and Team Queue — same card, same meaning,
 // wherever a client shows up.
 function queueCardHtml(c){
-  const status = statusMeta(c.draftStatus);
+  const status = statusMeta(c);
   return `<div class="q-card" id="q-${c.id}">
     <div class="q-card-top">
       <div class="avatar-circle" style="background:${avatarColorForName(c.name)};color:#fff;border:2px solid var(--card);box-shadow:none;">${c.name.trim().charAt(0).toUpperCase()}</div>
@@ -15704,6 +15704,19 @@ function queueCardHtml(c){
 // anything logged at all, and collapsing them into one "no dot" look would
 // throw that difference away.
 function queueActivityBadgeHtml(c){
+  // Once this exact approved draft has actually been sent, that's more
+  // relevant to show here than "logged this week" — same grey, dot-less
+  // treatment as "No improvements logged yet" below (the base
+  // .q-bulk-preview class, no .has-logs/.has-history modifier), since
+  // there's nothing left pending action for this cycle. Falls back to a
+  // generic message if draftImprovementIds is empty/missing — older sent
+  // drafts from before that field existed shouldn't show a misleading
+  // "0 improvements were sent".
+  if(c.draftStatus==='approved' && c.draftSentAt){
+    const sentCount = (c.draftImprovementIds||[]).length;
+    return `<div class="q-bulk-preview">${sentCount>0 ? `${sentCount} improvement${sentCount!==1?'s':''} ${sentCount!==1?'were':'was'} sent` : 'Draft was sent'}</div>`;
+  }
+
   const weekStart = getWeekStart(new Date());
   const emailRelevant = c.improvements.filter(i=>i.includeInEmail!==false);
   const thisWeekCount = emailRelevant.filter(i=>i.date && new Date(i.date) >= weekStart).length;
@@ -15721,9 +15734,18 @@ function queueActivityBadgeHtml(c){
   return `<div class="q-bulk-preview has-history"><span class="history-dot"></span>Last logged ${timeAgo(mostRecent.date)}</div>`;
 }
 
-function statusMeta(draftStatus){
-  if(draftStatus==='approved') return {label:'✓ Approved', color:'var(--green)'};
-  if(draftStatus==='pending') return {label:'Draft ready', color:'var(--brand)'};
+// Takes the full client object (not just draftStatus) specifically to
+// distinguish "approved, ready to send" from "approved, and this exact
+// draft was already sent" — draftSentAt is cleared whenever a genuinely
+// new draft cycle starts (see confirmGenerateDraftSelection() and
+// skipDraft()), so if it's still set here, the currently-approved draft
+// IS the one that was sent, not a newer one waiting to go out.
+function statusMeta(c){
+  if(c.draftStatus==='approved'){
+    if(c.draftSentAt) return {label:`Sent on ${new Date(c.draftSentAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})}`, color:'var(--muted-lt)'};
+    return {label:'✓ Approved', color:'var(--green)'};
+  }
+  if(c.draftStatus==='pending') return {label:'Draft ready', color:'var(--brand)'};
   return {label:'No draft yet', color:'var(--muted-lt)'};
 }
 
@@ -16043,7 +16065,7 @@ function openQueueCardModal(id){
   const c = clients.find(x=>x.id===id);
   if(!c) return;
   const shownImprovements = c.improvements.filter(i=>improvementInDateRange(i, false));
-  const status = statusMeta(c.draftStatus);
+  const status = statusMeta(c);
   openAppModal(`
     <div class="modal-head">
       <div>
