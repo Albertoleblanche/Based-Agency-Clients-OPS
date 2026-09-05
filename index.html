@@ -10506,41 +10506,11 @@ async function saveInhouseMetricsConnection(){
 }
 
 // ---- Pulling Quick Metrics + the Overview matrix directly from the
-// in-house tool, from within the report editor. The client itself is no
-// longer picked separately here — it's auto-matched by name against the
-// report's own client selection (see syncInhouseClientMatch() below) —
+// in-house tool, from within the report editor. The report's own Client
+// field (see onReportClientChanged()) pulls directly from this same
+// in-house client list now, so no separate name-matching step is needed —
 // only the scan picker(s) remain manual. ----
 let inhouseMetricsClients = [];
-
-// Called whenever the report's own client selection changes. Matches by
-// name (case-insensitive, trimmed) against the in-house tool's own client
-// list — the two systems have entirely separate client tables with
-// different ids, so this is the only practical link between them without
-// requiring the two names to be manually kept in sync somewhere. If no
-// match is found, inhouse_client_id stays null and the pull panels show
-// a clear "no match" state with a manual fallback picker, rather than
-// silently failing.
-async function syncInhouseClientMatch(){
-  const d = aiVisibilityDraft;
-  if(!d.client_name_snapshot){ d.inhouse_client_id = null; renderAiVisibilityMain(); return; }
-  if(!inhouseMetricsClients.length){
-    try{
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      const response = await fetch('/api/admin-user-actions', {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
-        body: JSON.stringify({ action:'list-inhouse-clients' }),
-      });
-      const data = await response.json();
-      if(response.ok) inhouseMetricsClients = data.clients || [];
-    }catch(e){ /* connection may not be set up yet — pull panels handle showing "no match" either way */ }
-  }
-  const nameLower = d.client_name_snapshot.trim().toLowerCase();
-  const match = inhouseMetricsClients.find(c => (c.name||'').trim().toLowerCase() === nameLower);
-  d.inhouse_client_id = match ? String(match.id) : null;
-  if(match) onInhouseClientMatched(); // pre-populate both scan pickers now that a client is known
-  renderAiVisibilityMain();
-}
 
 // Once a match is known, both scan pickers (Quick Metrics' before/after,
 // Page 5's single scan) can load their scan lists immediately — no need
@@ -10555,21 +10525,24 @@ async function onInhouseClientMatched(){
   ]);
 }
 
-// Shared markup for both pull panels — a single dropdown pre-selected to
-// the auto-matched client (if found), with a clear warning when nothing
-// matched. idSuffix keeps the two panels' dropdown ids distinct since
+// Shared markup for both pull panels — reflects the client already
+// picked in the Report Details "Client" field above (which now pulls
+// directly from this same in-house list — see onReportClientChanged()),
+// but still overridable per-panel in case a report ever needs to pull
+// data for a different in-house client than the one it's otherwise
+// linked to. idSuffix keeps the two panels' dropdown ids distinct since
 // they're separate DOM locations for the same underlying report-level
 // field (aiVisibilityDraft.inhouse_client_id).
 function inhouseClientLinkHtml(idSuffix){
   const d = aiVisibilityDraft;
   return `
     <div style="margin-bottom:10px;">
-      <label style="font-size:11px;">In-house client${d.inhouse_client_id ? ' (auto-matched)' : ''}</label>
+      <label style="font-size:11px;">In-house client</label>
       <select id="inhouseLinkedClientSelect_${idSuffix}" onchange="manuallySetInhouseClient(this.value)">
-        <option value="">${inhouseMetricsClients.length ? 'No match — select manually' : 'Loading…'}</option>
+        <option value="">${inhouseMetricsClients.length ? 'Select a client…' : 'Loading…'}</option>
         ${inhouseMetricsClients.map(c=>`<option value="${c.id}" ${String(c.id)===d.inhouse_client_id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
-      ${!d.inhouse_client_id && d.client_name_snapshot ? `<p style="font-size:10.5px;color:var(--amber);margin:4px 0 0;">No automatic match for "${escapeHtml(d.client_name_snapshot)}" — pick the right one above.</p>` : ''}
+      ${!d.inhouse_client_id ? `<p style="font-size:10.5px;color:var(--amber);margin:4px 0 0;">No client linked yet — pick one above in Report Details, or here.</p>` : ''}
     </div>`;
 }
 
@@ -10579,18 +10552,22 @@ async function manuallySetInhouseClient(clientId){
   renderAiVisibilityMain();
 }
 
-// Targeted update of both panels' client-link dropdowns, deliberately
-// NOT a full renderAiVisibilityMain() — that would reset the panel's own
-// open/closed display state back to its default (closed), collapsing
-// whichever panel just triggered this load.
+// Targeted update of all three client dropdowns tied to the in-house
+// tool's client list — the report's own Client field plus both pull
+// panels' client-link fields. Deliberately NOT a full renderAiVisibilityMain()
+// here: this runs after an async fetch, and a full re-render at that
+// point could disrupt focus or scroll position if the admin is already
+// interacting with something else on the page.
 function refreshInhouseClientLinkDropdowns(){
   const d = aiVisibilityDraft;
+  const optionsHtml = (placeholder) => `<option value="">${inhouseMetricsClients.length ? placeholder : 'Loading…'}</option>` +
+    inhouseMetricsClients.map(c=>`<option value="${c.id}" ${String(c.id)===d.inhouse_client_id?'selected':''}>${escapeHtml(c.name)}</option>`).join('');
   ['metrics','keywords'].forEach(suffix=>{
     const selectEl = document.getElementById(`inhouseLinkedClientSelect_${suffix}`);
-    if(!selectEl) return;
-    selectEl.innerHTML = `<option value="">${inhouseMetricsClients.length ? 'No match — select manually' : 'Loading…'}</option>` +
-      inhouseMetricsClients.map(c=>`<option value="${c.id}" ${String(c.id)===d.inhouse_client_id?'selected':''}>${escapeHtml(c.name)}</option>`).join('');
+    if(selectEl) selectEl.innerHTML = optionsHtml('No match — select manually');
   });
+  const clientSelectEl = document.getElementById('avClientId');
+  if(clientSelectEl) clientSelectEl.innerHTML = optionsHtml('Select a client…');
 }
 
 async function loadInhouseMetricsClientsForPicker(){
@@ -10844,7 +10821,7 @@ function emptyAiVisibilityDraft(){
     executive_summary:'', competitive_intelligence_summary:'',
     overview_summary: '', overview_matrix_data: [],
     what_ai_values: '',
-    inhouse_client_id: null, // auto-matched by name against the in-house tool's own client list; see syncInhouseClientMatch()
+    inhouse_client_id: null, // set directly when the Client field is picked; see onReportClientChanged()
   };
 }
 
@@ -11161,11 +11138,13 @@ function renderAiVisibilityDetail(el){
       <div class="panel-head"><span class="panel-title">Report details</span></div>
       <div class="panel-body">
         <div class="form-grid">
-          <div style="position:relative;">
+          <div>
             <label>Client</label>
-            <input type="text" class="client-search-input" id="avClientSearch" placeholder="Search client…" autocomplete="off" value="${(d.client_name_snapshot||'').replace(/"/g,'&quot;')}">
-            <input type="hidden" id="avClientId" value="${d.client_id||''}">
-            <div class="client-search-dropdown" id="avClientDropdown"></div>
+            <select id="avClientId" onchange="onReportClientChanged(this.value)">
+              <option value="">${inhouseMetricsClients.length ? 'Select a client…' : 'Loading…'}</option>
+              ${inhouseMetricsClients.map(c=>`<option value="${c.id}" ${String(c.id)===d.inhouse_client_id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+            </select>
+            <p style="font-size:10.5px;color:var(--muted-lt);margin:4px 0 0;">Pulled from the in-house tracking tool, not Based Agency's own client list — this report's data all comes from there.</p>
           </div>
           <div><label>Target keyword</label><input id="avKeyword" value="${(d.target_keyword||'').replace(/"/g,'&quot;')}" onchange="aiVisibilityDraft.target_keyword=this.value"></div>
           <div style="position:relative;"><label>Report date</label>${datePickerFieldHtml('avReportDate', { value: d.report_date })}</div>
@@ -11311,13 +11290,6 @@ function renderAiVisibilityDetail(el){
       <button class="btn btn-brand" onclick="saveAiVisibilityReport()">Save report</button>
     </div>`;
 
-  setupClientSearchSelect('avClientSearch', 'avClientId', 'avClientDropdown');
-  document.getElementById('avClientId')?.addEventListener('change', function(){
-    const c = clients.find(x=>x.id===this.value);
-    aiVisibilityDraft.client_id = this.value || null;
-    aiVisibilityDraft.client_name_snapshot = c ? c.name : aiVisibilityDraft.client_name_snapshot;
-    syncInhouseClientMatch();
-  });
   const dateInput = document.getElementById('avReportDate');
   if(dateInput) dateInput.addEventListener('change', function(){ aiVisibilityDraft.report_date = this.value; });
 
@@ -11332,6 +11304,27 @@ function renderAiVisibilityDetail(el){
     if(!inhouseMetricsClients.length) await loadInhouseMetricsClientsForPicker();
     if(d.inhouse_client_id) onInhouseClientMatched();
   })();
+}
+
+// The report's own Client field now pulls directly from the in-house
+// tool rather than Based Agency's own client list — this report's data
+// (Quick Metrics, Overview, keywords) all comes from there, so selecting
+// the client from that same source removes the name-matching step
+// entirely instead of relying on it.
+async function onReportClientChanged(inhouseClientId){
+  const d = aiVisibilityDraft;
+  const selected = inhouseMetricsClients.find(c=>String(c.id)===inhouseClientId);
+  d.inhouse_client_id = inhouseClientId || null;
+  d.client_name_snapshot = selected ? selected.name : d.client_name_snapshot;
+  // Still tries to link back to a matching Based Agency client by name
+  // (case-insensitive) — client_id is a real FK on this table, and other
+  // tooling may eventually expect it, so this keeps it populated where a
+  // match exists rather than always leaving it null now that it's no
+  // longer the field being directly selected.
+  const matchingAgencyClient = clients.find(c=>(c.name||'').trim().toLowerCase() === (selected?.name||'').trim().toLowerCase());
+  d.client_id = matchingAgencyClient ? matchingAgencyClient.id : null;
+  if(inhouseClientId) await onInhouseClientMatched();
+  renderAiVisibilityMain();
 }
 
 // Same manual-drawing jsPDF pattern already established by
