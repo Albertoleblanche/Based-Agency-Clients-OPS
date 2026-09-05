@@ -15413,13 +15413,21 @@ function improvementInDateRange(imp, isTeam){
 // what clicking that tab would actually show — not an approximation of it.
 function queueFilterCount(filterKey){
   const ac = activeClients();
+  // Once sent, a client is archived out of every other tab entirely — see
+  // the matching comment in renderTeamQueue()'s statusMatches for the
+  // full reasoning; same rule applied here so the count badges always
+  // match what each tab actually shows.
+  const isSentDraft = (c) => c.draftStatus==='approved' && !!c.draftSentAt;
   let sorted = ac;
-  if(filterKey==='pending') sorted = sorted.filter(c=>c.draftStatus==='pending');
-  else if(filterKey==='approved') sorted = sorted.filter(c=>c.draftStatus==='approved');
-  else if(filterKey==='none') sorted = sorted.filter(c=>c.draftStatus==='none');
-  else if(filterKey==='atrisk') sorted = sorted.filter(c=>c.danger>=4);
-  else if(filterKey==='stale') sorted = sorted.filter(c=>c.draftStatus==='approved' && !c.draftSentAt && hasLoggedThisWeek(c));
-  else if(filterKey==='sent') sorted = sorted.filter(c=>c.draftStatus==='approved' && c.draftSentAt);
+  if(filterKey==='sent') sorted = sorted.filter(isSentDraft);
+  else {
+    sorted = sorted.filter(c=>!isSentDraft(c));
+    if(filterKey==='pending') sorted = sorted.filter(c=>c.draftStatus==='pending');
+    else if(filterKey==='approved') sorted = sorted.filter(c=>c.draftStatus==='approved');
+    else if(filterKey==='none') sorted = sorted.filter(c=>c.draftStatus==='none');
+    else if(filterKey==='atrisk') sorted = sorted.filter(c=>c.danger>=4);
+    else if(filterKey==='stale') sorted = sorted.filter(c=>c.draftStatus==='approved' && hasLoggedThisWeek(c));
+  }
   let rows = sorted.map(c => ({ c, shownImprovements: c.improvements.filter(i=>improvementInDateRange(i, false)) }));
   if(dateFilterMode !== 'all') rows = rows.filter(r => r.shownImprovements.length > 0);
   const me = myName();
@@ -15460,17 +15468,20 @@ function renderQueue(){
     '<button class="btn btn-brand" onclick="switchView(\'clients\')">Go to Clients</button>'
   )}</div>`; return; }
   let sorted = [...ac].sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
-  if(queueFilter==='pending') sorted = sorted.filter(c=>c.draftStatus==='pending');
-  else if(queueFilter==='approved') sorted = sorted.filter(c=>c.draftStatus==='approved');
-  else if(queueFilter==='none') sorted = sorted.filter(c=>c.draftStatus==='none');
-  else if(queueFilter==='atrisk') sorted = sorted.filter(c=>c.danger>=4);
-  // Excludes already-sent drafts from "Needs re-review" — a client whose
-  // current approved draft has already gone out belongs in the dedicated
-  // Sent tab below instead, even if new work happened to get logged the
-  // same week (that's not the same thing as "stale and needs another
-  // look before sending" — it's already sent).
-  else if(queueFilter==='stale') sorted = sorted.filter(c=>c.draftStatus==='approved' && !c.draftSentAt && hasLoggedThisWeek(c));
-  else if(queueFilter==='sent') sorted = sorted.filter(c=>c.draftStatus==='approved' && c.draftSentAt);
+  // Once sent, a client is archived out of every other tab entirely — see
+  // the matching comment in renderTeamQueue()'s statusMatches for the
+  // full reasoning. Checked first so every branch below (including the
+  // 'all' fallback) never needs its own separate exclusion.
+  const isSentDraft = (c) => c.draftStatus==='approved' && !!c.draftSentAt;
+  if(queueFilter==='sent') sorted = sorted.filter(isSentDraft);
+  else {
+    sorted = sorted.filter(c=>!isSentDraft(c));
+    if(queueFilter==='pending') sorted = sorted.filter(c=>c.draftStatus==='pending');
+    else if(queueFilter==='approved') sorted = sorted.filter(c=>c.draftStatus==='approved');
+    else if(queueFilter==='none') sorted = sorted.filter(c=>c.draftStatus==='none');
+    else if(queueFilter==='atrisk') sorted = sorted.filter(c=>c.danger>=4);
+    else if(queueFilter==='stale') sorted = sorted.filter(c=>c.draftStatus==='approved' && hasLoggedThisWeek(c));
+  }
 
   // Attach the date-filtered improvement subset per client, and drop
   // clients with none when a date filter is active. Also excludes
@@ -15503,13 +15514,19 @@ function renderQueue(){
 // personal author scoping, matching what that page itself actually shows.
 function teamQueueFilterCount(filterKey){
   const ac = activeClients();
+  // Once sent, a client is archived out of every other tab entirely — see
+  // the matching comment in renderTeamQueue()'s statusMatches for the
+  // full reasoning; same rule applied here so the count badges always
+  // match what each tab actually shows.
+  const isSentDraft = (c) => c.draftStatus==='approved' && !!c.draftSentAt;
   const statusMatches = (c) => {
+    if(filterKey==='sent') return isSentDraft(c);
+    if(isSentDraft(c)) return false;
     if(filterKey==='pending') return c.draftStatus==='pending';
     if(filterKey==='approved') return c.draftStatus==='approved';
     if(filterKey==='none') return c.draftStatus==='none';
     if(filterKey==='atrisk') return c.danger>=4;
-    if(filterKey==='stale') return c.draftStatus==='approved' && !c.draftSentAt && hasLoggedThisWeek(c);
-    if(filterKey==='sent') return c.draftStatus==='approved' && !!c.draftSentAt;
+    if(filterKey==='stale') return c.draftStatus==='approved' && hasLoggedThisWeek(c);
     return true;
   };
   // A client is only ever visible in Team Queue once there's an actual
@@ -15555,13 +15572,19 @@ function renderTeamQueue(){
     '<button class="btn btn-brand" onclick="switchView(\'clients\')">Go to Clients</button>'
   )}</div>`; return; }
 
+  // Once sent, a client is archived out of every other tab entirely —
+  // only the dedicated Sent tab shows it. Checked first and returns
+  // immediately either way, so every other filter branch below (including
+  // the 'all' fallback) never needs its own separate exclusion for this.
+  const isSentDraft = (c) => c.draftStatus==='approved' && !!c.draftSentAt;
   const statusMatches = (c) => {
+    if(teamQueueFilter==='sent') return isSentDraft(c);
+    if(isSentDraft(c)) return false;
     if(teamQueueFilter==='pending') return c.draftStatus==='pending';
     if(teamQueueFilter==='approved') return c.draftStatus==='approved';
     if(teamQueueFilter==='none') return c.draftStatus==='none';
     if(teamQueueFilter==='atrisk') return c.danger>=4;
-    if(teamQueueFilter==='stale') return c.draftStatus==='approved' && !c.draftSentAt && hasLoggedThisWeek(c);
-    if(teamQueueFilter==='sent') return c.draftStatus==='approved' && !!c.draftSentAt;
+    if(teamQueueFilter==='stale') return c.draftStatus==='approved' && hasLoggedThisWeek(c);
     return true;
   };
   // Pending drafts stay hidden from Team Queue until the owning member
@@ -16144,11 +16167,15 @@ function openQueueCardModal(id){
       ${c.draft && !c.email ? `<span class="warn-text">No client email on file — add one in Clients</span>` : ''}
     </div>
     <div class="modal-actions">
+      ${c.draftStatus==='approved' && c.draftSentAt ? `
+      <span style="font-size:13px;color:var(--muted-lt);">✓ Sent on ${new Date(c.draftSentAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} — nothing left to do here. New work logged for ${escapeHtml(c.name)} will start a fresh draft cycle on its own.</span>
+      ` : `
       ${c.improvements.length && !(c.draftStatus==='approved' && !canApprove()) && canGenerateOrRegenerateDraft(c) ? `<button class="btn btn-dark" id="gen-${c.id}" onclick="generateDraft('${c.id}')" title="${c.draft?'Regenerate':'Generate'} with AI"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/></svg>${c.draft?'Regenerate':'Generate'}</button>` : ''}
       ${c.draft && canApprove() ? `<button class="btn btn-brand" onclick="approveDraft('${c.id}')" ${c.draftStatus==='approved'?'disabled':''}>Approve</button>
       <button class="btn btn-outline" onclick="skipDraft('${c.id}')" title="Excludes these improvements from future drafts too — they won't reappear next week">Skip &amp; exclude</button>` : ''}
       ${c.draft && !canApprove() && c.draftStatus!=='approved' ? `<span class="warn-text" style="color:var(--muted-lt);">Only admins and approvers can approve or skip drafts.</span>` : ''}
       ${c.draftStatus==='approved' && !canApprove() ? `<span style="font-size:13px;color:var(--muted-lt);">✓ ${escapeHtml(c.name)} was approved.</span>` : ''}
+      `}
     </div>`, 560);
   const card = document.querySelector('#appModalOverlay .modal-card');
   if(card) card.dataset.clientId = id;
