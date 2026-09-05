@@ -16123,7 +16123,7 @@ function openQueueCardModal(id){
     <div class="modal-actions">
       ${c.improvements.length && !(c.draftStatus==='approved' && !canApprove()) && canGenerateOrRegenerateDraft(c) ? `<button class="btn btn-dark" id="gen-${c.id}" onclick="generateDraft('${c.id}')" title="${c.draft?'Regenerate':'Generate'} with AI"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/></svg>${c.draft?'Regenerate':'Generate'}</button>` : ''}
       ${c.draft && canApprove() ? `<button class="btn btn-brand" onclick="approveDraft('${c.id}')" ${c.draftStatus==='approved'?'disabled':''}>Approve</button>
-      <button class="btn btn-outline" onclick="skipDraft('${c.id}')">Skip this week</button>` : ''}
+      <button class="btn btn-outline" onclick="skipDraft('${c.id}')" title="Excludes these improvements from future drafts too — they won't reappear next week">Skip &amp; exclude</button>` : ''}
       ${c.draft && !canApprove() && c.draftStatus!=='approved' ? `<span class="warn-text" style="color:var(--muted-lt);">Only admins and approvers can approve or skip drafts.</span>` : ''}
       ${c.draftStatus==='approved' && !canApprove() ? `<span style="font-size:13px;color:var(--muted-lt);">✓ ${escapeHtml(c.name)} was approved.</span>` : ''}
     </div>`, 560);
@@ -16431,10 +16431,19 @@ async function skipDraft(id){
   // Captured before draftImprovementIds gets cleared below — used by the
   // notification loop at the end of this function.
   const includedAuthorProfiles = getIncludedAuthorProfiles(c);
+  const includedIds = c.draftImprovementIds || [];
   c.draftStatus='none'; c.draft='';
-  // Nothing was actually sent, so the improvements that were part of
-  // this abandoned draft stay eligible (include_in_email is untouched) —
-  // this just clears the now-stale "what's in the current draft" record.
+  // Same treatment as approveDraft(): flipping include_in_email off for
+  // exactly the improvements that were part of THIS draft is what keeps
+  // them from silently reappearing in a future draft. Previously this was
+  // left untouched on the theory that "nothing was sent, so it should stay
+  // eligible" — but that meant skipping only discarded the draft text
+  // itself, while the underlying logged work stayed eligible and got
+  // pulled right back into whatever draft was generated next, which read
+  // as the skip having done nothing at all a week later.
+  if(includedIds.length){
+    c.improvements.forEach(i => { if(includedIds.includes(i.id)) i.includeInEmail = false; });
+  }
   c.draftImprovementIds = [];
   // A full reset back to square one — any prior "already sent" record
   // belongs to this now-abandoned cycle, not whatever draft eventually
@@ -16442,11 +16451,14 @@ async function skipDraft(id){
   c.draftSentAt = null; c.draftSentBy = '';
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Skipped <b>${c.name}</b> this week — no email sent.`});
   const ok = await updateClientRow(id, { draftStatus:c.draftStatus, draft:c.draft, draftImprovementIds: [], draftSentAt: null, draftSentBy: '' });
+  if(ok && includedIds.length){
+    await supabaseClient.from('client_improvements').update({ include_in_email: false }).in('id', includedIds);
+  }
   if(ok) await persistLog();
   renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
   if(ok){ logClientActivity(id, 'draft_skipped', `${myName()||'Someone'} skipped this week's update.`); refreshClientDetailActivityIfOpen(id); }
   if(modalOpenForThis) openQueueCardModal(id);
-  ok ? showToast('info','Skipped', `${c.name} won't get an update this week.`) : showToast('error','Save failed','Could not save — try again.');
+  ok ? showToast('info','Skipped', `${c.name} won't get an update this week — those improvements are now excluded from future drafts too.`) : showToast('error','Save failed','Could not save — try again.');
   if(ok){
     for(const authorProfile of includedAuthorProfiles){
       sendNotification(authorProfile.id, 'draft_skipped', 'Draft skipped', `${myName()||'An approver'} skipped this week's draft for ${c.name} — no email was sent.`, 'approve');
