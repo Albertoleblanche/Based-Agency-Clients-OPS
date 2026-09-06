@@ -2713,6 +2713,20 @@ document.addEventListener('DOMContentLoaded', function(){
             </div>
           </div>
         </div>
+        <div id="adminOnlyIntegrations" style="display:none;">
+          <div class="panel">
+            <div class="panel-head"><span class="panel-title">In-house metrics tool connection</span></div>
+            <div class="panel-body">
+              <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;line-height:1.5;">Powers AI Visibility's Quick Metrics and Overview matrix — a real connection against the in-house tracking tool's own database, not a screenshot or a probe.</p>
+              <div id="inhouseConnectionStatus" style="margin-bottom:14px;font-size:12.5px;color:var(--muted-lt);">Checking connection…</div>
+              <div class="form-grid" style="margin-bottom:14px;">
+                <div><label>Supabase project URL</label><input type="text" id="inhouseProjectUrlInput" placeholder="https://xxxxx.supabase.co" autocomplete="off"></div>
+                <div><label>Anon key</label><input type="password" id="inhouseAnonKeyInput" placeholder="Paste the anon key" autocomplete="off"></div>
+              </div>
+              <button class="btn btn-outline" onclick="saveInhouseMetricsConnection()">Save connection</button>
+            </div>
+          </div>
+        </div>
         <div id="approverOnlyIntegrations" style="display:none;">
           <div class="panel">
             <div class="panel-head"><span class="panel-title">Harvest Time Sync</span></div>
@@ -4336,6 +4350,7 @@ const VIEW_TITLES = {
   settings: ['Settings & Integrations', "What's actually connected right now — no guessing"],
   claude: ['Assistant', "Ask about a client, get a recommendation, or have it check a website"],
   profile: ['My Profile', 'Your info, visible to the rest of the team the same way it always has been'],
+  aivisibility: ['AI Visibility', 'Client-facing reports on how AI assistants describe and recommend them'],
 };
 
 const CMDK_PAGE_ICONS = {
@@ -4539,6 +4554,9 @@ function switchSettingsTab(name){
     if(isAdmin()) loadAiProviderConnectionStatus();
   }
   if(name==='integrations'){
+    const adminOnly = document.getElementById('adminOnlyIntegrations');
+    if(adminOnly) adminOnly.style.display = isAdmin() ? 'block' : 'none';
+    if(isAdmin()) loadInhouseMetricsConnectionStatus();
     const approverOnly = document.getElementById('approverOnlyIntegrations');
     if(approverOnly) approverOnly.style.display = canApprove() ? 'block' : 'none';
     if(canApprove()){ loadHarvestPanel(); loadSlackChannelsPanel(); }
@@ -10624,15 +10642,6 @@ function renderAiVisibilityMain(){
 }
 
 
-function toggleInhouseMetricsPanel(){
-  const body = document.getElementById('inhousePanelBody');
-  const toggle = document.getElementById('inhousePanelToggle');
-  if(!body) return;
-  const showing = body.style.display !== 'none';
-  body.style.display = showing ? 'none' : 'block';
-  if(toggle) toggle.textContent = showing ? 'Show' : 'Hide';
-}
-
 async function loadInhouseMetricsConnectionStatus(){
   const statusEl = document.getElementById('inhouseConnectionStatus');
   if(!statusEl) return;
@@ -10842,22 +10851,6 @@ async function pullInhouseMetrics(){
 
 async function renderAiVisibilityList(el){
   el.innerHTML = `
-    <div class="panel" style="margin-bottom:20px;">
-      <div class="panel-head" style="cursor:pointer;" onclick="toggleInhouseMetricsPanel()">
-        <span class="panel-title">In-house metrics tool connection</span>
-        <span id="inhousePanelToggle" style="font-size:12px;color:var(--muted-lt);">Show</span>
-      </div>
-      <div class="panel-body" id="inhousePanelBody" style="display:none;">
-        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;line-height:1.5;">Pulls Quick Metrics and the Overview matrix directly from the in-house tracking tool's own database — a real connection against a confirmed schema, not a screenshot or a probe.</p>
-        <div id="inhouseConnectionStatus" style="margin-bottom:14px;font-size:12.5px;color:var(--muted-lt);">Checking connection…</div>
-        <div class="form-grid" style="margin-bottom:14px;">
-          <div><label>Supabase project URL</label><input type="text" id="inhouseProjectUrlInput" placeholder="https://xxxxx.supabase.co" autocomplete="off"></div>
-          <div><label>Anon key</label><input type="password" id="inhouseAnonKeyInput" placeholder="Paste the anon key" autocomplete="off"></div>
-        </div>
-        <button class="btn btn-outline" onclick="saveInhouseMetricsConnection()">Save connection</button>
-      </div>
-    </div>
-
     <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:16px;">
       <button class="btn btn-brand" onclick="openNewAiVisibilityReport()">+ New report</button>
     </div>
@@ -10869,7 +10862,6 @@ async function renderAiVisibilityList(el){
         </table>
       </div>
     </div>`;
-  loadInhouseMetricsConnectionStatus();
   const { data: rows, error } = await supabaseClient
     .from('ai_visibility_reports').select('id, client_name_snapshot, target_keyword, report_date')
     .order('report_date', { ascending:false });
@@ -16833,6 +16825,7 @@ const NAV_LABEL_DEFAULTS = {
   overview: 'Overview', focusreports: 'Past Reports', clients: 'Clients', approve: 'Approval Queue', teamqueue: 'Team Queue',
   notes: 'Notes', tasks: 'Tasks', reminders: 'Reminders', calendar: 'Calendar',
   time: 'Time Tracker', team: 'Team', trash: 'Trash', settings: 'Settings & Integrations',
+  aivisibility: 'AI Visibility',
 };
 
 // Updates both the visible expanded-sidebar label AND the collapsed-
