@@ -15820,17 +15820,69 @@ function teamQueueAvatarHtml(member){
 // escalation logic as the main Notify button (based on the viewer's own
 // role, never revealing who the recipient actually is), but the email
 // content only covers this one person's ready work, not everyone's.
+let _notifyMemberSelectedClientIds = [];
+
+// Shared by markMemberDraftsReady() and notifyForMemberByEmail() — the
+// exact same "which of this member's drafts are we actually acting on"
+// question, computed once so both stay in sync with the picker's
+// selection rather than risking two slightly different filters drifting
+// apart. The !d.draftSentAt check is defensive: draftStatus==='pending'
+// should already structurally guarantee this (a fresh generation always
+// clears draftSentAt — see confirmGenerateDraftSelection()), but an
+// already-sent draft showing up here by mistake is exactly the scenario
+// this whole redesign is meant to prevent, so it's checked explicitly
+// rather than assumed.
+function getSelectedPendingDraftsForMember(member){
+  const selectedIds = new Set(_notifyMemberSelectedClientIds);
+  return activeClients().filter(c=>{
+    const d = getDraftFor(c, member.name);
+    return selectedIds.has(c.id) && d.draftStatus==='pending' && !d.draftSentAt && c.improvements.some(i=>i.author===member.name);
+  });
+}
+
+// First step now: pick which of this member's pending drafts to actually
+// notify about, rather than always including all of them. The choice
+// carries forward into confirmNotifyMemberSelection() below.
 function notifyForMember(memberId){
   const member = teamProfiles.find(p=>p.id===memberId);
   if(!member) return;
-  const pending = activeClients().filter(c=>getDraftFor(c, member.name).draftStatus==='pending' && c.improvements.some(i=>i.author===member.name));
+  const pending = activeClients().filter(c=>{
+    const d = getDraftFor(c, member.name);
+    return d.draftStatus==='pending' && !d.draftSentAt && c.improvements.some(i=>i.author===member.name);
+  });
   if(!pending.length){ showToast('info','Nothing pending', `${member.name} has no drafts ready right now.`); return; }
   if(!pending.some(c=>getDraftFor(c, member.name).readyToNotify!==true)){ showToast('info','Already notified', `Everything pending for ${member.name} has already been flagged for review.`); return; }
 
   openAppModal(`
-    <div class="modal-head"><span class="panel-title">Notify about ${member.name}'s drafts</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-head"><span class="panel-title">Choose which of ${escapeHtml(member.name)}'s drafts to notify about</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
-      <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">${pending.length} draft${pending.length!==1?'s':''} ready for review. How do you want to let them know?</p>
+      <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">${pending.length} draft${pending.length!==1?'s':''} ready — uncheck any you'd rather hold back for now.</p>
+      <div style="display:flex;flex-direction:column;gap:2px;max-height:340px;overflow-y:auto;">
+        ${pending.map(c=>`
+          <label style="display:flex;align-items:flex-start;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border);cursor:pointer;">
+            <input type="checkbox" class="notify-select-checkbox" value="${c.id}" checked style="margin-top:3px;flex:none;">
+            <span style="flex:1;font-size:13px;color:var(--ink);">${escapeHtml(c.name)}<br><span style="font-size:11px;color:var(--muted-lt);">danger ${c.danger}/5, importance ${c.importance}/10</span></span>
+          </label>
+        `).join('')}
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
+      <button class="btn btn-brand" onclick="confirmNotifyMemberSelection('${memberId}')">Continue</button>
+    </div>`, 480);
+}
+
+function confirmNotifyMemberSelection(memberId){
+  const member = teamProfiles.find(p=>p.id===memberId);
+  if(!member) return;
+  const checkedIds = [...document.querySelectorAll('.notify-select-checkbox:checked')].map(el=>el.value);
+  if(!checkedIds.length){ showToast('error','Nothing selected','Check at least one client to notify about.'); return; }
+  _notifyMemberSelectedClientIds = checkedIds;
+
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">Notify about ${escapeHtml(member.name)}'s drafts</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">${checkedIds.length} draft${checkedIds.length!==1?'s':''} selected. How do you want to let them know?</p>
       <div style="display:flex;flex-direction:column;gap:8px;">
         <button class="btn btn-brand" onclick="notifyForMemberByEmail('${memberId}')">Send Email</button>
         <button class="btn btn-outline" onclick="notifyForMemberInternally('${memberId}')">Send Internally</button>
@@ -15839,13 +15891,13 @@ function notifyForMember(memberId){
     </div>`, 420);
 }
 
-// Marks this member's pending drafts as ready — the actual signal that
-// makes them visible in Team Queue (see renderTeamQueue()'s readyToNotify
-// filter) — shared by both the email and internal notify paths below,
-// since either one represents genuine intent to notify. Not called on
-// Cancel, since nothing was actually sent in that case.
+// Marks this member's SELECTED pending drafts as ready — the actual
+// signal that makes them visible in Team Queue (see renderTeamQueue()'s
+// readyToNotify filter) — shared by both the email and internal notify
+// paths below, since either one represents genuine intent to notify. Not
+// called on Cancel, since nothing was actually sent in that case.
 function markMemberDraftsReady(member){
-  const pending = activeClients().filter(c=>getDraftFor(c, member.name).draftStatus==='pending' && c.improvements.some(i=>i.author===member.name));
+  const pending = getSelectedPendingDraftsForMember(member);
   pending.forEach(c => { getDraftFor(c, member.name).readyToNotify = true; });
   Promise.all(pending.map(c=>saveDraftFor(c.id, member.name, { readyToNotify:true }))).then(()=>renderTeamQueue());
   return pending;
@@ -15857,7 +15909,7 @@ function notifyForMemberByEmail(memberId){
   if(!recipient.hasEmail){ showToast('error','Missing email on file', `No ${recipient.configLabel} has an email on file — add one under Team.`); return; }
   const member = teamProfiles.find(p=>p.id===memberId);
   if(!member) return;
-  const pending = activeClients().filter(c=>getDraftFor(c, member.name).draftStatus==='pending' && c.improvements.some(i=>i.author===member.name));
+  const pending = getSelectedPendingDraftsForMember(member);
   const subject = `${pending.length} update${pending.length!==1?'s':''} from ${member.name} ready for approval`;
   const bodyLines = pending.map(c=>`- ${c.name} (danger ${c.danger}/5, importance ${c.importance}/10)`).join('\n');
   const body = `${member.name}'s client update drafts are ready for review, sorted by danger score:\n\n${bodyLines}\n\nReview and approve here: ${window.location.href}`;
