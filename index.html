@@ -4491,7 +4491,10 @@ async function switchView(name){
   if(meta){
     const titleEl = document.getElementById('topbarTitle');
     const subEl = document.getElementById('topbarSub');
-    if(titleEl) titleEl.textContent = meta[0];
+    // Falls back to the hardcoded default when no custom name is set —
+    // the subtitle always stays the default, since Sidebar Tab Names only
+    // lets admins rename the tab itself, not write a custom description.
+    if(titleEl) titleEl.textContent = (settings.navLabels && settings.navLabels[name]) || meta[0];
     if(subEl) subEl.textContent = meta[1];
   }
   // Shown immediately, before the data load starts — the check inside
@@ -12571,7 +12574,7 @@ function tourSwitchView(name){
   if(meta){
     const titleEl = document.getElementById('topbarTitle');
     const subEl = document.getElementById('topbarSub');
-    if(titleEl) titleEl.textContent = meta[0];
+    if(titleEl) titleEl.textContent = (settings.navLabels && settings.navLabels[name]) || meta[0];
     if(subEl) subEl.textContent = meta[1];
   }
   // Fast, in-memory, no-network renders — kept as a safety net in case
