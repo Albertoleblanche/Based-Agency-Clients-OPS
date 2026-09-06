@@ -15365,16 +15365,22 @@ function openQueueLogImprovementModal(presetClientId){
 // new" form so the same modal actually covers both halves of what its
 // menu label promises — "log or edit" — rather than only supporting new
 // entries and leaving editing an existing one to a different screen
-// entirely.
+// entirely. Personal for a regular member — same restriction as Past
+// Improvements (see getAllImprovementsFlat()) — since seeing (and being
+// able to edit/delete) a colleague's own logged work isn't something a
+// regular member should have here either. Admins/approvers still see
+// everyone's, matching their oversight role.
 function renderQueueModalImprovementsList(clientId){
   const el = document.getElementById('queueModalExistingImprovements');
   if(!el) return;
   const c = clients.find(x=>x.id===clientId);
   if(!c){ el.innerHTML = ''; return; }
   const weekStart = getWeekStart(new Date());
+  const me = myName();
+  const restrictToSelf = !canApprove();
   const thisWeek = c.improvements
     .map((imp,idx)=>({imp,idx}))
-    .filter(({imp})=>imp.date && new Date(imp.date) >= weekStart);
+    .filter(({imp})=>imp.date && new Date(imp.date) >= weekStart && (!restrictToSelf || imp.author===me));
 
   if(!thisWeek.length){ el.innerHTML = ''; return; }
 
