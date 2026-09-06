@@ -930,8 +930,12 @@
   .ts-entry-desc{font-size:12px;color:var(--muted);margin-top:12px;}
   .ts-entry-right{display:flex;align-items:center;gap:10px;flex:none;}
 
-  .include-toggle{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted-lt);cursor:pointer;white-space:nowrap;}
-  .include-toggle input{cursor:pointer;}
+  .include-toggle{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted-lt);cursor:pointer;white-space:nowrap;}
+  .include-toggle input{position:absolute;opacity:0;width:0;height:0;}
+  .include-toggle .toggle-track{position:relative;display:inline-block;width:32px;height:18px;background:var(--border);border-radius:999px;flex:none;transition:background .15s;}
+  .include-toggle .toggle-track::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;background:#fff;border-radius:50%;transition:transform .15s;box-shadow:0 1px 2px rgba(0,0,0,.25);}
+  .include-toggle input:checked + .toggle-track{background:var(--green);}
+  .include-toggle input:checked + .toggle-track::after{transform:translateX(14px);}
   .include-toggle:has(input:checked){color:var(--green);font-weight:600;}
   .ts-entry-duration{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:600;min-width:52px;text-align:right;}
 
@@ -1878,7 +1882,7 @@ document.addEventListener('DOMContentLoaded', function(){
                   <label>Client</label>
                   <select id="improvementsClientFilter" onchange="improvementsPage=1;renderImprovementsHistory()"><option value="all">All clients</option></select>
                 </div>
-                <div class="filters-popover-field">
+                <div class="filters-popover-field" id="improvementsMemberFilterField">
                   <label>Team member</label>
                   <select id="improvementsMemberFilter" onchange="improvementsPage=1;renderImprovementsHistory()"><option value="all">Everyone</option></select>
                 </div>
@@ -3117,6 +3121,7 @@ document.addEventListener('DOMContentLoaded', function(){
 <script>
 let clients = [];
 let clientImprovements = []; // flat table now — hydrated onto each client's .improvements in loadAll()
+let clientDrafts = []; // one row per (client, author) pair — hydrated onto each client's .drafts in loadAll(). See addendum-25.sql and getDraftFor()/saveDraftFor().
 // Distinguishes "genuinely zero clients" from "the initial fetch just
 // hasn't come back yet" — without this, renderClientsTable() couldn't
 // tell the two apart, since clients starts as an empty array either way,
@@ -3203,10 +3208,16 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 const CLIENT_FIELD_DB_MAP = {
   name:'name', email:'email', website:'website', service:'service', status:'status',
   importance:'importance', danger:'danger', monthlyHourBudget:'monthly_hour_budget',
-  sow:'sow', draft:'draft', draftStatus:'draft_status', draftPendingSince:'draft_pending_since',
+  sow:'sow',
   lastProactiveCheckAt:'last_proactive_check_at', customFieldValues:'custom_field_values',
-  deletedAt:'deleted_at', readyToNotify:'ready_to_notify', startDate:'start_date',
-  draftImprovementIds:'draft_improvement_ids', draftSentAt:'draft_sent_at', draftSentBy:'draft_sent_by',
+  deletedAt:'deleted_at', startDate:'start_date',
+  // draft/draftStatus/draftPendingSince/draftImprovementIds/draftSentAt/
+  // draftSentBy/readyToNotify used to live here — they've moved to
+  // client_drafts (one row per client+author, see addendum-25.sql and
+  // saveDraftFor()), since a single slot on the client itself couldn't
+  // represent more than one team member's draft for the same client at
+  // once. The old columns still exist on `clients` for safety, but nothing
+  // in the app writes to them anymore.
 };
 function clientFieldsToDb(fields){
   const out = {};
@@ -3217,20 +3228,61 @@ function clientRowFromDb(r){
   return {
     id:r.id, name:r.name, email:r.email||'', website:r.website||'', service:r.service, status:r.status,
     importance:r.importance, danger:r.danger, monthlyHourBudget:r.monthly_hour_budget||0, sow:r.sow||'',
-    draft:r.draft||'', draftStatus:r.draft_status||'none', draftPendingSince:r.draft_pending_since,
     lastProactiveCheckAt:r.last_proactive_check_at, customFieldValues:r.custom_field_values||{},
-    deletedAt:r.deleted_at||undefined, readyToNotify:!!r.ready_to_notify, startDate:r.start_date||'',
-    // Exactly which improvements are part of the CURRENT draft cycle —
-    // set explicitly at generation time (from a picker, not a date
-    // heuristic), read at approval time to know which specific rows to
-    // flip include_in_email off for. See addendum-14.sql.
-    draftImprovementIds: r.draft_improvement_ids || [],
-    // Whether (and by whom) this approved draft has already been emailed
-    // to the client — sendApprovedDraft() uses this to require an
-    // explicit confirmation before sending it again. See addendum-15.sql.
-    draftSentAt: r.draft_sent_at || null, draftSentBy: r.draft_sent_by || '',
+    deletedAt:r.deleted_at||undefined, startDate:r.start_date||'',
     improvements:[], // hydrated separately from clientImprovements
+    drafts:[], // hydrated separately from clientDrafts — one entry per author who has ever had a draft for this client (see draftRowFromDb / getDraftFor)
   };
+}
+// One row per (client, author) pair — see addendum-25.sql. Replaces the old
+// single-slot draft/draftStatus/etc. fields that used to live directly on
+// the client row, which meant two people contributing to the same client
+// would silently overwrite each other's in-progress draft.
+function draftRowFromDb(r){
+  return {
+    id:r.id, clientId:r.client_id, author:r.author,
+    draft:r.draft||'', draftStatus:r.draft_status||'none', draftPendingSince:r.draft_pending_since,
+    draftImprovementIds: r.draft_improvement_ids || [],
+    draftSentAt: r.draft_sent_at || null, draftSentBy: r.draft_sent_by || '',
+    readyToNotify: !!r.ready_to_notify,
+  };
+}
+// Returns the draft object for this (client, author) pair, or a fresh
+// in-memory default if none has ever been saved for them yet — callers
+// don't need to special-case "no draft row exists yet" everywhere, since
+// generating the first draft for someone is exactly as valid as
+// regenerating an existing one.
+function getDraftFor(c, author){
+  const existing = (c.drafts||[]).find(d => d.author === author);
+  if(existing) return existing;
+  return { id:null, clientId:c.id, author, draft:'', draftStatus:'none', draftPendingSince:null, draftImprovementIds:[], draftSentAt:null, draftSentBy:'', readyToNotify:false };
+}
+// Upserts a (client, author) draft row and keeps c.drafts / clientDrafts in
+// memory consistent with what was actually persisted — mirrors
+// updateClientRow()'s role for the old single-slot fields, but scoped to
+// one author's draft rather than the whole client.
+async function saveDraftFor(clientId, author, fields){
+  const c = clients.find(x=>x.id===clientId);
+  const dbFields = {};
+  const DRAFT_FIELD_DB_MAP = { draft:'draft', draftStatus:'draft_status', draftPendingSince:'draft_pending_since', draftImprovementIds:'draft_improvement_ids', draftSentAt:'draft_sent_at', draftSentBy:'draft_sent_by', readyToNotify:'ready_to_notify' };
+  Object.keys(fields).forEach(k=>{ const col = DRAFT_FIELD_DB_MAP[k]; if(col) dbFields[col] = fields[k]; });
+  const { data, error } = await supabaseClient.from('client_drafts')
+    .upsert({ client_id: clientId, author, ...dbFields, updated_at: new Date().toISOString() }, { onConflict: 'client_id,author' })
+    .select();
+  if(error || !data || !data.length){
+    if(error) console.error('saveDraftFor failed', clientId, author, error);
+    else console.error('saveDraftFor: upsert affected 0 rows (likely blocked by RLS)', clientId, author);
+    return false;
+  }
+  const saved = draftRowFromDb(data[0]);
+  if(c){
+    if(!c.drafts) c.drafts = [];
+    const idx = c.drafts.findIndex(d=>d.author===author);
+    if(idx===-1) c.drafts.push(saved); else c.drafts[idx] = saved;
+  }
+  const flatIdx = clientDrafts.findIndex(d=>d.clientId===clientId && d.author===author);
+  if(flatIdx===-1) clientDrafts.push(saved); else clientDrafts[flatIdx] = saved;
+  return true;
 }
 function improvementRowFromDb(r){
   return { id:r.id, clientId:r.client_id, author:r.author||'', text:r.text, date:r.date, includeInEmail:r.include_in_email, source:r.source };
@@ -3702,11 +3754,12 @@ const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 let _loadAllSeq = 0;
 async function loadAll(){
   const mySeq = ++_loadAllSeq;
-  const [appData, s, clientsRes, impRes] = await Promise.all([
+  const [appData, s, clientsRes, impRes, draftsRes] = await Promise.all([
     safeGet('app-data'),
     safeGet('settings'),
     supabaseClient.from('clients').select('*'),
     supabaseClient.from('client_improvements').select('*').order('date', { ascending:true }),
+    supabaseClient.from('client_drafts').select('*'),
   ]);
   // A newer loadAll() call has started since this one began — its data (or
   // data from whichever call turns out to resolve last) is what should win,
@@ -3718,23 +3771,29 @@ async function loadAll(){
     const parsed = JSON.parse(appData);
     log = parsed.log || [];
   } else {
-    // One-time migration from the old two-key layout (clients-roster + activity-log),
+    // One-time migration from the old two-key layout (clients-roster and activity-log),
     // which doubled write volume on every action and was the actual cause of the
     // "rate limit exceeded" error. New saves go through the combined key below.
     const l = await safeGet('activity-log');
     log = l ? JSON.parse(l) : [];
     if(log.length) await persistAppData();
   }
-  // clients/client_improvements: real tables now (see
-  // schema-clients-migration.sql), not part of the app-data JSON blob —
-  // hydrate each client's .improvements from the flat table so the ~100+
-  // existing read sites (c.improvements, activeClients(), etc.) keep
-  // working completely unchanged. Only the write paths changed.
+  // clients/client_improvements/client_drafts: real tables now (see
+  // schema-clients-migration.sql and addendum-25.sql), not part of the
+  // app-data JSON blob — hydrate each client's .improvements and .drafts
+  // from their flat tables so existing read sites (c.improvements,
+  // activeClients(), etc.) keep working unchanged. Only the write paths
+  // changed.
   if(clientsRes.error) console.error('loadAll: clients fetch failed', clientsRes.error);
   if(impRes.error) console.error('loadAll: client_improvements fetch failed', impRes.error);
+  if(draftsRes.error) console.error('loadAll: client_drafts fetch failed', draftsRes.error);
   clients = (clientsRes.data || []).map(clientRowFromDb);
   clientImprovements = (impRes.data || []).map(improvementRowFromDb);
-  clients.forEach(c => { c.improvements = clientImprovements.filter(i => i.clientId === c.id); });
+  clientDrafts = (draftsRes.data || []).map(draftRowFromDb);
+  clients.forEach(c => {
+    c.improvements = clientImprovements.filter(i => i.clientId === c.id);
+    c.drafts = clientDrafts.filter(d => d.clientId === c.id);
+  });
   clientsDataLoaded = true;
   settings = s ? JSON.parse(s) : {};
   settings.sheetCsvUrl = settings.sheetCsvUrl || '';
@@ -4187,6 +4246,13 @@ function applyRoleVisibility(){
     notifyBtn.style.display = 'inline-flex';
     notifyBtn.textContent = 'Ready to Notify';
   }
+  // A regular member only ever sees their own improvements in this list
+  // now (see getAllImprovementsFlat()), so a "filter by team member"
+  // dropdown listing everyone else would be actively misleading — picking
+  // a colleague's name would just show an empty list, reading as a bug
+  // rather than the intended restriction.
+  const memberFilterField = document.getElementById('improvementsMemberFilterField');
+  if(memberFilterField) memberFilterField.style.display = canApprove() ? 'block' : 'none';
   const addClientBtn = document.getElementById('addClientBtn');
   const navAiVisibility = document.getElementById('navAiVisibility');
   if(navAiVisibility) navAiVisibility.style.display = isAdmin() ? 'flex' : 'none';
@@ -4797,9 +4863,14 @@ function renderAttentionList(){
   const el = document.getElementById('attentionList');
   if(!el) return;
   const hasOverdueReminder = c => clientReminders.some(r=>r.clientId===c.id && r.askedBy===currentUser?.id && reminderDisplayStatus(r)==='due');
-  let items = attentionEligibleClients().filter(c => c.danger>=4 || c.draftStatus==='pending' || hasOverdueReminder(c));
+  // A client can now have several independent drafts (one per author, see
+  // addendum-25.sql) — "pending" here means at least one of them is, since
+  // this dashboard widget is about whether ANYTHING needs attention for
+  // this client, not any one specific person's draft.
+  const hasPendingDraft = c => (c.drafts||[]).some(d => d.draftStatus==='pending');
+  let items = attentionEligibleClients().filter(c => c.danger>=4 || hasPendingDraft(c) || hasOverdueReminder(c));
   if(attentionTierFilter) items = attentionEligibleClients().filter(c => riskLabel(c.danger).text === attentionTierFilter);
-  items.sort((a,b)=> b.danger-a.danger || (b.draftStatus==='pending')-(a.draftStatus==='pending'));
+  items.sort((a,b)=> b.danger-a.danger || (hasPendingDraft(b))-(hasPendingDraft(a)));
   if(!items.length){
     const title = attentionTierFilter ? `No clients in "${attentionTierFilter}"` : 'Nothing urgent right now';
     const sub = attentionTierFilter ? 'Try a different segment, or clear the filter to see everyone.' : 'At-risk clients, drafts waiting on approval, and overdue follow-ups will show up here.';
@@ -4811,11 +4882,12 @@ function renderAttentionList(){
   const cap = attentionTierFilter ? 10 : 6;
   el.innerHTML = items.slice(0,cap).map(c=>{
     const overdue = hasOverdueReminder(c);
-    const reason = c.draftStatus==='pending' ? 'Draft awaiting approval'
+    const pending = hasPendingDraft(c);
+    const reason = pending ? 'Draft awaiting approval'
       : c.danger>=4 ? riskLabel(c.danger).text
       : overdue ? 'Follow-up overdue'
       : riskLabel(c.danger).text;
-    const onclickAction = c.draftStatus==='pending' ? `goToClientInQueue('${c.id}','pending')`
+    const onclickAction = pending ? `goToClientInQueue('${c.id}','pending')`
       : c.danger>=4 ? `goToClientInQueue('${c.id}','atrisk')`
       : overdue ? `openClientDetail('${c.id}')`
       : `goToClientInQueue('${c.id}','atrisk')`;
@@ -4872,10 +4944,21 @@ function paginationControlsHtml(currentPage, totalItems, pageSize, onPageChangeF
   </div>`;
 }
 
+// Role-scoped: a regular team member only sees their own logged
+// improvements here — Past Improvements is personal for them, same as
+// their own Queue. Admins and approvers see everyone's, since reviewing
+// across the whole team is the actual point of their role. Applied here
+// at the source rather than in renderImprovementsHistory() itself, since
+// getFilteredImprovements() (used by "Delete all") needs to match
+// exactly the same restricted set, not accidentally operate on
+// improvements the current viewer isn't even supposed to see.
 function getAllImprovementsFlat(){
   const list = [];
+  const restrictToSelf = !canApprove();
+  const me = myName();
   activeClients().forEach(c=>{
     (c.improvements||[]).forEach(imp=>{
+      if(restrictToSelf && imp.author !== me) return;
       list.push({ id:imp.id, clientId:c.id, clientName:c.name, author:imp.author||'Team member', text:imp.text, date:imp.date, includeInEmail: imp.includeInEmail!==false, source: imp.source||'manual' });
     });
   });
@@ -4970,8 +5053,25 @@ async function deleteAllFilteredImprovements(){
   // each row is deleted independently by its own stable id.
   const results = await Promise.all(filtered.map(imp => deleteImprovementRow(imp.id)));
   const removedCount = results.filter(Boolean).length;
-  const touchedClientIds = new Set(filtered.map(imp=>imp.clientId));
-  touchedClientIds.forEach(clientId=>{ const c = clients.find(x=>x.id===clientId); if(c) invalidateStaleDraft(c); });
+  // Groups by (client, author) pair, not just client — a bulk delete like
+  // this can span multiple people's work across multiple clients at once,
+  // and only the specific authors whose improvements were actually
+  // removed should have their own draft invalidated.
+  const touchedPairs = new Map(); // clientId -> Set of authors
+  filtered.forEach(imp => {
+    if(!touchedPairs.has(imp.clientId)) touchedPairs.set(imp.clientId, new Set());
+    touchedPairs.get(imp.clientId).add(imp.author);
+  });
+  const invalidationSaves = [];
+  touchedPairs.forEach((authors, clientId) => {
+    const c = clients.find(x=>x.id===clientId);
+    if(!c) return;
+    authors.forEach(author => {
+      const invalidated = invalidateStaleDraft(c, author);
+      if(invalidated) invalidationSaves.push(saveDraftFor(clientId, author, { draftStatus:'none', draft:'' }));
+    });
+  });
+  await Promise.all(invalidationSaves);
 
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Deleted ${removedCount} logged improvement${removedCount!==1?'s':''}${isFiltered?' (filtered)':' (all)'}.`});
   const ok = await persistLog();
@@ -5066,6 +5166,7 @@ function renderImprovementsHistory(){
             <div class="ts-entry-right" style="align-items:flex-end;gap:6px;">
               <label class="include-toggle" title="Include in the client email">
                 <input type="checkbox" ${imp.includeInEmail?'checked':''} onchange="event.stopPropagation();toggleImprovementIncludeInEmail('${imp.clientId}', '${imp.id}', this.checked)">
+                <span class="toggle-track"></span>
                 <span>${imp.includeInEmail ? 'Included in email' : 'Not in email'}</span>
               </label>
             </div>
@@ -5085,8 +5186,18 @@ async function toggleImprovementIncludeInEmail(clientId, impId, checked){
   const c = clients.find(x=>x.id===clientId);
   const imp = c && c.improvements.find(i=>i.id===impId);
   if(!imp) return;
-  const { error } = await supabaseClient.from('client_improvements').update({ include_in_email: checked }).eq('id', impId);
-  const ok = !error;
+  // .select() after .update() to confirm a row was actually affected —
+  // same reasoning as the delete functions fixed earlier on this exact
+  // table: an RLS policy that silently blocks the update reports success
+  // (no error) while changing nothing, which is exactly what made this
+  // look like "I uncheck it and it re-checks itself" — the checkbox
+  // briefly showed the new state, but the database never actually
+  // changed, so the very next loadAll() (run at the top of this same
+  // function on the next interaction) fetched back the old value.
+  const { data, error } = await supabaseClient.from('client_improvements').update({ include_in_email: checked }).eq('id', impId).select();
+  const ok = !error && !!(data && data.length);
+  if(error) console.error('toggleImprovementIncludeInEmail failed', impId, error);
+  else if(!ok) console.error('toggleImprovementIncludeInEmail: update affected 0 rows (likely blocked by RLS)', impId);
   if(ok) imp.includeInEmail = checked;
   renderImprovementsHistory();
   if(!ok) showToast('error','Save failed','Could not save — try again.');
@@ -5673,9 +5784,15 @@ function computeSuggestedDanger(c){
   const daysSinceImp = lastImp ? (Date.now()-new Date(lastImp.date).getTime())/86400000 : 999;
   const staleSeverity = Math.min(daysSinceImp/30, 1);
 
+  // A client can now have several independent pending drafts (one per
+  // author, see addendum-25.sql) — uses whichever has been pending
+  // longest, since that's the most severe signal for a risk score. Any
+  // one person's draft sitting untouched for a week is worth flagging,
+  // regardless of what state everyone else's drafts for this client are in.
   let draftSeverity = 0;
-  if(c.draftStatus==='pending' && c.draftPendingSince){
-    const daysPending = (Date.now()-new Date(c.draftPendingSince).getTime())/86400000;
+  const pendingDrafts = (c.drafts||[]).filter(d => d.draftStatus==='pending' && d.draftPendingSince);
+  if(pendingDrafts.length){
+    const daysPending = Math.max(...pendingDrafts.map(d => (Date.now()-new Date(d.draftPendingSince).getTime())/86400000));
     draftSeverity = Math.min(daysPending/7, 1);
   }
 
@@ -5948,15 +6065,15 @@ function renderKpis(){
   // Total Clients and Client Health stay roster-wide regardless of role,
   // since this app has no "my clients" ownership concept to scope them by.
   const pending = admin
-    ? aec.filter(c=>c.draftStatus==='pending').length
-    : aec.filter(c=>c.draftStatus==='pending' && c.improvements.some(i=>i.author===me)).length;
+    ? aec.filter(c=>(c.drafts||[]).some(d=>d.draftStatus==='pending')).length
+    : aec.filter(c=>getDraftFor(c, me).draftStatus==='pending' && c.improvements.some(i=>i.author===me)).length;
   // Approval Queue is personal now — the sidebar badge needs to match what
   // that page actually shows, not every pending draft on the whole roster.
   // Also requires includeInEmail!==false on the matching improvement,
   // matching renderQueue()'s own shownImprovements check — otherwise this
   // could count a client whose only improvements from "me" are marked
   // "not in email," which the page itself would never show a card for.
-  const myPending = aec.filter(c=>c.draftStatus==='pending' && c.improvements.filter(i=>improvementInDateRange(i, false) && i.includeInEmail!==false).some(i=>i.author===me)).length;
+  const myPending = aec.filter(c=>getDraftFor(c, me).draftStatus==='pending' && c.improvements.filter(i=>improvementInDateRange(i, false) && i.includeInEmail!==false).some(i=>i.author===me)).length;
   document.getElementById('navPendingBadge').textContent = myPending;
   // Team Queue shows every APPROVED draft, plus pending drafts the owning
   // member has explicitly marked Ready to Notify — not every pending draft
@@ -5964,7 +6081,9 @@ function renderKpis(){
   // member's private working state). This badge has to match that exact
   // rule, or it counts things the page itself won't show — see
   // readyForReview() in renderTeamQueue() for the canonical version of
-  // this same check.
+  // this same check. Counted per-(client, author) pair now, same as Team
+  // Queue's own count — the same client can legitimately count once per
+  // contributing member, not just once overall.
   // Also requires at least one improvement actually marked "include in
   // email" — matching renderTeamQueue()'s own shownImprovements check.
   // Without this, a client could pass readyForReview() (e.g. approved)
@@ -5977,8 +6096,11 @@ function renderKpis(){
   // change count based on a filter state that lives on a different page.
   const teamPendingBadge = document.getElementById('navTeamPendingBadge');
   if(teamPendingBadge){
-    const readyForReview = (c) => c.draftStatus==='approved' || (c.draftStatus==='pending' && c.readyToNotify===true);
-    teamPendingBadge.textContent = aec.filter(c => readyForReview(c) && c.improvements.some(i=>i.includeInEmail!==false)).length;
+    const readyForReview = (c, author) => { const d = getDraftFor(c, author); return d.draftStatus==='approved' || (d.draftStatus==='pending' && d.readyToNotify===true); };
+    teamPendingBadge.textContent = teamProfiles.reduce((total, member) => {
+      const count = aec.filter(c => c.improvements.some(i=>i.author===member.name && i.includeInEmail!==false) && readyForReview(c, member.name)).length;
+      return total + count;
+    }, 0);
   }
 
   // --- Total Clients ---
@@ -6026,7 +6148,10 @@ function renderKpis(){
   const withRecentLogs = admin
     ? ac.filter(hasLoggedThisWeek)
     : ac.filter(c => c.improvements.some(i => i.author===me && i.date && new Date(i.date) >= getWeekStart(new Date())));
-  const approvedWithLogs = withRecentLogs.filter(c=>c.draftStatus==='approved').length;
+  // Admin view checks if ANY author's draft for the client is approved;
+  // personal view checks specifically the viewer's own draft — matching
+  // the same admin/personal split withRecentLogs itself already uses.
+  const approvedWithLogs = withRecentLogs.filter(c => admin ? (c.drafts||[]).some(d=>d.draftStatus==='approved') : getDraftFor(c, me).draftStatus==='approved').length;
   const completionPct = withRecentLogs.length ? Math.round((approvedWithLogs/withRecentLogs.length)*100) : 0;
   document.getElementById('kpiCompletionLabel').textContent = 'Weekly Completion';
   document.getElementById('kpiCompletion').textContent = withRecentLogs.length ? completionPct + '%' : '—';
@@ -6057,7 +6182,7 @@ function renderOverviewActiveQueue(){
     'Log an improvement for a client and it\'ll show up here.'
   ); return; }
   el.innerHTML = active.slice(0,7).map(c=>{
-    const status = statusMeta(c);
+    const status = statusMeta(c, me);
     const recentCount = c.improvements.filter(i=>i.date && new Date(i.date) >= weekStart && i.author === me).length;
     return `<div class="ov-row" onclick="goToClientInQueue('${c.id}','all')">
       <span class="ov-row-dot" style="background:${riskLabel(c.danger).color};"></span>
@@ -7307,16 +7432,17 @@ async function confirmSendSlackSummary(){
 // mapped Slack channel — bridged to their WhatsApp group on Slack's own
 // side, so this is a real alternative delivery path to email, not a copy
 // of it. Same review-before-sending pattern as the daily summary above.
-function openSendToSlackConfirm(clientId){
+function openSendToSlackConfirm(clientId, author){
   const c = clients.find(x=>x.id===clientId);
   const mapping = slackClientChannels[clientId];
   if(!c || !mapping){ showToast('error','No Slack channel mapped','Map this client to a channel in Settings first.'); return; }
-  if(!c.draft){ showToast('error','Nothing to send','This client has no draft yet.'); return; }
+  const d = getDraftFor(c, author);
+  if(!d.draft){ showToast('error','Nothing to send',`${author} has no draft yet for this client.`); return; }
   openAppModal(`
-    <div class="modal-head"><span class="panel-title">Send to ${escapeHtml(c.name)}'s Slack channel?</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-head"><span class="panel-title">Send ${escapeHtml(author)}'s update to ${escapeHtml(c.name)}'s Slack channel?</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
       <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 12px;">Posts to ${escapeHtml(mapping.channelName || mapping.channelId)} — review before sending, this posts immediately once confirmed.</p>
-      <textarea spellcheck="true" id="slackClientMessageText" style="width:100%;min-height:220px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;padding:10px;border-radius:8px;border:1px solid var(--border);white-space:pre-wrap;">${escapeHtml(c.draft)}</textarea>
+      <textarea spellcheck="true" id="slackClientMessageText" style="width:100%;min-height:220px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;padding:10px;border-radius:8px;border:1px solid var(--border);white-space:pre-wrap;">${escapeHtml(d.draft)}</textarea>
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" id="sendSlackClientBtn" onclick="confirmSendToSlack('${clientId}')">Send to Slack</button>
@@ -7507,11 +7633,18 @@ function renderClientDetail(){
       </div>`).join('')
     : `<div class="empty">No improvements logged yet.</div>`;
 
-  const status = statusMeta(c);
-  document.getElementById('cdDraftStatus').innerHTML = `
-    <p style="font-size:13px;margin:0 0 10px;">Status: <b style="color:${status.color};">${status.label}</b></p>
-    ${c.draft ? `<div class="ts-entry-desc" style="white-space:pre-wrap;line-height:1.5;">${c.draft}</div>` : `<div class="empty">No draft generated yet.</div>`}
-    <button class="btn btn-outline" style="margin-top:12px;width:100%;justify-content:center;" onclick="goToClientInQueue('${c.id}','all')">Open in Approval Queue →</button>`;
+  // A client can now have several independent drafts (one per author, see
+  // addendum-25.sql) — shows each one that's actually in progress
+  // separately, rather than assuming there's only ever one to display.
+  const activeDrafts = (c.drafts||[]).filter(d => d.draftStatus !== 'none');
+  document.getElementById('cdDraftStatus').innerHTML = (activeDrafts.length ? activeDrafts.map(d => {
+    const status = statusMeta(c, d.author);
+    return `<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border);">
+      <p style="font-size:13px;margin:0 0 6px;"><b>${escapeHtml(d.author)}</b> — Status: <b style="color:${status.color};">${status.label}</b></p>
+      <div class="ts-entry-desc" style="white-space:pre-wrap;line-height:1.5;">${escapeHtml(d.draft)}</div>
+    </div>`;
+  }).join('') : `<div class="empty">No draft generated yet.</div>`)
+    + `<button class="btn btn-outline" style="margin-top:12px;width:100%;justify-content:center;" onclick="goToClientInQueue('${c.id}','all')">Open in Approval Queue →</button>`;
 
   document.getElementById('cdTimeEntries').innerHTML = myTimeEntries.length
     ? myTimeEntries.slice(0,25).map(e=>{
@@ -7631,8 +7764,12 @@ async function deleteAllImprovements(clientId){
   if(delErr) console.error('deleteAllImprovements failed', clientId, delErr);
   else if(actuallyDeletedCount !== count) console.error(`deleteAllImprovements: expected to delete ${count} rows, only ${actuallyDeletedCount} were actually deleted (likely blocked by RLS for the rest)`, clientId);
   if(okDel){ c.improvements = []; clientImprovements = clientImprovements.filter(i=>i.clientId!==clientId); }
-  invalidateStaleDraft(c);
-  const ok = okDel && await updateClientRow(clientId, { draftStatus:c.draftStatus, draft:c.draft });
+  // Every author's draft for this client is now stale, not just one
+  // person's — they all just lost their source improvements at once.
+  const invalidatedAuthors = (c.drafts||[]).filter(d => d.draftStatus !== 'none').map(d => d.author);
+  invalidatedAuthors.forEach(author => invalidateStaleDraft(c, author));
+  if(okDel) await Promise.all(invalidatedAuthors.map(author => saveDraftFor(clientId, author, { draftStatus:'none', draft:'' })));
+  const ok = okDel;
   renderClientsTable(); renderKpis(); renderQueue(); renderTeamQueue(); renderImprovementsHistory();
   if(ok){
     logClientActivity(clientId, 'improvement_deleted', `${myName()||'Someone'} deleted all ${count} logged improvements.`);
@@ -8139,7 +8276,8 @@ async function logNoteNow(id){
   const c = clients.find(x=>x.id===n.clientId);
   if(!c){ restoreBtn(btn); showToast('error','Client not found','This client may have been removed.'); return; }
   c.improvements.push({ author: myName()||'Team member', text: n.text, date: new Date().toISOString(), includeInEmail: true, source: 'note' });
-  invalidateStaleDraft(c);
+  const invalidated = invalidateStaleDraft(c, myName()||'Team member');
+  if(invalidated) await saveDraftFor(c.id, myName()||'Team member', { draftStatus:'none', draft:'' });
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Logged a planned improvement for <b>${c.name}</b> from Notes.`});
   const ok = await persistAppData();
   const { error } = await supabaseClient.from('notes').update({ status: 'done' }).eq('id', id).eq('user_id', currentUser.id);
@@ -8813,8 +8951,8 @@ async function confirmTaskCompletion(taskId){
         includeInEmail: false,
         source: 'task'
       });
-      invalidateStaleDraft(c);
-      await updateClientRow(t.clientId, { draftStatus:c.draftStatus, draft:c.draft });
+      const invalidated = invalidateStaleDraft(c, myName()||'Team member');
+      if(invalidated) await saveDraftFor(t.clientId, myName()||'Team member', { draftStatus:'none', draft:'' });
       renderImprovementsHistory();
       renderClientsTable();
       renderQueue();
@@ -12239,9 +12377,9 @@ async function logTimeEntryAsImprovement(entryId){
   const c = clients.find(x=>x.id===entry.clientId);
   if(!c){ showToast('error','Client not found','This client may have been removed.'); return; }
   const imp = await insertImprovementRow(entry.clientId, { author: myName()||'Team member', text: entry.description.trim(), includeInEmail: false, source: 'time' });
-  invalidateStaleDraft(c);
-  const ok = !!imp && await updateClientRow(entry.clientId, { draftStatus:c.draftStatus, draft:c.draft });
-  if(!ok){ showToast('error','Save failed','Could not save — try again.'); return; }
+  if(!imp){ showToast('error','Save failed','Could not save — try again.'); return; }
+  const invalidated = invalidateStaleDraft(c, myName()||'Team member');
+  if(invalidated) await saveDraftFor(entry.clientId, myName()||'Team member', { draftStatus:'none', draft:'' });
   renderImprovementsHistory();
   renderClientsTable();
   renderQueue();
@@ -13294,7 +13432,12 @@ function buildClaudeContext(){
   const rows = activeClients().filter(c=>c.status!=='Paused').map(c=>{
     const lastImp = [...(c.improvements||[])].sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
     const lastImpStr = lastImp ? `last logged ${new Date(lastImp.date).toLocaleDateString('en-US',{month:'short',day:'numeric'})}` : 'nothing logged yet';
-    return `- ${c.name}${c.website ? ` (${c.website})` : ''}: risk ${riskLabel(c.danger).text}, ${lastImpStr}, draft ${c.draftStatus||'none'}`;
+    // A client can have several independent drafts now (one per author,
+    // see addendum-25.sql) — summarized as "author: status" pairs rather
+    // than one single status, so the assistant can see who's contributed
+    // and where each of their drafts stands.
+    const draftsSummary = (c.drafts||[]).filter(d=>d.draftStatus!=='none').map(d=>`${d.author}: ${d.draftStatus}`).join(', ') || 'none';
+    return `- ${c.name}${c.website ? ` (${c.website})` : ''}: risk ${riskLabel(c.danger).text}, ${lastImpStr}, drafts: ${draftsSummary}`;
   });
   return rows.join('\n');
 }
@@ -15174,9 +15317,19 @@ async function bulkDownloadSelectedClients(format){
 // "Approved" status would otherwise silently claim work that was never
 // actually reviewed. Called every time something gets pushed onto
 // c.improvements, from any of the four places that can happen.
-function invalidateStaleDraft(c){
-  c.draftStatus = 'none';
-  c.draft = '';
+// author is required now — draft state is scoped per (client, author) pair
+// (see addendum-25.sql), so invalidating "the" draft for a client doesn't
+// make sense anymore; only the specific author whose new/removed work
+// triggered this should have their own draft reset. Mutates in memory only
+// and returns the affected draft object (or null if there was nothing to
+// invalidate) — callers are responsible for persisting via saveDraftFor()
+// if non-null, same as they already handle their own other saves.
+function invalidateStaleDraft(c, author){
+  const d = (c.drafts||[]).find(x => x.author === author);
+  if(!d || d.draftStatus === 'none') return null;
+  d.draftStatus = 'none';
+  d.draft = '';
+  return d;
 }
 
 // Lets anyone log an improvement directly from the queue, without
@@ -15286,8 +15439,9 @@ async function saveQueueLogImprovement(){
   const c = clients.find(x=>x.id===clientId);
   if(!c){ showToast('error','Client not found','This client may have been removed by someone else.'); restoreBtn(btn); return; }
   const imp = await insertImprovementRow(clientId, {author, text, includeInEmail: true, source: 'manual'});
-  invalidateStaleDraft(c);
-  const ok = !!imp && await updateClientRow(clientId, { draftStatus:c.draftStatus, draft:c.draft });
+  const invalidated = invalidateStaleDraft(c, author);
+  if(invalidated) await saveDraftFor(clientId, author, { draftStatus:'none', draft:'' });
+  const ok = !!imp;
   renderClientsTable(); renderKpis(); renderQueue(); renderTeamQueue();
   restoreBtn(btn);
   if(ok){
@@ -15308,8 +15462,9 @@ async function logImprovement(id){
   const c = clients.find(x=>x.id===id);
   if(!c){ showToast('error','Client not found','This client may have been removed by someone else — refreshing.'); renderClientsTable(); return; }
   const imp = await insertImprovementRow(id, {author, text, includeInEmail: true, source: 'manual'});
-  invalidateStaleDraft(c);
-  const ok = !!imp && await updateClientRow(id, { draftStatus:c.draftStatus, draft:c.draft });
+  const invalidated = invalidateStaleDraft(c, author);
+  if(invalidated) await saveDraftFor(id, author, { draftStatus:'none', draft:'' });
+  const ok = !!imp;
   renderClientsTable();
   renderKpis();
   renderQueue();
@@ -15413,24 +15568,25 @@ function improvementInDateRange(imp, isTeam){
 // what clicking that tab would actually show — not an approximation of it.
 function queueFilterCount(filterKey){
   const ac = activeClients();
+  const me = myName();
   // Once sent, a client is archived out of every other tab entirely — see
   // the matching comment in renderTeamQueue()'s statusMatches for the
   // full reasoning; same rule applied here so the count badges always
-  // match what each tab actually shows.
-  const isSentDraft = (c) => c.draftStatus==='approved' && !!c.draftSentAt;
+  // match what each tab actually shows. Reads MY OWN draft per client
+  // (getDraftFor) — this page has always been personal.
+  const isSentDraft = (c) => { const d = getDraftFor(c, me); return d.draftStatus==='approved' && !!d.draftSentAt; };
   let sorted = ac;
   if(filterKey==='sent') sorted = sorted.filter(isSentDraft);
   else {
     sorted = sorted.filter(c=>!isSentDraft(c));
-    if(filterKey==='pending') sorted = sorted.filter(c=>c.draftStatus==='pending');
-    else if(filterKey==='approved') sorted = sorted.filter(c=>c.draftStatus==='approved');
-    else if(filterKey==='none') sorted = sorted.filter(c=>c.draftStatus==='none');
+    if(filterKey==='pending') sorted = sorted.filter(c=>getDraftFor(c, me).draftStatus==='pending');
+    else if(filterKey==='approved') sorted = sorted.filter(c=>getDraftFor(c, me).draftStatus==='approved');
+    else if(filterKey==='none') sorted = sorted.filter(c=>getDraftFor(c, me).draftStatus==='none');
     else if(filterKey==='atrisk') sorted = sorted.filter(c=>c.danger>=4);
-    else if(filterKey==='stale') sorted = sorted.filter(c=>c.draftStatus==='approved' && hasLoggedThisWeek(c));
+    else if(filterKey==='stale') sorted = sorted.filter(c=>getDraftFor(c, me).draftStatus==='approved' && hasLoggedThisWeek(c));
   }
   let rows = sorted.map(c => ({ c, shownImprovements: c.improvements.filter(i=>improvementInDateRange(i, false)) }));
   if(dateFilterMode !== 'all') rows = rows.filter(r => r.shownImprovements.length > 0);
-  const me = myName();
   rows = rows.filter(r => r.shownImprovements.some(i => i.author === me));
   return rows.length;
 }
@@ -15468,19 +15624,23 @@ function renderQueue(){
     '<button class="btn btn-brand" onclick="switchView(\'clients\')">Go to Clients</button>'
   )}</div>`; return; }
   let sorted = [...ac].sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
+  const me = myName();
   // Once sent, a client is archived out of every other tab entirely — see
   // the matching comment in renderTeamQueue()'s statusMatches for the
   // full reasoning. Checked first so every branch below (including the
-  // 'all' fallback) never needs its own separate exclusion.
-  const isSentDraft = (c) => c.draftStatus==='approved' && !!c.draftSentAt;
+  // 'all' fallback) never needs its own separate exclusion. Reads MY OWN
+  // draft for each client now (getDraftFor), not a single shared slot on
+  // the client — this page has always been personal, and draft state
+  // itself is now genuinely per-author too (see addendum-25.sql).
+  const isSentDraft = (c) => { const d = getDraftFor(c, me); return d.draftStatus==='approved' && !!d.draftSentAt; };
   if(queueFilter==='sent') sorted = sorted.filter(isSentDraft);
   else {
     sorted = sorted.filter(c=>!isSentDraft(c));
-    if(queueFilter==='pending') sorted = sorted.filter(c=>c.draftStatus==='pending');
-    else if(queueFilter==='approved') sorted = sorted.filter(c=>c.draftStatus==='approved');
-    else if(queueFilter==='none') sorted = sorted.filter(c=>c.draftStatus==='none');
+    if(queueFilter==='pending') sorted = sorted.filter(c=>getDraftFor(c, me).draftStatus==='pending');
+    else if(queueFilter==='approved') sorted = sorted.filter(c=>getDraftFor(c, me).draftStatus==='approved');
+    else if(queueFilter==='none') sorted = sorted.filter(c=>getDraftFor(c, me).draftStatus==='none');
     else if(queueFilter==='atrisk') sorted = sorted.filter(c=>c.danger>=4);
-    else if(queueFilter==='stale') sorted = sorted.filter(c=>c.draftStatus==='approved' && hasLoggedThisWeek(c));
+    else if(queueFilter==='stale') sorted = sorted.filter(c=>getDraftFor(c, me).draftStatus==='approved' && hasLoggedThisWeek(c));
   }
 
   // Attach the date-filtered improvement subset per client, and drop
@@ -15494,7 +15654,6 @@ function renderQueue(){
   // Always personal — only clients the current user themselves logged
   // something for (within the current date filter). The full team-wide
   // view lives on its own separate Team Queue page now, not as a toggle here.
-  const me = myName();
   rows = rows.filter(r => r.shownImprovements.some(i => i.author === me));
 
   if(!rows.length){
@@ -15507,26 +15666,29 @@ function renderQueue(){
     return;
   }
 
-  el.innerHTML = `<div class="queue-grid">` + rows.map(({c})=>queueCardHtml(c)).join('') + `</div>`;
+  // Scoped to the viewer's own name — this page is already filtered to
+  // clients they logged something for, but the card itself (count, list)
+  // should reflect only their own contribution too, not a combined total
+  // that happens to include a colleague's work on the same client.
+  el.innerHTML = `<div class="queue-grid">` + rows.map(({c})=>queueCardHtml(c, me)).join('') + `</div>`;
 }
 
 // Mirrors renderTeamQueue()'s own status+date filter chain — team-wide, no
 // personal author scoping, matching what that page itself actually shows.
 function teamQueueFilterCount(filterKey){
   const ac = activeClients();
-  // Once sent, a client is archived out of every other tab entirely — see
-  // the matching comment in renderTeamQueue()'s statusMatches for the
-  // full reasoning; same rule applied here so the count badges always
-  // match what each tab actually shows.
-  const isSentDraft = (c) => c.draftStatus==='approved' && !!c.draftSentAt;
-  const statusMatches = (c) => {
-    if(filterKey==='sent') return isSentDraft(c);
-    if(isSentDraft(c)) return false;
-    if(filterKey==='pending') return c.draftStatus==='pending';
-    if(filterKey==='approved') return c.draftStatus==='approved';
-    if(filterKey==='none') return c.draftStatus==='none';
+  // Mirrors renderTeamQueue()'s own per-(client, author) filter chain
+  // exactly, so the count badges always match what's actually displayed.
+  const isSentDraft = (c, author) => { const d = getDraftFor(c, author); return d.draftStatus==='approved' && !!d.draftSentAt; };
+  const statusMatches = (c, author) => {
+    const d = getDraftFor(c, author);
+    if(filterKey==='sent') return isSentDraft(c, author);
+    if(isSentDraft(c, author)) return false;
+    if(filterKey==='pending') return d.draftStatus==='pending';
+    if(filterKey==='approved') return d.draftStatus==='approved';
+    if(filterKey==='none') return d.draftStatus==='none';
     if(filterKey==='atrisk') return c.danger>=4;
-    if(filterKey==='stale') return c.draftStatus==='approved' && hasLoggedThisWeek(c);
+    if(filterKey==='stale') return d.draftStatus==='approved' && hasLoggedThisWeek(c, author);
     return true;
   };
   // A client is only ever visible in Team Queue once there's an actual
@@ -15536,17 +15698,15 @@ function teamQueueFilterCount(filterKey){
   // 'none' (logged but no draft generated yet) are never visible here,
   // regardless of which filter chip is selected — that's purely a
   // member's own, private working state until they generate and notify.
-  const readyForReview = (c) => c.draftStatus==='approved' || (c.draftStatus==='pending' && c.readyToNotify===true);
-  const rows = ac.filter(statusMatches).filter(readyForReview)
-    .map(c => ({ c, shownImprovements: c.improvements.filter(i=>improvementInDateRange(i, true)) }))
-    .filter(r => teamDateFilterMode==='all' || r.shownImprovements.length > 0);
-  // A card only actually renders under a member's section if at least one
-  // of that client's date-filtered improvements was authored by them — and
-  // since the same client can legitimately show up under multiple members
-  // (if more than one person logged work for it), the true count is the
-  // total across every section combined, not the number of distinct clients.
+  const readyForReview = (c, author) => { const d = getDraftFor(c, author); return d.draftStatus==='approved' || (d.draftStatus==='pending' && d.readyToNotify===true); };
+  // Same client can legitimately count under multiple members (if more
+  // than one person logged work for it), so the true count is the total
+  // across every member's own section combined, not distinct clients.
   return teamProfiles.reduce((total, member) => {
-    const memberCount = rows.filter(r => r.shownImprovements.some(i => i.author === member.name)).length;
+    const memberCount = ac
+      .filter(c => c.improvements.some(i=>improvementInDateRange(i, true) && i.includeInEmail!==false && i.author===member.name))
+      .filter(c => statusMatches(c, member.name) && readyForReview(c, member.name))
+      .length;
     return total + memberCount;
   }, 0);
 }
@@ -15572,19 +15732,24 @@ function renderTeamQueue(){
     '<button class="btn btn-brand" onclick="switchView(\'clients\')">Go to Clients</button>'
   )}</div>`; return; }
 
+  // Per-(client, author) checks now, not per-client — draft state is
+  // scoped to one team member's own contribution (see addendum-25.sql),
+  // so "does this draft match the filter" has to ask about a specific
+  // member's draft for a specific client, not a single shared status.
   // Once sent, a client is archived out of every other tab entirely —
   // only the dedicated Sent tab shows it. Checked first and returns
   // immediately either way, so every other filter branch below (including
   // the 'all' fallback) never needs its own separate exclusion for this.
-  const isSentDraft = (c) => c.draftStatus==='approved' && !!c.draftSentAt;
-  const statusMatches = (c) => {
-    if(teamQueueFilter==='sent') return isSentDraft(c);
-    if(isSentDraft(c)) return false;
-    if(teamQueueFilter==='pending') return c.draftStatus==='pending';
-    if(teamQueueFilter==='approved') return c.draftStatus==='approved';
-    if(teamQueueFilter==='none') return c.draftStatus==='none';
+  const isSentDraft = (c, author) => { const d = getDraftFor(c, author); return d.draftStatus==='approved' && !!d.draftSentAt; };
+  const statusMatches = (c, author) => {
+    const d = getDraftFor(c, author);
+    if(teamQueueFilter==='sent') return isSentDraft(c, author);
+    if(isSentDraft(c, author)) return false;
+    if(teamQueueFilter==='pending') return d.draftStatus==='pending';
+    if(teamQueueFilter==='approved') return d.draftStatus==='approved';
+    if(teamQueueFilter==='none') return d.draftStatus==='none';
     if(teamQueueFilter==='atrisk') return c.danger>=4;
-    if(teamQueueFilter==='stale') return c.draftStatus==='approved' && hasLoggedThisWeek(c);
+    if(teamQueueFilter==='stale') return d.draftStatus==='approved' && hasLoggedThisWeek(c, author);
     return true;
   };
   // Pending drafts stay hidden from Team Queue until the owning member
@@ -15593,28 +15758,29 @@ function renderTeamQueue(){
   // attention, not the mere existence of a generated draft. Clients
   // still at 'none' (logged but no draft generated at all) are never
   // visible here — that's purely a member's own private working state.
-  const readyForReview = (c) => c.draftStatus==='approved' || (c.draftStatus==='pending' && c.readyToNotify===true);
-
-  // Date-filtered improvement subset per client, kept alongside each client
-  // so each member's section below can check who actually logged what.
-  // Also excludes improvements marked "Not in email" — a client with
-  // nothing but excluded logs has nothing actually pending review, so
-  // they shouldn't get a card here at all. Unlike the date-range part of
-  // this filter, this check always applies regardless of date filter
-  // mode — "in email or not" isn't a date question, so "All time" mode
-  // shouldn't bypass it the way it intentionally bypasses the date check.
-  const rows = ac.filter(statusMatches).filter(readyForReview)
-    .map(c => ({ c, shownImprovements: c.improvements.filter(i=>improvementInDateRange(i, true) && i.includeInEmail!==false) }))
-    .filter(r => r.shownImprovements.length > 0);
+  const readyForReview = (c, author) => { const d = getDraftFor(c, author); return d.draftStatus==='approved' || (d.draftStatus==='pending' && d.readyToNotify===true); };
 
   const sortedMembers = [...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name));
   const sectionsHtml = sortedMembers.map(member => {
-    const memberClients = rows
-      .filter(r => r.shownImprovements.some(i => i.author === member.name))
-      .map(r => r.c)
+    // Date-filtered improvement subset per client, scoped to this
+    // specific member — a client only earns a card in this section if
+    // THIS member actually logged something eligible for it, and their
+    // OWN draft for it matches the current filter. Also excludes
+    // improvements marked "Not in email" — a client with nothing but
+    // excluded logs has nothing actually pending review, so it shouldn't
+    // get a card here at all. Unlike the date-range part of this filter,
+    // this check always applies regardless of date filter mode — "in
+    // email or not" isn't a date question, so "All time" mode shouldn't
+    // bypass it the way it intentionally bypasses the date check.
+    const memberClients = ac
+      .filter(c => c.improvements.some(i=>improvementInDateRange(i, true) && i.includeInEmail!==false && i.author===member.name))
+      .filter(c => statusMatches(c, member.name) && readyForReview(c, member.name))
       .sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
     if(!memberClients.length) return '';
-    const memberHasNewToNotify = activeClients().some(c => c.draftStatus==='pending' && c.readyToNotify!==true && c.improvements.some(i=>i.author===member.name));
+    const memberHasNewToNotify = activeClients().some(c => {
+      const d = getDraftFor(c, member.name);
+      return d.draftStatus==='pending' && d.readyToNotify!==true && c.improvements.some(i=>i.author===member.name);
+    });
     return `<div class="team-queue-section">
       <div class="team-queue-member-head">
         ${teamQueueAvatarHtml(member)}
@@ -15624,7 +15790,7 @@ function renderTeamQueue(){
         </div>
         <button class="btn btn-dark" style="margin-left:auto;flex:none;" onclick="notifyForMember('${member.id}')" ${memberHasNewToNotify ? '' : 'disabled title="Nothing new to notify — everything pending for this member has already been flagged."'}>Ready to Notify</button>
       </div>
-      <div class="queue-grid">${memberClients.map(c=>queueCardHtml(c)).join('')}</div>
+      <div class="queue-grid">${memberClients.map(c=>queueCardHtml(c, member.name)).join('')}</div>
     </div>`;
   }).filter(Boolean).join('');
 
@@ -15657,9 +15823,9 @@ function teamQueueAvatarHtml(member){
 function notifyForMember(memberId){
   const member = teamProfiles.find(p=>p.id===memberId);
   if(!member) return;
-  const pending = activeClients().filter(c=>c.draftStatus==='pending' && c.improvements.some(i=>i.author===member.name));
+  const pending = activeClients().filter(c=>getDraftFor(c, member.name).draftStatus==='pending' && c.improvements.some(i=>i.author===member.name));
   if(!pending.length){ showToast('info','Nothing pending', `${member.name} has no drafts ready right now.`); return; }
-  if(!pending.some(c=>c.readyToNotify!==true)){ showToast('info','Already notified', `Everything pending for ${member.name} has already been flagged for review.`); return; }
+  if(!pending.some(c=>getDraftFor(c, member.name).readyToNotify!==true)){ showToast('info','Already notified', `Everything pending for ${member.name} has already been flagged for review.`); return; }
 
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Notify about ${member.name}'s drafts</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
@@ -15679,9 +15845,9 @@ function notifyForMember(memberId){
 // since either one represents genuine intent to notify. Not called on
 // Cancel, since nothing was actually sent in that case.
 function markMemberDraftsReady(member){
-  const pending = activeClients().filter(c=>c.draftStatus==='pending' && c.improvements.some(i=>i.author===member.name));
-  pending.forEach(c => { c.readyToNotify = true; });
-  Promise.all(pending.map(c=>updateClientRow(c.id, { readyToNotify:true }))).then(()=>renderTeamQueue());
+  const pending = activeClients().filter(c=>getDraftFor(c, member.name).draftStatus==='pending' && c.improvements.some(i=>i.author===member.name));
+  pending.forEach(c => { getDraftFor(c, member.name).readyToNotify = true; });
+  Promise.all(pending.map(c=>saveDraftFor(c.id, member.name, { readyToNotify:true }))).then(()=>renderTeamQueue());
   return pending;
 }
 
@@ -15691,15 +15857,15 @@ function notifyForMemberByEmail(memberId){
   if(!recipient.hasEmail){ showToast('error','Missing email on file', `No ${recipient.configLabel} has an email on file — add one under Team.`); return; }
   const member = teamProfiles.find(p=>p.id===memberId);
   if(!member) return;
-  const pending = activeClients().filter(c=>c.draftStatus==='pending' && c.improvements.some(i=>i.author===member.name));
+  const pending = activeClients().filter(c=>getDraftFor(c, member.name).draftStatus==='pending' && c.improvements.some(i=>i.author===member.name));
   const subject = `${pending.length} update${pending.length!==1?'s':''} from ${member.name} ready for approval`;
   const bodyLines = pending.map(c=>`- ${c.name} (danger ${c.danger}/5, importance ${c.importance}/10)`).join('\n');
   const body = `${member.name}'s client update drafts are ready for review, sorted by danger score:\n\n${bodyLines}\n\nReview and approve here: ${window.location.href}`;
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Opened a notification email for ${member.name}'s drafts — ${pending.length} pending.`});
   persistLog().then(renderLog);
   showSendEmailConfirm(recipient.email, subject, body, () => {
-    pending.forEach(c => { c.readyToNotify = true; });
-    Promise.all(pending.map(c=>updateClientRow(c.id, { readyToNotify:true }))).then(()=>renderTeamQueue());
+    pending.forEach(c => { getDraftFor(c, member.name).readyToNotify = true; });
+    Promise.all(pending.map(c=>saveDraftFor(c.id, member.name, { readyToNotify:true }))).then(()=>renderTeamQueue());
   });
 }
 
@@ -15725,8 +15891,15 @@ async function notifyForMemberInternally(memberId){
 
 // Shared by Approval Queue and Team Queue — same card, same meaning,
 // wherever a client shows up.
-function queueCardHtml(c){
-  const status = statusMeta(c);
+// scopeAuthor restricts everything below to one person's own logged work
+// — used when this card is shown inside a specific member's Team Queue
+// section (or the viewer's own personal Queue), so someone doesn't see a
+// combined count/list that includes colleagues' contributions mixed into
+// theirs. Left undefined shows everyone's, unchanged from before.
+function queueCardHtml(c, scopeAuthor){
+  const status = statusMeta(c, scopeAuthor);
+  const d = getDraftFor(c, scopeAuthor);
+  const authorEsc = (scopeAuthor||'').replace(/'/g,"\\'");
   return `<div class="q-card" id="q-${c.id}">
     <div class="q-card-top">
       <div class="avatar-circle" style="background:${avatarColorForName(c.name)};color:#fff;border:2px solid var(--card);box-shadow:none;">${c.name.trim().charAt(0).toUpperCase()}</div>
@@ -15748,16 +15921,16 @@ function queueCardHtml(c){
       <span class="rating-pill rating-pill-ink">Importance ${c.importance}/10</span>
       ${clientReminders.some(r=>r.clientId===c.id && reminderDisplayStatus(r)==='due') ? `<span class="rating-pill" style="background:#3A63C918;color:#3A63C9;" title="A client question is overdue for a follow-up"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:3px;vertical-align:-1px;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Follow-up due</span>` : ''}
     </div>
-    ${queueActivityBadgeHtml(c)}
+    ${queueActivityBadgeHtml(c, scopeAuthor)}
     <div class="q-card-actions">
-      ${c.draftStatus==='approved' ? (canApprove() ? `
-      <button class="btn btn-brand" onclick="sendApprovedDraft('${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Send</button>
-      ${slackClientChannels[c.id] ? `<button class="btn btn-outline" onclick="openSendToSlackConfirm('${c.id}')" title="Post this update to ${escapeHtml(slackClientChannels[c.id].channelName||'their Slack channel')}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M15 3v6M9 3v6M15 15v6M9 15v6M3 9h6M15 9h6M3 15h6M15 15h6"/></svg>Slack</button>` : ''}
-      <button class="btn btn-outline" onclick="openQueueCardModal('${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Details</button>
+      ${d.draftStatus==='approved' ? (canApprove() ? `
+      <button class="btn btn-brand" onclick="sendApprovedDraft('${c.id}','${authorEsc}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Send</button>
+      ${slackClientChannels[c.id] ? `<button class="btn btn-outline" onclick="openSendToSlackConfirm('${c.id}','${authorEsc}')" title="Post this update to ${escapeHtml(slackClientChannels[c.id].channelName||'their Slack channel')}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M15 3v6M9 3v6M15 15v6M9 15v6M3 9h6M15 9h6M3 15h6M15 15h6"/></svg>Slack</button>` : ''}
+      <button class="btn btn-outline" onclick="openQueueCardModal('${c.id}','${authorEsc}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Details</button>
       ` : `
-      <button class="btn btn-brand" onclick="openQueueCardModal('${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Details</button>
+      <button class="btn btn-brand" onclick="openQueueCardModal('${c.id}','${authorEsc}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Details</button>
       `) : `
-      <button class="btn btn-brand" onclick="openQueueCardModal('${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Details</button>
+      <button class="btn btn-brand" onclick="openQueueCardModal('${c.id}','${authorEsc}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Details</button>
       <button class="btn btn-outline" onclick="openQueueLogImprovementModal('${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Log now</button>
       `}
     </div>
@@ -15768,7 +15941,8 @@ function queueCardHtml(c){
 // history is a completely different situation from one that's never had
 // anything logged at all, and collapsing them into one "no dot" look would
 // throw that difference away.
-function queueActivityBadgeHtml(c){
+function queueActivityBadgeHtml(c, scopeAuthor){
+  const d = getDraftFor(c, scopeAuthor);
   // Once this exact approved draft has actually been sent, that's more
   // relevant to show here than "logged this week" — same grey, dot-less
   // treatment as "No improvements logged yet" below (the base
@@ -15780,16 +15954,19 @@ function queueActivityBadgeHtml(c){
   // separately in two different spots saying the same thing. Falls back
   // to a generic message if draftImprovementIds is empty/missing — older
   // sent drafts from before that field existed shouldn't show a
-  // misleading "0 improvements were sent".
-  if(c.draftStatus==='approved' && c.draftSentAt){
-    const sentCount = (c.draftImprovementIds||[]).length;
-    const sentDate = new Date(c.draftSentAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  // misleading "0 improvements were sent". No more manual author
+  // filtering needed here — the draft itself is already scoped to
+  // scopeAuthor via getDraftFor().
+  if(d.draftStatus==='approved' && d.draftSentAt){
+    const sentCount = (d.draftImprovementIds||[]).length;
+    const sentDate = new Date(d.draftSentAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
     const countPhrase = sentCount>0 ? `${sentCount} improvement${sentCount!==1?'s':''} ${sentCount!==1?'were':'was'} sent` : 'Draft was sent';
     return `<div class="q-bulk-preview">${countPhrase} on ${sentDate}</div>`;
   }
 
   const weekStart = getWeekStart(new Date());
-  const emailRelevant = c.improvements.filter(i=>i.includeInEmail!==false);
+  let emailRelevant = c.improvements.filter(i=>i.includeInEmail!==false);
+  if(scopeAuthor) emailRelevant = emailRelevant.filter(i=>i.author===scopeAuthor);
   const thisWeekCount = emailRelevant.filter(i=>i.date && new Date(i.date) >= weekStart).length;
 
   if(thisWeekCount){
@@ -15805,27 +15982,31 @@ function queueActivityBadgeHtml(c){
   return `<div class="q-bulk-preview has-history"><span class="history-dot"></span>Last logged ${timeAgo(mostRecent.date)}</div>`;
 }
 
-// Takes the full client object (not just draftStatus) specifically to
-// distinguish "approved, ready to send" from "approved, and this exact
-// draft was already sent" — draftSentAt is cleared whenever a genuinely
-// new draft cycle starts (see confirmGenerateDraftSelection() and
-// skipDraft()), so if it's still set here, the currently-approved draft
-// IS the one that was sent, not a newer one waiting to go out.
+// Takes the client plus a specific author now — draft state is per
+// (client, author) pair (see addendum-25.sql / getDraftFor()), not a single
+// slot on the client itself, so this needs to know whose draft it's
+// describing. Otherwise unchanged: still distinguishes "approved, ready to
+// send" from "approved, and this exact draft was already sent" —
+// draftSentAt is cleared whenever a genuinely new draft cycle starts (see
+// confirmGenerateDraftSelection() and skipDraft()), so if it's still set
+// here, the currently-approved draft IS the one that was sent, not a newer
+// one waiting to go out.
 //
-// Every status now returns a real "bg" color (not the old
-// `${status.color}18` string-concatenation trick used at the one render
-// site with a pill background) — that pattern produces something like
-// "var(--green)18", which isn't valid CSS at all, so the background
-// silently failed to apply everywhere it was used. Vibrant colors like
-// green/orange still read fine as plain text without it, which is why
-// this went unnoticed until a muted grey text-only "pill" made the
-// missing background actually visible as a problem.
-function statusMeta(c){
-  if(c.draftStatus==='approved'){
-    if(c.draftSentAt) return {label:'Sent', color:'var(--muted)', bg:'var(--border)'};
+// Every status returns a real "bg" color (not the old `${status.color}18`
+// string-concatenation trick used at one render site with a pill
+// background) — that pattern produces something like "var(--green)18",
+// which isn't valid CSS at all, so the background silently failed to apply
+// everywhere it was used. Vibrant colors like green/orange still read fine
+// as plain text without it, which is why this went unnoticed until a muted
+// grey text-only "pill" made the missing background actually visible as a
+// problem.
+function statusMeta(c, author){
+  const d = getDraftFor(c, author);
+  if(d.draftStatus==='approved'){
+    if(d.draftSentAt) return {label:'Sent', color:'var(--muted)', bg:'var(--border)'};
     return {label:'✓ Approved', color:'var(--green)', bg:'var(--green-bg)'};
   }
-  if(c.draftStatus==='pending') return {label:'Draft ready', color:'var(--brand)', bg:'var(--brand-bg)'};
+  if(d.draftStatus==='pending') return {label:'Draft ready', color:'var(--brand)', bg:'var(--brand-bg)'};
   return {label:'No draft yet', color:'var(--muted-lt)', bg:'var(--border)'};
 }
 
@@ -15929,7 +16110,10 @@ function renderTotalClientsDonut(){
   if(statsEl){
     const avgImportance = (ac.reduce((s,c)=>s+c.importance,0) / total).toFixed(1);
     const avgDanger = (ac.reduce((s,c)=>s+c.danger,0) / total).toFixed(1);
-    const atRiskNoDraft = ac.filter(c=> c.danger>=4 && c.draftStatus==='none').length;
+    // "No draft" now means no author has ever started one for this
+    // client — checks across all of a client's drafts (one per author,
+    // see addendum-25.sql), not a single client-level status.
+    const atRiskNoDraft = ac.filter(c=> c.danger>=4 && !(c.drafts||[]).some(d=>d.draftStatus!=='none')).length;
     statsEl.innerHTML = `
       <div class="donut-stat-row"><span class="donut-stat-label">Avg Importance</span><span class="donut-stat-val">${avgImportance}/10</span></div>
       <div class="donut-stat-row"><span class="donut-stat-label">Avg Danger</span><span class="donut-stat-val">${avgDanger}/5</span></div>
@@ -16090,9 +16274,13 @@ function budgetTierMeta(tier){
 // from last Friday would still count as "this week" on the following
 // Monday — the label promised a week that resets, but the logic never
 // actually reset at any fixed point.
-function hasLoggedThisWeek(c){
+// author is optional — when provided, scopes "logged this week" to just
+// that person's own improvements (needed now that "stale" is a
+// per-author question, not a per-client one — see renderTeamQueue()).
+// Omitting it checks across all authors, unchanged from before.
+function hasLoggedThisWeek(c, author){
   const weekStart = getWeekStart(new Date());
-  return c.improvements.some(i=>i.date && i.includeInEmail!==false && new Date(i.date) >= weekStart);
+  return c.improvements.some(i=>i.date && i.includeInEmail!==false && new Date(i.date) >= weekStart && (!author || i.author===author));
 }
 
 // Preserves each improvement's original index in c.improvements before
@@ -16141,15 +16329,19 @@ function loggedPill(c){
   return `<span class="pill pill-history">${timeAgo(mostRecent.date)}</span>`;
 }
 
-function openQueueCardModal(id){
+function openQueueCardModal(id, author){
   const c = clients.find(x=>x.id===id);
   if(!c) return;
-  const shownImprovements = c.improvements.filter(i=>improvementInDateRange(i, false));
-  const status = statusMeta(c);
+  const d = getDraftFor(c, author);
+  // Scoped to this author's own logged work — this modal represents one
+  // specific person's draft for this client, not a combined view of
+  // everyone who's ever logged something here.
+  const shownImprovements = c.improvements.filter(i=>improvementInDateRange(i, false) && i.author===author);
+  const status = statusMeta(c, author);
   openAppModal(`
     <div class="modal-head">
       <div>
-        <div class="q-name">${c.name}</div>
+        <div class="q-name">${c.name} <span style="font-weight:400;color:var(--muted-lt);font-size:13px;">— ${escapeHtml(author)}</span></div>
         <div class="q-service-caption">${c.service} · ${riskCaptionHtml(c.danger)}</div>
         <div class="q-ratings" style="margin-top:12px;">
           ${dotRating('Importance', c.importance, 'ink', 10)}
@@ -16161,81 +16353,88 @@ function openQueueCardModal(id){
     <div class="modal-body">
       <span class="q-status-label" style="color:${status.color};">${status.label}</span>
       <div class="q-bulk">
-        ${shownImprovements.length ? `<div class="q-bulk-title">Logged ${activeDateFilterLabel()} (${shownImprovements.length}) — ${shownImprovements.filter(i=>i.includeInEmail!==false).length} included in email</div><div class="q-bulk-list"><ul>${shownImprovements.map(i=>`<li style="${i.includeInEmail===false?'opacity:.55;':''}">${i.includeInEmail===false ? '<span style="color:var(--muted-lt);font-size:10px;">[not in email]</span> ' : ''}${i.text} — <span style="color:var(--muted-lt);">${i.author}</span></li>`).join('')}</ul></div>` : `<i>No improvements logged ${activeDateFilterLabel()} — nothing to send.</i>`}
+        ${shownImprovements.length ? `<div class="q-bulk-title">Logged ${activeDateFilterLabel()} (${shownImprovements.length}) — ${shownImprovements.filter(i=>i.includeInEmail!==false).length} included in email</div><div class="q-bulk-list"><ul>${shownImprovements.map(i=>`<li style="${i.includeInEmail===false?'opacity:.55;':''}">${i.includeInEmail===false ? '<span style="color:var(--muted-lt);font-size:10px;">[not in email]</span> ' : ''}${i.text} — <span style="color:var(--muted-lt);">${i.author}</span></li>`).join('')}</ul></div>` : `<i>No improvements logged by ${escapeHtml(author)} ${activeDateFilterLabel()} — nothing to send.</i>`}
       </div>
-      ${c.draft ? `<textarea spellcheck="true" class="draft" id="draft-${c.id}" ${c.draftStatus==='approved' && !canApprove() ? 'disabled' : ''}>${escapeHtml(c.draft)}</textarea>` : ''}
-      ${c.draft && !c.email ? `<span class="warn-text">No client email on file — add one in Clients</span>` : ''}
+      ${d.draft ? `<textarea spellcheck="true" class="draft" id="draft-${c.id}" ${d.draftStatus==='approved' && !canApprove() ? 'disabled' : ''}>${escapeHtml(d.draft)}</textarea>` : ''}
+      ${d.draft && !c.email ? `<span class="warn-text">No client email on file — add one in Clients</span>` : ''}
     </div>
     <div class="modal-actions">
-      ${c.draftStatus==='approved' && c.draftSentAt ? `
-      <span style="font-size:13px;color:var(--muted-lt);">✓ Sent on ${new Date(c.draftSentAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} — nothing left to do here. New work logged for ${escapeHtml(c.name)} will start a fresh draft cycle on its own.</span>
+      ${d.draftStatus==='approved' && d.draftSentAt ? `
+      <span style="font-size:13px;color:var(--muted-lt);">✓ Sent on ${new Date(d.draftSentAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} — nothing left to do here. New work logged by ${escapeHtml(author)} for ${escapeHtml(c.name)} will start a fresh draft cycle on its own.</span>
       ` : `
-      ${c.improvements.length && !(c.draftStatus==='approved' && !canApprove()) && canGenerateOrRegenerateDraft(c) ? `<button class="btn btn-dark" id="gen-${c.id}" onclick="generateDraft('${c.id}')" title="${c.draft?'Regenerate':'Generate'} with AI"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/></svg>${c.draft?'Regenerate':'Generate'}</button>` : ''}
-      ${c.draft && canApprove() ? `<button class="btn btn-brand" onclick="approveDraft('${c.id}')" ${c.draftStatus==='approved'?'disabled':''}>Approve</button>
-      <button class="btn btn-outline" onclick="skipDraft('${c.id}')" title="Excludes these improvements from future drafts too — they won't reappear next week">Skip &amp; exclude</button>` : ''}
-      ${c.draft && !canApprove() && c.draftStatus!=='approved' ? `<span class="warn-text" style="color:var(--muted-lt);">Only admins and approvers can approve or skip drafts.</span>` : ''}
-      ${c.draftStatus==='approved' && !canApprove() ? `<span style="font-size:13px;color:var(--muted-lt);">✓ ${escapeHtml(c.name)} was approved.</span>` : ''}
+      ${c.improvements.some(i=>i.author===author) && !(d.draftStatus==='approved' && !canApprove()) && canGenerateOrRegenerateDraft(c, author) ? `<button class="btn btn-dark" id="gen-${c.id}" onclick="generateDraft('${c.id}','${author.replace(/'/g,"\\'")}')" title="${d.draft?'Regenerate':'Generate'} with AI"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/></svg>${d.draft?'Regenerate':'Generate'}</button>` : ''}
+      ${d.draft && canApprove() ? `<button class="btn btn-brand" onclick="approveDraft('${c.id}','${author.replace(/'/g,"\\'")}')" ${d.draftStatus==='approved'?'disabled':''}>Approve</button>
+      <button class="btn btn-outline" onclick="skipDraft('${c.id}','${author.replace(/'/g,"\\'")}')" title="Excludes these improvements from future drafts too — they won't reappear next week">Skip &amp; exclude</button>` : ''}
+      ${d.draft && !canApprove() && d.draftStatus!=='approved' ? `<span class="warn-text" style="color:var(--muted-lt);">Only admins and approvers can approve or skip drafts.</span>` : ''}
+      ${d.draftStatus==='approved' && !canApprove() ? `<span style="font-size:13px;color:var(--muted-lt);">✓ ${escapeHtml(author)}'s update was approved.</span>` : ''}
       `}
     </div>`, 560);
   const card = document.querySelector('#appModalOverlay .modal-card');
-  if(card) card.dataset.clientId = id;
+  if(card){ card.dataset.clientId = id; card.dataset.author = author; }
   const list = document.querySelector('#appModalOverlay .q-bulk-list');
   if(list && list.scrollHeight > list.clientHeight) list.classList.add('scrollable');
 }
 
 
-async function generateDraft(id){
+async function generateDraft(id, author){
   await loadAll();
   const c = clients.find(x=>x.id===id);
   if(!c) return;
-  if(!canGenerateOrRegenerateDraft(c)){
-    showToast('error','Not allowed', (c.draftStatus==='pending' && c.readyToNotify===true && !canApprove())
+  const d = getDraftFor(c, author);
+  if(!canGenerateOrRegenerateDraft(c, author)){
+    showToast('error','Not allowed', (d.draftStatus==='pending' && d.readyToNotify===true && !canApprove())
       ? "This draft's already been marked ready for approval — an admin or approver needs to act on it before it can be regenerated."
-      : c.draft
-        ? 'Only admins, approvers, or contributors to this client\'s pending work can regenerate this draft.'
-        : 'Only someone who logged this client\'s included improvements can generate the first draft.');
+      : d.draft
+        ? 'Only admins, approvers, or the person this draft belongs to can regenerate it.'
+        : 'Only that team member (or an admin/approver) can generate their first draft.');
     return;
   }
   const modalCard = document.querySelector('#appModalOverlay .modal-card');
-  const modalOpenForThis = modalCard && modalCard.dataset.clientId === id;
-  // No longer restricted to "this week" — an improvement now stays
-  // eligible for a draft indefinitely until it's actually approved
-  // (which is what clears include_in_email for whichever ones ended up
-  // included — see approveDraft()), instead of silently falling out of
-  // consideration the moment the calendar rolls over to a new week.
-  const eligibleImprovements = c.improvements.filter(i => i.includeInEmail !== false)
+  const modalOpenForThis = modalCard && modalCard.dataset.clientId === id && modalCard.dataset.author === author;
+  // Personal by default — each team member's draft only ever draws from
+  // their own logged work, so a client with multiple contributors gets
+  // one independent draft per person rather than one shared draft that
+  // silently mixes everyone's improvements together. Admins/approvers get
+  // the full picture instead: every eligible improvement for this client,
+  // from any author, in case they need to fold someone else's work into
+  // the draft they're overseeing — but only this specific author's own
+  // items are pre-checked, so nothing gets included from someone else by
+  // accident.
+  const allEligible = c.improvements.filter(i => i.includeInEmail !== false)
     .sort((a,b) => new Date(a.date||0) - new Date(b.date||0)); // oldest first — easy to miss otherwise
+  const eligibleImprovements = canApprove() ? allEligible : allEligible.filter(i => i.author === author);
   if(!eligibleImprovements.length){
-    showToast('error','Nothing to include', c.improvements.length
-      ? `${c.name} has logged items, but none are marked "Include in email" yet — review them in Past Improvements.`
-      : `No improvements logged yet for ${c.name}.`);
+    showToast('error','Nothing to include', c.improvements.some(i=>i.author===author)
+      ? `${author} has logged items for ${c.name}, but none are marked "Include in email" yet — review them in Past Improvements.`
+      : `No improvements logged yet by ${author} for ${c.name}.`);
     return;
   }
   // A picker rather than auto-including everything eligible — lets
   // someone hold specific logged work back for a later draft instead of
   // it being all-or-nothing.
   openAppModal(`
-    <div class="modal-head"><span class="panel-title">Select improvements to include</span><span class="toast-close" onclick="${modalOpenForThis ? `openQueueCardModal('${id}')` : 'closeAppModal()'}">✕</span></div>
+    <div class="modal-head"><span class="panel-title">Select improvements to include</span><span class="toast-close" onclick="${modalOpenForThis ? `openQueueCardModal('${id}','${author.replace(/'/g,"\\'")}')` : 'closeAppModal()'}">✕</span></div>
     <div class="modal-body">
-      <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">Everything checked below will go into this draft for ${escapeHtml(c.name)}. Uncheck anything you'd rather hold back for a later one.</p>
+      <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">Everything checked below will go into ${escapeHtml(author)}'s draft for ${escapeHtml(c.name)}. Uncheck anything you'd rather hold back for a later one.</p>
       <div style="display:flex;flex-direction:column;gap:2px;max-height:340px;overflow-y:auto;">
         ${eligibleImprovements.map(i=>`
           <label style="display:flex;align-items:flex-start;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border);cursor:pointer;">
-            <input type="checkbox" class="draft-select-checkbox" value="${i.id}" checked style="margin-top:3px;flex:none;">
+            <input type="checkbox" class="draft-select-checkbox" value="${i.id}" ${i.author===author?'checked':''} style="margin-top:3px;flex:none;">
             <span style="flex:1;font-size:13px;color:var(--ink);">${escapeHtml(i.text)}<br><span style="font-size:11px;color:var(--muted-lt);">${escapeHtml(i.author||'')} — ${i.date ? new Date(i.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : 'no date'}</span></span>
           </label>
         `).join('')}
       </div>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-outline" onclick="${modalOpenForThis ? `openQueueCardModal('${id}')` : 'closeAppModal()'}">Cancel</button>
-      <button class="btn btn-brand" onclick="confirmGenerateDraftSelection('${id}')">Generate draft</button>
+      <button class="btn btn-outline" onclick="${modalOpenForThis ? `openQueueCardModal('${id}','${author.replace(/'/g,"\\'")}')` : 'closeAppModal()'}">Cancel</button>
+      <button class="btn btn-brand" onclick="confirmGenerateDraftSelection('${id}','${author.replace(/'/g,"\\'")}')">Generate draft</button>
     </div>`, 520);
 }
 
-async function confirmGenerateDraftSelection(id){
+async function confirmGenerateDraftSelection(id, author){
   const c = clients.find(x=>x.id===id);
   if(!c) return;
+  const d = getDraftFor(c, author);
   const checkedIds = [...document.querySelectorAll('.draft-select-checkbox:checked')].map(el=>el.value);
   if(!checkedIds.length){ showToast('error','Nothing selected','Check at least one improvement to include.'); return; }
   const includedImprovements = c.improvements.filter(i => checkedIds.includes(i.id));
@@ -16282,72 +16481,69 @@ ${contentRules}`;
     });
     const data = await response.json();
     const text = (data.text || '').trim();
-    const stayedApproved = c.draftStatus === 'approved';
-    c.draft = text || 'Could not generate a draft — try again.';
+    const stayedApproved = d.draftStatus === 'approved';
+    const fields = { draft: text || 'Could not generate a draft — try again.' };
     // Regenerating an already-approved draft doesn't require re-approval —
     // what was actually approved is the underlying included improvements,
     // which haven't changed, not this specific AI wording of them. A
     // fresh (never-approved) draft still becomes pending as before.
     if(!stayedApproved){
-      c.draftStatus = 'pending'; c.draftPendingSince = new Date().toISOString();
+      fields.draftStatus = 'pending'; fields.draftPendingSince = new Date().toISOString();
       // A genuinely new cycle means different underlying content — the
       // "already sent" record from whatever was sent before no longer
       // applies to this draft. Deliberately NOT cleared in the
-      // stayedApproved branch above — reording an already-approved draft
-      // is still the same underlying work, so sendApprovedDraft() should
-      // keep warning about it.
-      c.draftSentAt = null; c.draftSentBy = '';
+      // stayedApproved branch above — regenerating an already-approved
+      // draft is still the same underlying work, so sendApprovedDraft()
+      // should keep warning about it.
+      fields.draftSentAt = null; fields.draftSentBy = '';
+    } else {
+      fields.draftStatus = d.draftStatus;
     }
     // A fresh/regenerated draft was never "marked ready to notify" for
     // this specific content — Team Queue shouldn't surface it to
     // approvers as awaiting review until the owning member explicitly
     // clicks Ready to Notify again.
-    c.readyToNotify = false;
+    fields.readyToNotify = false;
     // Exactly what's in this draft cycle, from the picker's selection —
     // not re-derived from a date range. Read back by approveDraft() to
     // know precisely which rows to flip include_in_email off for.
-    c.draftImprovementIds = checkedIds;
-    log.unshift({t:nowTime(), tag:'auto', text:`AI ${stayedApproved?'re-worded':'drafted'} the update for <b>${c.name}</b> from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''}${stayedApproved?' — stayed approved, the included improvements didn\'t change':''}.`});
-    const saved = await updateClientRow(id, { draft:c.draft, draftStatus:c.draftStatus, draftPendingSince:c.draftPendingSince, readyToNotify:false, draftImprovementIds: checkedIds, draftSentAt: c.draftSentAt, draftSentBy: c.draftSentBy });
+    fields.draftImprovementIds = checkedIds;
+    log.unshift({t:nowTime(), tag:'auto', text:`AI ${stayedApproved?'re-worded':'drafted'} ${author}'s update for <b>${c.name}</b> from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''}${stayedApproved?' — stayed approved, the included improvements didn\'t change':''}.`});
+    const saved = await saveDraftFor(id, author, fields);
     if(!saved){
-      // The draft text and status are already updated in memory above, so
-      // the modal shows the generated text either way — but if this save
-      // failed, that text only exists on this screen right now. A reload,
-      // or another team member opening this client, would show the old
-      // state, since nothing actually reached the database. A silent
-      // "Draft generated" success toast here would be actively misleading
-      // in exactly the way that's easy to mistake for "it's not saving."
+      // A silent "Draft generated" success toast here would be actively
+      // misleading in exactly the way that's easy to mistake for "it's
+      // not saving" — see saveDraftFor()'s own RLS-affected-0-rows check.
       renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
-      openQueueCardModal(id);
+      openQueueCardModal(id, author);
       showToast('error','Draft generated, but not saved', 'The AI wrote it, but saving to the database failed — check that all schema migrations have been run, then try again.');
       return;
     }
     await persistLog();
     renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
-    logClientActivity(id, 'draft_generated', `AI ${stayedApproved?'re-worded':'generated'} a draft from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''} (of ${c.improvements.length} logged)${stayedApproved?' — approval carried over':''}.`);
+    logClientActivity(id, 'draft_generated', `AI ${stayedApproved?'re-worded':'generated'} ${author}'s draft from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''} (of ${c.improvements.filter(i=>i.author===author).length} logged by them)${stayedApproved?' — approval carried over':''}.`);
     refreshClientDetailActivityIfOpen(id);
-    openQueueCardModal(id);
-    showToast('success','Draft generated', stayedApproved ? `${c.name}'s draft was re-worded — still approved, no need to re-approve.` : `AI wrote the update for ${c.name}.`);
+    openQueueCardModal(id, author);
+    showToast('success','Draft generated', stayedApproved ? `${author}'s draft for ${c.name} was re-worded — still approved, no need to re-approve.` : `AI wrote ${author}'s update for ${c.name}.`);
     // No automatic notification here at all — the only way admins/
     // approvers get notified is the explicit "Ready to Notify" button,
     // which is also what makes a pending draft actually visible in Team
     // Queue (see renderTeamQueue()'s readyToNotify filter below).
   }catch(e){
     console.error('generateDraft failed', e);
-    c.draft = 'AI generation failed — you can write the draft manually here.';
-    c.draftStatus = 'pending';
-    c.draftPendingSince = new Date().toISOString();
     // Same reasoning as the success path above — a failed generation still
     // starts a fresh pending cycle that hasn't been marked ready for
     // review by anyone yet. Missing this reset was a real gap: a client
     // that had previously been marked Ready to Notify (then regenerated,
     // then hit this failure branch) would keep showing up in Team Queue —
     // and in its badge count — for a draft nobody had actually flagged.
-    c.readyToNotify = false;
-    c.draftImprovementIds = checkedIds;
-    const saved = await updateClientRow(id, { draft:c.draft, draftStatus:c.draftStatus, draftPendingSince:c.draftPendingSince, readyToNotify:false, draftImprovementIds: checkedIds });
+    const saved = await saveDraftFor(id, author, {
+      draft: 'AI generation failed — you can write the draft manually here.',
+      draftStatus: 'pending', draftPendingSince: new Date().toISOString(),
+      readyToNotify: false, draftImprovementIds: checkedIds,
+    });
     renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
-    openQueueCardModal(id);
+    openQueueCardModal(id, author);
     showToast('error', saved ? 'AI generation failed' : 'AI generation failed, and the fallback state failed to save too', saved ? 'Write the draft manually below, or try again.' : 'Try refreshing before writing a draft manually — this client\'s saved state may be stale.');
   }
 }
@@ -16355,9 +16551,10 @@ ${contentRules}`;
 // The Send button on an already-approved card — same confirmation flow
 // approveDraft() itself uses when it opens the email right after approving,
 // for the case where that got dismissed earlier without actually sending.
-async function sendApprovedDraft(id){
+async function sendApprovedDraft(id, author){
   const c = clients.find(x=>x.id===id);
   if(!c) return;
+  const d = getDraftFor(c, author);
   if(!c.email){ showToast('error','No email on file', `Add an email for ${c.name} in Clients to send.`); return; }
   // Already sent this exact draft once — require an explicit
   // confirmation naming who sent it and when, rather than silently
@@ -16365,67 +16562,61 @@ async function sendApprovedDraft(id){
   // cycle clears this automatically (see confirmGenerateDraftSelection());
   // reaching here with draftSentAt still set means this is the same
   // underlying content being sent again.
-  if(c.draftSentAt){
-    const who = c.draftSentBy && c.draftSentBy === myName() ? 'You' : (c.draftSentBy || 'Someone');
-    const sentDate = new Date(c.draftSentAt).toLocaleDateString('en-US',{month:'long', day:'numeric', year:'numeric'});
+  if(d.draftSentAt){
+    const who = d.draftSentBy && d.draftSentBy === myName() ? 'You' : (d.draftSentBy || 'Someone');
+    const sentDate = new Date(d.draftSentAt).toLocaleDateString('en-US',{month:'long', day:'numeric', year:'numeric'});
     const confirmed = await confirmDialog(
-      `${who} sent this improvement to ${c.name} (${c.email}) on ${sentDate}. Are you sure you want to send it again?`,
+      `${who} sent ${author}'s update to ${c.name} (${c.email}) on ${sentDate}. Are you sure you want to send it again?`,
       { confirmLabel:'Send again' }
     );
     if(!confirmed) return;
   }
-  showSendEmailConfirm(c.email, `Your weekly update from ${settings.appName || 'Based Agency'}`, c.draft || '', () => recordDraftSent(id), true);
+  showSendEmailConfirm(c.email, `Your weekly update from ${settings.appName || 'Based Agency'}`, d.draft || '', () => recordDraftSent(id, author), true);
 }
 
 // Called only once the email actually, successfully sends (via
 // showSendEmailConfirm's onSent callback) — never on a failed or
 // cancelled attempt, so draftSentAt always reflects a real delivery.
-async function recordDraftSent(id){
+async function recordDraftSent(id, author){
   const c = clients.find(x=>x.id===id);
   if(!c) return;
-  c.draftSentAt = new Date().toISOString();
-  c.draftSentBy = myName() || 'Someone';
-  await updateClientRow(id, { draftSentAt: c.draftSentAt, draftSentBy: c.draftSentBy });
+  await saveDraftFor(id, author, { draftSentAt: new Date().toISOString(), draftSentBy: myName() || 'Someone' });
 }
 
-// Whether the current user personally logged at least one improvement
-// that's currently eligible to be drafted for a client — used to gate
-// draft generation, so "did I contribute" rather than "who else
-// contributed" (the opposite question getIncludedAuthorProfiles answers,
-// which is why this is separate rather than reusing that one). No longer
-// restricted to "this week" — matches generateDraft()'s own eligibility
-// check (include_in_email !== false, regardless of date).
-function iContributedToClientDraft(c){
-  return c.improvements.some(i => i.includeInEmail !== false && i.author === myName());
-}
-
-function canGenerateOrRegenerateDraft(c){
+function canGenerateOrRegenerateDraft(c, author){
+  const d = getDraftFor(c, author);
   // Locked for the original contributor once they've told an approver
   // it's ready — regenerating out from under someone who's actively
   // reviewing it would silently change what they're looking at.
   // Approvers/admins keep full control regardless, since they're the
   // ones with authority over what happens next.
-  if(c.draftStatus==='pending' && c.readyToNotify===true && !canApprove()) return false;
-  if(iContributedToClientDraft(c)) return true;
-  if(c.draft) return canApprove();
-  return false;
+  if(d.draftStatus==='pending' && d.readyToNotify===true && !canApprove()) return false;
+  // Each person can always work on their own draft (subject to the lock
+  // above) — draft state is now genuinely per-author, so "is this my own
+  // draft" replaces the old "did I contribute to the shared draft"
+  // question entirely. Anyone else's draft is admin/approver territory,
+  // matching their oversight role across the whole team.
+  if(author === myName()) return true;
+  return canApprove();
 }
 
-// Whoever's actual logged work is included in this draft for a client —
-// reads the exact selection from generateDraft()'s picker
-// (c.draftImprovementIds), not a re-derived date heuristic, so this
-// matches "whose work is actually part of it" precisely. Excludes the
+// Whoever's actual logged work is included in this specific draft — reads
+// the exact selection from generateDraft()'s picker (d.draftImprovementIds),
+// not a re-derived date heuristic, so this matches "whose work is actually
+// part of it" precisely. Takes the draft object directly now rather than
+// just the client, since a client can have several independent drafts (one
+// per author) with different improvements included in each. Excludes the
 // current user, since notifying yourself about your own client's status
 // wouldn't make sense.
-function getIncludedAuthorProfiles(c){
-  const includedIds = new Set(c.draftImprovementIds || []);
+function getIncludedAuthorProfiles(c, d){
+  const includedIds = new Set(d.draftImprovementIds || []);
   const includedAuthors = [...new Set(
     c.improvements.filter(i => includedIds.has(i.id)).map(i=>i.author)
   )].filter(author => author && author !== myName());
   return includedAuthors.map(name => teamProfiles.find(p=>p.name===name)).filter(Boolean);
 }
 
-async function approveDraft(id){
+async function approveDraft(id, author){
   if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can approve drafts.'); return; }
   const ta = document.getElementById('draft-'+id);
   setBtnLoading(clickedBtn(), 'Approving…');
@@ -16433,15 +16624,16 @@ async function approveDraft(id){
   await loadAll();
   const c = clients.find(x=>x.id===id);
   if(!c) return;
+  const d = getDraftFor(c, author);
   const modalCard = document.querySelector('#appModalOverlay .modal-card');
-  const modalOpenForThis = modalCard && modalCard.dataset.clientId === id;
-  if(ta) c.draft = ta.value;
-  c.draftStatus = 'approved';
+  const modalOpenForThis = modalCard && modalCard.dataset.clientId === id && modalCard.dataset.author === author;
+  const fields = { draftStatus: 'approved' };
+  if(ta) fields.draft = ta.value;
   // Captured before draftImprovementIds gets cleared below —
   // getIncludedAuthorProfiles() needs it.
-  const includedAuthorProfiles = getIncludedAuthorProfiles(c);
-  const includedIds = c.draftImprovementIds || [];
-  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Approved <b>${c.name}</b>'s draft.`});
+  const includedAuthorProfiles = getIncludedAuthorProfiles(c, d);
+  const includedIds = d.draftImprovementIds || [];
+  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Approved ${author}'s draft for <b>${c.name}</b>.`});
   // Once approved, the specific improvements that were part of THIS
   // draft are considered communicated — flipping include_in_email off
   // for exactly those is what naturally keeps them from being offered
@@ -16449,40 +16641,40 @@ async function approveDraft(id){
   if(includedIds.length){
     c.improvements.forEach(i => { if(includedIds.includes(i.id)) i.includeInEmail = false; });
   }
-  c.draftImprovementIds = [];
-  const ok = await updateClientRow(id, { draft:c.draft, draftStatus:c.draftStatus, draftImprovementIds: [] });
+  fields.draftImprovementIds = [];
+  const ok = await saveDraftFor(id, author, fields);
   if(ok && includedIds.length){
     await supabaseClient.from('client_improvements').update({ include_in_email: false }).in('id', includedIds);
   }
   if(ok) await persistLog();
   renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
-  if(modalOpenForThis) openQueueCardModal(id);
+  if(modalOpenForThis) openQueueCardModal(id, author);
   if(!ok){ showToast('error','Save failed','Approval may not have synced — refresh and check.'); return; }
-  logClientActivity(id, 'draft_approved', `${myName()||'Someone'} approved this week's draft.`);
+  logClientActivity(id, 'draft_approved', `${myName()||'Someone'} approved ${author}'s draft.`);
   refreshClientDetailActivityIfOpen(id);
 
   // Notify whoever's actual logged work was included in what just got
   // approved.
   for(const authorProfile of includedAuthorProfiles){
-    await sendNotification(authorProfile.id, 'draft_approved', 'Your submission was approved', `${myName()||'An approver'} approved this week's draft for ${c.name}.`, 'approve');
+    await sendNotification(authorProfile.id, 'draft_approved', 'Your submission was approved', `${myName()||'An approver'} approved ${author}'s draft for ${c.name}, which included your logged work.`, 'approve');
   }
 
-  showToast('success','Draft approved', `${c.name}'s update was approved.`);
+  showToast('success','Draft approved', `${author}'s update for ${c.name} was approved.`);
 }
 
-async function skipDraft(id){
+async function skipDraft(id, author){
   if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can skip drafts.'); return; }
   setBtnLoading(clickedBtn(), 'Skipping…');
   await loadAll();
   const c = clients.find(x=>x.id===id);
   if(!c) return;
+  const d = getDraftFor(c, author);
   const modalCard = document.querySelector('#appModalOverlay .modal-card');
-  const modalOpenForThis = modalCard && modalCard.dataset.clientId === id;
+  const modalOpenForThis = modalCard && modalCard.dataset.clientId === id && modalCard.dataset.author === author;
   // Captured before draftImprovementIds gets cleared below — used by the
   // notification loop at the end of this function.
-  const includedAuthorProfiles = getIncludedAuthorProfiles(c);
-  const includedIds = c.draftImprovementIds || [];
-  c.draftStatus='none'; c.draft='';
+  const includedAuthorProfiles = getIncludedAuthorProfiles(c, d);
+  const includedIds = d.draftImprovementIds || [];
   // Same treatment as approveDraft(): flipping include_in_email off for
   // exactly the improvements that were part of THIS draft is what keeps
   // them from silently reappearing in a future draft. Previously this was
@@ -16494,24 +16686,22 @@ async function skipDraft(id){
   if(includedIds.length){
     c.improvements.forEach(i => { if(includedIds.includes(i.id)) i.includeInEmail = false; });
   }
-  c.draftImprovementIds = [];
+  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Skipped ${author}'s draft for <b>${c.name}</b> — no email sent.`});
   // A full reset back to square one — any prior "already sent" record
   // belongs to this now-abandoned cycle, not whatever draft eventually
-  // gets generated next for this client.
-  c.draftSentAt = null; c.draftSentBy = '';
-  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Skipped <b>${c.name}</b> this week — no email sent.`});
-  const ok = await updateClientRow(id, { draftStatus:c.draftStatus, draft:c.draft, draftImprovementIds: [], draftSentAt: null, draftSentBy: '' });
+  // gets generated next for this author/client pair.
+  const ok = await saveDraftFor(id, author, { draftStatus:'none', draft:'', draftImprovementIds: [], draftSentAt: null, draftSentBy: '' });
   if(ok && includedIds.length){
     await supabaseClient.from('client_improvements').update({ include_in_email: false }).in('id', includedIds);
   }
   if(ok) await persistLog();
   renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
-  if(ok){ logClientActivity(id, 'draft_skipped', `${myName()||'Someone'} skipped this week's update.`); refreshClientDetailActivityIfOpen(id); }
-  if(modalOpenForThis) openQueueCardModal(id);
-  ok ? showToast('info','Skipped', `${c.name} won't get an update this week — those improvements are now excluded from future drafts too.`) : showToast('error','Save failed','Could not save — try again.');
+  if(ok){ logClientActivity(id, 'draft_skipped', `${myName()||'Someone'} skipped ${author}'s update.`); refreshClientDetailActivityIfOpen(id); }
+  if(modalOpenForThis) openQueueCardModal(id, author);
+  ok ? showToast('info','Skipped', `${author}'s update for ${c.name} won't be sent — those improvements are now excluded from future drafts too.`) : showToast('error','Save failed','Could not save — try again.');
   if(ok){
     for(const authorProfile of includedAuthorProfiles){
-      sendNotification(authorProfile.id, 'draft_skipped', 'Draft skipped', `${myName()||'An approver'} skipped this week's draft for ${c.name} — no email was sent.`, 'approve');
+      sendNotification(authorProfile.id, 'draft_skipped', 'Draft skipped', `${myName()||'An approver'} skipped ${author}'s draft for ${c.name}, which included your logged work — no email was sent.`, 'approve');
     }
   }
 }
@@ -17342,8 +17532,23 @@ function getNotifyRecipient(){
 // used to disable the Notify button once everything currently pending has
 // already been flagged, so clicking it again can't re-notify approvers
 // about the exact same drafts they already know about.
+// Every currently-pending draft across the whole team, one entry per
+// (client, author) pair — not per client, since a client can have several
+// independent pending drafts at once now (see addendum-25.sql). This is
+// the team-wide equivalent of what Team Queue's per-member sections show
+// individually, flattened into one list for the general Notify flow below.
+function getAllPendingDrafts(){
+  const result = [];
+  activeClients().forEach(c => {
+    (c.drafts||[]).forEach(d => {
+      if(d.draftStatus==='pending') result.push({ c, author: d.author, d });
+    });
+  });
+  return result;
+}
+
 function hasNewDraftsToNotify(){
-  return activeClients().some(c => c.draftStatus==='pending' && c.readyToNotify!==true);
+  return getAllPendingDrafts().some(({d}) => d.readyToNotify!==true);
 }
 
 function updateNotifyBtnState(){
@@ -17355,7 +17560,7 @@ function updateNotifyBtnState(){
 }
 
 function notifyApprovers(){
-  const pending = activeClients().filter(c=>c.draftStatus==='pending');
+  const pending = getAllPendingDrafts();
   if(!pending.length){ showToast('info','Nothing pending', 'No drafts are ready right now.'); return; }
   if(!hasNewDraftsToNotify()){ showToast('info','Already notified', 'Everything pending has already been flagged for review.'); return; }
 
@@ -17371,14 +17576,14 @@ function notifyApprovers(){
     </div>`, 420);
 }
 
-// Marks every currently-pending client as ready — the team-wide
+// Marks every currently-pending draft as ready — the team-wide
 // counterpart to markMemberDraftsReady() above, used by this general
 // Notify button rather than the per-member one, since this covers
 // everyone's pending work at once, not one person's.
 function markAllPendingDraftsReady(){
-  const pending = activeClients().filter(c=>c.draftStatus==='pending');
-  pending.forEach(c => { c.readyToNotify = true; });
-  Promise.all(pending.map(c=>updateClientRow(c.id, { readyToNotify:true }))).then(()=>renderTeamQueue());
+  const pending = getAllPendingDrafts();
+  pending.forEach(({d}) => { d.readyToNotify = true; });
+  Promise.all(pending.map(({c, author})=>saveDraftFor(c.id, author, { readyToNotify:true }))).then(()=>renderTeamQueue());
   return pending;
 }
 
@@ -17386,15 +17591,15 @@ function notifyApproversByEmail(){
   const recipient = getNotifyRecipient();
   if(!recipient){ closeAppModal(); showToast('info','Nobody to notify by email', "You're the last stop in the chain — try Send Internally instead."); return; }
   if(!recipient.hasEmail){ showToast('error','Missing email on file', `No ${recipient.configLabel} has an email on file — add one under Team.`); return; }
-  const pending = activeClients().filter(c=>c.draftStatus==='pending');
+  const pending = getAllPendingDrafts();
   const subject = `${pending.length} client update${pending.length!==1?'s':''} ready for approval`;
-  const bodyLines = pending.map(c=>`- ${c.name} (danger ${c.danger}/5, importance ${c.importance}/10)`).join('\n');
+  const bodyLines = pending.map(({c, author})=>`- ${c.name} (${author}) (danger ${c.danger}/5, importance ${c.importance}/10)`).join('\n');
   const body = `This week's client update drafts are ready for review, sorted by danger score:\n\n${bodyLines}\n\nReview and approve here: ${window.location.href}`;
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Opened a notification email — ${pending.length} draft${pending.length!==1?'s':''} pending.`});
   persistLog().then(renderLog);
   showSendEmailConfirm(recipient.email, subject, body, () => {
-    pending.forEach(c => { c.readyToNotify = true; });
-    Promise.all(pending.map(c=>updateClientRow(c.id, { readyToNotify:true }))).then(()=>renderTeamQueue());
+    pending.forEach(({d}) => { d.readyToNotify = true; });
+    Promise.all(pending.map(({c, author})=>saveDraftFor(c.id, author, { readyToNotify:true }))).then(()=>renderTeamQueue());
   });
 }
 
