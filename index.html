@@ -15785,27 +15785,21 @@ function notifyForMember(memberId){
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
-      <button class="btn btn-brand" onclick="confirmNotifyMemberSelection('${memberId}')">Continue</button>
+      <button class="btn btn-brand" onclick="confirmNotifyMemberSelection('${memberId}')">${isSelf ? 'Send for Approval' : 'Notify'}</button>
     </div>`, 480);
 }
 
+// Goes straight to sending now — with "Send Email" already removed
+// earlier, this step only ever had one real action left ("Send Internally"
+// / "Send for Approval" vs Cancel), making the extra confirmation modal
+// redundant for both contexts. notifyForMemberInternally() already closes
+// the modal itself once sending completes, so the picker just stays open
+// (with its own Cancel button) until then.
 function confirmNotifyMemberSelection(memberId){
-  const member = teamProfiles.find(p=>p.id===memberId);
-  if(!member) return;
-  const isSelf = member.name === myName();
   const checkedIds = [...document.querySelectorAll('.notify-select-checkbox:checked')].map(el=>el.value);
   if(!checkedIds.length){ showToast('error','Nothing selected','Check at least one client to notify about.'); return; }
   _notifyMemberSelectedClientIds = checkedIds;
-
-  openAppModal(`
-    <div class="modal-head"><span class="panel-title">${isSelf ? 'Send for approval' : `Notify about ${escapeHtml(member.name)}'s drafts`}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
-    <div class="modal-body">
-      <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">${checkedIds.length} draft${checkedIds.length!==1?'s':''} selected. ${isSelf ? 'How do you want to send this for approval?' : 'How do you want to let them know?'}</p>
-      <div style="display:flex;gap:8px;">
-        <button class="btn btn-brand" onclick="notifyForMemberInternally('${memberId}')" style="flex:1;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>${isSelf ? 'Send for Approval' : 'Send Internally'}</button>
-        <button class="btn btn-outline" onclick="closeAppModal()" style="flex:1;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Cancel</button>
-      </div>
-    </div>`, 420);
+  notifyForMemberInternally(memberId);
 }
 
 // Marks this member's SELECTED pending drafts as ready — the actual
