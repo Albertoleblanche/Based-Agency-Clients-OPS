@@ -15681,10 +15681,6 @@ function renderTeamQueue(){
       .filter(c => statusMatches(c, member.name) && readyForReview(c, member.name))
       .sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
     if(!memberClients.length) return '';
-    const memberHasNewToNotify = activeClients().some(c => {
-      const d = getDraftFor(c, member.name);
-      return d.draftStatus==='pending' && d.readyToNotify!==true && c.improvements.some(i=>i.author===member.name);
-    });
     return `<div class="team-queue-section">
       <div class="team-queue-member-head">
         ${teamQueueAvatarHtml(member)}
@@ -15692,7 +15688,6 @@ function renderTeamQueue(){
           <div class="team-queue-member-name">${member.name}</div>
           <div class="team-queue-member-role">${member.title || member.role}</div>
         </div>
-        <button class="btn btn-dark" style="margin-left:auto;flex:none;" onclick="notifyForMember('${member.id}')" ${memberHasNewToNotify ? '' : 'disabled title="Nothing new to notify — everything pending for this member has already been flagged."'}>Ready to Notify</button>
       </div>
       <div class="queue-grid">${memberClients.map(c=>queueCardHtml(c, member.name)).join('')}</div>
     </div>`;
