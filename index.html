@@ -15787,9 +15787,9 @@ function confirmNotifyMemberSelection(memberId){
     <div class="modal-head"><span class="panel-title">Notify about ${escapeHtml(member.name)}'s drafts</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
       <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">${checkedIds.length} draft${checkedIds.length!==1?'s':''} selected. How do you want to let them know?</p>
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        <button class="btn btn-brand" onclick="notifyForMemberInternally('${memberId}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Send Internally</button>
-        <button class="btn btn-outline" onclick="closeAppModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Cancel</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-brand" onclick="notifyForMemberInternally('${memberId}')" style="flex:1;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Send Internally</button>
+        <button class="btn btn-outline" onclick="closeAppModal()" style="flex:1;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Cancel</button>
       </div>
     </div>`, 420);
 }
@@ -15943,7 +15943,15 @@ function statusMeta(c, author){
     if(d.draftSentAt) return {label:'Sent', color:'var(--muted)', bg:'var(--border)'};
     return {label:'✓ Approved', color:'var(--green)', bg:'var(--green-bg)'};
   }
-  if(d.draftStatus==='pending') return {label:'Draft ready', color:'var(--brand)', bg:'var(--brand-bg)'};
+  if(d.draftStatus==='pending'){
+    // Distinguishes "still working on this draft" from "I've flagged it
+    // for review" — readyToNotify is the same signal that makes a draft
+    // actually visible in Team Queue (see renderTeamQueue()'s
+    // readyForReview), so the card should reflect that transition rather
+    // than showing the same "Draft ready" label before and after it.
+    if(d.readyToNotify===true) return {label:'Sent for approval', color:'#3A63C9', bg:'#3A63C918'};
+    return {label:'Draft ready', color:'var(--brand)', bg:'var(--brand-bg)'};
+  }
   return {label:'No draft yet', color:'var(--muted-lt)', bg:'var(--border)'};
 }
 
@@ -17467,26 +17475,20 @@ function getNotifyRecipient(){
 }
 
 // True only if at least one pending draft hasn't been marked ready yet —
-// used to disable the Notify button once everything currently pending has
-// already been flagged, so clicking it again can't re-notify approvers
-// about the exact same drafts they already know about.
-// Every currently-pending draft across the whole team, one entry per
-// (client, author) pair — not per client, since a client can have several
-// independent pending drafts at once now (see addendum-25.sql). This is
-// the team-wide equivalent of what Team Queue's per-member sections show
-// individually, flattened into one list for the general Notify flow below.
-function getAllPendingDrafts(){
-  const result = [];
-  activeClients().forEach(c => {
-    (c.drafts||[]).forEach(d => {
-      if(d.draftStatus==='pending') result.push({ c, author: d.author, d });
-    });
-  });
-  return result;
-}
-
+// Scoped to the current user's own pending drafts — this button lives on
+// the personal Queue page, so "notify" here has always meant "notify
+// about MY work," same as the per-member button means one specific
+// person's work in Team Queue. A previous version of this pulled
+// EVERYONE's pending drafts team-wide instead, which was the actual bug
+// behind both the miscounted "3 drafts" (when the viewer only had 1 of
+// their own) and having to pick through colleagues' work that wasn't
+// theirs to decide on.
 function hasNewDraftsToNotify(){
-  return getAllPendingDrafts().some(({d}) => d.readyToNotify!==true);
+  const me = myName();
+  return activeClients().some(c => {
+    const d = getDraftFor(c, me);
+    return d.draftStatus==='pending' && d.readyToNotify!==true && c.improvements.some(i=>i.author===me);
+  });
 }
 
 function updateNotifyBtnState(){
@@ -17494,68 +17496,18 @@ function updateNotifyBtnState(){
   if(!notifyBtn) return;
   const hasNew = hasNewDraftsToNotify();
   notifyBtn.disabled = !hasNew;
-  notifyBtn.title = hasNew ? '' : 'Nothing new to notify — everything pending has already been flagged for review.';
+  notifyBtn.title = hasNew ? '' : 'Nothing new to notify — everything pending for you has already been flagged for review.';
 }
 
-let _notifyTeamSelectedKeys = [];
-
-// No picker here — unlike notifyForMember()'s (where the person clicking
-// owns the work being chosen from), this button is clicked by an
-// admin/approver who isn't the owner of any of these drafts. Deciding
-// which of their own work to flag ready is each member's own call, made
-// through their own "Ready to Notify" button — an admin/approver
-// selecting through individual items here would be making that call on
-// someone else's behalf, which isn't theirs to make. This notifies about
-// everything currently pending, with no selection step — same as before
-// the per-member picker was introduced.
+// Delegates straight to notifyForMember() with the current user's own
+// team profile — this button and the per-member one in Team Queue are
+// otherwise doing exactly the same thing (pick which of one person's own
+// not-yet-sent pending drafts to flag, then choose how to notify), so
+// there's no separate picker/scoping logic to maintain here anymore.
 function notifyApprovers(){
-  const pending = getAllPendingDrafts();
-  if(!pending.length){ showToast('info','Nothing pending', 'No drafts are ready right now.'); return; }
-  if(!hasNewDraftsToNotify()){ showToast('info','Already notified', 'Everything pending has already been flagged for review.'); return; }
-  _notifyTeamSelectedKeys = pending.map(({c, author}) => `${c.id}::${author}`);
-
-  openAppModal(`
-    <div class="modal-head"><span class="panel-title">Notify about pending drafts</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
-    <div class="modal-body">
-      <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">${pending.length} draft${pending.length!==1?'s':''} pending across the team. How do you want to let them know?</p>
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        <button class="btn btn-brand" onclick="notifyApproversInternally()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Send Internally</button>
-        <button class="btn btn-outline" onclick="closeAppModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Cancel</button>
-      </div>
-    </div>`, 420);
-}
-
-// Resolves the selected composite keys back to real {c, author, d}
-// entries, re-checking !d.draftSentAt defensively — same reasoning as
-// getSelectedPendingDraftsForMember() above.
-function getSelectedPendingDraftsForTeam(){
-  const selectedKeys = new Set(_notifyTeamSelectedKeys);
-  return getAllPendingDrafts().filter(({c, author, d}) => selectedKeys.has(`${c.id}::${author}`) && !d.draftSentAt);
-}
-
-// Marks every SELECTED currently-pending draft as ready — the team-wide
-// counterpart to markMemberDraftsReady() above, used by this general
-// Notify button rather than the per-member one, since this covers
-// everyone's pending work at once, not one person's.
-function markAllPendingDraftsReady(){
-  const pending = getSelectedPendingDraftsForTeam();
-  pending.forEach(({d}) => { d.readyToNotify = true; });
-  Promise.all(pending.map(({c, author})=>saveDraftFor(c.id, author, { readyToNotify:true }))).then(()=>renderTeamQueue());
-  return pending;
-}
-
-async function notifyApproversInternally(){
-  const pending = markAllPendingDraftsReady();
-  const approvers = teamProfiles.filter(p => (p.role==='admin' || p.role==='approver') && p.id !== currentUser?.id);
-  if(!approvers.length){ showToast('info','Nobody to notify', 'No other admins or approvers on the team yet.'); return; }
-  for(const approver of approvers){
-    await sendNotification(approver.id, 'draft_ready', `${pending.length} draft${pending.length!==1?'s':''} ready for approval`,
-      `${pending.length} client update draft${pending.length!==1?'s':''} ${pending.length!==1?'are':'is'} ready for review.`, 'teamqueue');
-  }
-  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Notified the team internally — ${pending.length} draft${pending.length!==1?'s':''} pending.`});
-  persistLog().then(renderLog);
-  closeAppModal();
-  showToast('success','Team notified', `${approvers.length} admin${approvers.length!==1?'s':''}/approver${approvers.length!==1?'s':''} notified in-app.`);
+  const myTeamProfile = teamProfiles.find(p=>p.id===currentUser?.id);
+  if(!myTeamProfile){ showToast('error','Profile not found','Could not find your team profile.'); return; }
+  notifyForMember(myTeamProfile.id);
 }
 
 // Shows exactly what the Wednesday automation would send right now — same
