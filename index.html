@@ -15750,12 +15750,18 @@ function getSelectedPendingDraftsForMember(member){
 function notifyForMember(memberId){
   const member = teamProfiles.find(p=>p.id===memberId);
   if(!member) return;
-  const pending = activeClients().filter(c=>{
+  const allPendingNotSent = activeClients().filter(c=>{
     const d = getDraftFor(c, member.name);
     return d.draftStatus==='pending' && !d.draftSentAt && c.improvements.some(i=>i.author===member.name);
   });
-  if(!pending.length){ showToast('info','Nothing pending', `${member.name} has no drafts ready right now.`); return; }
-  if(!pending.some(c=>getDraftFor(c, member.name).readyToNotify!==true)){ showToast('info','Already notified', `Everything pending for ${member.name} has already been flagged for review.`); return; }
+  if(!allPendingNotSent.length){ showToast('info','Nothing pending', `${member.name} has no drafts ready right now.`); return; }
+  // Excludes drafts already flagged (readyToNotify===true) — "Sent for
+  // approval" isn't a different draftStatus from "Draft ready", it's the
+  // same 'pending' status with this flag set, so the earlier filter alone
+  // doesn't catch it. Without this, the picker offered to re-notify about
+  // work an approver had already been told about, with nothing new to say.
+  const pending = allPendingNotSent.filter(c=>getDraftFor(c, member.name).readyToNotify!==true);
+  if(!pending.length){ showToast('info','Already notified', `Everything pending for ${member.name} has already been flagged for review.`); return; }
 
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Choose which of ${escapeHtml(member.name)}'s drafts to notify about</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
