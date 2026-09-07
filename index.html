@@ -4234,7 +4234,7 @@ function applyRoleVisibility(){
   const notifyBtn = document.getElementById('notifyBtn');
   if(notifyBtn){
     notifyBtn.style.display = 'inline-flex';
-    notifyBtn.textContent = 'Notify Team';
+    notifyBtn.textContent = 'Send for Approval';
   }
   // A regular member only ever sees their own improvements in this list
   // now (see getAllImprovementsFlat()), so a "filter by team member"
@@ -15746,25 +15746,32 @@ function getSelectedPendingDraftsForMember(member){
 
 // First step now: pick which of this member's pending drafts to actually
 // notify about, rather than always including all of them. The choice
-// carries forward into confirmNotifyMemberSelection() below.
+// carries forward into confirmNotifyMemberSelection() below. Wording is
+// conditional on whether this is the current user looking at their own
+// work (member.name === myName()) or an approver looking at a colleague's
+// — "notify about Albert's drafts" reads fine from an approver's side,
+// but Albert seeing that same phrasing about himself reads like the app
+// doesn't know who he is, when what's actually happening for him is
+// simply sending his own work in for approval.
 function notifyForMember(memberId){
   const member = teamProfiles.find(p=>p.id===memberId);
   if(!member) return;
+  const isSelf = member.name === myName();
   const allPendingNotSent = activeClients().filter(c=>{
     const d = getDraftFor(c, member.name);
     return d.draftStatus==='pending' && !d.draftSentAt && c.improvements.some(i=>i.author===member.name);
   });
-  if(!allPendingNotSent.length){ showToast('info','Nothing pending', `${member.name} has no drafts ready right now.`); return; }
+  if(!allPendingNotSent.length){ showToast('info','Nothing pending', isSelf ? "You don't have any drafts ready right now." : `${member.name} has no drafts ready right now.`); return; }
   // Excludes drafts already flagged (readyToNotify===true) — "Sent for
   // approval" isn't a different draftStatus from "Draft ready", it's the
   // same 'pending' status with this flag set, so the earlier filter alone
   // doesn't catch it. Without this, the picker offered to re-notify about
   // work an approver had already been told about, with nothing new to say.
   const pending = allPendingNotSent.filter(c=>getDraftFor(c, member.name).readyToNotify!==true);
-  if(!pending.length){ showToast('info','Already notified', `Everything pending for ${member.name} has already been flagged for review.`); return; }
+  if(!pending.length){ showToast('info','Already sent', isSelf ? "Everything you've got pending has already been sent for approval." : `Everything pending for ${member.name} has already been flagged for review.`); return; }
 
   openAppModal(`
-    <div class="modal-head"><span class="panel-title">Choose which of ${escapeHtml(member.name)}'s drafts to notify about</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-head"><span class="panel-title">Choose which ${isSelf ? 'drafts' : `of ${escapeHtml(member.name)}'s drafts`} to ${isSelf ? 'send for approval' : 'notify about'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
       <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">${pending.length} draft${pending.length!==1?'s':''} ready — uncheck any you'd rather hold back for now.</p>
       <div style="display:flex;flex-direction:column;gap:2px;max-height:340px;overflow-y:auto;">
@@ -15785,16 +15792,17 @@ function notifyForMember(memberId){
 function confirmNotifyMemberSelection(memberId){
   const member = teamProfiles.find(p=>p.id===memberId);
   if(!member) return;
+  const isSelf = member.name === myName();
   const checkedIds = [...document.querySelectorAll('.notify-select-checkbox:checked')].map(el=>el.value);
   if(!checkedIds.length){ showToast('error','Nothing selected','Check at least one client to notify about.'); return; }
   _notifyMemberSelectedClientIds = checkedIds;
 
   openAppModal(`
-    <div class="modal-head"><span class="panel-title">Notify about ${escapeHtml(member.name)}'s drafts</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-head"><span class="panel-title">${isSelf ? 'Send for approval' : `Notify about ${escapeHtml(member.name)}'s drafts`}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
-      <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">${checkedIds.length} draft${checkedIds.length!==1?'s':''} selected. How do you want to let them know?</p>
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">${checkedIds.length} draft${checkedIds.length!==1?'s':''} selected. ${isSelf ? 'How do you want to send this for approval?' : 'How do you want to let them know?'}</p>
       <div style="display:flex;gap:8px;">
-        <button class="btn btn-brand" onclick="notifyForMemberInternally('${memberId}')" style="flex:1;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Send Internally</button>
+        <button class="btn btn-brand" onclick="notifyForMemberInternally('${memberId}')" style="flex:1;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>${isSelf ? 'Send for Approval' : 'Send Internally'}</button>
         <button class="btn btn-outline" onclick="closeAppModal()" style="flex:1;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Cancel</button>
       </div>
     </div>`, 420);
@@ -15819,6 +15827,7 @@ function markMemberDraftsReady(member){
 async function notifyForMemberInternally(memberId){
   const member = teamProfiles.find(p=>p.id===memberId);
   if(!member) return;
+  const isSelf = member.name === myName();
   const pending = markMemberDraftsReady(member);
   const approvers = teamProfiles.filter(p => (p.role==='admin' || p.role==='approver') && p.id !== currentUser?.id);
   if(!approvers.length){ showToast('info','Nobody to notify', 'No other admins or approvers on the team yet.'); return; }
@@ -15829,7 +15838,9 @@ async function notifyForMemberInternally(memberId){
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Notified the team internally about ${member.name}'s drafts — ${pending.length} pending.`});
   persistLog().then(renderLog);
   closeAppModal();
-  showToast('success','Team notified', `${approvers.length} admin${approvers.length!==1?'s':''}/approver${approvers.length!==1?'s':''} notified in-app.`);
+  showToast('success', isSelf ? 'Sent for approval' : 'Team notified', isSelf
+    ? `${pending.length} draft${pending.length!==1?'s':''} sent for approval.`
+    : `${approvers.length} admin${approvers.length!==1?'s':''}/approver${approvers.length!==1?'s':''} notified in-app.`);
 }
 
 // Shared by Approval Queue and Team Queue — same card, same meaning,
