@@ -801,6 +801,22 @@
   .icon-tab.active .icon-tab-count{background:var(--brand);color:#fff;}
   .icon-tab-count{font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;font-weight:700;color:var(--muted-lt);background:var(--surface-2);padding:1px 6px;border-radius:10px;}
 
+  /* Team Queue's two-column layout: filters (status/time/client) fixed to
+     the left at 25% width, the actual member sections filling the
+     remaining 75% on the right — rather than status tabs, a date
+     dropdown, and the list all just stacked vertically on top of each
+     other with no visual grouping between "ways to narrow this down" and
+     "what's actually being shown". */
+  .team-queue-layout{display:grid;grid-template-columns:25% 75%;gap:20px;align-items:start;}
+  .team-queue-filters-col{display:flex;flex-direction:column;gap:16px;position:sticky;top:20px;}
+  .icon-tab-group-vertical{display:flex;flex-direction:column;gap:4px;}
+  .icon-tab-group-vertical .icon-tab{width:100%;justify-content:space-between;white-space:normal;}
+  @media (max-width:900px){
+    .team-queue-layout{display:block;}
+    .team-queue-filters-col{position:static;margin-bottom:16px;}
+  }
+
+
   .kanban-board{display:flex;gap:16px;overflow-x:auto;padding-bottom:14px;align-items:flex-start;}
   .kanban-column{min-width:270px;max-width:320px;background:var(--bg);border-radius:var(--radius-lg);padding:14px;flex:1 1 290px;}
   .kanban-column-head{display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:9px 10px;border-radius:10px;}
@@ -1428,7 +1444,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         <span class="nav-label">Clients</span>
       </div>
-      <div class="nav-item" data-view="approve" data-tooltip="Approval Queue" onclick="switchView('approve')">
+      <div class="nav-item" data-view="approve" data-tooltip="Approval Queue" id="approveQueueNavItem" onclick="switchView('approve')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
         <span class="nav-label">Approval Queue</span>
         <span class="nav-badge" id="navPendingBadge">0</span>
@@ -1987,58 +2003,79 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- TEAM QUEUE -->
     <div class="view" id="view-teamqueue">
-      <div class="icon-tab-group" id="teamQueueFilterBar">
-        <div class="icon-tab active" data-f="all" onclick="setTeamQueueFilter('all')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
-          <span>All</span>
-          <span class="icon-tab-count" id="tqf-count-all">0</span>
+      <div class="team-queue-layout">
+        <div class="team-queue-filters-col">
+          <div class="panel">
+            <div class="panel-head"><span class="panel-title">Status</span></div>
+            <div class="panel-body">
+              <div class="icon-tab-group-vertical" id="teamQueueFilterBar">
+                <div class="icon-tab active" data-f="all" onclick="setTeamQueueFilter('all')">
+                  <span style="display:flex;align-items:center;gap:7px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg><span>All</span></span>
+                  <span class="icon-tab-count" id="tqf-count-all">0</span>
+                </div>
+                <div class="icon-tab" data-f="pending" onclick="setTeamQueueFilter('pending')">
+                  <span style="display:flex;align-items:center;gap:7px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span>Draft ready</span></span>
+                  <span class="icon-tab-count" id="tqf-count-pending">0</span>
+                </div>
+                <div class="icon-tab" data-f="approved" onclick="setTeamQueueFilter('approved')">
+                  <span style="display:flex;align-items:center;gap:7px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span>Approved</span></span>
+                  <span class="icon-tab-count" id="tqf-count-approved">0</span>
+                </div>
+                <div class="icon-tab" data-f="atrisk" onclick="setTeamQueueFilter('atrisk')">
+                  <span style="display:flex;align-items:center;gap:7px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span>At risk (4–5)</span></span>
+                  <span class="icon-tab-count" id="tqf-count-atrisk">0</span>
+                </div>
+                <div class="icon-tab" data-f="stale" onclick="setTeamQueueFilter('stale')">
+                  <span style="display:flex;align-items:center;gap:7px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg><span>Needs re-review</span></span>
+                  <span class="icon-tab-count" id="tqf-count-stale">0</span>
+                </div>
+                <div class="icon-tab" data-f="sent" onclick="setTeamQueueFilter('sent')">
+                  <span style="display:flex;align-items:center;gap:7px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg><span>Sent</span></span>
+                  <span class="icon-tab-count" id="tqf-count-sent">0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><span class="panel-title">Time</span></div>
+            <div class="panel-body">
+              <div class="select-field" style="width:100%;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <select id="teamDateFilterSelect" onchange="onDateFilterChange('team')" style="width:100%;">
+                  <option value="thisweek" selected>This week</option>
+                  <option value="all">All time</option>
+                  <option value="today">Today</option>
+                  <option value="7days">Last 7 days</option>
+                  <option value="30days">Last 30 days</option>
+                  <option value="custom">Custom range…</option>
+                </select>
+              </div>
+              <div id="teamCustomDateRange" style="display:none;margin-top:10px;">
+                <input type="date" id="teamDateFrom" style="width:100%;margin-bottom:6px;"> <span style="color:var(--muted-lt);font-size:11.5px;">to</span> <input type="date" id="teamDateTo" style="width:100%;margin:6px 0;">
+                <button class="btn btn-outline" style="width:100%;justify-content:center;" onclick="applyCustomDateRange('team')">Apply</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><span class="panel-title">Client</span></div>
+            <div class="panel-body">
+              <select id="teamQueueClientFilter" onchange="setTeamQueueClientFilter(this.value)" style="width:100%;">
+                <option value="all">All clients</option>
+              </select>
+            </div>
+          </div>
         </div>
-        <div class="icon-tab" data-f="pending" onclick="setTeamQueueFilter('pending')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          <span>Draft ready</span>
-          <span class="icon-tab-count" id="tqf-count-pending">0</span>
-        </div>
-        <div class="icon-tab" data-f="approved" onclick="setTeamQueueFilter('approved')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-          <span>Approved</span>
-          <span class="icon-tab-count" id="tqf-count-approved">0</span>
-        </div>
-        <div class="icon-tab" data-f="atrisk" onclick="setTeamQueueFilter('atrisk')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          <span>At risk (4–5)</span>
-          <span class="icon-tab-count" id="tqf-count-atrisk">0</span>
-        </div>
-        <div class="icon-tab" data-f="stale" onclick="setTeamQueueFilter('stale')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
-          <span>Needs re-review</span>
-          <span class="icon-tab-count" id="tqf-count-stale">0</span>
-        </div>
-        <div class="icon-tab" data-f="sent" onclick="setTeamQueueFilter('sent')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-          <span>Sent</span>
-          <span class="icon-tab-count" id="tqf-count-sent">0</span>
+
+        <div class="team-queue-main-col">
+          <div id="adminOnlyQueueActionsRow" style="display:none;margin-bottom:16px;gap:8px;">
+            <button class="btn btn-dark" onclick="openQueueLogImprovementModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Log Improvement</button>
+            <button class="btn btn-outline" onclick="openGroupAndSendModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Group &amp; Send</button>
+          </div>
+          <div id="teamQueueList"></div>
         </div>
       </div>
-
-      <div class="date-filter-row">
-        <div class="select-field" style="min-width:150px;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          <select id="teamDateFilterSelect" onchange="onDateFilterChange('team')">
-            <option value="thisweek" selected>This week</option>
-            <option value="all">All time</option>
-            <option value="today">Today</option>
-            <option value="7days">Last 7 days</option>
-            <option value="30days">Last 30 days</option>
-            <option value="custom">Custom range…</option>
-          </select>
-        </div>
-        <span id="teamCustomDateRange" style="display:none;">
-          <input type="date" id="teamDateFrom"> <span style="color:var(--muted-lt);font-size:11.5px;">to</span> <input type="date" id="teamDateTo">
-          <button class="btn btn-outline" style="padding:6px 10px;" onclick="applyCustomDateRange('team')">Apply</button>
-        </span>
-      </div>
-
-      <div id="teamQueueList"></div>
     </div>
 
     <!-- NOTES -->
@@ -3183,6 +3220,7 @@ let team = [];
 let editingClientId = null;
 let queueFilter = 'all';
 let teamQueueFilter = 'all';
+let teamQueueClientFilter = 'all';
 let dateFilterMode = 'all';
 let dateFilterFrom = getWeekStart(new Date()); // only consulted by non-"all" modes — see improvementInDateRange()
 let dateFilterTo = null;   // inclusive, Date object
@@ -4255,6 +4293,17 @@ function applyRoleVisibility(){
     // If a non-approver somehow ends up on Team Queue (e.g. lost approver
     // status mid-session), fall back to their own personal queue.
     if(!hasPermission('view_team_queue') && document.getElementById('view-teamqueue')?.classList.contains('active')){ switchView('approve'); }
+  }
+  const approveQueueNavItem = document.getElementById('approveQueueNavItem');
+  if(approveQueueNavItem){
+    // An admin/approver has no one else to wait on approving their own
+    // work — that's a redundant gate when the person clicking Approve and
+    // the person who logged the work are the same person. They log work
+    // and act on their own drafts directly from their own section inside
+    // Team Queue instead (see queueCardHtml()'s canSkipApproval branch),
+    // so the separate personal queue has nothing left for them to do here.
+    approveQueueNavItem.style.display = canApprove() ? 'none' : 'flex';
+    if(canApprove() && document.getElementById('view-approve')?.classList.contains('active')){ switchView('teamqueue'); }
   }
   const claudeNavItem = document.getElementById('claudeNavItem');
   const claudeFloatBtn = document.getElementById('claudeFloatBtn');
@@ -6093,7 +6142,16 @@ function renderKpis(){
   // change count based on a filter state that lives on a different page.
   const teamPendingBadge = document.getElementById('navTeamPendingBadge');
   if(teamPendingBadge){
-    const readyForReview = (c, author) => { const d = getDraftFor(c, author); return d.draftStatus==='approved' || (d.draftStatus==='pending' && d.readyToNotify===true); };
+    // Mirrors renderTeamQueue()'s own readyForReview() exactly, including
+    // the admin/approver-viewing-their-own-work exception — otherwise this
+    // badge undercounts relative to what the page itself actually shows.
+    const readyForReview = (c, author) => {
+      const d = getDraftFor(c, author);
+      if(d.draftStatus==='approved') return true;
+      if(d.draftStatus!=='pending') return false;
+      if(author===myName() && canApprove()) return true;
+      return d.readyToNotify===true;
+    };
     teamPendingBadge.textContent = teamProfiles.reduce((total, member) => {
       const count = aec.filter(c => c.improvements.some(i=>i.author===member.name && i.includeInEmail!==false) && readyForReview(c, member.name)).length;
       return total + count;
@@ -12608,7 +12666,6 @@ const tourSteps = [
   { view:'settings', target:'[data-view="settings"]', title:"Settings & Integrations", body:"What's actually connected right now, no guessing — plus your own notification preferences, so you only hear about what you actually want to.", icon:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>' },
   { view:'profile', target:'.sidebar-profile-trigger', title:"Your Profile", body:"Your name, phone, and photo — visible to the rest of the team the same way it always has been. Update your email here too, if it ever changes.", icon:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' },
 
-  { view:'approve', target:'[data-view="approve"]', title:"Approval Queue", body:"Since you can approve drafts, this is where that happens — every client with fresh logged work, riskiest first. Generate a draft with AI, then Approve or Skip.", icon:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>', show:()=>canApprove() },
   { view:'teamqueue', target:'#teamQueueNavItem', title:"Team Queue", body:"You also get the wider view — every draft across the whole team in one place, not just your own, so nothing slips through.", icon:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>', show:()=>hasPermission('view_team_queue') },
 
   { view:'team', teamTab:'add', target:'[data-view="team"]', title:"Bringing someone new on", body:"A couple of things here that not everyone sees — adding new people, setting job titles, and reviewing anyone's requested email change.", icon:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>', show:()=>isAdmin() },
@@ -15388,6 +15445,11 @@ function setTeamQueueFilter(f){
   renderTeamQueue();
 }
 
+function setTeamQueueClientFilter(clientId){
+  teamQueueClientFilter = clientId;
+  renderTeamQueue();
+}
+
 function activeDateFilterLabel(){
   if(dateFilterMode==='thisweek') return 'this week';
   if(dateFilterMode==='all') return '(all time)';
@@ -15602,12 +15664,21 @@ function teamQueueFilterCount(filterKey){
   // 'none' (logged but no draft generated yet) are never visible here,
   // regardless of which filter chip is selected — that's purely a
   // member's own, private working state until they generate and notify.
-  const readyForReview = (c, author) => { const d = getDraftFor(c, author); return d.draftStatus==='approved' || (d.draftStatus==='pending' && d.readyToNotify===true); };
+  // Exception: an admin/approver's own pending drafts skip that gate —
+  // see the matching comment on renderTeamQueue()'s own readyForReview().
+  const readyForReview = (c, author) => {
+    const d = getDraftFor(c, author);
+    if(d.draftStatus==='approved') return true;
+    if(d.draftStatus!=='pending') return false;
+    if(author===myName() && canApprove()) return true;
+    return d.readyToNotify===true;
+  };
   // Same client can legitimately count under multiple members (if more
   // than one person logged work for it), so the true count is the total
   // across every member's own section combined, not distinct clients.
   return teamProfiles.reduce((total, member) => {
     const memberCount = ac
+      .filter(c => teamQueueClientFilter==='all' || c.id===teamQueueClientFilter)
       .filter(c => c.improvements.some(i=>improvementInDateRange(i, true) && i.includeInEmail!==false && i.author===member.name))
       .filter(c => statusMatches(c, member.name) && readyForReview(c, member.name))
       .length;
@@ -15628,6 +15699,20 @@ function renderTeamQueue(){
   const ac = activeClients();
   syncDateFilterDropdowns();
   updateTeamQueueFilterCounts();
+  const actionsRow = document.getElementById('adminOnlyQueueActionsRow');
+  if(actionsRow) actionsRow.style.display = canApprove() ? 'flex' : 'none';
+  // Populated once per distinct client list rather than on every render —
+  // rebuilding this dropdown's options on every re-render would reset
+  // whatever the user currently has selected back to "All clients" each
+  // time (e.g. after switching a status tab), which would make the
+  // filter feel broken rather than persistent.
+  const clientFilterEl = document.getElementById('teamQueueClientFilter');
+  if(clientFilterEl && clientFilterEl.dataset.builtForCount !== String(ac.length)){
+    const sortedClients = [...ac].sort((a,b)=>a.name.localeCompare(b.name));
+    clientFilterEl.innerHTML = `<option value="all">All clients</option>` + sortedClients.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+    clientFilterEl.value = teamQueueClientFilter;
+    clientFilterEl.dataset.builtForCount = String(ac.length);
+  }
   if(!slackChannelsLoaded) loadSlackClientChannels().then(renderTeamQueue);
   if(!ac.length){ el.innerHTML = `<div class="panel">${emptyStateHtml(
     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
@@ -15662,7 +15747,19 @@ function renderTeamQueue(){
   // attention, not the mere existence of a generated draft. Clients
   // still at 'none' (logged but no draft generated at all) are never
   // visible here — that's purely a member's own private working state.
-  const readyForReview = (c, author) => { const d = getDraftFor(c, author); return d.draftStatus==='approved' || (d.draftStatus==='pending' && d.readyToNotify===true); };
+  // Exception: an admin/approver's OWN pending drafts skip that gate
+  // entirely — "flag this ready for someone else to review" makes no
+  // sense when the person who'd be reviewing it is the same person who
+  // wrote it. They see their own pending work here immediately and act on
+  // it directly (see queueCardHtml()'s canSkipApproval branch), same
+  // reasoning as no longer having a separate personal Approval Queue tab.
+  const readyForReview = (c, author) => {
+    const d = getDraftFor(c, author);
+    if(d.draftStatus==='approved') return true;
+    if(d.draftStatus!=='pending') return false;
+    if(author===myName() && canApprove()) return true;
+    return d.readyToNotify===true;
+  };
 
   const sortedMembers = [...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name));
   const sectionsHtml = sortedMembers.map(member => {
@@ -15677,6 +15774,7 @@ function renderTeamQueue(){
     // email or not" isn't a date question, so "All time" mode shouldn't
     // bypass it the way it intentionally bypasses the date check.
     const memberClients = ac
+      .filter(c => teamQueueClientFilter==='all' || c.id===teamQueueClientFilter)
       .filter(c => c.improvements.some(i=>improvementInDateRange(i, true) && i.includeInEmail!==false && i.author===member.name))
       .filter(c => statusMatches(c, member.name) && readyForReview(c, member.name))
       .sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
@@ -15866,16 +15964,30 @@ function queueCardHtml(c, scopeAuthor){
     </div>
     ${queueActivityBadgeHtml(c, scopeAuthor)}
     <div class="q-card-actions">
-      ${d.draftStatus==='approved' ? (canApprove() ? `
-      <button class="btn btn-brand" onclick="sendApprovedDraft('${c.id}','${authorEsc}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Send</button>
+      ${(() => {
+        // An admin/approver's own pending draft skips the approve step
+        // entirely — same reasoning as no longer having a separate
+        // personal Approval Queue tab (see applyRoleVisibility()). One
+        // "Send" click does both approve and send together
+        // (approveAndSendOwnDraft), rather than making them click Approve
+        // and then Send on their own work as if someone else needed to
+        // sign off on it first.
+        const canSkipApproval = d.draftStatus==='pending' && scopeAuthor===myName() && canApprove();
+        if(d.draftStatus==='approved' || canSkipApproval){
+          if(!canApprove()) return `
+      <button class="btn btn-brand" onclick="openQueueCardModal('${c.id}','${authorEsc}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Details</button>
+      `;
+          return `
+      <button class="btn btn-brand" onclick="${canSkipApproval ? `approveAndSendOwnDraft('${c.id}','${authorEsc}')` : `sendApprovedDraft('${c.id}','${authorEsc}')`}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Send</button>
       ${slackClientChannels[c.id] ? `<button class="btn btn-outline" onclick="openSendToSlackConfirm('${c.id}','${authorEsc}')" title="Post this update to ${escapeHtml(slackClientChannels[c.id].channelName||'their Slack channel')}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M15 3v6M9 3v6M15 15v6M9 15v6M3 9h6M15 9h6M3 15h6M15 15h6"/></svg>Slack</button>` : ''}
       <button class="btn btn-outline" onclick="openQueueCardModal('${c.id}','${authorEsc}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Details</button>
-      ` : `
-      <button class="btn btn-brand" onclick="openQueueCardModal('${c.id}','${authorEsc}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Details</button>
-      `) : `
+      `;
+        }
+        return `
       <button class="btn btn-brand" onclick="openQueueCardModal('${c.id}','${authorEsc}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Details</button>
       <button class="btn btn-outline" onclick="openQueueLogImprovementModal('${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Log now</button>
-      `}
+      `;
+      })()}
     </div>
   </div>`;
 }
@@ -16314,8 +16426,9 @@ function openQueueCardModal(id, author){
       <span style="font-size:13px;color:var(--muted-lt);">✓ Sent on ${new Date(d.draftSentAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} — nothing left to do here. New work logged by ${escapeHtml(author)} for ${escapeHtml(c.name)} will start a fresh draft cycle on its own.</span>
       ` : `
       ${c.improvements.some(i=>i.author===author) && !(d.draftStatus==='approved' && !canApprove()) && canGenerateOrRegenerateDraft(c, author) ? `<button class="btn btn-dark" id="gen-${c.id}" onclick="generateDraft('${c.id}','${author.replace(/'/g,"\\'")}')" title="${d.draft?'Regenerate':'Generate'} with AI"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/></svg>${d.draft?'Regenerate':'Generate'}</button>` : ''}
-      ${d.draft && canApprove() ? `<button class="btn btn-brand" onclick="approveDraft('${c.id}','${author.replace(/'/g,"\\'")}')" ${d.draftStatus==='approved'?'disabled':''}>Approve</button>
-      <button class="btn btn-outline" onclick="skipDraft('${c.id}','${author.replace(/'/g,"\\'")}')" title="Excludes these improvements from future drafts too — they won't reappear next week">Skip &amp; exclude</button>` : ''}
+      ${d.draft && canApprove() ? (author===myName() ? `<button class="btn btn-brand" onclick="approveAndSendOwnDraft('${c.id}','${author.replace(/'/g,"\\'")}')" ${d.draftStatus==='approved'?'disabled':''}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Send</button>
+      <button class="btn btn-outline" onclick="skipDraft('${c.id}','${author.replace(/'/g,"\\'")}')" title="Excludes these improvements from future drafts too — they won't reappear next week">Skip &amp; exclude</button>` : `<button class="btn btn-brand" onclick="approveDraft('${c.id}','${author.replace(/'/g,"\\'")}')" ${d.draftStatus==='approved'?'disabled':''}>Approve</button>
+      <button class="btn btn-outline" onclick="skipDraft('${c.id}','${author.replace(/'/g,"\\'")}')" title="Excludes these improvements from future drafts too — they won't reappear next week">Skip &amp; exclude</button>`) : ''}
       ${d.draft && !canApprove() && d.draftStatus!=='approved' ? `<span class="warn-text" style="color:var(--muted-lt);">Only admins and approvers can approve or skip drafts.</span>` : ''}
       ${d.draftStatus==='approved' && !canApprove() ? `<span style="font-size:13px;color:var(--muted-lt);">✓ ${escapeHtml(author)}'s update was approved.</span>` : ''}
       `}
@@ -16534,6 +16647,98 @@ async function recordDraftSent(id, author){
   await saveDraftFor(id, author, { draftSentAt: new Date().toISOString(), draftSentBy: myName() || 'Someone' });
 }
 
+let _groupSendClientId = null;
+let _groupSendAuthors = [];
+
+// "Group & Send" combines approved, unsent drafts from DIFFERENT team
+// members for the SAME client into one email, instead of an approver
+// sending each person's update to that client separately. Only surfaces
+// clients where this actually applies — one approved draft doesn't need
+// grouping, the regular per-card Send button already covers that case.
+function openGroupAndSendModal(){
+  const eligibleClients = activeClients().filter(c => {
+    const approvedNotSent = (c.drafts||[]).filter(d => d.draftStatus==='approved' && !d.draftSentAt);
+    return approvedNotSent.length >= 2;
+  }).sort((a,b)=>a.name.localeCompare(b.name));
+  if(!eligibleClients.length){ showToast('info','Nothing to group', 'No client currently has approved, unsent drafts from more than one team member.'); return; }
+
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">Group &amp; Send</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">These clients have approved, unsent drafts from more than one team member. Pick one to combine into a single send.</p>
+      <div style="display:flex;flex-direction:column;gap:2px;max-height:360px;overflow-y:auto;">
+        ${eligibleClients.map(c=>{
+          const count = (c.drafts||[]).filter(d => d.draftStatus==='approved' && !d.draftSentAt).length;
+          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 4px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="openGroupSendDraftPicker('${c.id}')">
+            <span style="font-size:13px;color:var(--ink);font-weight:600;">${escapeHtml(c.name)}</span>
+            <span style="font-size:11.5px;color:var(--muted-lt);">${count} drafts ready</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
+    </div>`, 480);
+}
+
+function openGroupSendDraftPicker(clientId){
+  const c = clients.find(x=>x.id===clientId);
+  if(!c) return;
+  // Re-checked fresh rather than trusting the count from the previous
+  // screen — another approver could have sent one of these in the
+  // meantime, or the underlying draft could have changed.
+  const approvedNotSent = (c.drafts||[]).filter(d => d.draftStatus==='approved' && !d.draftSentAt);
+  if(approvedNotSent.length < 2){ showToast('info','Nothing to group', `${c.name} no longer has drafts from more than one team member ready.`); closeAppModal(); return; }
+
+  openAppModal(`
+    <div class="modal-head"><span class="panel-title">Combine drafts for ${escapeHtml(c.name)}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">Uncheck any you'd rather send separately. At least two are needed to combine.</p>
+      <div style="display:flex;flex-direction:column;gap:2px;max-height:320px;overflow-y:auto;">
+        ${approvedNotSent.map(d=>`
+          <label style="display:flex;align-items:flex-start;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border);cursor:pointer;">
+            <input type="checkbox" class="group-send-draft-checkbox" value="${d.author.replace(/"/g,'&quot;')}" checked style="margin-top:3px;flex:none;">
+            <span style="flex:1;font-size:13px;color:var(--ink);">${escapeHtml(d.author)}</span>
+          </label>
+        `).join('')}
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="openGroupAndSendModal()">Back</button>
+      <button class="btn btn-brand" onclick="confirmGroupSendSelection('${clientId}')">Continue</button>
+    </div>`, 480);
+}
+
+// Combines the selected authors' approved draft text into one starting
+// body — a reasonable draft the approver can still edit in the send modal
+// before it actually goes out, not an attempt at seamlessly merging
+// separate greetings/sign-offs into one message on its own.
+function confirmGroupSendSelection(clientId){
+  const checkedAuthors = [...document.querySelectorAll('.group-send-draft-checkbox:checked')].map(el=>el.value);
+  if(checkedAuthors.length < 2){ showToast('error','Pick at least two', "Select at least two team members' drafts to combine — one alone doesn't need grouping."); return; }
+  const c = clients.find(x=>x.id===clientId);
+  if(!c) return;
+  if(!c.email){ showToast('error','No email on file', `Add an email for ${c.name} in Clients to send.`); return; }
+
+  _groupSendClientId = clientId;
+  _groupSendAuthors = checkedAuthors;
+  const combinedBody = checkedAuthors.map(author => getDraftFor(c, author).draft || '').filter(Boolean).join('\n\n---\n\n');
+  showSendEmailConfirm(c.email, `Your weekly update from ${settings.appName || 'Based Agency'}`, combinedBody, () => recordGroupSendComplete(), true);
+}
+
+// Marks every included draft sent, in parallel — mirrors recordDraftSent()
+// but for the whole selected group at once, since a combined send needs
+// every one of them stamped, not just the one client/author pair
+// recordDraftSent() alone would handle.
+async function recordGroupSendComplete(){
+  const clientId = _groupSendClientId;
+  const authors = _groupSendAuthors;
+  if(!clientId || !authors.length) return;
+  await Promise.all(authors.map(author => recordDraftSent(clientId, author)));
+  renderTeamQueue();
+  showToast('success','Sent', `Combined update sent, covering ${authors.length} team members' work.`);
+}
+
 function canGenerateOrRegenerateDraft(c, author){
   const d = getDraftFor(c, author);
   // Locked for the original contributor once they've told an approver
@@ -16611,6 +16816,21 @@ async function approveDraft(id, author){
   }
 
   showToast('success','Draft approved', `${author}'s update for ${c.name} was approved.`);
+}
+
+// Admins/approvers don't need to approve their own work — that's a
+// redundant gate when the person who'd be reviewing it is the same person
+// who wrote it (see applyRoleVisibility()'s removal of their personal
+// Approval Queue tab). This is what their own pending drafts show as a
+// single "Send" action in Team Queue instead of the usual two separate
+// Approve-then-Send steps — reuses both existing functions rather than
+// duplicating their logic, so approving still behaves identically
+// underneath (including the notification loop, which is a no-op here
+// anyway since every improvement in your own draft is authored by you,
+// and that loop already excludes yourself).
+async function approveAndSendOwnDraft(id, author){
+  await approveDraft(id, author);
+  await sendApprovedDraft(id, author);
 }
 
 async function skipDraft(id, author){
