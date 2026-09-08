@@ -1445,14 +1445,9 @@ document.addEventListener('DOMContentLoaded', function(){
         <span class="nav-label">Overview</span>
       </div>
 
-      <div class="nav-item" data-view="focusreports" data-tooltip="Past Reports" onclick="switchView('focusreports')">
+      <div class="nav-item" data-view="reports" data-tooltip="Reports" onclick="switchView('focusreports')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
-        <span class="nav-label">Past Reports</span>
-      </div>
-
-      <div class="nav-item" id="navAiVisibility" data-view="aivisibility" data-tooltip="AI Visibility" onclick="switchView('aivisibility')" style="display:none;">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/></svg>
-        <span class="nav-label">AI Visibility</span>
+        <span class="nav-label">Reports</span>
       </div>
 
       <div class="nav-section-label">Client work</div>
@@ -1762,6 +1757,16 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- PAST REPORTS -->
     <div class="view" id="view-focusreports">
+      <div class="icon-tab-group" style="margin-bottom:16px;">
+        <div class="icon-tab active" onclick="switchView('focusreports')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+          <span>Past Reports</span>
+        </div>
+        <div class="icon-tab" id="reportsSubtabAiVisibility" onclick="switchView('aivisibility')" style="display:none;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/></svg>
+          <span>AI Visibility</span>
+        </div>
+      </div>
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
         <div style="display:flex;align-items:center;gap:6px;">
           <label style="font-size:11px;font-weight:600;color:var(--muted);">From</label>
@@ -1792,6 +1797,16 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- AI VISIBILITY REPORTING ENGINE (admin-only) -->
     <div class="view" id="view-aivisibility">
+      <div class="icon-tab-group" style="margin-bottom:16px;">
+        <div class="icon-tab" onclick="switchView('focusreports')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+          <span>Past Reports</span>
+        </div>
+        <div class="icon-tab active" onclick="switchView('aivisibility')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/></svg>
+          <span>AI Visibility</span>
+        </div>
+      </div>
       <div id="aiVisibilityMain"></div>
     </div>
 
@@ -2062,16 +2077,17 @@ document.addEventListener('DOMContentLoaded', function(){
               <div class="team-queue-filters-panel-body">
                 <div>
                   <label style="display:block;font-size:11px;font-weight:700;color:var(--muted-lt);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Time</label>
-                  <div class="select-field" style="width:100%;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                    <select id="teamDateFilterSelect" onchange="onDateFilterChange('team')" style="width:100%;">
-                      <option value="thisweek" selected>This week</option>
-                      <option value="all">All time</option>
-                      <option value="today">Today</option>
-                      <option value="7days">Last 7 days</option>
-                      <option value="30days">Last 30 days</option>
-                      <option value="custom">Custom range…</option>
-                    </select>
+                  <div class="tq-select-wrap" style="position:relative;">
+                    <div class="tq-select-btn" onclick="toggleTeamQueueCustomSelect('tqTime')">
+                      <span class="tq-select-btn-label-group">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        <span class="tq-select-btn-label" id="tqTimeFilterLabel">This week</span>
+                      </span>
+                      <svg class="tq-select-btn-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                    <div class="tq-select-list" id="tqTimeFilterList">
+                      <div id="tqTimeFilterOptions"></div>
+                    </div>
                   </div>
                   <div id="teamCustomDateRange" style="display:none;margin-top:10px;">
                     <input type="date" id="teamDateFrom" style="width:100%;margin-bottom:6px;"> <span style="color:var(--muted-lt);font-size:11.5px;">to</span> <input type="date" id="teamDateTo" style="width:100%;margin:6px 0;">
@@ -2114,30 +2130,33 @@ document.addEventListener('DOMContentLoaded', function(){
 
                 <div>
                   <label style="display:block;font-size:11px;font-weight:700;color:var(--muted-lt);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Danger score</label>
-                  <div class="select-field" style="width:100%;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                    <select id="teamQueueDangerFilter" onchange="setTeamQueueDangerFilter(this.value)" style="width:100%;">
-                      <option value="0">Any danger score</option>
-                      <option value="5">5 (Critical)</option>
-                      <option value="4">4+ (At risk)</option>
-                      <option value="3">3+ (Moderate)</option>
-                      <option value="2">2+ (Low)</option>
-                      <option value="1">1+ (Any logged)</option>
-                    </select>
+                  <div class="tq-select-wrap" style="position:relative;">
+                    <div class="tq-select-btn" onclick="toggleTeamQueueCustomSelect('tqDanger')">
+                      <span class="tq-select-btn-label-group">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        <span class="tq-select-btn-label" id="tqDangerFilterLabel">Any danger score</span>
+                      </span>
+                      <svg class="tq-select-btn-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                    <div class="tq-select-list" id="tqDangerFilterList">
+                      <div id="tqDangerFilterOptions"></div>
+                    </div>
                   </div>
                 </div>
 
                 <div>
                   <label style="display:block;font-size:11px;font-weight:700;color:var(--muted-lt);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Importance</label>
-                  <div class="select-field" style="width:100%;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.2 21 12 17.77 5.8 21 7 14.14l-5-4.87 7.1-1.01z"/></svg>
-                    <select id="teamQueueImportanceFilter" onchange="setTeamQueueImportanceFilter(this.value)" style="width:100%;">
-                      <option value="0">Any importance</option>
-                      <option value="9">9+ (Top priority)</option>
-                      <option value="7">7+ (High)</option>
-                      <option value="5">5+ (Medium)</option>
-                      <option value="3">3+ (Low)</option>
-                    </select>
+                  <div class="tq-select-wrap" style="position:relative;">
+                    <div class="tq-select-btn" onclick="toggleTeamQueueCustomSelect('tqImportance')">
+                      <span class="tq-select-btn-label-group">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.2 21 12 17.77 5.8 21 7 14.14l-5-4.87 7.1-1.01z"/></svg>
+                        <span class="tq-select-btn-label" id="tqImportanceFilterLabel">Any importance</span>
+                      </span>
+                      <svg class="tq-select-btn-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                    <div class="tq-select-list" id="tqImportanceFilterList">
+                      <div id="tqImportanceFilterOptions"></div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -4355,8 +4374,14 @@ function applyRoleVisibility(){
   const memberFilterField = document.getElementById('improvementsMemberFilterField');
   if(memberFilterField) memberFilterField.style.display = canApprove() ? 'block' : 'none';
   const addClientBtn = document.getElementById('addClientBtn');
-  const navAiVisibility = document.getElementById('navAiVisibility');
-  if(navAiVisibility) navAiVisibility.style.display = isAdmin() ? 'flex' : 'none';
+  // "Reports" is one shared nav item now, but AI Visibility itself stays
+  // admin-only — that restriction moved from the old separate nav item's
+  // own visibility down to this sub-tab, show only within the Past
+  // Reports view (the aivisibility view's own copy of this tab bar is
+  // only ever seen by admins in the first place — see switchView()'s
+  // redirect for anyone else who lands there).
+  const reportsSubtabAiVisibility = document.getElementById('reportsSubtabAiVisibility');
+  if(reportsSubtabAiVisibility) reportsSubtabAiVisibility.style.display = isAdmin() ? 'flex' : 'none';
   if(addClientBtn) addClientBtn.style.display = canApprove() ? 'inline-flex' : 'none';
   const editClientDetailBtn = document.getElementById('editClientDetailBtn');
   if(editClientDetailBtn) editClientDetailBtn.style.display = canApprove() ? 'inline-flex' : 'none';
@@ -4596,7 +4621,11 @@ function cmdkRefreshActiveHighlight(){
 
 async function switchView(name){
   closeMobileNav();
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name));
+  // "reports" isn't a real view name — Past Reports and AI Visibility are
+  // still two independent views internally (see the sub-tab bar atop
+  // each), but they share one nav item, so it needs to stay highlighted
+  // for either of its two actual sub-views.
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name || (n.dataset.view==='reports' && (name==='focusreports'||name==='aivisibility'))));
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
   // The floating "open the Assistant" button is redundant (and visually
@@ -12698,7 +12727,7 @@ function switchViewIfNotOnTimer(){
 // keeps the fast, synchronous DOM-visibility half of switchView(), and
 // nothing that touches the network.
 function tourSwitchView(name){
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name || (n.dataset.view==='reports' && (name==='focusreports'||name==='aivisibility'))));
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name)?.classList.add('active');
   const meta = VIEW_TITLES[name];
@@ -15587,31 +15616,84 @@ function toggleTeamQueueCustomSelect(prefix){
   }
 }
 
+// Static option lists for filters whose choices don't come from live data
+// (unlike Client/Team Member, which are built from activeClients()/
+// teamProfiles fresh each time their dropdown opens).
+const TQ_STATIC_OPTIONS = {
+  tqDanger: [
+    {id:'0', name:'Any danger score'}, {id:'5', name:'5 (Critical)'}, {id:'4', name:'4+ (At risk)'},
+    {id:'3', name:'3+ (Moderate)'}, {id:'2', name:'2+ (Low)'}, {id:'1', name:'1+ (Any logged)'},
+  ],
+  tqImportance: [
+    {id:'0', name:'Any importance'}, {id:'9', name:'9+ (Top priority)'}, {id:'7', name:'7+ (High)'},
+    {id:'5', name:'5+ (Medium)'}, {id:'3', name:'3+ (Low)'},
+  ],
+  tqTime: [
+    {id:'thisweek', name:'This week'}, {id:'all', name:'All time'}, {id:'today', name:'Today'},
+    {id:'7days', name:'Last 7 days'}, {id:'30days', name:'Last 30 days'}, {id:'custom', name:'Custom range…'},
+  ],
+};
+
 function renderTeamQueueCustomOptions(prefix, term){
   const container = document.getElementById(prefix+'FilterOptions');
   if(!container) return;
-  const lower = (term||'').toLowerCase();
-  const isClient = prefix === 'tqClient';
-  const allLabel = isClient ? 'All clients' : 'All team members';
-  const allItems = isClient
-    ? [...activeClients()].map(c=>({id:c.id, name:c.name})).sort((a,b)=>a.name.localeCompare(b.name))
-    : [...teamProfiles].map(p=>({id:p.name, name:p.name})).sort((a,b)=>a.name.localeCompare(b.name));
-  const filtered = term ? allItems.filter(i=>i.name.toLowerCase().includes(lower)) : allItems;
-  const currentValue = isClient ? teamQueueClientFilter : teamQueueMemberFilter;
-  const esc = s => s.replace(/'/g,"\\'").replace(/"/g,'&quot;');
-  let html = `<div class="tq-select-item${currentValue==='all'?' active':''}" onclick="selectTeamQueueCustomOption('${prefix}','all','${esc(allLabel)}')">${escapeHtml(allLabel)}</div>`;
-  html += filtered.map(i=>`<div class="tq-select-item${currentValue===i.id?' active':''}" onclick="selectTeamQueueCustomOption('${prefix}','${esc(i.id)}','${esc(i.name)}')">${escapeHtml(i.name)}</div>`).join('');
-  if(!filtered.length) html += `<div class="tq-select-empty">No matches</div>`;
-  container.innerHTML = html;
+  const esc = s => String(s).replace(/'/g,"\\'").replace(/"/g,'&quot;');
+
+  if(prefix === 'tqClient' || prefix === 'tqMember'){
+    const lower = (term||'').toLowerCase();
+    const isClient = prefix === 'tqClient';
+    const allLabel = isClient ? 'All clients' : 'All team members';
+    const allItems = isClient
+      ? [...activeClients()].map(c=>({id:c.id, name:c.name})).sort((a,b)=>a.name.localeCompare(b.name))
+      : [...teamProfiles].map(p=>({id:p.name, name:p.name})).sort((a,b)=>a.name.localeCompare(b.name));
+    const filtered = term ? allItems.filter(i=>i.name.toLowerCase().includes(lower)) : allItems;
+    const currentValue = isClient ? teamQueueClientFilter : teamQueueMemberFilter;
+    let html = `<div class="tq-select-item${currentValue==='all'?' active':''}" onclick="selectTeamQueueCustomOption('${prefix}','all','${esc(allLabel)}')">${escapeHtml(allLabel)}</div>`;
+    html += filtered.map(i=>`<div class="tq-select-item${currentValue===i.id?' active':''}" onclick="selectTeamQueueCustomOption('${prefix}','${esc(i.id)}','${esc(i.name)}')">${escapeHtml(i.name)}</div>`).join('');
+    if(!filtered.length) html += `<div class="tq-select-empty">No matches</div>`;
+    container.innerHTML = html;
+    return;
+  }
+
+  // Static lists (Time, Danger, Importance) — each list's own default
+  // item ("This week", "Any danger score", "Any importance") already
+  // serves the role an "All" wrapper option would, so none is added here.
+  const options = TQ_STATIC_OPTIONS[prefix] || [];
+  const currentValue = prefix==='tqDanger' ? teamQueueDangerFilter : prefix==='tqImportance' ? teamQueueImportanceFilter : teamDateFilterMode;
+  container.innerHTML = options.map(o=>`<div class="tq-select-item${currentValue===o.id?' active':''}" onclick="selectTeamQueueCustomOption('${prefix}','${o.id}','${esc(o.name)}')">${escapeHtml(o.name)}</div>`).join('');
 }
 
 function selectTeamQueueCustomOption(prefix, id, label){
-  const isClient = prefix === 'tqClient';
-  if(isClient) setTeamQueueClientFilter(id); else setTeamQueueMemberFilter(id);
+  if(prefix === 'tqClient') setTeamQueueClientFilter(id);
+  else if(prefix === 'tqMember') setTeamQueueMemberFilter(id);
+  else if(prefix === 'tqDanger') setTeamQueueDangerFilter(id);
+  else if(prefix === 'tqImportance') setTeamQueueImportanceFilter(id);
+  else if(prefix === 'tqTime') selectTeamQueueTimeOption(id);
+
   const labelEl = document.getElementById(prefix+'FilterLabel');
   if(labelEl) labelEl.textContent = label;
+
+  // Time's "Custom range…" needs its date inputs to stay open for the
+  // user to actually pick dates and click Apply — closing this dropdown
+  // immediately would hide the very controls they need next.
+  if(prefix==='tqTime' && id==='custom') return;
+
   const list = document.getElementById(prefix+'FilterList');
   if(list){ list.style.display = 'none'; list.closest('.tq-select-wrap')?.classList.remove('open'); }
+}
+
+// Mirrors onDateFilterChange('team')'s own logic — kept separate since
+// that function reads its mode from a native <select>'s .value, which the
+// custom Time dropdown here doesn't have.
+function selectTeamQueueTimeOption(mode){
+  const rangeEl = document.getElementById('teamCustomDateRange');
+  if(rangeEl) rangeEl.style.display = mode==='custom' ? 'inline-flex' : 'none';
+  teamDateFilterMode = mode;
+  if(mode==='custom') return; // wait for Apply click
+  const {from, to} = computeDateRange(mode);
+  teamDateFilterFrom = from; teamDateFilterTo = to;
+  renderTeamQueue();
+  updateTeamQueueFiltersActiveBadge();
 }
 
 // Shows a count on the Filters button itself whenever Time, Client,
@@ -15622,9 +15704,8 @@ function selectTeamQueueCustomOption(prefix, id, label){
 function updateTeamQueueFiltersActiveBadge(){
   const badge = document.getElementById('teamQueueFiltersActiveBadge');
   if(!badge) return;
-  const dateSelect = document.getElementById('teamDateFilterSelect');
   let activeCount = 0;
-  if(dateSelect && dateSelect.value !== 'thisweek') activeCount++;
+  if(teamDateFilterMode !== 'thisweek') activeCount++;
   if(teamQueueClientFilter !== 'all') activeCount++;
   if(teamQueueMemberFilter !== 'all') activeCount++;
   if(Number(teamQueueDangerFilter) > 0) activeCount++;
@@ -15655,28 +15736,23 @@ function computeDateRange(mode){
 
 const DATE_FILTER_IDS = {
   '':     { select:'dateFilterSelect',     range:'customDateRange',     from:'dateFrom',     to:'dateTo' },
-  team:   { select:'teamDateFilterSelect', range:'teamCustomDateRange', from:'teamDateFrom', to:'teamDateTo' },
+  team:   { range:'teamCustomDateRange', from:'teamDateFrom', to:'teamDateTo' },
 };
 
+// Only ever called for the personal Queue page now — Team Queue's Time
+// filter is the custom tqTime dropdown (see selectTeamQueueTimeOption()),
+// since it needed a fully custom-styled option list rather than a native
+// <select>'s unstylable one.
 function onDateFilterChange(prefix){
   prefix = prefix || '';
   const ids = DATE_FILTER_IDS[prefix];
   const mode = document.getElementById(ids.select).value;
   document.getElementById(ids.range).style.display = mode==='custom' ? 'inline-flex' : 'none';
-  if(prefix==='team'){
-    teamDateFilterMode = mode;
-    if(mode==='custom') return; // wait for Apply click
-    const {from, to} = computeDateRange(mode);
-    teamDateFilterFrom = from; teamDateFilterTo = to;
-    renderTeamQueue();
-    updateTeamQueueFiltersActiveBadge();
-  } else {
-    dateFilterMode = mode;
-    if(mode==='custom') return; // wait for Apply click
-    const {from, to} = computeDateRange(mode);
-    dateFilterFrom = from; dateFilterTo = to;
-    renderQueue();
-  }
+  dateFilterMode = mode;
+  if(mode==='custom') return; // wait for Apply click
+  const {from, to} = computeDateRange(mode);
+  dateFilterFrom = from; dateFilterTo = to;
+  renderQueue();
 }
 
 function applyCustomDateRange(prefix){
@@ -15691,6 +15767,13 @@ function applyCustomDateRange(prefix){
     teamDateFilterFrom = from; teamDateFilterTo = to;
     renderTeamQueue();
     updateTeamQueueFiltersActiveBadge();
+    const labelEl = document.getElementById('tqTimeFilterLabel');
+    if(labelEl){
+      const fmt = d => d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      labelEl.textContent = from && to ? `${fmt(from)} – ${fmt(to)}` : from ? `From ${fmt(from)}` : `Until ${fmt(to)}`;
+    }
+    const list = document.getElementById('tqTimeFilterList');
+    if(list){ list.style.display = 'none'; list.closest('.tq-select-wrap')?.classList.remove('open'); }
   } else {
     dateFilterFrom = from; dateFilterTo = to;
     renderQueue();
@@ -17240,10 +17323,9 @@ function applyAppBranding(){
 // duplicating that as a second editable field here would just be
 // confusing about which one actually takes effect.
 const NAV_LABEL_DEFAULTS = {
-  overview: 'Overview', focusreports: 'Past Reports', clients: 'Clients', approve: 'Approval Queue', teamqueue: 'Team Queue',
+  overview: 'Overview', reports: 'Reports', clients: 'Clients', approve: 'Approval Queue', teamqueue: 'Team Queue',
   notes: 'Notes', tasks: 'Tasks', reminders: 'Reminders', calendar: 'Calendar',
   time: 'Time Tracker', team: 'Team', trash: 'Trash', settings: 'Settings & Integrations',
-  aivisibility: 'AI Visibility',
 };
 
 // Updates both the visible expanded-sidebar label AND the collapsed-
