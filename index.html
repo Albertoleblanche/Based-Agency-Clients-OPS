@@ -11021,7 +11021,11 @@ async function renderAiVisibilityList(el){
       <td>${escapeHtml(r.client_name_snapshot||'—')}</td>
       <td>${escapeHtml(r.target_keyword||'—')}</td>
       <td>${new Date(r.report_date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td>
-      <td style="text-align:right;"><span class="row-link" style="color:var(--red);" onclick="event.stopPropagation();deleteAiVisibilityReport('${r.id}')">Delete</span></td>
+      <td style="text-align:right;white-space:nowrap;">
+        <span class="row-link" onclick="event.stopPropagation();openAiVisibilityPreview('${r.id}')">View</span>
+        <span class="row-link" onclick="event.stopPropagation();downloadAiVisibilityReportById('${r.id}')">Download</span>
+        <span class="row-link" style="color:var(--red);" onclick="event.stopPropagation();deleteAiVisibilityReport('${r.id}')">Delete</span>
+      </td>
     </tr>
   `).join('');
 }
@@ -11071,6 +11075,69 @@ function closeAiVisibilityDetail(){
   aiVisibilityCurrentReportId = null;
   aiVisibilityDraft = null;
   renderAiVisibilityMain();
+}
+
+// A quick, read-only look at a report's key numbers and summary — without
+// leaving the list or loading the full editor (which also puts the report
+// into an editable draft state, not appropriate for just wanting a look).
+async function openAiVisibilityPreview(id){
+  const { data, error } = await supabaseClient.from('ai_visibility_reports').select('*').eq('id', id).maybeSingle();
+  if(error || !data){ showToast('error','Could not load','Try again.'); return; }
+  const dateLabel = data.report_date ? new Date(data.report_date+'T00:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}) : '—';
+  const metricRow = (label, before, after) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+      <span style="font-size:12.5px;color:var(--muted);">${label}</span>
+      <span style="font-size:12.5px;color:var(--ink);font-weight:600;">${before==null?'—':before} <span style="color:var(--muted-lt);font-weight:400;">→</span> ${after==null?'—':after}</span>
+    </div>`;
+  openAppModal(`
+    <div class="modal-head">
+      <div>
+        <div class="q-name">${escapeHtml(data.client_name_snapshot||'—')}</div>
+        <div class="q-service-caption">${escapeHtml(data.target_keyword||'—')} · ${dateLabel}</div>
+      </div>
+      <span class="toast-close" onclick="closeAppModal()">✕</span>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom:16px;">
+        ${metricRow('Recommended (of prompts checked)', data.before_recommended_count!=null && data.before_total_prompts!=null ? `${data.before_recommended_count}/${data.before_total_prompts}` : null, data.after_recommended_count!=null && data.after_total_prompts!=null ? `${data.after_recommended_count}/${data.after_total_prompts}` : null)}
+        ${metricRow('Average position', data.before_avg_position, data.after_avg_position)}
+      </div>
+      ${data.executive_summary ? `<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;color:var(--muted-lt);text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px;">Executive Summary</div><div style="font-size:13px;color:var(--ink);line-height:1.6;white-space:pre-wrap;">${escapeHtml(data.executive_summary)}</div></div>` : ''}
+      ${data.what_ai_values ? `<div><div style="font-size:11px;font-weight:700;color:var(--muted-lt);text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px;">What AI Values</div><div style="font-size:13px;color:var(--ink);line-height:1.6;white-space:pre-wrap;">${escapeHtml(data.what_ai_values)}</div></div>` : ''}
+      ${!data.executive_summary && !data.what_ai_values ? `<p style="font-size:12.5px;color:var(--muted-lt);">No summary written for this report yet — open it to add one.</p>` : ''}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeAppModal();openAiVisibilityReport('${id}')">Open full report</button>
+      <button class="btn btn-brand" onclick="downloadAiVisibilityReportById('${id}')">Download PDF</button>
+    </div>`, 560);
+}
+
+// Downloads a report's PDF straight from the list, without navigating
+// into (and thereby also entering edit mode on) the full report first.
+// Reuses downloadAiVisibilityReportPdf()'s existing generation logic by
+// briefly populating aiVisibilityDraft with this report's data — safe to
+// do since that variable sits at null while the list itself is showing
+// (see closeAiVisibilityDetail()) — then restoring it back afterward.
+async function downloadAiVisibilityReportById(id){
+  const { data, error } = await supabaseClient.from('ai_visibility_reports').select('*').eq('id', id).maybeSingle();
+  if(error || !data){ showToast('error','Could not load','Try again.'); return; }
+  const previousDraft = aiVisibilityDraft;
+  aiVisibilityDraft = {
+    id: data.id, client_id: data.client_id, client_name_snapshot: data.client_name_snapshot||'',
+    target_keyword: data.target_keyword||'', report_date: data.report_date,
+    before_recommended_count: data.before_recommended_count, before_total_prompts: data.before_total_prompts, before_avg_position: data.before_avg_position,
+    after_recommended_count: data.after_recommended_count, after_total_prompts: data.after_total_prompts, after_avg_position: data.after_avg_position,
+    competitors: data.competitors || [],
+    keywords: data.keywords && Object.keys(data.keywords).length ? data.keywords : { positive:{}, neutral:{}, negative:{} },
+    concerns: data.concerns || [], links: data.links || { pressRelease:'', prPlacementReport:'', screenshotsFolder:'' },
+    executive_summary: data.executive_summary||'',
+    competitive_intelligence_summary: data.competitive_intelligence_summary||'',
+    overview_summary: data.overview_summary||'', overview_matrix_data: data.overview_matrix_data||[],
+    what_ai_values: data.what_ai_values||'',
+    inhouse_client_id: data.inhouse_client_id||null,
+  };
+  downloadAiVisibilityReportPdf();
+  aiVisibilityDraft = previousDraft;
 }
 
 async function deleteAiVisibilityReport(id){
