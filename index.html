@@ -761,6 +761,26 @@
   .client-search-item{padding:9px 12px;font-size:12.5px;cursor:pointer;}
   .client-search-item:hover{background:var(--surface-2);}
   .client-search-empty{padding:9px 12px;font-size:12px;color:var(--muted-lt);}
+
+  /* Team Queue's Client/Team Member filters — a custom searchable list
+     rather than a native <select>, since a native dropdown's open option
+     list is rendered by the OS/browser and can't be styled consistently
+     (see the plain, unstyled list a native <select> produces once
+     opened) — this stays fully within the app's own design language. */
+  .tq-select-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:9px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--muted-lt);font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;cursor:pointer;text-align:left;transition:border-color var(--duration-fast) var(--ease-out);}
+  .tq-select-btn:hover{border-color:var(--muted-lt);}
+  .tq-select-btn-label-group{display:flex;align-items:center;gap:8px;overflow:hidden;}
+  .tq-select-btn-label-group svg{flex:none;}
+  .tq-select-btn-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);}
+  .tq-select-btn-chevron{flex:none;transition:transform .15s ease;}
+  .tq-select-wrap.open .tq-select-btn-chevron{transform:rotate(180deg);}
+  .tq-select-list{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:60;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 10px 26px rgba(16,24,40,.14);max-height:280px;overflow-y:auto;}
+  .tq-select-search{width:100%;padding:10px 12px;border:none;border-bottom:1px solid var(--border);background:var(--card);color:var(--ink);font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;position:sticky;top:0;}
+  .tq-select-search:focus{outline:none;}
+  .tq-select-item{padding:9px 12px;font-size:12.5px;cursor:pointer;color:var(--ink);}
+  .tq-select-item:hover{background:var(--surface-2);}
+  .tq-select-item.active{background:var(--brand);color:#fff;}
+  .tq-select-empty{padding:9px 12px;font-size:12px;color:var(--muted-lt);}
   .timer-status-dot{width:7px;height:7px;border-radius:50%;background:var(--muted-lt);flex:none;}
   .timer-status-dot.running{background:var(--brand);position:relative;}
   .timer-status-dot.running::after{content:'';position:absolute;inset:0;border-radius:50%;background:var(--brand);animation:pulseRing 1.8s ease-out infinite;}
@@ -2037,7 +2057,7 @@ document.addEventListener('DOMContentLoaded', function(){
           <div style="width:1px;align-self:stretch;background:var(--border);"></div>
 
           <div class="team-queue-filters-wrap" style="position:relative;">
-            <button class="btn btn-outline" onclick="toggleTeamQueueFiltersPanel()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>Filters<span class="icon-tab-count" id="teamQueueFiltersActiveBadge" style="display:none;margin-left:4px;">0</span></button>
+            <div class="icon-tab" id="teamQueueFiltersBtn" onclick="toggleTeamQueueFiltersPanel()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg><span>Filters</span><span class="icon-tab-count" id="teamQueueFiltersActiveBadge" style="display:none;">0</span></div>
             <div class="team-queue-filters-panel" id="teamQueueFiltersPanel" style="display:none;">
               <div class="team-queue-filters-panel-body">
                 <div>
@@ -2061,32 +2081,64 @@ document.addEventListener('DOMContentLoaded', function(){
 
                 <div>
                   <label style="display:block;font-size:11px;font-weight:700;color:var(--muted-lt);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Client</label>
-                  <select id="teamQueueClientFilter" onchange="setTeamQueueClientFilter(this.value)" style="width:100%;">
-                    <option value="all">All clients</option>
-                  </select>
+                  <div class="tq-select-wrap" style="position:relative;">
+                    <div class="tq-select-btn" onclick="toggleTeamQueueCustomSelect('tqClient')">
+                      <span class="tq-select-btn-label-group">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l8-4v18M13 21V11l6 4v6"/></svg>
+                        <span class="tq-select-btn-label" id="tqClientFilterLabel">All clients</span>
+                      </span>
+                      <svg class="tq-select-btn-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                    <div class="tq-select-list" id="tqClientFilterList">
+                      <input type="text" class="tq-select-search" placeholder="Search clients…" oninput="renderTeamQueueCustomOptions('tqClient', this.value)">
+                      <div id="tqClientFilterOptions"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label style="display:block;font-size:11px;font-weight:700;color:var(--muted-lt);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Team member</label>
+                  <div class="tq-select-wrap" style="position:relative;">
+                    <div class="tq-select-btn" onclick="toggleTeamQueueCustomSelect('tqMember')">
+                      <span class="tq-select-btn-label-group">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        <span class="tq-select-btn-label" id="tqMemberFilterLabel">All team members</span>
+                      </span>
+                      <svg class="tq-select-btn-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                    <div class="tq-select-list" id="tqMemberFilterList">
+                      <div id="tqMemberFilterOptions"></div>
+                    </div>
+                  </div>
                 </div>
 
                 <div>
                   <label style="display:block;font-size:11px;font-weight:700;color:var(--muted-lt);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Danger score</label>
-                  <select id="teamQueueDangerFilter" onchange="setTeamQueueDangerFilter(this.value)" style="width:100%;">
-                    <option value="0">Any danger score</option>
-                    <option value="5">5 (Critical)</option>
-                    <option value="4">4+ (At risk)</option>
-                    <option value="3">3+ (Moderate)</option>
-                    <option value="2">2+ (Low)</option>
-                    <option value="1">1+ (Any logged)</option>
-                  </select>
+                  <div class="select-field" style="width:100%;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    <select id="teamQueueDangerFilter" onchange="setTeamQueueDangerFilter(this.value)" style="width:100%;">
+                      <option value="0">Any danger score</option>
+                      <option value="5">5 (Critical)</option>
+                      <option value="4">4+ (At risk)</option>
+                      <option value="3">3+ (Moderate)</option>
+                      <option value="2">2+ (Low)</option>
+                      <option value="1">1+ (Any logged)</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div>
                   <label style="display:block;font-size:11px;font-weight:700;color:var(--muted-lt);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Importance</label>
-                  <select id="teamQueueImportanceFilter" onchange="setTeamQueueImportanceFilter(this.value)" style="width:100%;">
-                    <option value="0">Any importance</option>
-                    <option value="9">9+ (Top priority)</option>
-                    <option value="7">7+ (High)</option>
-                    <option value="5">5+ (Medium)</option>
-                    <option value="3">3+ (Low)</option>
-                  </select>
+                  <div class="select-field" style="width:100%;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.2 21 12 17.77 5.8 21 7 14.14l-5-4.87 7.1-1.01z"/></svg>
+                    <select id="teamQueueImportanceFilter" onchange="setTeamQueueImportanceFilter(this.value)" style="width:100%;">
+                      <option value="0">Any importance</option>
+                      <option value="9">9+ (Top priority)</option>
+                      <option value="7">7+ (High)</option>
+                      <option value="5">5+ (Medium)</option>
+                      <option value="3">3+ (Low)</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
@@ -3239,6 +3291,7 @@ let editingClientId = null;
 let queueFilter = 'all';
 let teamQueueFilter = 'all';
 let teamQueueClientFilter = 'all';
+let teamQueueMemberFilter = 'all';
 let teamQueueDangerFilter = '0';
 let teamQueueImportanceFilter = '0';
 let dateFilterMode = 'all';
@@ -15471,6 +15524,12 @@ function setTeamQueueClientFilter(clientId){
   updateTeamQueueFiltersActiveBadge();
 }
 
+function setTeamQueueMemberFilter(memberName){
+  teamQueueMemberFilter = memberName;
+  renderTeamQueue();
+  updateTeamQueueFiltersActiveBadge();
+}
+
 function setTeamQueueDangerFilter(value){
   teamQueueDangerFilter = value;
   renderTeamQueue();
@@ -15488,15 +15547,72 @@ function setTeamQueueImportanceFilter(value){
 // registered once below rather than each popup needing its own.
 function toggleTeamQueueFiltersPanel(){
   const panel = document.getElementById('teamQueueFiltersPanel');
+  const btn = document.getElementById('teamQueueFiltersBtn');
   if(!panel) return;
-  panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+  const opening = panel.style.display !== 'block';
+  panel.style.display = opening ? 'block' : 'none';
+  if(btn) btn.classList.toggle('active', opening);
 }
 
 document.addEventListener('click', (e)=>{
   const wrap = document.querySelector('.team-queue-filters-wrap');
   const panel = document.getElementById('teamQueueFiltersPanel');
-  if(panel && panel.style.display==='block' && wrap && !wrap.contains(e.target)) panel.style.display='none';
+  const btn = document.getElementById('teamQueueFiltersBtn');
+  if(panel && panel.style.display==='block' && wrap && !wrap.contains(e.target)){
+    panel.style.display='none';
+    if(btn) btn.classList.remove('active');
+  }
 });
+
+// Generic searchable dropdown shared by Team Queue's Client and Team
+// Member filters — a fully custom list rather than a native <select>,
+// since a native dropdown's open option list is rendered by the OS and
+// can't be restyled to match the rest of this panel. prefix is 'tqClient'
+// or 'tqMember', matching the element id scheme used throughout.
+function toggleTeamQueueCustomSelect(prefix){
+  const list = document.getElementById(prefix+'FilterList');
+  const wrap = list ? list.closest('.tq-select-wrap') : null;
+  if(!list) return;
+  const opening = list.style.display !== 'block';
+  document.querySelectorAll('.tq-select-list').forEach(l=>{
+    if(l.id !== prefix+'FilterList'){ l.style.display='none'; l.closest('.tq-select-wrap')?.classList.remove('open'); }
+  });
+  list.style.display = opening ? 'block' : 'none';
+  if(wrap) wrap.classList.toggle('open', opening);
+  if(opening){
+    const search = list.querySelector('.tq-select-search');
+    if(search) search.value = '';
+    renderTeamQueueCustomOptions(prefix, '');
+    if(search) search.focus();
+  }
+}
+
+function renderTeamQueueCustomOptions(prefix, term){
+  const container = document.getElementById(prefix+'FilterOptions');
+  if(!container) return;
+  const lower = (term||'').toLowerCase();
+  const isClient = prefix === 'tqClient';
+  const allLabel = isClient ? 'All clients' : 'All team members';
+  const allItems = isClient
+    ? [...activeClients()].map(c=>({id:c.id, name:c.name})).sort((a,b)=>a.name.localeCompare(b.name))
+    : [...teamProfiles].map(p=>({id:p.name, name:p.name})).sort((a,b)=>a.name.localeCompare(b.name));
+  const filtered = term ? allItems.filter(i=>i.name.toLowerCase().includes(lower)) : allItems;
+  const currentValue = isClient ? teamQueueClientFilter : teamQueueMemberFilter;
+  const esc = s => s.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+  let html = `<div class="tq-select-item${currentValue==='all'?' active':''}" onclick="selectTeamQueueCustomOption('${prefix}','all','${esc(allLabel)}')">${escapeHtml(allLabel)}</div>`;
+  html += filtered.map(i=>`<div class="tq-select-item${currentValue===i.id?' active':''}" onclick="selectTeamQueueCustomOption('${prefix}','${esc(i.id)}','${esc(i.name)}')">${escapeHtml(i.name)}</div>`).join('');
+  if(!filtered.length) html += `<div class="tq-select-empty">No matches</div>`;
+  container.innerHTML = html;
+}
+
+function selectTeamQueueCustomOption(prefix, id, label){
+  const isClient = prefix === 'tqClient';
+  if(isClient) setTeamQueueClientFilter(id); else setTeamQueueMemberFilter(id);
+  const labelEl = document.getElementById(prefix+'FilterLabel');
+  if(labelEl) labelEl.textContent = label;
+  const list = document.getElementById(prefix+'FilterList');
+  if(list){ list.style.display = 'none'; list.closest('.tq-select-wrap')?.classList.remove('open'); }
+}
 
 // Shows a count on the Filters button itself whenever Time, Client,
 // Danger, or Importance is set to anything other than its default — a
@@ -15510,6 +15626,7 @@ function updateTeamQueueFiltersActiveBadge(){
   let activeCount = 0;
   if(dateSelect && dateSelect.value !== 'thisweek') activeCount++;
   if(teamQueueClientFilter !== 'all') activeCount++;
+  if(teamQueueMemberFilter !== 'all') activeCount++;
   if(Number(teamQueueDangerFilter) > 0) activeCount++;
   if(Number(teamQueueImportanceFilter) > 0) activeCount++;
   badge.style.display = activeCount > 0 ? 'inline-flex' : 'none';
@@ -15745,6 +15862,7 @@ function teamQueueFilterCount(filterKey){
   // than one person logged work for it), so the true count is the total
   // across every member's own section combined, not distinct clients.
   return teamProfiles.reduce((total, member) => {
+    if(teamQueueMemberFilter !== 'all' && member.name !== teamQueueMemberFilter) return total;
     const memberCount = ac
       .filter(c => teamQueueClientFilter==='all' || c.id===teamQueueClientFilter)
       .filter(c => c.danger >= (Number(teamQueueDangerFilter)||0))
@@ -15772,18 +15890,6 @@ function renderTeamQueue(){
   updateTeamQueueFiltersActiveBadge();
   const actionsRow = document.getElementById('adminOnlyQueueActionsRow');
   if(actionsRow) actionsRow.style.display = canApprove() ? 'flex' : 'none';
-  // Populated once per distinct client list rather than on every render —
-  // rebuilding this dropdown's options on every re-render would reset
-  // whatever the user currently has selected back to "All clients" each
-  // time (e.g. after switching a status tab), which would make the
-  // filter feel broken rather than persistent.
-  const clientFilterEl = document.getElementById('teamQueueClientFilter');
-  if(clientFilterEl && clientFilterEl.dataset.builtForCount !== String(ac.length)){
-    const sortedClients = [...ac].sort((a,b)=>a.name.localeCompare(b.name));
-    clientFilterEl.innerHTML = `<option value="all">All clients</option>` + sortedClients.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
-    clientFilterEl.value = teamQueueClientFilter;
-    clientFilterEl.dataset.builtForCount = String(ac.length);
-  }
   if(!slackChannelsLoaded) loadSlackClientChannels().then(renderTeamQueue);
   if(!ac.length){ el.innerHTML = `<div class="panel">${emptyStateHtml(
     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
@@ -15835,6 +15941,7 @@ function renderTeamQueue(){
 
   const sortedMembers = [...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name));
   const sectionsHtml = sortedMembers.map(member => {
+    if(teamQueueMemberFilter !== 'all' && member.name !== teamQueueMemberFilter) return '';
     // Date-filtered improvement subset per client, scoped to this
     // specific member — a client only earns a card in this section if
     // THIS member actually logged something eligible for it, and their
