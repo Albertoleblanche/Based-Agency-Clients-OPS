@@ -801,6 +801,17 @@
   .icon-tab.active .icon-tab-count{background:var(--brand);color:#fff;}
   .icon-tab-count{font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;font-weight:700;color:var(--muted-lt);background:var(--surface-2);padding:1px 6px;border-radius:10px;}
 
+  /* Team Queue's Filters popup — same anchored-panel pattern as the
+     notification bell (.notif-panel): a button toggles a floating panel
+     positioned relative to its own wrapper, closed by the shared
+     outside-click handler rather than needing its own. */
+  .team-queue-filters-panel{position:absolute;top:calc(100% + 8px);right:0;width:280px;background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:80;}
+  .team-queue-filters-panel-body{display:flex;flex-direction:column;gap:16px;padding:16px;}
+  @media (max-width:640px){
+    .team-queue-filters-panel{width:min(280px, calc(100vw - 40px));}
+  }
+
+
 
   .kanban-board{display:flex;gap:16px;overflow-x:auto;padding-bottom:14px;align-items:flex-start;}
   .kanban-column{min-width:270px;max-width:320px;background:var(--bg);border-radius:var(--radius-lg);padding:14px;flex:1 1 290px;}
@@ -1989,74 +2000,99 @@ document.addEventListener('DOMContentLoaded', function(){
     <!-- TEAM QUEUE -->
     <div class="view" id="view-teamqueue">
       <div class="panel" style="margin-bottom:16px;">
-        <div class="panel-body" style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start;">
-          <div style="flex:1;min-width:320px;">
-            <label style="display:block;font-size:11px;font-weight:700;color:var(--muted-lt);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Status</label>
-            <div class="icon-tab-group" id="teamQueueFilterBar">
-              <div class="icon-tab active" data-f="all" onclick="setTeamQueueFilter('all')">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
-                <span>All</span>
-                <span class="icon-tab-count" id="tqf-count-all">0</span>
-              </div>
-              <div class="icon-tab" data-f="pending" onclick="setTeamQueueFilter('pending')">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                <span>Draft ready</span>
-                <span class="icon-tab-count" id="tqf-count-pending">0</span>
-              </div>
-              <div class="icon-tab" data-f="approved" onclick="setTeamQueueFilter('approved')">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                <span>Approved</span>
-                <span class="icon-tab-count" id="tqf-count-approved">0</span>
-              </div>
-              <div class="icon-tab" data-f="atrisk" onclick="setTeamQueueFilter('atrisk')">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                <span>At risk (4–5)</span>
-                <span class="icon-tab-count" id="tqf-count-atrisk">0</span>
-              </div>
-              <div class="icon-tab" data-f="stale" onclick="setTeamQueueFilter('stale')">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
-                <span>Needs re-review</span>
-                <span class="icon-tab-count" id="tqf-count-stale">0</span>
-              </div>
-              <div class="icon-tab" data-f="sent" onclick="setTeamQueueFilter('sent')">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                <span>Sent</span>
-                <span class="icon-tab-count" id="tqf-count-sent">0</span>
-              </div>
+        <div class="panel-body">
+          <label style="display:block;font-size:11px;font-weight:700;color:var(--muted-lt);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Status</label>
+          <div class="icon-tab-group" id="teamQueueFilterBar">
+            <div class="icon-tab active" data-f="all" onclick="setTeamQueueFilter('all')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+              <span>All</span>
+              <span class="icon-tab-count" id="tqf-count-all">0</span>
             </div>
-          </div>
-
-          <div style="min-width:170px;">
-            <label style="display:block;font-size:11px;font-weight:700;color:var(--muted-lt);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Time</label>
-            <div class="select-field" style="width:100%;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              <select id="teamDateFilterSelect" onchange="onDateFilterChange('team')" style="width:100%;">
-                <option value="thisweek" selected>This week</option>
-                <option value="all">All time</option>
-                <option value="today">Today</option>
-                <option value="7days">Last 7 days</option>
-                <option value="30days">Last 30 days</option>
-                <option value="custom">Custom range…</option>
-              </select>
+            <div class="icon-tab" data-f="pending" onclick="setTeamQueueFilter('pending')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <span>Draft ready</span>
+              <span class="icon-tab-count" id="tqf-count-pending">0</span>
             </div>
-            <div id="teamCustomDateRange" style="display:none;margin-top:10px;">
-              <input type="date" id="teamDateFrom" style="width:100%;margin-bottom:6px;"> <span style="color:var(--muted-lt);font-size:11.5px;">to</span> <input type="date" id="teamDateTo" style="width:100%;margin:6px 0;">
-              <button class="btn btn-outline" style="width:100%;justify-content:center;" onclick="applyCustomDateRange('team')">Apply</button>
+            <div class="icon-tab" data-f="approved" onclick="setTeamQueueFilter('approved')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              <span>Approved</span>
+              <span class="icon-tab-count" id="tqf-count-approved">0</span>
             </div>
-          </div>
-
-          <div style="min-width:170px;">
-            <label style="display:block;font-size:11px;font-weight:700;color:var(--muted-lt);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Client</label>
-            <select id="teamQueueClientFilter" onchange="setTeamQueueClientFilter(this.value)" style="width:100%;">
-              <option value="all">All clients</option>
-            </select>
+            <div class="icon-tab" data-f="stale" onclick="setTeamQueueFilter('stale')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
+              <span>Needs re-review</span>
+              <span class="icon-tab-count" id="tqf-count-stale">0</span>
+            </div>
+            <div class="icon-tab" data-f="sent" onclick="setTeamQueueFilter('sent')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              <span>Sent</span>
+              <span class="icon-tab-count" id="tqf-count-sent">0</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div id="adminOnlyQueueActionsRow" style="display:none;margin-bottom:16px;gap:8px;">
-        <button class="btn btn-dark" onclick="openQueueLogImprovementModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Log Improvement</button>
-        <button class="btn btn-outline" onclick="openGroupAndSendModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Group &amp; Send</button>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:16px;">
+        <div id="adminOnlyQueueActionsRow" style="display:none;gap:8px;">
+          <button class="btn btn-dark" onclick="openQueueLogImprovementModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Log Improvement</button>
+          <button class="btn btn-outline" onclick="openGroupAndSendModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Group &amp; Send</button>
+        </div>
+
+        <div class="team-queue-filters-wrap" style="position:relative;margin-left:auto;">
+          <button class="btn btn-outline" onclick="toggleTeamQueueFiltersPanel()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>Filters<span class="icon-tab-count" id="teamQueueFiltersActiveBadge" style="display:none;margin-left:4px;">0</span></button>
+          <div class="team-queue-filters-panel" id="teamQueueFiltersPanel" style="display:none;">
+            <div class="team-queue-filters-panel-body">
+              <div>
+                <label style="display:block;font-size:11px;font-weight:700;color:var(--muted-lt);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Time</label>
+                <div class="select-field" style="width:100%;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <select id="teamDateFilterSelect" onchange="onDateFilterChange('team')" style="width:100%;">
+                    <option value="thisweek" selected>This week</option>
+                    <option value="all">All time</option>
+                    <option value="today">Today</option>
+                    <option value="7days">Last 7 days</option>
+                    <option value="30days">Last 30 days</option>
+                    <option value="custom">Custom range…</option>
+                  </select>
+                </div>
+                <div id="teamCustomDateRange" style="display:none;margin-top:10px;">
+                  <input type="date" id="teamDateFrom" style="width:100%;margin-bottom:6px;"> <span style="color:var(--muted-lt);font-size:11.5px;">to</span> <input type="date" id="teamDateTo" style="width:100%;margin:6px 0;">
+                  <button class="btn btn-outline" style="width:100%;justify-content:center;" onclick="applyCustomDateRange('team')">Apply</button>
+                </div>
+              </div>
+
+              <div>
+                <label style="display:block;font-size:11px;font-weight:700;color:var(--muted-lt);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Client</label>
+                <select id="teamQueueClientFilter" onchange="setTeamQueueClientFilter(this.value)" style="width:100%;">
+                  <option value="all">All clients</option>
+                </select>
+              </div>
+
+              <div>
+                <label style="display:block;font-size:11px;font-weight:700;color:var(--muted-lt);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Danger score</label>
+                <select id="teamQueueDangerFilter" onchange="setTeamQueueDangerFilter(this.value)" style="width:100%;">
+                  <option value="0">Any danger score</option>
+                  <option value="5">5 (Critical)</option>
+                  <option value="4">4+ (At risk)</option>
+                  <option value="3">3+ (Moderate)</option>
+                  <option value="2">2+ (Low)</option>
+                  <option value="1">1+ (Any logged)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style="display:block;font-size:11px;font-weight:700;color:var(--muted-lt);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Importance</label>
+                <select id="teamQueueImportanceFilter" onchange="setTeamQueueImportanceFilter(this.value)" style="width:100%;">
+                  <option value="0">Any importance</option>
+                  <option value="9">9+ (Top priority)</option>
+                  <option value="7">7+ (High)</option>
+                  <option value="5">5+ (Medium)</option>
+                  <option value="3">3+ (Low)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
       <div id="teamQueueList"></div>
     </div>
@@ -3204,6 +3240,8 @@ let editingClientId = null;
 let queueFilter = 'all';
 let teamQueueFilter = 'all';
 let teamQueueClientFilter = 'all';
+let teamQueueDangerFilter = '0';
+let teamQueueImportanceFilter = '0';
 let dateFilterMode = 'all';
 let dateFilterFrom = getWeekStart(new Date()); // only consulted by non-"all" modes — see improvementInDateRange()
 let dateFilterTo = null;   // inclusive, Date object
@@ -15431,6 +15469,52 @@ function setTeamQueueFilter(f){
 function setTeamQueueClientFilter(clientId){
   teamQueueClientFilter = clientId;
   renderTeamQueue();
+  updateTeamQueueFiltersActiveBadge();
+}
+
+function setTeamQueueDangerFilter(value){
+  teamQueueDangerFilter = value;
+  renderTeamQueue();
+  updateTeamQueueFiltersActiveBadge();
+}
+
+function setTeamQueueImportanceFilter(value){
+  teamQueueImportanceFilter = value;
+  renderTeamQueue();
+  updateTeamQueueFiltersActiveBadge();
+}
+
+// Same anchored-panel pattern as the notification bell's .notif-panel —
+// toggled open/closed here, closed by the shared outside-click listener
+// registered once below rather than each popup needing its own.
+function toggleTeamQueueFiltersPanel(){
+  const panel = document.getElementById('teamQueueFiltersPanel');
+  if(!panel) return;
+  panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+}
+
+document.addEventListener('click', (e)=>{
+  const wrap = document.querySelector('.team-queue-filters-wrap');
+  const panel = document.getElementById('teamQueueFiltersPanel');
+  if(panel && panel.style.display==='block' && wrap && !wrap.contains(e.target)) panel.style.display='none';
+});
+
+// Shows a count on the Filters button itself whenever Time, Client,
+// Danger, or Importance is set to anything other than its default — a
+// quick visual cue that something inside the (currently closed) popup is
+// actively narrowing the list, since none of those controls are visible
+// at a glance once the panel is collapsed.
+function updateTeamQueueFiltersActiveBadge(){
+  const badge = document.getElementById('teamQueueFiltersActiveBadge');
+  if(!badge) return;
+  const dateSelect = document.getElementById('teamDateFilterSelect');
+  let activeCount = 0;
+  if(dateSelect && dateSelect.value !== 'thisweek') activeCount++;
+  if(teamQueueClientFilter !== 'all') activeCount++;
+  if(Number(teamQueueDangerFilter) > 0) activeCount++;
+  if(Number(teamQueueImportanceFilter) > 0) activeCount++;
+  badge.style.display = activeCount > 0 ? 'inline-flex' : 'none';
+  badge.textContent = activeCount;
 }
 
 function activeDateFilterLabel(){
@@ -15469,6 +15553,7 @@ function onDateFilterChange(prefix){
     const {from, to} = computeDateRange(mode);
     teamDateFilterFrom = from; teamDateFilterTo = to;
     renderTeamQueue();
+    updateTeamQueueFiltersActiveBadge();
   } else {
     dateFilterMode = mode;
     if(mode==='custom') return; // wait for Apply click
@@ -15489,6 +15574,7 @@ function applyCustomDateRange(prefix){
   if(prefix==='team'){
     teamDateFilterFrom = from; teamDateFilterTo = to;
     renderTeamQueue();
+    updateTeamQueueFiltersActiveBadge();
   } else {
     dateFilterFrom = from; dateFilterTo = to;
     renderQueue();
@@ -15636,7 +15722,6 @@ function teamQueueFilterCount(filterKey){
     if(filterKey==='pending') return d.draftStatus==='pending';
     if(filterKey==='approved') return d.draftStatus==='approved';
     if(filterKey==='none') return d.draftStatus==='none';
-    if(filterKey==='atrisk') return c.danger>=4;
     if(filterKey==='stale') return d.draftStatus==='approved' && hasLoggedThisWeek(c, author);
     return true;
   };
@@ -15663,6 +15748,8 @@ function teamQueueFilterCount(filterKey){
   return teamProfiles.reduce((total, member) => {
     const memberCount = ac
       .filter(c => teamQueueClientFilter==='all' || c.id===teamQueueClientFilter)
+      .filter(c => c.danger >= (Number(teamQueueDangerFilter)||0))
+      .filter(c => c.importance >= (Number(teamQueueImportanceFilter)||0))
       .filter(c => c.improvements.some(i=>improvementInDateRange(i, true) && i.includeInEmail!==false && i.author===member.name))
       .filter(c => statusMatches(c, member.name) && readyForReview(c, member.name))
       .length;
@@ -15671,7 +15758,7 @@ function teamQueueFilterCount(filterKey){
 }
 
 function updateTeamQueueFilterCounts(){
-  ['all','pending','approved','none','atrisk','stale','sent'].forEach(key=>{
+  ['all','pending','approved','none','stale','sent'].forEach(key=>{
     const el = document.getElementById('tqf-count-'+key);
     if(el) el.textContent = teamQueueFilterCount(key);
   });
@@ -15683,6 +15770,7 @@ function renderTeamQueue(){
   const ac = activeClients();
   syncDateFilterDropdowns();
   updateTeamQueueFilterCounts();
+  updateTeamQueueFiltersActiveBadge();
   const actionsRow = document.getElementById('adminOnlyQueueActionsRow');
   if(actionsRow) actionsRow.style.display = canApprove() ? 'flex' : 'none';
   // Populated once per distinct client list rather than on every render —
@@ -15721,7 +15809,6 @@ function renderTeamQueue(){
     if(teamQueueFilter==='pending') return d.draftStatus==='pending';
     if(teamQueueFilter==='approved') return d.draftStatus==='approved';
     if(teamQueueFilter==='none') return d.draftStatus==='none';
-    if(teamQueueFilter==='atrisk') return c.danger>=4;
     if(teamQueueFilter==='stale') return d.draftStatus==='approved' && hasLoggedThisWeek(c, author);
     return true;
   };
@@ -15761,6 +15848,8 @@ function renderTeamQueue(){
     // bypass it the way it intentionally bypasses the date check.
     const memberClients = ac
       .filter(c => teamQueueClientFilter==='all' || c.id===teamQueueClientFilter)
+      .filter(c => c.danger >= (Number(teamQueueDangerFilter)||0))
+      .filter(c => c.importance >= (Number(teamQueueImportanceFilter)||0))
       .filter(c => c.improvements.some(i=>improvementInDateRange(i, true) && i.includeInEmail!==false && i.author===member.name))
       .filter(c => statusMatches(c, member.name) && readyForReview(c, member.name))
       .sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
