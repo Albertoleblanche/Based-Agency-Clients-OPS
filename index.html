@@ -1445,9 +1445,15 @@ document.addEventListener('DOMContentLoaded', function(){
         <span class="nav-label">Overview</span>
       </div>
 
-      <div class="nav-item" data-view="reports" data-tooltip="Reports" onclick="switchView('focusreports')">
+      <div class="nav-section-label">Reports</div>
+      <div class="nav-item" data-view="focusreports" data-tooltip="Past Reports" onclick="switchView('focusreports')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
-        <span class="nav-label">Reports</span>
+        <span class="nav-label">Past Reports</span>
+      </div>
+
+      <div class="nav-item" id="navAiVisibility" data-view="aivisibility" data-tooltip="AI Visibility" onclick="switchView('aivisibility')" style="display:none;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/></svg>
+        <span class="nav-label">AI Visibility</span>
       </div>
 
       <div class="nav-section-label">Client work</div>
@@ -1757,16 +1763,6 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- PAST REPORTS -->
     <div class="view" id="view-focusreports">
-      <div class="icon-tab-group" style="margin-bottom:16px;">
-        <div class="icon-tab active" onclick="switchView('focusreports')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
-          <span>Past Reports</span>
-        </div>
-        <div class="icon-tab" id="reportsSubtabAiVisibility" onclick="switchView('aivisibility')" style="display:none;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/></svg>
-          <span>AI Visibility</span>
-        </div>
-      </div>
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
         <div style="display:flex;align-items:center;gap:6px;">
           <label style="font-size:11px;font-weight:600;color:var(--muted);">From</label>
@@ -1797,16 +1793,6 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- AI VISIBILITY REPORTING ENGINE (admin-only) -->
     <div class="view" id="view-aivisibility">
-      <div class="icon-tab-group" style="margin-bottom:16px;">
-        <div class="icon-tab" onclick="switchView('focusreports')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
-          <span>Past Reports</span>
-        </div>
-        <div class="icon-tab active" onclick="switchView('aivisibility')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/></svg>
-          <span>AI Visibility</span>
-        </div>
-      </div>
       <div id="aiVisibilityMain"></div>
     </div>
 
@@ -4374,14 +4360,8 @@ function applyRoleVisibility(){
   const memberFilterField = document.getElementById('improvementsMemberFilterField');
   if(memberFilterField) memberFilterField.style.display = canApprove() ? 'block' : 'none';
   const addClientBtn = document.getElementById('addClientBtn');
-  // "Reports" is one shared nav item now, but AI Visibility itself stays
-  // admin-only — that restriction moved from the old separate nav item's
-  // own visibility down to this sub-tab, show only within the Past
-  // Reports view (the aivisibility view's own copy of this tab bar is
-  // only ever seen by admins in the first place — see switchView()'s
-  // redirect for anyone else who lands there).
-  const reportsSubtabAiVisibility = document.getElementById('reportsSubtabAiVisibility');
-  if(reportsSubtabAiVisibility) reportsSubtabAiVisibility.style.display = isAdmin() ? 'flex' : 'none';
+  const navAiVisibility = document.getElementById('navAiVisibility');
+  if(navAiVisibility) navAiVisibility.style.display = isAdmin() ? 'flex' : 'none';
   if(addClientBtn) addClientBtn.style.display = canApprove() ? 'inline-flex' : 'none';
   const editClientDetailBtn = document.getElementById('editClientDetailBtn');
   if(editClientDetailBtn) editClientDetailBtn.style.display = canApprove() ? 'inline-flex' : 'none';
@@ -4621,11 +4601,7 @@ function cmdkRefreshActiveHighlight(){
 
 async function switchView(name){
   closeMobileNav();
-  // "reports" isn't a real view name — Past Reports and AI Visibility are
-  // still two independent views internally (see the sub-tab bar atop
-  // each), but they share one nav item, so it needs to stay highlighted
-  // for either of its two actual sub-views.
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name || (n.dataset.view==='reports' && (name==='focusreports'||name==='aivisibility'))));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name));
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
   // The floating "open the Assistant" button is redundant (and visually
@@ -12727,7 +12703,7 @@ function switchViewIfNotOnTimer(){
 // keeps the fast, synchronous DOM-visibility half of switchView(), and
 // nothing that touches the network.
 function tourSwitchView(name){
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name || (n.dataset.view==='reports' && (name==='focusreports'||name==='aivisibility'))));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name));
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name)?.classList.add('active');
   const meta = VIEW_TITLES[name];
@@ -17323,9 +17299,10 @@ function applyAppBranding(){
 // duplicating that as a second editable field here would just be
 // confusing about which one actually takes effect.
 const NAV_LABEL_DEFAULTS = {
-  overview: 'Overview', reports: 'Reports', clients: 'Clients', approve: 'Approval Queue', teamqueue: 'Team Queue',
+  overview: 'Overview', focusreports: 'Past Reports', clients: 'Clients', approve: 'Approval Queue', teamqueue: 'Team Queue',
   notes: 'Notes', tasks: 'Tasks', reminders: 'Reminders', calendar: 'Calendar',
   time: 'Time Tracker', team: 'Team', trash: 'Trash', settings: 'Settings & Integrations',
+  aivisibility: 'AI Visibility',
 };
 
 // Updates both the visible expanded-sidebar label AND the collapsed-
