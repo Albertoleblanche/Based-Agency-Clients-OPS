@@ -6221,11 +6221,18 @@ function renderKpis(){
   const teamPendingBadge = document.getElementById('navTeamPendingBadge');
   if(teamPendingBadge){
     // Mirrors renderTeamQueue()'s own readyForReview() exactly, including
-    // the admin/approver-viewing-their-own-work exception — otherwise this
-    // badge undercounts relative to what the page itself actually shows.
+    // the admin/approver-viewing-their-own-work exception AND excluding
+    // already-sent drafts — an approved draft that's since been sent is
+    // archived out of every tab except the dedicated Sent one on the page
+    // itself. The page achieves that exclusion via a separate statusMatches
+    // check combined alongside readyForReview, which this badge doesn't
+    // have, so the sent-check has to sit here instead, checked before the
+    // admin exception rather than after it — otherwise an admin's own
+    // already-sent draft would still slip through via that early return.
     const readyForReview = (c, author) => {
-      if(author===myName() && canApprove()) return true;
       const d = getDraftFor(c, author);
+      if(d.draftStatus==='approved' && d.draftSentAt) return false;
+      if(author===myName() && canApprove()) return true;
       if(d.draftStatus==='approved') return true;
       if(d.draftStatus!=='pending') return false;
       return d.readyToNotify===true;
