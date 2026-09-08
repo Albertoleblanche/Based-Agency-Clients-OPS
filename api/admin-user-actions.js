@@ -111,8 +111,25 @@ module.exports = async function handler(req, res) {
       return;
     }
     const { data: callerProfile, error: profileErr } = await admin
-      .from('team_profiles').select('role').eq('id', callerData.user.id).maybeSingle();
-    if (profileErr || !callerProfile || callerProfile.role !== 'admin') {
+      .from('team_profiles').select('role, extra_permissions').eq('id', callerData.user.id).maybeSingle();
+    if (profileErr || !callerProfile) {
+      res.status(403).json({ error: 'Only admins can perform this action' });
+      return;
+    }
+    // Every action in this file was admin-only until AI Visibility's
+    // report-building flow needed to call four of them (pulling Quick
+    // Metrics/Overview/keyword data from the in-house tool) for anyone
+    // granted the new view_ai_visibility permission, not just admins —
+    // see EXTRA_PERMISSIONS_META in index.html. Everything else here
+    // (team management, AI provider connections, the in-house tool's own
+    // connection credentials) stays admin-only, since granting
+    // view_ai_visibility is about using reports, not managing the
+    // underlying integration or the team itself.
+    const AI_VISIBILITY_DATA_ACTIONS = ['list-inhouse-clients', 'list-inhouse-scans', 'fetch-inhouse-metrics', 'fetch-inhouse-keywords'];
+    const isCallerAdmin = callerProfile.role === 'admin';
+    const hasAiVisibilityPermission = Array.isArray(callerProfile.extra_permissions) && callerProfile.extra_permissions.includes('view_ai_visibility');
+    const allowed = isCallerAdmin || (AI_VISIBILITY_DATA_ACTIONS.includes(action) && hasAiVisibilityPermission);
+    if (!allowed) {
       res.status(403).json({ error: 'Only admins can perform this action' });
       return;
     }
