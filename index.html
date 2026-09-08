@@ -16287,6 +16287,19 @@ function queueCardHtml(c, scopeAuthor){
         // and then Send on their own work as if someone else needed to
         // sign off on it first.
         const canSkipApproval = d.draftStatus==='pending' && scopeAuthor===myName() && canApprove();
+        // Once a draft has actually been sent, "Send"/"Slack" stop being
+        // the relevant actions — the one useful new action at that point
+        // is archiving it off the board (see archiveSentDraft()), so that
+        // replaces them here rather than sitting alongside them.
+        if(d.draftStatus==='approved' && d.draftSentAt){
+          if(!canApprove()) return `
+      <button class="btn btn-brand" onclick="openQueueCardModal('${c.id}','${authorEsc}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Details</button>
+      `;
+          return `
+      <button class="btn btn-outline" onclick="archiveSentDraft('${c.id}','${authorEsc}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>Archive</button>
+      <button class="btn btn-outline" onclick="openQueueCardModal('${c.id}','${authorEsc}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Details</button>
+      `;
+        }
         if(d.draftStatus==='approved' || canSkipApproval){
           if(!canApprove()) return `
       <button class="btn btn-brand" onclick="openQueueCardModal('${c.id}','${authorEsc}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Details</button>
@@ -16959,6 +16972,39 @@ async function recordDraftSent(id, author){
   const c = clients.find(x=>x.id===id);
   if(!c) return;
   await saveDraftFor(id, author, { draftSentAt: new Date().toISOString(), draftSentBy: myName() || 'Someone' });
+}
+
+// Archives a sent draft off the board — marks every one of this author's
+// currently-eligible improvements for this client as excluded from email,
+// the same toggle used elsewhere on Past Improvements. That flag is
+// exactly what determines whether a client earns a card in Team Queue at
+// all (see renderTeamQueue()'s own memberClients filter, which requires
+// at least one includeInEmail!==false improvement to exist) — so once
+// archived, the card disappears from every tab including Sent, and the
+// Sent count itself drops to match, without needing any separate
+// "archived" flag or filter of its own.
+async function archiveSentDraft(clientId, author){
+  const c = clients.find(x=>x.id===clientId);
+  if(!c) return;
+  const toArchive = c.improvements.filter(i=>i.author===author && i.includeInEmail!==false);
+  if(!toArchive.length){ renderTeamQueue(); return; }
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Archiving…');
+  const ids = toArchive.map(i=>i.id);
+  // .select() after .update() to confirm every targeted row was actually
+  // affected — same RLS-block detection pattern used elsewhere on this
+  // table (see toggleImprovementIncludeInEmail()), since a silently
+  // blocked update reports success while changing nothing.
+  const { data, error } = await supabaseClient.from('client_improvements').update({ include_in_email: false }).in('id', ids).select();
+  const ok = !error && !!(data && data.length === ids.length);
+  if(error) console.error('archiveSentDraft failed', clientId, author, error);
+  else if(!ok) console.error('archiveSentDraft: update affected fewer rows than expected (likely blocked by RLS)', clientId, author);
+  if(ok) toArchive.forEach(i => { i.includeInEmail = false; });
+  restoreBtn(btn);
+  renderTeamQueue();
+  renderKpis();
+  if(ok) showToast('success','Archived', `${author}'s sent update for ${c.name} is now archived.`);
+  else showToast('error','Archive failed','Could not archive — try again.');
 }
 
 let _groupSendClientId = null;
