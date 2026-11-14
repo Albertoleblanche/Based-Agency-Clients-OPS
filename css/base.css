@@ -1,0 +1,169 @@
+/* Design tokens (type, spacing, radius, motion), dark-theme overrides, focus
+   styles, base page layout and the collapsed sidebar. Loaded first. */
+
+:root{
+  --bg:#F3F4F7; --sidebar:rgb(30,30,32); --sidebar-hover:rgba(232,98,44,.14); --sidebar-active:rgba(232,98,44,.22);
+  --card:#FFFFFF; --surface-2:#FAFAFB; --border:#E5E7EB; --ink:#151B26; --muted:#565F6D; --muted-lt:#696F78; --sidebar-muted:#A8A8AC;
+  --brand:#E8622C; --brand-dark:#C94F1F; --brand-bg:#FDEAE0;
+  --green:#117F3A; --green-bg:#E8F8ED; --red:#CF2424; --red-bg:#FDEAEA; --amber:#A65B05; --amber-bg:#FEF3D6;
+  --shadow:0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06);
+
+  /* Type scale — every font-size in the app should trace back to one of
+     these eight steps rather than a one-off value invented on the spot.
+     Existing sizes were already close to a clean scale; these codify it. */
+  --text-2xs:10px; --text-xs:11px; --text-sm:12.5px; --text-base:13.5px;
+  --text-lg:16px; --text-xl:19px; --text-2xl:24px; --text-3xl:32px;
+
+  /* Spacing scale — 4px base unit. */
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px;
+  --space-5:20px; --space-6:24px; --space-8:32px; --space-10:40px;
+
+  /* Radius scale. */
+  --radius-sm:8px; --radius-md:12px; --radius-lg:15px; --radius-full:999px;
+
+  /* Motion — one set of curves and durations for the whole app, so
+     everything that moves feels like it belongs to the same product. */
+  --ease-out:cubic-bezier(.16,1,.3,1); --ease-in-out:cubic-bezier(.4,0,.2,1);
+  --duration-fast:120ms; --duration-base:200ms; --duration-slow:320ms;
+}
+body[data-theme="dark"]{
+  --bg:#000000; --sidebar:#000000; --sidebar-hover:rgba(230,63,38,.14); --sidebar-active:rgba(230,63,38,.22);
+  --card:#0A0A0A; --surface-2:#161616; --border:#1e1d1d; --ink:#dbdbdb; --muted:#A1A1A1; --muted-lt:#757575;
+  --brand:#E63F26; --brand-dark:#F27B49; --brand-bg:#2A1C14;
+  --green:#3ECF7E; --green-bg:#12261B; --red:#F0685F; --red-bg:#2A1414; --amber:#E5B04B; --amber-bg:#2A2314;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 1px 3px rgba(0,0,0,.4);
+}
+/* Overview KPI cards use inline style="background:#COLOR22" for their
+   colored banner headers — 7 separate inline occurrences, so a single
+   !important override here is safer than editing each one individually
+   (some duplicated, easy to miss one). */
+body[data-theme="dark"] .ov-card-title-row{background:transparent !important;border-bottom:1px solid var(--border);border-radius:0;}
+body[data-theme="dark"] .ov-mini-cal-head{background:transparent !important;border-bottom:1px solid var(--border);border-radius:0;}
+body[data-theme="dark"] .panel-title, body[data-theme="dark"] .ov-card-title, body[data-theme="dark"] .ov-card-icon{color:#A8A8AC !important;}
+body[data-theme="dark"] .xy-chart-title, body[data-theme="dark"] .donut-card-head{color:#A8A8AC !important;}
+body[data-theme="dark"] .donut-card-head{border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:14px;}
+body[data-theme="dark"] .xy-chart-header{border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:14px;}
+body[data-theme="dark"] #serviceBreakdownStats .donut-stat-label{font-size:13px;}
+body[data-theme="dark"] .ov-mini-cal-day.today{background:rgba(232,98,44,.35);color:#dbdbdb;}
+body[data-theme="dark"] .ov-mini-cal-day.today:hover{background:rgba(232,98,44,.35);}
+body[data-theme="dark"] .ov-mini-cal-dot{background:rgba(232,98,44,.6);}
+body[data-theme="dark"] .ov-mini-cal-day.today .ov-mini-cal-dot{background:#dbdbdb;}
+body[data-theme="dark"] .ov-row-dot{opacity:.55 !important;}
+body[data-theme="dark"] .kanban-card{border:1px solid var(--border);}
+body[data-theme="dark"] .q-bulk-list li{font-size:13px;color:#dbdbdb;}
+body[data-theme="dark"] textarea{background:var(--card);color:var(--ink);}
+
+/* Toast notifications — kanban-style tinted card per state, bottom-center
+   entrance, dark mode only per explicit request; light mode's existing
+   neutral-card toast is untouched. */
+body[data-theme="dark"] .toast.success{background:#12261bf2;border-color:#117F3A66;}
+body[data-theme="dark"] .toast.success .toast-icon{background:#117F3A22;color:var(--green);}
+body[data-theme="dark"] .toast.success .toast-progress{background:var(--green);}
+body[data-theme="dark"] .toast.error{background:#2A1414f2;border-color:#F0685F66;}
+body[data-theme="dark"] .toast.error .toast-icon{background:#F0685F22;color:var(--red);}
+body[data-theme="dark"] .toast.error .toast-progress{background:var(--red);}
+body[data-theme="dark"] .toast.warning{background:#2A2314f2;border-color:#E5B04B66;}
+body[data-theme="dark"] .toast.warning .toast-icon{background:#E5B04B22;color:var(--amber);}
+body[data-theme="dark"] .toast.warning .toast-progress{background:var(--amber);}
+body[data-theme="dark"] .toast.cancel{background:#1C232Bf2;border-color:#7C93B066;}
+body[data-theme="dark"] .toast.cancel .toast-icon{background:#7C93B022;color:#7C93B0;}
+body[data-theme="dark"] .toast.cancel .toast-progress{background:#7C93B0;}
+body[data-theme="dark"] .toast.info{background:#1B2A45f2;border-color:#7CA3F066;}
+body[data-theme="dark"] .toast.info .toast-icon{background:#7CA3F022;color:#7CA3F0;}
+body[data-theme="dark"] .toast.info .toast-progress{background:#7CA3F0;}
+
+body[data-theme="dark"] ::-webkit-scrollbar{width:9px;height:9px;}
+/* Native browser calendar-picker icon renders a fixed dark color by
+   default and doesn't adapt to the page theme on its own — inverting
+   it here is what actually makes it visible in dark mode. Covers every
+   date input in the app at once. */
+body[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);}
+body[data-theme="dark"] ::-webkit-scrollbar-track{background:transparent;}
+body[data-theme="dark"] ::-webkit-scrollbar-thumb{background:#3a3a3c;border-radius:20px;border:2px solid transparent;background-clip:padding-box;}
+body[data-theme="dark"] ::-webkit-scrollbar-thumb:hover{background:#4a4a4d;}
+body[data-theme="dark"] ::-webkit-scrollbar-corner{background:transparent;}
+body[data-theme="dark"]{scrollbar-width:thin;scrollbar-color:#3a3a3c transparent;}
+body[data-theme="dark"] .settings-tab.active{color:var(--brand) !important;}
+body[data-theme="dark"] .filter-pill.active{background:#dedede !important;border-color:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(0, 0, 0, 0.5) !important;}
+body[data-theme="dark"] .pagination-btn.active{background:#dedede !important;border-color:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(0, 0, 0, 0.5) !important;}
+body[data-theme="dark"] .btn-brand{background:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(0, 0, 0, 0.5) !important;}
+body[data-theme="dark"] .btn-dark{background:#dedede !important;color:#151B26 !important;box-shadow:inset 0px 0px 5px 0px rgba(0, 0, 0, 0.5) !important;}
+body[data-theme="dark"] .nav-item:hover, body[data-theme="dark"] .nav-item.active{background:#ffffff17 !important;border-left-color:transparent !important;}
+*{box-sizing:border-box;}
+
+/* Keyboard focus — was largely missing app-wide before this. Uses
+   :focus-visible specifically so the ring only appears for keyboard
+   navigation, not every mouse click, matching how modern browsers
+   already distinguish the two. */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible, [tabindex]:focus-visible, .btn:focus-visible,
+.icon-tab:focus-visible, .nav-item:focus-visible, .icon-menu-btn:focus-visible,
+.pagination-btn:focus-visible, .cmdk-item:focus-visible{
+  outline:2px solid var(--brand);
+  outline-offset:2px;
+  border-radius:4px;
+}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Plus Jakarta Sans',sans-serif;-webkit-font-smoothing:antialiased;transition:background .2s ease, color .2s ease;}
+/* Smooth color changes on interactive elements only. This used to apply to
+   every element (body *), so the browser tracked transitions on thousands
+   of nodes all the time. The whole-page fade now happens only while the
+   theme is switching (toggleDarkMode adds .theme-switching briefly). */
+button, a, input, select, textarea, [onclick], .btn, .nav-item, .row-link, .icon-tab,
+.filter-pill, .pagination-btn, .kanban-card, .ov-card, .panel, .card, .toast{
+  transition: background-color .18s ease, border-color .18s ease, color .18s ease;
+}
+body.theme-switching, body.theme-switching *{ transition: background-color .18s ease, border-color .18s ease, color .18s ease; }
+.app{display:grid;grid-template-columns:224px 1fr;height:100vh;overflow:hidden;transition:grid-template-columns var(--duration-base) var(--ease-out);}
+body.sidebar-collapsed .app{grid-template-columns:60px 1fr;}
+body.sidebar-collapsed .app-topbar{left:60px;}
+body.sidebar-collapsed .sidebar{padding-left:9px;padding-right:9px;overflow:visible;}
+body.sidebar-collapsed .brand{padding-left:0;padding-right:0;justify-content:center;}
+body.sidebar-collapsed .brand-text, body.sidebar-collapsed .nav-section-label,
+body.sidebar-collapsed .sidebar-profile-info, body.sidebar-collapsed .sidebar-profile-chevron{display:none;}
+body.sidebar-collapsed .nav-item{justify-content:center;padding:9px 0;gap:0;border-left:none;}
+body.sidebar-collapsed .nav-label{opacity:0;max-width:0;}
+body.sidebar-collapsed .nav-badge{position:absolute;top:2px;right:2px;margin-left:0;font-size:9px;padding:0 4px;min-width:14px;height:14px;box-shadow:0 0 0 2px var(--sidebar);}
+body.sidebar-collapsed .sidebar-profile-trigger{justify-content:center;}
+body.sidebar-collapsed .sidebar-collapse-btn{display:none;}
+
+/* Collapsed-only hover tooltips — an icon-only nav is unusable without
+   these, not a nice-to-have. Pulls straight from data-tooltip, no JS. */
+body.sidebar-collapsed .nav-item:hover::after{
+  content:attr(data-tooltip);
+  position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);
+  background:var(--ink);color:#fff;padding:6px 11px;border-radius:7px;
+  font-size:12px;font-weight:600;white-space:nowrap;
+  box-shadow:0 8px 20px rgba(16,24,40,.28);z-index:200;pointer-events:none;
+  animation:tooltipIn .12s var(--ease-out);
+}
+body.sidebar-collapsed .nav-item:hover::before{
+  content:'';position:absolute;left:calc(100% + 6px);top:50%;
+  transform:translateY(-50%);border:5px solid transparent;border-right-color:var(--ink);
+  z-index:200;pointer-events:none;
+}
+@keyframes tooltipIn{from{opacity:0;transform:translateY(-50%) translateX(-4px);}to{opacity:1;transform:translateY(-50%) translateX(0);}}
+
+.mobile-nav-toggle{display:none;}
+.mobile-nav-scrim{display:none;position:fixed;inset:0;background:rgba(16,24,40,.5);z-index:999;animation:modalOverlayIn var(--duration-base) var(--ease-out);}
+
+.login-overlay{position:fixed;inset:0;background:radial-gradient(at top center, #000000 64%, #E63F26 100%);display:flex;align-items:center;justify-content:center;z-index:2000;padding:20px;}
+
+.login-card{background:#0A0A0A;border:1px solid #262626;border-radius:12px;box-shadow:0 24px 64px rgba(0,0,0,.5);padding:32px 30px;width:100%;max-width:340px;display:flex;flex-direction:column;align-items:center;text-align:center;}
+.login-card, .login-card .settings-field label{color:#dbdbdb;}
+#loginEmail, #loginPassword{background:#000000 !important;border-color:#262626 !important;color:#dbdbdb !important;}
+.login-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:19px;font-weight:600;letter-spacing:.01em;color:#dbdbdb;}
+.login-sub{font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;letter-spacing:.06em;color:#9a9a9a;margin-top:3px;}
+.login-card .settings-field{width:100%;text-align:left;margin-top:12px;}
+.login-error{width:100%;background:#2A1414;color:#F0685F;font-size:12px;border-radius:6px;padding:9px 11px;margin-top:16px;text-align:left;}
+#loginBtn{
+  color:#ffffff !important;
+  background-color:transparent !important;
+  background-image:linear-gradient(192deg, #000000 15%, #E63F26 100%) !important;
+  border-style:none !important;
+  border-radius:10px 10px 10px 10px !important;
+  padding:12px 18px !important;
+  box-shadow:inset 0px 0px 5px 0px rgba(255, 255, 255, 0.5) !important;
+}
+.login-footnote{font-size:11px;color:#8a8a8a;margin-top:18px;line-height:1.5;}
+
+.role-chip{font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;letter-spacing:.04em;color:var(--muted-lt);border:1px solid var(--border);border-radius:10px;padding:1px 6px;margin-left:2px;text-transform:capitalize;}

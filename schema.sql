@@ -1,3 +1,8 @@
+-- NOTE (Nov 2026): this is the ORIGINAL bootstrap schema from before the app
+-- had logins. The live database has since moved on (real per-table data, and
+-- app_storage now requires a signed-in session). Don't re-run the policy below
+-- on the live project; see README → Database migrations for current changes.
+
 -- Run this once in Supabase: Project -> SQL Editor -> New query -> paste -> Run
 
 create table if not exists app_storage (

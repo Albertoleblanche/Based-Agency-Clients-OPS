@@ -7,7 +7,8 @@
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<!-- Pinned copy in /vendor (same file the desktop app uses) instead of a floating CDN version. -->
+<script src="vendor/supabase-2.119.0.js"></script>
 <style>
 /* ============================================================
    DESIGN TOKENS — same palette/radius language as the desktop
@@ -506,6 +507,13 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
   global: { fetch: (url, options={}) => fetch(url, { ...options, cache: 'no-store' }) }
 });
 
+// Headers for calls to the app's own /api routes that require a signed-in
+// team member (send-email, generate-draft).
+async function apiAuthHeaders(){
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  return { 'Content-Type': 'application/json', ...(session ? { 'Authorization': `Bearer ${session.access_token}` } : {}) };
+}
+
 let currentUser = null;
 let myProfile = null;
 let teamProfiles = [];
@@ -524,6 +532,16 @@ let mQueueFilter = 'all';
 function escapeHtml(str){
   if(str===null || str===undefined) return '';
   return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+// Safe-output helpers — same rules as the desktop app:
+//   text/attribute → escapeHtml(v) · href/src → safeUrl(v) · inline handler arg → onclick="fn(${jsArg(v)})"
+function jsArg(value){ return escapeHtml(JSON.stringify(String(value ?? ''))); }
+function safeUrl(url){
+  const u = String(url ?? '').trim();
+  if(!u) return '';
+  const scheme = u.replace(/[\u0000-\u001F\s]+/g,'').match(/^([a-z][a-z0-9+.-]*):/i);
+  if(scheme && !/^(https?|mailto|tel|blob)$/i.test(scheme[1]) && !/^data:image\/(png|jpe?g|gif|webp|avif);/i.test(u)) return '#';
+  return escapeHtml(u);
 }
 function toDateStr(d){ const dt=new Date(d); return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`; }
 function myName(){ return myProfile ? myProfile.name : ''; }
@@ -564,7 +582,7 @@ async function mBoot(){
   document.title = mSettings.appName || 'Based Agency';
   const headerAvatarBtn = document.querySelector('.m-header-avatar-btn');
   if(myProfile && myProfile.avatar_url){
-    headerAvatarBtn.innerHTML = `<img src="${myProfile.avatar_url}" alt="">`;
+    headerAvatarBtn.innerHTML = `<img src="${safeUrl(myProfile.avatar_url)}" alt="">`;
   } else {
     document.getElementById('mHeaderAvatarFallback').textContent = (myName()||'?').trim().charAt(0).toUpperCase();
   }
@@ -964,10 +982,10 @@ function mRenderHome(){
   const kpiCard = (icon, title, value, valueColor, chipsHtml, onclick, seeAll, headerColor) => `
     <div class="m-card"${onclick?` onclick="${onclick}"`:''}>
       <div class="m-ov-card-title-row" style="background:${headerColor}22;">
-        <span class="m-ov-card-head-left"><span class="m-metric-icon" style="background:none;color:${headerColor};">${icon}</span><span class="m-ov-card-title" style="color:${headerColor};">${title}</span></span>
+        <span class="m-ov-card-head-left"><span class="m-metric-icon" style="background:none;color:${headerColor};">${icon}</span><span class="m-ov-card-title" style="color:${headerColor};">${escapeHtml(title)}</span></span>
         ${seeAll?`<span class="m-ov-card-btn" onclick="event.stopPropagation();${seeAll}">See All</span>`:''}
       </div>
-      <div class="m-metric-value"${valueColor?` style="color:${valueColor};"`:''}>${value}</div>
+      <div class="m-metric-value"${valueColor?` style="color:${valueColor};"`:''}>${escapeHtml(value)}</div>
       <div class="m-metric-chips">${chipsHtml}</div>
     </div>`;
 
@@ -986,7 +1004,7 @@ function mRenderHome(){
 
       ${kpiCard(icoHealth, 'Client Health', ac.length ? healthPct+'%' : '—',
         null,
-        ac.length ? `<span class="m-chip-pill ${healthTier.cls}">${healthTier.label}</span>` : '',
+        ac.length ? `<span class="m-chip-pill ${healthTier.cls}">${escapeHtml(healthTier.label)}</span>` : '',
         null, null, '#117F3A')}
 
       ${kpiCard(icoPending, admin ? 'Pending Approval' : 'Drafts Ready', pending,
@@ -1015,8 +1033,8 @@ function mRenderHome(){
             <div class="m-list-title">${escapeHtml(t.title)}</div>
             ${t.description ? `<div class="m-list-sub" style="white-space:normal;overflow-wrap:break-word;word-break:break-word;">${escapeHtml(t.description)}</div>` : ''}
             <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-              <span class="m-pill" style="background:${pMeta.color}18;color:${pMeta.color};">${pMeta.label}</span>
-              <span style="font-size:11px;${overdue?'color:var(--red);font-weight:700;':'color:var(--muted-lt);'}">${dateLabel}</span>
+              <span class="m-pill" style="background:${pMeta.color}18;color:${pMeta.color};">${escapeHtml(pMeta.label)}</span>
+              <span style="font-size:11px;${overdue?'color:var(--red);font-weight:700;':'color:var(--muted-lt);'}">${escapeHtml(dateLabel)}</span>
             </div>
           </div>
         </div>`;
@@ -1150,7 +1168,7 @@ function mAttentionScrollCard(c){
   const reason = c.draftStatus==='pending' ? 'Draft awaiting approval' : `Danger score ${c.danger}/5`;
   return `<div class="m-attention-card m-card-clickable" onclick="mOpenClientFromHome('${c.id}')">
     <div class="m-attention-card-header">
-      <div class="m-avatar" style="background:${avColor};color:#fff;flex:none;">${(c.name||'?').charAt(0).toUpperCase()}</div>
+      <div class="m-avatar" style="background:${avColor};color:#fff;flex:none;">${escapeHtml((c.name||'?').charAt(0).toUpperCase())}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:14px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.name)}</div>
         <div style="font-size:11.5px;color:var(--sidebar-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.service||'Client')}</div>
@@ -1166,21 +1184,21 @@ function mAttentionScrollCard(c){
     </div>
     <div class="m-attention-card-body">
       <div class="m-attention-card-pill">
-        <span style="font-size:13px;font-weight:700;color:${risk.color};">${risk.text}</span>
+        <span style="font-size:13px;font-weight:700;color:${risk.color};">${escapeHtml(risk.text)}</span>
         <span style="font-size:11.5px;color:var(--muted-lt);">Importance ${c.importance}/10</span>
       </div>
       <div class="m-attention-timeline-row">
         <div class="m-attention-timeline-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
         <div>
           <div style="font-size:10.5px;color:var(--muted-lt);">Risk level</div>
-          <div style="font-size:12.5px;font-weight:700;color:var(--ink);">${risk.text}</div>
+          <div style="font-size:12.5px;font-weight:700;color:var(--ink);">${escapeHtml(risk.text)}</div>
         </div>
       </div>
       <div class="m-attention-timeline-row">
         <div class="m-attention-timeline-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
         <div>
           <div style="font-size:10.5px;color:var(--muted-lt);">Why it needs attention</div>
-          <div style="font-size:12.5px;font-weight:700;color:var(--ink);">${reason}</div>
+          <div style="font-size:12.5px;font-weight:700;color:var(--ink);">${escapeHtml(reason)}</div>
         </div>
       </div>
     </div>
@@ -1194,10 +1212,10 @@ function mClientAttentionRow(c, showServiceInstead){
     : c.draftStatus==='pending' ? 'Draft awaiting approval' : riskLabel(c.danger).text;
   const avColor = avatarColorForName(c.name||'?');
   return `<div class="m-list-row" onclick="mOpenClientFromHome('${c.id}')">
-    <div class="m-avatar" style="background:${avColor};color:#fff;">${(c.name||'?').charAt(0).toUpperCase()}</div>
+    <div class="m-avatar" style="background:${avColor};color:#fff;">${escapeHtml((c.name||'?').charAt(0).toUpperCase())}</div>
     <div class="m-list-main">
       <div class="m-list-title">${escapeHtml(c.name)}</div>
-      <div class="m-list-sub">${reason}</div>
+      <div class="m-list-sub">${escapeHtml(reason)}</div>
     </div>
     <div class="m-list-meta">${c.importance}/10</div>
   </div>`;
@@ -1276,9 +1294,9 @@ function mTaskRow(t){
   return `<div class="m-list-row" onclick="mOpenTaskDetail('${t.id}')">
     <div class="m-list-main">
       <div class="m-list-title">${escapeHtml(t.title)}</div>
-      <div class="m-list-sub">${assignee?assignee.name:'Unassigned'}${t.dueDate ? ' · '+(overdue?'<span style="color:var(--red);">Overdue</span>':new Date(t.dueDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})) : ''}</div>
+      <div class="m-list-sub">${assignee?escapeHtml(assignee.name):'Unassigned'}${t.dueDate ? ' · '+(overdue?'<span style="color:var(--red);">Overdue</span>':new Date(t.dueDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})) : ''}</div>
     </div>
-    <span class="m-pill" style="background:${meta.color}18;color:${meta.color};">${meta.icon}${meta.label}</span>
+    <span class="m-pill" style="background:${meta.color}18;color:${meta.color};">${meta.icon}${escapeHtml(meta.label)}</span>
   </div>`;
 }
 
@@ -1286,8 +1304,8 @@ function mPersonAvatarHtml(profile, size){
   size = size || 24;
   if(!profile) return `<div class="m-avatar" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.4)}px;background:var(--surface-2);color:var(--muted-lt);">?</div>`;
   return profile.avatar_url
-    ? `<img src="${profile.avatar_url}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;display:block;flex:none;" alt="">`
-    : `<div class="m-avatar" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.4)}px;background:${avatarColorForName(profile.name||'?')};color:#fff;">${(profile.name||'?').trim().charAt(0).toUpperCase()}</div>`;
+    ? `<img src="${safeUrl(profile.avatar_url)}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;display:block;flex:none;" alt="">`
+    : `<div class="m-avatar" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.4)}px;background:${avatarColorForName(profile.name||'?')};color:#fff;">${escapeHtml((profile.name||'?').trim().charAt(0).toUpperCase())}</div>`;
 }
 
 function mOpenTaskDetail(taskId){
@@ -1302,8 +1320,8 @@ function mOpenTaskDetail(taskId){
       <div style="font-size:17px;font-weight:700;margin-bottom:10px;">${escapeHtml(t.title)}</div>
       ${t.description ? `<div style="font-size:13.5px;color:var(--muted);margin-bottom:14px;line-height:1.5;overflow-wrap:break-word;word-break:break-word;">${escapeHtml(t.description)}</div>` : ''}
       <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;"><span style="color:var(--muted);">Assigned to</span><span style="display:flex;align-items:center;gap:8px;font-weight:600;">${mPersonAvatarHtml(assignee)}${assignee?assignee.name:'—'}</span></div>
-        <div style="display:flex;justify-content:space-between;align-items:center;"><span style="color:var(--muted);">Assigned by</span><span style="display:flex;align-items:center;gap:8px;font-weight:600;">${mPersonAvatarHtml(assigner)}${assigner?assigner.name:'—'}</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;"><span style="color:var(--muted);">Assigned to</span><span style="display:flex;align-items:center;gap:8px;font-weight:600;">${mPersonAvatarHtml(assignee)}${assignee?escapeHtml(assignee.name):'—'}</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;"><span style="color:var(--muted);">Assigned by</span><span style="display:flex;align-items:center;gap:8px;font-weight:600;">${mPersonAvatarHtml(assigner)}${assigner?escapeHtml(assigner.name):'—'}</span></div>
         ${client ? `<div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Client</span><span style="font-weight:600;">${escapeHtml(client.name)}</span></div>` : ''}
         ${t.dueDate ? `<div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Due</span><span style="font-weight:600;">${new Date(t.dueDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span></div>` : ''}
         <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Priority</span><span style="font-weight:600;text-transform:capitalize;">${t.priority}</span></div>
@@ -1314,7 +1332,7 @@ function mOpenTaskDetail(taskId){
       <div class="m-card-row"><h3>Update status</h3></div>
       <div style="display:flex;flex-direction:column;gap:8px;">
         ${Object.entries(M_TASK_STATUS_META).map(([key,meta])=>`
-          <button class="m-btn ${t.status===key?'m-btn-brand':'m-btn-outline'} m-btn-full" style="justify-content:flex-start;" onclick="mChangeTaskStatus('${t.id}','${key}')">${meta.label}</button>
+          <button class="m-btn ${t.status===key?'m-btn-brand':'m-btn-outline'} m-btn-full" style="justify-content:flex-start;" onclick="mChangeTaskStatus('${t.id}','${key}')">${escapeHtml(meta.label)}</button>
         `).join('')}
       </div>
     </div>` : ''}
@@ -1337,7 +1355,7 @@ function mOpenNewTaskSheet(presetTitle, presetDescription, presetClientId){
   const html = `
     <div class="m-field"><label>Title</label><input id="mTaskTitle" placeholder="e.g. Update the roofing page copy" value="${presetTitle?escapeHtml(presetTitle):''}"></div>
     <div class="m-field"><label>Description (optional)</label><textarea spellcheck="true" id="mTaskDescription" placeholder="Any context they'll need">${presetDescription?escapeHtml(presetDescription):''}</textarea></div>
-    <div class="m-field"><label>Assign to</label><select id="mTaskAssignee">${teamProfiles.map(p=>`<option value="${p.id}" ${p.id===currentUser.id?'selected':''}>${p.name}</option>`).join('')}</select></div>
+    <div class="m-field"><label>Assign to</label><select id="mTaskAssignee">${teamProfiles.map(p=>`<option value="${p.id}" ${p.id===currentUser.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('')}</select></div>
     <div class="m-field"><label>Client (optional)</label>
       <select id="mTaskClient"><option value="">— None —</option>${clients.filter(c=>!c.deletedAt).sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${presetClientId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select>
     </div>
@@ -1456,7 +1474,7 @@ function mRenderQueue(){
     </div>
 
     <div class="m-chip-row">
-      ${M_QUEUE_FILTERS.map(({key,label})=>`<div class="m-chip ${mQueueFilter===key?'active':''}" onclick="mSetQueueFilter('${key}')">${label} <span style="opacity:.6;">${counts[key]}</span></div>`).join('')}
+      ${M_QUEUE_FILTERS.map(({key,label})=>`<div class="m-chip ${mQueueFilter===key?'active':''}" onclick="mSetQueueFilter('${key}')">${escapeHtml(label)} <span style="opacity:.6;">${counts[key]}</span></div>`).join('')}
     </div>
 
     ${filtered.length ? filtered.map(c=>mQueueRow(c)).join('') : `<div class="m-card"><div class="m-empty">No clients match this filter.</div></div>`}
@@ -1495,8 +1513,8 @@ function mOpenSendEmailSheet(to, subject, body){
   const mailtoHref = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   const actions = `
     <button class="m-btn m-btn-outline" onclick="mCloseSheet()">Cancel</button>
-    <a class="m-btn m-btn-outline" href="${mailtoHref}" style="text-decoration:none;">Open in mail app</a>
-    <button class="m-btn m-btn-brand" id="mSendEmailBtn" onclick="mConfirmSendEmail('${to}')">Send</button>
+    <a class="m-btn m-btn-outline" href="${safeUrl(mailtoHref)}" style="text-decoration:none;">Open in mail app</a>
+    <button class="m-btn m-btn-brand" id="mSendEmailBtn" onclick="mConfirmSendEmail(${jsArg(to)})">Send</button>
   `;
   mOpenSheet('Send this email?', html, actions);
 }
@@ -1508,7 +1526,7 @@ async function mConfirmSendEmail(to){
   btn.disabled = true; btn.innerHTML = '<span class="m-spinner"></span>';
   try{
     const response = await fetch('/api/send-email', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: await apiAuthHeaders(),
       body: JSON.stringify({ to, subject, body }),
     });
     const data = await response.json();
@@ -1613,10 +1631,10 @@ function mQueueRow(c){
   const hasFollowUpDue = clientReminders.some(r=>r.clientId===c.id && mReminderDisplayStatus(r)==='due');
   return `<div class="m-card m-card-clickable" onclick="mOpenQueueDetail('${c.id}')">
     <div style="display:flex;align-items:center;gap:12px;">
-      <div class="m-avatar" style="background:${avColor};color:#fff;">${(c.name||'?').charAt(0).toUpperCase()}</div>
+      <div class="m-avatar" style="background:${avColor};color:#fff;">${escapeHtml((c.name||'?').charAt(0).toUpperCase())}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:15px;font-weight:700;">${escapeHtml(c.name)}</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${escapeHtml(c.service||'')} · <span class="m-pill" style="background:${statusMeta.color}18;color:${statusMeta.color};">${statusMeta.label}</span></div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${escapeHtml(c.service||'')} · <span class="m-pill" style="background:${statusMeta.color}18;color:${statusMeta.color};">${escapeHtml(statusMeta.label)}</span></div>
       </div>
       <div class="m-card-menu-wrap" onclick="event.stopPropagation();">
         <div class="m-card-menu-btn" onclick="mToggleCardMenu('q-${c.id}')">⋯</div>
@@ -1628,7 +1646,7 @@ function mQueueRow(c){
       </div>
     </div>
     <div class="m-q-pill-row">
-      <span class="m-pill" style="background:${risk.color}18;color:${risk.color};">${risk.text}</span>
+      <span class="m-pill" style="background:${risk.color}18;color:${risk.color};">${escapeHtml(risk.text)}</span>
       <span class="m-pill" style="background:var(--surface-2);color:var(--ink);">Importance ${c.importance}/10</span>
       ${hasFollowUpDue ? `<span class="m-pill" style="background:#3A63C918;color:#3A63C9;"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Follow-up due</span>` : ''}
     </div>
@@ -1649,7 +1667,7 @@ function mOpenQueueDetail(clientId){
           <div style="font-size:17px;font-weight:700;">${escapeHtml(c.name)}</div>
           <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">${escapeHtml(c.service||'')}</div>
         </div>
-        <span class="m-pill" style="background:${riskLabel(c.danger).color}18;color:${riskLabel(c.danger).color};">${riskLabel(c.danger).text}</span>
+        <span class="m-pill" style="background:${riskLabel(c.danger).color}18;color:${riskLabel(c.danger).color};">${escapeHtml(riskLabel(c.danger).text)}</span>
       </div>
     </div>
     <div class="m-card">
@@ -1781,7 +1799,7 @@ ${contentRules}`;
 
   try{
     const response = await fetch('/api/generate-draft', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ prompt, model: mSettings.openaiModel })
+      method:'POST', headers: await apiAuthHeaders(), body: JSON.stringify({ prompt, model: mSettings.openaiModel })
     });
     const data = await response.json();
     const text = (data.text || '').trim();
@@ -1858,7 +1876,7 @@ function mRenderReminders(){
     <div class="m-chip-row">
       ${filters.map(f=>{
         const count = f.key==='all' ? mine.length : mine.filter(r=>mReminderDisplayStatus(r)===f.key).length;
-        return `<div class="m-chip ${mReminderFilter===f.key?'active':''}" onclick="mSetReminderFilter('${f.key}')">${f.label} <span style="opacity:.6;">${count}</span></div>`;
+        return `<div class="m-chip ${mReminderFilter===f.key?'active':''}" onclick="mSetReminderFilter('${f.key}')">${escapeHtml(f.label)} <span style="opacity:.6;">${count}</span></div>`;
       }).join('')}
     </div>
     <div id="mRemindersListBody">${visible.length ? visible.map(r=>mReminderCard(r)).join('') : `<div class="m-empty">Nothing here.</div>`}</div>
@@ -1882,11 +1900,11 @@ function mReminderCard(r){
 
   return `<div class="m-card m-card-clickable" onclick="mOpenReminderDetail('${r.id}')">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-      <span class="m-pill" style="background:${meta.color}18;color:${meta.color};">${meta.icon}${meta.label}</span>
+      <span class="m-pill" style="background:${meta.color}18;color:${meta.color};">${meta.icon}${escapeHtml(meta.label)}</span>
       <div class="m-card-menu-wrap" onclick="event.stopPropagation();">
         <div class="m-card-menu-btn" onclick="mToggleCardMenu('reminder-${r.id}')">⋯</div>
         <div class="m-card-menu" id="cardMenu-reminder-${r.id}">
-          ${moveOptions.map(([status,label])=>`<div class="m-card-menu-item" onclick="mCloseCardMenus();mResolveReminder('${r.id}','${status}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>${label}</div>`).join('')}
+          ${moveOptions.map(([status,label])=>`<div class="m-card-menu-item" onclick="mCloseCardMenus();mResolveReminder('${r.id}','${status}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>${escapeHtml(label)}</div>`).join('')}
           <div class="m-card-menu-item" onclick="mCloseCardMenus();mOpenNoteSheet(null,'${r.clientId}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Start a note</div>
           ${display==='due' ? `<div class="m-card-menu-item" onclick="mCloseCardMenus();mCreateTaskFromReminder('${r.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>+ Task: chase this down</div>` : ''}
           <div class="m-card-menu-item" style="color:var(--red);" onclick="mCloseCardMenus();mDeleteReminder('${r.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete</div>
@@ -1911,7 +1929,7 @@ function mOpenReminderDetail(id){
     <div class="m-card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
         <div style="font-size:16px;font-weight:700;">${c?escapeHtml(c.name):'Unknown client'}</div>
-        <span class="m-pill" style="background:${meta.color}18;color:${meta.color};">${meta.icon}${meta.label}</span>
+        <span class="m-pill" style="background:${meta.color}18;color:${meta.color};">${meta.icon}${escapeHtml(meta.label)}</span>
       </div>
       <div style="font-size:13.5px;color:var(--ink);line-height:1.5;margin-bottom:10px;">${escapeHtml(r.question)}</div>
       <div style="font-size:12px;color:var(--muted);">Follow-up: ${r.followUpDate ? new Date(r.followUpDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—'}</div>
@@ -2135,7 +2153,7 @@ function mRenderSettingsSheetBody(){
     }).map(([type,meta])=>`
       <label style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
         <input type="checkbox" ${muted.includes(type)?'':'checked'} onchange="mToggleNotificationMute('${type}', !this.checked)" style="width:18px;height:18px;flex:none;">
-        <span style="font-size:13px;color:var(--ink);">${meta.label}</span>
+        <span style="font-size:13px;color:var(--ink);">${escapeHtml(meta.label)}</span>
       </label>`).join('')}
   `;
   mOpenSheet('Notification Settings', html);
@@ -2201,7 +2219,7 @@ async function mRenderTrashScreen(){
 
   const html = `
     <div class="m-chip-row">
-      ${tabs.map(t=>`<div class="m-chip ${mTrashTab===t.key?'active':''}" onclick="mSetTrashTab('${t.key}')">${t.label}</div>`).join('')}
+      ${tabs.map(t=>`<div class="m-chip ${mTrashTab===t.key?'active':''}" onclick="mSetTrashTab('${t.key}')">${escapeHtml(t.label)}</div>`).join('')}
     </div>
     <div class="m-card" style="padding:0 16px;">${bodyHtml}</div>
   `;
@@ -2256,7 +2274,7 @@ async function mRenderProfileScreen(){
       <div class="m-card-row"><h3>Profile Photo</h3></div>
       <div style="display:flex;align-items:center;gap:16px;">
         ${myProfile && myProfile.avatar_url
-          ? `<img src="${myProfile.avatar_url}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;display:block;flex:none;" alt="">`
+          ? `<img src="${safeUrl(myProfile.avatar_url)}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;display:block;flex:none;" alt="">`
           : `<div class="m-avatar" style="width:64px;height:64px;font-size:22px;">${(myName()||'?').charAt(0).toUpperCase()}</div>`}
         <div>
           <input type="file" id="mAvatarFileInput" accept="image/*" style="display:none;" onchange="mUploadAvatar(this.files[0])">
@@ -2297,7 +2315,7 @@ async function mUploadAvatar(file){
   if(profileErr){ mShowToast('error','Save failed'); return; }
   myProfile.avatar_url = avatarUrl;
   const headerAvatarBtn = document.querySelector('.m-header-avatar-btn');
-  headerAvatarBtn.innerHTML = `<img src="${avatarUrl}" alt="">`;
+  headerAvatarBtn.innerHTML = `<img src="${safeUrl(avatarUrl)}" alt="">`;
   mShowToast('success','Photo updated');
   mRenderProfileScreen();
 }
@@ -2465,7 +2483,7 @@ function mOpenClientsList(){
 }
 function mClientRow(c){
   return `<div class="m-list-row" onclick="mOpenQueueDetail('${c.id}')" data-name="${escapeHtml(c.name).toLowerCase()}">
-    <div class="m-avatar" style="background:${avatarColorForName(c.name||'?')};color:#fff;">${(c.name||'?').charAt(0).toUpperCase()}</div>
+    <div class="m-avatar" style="background:${avatarColorForName(c.name||'?')};color:#fff;">${escapeHtml((c.name||'?').charAt(0).toUpperCase())}</div>
     <div class="m-list-main"><div class="m-list-title">${escapeHtml(c.name)}</div><div class="m-list-sub">${escapeHtml(c.service||'')}</div></div>
   </div>`;
 }
@@ -2520,7 +2538,7 @@ function mRenderNotesList(){
   const html = `
     <div class="m-chip-row">
       <div class="m-chip ${mNoteStatusFilter==='all'?'active':''}" onclick="mSetNoteStatusFilter('all')">All <span style="opacity:.6;">${notes.length}</span></div>
-      ${M_NOTE_STAGES.map(s=>`<div class="m-chip ${mNoteStatusFilter===s.key?'active':''}" onclick="mSetNoteStatusFilter('${s.key}')">${s.label} <span style="opacity:.6;">${notes.filter(n=>n.status===s.key).length}</span></div>`).join('')}
+      ${M_NOTE_STAGES.map(s=>`<div class="m-chip ${mNoteStatusFilter===s.key?'active':''}" onclick="mSetNoteStatusFilter('${s.key}')">${escapeHtml(s.label)} <span style="opacity:.6;">${notes.filter(n=>n.status===s.key).length}</span></div>`).join('')}
     </div>
     <div id="mNotesListBody">${cardsHtml}</div>
   `;
@@ -2544,7 +2562,7 @@ function mNoteCard(n){
       <div class="m-card-menu-wrap" onclick="event.stopPropagation();">
         <div class="m-card-menu-btn" onclick="mToggleCardMenu('note-${n.id}')">⋯</div>
         <div class="m-card-menu" id="cardMenu-note-${n.id}">
-          ${M_NOTE_STAGES.filter(s=>s.key!==n.status).map(s=>`<div class="m-card-menu-item" onclick="mCloseCardMenus();mChangeNoteStatus('${n.id}','${s.key}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>Move to ${s.label}</div>`).join('')}
+          ${M_NOTE_STAGES.filter(s=>s.key!==n.status).map(s=>`<div class="m-card-menu-item" onclick="mCloseCardMenus();mChangeNoteStatus('${n.id}','${s.key}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>Move to ${escapeHtml(s.label)}</div>`).join('')}
           <div class="m-card-menu-item" onclick="mCloseCardMenus();mOpenNoteSheet('${n.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit</div>
           <div class="m-card-menu-item" style="color:var(--red);" onclick="mCloseCardMenus();mDeleteNote('${n.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete</div>
         </div>
@@ -2553,7 +2571,7 @@ function mNoteCard(n){
     <div style="font-size:15px;font-weight:700;margin-bottom:4px;">${escapeHtml(n.title || 'Untitled note')}</div>
     <div style="font-size:12.5px;color:var(--muted-lt);margin-bottom:6px;">${c ? escapeHtml(c.name) : 'Unknown client'}</div>
     <div style="font-size:13px;color:var(--muted);line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtml(n.text||'')}</div>
-    ${n.link ? `<a href="${n.link}" target="_blank" rel="noopener" onclick="event.stopPropagation();" style="display:block;margin-top:8px;font-size:12px;color:var(--blue);">🔗 ${escapeHtml(n.link.replace(/^https?:\/\//,'').slice(0,40))}</a>` : ''}
+    ${n.link ? `<a href="${safeUrl(n.link)}" target="_blank" rel="noopener" onclick="event.stopPropagation();" style="display:block;margin-top:8px;font-size:12px;color:var(--blue);">🔗 ${escapeHtml(n.link.replace(/^https?:\/\//,'').slice(0,40))}</a>` : ''}
     <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">
       ${!isDone
         ? `<button class="m-btn m-btn-brand" style="padding:9px 16px;min-height:auto;" onclick="event.stopPropagation();mLogNoteNow('${n.id}')">Log it now</button>`
@@ -2601,7 +2619,7 @@ function mOpenNoteSheet(noteId, presetClientId){
       <select id="mNoteClient"><option value="">— None —</option>${clients.filter(c=>!c.deletedAt).sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${selectedClientId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select>
     </div>
     <div class="m-field"><label>Status</label>
-      <select id="mNoteStatus">${M_NOTE_STAGES.map(s=>`<option value="${s.key}" ${(n?n.status:'idea')===s.key?'selected':''}>${s.label}</option>`).join('')}</select>
+      <select id="mNoteStatus">${M_NOTE_STAGES.map(s=>`<option value="${s.key}" ${(n?n.status:'idea')===s.key?'selected':''}>${escapeHtml(s.label)}</option>`).join('')}</select>
     </div>
     <div class="m-field"><label>Note</label><textarea spellcheck="true" id="mNoteText" placeholder="What's the idea or plan?">${n?escapeHtml(n.text||''):''}</textarea></div>
     <div class="m-field" style="margin-bottom:0;"><label>Link (optional)</label><input id="mNoteLink" type="url" placeholder="https://…" value="${n&&n.link?escapeHtml(n.link):''}"></div>
@@ -2783,7 +2801,7 @@ function mRenderCalendarMain(){
     <div class="m-chip-row">
       ${M_CALENDAR_TYPE_TABS.map(t=>{
         const count = t.key==='all' ? periodEvents.length : periodEvents.filter(e=>mEventMatchesTypeTab(e,t.key)).length;
-        return `<div class="m-chip ${mCalendarTypeTab===t.key?'active':''}" onclick="mSwitchCalendarTypeTab('${t.key}')">${t.label} <span style="opacity:.6;">${count}</span></div>`;
+        return `<div class="m-chip ${mCalendarTypeTab===t.key?'active':''}" onclick="mSwitchCalendarTypeTab('${t.key}')">${escapeHtml(t.label)} <span style="opacity:.6;">${count}</span></div>`;
       }).join('')}
     </div>
 
@@ -3136,7 +3154,7 @@ function mRenderTimeTrackerMain(presetClientId){
   ];
   const html = `
     <div class="m-chip-row">
-      ${tabs.map(t=>`<div class="m-chip ${mTimeTrackerTab===t.key?'active':''}" onclick="mSwitchTimeTrackerTab('${t.key}')">${t.label}</div>`).join('')}
+      ${tabs.map(t=>`<div class="m-chip ${mTimeTrackerTab===t.key?'active':''}" onclick="mSwitchTimeTrackerTab('${t.key}')">${escapeHtml(t.label)}</div>`).join('')}
     </div>
     <div id="mTimeTrackerBody"></div>
   `;
@@ -3255,7 +3273,7 @@ function mTimeEntryCard(e, showDate){
         <div style="font-size:14px;font-weight:700;">${c ? escapeHtml(c.name) : 'Unknown client'}${e.service ? ` <span style="font-weight:400;color:var(--muted);">(${escapeHtml(e.service)})</span>` : ''}</div>
         ${showDate ? `<div style="font-size:11px;color:var(--muted-lt);margin-top:2px;">${new Date(e.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</div>` : ''}
         ${c ? `<div class="m-q-pill-row" style="margin-top:8px;">
-          <span class="m-pill" style="background:${risk.color}18;color:${risk.color};">${risk.text}</span>
+          <span class="m-pill" style="background:${risk.color}18;color:${risk.color};">${escapeHtml(risk.text)}</span>
           <span class="m-pill" style="background:var(--surface-2);color:var(--ink);">Importance ${c.importance}/10</span>
         </div>` : ''}
         ${e.description ? `<div style="font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.4;">${escapeHtml(e.description)}</div>` : ''}
@@ -3470,7 +3488,7 @@ async function mLoadAndRenderDailySummary(body){
     <div class="m-cal-nav-row" style="margin-bottom:14px;">
       <div class="m-date-nav" style="flex:1;">
         <button class="m-date-nav-arrow" onclick="mShiftDailySummaryDate(-1)">‹</button>
-        <span class="m-date-nav-label" style="flex:1;text-align:center;">${dateLabel}</span>
+        <span class="m-date-nav-label" style="flex:1;text-align:center;">${escapeHtml(dateLabel)}</span>
         <button class="m-date-nav-arrow" onclick="mShiftDailySummaryDate(1)">›</button>
       </div>
       <button class="m-cal-today-btn" onclick="mResetDailySummaryToToday()">Today</button>
@@ -3494,7 +3512,7 @@ async function mLoadAndRenderDailySummary(body){
       const previewNames = clientNames.slice(0,3).join(', ');
       const extra = clientNames.length>3 ? ` +${clientNames.length-3} more` : '';
       return `<div class="m-list-row">
-        <div class="m-avatar" style="background:${avatarColorForName(person.name||'?')};color:#fff;">${(person.name||'?').charAt(0).toUpperCase()}</div>
+        <div class="m-avatar" style="background:${avatarColorForName(person.name||'?')};color:#fff;">${escapeHtml((person.name||'?').charAt(0).toUpperCase())}</div>
         <div class="m-list-main">
           <div class="m-list-title">${escapeHtml(person.name)}</div>
           <div class="m-list-sub">${person.entries.length} client${person.entries.length!==1?'s':''} — ${escapeHtml(previewNames)}${extra}</div>

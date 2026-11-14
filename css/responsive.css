@@ -1,0 +1,40 @@
+/* Mobile navigation and small-screen overrides — deliberately loaded last
+   so these rules win over everything above. */
+
+/* Mobile nav — deliberately placed last in the stylesheet. Every rule
+   here shares its selector's specificity with a desktop-default rule
+   declared earlier in the file (e.g. .sidebar, .mobile-nav-toggle), and
+   CSS resolves same-specificity conflicts by source order, not by
+   "inside a media query wins" — so if this block sat anywhere earlier,
+   later desktop rules could silently re-override it even while the
+   media query's condition was true. Being last guarantees that can't
+   happen, regardless of what gets added elsewhere in the future. */
+@media (max-width:900px){
+  .mobile-nav-toggle{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;border:none;background:none;color:var(--muted);cursor:pointer;margin-right:10px;flex:none;}
+  .mobile-nav-toggle:hover{background:var(--surface-2);}
+  .app{grid-template-columns:1fr;}
+  body.sidebar-collapsed .app{grid-template-columns:1fr;}
+  .app-topbar{left:0;}
+  .sidebar{display:flex;position:fixed;top:0;left:0;bottom:0;width:260px;z-index:1000;box-shadow:0 20px 60px rgba(0,0,0,.35);transform:translateX(-100%);transition:transform var(--duration-base) var(--ease-out);}
+  body.mobile-nav-open .sidebar{transform:translateX(0);}
+  body.mobile-nav-open .mobile-nav-scrim{display:block;}
+  /* A temporary overlay you explicitly opened to navigate should always
+     show full labels — an icon-only rail doesn't serve its space-saving
+     purpose here the way it does as a persistent desktop state, so this
+     ignores the sidebar-collapsed preference entirely while on mobile. */
+  body.sidebar-collapsed .sidebar{padding:18px 12px;}
+  body.sidebar-collapsed .brand{padding:6px 10px 20px;justify-content:flex-start;}
+  body.sidebar-collapsed .brand-mark{cursor:default;}
+  body.sidebar-collapsed .brand-text, body.sidebar-collapsed .nav-label,
+  body.sidebar-collapsed .nav-section-label, body.sidebar-collapsed .sidebar-profile-info,
+  body.sidebar-collapsed .sidebar-profile-chevron{display:revert;opacity:1;max-width:none;}
+  body.sidebar-collapsed .nav-item{justify-content:flex-start;padding:9px 11px 9px 6px;gap:10px;}
+  body.sidebar-collapsed .nav-badge{position:static;margin-left:auto;font-size:10px;padding:0 4px;min-width:16px;height:16px;box-shadow:none;}
+  body.sidebar-collapsed .sidebar-profile-trigger{justify-content:flex-start;}
+  .sidebar-collapse-btn{display:none;}
+  .app-topbar-inner{padding-right:4px;}
+  .filters-popover{width:min(280px, calc(100vw - 32px));}
+  .calendar-day{min-height:64px;padding:5px;}
+  .calendar-week-hour-label,.calendar-week-hour-slot{height:40px;}
+  .notif-panel{width:min(340px, calc(100vw - 24px));}
+}

@@ -1,4 +1,26 @@
-# Deploying the Client Update Workflow outside Claude
+# Based Agency — Client Ops
+
+## Project layout
+
+- `index.html` + `css/` + `js/` + `vendor/` — the desktop app (see [`js/README.md`](js/README.md) for how the code is organised and the rules for adding to it)
+- `mobile.html` — the phone version (phones are redirected here automatically)
+- `api/` — Vercel serverless functions (already 12 functions; shared code goes in `lib/` so it doesn't count toward Vercel's function limit)
+- `lib/` — shared server code: AI client, sign-in check (`require-team-member.js`), Slack, Harvest, Google Calendar, push
+- `*.sql` — database changes to run in the Supabase SQL Editor
+
+No build step: Vercel serves the files as they are.
+
+## Database migrations
+
+Run new `.sql` files once in Supabase → SQL Editor. The current one:
+
+- `addendum-team-activity-log.sql` — moves the Overview activity log into its own
+  table. Safe to run more than once; the app keeps working on the old storage until
+  it's run, then switches over by itself.
+
+---
+
+# Original setup guide (first deployment)
 
 Everything code-related is done. Three things need a human to click through them —
 here's exactly what to do, in order.
