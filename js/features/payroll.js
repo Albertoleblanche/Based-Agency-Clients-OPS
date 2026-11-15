@@ -92,7 +92,7 @@ function renderPayrollRatesList(){
       <div><div class="integ-name">${escapeHtml(p.name)}</div><div class="integ-desc">${escapeHtml(p.title) || escapeHtml(p.role)}</div></div>
       <div style="display:flex;align-items:center;gap:8px;">
         <span style="font-size:13px;color:var(--muted-lt);">$</span>
-        <input type="number" min="0" step="0.5" id="payrollRateInput-${p.id}" value="${rate || ''}" placeholder="0.00" style="width:90px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);">
+        <input type="number" min="0" step="0.5" id="payrollRateInput-${p.id}" value="${rate || ''}" placeholder="0.00" style="width:90px;font-family:var(--font);font-size:13px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);">
         <span style="font-size:11px;color:var(--muted-lt);">/hr</span>
         <button class="btn btn-outline" onclick="savePayrollRate('${p.id}')">Save</button>
       </div>

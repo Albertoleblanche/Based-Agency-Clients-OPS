@@ -15,7 +15,7 @@ function openSendToSlackConfirm(clientId, author){
     <div class="modal-head"><span class="panel-title">Send ${escapeHtml(author)}'s update to ${escapeHtml(c.name)}'s Slack channel?</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
       <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 12px;">Posts to ${escapeHtml(mapping.channelName || mapping.channelId)} — review before sending, this posts immediately once confirmed.</p>
-      <textarea spellcheck="true" id="slackClientMessageText" style="width:100%;min-height:220px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;padding:10px;border-radius:8px;border:1px solid var(--border);white-space:pre-wrap;">${escapeHtml(d.draft)}</textarea>
+      <textarea spellcheck="true" id="slackClientMessageText" style="width:100%;min-height:220px;font-family:var(--font);font-size:12px;padding:10px;border-radius:8px;border:1px solid var(--border);white-space:pre-wrap;">${escapeHtml(d.draft)}</textarea>
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" id="sendSlackClientBtn" onclick="confirmSendToSlack('${clientId}')">Send to Slack</button>

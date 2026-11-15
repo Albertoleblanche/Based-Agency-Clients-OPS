@@ -226,6 +226,13 @@ async function showApp(session){
     if(event === 'SIGNED_OUT'){ showLoginScreen(); }
   });
 
+  // Toolbar material: transparent while the page is at the top, glass with a
+  // hairline once content scrolls under it (macOS scroll-edge behaviour).
+  const mainEl = document.querySelector('.main'), topbarEl = document.getElementById('appTopbar');
+  if(mainEl && topbarEl){
+    mainEl.addEventListener('scroll', () => topbarEl.classList.toggle('scrolled', mainEl.scrollTop > 4), { passive:true });
+  }
+
   setInterval(renderGauge, 1000);
 
   // Realtime subscriptions are the primary update mechanism now — this is

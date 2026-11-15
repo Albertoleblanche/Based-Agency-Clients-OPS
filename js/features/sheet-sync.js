@@ -256,7 +256,7 @@ async function previewWednesdayEmail(){
         <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 12px;">Preview only — nothing has been sent. This is exactly what the automated job will send when it runs.</p>
         <div class="settings-field"><label>To</label><input value="${escapeHtml(data.to)}" readonly></div>
         <div class="settings-field"><label>Subject</label><input value="${escapeHtml(data.subject)}" readonly></div>
-        <div class="settings-field"><label>Body</label><textarea readonly style="min-height:150px;width:100%;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:6px;border:1px solid var(--border);">${escapeHtml(data.body)}</textarea></div>
+        <div class="settings-field"><label>Body</label><textarea readonly style="min-height:150px;width:100%;font-family:var(--font);font-size:13px;padding:10px;border-radius:6px;border:1px solid var(--border);">${escapeHtml(data.body)}</textarea></div>
       </div>
       <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 500);
   }catch(e){

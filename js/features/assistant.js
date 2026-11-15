@@ -255,7 +255,7 @@ function openNewClaudeProjectModal(){
     <div class="modal-head"><span class="panel-title">New project</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
       <div class="settings-field"><label>Name</label><input id="claudeProjectNameInput" style="width:100%;" placeholder="e.g. Q3 Client Campaigns"></div>
-      <div class="settings-field"><label>Description <span style="font-weight:400;color:var(--muted-lt);">(optional)</span></label><textarea id="claudeProjectDescInput" style="width:100%;min-height:80px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="What's this project about?"></textarea></div>
+      <div class="settings-field"><label>Description <span style="font-weight:400;color:var(--muted-lt);">(optional)</span></label><textarea id="claudeProjectDescInput" style="width:100%;min-height:80px;font-family:var(--font);font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="What's this project about?"></textarea></div>
     </div>
     <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Cancel</button><button class="btn btn-brand" onclick="submitNewClaudeProject()">Create</button></div>`, 460);
   setTimeout(()=>{ document.getElementById('claudeProjectNameInput')?.focus(); }, 50);
@@ -283,7 +283,7 @@ function openEditClaudeProjectModal(id){
     <div class="modal-head"><span class="panel-title">Edit project</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
       <div class="settings-field"><label>Name</label><input id="claudeProjectNameInput" style="width:100%;" value="${escapeHtml(project.name||'')}"></div>
-      <div class="settings-field"><label>Description</label><textarea id="claudeProjectDescInput" style="width:100%;min-height:80px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${escapeHtml(project.description||'')}</textarea></div>
+      <div class="settings-field"><label>Description</label><textarea id="claudeProjectDescInput" style="width:100%;min-height:80px;font-family:var(--font);font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${escapeHtml(project.description||'')}</textarea></div>
     </div>
     <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Cancel</button><button class="btn btn-brand" onclick="submitEditClaudeProject('${id}')">Save</button></div>`, 460);
   setTimeout(()=>{ document.getElementById('claudeProjectNameInput')?.focus(); }, 50);

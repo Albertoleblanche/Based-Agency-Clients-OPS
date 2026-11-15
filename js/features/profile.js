@@ -122,7 +122,7 @@ async function renderMyEmailRequests(){
   const { data, error } = await supabaseClient.from('email_change_requests').select('*').eq('user_id', currentUser.id).order('created_at',{ascending:false}).limit(5);
   if(error || !data || !data.length){ el.innerHTML = ''; return; }
   const statusMeta = { pending:{cls:'pill-mid',label:'Pending'}, approved:{cls:'pill-good',label:'Approved'}, denied:{cls:'pill-bad',label:'Denied'} };
-  el.innerHTML = `<label style="font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;color:var(--muted);display:block;margin-bottom:8px;">Your requests</label>` +
+  el.innerHTML = `<label style="font-family:var(--font);font-size:10px;color:var(--muted);display:block;margin-bottom:8px;">Your requests</label>` +
     data.map(r=>{
       const s = statusMeta[r.status];
       return `<div class="integ-row"><div><div class="integ-name">${escapeHtml(r.requested_email)}</div><div class="integ-desc">${new Date(r.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div></div><span class="pill ${s.cls}">${escapeHtml(s.label)}</span></div>`;

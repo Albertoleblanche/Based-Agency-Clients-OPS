@@ -15,7 +15,7 @@ function restackToasts(){
   const stack = document.getElementById('toastStack');
   if(!stack) return;
   const toasts = [...stack.children].filter(el=>el.classList.contains('toast') && !el.classList.contains('leaving'));
-  const dir = -1; // both themes now anchor at the bottom — older toasts always stack upward, away from the bottom edge
+  const dir = 1; // anchored top-right like macOS notifications — older toasts stack downward, away from the top edge
 
   if(toastStackExpanded){
     // Every toast becomes fully visible, full size, and individually
@@ -26,6 +26,8 @@ function restackToasts(){
     const gap = 10;
     for(let i = toasts.length - 1, depthFromFront = 0; i >= 0; i--, depthFromFront++){
       const el = toasts[i];
+      el.classList.remove('behind');
+      el.style.height = '';
       el.style.zIndex = String(1000 - depthFromFront);
       el.style.pointerEvents = 'auto';
       el.style.opacity = '1';
@@ -37,8 +39,16 @@ function restackToasts(){
 
   // Newest toast is always the most recently appended (last child) —
   // walk from the end backward to assign depth-from-front correctly.
+  // Cards behind the front one take its height and hide their content,
+  // so only their edges peek out — a long older toast never shows its
+  // text below a short new one.
+  const front = toasts[toasts.length - 1];
+  if(front){ front.classList.remove('behind'); front.style.height = ''; }
+  const frontHeight = front ? front.offsetHeight : 0;
   for(let i = toasts.length - 1, depthFromFront = 0; i >= 0; i--, depthFromFront++){
     const el = toasts[i];
+    el.classList.toggle('behind', depthFromFront > 0);
+    el.style.height = depthFromFront > 0 ? frontHeight + 'px' : '';
     const depth = Math.min(depthFromFront, TOAST_STACK_MAX_VISIBLE);
     el.style.zIndex = String(1000 - depthFromFront);
     el.style.pointerEvents = depthFromFront === 0 ? 'auto' : 'none';
