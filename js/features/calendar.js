@@ -405,7 +405,7 @@ function eventFormHtml(editing, presetDateStr){
     <div class="modal-head"><span class="panel-title">${editing ? 'Edit event' : 'New event'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
       <div class="settings-field"><label>Title</label><input id="eventTitleInput" style="width:100%;" placeholder="e.g. Kickoff call with Flame Auto Repair" value="${editing ? escapeHtml(editing.title) : ''}"></div>
-      <div class="settings-field"><label>Description (optional)</label><textarea spellcheck="true" id="eventDescInput" style="width:100%;min-height:70px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);">${editing ? escapeHtml(editing.description) : ''}</textarea></div>
+      <div class="settings-field"><label>Description (optional)</label><textarea spellcheck="true" id="eventDescInput" style="width:100%;min-height:70px;font-family:var(--font);font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);">${editing ? escapeHtml(editing.description) : ''}</textarea></div>
       <div class="form-grid">
         <div style="position:relative;"><label>Date</label>${datePickerFieldHtml('eventDateInput', { value: startDate, minDate: toDateStr(new Date()) })}</div>
         <div><label>Type</label>
@@ -602,7 +602,7 @@ function openRequestChangeModal(eventId){
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Request a change</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
-      <div class="settings-field"><label>What would you like changed?</label><textarea spellcheck="true" id="changeRequestInput" style="width:100%;min-height:90px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);" placeholder="e.g. Can we move this to 3pm instead?"></textarea></div>
+      <div class="settings-field"><label>What would you like changed?</label><textarea spellcheck="true" id="changeRequestInput" style="width:100%;min-height:90px;font-family:var(--font);font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);" placeholder="e.g. Can we move this to 3pm instead?"></textarea></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" onclick="submitChangeRequest('${eventId}')">Send request</button>

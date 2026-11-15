@@ -693,7 +693,7 @@ function narrativeSectionHtml(fieldName, title, placeholder){
     <div class="panel" style="margin-bottom:20px;">
       <div class="panel-head"><span class="panel-title">${escapeHtml(title)}</span><button class="btn btn-outline" onclick="generateAiVisibilitySection('${fieldName}')">✨ Generate with AI</button></div>
       <div class="panel-body">
-        <textarea id="av_${escapeHtml(fieldName)}" style="width:100%;min-height:110px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="${placeholder}" onchange="aiVisibilityDraft.${fieldName}=this.value">${escapeHtml(d[fieldName]||'')}</textarea>
+        <textarea id="av_${escapeHtml(fieldName)}" style="width:100%;min-height:110px;font-family:var(--font);font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="${placeholder}" onchange="aiVisibilityDraft.${fieldName}=this.value">${escapeHtml(d[fieldName]||'')}</textarea>
       </div>
     </div>`;
 }
@@ -760,7 +760,7 @@ function renderAiVisibilityDetail(el){
       <div class="panel-head"><span class="panel-title">Overview</span></div>
       <div class="panel-body">
         <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 14px;line-height:1.5;">Filled in automatically by "Pull data" above — computed directly from real before/after position data, not read off a screenshot. Still editable by hand if anything needs adjusting.</p>
-        <textarea id="av_overview_summary" style="width:100%;min-height:130px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="Net gainers:&#10;- ...&#10;&#10;Net losers / concerning:&#10;- ..." onchange="aiVisibilityDraft.overview_summary=this.value">${escapeHtml(d.overview_summary||'')}</textarea>
+        <textarea id="av_overview_summary" style="width:100%;min-height:130px;font-family:var(--font);font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="Net gainers:&#10;- ...&#10;&#10;Net losers / concerning:&#10;- ..." onchange="aiVisibilityDraft.overview_summary=this.value">${escapeHtml(d.overview_summary||'')}</textarea>
       </div>
     </div>
 
@@ -779,7 +779,7 @@ function renderAiVisibilityDetail(el){
                 <tr>
                   <td style="text-transform:capitalize;font-weight:700;white-space:nowrap;vertical-align:top;">${escapeHtml(sentiment)}</td>
                   ${AI_VISIBILITY_PLATFORMS.map(p=>`
-                    <td><textarea style="width:100%;min-height:90px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);resize:vertical;" onchange="updateAiVisibilityKeywords('${sentiment}','${p}',this.value)">${escapeHtml((d.keywords[sentiment]||{})[p]||'')}</textarea></td>
+                    <td><textarea style="width:100%;min-height:90px;font-family:var(--font);font-size:12px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);resize:vertical;" onchange="updateAiVisibilityKeywords('${sentiment}','${p}',this.value)">${escapeHtml((d.keywords[sentiment]||{})[p]||'')}</textarea></td>
                   `).join('')}
                 </tr>
               `).join('')}
@@ -816,13 +816,13 @@ function renderAiVisibilityDetail(el){
           </table>
         </div>
         <button class="btn btn-outline" style="margin:10px 0 18px;" onclick="addAiVisibilityCompetitor()">+ Add competitor</button>
-        <textarea id="av_competitive_intelligence_summary" style="width:100%;min-height:110px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="Narrative analysis of competitive position..." onchange="aiVisibilityDraft.competitive_intelligence_summary=this.value">${escapeHtml(d.competitive_intelligence_summary||'')}</textarea>
+        <textarea id="av_competitive_intelligence_summary" style="width:100%;min-height:110px;font-family:var(--font);font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="Narrative analysis of competitive position..." onchange="aiVisibilityDraft.competitive_intelligence_summary=this.value">${escapeHtml(d.competitive_intelligence_summary||'')}</textarea>
         <button class="btn btn-outline" style="margin-top:8px;" onclick="generateAiVisibilitySection('competitive_intelligence_summary')">✨ Generate with AI</button>
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
           <label style="font-size:12.5px;font-weight:700;color:var(--ink);display:block;margin-bottom:8px;">What AIs Value</label>
           <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 10px;line-height:1.5;">Not read off the screenshot — this comes from actually researching the competitors above online (their websites, reviews, what's said about them) to identify what's really driving AI recommendations in this category.</p>
           <button class="btn btn-brand" style="margin-bottom:10px;" onclick="researchAiVisibilityWhatAiValues()" ${!d.competitors.length ? 'disabled' : ''}>🔍 Research competitors &amp; fill in</button>
-          <textarea id="av_what_ai_values" style="width:100%;min-height:130px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="- Location&#10;- Family owned businesses&#10;- Establishment / age&#10;- ..." onchange="aiVisibilityDraft.what_ai_values=this.value">${escapeHtml(d.what_ai_values||'')}</textarea>
+          <textarea id="av_what_ai_values" style="width:100%;min-height:130px;font-family:var(--font);font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="- Location&#10;- Family owned businesses&#10;- Establishment / age&#10;- ..." onchange="aiVisibilityDraft.what_ai_values=this.value">${escapeHtml(d.what_ai_values||'')}</textarea>
           <p style="font-size:11px;color:var(--muted-lt);margin:6px 0 0;">Real web search, not a guess — still editable by hand, and worth reviewing before saving.</p>
         </div>
       </div>
@@ -834,7 +834,7 @@ function renderAiVisibilityDetail(el){
         ${d.concerns.map((c,i)=>`
           <div style="display:flex;gap:8px;margin-bottom:8px;align-items:flex-start;">
             <input type="text" style="width:140px;flex:none;" placeholder="Platform" value="${escapeHtml(c.platform||'')}" onchange="updateAiVisibilityConcernField(${i},'platform',this.value)">
-            <textarea style="flex:1;min-height:44px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;padding:8px;border-radius:6px;border:1px solid var(--border);resize:vertical;" placeholder="Quoted concern" onchange="updateAiVisibilityConcernField(${i},'quote',this.value)">${escapeHtml(c.quote||'')}</textarea>
+            <textarea style="flex:1;min-height:44px;font-family:var(--font);font-size:12.5px;padding:8px;border-radius:6px;border:1px solid var(--border);resize:vertical;" placeholder="Quoted concern" onchange="updateAiVisibilityConcernField(${i},'quote',this.value)">${escapeHtml(c.quote||'')}</textarea>
             <span class="row-link" style="color:var(--red);flex:none;margin-top:8px;" onclick="removeAiVisibilityConcern(${i})">✕</span>
           </div>
         `).join('')}
@@ -846,7 +846,7 @@ function renderAiVisibilityDetail(el){
       <div class="panel-head"><span class="panel-title">Executive Summary</span></div>
       <div class="panel-body">
         <p style="font-size:11px;color:var(--muted-lt);margin:0 0 12px;line-height:1.5;">Saved last in this editor on purpose — it summarizes everything above, so it reads better written (or generated) once the rest of the report actually has content. It still appears first in the downloaded report itself.</p>
-        <textarea id="av_executive_summary" style="width:100%;min-height:110px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="The high-level takeaway a client reads first..." onchange="aiVisibilityDraft.executive_summary=this.value">${escapeHtml(d.executive_summary||'')}</textarea>
+        <textarea id="av_executive_summary" style="width:100%;min-height:110px;font-family:var(--font);font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="The high-level takeaway a client reads first..." onchange="aiVisibilityDraft.executive_summary=this.value">${escapeHtml(d.executive_summary||'')}</textarea>
         <button class="btn btn-outline" style="margin-top:8px;" onclick="generateAiVisibilitySection('executive_summary')">✨ Generate with AI</button>
       </div>
     </div>

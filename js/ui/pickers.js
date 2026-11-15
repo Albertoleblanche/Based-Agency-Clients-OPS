@@ -25,7 +25,7 @@ function datePickerFieldHtml(id, opts={}){
   const hasValue = !!value;
   return `
     <input type="hidden" id="${id}" value="${escapeHtml(value)}" data-min-date="${minDate}" data-max-date="${maxDate}">
-    <button type="button" id="${id}Btn" onclick="toggleDatePickerCalendar('${id}', event)" ${disabled?'disabled':''} style="width:100%;text-align:left;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--ink);cursor:${disabled?'not-allowed':'pointer'};display:flex;align-items:center;justify-content:space-between;${disabled?'opacity:.6;':''}">
+    <button type="button" id="${id}Btn" onclick="toggleDatePickerCalendar('${id}', event)" ${disabled?'disabled':''} style="width:100%;text-align:left;font-family:var(--font);font-size:13px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--ink);cursor:${disabled?'not-allowed':'pointer'};display:flex;align-items:center;justify-content:space-between;${disabled?'opacity:.6;':''}">
       <span id="${id}Display" style="color:${hasValue?'var(--ink)':'var(--muted-lt)'};">${hasValue?formatDatePickerDisplay(value):'Select a date'}</span>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
     </button>
@@ -198,7 +198,7 @@ function timePickerFieldHtml(id, opts={}){
   const { value='09:00', disabled=false } = opts;
   return `
     <input type="hidden" id="${id}" value="${escapeHtml(value)}">
-    <button type="button" id="${id}Btn" onclick="toggleTimePickerDropdown('${id}', event)" ${disabled?'disabled':''} style="width:100%;text-align:left;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--ink);cursor:${disabled?'not-allowed':'pointer'};display:flex;align-items:center;justify-content:space-between;${disabled?'opacity:.6;':''}">
+    <button type="button" id="${id}Btn" onclick="toggleTimePickerDropdown('${id}', event)" ${disabled?'disabled':''} style="width:100%;text-align:left;font-family:var(--font);font-size:13px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--ink);cursor:${disabled?'not-allowed':'pointer'};display:flex;align-items:center;justify-content:space-between;${disabled?'opacity:.6;':''}">
       <span id="${id}Display">${formatTimeDisplay(value)}</span>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
     </button>

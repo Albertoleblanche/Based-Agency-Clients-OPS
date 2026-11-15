@@ -83,7 +83,7 @@ function openDailySummaryDetail(userId){
   openAppModal(`
     <div class="modal-head"><span class="panel-title">${escapeHtml(person.name)} — ${escapeHtml(dateLabel)}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
-      <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;font-weight:700;color:var(--ink);margin-bottom:14px;">${formatMinutes(person.totalMinutes)} <span style="font-size:11px;font-weight:500;color:var(--muted-lt);">total</span></div>
+      <div style="font-family:var(--font);font-size:20px;font-weight:700;color:var(--ink);margin-bottom:14px;">${formatMinutes(person.totalMinutes)} <span style="font-size:11px;font-weight:500;color:var(--muted-lt);">total</span></div>
       ${person.entries.map(e=>`
         <div class="ts-entry-card" style="margin-bottom:8px;">
           <div class="ts-entry-info">

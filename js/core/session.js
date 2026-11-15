@@ -7,14 +7,38 @@ async function initTheme(){
     // myProfile.theme is the real, per-account source of truth — only
     // fall back to the localStorage guess if this account has never set
     // a preference at all (myProfile.theme is null/undefined).
-    const pref = myProfile && myProfile.theme != null ? myProfile.theme : localStorage.getItem('bda_theme');
+    const saved = myProfile && myProfile.theme != null ? myProfile.theme : localStorage.getItem('bda_theme');
+    // Nobody has picked a theme yet → follow the system appearance (like a
+    // Mac app) instead of defaulting to light.
+    const systemDark = !!(window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+    const pref = saved || (systemDark ? 'dark' : 'light');
     if(pref === 'dark') document.body.dataset.theme = 'dark';
     else delete document.body.dataset.theme;
     // Keep localStorage in sync so this device's early FOUC-prevention
     // script (which runs before login, with no access to Supabase) has
-    // an accurate guess to paint with on the next load.
-    localStorage.setItem('bda_theme', pref === 'dark' ? 'dark' : 'light');
+    // an accurate guess to paint with on the next load — but only for a
+    // real choice; an unset preference keeps following the system.
+    if(saved) localStorage.setItem('bda_theme', pref === 'dark' ? 'dark' : 'light');
+    else localStorage.removeItem('bda_theme');
+    watchSystemTheme();
   }catch(e){ delete document.body.dataset.theme; }
+}
+
+// While nobody has picked a theme, follow the system live — e.g. when
+// macOS switches to dark at sunset with Appearance set to "Auto".
+function watchSystemTheme(){
+  if(watchSystemTheme._on || !window.matchMedia) return;
+  watchSystemTheme._on = true;
+  const mq = matchMedia('(prefers-color-scheme: dark)');
+  const follow = () => {
+    const chosen = (myProfile && myProfile.theme != null) || localStorage.getItem('bda_theme');
+    if(chosen) return;
+    if(mq.matches) document.body.dataset.theme = 'dark';
+    else delete document.body.dataset.theme;
+    if(typeof syncDarkModeToggleUI === 'function') syncDarkModeToggleUI();
+  };
+  if(mq.addEventListener) mq.addEventListener('change', follow);
+  else if(mq.addListener) mq.addListener(follow);
 }
 
 function toggleSidebar(){

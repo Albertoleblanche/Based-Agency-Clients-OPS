@@ -187,7 +187,7 @@ function showSendEmailConfirm(to, subject, body, onSent, includeSignature){
     <div class="modal-body">
       <div class="settings-field"><label>To</label><input id="mailModalTo" value="${escapeHtml(to)}" readonly style="width:100%;"></div>
       <div class="settings-field"><label>Subject</label><input id="mailModalSubject" style="width:100%;"></div>
-      <div class="settings-field"><label>Body</label><textarea spellcheck="true" id="mailModalBody" style="min-height:150px;width:100%;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:10px;border-radius:6px;border:1px solid var(--border);"></textarea></div>
+      <div class="settings-field"><label>Body</label><textarea spellcheck="true" id="mailModalBody" style="min-height:150px;width:100%;font-family:var(--font);font-size:13px;padding:10px;border-radius:6px;border:1px solid var(--border);"></textarea></div>
       <p style="font-size:11.5px;color:var(--muted-lt);margin:8px 0 0;line-height:1.5;">Review the text above — clicking Send delivers it immediately from the app, no further confirmation.</p>
     </div>
     <div class="modal-actions">

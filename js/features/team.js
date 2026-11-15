@@ -109,20 +109,20 @@ function openTeamMemberDetail(id){
   const isSelf = currentUser && m.id === currentUser.id;
   const isRevoked = !!m.access_revoked;
   const roleControl = (isAdmin() && !isSelf)
-    ? `<select onchange="changeTeamRole('${m.id}', this.value)" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);width:100%;">
+    ? `<select onchange="changeTeamRole('${m.id}', this.value)" style="font-family:var(--font);font-size:12px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);width:100%;">
         <option value="member" ${m.role==='member'?'selected':''}>Member</option>
         <option value="approver" ${m.role==='approver'?'selected':''}>Approver</option>
         <option value="admin" ${m.role==='admin'?'selected':''}>Admin</option>
       </select>`
     : `<span class="role-chip">${escapeHtml(roleDisplayLabel(m.role))}${isSelf ? ' · you' : ''}</span>`;
   const titleControl = isAdmin()
-    ? `<select onchange="changeTeamTitle('${m.id}', this.value)" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);width:100%;">
+    ? `<select onchange="changeTeamTitle('${m.id}', this.value)" style="font-family:var(--font);font-size:12px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);width:100%;">
         <option value="">No title</option>
         ${(settings.teamTitleOptions||[]).map(o=>`<option value="${escapeHtml(o)}" ${m.title===o?'selected':''}>${escapeHtml(o)}</option>`).join('')}
       </select>`
     : (m.title ? `<span class="role-chip">${escapeHtml(m.title)}</span>` : `<span style="color:var(--muted-lt);font-size:12px;">No title set</span>`);
   const slackIdControl = isAdmin()
-    ? `<input type="text" value="${escapeHtml(m.slack_user_id||'')}" placeholder="e.g. U0123ABCDEF" onblur="changeTeamSlackId('${m.id}', this.value.trim())" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);width:100%;">`
+    ? `<input type="text" value="${escapeHtml(m.slack_user_id||'')}" placeholder="e.g. U0123ABCDEF" onblur="changeTeamSlackId('${m.id}', this.value.trim())" style="font-family:var(--font);font-size:12px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);width:100%;">`
     : '';
 
   // A real section header, not a plain field <label> (11px, muted) — the
@@ -131,7 +131,7 @@ function openTeamMemberDetail(id){
   // heading was smaller than its own contents. This matches the section
   // header treatment already used elsewhere (Additional Info, weekly
   // report steps).
-  const sectionHeadingStyle = 'font-family:\'Plus Jakarta Sans\',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink);display:block;margin-bottom:2px;';
+  const sectionHeadingStyle = 'font-family:var(--font);font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink);display:block;margin-bottom:2px;';
   const toggleRow = (label, isOn, onclickJs, showDivider) => `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;${showDivider?'border-bottom:1px solid var(--border);':''}">
       <span style="font-size:12.5px;color:var(--ink);">${escapeHtml(label)}</span>
@@ -269,7 +269,7 @@ async function adminResetPassword(userId, name){
       <div class="modal-head"><span class="panel-title">Password reset for ${escapeHtml(name)}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
       <div class="modal-body">
         <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Send this to ${escapeHtml(name)} directly — it won't be shown again. They should change it after logging in.</p>
-        <div class="settings-field"><label>Temporary password</label><input value="${data.tempPassword}" readonly style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;"></div>
+        <div class="settings-field"><label>Temporary password</label><input value="${data.tempPassword}" readonly style="font-family:var(--font);font-weight:600;"></div>
       </div>
       <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 440);
   }catch(e){

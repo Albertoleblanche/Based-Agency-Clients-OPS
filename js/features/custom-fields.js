@@ -109,10 +109,10 @@ function customFieldModalHtml(editing){
         </select>
       </div>
       <div id="cfSelectOptionsWrap" style="display:none;">
-        <label style="font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;color:var(--muted);display:block;margin:14px 0 8px;">Dropdown options</label>
+        <label style="font-family:var(--font);font-size:10px;color:var(--muted);display:block;margin:14px 0 8px;">Dropdown options</label>
         <div id="cfSelectOptionsList" class="options-list"></div>
         <div style="display:flex;gap:8px;margin-top:10px;">
-          <input id="cfSelectOptionInput" placeholder="New option" style="flex:1;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);">
+          <input id="cfSelectOptionInput" placeholder="New option" style="flex:1;font-family:var(--font);font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);">
           <button class="btn btn-outline" onclick="addCustomFieldOptionDraft()">Add</button>
         </div>
       </div>
@@ -208,7 +208,7 @@ function customFieldInputHtml(field, value){
     return `<div><label>${labelHtml}</label><select id="${id}">${opts}</select></div>`;
   }
   if(field.type==='textarea'){
-    return `<div style="grid-column:1/-1;"><label>${labelHtml}</label><textarea spellcheck="true" id="${id}" style="width:100%;min-height:70px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;padding:9px 11px;border-radius:6px;border:1px solid var(--border);box-sizing:border-box;">${escapeHtml(val)}</textarea></div>`;
+    return `<div style="grid-column:1/-1;"><label>${labelHtml}</label><textarea spellcheck="true" id="${id}" style="width:100%;min-height:70px;font-family:var(--font);font-size:13px;padding:9px 11px;border-radius:6px;border:1px solid var(--border);box-sizing:border-box;">${escapeHtml(val)}</textarea></div>`;
   }
   const htmlType = { text:'text', url:'url', email:'email', phone:'tel', number:'number' }[field.type] || 'text';
   return `<div><label>${labelHtml}</label><input type="${htmlType}" id="${id}" value="${escVal}" placeholder="${escapeHtml(field.label)}"></div>`;
