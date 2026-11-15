@@ -15,7 +15,7 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const { CLAUDE_MODEL, OPENAI_MODEL } = require('../lib/ai-client');
-const { sendPushToUser } = require('../lib/push-notify');
+const { sendPushToUser, pushUrlFor } = require('../lib/push-notify');
 
 function generateTempPassword() {
   const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz';
@@ -221,7 +221,8 @@ module.exports = async function handler(req, res) {
       try{
         await sendPushToUser(admin, reqRow.user_id,
           approve ? 'Email change approved' : 'Email change request denied',
-          approve ? `Your email is now ${reqRow.requested_email}.` : `Your request to change your email was denied.`
+          approve ? `Your email is now ${reqRow.requested_email}.` : `Your request to change your email was denied.`,
+          pushUrlFor('profile')
         );
       }catch(e){}
       res.status(200).json({ success: true });

@@ -30,7 +30,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 const { sendSlackDM } = require('../lib/slack-notify');
-const { sendPushToUser } = require('../lib/push-notify');
+const { sendPushToUser, pushUrlFor } = require('../lib/push-notify');
 
 module.exports.config = { api: { bodyParser: false } };
 
@@ -164,7 +164,7 @@ async function handleTaskSlashCommand(req, res, rawBody, admin) {
       user_id: assigneeProfile.id, type: 'task_assigned', title: 'New task assigned to you',
       body: `${runnerProfile.name || 'Someone'}: "${title}"`, target_view: 'tasks',
     });
-    try { await sendPushToUser(admin, assigneeProfile.id, 'New task assigned to you', `${runnerProfile.name || 'Someone'}: "${title}"`); } catch (e) {}
+    try { await sendPushToUser(admin, assigneeProfile.id, 'New task assigned to you', `${runnerProfile.name || 'Someone'}: "${title}"`, pushUrlFor('tasks')); } catch (e) {}
     try { await sendSlackDM(admin, assigneeProfile.id, 'task_assigned', `*New task assigned to you*\n${runnerProfile.name || 'Someone'}: "${title}"`); } catch (e) {}
   }
 

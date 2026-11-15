@@ -254,11 +254,96 @@ function cmdkRefreshActiveHighlight(){
   if(activeEl) activeEl.scrollIntoView({ block:'nearest' });
 }
 
+// ---- Screen addresses ------------------------------------------------------
+// Every screen has its own web address — #clients, #tasks, #client/<id>… —
+// so a refresh keeps you where you were, Back/Forward move between screens,
+// and a screen can be bookmarked or linked to (push notifications use this).
+// It's still one page: only the part after # changes, nothing reloads.
+let currentViewName = 'overview';
+let _routingFromAddress = false; // true while a screen opens *because of* the address bar
+
+function routeHashFor(name){
+  if(name === 'clientdetail' && currentDetailClientId) return '#client/' + encodeURIComponent(currentDetailClientId);
+  return '#' + name;
+}
+// Link for a notification's target (same targets the bell already uses).
+function notificationUrl(targetView, targetId){
+  if(targetView === 'client-detail' && targetId) return '/#client/' + encodeURIComponent(targetId);
+  if(targetView === 'weekly-focus-report') return '/#focusreports';
+  if(targetView && /^[a-z-]+$/.test(targetView)) return '/#' + targetView;
+  return '/';
+}
+function parseRouteHash(hash){
+  const raw = String(hash || '').replace(/^#\/?/, '').split('?')[0];
+  if(!raw) return null;
+  const client = raw.match(/^client\/(.+)$/);
+  if(client){ try{ return { view:'clientdetail', clientId: decodeURIComponent(client[1]) }; }catch(e){ return null; } }
+  return { view: raw };
+}
+// Only screens this person can actually reach from the sidebar (or from a
+// screen they can reach) — a typed or bookmarked address can't open a
+// screen their role hides.
+const ROUTE_PARENT_VIEW = { improvements:'approve', 'task-archive':'tasks' };
+function canOpenViewFromAddress(name){
+  if(!/^[a-z-]+$/.test(name) || name === 'clientdetail') return false;
+  if(!document.getElementById('view-' + name)) return false;
+  const navView = ROUTE_PARENT_VIEW[name] || name;
+  const nav = document.querySelector(`.nav-item[data-view="${navView}"]`);
+  if(nav && getComputedStyle(nav).display === 'none') return false;
+  if(name === 'aivisibility' && !hasPermission('view_ai_visibility')) return false;
+  return true;
+}
+// Keeps the address in step when a screen opens from inside the app.
+function syncAddressToView(name){
+  currentViewName = name;
+  updateDocumentTitle(name);
+  if(_routingFromAddress) return;
+  const target = routeHashFor(name);
+  if(location.hash !== target) history.pushState(null, '', target);
+}
+function updateDocumentTitle(name){
+  const appName = settings.appName || 'Based Agency';
+  let screen = null;
+  if(name === 'clientdetail'){
+    const c = clients.find(x => x.id === currentDetailClientId);
+    screen = c ? c.name : 'Client';
+  } else if(VIEW_TITLES[name]){
+    screen = (settings.navLabels && settings.navLabels[name]) || VIEW_TITLES[name][0];
+  }
+  document.title = screen ? `${screen} — ${appName}` : `${appName} — ${settings.appDescription || 'Client Update Workflow'}`;
+}
+// Opens whatever screen the address points at. Unknown or off-limits
+// addresses fall back to Overview, and the address is corrected to match.
+async function openScreenFromAddress(hash){
+  if(!currentUser) return;
+  const route = parseRouteHash(hash) || { view:'overview' };
+  const already = route.view === currentViewName && (route.view !== 'clientdetail' || route.clientId === currentDetailClientId);
+  if(already) return;
+  _routingFromAddress = true;
+  let opened;
+  try{
+    if(route.view === 'clientdetail'){
+      if(clients.some(c => c.id === route.clientId && !c.deletedAt)){ opened = openClientDetail(route.clientId); }
+      else { opened = switchView('clients'); showToast('info','Client not found','That client may have been removed or moved to Trash.'); }
+    } else {
+      opened = switchView(canOpenViewFromAddress(route.view) ? route.view : 'overview');
+    }
+  } finally {
+    // switchView() records the screen synchronously, before its data load —
+    // so the flag only needs to cover that first, synchronous part.
+    _routingFromAddress = false;
+  }
+  const corrected = routeHashFor(currentViewName);
+  if(location.hash && location.hash !== corrected && !/gcal=/.test(location.hash)) history.replaceState(null, '', corrected);
+  await opened;
+}
+
 async function switchView(name){
   closeMobileNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name));
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
+  syncAddressToView(name);
   // The floating "open the Assistant" button is redundant (and visually
   // odd sitting on top of the tab's own dark background) while you're
   // already looking at the Assistant tab itself — hidden here rather than

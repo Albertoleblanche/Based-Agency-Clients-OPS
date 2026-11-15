@@ -43,23 +43,20 @@ self.addEventListener('push', (event) => {
 });
 
 // Fires when someone clicks the OS notification itself. Prefers
-// refocusing an already-open tab over opening a new one — if someone
-// already has the app open in a background tab, clicking the
-// notification should bring that forward, not spawn a duplicate.
-//
-// Known limitation for now: this always focuses/opens the app's root,
-// not a specific view — this app is a single-page app without per-view
-// URLs to deep-link into yet (the same limitation noted earlier for the
-// Harvest Button's permalink). Clicking brings the app to the front;
-// getting to the exact relevant screen is still a manual step after that.
+// refocusing an already-open tab over opening a new one — and asks that tab
+// to open the notification's screen (pushes carry a screen address such as
+// /#tasks or /#client/<id>; the app listens for the 'open-url' message).
+// With no tab open, it opens a new one straight at that address.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url || '/';
+  const raw = event.notification.data?.url || '/';
+  const targetUrl = /^\/(?!\/)/.test(raw) ? raw : '/'; // same-site paths only
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
       for (const client of windowClients) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
+        if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+          client.postMessage({ type: 'open-url', url: targetUrl });
           return client.focus();
         }
       }
