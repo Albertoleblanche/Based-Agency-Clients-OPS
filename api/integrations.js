@@ -263,14 +263,14 @@ module.exports = async function handler(req, res) {
     // ================= PUSH NOTIFICATIONS =================
     if (provider === 'push') {
       if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
-      const { action, targetUserId, title, body: notifBody } = req.body || {};
+      const { action, targetUserId, title, body: notifBody, url: pushUrl } = req.body || {};
       if (action !== 'send') { res.status(400).json({ error: `Unknown action: ${action}` }); return; }
       if (!targetUserId || !title) { res.status(400).json({ error: 'targetUserId and title are required.' }); return; }
       if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
         res.status(500).json({ error: 'Server is not configured with VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY' });
         return;
       }
-      const result = await sendPushToUser(admin, targetUserId, title, notifBody);
+      const result = await sendPushToUser(admin, targetUserId, title, notifBody, pushUrl);
       res.status(200).json(result);
       return;
     }

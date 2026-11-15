@@ -136,14 +136,14 @@ async function showApp(session){
     document.getElementById('loginLoadingCard').style.display = 'block';
     await initTheme();
     await loadAll();
-    await loadTeamProfiles();
-    await loadMyNotes();
-    await loadTimeEntries();
-    await loadMyTasks();
-    await loadNotifications();
-    await loadCalendarEvents();
-    await loadDangerHistory();
-    await seedDangerHistoryIfEmpty();
+    // Everything below only fills its own list, so it loads in parallel
+    // instead of one request after another (the seed step needs the
+    // danger history first, so those two stay chained).
+    await Promise.all([
+      loadTeamProfiles(), loadMyNotes(), loadTimeEntries(), loadMyTasks(),
+      loadNotifications(), loadCalendarEvents(),
+      loadDangerHistory().then(seedDangerHistoryIfEmpty),
+    ]);
     document.getElementById('appRoot').style.display = 'grid';
     renderAll();
     document.getElementById('loginOverlay').style.display = 'none';
@@ -162,6 +162,10 @@ async function showApp(session){
     if(myProfile?.ai_chat_enabled){ loadClaudeHistory().then(renderClaudeMessages); }
     await checkForNewNotificationToasts();
     setupRealtimeSubscriptions();
+    // Open the screen the address points at (a refresh, bookmark, shared
+    // link or push notification). The Google Calendar return is handled
+    // separately in init() below.
+    if(location.hash && !/gcal=/.test(location.hash)) openScreenFromAddress(location.hash);
   }catch(e){
     console.error('showApp failed', e);
     document.getElementById('loginLoadingCard').style.display = 'none';
@@ -191,7 +195,22 @@ async function showApp(session){
       else if(outcome==='denied') showToast('info','Not connected','You can connect Google Calendar anytime from this page.');
       else if(outcome==='error') showToast('error','Connection failed','Something went wrong connecting Google Calendar — try again.');
     }
-    history.replaceState(null, '', window.location.pathname);
+    history.replaceState(null, '', window.location.pathname + (session ? '#profile' : ''));
+  }
+
+  // Back/Forward, or an address typed/pasted into the bar → open that screen.
+  window.addEventListener('hashchange', () => openScreenFromAddress(location.hash));
+
+  // Tapping a push notification while the app is already open: the service
+  // worker focuses this tab and asks it to open the notification's screen.
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      if(e.data?.type !== 'open-url' || typeof e.data.url !== 'string') return;
+      try{
+        const u = new URL(e.data.url, location.origin);
+        if(u.origin === location.origin && u.hash && u.hash !== location.hash) location.hash = u.hash;
+      }catch(err){}
+    });
   }
 
   // Supabase fires onAuthStateChange once immediately upon subscribing,

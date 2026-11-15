@@ -53,7 +53,7 @@ async function sendNotification(userId, type, title, body, targetView, targetId,
   const row = { user_id:userId, type, title, body, target_view:targetView, read:!!alreadyToasted };
   if(targetId) row.target_id = targetId;
   await supabaseClient.from('notifications').insert(row);
-  sendPushNotification(userId, title, body);
+  sendPushNotification(userId, title, body, notificationUrl(targetView, targetId));
   sendSlackNotification(userId, type, title, body);
 }
 
@@ -94,13 +94,13 @@ async function sendSlackNotification(userId, type, title, body){
 // a fully misconfigured server. A recipient with no subscribed devices at
 // all is normal/expected (not everyone opts into push), so that case is
 // only logged, not surfaced as an error toast.
-async function sendPushNotification(userId, title, body){
+async function sendPushNotification(userId, title, body, url){
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
     const res = await fetch('/api/integrations', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider: 'push', action: 'send', targetUserId: userId, title, body, url: '/' }),
+      body: JSON.stringify({ provider: 'push', action: 'send', targetUserId: userId, title, body, url: url || '/' }),
     });
     const result = await res.json().catch(()=>({}));
     if(!res.ok){

@@ -41,3 +41,19 @@ through one of these before it becomes HTML (defined in `js/core/helpers.js`):
 | `href` / `src`                     | `${safeUrl(value)}`                  |
 | An inline handler argument         | `onclick="fn(${jsArg(value)})"` — no quotes around it |
 | Stored text allowed light bold/italic | `${sanitizeInlineHtml(value)}`    |
+
+## Screen addresses
+
+Every screen has its own address — `#clients`, `#tasks`, `#calendar`,
+`#client/<id>`… (the part after `#` is the screen's `view-…` id). It's still one
+page: switching screens changes the address with `history.pushState`, so refresh,
+Back/Forward, bookmarks and shared links all work. The code is in
+`js/core/navigation.js` (`syncAddressToView`, `openScreenFromAddress`).
+
+- A new screen gets an address automatically once it has a `view-<name>` element.
+- Addresses only open screens the person can reach from their sidebar; anything
+  else falls back to Overview.
+- Push notifications link to the same addresses (`pushUrlFor()` in
+  `lib/push-notify.js`); tapping one focuses an open tab and opens that screen.
+- On phones the address is forwarded to `mobile.html`, which opens the closest
+  matching screen once and then clears it.

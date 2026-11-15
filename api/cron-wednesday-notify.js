@@ -33,7 +33,7 @@
 // end-of-run blob rewrite the way the old app-data.clients array was.
 
 const { createClient } = require('@supabase/supabase-js');
-const { sendPushToUser } = require('../lib/push-notify');
+const { sendPushToUser, pushUrlFor } = require('../lib/push-notify');
 const { clientRowFromDb, improvementRowFromDb, runProactiveInsights } = require('../lib/proactive-insights');
 
 const EMAIL_DIGEST_DAY_OF_WEEK = 3; // Wednesday, hardcoded — not admin-configurable, unlike proactive insights
@@ -87,7 +87,7 @@ async function runEmailDigest(admin, clients, log, settings, resendKey) {
       body: `Wednesday automation sent "${subject}" to ${recipients.join(', ')}.`, target_view: 'approve',
     })));
     for (const id of notifyIds) {
-      try { await sendPushToUser(admin, id, 'Client email sent', `Wednesday automation sent "${subject}" to ${recipients.join(', ')}.`); } catch (e) {}
+      try { await sendPushToUser(admin, id, 'Client email sent', `Wednesday automation sent "${subject}" to ${recipients.join(', ')}.`, pushUrlFor('approve')); } catch (e) {}
     }
   }
 

@@ -159,7 +159,7 @@ function applyAppBranding(){
   const subEl = document.querySelector('.brand-sub');
   if(nameEl) nameEl.textContent = name;
   if(subEl) subEl.textContent = description.toUpperCase();
-  document.title = `${name} — ${description}`;
+  updateDocumentTitle(currentViewName); // "<screen> — <app name>", or the app name + description on Overview
 
   const nameInput = document.getElementById('appNameInput');
   const descInput = document.getElementById('appDescriptionInput');

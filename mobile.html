@@ -592,6 +592,8 @@ async function mBoot(){
   mSwitchTab('home');
   setupMRealtime();
   mSetupPullToRefresh();
+  if(location.hash) mOpenFromAddress(location.hash);
+  window.addEventListener('hashchange', () => mOpenFromAddress(location.hash));
 }
 
 // ---- clients / client_improvements: real per-row tables (migrated off the
@@ -762,6 +764,31 @@ async function mPullToRefreshTrigger(){
   indicator.style.opacity = '0';
   setTimeout(()=>{ indicator.querySelector('.m-ptr-spinner').classList.remove('spinning'); mPtrRefreshing = false; }, 250);
   mShowToast('success','Up to date');
+}
+
+// ---- Links into a specific screen ------------------------------------------
+// The desktop app's screen addresses (#tasks, #client/<id>…) also work here —
+// shared links and push notifications land on phones too (the desktop page
+// forwards the # part when it redirects). Opened once, then the address is
+// cleared so a later refresh starts from Home as usual.
+function mOpenFromAddress(hash){
+  const raw = String(hash || '').replace(/^#\/?/, '').split('?')[0];
+  if(!raw) return;
+  const client = raw.match(/^client\/(.+)$/);
+  let clientId = null;
+  if(client){ try{ clientId = decodeURIComponent(client[1]); }catch(e){} }
+  try{
+    if(clientId){ if(clients.some(c => c.id === clientId && !c.deletedAt)) mOpenClientFromHome(clientId); }
+    else if(raw === 'tasks' || raw === 'task-archive') mSwitchTab('tasks');
+    else if(raw === 'approve' || raw === 'teamqueue' || raw === 'improvements') mSwitchTab('queue');
+    else if(raw === 'clients') mOpenClientsList();
+    else if(raw === 'notes') mOpenNotesList();
+    else if(raw === 'calendar') mOpenCalendarAgenda();
+    else if(raw === 'time') mOpenTimeTracker();
+    else if(raw === 'profile') mOpenProfileScreen();
+    else if(raw === 'trash') mOpenTrashSheet();
+  }catch(e){ console.error('mOpenFromAddress failed', e); }
+  history.replaceState(null, '', location.pathname);
 }
 
 function mSwitchTab(name){
@@ -3579,6 +3606,12 @@ mBoot();
      registration as desktop's copy of this same block. -->
 <script>
   if('serviceWorker' in navigator){
+    // Tapping a push while the app is open: the service worker focuses this
+    // tab and asks it to open the notification's screen.
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      if(e.data?.type !== 'open-url' || typeof e.data.url !== 'string') return;
+      try{ const u = new URL(e.data.url, location.origin); if(u.origin === location.origin && u.hash) mOpenFromAddress(u.hash); }catch(err){}
+    });
     navigator.serviceWorker.register('/sw.js')
       .then(reg => console.log('Service worker registered:', reg.scope))
       .catch(err => console.warn('Service worker registration failed:', err));

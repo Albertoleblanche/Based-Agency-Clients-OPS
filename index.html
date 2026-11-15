@@ -14,7 +14,7 @@
     }catch(e){}
     const ua = navigator.userAgent || '';
     const isPhone = /iPhone|iPod|Android.*Mobile|Windows Phone/i.test(ua);
-    if(isPhone) window.location.replace('/mobile.html');
+    if(isPhone) window.location.replace('/mobile.html' + window.location.hash); // keep #screen links
   })();
 </script>
 <!-- Third-party libraries are bundled in /vendor (exact, pinned versions)
