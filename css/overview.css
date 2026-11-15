@@ -1,0 +1,254 @@
+/* Overview dashboard: KPI and metric cards, lists, mini calendar, charts. */
+
+/* KPI cards */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px;margin-bottom:24px;}
+@media (max-width:820px){.kpis{grid-template-columns:repeat(2,1fr);}}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px 22px;box-shadow:0 1px 2px rgba(16,24,40,.03);}
+.kpi-label{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;letter-spacing:.07em;color:var(--muted-lt);}
+.kpi-val{font-family:'Plus Jakarta Sans',sans-serif;font-size:30px;font-weight:600;margin-top:7px;letter-spacing:.01em;}
+.kpi-val.warn{color:var(--red);}
+.kpi-foot{font-size:11px;color:var(--muted-lt);margin-top:5px;}
+.kpi-click{cursor:pointer;transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;}
+.kpi-click:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(16,24,40,.08);border-color:var(--border);}
+
+/* Metric cards — icon badge, big number, status chips, muted caption. Uniform style. */
+/* Overview: 25 / 50 / 25. Every block here is a single flat surface —
+   one border, content directly inside. No panel-inside-panel. All
+   KPI-style cards (Total Clients included) share one background and one
+   value/label typography (.ov-card / .ov-kpi-value) so nothing stands
+   out as a different "kind" of card. */
+.ov-grid{display:grid;grid-template-columns:1fr 2fr 1fr;gap:16px;align-items:start;}
+.ov-col{display:flex;flex-direction:column;gap:16px;min-width:0;}
+.ov-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;box-shadow:0 1px 2px rgba(16,24,40,.03);min-width:0;}
+.ov-card-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;text-transform:capitalize;color:var(--ink);font-weight:700;margin-bottom:10px;}
+.ov-card-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-10px -10px 14px -10px;padding:12px 18px;border-radius:7px;}
+.ov-card-title-row-plain{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:12px;margin-bottom:14px;border-bottom:1px solid var(--border);}
+.ov-card-title-row-plain .ov-card-icon{background:var(--surface-2);color:var(--ink);}
+.ov-card-title-row-plain .ov-card-title{color:var(--ink);}
+.ov-card-head-left{display:flex;align-items:center;gap:8px;min-width:0;}
+.ov-card-icon{width:24px;height:24px;border-radius:7px;background:none;color:var(--ink);display:flex;align-items:center;justify-content:center;flex:none;}
+.ov-card-btn{font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;font-weight:600;color:var(--ink);background:var(--card);border:1px solid var(--border);border-radius:20px;padding:5px 11px;cursor:pointer;white-space:nowrap;flex:none;transition:background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);}
+.ov-card-btn:hover{background:var(--card);border-color:var(--border);}
+.ov-card-caption{font-size:10.5px;color:var(--muted-lt);margin-top:8px;}
+.ov-kpi-value{font-family:'Plus Jakarta Sans',sans-serif;font-size:30px;font-weight:600;color:var(--ink);line-height:1.1;}
+.ov-kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+
+.ov-tasks-notes-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+
+/* Softer than the old solid-black track — a light neutral surface, same
+   family as the rest of the app's subtle backgrounds, not the sidebar color. */
+.ov-health-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px;}
+.ov-health-value{font-family:'Plus Jakarta Sans',sans-serif;font-size:30px;font-weight:600;color:var(--ink);line-height:1;}
+.ov-health-track{
+  position:relative;height:5.5px;border-radius:20px;background:var(--surface-2);
+  overflow:hidden;
+}
+.ov-health-fill{
+  position:relative;height:100%;border-radius:20px;
+  background:var(--health-fill-color, var(--green));
+  transition:width var(--duration-slow) var(--ease-out), background var(--duration-slow) var(--ease-out);
+}
+
+/* Compact rows used by the attention / active / tasks / upcoming lists */
+.ov-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;}
+.ov-row:last-child{border-bottom:none;padding-bottom:0;}
+.ov-row:first-child{padding-top:0;}
+.ov-row:hover .ov-row-name{color:var(--brand-dark);}
+.ov-row-dot{width:7px;height:7px;border-radius:50%;flex:none;}
+.ov-row-main{flex:1;min-width:0;}
+.ov-row-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color var(--duration-fast) var(--ease-out);}
+.ov-row-sub{font-size:10.5px;color:var(--muted-lt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
+.ov-row-meta{font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;font-weight:600;color:var(--muted);flex:none;white-space:nowrap;}
+
+/* Richer row for My Notes — title, a description preview line, then a
+   bottom row pairing the stage pill with the date. */
+.ov-note-row{padding:11px 0;border-bottom:1px solid var(--border);cursor:pointer;}
+.ov-note-row:last-child{border-bottom:none;padding-bottom:0;}
+.imp-group-row{padding:12px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:16px;}
+.imp-group-row:last-child{border-bottom:none;padding-bottom:0;}
+.ov-note-row:first-child{padding-top:0;}
+.ov-note-row:hover .ov-note-title{color:var(--brand-dark);}
+.ov-note-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color var(--duration-fast) var(--ease-out);}
+.ov-note-desc{font-size:11px;color:var(--muted-lt);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ov-note-meta-row{display:flex;align-items:center;justify-content:space-between;margin-top:9px;gap:8px;}
+.ov-note-stage-pill{font-family:'Plus Jakarta Sans',sans-serif;font-size:9.5px;font-weight:700;padding:3px 9px;border-radius:20px;flex:none;text-transform:capitalize;}
+.ov-note-date{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;color:var(--muted-lt);flex:none;}
+
+/* Daily Summary (Time Tracker) — one flat card per person, matching
+   Overview's card language instead of the old panel-inside-panel with
+   every entry expanded inline. Each card previews a couple of clients;
+   the full entry list opens in a modal on click. */
+.dsummary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;}
+.dsummary-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;cursor:pointer;transition:box-shadow var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out);}
+.dsummary-card:hover{box-shadow:0 4px 16px rgba(16,24,40,.08);border-color:var(--border);}
+.dsummary-head{display:flex;align-items:center;gap:10px;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--border);}
+.dsummary-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;color:var(--ink);}
+.dsummary-role{font-size:10.5px;color:var(--muted-lt);margin-top:1px;}
+.dsummary-total{margin-left:auto;font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:700;color:var(--ink);flex:none;}
+.dsummary-head .team-card-avatar, .dsummary-head .team-card-avatar-fallback{margin-bottom:0;flex:none;}
+.dsummary-preview{font-size:11.5px;color:var(--muted-lt);line-height:1.6;}
+#overviewDailySummary{max-height:320px;overflow-y:auto;}
+
+/* Real mini month grid — day numbers + a dot for days with something on
+   them, sized for a ~25% column rather than the full Calendar page's
+   700px-min-width grid, which can't fit here at all. */
+.ov-mini-cal-head{display:flex;align-items:center;justify-content:space-between;margin:-10px -10px 14px -10px;padding:12px 18px;border-radius:7px;}
+.ov-mini-cal-nav{display:flex;gap:2px;}
+.ov-mini-cal-arrow{width:22px;height:22px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center;transition:background var(--duration-fast) var(--ease-out);}
+.ov-mini-cal-arrow:hover{background:var(--surface-2);color:var(--ink);}
+.ov-mini-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+.ov-mini-cal-dow{font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;font-weight:700;color:var(--muted-lt);text-align:center;padding-bottom:4px;}
+.ov-mini-cal-day{position:relative;aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--ink);border-radius:7px;cursor:pointer;transition:background var(--duration-fast) var(--ease-out);}
+.ov-mini-cal-day:hover{background:var(--surface-2);}
+.ov-mini-cal-day.other-month{color:var(--muted-lt);opacity:.4;}
+.ov-mini-cal-day.today{background:var(--brand-dark);color:#fff;font-weight:700;}
+.ov-mini-cal-day.today:hover{background:var(--brand-dark);}
+.ov-mini-cal-dot{position:absolute;bottom:3px;width:4px;height:4px;border-radius:50%;background:var(--brand-dark);}
+.ov-mini-cal-day.today .ov-mini-cal-dot{background:#fff;}
+
+@media (max-width:1200px){
+  .ov-grid{grid-template-columns:1fr 1fr;}
+  .ov-col:last-child{grid-column:1/-1;}
+  .queue-grid{grid-template-columns:repeat(2,1fr);}
+}
+@media (max-width:820px){
+  .ov-grid{grid-template-columns:1fr;}
+  .ov-col:last-child{grid-column:auto;}
+  .queue-grid{grid-template-columns:1fr;}
+}
+@media (max-width:480px){
+  .ov-tasks-notes-row{grid-template-columns:1fr;}
+}
+@media (max-width:360px){
+  .ov-kpi-row{grid-template-columns:1fr;}
+}
+
+.metrics-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px;}
+#cdMetrics.metrics-row{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));}
+@media (max-width:900px){.metrics-row{grid-template-columns:1fr 1fr;}}
+@media (max-width:560px){.metrics-row{grid-template-columns:1fr;}}
+
+.metric-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px;box-shadow:0 1px 2px rgba(16,24,40,.03);}
+
+.donut-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px;box-shadow:0 1px 2px rgba(16,24,40,.03);display:flex;flex-direction:column;align-items:center;}
+.donut-card:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(16,24,40,.08);border-color:var(--border);}
+.donut-card-head{font-size:12.5px;font-weight:600;color:var(--muted);align-self:flex-start;text-transform:capitalize;display:flex;align-items:center;gap:10px;}
+.donut-wrap{position:relative;width:150px;height:150px;margin:6px auto;}
+/* Service Breakdown is now a bar list, not an SVG ring — needs full
+   width and auto height, unlike the shared .donut-wrap default which
+   is sized for a fixed, centered ring. Targeted by ID specifically so
+   the Overview Risk Breakdown chart (#totalClientsDonut), which still
+   shares the same base class and is still an actual ring, is completely
+   unaffected. */
+#serviceBreakdownDonut{width:100%;height:auto;margin:0;}
+.donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.donut-center-value{font-family:'Plus Jakarta Sans',sans-serif;font-size:34px;font-weight:600;color:var(--ink);}
+.donut-center-label{font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;letter-spacing:.04em;color:var(--muted-lt);margin-top:2px;}
+.donut-legend{display:flex;flex-wrap:wrap;justify-content:center;gap:9px;margin-top:2px;}
+.donut-legend-item{font-size:10.5px;color:var(--muted);display:flex;align-items:center;gap:5px;white-space:nowrap;}
+.donut-legend-dot{width:7px;height:7px;border-radius:50%;flex:none;position:relative;}
+.donut-legend-dot::after{content:'';position:absolute;inset:0;border-radius:50%;background-color:inherit;animation:pulseRing 1.8s ease-out infinite;}
+.donut-stats{width:100%;margin-top:18px;padding-top:16px;border-top:1px solid var(--border);}
+.donut-stat-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;}
+.donut-stat-label{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;letter-spacing:.04em;color:var(--muted-lt);}
+.donut-stat-val{font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:600;color:var(--ink);max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
+.metric-head{display:flex;align-items:center;gap:9px;margin-bottom:14px;}
+.metric-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex:none;}
+.metric-icon-blue, .metric-icon-green, .metric-icon-amber, .metric-icon-purple{background:var(--surface-2);color:var(--ink);}
+.metric-label{font-size:12.5px;font-weight:600;color:var(--muted);}
+.metric-value{font-family:'Plus Jakarta Sans',sans-serif;font-size:28px;font-weight:600;line-height:1;letter-spacing:.01em;}
+.metric-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;min-height:20px;}
+.metric-caption{font-size:11px;color:var(--muted-lt);margin-top:9px;}
+
+.bar-card{padding:20px 22px;display:flex;flex-direction:column;}
+.bar-card-head{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;margin-bottom:16px;}
+.segmented-bar{display:flex;height:8px;border-radius:5px;overflow:hidden;background:var(--border);gap:2px;}
+.bar-segment{height:100%;transition:width .6s ease;}
+.bar-legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px;}
+.legend-item{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px;}
+.legend-dot{width:7px;height:7px;border-radius:50%;flex:none;}
+
+.filter-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+.filter-pill{font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;letter-spacing:.03em;padding:6px 12px;border-radius:20px;background:var(--card);border:1px solid var(--border);color:var(--muted);cursor:pointer;font-weight:600;transition:border-color .15s ease, color .15s ease;}
+.filter-pill:hover{border-color:var(--brand);color:var(--brand-dark);}
+.filter-pill.active{background:var(--sidebar);border-color:var(--sidebar);color:#fff;}
+
+.date-filter-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:var(--muted);}
+.date-filter-row label{font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;letter-spacing:.03em;color:var(--muted-lt);}
+select{appearance:none;-webkit-appearance:none;-moz-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%239AA3AF' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}
+body[data-theme="dark"] select,
+body[data-theme="dark"] input[type="text"],
+body[data-theme="dark"] input[type="date"],
+body[data-theme="dark"] input[type="email"],
+body[data-theme="dark"] input[type="tel"],
+body[data-theme="dark"] input[type="number"],
+body[data-theme="dark"] input[type="password"],
+body[data-theme="dark"] input:not([type]),
+body[data-theme="dark"] textarea{
+  background-color:var(--surface-2);
+  color:var(--ink);
+  border-color:var(--border);
+  transition:border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
+}
+body[data-theme="dark"] select:focus,
+body[data-theme="dark"] input:focus,
+body[data-theme="dark"] textarea:focus{
+  outline:none;
+  border-color:var(--brand);
+  box-shadow:0 0 0 3px rgba(230,63,38,.18);
+}
+/* Styles the dropdown's own option list where the browser respects it
+   (Chrome/Edge) — Safari on macOS renders its native option list
+   regardless of CSS here, which is a real, browser-level limitation,
+   not something fixable from the page's own styles. */
+body[data-theme="dark"] select option{background-color:var(--surface-2);color:var(--ink);}
+.date-filter-row select{font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;padding:6px 28px 6px 9px;border-radius:6px;border:1px solid var(--border);background-color:var(--card);color:var(--ink);}
+.date-filter-row input[type="date"]{font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);}
+
+.clients-filter-panel{padding:18px 20px;}
+.clients-filter-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.search-field{display:flex;align-items:center;gap:8px;flex:1;min-width:200px;padding:0 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);transition:border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);}
+.select-field{display:flex;align-items:center;gap:8px;min-width:180px;padding:0 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--muted-lt);transition:border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);}
+.select-field:focus-within, .search-field:focus-within{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-bg);}
+.select-field select{border:none;background-color:transparent;background-position:right 0 center;padding:9px 18px 9px 0;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;color:var(--ink);width:100%;cursor:pointer;}
+.select-field select:focus{outline:none;}
+.search-field svg{color:var(--muted-lt);flex:none;}
+.search-field input{border:none;background:transparent;padding:9px 0;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;color:var(--ink);width:100%;}
+.search-field input:focus{outline:none;}
+.clients-filter-bar select{font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;padding:9px 30px 9px 12px;border-radius:6px;border:1px solid var(--border);background-color:var(--surface-2);color:var(--ink);min-width:150px;}
+.clients-filter-count{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;color:var(--muted-lt);margin-top:10px;}
+
+.filters-popover-wrap{position:relative;}
+.filters-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;margin-left:7px;background:var(--brand-dark);color:#fff;border-radius:20px;font-size:10px;font-weight:700;}
+.filters-popover{position:absolute;top:calc(100% + 8px);left:0;width:280px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:200;animation:modalCardIn var(--duration-base) var(--ease-out);}
+.calendar-dropdown{position:fixed;width:240px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:1100;animation:modalCardIn var(--duration-base) var(--ease-out);}
+.dp-calendar-day{width:28px;height:28px;border:none;border-radius:6px;font-size:12px;font-family:'Plus Jakarta Sans',sans-serif;background:transparent;color:var(--ink);cursor:pointer;}
+.dp-calendar-day:hover:not(:disabled){background:var(--surface-2);}
+.dp-calendar-day:disabled{color:var(--muted-lt);cursor:not-allowed;}
+.dp-calendar-day.selected{background:var(--brand);color:#fff;}
+.dp-calendar-day.selected:hover{background:var(--brand-dark);}
+.dp-calendar-day.today:not(.selected){box-shadow:inset 0 0 0 1px var(--brand);}
+.time-picker-option{display:block;width:100%;text-align:left;padding:8px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;border:none;background:transparent;color:var(--ink);cursor:pointer;}
+.time-picker-option:hover{background:var(--surface-2);}
+.time-picker-option.selected{background:var(--brand);color:#fff;}
+.pagination-controls{display:flex;align-items:center;justify-content:center;gap:14px;padding:16px 0 4px;}
+.pagination-controls .btn{padding:7px 14px;font-size:12px;}
+.pagination-controls .btn:disabled{opacity:.4;cursor:default;}
+.pagination-label{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;color:var(--muted);white-space:nowrap;}
+.filters-popover-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border);}
+.filters-popover-title{font-size:13px;font-weight:600;color:var(--ink);}
+.filters-popover-body{padding:14px 16px;display:flex;flex-direction:column;gap:12px;}
+.filters-popover-field label{display:block;font-size:11px;color:var(--muted-lt);margin-bottom:5px;font-weight:600;}
+.filters-popover-field select{width:100%;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;padding:8px 26px 8px 10px;border-radius:6px;border:1px solid var(--border);background-color:var(--surface-2);color:var(--ink);}
+.filter-btn{display:flex;align-items:center;white-space:nowrap;}
+.filter-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;margin-left:7px;border-radius:20px;background:var(--brand-dark);color:#fff;font-size:10px;font-weight:700;}
+
+@keyframes flash{0%{box-shadow:0 0 0 2px var(--brand);}100%{box-shadow:0 0 0 2px transparent;}}
+.q-card.highlight-flash{animation:flash 1.4s ease-out;}
+
+.panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 1px 2px rgba(16,24,40,.03);margin-bottom:20px;}
+.table-scroll-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.calendar-month-inner{min-width:700px;}
+.panel-head{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px;}
+.panel-title{font-size:13.5px;font-weight:600;letter-spacing:.01em;text-transform:capitalize;}
+.panel-body{padding:18px 20px;}

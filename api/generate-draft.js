@@ -2,53 +2,52 @@
 // The OpenAI API key lives only here, as an environment variable, so it's
 // never exposed to anyone viewing the site's source or network requests.
 
+const { requireTeamMember } = require('../lib/require-team-member');
+const { callOpenAI, OPENAI_MODEL } = require('../lib/ai-client');
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
 
+  // Signed-in team members only — otherwise anyone who found this URL could
+  // run unlimited AI requests on the agency's OpenAI account.
+  const auth = await requireTeamMember(req, res);
+  if (!auth) return;
+
   const { prompt, model } = req.body || {};
   if (!prompt || typeof prompt !== 'string') {
     res.status(400).json({ error: 'Missing "prompt" in request body' });
     return;
   }
+  if (prompt.length > 60000) {
+    res.status(400).json({ error: 'Prompt is too long' });
+    return;
+  }
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
+  if (!process.env.OPENAI_API_KEY) {
     res.status(500).json({ error: 'Server is not configured with OPENAI_API_KEY' });
     return;
   }
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        // Caller passes settings.openaiModel (admin-editable in Settings ->
-        // AI & Email, shared with the Assistant's OpenAI path — see that
-        // panel's copy) — falls back to gpt-4o-mini if not sent, so this
-        // stays backward-compatible with any caller that doesn't pass one.
-        model: (typeof model === 'string' && model.trim()) || 'gpt-4o-mini',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      res.status(response.status).json({ error: `OpenAI API error: ${errText}` });
+    // Goes through the shared OpenAI client (Responses API) — the same path
+    // the Assistant already uses. The old Chat Completions call sent
+    // max_tokens, which newer models (GPT-5 family) reject. Caller passes
+    // settings.openaiModel (admin-editable in Settings -> AI & Email);
+    // falls back to the shared default if not sent.
+    const result = await callOpenAI(
+      [{ role: 'user', content: prompt }],
+      null, // no system prompt — the prompt carries all instructions, as before
+      { model: (typeof model === 'string' && model.trim()) || OPENAI_MODEL, webSearch: false }
+    );
+    if (!result.ok) {
+      res.status(502).json({ error: `OpenAI API error: ${result.error}` });
       return;
     }
-
-    const data = await response.json();
-    const text = (data.choices?.[0]?.message?.content || '').trim();
-
-    res.status(200).json({ text });
+    res.status(200).json({ text: result.reply });
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
-}
+};

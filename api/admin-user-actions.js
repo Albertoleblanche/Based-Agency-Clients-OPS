@@ -14,6 +14,7 @@
 //           'create-member' | 'delete-user' | 'toggle-access', ...fields }
 
 const { createClient } = require('@supabase/supabase-js');
+const { CLAUDE_MODEL, OPENAI_MODEL } = require('../lib/ai-client');
 const { sendPushToUser } = require('../lib/push-notify');
 
 function generateTempPassword() {
@@ -38,7 +39,7 @@ async function validateAnthropicKey(apiKey, model) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: model || 'claude-sonnet-5', max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
+    body: JSON.stringify({ model: model || CLAUDE_MODEL, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
   });
   if (res.ok) return { ok: true };
   const data = await res.json().catch(() => null);
@@ -67,7 +68,7 @@ async function validateOpenAIKey(apiKey, baseUrl, model) {
     const res = await fetch(`${cleanUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: model || 'gpt-4o-mini', messages: [{ role: 'user', content: 'hi' }], max_tokens: 1 }),
+      body: JSON.stringify({ model: model || OPENAI_MODEL, messages: [{ role: 'user', content: 'hi' }], max_tokens: 1 }),
     });
     if (res.ok) return { ok: true };
     const data = await res.json().catch(() => null);

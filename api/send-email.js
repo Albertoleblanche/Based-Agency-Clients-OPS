@@ -2,7 +2,7 @@
 // runs after the person has reviewed the message and clicked "Send Email" in
 // the confirmation popup; nothing here fires automatically on its own.
 
-const { createClient } = require('@supabase/supabase-js');
+const { requireTeamMember } = require('../lib/require-team-member');
 
 // Escapes plain text for safe inclusion in HTML, then converts line breaks
 // to <br> and blank lines to paragraph spacing — the body itself was
@@ -20,17 +20,33 @@ function plainTextToHtml(text) {
 // Table-based layout with inline styles throughout — standard practice for
 // HTML email specifically because flexbox/grid and <style> blocks aren't
 // reliably supported across mail clients, unlike in this app's own UI.
-function buildSignatureHtml(sig) {
-  if (!sig || !(sig.companyName || sig.phone || sig.email || sig.website || sig.address || sig.logoUrl)) return '';
+function escapeHtml(v) {
+  return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+// Only web links in the signature — never javascript: or other schemes.
+function safeHttpUrl(u) {
+  const s = String(u || '').trim();
+  return /^https?:\/\//i.test(s) ? s : '';
+}
+
+function buildSignatureHtml(rawSig) {
+  if (!rawSig || !(rawSig.companyName || rawSig.phone || rawSig.email || rawSig.website || rawSig.address || rawSig.logoUrl)) return '';
+  // Escape every admin-entered value once, up front, since all of it ends
+  // up inside HTML sent to clients.
+  const sig = {
+    companyName: escapeHtml(rawSig.companyName), phone: escapeHtml(rawSig.phone), email: escapeHtml(rawSig.email),
+    website: escapeHtml(rawSig.website), address: escapeHtml(rawSig.address), teamLine: rawSig.teamLine,
+    logoUrl: escapeHtml(safeHttpUrl(rawSig.logoUrl)),
+  };
   const brand = '#E8622C';
-  const teamLines = String(sig.teamLine || '').split('\n').map(l => l.trim()).filter(Boolean);
+  const teamLines = String(sig.teamLine || '').split('\n').map(l => escapeHtml(l.trim())).filter(Boolean);
   const contactRow = (icon, text, href) => {
     if (!text) return '';
     const inner = href ? `<a href="${href}" style="color:#333333;text-decoration:underline;">${text}</a>` : text;
     return `<tr><td style="padding:0 0 6px;font-size:13px;color:#333333;font-family:Arial,Helvetica,sans-serif;"><span style="color:${brand};margin-right:6px;">${icon}</span>${inner}</td></tr>`;
   };
-  const websiteHref = sig.website ? (sig.website.startsWith('http') ? sig.website : `https://${sig.website}`) : null;
-  const phoneHref = sig.phone ? `tel:${sig.phone.replace(/[^0-9+]/g, '')}` : null;
+  const websiteHref = rawSig.website ? escapeHtml(/^https?:\/\//i.test(rawSig.website) ? rawSig.website : `https://${rawSig.website}`) : null;
+  const phoneHref = rawSig.phone ? `tel:${String(rawSig.phone).replace(/[^0-9+]/g, '')}` : null;
   return `
     <table cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;font-family:Arial,Helvetica,sans-serif;">
       <tr><td style="font-weight:bold;font-size:14px;color:#1a1a1a;padding-bottom:12px;">Thank you,</td></tr>
@@ -59,6 +75,11 @@ module.exports = async function handler(req, res) {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
+
+  // Signed-in team members only. Without this, anyone who found the URL
+  // could send any message to anyone from the agency's sending address.
+  const auth = await requireTeamMember(req, res);
+  if (!auth) return;
 
   const { to, subject, body, includeSignature } = req.body || {};
   if (!to || !subject || !body) {
@@ -94,23 +115,18 @@ module.exports = async function handler(req, res) {
   // content itself lives in admin Settings, not here, so it can be updated
   // without touching this file.
   if (includeSignature) {
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (supabaseUrl && serviceKey) {
-      try {
-        const admin = createClient(supabaseUrl, serviceKey);
-        const { data: settingsRow } = await admin.from('app_storage').select('value').eq('key', 'settings').maybeSingle();
-        const settings = settingsRow ? JSON.parse(settingsRow.value) : {};
-        const signatureHtml = buildSignatureHtml(settings.emailSignature);
-        if (signatureHtml) {
-          emailPayload.html = plainTextToHtml(body) + signatureHtml;
-        }
-      } catch (e) {
-        // A signature failing to load is not worth blocking the send over —
-        // falls through to a plain-text send below instead of erroring out
-        // on something the person already reviewed and approved.
-        console.error('Could not build email signature, sending without it', e);
+    try {
+      const { data: settingsRow } = await auth.admin.from('app_storage').select('value').eq('key', 'settings').maybeSingle();
+      const settings = settingsRow ? JSON.parse(settingsRow.value) : {};
+      const signatureHtml = buildSignatureHtml(settings.emailSignature);
+      if (signatureHtml) {
+        emailPayload.html = plainTextToHtml(body) + signatureHtml;
       }
+    } catch (e) {
+      // A signature failing to load is not worth blocking the send over —
+      // falls through to a plain-text send below instead of erroring out
+      // on something the person already reviewed and approved.
+      console.error('Could not build email signature, sending without it', e);
     }
   }
 
