@@ -95,7 +95,7 @@
 .claude-msg-assistant li:last-child{margin-bottom:0;}
 .claude-msg-assistant li>ul,.claude-msg-assistant li>ol{margin-top:4px;}
 .claude-msg-assistant strong{font-weight:700;color:var(--ink);}
-.claude-msg-assistant code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:var(--surface-2);padding:1px 5px;border-radius:4px;}
+.claude-msg-assistant code{font-family:var(--font-mono);font-size:12px;background:var(--surface-2);padding:1px 5px;border-radius:4px;}
 .claude-msg-assistant pre{background:var(--surface-2);border-radius:8px;padding:10px 12px;overflow-x:auto;margin:0 0 10px;}
 .claude-msg-assistant pre code{background:none;padding:0;}
 .claude-msg-assistant a{color:var(--brand-dark);text-decoration:underline;}

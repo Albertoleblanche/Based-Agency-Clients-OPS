@@ -7,7 +7,11 @@
    the window chrome (sidebar, toolbar, menus). Inspired by Dorax's v6 look.
    Component styles live in css/macos.css; these tokens drive both. */
 :root{
-  --font:"Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  /* Apple's San Francisco on Mac, iPhone and iPad (the system font — Apple
+     doesn't license SF for web embedding, so it's used where it's installed).
+     Everywhere else Inter, the closest open match, loads instead. */
+  --font:-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono:ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
   color-scheme: light;
 
   /* surfaces */

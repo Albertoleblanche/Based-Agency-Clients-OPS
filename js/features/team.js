@@ -70,7 +70,7 @@ function renderTeam(){
     const roleAtCompany = m.title || roleDisplayLabel(m.role);
     return `<div class="team-card ${isRevoked?'revoked':''}">
       ${isAdmin() ? `<button class="icon-menu-btn team-card-menu-btn" onclick='toggleTeamActionsMenu(event, ${escapeHtml(JSON.stringify({id:m.id,name:m.name,access_revoked:isRevoked}))})' title="Actions">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+        <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M112,60a16,16,0,1,1,16,16A16,16,0,0,1,112,60Zm16,52a16,16,0,1,0,16,16A16,16,0,0,0,128,112Zm0,68a16,16,0,1,0,16,16A16,16,0,0,0,128,180Z"/></svg>
       </button>` : ''}
       ${teamCardAvatarHtml(m)}
       <div class="team-card-name">${escapeHtml(m.name)}${isSelf?' · you':''}</div>
