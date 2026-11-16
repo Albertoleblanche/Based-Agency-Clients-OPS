@@ -138,11 +138,9 @@ function renderKpis(){
     : aec.filter(c=>getDraftFor(c, me).draftStatus==='pending' && c.improvements.some(i=>i.author===me)).length;
   // Approval Queue is personal now — the sidebar badge needs to match what
   // that page actually shows, not every pending draft on the whole roster.
-  // Also requires includeInEmail!==false on the matching improvement,
-  // matching renderQueue()'s own shownImprovements check — otherwise this
-  // could count a client whose only improvements from "me" are marked
-  // "not in email," which the page itself would never show a card for.
-  const myPending = aec.filter(c=>getDraftFor(c, me).draftStatus==='pending' && c.improvements.filter(i=>improvementInDateRange(i, false) && i.includeInEmail!==false).some(i=>i.author===me)).length;
+  // Uses the page's own card rule (queueCardEligible) so the badge never
+  // counts a client the page wouldn't show a card for.
+  const myPending = aec.filter(c=>getDraftFor(c, me).draftStatus==='pending' && queueCardEligible(getDraftFor(c, me), c.improvements.filter(i=>i.author===me && improvementInDateRange(i, false)))).length;
   document.getElementById('navPendingBadge').textContent = myPending;
   // Team Queue shows every APPROVED draft, plus pending drafts the owning
   // member has explicitly marked Ready to Notify — not every pending draft
@@ -153,16 +151,12 @@ function renderKpis(){
   // this same check. Counted per-(client, author) pair now, same as Team
   // Queue's own count — the same client can legitimately count once per
   // contributing member, not just once overall.
-  // Also requires at least one improvement actually marked "include in
-  // email" — matching renderTeamQueue()'s own shownImprovements check.
-  // Without this, a client could pass readyForReview() (e.g. approved)
-  // while every one of its improvements has since been excluded (see
-  // approveDraft(), which clears include_in_email for whatever was
-  // actually part of that approval) — counted here, but showing no card
-  // on the page itself, which is exactly the mismatch this comment
-  // originally warned about. Deliberately ignores the Team Queue page's
-  // own date filter dropdown — a persistent nav badge shouldn't silently
-  // change count based on a filter state that lives on a different page.
+  // Uses the page's own card rule (queueCardEligible), so an approved
+  // draft whose improvements were marked "not in email" by approval still
+  // counts — the page shows it too, ready to send. Deliberately ignores
+  // the Team Queue page's own date filter dropdown — a persistent nav
+  // badge shouldn't change count based on a filter that lives on another
+  // page.
   const teamPendingBadge = document.getElementById('navTeamPendingBadge');
   if(teamPendingBadge){
     // Mirrors renderTeamQueue()'s own readyForReview() exactly, including
@@ -183,7 +177,7 @@ function renderKpis(){
       return d.readyToNotify===true;
     };
     teamPendingBadge.textContent = teamProfiles.reduce((total, member) => {
-      const count = aec.filter(c => c.improvements.some(i=>i.author===member.name && i.includeInEmail!==false) && readyForReview(c, member.name)).length;
+      const count = aec.filter(c => queueCardEligible(getDraftFor(c, member.name), c.improvements.filter(i=>i.author===member.name)) && readyForReview(c, member.name)).length;
       return total + count;
     }, 0);
   }
