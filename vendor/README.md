@@ -16,3 +16,7 @@ npm, except that source-map comments were removed.
 License texts are in `licenses/`. To upgrade one: download the new build, add it
 here with the version in the file name, update its tag in `index.html` (and
 `mobile.html` for Supabase), and delete the old file.
+
+## Icons
+
+The app's icons are [Phosphor Icons](https://phosphoricons.com) (@phosphor-icons/core 2.1.1, MIT), pasted inline as SVG, so there's no icon file or font to load. Regular icons get a 4-unit outline stroke (`stroke-width="4"` on a 256-unit grid), which brings them to the weight of Apple's SF Symbols at 13–18px. Very small or emphasised icons use the Bold set, and selected sidebar and tab-bar items switch to the Fill set. To add an icon, copy its `<path>` from the Phosphor site's SVG export and keep the same `<svg>` attributes as the icons next to it.

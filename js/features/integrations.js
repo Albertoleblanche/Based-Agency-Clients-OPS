@@ -63,7 +63,7 @@ function renderSlackChannelsList(){
       const mapping = slackClientChannels[c.id];
       return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
         <span style="flex:1;font-size:13px;font-weight:600;">${escapeHtml(c.name)}</span>
-        <input type="text" id="slackChanInput-${c.id}" placeholder="C0123456789" value="${mapping ? escapeHtml(mapping.channelId) : ''}" ${canEdit ? '' : 'disabled'} style="flex:1;font-size:12.5px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);font-family:monospace;${canEdit ? '' : 'background:var(--surface-2);color:var(--muted);'}">
+        <input type="text" id="slackChanInput-${c.id}" placeholder="C0123456789" value="${mapping ? escapeHtml(mapping.channelId) : ''}" ${canEdit ? '' : 'disabled'} style="flex:1;font-size:12.5px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);font-family:var(--font-mono);${canEdit ? '' : 'background:var(--surface-2);color:var(--muted);'}">
         ${canEdit ? `<button class="btn btn-outline" style="flex:none;padding:6px 10px;min-height:auto;font-size:11.5px;" onclick="saveSlackChannelMapping('${c.id}')">Save</button>` : ''}
       </div>`;
     }).join('') || `<p style="font-size:12px;color:var(--muted-lt);">${query ? 'No clients match your search.' : 'No active clients yet.'}</p>`}

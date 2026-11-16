@@ -164,33 +164,33 @@ function renderClientDetail(){
 
   document.getElementById('cdMetrics').innerHTML = `
     <div class="metric-card">
-      <div class="metric-head"><span class="metric-icon metric-icon-blue"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="metric-label">Status</span></div>
+      <div class="metric-head"><span class="metric-icon metric-icon-blue"><svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M117.25,157.92a60,60,0,1,0-66.5,0A95.83,95.83,0,0,0,3.53,195.63a8,8,0,1,0,13.4,8.74,80,80,0,0,1,134.14,0,8,8,0,0,0,13.4-8.74A95.83,95.83,0,0,0,117.25,157.92ZM40,108a44,44,0,1,1,44,44A44.05,44.05,0,0,1,40,108Zm210.14,98.7a8,8,0,0,1-11.07-2.33A79.83,79.83,0,0,0,172,168a8,8,0,0,1,0-16,44,44,0,1,0-16.34-84.87,8,8,0,1,1-5.94-14.85,60,60,0,0,1,55.53,105.64,95.83,95.83,0,0,1,47.22,37.71A8,8,0,0,1,250.14,206.7Z"/></svg></span><span class="metric-label">Status</span></div>
       <div class="metric-value" style="font-size:19px;">${escapeHtml(c.status)}</div>
       <div class="metric-chips"><span class="pill ${statusPillClass(c.status)}">${escapeHtml(c.status)}</span></div>
     </div>
     <div class="metric-card">
-      <div class="metric-head"><span class="metric-icon metric-icon-blue"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span><span class="metric-label">Months Active</span></div>
+      <div class="metric-head"><span class="metric-icon metric-icon-blue"><svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM72,48v8a8,8,0,0,0,16,0V48h80v8a8,8,0,0,0,16,0V48h24V80H48V48ZM208,208H48V96H208V208Z"/></svg></span><span class="metric-label">Months Active</span></div>
       <div class="metric-value" style="font-size:19px;">${monthsActive===null ? '—' : monthsActive}</div>
       <div class="metric-caption">${monthsActive===null ? 'Set a start date to track this' : `Since ${new Date(c.startDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`}</div>
     </div>
     <div class="metric-card">
-      <div class="metric-head"><span class="metric-icon metric-icon-purple"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span><span class="metric-label">Importance / Danger</span></div>
+      <div class="metric-head"><span class="metric-icon metric-icon-purple"><svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M240,128a8,8,0,0,1-8,8H204.94l-37.78,75.58A8,8,0,0,1,160,216h-.4a8,8,0,0,1-7.08-5.14L95.35,60.76,63.28,131.31A8,8,0,0,1,56,136H24a8,8,0,0,1,0-16H50.85L88.72,36.69a8,8,0,0,1,14.76.46l57.51,151,31.85-63.71A8,8,0,0,1,200,120h32A8,8,0,0,1,240,128Z"/></svg></span><span class="metric-label">Importance / Danger</span></div>
       <div class="metric-value" style="font-size:19px;">${c.importance}/10 · ${c.danger}/5</div>
       <div class="metric-chips">${riskCaptionHtml(c.danger)}</div>
     </div>
     <div class="metric-card">
-      <div class="metric-head"><span class="metric-icon metric-icon-green"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span><span class="metric-label">Total Time Logged</span></div>
+      <div class="metric-head"><span class="metric-icon metric-icon-green"><svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z"/></svg></span><span class="metric-label">Total Time Logged</span></div>
       <div class="metric-value">${formatMinutes(totalMinutes)}</div>
       <div class="metric-caption">${myTimeEntries.length} entr${myTimeEntries.length!==1?'ies':'y'}, all time</div>
     </div>
     <div class="metric-card">
-      <div class="metric-head"><span class="metric-icon metric-icon-amber"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></span><span class="metric-label">Improvements</span></div>
+      <div class="metric-head"><span class="metric-icon metric-icon-amber"><svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M229.66,58.34l-32-32a8,8,0,0,0-11.32,0l-96,96A8,8,0,0,0,88,128v32a8,8,0,0,0,8,8h32a8,8,0,0,0,5.66-2.34l96-96A8,8,0,0,0,229.66,58.34ZM124.69,152H104V131.31l64-64L188.69,88ZM200,76.69,179.31,56,192,43.31,212.69,64ZM224,128v80a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V48A16,16,0,0,1,48,32h80a8,8,0,0,1,0,16H48V208H208V128a8,8,0,0,1,16,0Z"/></svg></span><span class="metric-label">Improvements</span></div>
       <div class="metric-value">${c.improvements.length}</div>
       <div class="metric-caption">Logged all time</div>
     </div>
     ${budget ? `
     <div class="metric-card">
-      <div class="metric-head"><span class="metric-icon" style="background:${budgetTierMeta(budget.tier).pill==='pill-bad'?'var(--red-bg)':budget.tier==='warn'?'var(--amber-bg)':'var(--green-bg)'};color:${budgetTierMeta(budget.tier).color};"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span><span class="metric-label">Monthly Budget</span></div>
+      <div class="metric-head"><span class="metric-icon" style="background:${budgetTierMeta(budget.tier).pill==='pill-bad'?'var(--red-bg)':budget.tier==='warn'?'var(--amber-bg)':'var(--green-bg)'};color:${budgetTierMeta(budget.tier).color};"><svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z"/></svg></span><span class="metric-label">Monthly Budget</span></div>
       <div class="metric-value" style="font-size:19px;">${(budget.usedMinutes/60).toFixed(1)}h <span style="color:var(--muted-lt);font-weight:400;font-size:14px;">of ${(budget.budgetMinutes/60).toFixed(1)}h</span></div>
       <div class="metric-chips"><span class="pill ${budgetTierMeta(budget.tier).pill}">${escapeHtml(budgetTierMeta(budget.tier).label)} · ${budget.pct}%</span></div>
     </div>` : ''}`;
