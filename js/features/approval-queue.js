@@ -355,32 +355,56 @@ function improvementInDateRange(imp, isTeam){
   return true;
 }
 
-// Mirrors renderQueue()'s own filter chain exactly (status, date range,
-// personal author scoping) so each tab's badge always matches precisely
-// what clicking that tab would actually show — not an approximation of it.
-function queueFilterCount(filterKey){
-  const ac = activeClients();
+// Whether one author's work for a client earns a card. Unsent work
+// ("include in email") always does. So does a live draft — pending, or
+// approved and not yet archived — as long as that author logged something
+// in range: approving a draft marks the improvements it used as "not in
+// email" so they aren't offered again next week, and without this rule the
+// card vanished the moment it was approved — still counted on the filter
+// chips, but with nothing to open, send or archive. A sent draft is
+// archived by clearing its text (see archiveSentDraft()), which is what
+// takes it off the board. `mine` = this author's improvements, already
+// narrowed to the active date range by the caller.
+function queueCardEligible(d, mine){
+  if(mine.some(i => i.includeInEmail !== false)) return true;
+  const liveDraft = (d.draftStatus === 'pending' || d.draftStatus === 'approved') && !!d.draft;
+  return liveDraft && mine.length > 0;
+}
+
+// The single source of truth for the personal Approval Queue: which
+// clients show under a filter chip. renderQueue() draws exactly these rows
+// and the chip badges count exactly these rows, so a badge can never
+// promise cards the list doesn't show. Sorted by danger, then importance.
+function personalQueueClients(filterKey){
   const me = myName();
   // Once sent, a client is archived out of every other tab entirely — see
-  // the matching comment in renderTeamQueue()'s statusMatches for the
-  // full reasoning; same rule applied here so the count badges always
-  // match what each tab actually shows. Reads MY OWN draft per client
-  // (getDraftFor) — this page has always been personal.
+  // the matching comment in renderTeamQueue()'s statusMatches. Reads MY OWN
+  // draft for each client (getDraftFor) — this page has always been
+  // personal, and draft state is per-author (see addendum-25.sql).
   const isSentDraft = (c) => { const d = getDraftFor(c, me); return d.draftStatus==='approved' && !!d.draftSentAt; };
-  let sorted = ac;
-  if(filterKey==='sent') sorted = sorted.filter(isSentDraft);
+  let list = [...activeClients()].sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
+  if(filterKey==='sent') list = list.filter(isSentDraft);
   else {
-    sorted = sorted.filter(c=>!isSentDraft(c));
-    if(filterKey==='pending') sorted = sorted.filter(c=>getDraftFor(c, me).draftStatus==='pending');
-    else if(filterKey==='approved') sorted = sorted.filter(c=>getDraftFor(c, me).draftStatus==='approved');
-    else if(filterKey==='none') sorted = sorted.filter(c=>getDraftFor(c, me).draftStatus==='none');
-    else if(filterKey==='atrisk') sorted = sorted.filter(c=>c.danger>=4);
-    else if(filterKey==='stale') sorted = sorted.filter(c=>getDraftFor(c, me).draftStatus==='approved' && hasLoggedThisWeek(c));
+    list = list.filter(c=>!isSentDraft(c));
+    if(filterKey==='pending') list = list.filter(c=>getDraftFor(c, me).draftStatus==='pending');
+    else if(filterKey==='approved') list = list.filter(c=>getDraftFor(c, me).draftStatus==='approved');
+    else if(filterKey==='none') list = list.filter(c=>getDraftFor(c, me).draftStatus==='none');
+    else if(filterKey==='atrisk') list = list.filter(c=>c.danger>=4);
+    else if(filterKey==='stale') list = list.filter(c=>getDraftFor(c, me).draftStatus==='approved' && hasLoggedThisWeek(c));
   }
-  let rows = sorted.map(c => ({ c, shownImprovements: c.improvements.filter(i=>improvementInDateRange(i, false)) }));
-  if(dateFilterMode !== 'all') rows = rows.filter(r => r.shownImprovements.length > 0);
-  rows = rows.filter(r => r.shownImprovements.some(i => i.author === me));
-  return rows.length;
+  // Always personal — only clients the current user themselves logged
+  // something for (within the current date filter). The team-wide view
+  // lives on its own Team Queue page.
+  return list.filter(c => queueCardEligible(
+    getDraftFor(c, me),
+    c.improvements.filter(i => i.author===me && improvementInDateRange(i, false))
+  ));
+}
+
+// Each chip's badge is the number of cards that chip shows — same rows
+// renderQueue() draws, from personalQueueClients().
+function queueFilterCount(filterKey){
+  return personalQueueClients(filterKey).length;
 }
 
 function updateQueueFilterCounts(){
@@ -415,42 +439,14 @@ function renderQueue(){
     'Add a client to start tracking their drafts and improvements.',
     '<button class="btn btn-brand" onclick="switchView(\'clients\')">Go to Clients</button>'
   )}</div>`; return; }
-  let sorted = [...ac].sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
   const me = myName();
-  // Once sent, a client is archived out of every other tab entirely — see
-  // the matching comment in renderTeamQueue()'s statusMatches for the
-  // full reasoning. Checked first so every branch below (including the
-  // 'all' fallback) never needs its own separate exclusion. Reads MY OWN
-  // draft for each client now (getDraftFor), not a single shared slot on
-  // the client — this page has always been personal, and draft state
-  // itself is now genuinely per-author too (see addendum-25.sql).
-  const isSentDraft = (c) => { const d = getDraftFor(c, me); return d.draftStatus==='approved' && !!d.draftSentAt; };
-  if(queueFilter==='sent') sorted = sorted.filter(isSentDraft);
-  else {
-    sorted = sorted.filter(c=>!isSentDraft(c));
-    if(queueFilter==='pending') sorted = sorted.filter(c=>getDraftFor(c, me).draftStatus==='pending');
-    else if(queueFilter==='approved') sorted = sorted.filter(c=>getDraftFor(c, me).draftStatus==='approved');
-    else if(queueFilter==='none') sorted = sorted.filter(c=>getDraftFor(c, me).draftStatus==='none');
-    else if(queueFilter==='atrisk') sorted = sorted.filter(c=>c.danger>=4);
-    else if(queueFilter==='stale') sorted = sorted.filter(c=>getDraftFor(c, me).draftStatus==='approved' && hasLoggedThisWeek(c));
-  }
-
-  // Attach the date-filtered improvement subset per client, and drop
-  // clients with none when a date filter is active. Also excludes
-  // improvements explicitly marked "Not in email" — a client whose only
-  // logged work in range is excluded from the update has nothing
-  // actually pending review, so they shouldn't get a card here at all.
-  let rows = sorted.map(c => ({ c, shownImprovements: c.improvements.filter(i=>improvementInDateRange(i, false) && i.includeInEmail!==false) }));
-  if(dateFilterMode !== 'all') rows = rows.filter(r => r.shownImprovements.length > 0);
-
-  // Always personal — only clients the current user themselves logged
-  // something for (within the current date filter). The full team-wide
-  // view lives on its own separate Team Queue page now, not as a toggle here.
-  rows = rows.filter(r => r.shownImprovements.some(i => i.author === me));
+  const rows = personalQueueClients(queueFilter);
 
   if(!rows.length){
-    const title = "You haven't logged anything yet";
-    const sub = dateFilterMode==='all' ? "Log an improvement for a client to see it show up here." : "Nothing from you in this range — try All time, or check Team Queue to see everyone's.";
+    const filtered = queueFilter !== 'all';
+    const title = filtered ? 'Nothing in this tab' : "You haven't logged anything yet";
+    const sub = dateFilterMode!=='all' ? "Nothing from you in this range — try All time, or check Team Queue to see everyone's."
+      : filtered ? 'None of your clients are at this stage right now.' : 'Log an improvement for a client to see it show up here.';
     el.innerHTML = `<div class="panel">${emptyStateHtml(
       '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
       title, sub
@@ -462,15 +458,17 @@ function renderQueue(){
   // clients they logged something for, but the card itself (count, list)
   // should reflect only their own contribution too, not a combined total
   // that happens to include a colleague's work on the same client.
-  el.innerHTML = `<div class="queue-grid">` + rows.map(({c})=>queueCardHtml(c, me)).join('') + `</div>`;
+  el.innerHTML = `<div class="queue-grid">` + rows.map(c=>queueCardHtml(c, me)).join('') + `</div>`;
 }
 
-// Mirrors renderTeamQueue()'s own status+date filter chain — team-wide, no
-// personal author scoping, matching what that page itself actually shows.
-function teamQueueFilterCount(filterKey){
-  const ac = activeClients();
-  // Mirrors renderTeamQueue()'s own per-(client, author) filter chain
-  // exactly, so the count badges always match what's actually displayed.
+// The single source of truth for Team Queue: which of one member's clients
+// show under a filter chip, with the panel filters (client, danger,
+// importance) and the date filter applied. renderTeamQueue() draws exactly
+// these and the chip badges count exactly these.
+function teamQueueMemberClients(member, filterKey){
+  // Per-(client, author) checks — draft state is scoped to one team
+  // member's own contribution (see addendum-25.sql). Once sent, a draft is
+  // archived out of every tab except the dedicated Sent tab.
   const isSentDraft = (c, author) => { const d = getDraftFor(c, author); return d.draftStatus==='approved' && !!d.draftSentAt; };
   const statusMatches = (c, author) => {
     const d = getDraftFor(c, author);
@@ -482,16 +480,11 @@ function teamQueueFilterCount(filterKey){
     if(filterKey==='stale') return d.draftStatus==='approved' && hasLoggedThisWeek(c, author);
     return true;
   };
-  // A client is only ever visible in Team Queue once there's an actual
-  // draft an approver could act on — approved drafts always qualify,
-  // pending ones only once the owning member has explicitly clicked
-  // Ready to Notify and completed the actual send. Clients still at
-  // 'none' (logged but no draft generated yet) are never visible here,
-  // regardless of which filter chip is selected — that's purely a
-  // member's own, private working state until they generate and notify.
-  // Exception: an admin/approver's own clients always show, regardless of
-  // draft status — see the matching comment on renderTeamQueue()'s own
-  // readyForReview() for the full reasoning.
+  // Pending drafts stay hidden until the owning member clicks Ready to
+  // Notify; clients still at 'none' are that member's private working
+  // state. Exception: an admin/approver's own clients always show — they
+  // have no personal Approval Queue tab (see applyRoleVisibility()), so
+  // Team Queue is where they take their own work from logged to sent.
   const readyForReview = (c, author) => {
     if(author===myName() && canApprove()) return true;
     const d = getDraftFor(c, author);
@@ -499,19 +492,22 @@ function teamQueueFilterCount(filterKey){
     if(d.draftStatus!=='pending') return false;
     return d.readyToNotify===true;
   };
-  // Same client can legitimately count under multiple members (if more
-  // than one person logged work for it), so the true count is the total
-  // across every member's own section combined, not distinct clients.
+  return activeClients()
+    .filter(c => teamQueueClientFilter==='all' || c.id===teamQueueClientFilter)
+    .filter(c => c.danger >= (Number(teamQueueDangerFilter)||0))
+    .filter(c => c.importance >= (Number(teamQueueImportanceFilter)||0))
+    .filter(c => queueCardEligible(getDraftFor(c, member.name), c.improvements.filter(i => i.author===member.name && improvementInDateRange(i, true))))
+    .filter(c => statusMatches(c, member.name) && readyForReview(c, member.name))
+    .sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
+}
+
+// Same client can legitimately count under several members (if more than
+// one person logged work for it), so the count is the total across every
+// member's own section — exactly the number of cards on the page.
+function teamQueueFilterCount(filterKey){
   return teamProfiles.reduce((total, member) => {
     if(teamQueueMemberFilter !== 'all' && member.name !== teamQueueMemberFilter) return total;
-    const memberCount = ac
-      .filter(c => teamQueueClientFilter==='all' || c.id===teamQueueClientFilter)
-      .filter(c => c.danger >= (Number(teamQueueDangerFilter)||0))
-      .filter(c => c.importance >= (Number(teamQueueImportanceFilter)||0))
-      .filter(c => c.improvements.some(i=>improvementInDateRange(i, true) && i.includeInEmail!==false && i.author===member.name))
-      .filter(c => statusMatches(c, member.name) && readyForReview(c, member.name))
-      .length;
-    return total + memberCount;
+    return total + teamQueueMemberClients(member, filterKey).length;
   }, 0);
 }
 
@@ -539,67 +535,10 @@ function renderTeamQueue(){
     '<button class="btn btn-brand" onclick="switchView(\'clients\')">Go to Clients</button>'
   )}</div>`; return; }
 
-  // Per-(client, author) checks now, not per-client — draft state is
-  // scoped to one team member's own contribution (see addendum-25.sql),
-  // so "does this draft match the filter" has to ask about a specific
-  // member's draft for a specific client, not a single shared status.
-  // Once sent, a client is archived out of every other tab entirely —
-  // only the dedicated Sent tab shows it. Checked first and returns
-  // immediately either way, so every other filter branch below (including
-  // the 'all' fallback) never needs its own separate exclusion for this.
-  const isSentDraft = (c, author) => { const d = getDraftFor(c, author); return d.draftStatus==='approved' && !!d.draftSentAt; };
-  const statusMatches = (c, author) => {
-    const d = getDraftFor(c, author);
-    if(teamQueueFilter==='sent') return isSentDraft(c, author);
-    if(isSentDraft(c, author)) return false;
-    if(teamQueueFilter==='pending') return d.draftStatus==='pending';
-    if(teamQueueFilter==='approved') return d.draftStatus==='approved';
-    if(teamQueueFilter==='none') return d.draftStatus==='none';
-    if(teamQueueFilter==='stale') return d.draftStatus==='approved' && hasLoggedThisWeek(c, author);
-    return true;
-  };
-  // Pending drafts stay hidden from Team Queue until the owning member
-  // explicitly clicks Ready to Notify and completes the actual send —
-  // that's the genuine signal something is ready for an approver's
-  // attention, not the mere existence of a generated draft. Clients
-  // still at 'none' (logged but no draft generated at all) are never
-  // visible here — that's purely a member's own private working state.
-  // Exception: an admin/approver's own clients always show here,
-  // regardless of draft status — they have no separate personal queue to
-  // work from anymore (see applyRoleVisibility()'s removal of their
-  // Approval Queue tab), so Team Queue has to be where they can go from
-  // "just logged work, no draft generated yet" all the way through
-  // generate/approve/send for their own contributions. Checked first and
-  // returns immediately either way — the draftStatus checks below only
-  // ever apply to a colleague's work, never the viewer's own.
-  const readyForReview = (c, author) => {
-    if(author===myName() && canApprove()) return true;
-    const d = getDraftFor(c, author);
-    if(d.draftStatus==='approved') return true;
-    if(d.draftStatus!=='pending') return false;
-    return d.readyToNotify===true;
-  };
-
   const sortedMembers = [...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name));
   const sectionsHtml = sortedMembers.map(member => {
     if(teamQueueMemberFilter !== 'all' && member.name !== teamQueueMemberFilter) return '';
-    // Date-filtered improvement subset per client, scoped to this
-    // specific member — a client only earns a card in this section if
-    // THIS member actually logged something eligible for it, and their
-    // OWN draft for it matches the current filter. Also excludes
-    // improvements marked "Not in email" — a client with nothing but
-    // excluded logs has nothing actually pending review, so it shouldn't
-    // get a card here at all. Unlike the date-range part of this filter,
-    // this check always applies regardless of date filter mode — "in
-    // email or not" isn't a date question, so "All time" mode shouldn't
-    // bypass it the way it intentionally bypasses the date check.
-    const memberClients = ac
-      .filter(c => teamQueueClientFilter==='all' || c.id===teamQueueClientFilter)
-      .filter(c => c.danger >= (Number(teamQueueDangerFilter)||0))
-      .filter(c => c.importance >= (Number(teamQueueImportanceFilter)||0))
-      .filter(c => c.improvements.some(i=>improvementInDateRange(i, true) && i.includeInEmail!==false && i.author===member.name))
-      .filter(c => statusMatches(c, member.name) && readyForReview(c, member.name))
-      .sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
+    const memberClients = teamQueueMemberClients(member, teamQueueFilter);
     if(!memberClients.length) return '';
     return `<div class="team-queue-section">
       <div class="team-queue-member-head">
@@ -862,7 +801,10 @@ function queueActivityBadgeHtml(c, scopeAuthor){
     return `<div class="q-bulk-preview has-logs"><span class="pulse-dot"></span>${thisWeekCount} improvement${thisWeekCount!==1?'s':''} logged this week</div>`;
   }
 
-  const dated = emailRelevant.filter(i=>i.date);
+  // Work already used in an approved draft is marked "not in email" — it
+  // still counts as logged here, or an approved card would claim nothing
+  // was ever logged.
+  const dated = c.improvements.filter(i=>i.date && (!scopeAuthor || i.author===scopeAuthor));
   if(!dated.length){
     return `<div class="q-bulk-preview">No improvements logged yet</div>`;
   }
@@ -1137,34 +1079,36 @@ async function recordDraftSent(id, author){
   await saveDraftFor(id, author, { draftSentAt: new Date().toISOString(), draftSentBy: myName() || 'Someone' });
 }
 
-// Archives a sent draft off the board — marks every one of this author's
-// currently-eligible improvements for this client as excluded from email,
-// the same toggle used elsewhere on Past Improvements. That flag is
-// exactly what determines whether a client earns a card in Team Queue at
-// all (see renderTeamQueue()'s own memberClients filter, which requires
-// at least one includeInEmail!==false improvement to exist) — so once
-// archived, the card disappears from every tab including Sent, and the
-// Sent count itself drops to match, without needing any separate
-// "archived" flag or filter of its own.
+// Archives a sent draft off the board. Clears the sent draft's text —
+// that's what queueCardEligible() reads as "no live draft any more" — and
+// marks any of this author's still-unsent improvements for this client as
+// excluded from email (the same toggle used on Past Improvements), so the
+// card disappears from every tab including Sent and the Sent count drops to
+// match. The draft keeps its Approved/Sent status and sent date, so Weekly
+// Completion still counts it.
 async function archiveSentDraft(clientId, author){
   const c = clients.find(x=>x.id===clientId);
   if(!c) return;
   const toArchive = c.improvements.filter(i=>i.author===author && i.includeInEmail!==false);
-  if(!toArchive.length){ renderTeamQueue(); return; }
   const btn = clickedBtn();
   setBtnLoading(btn, 'Archiving…');
-  const ids = toArchive.map(i=>i.id);
-  // .select() after .update() to confirm every targeted row was actually
-  // affected — same RLS-block detection pattern used elsewhere on this
-  // table (see toggleImprovementIncludeInEmail()), since a silently
-  // blocked update reports success while changing nothing.
-  const { data, error } = await supabaseClient.from('client_improvements').update({ include_in_email: false }).in('id', ids).select();
-  const ok = !error && !!(data && data.length === ids.length);
-  if(error) console.error('archiveSentDraft failed', clientId, author, error);
-  else if(!ok) console.error('archiveSentDraft: update affected fewer rows than expected (likely blocked by RLS)', clientId, author);
-  if(ok) toArchive.forEach(i => { i.includeInEmail = false; });
+  let ok = true;
+  if(toArchive.length){
+    const ids = toArchive.map(i=>i.id);
+    // .select() after .update() to confirm every targeted row was actually
+    // affected — same RLS-block detection pattern used elsewhere on this
+    // table (see toggleImprovementIncludeInEmail()), since a silently
+    // blocked update reports success while changing nothing.
+    const { data, error } = await supabaseClient.from('client_improvements').update({ include_in_email: false }).in('id', ids).select();
+    ok = !error && !!(data && data.length === ids.length);
+    if(error) console.error('archiveSentDraft failed', clientId, author, error);
+    else if(!ok) console.error('archiveSentDraft: update affected fewer rows than expected (likely blocked by RLS)', clientId, author);
+    if(ok) toArchive.forEach(i => { i.includeInEmail = false; });
+  }
+  if(ok) ok = await saveDraftFor(clientId, author, { draft: '' });
   restoreBtn(btn);
   renderTeamQueue();
+  renderQueue();
   renderKpis();
   if(ok) showToast('success','Archived', `${author}'s sent update for ${c.name} is now archived.`);
   else showToast('error','Archive failed','Could not archive — try again.');
