@@ -49,6 +49,7 @@ Every screen has its own address — `#clients`, `#tasks`, `#calendar`,
 page: switching screens changes the address with `history.pushState`, so refresh,
 Back/Forward, bookmarks and shared links all work. The code is in
 `js/core/navigation.js` (`syncAddressToView`, `openScreenFromAddress`).
+- `core/desktop-app.js` — desktop-app behaviour: install as an app (own window, title bar), window colour, scrollbars that show while scrolling, right-click menus, keyboard shortcuts (styles in `css/desktop-app.css`).
 
 - A new screen gets an address automatically once it has a `view-<name>` element.
 - Addresses only open screens the person can reach from their sidebar; anything

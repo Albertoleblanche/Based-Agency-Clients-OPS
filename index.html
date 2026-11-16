@@ -3,6 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <title>Based Agency — Client Update Workflow</title>
+<!-- Installable as a desktop app (Chrome/Edge "Install"): own window and
+     taskbar icon, no browser bars, and the app draws its own title bar. -->
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#F5F5F7">
+<meta name="color-scheme" content="light dark">
 <script>
   // Redirect phones (not tablets) to the dedicated mobile-native
   // interface, unless the person has explicitly chosen to stay on
@@ -37,6 +44,7 @@
 <link rel="stylesheet" href="css/screens.css">
 <link rel="stylesheet" href="css/components.css">
 <link rel="stylesheet" href="css/macos.css">
+<link rel="stylesheet" href="css/desktop-app.css">
 <link rel="stylesheet" href="css/responsive.css">
 </head>
 <body>
@@ -181,6 +189,14 @@
         <div class="sidebar-profile-menu-item" onclick="closeSidebarProfileMenu(); startTour();">
           <svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216ZM172.42,72.84l-64,32a8.05,8.05,0,0,0-3.58,3.58l-32,64A8,8,0,0,0,80,184a8.1,8.1,0,0,0,3.58-.84l64-32a8.05,8.05,0,0,0,3.58-3.58l32-64a8,8,0,0,0-10.74-10.74ZM138,138,97.89,158.11,118,118l40.15-20.07Z"/></svg>
           <span>Take a tour</span>
+        </div>
+        <div class="sidebar-profile-menu-item" onclick="closeSidebarProfileMenu(); openShortcutsSheet();">
+          <svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M224,48H32A16,16,0,0,0,16,64V192a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V64A16,16,0,0,0,224,48Zm0,144H32V64H224V192Zm-16-64a8,8,0,0,1-8,8H56a8,8,0,0,1,0-16H200A8,8,0,0,1,208,128Zm0-32a8,8,0,0,1-8,8H56a8,8,0,0,1,0-16H200A8,8,0,0,1,208,96ZM72,160a8,8,0,0,1-8,8H56a8,8,0,0,1,0-16h8A8,8,0,0,1,72,160Zm96,0a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,168,160Zm40,0a8,8,0,0,1-8,8h-8a8,8,0,0,1,0-16h8A8,8,0,0,1,208,160Z"/></svg>
+          <span>Keyboard shortcuts</span>
+        </div>
+        <div class="sidebar-profile-menu-item" id="installAppMenuItem" style="display:none;" onclick="closeSidebarProfileMenu(); installDesktopApp();">
+          <svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,160H40V56H216V200ZM80,84A12,12,0,1,1,68,72,12,12,0,0,1,80,84Zm40,0a12,12,0,1,1-12-12A12,12,0,0,1,120,84Z"/></svg>
+          <span>Install as desktop app</span>
         </div>
         <div class="sidebar-profile-menu-item" onclick="switchToMobileVersion();">
           <svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M176,16H80A24,24,0,0,0,56,40V216a24,24,0,0,0,24,24h96a24,24,0,0,0,24-24V40A24,24,0,0,0,176,16ZM72,64H184V192H72Zm8-32h96a8,8,0,0,1,8,8v8H72V40A8,8,0,0,1,80,32Zm96,192H80a8,8,0,0,1-8-8v-8H184v8A8,8,0,0,1,176,224Z"/></svg>
@@ -1896,6 +1912,7 @@
 <script src="js/core/modals.js"></script>
 <script src="js/core/realtime.js"></script>
 <script src="js/core/navigation.js"></script>
+<script src="js/core/desktop-app.js"></script>
 <script src="js/ui/pickers.js"></script>
 <script src="js/ui/badges.js"></script>
 <script src="js/features/integrations.js"></script>
