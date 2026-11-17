@@ -352,8 +352,6 @@ body[data-theme="dark"] .login-card{box-shadow:0 0 0 .5px rgba(255,255,255,.12),
 #clientsTbody tr.client-row:focus{outline:none;}
 #clientsTbody tr.client-row:focus-visible td{box-shadow:inset 0 2px 0 var(--ring), inset 0 -2px 0 var(--ring);}
 #clientsTbody tr.client-row.sel td{background:var(--sidebar-active) !important;}
-.client-insp{flex:0 0 330px;position:sticky;top:84px;max-height:calc(100vh - 100px);overflow:auto;background:var(--card);
-  border-radius:12px;box-shadow:0 0 0 .5px var(--grp-line);padding:16px 18px 20px;}
 .client-insp[hidden]{display:none;}
 .ci-top{display:flex;align-items:flex-start;justify-content:space-between;}
 .ci-top .cd-mono{width:48px;height:48px;border-radius:12px;font-size:16px;}
@@ -379,27 +377,22 @@ body[data-theme="dark"] .login-card{box-shadow:0 0 0 .5px rgba(255,255,255,.12),
 .ci-act{display:flex;align-items:center;min-height:34px;padding:0 4px;border:0;border-bottom:.5px solid var(--grp-line);background:transparent;
   font:inherit;font-size:13px;color:var(--ink);text-align:left;cursor:pointer;text-decoration:none;}
 .ci-act:last-child{border-bottom:0;}
-.ci-act:hover{color:var(--brand);}
+.ci-act:hover{background:var(--fill);}
 .ci-danger{color:var(--red);}
 .ci-danger:hover{color:var(--red);text-decoration:underline;}
-@media (max-width:1100px){
-  .clients-split{flex-direction:column;}
-  .client-insp{position:static;flex-basis:auto;width:100%;max-height:none;}
-}
 #clientsTbody .client-cell .avatar-circle{border-radius:8px !important;background:var(--fill-2) !important;color:var(--ink) !important;font-weight:600;}
 
-/* The client panel is docked to the window's right edge — full height
-   under the toolbar, like an inspector in Finder or Mail — and the list
-   gives it room instead of being covered. Narrow windows keep it below. */
-@keyframes ciIn{from{transform:translateX(24px);opacity:0;}to{transform:none;opacity:1;}}
-@media (min-width:1100px){
-  .client-insp{position:fixed;top:64px;right:0;bottom:0;width:340px;max-height:none;z-index:90;border-radius:0;
-    background:var(--side-bg);box-shadow:inset .5px 0 0 var(--side-line);padding:18px 20px 28px;animation:ciIn 180ms cubic-bezier(.23,1,.32,1);}
-  .main:has(#view-clients.active #clientInspector:not([hidden])){margin-right:340px;}
-  .client-insp .cd-kv, .client-insp .ci-work, .client-insp .ci-act{border-color:var(--side-line);}
-  .client-insp .ci-log{background:var(--card);}
-}
+/* The client panel slides over the window from the right edge of the
+   screen — full height from the very top, over the toolbar, wide enough
+   to read — without moving or shrinking the table underneath. Sheets
+   opened from it (Edit, Track Time, New Note) still appear above it. */
+@keyframes ciIn{from{transform:translateX(100%);}to{transform:none;}}
+.clients-split{display:block;}
+.client-insp, .client-insp[style]{position:fixed !important;top:0;right:0;bottom:0;width:min(440px, 100vw);max-height:none;z-index:400;
+  border-radius:0;background:var(--side-bg);padding:20px 24px 32px;overflow:auto;
+  box-shadow:0 0 0 .5px var(--side-line), -16px 0 48px rgba(0,0,0,.14);animation:ciIn 220ms cubic-bezier(.32,.72,0,1);}
+body[data-theme="dark"] .client-insp{box-shadow:0 0 0 .5px var(--side-line), -16px 0 48px rgba(0,0,0,.5);}
+.client-insp .cd-kv, .client-insp .ci-work, .client-insp .ci-act{border-color:var(--side-line);}
+.client-insp .ci-log{background:var(--card);}
+body:has(#view-clients.active #clientInspector:not([hidden])) .claude-float-btn{right:calc(min(440px, 100vw) + 24px) !important;}
 @media (prefers-reduced-motion: reduce){ .client-insp{animation:none;} }
-@media (min-width:1100px){
-  body:has(#view-clients.active #clientInspector:not([hidden])) .claude-float-btn{right:364px !important;}
-}
