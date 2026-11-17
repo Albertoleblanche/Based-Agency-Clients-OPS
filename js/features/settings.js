@@ -14,7 +14,7 @@ function onIconFileSelected(e){
       <div class="modal-head"><span class="panel-title">Crop your icon</span><span class="toast-close" onclick="closeCropModal()">✕</span></div>
       <div class="modal-body">
         <div style="max-height:360px;overflow:hidden;background:#000;"><img id="cropImage" src="${evt.target.result}" style="max-width:100%;display:block;"></div>
-        <p style="font-size:11.5px;color:var(--muted-lt);margin:0;">Drag to reposition, scroll or pinch to zoom.</p>
+        <p style="font-size:12.5px;color:var(--muted-lt);margin:0;">Drag to reposition, scroll or pinch to zoom.</p>
       </div>
       <div class="modal-actions">
         <button class="btn btn-brand" onclick="saveAppIcon()">Save icon</button>
@@ -318,7 +318,7 @@ function renderNotificationPrefs(){
         const isOn = !muted.includes(type);
         return `
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);">
-          <span style="font-size:13px;color:var(--ink);">${escapeHtml(meta.label)}</span>
+          <span style="font-size:14px;color:var(--ink);">${escapeHtml(meta.label)}</span>
           <button class="theme-toggle-switch ${isOn?'on':''}" onclick="toggleNotificationMute('${type}', ${isOn})"></button>
         </div>`;
       }).join('')}
@@ -501,11 +501,11 @@ function openAiProviderConnectModal(provider){
   // format (see lib/ai-client.js's callOpenAI for why).
   const baseUrlField = provider==='openai' ? `
       <div class="settings-field"><label>Base URL <span style="font-weight:400;color:var(--muted-lt);">(optional)</span></label><input type="text" id="aiProviderBaseUrlInput" placeholder="https://api.openai.com/v1" style="width:100%;" autocomplete="off"></div>
-      <p style="font-size:11px;color:var(--muted-lt);margin:-4px 0 12px;line-height:1.5;">Leave blank for OpenAI itself. Set this to point at any other OpenAI-compatible endpoint instead — Azure OpenAI, Mistral, Groq, OpenRouter, a self-hosted model, etc. Note: web search (used for website checks) only works against OpenAI itself, not a custom endpoint.</p>` : '';
+      <p style="font-size:12px;color:var(--muted-lt);margin:-4px 0 12px;line-height:1.5;">Leave blank for OpenAI itself. Set this to point at any other OpenAI-compatible endpoint instead — Azure OpenAI, Mistral, Groq, OpenRouter, a self-hosted model, etc. Note: web search (used for website checks) only works against OpenAI itself, not a custom endpoint.</p>` : '';
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Connect ${escapeHtml(label)}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
-      <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;line-height:1.6;">Paste an API key from your ${escapeHtml(label)} account. It's tested against the real provider before saving, and won't be shown again after this — not even to you.</p>
+      <p style="font-size:13.5px;color:var(--muted);margin:0 0 12px;line-height:1.6;">Paste an API key from your ${escapeHtml(label)} account. It's tested against the real provider before saving, and won't be shown again after this — not even to you.</p>
       <div class="settings-field"><label>API key</label><input type="password" id="aiProviderKeyInput" placeholder="${keyHint}" style="width:100%;" autocomplete="off"></div>
       ${baseUrlField}
       <p style="margin:10px 0 0;"><span class="row-link" onclick="closeAppModal();disconnectAiProvider('${provider}')">Disconnect instead</span></p>

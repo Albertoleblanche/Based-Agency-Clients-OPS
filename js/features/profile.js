@@ -72,7 +72,7 @@ function renderProfileEmailPanel(){
   if(!el) return;
   if(isAdmin()){
     el.innerHTML = `
-      <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">As an admin, you can change your own login email directly. Supabase will send a confirmation link to the new address before the change actually takes effect.</p>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;line-height:1.5;">As an admin, you can change your own login email directly. Supabase will send a confirmation link to the new address before the change actually takes effect.</p>
       <div class="form-grid">
         <div><label>Current email</label><input value="${escapeHtml(currentUser.email)}" readonly style="color:var(--muted-lt);"></div>
         <div><label>New email</label><input id="directEmailInput" placeholder="new@basedagency.com"></div>
@@ -80,7 +80,7 @@ function renderProfileEmailPanel(){
       <button class="btn btn-brand" style="margin-top:6px;" onclick="saveDirectEmailChange()">Update email</button>`;
   } else {
     el.innerHTML = `
-      <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Changing your login email needs admin approval — submit a request below and an admin will confirm or deny it.</p>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Changing your login email needs admin approval — submit a request below and an admin will confirm or deny it.</p>
       <div class="form-grid">
         <div><label>Current email</label><input value="${escapeHtml(currentUser.email)}" readonly style="color:var(--muted-lt);"></div>
         <div><label>Requested new email</label><input id="requestEmailInput" placeholder="new@basedagency.com"></div>
@@ -122,7 +122,7 @@ async function renderMyEmailRequests(){
   const { data, error } = await supabaseClient.from('email_change_requests').select('*').eq('user_id', currentUser.id).order('created_at',{ascending:false}).limit(5);
   if(error || !data || !data.length){ el.innerHTML = ''; return; }
   const statusMeta = { pending:{cls:'pill-mid',label:'Pending'}, approved:{cls:'pill-good',label:'Approved'}, denied:{cls:'pill-bad',label:'Denied'} };
-  el.innerHTML = `<label style="font-family:var(--font);font-size:10px;color:var(--muted);display:block;margin-bottom:8px;">Your requests</label>` +
+  el.innerHTML = `<label style="font-family:var(--font);font-size:10.5px;color:var(--muted);display:block;margin-bottom:8px;">Your requests</label>` +
     data.map(r=>{
       const s = statusMeta[r.status];
       return `<div class="integ-row"><div><div class="integ-name">${escapeHtml(r.requested_email)}</div><div class="integ-desc">${new Date(r.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div></div><span class="pill ${s.cls}">${escapeHtml(s.label)}</span></div>`;

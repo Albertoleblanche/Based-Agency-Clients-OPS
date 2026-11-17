@@ -83,7 +83,7 @@ function openDailySummaryDetail(userId){
   openAppModal(`
     <div class="modal-head"><span class="panel-title">${escapeHtml(person.name)} — ${escapeHtml(dateLabel)}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
-      <div style="font-family:var(--font);font-size:20px;font-weight:700;color:var(--ink);margin-bottom:14px;">${formatMinutes(person.totalMinutes)} <span style="font-size:11px;font-weight:500;color:var(--muted-lt);">total</span></div>
+      <div style="font-family:var(--font);font-size:21px;font-weight:700;color:var(--ink);margin-bottom:14px;">${formatMinutes(person.totalMinutes)} <span style="font-size:12px;font-weight:500;color:var(--muted-lt);">total</span></div>
       ${person.entries.map(e=>`
         <div class="ts-entry-card" style="margin-bottom:8px;">
           <div class="ts-entry-info">
@@ -106,13 +106,13 @@ function openSlackSummaryConfirm(){
     const hasSlackId = !!(profile && (profile.daily_summary_slack_id || profile.slack_user_id));
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
       <span>${escapeHtml(person.name)} <span style="color:var(--muted-lt);">— ${formatMinutes(person.totalMinutes)}</span></span>
-      ${hasSlackId ? '<span style="color:var(--green);font-size:12px;">Will be sent</span>' : '<span style="color:var(--muted-lt);font-size:12px;">No Slack ID on file</span>'}
+      ${hasSlackId ? '<span style="color:var(--green);font-size:13px;">Will be sent</span>' : '<span style="color:var(--muted-lt);font-size:13px;">No Slack ID on file</span>'}
     </div>`;
   }).join('');
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Send personal summaries to Slack?</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
-      <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 12px;">Each person gets their own DM with just their own hours for ${escapeHtml(dateLabel)} — nobody sees anyone else's.</p>
+      <p style="font-size:12.5px;color:var(--muted-lt);margin:0 0 12px;">Each person gets their own DM with just their own hours for ${escapeHtml(dateLabel)} — nobody sees anyone else's.</p>
       ${rows}
     </div>
     <div class="modal-actions">

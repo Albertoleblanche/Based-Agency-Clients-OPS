@@ -620,12 +620,12 @@ function notifyForMember(memberId){
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Choose which ${isSelf ? 'drafts' : `of ${escapeHtml(member.name)}'s drafts`} to ${isSelf ? 'send for approval' : 'notify about'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
-      <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">${pending.length} draft${pending.length!==1?'s':''} ready — uncheck any you'd rather hold back for now.</p>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">${pending.length} draft${pending.length!==1?'s':''} ready — uncheck any you'd rather hold back for now.</p>
       <div style="display:flex;flex-direction:column;gap:2px;max-height:340px;overflow-y:auto;">
         ${pending.map(c=>`
           <label style="display:flex;align-items:flex-start;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border);cursor:pointer;">
             <input type="checkbox" class="notify-select-checkbox" value="${c.id}" checked style="margin-top:3px;flex:none;">
-            <span style="flex:1;font-size:13px;color:var(--ink);">${escapeHtml(c.name)}<br><span style="font-size:11px;color:var(--muted-lt);">danger ${c.danger}/5, importance ${c.importance}/10</span></span>
+            <span style="flex:1;font-size:14px;color:var(--ink);">${escapeHtml(c.name)}<br><span style="font-size:12px;color:var(--muted-lt);">danger ${c.danger}/5, importance ${c.importance}/10</span></span>
           </label>
         `).join('')}
       </div>
@@ -699,7 +699,7 @@ function queueCardHtml(c, scopeAuthor, showAuthor, selected, view){
       <div class="avatar-circle" style="background:${avatarColorForName(c.name)};color:#fff;border:2px solid var(--card);box-shadow:none;">${escapeHtml(c.name.trim().charAt(0).toUpperCase())}</div>
       <div style="flex:1;min-width:0;">
         <div class="q-name">${escapeHtml(c.name)}</div>
-        <div class="q-service-caption" style="margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${showAuthor && scopeAuthor ? `<span class="q-author">${escapeHtml(scopeAuthor)}</span> · ` : ''}${escapeHtml(c.service)} · <span class="rating-pill" style="background:${status.bg};color:${status.color};text-transform:capitalize;font-size:10px;padding:2px 8px;">${escapeHtml(status.label)}</span></div>
+        <div class="q-service-caption" style="margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${showAuthor && scopeAuthor ? `<span class="q-author">${escapeHtml(scopeAuthor)}</span> · ` : ''}${escapeHtml(c.service)} · <span class="rating-pill" style="background:${status.bg};color:${status.color};text-transform:capitalize;font-size:10.5px;padding:2px 8px;">${escapeHtml(status.label)}</span></div>
       </div>
       <div class="kanban-card-menu-wrap">
         <span class="kanban-card-menu-btn" onclick="toggleKanbanCardMenu('q-${c.id}')">⋯</span>
@@ -830,7 +830,7 @@ function queueDetailHtml(c, author){
   return `
     <div class="modal-head">
       <div>
-        <div class="q-name">${escapeHtml(c.name)} <span style="font-weight:400;color:var(--muted-lt);font-size:13px;">— ${escapeHtml(author)}</span></div>
+        <div class="q-name">${escapeHtml(c.name)} <span style="font-weight:400;color:var(--muted-lt);font-size:14px;">— ${escapeHtml(author)}</span></div>
         <div class="q-service-caption">${escapeHtml(c.service)} · ${riskCaptionHtml(c.danger)}</div>
         <div class="q-ratings" style="margin-top:12px;">
           ${dotRating('Importance', c.importance, 'ink', 10)}
@@ -842,21 +842,21 @@ function queueDetailHtml(c, author){
     <div class="modal-body">
       <span class="q-status-label" style="color:${status.color};">${escapeHtml(status.label)}</span>
       <div class="q-bulk">
-        ${shownImprovements.length ? `<div class="q-bulk-title">Logged ${activeDateFilterLabel()} (${shownImprovements.length}) — ${shownImprovements.filter(i=>i.includeInEmail!==false).length} included in email</div><div class="q-bulk-list"><ul>${shownImprovements.map(i=>`<li style="${i.includeInEmail===false?'opacity:.55;':''}">${i.includeInEmail===false ? '<span style="color:var(--muted-lt);font-size:10px;">[not in email]</span> ' : ''}${escapeHtml(i.text)} — <span style="color:var(--muted-lt);">${escapeHtml(i.author)}</span></li>`).join('')}</ul></div>` : `<i>No improvements logged by ${escapeHtml(author)} ${activeDateFilterLabel()} — nothing to send.</i>`}
+        ${shownImprovements.length ? `<div class="q-bulk-title">Logged ${activeDateFilterLabel()} (${shownImprovements.length}) — ${shownImprovements.filter(i=>i.includeInEmail!==false).length} included in email</div><div class="q-bulk-list"><ul>${shownImprovements.map(i=>`<li style="${i.includeInEmail===false?'opacity:.55;':''}">${i.includeInEmail===false ? '<span style="color:var(--muted-lt);font-size:10.5px;">[not in email]</span> ' : ''}${escapeHtml(i.text)} — <span style="color:var(--muted-lt);">${escapeHtml(i.author)}</span></li>`).join('')}</ul></div>` : `<i>No improvements logged by ${escapeHtml(author)} ${activeDateFilterLabel()} — nothing to send.</i>`}
       </div>
       ${d.draft ? `<textarea spellcheck="true" class="draft" id="draft-${c.id}" ${d.draftStatus==='approved' && !canApprove() ? 'disabled' : ''}>${escapeHtml(d.draft)}</textarea>` : ''}
       ${d.draft && !c.email ? `<span class="warn-text">No client email on file — add one in Clients</span>` : ''}
     </div>
     <div class="modal-actions">
       ${d.draftStatus==='approved' && d.draftSentAt ? `
-      <span style="font-size:13px;color:var(--muted-lt);">✓ Sent on ${new Date(d.draftSentAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} — nothing left to do here. New work logged by ${escapeHtml(author)} for ${escapeHtml(c.name)} will start a fresh draft cycle on its own.</span>
+      <span style="font-size:14px;color:var(--muted-lt);">✓ Sent on ${new Date(d.draftSentAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} — nothing left to do here. New work logged by ${escapeHtml(author)} for ${escapeHtml(c.name)} will start a fresh draft cycle on its own.</span>
       ` : `
       ${c.improvements.some(i=>i.author===author) && !(d.draftStatus==='approved' && !canApprove()) && canGenerateOrRegenerateDraft(c, author) ? `<button class="btn btn-dark" id="gen-${c.id}" onclick="generateDraft('${c.id}',${jsArg(author)})" title="${d.draft?'Regenerate':'Generate'} with AI"><svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor"><path d="M208,144a15.78,15.78,0,0,1-10.42,14.94L146,178l-19,51.62a15.92,15.92,0,0,1-29.88,0L78,178l-51.62-19a15.92,15.92,0,0,1,0-29.88L78,110l19-51.62a15.92,15.92,0,0,1,29.88,0L146,110l51.62,19A15.78,15.78,0,0,1,208,144ZM152,48h16V64a8,8,0,0,0,16,0V48h16a8,8,0,0,0,0-16H184V16a8,8,0,0,0-16,0V32H152a8,8,0,0,0,0,16Zm88,32h-8V72a8,8,0,0,0-16,0v8h-8a8,8,0,0,0,0,16h8v8a8,8,0,0,0,16,0V96h8a8,8,0,0,0,0-16Z"/></svg>${d.draft?'Regenerate':'Generate'}</button>` : ''}
       ${d.draft && canApprove() ? (author===myName() ? `<button class="btn btn-brand" onclick="approveAndSendOwnDraft('${c.id}',${jsArg(author)})" ${d.draftStatus==='approved'?'disabled':''}><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M227.32,28.68a16,16,0,0,0-15.66-4.08l-.15,0L19.57,82.84a16,16,0,0,0-2.49,29.8L102,154l41.3,84.87A15.86,15.86,0,0,0,157.74,248q.69,0,1.38-.06a15.88,15.88,0,0,0,14-11.51l58.2-191.94c0-.05,0-.1,0-.15A16,16,0,0,0,227.32,28.68ZM157.83,231.85l-.05.14,0-.07-40.06-82.3,48-48a8,8,0,0,0-11.31-11.31l-48,48L24.08,98.25l-.07,0,.14,0L216,40Z"/></svg>Send</button>
       <button class="btn btn-outline" onclick="skipDraft('${c.id}',${jsArg(author)})" title="Excludes these improvements from future drafts too — they won't reappear next week">Skip &amp; exclude</button>` : `<button class="btn btn-brand" onclick="approveDraft('${c.id}',${jsArg(author)})" ${d.draftStatus==='approved'?'disabled':''}>Approve</button>
       <button class="btn btn-outline" onclick="skipDraft('${c.id}',${jsArg(author)})" title="Excludes these improvements from future drafts too — they won't reappear next week">Skip &amp; exclude</button>`) : ''}
       ${d.draft && !canApprove() && d.draftStatus!=='approved' ? `<span class="warn-text" style="color:var(--muted-lt);">Only admins and approvers can approve or skip drafts.</span>` : ''}
-      ${d.draftStatus==='approved' && !canApprove() ? `<span style="font-size:13px;color:var(--muted-lt);">✓ ${escapeHtml(author)}'s update was approved.</span>` : ''}
+      ${d.draftStatus==='approved' && !canApprove() ? `<span style="font-size:14px;color:var(--muted-lt);">✓ ${escapeHtml(author)}'s update was approved.</span>` : ''}
       `}
     </div>`;
 }
@@ -968,12 +968,12 @@ async function generateDraft(id, author){
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Select improvements to include</span><span class="toast-close" onclick="${modalOpenForThis ? `openQueueCardModal('${id}',${jsArg(author)})` : 'closeAppModal()'}">✕</span></div>
     <div class="modal-body">
-      <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">Everything checked below will go into ${escapeHtml(author)}'s draft for ${escapeHtml(c.name)}. Uncheck anything you'd rather hold back for a later one.</p>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Everything checked below will go into ${escapeHtml(author)}'s draft for ${escapeHtml(c.name)}. Uncheck anything you'd rather hold back for a later one.</p>
       <div style="display:flex;flex-direction:column;gap:2px;max-height:340px;overflow-y:auto;">
         ${eligibleImprovements.map(i=>`
           <label style="display:flex;align-items:flex-start;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border);cursor:pointer;">
             <input type="checkbox" class="draft-select-checkbox" value="${i.id}" ${i.author===author?'checked':''} style="margin-top:3px;flex:none;">
-            <span style="flex:1;font-size:13px;color:var(--ink);">${escapeHtml(i.text)}<br><span style="font-size:11px;color:var(--muted-lt);">${escapeHtml(i.author||'')} — ${i.date ? new Date(i.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : 'no date'}</span></span>
+            <span style="flex:1;font-size:14px;color:var(--ink);">${escapeHtml(i.text)}<br><span style="font-size:12px;color:var(--muted-lt);">${escapeHtml(i.author||'')} — ${i.date ? new Date(i.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : 'no date'}</span></span>
           </label>
         `).join('')}
       </div>
@@ -1157,7 +1157,7 @@ function openCombineDraftsModal(){
   }).sort((a,b)=>a.name.localeCompare(b.name));
   if(!eligibleClients.length){ showToast('info','Nothing to combine', 'No client has approved, unsent drafts from more than one person.'); return; }
   openAppModal(`<h3>Combine Drafts</h3>
-<p style="margin:-8px 0 14px;font-size:13px;color:var(--label-2);line-height:1.5">These clients have approved drafts from more than one person. Pick one to send as a single email.</p>
+<p style="margin:-8px 0 14px;font-size:14px;color:var(--label-2);line-height:1.5">These clients have approved drafts from more than one person. Pick one to send as a single email.</p>
 <div class="grp" style="box-shadow:0 0 0 .5px var(--sep-strong);max-height:360px;overflow:auto">
 ${eligibleClients.map(c=>{
   const count = (c.drafts||[]).filter(d => d.draftStatus==='approved' && !d.draftSentAt).length;
@@ -1177,7 +1177,7 @@ function openGroupSendDraftPicker(clientId){
   if(approvedNotSent.length < 2){ showToast('info','Nothing to combine', `${c.name} no longer has approved drafts from more than one person.`); closeAppModal(); return; }
 
   openAppModal(`<h3>Combine Drafts for ${escapeHtml(c.name)}</h3>
-<p style="margin:-8px 0 14px;font-size:13px;color:var(--label-2);line-height:1.5">Uncheck any you’d rather send on their own. It takes two to combine.</p>
+<p style="margin:-8px 0 14px;font-size:14px;color:var(--label-2);line-height:1.5">Uncheck any you’d rather send on their own. It takes two to combine.</p>
 <div class="grp" style="box-shadow:0 0 0 .5px var(--sep-strong);max-height:320px;overflow:auto">
 ${approvedNotSent.map(d=>`<label class="row" style="cursor:default"><input type="checkbox" class="group-send-draft-checkbox ck-native" value="${escapeHtml(d.author)}" checked>${avHtml(d.author)}<div class="tx"><span class="t">${escapeHtml(d.author)}</span><span class="s">${escapeHtml((d.draft||'').replace(/\s+/g,' ').slice(0,90))}${(d.draft||'').length>90?'…':''}</span></div></label>`).join('')}
 </div>

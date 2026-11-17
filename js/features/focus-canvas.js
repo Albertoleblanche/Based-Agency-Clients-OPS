@@ -21,7 +21,7 @@ async function renderFocusReportsPage(){
 }
 function focusRangePop(){
   const day = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][settings.proactiveInsightsDayOfWeek ?? 3];
-  return `<label class="pop pop-sel"><span>${FOCUS_RANGES.find(r => r[0] === focusRange)[1]}</span>${icon('caret-up-down', { weight: 'bold' })}<select aria-label="Show reports from" onchange="focusRange=this.value;renderFocusReportsPage()">${FOCUS_RANGES.map(([k, t]) => `<option value="${k}" ${k === focusRange ? 'selected' : ''}>${t}</option>`).join('')}</select></label><span class="t-2" style="font-size:12px;margin-left:auto">Every ${day}</span>`;
+  return `<label class="pop pop-sel"><span>${FOCUS_RANGES.find(r => r[0] === focusRange)[1]}</span>${icon('caret-up-down', { weight: 'bold' })}<select aria-label="Show reports from" onchange="focusRange=this.value;renderFocusReportsPage()">${FOCUS_RANGES.map(([k, t]) => `<option value="${k}" ${k === focusRange ? 'selected' : ''}>${t}</option>`).join('')}</select></label><span class="t-2" style="font-size:13px;margin-left:auto">Every ${day}</span>`;
 }
 function selectFocusReport(id){ focusSelId = id; drawFocusReports(); }
 function focusCounts(d){
@@ -88,18 +88,18 @@ function focusDocHtml(r){
     return focusRow(c, cur?.author ? `Drafted by ${escapeHtml(cur.author)}` : 'Draft waiting for review', '<span class="st"><span class="dot blue"></span>Draft ready</span>', `focusOpenDraft('${x.id}')`);
   });
   const aiHtml = ai.length ? `<h3>Patterns noticed</h3>${ai.map(f => `<div class="callout" style="margin-bottom:8px"><span class="ic">${icon('sparkle')}</span><div>${f.title ? `<b style="font-weight:600">${escapeHtml(f.title)}.</b> ` : ''}${escapeHtml(f.body || '')}</div></div>`).join('')}` : '';
-  const nothing = !attn.length && !overdue.length && !stale.length && !drafts.length && !ai.length ? '<p class="t-2" style="font-size:13px;margin-top:22px">Nothing needed the team this week.</p>' : '';
+  const nothing = !attn.length && !overdue.length && !stale.length && !drafts.length && !ai.length ? '<p class="t-2" style="font-size:14px;margin-top:22px">Nothing needed the team this week.</p>' : '';
   const n = d.clientCount || activeClients().length;
   return `<div class="doc">
 <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:18px">
-<span class="t-2" style="font-size:12px">Sent to the team ${g.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} at ${fmtTime(g)}</span><span style="margin-left:auto"></span>
+<span class="t-2" style="font-size:13px">Sent to the team ${g.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} at ${fmtTime(g)}</span><span style="margin-left:auto"></span>
 <button class="btn" onclick="downloadFocusReport('${r.id}')">${icon('download-simple')}Download</button><button class="btn" onclick="emailFocusReportToTeam('${r.id}')">${icon('envelope-simple')}Email Team</button></div>
 <h1 class="lt">${r.id === focusReportsCache[0]?.id ? 'This week’s focus' : 'Focus for the week'}</h1>
 <p class="lt-sub">Week of ${g.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} · ${n} clients</p>
 <div class="grp glance" style="margin-top:18px">
 <div><b class="${attn.length ? 't-red' : ''}">${attn.length}</b><span>Need attention</span></div><div><b>${overdue.length}</b><span>Overdue follow-up${overdue.length === 1 ? '' : 's'}</span></div><div><b>${ot.ok} of ${ot.of}</b><span>On time last week</span></div><div><b>${drafts.length}</b><span>Pending draft${drafts.length === 1 ? '' : 's'}</span></div></div>
 ${sec('Need attention', attnRows)}${sec('Overdue follow-up' + (overdue.length === 1 ? '' : 's'), odRows)}${sec('Gone quiet', quietRows)}${sec('Pending drafts', draftRows)}${aiHtml}${nothing}
-${(d.errors || []).length ? `<p class="t-2" style="font-size:12px;margin-top:18px">${d.errors.length} check${d.errors.length === 1 ? '' : 's'} could not run when this report was made.</p>` : ''}
+${(d.errors || []).length ? `<p class="t-2" style="font-size:13px;margin-top:18px">${d.errors.length} check${d.errors.length === 1 ? '' : 's'} could not run when this report was made.</p>` : ''}
 </div>`;
 }
 

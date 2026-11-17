@@ -19,7 +19,7 @@ function renderHealth(){
     const on = x === sel, color = { r: 'red', y: 'yellow-fill', g: 'label-3' }[x.h.level];
     return `<a class="msg${on ? ' sel' : ''}" href="#health" onclick="selectHealthClient('${x.c.id}');return false;"${on ? ' aria-current="true"' : ''}>${x.h.level !== 'g' ? `<span class="ud" style="background:var(--${color})" aria-label="${healthWord(x.h.level)}"></span>` : ''}
 <div class="top">${monoHtml(x.c, 'sm')}<b>${escapeHtml(x.c.name)}</b><time>${x.h.since ? relDay(x.h.since) : ''}</time></div>
-<div class="tags">${x.h.level === 'g' ? tagHtml('gray', 'No signals', 'check') : signalChips(x.h, 2) + (x.h.level === 'r' && !nextStepTask(x.c) ? tagHtml('red', 'No next step') : '')}</div>
+<div class="tags">${x.h.level === 'g' ? tagHtml('gray', 'No signals', 'check') : (x.h.level === 'r' && !nextStepTask(x.c) ? signalChips(x.h, 1) + tagHtml('red', 'No next step') : signalChips(x.h, 2))}</div>
 <span class="pv" style="display:flex;align-items:center;gap:8px">${histDotsHtml(x.h.seq)}${clientOwner(x.c) ? avHtml(clientOwner(x.c)) : ''}</span></a>`;
   };
   const grp = (t, xs) => xs.length ? `<div class="lgh" style="padding-left:28px">${t}<span class="c">${xs.length}</span></div>${xs.map(item).join('')}` : '';
@@ -54,16 +54,16 @@ function healthDetailHtml(c, h){
   const seq = h.seq, ots = onTimeSummary(seq);
   return `<div style="max-width:780px">
 <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">${monoHtml(c, 'lg')}
-<div style="min-width:0;margin-right:auto"><div style="font-size:17px;font-weight:600;letter-spacing:-.01em">${escapeHtml(c.name)}</div><div class="t-2" style="font-size:12px;margin-top:2px">${escapeHtml(meta)}</div></div>
+<div style="min-width:0;margin-right:auto"><div style="font-size:18px;font-weight:600;letter-spacing:-.01em">${escapeHtml(c.name)}</div><div class="t-2" style="font-size:13px;margin-top:2px">${escapeHtml(meta)}</div></div>
 ${hstateHtml(h.level, stateText)}</div>
 ${nextBox}
 <div class="h2"><h2>Why<span class="c">${h.signals.length} signal${h.signals.length === 1 ? '' : 's'}</span></h2><a href="#settings" onclick="openSettingsTab('updates');return false;">Adjust signals</a></div>
-<div class="grp">${signalRowsHtml(h) || '<div class="row sm"><span class="s t-2" style="font-size:12px">No signals right now.</span></div>'}</div>
+<div class="grp">${signalRowsHtml(h) || '<div class="row sm"><span class="s t-2" style="font-size:13px">No signals right now.</span></div>'}</div>
 <div class="grid2" style="margin-top:14px">
-<section class="panel"><h3>Hours this month<span>${h.hp.budget ? `<b class="${h.hp.used > h.hp.budget ? 't-red' : ''}" style="font-weight:600">${Math.round(h.hp.used)}</b> of ${h.hp.budget}` : 'No budget set'}</span></h3>${h.hp.budget ? paceChartHtml(c, 320, 150) : '<p class="t-2" style="font-size:12px;margin:0">Add a monthly hour budget to this client to see its pace.</p>'}</section>
-<section class="panel"><h3>What changed<span>${events.length} event${events.length === 1 ? '' : 's'}</span></h3><div class="agenda">${events.map(e => `<div class="ag"><time>${relDay(e.at)}</time><div class="tx"><span class="t">${escapeHtml(e.t)}</span><span class="s">${escapeHtml(e.s)}</span></div></div>`).join('') || '<p class="t-2" style="font-size:12px;margin:0">Nothing yet.</p>'}</div></section>
+<section class="panel"><h3>Hours this month<span>${h.hp.budget ? `<b class="${h.hp.used > h.hp.budget ? 't-red' : ''}" style="font-weight:600">${Math.round(h.hp.used)}</b> of ${h.hp.budget}` : 'No budget set'}</span></h3>${h.hp.budget ? paceChartHtml(c, 320, 150) : '<p class="t-2" style="font-size:13px;margin:0">Add a monthly hour budget to this client to see its pace.</p>'}</section>
+<section class="panel"><h3>What changed<span>${events.length} event${events.length === 1 ? '' : 's'}</span></h3><div class="agenda">${events.map(e => `<div class="ag"><time>${relDay(e.at)}</time><div class="tx"><span class="t">${escapeHtml(e.t)}</span><span class="s">${escapeHtml(e.s)}</span></div></div>`).join('') || '<p class="t-2" style="font-size:13px;margin:0">Nothing yet.</p>'}</div></section>
 </div>
-<div class="h2"><h2>Weekly updates</h2><span class="t-2" style="font-size:12px">${ots.total ? `On time ${ots.onTime} of the last ${ots.total}` : ''}</span></div>
+<div class="h2"><h2>Weekly updates</h2><span class="t-2" style="font-size:13px">${ots.total ? `On time ${ots.onTime} of the last ${ots.total}` : ''}</span></div>
 ${weekStripHtml(c)}
 </div>`;
 }

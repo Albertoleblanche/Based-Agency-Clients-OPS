@@ -50,7 +50,7 @@ let selectedTrashIds = { clients:new Set(), notes:new Set(), time:new Set() };
 
 function trashBulkBarHtml(type){
   return `<div class="integ-row" style="padding-top:0;padding-bottom:10px;">
-    <label style="display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);font-weight:600;cursor:pointer;">
+    <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);font-weight:600;cursor:pointer;">
       <input type="checkbox" id="trashSelectAll-${type}" onchange="toggleAllTrashSelection('${type}', this.checked)">
       Select all
     </label>

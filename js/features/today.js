@@ -86,12 +86,12 @@ ${tile(atRisk, 'At risk', 'heart-pulse', 'red', "switchView('health')")}
     const sub = next && start > now ? `Starts in ${fmtDuration(start - now).replace(' hours', ' h').replace(' hour', ' h').replace(' minutes', ' min').replace(' minute', ' min')}` : (e.description || '').split('\n')[0];
     const link = (e.description || '').match(/https?:\/\/(meet\.google\.com|[a-z0-9.-]*zoom\.us|teams\.microsoft\.com)\/\S+/i);
     const join = next && link ? `<div class="r"><a class="btn sm" href="${safeUrl(link[0])}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Join</a></div>` : '';
-    return `<div class="row sm"${past ? ' style="opacity:.45"' : ''} onclick="openEventDetailModal('${e.id}')"><span class="t-2" style="width:58px;flex:0 0 auto;font-size:12px">${fmtTime(start)}</span>
+    return `<div class="row sm"${past ? ' style="opacity:.45"' : ''} onclick="openEventDetailModal('${e.id}')"><span class="t-2" style="width:58px;flex:0 0 auto;font-size:13px">${fmtTime(start)}</span>
 <div class="tx"><span class="t" style="font-weight:${next ? 500 : 400}">${escapeHtml(e.title)}</span><span class="s">${escapeHtml(sub)}</span></div>${join}</div>`;
   }).join('');
 
   const section = (title, n, link, label, rows, empty) => `<div class="h2"><h2>${title}<span class="c">${n}</span></h2>${link ? `<a href="#${link}" onclick="switchView('${link}');return false;">${label}</a>` : ''}</div>
-<div class="grp">${rows || `<div class="row sm"><span class="s t-2" style="font-size:12px">${empty}</span></div>`}</div>`;
+<div class="grp">${rows || `<div class="row sm"><span class="s t-2" style="font-size:13px">${empty}</span></div>`}</div>`;
   root.innerHTML = `${tiles}
 <div class="cols">
 <div class="col-main">
@@ -101,9 +101,9 @@ ${section(canApprove() ? 'Waiting for your review' : 'Your drafts', waiting.leng
 </div>
 <aside class="col-side">
 <div class="h2"><h2>Due today<span class="c">${due.length}</span></h2><a href="#tasks" onclick="switchView('tasks');return false;">All Tasks</a></div>
-<div class="grp flat">${dueRows || '<div class="row sm"><span class="s t-2" style="font-size:12px">Nothing due today.</span></div>'}</div>
+<div class="grp flat">${dueRows || '<div class="row sm"><span class="s t-2" style="font-size:13px">Nothing due today.</span></div>'}</div>
 <div class="h2"><h2>Calendar<span class="c">Today</span></h2><a href="#calendar" onclick="switchView('calendar');return false;">Open Calendar</a></div>
-<div class="grp flat">${evRows || '<div class="row sm"><span class="s t-2" style="font-size:12px">No meetings today.</span></div>'}</div>
+<div class="grp flat">${evRows || '<div class="row sm"><span class="s t-2" style="font-size:13px">No meetings today.</span></div>'}</div>
 </aside>
 </div>`;
   if(currentViewName === 'overview') setToolbar('Today', new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }));

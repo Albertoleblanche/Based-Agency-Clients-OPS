@@ -54,7 +54,7 @@ function renderSettingsView(){
   const keep = document.activeElement && document.activeElement.id;
   const body = { general: setGeneral, updates: setUpdates, fields: setFields, ai: setAi, integrations: setIntegrations, notifications: setNotifications }[settingsTab]();
   root.innerHTML = `<div class="set-tb"><div class="set-tabs" role="toolbar" aria-label="Settings sections">${tabs.map(([k, t, ic]) => `<button class="set-tab${k === settingsTab ? ' on' : ''}" ${k === settingsTab ? 'aria-current="page"' : ''} onclick="switchSettingsTab('${k}')">${icon(ic)}<span>${t}</span></button>`).join('')}</div></div>
-<div class="set-body">${body}<p class="t-2" style="font-size:12px;margin:14px 4px 0">Changes save as you make them.</p></div>`;
+<div class="set-body">${body}<p class="t-2" style="font-size:13px;margin:14px 4px 0">Changes save as you make them.</p></div>`;
   if(keep){ const el = document.getElementById(keep); if(el && el.tagName !== 'BUTTON') el.focus(); }
   if(settingsTab === 'ai') applyAiConn();
   if(settingsTab === 'ai' && typeof updateEmailInstructionsStatus === 'function') updateEmailInstructionsStatus();
@@ -72,7 +72,7 @@ function setGeneral(){
 <div class="form-grp">
 ${fr('Name', 'Shown in the sidebar and on emails', `<input id="appNameInput" class="tf" style="width:240px" value="${esc(settings.appName || '')}" placeholder="Based Agency" onchange="saveWorkspaceName(this.value)">`)}
 ${fr('Logo', 'Square image, at least 256 px', `${logo}<input type="file" id="iconFileInput" accept="image/*" hidden onchange="onIconFileSelected(event)"><button class="btn" onclick="document.getElementById('iconFileInput').click()">Change…</button>${settings.appIcon ? `<button class="btn btn-q" onclick="removeAppIcon().then(renderSettingsView)">Remove</button>` : ''}`)}
-${fr('Accent color', 'Used only for the main button on each screen', `<label class="well" style="background:${esc(brand)};position:relative;cursor:default"><input type="color" id="brandColorInput" value="${esc(brand)}" style="position:absolute;inset:0;opacity:0" onchange="saveAccentColor(this.value)" aria-label="Accent color"></label><span class="t-2" style="font-family:var(--mono);font-size:12px">${esc(brand.toUpperCase())}</span><button class="btn" onclick="document.getElementById('brandColorInput').click()">Change…</button>`)}
+${fr('Accent color', 'Used only for the main button on each screen', `<label class="well" style="background:${esc(brand)};position:relative;cursor:default"><input type="color" id="brandColorInput" value="${esc(brand)}" style="position:absolute;inset:0;opacity:0" onchange="saveAccentColor(this.value)" aria-label="Accent color"></label><span class="t-2" style="font-family:var(--mono);font-size:13px">${esc(brand.toUpperCase())}</span><button class="btn" onclick="document.getElementById('brandColorInput').click()">Change…</button>`)}
 ${fr('Names in the sidebar', 'Rename screens for everyone, and the line under the app name', `<button class="btn" onclick="openSidebarNamesSheet()">Edit…</button>`)}
 </div>` : ''}
 <div class="set-h">You</div>
@@ -117,7 +117,7 @@ function openSidebarNamesSheet(){
 <div class="f" style="grid-template-columns:120px minmax(0,1fr)">
 <label for="appDescriptionInput">Tagline</label><input class="tf" id="appDescriptionInput" value="${esc(settings.appDescription || '')}" placeholder="Client Update Workflow" onchange="changeSettings(s => { s.appDescription = this.value.trim(); }).then(() => applyAppBranding && applyAppBranding())">
 ${rows}
-<span></span><p class="t-2" style="font-size:12px;margin:0">Leave a name empty to go back to the usual one.</p></div>
+<span></span><p class="t-2" style="font-size:13px;margin:0">Leave a name empty to go back to the usual one.</p></div>
 <div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal()">Done</button></div>`, 520);
 }
 
@@ -144,7 +144,7 @@ ${auto('autoDraft', 'Write drafts automatically', 'Each morning, for clients due
 ${auto('remindBehind', 'Remind whoever has an overdue update', 'The morning after it’s due, in the app and on Slack')}
 ${auto('mondaySummary', 'Monday summary for approvers', 'Last week’s updates and any client health changes')}
 </div>
-<div class="mhead" style="margin-top:20px"><span style="font-size:13px;color:var(--label);font-weight:600">Client health signals</span><span class="mcol" style="width:150px">Watch at</span><span class="mcol" style="width:150px">At risk at</span></div>
+<div class="mhead" style="margin-top:20px"><span style="font-size:14px;color:var(--label);font-weight:600">Client health signals</span><span class="mcol" style="width:150px">Watch at</span><span class="mcol" style="width:150px">At risk at</span></div>
 <div class="form-grp">
 ${pair('noUpdateDays', 'No weekly update sent', days, days)}
 ${pair('lateOfLast4', 'Updates late or missed', lateO, lateO)}
@@ -169,14 +169,14 @@ function saveSignalToggle(key){ changeSettings(s => { const cur = healthThreshol
 // ---- Client Fields ----------------------------------------------------------------------------
 function optChips(kind){
   const list = settings[OPTION_KIND_KEYS[kind]] || [];
-  return list.length ? `<div class="opts">${list.map((o, i) => `<span class="opt">${i > 0 ? `<button class="ib opt-mv" aria-label="Move ${esc(o)} earlier" title="Move earlier" onclick="moveOpt('${kind}',${jsArg(o)},-1)">${icon('caret-left', { weight: 'bold' })}</button>` : ''}${esc(o)}<button class="ib" style="width:16px;height:16px" aria-label="Remove ${esc(o)}" onclick="removeOpt('${kind}',${jsArg(o)})">${icon('x', { weight: 'bold' })}</button></span>`).join('')}</div>` : '<span class="t-2" style="font-size:13px">None yet.</span>';
+  return list.length ? `<div class="opts">${list.map((o, i) => `<span class="opt">${i > 0 ? `<button class="ib opt-mv" aria-label="Move ${esc(o)} earlier" title="Move earlier" onclick="moveOpt('${kind}',${jsArg(o)},-1)">${icon('caret-left', { weight: 'bold' })}</button>` : ''}${esc(o)}<button class="ib" style="width:16px;height:16px" aria-label="Remove ${esc(o)}" onclick="removeOpt('${kind}',${jsArg(o)})">${icon('x', { weight: 'bold' })}</button></span>`).join('')}</div>` : '<span class="t-2" style="font-size:14px">None yet.</span>';
 }
 async function addOpt(kind){ await addFieldOption(kind); renderSettingsView(); }
 async function removeOpt(kind, v){ await removeFieldOption(kind, v); renderSettingsView(); }
 async function moveOpt(kind, v, d){ await moveFieldOption(kind, v, d); renderSettingsView(); }
 function setFields(){
   const fields = settings.customFields || [];
-  const frows = fields.map((f, i) => `<div class="fr"><div class="l"><b>${esc(f.label)}</b>${f.type === 'select' ? `<span>${(f.options || []).length} choices</span>` : ''}</div><span class="t-2" style="font-size:12px">${esc(CUSTOM_FIELD_TYPE_LABELS[f.type] || f.type)}${f.required ? ' · required' : ''}</span>
+  const frows = fields.map((f, i) => `<div class="fr"><div class="l"><b>${esc(f.label)}</b>${f.type === 'select' ? `<span>${(f.options || []).length} choices</span>` : ''}</div><span class="t-2" style="font-size:13px">${esc(CUSTOM_FIELD_TYPE_LABELS[f.type] || f.type)}${f.required ? ' · required' : ''}</span>
 <div class="pop-wrap" style="background:none;padding:0"><button class="ib" aria-label="More options for ${esc(f.label)}" onclick="cfMenu(event,'${f.id}',${i},${fields.length})">${icon('dots-three', { weight: 'bold' })}</button></div></div>`).join('');
   return `<div class="set-h">Services</div>
 <div class="form-grp"><div class="fr" style="flex-wrap:wrap;padding:12px 14px">${optChips('service')}</div>
@@ -217,8 +217,8 @@ ${fr('Weekly insights', 'A short note on patterns across your clients', `${popSe
 ${admin ? `<div class="set-h">AI accounts</div><div class="form-grp">${conn('claude')}${conn('openai')}</div>` : ''}
 <div class="set-h">Client emails</div>
 <div class="form-grp">
-${fr('How your drafts are written', 'The AI follows this for the drafts you write. Each person sets their own.', `<div style="width:340px"><textarea id="emailInstructions" class="tf" style="width:100%;height:112px" placeholder="Open with “Hi [first name],”. One sentence on the week, then a bulleted list of what we did." onchange="saveEmailInstructions()">${esc(myProfile?.email_instructions || '')}</textarea><div id="emailInstructionsStatus" class="t-2" style="font-size:11px;margin-top:4px"></div></div>`, { top: true })}
-${canApprove() ? fr('Signature', 'Added under every update', `<div style="width:340px;display:flex;gap:12px;align-items:center;padding:12px;border-radius:8px;background:var(--fill)">${sig.logoUrl ? `<img src="${safeUrl(sig.logoUrl)}" alt="" style="width:36px;height:36px;border-radius:9px;object-fit:contain;background:#fff">` : `<span class="logo">${esc((sig.companyName || settings.appName || 'B').charAt(0).toUpperCase())}</span>`}<div style="font-size:12px;line-height:1.45;min-width:0"><b>${esc(sig.companyName || 'Your company')}</b><div class="t-2">${esc(sig.teamLine || sig.website || 'Add a line under the name')}</div></div><button class="btn" style="margin-left:auto" onclick="openSignatureSheet()" ${admin ? '' : 'disabled'}>Edit…</button></div>`, { top: true }) : ''}
+${fr('How your drafts are written', 'The AI follows this for the drafts you write. Each person sets their own.', `<div style="width:340px"><textarea id="emailInstructions" class="tf" style="width:100%;height:112px" placeholder="Open with “Hi [first name],”. One sentence on the week, then a bulleted list of what we did." onchange="saveEmailInstructions()">${esc(myProfile?.email_instructions || '')}</textarea><div id="emailInstructionsStatus" class="t-2" style="font-size:12px;margin-top:4px"></div></div>`, { top: true })}
+${canApprove() ? fr('Signature', 'Added under every update', `<div style="width:340px;display:flex;gap:12px;align-items:center;padding:12px;border-radius:8px;background:var(--fill)">${sig.logoUrl ? `<img src="${safeUrl(sig.logoUrl)}" alt="" style="width:36px;height:36px;border-radius:9px;object-fit:contain;background:#fff">` : `<span class="logo">${esc((sig.companyName || settings.appName || 'B').charAt(0).toUpperCase())}</span>`}<div style="font-size:13px;line-height:1.45;min-width:0"><b>${esc(sig.companyName || 'Your company')}</b><div class="t-2">${esc(sig.teamLine || sig.website || 'Add a line under the name')}</div></div><button class="btn" style="margin-left:auto" onclick="openSignatureSheet()" ${admin ? '' : 'disabled'}>Edit…</button></div>`, { top: true }) : ''}
 </div>
 ${admin ? `<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button class="btn" onclick="previewProactiveInsights()">${icon('eye')}Preview Weekly Insights</button></div>` : ''}`;
 }
@@ -289,7 +289,7 @@ function setIntegrations(){
   rows.push(['table', 'Google Sheet', settings.sheetCsvUrl ? 'Pulls the client list from a published sheet' : 'Keep the client list in a Google Sheet',
     settings.sheetCsvUrl ? st('green', 'Connected') : st('hollow', 'Not connected'), `${settings.sheetCsvUrl ? `<button class="btn" onclick="syncFromSheetUrl()">Sync Now</button>` : ''}<button class="btn" onclick="openIntegrationSheet('sheet')">${settings.sheetCsvUrl ? 'Edit…' : 'Connect…'}</button>`]);
   const html = rows.map(([ic, n, d, s, b]) => `<div class="fr"><span class="ic lg">${icon(ic)}</span><div class="l"><b>${n}</b><span>${d}</span></div>${s}${b}</div>`).join('');
-  return `<div class="set-h">Connected apps</div><div class="form-grp">${html}</div><p class="t-2" style="font-size:12px;margin:8px 4px 0" id="sheetSyncStatus"></p>
+  return `<div class="set-h">Connected apps</div><div class="form-grp">${html}</div><p class="t-2" style="font-size:13px;margin:8px 4px 0" id="sheetSyncStatus"></p>
 <div class="set-h">Client list</div>
 <div class="form-grp"><div class="fr"><div class="l"><b>Export the client list</b><span>A CSV you can paste back into the Google Sheet</span></div><button class="btn" onclick="exportRosterCsv()">${icon('export')}Export CSV</button></div></div>`;
 }
@@ -298,13 +298,13 @@ function openIntegrationSheet(which){
     openAppModal(`<h3>Harvest</h3><div id="harvestPanelBody" class="integ-sheet">Loading…</div><div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal();loadIntegrationStatuses()">Done</button></div>`, 620);
     loadHarvestPanel();
   } else if(which === 'slack'){
-    openAppModal(`<h3>Slack channels</h3><p class="t-2" style="font-size:12px;margin:-8px 0 12px">Link each client to its Slack channel so updates and alerts land there.</p><div id="slackChannelsPanelBody" class="integ-sheet">Loading…</div><div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal();loadIntegrationStatuses()">Done</button></div>`, 620);
+    openAppModal(`<h3>Slack channels</h3><p class="t-2" style="font-size:13px;margin:-8px 0 12px">Link each client to its Slack channel so updates and alerts land there.</p><div id="slackChannelsPanelBody" class="integ-sheet">Loading…</div><div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal();loadIntegrationStatuses()">Done</button></div>`, 620);
     loadSlackChannelsPanel();
   } else {
     openAppModal(`<h3>Google Sheet</h3>
 <div class="f" style="grid-template-columns:120px minmax(0,1fr)">
 <label for="sheetCsvUrl">Published link</label><input class="tf" id="sheetCsvUrl" value="${esc(settings.sheetCsvUrl || '')}" placeholder="https://docs.google.com/…/pub?output=csv">
-<span></span><p class="t-2" style="font-size:12px;margin:0">In Google Sheets: File → Share → Publish to web → CSV. A normal edit link won’t work.</p>
+<span></span><p class="t-2" style="font-size:13px;margin:0">In Google Sheets: File → Share → Publish to web → CSV. A normal edit link won’t work.</p>
 <label for="csvPasteArea" class="top">Or paste</label><textarea class="tf" id="csvPasteArea" style="height:90px" placeholder="Paste copied cells or CSV here"></textarea>
 </div>
 <div class="sheet-a"><button class="btn" style="margin-right:auto" onclick="importPastedCsv()">Import Pasted</button><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="saveAndSyncSheet().then(()=>{closeAppModal();renderSettingsView();})">Save &amp; Sync</button></div>`, 560);
@@ -338,8 +338,8 @@ function setNotifications(){
     sections.get(s).push([type, meta]);
   });
   const ck = (type, ch, label) => { const on = notifOn(type, ch); return `<span class="mcol"><button class="ck${on ? ' on' : ''}" role="checkbox" aria-checked="${on}" aria-label="${esc(label)}" onclick="toggleNotifChannel('${type}','${ch}')">${on ? icon('check', { weight: 'bold' }) : ''}</button></span>`; };
-  return `<p class="t-2" style="font-size:12px;margin:0 4px">Choose where each kind of notification reaches you.</p>` + [...sections.entries()].map(([s, rows]) =>
-    `<div class="mhead" style="margin-top:20px"><span style="font-size:12px;color:var(--label);font-weight:600">${esc(s)}</span><span class="mcol">In app</span><span class="mcol">Slack</span><span class="mcol">Push</span></div>
+  return `<p class="t-2" style="font-size:13px;margin:0 4px">Choose where each kind of notification reaches you.</p>` + [...sections.entries()].map(([s, rows]) =>
+    `<div class="mhead" style="margin-top:20px"><span style="font-size:13px;color:var(--label);font-weight:600">${esc(s)}</span><span class="mcol">In app</span><span class="mcol">Slack</span><span class="mcol">Push</span></div>
 <div class="form-grp">${rows.map(([type, meta]) => `<div class="fr"><div class="l"><b style="font-weight:400">${esc(meta.label)}</b></div>${ck(type, 'app', meta.label + ' — in app')}${ck(type, 'slack', meta.label + ' — Slack')}${ck(type, 'push', meta.label + ' — push')}</div>`).join('')}</div>`).join('');
 }
 

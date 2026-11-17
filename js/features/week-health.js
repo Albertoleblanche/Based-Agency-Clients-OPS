@@ -324,7 +324,7 @@ function signalChips(h, max){
   const lateM = h.signals.map(s => s.text.match(/(\d) of the last 4 were late or missed/)).find(Boolean);
   const word = s => ({
     hours: h.hp.used > h.hp.budget ? 'Over budget' : `${Math.round(h.hp.projected / h.hp.budget * 100)}% of hours`,
-    under: 'Hours under-used',
+    under: 'Low hours',
     noupdate: (s.text.match(/No update in (\d+) days/) || [])[1] ? `${s.text.match(/No update in (\d+) days/)[1]}d no update` : 'No update',
     late: lateM ? `${lateM[1]}/4 late` : 'Late updates',
     quiet: (s.text.match(/(\d+) days/) || [])[1] ? `${s.text.match(/(\d+) days/)[1]}d quiet` : 'Quiet',

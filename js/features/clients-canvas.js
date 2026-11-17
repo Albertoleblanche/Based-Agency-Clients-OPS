@@ -63,18 +63,18 @@ function renderClientInspector(){
   el.hidden = false;
   el.innerHTML = `<button class="ib" aria-label="Close panel" title="Close (Esc)" style="position:absolute;top:14px;right:14px" onclick="closeClientInspector()">${icon('x', { weight: 'bold' })}</button>
 <div style="display:flex;flex-direction:column;align-items:flex-start;gap:10px">
-<span class="mono ${clientColor(c)}" style="width:48px;height:48px;border-radius:12px;font-size:16px" aria-hidden="true">${escapeHtml(clientMono(c))}</span>
-<div><div style="font-size:17px;font-weight:600;letter-spacing:-.01em">${escapeHtml(c.name)}</div><div class="t-2" style="font-size:12px;margin-top:2px">${escapeHtml([c.service, owner].filter(Boolean).join(' · '))}${since}</div></div>
+<span class="mono ${clientColor(c)}" style="width:48px;height:48px;border-radius:12px;font-size:17px" aria-hidden="true">${escapeHtml(clientMono(c))}</span>
+<div><div style="font-size:18px;font-weight:600;letter-spacing:-.01em">${escapeHtml(c.name)}</div><div class="t-2" style="font-size:13px;margin-top:2px">${escapeHtml([c.service, owner].filter(Boolean).join(' · '))}${since}</div></div>
 <div style="display:flex;gap:8px;flex-wrap:wrap">${primary}</div></div>
 <div style="margin-top:20px;display:flex;align-items:center;justify-content:space-between"><span class="set-h" style="margin:0">Health</span>${hstateHtml(h.level, h.level === 'g' ? 'Healthy' : `${healthWord(h.level)} since ${relDay(h.since || rNow()).toLowerCase() === 'today' ? 'today' : relDay(h.since || rNow())}`)}</div>
 ${h.signals.length ? `<div class="grp" style="margin-top:8px">${signalRowsHtml(h, 2)}</div>` : ''}
 <div class="set-h" style="margin:22px 0 10px">This week’s update</div>
-<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px">${stepsHtml(w)}<span class="t-2">${w.sent ? '' : `<span class="${w.late ? 't-red' : ''}">${escapeHtml(w.dueText)}</span> · `}${escapeHtml(w.note || '')}</span></div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px">${stepsHtml(w)}<span class="t-2">${w.sent ? '' : `<span class="${w.late ? 't-red' : ''}">${escapeHtml(w.dueText)}</span> · `}${escapeHtml(w.note || '')}</span></div>
 ${weekBtns}
 <div class="set-h" style="margin:22px 0 8px">Hours this month</div>
-${h.hp.budget ? paceChartHtml(c, 392, 130) : `<p class="t-2" style="font-size:12px;margin:0">${Math.round(h.hp.used)} hours logged · no monthly budget set.</p>`}
+${h.hp.budget ? paceChartHtml(c, 392, 130) : `<p class="t-2" style="font-size:13px;margin:0">${Math.round(h.hp.used)} hours logged · no monthly budget set.</p>`}
 <div class="set-h" style="margin:22px 0 8px">Last 8 weekly updates</div>
-<div style="display:flex;align-items:center;justify-content:space-between;font-size:12px">${histDotsHtml(h.seq)}<span class="t-2">${last ? `Last sent ${fmtShortDate(last)} · ${daysBetween(last, rNow()) === 0 ? 'today' : daysBetween(last, rNow()) + ' days ago'}` : 'No update sent yet'}</span></div>
+<div style="display:flex;align-items:center;justify-content:space-between;font-size:13px">${histDotsHtml(h.seq)}<span class="t-2">${last ? `Last sent ${fmtShortDate(last)} · ${daysBetween(last, rNow()) === 0 ? 'today' : daysBetween(last, rNow()) + ' days ago'}` : 'No update sent yet'}</span></div>
 <div class="set-h" style="margin:26px 0 6px">Actions</div>
 <div class="insp-acts">
 ${act('Log Improvement', `openQueueLogImprovementModal('${c.id}')`, 'square-pen')}

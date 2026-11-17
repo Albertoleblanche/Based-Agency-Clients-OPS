@@ -151,7 +151,7 @@ function renderTimesheet(){
     const runRow = isToday && running ? `<div class="row sm"><div class="tx"><span class="t" style="font-weight:400">${escapeHtml(timerState.description || 'No description')}</span><span class="s">${[tc?.name, svc].filter(Boolean).map(escapeHtml).join(' · ')}</span></div><div class="r"><span class="st" style="color:var(--red)"><span class="dot red"></span>Running</span><span class="dur" id="tsRunDur" style="width:56px;text-align:right">${hmm(runningMinutes())}</span></div></div>` : '';
     const rows = runRow + list.map(tsRowHtml).join('');
     return `<div class="h2"><h2>${dayLabel(d)}<span class="c">${hmLong(total)}</span></h2>${i === 0 ? `<a href="#" onclick="event.preventDefault();openManualEntryModal()">Add Time</a>` : ''}</div>
-<div class="grp">${rows || `<div class="row sm"><span class="t-2" style="font-size:13px">Nothing logged yet today.</span></div>`}</div>`;
+<div class="grp">${rows || `<div class="row sm"><span class="t-2" style="font-size:14px">Nothing logged yet today.</span></div>`}</div>`;
   }).join('');
   const older = mine.some(e => e.date < since);
   const more = older ? `<div style="margin-top:14px"><button class="btn btn-q" onclick="tsDays+=14;renderTimesheet()">Show Earlier</button></div>` : '';
@@ -163,16 +163,16 @@ function renderTimesheet(){
   const weekTotal = week.reduce((s, x) => s + x.min, 0);
   const bars = week.map(x => `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:1">
 <div style="height:96px;width:100%;display:flex;align-items:flex-end;justify-content:center"><i title="${hmLong(x.min)}" style="display:block;width:26px;border-radius:5px;height:${Math.max(Math.min(x.min / 60 / 8, 1) * 96, 3).toFixed(0)}px;background:${x.k === today ? 'var(--accent-fill)' : 'var(--label-2)'};opacity:${x.min ? 1 : .35}"></i></div>
-<span style="font-size:11px;color:var(--label-2)">${x.d.toLocaleDateString('en-US', { weekday: 'short' })}</span></div>`).join('');
+<span style="font-size:12px;color:var(--label-2)">${x.d.toLocaleDateString('en-US', { weekday: 'short' })}</span></div>`).join('');
 
   const budgets = activeClients().filter(c => c.monthlyHourBudget > 0).map(c => ({ c, used: monthHours(c), b: c.monthlyHourBudget }))
     .map(x => Object.assign(x, { pct: x.used / x.b })).sort((a, b) => b.pct - a.pct).slice(0, 7);
   const brows = budgets.map(({ c, used, b, pct }) => {
     const col = pct > 1 ? 'var(--red)' : (pct >= .9 ? 'var(--yellow)' : 'var(--label-2)');
     return `<div style="display:flex;flex-direction:column;gap:5px;padding:7px 0">
-<div style="display:flex;justify-content:space-between;font-size:12px"><span>${escapeHtml(c.name)}</span><span><b class="${pct > 1 ? 't-red' : ''}" style="font-weight:600">${Math.round(used)}</b><span class="t-2"> / ${b} h</span></span></div>
+<div style="display:flex;justify-content:space-between;font-size:13px"><span>${escapeHtml(c.name)}</span><span><b class="${pct > 1 ? 't-red' : ''}" style="font-weight:600">${Math.round(used)}</b><span class="t-2"> / ${b} h</span></span></div>
 <div class="bar"><i style="width:${Math.min(pct, 1) * 100}%;background:${col}"></i></div></div>`;
-  }).join('') || '<p class="t-2" style="font-size:12px;margin:0">No hour budgets set. Add one on a client.</p>';
+  }).join('') || '<p class="t-2" style="font-size:13px;margin:0">No hour budgets set. Add one on a client.</p>';
 
   const keepFocus = document.activeElement && document.activeElement.id;
   root.innerHTML = `<div class="cols"><div class="col-main">${card}${newRow}${groups}${more}</div>
@@ -245,7 +245,7 @@ function renderReports(){
   const rangeWord = { week: 'this week', month: 'this month', all: 'all time', custom: 'in this range' }[range];
   const gseg = `<div class="seg" role="tablist" aria-label="Granularity">${['day', 'week', 'month'].map(k => `<button class="${g === k ? 'on' : ''}" role="tab" aria-selected="${g === k}" onclick="setReportChartGranularity('${k}')">${k[0].toUpperCase() + k.slice(1)}</button>`).join('')}</div>`;
   document.getElementById('reportChartPanel').innerHTML = `<h3>Hours over time<span>${gseg}</span></h3>
-<div style="display:flex;flex-wrap:wrap;gap:4px 28px;align-items:baseline;margin:2px 0 14px"><div><b style="font-size:22px;font-weight:600;letter-spacing:-.02em" class="dur">${hrs(total)}</b> <span class="t-2" style="font-size:12px">${rangeWord}</span></div>${busiest ? `<div class="t-2" style="font-size:12px">Busiest ${busyWord}: ${busyLabel} · ${hrs(busiest.minutes)}</div>` : ''}</div>
+<div style="display:flex;flex-wrap:wrap;gap:4px 28px;align-items:baseline;margin:2px 0 14px"><div><b style="font-size:22px;font-weight:600;letter-spacing:-.02em" class="dur">${hrs(total)}</b> <span class="t-2" style="font-size:13px">${rangeWord}</span></div>${busiest ? `<div class="t-2" style="font-size:13px">Busiest ${busyWord}: ${busyLabel} · ${hrs(busiest.minutes)}</div>` : ''}</div>
 <div class="chart" style="gap:6px">${bars}</div><div class="chart-x" style="gap:6px">${xs}</div>`;
 
   // By client / service / teammate
@@ -341,10 +341,10 @@ function renderDailySummaryList(data){
     const st = slack ? `<span class="st"><span class="dot green"></span>Sends to ${escapeHtml(firstName(person.name))} in Slack</span>`
       : `<span class="st t-red"><span class="ic sm" style="color:var(--red)">${icon('warning', { fill: false })}</span>No Slack ID on file</span><button class="btn btn-q sm" onclick="event.stopPropagation();switchView('team')">Add in Team</button>`;
     const n = impsBy(person.name);
-    return `<div class="grp og"><div class="og-h" role="button" tabindex="0" onclick="openDailySummaryDetail('${person.userId}')">${avHtml(person.name, 'style="width:28px;height:28px;font-size:11px"')}
+    return `<div class="grp og"><div class="og-h" role="button" tabindex="0" onclick="openDailySummaryDetail('${person.userId}')">${avHtml(person.name, 'style="width:28px;height:28px;font-size:12px"')}
 <div class="tx"><b>${escapeHtml(person.name)}</b><span>${hmLong(person.totalMinutes)} logged · ${n} improvement${n === 1 ? '' : 's'} · ${ents.length} entr${ents.length === 1 ? 'y' : 'ies'}</span></div><div class="r">${st}</div></div>
 ${ents.slice(0, 3).map(e => `<div class="og-i" style="padding-left:52px"><div class="tx"><span>${escapeHtml(e.description || e.service || 'No description')}</span><span class="s">${escapeHtml(e.client)}</span></div><div class="r"><span class="dur">${hmm(e.minutes)}</span></div></div>`).join('')}
-${more > 0 ? `<div class="og-i" style="padding-left:52px"><button class="link-row t-2" style="font-size:12px" onclick="openDailySummaryDetail('${person.userId}')">${more} more ${more === 1 ? 'entry' : 'entries'}</button></div>` : ''}</div>`;
+${more > 0 ? `<div class="og-i" style="padding-left:52px"><button class="link-row t-2" style="font-size:13px" onclick="openDailySummaryDetail('${person.userId}')">${more} more ${more === 1 ? 'entry' : 'entries'}</button></div>` : ''}</div>`;
   }).join('');
   const worked = new Set(people.flatMap(p => p.entries.map(e => e.client)));
   const act = activeClients();
@@ -359,7 +359,7 @@ ${more > 0 ? `<div class="og-i" style="padding-left:52px"><button class="link-ro
 <div class="kv"><span>Clients worked on</span><b style="font-weight:500">${act.filter(c => worked.has(c.name)).length} of ${act.length}</b></div>
 <div class="kv"><span>Over 9 hours</span><b style="font-weight:500">${long.length ? long.map(escapeHtml).join(', ') : 'Nobody'}</b></div></section>
 <section class="panel"><h3>Not touched ${dayName}</h3>
-<p style="font-size:13px;margin:0;line-height:1.5">${untouched.length ? untouched.map(escapeHtml).join(' · ') : '<span class="t-2">Every client got time.</span>'}</p></section>
+<p style="font-size:14px;margin:0;line-height:1.5">${untouched.length ? untouched.map(escapeHtml).join(' · ') : '<span class="t-2">Every client got time.</span>'}</p></section>
 </aside></div>`;
 }
 
@@ -383,7 +383,7 @@ function choosePayrollPeriod(v){
 }
 function openPayrollAnchorSheet(){
   openAppModal(`<div class="modal-head"><span class="panel-title">Pay periods</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
-<div class="modal-body"><p class="t-2" style="font-size:13px;margin:0 0 12px">Periods are 14 days. Pick the first day of any real pay period and the rest line up with it.</p>
+<div class="modal-body"><p class="t-2" style="font-size:14px;margin:0 0 12px">Periods are 14 days. Pick the first day of any real pay period and the rest line up with it.</p>
 <div class="f"><label for="payAnchor">First day</label><input type="date" class="tf" id="payAnchor" value="${toDateStr(payrollCurrentStart())}"></div></div>
 <div class="modal-actions"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="setPayrollPeriodStart(document.getElementById('payAnchor').value);closeAppModal()">Use This Date</button></div>`, 420);
   renderPayrollView();
@@ -440,7 +440,7 @@ function renderPayrollView(){
     const by = teamProfiles.find(p => p.id === row.marked_paid_by), s = new Date(row.period_start + 'T00:00:00'), e = new Date(row.period_end + 'T00:00:00');
     const on = row.created_at ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
     return `<div class="row sm"><div class="tx"><span class="t" style="font-weight:400">${fmt(s)} – ${s.getMonth() === e.getMonth() ? e.getDate() : fmt(e)}</span><span class="s">Marked paid by ${escapeHtml(by ? firstName(by.name) : 'a former teammate')}${on ? ' on ' + on : ''}</span></div><div class="r"><span class="dur" style="color:var(--label)">${money(parseFloat(row.total_amount))}</span></div></div>`;
-  }).join('') : '<div class="row sm"><span class="t-2" style="font-size:13px">No periods marked as paid yet.</span></div>';
+  }).join('') : '<div class="row sm"><span class="t-2" style="font-size:14px">No periods marked as paid yet.</span></div>';
 
   const rates = [...teamProfiles].sort((a, b) => (payrollRates[a.id] ? 0 : 1) - (payrollRates[b.id] ? 0 : 1) || a.name.localeCompare(b.name)).map(p => {
     const r = payrollRates[p.id] || 0;
@@ -453,14 +453,14 @@ function renderPayrollView(){
   root.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><select class="pop" aria-label="Pay period" onchange="choosePayrollPeriod(this.value)">${pOpts}</select><span style="flex:1"></span>
 <button class="btn" onclick="exportPayrollCsv()">${icon('export')}Export CSV</button><button class="btn" onclick="markPayrollPeriodPaid()">${icon('check-circle')}Mark Period as Paid…</button></div>
 <div class="cols" style="margin-top:6px"><div class="col-main">
-<div class="h2"><h2>Pay period summary</h2><span class="t-2" style="font-size:12px">Hours come from the timesheet</span></div>
+<div class="h2"><h2>Pay period summary</h2><span class="t-2" style="font-size:13px">Hours come from the timesheet</span></div>
 <div class="grp">${table}</div>
-<p class="t-2" style="font-size:12px;margin:10px 2px 0">Only people with an hourly rate appear here.${notes.length ? ' ' + notes.join(' ') : ''}</p>
+<p class="t-2" style="font-size:13px;margin:10px 2px 0">Only people with an hourly rate appear here.${notes.length ? ' ' + notes.join(' ') : ''}</p>
 <div class="h2"><h2>Paid periods</h2></div>
 <div class="grp">${hist}</div></div>
 <aside class="col-side" style="padding-top:28px">
 <section class="panel"><h3>Overtime rule</h3>
-<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px">After <input class="tf" id="overtimeThresholdInput" style="width:52px;text-align:center" value="${settings.overtimeThresholdHours ?? 40}" aria-label="Hours per week" onchange="saveOvertimeRules()"> hours a week, pay <input class="tf" id="overtimeMultiplierInput" style="width:52px;text-align:center" value="${settings.overtimeMultiplier ?? 1.5}" aria-label="Overtime multiplier" onchange="saveOvertimeRules()">× the normal rate.</div>
+<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:14px">After <input class="tf" id="overtimeThresholdInput" style="width:52px;text-align:center" value="${settings.overtimeThresholdHours ?? 40}" aria-label="Hours per week" onchange="saveOvertimeRules()"> hours a week, pay <input class="tf" id="overtimeMultiplierInput" style="width:52px;text-align:center" value="${settings.overtimeMultiplier ?? 1.5}" aria-label="Overtime multiplier" onchange="saveOvertimeRules()">× the normal rate.</div>
 </section>
 <section class="panel"><h3>Hourly rates</h3>${rates}</section>
 </aside></div>`;

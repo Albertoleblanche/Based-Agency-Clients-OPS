@@ -16,7 +16,7 @@ const WEEKLY_REPORT_ICONS = {
 };
 
 function weeklyReportEmptyState(text){
-  return `<p style="font-size:13px;color:var(--muted-lt);text-align:center;padding:24px 0;">${escapeHtml(text)}</p>`;
+  return `<p style="font-size:14px;color:var(--muted-lt);text-align:center;padding:24px 0;">${escapeHtml(text)}</p>`;
 }
 
 // coverNote: a short line specific to how this wizard was opened (a real
@@ -26,47 +26,47 @@ function weeklyReportEmptyState(text){
 function buildWeeklyFocusReportSteps(r, coverNote){
   const attentionHtml = (r.attentionClients||[]).map(c=>`
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="dockWeeklyFocusReportModal();openClientDetail('${c.id}')">
-      <span style="font-size:13.5px;color:var(--ink);">${escapeHtml(c.name)}</span>
+      <span style="font-size:14.5px;color:var(--ink);">${escapeHtml(c.name)}</span>
       <span style="display:flex;align-items:center;gap:8px;flex:none;">
         <span class="pill ${c.danger>=5?'pill-bad':'pill-mid'}">Danger ${c.danger}/5</span>
-        <span style="font-size:11.5px;color:var(--muted-lt);white-space:nowrap;">${c.daysSinceImprovement==null?'never logged':c.daysSinceImprovement+'d since update'}</span>
+        <span style="font-size:12.5px;color:var(--muted-lt);white-space:nowrap;">${c.daysSinceImprovement==null?'never logged':c.daysSinceImprovement+'d since update'}</span>
       </span>
     </div>`).join('');
 
   const overdueHtml = (r.overdueFollowUps||[]).map(f=>`
     <div style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="dockWeeklyFocusReportModal();openClientDetail('${f.clientId}')">
-      <div style="font-size:13.5px;color:var(--ink);">${escapeHtml(f.clientName)}</div>
-      <div style="font-size:11.5px;color:var(--muted-lt);">"${escapeHtml(f.question||'')}" — was due ${new Date(f.followUpDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
+      <div style="font-size:14.5px;color:var(--ink);">${escapeHtml(f.clientName)}</div>
+      <div style="font-size:12.5px;color:var(--muted-lt);">"${escapeHtml(f.question||'')}" — was due ${new Date(f.followUpDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
     </div>`).join('');
 
   const staleHtml = (r.staleClients||[]).map(c=>`
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="dockWeeklyFocusReportModal();openClientDetail('${c.id}')">
-      <span style="font-size:13.5px;color:var(--ink);">${escapeHtml(c.name)}</span>
-      <span style="font-size:11.5px;color:var(--muted-lt);">${c.daysSinceImprovement==null?'never logged':c.daysSinceImprovement+' days quiet'}</span>
+      <span style="font-size:14.5px;color:var(--ink);">${escapeHtml(c.name)}</span>
+      <span style="font-size:12.5px;color:var(--muted-lt);">${c.daysSinceImprovement==null?'never logged':c.daysSinceImprovement+' days quiet'}</span>
     </div>`).join('');
 
   const draftsHtml = (r.pendingDrafts||[]).map(c=>`
     <div style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="dockWeeklyFocusReportModal();openClientDetail('${c.id}')">
-      <span style="font-size:13.5px;color:var(--ink);">${escapeHtml(c.name)}</span>
+      <span style="font-size:14.5px;color:var(--ink);">${escapeHtml(c.name)}</span>
     </div>`).join('');
 
   const aiHtml = (r.aiFindings||[]).map(f=>`
     <div style="padding:12px 0;border-bottom:1px solid var(--border);">
-      <div style="font-size:13.5px;font-weight:600;color:var(--ink);margin-bottom:4px;">${escapeHtml(f.title)}</div>
-      <div style="font-size:12.5px;color:var(--muted);line-height:1.5;">${escapeHtml(f.body)}</div>
+      <div style="font-size:14.5px;font-weight:600;color:var(--ink);margin-bottom:4px;">${escapeHtml(f.title)}</div>
+      <div style="font-size:13.5px;color:var(--muted);line-height:1.5;">${escapeHtml(f.body)}</div>
     </div>`).join('');
 
   const statTile = (count, label, stepIdx) => `
     <div onclick="goToWeeklyFocusReportStep(${stepIdx})" style="flex:1;min-width:110px;background:var(--surface-2);border-radius:var(--radius-lg);padding:16px 10px;cursor:pointer;text-align:center;">
       <div style="font-size:24px;font-weight:700;color:var(--ink);">${count}</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:3px;">${escapeHtml(label)}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:3px;">${escapeHtml(label)}</div>
     </div>`;
 
   const attn = r.attentionClients||[], overdue = r.overdueFollowUps||[], stale = r.staleClients||[], drafts = r.pendingDrafts||[], ai = r.aiFindings||[];
 
   return [
     { icon: WEEKLY_REPORT_ICONS.overview, title: 'This week at a glance', subtitle: null, body: `
-        ${coverNote ? `<p style="font-size:11.5px;color:var(--muted-lt);text-align:center;margin:0 0 16px;">${coverNote}</p>` : ''}
+        ${coverNote ? `<p style="font-size:12.5px;color:var(--muted-lt);text-align:center;margin:0 0 16px;">${coverNote}</p>` : ''}
         <div style="display:flex;flex-wrap:wrap;gap:10px;">
           ${statTile(attn.length, 'Need attention', 1)}
           ${statTile(overdue.length, 'Overdue', 2)}
@@ -74,7 +74,7 @@ function buildWeeklyFocusReportSteps(r, coverNote){
           ${statTile(drafts.length, 'Pending drafts', 4)}
           ${statTile(ai.length, 'From the Assistant', 5)}
         </div>
-        ${(r.errors||[]).length ? `<p style="font-size:11px;color:var(--red);margin-top:16px;text-align:center;">${r.errors.length} check${r.errors.length!==1?'s':''} failed while generating this report.</p>` : ''}
+        ${(r.errors||[]).length ? `<p style="font-size:12px;color:var(--red);margin-top:16px;text-align:center;">${r.errors.length} check${r.errors.length!==1?'s':''} failed while generating this report.</p>` : ''}
       ` },
     { icon: WEEKLY_REPORT_ICONS.attention, title: 'Needs attention', subtitle: `${attn.length} client${attn.length!==1?'s':''}`, body: attentionHtml || weeklyReportEmptyState('No high-danger clients right now.') },
     { icon: WEEKLY_REPORT_ICONS.overdue, title: 'Overdue follow-ups', subtitle: `${overdue.length}`, body: overdueHtml || weeklyReportEmptyState('Nothing overdue.') },
@@ -102,8 +102,8 @@ function renderWeeklyFocusReportStep(){
   bodyEl.innerHTML = `
     <div style="display:flex;gap:6px;justify-content:center;margin-bottom:20px;">${dotsHtml}</div>
     <div style="text-align:center;margin-bottom:16px;">
-      <div style="font-size:15px;font-weight:700;color:var(--ink);">${escapeHtml(step.title)}</div>
-      ${step.subtitle ? `<div style="font-size:12px;color:var(--muted-lt);margin-top:2px;">${escapeHtml(step.subtitle)}</div>` : ''}
+      <div style="font-size:16px;font-weight:700;color:var(--ink);">${escapeHtml(step.title)}</div>
+      ${step.subtitle ? `<div style="font-size:13px;color:var(--muted-lt);margin-top:2px;">${escapeHtml(step.subtitle)}</div>` : ''}
     </div>
     <div style="min-height:140px;max-height:44vh;overflow-y:auto;">${step.body}</div>
   `;
@@ -133,11 +133,11 @@ function openWeeklyFocusReportShell(){
     <div class="modal-head" onclick="undockWeeklyFocusReportIfNeeded()">
       <span class="panel-title">This week's focus report</span>
       <div style="display:flex;align-items:center;gap:14px;">
-        <span class="row-link" style="font-size:12px;" onclick="event.stopPropagation();openWeeklyFocusReportHistory()">Past reports</span>
+        <span class="row-link" style="font-size:13px;" onclick="event.stopPropagation();openWeeklyFocusReportHistory()">Past reports</span>
         <span class="toast-close" onclick="event.stopPropagation();closeAppModal()">✕</span>
       </div>
     </div>
-    <div class="modal-body" id="weeklyFocusReportBody"><p style="font-size:13px;color:var(--muted);text-align:center;">Loading…</p></div>
+    <div class="modal-body" id="weeklyFocusReportBody"><p style="font-size:14px;color:var(--muted);text-align:center;">Loading…</p></div>
     <div class="modal-actions" style="justify-content:space-between;">
       <button class="btn btn-outline" id="weeklyFocusReportPrevBtn" onclick="weeklyFocusReportPrev()">Back</button>
       <button class="btn btn-brand" id="weeklyFocusReportNextBtn" onclick="weeklyFocusReportNext()">Next</button>
@@ -166,7 +166,7 @@ async function openWeeklyFocusReportHistory(){
   listEl.innerHTML = rows.map((r,i)=>`
     <button type="button" class="claude-popup-menu-btn" style="justify-content:space-between;" onclick="openWeeklyFocusReportModal('${r.id}')">
       <span>${new Date(r.generated_at).toLocaleDateString('en-US',{weekday:'long', month:'short', day:'numeric', year:'numeric'})}</span>
-      ${i===0 ? `<span style="font-size:10.5px;color:var(--muted-lt);">Latest</span>` : ''}
+      ${i===0 ? `<span style="font-size:11px;color:var(--muted-lt);">Latest</span>` : ''}
     </button>
   `).join('');
 }
@@ -300,7 +300,7 @@ function undockWeeklyFocusReportIfNeeded(){
 
 function showWeeklyFocusReportLoadError(){
   const bodyEl = document.getElementById('weeklyFocusReportBody');
-  if(bodyEl) bodyEl.innerHTML = `<p style="font-size:13px;color:var(--muted);text-align:center;">Could not load this report — it may have been generated before this feature existed, or something went wrong.</p>`;
+  if(bodyEl) bodyEl.innerHTML = `<p style="font-size:14px;color:var(--muted);text-align:center;">Could not load this report — it may have been generated before this feature existed, or something went wrong.</p>`;
   const prevBtn = document.getElementById('weeklyFocusReportPrevBtn'); if(prevBtn) prevBtn.style.display = 'none';
   const nextBtn = document.getElementById('weeklyFocusReportNextBtn'); if(nextBtn){ nextBtn.textContent = 'Close'; nextBtn.onclick = closeAppModal; }
 }

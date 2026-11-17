@@ -140,8 +140,8 @@ async function openImprovementFiles(clientId, impId){
   const i = (c?.improvements || []).find(x => x.id === impId) || clientImprovements.find(x => x.id === impId);
   if(!i || !(i.attachments || []).length) return;
   openAppModal(`<h3>Screenshots</h3>
-<p class="t-2" style="margin:-8px 0 14px;font-size:13px;line-height:1.45">${escapeHtml(i.text)}</p>
-<div class="att-grid" id="impFilesGrid"><div class="t-2" style="font-size:12px">Loading…</div></div>
+<p class="t-2" style="margin:-8px 0 14px;font-size:14px;line-height:1.45">${escapeHtml(i.text)}</p>
+<div class="att-grid" id="impFilesGrid"><div class="t-2" style="font-size:13px">Loading…</div></div>
 <div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal()">Done</button></div>`, 560);
   const withUrls = await Promise.all(i.attachments.map(async a => {
     try{ const { data } = await supabaseClient.storage.from('attachments').createSignedUrl(a.path, 3600); return { ...a, url: data?.signedUrl || null }; }
@@ -177,9 +177,9 @@ function openQueueLogImprovementModal(presetClientId){
 <label for="liService">Service</label><div id="liServiceWrap">${sheetPop('liService', 'Service', services.map(s => [s, s]), svc, 'logSheet.serviceTouched=true')}</div>
 <label for="liDate">Date</label><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${sheetDateField('liDate', toDateStr(new Date()), { past: true, from: -13, to: 0, max: toDateStr(new Date()) })}</div>
 <label for="liTime">Time spent</label><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><input id="liTime" class="tf" style="width:80px" placeholder="0:30" autocomplete="off" oninput="logSheet.useTimer=false">${timerLink}</div>
-<span></span><div style="display:flex;align-items:flex-start;gap:10px;font-size:13px">${sheetSw('liInclude', true, 'Include in the client email')}<div><div>Include in the client email</div><div class="t-2" style="font-size:12px">Turn off for internal work the client doesn’t need to hear about</div></div></div>
+<span></span><div style="display:flex;align-items:flex-start;gap:10px;font-size:14px">${sheetSw('liInclude', true, 'Include in the client email')}<div><div>Include in the client email</div><div class="t-2" style="font-size:13px">Turn off for internal work the client doesn’t need to hear about</div></div></div>
 ${improvementExtrasReady === false ? '' : `<label>Screenshots</label><div class="fchips" id="liFiles"></div>`}
-<label>Logged by</label><div style="font-size:13px">${sheetWho(me)}</div>
+<label>Logged by</label><div style="font-size:14px">${sheetWho(me)}</div>
 </div>
 <input type="file" id="liFileInput" multiple accept="image/*,.pdf" hidden onchange="liAddFiles(this)">
 <div class="sheet-a"><button class="btn" style="margin-right:auto" onclick="saveQueueLogImprovement(true)">Log &amp; Add Another</button><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="saveQueueLogImprovement()">Log Improvement</button></div>`, 520);
@@ -315,10 +315,10 @@ function gsRender(keep){
   const rows = gsList.map(x => `<div class="row" style="cursor:default" onclick="gsToggle('${x.c.id}')">${sheetCk(gsPick.has(x.c.id), 'Include ' + x.c.name, `event.stopPropagation();gsToggle('${x.c.id}')`)}${monoHtml(x.c)}<div class="tx"><span class="t">${escapeHtml(x.c.name)}</span><span class="s">${escapeHtml(x.sub)}</span></div></div>`).join('')
     || `<div class="row"><div class="tx"><span class="t">Nothing to group</span><span class="s">Every client with work logged since its last update already has a draft.</span></div></div>`;
   const comb = gsCombinable();
-  const combLine = comb.length && canApprove() ? `<p class="t-2" style="margin:12px 0 0;font-size:12px;line-height:1.45">${escapeHtml(comb[0].name)}${comb.length > 1 ? ` and ${comb.length - 1} more have` : ' has'} approved drafts from more than one person. <button class="link-btn" onclick="openCombineDraftsModal()">Combine Them…</button></p>` : '';
+  const combLine = comb.length && canApprove() ? `<p class="t-2" style="margin:12px 0 0;font-size:13px;line-height:1.45">${escapeHtml(comb[0].name)}${comb.length > 1 ? ` and ${comb.length - 1} more have` : ' has'} approved drafts from more than one person. <button class="link-btn" onclick="openCombineDraftsModal()">Combine Them…</button></p>` : '';
   const n = gsPick.size;
   const html = `<h3>Group &amp; Send</h3>
-<p style="margin:-8px 0 14px;font-size:13px;color:var(--label-2);line-height:1.5">Each client’s improvements become one email draft. Drafts go to Review first, so nothing reaches a client until an approver sends it.</p>
+<p style="margin:-8px 0 14px;font-size:14px;color:var(--label-2);line-height:1.5">Each client’s improvements become one email draft. Drafts go to Review first, so nothing reaches a client until an approver sends it.</p>
 <div class="grp gs-list" style="box-shadow:0 0 0 .5px var(--sep-strong)">${rows}</div>
 <div class="form-grp" style="margin-top:14px">
 <div class="fr"><div class="l"><b>Write the drafts with AI</b><span>Uses your email structure and signature from Settings</span></div>${sheetSw('gsAI', gsAIOn(), 'Write the drafts with AI', 'gsSaveAI()')}</div>
@@ -404,7 +404,7 @@ function taskFormHtml(editing, presetAssigneeId, presetContext){
 <label for="taskDueInput">Due</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap" id="ntDueRow">${sheetDateField('taskDueInput', due, { none: 'No date', from: 0, to: 20, min: toDateStr(new Date()), after: 'ntSyncDue', label: 'Due date' })}${sheetPop('taskTimeInput', 'Due time', taskTimeOptions(), time, '', { disabled: !due })}</div>
 <label>Priority</label><div><div class="seg" role="radiogroup" aria-label="Priority" id="ntPriority">${priSeg}</div></div>
 <label class="top" for="taskDescInput">Notes</label><textarea id="taskDescInput" class="tf" spellcheck="true" placeholder="Add details, links or a checklist">${escapeHtml(notes)}</textarea>
-${t ? '' : `<span></span><div style="display:flex;align-items:center;gap:10px;font-size:13px" id="ntCalRow" class="${due ? '' : 'off'}">${sheetSw('ntCal', true, 'Add to my calendar')}Add to my calendar</div>`}
+${t ? '' : `<span></span><div style="display:flex;align-items:center;gap:10px;font-size:14px" id="ntCalRow" class="${due ? '' : 'off'}">${sheetSw('ntCal', true, 'Add to my calendar')}Add to my calendar</div>`}
 </div>
 <div class="sheet-a">${noteMenu}<button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="${t ? `saveEditTask('${t.id}')` : 'saveNewTask()'}">${t ? 'Save' : 'Create Task'}</button></div>`;
 }
@@ -429,7 +429,7 @@ function ntToggleNoteMenu(){
   const m = document.getElementById('ntNoteMenu'); if(!m) return;
   if(!m.hidden){ m.hidden = true; return; }
   const mine = (typeof notes !== 'undefined' ? notes : []).filter(n => !n.deletedAt && (n.text || n.title)).sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0)).slice(0, 10);
-  m.innerHTML = '<div class="mh">Pick a note</div>' + (mine.length ? mine.map(n => { const c = clients.find(x => x.id === n.clientId); return `<button type="button" class="mi" style="height:auto;padding:6px 9px;flex-direction:column;align-items:flex-start;gap:1px" onclick="ntFillFromNote('${n.id}')"><span style="font-weight:500">${escapeHtml(n.title || 'Untitled note')}</span><span class="t-2" style="font-size:11.5px">${escapeHtml(c ? c.name : (n.text || '').slice(0, 48))}</span></button>`; }).join('')
+  m.innerHTML = '<div class="mh">Pick a note</div>' + (mine.length ? mine.map(n => { const c = clients.find(x => x.id === n.clientId); return `<button type="button" class="mi" style="height:auto;padding:6px 9px;flex-direction:column;align-items:flex-start;gap:1px" onclick="ntFillFromNote('${n.id}')"><span style="font-weight:500">${escapeHtml(n.title || 'Untitled note')}</span><span class="t-2" style="font-size:12.5px">${escapeHtml(c ? c.name : (n.text || '').slice(0, 48))}</span></button>`; }).join('')
     : '<div class="mi" style="color:var(--label-2)">No notes yet</div>');
   m.hidden = false;
 }

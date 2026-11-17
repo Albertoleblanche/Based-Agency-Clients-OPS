@@ -39,19 +39,19 @@ function drawTrash(){
       const imps = (c.improvements || []).length, te = timeEntries.filter(e => e.clientId === c.id).length;
       const extra = [imps ? `${imps} improvement${imps === 1 ? '' : 's'}` : '', te ? `${te} time entr${te === 1 ? 'y' : 'ies'}` : ''].filter(Boolean).join(' and ');
       return trashRow('buildings', c.name, `Deleted ${trashDay(c.deletedAt)}${extra ? ` · with its ${extra}` : ''}`, `restoreClient('${c.id}')`, `permanentlyDeleteClient('${c.id}')`);
-    }).join('') || '<div class="row"><span class="t-2" style="font-size:13px">No deleted clients.</span></div>'}</div>`;
+    }).join('') || '<div class="row"><span class="t-2" style="font-size:14px">No deleted clients.</span></div>'}</div>`;
   }
   if(show('notes') && (nt.length || trashTab === 'notes')){
-    html += head('notes', 'Notes', `<span class="t-2" style="font-size:12px;display:inline-flex;align-items:center;gap:4px"><span class="ic sm">${icon('lock-simple')}</span>Only you can see your deleted notes</span>`) + `<div class="grp">${nt.map(n => {
+    html += head('notes', 'Notes', `<span class="t-2" style="font-size:13px;display:inline-flex;align-items:center;gap:4px"><span class="ic sm">${icon('lock-simple')}</span>Only you can see your deleted notes</span>`) + `<div class="grp">${nt.map(n => {
       const c = clients.find(x => x.id === n.clientId);
       return trashRow('notepad', n.title || 'Untitled note', `${escapeHtml(c ? c.name : 'No client')} · deleted ${trashDay(n.deletedAt)}`, `restoreNote('${n.id}')`, `permanentlyDeleteNote('${n.id}')`);
-    }).join('') || '<div class="row"><span class="t-2" style="font-size:13px">No deleted notes.</span></div>'}</div>`;
+    }).join('') || '<div class="row"><span class="t-2" style="font-size:14px">No deleted notes.</span></div>'}</div>`;
   }
   if(show('time') && (tm.length || trashTab === 'time')){
     html += head('time', 'Time entries') + `<div class="grp">${tm.map(e => {
       const c = clients.find(x => x.id === e.clientId);
       return trashRow('timer', `${e.description || e.service || 'Time'} · ${hmm(e.minutes)}`, `${escapeHtml(c ? c.name : 'Client removed')} · deleted ${trashDay(e.deletedAt)}`, `restoreTimeEntry('${e.id}')`, `permanentlyDeleteTimeEntry('${e.id}')`);
-    }).join('') || '<div class="row"><span class="t-2" style="font-size:13px">No deleted time entries.</span></div>'}</div>`;
+    }).join('') || '<div class="row"><span class="t-2" style="font-size:14px">No deleted time entries.</span></div>'}</div>`;
   }
   if(!html) html = `<div class="empty"><b>Nothing deleted</b>Clients, notes and time entries you delete wait here, so you can bring them back.</div>`;
   root.innerHTML = `${seg}<div style="max-width:860px">${html}</div>`;

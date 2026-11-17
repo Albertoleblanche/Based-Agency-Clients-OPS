@@ -141,7 +141,7 @@ function showToastWithCopy(type, title, detail, copyText){
   };
   const ic = toastIconHtml(type);
   const copyId = 'copytext-' + Date.now();
-  el.innerHTML = `<span class="toast-icon">${ic}</span><span class="toast-text"><b class="toast-t">${escapeHtml(title)}</b>${escapeHtml(detail)}<br><textarea class="toast-copy-area" id="${copyId}" readonly>${escapeHtml(copyText)}</textarea><span class="row-link" style="font-size:11.5px;" onclick="copyToastText('${copyId}', this)">Copy details</span></span><span class="toast-close" onclick="dismissToastEl(this.parentElement)">✕</span>`;
+  el.innerHTML = `<span class="toast-icon">${ic}</span><span class="toast-text"><b class="toast-t">${escapeHtml(title)}</b>${escapeHtml(detail)}<br><textarea class="toast-copy-area" id="${copyId}" readonly>${escapeHtml(copyText)}</textarea><span class="row-link" style="font-size:12.5px;" onclick="copyToastText('${copyId}', this)">Copy details</span></span><span class="toast-close" onclick="dismissToastEl(this.parentElement)">✕</span>`;
   el.style.opacity = '0';
   el.style.transform = 'scale(.94)';
   stack.appendChild(el);

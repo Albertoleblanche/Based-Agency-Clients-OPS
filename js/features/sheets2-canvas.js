@@ -67,7 +67,7 @@ function openReminderDetailModal(id){
 <h3>Client Follow-up</h3>
 <div class="f">
 <label class="top" for="reminderEditQuestion">Question</label><textarea id="reminderEditQuestion" class="tf" spellcheck="true">${escapeHtml(r.question)}</textarea>
-<label>Asked by</label><div style="font-size:13px">${owner ? sheetWho(owner.name) : '—'}${asked ? `<span class="t-2"> · ${asked}</span>` : ''}</div>
+<label>Asked by</label><div style="font-size:14px">${owner ? sheetWho(owner.name) : '—'}${asked ? `<span class="t-2"> · ${asked}</span>` : ''}</div>
 <label for="reminderEditFollowUp">Follow up</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sheetDateField('reminderEditFollowUp', r.followUpDate || '', { from: 0, to: 30, min: toDateStr(new Date()), disabled: resolved })}</div>
 </div>
 <div class="sheet-a"><button class="btn danger" style="margin-right:auto" onclick="closeAppModal();deleteReminder('${r.id}')">Delete</button>${resolved
@@ -121,14 +121,14 @@ function eventFormHtml(editing, presetDateStr){
 <label for="eventTitleInput">Title</label><input id="eventTitleInput" class="tf" placeholder="e.g. Kickoff call with Northline Roofing" value="${e ? escapeHtml(e.title) : ''}">
 <label for="eventTypeSelect">Type</label><div>${sheetPop('eventTypeSelect', 'Type', types, e ? e.eventType : 'meeting')}</div>
 <label for="eventDateInput">Date</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sheetDateField('eventDateInput', date, { from: 0, to: 30, min: toDateStr(new Date()) })}</div>
-<label for="eventStartInput">Time</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap" id="eventTimeRow">${sheetPop('eventStartInput', 'Starts', sheetTimeOpts(start), start, 'eventStartChanged(this)', { disabled: allDay })}<span class="t-2" style="font-size:12px">to</span>${sheetPop('eventEndInput', 'Ends', sheetTimeOpts(end), end, '', { disabled: allDay })}<span class="sw-line" style="margin-left:6px">${sheetSwCk('eventAllDayInput', allDay, 'All day', 'toggleEventAllDay()')}All day</span></div>
+<label for="eventStartInput">Time</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap" id="eventTimeRow">${sheetPop('eventStartInput', 'Starts', sheetTimeOpts(start), start, 'eventStartChanged(this)', { disabled: allDay })}<span class="t-2" style="font-size:13px">to</span>${sheetPop('eventEndInput', 'Ends', sheetTimeOpts(end), end, '', { disabled: allDay })}<span class="sw-line" style="margin-left:6px">${sheetSwCk('eventAllDayInput', allDay, 'All day', 'toggleEventAllDay()')}All day</span></div>
 <label for="eventClientSelect">Client</label><div>${sheetPop('eventClientSelect', 'Client', [['', 'No client'], ...sheetClientOptions(e && e.clientId)], e && e.clientId ? e.clientId : '')}</div>
 <label for="eventLocationInput">Location</label><input id="eventLocationInput" class="tf" placeholder="Zoom link or address" value="${e && e.location ? escapeHtml(e.location) : ''}">
 <label for="eventReminderSelect">Alert</label><div>${sheetPop('eventReminderSelect', 'Alert', REMINDER_OPTIONS, String(e ? (e.reminderMinutes ?? '') : ''))}</div>
-${e ? '' : `<label for="eventRepeatSelect">Repeat</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sheetPop('eventRepeatSelect', 'Repeat', [['none', 'Never'], ['daily', 'Every day'], ['weekly', 'Every week'], ['monthly', 'Every month']], 'none', 'toggleRepeatUntilField()')}<span id="eventRepeatUntilWrap" style="display:none;align-items:center;gap:8px"><span class="t-2" style="font-size:12px">until</span>${sheetDateField('eventRepeatUntilInput', until, { from: 7, to: 30, min: toDateStr(new Date()) })}</span></div>`}
+${e ? '' : `<label for="eventRepeatSelect">Repeat</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sheetPop('eventRepeatSelect', 'Repeat', [['none', 'Never'], ['daily', 'Every day'], ['weekly', 'Every week'], ['monthly', 'Every month']], 'none', 'toggleRepeatUntilField()')}<span id="eventRepeatUntilWrap" style="display:none;align-items:center;gap:8px"><span class="t-2" style="font-size:13px">until</span>${sheetDateField('eventRepeatUntilInput', until, { from: 7, to: 30, min: toDateStr(new Date()) })}</span></div>`}
 <label class="top">Invitees</label><div class="pick-people">${people.map(p => `<label class="pick"><input type="checkbox" class="event-attendee-checkbox ck-native" value="${p.id}"${who.includes(p.id) ? ' checked' : ''}>${avHtml(p.name)}<span>${escapeHtml(p.id === currentUser.id ? 'You' : p.name)}</span></label>`).join('')}</div>
 <label class="top" for="eventDescInput">Notes</label><textarea id="eventDescInput" class="tf" spellcheck="true" placeholder="Agenda, links, anything people should know">${e ? escapeHtml(e.description || '') : ''}</textarea>
-${e && e.recurrenceGroupId ? `<span></span><p class="t-2" style="margin:0;font-size:12px">Part of a series that repeats ${escapeHtml((e.recurrenceLabel || '').toLowerCase() || 'regularly')}. Changes here apply to this one only.</p>` : ''}
+${e && e.recurrenceGroupId ? `<span></span><p class="t-2" style="margin:0;font-size:13px">Part of a series that repeats ${escapeHtml((e.recurrenceLabel || '').toLowerCase() || 'regularly')}. Changes here apply to this one only.</p>` : ''}
 </div>
 <div class="sheet-a">${e && !e.googleEventId ? `<button class="btn danger" style="margin-right:auto" onclick="${e.recurrenceGroupId ? `openDeleteRecurringChoice('${e.id}')` : `deleteCalendarEvent('${e.id}')`}">Delete</button>` : ''}<button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="${e ? `saveEditEvent('${e.id}')` : 'saveNewEvent()'}">${e ? 'Save' : 'Add Event'}</button></div>`;
 }
@@ -157,7 +157,7 @@ function openDeleteRecurringChoice(eventId){
   const e = calendarEvents.find(x => x.id === eventId);
   if(!e) return;
   openAppModal(`<h3>Delete a Repeating Event</h3>
-<p class="t-2" style="margin:-6px 0 0;font-size:13px;line-height:1.5">“${escapeHtml(e.title)}” repeats ${escapeHtml((e.recurrenceLabel || 'regularly').toLowerCase())}. Delete just this one, or every one?</p>
+<p class="t-2" style="margin:-6px 0 0;font-size:14px;line-height:1.5">“${escapeHtml(e.title)}” repeats ${escapeHtml((e.recurrenceLabel || 'regularly').toLowerCase())}. Delete just this one, or every one?</p>
 <div class="sheet-a"><button class="btn" style="margin-right:auto" onclick="closeAppModal()">Cancel</button><button class="btn danger" onclick="deleteRecurringSeries('${e.recurrenceGroupId}')">Delete All</button><button class="btn btn-p" onclick="deleteCalendarEvent('${eventId}')">Delete This One</button></div>`, 440);
   sheetFocusPrimary();
 }
@@ -178,7 +178,7 @@ function openEventDetailModal(eventId){
     const r = (e.rsvps && e.rsvps[id]) || { status: 'pending' }, [dc, lab] = RS[r.status] || RS.pending;
     return `<div class="row sm">${avHtml(p.name)}<div class="tx"><span class="t" style="font-weight:400">${escapeHtml(p.name)}</span>${r.status === 'change_requested' && r.message ? `<span class="s">“${escapeHtml(r.message)}”</span>` : ''}</div><div class="r"><span class="st"><span class="dot ${dc}"></span>${lab}</span></div></div>`;
   }).join('');
-  const peopleRows = (organizer ? `<div class="row sm">${avHtml(organizer.name)}<div class="tx"><span class="t" style="font-weight:400">${escapeHtml(organizer.name)}</span></div><div class="r"><span class="t-2" style="font-size:12px">Organizer</span></div></div>` : '') + others;
+  const peopleRows = (organizer ? `<div class="row sm">${avHtml(organizer.name)}<div class="tx"><span class="t" style="font-weight:400">${escapeHtml(organizer.name)}</span></div><div class="r"><span class="t-2" style="font-size:13px">Organizer</span></div></div>` : '') + others;
   const line = (ic, html) => `<div class="ev-line">${icon(ic)}<span>${html}</span></div>`;
   const rsvp = !mine && invited && !e.googleEventId
     ? `<button class="btn" onclick="openRequestChangeModal('${e.id}')">Ask for a Change</button><button class="btn" onclick="respondToEvent('${e.id}','declined')"${myRsvp === 'declined' ? ' disabled' : ''}>${myRsvp === 'declined' ? 'Not Going' : 'Decline'}</button><button class="btn btn-p" onclick="respondToEvent('${e.id}','confirmed')"${myRsvp === 'confirmed' ? ' disabled' : ''}>${myRsvp === 'confirmed' ? 'Going' : 'Accept'}</button>` : '';
@@ -187,7 +187,7 @@ function openEventDetailModal(eventId){
 <div class="ev-lines">${line('calendar-blank', escapeHtml(when))}${e.location ? line('map-pin', /^https?:\/\//i.test(e.location) ? `<a href="${safeUrl(e.location)}" target="_blank" rel="noopener">${escapeHtml(truncateLinkDisplay(e.location, 52))}</a>` : escapeHtml(e.location)) : ''}${c ? line('buildings', `<a href="#" onclick="closeAppModal();openClientDetail('${c.id}');return false;">${escapeHtml(c.name)}</a>`) : ''}${reminderLabel(e.reminderMinutes) ? line('bell', 'Alert ' + escapeHtml(reminderLabel(e.reminderMinutes).toLowerCase())) : ''}</div>
 ${e.description ? `<p class="ev-desc">${escapeHtml(e.description)}</p>` : ''}
 ${peopleRows ? `<div class="h2" style="margin-top:16px"><h2>Who’s coming</h2></div><div class="grp">${peopleRows}</div>` : ''}
-${e.googleEventId ? `<p class="t-2" style="margin:12px 0 0;font-size:12px">Change it in Google Calendar. Edits show up here at the next sync.</p>` : ''}
+${e.googleEventId ? `<p class="t-2" style="margin:12px 0 0;font-size:13px">Change it in Google Calendar. Edits show up here at the next sync.</p>` : ''}
 <div class="sheet-a">${mine && !e.googleEventId ? `<button class="btn danger" style="margin-right:auto" onclick="${e.recurrenceGroupId ? `openDeleteRecurringChoice('${e.id}')` : `deleteCalendarEvent('${e.id}')`}">Delete</button>` : ''}${rsvp}<button class="btn${mine && !e.googleEventId || rsvp ? '' : ' btn-p'}" onclick="closeAppModal()">Close</button>${mine && !e.googleEventId ? `<button class="btn btn-p" onclick="openEditEventForm('${e.id}')">Edit</button>` : ''}</div>`, 520);
   sheetFocusPrimary();
 }
@@ -266,7 +266,7 @@ function openTaskDetailModal(taskId){
   const due = t.dueDate ? new Date(t.dueDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) + (hhmm ? ' at ' + fmtTime(atTime(new Date(t.dueDate + 'T12:00:00'), hhmm)) : '') : '';
   const linked = calendarEvents.find(e => e.relatedTaskId === t.id);
   const moves = Object.keys(TASK_STAGE_LABEL).filter(k => k !== t.status && (k !== 'done' || amAssignee)).map(k => [k, TASK_STAGE_LABEL[k]]);
-  const kv = (l, v) => `<label>${l}</label><div style="font-size:13px">${v}</div>`;
+  const kv = (l, v) => `<label>${l}</label><div style="font-size:14px">${v}</div>`;
   openAppModal(`<div class="sheet-meta"><span class="st"><span class="dot ${done ? 'green' : t.status === 'in_review' ? 'purple' : t.status === 'in_progress' ? 'blue' : 'hollow'}"></span>${TASK_STAGE_LABEL[t.status] || 'To Do'}</span>${overdue ? '<span class="t-red">Overdue</span>' : ''}${t.priority === 'high' && !done ? `<span class="st">${icon('flag', { cls: 'flag', fill: true })}High priority</span>` : ''}</div>
 <h3>${escapeHtml(t.title)}</h3>
 ${t.description ? `<p class="ev-desc" style="margin-top:-6px">${escapeHtml(t.description)}</p>` : ''}
@@ -288,7 +288,7 @@ function completeTaskModalHtml(taskId){
   const t = tasks.find(x => x.id === taskId);
   if(!t) return '';
   openAppModal(`<h3>Mark Done</h3>
-<p class="t-2" style="margin:-8px 0 14px;font-size:13px">${escapeHtml(t.title)}</p>
+<p class="t-2" style="margin:-8px 0 14px;font-size:14px">${escapeHtml(t.title)}</p>
 <div class="f">
 <label class="top" for="taskCompletionNotes">Notes</label><textarea id="taskCompletionNotes" class="tf" spellcheck="true" placeholder="Anything ${escapeHtml(firstName(teamProfiles.find(p => p.id === t.assignerId)?.name || 'they'))} should know: what you found, what’s left">${escapeHtml(t.completionNotes || '')}</textarea>
 <label for="taskCompletionLink">Link</label><input id="taskCompletionLink" class="tf" value="${escapeHtml(t.completionLink || '')}" placeholder="A doc, a page you built, a file">
@@ -310,14 +310,14 @@ function clientFormHtml(title, submitLabel, customValues){
   const opt = list => (list || []).map(o => [o, o]);
   return `<h3>${escapeHtml(title === 'Add client' ? 'New Client' : title === 'Edit client' ? 'Edit Client' : title)}</h3>
 <div class="f">
-<label for="ncName">Name</label><div><input id="ncName" class="tf" placeholder="e.g. Premium Homes" oninput="checkDuplicateClientName()"><div id="ncNameWarning" class="t-red" style="display:none;font-size:12px;margin-top:5px"></div></div>
+<label for="ncName">Name</label><div><input id="ncName" class="tf" placeholder="e.g. Premium Homes" oninput="checkDuplicateClientName()"><div id="ncNameWarning" class="t-red" style="display:none;font-size:13px;margin-top:5px"></div></div>
 <label for="ncWebsite">Website</label><input id="ncWebsite" class="tf" placeholder="https://client.com">
-<label for="ncEmail">Email</label><div><input id="ncEmail" class="tf" placeholder="contact@client.com, billing@client.com"><div class="t-2" style="font-size:12px;margin-top:5px">Separate addresses with commas. Updates go to everyone listed.</div></div>
+<label for="ncEmail">Email</label><div><input id="ncEmail" class="tf" placeholder="contact@client.com, billing@client.com"><div class="t-2" style="font-size:13px;margin-top:5px">Separate addresses with commas. Updates go to everyone listed.</div></div>
 <label for="ncService">Service</label><div>${sheetPop('ncService', 'Service', opt(settings.serviceOptions), (settings.serviceOptions || [])[0] || '')}</div>
 <label for="ncStatus">Status</label><div>${sheetPop('ncStatus', 'Status', opt(settings.statusOptions), (settings.statusOptions || [])[0] || '')}</div>
-<label for="ncImportance">Importance</label><div style="display:flex;gap:10px;align-items:center">${sheetPop('ncImportance', 'Importance', Array.from({ length: 10 }, (_, i) => [String(i + 1), `${i + 1} of 10`]), '5')}<span class="t-2" style="font-size:12px">How much this client matters to the agency</span></div>
-<label for="ncDanger">Risk</label><div><div style="display:flex;gap:10px;align-items:center">${sheetPop('ncDanger', 'Risk', [['1', '1 · Low'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5 · High']], '1')}<span class="t-2" style="font-size:12px">Your read on how likely they are to leave</span></div><div id="ncDangerNudge" class="t-2" style="display:none;font-size:12px;margin-top:5px"></div></div>
-<label for="ncBudget">Hours a month</label><div style="display:flex;gap:10px;align-items:center"><input type="number" id="ncBudget" class="tf" style="width:90px" min="0" step="0.5" placeholder="20"><span class="t-2" style="font-size:12px">Leave empty if there’s no budget</span></div>
+<label for="ncImportance">Importance</label><div style="display:flex;gap:10px;align-items:center">${sheetPop('ncImportance', 'Importance', Array.from({ length: 10 }, (_, i) => [String(i + 1), `${i + 1} of 10`]), '5')}<span class="t-2" style="font-size:13px">How much this client matters to the agency</span></div>
+<label for="ncDanger">Risk</label><div><div style="display:flex;gap:10px;align-items:center">${sheetPop('ncDanger', 'Risk', [['1', '1 · Low'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5 · High']], '1')}<span class="t-2" style="font-size:13px">Your read on how likely they are to leave</span></div><div id="ncDangerNudge" class="t-2" style="display:none;font-size:13px;margin-top:5px"></div></div>
+<label for="ncBudget">Hours a month</label><div style="display:flex;gap:10px;align-items:center"><input type="number" id="ncBudget" class="tf" style="width:90px" min="0" step="0.5" placeholder="20"><span class="t-2" style="font-size:13px">Leave empty if there’s no budget</span></div>
 <label for="ncStartDate">Client since</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sheetDateField('ncStartDate', '', { none: 'Not set', past: true, from: -14, to: 0, max: toDateStr(new Date()) })}</div>
 <label class="top" for="ncSow">Scope</label><textarea id="ncSow" class="tf" spellcheck="true" placeholder="What the agency does for them, in a line or two"></textarea>
 ${customFieldsFormHtml(customValues)}
@@ -362,10 +362,10 @@ function showSendEmailConfirm(to, subject, body, onSent, includeSignature){
   _emailIncludeSignature = !!includeSignature;
   openAppModal(`<h3>Send Email</h3>
 <div class="f">
-<label>To</label><div style="font-size:13px;padding:4px 0">${escapeHtml(to)}<input type="hidden" id="mailModalTo" value="${escapeHtml(to)}"></div>
+<label>To</label><div style="font-size:14px;padding:4px 0">${escapeHtml(to)}<input type="hidden" id="mailModalTo" value="${escapeHtml(to)}"></div>
 <label for="mailModalSubject">Subject</label><input id="mailModalSubject" class="tf">
 <label class="top" for="mailModalBody">Message</label><textarea id="mailModalBody" class="tf" spellcheck="true" style="height:280px"></textarea>
-<span></span><div class="t-2" style="font-size:12px;line-height:1.45">${includeSignature ? 'Goes out from the app with your signature as soon as you click Send.' : 'Goes out from the app as soon as you click Send.'}</div>
+<span></span><div class="t-2" style="font-size:13px;line-height:1.45">${includeSignature ? 'Goes out from the app with your signature as soon as you click Send.' : 'Goes out from the app as soon as you click Send.'}</div>
 </div>
 <div class="sheet-a"><button class="link-btn" id="mailModalCopyBtn" style="margin-right:auto" onclick="copyMailModalBody()">Copy Email</button><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" id="sendEmailConfirmBtn" onclick="confirmSendEmail()">${icon('paper-plane-tilt')}Send</button></div>`, 600);
   document.getElementById('mailModalSubject').value = subject;

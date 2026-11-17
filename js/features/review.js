@@ -85,7 +85,7 @@ ${when ? `<div class="when">${relDay(when)}<br>${fmtTime(when)}</div>` : ''}</di
 ${!d.draftSentAt ? `<span style="margin-left:auto"${w.late ? ' class="t-red"' : ''}>${escapeHtml(w.dueText)}</span>` : ''}</div>
 <h2 class="subject">Your weekly update — ${escapeHtml(updateRangeLabel(c))}</h2>
 ${editing ? `<textarea spellcheck="true" class="draft rv-edit" id="draft-${c.id}">${escapeHtml(d.draft || '')}</textarea>` : `<div class="body">${draftBodyHtml(d.draft)}</div>`}
-${!c.email ? '<p class="t-red" style="font-size:12px">No client email on file — add one in All Clients to send.</p>' : ''}
+${!c.email ? '<p class="t-red" style="font-size:13px">No client email on file — add one in All Clients to send.</p>' : ''}
 ${impRows ? `<div class="src-note">${icon('list-checks')}<span>Written from these improvements</span></div><div class="grp">${impRows}</div>` : ''}
 </div>`;
 }

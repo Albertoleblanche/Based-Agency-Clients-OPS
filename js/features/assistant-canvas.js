@@ -38,8 +38,8 @@ ${c.project_id ? `<button type="button" class="mi" onclick="removeClaudeConversa
     return `<a class="chat-i${on ? ' sel' : ''}" href="#claude" onclick="openClaudeProjectDetail('${p.id}');return false;"><span class="chat-t" style="display:flex;align-items:center;gap:6px"><span class="ic sm">${icon('folder-simple')}</span>${escapeHtml(p.name)}</span><span>${n} chat${n === 1 ? '' : 's'}</span></a>`;
   }).join('');
   el.innerHTML = (pinned.length ? `<div class="lst-h">Pinned</div>${pinned.map(item).join('')}` : '')
-    + `<div class="lst-h" style="display:flex;align-items:center">Projects<button class="ib" style="margin-left:auto;width:20px;height:20px" aria-label="All projects" title="All projects" onclick="openClaudeProjectsView()">${icon('caret-right', { weight: 'bold' })}</button></div>${projects || '<p class="t-2" style="font-size:12px;margin:2px 18px 4px">No projects yet.</p>'}`
-    + `<div class="lst-h">Recent</div>${rest.map(item).join('') || '<p class="t-2" style="font-size:12px;margin:2px 18px">No chats yet. Ask anything below.</p>'}`;
+    + `<div class="lst-h" style="display:flex;align-items:center">Projects<button class="ib" style="margin-left:auto;width:20px;height:20px" aria-label="All projects" title="All projects" onclick="openClaudeProjectsView()">${icon('caret-right', { weight: 'bold' })}</button></div>${projects || '<p class="t-2" style="font-size:13px;margin:2px 18px 4px">No projects yet.</p>'}`
+    + `<div class="lst-h">Recent</div>${rest.map(item).join('') || '<p class="t-2" style="font-size:13px;margin:2px 18px">No chats yet. Ask anything below.</p>'}`;
 }
 
 // Messages: your messages as bubbles on the right, the Assistant's as text under its name.

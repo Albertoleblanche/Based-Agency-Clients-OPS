@@ -93,7 +93,7 @@ function renderTasks(){
         <button class="kanban-add-btn" onclick="openNewTaskModal(undefined,'${stage.key}')" title="New task in ${escapeHtml(stage.label)}">+</button>
       </div>
       <div class="kanban-cards">
-        ${stageTasks.length ? stageTasks.map(t=>kanbanCardHtml(t)).join('') : `<div class="empty" style="padding:18px 8px;font-size:11.5px;">Nothing here yet.</div>`}
+        ${stageTasks.length ? stageTasks.map(t=>kanbanCardHtml(t)).join('') : `<div class="empty" style="padding:18px 8px;font-size:12.5px;">Nothing here yet.</div>`}
       </div>
     </div>`;
   }).join('');
@@ -231,27 +231,27 @@ function openTaskDetailModal(taskId){
     </div>
     <div class="modal-body">
       <div class="q-name" style="margin-bottom:10px;">${escapeHtml(t.title)}</div>
-      ${t.description ? `<div style="font-size:13px;color:var(--ink);line-height:1.6;white-space:pre-wrap;overflow-wrap:break-word;word-break:break-word;margin-bottom:14px;">${escapeHtml(t.description)}</div>` : `<div style="font-size:12.5px;color:var(--muted-lt);margin-bottom:14px;">No description added.</div>`}
+      ${t.description ? `<div style="font-size:14px;color:var(--ink);line-height:1.6;white-space:pre-wrap;overflow-wrap:break-word;word-break:break-word;margin-bottom:14px;">${escapeHtml(t.description)}</div>` : `<div style="font-size:13.5px;color:var(--muted-lt);margin-bottom:14px;">No description added.</div>`}
       <div class="form-grid" style="margin-bottom:6px;">
-        <div><label style="font-family:var(--font);font-size:10px;color:var(--muted-lt);display:block;margin-bottom:4px;">Direction</label><div style="font-size:13px;">${directionLabel}</div></div>
-        ${dueStr ? `<div><label style="font-family:var(--font);font-size:10px;color:var(--muted-lt);display:block;margin-bottom:4px;">Due</label><div style="font-size:13px;${overdue?'color:var(--red);font-weight:700;':''}">${dueStr}</div></div>` : ''}
-        ${c ? `<div><label style="font-family:var(--font);font-size:10px;color:var(--muted-lt);display:block;margin-bottom:4px;">Related client</label><div style="font-size:13px;"><span class="row-link" onclick="closeAppModal(); openClientDetail('${c.id}');">${escapeHtml(c.name)}</span></div></div>` : ''}
-        ${t.status==='done' && t.completedAt ? `<div><label style="font-family:var(--font);font-size:10px;color:var(--muted-lt);display:block;margin-bottom:4px;">Completed</label><div style="font-size:13px;">${new Date(t.completedAt).toLocaleDateString('en-US',{month:'long',day:'numeric'})}</div></div>` : ''}
+        <div><label style="font-family:var(--font);font-size:10.5px;color:var(--muted-lt);display:block;margin-bottom:4px;">Direction</label><div style="font-size:14px;">${directionLabel}</div></div>
+        ${dueStr ? `<div><label style="font-family:var(--font);font-size:10.5px;color:var(--muted-lt);display:block;margin-bottom:4px;">Due</label><div style="font-size:14px;${overdue?'color:var(--red);font-weight:700;':''}">${dueStr}</div></div>` : ''}
+        ${c ? `<div><label style="font-family:var(--font);font-size:10.5px;color:var(--muted-lt);display:block;margin-bottom:4px;">Related client</label><div style="font-size:14px;"><span class="row-link" onclick="closeAppModal(); openClientDetail('${c.id}');">${escapeHtml(c.name)}</span></div></div>` : ''}
+        ${t.status==='done' && t.completedAt ? `<div><label style="font-family:var(--font);font-size:10.5px;color:var(--muted-lt);display:block;margin-bottom:4px;">Completed</label><div style="font-size:14px;">${new Date(t.completedAt).toLocaleDateString('en-US',{month:'long',day:'numeric'})}</div></div>` : ''}
       </div>
       ${t.link ? `<a href="${safeUrl(normalizeUrl(t.link))}" target="_blank" rel="noopener" class="note-link" style="display:block;margin-top:8px;">🔗 ${truncateLinkDisplay(t.link, 50)}</a>` : ''}
       ${t.status==='done' && (t.completionNotes || t.completionLink) ? `
         <div style="margin-top:14px;padding:12px;border-radius:8px;background:var(--surface-2);">
-          <div style="font-family:var(--font);font-size:10px;color:var(--muted-lt);letter-spacing:.04em;margin-bottom:6px;">FROM ${escapeHtml(teamProfiles.find(p=>p.id===t.assigneeId)?.name || 'the assignee')} ON COMPLETION</div>
-          ${t.completionNotes ? `<div style="font-size:13px;color:var(--ink);line-height:1.5;white-space:pre-wrap;">${escapeHtml(t.completionNotes)}</div>` : ''}
+          <div style="font-family:var(--font);font-size:10.5px;color:var(--muted-lt);letter-spacing:.04em;margin-bottom:6px;">FROM ${escapeHtml(teamProfiles.find(p=>p.id===t.assigneeId)?.name || 'the assignee')} ON COMPLETION</div>
+          ${t.completionNotes ? `<div style="font-size:14px;color:var(--ink);line-height:1.5;white-space:pre-wrap;">${escapeHtml(t.completionNotes)}</div>` : ''}
           ${t.completionLink ? `<a href="${safeUrl(normalizeUrl(t.completionLink))}" target="_blank" rel="noopener" class="note-link" style="display:block;margin-top:${t.completionNotes?'8px':'0'};">🔗 ${truncateLinkDisplay(t.completionLink, 50)}</a>` : ''}
         </div>` : ''}
       ${t.dueDate ? (linkedEvent
-        ? `<div style="margin-top:14px;font-size:12.5px;color:var(--green);font-weight:600;">✓ On the calendar — <span class="row-link" onclick="closeAppModal();switchView('calendar');jumpToCalendarDate('${t.dueDate}');">view it</span></div>`
+        ? `<div style="margin-top:14px;font-size:13.5px;color:var(--green);font-weight:600;">✓ On the calendar — <span class="row-link" onclick="closeAppModal();switchView('calendar');jumpToCalendarDate('${t.dueDate}');">view it</span></div>`
         : `<button class="btn btn-outline" style="margin-top:14px;" onclick="addTaskToCalendar('${t.id}')">+ Add to calendar</button>`) : ''}
     </div>
     <div class="modal-actions" style="justify-content:space-between;align-items:center;">
       <div>
-        ${moveOptionsHtml && t.status!=='done' ? `<select onchange="if(this.value) moveTaskToStatus('${t.id}', this.value);" style="font-family:var(--font);font-size:12.5px;padding:9px 30px 9px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background-color:var(--surface-2);color:var(--ink);cursor:pointer;">
+        ${moveOptionsHtml && t.status!=='done' ? `<select onchange="if(this.value) moveTaskToStatus('${t.id}', this.value);" style="font-family:var(--font);font-size:13.5px;padding:9px 30px 9px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background-color:var(--surface-2);color:var(--ink);cursor:pointer;">
           <option value="">Move to…</option>
           ${moveOptionsHtml}
         </select>` : ''}
@@ -300,7 +300,7 @@ function taskFormHtml(editing, presetAssigneeId, presetContext){
     <div class="modal-head"><span class="panel-title">${editing ? 'Edit task' : 'New task'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
       <div class="settings-field"><label>Title</label><input id="taskTitleInput" spellcheck="true" placeholder="e.g. Update the roofing page copy" value="${editing ? escapeHtml(editing.title) : presetTitle}" style="width:100%;"></div>
-      <div class="settings-field"><label>Description (optional)</label><textarea spellcheck="true" id="taskDescInput" onpaste="handleTaskDescPaste(event)" style="width:100%;min-height:80px;font-family:var(--font);font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);overflow-wrap:break-word;word-break:break-word;">${editing ? escapeHtml(editing.description) : escapeHtml(presetDesc)}</textarea></div>
+      <div class="settings-field"><label>Description (optional)</label><textarea spellcheck="true" id="taskDescInput" onpaste="handleTaskDescPaste(event)" style="width:100%;min-height:80px;font-family:var(--font);font-size:14px;padding:10px;border-radius:8px;border:1px solid var(--border);overflow-wrap:break-word;word-break:break-word;">${editing ? escapeHtml(editing.description) : escapeHtml(presetDesc)}</textarea></div>
       <div class="form-grid">
         <div><label>Assign to</label><select id="taskAssigneeSelect">${populateTaskAssigneeSelect(editing ? editing.assigneeId : (presetAssigneeId || currentUser.id))}</select></div>
         <div><label>Priority</label>
@@ -314,7 +314,7 @@ function taskFormHtml(editing, presetAssigneeId, presetContext){
         <div><label>Related client (optional)</label><select id="taskClientSelect">${populateTaskClientSelect(editing ? editing.clientId : (presetContext?.clientId || null))}</select></div>
       </div>
       <div class="settings-field"><label>Link (optional)</label><input id="taskLinkInput" type="url" placeholder="https://…" value="${editing && editing.link ? escapeHtml(editing.link) : ''}" style="width:100%;"></div>
-      ${!editing ? `<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink);cursor:pointer;margin-top:2px;"><input type="checkbox" id="taskAddToCalendarInput"> Add to calendar (needs a due date)</label>` : ''}
+      ${!editing ? `<label style="display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink);cursor:pointer;margin-top:2px;"><input type="checkbox" id="taskAddToCalendarInput"> Add to calendar (needs a due date)</label>` : ''}
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" onclick="${editing ? `saveEditTask('${editing.id}')` : 'saveNewTask()'}">${editing ? 'Save changes' : 'Assign task'}</button>
@@ -542,7 +542,7 @@ function completeTaskModalHtml(taskId){
       <div class="q-name" style="margin-bottom:14px;">${escapeHtml(t.title)}</div>
       <div class="settings-field" style="margin-bottom:14px;">
         <label>Notes <span style="color:var(--muted-lt);font-weight:400;">(optional)</span></label>
-        <textarea spellcheck="true" id="taskCompletionNotes" placeholder="Anything the assigner should know — what you found, decisions made, what's left, etc." style="width:100%;min-height:80px;font-family:var(--font);font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${escapeHtml(t.completionNotes||'')}</textarea>
+        <textarea spellcheck="true" id="taskCompletionNotes" placeholder="Anything the assigner should know — what you found, decisions made, what's left, etc." style="width:100%;min-height:80px;font-family:var(--font);font-size:14px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${escapeHtml(t.completionNotes||'')}</textarea>
       </div>
       <div class="settings-field">
         <label>Link <span style="color:var(--muted-lt);font-weight:400;">(optional)</span></label>

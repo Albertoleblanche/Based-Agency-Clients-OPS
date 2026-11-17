@@ -20,7 +20,7 @@ function setToolbar(title, sub){
 const VIEW_TOOLBAR_ACTIONS = {
   approve: () => `<button class="btn" onclick="openGroupAndSendModal()">${icon('layers')}Group &amp; Send</button>`,
   clientdetail: () => `<button class="btn" onclick="openQueueLogImprovementModal(currentDetailClientId)">${icon('plus')}Log Improvement</button>`,
-  time: () => (typeof timeToolbarTabsHtml === 'function' ? timeToolbarTabsHtml() : '') + `<button class="btn" onclick="openManualEntryModal()">${icon('plus')}Add Time</button>`,
+  time: () => (typeof timeToolbarTabsHtml === 'function' ? timeToolbarTabsHtml() : '') + `<button class="btn harvest-btn" onclick="toggleHarvestTimer(this)" title="Open the Harvest timer">${icon('history')}Track Time</button><button class="btn" onclick="openManualEntryModal()">${icon('plus')}Add Time</button>`,
 };
 function setToolbarActions(view){
   const el = document.getElementById('tbActions');
@@ -39,6 +39,7 @@ function newMenuItems(){
     ['Event', 'calendar-plus', "openNewEventModal()"],
     ['Start Timer', 'timer', "openTimerModal()"],
     ['Time Worked', 'clock', "openManualEntryModal()"],
+    ['Track Time', 'history', "toggleHarvestTimer(document.getElementById('tbNewBtn'))", '', 'Harvest'],
   ];
   if(typeof canApprove === 'function' && canApprove()) items.push(['Client', 'building-2', "openAddClientForm()"]);
   return items;
@@ -47,8 +48,8 @@ function toggleNewMenu(){
   const m = document.getElementById('newMenu');
   if(!m) return;
   if(m.style.display === 'block'){ closeNewMenu(); return; }
-  m.innerHTML = '<div class="mh">New</div>' + newMenuItems().map(([label, ic, fn, kbd]) =>
-    `<button class="mi" role="menuitem" onclick="closeNewMenu(); ${fn}">${icon(ic)}<span>${label}</span>${kbd ? `<span class="kbd">${kbd}</span>` : ''}</button>`).join('');
+  m.innerHTML = '<div class="mh">New</div>' + newMenuItems().map(([label, ic, fn, kbd, note]) =>
+    `<button class="mi" role="menuitem" onclick="closeNewMenu(); ${fn}">${icon(ic)}<span>${label}</span>${kbd ? `<span class="kbd">${kbd}</span>` : ''}${note ? `<span class="mi-note">${note}</span>` : ''}</button>`).join('');
   m.style.display = 'block';
 }
 function closeNewMenu(){ const m = document.getElementById('newMenu'); if(m && m.style.display === 'block') typeof hidePop === 'function' ? hidePop(m) : (m.style.display = 'none'); }

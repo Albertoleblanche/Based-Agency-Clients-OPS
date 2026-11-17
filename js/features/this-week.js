@@ -93,19 +93,19 @@ function weekDetailHtml(w, cyc){
   const impRows = imps.map(i => `<div class="row sm"><div class="tx"><span class="t" style="font-weight:400">${escapeHtml(i.text)}</span><span class="s">${escapeHtml(i.service || c.service || '')} · ${fmtShortDate(new Date(i.date))}</span></div>
 <div class="r">${i.includeInEmail === false ? `<span class="st">${icon('lock-simple')}Internal, not in the email</span>` : ''}${typeof impFilesBtn === 'function' ? impFilesBtn({ ...i, clientId: c.id }) : ''}${avHtml(i.author)}</div></div>`).join('');
   const seq = weekHistory(c), ots = onTimeSummary(seq);
-  const preview = d && d.draft ? `<div class="h2"><h2>The draft</h2><span class="t-2" style="font-size:12px">${d.author ? 'By ' + escapeHtml(d.author) : ''}${d.draftPendingSince ? ' · ' + relDay(d.draftPendingSince).toLowerCase() + ' ' + fmtTime(new Date(d.draftPendingSince)) : ''}</span></div>
+  const preview = d && d.draft ? `<div class="h2"><h2>The draft</h2><span class="t-2" style="font-size:13px">${d.author ? 'By ' + escapeHtml(d.author) : ''}${d.draftPendingSince ? ' · ' + relDay(d.draftPendingSince).toLowerCase() + ' ' + fmtTime(new Date(d.draftPendingSince)) : ''}</span></div>
 <div class="preview"><b>Your weekly update — ${escapeHtml(updateRangeLabel(c))}</b><br>${escapeHtml(d.draft.replace(/\s+/g, ' ').slice(0, 260))}${d.draft.length > 260 ? '…' : ''}</div>` : '';
   return `<div style="max-width:760px">
 <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">${monoHtml(c, 'lg')}
-<div style="min-width:0;margin-right:auto"><div style="font-size:17px;font-weight:600;letter-spacing:-.01em">${escapeHtml(c.name)}</div>
-<div class="t-2" style="font-size:12px;margin-top:2px">${w.owner ? escapeHtml(w.owner) + ' owns it · ' : ''}${escapeHtml(c.service || '')} · importance ${c.importance || 0} of 10</div></div>
+<div style="min-width:0;margin-right:auto"><div style="font-size:18px;font-weight:600;letter-spacing:-.01em">${escapeHtml(c.name)}</div>
+<div class="t-2" style="font-size:13px;margin-top:2px">${w.owner ? escapeHtml(w.owner) + ' owns it · ' : ''}${escapeHtml(c.service || '')} · importance ${c.importance || 0} of 10</div></div>
 ${h.level !== 'g' ? `<a href="#health" onclick="openHealthClient('${c.id}');return false;" style="text-decoration:none">${hstateHtml(h.level)}</a>` : ''}</div>
 ${callout}
 <div class="stepper" style="margin-top:22px">${stepper}</div>
 ${preview}
 <div class="h2"><h2>Logged for this update<span class="c">${imps.length}</span></h2><a href="#" onclick="openQueueLogImprovementModal('${c.id}');return false;">Log Improvement</a></div>
-<div class="grp">${impRows || '<div class="row sm"><span class="s t-2" style="font-size:12px">Nothing logged since the last update.</span></div>'}</div>
-<div class="h2"><h2>Last 8 updates</h2><span class="t-2" style="font-size:12px">${ots.total ? `On time ${ots.onTime} of the last ${ots.total}` : 'History starts with the first update sent'}</span></div>
+<div class="grp">${impRows || '<div class="row sm"><span class="s t-2" style="font-size:13px">Nothing logged since the last update.</span></div>'}</div>
+<div class="h2"><h2>Last 8 updates</h2><span class="t-2" style="font-size:13px">${ots.total ? `On time ${ots.onTime} of the last ${ots.total}` : 'History starts with the first update sent'}</span></div>
 ${weekStripHtml(c)}
 </div>`;
 }

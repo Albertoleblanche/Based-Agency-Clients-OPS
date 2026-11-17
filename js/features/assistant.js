@@ -126,7 +126,7 @@ function renderClaudeSidebarProjects(){
           </button>
         </div>
       `).join('')
-    : `<p style="font-size:11.5px;color:var(--muted-lt);padding:8px 10px;margin:0;">No projects yet.</p>`;
+    : `<p style="font-size:12.5px;color:var(--muted-lt);padding:8px 10px;margin:0;">No projects yet.</p>`;
 }
 
 function openClaudeProjectsView(){
@@ -190,7 +190,7 @@ function renderClaudeProjectsGrid(){
           <div class="claude-project-card-name">${escapeHtml(p.name)}</div>
           <div class="claude-project-card-desc">${p.description ? escapeHtml(p.description) : '<span style="color:var(--muted-lt);">No description</span>'}</div>
         </div>`).join('')
-    : `<p style="font-size:12.5px;color:var(--muted-lt);grid-column:1/-1;">${q ? 'No projects match your search.' : 'No projects yet — create one to get started.'}</p>`;
+    : `<p style="font-size:13.5px;color:var(--muted-lt);grid-column:1/-1;">${q ? 'No projects match your search.' : 'No projects yet — create one to get started.'}</p>`;
 }
 
 function filterClaudeProjects(value){
@@ -247,7 +247,7 @@ async function loadClaudeProjectConversations(projectId){
           <span class="claude-project-conv-title">${escapeHtml(c.title)}</span>
           <span class="claude-project-conv-date">${new Date(c.updated_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
         </button>`).join('')
-    : `<p style="font-size:12px;color:var(--muted-lt);">No conversations in this project yet.</p>`;
+    : `<p style="font-size:13px;color:var(--muted-lt);">No conversations in this project yet.</p>`;
 }
 
 function openNewClaudeProjectModal(){
@@ -255,7 +255,7 @@ function openNewClaudeProjectModal(){
     <div class="modal-head"><span class="panel-title">New project</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
       <div class="settings-field"><label>Name</label><input id="claudeProjectNameInput" style="width:100%;" placeholder="e.g. Q3 Client Campaigns"></div>
-      <div class="settings-field"><label>Description <span style="font-weight:400;color:var(--muted-lt);">(optional)</span></label><textarea id="claudeProjectDescInput" style="width:100%;min-height:80px;font-family:var(--font);font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="What's this project about?"></textarea></div>
+      <div class="settings-field"><label>Description <span style="font-weight:400;color:var(--muted-lt);">(optional)</span></label><textarea id="claudeProjectDescInput" style="width:100%;min-height:80px;font-family:var(--font);font-size:14px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;" placeholder="What's this project about?"></textarea></div>
     </div>
     <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Cancel</button><button class="btn btn-brand" onclick="submitNewClaudeProject()">Create</button></div>`, 460);
   setTimeout(()=>{ document.getElementById('claudeProjectNameInput')?.focus(); }, 50);
@@ -283,7 +283,7 @@ function openEditClaudeProjectModal(id){
     <div class="modal-head"><span class="panel-title">Edit project</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
       <div class="settings-field"><label>Name</label><input id="claudeProjectNameInput" style="width:100%;" value="${escapeHtml(project.name||'')}"></div>
-      <div class="settings-field"><label>Description</label><textarea id="claudeProjectDescInput" style="width:100%;min-height:80px;font-family:var(--font);font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${escapeHtml(project.description||'')}</textarea></div>
+      <div class="settings-field"><label>Description</label><textarea id="claudeProjectDescInput" style="width:100%;min-height:80px;font-family:var(--font);font-size:14px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${escapeHtml(project.description||'')}</textarea></div>
     </div>
     <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Cancel</button><button class="btn btn-brand" onclick="submitEditClaudeProject('${id}')">Save</button></div>`, 460);
   setTimeout(()=>{ document.getElementById('claudeProjectNameInput')?.focus(); }, 50);
@@ -376,7 +376,7 @@ function renderClaudeConversationsSidebar(){
           </div>`}
         </div>
       `).join('')
-    : `<p style="font-size:11.5px;color:var(--muted-lt);padding:8px 10px;margin:0;">No conversations yet.</p>`;
+    : `<p style="font-size:12.5px;color:var(--muted-lt);padding:8px 10px;margin:0;">No conversations yet.</p>`;
 }
 
 // Bulk actions on Assistant conversations — select multiple, then pin,
@@ -593,7 +593,7 @@ function renderClaudeSidebarProjectSubmenu(id){
   const el = document.getElementById('claudeSidebarProjectSubmenu-'+id);
   if(!el) return;
   if(!claudeProjectsList.length){
-    el.innerHTML = `<p style="font-size:11px;color:var(--muted-lt);padding:8px 10px;margin:0;">No projects yet.</p>`;
+    el.innerHTML = `<p style="font-size:12px;color:var(--muted-lt);padding:8px 10px;margin:0;">No projects yet.</p>`;
     return;
   }
   const conv = claudeConversationsList.find(c=>c.id===id);
@@ -928,11 +928,11 @@ function renderClaudePlusSubmenu(){
   const el = document.getElementById('claudePlusSubmenu');
   if(!el) return;
   if(!claudeConversationId){
-    el.innerHTML = `<p style="font-size:11px;color:var(--muted-lt);padding:8px 10px;margin:0;">Send a message first.</p>`;
+    el.innerHTML = `<p style="font-size:12px;color:var(--muted-lt);padding:8px 10px;margin:0;">Send a message first.</p>`;
     return;
   }
   if(!claudeProjectsList.length){
-    el.innerHTML = `<p style="font-size:11px;color:var(--muted-lt);padding:8px 10px;margin:0;">No projects yet — create one from the Projects tab.</p>`;
+    el.innerHTML = `<p style="font-size:12px;color:var(--muted-lt);padding:8px 10px;margin:0;">No projects yet — create one from the Projects tab.</p>`;
     return;
   }
   const currentConv = claudeConversationsList.find(c=>c.id===claudeConversationId);

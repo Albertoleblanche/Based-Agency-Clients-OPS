@@ -5,12 +5,12 @@ function clientFormHtml(title, submitLabel, customValues){
     <div class="modal-head"><span class="panel-title">${escapeHtml(title)}</span><span class="toast-close" onclick="closeClientForm()">✕</span></div>
     <div class="modal-body">
       <div class="form-grid">
-        <div><label>Client name</label><input id="ncName" placeholder="e.g. Premium Homes" oninput="checkDuplicateClientName()"><div id="ncNameWarning" style="display:none;font-size:11px;color:var(--red);margin-top:5px;"></div></div>
+        <div><label>Client name</label><input id="ncName" placeholder="e.g. Premium Homes" oninput="checkDuplicateClientName()"><div id="ncNameWarning" style="display:none;font-size:12px;color:var(--red);margin-top:5px;"></div></div>
         <div><label>Website <span style="font-weight:400;color:var(--muted-lt);">(optional)</span></label><input id="ncWebsite" placeholder="https://client.com"></div>
         <div><label>Service</label><select id="ncService"></select></div>
         <div><label>Status</label><select id="ncStatus"></select></div>
         <div><label>Importance (1–10)</label><select id="ncImportance"></select></div>
-        <div><label>Danger score (1–5)</label><select id="ncDanger"><option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select><div id="ncDangerNudge" style="display:none;font-size:11px;color:var(--amber);margin-top:5px;"></div></div>
+        <div><label>Danger score (1–5)</label><select id="ncDanger"><option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select><div id="ncDangerNudge" style="display:none;font-size:12px;color:var(--amber);margin-top:5px;"></div></div>
         <div><label>Monthly hour budget</label><input type="number" id="ncBudget" min="0" step="0.5" placeholder="e.g. 20 (optional)"></div>
         <div style="position:relative;">
           <label>Start date <span style="font-weight:400;color:var(--muted-lt);">(optional)</span></label>
@@ -19,7 +19,7 @@ function clientFormHtml(title, submitLabel, customValues){
         <div style="grid-column:1/-1;">
           <label>Client email</label>
           <input id="ncEmail" style="width:100%;" placeholder="contact@client.com, billing@client.com">
-          <p style="font-size:11.5px;color:var(--muted-lt);margin:6px 0 0;line-height:1.5;">Add more than one address by separating them with commas — updates will go to everyone listed here.</p>
+          <p style="font-size:12.5px;color:var(--muted-lt);margin:6px 0 0;line-height:1.5;">Add more than one address by separating them with commas — updates will go to everyone listed here.</p>
         </div>
         <div style="grid-column:1/-1;"><label>SOW / scope notes</label><input id="ncSow" spellcheck="true" placeholder="Brief scope summary"></div>
         ${customFieldsFormHtml(customValues)}
@@ -69,10 +69,10 @@ function renderDangerWeights(){
     return `
     <div>
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">
-        <label style="font-size:12.5px;font-weight:600;color:var(--ink);">${escapeHtml(w.label)}</label>
-        <span id="dangerWeight-${w.key}-val" style="font-size:12px;color:var(--muted);font-weight:600;">${escapeHtml(val)}</span>
+        <label style="font-size:13.5px;font-weight:600;color:var(--ink);">${escapeHtml(w.label)}</label>
+        <span id="dangerWeight-${w.key}-val" style="font-size:13px;color:var(--muted);font-weight:600;">${escapeHtml(val)}</span>
       </div>
-      <p style="font-size:11px;color:var(--muted-lt);margin:0 0 6px;">${w.hint}</p>
+      <p style="font-size:12px;color:var(--muted-lt);margin:0 0 6px;">${w.hint}</p>
       <input type="range" min="0" max="5" step="1" value="${escapeHtml(val)}" id="dangerWeight-${w.key}" oninput="document.getElementById('dangerWeight-${w.key}-val').textContent=this.value" style="width:100%;accent-color:var(--brand);">
     </div>`;
   }).join('');

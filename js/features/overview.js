@@ -185,7 +185,7 @@ function renderKpis(){
   // --- Total Clients ---
   (document.getElementById('kpiTotal')||{}).textContent = ac.length;
   (document.getElementById('totalChips')||{}).innerHTML = ac.length
-    ? `<span style="font-size:11px;color:var(--green);font-weight:600;">${active} active</span>`
+    ? `<span style="font-size:12px;color:var(--green);font-weight:600;">${active} active</span>`
     : '';
   renderTotalClientsDonut();
 

@@ -153,37 +153,41 @@ document.addEventListener('click', (e)=>{
   if(panel && panel.style.display==='block' && wrap && !wrap.contains(e.target)) hidePop(panel);
 });
 
-// Harvest's own Widget iframe, replacing the earlier Button approach —
-// full document isolation means nothing on this page can interfere with
-// or accidentally reset the timer mid-run, which is the class of problem
-// the Button kept running into. src is set only once on first open, not
-// on every toggle, since a running timer's actual state lives on
-// Harvest's own server regardless of what this page does locally.
-function toggleHarvestTimerPanel(){
+// Harvest's own timer widget in an iframe: the timer itself runs on Harvest's server, so
+// closing the popover never stops it. Opens under the button that asked for it (Track Time
+// on the Time toolbar, or New → Track Time). src is set once, on first open.
+function toggleHarvestTimer(anchor){
   const panel = document.getElementById('harvestTimerPanel');
   if(!panel) return;
-  const opening = panel.style.display !== 'block';
-  panel.style.display = opening ? 'block' : 'none';
-  if(opening){
-    const iframe = document.getElementById('harvestTimerIframe');
-    if(iframe && !iframe.src){
-      const params = new URLSearchParams({
-        app_name: 'Based Agency',
-        closable: 'false',
-        permalink: window.location.origin + '/',
-        external_item_id: 'global',
-        external_item_name: 'Time Entry',
-      });
-      iframe.src = `https://platform.harvestapp.com/platform/timer?${params.toString()}`;
-    }
+  if(panel.style.display === 'block'){ closeHarvestTimer(); return; }
+  const a = anchor || document.getElementById('tbNewBtn');
+  const r = a ? a.getBoundingClientRect() : { bottom: 52, right: window.innerWidth - 14 };
+  panel.style.top = Math.round(r.bottom + 6) + 'px';
+  panel.style.right = Math.max(8, Math.round(window.innerWidth - r.right)) + 'px';
+  const iframe = document.getElementById('harvestTimerIframe');
+  if(iframe && !iframe.getAttribute('src')){
+    const params = new URLSearchParams({
+      app_name: (typeof settings !== 'undefined' && settings.appName) || 'Based Agency',
+      closable: 'false',
+      permalink: window.location.origin + '/',
+      external_item_id: 'global',
+      external_item_name: 'Time Entry',
+    });
+    iframe.src = `https://platform.harvestapp.com/platform/timer?${params.toString()}`;
   }
+  panel.style.display = 'block';
+  if(typeof enterIn === 'function') enterIn(panel, 'translateY(-4px) scale(.98)');
 }
-
-document.addEventListener('click', (e)=>{
-  const wrap = document.getElementById('harvestTimerBellWrap');
+function closeHarvestTimer(){
   const panel = document.getElementById('harvestTimerPanel');
-  if(panel && panel.style.display==='block' && wrap && !wrap.contains(e.target)) panel.style.display='none';
+  if(panel && panel.style.display === 'block') typeof hidePop === 'function' ? hidePop(panel) : (panel.style.display = 'none');
+}
+const toggleHarvestTimerPanel = toggleHarvestTimer; // older name
+document.addEventListener('click', e => {
+  const panel = document.getElementById('harvestTimerPanel');
+  if(panel && panel.style.display === 'block' && !e.target.closest('#harvestTimerPanel, .harvest-btn, .new-wrap')) closeHarvestTimer();
 });
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeHarvestTimer(); });
 
 function renderNotifPanel(){
   const el = document.getElementById('notifPanelList');

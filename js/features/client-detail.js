@@ -14,8 +14,8 @@ function openSendToSlackConfirm(clientId, author){
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Send ${escapeHtml(author)}'s update to ${escapeHtml(c.name)}'s Slack channel?</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
-      <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 12px;">Posts to ${escapeHtml(mapping.channelName || mapping.channelId)} — review before sending, this posts immediately once confirmed.</p>
-      <textarea spellcheck="true" id="slackClientMessageText" style="width:100%;min-height:220px;font-family:var(--font);font-size:12px;padding:10px;border-radius:8px;border:1px solid var(--border);white-space:pre-wrap;">${escapeHtml(d.draft)}</textarea>
+      <p style="font-size:12.5px;color:var(--muted-lt);margin:0 0 12px;">Posts to ${escapeHtml(mapping.channelName || mapping.channelId)} — review before sending, this posts immediately once confirmed.</p>
+      <textarea spellcheck="true" id="slackClientMessageText" style="width:100%;min-height:220px;font-family:var(--font);font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);white-space:pre-wrap;">${escapeHtml(d.draft)}</textarea>
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" id="sendSlackClientBtn" onclick="confirmSendToSlack('${clientId}')">Send to Slack</button>
@@ -146,7 +146,7 @@ function renderClientDetail(){
     // Website gets its own real button (not a plain link like custom
     // URL-type fields below) — shown only when the client actually has
     // one set, since not every client does.
-    const websiteHtml = hasWebsite ? `<div class="info-grid-item"><label class="info-grid-label">Website</label><div class="info-grid-value"><a href="${safeUrl(c.website.startsWith('http')?c.website:'https://'+c.website)}" target="_blank" rel="noopener" class="btn btn-outline" style="display:inline-flex;padding:7px 14px;min-height:auto;font-size:12px;text-decoration:none;">View website ↗</a></div></div>` : '';
+    const websiteHtml = hasWebsite ? `<div class="info-grid-item"><label class="info-grid-label">Website</label><div class="info-grid-value"><a href="${safeUrl(c.website.startsWith('http')?c.website:'https://'+c.website)}" target="_blank" rel="noopener" class="btn btn-outline" style="display:inline-flex;padding:7px 14px;min-height:auto;font-size:13px;text-decoration:none;">View website ↗</a></div></div>` : '';
     const fieldsHtml = fields.map(f=>{
       const val = values[f.id];
       return `<div class="info-grid-item"><label class="info-grid-label">${escapeHtml(f.label)}</label><div class="info-grid-value">${val ? (f.type==='url' ? `<a href="${val.startsWith('http')?val:'https://'+val}" target="_blank" style="color:var(--brand-dark);">${escapeHtml(val)}</a>` : escapeHtml(val)) : '<span style="color:var(--muted-lt);">—</span>'}</div></div>`;
@@ -201,7 +201,7 @@ function renderClientDetail(){
           <div class="ts-entry-title">${escapeHtml(imp.author)||'Team member'}</div>
           <div class="ts-entry-desc">${escapeHtml(imp.text)}</div>
         </div>
-        <div class="ts-entry-right"><div class="ts-entry-duration" style="font-size:10.5px;color:var(--muted-lt);">${imp.date ? new Date(imp.date).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : ''}</div></div>
+        <div class="ts-entry-right"><div class="ts-entry-duration" style="font-size:11px;color:var(--muted-lt);">${imp.date ? new Date(imp.date).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : ''}</div></div>
       </div>`).join('')
     : `<div class="empty">No improvements logged yet.</div>`;
 
@@ -212,7 +212,7 @@ function renderClientDetail(){
   document.getElementById('cdDraftStatus').innerHTML = (activeDrafts.length ? activeDrafts.map(d => {
     const status = statusMeta(c, d.author);
     return `<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border);">
-      <p style="font-size:13px;margin:0 0 6px;"><b>${escapeHtml(d.author)}</b> — Status: <b style="color:${status.color};">${escapeHtml(status.label)}</b></p>
+      <p style="font-size:14px;margin:0 0 6px;"><b>${escapeHtml(d.author)}</b> — Status: <b style="color:${status.color};">${escapeHtml(status.label)}</b></p>
       <div class="ts-entry-desc" style="white-space:pre-wrap;line-height:1.5;">${escapeHtml(d.draft)}</div>
     </div>`;
   }).join('') : `<div class="empty">No draft generated yet.</div>`)
@@ -240,11 +240,11 @@ function renderClientDetail(){
           <div class="note-meta">${new Date(n.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
           <span class="pill ${noteStatus.cls}">${escapeHtml(noteStatus.label)}</span>
         </div>
-        <div style="font-weight:700;font-size:13px;color:var(--ink);margin-bottom:3px;">${escapeHtml(n.title || 'Untitled note')}</div>
+        <div style="font-weight:700;font-size:14px;color:var(--ink);margin-bottom:3px;">${escapeHtml(n.title || 'Untitled note')}</div>
         <div class="note-text">${escapeHtml(n.text)}</div>
         ${n.link ? `<a href="${safeUrl(normalizeUrl(n.link))}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${truncateLinkDisplay(n.link, 40)}</a>` : ''}
         <div class="note-actions">
-          ${n.status!=='done' ? `<button class="btn btn-brand" style="padding:7px 12px;font-size:11.5px;" onclick="logNoteNow('${n.id}')">Log it now</button>` : ''}
+          ${n.status!=='done' ? `<button class="btn btn-brand" style="padding:7px 12px;font-size:12.5px;" onclick="logNoteNow('${n.id}')">Log it now</button>` : ''}
           <span class="row-link" onclick="openNoteModal('${n.id}')">Edit</span>
         </div>
       </div>`;
@@ -268,7 +268,7 @@ function renderClientDetail(){
           </div>
           <div class="note-text">${escapeHtml(r.question)}</div>
           <div class="note-actions">
-            <span style="font-size:11px;color:var(--muted-lt);">Follow-up: ${reminderFollowUpLabel(r.followUpDate)}</span>
+            <span style="font-size:12px;color:var(--muted-lt);">Follow-up: ${reminderFollowUpLabel(r.followUpDate)}</span>
             <span class="row-link" onclick="markReminderStatus('${r.id}','answered')">Mark answered</span>
           </div>
         </div>`;

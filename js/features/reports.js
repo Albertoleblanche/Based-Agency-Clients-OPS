@@ -169,7 +169,7 @@ function renderReports(){
       const label = getLabel(key);
       const initial = label.trim().charAt(0).toUpperCase();
       const nameEl = `<div class="client-cell" style="cursor:pointer;" onclick="openClientReportDetail('${key}')">
-        <div class="avatar-circle" style="width:28px;height:28px;font-size:11.5px;">${escapeHtml(initial)}</div>
+        <div class="avatar-circle" style="width:28px;height:28px;font-size:12.5px;">${escapeHtml(initial)}</div>
         <div>
           <span class="report-name-link">${escapeHtml(label)}</span>
           ${c ? `<div class="q-service-caption" style="margin-top:2px;">${escapeHtml(c.service)} · ${riskCaptionHtml(c.danger)}</div>` : ''}
@@ -189,7 +189,7 @@ function renderReports(){
 
   tableBody.innerHTML = pageRows.map(([key,mins])=>{
     const label = getLabel(key);
-    const nameEl = `<span style="font-weight:600;font-size:13px;">${escapeHtml(label)}</span>`;
+    const nameEl = `<span style="font-weight:600;font-size:14px;">${escapeHtml(label)}</span>`;
     return `<tr>
       <td>${nameEl}</td>
       <td class="report-hours-val">${formatMinutes(mins)}</td>

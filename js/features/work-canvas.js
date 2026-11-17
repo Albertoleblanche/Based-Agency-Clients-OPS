@@ -93,8 +93,8 @@ function renderReminders(){
 <label class="pop-wrap"><select class="pop" onchange="setRem('who',this.value)"><option value="all">Everyone</option>${askers.map(p => `<option value="${p.id}"${remWho === p.id ? ' selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}</select></label></div>
 <div class="cols"><div class="col-main">${main}</div>
 <aside class="col-side" style="padding-top:28px">
-<section class="panel"><h3>Unanswered a week or more</h3>${stale.length ? stale.slice(0, 5).map(r => { const c = clients.find(x => x.id === r.clientId); return `<div class="row sm" style="padding:6px 0" onclick="openReminderDetailModal('${r.id}')">${c ? monoHtml(c) : ''}<div class="tx"><span class="t">${escapeHtml(c ? c.name : '')}</span><span class="s">${daysBetween(new Date(r.askedDate + 'T12:00:00'), rNow())} days · asked by ${escapeHtml(firstName(who(r.askedBy)))}</span></div></div>`; }).join('') : '<p class="t-2" style="font-size:12px;margin:0">Nothing older than a week.</p>'}</section>
-<section class="panel"><h3>By owner</h3>${Object.keys(owners).length ? Object.entries(owners).sort((a, b) => b[1] - a[1]).map(([id, n]) => `<div class="kv" style="border:0;padding:6px 0"><span style="display:inline-flex;align-items:center;gap:8px;color:var(--label)">${avHtml(who(id))}${escapeHtml(who(id))}</span><b style="font-weight:500">${n} open</b></div>`).join('') : '<p class="t-2" style="font-size:12px;margin:0">Nothing open.</p>'}</section>
+<section class="panel"><h3>Unanswered a week or more</h3>${stale.length ? stale.slice(0, 5).map(r => { const c = clients.find(x => x.id === r.clientId); return `<div class="row sm" style="padding:6px 0" onclick="openReminderDetailModal('${r.id}')">${c ? monoHtml(c) : ''}<div class="tx"><span class="t">${escapeHtml(c ? c.name : '')}</span><span class="s">${daysBetween(new Date(r.askedDate + 'T12:00:00'), rNow())} days · asked by ${escapeHtml(firstName(who(r.askedBy)))}</span></div></div>`; }).join('') : '<p class="t-2" style="font-size:13px;margin:0">Nothing older than a week.</p>'}</section>
+<section class="panel"><h3>By owner</h3>${Object.keys(owners).length ? Object.entries(owners).sort((a, b) => b[1] - a[1]).map(([id, n]) => `<div class="kv" style="border:0;padding:6px 0"><span style="display:inline-flex;align-items:center;gap:8px;color:var(--label)">${avHtml(who(id))}${escapeHtml(who(id))}</span><b style="font-weight:500">${n} open</b></div>`).join('') : '<p class="t-2" style="font-size:13px;margin:0">Nothing open.</p>'}</section>
 </aside></div>`;
   if(currentViewName === 'reminders') setToolbar(null, 'Client follow-ups');
 }
@@ -147,11 +147,11 @@ function renderNotes(){
 <label class="pop-wrap"><span class="dot ${{ idea: 'gray', planned: 'gray', 'in-progress': 'blue', done: 'green' }[sel.status] || 'gray'}" style="margin-right:6px"></span><select class="pop" onchange="changeNoteStatus('${sel.id}',this.value)">${['idea', 'planned', 'in-progress', 'done'].map(s => `<option value="${s}"${s === sel.status ? ' selected' : ''}>${label(s)}</option>`).join('')}</select></label>
 <button class="btn" onclick="openNewEventModal()">${icon('calendar-plus')}Add to Calendar</button>
 ${sel.status !== 'done' ? `<button class="btn" onclick="logNoteNow('${sel.id}')">${icon('square-pen')}Log as Improvement</button>` : ''}
-<span style="margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--label-2)">${icon('lock-simple', { size: 13 })}Only you can see this note</span>
+<span style="margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--label-2)">${icon('lock-simple', { size: 13 })}Only you can see this note</span>
 <button class="ib" aria-label="Delete note" title="Delete" onclick="deleteNote('${sel.id}')">${icon('trash')}</button></div>
 <input class="note-title" id="noteTitleInput" value="${escapeHtml(sel.title || '')}" placeholder="Title" oninput="noteAutosave('${sel.id}')">
 <textarea class="note-body" id="noteBodyInput" placeholder="Write here. Start a line with [ ] for a checklist." oninput="noteAutosave('${sel.id}')">${escapeHtml(sel.text || '')}</textarea>
-<p class="t-2" style="font-size:12px;margin-top:14px">Created ${fmtShortDate(new Date(sel.createdAt))}${sel.updatedAt && sel.updatedAt !== sel.createdAt ? ' · Edited ' + relDay(sel.updatedAt).toLowerCase() : ''}</p></div>`;
+<p class="t-2" style="font-size:13px;margin-top:14px">Created ${fmtShortDate(new Date(sel.createdAt))}${sel.updatedAt && sel.updatedAt !== sel.createdAt ? ' · Edited ' + relDay(sel.updatedAt).toLowerCase() : ''}</p></div>`;
   }
   root.innerHTML = `<section class="list" aria-label="Notes"><div class="list-h">
 <label class="pop-wrap"><select class="pop" onchange="setNotesFilter('client',this.value)"><option value="all">All clients</option>${usedClients.map(c => `<option value="${c.id}"${notesClient === c.id ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></label>

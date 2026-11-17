@@ -144,7 +144,7 @@ function openNewReminderModal(presetClientId){
         <div style="grid-column:1/-1;"><label>Question / request</label><textarea spellcheck="true" id="reminderQuestion" placeholder="e.g. Can you send us the latest project photos?" rows="3" style="resize:vertical;min-height:64px;font-family:inherit;"></textarea></div>
         <div style="position:relative;"><label>Follow-up date</label>${datePickerFieldHtml('reminderFollowUpDate', { value: toDateStr(defaultFollowUp), minDate: toDateStr(new Date()) })}</div>
       </div>
-      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink);cursor:pointer;margin-top:2px;"><input type="checkbox" id="reminderAddToCalendarInput" checked> Add to calendar</label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink);cursor:pointer;margin-top:2px;"><input type="checkbox" id="reminderAddToCalendarInput" checked> Add to calendar</label>
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
@@ -198,9 +198,9 @@ function openReminderDetailModal(id){
         <span class="rating-pill" style="background:${meta.color}18;color:${meta.color};">${meta.icon} ${escapeHtml(meta.label)}</span>
         ${c ? `<span class="row-link" onclick="closeAppModal();openClientDetail('${c.id}');">${escapeHtml(c.name)}</span>` : ''}
       </div>
-      <div class="settings-field"><label>Question / request</label><textarea spellcheck="true" id="reminderEditQuestion" rows="3" style="width:100%;resize:vertical;min-height:64px;font-family:inherit;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);">${escapeHtml(r.question)}</textarea></div>
+      <div class="settings-field"><label>Question / request</label><textarea spellcheck="true" id="reminderEditQuestion" rows="3" style="width:100%;resize:vertical;min-height:64px;font-family:inherit;font-size:14px;padding:10px;border-radius:8px;border:1px solid var(--border);">${escapeHtml(r.question)}</textarea></div>
       <div class="form-grid">
-        <div><label>Asked by</label><div style="font-size:13px;padding:9px 0;">${owner ? escapeHtml(owner.name) : '—'} · ${new Date(r.askedDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div></div>
+        <div><label>Asked by</label><div style="font-size:14px;padding:9px 0;">${owner ? escapeHtml(owner.name) : '—'} · ${new Date(r.askedDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div></div>
         <div style="position:relative;"><label>Follow-up date</label>${datePickerFieldHtml('reminderEditFollowUp', { value: r.followUpDate||'', minDate: toDateStr(new Date()), disabled: isResolved })}</div>
       </div>
     </div>

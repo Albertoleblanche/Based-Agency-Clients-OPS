@@ -147,6 +147,10 @@
         <button class="btn btn-p" id="tbNewBtn" onclick="toggleNewMenu()" aria-haspopup="menu" title="New (⌘N)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /> <path d="M12 5v14" /></svg>New</button>
         <div class="menu new-menu" id="newMenu" role="menu" style="display:none;"></div>
       </div>
+      <div class="menu hv-pop" id="harvestTimerPanel" role="dialog" aria-label="Harvest timer" style="display:none;">
+        <div class="notif-panel-head"><b>Harvest timer</b><button class="ib" onclick="closeHarvestTimer()" aria-label="Close" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></svg></button></div>
+        <iframe id="harvestTimerIframe" title="Harvest timer"></iframe>
+      </div>
     </div>
     <div class="views">
 

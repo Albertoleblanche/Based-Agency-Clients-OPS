@@ -42,18 +42,18 @@ function drawTeam(){
   if(teamTab === 'members'){
     const rows = people.map(m => {
       const self = m.id === currentUser?.id, on = m.id === teamSelId, owns = teamOwns(m);
-      return `<div class="row${on ? ' sel' : ''}" role="button" tabindex="0" ${on ? 'aria-current="true" style="background:var(--select)"' : ''} onclick="selectTeamMember('${m.id}')" onkeydown="if(event.key==='Enter')selectTeamMember('${m.id}')"${m.access_revoked ? ' data-off="1"' : ''}>${avHtml(m.name, 'style="width:32px;height:32px;font-size:12px"')}
+      return `<div class="row${on ? ' sel' : ''}" role="button" tabindex="0" ${on ? 'aria-current="true" style="background:var(--select)"' : ''} onclick="selectTeamMember('${m.id}')" onkeydown="if(event.key==='Enter')selectTeamMember('${m.id}')"${m.access_revoked ? ' data-off="1"' : ''}>${avHtml(m.name, 'style="width:32px;height:32px;font-size:13px"')}
 <div class="tx"><span class="t">${escapeHtml(m.name)}${self ? ' (you)' : ''}</span><span class="s">${escapeHtml(m.title || ({ member: 'Member', approver: 'Approver', admin: 'Admin' }[m.role] || ''))}${m.access_revoked ? ' · access revoked' : ''}</span></div>
 <div class="r"><span style="width:84px">${{ member: 'Member', approver: 'Approver', admin: 'Admin' }[m.role] || escapeHtml(roleDisplayLabel(m.role))}</span><span style="width:70px">${owns ? `${owns} client${owns === 1 ? '' : 's'}` : '—'}</span>${admin ? `<span class="dur" style="width:64px;text-align:right">${hmLong(teamWeekMinutes(m.id))}</span>` : ''}</div></div>`;
     }).join('');
     const waiting = admin && emailRequests.length ? `<div class="h2"><h2>Waiting for you<span class="c">${emailRequests.length}</span></h2></div><div class="grp">${emailRequests.map(emailReqRow).join('')}</div>` : '';
     body = `<div class="mhead" style="padding:0 14px 6px 58px"><span>Name</span><span style="width:84px;flex:0 0 auto">Role</span><span style="width:70px;flex:0 0 auto">Owns</span>${admin ? '<span style="width:64px;flex:0 0 auto;text-align:right">This week</span>' : ''}</div>
 <div class="grp">${rows || '<div class="empty">No one on the team yet.</div>'}</div>${waiting}
-${admin ? '' : '<p class="t-2" style="font-size:12px;margin:12px 4px 0">Only admins can add people or change roles.</p>'}`;
+${admin ? '' : '<p class="t-2" style="font-size:13px;margin:12px 4px 0">Only admins can add people or change roles.</p>'}`;
   } else if(teamTab === 'titles'){
     const opts = (settings.teamTitleOptions || []).map(o => `<span class="opt">${escapeHtml(o)}<button class="ib" style="width:16px;height:16px" aria-label="Remove ${escapeHtml(o)}" onclick="removeTitle(${jsArg(o)})">${icon('x', { weight: 'bold' })}</button></span>`).join('');
-    body = `<p class="t-2" style="font-size:12px;margin:0 4px 10px">Shown under each person’s name. Titles don’t change what anyone can do; roles do.</p>
-<div class="form-grp"><div class="fr" style="flex-wrap:wrap;padding:12px 14px">${opts ? `<div class="opts">${opts}</div>` : '<span class="t-2" style="font-size:13px">No job titles yet.</span>'}</div>
+    body = `<p class="t-2" style="font-size:13px;margin:0 4px 10px">Shown under each person’s name. Titles don’t change what anyone can do; roles do.</p>
+<div class="form-grp"><div class="fr" style="flex-wrap:wrap;padding:12px 14px">${opts ? `<div class="opts">${opts}</div>` : '<span class="t-2" style="font-size:14px">No job titles yet.</span>'}</div>
 <div class="fr"><input class="tf" id="titleOptionInput" style="flex:1" placeholder="Add a job title" aria-label="Add a job title" onkeydown="if(event.key==='Enter')addTitle()"><button class="btn" onclick="addTitle()">Add</button></div></div>`;
   } else {
     body = emailRequests.length ? `<div class="grp">${emailRequests.map(emailReqRow).join('')}</div>` : '<div class="empty">No email changes waiting.</div>';
@@ -74,9 +74,9 @@ function teamInspHtml(m){
   const admin = isAdmin(), self = m.id === currentUser?.id, extra = m.extra_permissions || [];
   const titleCtl = admin
     ? `<label class="pop pop-sel"><span>${escapeHtml(m.title || 'No title')}</span>${icon('caret-up-down', { weight: 'bold' })}<select aria-label="Job title" onchange="changeTeamTitle('${m.id}', this.value)"><option value="">No title</option>${(settings.teamTitleOptions || []).map(o => `<option ${m.title === o ? 'selected' : ''}>${escapeHtml(o)}</option>`).join('')}</select></label>`
-    : `<span style="font-size:13px">${escapeHtml(m.title || 'No title')}</span>`;
+    : `<span style="font-size:14px">${escapeHtml(m.title || 'No title')}</span>`;
   const canRole = admin && !self;
-  const roles = ROLE_INFO.map(([k, t, d]) => `<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0"${canRole ? ` role="radio" tabindex="0" aria-checked="${m.role === k}" onclick="${m.role === k ? '' : `changeTeamRole('${m.id}','${k}')`}" onkeydown="if(event.key==='Enter'||event.key===' ')this.click()"` : ''}><span class="rd${m.role === k ? ' on' : ''}" aria-hidden="true"></span><div><div style="font-size:13px;font-weight:500">${t}</div><div class="t-2" style="font-size:12px;line-height:1.4">${d}</div></div></div>`).join('');
+  const roles = ROLE_INFO.map(([k, t, d]) => `<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0"${canRole ? ` role="radio" tabindex="0" aria-checked="${m.role === k}" onclick="${m.role === k ? '' : `changeTeamRole('${m.id}','${k}')`}" onkeydown="if(event.key==='Enter'||event.key===' ')this.click()"` : ''}><span class="rd${m.role === k ? ' on' : ''}" aria-hidden="true"></span><div><div style="font-size:14px;font-weight:500">${t}</div><div class="t-2" style="font-size:13px;line-height:1.4">${d}</div></div></div>`).join('');
   // extra access beyond the role, one switch each
   const sw = (label, on, js) => `<div class="kv" style="align-items:center"><span style="color:var(--label)">${label}</span><button class="sw${on ? ' on' : ''}" role="switch" aria-checked="${on}" aria-label="${escapeHtml(label)}" onclick="${js}"></button></div>`;
   let extras = '';
@@ -101,12 +101,12 @@ function teamInspHtml(m){
 <button class="btn btn-q" style="padding:0" onclick="toggleUserAccess('${m.id}', ${jsArg(m.name)}, ${!m.access_revoked})">${m.access_revoked ? 'Restore Access…' : 'Revoke Access…'}</button>
 <button class="btn danger" onclick="confirmDeleteUser('${m.id}', ${jsArg(m.name)})">Remove from Team…</button></div>` : '';
   return `<aside class="insp" aria-label="${escapeHtml(m.name)}">
-<div style="display:flex;align-items:center;gap:12px">${avHtml(m.name, 'style="width:48px;height:48px;font-size:16px"')}
-<div style="min-width:0"><div style="font-size:17px;font-weight:600;letter-spacing:-.01em">${escapeHtml(m.name)}</div><div class="t-2" style="font-size:12px;overflow:hidden;text-overflow:ellipsis">${escapeHtml(m.email || '')}</div></div></div>
+<div style="display:flex;align-items:center;gap:12px">${avHtml(m.name, 'style="width:48px;height:48px;font-size:17px"')}
+<div style="min-width:0"><div style="font-size:18px;font-weight:600;letter-spacing:-.01em">${escapeHtml(m.name)}</div><div class="t-2" style="font-size:13px;overflow:hidden;text-overflow:ellipsis">${escapeHtml(m.email || '')}</div></div></div>
 ${acts ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px">${acts}</div>` : ''}
 <div class="set-h" style="margin:22px 0 6px">Job title</div>${titleCtl}
 <div class="set-h" style="margin:22px 0 2px">Permissions</div><div ${canRole ? 'role="radiogroup" aria-label="Permissions"' : ''}>${roles}</div>
-${self && admin ? '<p class="t-2" style="font-size:12px;margin:2px 0 0">You can’t change your own role.</p>' : ''}
+${self && admin ? '<p class="t-2" style="font-size:13px;margin:2px 0 0">You can’t change your own role.</p>' : ''}
 ${extras ? `<div class="set-h" style="margin:18px 0 4px">Also allowed</div>${extras}` : ''}
 <div class="set-h" style="margin:18px 0 4px">Details</div>
 <div class="kv" style="align-items:center"><span>Slack</span>${slack}</div>
@@ -127,7 +127,7 @@ function openAddMemberSheet(){
 <label for="tmEmail">Email</label><input class="tf" id="tmEmail" type="email" placeholder="priya@basedagency.com">
 <label for="tmTitle">Job title</label><select id="tmTitle"><option value="">No title</option>${(settings.teamTitleOptions || []).map(o => `<option>${escapeHtml(o)}</option>`).join('')}</select>
 <label for="tmRole">Role</label><select id="tmRole">${ROLE_INFO.map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select>
-<span></span><p class="t-2" style="font-size:12px;margin:0">They get a sign-in right away. You’ll see a one-time password to send them.</p>
+<span></span><p class="t-2" style="font-size:13px;margin:0">They get a sign-in right away. You’ll see a one-time password to send them.</p>
 </div>
 <div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="submitAddMember()">Create Account</button></div>`, 480);
 }

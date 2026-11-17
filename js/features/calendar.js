@@ -406,7 +406,7 @@ function eventFormHtml(editing, presetDateStr){
     <div class="modal-head"><span class="panel-title">${editing ? 'Edit event' : 'New event'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
       <div class="settings-field"><label>Title</label><input id="eventTitleInput" style="width:100%;" placeholder="e.g. Kickoff call with Flame Auto Repair" value="${editing ? escapeHtml(editing.title) : ''}"></div>
-      <div class="settings-field"><label>Description (optional)</label><textarea spellcheck="true" id="eventDescInput" style="width:100%;min-height:70px;font-family:var(--font);font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);">${editing ? escapeHtml(editing.description) : ''}</textarea></div>
+      <div class="settings-field"><label>Description (optional)</label><textarea spellcheck="true" id="eventDescInput" style="width:100%;min-height:70px;font-family:var(--font);font-size:14px;padding:10px;border-radius:8px;border:1px solid var(--border);">${editing ? escapeHtml(editing.description) : ''}</textarea></div>
       <div class="form-grid">
         <div style="position:relative;"><label>Date</label>${datePickerFieldHtml('eventDateInput', { value: startDate, minDate: toDateStr(new Date()) })}</div>
         <div><label>Type</label>
@@ -441,13 +441,13 @@ function eventFormHtml(editing, presetDateStr){
       <div id="eventRepeatUntilWrap" style="display:none;position:relative;"><label>Repeats until</label>${datePickerFieldHtml('eventRepeatUntilInput', { value: (()=>{ const d=new Date(); d.setFullYear(d.getFullYear()+1); return toDateStr(d); })(), minDate: toDateStr(new Date()) })}</div>
       ` : `
       <div class="settings-field"><label>Related client (optional)</label><select id="eventClientSelect" style="width:100%;">${populateCalendarClientSelect(editing ? editing.clientId : null)}</select></div>
-      ${editing.recurrenceGroupId ? `<p style="font-size:11.5px;color:var(--muted-lt);margin:0;">🔁 ${editing.recurrenceLabel||'Recurring'} — part of a series. Editing here only changes this one occurrence.</p>` : ''}
+      ${editing.recurrenceGroupId ? `<p style="font-size:12.5px;color:var(--muted-lt);margin:0;">🔁 ${editing.recurrenceLabel||'Recurring'} — part of a series. Editing here only changes this one occurrence.</p>` : ''}
       `}
       <div class="settings-field">
         <label>Attendees</label>
         <div style="display:flex;flex-wrap:wrap;gap:10px;padding:10px;border:1px solid var(--border);border-radius:8px;max-height:120px;overflow-y:auto;">
           ${[...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`
-            <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;cursor:pointer;">
               <input type="checkbox" class="event-attendee-checkbox" value="${p.id}" ${selectedAttendees.includes(p.id)?'checked':''} style="width:auto;">
               ${escapeHtml(p.name)}${p.id===currentUser.id?' (you)':''}
             </label>`).join('')}
@@ -603,7 +603,7 @@ function openRequestChangeModal(eventId){
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Request a change</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
-      <div class="settings-field"><label>What would you like changed?</label><textarea spellcheck="true" id="changeRequestInput" style="width:100%;min-height:90px;font-family:var(--font);font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);" placeholder="e.g. Can we move this to 3pm instead?"></textarea></div>
+      <div class="settings-field"><label>What would you like changed?</label><textarea spellcheck="true" id="changeRequestInput" style="width:100%;min-height:90px;font-family:var(--font);font-size:14px;padding:10px;border-radius:8px;border:1px solid var(--border);" placeholder="e.g. Can we move this to 3pm instead?"></textarea></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" onclick="submitChangeRequest('${eventId}')">Send request</button>
@@ -874,7 +874,7 @@ function openDeleteRecurringChoice(eventId){
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Delete recurring event</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
-      <p style="font-size:13px;color:var(--muted);line-height:1.5;">"${escapeHtml(e.title)}" is part of a ${(e.recurrenceLabel||'recurring').toLowerCase()} series. What do you want to delete?</p>
+      <p style="font-size:14px;color:var(--muted);line-height:1.5;">"${escapeHtml(e.title)}" is part of a ${(e.recurrenceLabel||'recurring').toLowerCase()} series. What do you want to delete?</p>
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" onclick="deleteCalendarEvent('${eventId}')">Just this event</button>
