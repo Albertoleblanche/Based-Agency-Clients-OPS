@@ -535,24 +535,17 @@ function renderTeamQueue(){
     '<button class="btn btn-brand" onclick="switchView(\'clients\')">Go to Clients</button>'
   )}</div>`; return; }
 
-  const sortedMembers = [...teamProfiles].sort((a,b)=>a.name.localeCompare(b.name));
-  const sectionsHtml = sortedMembers.map(member => {
-    if(teamQueueMemberFilter !== 'all' && member.name !== teamQueueMemberFilter) return '';
-    const memberClients = teamQueueMemberClients(member, teamQueueFilter);
-    if(!memberClients.length) return '';
-    return `<div class="team-queue-section">
-      <div class="team-queue-member-head">
-        ${teamQueueAvatarHtml(member)}
-        <div>
-          <div class="team-queue-member-name">${escapeHtml(member.name)}</div>
-          <div class="team-queue-member-role">${escapeHtml(member.title) || escapeHtml(member.role)}</div>
-        </div>
-      </div>
-      <div class="queue-grid">${memberClients.map(c=>queueCardHtml(c, member.name)).join('')}</div>
-    </div>`;
-  }).filter(Boolean).join('');
+  // One list, riskiest client first, each row naming whose draft it is —
+  // the page's promise ("riskiest first") applies across the whole team,
+  // not inside each person's section.
+  const pairs = [];
+  teamProfiles.forEach(member => {
+    if(teamQueueMemberFilter !== 'all' && member.name !== teamQueueMemberFilter) return;
+    teamQueueMemberClients(member, teamQueueFilter).forEach(c => pairs.push({ c, member }));
+  });
+  pairs.sort((a,b)=> (b.c.danger - a.c.danger) || (b.c.importance - a.c.importance) || a.c.name.localeCompare(b.c.name) || a.member.name.localeCompare(b.member.name));
 
-  if(!sectionsHtml){
+  if(!pairs.length){
     const title = teamDateFilterMode!=='all' ? 'No improvements in this range' : 'No clients match this filter';
     const sub = teamDateFilterMode!=='all' ? 'Try a wider date range, or switch back to All time.' : 'Try a different filter, or clear it to see everyone.';
     el.innerHTML = `<div class="panel">${emptyStateHtml(
@@ -562,17 +555,9 @@ function renderTeamQueue(){
     return;
   }
 
-  el.innerHTML = sectionsHtml;
+  el.innerHTML = `<div class="queue-grid">${pairs.map(p => queueCardHtml(p.c, p.member.name, true)).join('')}</div>`;
 }
 
-// Larger avatar variant specifically for the Team Queue section headers —
-// personAvatarHtml()'s existing size (30px) reads fine inline but too small
-// as a section-level identifier here.
-function teamQueueAvatarHtml(member){
-  return member.avatar_url
-    ? `<img class="team-queue-avatar" src="${safeUrl(member.avatar_url)}">`
-    : `<div class="team-queue-avatar-fallback" style="background:${avatarColorForName(member.name)};">${escapeHtml((member.name||'?').trim().charAt(0).toUpperCase())}</div>`;
-}
 
 // Scoped specifically to one member's pending drafts — same recipient
 // escalation logic as the main Notify button (based on the viewer's own
@@ -698,7 +683,7 @@ async function notifyForMemberInternally(memberId){
 // section (or the viewer's own personal Queue), so someone doesn't see a
 // combined count/list that includes colleagues' contributions mixed into
 // theirs. Left undefined shows everyone's, unchanged from before.
-function queueCardHtml(c, scopeAuthor){
+function queueCardHtml(c, scopeAuthor, showAuthor){
   const status = statusMeta(c, scopeAuthor);
   const d = getDraftFor(c, scopeAuthor);
   return `<div class="q-card" id="q-${c.id}">
@@ -706,7 +691,7 @@ function queueCardHtml(c, scopeAuthor){
       <div class="avatar-circle" style="background:${avatarColorForName(c.name)};color:#fff;border:2px solid var(--card);box-shadow:none;">${escapeHtml(c.name.trim().charAt(0).toUpperCase())}</div>
       <div style="flex:1;min-width:0;">
         <div class="q-name">${escapeHtml(c.name)}</div>
-        <div class="q-service-caption" style="margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${escapeHtml(c.service)} · <span class="rating-pill" style="background:${status.bg};color:${status.color};text-transform:capitalize;font-size:10px;padding:2px 8px;">${escapeHtml(status.label)}</span></div>
+        <div class="q-service-caption" style="margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${showAuthor && scopeAuthor ? `<span class="q-author">${escapeHtml(scopeAuthor)}</span> · ` : ''}${escapeHtml(c.service)} · <span class="rating-pill" style="background:${status.bg};color:${status.color};text-transform:capitalize;font-size:10px;padding:2px 8px;">${escapeHtml(status.label)}</span></div>
       </div>
       <div class="kanban-card-menu-wrap">
         <span class="kanban-card-menu-btn" onclick="toggleKanbanCardMenu('q-${c.id}')">⋯</span>
