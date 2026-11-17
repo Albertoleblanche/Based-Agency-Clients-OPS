@@ -22,7 +22,7 @@ async function renderTrash(){
     const trashedClients = clients.filter(c=>c.deletedAt).sort((a,b)=> new Date(b.deletedAt)-new Date(a.deletedAt));
     clientsEl.innerHTML = trashedClients.length ? trashBulkBarHtml('clients') + trashedClients.map(c=>
       trashRowHtml(c.id, 'clients', c.name, c.service, c.deletedAt, `restoreClient('${c.id}')`, `permanentlyDeleteClient('${c.id}')`)
-    ).join('') : `<div class="empty" style="padding:14px 0;">Trash is empty.</div>`;
+    ).join('') : `<div class="empty" style="padding:14px 0;">Nothing here — deleted items show up in this list.</div>`;
   }
 
   if(notesEl){
@@ -31,7 +31,7 @@ async function renderTrash(){
     notesEl.innerHTML = trashedNotes.length ? trashBulkBarHtml('notes') + trashedNotes.map(n=>{
       const c = clients.find(x=>x.id===n.clientId);
       return trashRowHtml(n.id, 'notes', n.title || 'Untitled note', c ? c.name : 'Unknown client', n.deletedAt, `restoreNote('${n.id}')`, `permanentlyDeleteNote('${n.id}')`);
-    }).join('') : `<div class="empty" style="padding:14px 0;">Trash is empty.</div>`;
+    }).join('') : `<div class="empty" style="padding:14px 0;">Nothing here — deleted items show up in this list.</div>`;
   }
 
   if(timeEl){
@@ -40,7 +40,7 @@ async function renderTrash(){
     timeEl.innerHTML = trashedTime.length ? trashBulkBarHtml('time') + trashedTime.map(e=>{
       const c = clients.find(x=>x.id===e.clientId);
       return trashRowHtml(e.id, 'time', `${c?c.name:'Unknown client'} — ${formatMinutes(e.minutes)}`, e.description || e.service || '', e.deletedAt, `restoreTimeEntry('${e.id}')`, `permanentlyDeleteTimeEntry('${e.id}')`);
-    }).join('') : `<div class="empty" style="padding:14px 0;">Trash is empty.</div>`;
+    }).join('') : `<div class="empty" style="padding:14px 0;">Nothing here — deleted items show up in this list.</div>`;
   }
   selectedTrashIds = { clients:new Set(), notes:new Set(), time:new Set() };
 }
