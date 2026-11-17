@@ -562,6 +562,8 @@
     </div>
 
     <div class="view" id="view-notes">
+      <div class="split" id="notesRoot"></div>
+      <div hidden class="legacy">
       <div class="clients-filter-bar" style="margin-bottom:8px;">
         <div class="select-field">
           <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M117.25,157.92a60,60,0,1,0-66.5,0A95.83,95.83,0,0,0,3.53,195.63a8,8,0,1,0,13.4,8.74,80,80,0,0,1,134.14,0,8,8,0,0,0,13.4-8.74A95.83,95.83,0,0,0,117.25,157.92ZM40,108a44,44,0,1,1,44,44A44.05,44.05,0,0,1,40,108Zm210.14,98.7a8,8,0,0,1-11.07-2.33A79.83,79.83,0,0,0,172,168a8,8,0,0,1,0-16,44,44,0,1,0-16.34-84.87,8,8,0,1,1-5.94-14.85,60,60,0,0,1,55.53,105.64,95.83,95.83,0,0,1,47.22,37.71A8,8,0,0,1,250.14,206.7Z"/></svg>
@@ -575,9 +577,11 @@
 
       <div class="notes-split" id="notesBoard"></div>
     </div>
+    </div>
 
-    <!-- TASKS -->
     <div class="view" id="view-tasks">
+      <div class="content" id="tasksRoot" style="padding-top:12px"></div>
+      <div hidden class="legacy">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
         <div class="icon-tab-group" id="taskDirectionTabs">
           <div class="icon-tab active" data-tdir="all" onclick="switchTaskDirectionTab('all')">
@@ -605,8 +609,8 @@
 
       <div class="kanban-board" id="kanbanBoard"></div>
     </div>
+    </div>
 
-    <!-- TASK ARCHIVE -->
     <div class="view" id="view-task-archive">
       <span class="row-link" style="display:inline-block;margin-bottom:14px;" onclick="switchView('tasks')">← Back to Tasks</span>
 
@@ -659,6 +663,8 @@
 
     <!-- REMINDERS -->
     <div class="view" id="view-reminders">
+      <div class="content" id="remindersRoot"></div>
+      <div hidden class="legacy">
       <div class="clients-filter-bar" style="margin-bottom:8px;">
         <div style="flex:1;"></div>
         <button class="btn btn-brand" style="flex:none;" onclick="openNewReminderModal()">New Reminder</button>
@@ -666,9 +672,12 @@
 
       <div class="rem-list" id="remindersBoard"></div>
     </div>
+    </div>
 
-    <!-- CALENDAR -->
     <div class="view" id="view-calendar">
+      <div class="cal-legend"><span class="st"><span class="dot blue"></span>Client meetings</span><span class="st"><span class="dot purple"></span>Internal</span><span class="st"><span class="dot"></span>Tasks</span><span class="st"><span class="dot red"></span>Deadlines</span><span class="st"><span class="dot green"></span>Sends</span><span class="st" id="calGoogleSyncStatus" style="margin-left:auto;display:none"></span></div>
+      <div class="cal-wrap" id="calendarRoot"></div>
+      <div hidden class="legacy">
       <div class="panel" style="margin-bottom:16px;">
         <div class="panel-body">
           <div id="calendarTodaySummary" style="font-size:12.5px;color:var(--muted);margin-bottom:14px;"></div>
@@ -685,7 +694,7 @@
               <div class="view-toggle-option" data-cview="week" onclick="switchCalendarViewMode('week')">Week</div>
             </div>
             <div style="flex:1;"></div>
-            <div id="calGoogleSyncStatus" style="display:none;align-items:center;gap:8px;font-size:12px;color:var(--muted-lt);"></div>
+            <div id="calGoogleSyncStatusLegacy" style="display:none;align-items:center;gap:8px;font-size:12px;color:var(--muted-lt);"></div>
             <button class="btn btn-brand" style="flex:none;" onclick="openNewEventModal()">+ New event</button>
           </div>
         </div>
@@ -696,8 +705,8 @@
 
       <div id="calendarViewContainer"></div>
     </div>
+    </div>
 
-    <!-- TIME TRACKER -->
     <div class="view" id="view-time">
       <div class="icon-tab-group" id="timeMainTabs">
         <div class="icon-tab active" data-ttab="timesheet" onclick="switchTimeTab('timesheet')">
@@ -1685,6 +1694,8 @@
 <script src="js/features/health.js"></script>
 <script src="js/features/clients-canvas.js"></script>
 <script src="js/features/client-page.js"></script>
+<script src="js/features/work-canvas.js"></script>
+<script src="js/features/calendar-canvas.js"></script>
 <script src="js/features/settings.js"></script>
 <script src="js/features/sheet-sync.js"></script>
 <script src="js/features/team.js"></script>

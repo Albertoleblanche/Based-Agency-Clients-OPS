@@ -146,3 +146,47 @@ button.cb:hover { box-shadow: inset 0 0 0 1.5px var(--label-2); }
 .cd-activity .tag { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 4px; background: var(--fill-2); font-size: 11px; font-weight: 600; color: var(--label-2); }
 .cd-activity .empty { padding: 20px 14px; text-align: left; }
 .row .ib.act { width: 26px; height: 24px; }
+/* Tasks */
+.bcol { min-width: 0; }
+.bcol-h { display: flex; align-items: center; gap: 6px; padding: 0 2px 10px; }
+.bcol-h b { font-size: 13px; font-weight: 600; }
+.bcol-h span { font-size: 12px; color: var(--label-2); }
+.bcol-h .ib { margin-left: auto; width: 24px; height: 24px; }
+.bcol .add { display: flex; align-items: center; gap: 6px; padding: 8px 4px; font-size: 12px; color: var(--label-2); text-decoration: none; }
+.bcol .add svg { width: 13px; height: 13px; }
+.bcol .add:hover { color: var(--label); }
+.task { cursor: default; }
+.task .cb { margin-top: 1px; }
+.task-list .task + .task { margin-top: 6px; }
+.task svg.flag { width: 13px; height: 13px; color: var(--label-2); }
+.seg button svg { width: 14px; height: 14px; }
+/* Notes */
+.note-doc { max-width: 680px; }
+.note-title { width: 100%; height: auto !important; padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; font-size: 22px !important; font-weight: 700; letter-spacing: -.02em; color: var(--label); }
+.note-body { width: 100%; min-height: 340px; margin-top: 10px; padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; font-size: 14px !important; line-height: 1.65; resize: none; }
+/* Calendar */
+.cal-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; padding: 10px 24px; border-bottom: .5px solid var(--sep); border-top: .5px solid var(--sep); }
+.cal-legend .st svg { width: 13px; height: 13px; }
+.cal-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.cal { display: grid; min-width: 760px; }
+.ev { border: 0; text-align: left; font: inherit; font-size: 12px; cursor: default; }
+.ev b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.cal-all-l, .cal-all { position: sticky; z-index: 2; background: var(--window); }
+.cal-all-l { font-size: 11px; color: var(--label-2); text-align: right; padding: 6px 8px; border-bottom: .5px solid var(--sep); }
+.cal-all { display: flex; flex-direction: column; gap: 3px; padding: 4px; border-left: .5px solid var(--sep); border-bottom: .5px solid var(--sep); min-width: 0; }
+.mchip { display: flex; align-items: center; gap: 5px; width: 100%; min-width: 0; padding: 2px 6px; border: 0; border-radius: 5px; background: transparent; font: inherit; font-size: 11.5px; color: var(--label); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; }
+.cal-all .mchip { display: block; background: var(--fill-2); border-radius: 6px; padding: 5px 7px; font-size: 12px; font-weight: 600; line-height: 1.25; }
+.cal-all .mchip:hover { background: var(--fill-3, var(--fill-2)); }
+.cal-sync { border: 0; background: transparent; font: inherit; cursor: default; padding: 0; }
+.cal-sync:hover { color: var(--label); }
+.mchip i { font-style: normal; color: var(--label-2); }
+.mchip .dot { width: 6px; height: 6px; }
+.mchip:hover { background: var(--fill-2); }
+.mgrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: auto repeat(6, minmax(108px, 1fr)); min-height: 100%; }
+.mhd { position: sticky; top: 0; z-index: 1; padding: 8px 10px; font-size: 12px; color: var(--label-2); background: var(--window); border-bottom: .5px solid var(--sep); }
+.mcell { padding: 6px; border-right: .5px solid var(--sep); border-bottom: .5px solid var(--sep); min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mcell.out { opacity: .45; }
+.mday { display: flex; justify-content: flex-end; margin-bottom: 2px; }
+.mday b { font-size: 13px; font-weight: 500; min-width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; }
+.mcell.today .mday b { background: var(--accent-fill); color: #fff; font-weight: 600; }
+.mcell .more { font-size: 11px; color: var(--label-2); padding-left: 6px; }
