@@ -32,11 +32,6 @@ const REMINDER_STATUS_META = {
   closed:   { label:'Closed',            icon:'<svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M224,48H32A16,16,0,0,0,16,64V88a16,16,0,0,0,16,16v88a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V104a16,16,0,0,0,16-16V64A16,16,0,0,0,224,48ZM208,192H48V104H208ZM224,88H32V64H224V88ZM96,136a8,8,0,0,1,8-8h48a8,8,0,0,1,0,16H104A8,8,0,0,1,96,136Z"/></svg>', color:'#696F78' },
 };
 
-// Kanban column order — includes 'due' as its own visual column even
-// though it's derived rather than stored, since the whole point of the
-// board is seeing what needs action grouped separately from what's simply
-// still waiting.
-const REMINDER_STAGES = ['waiting','due','answered','closed'].map(key=>({ key, ...REMINDER_STATUS_META[key] }));
 
 function updateRemindersNavBadge(){
   const badge = document.getElementById('navRemindersBadge');
@@ -46,27 +41,50 @@ function updateRemindersNavBadge(){
   badge.style.display = dueCount ? 'flex' : 'none';
 }
 
+// Grouped lists, most urgent first — like Apple's Reminders: due
+// follow-ups, then questions still waiting on the client, then the ones
+// answered or closed. The circle marks a question answered in one click.
+const REMINDER_SECTIONS = [['due','Due'],['waiting','Waiting on the client'],['answered','Answered'],['closed','Closed']];
+
 function renderReminders(){
   const board = document.getElementById('remindersBoard');
   if(!board) return;
 
   const visible = clientReminders.filter(r=>r.askedBy===currentUser?.id);
-
-  board.innerHTML = REMINDER_STAGES.map(stage=>{
-    const stageReminders = visible.filter(r=>reminderDisplayStatus(r)===stage.key)
-      .sort((a,b)=> (a.followUpDate||'').localeCompare(b.followUpDate||''));
-    return `<div class="kanban-column">
-      <div class="kanban-column-head" style="background:${stage.color}22;border:1px solid ${stage.color}66;">
-        <span class="kanban-column-icon" style="color:${stage.color};">${stage.icon}</span>
-        <span class="kanban-column-title">${escapeHtml(stage.label)}</span>
-        <span class="kanban-column-count">${stageReminders.length}</span>
-        ${stage.key==='waiting' ? `<button class="kanban-add-btn" onclick="openNewReminderModal()" title="New reminder">+</button>` : ''}
-      </div>
-      <div class="kanban-cards">
-        ${stageReminders.length ? stageReminders.map(r=>reminderCardHtml(r)).join('') : `<div class="empty" style="padding:18px 8px;font-size:11.5px;">Nothing here yet.</div>`}
-      </div>
-    </div>`;
+  if(!visible.length){
+    board.innerHTML = `<div class="cd-grp">${emptyStateHtml(REMINDER_STATUS_META.waiting.icon.replace(/width="14" height="14"/,'width="20" height="20"'),
+      'No follow-ups yet', 'When you ask a client something, add it here so the team knows you’re waiting on an answer.',
+      '<button class="btn btn-brand" onclick="openNewReminderModal()">New Reminder</button>')}</div>`;
+    return;
+  }
+  board.innerHTML = REMINDER_SECTIONS.map(([key, title])=>{
+    const rows = visible.filter(r=>reminderDisplayStatus(r)===key)
+      .sort((a,b)=> key==='answered' || key==='closed'
+        ? (b.resolvedAt||'').localeCompare(a.resolvedAt||'')
+        : (a.followUpDate||'').localeCompare(b.followUpDate||''));
+    if(!rows.length && key!=='waiting') return '';
+    return `<div class="cd-h2"><h2>${escapeHtml(title)}<span class="t-c">${rows.length}</span></h2>${key==='waiting' ? `<span class="row-link" onclick="openNewReminderModal()">New Reminder</span>` : ''}</div>
+      <div class="cd-grp">${rows.length ? rows.map(reminderRowHtml).join('') : `<p class="rem-empty">Nothing waiting on a client right now.</p>`}</div>`;
   }).join('');
+}
+
+function reminderRowHtml(r){
+  const c = clients.find(x=>x.id===r.clientId);
+  const display = reminderDisplayStatus(r);
+  const resolved = display==='answered' || display==='closed';
+  const asked = r.askedDate ? new Date(r.askedDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
+  const when = resolved ? (display==='answered' ? 'Answered' : 'Closed') : `Follow up ${reminderFollowUpLabel(r.followUpDate)}`;
+  const circle = resolved
+    ? `<span class="rem-cb done" aria-hidden="true"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M232.49,80.49l-128,128a12,12,0,0,1-17,0l-56-56a12,12,0,1,1,17-17L96,183,215.51,63.51a12,12,0,0,1,17,17Z"/></svg></span>`
+    : `<button type="button" class="rem-cb" title="Mark answered" aria-label="Mark answered" onclick="event.stopPropagation();markReminderStatus('${r.id}','answered')"></button>`;
+  return `<div class="rem-row${resolved ? ' done' : ''}" role="button" tabindex="0" onclick="openReminderDetailModal('${r.id}')">
+    ${circle}
+    <div class="rem-tx"><span class="rem-t">${escapeHtml(r.question)}</span><span class="rem-s">${c ? escapeHtml(c.name) : 'Unknown client'}${asked ? ` · asked ${escapeHtml(asked)}` : ''}</span></div>
+    <div class="rem-r"><span class="${display==='due' ? 'rem-due' : ''}">${escapeHtml(when)}</span>
+      <div class="kanban-card-menu-wrap" onclick="event.stopPropagation()">
+        <span class="kanban-card-menu-btn" onclick="toggleKanbanCardMenu('reminder-${r.id}')">⋯</span>
+        <div class="kanban-card-menu" id="kanbanMenu-reminder-${r.id}" style="display:none;">${reminderCardMenuHtml(r)}</div>
+      </div></div></div>`;
 }
 
 function reminderCardMenuHtml(r){
@@ -101,36 +119,6 @@ function createTaskFromReminder(reminderId){
     description: r.question,
     clientId: r.clientId,
   });
-}
-
-function reminderCardHtml(r){
-  const c = clients.find(x=>x.id===r.clientId);
-  const owner = teamProfiles.find(p=>p.id===r.askedBy);
-  const display = reminderDisplayStatus(r);
-  const isResolved = display==='answered' || display==='closed';
-  const followUpLabel = reminderFollowUpLabel(r.followUpDate);
-
-  return `<div class="kanban-card" onclick="openReminderDetailModal('${r.id}')">
-    <div class="kanban-card-top">
-      ${isResolved
-        ? `<span class="kanban-card-due" style="color:var(--green);font-weight:700;">
-            <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M176.49,95.51a12,12,0,0,1,0,17l-56,56a12,12,0,0,1-17,0l-24-24a12,12,0,1,1,17-17L112,143l47.51-47.52A12,12,0,0,1,176.49,95.51ZM236,128A108,108,0,1,1,128,20,108.12,108.12,0,0,1,236,128Zm-24,0a84,84,0,1,0-84,84A84.09,84.09,0,0,0,212,128Z"/></svg>
-            ${display==='answered' ? 'Answered' : 'Closed'}
-          </span>`
-        : `<span class="kanban-card-due" style="${display==='due'?'color:var(--brand-dark);':''}">
-            <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor"><path d="M208,28H188V24a12,12,0,0,0-24,0v4H92V24a12,12,0,0,0-24,0v4H48A20,20,0,0,0,28,48V208a20,20,0,0,0,20,20H208a20,20,0,0,0,20-20V48A20,20,0,0,0,208,28ZM68,52a12,12,0,0,0,24,0h72a12,12,0,0,0,24,0h16V76H52V52ZM52,204V100H204V204Z"/></svg>
-            Follow up ${followUpLabel}
-          </span>`}
-      <div class="kanban-card-menu-wrap">
-        <span class="kanban-card-menu-btn" onclick="event.stopPropagation();toggleKanbanCardMenu('reminder-${r.id}')">⋯</span>
-        <div class="kanban-card-menu" id="kanbanMenu-reminder-${r.id}" style="display:none;">${reminderCardMenuHtml(r)}</div>
-      </div>
-    </div>
-    <div class="kanban-card-desc" style="white-space:normal;-webkit-line-clamp:1;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;color:var(--muted-lt);cursor:pointer;" onclick="event.stopPropagation();openClientDetail('${r.clientId}')">${c ? escapeHtml(c.name) : 'Unknown client'}</div>
-    <div class="kanban-card-title" style="font-size:13px;">${escapeHtml(r.question)}</div>
-    <div class="kanban-card-assigned-label">Asked by</div>
-    <div class="kanban-card-avatars">${owner ? personAvatarHtml(owner.id) : ''}</div>
-  </div>`;
 }
 
 function reminderFollowUpLabel(dateStr){

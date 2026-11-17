@@ -765,10 +765,10 @@
     <div class="view" id="view-reminders">
       <div class="clients-filter-bar" style="margin-bottom:8px;">
         <div style="flex:1;"></div>
-        <button class="btn btn-brand" style="flex:none;" onclick="openNewReminderModal()">+ New reminder</button>
+        <button class="btn btn-brand" style="flex:none;" onclick="openNewReminderModal()">New Reminder</button>
       </div>
 
-      <div class="kanban-board" id="remindersBoard"></div>
+      <div class="rem-list" id="remindersBoard"></div>
     </div>
 
     <!-- CALENDAR -->
@@ -1564,43 +1564,26 @@
         </div>
       </div>
 
-      <div class="metrics-row" id="cdMetrics"></div>
-
-      <div class="panel" id="cdCustomFieldsPanel" style="margin-bottom:24px;display:none;">
-        <div class="panel-head"><span class="panel-title">Additional Info</span></div>
-        <div class="panel-body"><div id="cdCustomFields"></div></div>
-      </div>
-
-      <div class="bento-row">
-        <div class="panel bento-main">
-          <div class="panel-head"><span class="panel-title">Improvements Logged</span></div>
-          <div class="panel-body"><div id="cdImprovements" class="scroll-cap"></div></div>
+      <div class="cd-head" id="cdHeader"></div>
+      <div id="cdRiskNote"></div>
+      <div class="cd-cols">
+        <div class="cd-main">
+          <div class="cd-h2"><h2>This week’s draft</h2></div>
+          <div class="cd-grp cd-pad" id="cdDraftStatus"></div>
+          <div class="cd-h2"><h2>Improvements</h2><span class="row-link" onclick="openQueueLogImprovementModal(currentDetailClientId)">Log Improvement</span></div>
+          <div class="cd-grp" id="cdImprovements"></div>
+          <div class="cd-h2"><h2 id="cdTimeLoggedTitle">Time logged</h2></div>
+          <div class="cd-grp" id="cdTimeEntries"></div>
+          <div class="cd-h2"><h2>Waiting on the client</h2><span class="row-link" onclick="openNewReminderModal(currentDetailClientId)">New Reminder</span></div>
+          <div class="cd-grp" id="cdReminders"></div>
+          <div class="cd-h2"><h2>Activity</h2></div>
+          <div class="cd-grp cd-pad" id="cdActivityHistory"></div>
         </div>
-        <div class="panel bento-side">
-          <div class="panel-head"><span class="panel-title">This Week's Draft</span></div>
-          <div class="panel-body"><div id="cdDraftStatus"></div></div>
-        </div>
-      </div>
-
-      <div class="bento-row">
-        <div class="panel bento-main">
-          <div class="panel-head"><span class="panel-title" id="cdTimeLoggedTitle">Time Logged</span></div>
-          <div class="panel-body"><div id="cdTimeEntries" class="scroll-cap"></div></div>
-        </div>
-        <div class="panel bento-side">
-          <div class="panel-head"><span class="panel-title">My Notes</span><span class="row-link" onclick="openNoteModalFromDetail()">+ Add</span></div>
-          <div class="panel-body"><div id="cdNotes" class="scroll-cap"></div></div>
-        </div>
-      </div>
-
-      <div class="panel" style="margin-top:20px;">
-        <div class="panel-head"><span class="panel-title">Waiting on Client</span><span class="row-link" onclick="openNewReminderModal(currentDetailClientId)">+ Add</span></div>
-        <div class="panel-body"><div id="cdReminders" class="scroll-cap"></div></div>
-      </div>
-
-      <div class="panel" style="margin-bottom:24px;">
-        <div class="panel-head"><span class="panel-title">Activity History</span></div>
-        <div class="panel-body"><div id="cdActivityHistory" class="scroll-cap"></div></div>
+        <aside class="cd-side">
+          <section class="cd-panel"><h3>Details</h3><div id="cdMetrics"></div></section>
+          <section class="cd-panel" id="cdCustomFieldsPanel" style="display:none;"><h3>Scope and fields</h3><div id="cdCustomFields"></div></section>
+          <section class="cd-panel"><h3>My notes<span class="row-link" onclick="openNoteModalFromDetail()">New Note</span></h3><div id="cdNotes"></div></section>
+        </aside>
       </div>
     </div>
 

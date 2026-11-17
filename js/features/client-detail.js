@@ -162,38 +162,37 @@ function renderClientDetail(){
   const budget = monthBudgetInfo(c);
   const monthsActive = monthsActiveFor(c);
 
+  // Header and risk note: who this is and, when it's at risk 4–5, why.
+  const headerEl = document.getElementById('cdHeader');
+  if(headerEl){
+    const since = c.startDate ? ` · client since ${new Date(c.startDate+'T00:00:00').toLocaleDateString('en-US',{month:'long',year:'numeric'})}` : '';
+    headerEl.innerHTML = `<span class="cd-mono" aria-hidden="true">${escapeHtml(todayInitials(c.name))}</span>
+      <div class="cd-head-tx"><h1 class="cd-lt">${escapeHtml(c.name)}</h1><p class="cd-sub">${escapeHtml(c.service||'')} · ${escapeHtml(c.status||'')}${escapeHtml(since)}</p></div>`;
+  }
+  const riskEl = document.getElementById('cdRiskNote');
+  if(riskEl){
+    if((c.danger||0) >= 4){
+      const lastSent = todayLastSent(c);
+      const days = lastSent ? Math.floor((Date.now() - lastSent) / 86400000) : null;
+      const bits = [lastSent ? (days === 0 ? 'Update sent today.' : `No update in ${days} day${days===1?'':'s'}.`) : 'No update sent yet.'];
+      if(budget && budget.tier === 'over') bits.push(`Over this month’s hours (${(budget.usedMinutes/60).toFixed(1)} of ${(budget.budgetMinutes/60).toFixed(1)}).`);
+      riskEl.innerHTML = `<div class="cd-risk" role="note"><svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M236.8,188.09,149.35,36.22a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM120,104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm8,88a12,12,0,1,1,12-12A12,12,0,0,1,128,192Z"/></svg><div><b>Risk ${c.danger} of 5.</b> ${escapeHtml(bits.join(' '))}</div></div>`;
+    } else riskEl.innerHTML = '';
+  }
+
+  // Details: one quiet list instead of a row of cards.
+  const kv = (label, value) => `<div class="cd-kv"><span>${label}</span><b>${value}</b></div>`;
+  const riskWord = (c.danger||0) >= 4 ? 'At risk' : (c.danger||0) === 3 ? 'Watch' : 'OK';
+  const budgetHtml = budget ? `<div class="cd-kv cd-kv-budget"><span>This month</span><b class="${budget.tier==='over'?'cd-red':''}">${(budget.usedMinutes/60).toFixed(1)}h <i>of ${(budget.budgetMinutes/60).toFixed(1)}h</i></b></div>
+      <div class="cd-bar"><i style="width:${Math.min(budget.pct,100)}%;background:${budget.tier==='over'?'var(--red)':budget.tier==='warn'?'var(--amber)':'var(--muted-lt)'}"></i></div>` : '';
   document.getElementById('cdMetrics').innerHTML = `
-    <div class="metric-card">
-      <div class="metric-head"><span class="metric-icon metric-icon-blue"><svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M117.25,157.92a60,60,0,1,0-66.5,0A95.83,95.83,0,0,0,3.53,195.63a8,8,0,1,0,13.4,8.74,80,80,0,0,1,134.14,0,8,8,0,0,0,13.4-8.74A95.83,95.83,0,0,0,117.25,157.92ZM40,108a44,44,0,1,1,44,44A44.05,44.05,0,0,1,40,108Zm210.14,98.7a8,8,0,0,1-11.07-2.33A79.83,79.83,0,0,0,172,168a8,8,0,0,1,0-16,44,44,0,1,0-16.34-84.87,8,8,0,1,1-5.94-14.85,60,60,0,0,1,55.53,105.64,95.83,95.83,0,0,1,47.22,37.71A8,8,0,0,1,250.14,206.7Z"/></svg></span><span class="metric-label">Status</span></div>
-      <div class="metric-value" style="font-size:19px;">${escapeHtml(c.status)}</div>
-      <div class="metric-chips"><span class="pill ${statusPillClass(c.status)}">${escapeHtml(c.status)}</span></div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-head"><span class="metric-icon metric-icon-blue"><svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM72,48v8a8,8,0,0,0,16,0V48h80v8a8,8,0,0,0,16,0V48h24V80H48V48ZM208,208H48V96H208V208Z"/></svg></span><span class="metric-label">Months Active</span></div>
-      <div class="metric-value" style="font-size:19px;">${monthsActive===null ? '—' : monthsActive}</div>
-      <div class="metric-caption">${monthsActive===null ? 'Set a start date to track this' : `Since ${new Date(c.startDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`}</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-head"><span class="metric-icon metric-icon-purple"><svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M240,128a8,8,0,0,1-8,8H204.94l-37.78,75.58A8,8,0,0,1,160,216h-.4a8,8,0,0,1-7.08-5.14L95.35,60.76,63.28,131.31A8,8,0,0,1,56,136H24a8,8,0,0,1,0-16H50.85L88.72,36.69a8,8,0,0,1,14.76.46l57.51,151,31.85-63.71A8,8,0,0,1,200,120h32A8,8,0,0,1,240,128Z"/></svg></span><span class="metric-label">Importance / Danger</span></div>
-      <div class="metric-value" style="font-size:19px;">${c.importance}/10 · ${c.danger}/5</div>
-      <div class="metric-chips">${riskCaptionHtml(c.danger)}</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-head"><span class="metric-icon metric-icon-green"><svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z"/></svg></span><span class="metric-label">Total Time Logged</span></div>
-      <div class="metric-value">${formatMinutes(totalMinutes)}</div>
-      <div class="metric-caption">${myTimeEntries.length} entr${myTimeEntries.length!==1?'ies':'y'}, all time</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-head"><span class="metric-icon metric-icon-amber"><svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M229.66,58.34l-32-32a8,8,0,0,0-11.32,0l-96,96A8,8,0,0,0,88,128v32a8,8,0,0,0,8,8h32a8,8,0,0,0,5.66-2.34l96-96A8,8,0,0,0,229.66,58.34ZM124.69,152H104V131.31l64-64L188.69,88ZM200,76.69,179.31,56,192,43.31,212.69,64ZM224,128v80a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V48A16,16,0,0,1,48,32h80a8,8,0,0,1,0,16H48V208H208V128a8,8,0,0,1,16,0Z"/></svg></span><span class="metric-label">Improvements</span></div>
-      <div class="metric-value">${c.improvements.length}</div>
-      <div class="metric-caption">Logged all time</div>
-    </div>
-    ${budget ? `
-    <div class="metric-card">
-      <div class="metric-head"><span class="metric-icon" style="background:${budgetTierMeta(budget.tier).pill==='pill-bad'?'var(--red-bg)':budget.tier==='warn'?'var(--amber-bg)':'var(--green-bg)'};color:${budgetTierMeta(budget.tier).color};"><svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z"/></svg></span><span class="metric-label">Monthly Budget</span></div>
-      <div class="metric-value" style="font-size:19px;">${(budget.usedMinutes/60).toFixed(1)}h <span style="color:var(--muted-lt);font-weight:400;font-size:14px;">of ${(budget.budgetMinutes/60).toFixed(1)}h</span></div>
-      <div class="metric-chips"><span class="pill ${budgetTierMeta(budget.tier).pill}">${escapeHtml(budgetTierMeta(budget.tier).label)} · ${budget.pct}%</span></div>
-    </div>` : ''}`;
+    ${kv('Status', `<span class="pill ${statusPillClass(c.status)}">${escapeHtml(c.status)}</span>`)}
+    ${kv('Risk', `<span class="${(c.danger||0)>=4?'cd-red':''}">${c.danger} of 5 · ${riskWord}</span>`)}
+    ${kv('Importance', `${c.importance} of 10`)}
+    ${kv('Months active', monthsActive===null ? '—' : monthsActive)}
+    ${kv('Time logged', `${formatMinutes(totalMinutes)} <i>· ${myTimeEntries.length} entr${myTimeEntries.length!==1?'ies':'y'}</i>`)}
+    ${kv('Improvements', c.improvements.length)}
+    ${budgetHtml}`;
 
   document.getElementById('cdImprovements').innerHTML = c.improvements.length
     ? [...c.improvements].reverse().map(imp=>`
@@ -217,7 +216,7 @@ function renderClientDetail(){
       <div class="ts-entry-desc" style="white-space:pre-wrap;line-height:1.5;">${escapeHtml(d.draft)}</div>
     </div>`;
   }).join('') : `<div class="empty">No draft generated yet.</div>`)
-    + `<button class="btn btn-outline" style="margin-top:12px;width:100%;justify-content:center;" onclick="goToClientInQueue('${c.id}','all')">Open in Approval Queue →</button>`;
+    + `<button class="btn btn-outline" style="margin-top:12px;width:100%;justify-content:center;" onclick="goToClientInQueue('${c.id}','all')">Open in Review →</button>`;
 
   document.getElementById('cdTimeEntries').innerHTML = myTimeEntries.length
     ? myTimeEntries.slice(0,25).map(e=>{
