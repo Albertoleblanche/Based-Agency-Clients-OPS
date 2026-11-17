@@ -216,7 +216,10 @@ function clientHealth(c){
     const ex = sig.find(s => s.key === 'noupdate');
     const txt = `${lateN} of the last 4 were late or missed${w.behind != null ? '; this week’s is behind' : ''}.`;
     if(ex){ ex.text += ' ' + txt; if(ll === 'r') ex.l = 'r'; }
-    else sig.push({ l: ll, key: 'late', icon: 'mail', title: 'Updates keep slipping', since: now, text: txt.charAt(0).toUpperCase() + txt.slice(1) });
+    else {
+      const lastBad = [6, 5, 4, 3].find(i => seq[i] === 'l' || seq[i] === 'm');
+      sig.push({ l: ll, key: 'late', icon: 'mail', title: 'Updates keep slipping', since: lastBad != null ? addDays(updateCycle().send, -7 * (7 - lastBad)) : now, text: txt.charAt(0).toUpperCase() + txt.slice(1) });
+    }
   }
   const hp = hoursPace(c);
   if(hp.budget){
@@ -236,6 +239,8 @@ function clientHealth(c){
   if(lo) sig.push({ l: lo, key: 'tasks', icon: 'list-checks', title: `${overdue.length} tasks overdue`, since: now, text: overdue.map(t => t.title).slice(0, 2).join(' · ') });
   const lf = lvl(c.danger || 0, T.ownerFlag);
   if(lf) sig.push({ l: lf, key: 'flag', icon: 'flag', title: `Flagged by ${firstName(clientOwner(c)) || 'the owner'}`, since: now, text: `Risk set to ${c.danger} of 5.` });
+  const prio = ['hours', 'noupdate', 'late', 'quiet', 'under', 'tasks', 'flag'];
+  sig.sort((a, b) => (a.l === 'r' ? 0 : 1) - (b.l === 'r' ? 0 : 1) || prio.indexOf(a.key) - prio.indexOf(b.key));
   let level = sig.some(s => s.l === 'r') ? 'r' : (sig.length ? 'y' : 'g');
   if(level === 'y' && T.importantBump && (c.importance || 0) >= 8) level = 'r';
   const h = healthHandled[c.id];
@@ -249,7 +254,7 @@ function hstateHtml(l, text){
   const dot = l === 'g' ? '' : `<span class="dot ${l === 'r' ? 'red' : 'yellow'}"></span>`;
   return `<span class="hstate ${l}">${dot}${escapeHtml(text || healthWord(l))}</span>`;
 }
-function shortSignal(h){
+function shortSignal(h, max){
   if(!h.signals.length) return '';
   const order = ['hours', 'late', 'noupdate', 'quiet', 'under', 'tasks', 'flag'];
   const lateM = h.signals.map(s => s.text.match(/(\d) of the last 4 were late or missed/)).find(Boolean);
@@ -260,7 +265,7 @@ function shortSignal(h){
     noupdate: lateM ? `${lateM[1]} of the last 4 updates late` : s.text.split('.')[0],
     late: `${lateM ? lateM[1] : ''} of the last 4 updates late`.trim(),
     tasks: s.title, flag: s.title }[s.key]));
-  return [...new Set(bits)].slice(0, 2).join(' · ');
+  return [...new Set(bits)].slice(0, max || 2).join(' · ');
 }
 function nextStepTask(c){
   return (typeof tasks !== 'undefined' ? tasks : []).find(t => t.clientId === c.id && t.status !== 'done' && !t.cancelledAt && (!t.dueDate || new Date(t.dueDate + 'T23:59:00') >= dayStart(rNow())) && /next step/i.test(t.description || ''));
@@ -309,3 +314,24 @@ function signalRowsHtml(h, limit){
 <div class="r"><span class="since">Since ${relDay(s.since).toLowerCase() === 'today' ? 'today' : relDay(s.since)}</span></div></div>`).join('');
 }
 function isApproverName(name){ const p = profileByName(name); return !!p && (p.role === 'admin' || p.role === 'approver'); }
+
+// Compact wording for table cells and lists: "Over budget · 2 of 4 updates late".
+function tableSignal(h, c){
+  if(!h.signals.length) return '';
+  const lateM = h.signals.map(s => s.text.match(/(\d) of the last 4 were late or missed/)).find(Boolean);
+  const bits = h.signals.map(s => ({
+    hours: h.hp.used > h.hp.budget ? 'Over budget' : `On pace for ${Math.round(h.hp.projected)} of ${h.hp.budget} h`,
+    under: `${Math.round(h.hp.used)} of ${h.hp.budget} hours used, month half gone`,
+    noupdate: lateM ? `${lateM[1]} of 4 updates late` : s.text.split('.')[0],
+    late: lateM ? `${lateM[1]} of 4 updates late` : 'Updates late',
+    quiet: s.text.replace(/\.$/, ''), tasks: s.title, flag: s.title }[s.key]));
+  const out = [...new Set(bits)].slice(0, 2);
+  if(out.length < 2 && h.level === 'r' && !h.signals.some(s => s.l === 'r') && c && (c.importance || 0) >= 8) out.push('importance ' + c.importance);
+  return out.join(' · ');
+}
+// "Today" · weekday for this week · "Nov 12" before that.
+function weekDay(d){
+  const dd = new Date(d), monday = dayStart(addDays(rNow(), -((rNow().getDay() + 6) % 7)));
+  if(daysBetween(dd, rNow()) <= 0) return 'Today';
+  return dd >= monday ? dd.toLocaleDateString('en-US', { weekday: 'short' }) : fmtShortDate(dd);
+}

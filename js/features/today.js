@@ -113,3 +113,8 @@ function nextCheckpointText(cyc){
   const i = pts.findIndex(p => p > cyc.now);
   return i < 0 ? 'next week' : `${names[i]} by ${fmtDay(pts[i])} ${fmtTime(pts[i])}`;
 }
+
+// Older helpers other screens still call.
+function todayInitials(name){ return clientMono({ name }); }
+function todayLastSent(c){ return lastSentAt(c); }
+function todayMono(name){ return `<span class="mono" aria-hidden="true">${escapeHtml(clientMono({ name }))}</span>`; }

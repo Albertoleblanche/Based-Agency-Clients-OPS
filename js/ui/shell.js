@@ -68,7 +68,7 @@ document.addEventListener('keydown', e => {
 
 // Jump to a client on a screen (defined fully by each screen; safe defaults here).
 function openWeekClient(id){ window._weekSel = id; switchView('approve'); if(typeof renderThisWeek === 'function') renderThisWeek(); }
-function openHealthClient(id){ window._healthSel = id; switchView('health'); }
+function openHealthClient(id){ window._healthSel = id; switchView('health'); if(typeof renderHealth === 'function') renderHealth(); }
 function openReviewDraft(clientId, author){ window._reviewSel = { clientId, author }; switchView('teamqueue'); }
 
 // Sidebar counts as on the canvas: All Clients (roster size), Health (needs attention),

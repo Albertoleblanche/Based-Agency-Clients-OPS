@@ -192,6 +192,9 @@
 
     <!-- CLIENTS -->
     <div class="view" id="view-clients">
+      <div class="split" id="clientsSplit"><div class="tbl-wrap" id="clientsRoot"></div></div>
+      <aside class="insp insp-over client-insp" id="clientInspector" aria-label="Client details" hidden></aside>
+      <div hidden class="legacy">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
         <div class="filters-popover-wrap">
           <button class="btn btn-outline" onclick="toggleClientFiltersPopover()">
@@ -261,7 +264,7 @@
         <button class="btn btn-outline" style="color:var(--red);border-color:var(--red-bg);" onclick="bulkDeleteClients()">Delete selected</button>
       </div>
 
-      <div class="clients-split" id="clientsSplit">
+      <div class="clients-split" id="clientsSplitLegacy">
         <div class="panel clients-table-panel">
         <div class="table-scroll-wrap">
         <table id="clientsTable">
@@ -274,16 +277,16 @@
             <th class="sortable" onclick="setClientSort('danger')">Risk<span class="sort-arrow" id="sortArrow-danger"></span></th>
             <th>This week</th>
           </tr></thead>
-          <tbody id="clientsTbody"></tbody>
+          <tbody id="clientsTbodyLegacy"></tbody>
         </table>
         </div>
         <div class="table-pagination" id="clientsPagination"></div>
       </div>
-        <aside class="client-insp" id="clientInspector" aria-label="Client details" hidden></aside>
+        <aside class="client-insp" id="clientInspectorLegacy" aria-label="Client details" hidden></aside>
       </div>
     </div>
+    </div>
 
-    <!-- PAST IMPROVEMENTS -->
     <div class="view" id="view-health">
       <div class="split" id="healthRoot"></div>
     </div>
@@ -1449,6 +1452,15 @@
 
     <!-- CLIENT DETAIL -->
     <div class="view" id="view-clientdetail">
+      <div class="content" id="cdRoot">
+        <div id="cdTop"></div>
+        <div class="cd-tab" data-tab="overview"><div class="cols" style="margin-top:4px"><div class="col-main" id="cdOverviewMain"></div><aside class="col-side" style="padding-top:28px" id="cdOverviewSide"></aside></div></div>
+        <div class="cd-tab" data-tab="improvements" hidden><div id="cdImpTab"></div></div>
+        <div class="cd-tab" data-tab="time" hidden><div id="cdTimeTab"></div></div>
+        <div class="cd-tab" data-tab="notes" hidden><div id="cdNotesTab"></div></div>
+        <div class="cd-tab" data-tab="activity" hidden><div class="h2"><h2>Activity</h2></div><div class="grp cd-activity" id="cdActivityHistory"></div></div>
+      </div>
+      <div hidden class="legacy">
       <div class="topbar">
         <button type="button" class="back-btn" onclick="switchView('clients')"><svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M165.66,202.34a8,8,0,0,1-11.32,11.32l-80-80a8,8,0,0,1,0-11.32l80-80a8,8,0,0,1,11.32,11.32L91.31,128Z"/></svg>Back to Clients</button>
         <div class="topbar-right">
@@ -1470,7 +1482,7 @@
           <div class="cd-h2"><h2>Waiting on the client</h2><span class="row-link" onclick="openNewReminderModal(currentDetailClientId)">New Reminder</span></div>
           <div class="cd-grp" id="cdReminders"></div>
           <div class="cd-h2"><h2>Activity</h2></div>
-          <div class="cd-grp cd-pad" id="cdActivityHistory"></div>
+          <div class="cd-grp cd-pad" id="cdActivityHistoryLegacy"></div>
         </div>
         <aside class="cd-side">
           <section class="cd-panel"><h3>Details</h3><div id="cdMetrics"></div></section>
@@ -1478,6 +1490,7 @@
           <section class="cd-panel"><h3>My notes<span class="row-link" onclick="openNoteModalFromDetail()">New Note</span></h3><div id="cdNotes"></div></section>
         </aside>
       </div>
+    </div>
     </div>
 
     <!-- ASSISTANT (full tab) -->
@@ -1669,6 +1682,9 @@
 <script src="js/features/approval-queue.js"></script>
 <script src="js/features/this-week.js"></script>
 <script src="js/features/review.js"></script>
+<script src="js/features/health.js"></script>
+<script src="js/features/clients-canvas.js"></script>
+<script src="js/features/client-page.js"></script>
 <script src="js/features/settings.js"></script>
 <script src="js/features/sheet-sync.js"></script>
 <script src="js/features/team.js"></script>

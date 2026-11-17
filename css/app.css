@@ -122,3 +122,27 @@ button.cb:hover { box-shadow: inset 0 0 0 1.5px var(--label-2); }
 .ok-ic { display: inline-flex; width: 18px; height: 18px; color: var(--green); flex: 0 0 auto; }
 .ok-ic svg { width: 18px; height: 18px; }
 .msg { color: inherit; text-decoration: none; }
+/* All Clients */
+#view-clients { position: relative; }
+.tbl-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 24px; }
+.pop-wrap { display: inline-flex; align-items: center; gap: 0; height: 26px; padding-left: 10px; border-radius: 6px; background: var(--fill-2); font-size: 13px; font-weight: 400; color: var(--label); }
+.pop-wrap select.pop { height: 26px; padding: 0 24px 0 4px; border: 0; background-color: transparent; box-shadow: none; font-size: 13px; color: var(--label); }
+.tbl th[onclick] { cursor: default; }
+.tbl tr.client-row { cursor: default; }
+.client-insp[hidden] { display: none; }
+.client-insp { position: fixed; top: 0; right: 0; bottom: 0; width: min(440px, 100vw); z-index: 40; border-radius: 0; background: var(--side-solid); padding: 22px 24px 32px; overflow: auto;
+  box-shadow: 0 0 0 .5px var(--sep-strong), -16px 0 48px rgba(0,0,0,.18); animation: insIn 240ms cubic-bezier(.32,.72,0,1); }
+@keyframes insIn { from { transform: translateX(100%); } }
+.insp-acts { display: flex; flex-direction: column; gap: 1px; margin: 0 -9px; }
+.insp-acts .mi { display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 9px; border: 0; border-radius: 6px; background: transparent; color: var(--label); font-size: 13px; text-align: left; text-decoration: none; }
+.insp-acts .mi svg { width: 16px; height: 16px; color: var(--label-2); }
+.insp-acts .mi:hover { background: var(--fill); }
+.insp-acts .mi.danger, .insp-acts .mi.danger svg { color: var(--red); }
+.pop-wrap select.pop { border: 0 !important; width: auto !important; min-width: 0; box-shadow: none !important; }
+/* client page activity log (rows written by loadClientActivityHistory) */
+.cd-activity .log-row { display: flex; gap: 12px; padding: 9px 14px; font-size: 13px; border-top: .5px solid var(--sep); }
+.cd-activity .log-row:first-child { border-top: 0; }
+.cd-activity .log-time { width: 120px; flex: 0 0 auto; font-size: 12px; color: var(--label-2); }
+.cd-activity .tag { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 4px; background: var(--fill-2); font-size: 11px; font-weight: 600; color: var(--label-2); }
+.cd-activity .empty { padding: 20px 14px; text-align: left; }
+.row .ib.act { width: 26px; height: 24px; }
