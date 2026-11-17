@@ -181,6 +181,7 @@ async function fullRefresh(showFeedback){
   await Promise.all([
     loadMyNotes(), loadTimeEntries(), loadMyTasks(),
     loadNotifications(), loadCalendarEvents(), loadClientReminders(),
+    loadUpdateHistory(), loadHealthHandled(),
   ]);
   renderAll();
   updateTasksNavBadge();
@@ -189,7 +190,7 @@ async function fullRefresh(showFeedback){
   if(syncEl) syncEl.textContent = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
   if(showFeedback && btn){ btn.disabled = false; btn.innerHTML = refreshIcon + ' Refresh'; showToast('success','Synced','Loaded the latest data from the team.'); }
 }
-function renderAll(){ renderKpis(); renderClientsTable(); renderClientDetail(); renderQueue(); renderTeamQueue(); renderLog(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); syncDarkModeToggleUI(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); renderTasks(); renderCalendar(); renderTimesheet(); renderTrash(); renderReminders(); }
+function renderAll(){ renderKpis(); renderClientsTable(); renderClientDetail(); renderQueue(); renderTeamQueue(); renderLog(); renderTeam(); renderAttentionList(); renderWhoAmI(); renderClientOptionsSelects(); applyRoleVisibility(); syncDarkModeToggleUI(); populateNotesClientFilter(); renderNotes(); populateTimeClientSelects(); renderOverviewChart(); renderBudgetAlerts(); renderImprovementsHistory(); renderTasks(); renderCalendar(); renderTimesheet(); renderTrash(); renderReminders(); if(typeof renderHealth === 'function') renderHealth(); if(typeof updateShellBadges === 'function') updateShellBadges(); }
 
 function switchTrashTab(name){
   document.querySelectorAll('#trashTabsBar .icon-tab').forEach(t=>t.classList.toggle('active', t.dataset.ttab===name));

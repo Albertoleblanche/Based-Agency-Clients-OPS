@@ -35,8 +35,8 @@ function applyRoleVisibility(){
     // and act on their own drafts directly from their own section inside
     // Team Queue instead (see queueCardHtml()'s canSkipApproval branch),
     // so the separate personal queue has nothing left for them to do here.
-    approveQueueNavItem.style.display = canApprove() ? 'none' : 'flex';
-    if(canApprove() && document.getElementById('view-approve')?.classList.contains('active')){ switchView('teamqueue'); }
+    // This Week is for everyone: members see their clients, approvers see the whole team's.
+    approveQueueNavItem.style.display = 'flex';
   }
   const claudeNavItem = document.getElementById('claudeNavItem');
   const claudeFloatBtn = document.getElementById('claudeFloatBtn');
@@ -117,10 +117,11 @@ function populateReportMemberFilter(){
 
 const VIEW_TITLES = {
   focusreports: ['Focus Reports', 'Every weekly brief on what needs the team'],
-  clients: ['All Clients', 'Everyone you work for, with their risk and this week’s update'],
+  clients: ['All Clients', ''],
+  health: ['Health', ''],
   improvements: ['Past Improvements', "The team's full history of client work, searchable by date"],
-  approve: ['Review', 'Your clients’ drafts, riskiest first'],
-  teamqueue: ['Team Queue', 'Every draft on the team, riskiest first'],
+  approve: ['This Week', ''],
+  teamqueue: ['Review', ''],
   notes: ['Notes', "Private to you — improvements you're planning or want to get to. Nobody else on the team can see these."],
   tasks: ['Tasks', 'Assign tasks to anyone on the team — only you and the other person can see it'],
   'task-archive': ['Task Archive', "A record of everything the team has finished — search or filter to find anything"],
@@ -345,7 +346,8 @@ async function openScreenFromAddress(hash){
 
 async function switchView(name){
   closeMobileNav();
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name));
+  document.querySelectorAll('.nav-item').forEach(n=>{ const on = n.dataset.view===name; n.classList.toggle('active', on); n.classList.toggle('on', on); if(on) n.setAttribute('aria-current','page'); else n.removeAttribute('aria-current'); });
+  if(typeof setToolbarActions === 'function') setToolbarActions(name);
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
   syncAddressToView(name);

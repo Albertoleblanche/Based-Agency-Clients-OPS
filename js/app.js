@@ -146,7 +146,7 @@ async function showApp(session){
       loadNotifications(), loadCalendarEvents(),
       loadDangerHistory().then(seedDangerHistoryIfEmpty),
     ]);
-    document.getElementById('appRoot').style.display = 'grid';
+    document.getElementById('appRoot').style.display = 'flex';
     renderAll();
     document.getElementById('loginOverlay').style.display = 'none';
     updateTasksNavBadge();

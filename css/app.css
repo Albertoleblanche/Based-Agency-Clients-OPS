@@ -1,0 +1,124 @@
+/* Based Radar — the app shell on top of mac.css (the canvas stylesheet, copied as-is).
+   mac.css draws the window, sidebar, toolbar, lists and controls exactly as the canvas does;
+   this file only adapts it to a real, full-window app: the window fills the screen, views
+   switch, menus and sheets open, toasts appear, and form fields everywhere get one look. */
+
+html, body { height: 100%; margin: 0; }
+body.mac { background: var(--window); overflow: hidden; }
+body.mac.theme-switching, body.mac.theme-switching * { transition: background-color 220ms ease, color 220ms ease, border-color 220ms ease !important; }
+
+/* ---------- window ---------- */
+.win.app-win { max-width: none; width: 100vw; height: 100vh; height: 100dvh; margin: 0; border-radius: 0; box-shadow: none; flex-wrap: nowrap; }
+.app-win .side { flex: 0 0 232px; }
+.side-top { flex: 0 0 auto; height: 28px; -webkit-app-region: drag; }
+.app-win .main { flex: 1 1 auto; min-width: 0; height: 100%; }
+body.sidebar-collapsed .app-win .side { display: none; }
+.views { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; position: relative; }
+.view { display: none; flex: 1 1 auto; min-height: 0; flex-direction: column; }
+.view.active { display: flex; }
+.view > .content { flex: 1 1 auto; }
+.view > .split { flex: 1 1 auto; min-height: 0; flex-wrap: nowrap; }
+.split > .list, .split > .detail, .split > .tbl-wrap { height: auto; }
+.tb-actions { display: flex; align-items: center; gap: 8px; }
+.tb-actions:empty { display: none; }
+.tb .seg { margin: 0 auto; }
+
+/* sidebar footer: the account button opens the account menu */
+.side-me { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; padding: 4px; margin: -4px; border: 0; border-radius: 8px; background: transparent; text-align: left; cursor: default; }
+.side-me:hover { background: var(--fill); }
+.side-me .who { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.side-me .who b { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.side-me .who span { font-size: 11px; color: var(--label-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.av-img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex: 0 0 auto; }
+.src-i { cursor: default; }
+#navNotesBadge, #navCalendarBadge, #navPendingBadge { display: none !important; }
+
+/* ---------- menus (New, account, notifications, row menus) ---------- */
+.menu { position: absolute; z-index: 60; min-width: 220px; padding: 5px; border-radius: 10px; background: var(--menu); -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6); box-shadow: var(--shadow-pop); }
+.menu .mi { display: flex; align-items: center; gap: 10px; width: 100%; height: 30px; padding: 0 9px; border: 0; border-radius: 6px; background: transparent; color: var(--label); font-size: 13px; text-align: left; cursor: default; }
+.menu .mi svg { width: 16px; height: 16px; color: var(--label-2); flex: 0 0 auto; }
+.menu .mi:hover, .menu .mi.on { background: var(--select); }
+.menu .mi .kbd { margin-left: auto; }
+.menu .mi .sw { margin-left: auto; }
+.menu .mi.danger, .menu .mi.danger svg { color: var(--red); }
+.menu .msep { height: .5px; margin: 5px 6px; background: var(--sep); }
+.menu .mh { padding: 6px 9px 4px; font-size: 11px; font-weight: 600; color: var(--label-2); }
+.menu .msync { display: flex; align-items: center; gap: 6px; padding: 6px 9px 3px; font-size: 11px; color: var(--label-2); }
+.menu .msync .dot { width: 6px; height: 6px; }
+.side-menu { left: 6px; right: 6px; bottom: 52px; min-width: 0; }
+.new-menu { right: 0; top: 34px; }
+.notif-panel { right: 0; top: 34px; width: 360px; max-height: 70vh; overflow: auto; padding: 0; }
+.notif-panel-head { position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 8px; background: var(--menu); border-bottom: .5px solid var(--sep); }
+.notif-panel-head b { font-size: 13px; font-weight: 600; }
+.notif-bell-btn { position: relative; }
+.notif-badge { position: absolute; top: 2px; right: 3px; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px; background: var(--red); color: #fff; font-size: 10px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+.btn.sm { height: 24px; padding: 0 9px; font-size: 12px; }
+.btn-q.btn.sm { padding: 0 6px; }
+.timerpill { border: 0; cursor: default; }
+.timerpill b { font-weight: 500; }
+
+/* ---------- sign-in window ---------- */
+.signin-desk { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 40px; background: var(--desk); }
+.signin { padding: 22px 12px 28px; }
+.signin-err { width: 100%; margin: -8px 0 12px; padding: 8px 10px; border-radius: 8px; background: var(--red-soft); color: var(--red); font-size: 12px; text-align: left; }
+.signin-b .btn-q { width: 100%; justify-content: center; }
+.app-loading-spinner { width: 22px; height: 22px; margin: 4px auto 0; border-radius: 50%; border: 2px solid var(--fill-3); border-top-color: var(--label-2); animation: spin 800ms linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- sheets: every modal opens as a sheet from the toolbar ---------- */
+.modal-overlay { position: fixed; inset: 0; z-index: 200; display: flex; justify-content: center; align-items: flex-start; padding: 64px 16px 24px; background: var(--scrim); animation: fadeIn 160ms ease-out; }
+.modal-card { position: relative; width: 100%; max-height: calc(100vh - 96px); overflow: auto; border-radius: 14px; background: var(--window); box-shadow: var(--shadow-win); padding: 22px 24px 20px; animation: sheetIn 240ms cubic-bezier(.32,.72,0,1); }
+@keyframes fadeIn { from { opacity: 0; } }
+@keyframes sheetIn { from { transform: translateY(-14px); opacity: 0; } }
+.modal-card h2, .modal-card h3, .modal-title { margin: 0 0 16px; font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+.modal-actions, .sheet-a { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+/* ---------- fields: one look for every input in the app ---------- */
+.mac input[type="text"], .mac input[type="email"], .mac input[type="password"], .mac input[type="number"], .mac input[type="url"],
+.mac input[type="date"], .mac input[type="time"], .mac input[type="search"], .mac input[type="tel"], .mac input:not([type]), .mac select, .mac textarea {
+  height: 28px; padding: 0 9px; border-radius: 7px; border: .5px solid var(--sep-strong); background: var(--field); color: var(--label);
+  font: inherit; font-size: 13px; outline: none; box-sizing: border-box; }
+.mac textarea { height: auto; min-height: 72px; padding: 7px 9px; line-height: 1.5; resize: vertical; }
+.mac select { padding-right: 26px; -webkit-appearance: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5'/%3E%3Cpath d='m7 9 5-5 5 5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center; }
+.mac input:focus, .mac select:focus, .mac textarea:focus { border-color: var(--label-3); box-shadow: 0 0 0 3px var(--fill-2); }
+.mac input::placeholder, .mac textarea::placeholder { color: var(--label-3); }
+.mac input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--label-2); }
+.mac label { font-size: 12px; font-weight: 500; color: var(--label-2); }
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.field > input, .field > select, .field > textarea { width: 100%; }
+
+/* ---------- toasts ---------- */
+.toast-stack { position: fixed; z-index: 300; left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+.toast { pointer-events: auto; display: flex; align-items: flex-start; gap: 10px; min-width: 300px; max-width: 440px; padding: 11px 14px; border-radius: 12px;
+  background: var(--menu); -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6); box-shadow: var(--shadow-pop); font-size: 13px; animation: sheetIn 220ms cubic-bezier(.32,.72,0,1); }
+.toast-title { font-weight: 600; }
+.toast-msg, .toast-body { color: var(--label-2); font-size: 12px; margin-top: 1px; }
+.toast-close { margin-left: auto; color: var(--label-3); cursor: default; }
+
+/* ---------- empty + loading states ---------- */
+.empty { padding: 48px 24px; text-align: center; color: var(--label-2); font-size: 13px; }
+.empty b { display: block; color: var(--label); font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+
+/* hidden for good: the floating Assistant button (the Assistant is ⌘J and the sidebar) */
+.claude-float-btn, .claude-float-panel, .floating-timer-pill { display: none !important; }
+
+/* canvas controls drawn as real buttons */
+button.search, button.cb, button.timerpill, .side-me, button.mi { border: 0; font: inherit; cursor: default; }
+button.search { text-align: left; }
+button.cb { background: transparent; padding: 0; }
+button.cb:hover { box-shadow: inset 0 0 0 1.5px var(--label-2); }
+.row .tx[onclick], .row[onclick] { cursor: default; }
+.mono.lg { width: 40px; height: 40px; border-radius: 10px; font-size: 14px; }
+.wk { color: inherit; text-decoration: none; }
+.wk .ud { width: 7px; height: 7px; }
+.stp .m svg { stroke-width: 3; }
+.rv-due { display: flex; align-items: center; gap: 8px; padding: 10px 14px 8px 28px; font-size: 12px; color: var(--label-2); }
+.rv-due svg { width: 14px; height: 14px; flex: 0 0 auto; }
+.rv-due b { color: var(--label); font-weight: 600; }
+.rv-ctx { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 0; border-bottom: .5px solid var(--sep); font-size: 12px; color: var(--label-2); }
+.rv-edit { width: 100%; min-height: 320px; font-size: 14px; line-height: 1.6; }
+.ok-ic { display: inline-flex; width: 18px; height: 18px; color: var(--green); flex: 0 0 auto; }
+.ok-ic svg { width: 18px; height: 18px; }
+.msg { color: inherit; text-decoration: none; }

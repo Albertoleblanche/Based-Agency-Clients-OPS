@@ -1,173 +1,115 @@
-// Today: the first screen. One sentence that says what needs you, then
-// three short lists, most urgent first — drafts waiting, clients at risk,
-// work due today — with the week's progress, today's agenda and your time
-// on the side. Redrawn whenever renderKpis() runs, so it stays as live as
-// the sidebar badges.
+// Today: what needs you now, in order — updates behind for the send, clients whose health
+// changed, drafts waiting for you — with your tasks due today and today's calendar on the side.
+// Exactly the canvas "Today" board. Redrawn whenever data changes.
 
-function todayInitials(name){
-  const words = String(name || '').replace(/&/g, ' ').trim().split(/\s+/).filter(Boolean);
-  return ((words[0] || '?').charAt(0) + (words[1] ? words[1].charAt(0) : '')).toUpperCase();
-}
-
-function todayMono(name){
-  return `<span class="t-mono" aria-hidden="true">${escapeHtml(todayInitials(name))}</span>`;
-}
-
-function todayDot(color, label, extraClass){
-  return `<span class="t-st${extraClass ? ' ' + extraClass : ''}"><span class="t-dot" style="background:${color}"></span>${escapeHtml(label)}</span>`;
-}
-
-const TODAY_CHEVRON = '<svg class="t-go" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M184.49,136.49l-80,80a12,12,0,0,1-17-17L159,128,87.51,56.49a12,12,0,1,1,17-17l80,80A12,12,0,0,1,184.49,136.49Z"/></svg>';
-
+const CHEV = () => icon('caret-right', { cls: 'go', weight: 'bold' });
 function todayPlural(n, one, many){ return `${n} ${n === 1 ? one : (many || one + 's')}`; }
 
-// Drafts that are waiting on the person looking at the screen. Approvers
-// see what the team has sent for review (the same rule Team Queue uses)
-// plus their own drafts; everyone else sees their own drafts that are
-// written and ready to send for review.
+// Drafts waiting on the person looking at the screen. Approvers: what the team sent for
+// review plus their own drafts. Everyone else: their own drafts that are written.
 function todayWaitingDrafts(){
-  const me = myName();
-  const approver = canApprove();
-  const out = [];
-  attentionEligibleClients().forEach(c => {
-    (c.drafts || []).forEach(d => {
-      if(d.draftStatus !== 'pending') return;
-      const mine = d.author === me;
-      if(approver ? (mine || d.readyToNotify === true) : mine){
-        const count = (d.draftImprovementIds || []).length || c.improvements.filter(i => i.author === d.author).length;
-        out.push({ c, d, count });
-      }
-    });
-  });
-  out.sort((a, b) => (b.c.danger - a.c.danger) || (new Date(a.d.draftPendingSince || 0) - new Date(b.d.draftPendingSince || 0)));
+  const me = myName(), approver = canApprove(), out = [];
+  attentionEligibleClients().forEach(c => (c.drafts || []).forEach(d => {
+    if(d.draftStatus !== 'pending') return;
+    const mine = d.author === me;
+    if(approver ? (mine || d.readyToNotify === true) : mine){
+      const count = (d.draftImprovementIds || []).length || c.improvements.filter(i => i.author === d.author).length;
+      out.push({ c, d, count });
+    }
+  }));
+  out.sort((a, b) => new Date(a.d.draftPendingSince || 0) - new Date(b.d.draftPendingSince || 0));
   return out;
 }
+function myClientsFilter(c){ return canApprove() || clientOwner(c) === myName(); }
 
-function todayLastSent(c){
-  const sent = (c.drafts || []).map(d => d.draftSentAt).filter(Boolean).sort().pop();
-  return sent ? new Date(sent) : null;
-}
-
-function todayWeekProgress(){
-  const weekStart = getWeekStart(new Date());
-  const counts = { sent: 0, approved: 0, review: 0, none: 0 };
-  const list = attentionEligibleClients();
-  list.forEach(c => {
-    const drafts = c.drafts || [];
-    if(drafts.some(d => d.draftSentAt && new Date(d.draftSentAt) >= weekStart)) counts.sent++;
-    else if(drafts.some(d => d.draftStatus === 'approved' && !d.draftSentAt)) counts.approved++;
-    else if(drafts.some(d => d.draftStatus === 'pending')) counts.review++;
-    else counts.none++;
-  });
-  return { counts, total: list.length };
+async function remindHolder(clientId){
+  const c = clients.find(x => x.id === clientId); if(!c) return;
+  const w = clientWeek(c), who = w.holder === 'approvers' ? null : profileByName(w.holder || w.owner);
+  if(!who){ showToast('info', 'Nobody to remind', 'This update is waiting on approvers.'); return; }
+  const cyc = updateCycle();
+  await sendNotification(who.id, 'update_behind', `${c.name}: this week’s update is behind`,
+    `${w.behind != null ? STEP_NAMES[w.behind] + ' was due ' + fmtDay(Object.values(cyc.checkpoints)[w.behind]) + ' ' + fmtTime(Object.values(cyc.checkpoints)[w.behind]) : 'Due soon'} · updates go out ${cyc.sendLabel}.`, 'approve', c.id);
+  showToast('success', `Reminded ${firstName(who.name)}`, 'In the app, and on Slack if they use it.');
 }
 
 function renderToday(){
   const root = document.getElementById('todayRoot');
-  if(!root) return;
-  const now = new Date();
-  const todayStr = toDateStr(now);
-  const approver = canApprove();
-
-  // --- waiting drafts
+  if(!root || typeof clients === 'undefined') return;
+  const cyc = updateCycle(), list = attentionEligibleClients();
+  const sum = weekSummary(list);
+  const mine = sum.ws.filter(w => myClientsFilter(w.c));
+  const behind = mine.filter(w => w.state === 'behind' || w.state === 'late')
+    .sort((a, b) => (b.behind ?? -1) - (a.behind ?? -1) || (b.c.importance || 0) - (a.c.importance || 0));
+  const health = list.filter(myClientsFilter).map(c => ({ c, h: clientHealth(c) })).filter(x => x.h.level !== 'g')
+    .sort((a, b) => (a.h.level === 'r' ? 0 : 1) - (b.h.level === 'r' ? 0 : 1) || (b.h.since || 0) - (a.h.since || 0));
+  const atRisk = health.filter(x => x.h.level === 'r').length;
   const waiting = todayWaitingDrafts();
-  const waitingRows = waiting.slice(0, 5).map(({ c, d, count }) => {
-    const by = d.author === myName() ? 'Your draft' : `Weekly update by ${escapeHtml(d.author)}`;
-    const since = d.draftPendingSince ? timeAgo(d.draftPendingSince) : '';
-    const go = approver ? `switchView('teamqueue')` : `goToClientInQueue('${c.id}','pending')`;
-    return `<div class="t-row" role="button" tabindex="0" onclick="${go}">${todayMono(c.name)}
-      <div class="t-tx"><span class="t-t">${escapeHtml(c.name)}</span><span class="t-s">${by} · ${todayPlural(count, 'improvement')}</span></div>
-      <div class="t-r">${todayDot('var(--blue)', 'Draft ready')}${since ? `<span>${escapeHtml(since)}</span>` : ''}${TODAY_CHEVRON}</div></div>`;
-  }).join('');
+  const day = cyc.sendDayName, sendTime = fmtTime(cyc.send);
 
-  // --- clients at risk
-  const risky = attentionEligibleClients().filter(c => (c.danger || 0) >= 4)
-    .sort((a, b) => (b.danger - a.danger) || (b.importance - a.importance));
-  const riskRows = risky.slice(0, 5).map(c => {
-    const last = todayLastSent(c);
-    const days = last ? Math.floor((now - last) / 86400000) : null;
-    const why = last ? (days === 0 ? 'Update sent today' : `No update in ${todayPlural(days, 'day')}`) : 'No update sent yet';
-    return `<div class="t-row" role="button" tabindex="0" onclick="openClientDetail('${c.id}')">${todayMono(c.name)}
-      <div class="t-tx"><span class="t-t">${escapeHtml(c.name)}</span><span class="t-s">${escapeHtml(why)} · importance ${c.importance} of 10</span></div>
-      <div class="t-r">${todayDot('var(--red)', 'Risk ' + c.danger, 't-red')}${TODAY_CHEVRON}</div></div>`;
-  }).join('');
+  let h1;
+  if(sum.sent === sum.total && sum.total) h1 = `All ${sum.total} updates are sent`;
+  else if(behind.length) h1 = `${todayPlural(behind.length, 'update')} ${behind.length === 1 ? 'is' : 'are'} ${cyc.now > cyc.send ? 'late' : 'behind for ' + day}`;
+  else if(waiting.length) h1 = `${todayPlural(waiting.length, 'update')} ${waiting.length === 1 ? 'is' : 'are'} waiting for you`;
+  else h1 = `You’re all caught up for ${day}`;
+  const subBits = [`<b>${sum.sent} of ${sum.total}</b> sent`, cyc.now > cyc.send ? 'the rest are late' : `the rest go out ${day} at ${sendTime}`];
+  if(atRisk) subBits.push(`<b>${atRisk}</b> ${atRisk === 1 ? 'client' : 'clients'} at risk`);
+  if(waiting.length) subBits.push(`<b>${waiting.length}</b> ${waiting.length === 1 ? 'draft' : 'drafts'} waiting for your review`);
 
-  // --- due today (and overdue)
-  const due = tasks.filter(t => t.assigneeId === currentUser?.id && t.status !== 'done' && !t.cancelledAt && t.dueDate && t.dueDate <= todayStr)
+  const behindRows = behind.map(w => {
+    const sub = w.done === 0 ? `${w.note} · ${w.owner || '—'}` : w.note;
+    const who = w.holder && w.holder !== 'approvers' ? w.holder : w.owner;
+    return `<a class="row" href="#approve" onclick="openWeekClient('${w.c.id}');return false;">${monoHtml(w.c)}<div class="tx"><span class="t">${escapeHtml(w.c.name)}</span><span class="s">${escapeHtml(sub)}</span></div>
+<div class="r">${stepsHtml(w)}${who ? avHtml(who) : ''}<button class="btn act sm" onclick="event.stopPropagation();event.preventDefault();remindHolder('${w.c.id}')">Remind ${escapeHtml(firstName(who) || '')}</button>${CHEV()}</div></a>`;
+  }).join('');
+  const healthRows = health.slice(0, 6).map(({ c, h }) => `<a class="row" href="#health" onclick="openHealthClient('${c.id}');return false;">${monoHtml(c)}<div class="tx"><span class="t">${escapeHtml(c.name)}</span><span class="s">${escapeHtml(shortSignal(h))}</span></div>
+<div class="r">${hstateHtml(h.level)}<span style="width:52px;text-align:right">${relDay(h.since || rNow())}</span>${CHEV()}</div></a>`).join('');
+  const waitRows = waiting.slice(0, 6).map(({ c, d, count }) => `<a class="row" href="#teamqueue" onclick="openReviewDraft('${c.id}','${jsArg(d.author)}');return false;">${monoHtml(c)}<div class="tx"><span class="t">${escapeHtml(c.name)}</span><span class="s">${escapeHtml(d.author)} · ${todayPlural(count, 'improvement')}</span></div>
+<div class="r"><span class="st"><span class="dot blue"></span>Draft ready</span><span style="width:76px;text-align:right">Waiting ${fmtWait(d.draftPendingSince || rNow())}</span>${CHEV()}</div></a>`).join('');
+
+  const todayStr = toDateStr(new Date());
+  const due = (typeof tasks !== 'undefined' ? tasks : []).filter(t => t.assigneeId === currentUser?.id && t.status !== 'done' && !t.cancelledAt && t.dueDate && t.dueDate <= todayStr)
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-  const dueRows = due.slice(0, 6).map(t => {
-    const client = clients.find(c => c.id === t.clientId);
-    const overdue = t.dueDate < todayStr;
-    const when = overdue ? `<span class="t-red">${escapeHtml(new Date(t.dueDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }))}</span>` : 'Today';
-    return `<div class="t-row t-sm" role="button" tabindex="0" onclick="openTaskDetailModal('${t.id}')"><span class="t-cb" aria-hidden="true"></span>
-      <div class="t-tx"><span class="t-t t-n">${escapeHtml(t.title)}</span><span class="t-s">${client ? escapeHtml(client.name) : 'No client'}</span></div>
-      <div class="t-r">${t.priority === 'high' ? todayDot('var(--brand)', 'High') : ''}<span>${when}</span></div></div>`;
+  const dueRows = due.map(t => {
+    const c = clients.find(x => x.id === t.clientId);
+    const when = t.dueDate < todayStr ? `<span class="t-red">Due ${t.dueDate === toDateStr(addDays(new Date(), -1)) ? 'yesterday' : fmtShortDate(new Date(t.dueDate + 'T12:00:00'))}</span>` : (t.dueTime ? fmtTime(new Date(t.dueDate + 'T' + t.dueTime)) : 'Today');
+    return `<div class="row sm"><button class="cb" role="checkbox" aria-checked="false" aria-label="Mark ${escapeHtml(t.title)} done" onclick="moveTaskToStatus('${t.id}','done')"></button>
+<div class="tx" onclick="openTaskDetailModal('${t.id}')"><span class="t" style="font-weight:400">${escapeHtml(t.title)}</span><span class="s">${c ? escapeHtml(c.name) + ' · ' : ''}${when}</span></div></div>`;
+  }).join('');
+  const now = rNow();
+  const evs = (typeof calendarEvents !== 'undefined' ? calendarEvents : []).filter(e => !e.allDay && e.startAt && toDateStr(new Date(e.startAt)) === todayStr)
+    .sort((a, b) => new Date(a.startAt) - new Date(b.startAt));
+  const nextEv = evs.find(e => new Date(e.endAt || e.startAt) > now);
+  const evRows = evs.map(e => {
+    const past = new Date(e.endAt || e.startAt) <= now, next = e === nextEv, start = new Date(e.startAt);
+    const sub = next && start > now ? `Starts in ${fmtDuration(start - now).replace(' hours', ' h').replace(' hour', ' h').replace(' minutes', ' min').replace(' minute', ' min')}` : (e.description || '').split('\n')[0];
+    const link = (e.description || '').match(/https?:\/\/(meet\.google\.com|[a-z0-9.-]*zoom\.us|teams\.microsoft\.com)\/\S+/i);
+    const join = next && link ? `<div class="r"><a class="btn sm" href="${safeUrl(link[0])}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Join</a></div>` : '';
+    return `<div class="row sm"${past ? ' style="opacity:.45"' : ''} onclick="openEventDetailModal('${e.id}')"><span class="t-2" style="width:58px;flex:0 0 auto;font-size:12px">${fmtTime(start)}</span>
+<div class="tx"><span class="t" style="font-weight:${next ? 500 : 400}">${escapeHtml(e.title)}</span><span class="s">${escapeHtml(sub)}</span></div>${join}</div>`;
   }).join('');
 
-  // --- side: week progress
-  const { counts, total } = todayWeekProgress();
-  const pct = n => total ? (n / total * 100).toFixed(1) : 0;
-  const weekStart = getWeekStart(new Date());
-  const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6);
-  const fmtDay = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
-  // --- side: today's agenda
-  const agenda = calendarEvents.filter(e => {
-    if(toDateStr(new Date(e.startAt)) !== todayStr) return false;
-    return (e.attendeeIds || []).includes(currentUser?.id) || e.createdBy === currentUser?.id;
-  }).sort((a, b) => new Date(a.startAt) - new Date(b.startAt)).slice(0, 5);
-  const agendaHtml = agenda.length ? agenda.map(e => {
-    const t = e.allDay ? 'All day' : new Date(e.startAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    return `<div class="t-ag" role="button" tabindex="0" onclick="openEventDetailModal('${e.id}')"><time>${escapeHtml(t)}</time><div class="t-tx"><span class="t-t">${escapeHtml(e.title)}</span>${e.location ? `<span class="t-s">${escapeHtml(e.location)}</span>` : ''}</div></div>`;
-  }).join('') : `<p class="t-quiet">Nothing on your calendar today.</p>`;
-
-  // --- side: your time this week
-  const mine = timeEntries.filter(e => e.userId === currentUser?.id && e.date && e.date >= toDateStr(weekStart));
-  const totalMin = mine.reduce((s, e) => s + (e.minutes || 0), 0);
-  const byClient = {};
-  mine.forEach(e => { byClient[e.clientId || ''] = (byClient[e.clientId || ''] || 0) + (e.minutes || 0); });
-  const sorted = Object.entries(byClient).sort((a, b) => b[1] - a[1]);
-  const top = sorted.slice(0, 3);
-  const rest = sorted.slice(3).reduce((s, [, m]) => s + m, 0);
-  if(rest) top.push(['__rest', rest]);
-  const maxMin = Math.max(1, ...top.map(([, m]) => m));
-  const timeHtml = totalMin ? top.map(([id, m]) => {
-    const label = id === '__rest' ? 'Everything else' : (clients.find(c => c.id === id)?.name || 'No client');
-    return `<div class="t-bar-row"><div class="t-bar-l"><span>${escapeHtml(label)}</span><span class="t-num">${formatMinutes(m)}</span></div><div class="t-bar"><i style="width:${(m / maxMin * 100).toFixed(0)}%"></i></div></div>`;
-  }).join('') : `<p class="t-quiet">No time logged this week yet.</p>`;
-
-  // --- headline
-  let headline;
-  if(waiting.length) headline = approver ? `${todayPlural(waiting.length, 'update')} ${waiting.length === 1 ? 'is' : 'are'} waiting for you` : `${todayPlural(waiting.length, 'draft')} ${waiting.length === 1 ? 'is' : 'are'} ready to send for review`;
-  else if(risky.length) headline = `${todayPlural(risky.length, 'client')} need${risky.length === 1 ? 's' : ''} attention`;
-  else headline = 'You’re all caught up';
-  const subBits = [];
-  if(risky.length) subBits.push(`<b>${todayPlural(risky.length, 'client')}</b> at risk`);
-  subBits.push(`<b>${todayPlural(due.length, 'task')}</b> due`);
-  subBits.push(`${counts.sent} of ${total} clients updated this week`);
-
-  const section = (title, n, link, linkLabel, rows, empty) => `
-    <div class="t-h2"><h2>${title}${n ? `<span class="t-c">${n}</span>` : ''}</h2>${link ? `<a role="button" tabindex="0" onclick="${link}">${linkLabel}</a>` : ''}</div>
-    ${rows ? `<div class="t-grp">${rows}</div>` : `<div class="t-grp"><p class="t-quiet t-pad">${empty}</p></div>`}`;
-
-  root.innerHTML = `
-    <h1 class="t-lt">${escapeHtml(headline)}</h1>
-    <p class="t-sub">${subBits.join(' · ')}</p>
-    <div class="t-cols">
-      <div class="t-main">
-        ${section(approver ? 'Waiting for your review' : 'Ready to send for review', waiting.length, approver ? `switchView('teamqueue')` : `switchView('approve')`, approver ? 'Open Team Queue' : 'Open Review', waitingRows, 'Nothing is waiting on you.')}
-        ${section('Clients at risk', risky.length, `switchView('clients')`, 'All clients', riskRows, 'No client is at risk 4 or 5 right now.')}
-        ${section('Due today', due.length, `switchView('tasks')`, 'All tasks', dueRows, 'Nothing due today.')}
-      </div>
-      <aside class="t-side">
-        <section class="t-panel"><h3>This week’s updates<span>${fmtDay(weekStart)} – ${fmtDay(weekEnd)}</span></h3>
-          <div class="t-big">${counts.sent} <span>of ${total} clients sent</span></div>
-          <div class="t-track" role="img" aria-label="${counts.sent} sent, ${counts.approved} approved, ${counts.review} in review, ${counts.none} not started">
-            <i style="width:${pct(counts.sent)}%;background:var(--green)"></i><i style="width:${pct(counts.approved)}%;background:var(--purple)"></i><i style="width:${pct(counts.review)}%;background:var(--blue)"></i></div>
-          <div class="t-legend">${todayDot('var(--green)', counts.sent + ' sent')}${todayDot('var(--purple)', counts.approved + ' approved')}${todayDot('var(--blue)', counts.review + ' in review')}<span class="t-st"><span class="t-dot t-hollow"></span>${counts.none} not started</span></div>
-        </section>
-        <section class="t-panel"><h3>Today<span>${escapeHtml(now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }))}</span></h3>${agendaHtml}</section>
-        <section class="t-panel"><h3>Your time this week<span>${totalMin ? formatMinutes(totalMin) : '0h'}</span></h3>${timeHtml}</section>
-      </aside>
-    </div>`;
+  const section = (title, n, link, label, rows, empty) => `<div class="h2"><h2>${title}<span class="c">${n}</span></h2>${link ? `<a href="#${link}" onclick="switchView('${link}');return false;">${label}</a>` : ''}</div>
+<div class="grp">${rows || `<div class="row sm"><span class="s t-2" style="font-size:12px">${empty}</span></div>`}</div>`;
+  root.innerHTML = `<h1 class="lt">${escapeHtml(h1)}</h1>
+<p class="lt-sub">${subBits.join(' · ')}</p>
+<div class="cols">
+<div class="col-main">
+${section(`Behind for ${day}`, behind.length, 'approve', 'Open This Week', behindRows, `Nobody is behind. Next checkpoint: ${nextCheckpointText(cyc)}.`)}
+${section('Health changes', health.length, 'health', 'Open Health', healthRows, 'Every client looks healthy.')}
+${section(canApprove() ? 'Waiting for your review' : 'Your drafts', waiting.length, canApprove() ? 'teamqueue' : 'approve', canApprove() ? 'Open Review' : 'Open This Week', waitRows, 'Nothing is waiting for you.')}
+</div>
+<aside class="col-side">
+<div class="h2"><h2>Due today<span class="c">${due.length}</span></h2><a href="#tasks" onclick="switchView('tasks');return false;">All Tasks</a></div>
+<div class="grp flat">${dueRows || '<div class="row sm"><span class="s t-2" style="font-size:12px">Nothing due today.</span></div>'}</div>
+<div class="h2"><h2>Calendar<span class="c">Today</span></h2><a href="#calendar" onclick="switchView('calendar');return false;">Open Calendar</a></div>
+<div class="grp flat">${evRows || '<div class="row sm"><span class="s t-2" style="font-size:12px">No meetings today.</span></div>'}</div>
+</aside>
+</div>`;
+  if(currentViewName === 'overview') setToolbar('Today', new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }));
+}
+function nextCheckpointText(cyc){
+  const names = ['work logged', 'ready for review', 'approved', 'sent'];
+  const pts = [cyc.checkpoints.log, cyc.checkpoints.review, cyc.checkpoints.approve, cyc.checkpoints.send];
+  const i = pts.findIndex(p => p > cyc.now);
+  return i < 0 ? 'next week' : `${names[i]} by ${fmtDay(pts[i])} ${fmtTime(pts[i])}`;
 }

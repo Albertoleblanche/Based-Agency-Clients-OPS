@@ -205,7 +205,7 @@ function applyAppBranding(){
 // duplicating that as a second editable field here would just be
 // confusing about which one actually takes effect.
 const NAV_LABEL_DEFAULTS = {
-  overview: 'Today', focusreports: 'Focus Reports', clients: 'All Clients', approve: 'Review', teamqueue: 'Team Queue',
+  overview: 'Today', focusreports: 'Focus Reports', clients: 'All Clients', health: 'Health', approve: 'This Week', teamqueue: 'Review',
   notes: 'Notes', tasks: 'Tasks', reminders: 'Reminders', calendar: 'Calendar',
   time: 'Time', team: 'Team', trash: 'Recently Deleted', settings: 'Settings',
   aivisibility: 'AI Visibility',

@@ -133,7 +133,7 @@ document.addEventListener('contextmenu', (e) => {
 // ⌘/Ctrl+\ shows or hides the sidebar, ⌘/Ctrl+/ lists the shortcuts.
 // ⌘/Ctrl+K (search) lives with the command palette in navigation.js.
 function visibleNavItems(){
-  return [...document.querySelectorAll('.sidebar .nav-item[data-view]')].filter(isShown);
+  return [...document.querySelectorAll('#appSidebar .src .nav-item[data-view]')].filter(isShown);
 }
 
 function shortcutLabelForView(view){
@@ -157,7 +157,7 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     item.click();
   } else if(e.key === ',' && !e.shiftKey){
-    const settingsItem = document.querySelector('.sidebar .nav-item[data-view="settings"]');
+    const settingsItem = document.querySelector('#appSidebar .nav-item[data-view="settings"]');
     if(!isShown(settingsItem) || appModalOpen) return;
     e.preventDefault();
     settingsItem.click();

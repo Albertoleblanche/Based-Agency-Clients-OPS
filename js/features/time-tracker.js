@@ -210,6 +210,16 @@ function updateTimerDisplay(){
 // Keeps a persistent pill visible on every tab while a timer is running, so
 // leaving the Time Tracker page doesn't mean losing track of it.
 function updateFloatingTimerPill(timeStr){
+  // The running timer lives in the toolbar, as on the canvas (red dot · time · client).
+  const tb = document.getElementById('tbTimer');
+  if(tb){
+    tb.style.display = timerState.running ? 'inline-flex' : 'none';
+    if(timerState.running){
+      const tc = clients.find(x=>x.id===timerState.clientId);
+      document.getElementById('tbTimerTime').textContent = (timeStr || '0:00:00').replace(/^0(\d):/, '$1:');
+      document.getElementById('tbTimerClient').textContent = tc ? shortClientName(tc.name) : '';
+    }
+  }
   const pill = document.getElementById('floatingTimerPill');
   if(!pill) return;
   if(!timerState.running){ pill.style.display = 'none'; return; }

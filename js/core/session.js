@@ -13,7 +13,7 @@ async function initTheme(){
     const systemDark = !!(window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
     const pref = saved || (systemDark ? 'dark' : 'light');
     if(pref === 'dark') document.body.dataset.theme = 'dark';
-    else delete document.body.dataset.theme;
+    else document.body.dataset.theme = 'light';
     // Keep localStorage in sync so this device's early FOUC-prevention
     // script (which runs before login, with no access to Supabase) has
     // an accurate guess to paint with on the next load — but only for a
@@ -21,7 +21,7 @@ async function initTheme(){
     if(saved) localStorage.setItem('bda_theme', pref === 'dark' ? 'dark' : 'light');
     else localStorage.removeItem('bda_theme');
     watchSystemTheme();
-  }catch(e){ delete document.body.dataset.theme; }
+  }catch(e){ document.body.dataset.theme = 'light'; }
 }
 
 // While nobody has picked a theme, follow the system live — e.g. when
@@ -34,7 +34,7 @@ function watchSystemTheme(){
     const chosen = (myProfile && myProfile.theme != null) || localStorage.getItem('bda_theme');
     if(chosen) return;
     if(mq.matches) document.body.dataset.theme = 'dark';
-    else delete document.body.dataset.theme;
+    else document.body.dataset.theme = 'light';
     if(typeof syncDarkModeToggleUI === 'function') syncDarkModeToggleUI();
   };
   if(mq.addEventListener) mq.addEventListener('change', follow);
@@ -162,7 +162,7 @@ async function toggleDarkMode(){
   toggleDarkMode._t = setTimeout(()=> document.body.classList.remove('theme-switching'), 260);
   const isDark = document.body.dataset.theme === 'dark';
   const newTheme = isDark ? 'light' : 'dark';
-  if(isDark){ delete document.body.dataset.theme; }
+  if(isDark){ document.body.dataset.theme = 'light'; }
   else { document.body.dataset.theme = 'dark'; }
   try{ localStorage.setItem('bda_theme', newTheme); }catch(e){}
   syncDarkModeToggleUI();
@@ -186,7 +186,7 @@ function syncDarkModeToggleUI(){
 }
 
 document.addEventListener('click', function(e){
-  if(!e.target.closest('.sidebar-foot')) closeSidebarProfileMenu();
+  if(!e.target.closest('.side-foot')) closeSidebarProfileMenu();
 });
 
 function roleDisplayLabel(role){
@@ -210,16 +210,15 @@ function renderWhoAmI(){
       avatarEl.style.display = 'none';
       if(placeholderEl){
         placeholderEl.style.display = 'flex';
-        placeholderEl.textContent = myProfile && myProfile.name ? myProfile.name.trim().charAt(0).toUpperCase() : '?';
-        placeholderEl.style.background = myProfile && myProfile.name ? avatarColorForName(myProfile.name) : '';
-        placeholderEl.style.color = '#fff';
+        placeholderEl.textContent = myProfile && myProfile.name ? initialsOf(myProfile.name) : '?';
+        placeholderEl.className = 'av a' + (myProfile && myProfile.name ? avatarColorIndex(myProfile.name) : 1);
       }
     }
   }
   if(nameEl && roleEl){
     if(myProfile){
       nameEl.textContent = myProfile.name;
-      roleEl.textContent = myProfile.title || roleDisplayLabel(myProfile.role);
+      roleEl.textContent = `${(settings && settings.brandName) || 'Based Radar'} · ${roleDisplayLabel(myProfile.role)}`;
     } else {
       nameEl.textContent = '—'; roleEl.textContent = '';
     }
