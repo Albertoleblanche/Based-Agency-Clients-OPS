@@ -3,8 +3,8 @@
 
 const tourSteps = [
   { title: 'Welcome to Based Radar', body: 'A one-minute look at where everything lives. Skip anytime; the tour stays in the menu under your name.', icon: 'compass' },
-  { view: 'overview', title: 'Today', body: 'What needs you today: updates behind for this week, health changes, tasks due and the calendar.' },
-  { view: 'approve', title: 'This Week', body: 'Every client’s weekly update on its way out: logged, ready for review, approved, sent. The ones running behind come first.' },
+  { view: 'overview', title: 'Today', body: 'What needs you today: client updates due or overdue, health changes, tasks due and the calendar.' },
+  { view: 'approve', title: 'This Week', body: 'Every client gets one update a week, sent by an approver the day it’s ready. Overdue ones come first, then the ones due today.' },
   { view: 'teamqueue', title: 'Review', body: 'Drafts waiting for an approver. Read them, edit, and send.' },
   { view: 'focusreports', title: 'Focus Reports', body: 'A weekly brief on which clients need the team, and why.' },
   { view: 'clients', title: 'All Clients', body: 'Every client with its service, owner, hours and health. Open one to see its whole history.' },
@@ -15,7 +15,6 @@ const tourSteps = [
   { view: 'calendar', title: 'Calendar', body: 'Meetings, deadlines and the weekly send in one place, synced with Google Calendar.' },
   { view: 'time', title: 'Time', body: 'Start a timer for a client and it stays in the toolbar wherever you go. Reports and the daily summary are here too.' },
   { view: 'team', title: 'Team', body: 'Everyone on the team, their role and the clients they look after.' },
-  { view: 'claude', title: 'Assistant', body: 'Ask about your clients, drafts or time. It knows what the team has logged.' },
   { view: 'trash', title: 'Recently Deleted', body: 'Deleted notes and time wait here first, so a misclick is never permanent.' },
   { view: 'settings', title: 'Settings', body: 'The weekly schedule, client fields, AI, integrations and the notifications you get.' },
   { title: 'That’s the tour', body: 'Press ⌘K anytime to find a client or jump to a screen.', icon: 'check', isFinal: true },
@@ -81,8 +80,15 @@ function renderTourStep(){
 }
 function tourNext(){ if(tourIndex >= activeTourSteps.length - 1){ endTour(); return; } tourIndex++; renderTourStep(); }
 function tourPrev(){ if(tourIndex <= 0) return; tourIndex--; renderTourStep(); }
-function endTour(){
+function endTour(now){
   const card = document.getElementById('tourCard');
+  if(now !== true && card.style.display !== 'none' && typeof animateThen === 'function' && motionOK()){
+    if(card.dataset.leaving) return;
+    card.dataset.leaving = '1';
+    const t = getComputedStyle(card).transform, base = t && t !== 'none' ? t + ' ' : '';
+    animateThen(card, [{ opacity: 1, transform: base || 'none' }, { opacity: 0, transform: base + 'scale(.97)' }], 160, 'ease-in', () => { endTour(true); delete card.dataset.leaving; card.getAnimations?.().forEach(a => a.cancel()); });
+    return;
+  }
   card.style.display = 'none';
   card.classList.remove('tour-card-final', 'tour-card-centered');
   clearTourSpotlight();

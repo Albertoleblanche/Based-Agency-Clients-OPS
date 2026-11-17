@@ -22,9 +22,9 @@
 //      can never silently drift from what this real run actually does.
 //
 //   3. The weekly-update automations from Settings -> Updates (automatic
-//      drafts, reminders for whoever is behind, the scheduled send and the
-//      Monday summary) — see lib/update-automations.js. Each decides its
-//      own day from the team's schedule.
+//      drafts, reminders for overdue updates and the Monday summary) — see
+//      lib/update-automations.js. None of them ever emails a client:
+//      approvers send every update themselves.
 //
 // All of them run every invocation (after their own day-check
 // passes), independently, in their own try/catch — one failing (say, the
@@ -157,9 +157,8 @@ module.exports = async function handler(req, res) {
     const todayDow = new Date().getUTCDay();
     const result = { weeklyUpdates: null, emailDigest: null, proactiveInsights: null };
 
-    // The weekly-update automations (Settings -> Updates): scheduled send, reminders for
-    // whoever is behind, the Monday summary and automatic drafts. First, since the send is
-    // the one thing that's due at a set time. See lib/update-automations.js.
+    // The weekly-update automations (Settings -> Updates): reminders for overdue updates,
+    // the Monday summary and automatic drafts. See lib/update-automations.js.
     try {
       result.weeklyUpdates = await runUpdateAutomations(admin, settings, { started });
     } catch (e) {

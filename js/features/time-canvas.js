@@ -150,7 +150,7 @@ function renderTimesheet(){
     const isToday = d === today, total = list.reduce((s, e) => s + e.minutes, 0) + (isToday ? runningMinutes() : 0);
     const runRow = isToday && running ? `<div class="row sm"><div class="tx"><span class="t" style="font-weight:400">${escapeHtml(timerState.description || 'No description')}</span><span class="s">${[tc?.name, svc].filter(Boolean).map(escapeHtml).join(' · ')}</span></div><div class="r"><span class="st" style="color:var(--red)"><span class="dot red"></span>Running</span><span class="dur" id="tsRunDur" style="width:56px;text-align:right">${hmm(runningMinutes())}</span></div></div>` : '';
     const rows = runRow + list.map(tsRowHtml).join('');
-    return `<div class="h2"><h2>${dayLabel(d)}<span class="c">${hmLong(total)}</span></h2>${i === 0 ? `<a href="#" onclick="event.preventDefault();openManualEntryModal()">Add time manually</a>` : ''}</div>
+    return `<div class="h2"><h2>${dayLabel(d)}<span class="c">${hmLong(total)}</span></h2>${i === 0 ? `<a href="#" onclick="event.preventDefault();openManualEntryModal()">Add Time</a>` : ''}</div>
 <div class="grp">${rows || `<div class="row sm"><span class="t-2" style="font-size:13px">Nothing logged yet today.</span></div>`}</div>`;
   }).join('');
   const older = mine.some(e => e.date < since);

@@ -20,7 +20,9 @@ function confirmDialog(message, options){
 <h3 id="confirmDialogTitle">${escapeHtml(title)}</h3>${body ? `<p>${escapeHtml(body)}</p>` : ''}
 <div class="sheet-a"><button class="btn" id="confirmDialogCancelBtn">${escapeHtml(options.cancelLabel || 'Cancel')}</button><button class="btn ${destructive ? 'danger' : 'btn-p'}" id="confirmDialogOkBtn">${escapeHtml(options.confirmLabel || 'OK')}</button></div></div>`;
     function finish(result){
-      overlay.remove();
+      overlay.style.pointerEvents = 'none';
+      overlay.querySelector('.modal-card')?.animate?.([{ transform: 'none', opacity: 1 }, { transform: 'scale(.97)', opacity: 0 }], { duration: 140, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
+      typeof animateThen === 'function' ? animateThen(overlay, [{ opacity: 1 }, { opacity: 0 }], 160, 'ease-out', () => overlay.remove()) : overlay.remove();
       document.removeEventListener('keydown', onKeydown, true);
       if(previousFocus && typeof previousFocus.focus === 'function') previousFocus.focus();
       resolve(result);

@@ -11,8 +11,8 @@ function renderClientsTable(){
   const root = document.getElementById('clientsRoot');
   if(!root || typeof clients === 'undefined') return;
   const ac = activeClients();
-  const rows = ac.map(c => ({ c, h: clientHealth(c), w: clientWeek(c), owner: clientOwner(c) }));
-  const needs = rows.filter(r => r.h.level !== 'g'), behind = rows.filter(r => r.w.state === 'behind' || r.w.state === 'late');
+  const rows = ac.map(c => ({ c, h: clientHealth(c), w: weekView(clientWeek(c)), owner: clientOwner(c) }));
+  const needs = rows.filter(r => r.h.level !== 'g'), behind = rows.filter(r => needsUpdate(r.w));
   let shown = clientsSeg === 'attention' ? needs : clientsSeg === 'behind' ? behind : rows;
   shown = shown.filter(r => (clientFilters.service === 'all' || r.c.service === clientFilters.service) && (clientsOwnerFilter === 'all' || r.owner === clientsOwnerFilter)
     && (!clientFilters.search || r.c.name.toLowerCase().includes(clientFilters.search) || (r.c.email || '').toLowerCase().includes(clientFilters.search)));
@@ -34,7 +34,7 @@ function renderClientsTable(){
 <td><span class="cell-c">${monoHtml(c)}<span style="font-weight:500">${escapeHtml(c.name)}</span></span></td><td>${escapeHtml(owner || '—')}</td><td>${healthCell}</td>
 <td>${lastTxt}</td><td>${histDotsHtml(h.seq)}</td><td class="num">${hrs}</td><td>${stepsHtml(w)}</td></tr>`;
   }).join('');
-  const seg = [['all', 'All', rows.length], ['attention', 'Needs attention', needs.length], ['behind', `Behind for ${updateCycle().sendDayName}`, behind.length]]
+  const seg = [['all', 'All', rows.length], ['attention', 'Needs attention', needs.length], ['behind', 'Update due', behind.length]]
     .map(([k, t, n]) => `<button class="${clientsSeg === k ? 'on' : ''}" role="tab" aria-selected="${clientsSeg === k}" onclick="setClientsSeg('${k}')">${t} <span class="c">${n}</span></button>`).join('');
   const sortIc = `<span class="sort">${icon('caret-down', { weight: 'bold' })}</span>`;
   root.innerHTML = `<div class="tbl-bar">
@@ -53,7 +53,7 @@ function renderClientInspector(){
   if(!el) return;
   const c = inspectedClientId ? activeClients().find(x => x.id === inspectedClientId) : null;
   if(!c){ el.hidden = true; el.innerHTML = ''; return; }
-  const h = clientHealth(c), w = clientWeek(c), owner = clientOwner(c), next = nextStepTask(c), last = lastSentAt(c);
+  const h = clientHealth(c), w = weekView(clientWeek(c)), owner = clientOwner(c), next = nextStepTask(c), last = lastSentAt(c);
   const since = c.startDate ? ` · client since ${new Date(c.startDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}` : '';
   const primary = h.level !== 'g' && !next ? `<button class="btn btn-p" onclick="planNextStep('${c.id}')">${icon('plus')}Plan Next Step</button><button class="btn" onclick="openClientDetail('${c.id}')">Open</button>`
     : `<button class="btn btn-p" onclick="openClientDetail('${c.id}')">Open</button>`;
@@ -69,7 +69,7 @@ function renderClientInspector(){
 <div style="margin-top:20px;display:flex;align-items:center;justify-content:space-between"><span class="set-h" style="margin:0">Health</span>${hstateHtml(h.level, h.level === 'g' ? 'Healthy' : `${healthWord(h.level)} since ${relDay(h.since || rNow()).toLowerCase() === 'today' ? 'today' : relDay(h.since || rNow())}`)}</div>
 ${h.signals.length ? `<div class="grp" style="margin-top:8px">${signalRowsHtml(h, 2)}</div>` : ''}
 <div class="set-h" style="margin:22px 0 10px">This week’s update</div>
-<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px">${stepsHtml(w)}<span class="t-2">${w.behind != null ? 'Behind · ' : ''}${escapeHtml(w.note || '')}</span></div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px">${stepsHtml(w)}<span class="t-2">${w.sent ? '' : `<span class="${w.late ? 't-red' : ''}">${escapeHtml(w.dueText)}</span> · `}${escapeHtml(w.note || '')}</span></div>
 ${weekBtns}
 <div class="set-h" style="margin:22px 0 8px">Hours this month</div>
 ${h.hp.budget ? paceChartHtml(c, 392, 130) : `<p class="t-2" style="font-size:12px;margin:0">${Math.round(h.hp.used)} hours logged · no monthly budget set.</p>`}

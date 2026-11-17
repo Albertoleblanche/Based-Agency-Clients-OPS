@@ -20,9 +20,8 @@ let notifications = [];
 // mute toggle for those to someone who could never receive them is just
 // confusing clutter, not a real preference.
 const NOTIFICATION_TYPE_META = {
-  update_behind:           { label:'A client update you hold is behind', section:'Weekly Updates' },
+  update_behind:           { label:'A client update you hold is overdue', section:'Weekly Updates' },
   draft_written:           { label:'A draft is written for you to check', section:'Weekly Updates' },
-  updates_sent:            { label:'Approved updates go out on schedule', section:'Weekly Updates', visibleTo:'approver' },
   monday_summary:          { label:'The Monday summary', section:'Weekly Updates', visibleTo:'approver' },
   task_assigned:           { label:'A task is assigned to you', section:'Tasks' },
   task_completed:          { label:'A task you assigned is completed', section:'Tasks' },
@@ -145,14 +144,13 @@ function toggleNotifPanel(){
   const panel = document.getElementById('notifPanel');
   if(!panel) return;
   const opening = panel.style.display !== 'block';
-  panel.style.display = opening ? 'block' : 'none';
-  if(opening) renderNotifPanel();
+  if(opening){ panel.style.display = 'block'; renderNotifPanel(); } else hidePop(panel);
 }
 
 document.addEventListener('click', (e)=>{
   const wrap = document.querySelector('.notif-bell-wrap');
   const panel = document.getElementById('notifPanel');
-  if(panel && panel.style.display==='block' && wrap && !wrap.contains(e.target)) panel.style.display='none';
+  if(panel && panel.style.display==='block' && wrap && !wrap.contains(e.target)) hidePop(panel);
 });
 
 // Harvest's own Widget iframe, replacing the earlier Button approach —
@@ -233,17 +231,17 @@ async function handleNotifClick(id){
     renderNotifPanel();
   }
   if(n.target_view==='client-detail' && n.target_id){
-    document.getElementById('notifPanel').style.display = 'none';
+    hidePop(document.getElementById('notifPanel'));
     openClientDetail(n.target_id);
     return;
   }
   if(n.target_view==='weekly-focus-report'){
-    document.getElementById('notifPanel').style.display = 'none';
+    hidePop(document.getElementById('notifPanel'));
     openWeeklyFocusReportModal(n.target_id);
     return;
   }
   if(n.target_view){
-    document.getElementById('notifPanel').style.display = 'none';
+    hidePop(document.getElementById('notifPanel'));
     switchView(n.target_view);
     if(n.target_view==='approve' && n.target_id && clients.find(c=>c.id===n.target_id)){
       openQueueCardModal(n.target_id);

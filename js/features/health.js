@@ -70,11 +70,11 @@ ${weekStripHtml(c)}
 function healthEvents(c, h){
   const ev = [];
   h.signals.forEach(s => ev.push({ at: s.since, t: s.l === 'r' ? `${s.title}` : `${s.title}`, s: s.text }));
-  const cyc = updateCycle();
+  const now = rNow(), monday = dayStart(addDays(now, -((now.getDay() + 6) % 7)));
   h.seq.forEach((x, i) => {
-    const due = addDays(cyc.send, -7 * (7 - i));
-    if(x === 'm') ev.push({ at: due, t: 'Weekly update missed', s: 'Nothing was sent that week' });
-    if(x === 'l') ev.push({ at: due, t: 'Weekly update sent late', s: 'After the send time' });
+    const wk = addDays(monday, -7 * (7 - i));
+    if(x === 'm') ev.push({ at: wk, t: 'Weekly update missed', s: `Nothing was sent the week of ${fmtShortDate(wk)}` });
+    if(x === 'l') ev.push({ at: wk, t: 'Weekly update sent late', s: 'More than 7 days after the one before' });
   });
   const hd = healthHandled[c.id];
   if(hd) ev.push({ at: new Date(hd.at), t: `Marked handled by ${firstName(hd.by)}`, s: hd.note || 'Quiet unless it gets worse' });

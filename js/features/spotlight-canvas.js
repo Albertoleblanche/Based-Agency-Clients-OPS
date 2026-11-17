@@ -34,7 +34,8 @@ function getCommandPaletteIndex(query){
   const top = cl[0];
   if(top){
     const d = spotDraftAction(top); if(d) out.push({ group: 'Actions', ...d });
-    out.push({ group: 'Actions', icon: 'timer', title: `Log time to ${top.name}`, run: () => openTimerModal(top.id) });
+    out.push({ group: 'Actions', icon: 'timer', title: `Start a timer for ${top.name}`, run: () => openTimerModal(top.id) });
+    out.push({ group: 'Actions', icon: 'clock', title: `Add time worked for ${top.name}`, run: () => { openManualEntryModal(); setTimeout(() => { const s = document.getElementById('manualClient'); if(s){ s.value = top.id; syncPopSel?.(s); timeClientChanged?.('manualClient', 'manualService'); } }, 30); } });
     out.push({ group: 'Actions', icon: 'plus', title: `New task for ${top.name}`, run: () => openNewTaskModal(undefined, 'todo', { clientId: top.id }) });
   }
   const today = toDateStr(new Date()), me = currentUser?.id;
@@ -43,6 +44,7 @@ function getCommandPaletteIndex(query){
     .forEach(t => out.push({ group: 'Tasks', icon: 'list-checks', title: t.title, sub: t.dueDate && t.dueDate < today ? '' : (TASK_STAGE_LABEL[t.status] || ''), red: t.dueDate && t.dueDate < today ? 'Overdue' : '', run: () => openTaskDetailModal(t.id) }));
   (typeof notes !== 'undefined' ? notes : []).filter(n => spotNorm(n.title).includes(q) || spotNorm(n.text).includes(q)).slice(0, 3)
     .forEach(n => { const c = clients.find(x => x.id === n.clientId); out.push({ group: 'Notes', icon: 'notepad', title: n.title || 'Untitled note', sub: c ? c.name : '', run: () => { switchView('notes'); if(typeof selectNote === 'function') selectNote(n.id); } }); });
+  if(!top && ['add time', 'time worked', 'manual', 'hours'].some(w => w.includes(q) || q.includes(w))) out.push({ group: 'Create', icon: 'clock', title: 'Add Time Worked', run: () => openManualEntryModal() });
   screens.filter(s => spotNorm(s.title).includes(q)).forEach(s => out.push(s));
   return out;
 }

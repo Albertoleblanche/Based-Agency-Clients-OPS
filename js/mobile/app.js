@@ -12,7 +12,6 @@ const mEsc = s => escapeHtml(s == null ? '' : String(s));
 
 // ---- small helpers the desktop keeps in files the phone doesn't load ----------------------------
 function shortClientName(name){ return String(name || '').replace(/\s+(Builders|Co\.?|Company|LLC|Inc\.?|Homes|Remodeling|Construction)$/i, '').trim(); }
-function cycleLongLabel(cyc){ const a = addDays(cyc.periodStart, 1), b = cyc.periodEnd; return `${a.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} to ${a.getMonth() === b.getMonth() ? b.getDate() : b.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}`; }
 function parseDurationInput(str){
   str = (str || '').trim().toLowerCase().replace(',', '.'); if(!str) return null;
   const colon = str.match(/^(\d{1,3}):(\d{2})$/); if(colon) return +colon[1] * 60 + +colon[2];
@@ -38,7 +37,7 @@ function mEmpty(title, sub){ return `<div class="iempty"><b>${title}</b>${sub ||
 function mCb(t){
   const done = t.status === 'done', mine = t.assigneeId === currentUser?.id || t.assignerId === currentUser?.id;
   return done ? `<span class="cb done" role="checkbox" aria-checked="true" aria-label="Done">${icon('check', { weight: 'bold' })}</span>`
-    : `<button class="cb" role="checkbox" aria-checked="false" aria-label="Mark ${mEsc(t.title)} done"${mine ? ` onclick="event.stopPropagation();mCompleteTask('${t.id}')"` : ' disabled'}></button>`;
+    : `<button class="cb" role="checkbox" aria-checked="false" aria-label="Mark ${mEsc(t.title)} done"${mine ? ` onclick="event.stopPropagation();checkOff(this, () => mCompleteTask('${t.id}'))"` : ' disabled'}></button>`;
 }
 
 // ---- toast ---------------------------------------------------------------------------------
@@ -166,7 +165,8 @@ function mRenderShell(){
 <button role="menuitem" onclick="mToggleAdd(false);mOpenReminderSheet()">New Reminder${icon('bell')}</button>
 <button role="menuitem" onclick="mToggleAdd(false);mOpenNoteSheet()">New Note${icon('notepad')}</button>
 <button role="menuitem" onclick="mToggleAdd(false);mOpenEventSheet()">New Event${icon('calendar-plus')}</button>
-<div class="gap"></div><button role="menuitem" id="mAddTimer" onclick="mToggleAdd(false);timerState.running ? mStopTimer() : mOpenTimerSheet()">Start Timer${icon('timer')}</button></div>
+<div class="gap"></div><button role="menuitem" id="mAddTimer" onclick="mToggleAdd(false);timerState.running ? mStopTimer() : mOpenTimerSheet()">Start Timer${icon('timer')}</button>
+<button role="menuitem" onclick="mToggleAdd(false);mOpenTimeSheet()">Add Time Worked${icon('clock')}</button></div>
 <nav class="tabbar" id="mTabbar" aria-label="Tabs"></nav>
 <div id="mPushes"></div></div>
 <div class="iscrim" id="mSheetScrim" hidden onclick="mCloseSheet()"></div>
@@ -202,10 +202,12 @@ function mRenderBadges(){ mRenderTabbar(); }
 function mTabFromHash(){ const h = location.hash.replace('#', ''); return ['today', 'tasks', 'review', 'more'].includes(h) ? h : null; }
 function mSwitchTab(t){
   if(mStack.length) mPopAll();
+  const changed = mTab !== t;
   mTab = t;
   mRenderTabbar();
   mRenderTab();
   $m('mMain').scrollTop = 0;
+  if(changed) enterIn($m('mMain'), 'translateY(4px)');
   if(location.hash !== '#' + t) history.replaceState(null, '', '#' + t);
 }
 function mRenderTab(){
@@ -335,14 +337,14 @@ function mWaitingDrafts(){
 }
 function mMine(c){ return canApprove() || clientOwner(c) === myName(); }
 function mTodayHtml(){
-  const cyc = updateCycle(), list = attentionEligibleClients(), sum = weekSummary(list);
-  const behind = sum.ws.filter(w => mMine(w.c) && (w.state === 'behind' || w.state === 'late')).sort((a, b) => (b.behind ?? -1) - (a.behind ?? -1) || (b.c.importance || 0) - (a.c.importance || 0));
+  const list = attentionEligibleClients(), sum = weekSummary(list);
+  const behind = sum.ws.filter(w => mMine(w.c) && needsUpdate(w)).sort(dueOrder);
+  const lateN = behind.filter(w => w.late).length;
   const health = list.filter(mMine).map(c => ({ c, h: clientHealth(c) })).filter(x => x.h.level !== 'g').sort((a, b) => (a.h.level === 'r' ? 0 : 1) - (b.h.level === 'r' ? 0 : 1));
   const waiting = mWaitingDrafts();
   const me = myProfile || {}, unread = notifications.filter(n => !n.read).length;
-  const late = cyc.now > cyc.send;
-  const sub = sum.total ? `${sum.sent} of ${sum.total} sent · ${late ? 'the rest are late' : 'the rest go out ' + cyc.sendDayName}` : 'No clients yet';
-  const behindRows = behind.slice(0, 3).map(w => mIr(monoHtml(w.c), mEsc(w.c.name), mEsc(String(w.note || '').replace(/ since .*$/, '')), stepsHtml(w), mBehindTap(w))).join('');
+  const sub = sum.total ? `${sum.sent} of ${sum.total} sent this week${lateN ? ` · ${lateN} overdue` : ''}` : 'No clients yet';
+  const behindRows = behind.slice(0, 3).map(w => mIr(monoHtml(w.c), mEsc(w.c.name), `<span class="${w.late ? 't-red' : ''}">${mEsc(w.dueText)}</span> · ${mEsc(String(w.note || '').replace(/ since .*$/, ''))}`, stepsHtml(w), mBehindTap(w))).join('');
   const healthRows = health.slice(0, 2).map(({ c, h }) => mIr(monoHtml(c), mEsc(c.name), mEsc(mSignal(h)), hstateHtml(h.level), `mOpenClient('${c.id}')`)).join('');
   const waitRows = waiting.slice(0, 2).map(({ c, d }) => mIr(monoHtml(c), mEsc(c.name), `${mEsc(d.author)} · waiting ${fmtWait(d.draftPendingSince || rNow())}`, mDot('blue', ''), `mOpenDraft('${c.id}',${jsArg(d.author)})`)).join('');
   const todayStr = toDateStr(new Date());
@@ -350,13 +352,26 @@ function mTodayHtml(){
   return `<div class="ihead"><button onclick="mOpenProfile()" aria-label="My profile">${avHtml(me.name || '?')}</button><div class="r"><button aria-label="Search" onclick="mOpenSearch()">${icon('magnifying-glass')}</button><button aria-label="Notifications${unread ? ', ' + unread + ' new' : ''}" onclick="mOpenNotifications()">${icon('bell')}${unread ? '<span class="bd"></span>' : ''}</button></div></div>
 <h1 class="big">Today</h1><p class="big-sub">${mEsc(sub)}</p>
 ${mTimerCardHtml()}
-${behind.length ? mIsh(`${behind.length} ${late ? 'late' : 'behind for ' + cyc.sendDayName}`, "mSwitchTab('review')") + `<div class="ig">${behindRows}</div>` : ''}
+${behind.length ? mIsh(lateN ? `${behind.length} due or overdue` : `${behind.length} due today`, "mOpenWeek()") + `<div class="ig">${behindRows}</div>` : ''}
 ${health.length ? mIsh('Health', "mOpenClients('health')") + `<div class="ig">${healthRows}</div>` : ''}
 ${waiting.length ? mIsh(`${waiting.length} waiting for ${canApprove() ? 'review' : 'you'}`, "mSwitchTab('review')") + `<div class="ig">${waitRows}</div>` : ''}
 ${due.length ? mIsh('Due today', "mSwitchTab('tasks')") + `<div class="ig">${due.slice(0, 5).map(mTaskRow).join('')}</div>` : ''}
-${!behind.length && !health.length && !waiting.length && !due.length ? `<div style="margin-top:22px">${mEmpty('You’re all caught up', `Updates go out ${cyc.sendLabel}.`)}</div>` : ''}`;
+${!behind.length && !health.length && !waiting.length && !due.length ? `<div style="margin-top:22px">${mEmpty('You’re all caught up', mNextDue(sum.ws.filter(w => mMine(w.c))))}</div>` : ''}`;
 }
-// A behind client opens its draft when one is waiting, otherwise the client.
+// "Next up: Oakridge Flooring, due tomorrow."
+function mNextDue(ws){ const n = ws.filter(w => w.sent).sort((a, b) => a.daysLeft - b.daysLeft)[0]; return n ? `Next up: ${mEsc(n.c.name)}, ${n.dueText.toLowerCase()}.` : ''; }
+// Every client's update this week: overdue, due today, due soon, sent.
+function mOpenWeek(){
+  mPush('This Week', () => {
+    const ws = attentionEligibleClients().filter(mMine).map(c => weekView(clientWeek(c)));
+    const groups = [['Overdue', ws.filter(w => w.state === 'late').sort(dueOrder), 't-red'], ['Due today', ws.filter(w => w.state === 'due').sort(dueOrder)],
+      ['Due soon', ws.filter(w => w.upcoming).sort((a, b) => a.daysLeft - b.daysLeft)], ['Sent this week', ws.filter(w => w.sent).sort((a, b) => new Date(b.last) - new Date(a.last))]];
+    const sent = ws.filter(w => w.sent || w.upcoming).length;
+    return `<h1 class="big">This Week</h1><p class="big-sub">${sent} of ${ws.length} sent in the last 7 days</p>
+${groups.filter(g => g[1].length).map(([t, list, cls]) => mIsh(t, null, cls) + `<div class="ig">${list.map(w => mIr(monoHtml(w.c), mEsc(w.c.name), w.sent ? mEsc(w.note) : `<span class="${w.late ? 't-red' : ''}">${mEsc(w.dueText)}</span> · ${mEsc(String(w.note || '').replace(/ since .*$/, ''))}`, stepsHtml(w), w.sent ? `mOpenClient('${w.c.id}')` : mBehindTap(w))).join('')}</div>`).join('')}`;
+  });
+}
+// A due client opens its draft when one is waiting, otherwise the client.
 function mBehindTap(w){
   const d = (w.c.drafts || []).find(x => x.draftStatus === 'pending' && x.draft && (canApprove() || x.author === myName()));
   return d ? `mOpenDraft('${w.c.id}',${jsArg(d.author)})` : `mOpenClient('${w.c.id}')`;
@@ -476,7 +491,7 @@ function mReviewItems(allClients){
   const cyc = updateCycle(), me = myName(), approver = canApprove(), out = { waiting: [], approved: [], sent: [] };
   attentionEligibleClients().filter(c => allClients || mReviewClient === 'all' || c.id === mReviewClient).forEach(c => (c.drafts || []).forEach(d => {
     if(!approver && d.author !== me) return;
-    if(d.draftSentAt && new Date(d.draftSentAt) > cyc.prevSend) out.sent.push({ c, d, at: d.draftSentAt });
+    if(d.draftSentAt){ if(new Date(d.draftSentAt) >= cyc.weekStart) out.sent.push({ c, d, at: d.draftSentAt }); }
     else if(d.draftStatus === 'approved') out.approved.push({ c, d, at: d.draftPendingSince });
     else if(d.draftStatus === 'pending' && d.draft && (d.readyToNotify || d.author === me)) out.waiting.push({ c, d, at: d.draftPendingSince });
   }));
@@ -536,8 +551,7 @@ function mOpenDraft(clientId, author){
   let editing = false;
   const entry = mPush(c.name, () => {
     const { d } = mDraftFor(clientId, author); if(!d) return mEmpty('This draft is gone', '');
-    const cyc = updateCycle();
-    const n = (d.draftImprovementIds || []).length || (c.improvements || []).filter(i => i.author === d.author && new Date(i.date) > cyc.periodStart).length;
+    const n = (d.draftImprovementIds || []).length || (c.improvements || []).filter(i => i.author === d.author && new Date(i.date) > clientWeek(c).since).length;
     const status = d.draftSentAt ? ['green', `Sent ${relDay(d.draftSentAt).toLowerCase()}`] : d.draftStatus === 'approved' ? ['purple', 'Approved'] : d.readyToNotify ? ['blue', `Draft ready · written from ${mPlural(n, 'improvement')}`] : ['hollow', 'Not sent for review yet'];
     const contact = (c.email || '').split(',')[0].trim();
     let bar = '';
@@ -549,7 +563,7 @@ function mOpenDraft(clientId, author){
     return `<div class="idraft">
 <div style="display:flex;gap:12px;align-items:center">${monoHtml(c, 'lg')}<div style="min-width:0"><div style="font-size:17px;font-weight:600">${mEsc(c.name)}</div><div style="font-size:14px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">To ${mEsc(contact || 'no email on file')} · by ${mEsc(d.author)}</div></div></div>
 <div style="margin-top:12px">${mDot(status[0], status[1])}</div>
-<h2>Your weekly update — ${mEsc(cycleLongLabel(cyc))}</h2>
+<h2>Your weekly update — ${mEsc(updateRangeLabel(c))}</h2>
 ${editing ? `<textarea id="mDraftEdit" spellcheck="true">${mEsc(d.draft || '')}</textarea>` : `<div class="body">${mDraftBody(d.draft)}</div>`}
 </div>${bar && !editing ? `<div class="ibar">${bar}</div>` : ''}`;
   }, { right: '' });
@@ -581,7 +595,7 @@ function mDraftBody(text){
   if(list) out.push(`<ul>${list.join('')}</ul>`);
   return out.join('');
 }
-async function mApproveDraft(clientId, author, stay){
+async function mApproveDraft(clientId, author, stay, quiet){
   if(!canApprove()) return;
   const { c, d } = mDraftFor(clientId, author); if(!d) return;
   const edited = $m('mDraftEdit')?.value;
@@ -593,7 +607,7 @@ async function mApproveDraft(clientId, author, stay){
   const p = teamProfiles.find(x => x.name === author);
   if(p && p.id !== currentUser.id) mNotify(p.id, 'draft_approved', 'Your submission was approved', `${myName()} approved your update for ${c.name}.`, 'approve');
   await mRefresh();
-  showToast('success', 'Approved', `It goes out ${updateCycle().sendLabel} with the others.`);
+  if(!quiet) showToast('success', 'Approved', 'Send it from Review when you’re ready.');
   if(!stay && mStack.length) mPop();
 }
 async function mSkipDraft(clientId, author){
@@ -614,7 +628,7 @@ async function mSendForReview(clientId, author){
   for(const a of teamProfiles.filter(p => (p.role === 'admin' || p.role === 'approver') && p.id !== currentUser.id && !p.access_revoked)) mNotify(a.id, 'draft_ready', `${c.name}: draft ready for review`, `${author}'s weekly update is ready.`, 'teamqueue', c.id);
   await mRefresh(); showToast('success', 'Sent for review', `${c.name} is in Review.`);
 }
-async function mApproveAndSend(clientId, author){ await mApproveDraft(clientId, author, true); await mSendDraft(clientId, author); }
+async function mApproveAndSend(clientId, author){ await mApproveDraft(clientId, author, true, true); await mSendDraft(clientId, author); }
 // The email goes out from the app, with the agency's signature, the same as on the desktop.
 async function mSendDraft(clientId, author){
   const { c, d } = mDraftFor(clientId, author); if(!d) return;
@@ -676,12 +690,12 @@ function mOpenClients(mode){
 function mOpenClient(id){
   const c0 = clients.find(x => x.id === id); if(!c0) return;
   mPush(c0.name, () => {
-    const c = clients.find(x => x.id === id) || c0, w = clientWeek(c), h = clientHealth(c), cyc = updateCycle();
+    const c = clients.find(x => x.id === id) || c0, w = weekView(clientWeek(c)), h = clientHealth(c);
     const imps = (c.improvements || []).slice().sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8);
-    const steps = STEP_NAMES.map((n, k) => mIr(`<span class="gl" style="color:${w.sent || k < w.done ? 'var(--green)' : w.behind === k ? 'var(--red)' : 'var(--label-3)'}">${icon(w.sent || k < w.done ? 'check-circle' : w.behind === k ? 'warning' : 'circle')}</span>`, n, '', k === 3 ? cyc.sendLabel : '', null, { n: true })).join('');
+    const steps = STEP_NAMES.map((n, k) => mIr(`<span class="gl" style="color:${w.sent || k < w.done ? 'var(--green)' : w.behind === k ? (w.late ? 'var(--red)' : 'var(--yellow)') : 'var(--label-3)'}">${icon(w.sent || k < w.done ? 'check-circle' : w.behind === k ? 'warning' : 'circle')}</span>`, n, '', k === 3 ? (w.sent ? mEsc(relDay(w.last)) : `<span class="${w.late ? 't-red' : ''}">${mEsc(w.dueText)}</span>`) : '', null, { n: true })).join('');
     return `<div class="idetail" style="display:flex;gap:12px;align-items:center;margin-top:4px">${monoHtml(c, 'lg')}<div style="min-width:0"><h1 style="font-size:24px;font-weight:700;letter-spacing:-.02em;margin:0">${mEsc(c.name)}</h1><div class="ikv">${mEsc([c.service, w.owner].filter(Boolean).join(' · '))}</div></div></div>
 ${h.level !== 'g' ? `<div class="inote" style="margin-top:14px">${hstateHtml(h.level)} ${mEsc(shortSignal(h, 3))}</div>` : ''}
-${mIsh('This week')}<div class="ig">${steps}</div>
+${mIsh('This week’s update')}<div class="ig">${steps}</div>
 <div style="margin:12px 16px 0"><button class="ibtn s" onclick="mOpenLog('${c.id}')">${icon('plus')}Log Improvement</button></div>
 ${mIsh('Logged')}<div class="ig">${imps.map(i => mIr('', mEsc(i.text), `${mEsc(i.author)} · ${fmtShortDate(new Date(i.date))}${i.includeInEmail === false ? ' · internal' : ''}`, '', null, { n: true })).join('') || '<div class="ir"><span class="t n" style="color:var(--label-2)">Nothing logged yet</span></div>'}</div>`;
   });
@@ -693,8 +707,8 @@ function mOpenCalendar(){
       const d = addDays(t0, k), ds = toDateStr(d);
       const evs = calendarEvents.filter(e => toDateStr(new Date(e.startAt)) === ds && (!e.attendeeIds.length || e.attendeeIds.includes(currentUser.id) || e.createdBy === currentUser.id));
       const ts = mVisibleTasks().filter(t => t.status !== 'done' && t.dueDate === ds && t.assigneeId === currentUser.id);
-      const cyc = updateCycle(d);
-      const send = toDateStr(cyc.send) === ds ? [`<div class="ir"><span class="gl" style="color:var(--green)">${icon('paper-plane-tilt')}</span><div class="tx"><span class="t n">Weekly updates go out</span></div><div class="r">${fmtTime(cyc.send)}</div></div>`] : [];
+      const dueHere = activeClients().filter(c => { const due = clientDue(c).due; return toDateStr(due < t0 ? t0 : due) === ds; });
+      const send = dueHere.length ? [mIr(`<span class="gl" style="color:var(--red)">${icon('paper-plane-tilt')}</span>`, `${dueHere.length} update${dueHere.length === 1 ? '' : 's'} due`, mEsc(dueHere.slice(0, 3).map(c => c.name).join(', ') + (dueHere.length > 3 ? '…' : '')), '', k === 0 ? 'mOpenWeek()' : null, { n: true })] : [];
       const rows = [...send, ...evs.map(e => mIr(`<span class="gl">${icon('calendar-blank')}</span>`, mEsc(e.title), mEsc(clients.find(c => c.id === e.clientId)?.name || e.location || ''), e.allDay ? 'All day' : fmtTime(new Date(e.startAt)), null, { n: true })), ...ts.map(mTaskRow)];
       if(rows.length) days.push(`${mIsh(k === 0 ? 'Today' : k === 1 ? 'Tomorrow' : d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }))}<div class="ig">${rows.join('')}</div>`);
     }
@@ -705,10 +719,15 @@ function mOpenReminders(){
   mPush('Reminders', () => {
     const disp = r => (r.status === 'waiting' && r.followUpDate && r.followUpDate <= toDateStr(new Date())) ? 'due' : r.status;
     const open = clientReminders.filter(r => r.status === 'waiting').sort((a, b) => (a.followUpDate || '').localeCompare(b.followUpDate || ''));
-    const row = r => { const c = clients.find(x => x.id === r.clientId), due = disp(r) === 'due'; return mIr('', mEsc(r.question), `${mEsc(c ? c.name : '')}${r.followUpDate ? ' · ' + (due ? '<span class="t-red">Follow up ' + (r.followUpDate === toDateStr(new Date()) ? 'today' : fmtShortDate(new Date(r.followUpDate + 'T12:00:00'))) + '</span>' : 'Follow up ' + fmtShortDate(new Date(r.followUpDate + 'T12:00:00'))) : ''}`, '', `mReminderActions('${r.id}')`, { n: true }); };
+    const row = r => { const c = clients.find(x => x.id === r.clientId), due = disp(r) === 'due'; return mIr(`<button class="cb rem" role="checkbox" aria-checked="false" aria-label="Mark answered" onclick="event.stopPropagation();checkOff(this, () => mAnswerReminder('${r.id}'))"></button>`, mEsc(r.question), `${mEsc(c ? c.name : '')}${r.followUpDate ? ' · ' + (due ? '<span class="t-red">Follow up ' + (r.followUpDate === toDateStr(new Date()) ? 'today' : fmtShortDate(new Date(r.followUpDate + 'T12:00:00'))) + '</span>' : 'Follow up ' + fmtShortDate(new Date(r.followUpDate + 'T12:00:00'))) : ''}`, '', `mReminderActions('${r.id}')`, { n: true, div: true }); };
     return `<h1 class="big">Reminders</h1><p class="big-sub">${open.filter(r => disp(r) === 'due').length} to follow up · ${open.length} waiting on clients</p>
 <div class="ig" style="margin-top:16px">${open.map(row).join('') || '<div class="ir"><span class="t n" style="color:var(--label-2)">Nothing waiting on a client</span></div>'}</div>`;
   }, { right: `<button aria-label="New reminder" onclick="mOpenReminderSheet()">${icon('plus')}</button>` });
+}
+async function mAnswerReminder(id){
+  const { error } = await supabaseClient.from('client_reminders').update({ status: 'answered', resolved_at: new Date().toISOString() }).eq('id', id);
+  if(error){ showToast('error', 'Couldn’t mark it answered', error.message); await mRefresh(); return; }
+  await mRefresh(); showToast('success', 'Marked answered', '');
 }
 function mReminderActions(id){
   const r = clientReminders.find(x => x.id === id); if(!r) return;
@@ -732,7 +751,7 @@ function mOpenTime(){
     const c = clients.find(x => x.id === timerState.clientId);
     const hm = m => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
     return `<h1 class="big">Time</h1><p class="big-sub">${hm(wk)} this week</p>
-<div class="ibig-timer">${timerState.running ? `<div class="clk mClk">${mClock()}</div><div class="who">${mEsc(c ? c.name : '')}${timerState.description ? ' · ' + mEsc(timerState.description) : ''}</div><button class="ibtn s" style="color:var(--red)" onclick="mStopTimer()">Stop and Save</button>` : `<div class="clk" style="color:var(--label-3)">0:00:00</div><button class="ibtn p" onclick="mOpenTimerSheet()">${icon('play', { fill: true })}Start Timer</button>`}</div>
+<div class="ibig-timer">${timerState.running ? `<div class="clk mClk">${mClock()}</div><div class="who">${mEsc(c ? c.name : '')}${timerState.description ? ' · ' + mEsc(timerState.description) : ''}</div><button class="ibtn s" style="color:var(--red)" onclick="mStopTimer()">Stop and Save</button>` : `<div class="clk" style="color:var(--label-3)">0:00:00</div><button class="ibtn p" onclick="mOpenTimerSheet()">${icon('play', { fill: true })}Start Timer</button>`}<button class="ibtn s" style="margin-top:10px" onclick="mOpenTimeSheet()">${icon('plus')}Add Time Worked</button></div>
 ${mIsh('Today')}<div class="ig">${td.map(e => { const cc = clients.find(x => x.id === e.clientId); return mIr('', mEsc(cc ? cc.name : 'Client'), mEsc(e.description || e.service || ''), hm(e.minutes), null, { n: true }); }).join('') || '<div class="ir"><span class="t n" style="color:var(--label-2)">Nothing logged today</span></div>'}</div>`;
   });
 }
@@ -757,7 +776,7 @@ ${sec('Need attention', (d.attentionClients || []).map(a => mIr(monoHtml(fc(a.id
 ${sec('Overdue follow-ups', (d.overdueFollowUps || []).map(f => mIr('', mEsc(f.question || 'Follow-up'), mEsc(f.clientName || ''), '', null, { n: true })))}
 ${sec('Gone quiet', (d.staleClients || []).map(a => mIr(monoHtml(fc(a.id) || a), mEsc(a.name), a.daysSinceImprovement == null ? 'Nothing logged yet' : `Nothing logged in ${a.daysSinceImprovement} days`, '', fc(a.id) ? `mOpenClient('${a.id}')` : null)))}
 ${sec('Pending drafts', (d.pendingDrafts || []).map(a => mIr(monoHtml(fc(a.id) || a), mEsc(a.name), 'Draft waiting for review', '', null)))}
-${(d.aiFindings || []).length ? mIsh('From the Assistant') + d.aiFindings.map(f => `<div class="inote">${f.title ? `<b>${mEsc(f.title)}.</b> ` : ''}${mEsc(f.body || '')}</div>`).join('') : ''}`;
+${(d.aiFindings || []).length ? mIsh('Patterns noticed') + d.aiFindings.map(f => `<div class="inote">${f.title ? `<b>${mEsc(f.title)}.</b> ` : ''}${mEsc(f.body || '')}</div>`).join('') : ''}`;
   });
 }
 function mOpenTeam(){
@@ -829,7 +848,8 @@ async function mNotifTap(id){
   mPopAll();
   const v = n.target_view;
   if(v === 'client-detail' && n.target_id) mOpenClient(n.target_id);
-  else if(v === 'teamqueue' || v === 'approve') mSwitchTab('review');
+  else if(v === 'teamqueue' || (v === 'approve' && n.type !== 'update_behind' && n.type !== 'draft_written')) mSwitchTab('review');
+  else if(v === 'approve'){ mSwitchTab('today'); n.target_id ? mOpenClient(n.target_id) : mOpenWeek(); }
   else if(v === 'tasks') mSwitchTab('tasks');
   else if(v === 'reminders'){ mSwitchTab('more'); mOpenReminders(); }
   else if(v === 'calendar'){ mSwitchTab('more'); mOpenCalendar(); }
@@ -841,7 +861,8 @@ function mOpenFromHash(hash){
   if(['today', 'tasks', 'review', 'more'].includes(h)){ if(mTab !== h || mStack.length) mSwitchTab(h); return; }
   const m = h.match(/^client\/(.+)$/);
   if(m){ mSwitchTab('today'); mOpenClient(decodeURIComponent(m[1])); return; }
-  if(h === 'approve' || h === 'teamqueue') mSwitchTab('review');
+  if(h === 'teamqueue') mSwitchTab('review');
+  else if(h === 'approve'){ mSwitchTab('today'); mOpenWeek(); }
   else if(h === 'reminders'){ mSwitchTab('more'); mOpenReminders(); }
   else if(h === 'calendar'){ mSwitchTab('more'); mOpenCalendar(); }
   else if(h === 'health'){ mSwitchTab('today'); mOpenClients('health'); }
@@ -961,6 +982,36 @@ function mStartTimer(){
   try{ localStorage.setItem('bda_timer_state', JSON.stringify(timerState)); }catch(e){}
   mCloseSheet(true); mRenderTab(); mTop()?.refresh(); mTickTimer();
   showToast('success', 'Timer started', mClientName(timerState.clientId));
+}
+// Time worked without the timer: client, service, day, how long, what.
+let mTime_ = {};
+function mOpenTimeSheet(presetClientId){
+  const c = clients.find(x => x.id === presetClientId);
+  mTime_ = { clientId: presetClientId || '', service: (c && c.service) || (settings.serviceOptions || [])[0] || '', date: toDateStr(new Date()) };
+  mKeep('mTimeDur', ''); mKeep('mTimeDesc', '');
+  window.mTimeBody = () => `<div class="ig flat" style="margin-top:12px">${mRowPick('Client', mEsc(mClientName(mTime_.clientId) || 'Choose'), "mTimePick('client')", !!mTime_.clientId)}${mRowPick('Service', mEsc(mTime_.service || 'None'), "mTimePick('service')", !!mTime_.service)}${mRowPick('Date', mTime_.date === toDateStr(new Date()) ? 'Today' : sheetDayLabel(new Date(mTime_.date + 'T12:00:00')), "mTimePick('date')", true)}
+<div class="ir"><label class="ilab" for="mTimeDur">Time worked</label><input class="tm" id="mTimeDur" inputmode="decimal" placeholder="1:30" oninput="mKeep('mTimeDur',this.value)"></div></div>
+<p class="ifoot">1:30, 45m or 1.5 all work.</p>
+<div class="ig flat" style="margin-top:20px"><div class="ir" style="align-items:flex-start"><textarea class="iarea" id="mTimeDesc" placeholder="What did you work on?" style="min-height:72px" oninput="mKeep('mTimeDesc',this.value)"></textarea></div></div>`;
+  mOpenSheet('Add Time', window.mTimeBody(), { done: 'mSaveTime()', doneLabel: 'Add' });
+}
+function mTimePick(what){
+  mKeep('mTimeDur', mSheetVal('mTimeDur')); mKeep('mTimeDesc', mSheetVal('mTimeDesc'));
+  const back = () => { $m('mSheet').querySelector('.sheet-scroll').innerHTML = window.mTimeBody(); mRestoreSheetState(); };
+  if(what === 'client') mPickClient(mTime_.clientId, v => { mTime_.clientId = v; const c = clients.find(x => x.id === v); if(c && c.service) mTime_.service = c.service; back(); });
+  if(what === 'service') mPick('Service', [...new Set([mTime_.service, ...(settings.serviceOptions || [])].filter(Boolean))].map(x => [x, x]), mTime_.service, v => { mTime_.service = v; back(); });
+  if(what === 'date') mDayPick('Date', mTime_.date, -30, 0, null, v => { mTime_.date = v; back(); });
+}
+async function mSaveTime(){
+  const T = mTime_, raw = mSheetVal('mTimeDur').trim(), minutes = parseSpent(raw), desc = mSheetVal('mTimeDesc').trim();
+  if(!T.clientId){ showToast('error', 'Choose a client', 'Tap Client to pick one.'); return; }
+  if(!minutes){ showToast('error', 'How long did you work?', 'Try 1:30, 45m or 1.5.'); $m('mTimeDur')?.focus(); return; }
+  if(minutes > 16 * 60 && !(await confirmDialog(`That’s ${Math.floor(minutes / 60)} hours in one entry.`, { title: 'Log it anyway?', confirmLabel: 'Log It' }))) return;
+  const btn = $m('mSheetDone'); if(btn) btn.disabled = true;
+  const id = await mAddTime({ clientId: T.clientId, service: T.service, dateStr: T.date, minutes, description: desc });
+  if(!id){ if(btn) btn.disabled = false; showToast('error', 'Couldn’t add the time', 'Try again in a moment.'); return; }
+  mCloseSheet(true); await mRefresh();
+  showToast('success', 'Time added', `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')} for ${mClientName(T.clientId)}`);
 }
 async function mStopTimer(quiet, logged){
   if(!timerState.running) return;

@@ -1,4 +1,4 @@
-// Today: what needs you now, in order — updates behind for the send, clients whose health
+// Today: what needs you now, in order — updates due or overdue, clients whose health
 // changed, drafts waiting for you — with your tasks due today and today's calendar on the side.
 // Exactly the canvas "Today" board. Redrawn whenever data changes.
 
@@ -26,39 +26,40 @@ async function remindHolder(clientId){
   const c = clients.find(x => x.id === clientId); if(!c) return;
   const w = clientWeek(c), who = w.holder === 'approvers' ? null : profileByName(w.holder || w.owner);
   if(!who){ showToast('info', 'Nobody to remind', 'This update is waiting on approvers.'); return; }
-  const cyc = updateCycle();
-  await sendNotification(who.id, 'update_behind', `${c.name}: this week’s update is behind`,
-    `${w.behind != null ? STEP_NAMES[w.behind] + ' was due ' + fmtDay(Object.values(cyc.checkpoints)[w.behind]) + ' ' + fmtTime(Object.values(cyc.checkpoints)[w.behind]) : 'Due soon'} · updates go out ${cyc.sendLabel}.`, 'approve', c.id);
+  const next = w.behind != null ? ['log the week’s work', 'send the draft for review', 'approve it', 'send it'][w.behind] : 'get it ready';
+  await sendNotification(who.id, 'update_behind', `${c.name}: this week’s update is ${w.late ? 'overdue' : 'due'}`,
+    `${w.dueText}. Next: ${next}.`, 'approve', c.id);
   showToast('success', `Reminded ${firstName(who.name)}`, 'In the app, and on Slack if they use it.');
 }
 
 function renderToday(){
   const root = document.getElementById('todayRoot');
   if(!root || typeof clients === 'undefined') return;
-  const cyc = updateCycle(), list = attentionEligibleClients();
+  const list = attentionEligibleClients();
   const sum = weekSummary(list);
   const mine = sum.ws.filter(w => myClientsFilter(w.c));
-  const behind = mine.filter(w => w.state === 'behind' || w.state === 'late')
-    .sort((a, b) => (b.behind ?? -1) - (a.behind ?? -1) || (b.c.importance || 0) - (a.c.importance || 0));
+  const behind = mine.filter(needsUpdate).sort(dueOrder);
+  const lateN = behind.filter(w => w.late).length;
   const health = list.filter(myClientsFilter).map(c => ({ c, h: clientHealth(c) })).filter(x => x.h.level !== 'g')
     .sort((a, b) => (a.h.level === 'r' ? 0 : 1) - (b.h.level === 'r' ? 0 : 1) || (b.h.since || 0) - (a.h.since || 0));
   const atRisk = health.filter(x => x.h.level === 'r').length;
   const waiting = todayWaitingDrafts();
-  const day = cyc.sendDayName, sendTime = fmtTime(cyc.send);
-
   let h1;
   if(sum.sent === sum.total && sum.total) h1 = `All ${sum.total} updates are sent`;
-  else if(behind.length) h1 = `${todayPlural(behind.length, 'update')} ${behind.length === 1 ? 'is' : 'are'} ${cyc.now > cyc.send ? 'late' : 'behind for ' + day}`;
+  else if(lateN) h1 = `${todayPlural(lateN, 'update')} ${lateN === 1 ? 'is' : 'are'} overdue`;
+  else if(behind.length) h1 = `${todayPlural(behind.length, 'update')} ${behind.length === 1 ? 'is' : 'are'} due today`;
   else if(waiting.length) h1 = `${todayPlural(waiting.length, 'update')} ${waiting.length === 1 ? 'is' : 'are'} waiting for you`;
-  else h1 = `You’re all caught up for ${day}`;
-  const subBits = [`<b>${sum.sent} of ${sum.total}</b> sent`, cyc.now > cyc.send ? 'the rest are late' : `the rest go out ${day} at ${sendTime}`];
+  else h1 = 'You’re all caught up';
+  const dueToday = behind.length - lateN;
+  const subBits = [`<b>${sum.sent} of ${sum.total}</b> sent in the last 7 days`];
+  if(lateN && dueToday) subBits.push(`<b>${dueToday}</b> more due today`);
   if(atRisk) subBits.push(`<b>${atRisk}</b> ${atRisk === 1 ? 'client' : 'clients'} at risk`);
   if(waiting.length) subBits.push(`<b>${waiting.length}</b> ${waiting.length === 1 ? 'draft' : 'drafts'} waiting for your review`);
 
   const behindRows = behind.map(w => {
-    const sub = w.done === 0 ? `${w.note} · ${w.owner || '—'}` : w.note;
+    const sub = (w.done === 0 ? `${w.note} · ${w.owner || '—'}` : w.note);
     const who = w.holder && w.holder !== 'approvers' ? w.holder : w.owner;
-    return `<a class="row" href="#approve" onclick="openWeekClient('${w.c.id}');return false;">${monoHtml(w.c)}<div class="tx"><span class="t">${escapeHtml(w.c.name)}</span><span class="s">${escapeHtml(sub)}</span></div>
+    return `<a class="row" href="#approve" onclick="openWeekClient('${w.c.id}');return false;">${monoHtml(w.c)}<div class="tx"><span class="t">${escapeHtml(w.c.name)}</span><span class="s"><span class="${w.late ? 't-red' : ''}">${escapeHtml(w.dueText)}</span> · ${escapeHtml(sub)}</span></div>
 <div class="r">${stepsHtml(w)}${who ? avHtml(who) : ''}<button class="btn act sm" onclick="event.stopPropagation();event.preventDefault();remindHolder('${w.c.id}')">Remind ${escapeHtml(firstName(who) || '')}</button>${CHEV()}</div></a>`;
   }).join('');
   const healthRows = health.slice(0, 6).map(({ c, h }) => `<a class="row" href="#health" onclick="openHealthClient('${c.id}');return false;">${monoHtml(c)}<div class="tx"><span class="t">${escapeHtml(c.name)}</span><span class="s">${escapeHtml(shortSignal(h))}</span></div>
@@ -94,7 +95,7 @@ function renderToday(){
 <p class="lt-sub">${subBits.join(' · ')}</p>
 <div class="cols">
 <div class="col-main">
-${section(`Behind for ${day}`, behind.length, 'approve', 'Open This Week', behindRows, `Nobody is behind. Next checkpoint: ${nextCheckpointText(cyc)}.`)}
+${section(lateN ? 'Overdue and due today' : 'Due today', behind.length, 'approve', 'Open This Week', behindRows, `Nothing is due. ${nextDueText(sum.ws.filter(w => myClientsFilter(w.c)))}`)}
 ${section('Health changes', health.length, 'health', 'Open Health', healthRows, 'Every client looks healthy.')}
 ${section(canApprove() ? 'Waiting for your review' : 'Your drafts', waiting.length, canApprove() ? 'teamqueue' : 'approve', canApprove() ? 'Open Review' : 'Open This Week', waitRows, 'Nothing is waiting for you.')}
 </div>
@@ -107,11 +108,10 @@ ${section(canApprove() ? 'Waiting for your review' : 'Your drafts', waiting.leng
 </div>`;
   if(currentViewName === 'overview') setToolbar('Today', new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }));
 }
-function nextCheckpointText(cyc){
-  const names = ['work logged', 'ready for review', 'approved', 'sent'];
-  const pts = [cyc.checkpoints.log, cyc.checkpoints.review, cyc.checkpoints.approve, cyc.checkpoints.send];
-  const i = pts.findIndex(p => p > cyc.now);
-  return i < 0 ? 'next week' : `${names[i]} by ${fmtDay(pts[i])} ${fmtTime(pts[i])}`;
+// "Next up: Oakridge Flooring, due tomorrow."
+function nextDueText(ws){
+  const n = ws.filter(w => w.sent).sort((a, b) => a.daysLeft - b.daysLeft)[0];
+  return n ? `Next up: ${n.c.name}, ${n.dueText.toLowerCase()}.` : '';
 }
 
 // Older helpers other screens still call.

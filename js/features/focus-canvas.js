@@ -31,9 +31,9 @@ function focusCounts(d){
   if(p) parts.push(`${p} pending draft${p === 1 ? '' : 's'}`);
   return parts.length ? parts.join(' · ') : 'Nothing needed attention';
 }
-// How many clients got last week's update on time, as of a report's date.
+// How many clients had an update in the 7 days before a report's date.
 function onTimeBefore(when){
-  const cyc = updateCycle(addDays(new Date(when), -7)), due = cyc.send, from = addDays(due, -7);
+  const due = new Date(when), from = addDays(due, -UPDATE_EVERY_DAYS);
   const act = activeClients();
   const ok = act.filter(c => sentTimes(c).some(t => t > from && t <= due)).length;
   return { ok, of: act.length };
@@ -87,7 +87,7 @@ function focusDocHtml(r){
     const c = fc(x.id) || { id: x.id, name: x.name }, cur = (fc(x.id)?.drafts || []).find(dd => dd.draftStatus === 'pending');
     return focusRow(c, cur?.author ? `Drafted by ${escapeHtml(cur.author)}` : 'Draft waiting for review', '<span class="st"><span class="dot blue"></span>Draft ready</span>', `focusOpenDraft('${x.id}')`);
   });
-  const aiHtml = ai.length ? `<h3>From the Assistant</h3>${ai.map(f => `<div class="callout" style="margin-bottom:8px"><span class="ic">${icon('sparkle')}</span><div>${f.title ? `<b style="font-weight:600">${escapeHtml(f.title)}.</b> ` : ''}${escapeHtml(f.body || '')}</div></div>`).join('')}` : '';
+  const aiHtml = ai.length ? `<h3>Patterns noticed</h3>${ai.map(f => `<div class="callout" style="margin-bottom:8px"><span class="ic">${icon('sparkle')}</span><div>${f.title ? `<b style="font-weight:600">${escapeHtml(f.title)}.</b> ` : ''}${escapeHtml(f.body || '')}</div></div>`).join('')}` : '';
   const nothing = !attn.length && !overdue.length && !stale.length && !drafts.length && !ai.length ? '<p class="t-2" style="font-size:13px;margin-top:22px">Nothing needed the team this week.</p>' : '';
   const n = d.clientCount || activeClients().length;
   return `<div class="doc">

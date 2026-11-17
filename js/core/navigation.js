@@ -49,8 +49,7 @@ function applyRoleVisibility(){
   // floating button just for themselves, e.g. if they find it visually
   // intrusive. Doesn't affect anyone else's session.
   const floatBtnAllowed = aiChatAllowed && loadClaudeFloatButtonPref();
-  if(claudeNavItem) claudeNavItem.style.display = aiChatAllowed ? 'flex' : 'none';
-  if(claudeFloatBtn) claudeFloatBtn.style.display = floatBtnAllowed ? 'flex' : 'none';
+  if(claudeFloatBtn) claudeFloatBtn.style.display = 'none';
   if(!floatBtnAllowed){
     document.getElementById('claudeFloatPanel')?.classList.remove('open');
   }
@@ -129,7 +128,6 @@ const VIEW_TITLES = {
   team: ['Team', "Everyone on the team, and what they do here"],
   trash: ['Recently Deleted', 'Restore anything here, or delete it for good'],
   settings: ['Settings', 'Workspace, client fields, AI, integrations and notifications'],
-  claude: ['Assistant', 'Knows your clients, drafts, tasks and time'],
   profile: ['My Profile', 'How the team sees you'],
 };
 
@@ -168,7 +166,10 @@ function openCommandPalette(){
 
 function closeCommandPalette(){
   const overlay = document.getElementById('cmdkOverlay');
-  if(overlay) overlay.style.display = 'none';
+  if(!overlay || overlay.style.display === 'none') return;
+  // Quick, since it's opened and closed from the keyboard all day.
+  overlay.querySelector('.spot')?.animate?.([{ opacity: 1, transform: 'translateX(-50%)' }, { opacity: 0, transform: 'translateX(-50%) scale(.98)' }], { duration: 110, easing: 'ease-in', fill: 'forwards' });
+  typeof animateThen === 'function' ? animateThen(overlay, [{ opacity: 1 }, { opacity: 0 }], 120, 'ease-in', () => { overlay.style.display = 'none'; overlay.getAnimations?.().forEach(a => a.cancel()); overlay.querySelector('.spot')?.getAnimations?.().forEach(a => a.cancel()); }) : (overlay.style.display = 'none');
 }
 
 function getCommandPaletteIndex(query){
@@ -341,11 +342,16 @@ async function openScreenFromAddress(hash){
 }
 
 async function switchView(name){
+  if(name === 'claude') name = 'overview'; // the Assistant was removed; old links land on Today
   closeMobileNav();
   document.querySelectorAll('.nav-item').forEach(n=>{ const on = n.dataset.view===name; n.classList.toggle('active', on); n.classList.toggle('on', on); if(on) n.setAttribute('aria-current','page'); else n.removeAttribute('aria-current'); });
   if(typeof setToolbarActions === 'function') setToolbarActions(name);
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.getElementById('view-'+name).classList.add('active');
+  const viewEl = document.getElementById('view-'+name);
+  viewEl.classList.add('active');
+  // The new screen fades in; it only moves too when nothing in it is pinned to the window.
+  if(typeof enterIn === 'function' && switchView._last !== name){ const pinned = viewEl.querySelector('.client-insp:not([hidden])'); pinned ? viewEl.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' }) : enterIn(viewEl, 'translateY(8px)'); }
+  switchView._last = name;
   syncAddressToView(name);
   // The floating "open the Assistant" button is redundant (and visually
   // odd sitting on top of the tab's own dark background) while you're
@@ -353,7 +359,7 @@ async function switchView(name){
   // in applyRoleVisibility(), since that only re-runs on permission
   // changes, not on every navigation.
   const claudeFloatBtn = document.getElementById('claudeFloatBtn');
-  if(claudeFloatBtn && myProfile?.ai_chat_enabled && loadClaudeFloatButtonPref()){ claudeFloatBtn.style.display = name==='claude' ? 'none' : 'flex'; }
+  if(claudeFloatBtn) claudeFloatBtn.style.display = 'none';
   // Overview and Client Detail aren't in this lookup — their titles are
   // dynamic (greeting text, client name) and get set by renderGreeting()
   // and renderClientDetail() respectively, moments later in this same flow.

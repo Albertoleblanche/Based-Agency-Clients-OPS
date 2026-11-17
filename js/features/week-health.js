@@ -1,23 +1,19 @@
-// The two things Based Radar watches for the team (see the "How it works" plan):
-//   1. The weekly deadline — one send time a week, with three checkpoints before it.
-//      Each client's update is Sent, On track, Behind (missed a checkpoint) or Late (missed the send).
+// The two things Based Radar watches for the team:
+//   1. The weekly update — every client gets one a week, on no fixed day: an approver checks it
+//      and sends it the day it's ready. A client is due 7 days after its last update and
+//      overdue after that. Each client's update is Sent, Due or Overdue.
 //   2. Client health — Watch and At risk, worked out every time data changes from what the
 //      app already knows: updates sent, hours against budget, work logged, overdue tasks and
 //      the owner's own risk flag. Thresholds live in Settings → Updates.
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const DEFAULT_UPDATE_SCHEDULE = {
-  send: { day: 4, time: '09:00' },      // Thursday 9:00 AM — updates go out
-  log: { day: 1, time: '18:00' },       // Monday 6:00 PM — work logged by
-  review: { day: 2, time: '12:00' },    // Tuesday 12:00 PM — ready for review by
-  approve: { day: 3, time: '18:00' },   // Wednesday 6:00 PM — approved by
-};
-const DEFAULT_UPDATE_AUTOMATION = { autoDraft: true, remindBehind: true, scheduledSend: true, mondaySummary: true };
+const UPDATE_EVERY_DAYS = 7;
+// Nothing here ever sends to a client: every update is checked and sent by an approver.
+const DEFAULT_UPDATE_AUTOMATION = { autoDraft: true, remindBehind: true, mondaySummary: true };
 const DEFAULT_HEALTH_SIGNALS = {
   noUpdateDays: [8, 14], lateOfLast4: [2, 3], hoursPacePct: [110, 150], underUsedPct: 50,
   nothingLoggedDays: [7, 14], overdueTasks: [2, 4], ownerFlag: [3, 4], importantBump: true, quietDays: 7,
 };
-function updateSchedule(){ return Object.assign({}, DEFAULT_UPDATE_SCHEDULE, (typeof settings !== 'undefined' && settings.updatesSchedule) || {}); }
 function updateAutomation(){ return Object.assign({}, DEFAULT_UPDATE_AUTOMATION, (typeof settings !== 'undefined' && settings.updatesAutomation) || {}); }
 function healthThresholds(){ return Object.assign({}, DEFAULT_HEALTH_SIGNALS, (typeof settings !== 'undefined' && settings.healthSignals) || {}); }
 
@@ -53,19 +49,40 @@ function fmtWait(since){
   return `${Math.round(mins / 1440)}d`;
 }
 
-// ---- the weekly cycle ----------------------------------------------------------------------
-// The cycle is the Monday–Sunday week that holds this week's send. Checkpoints are the days
-// before the send in that same week. Work logged up to the "work logged" checkpoint goes in.
+// ---- the week -------------------------------------------------------------------------------
+// "This week" is the last 7 days, today included. Each client has its own due day.
 function updateCycle(now){
   now = now || rNow();
-  const sch = updateSchedule();
-  const monday = dayStart(addDays(now, -((now.getDay() + 6) % 7)));
-  const at = (cp) => atTime(addDays(monday, (cp.day + 6) % 7), cp.time);
-  const send = at(sch.send), log = at(sch.log), review = at(sch.review), approve = at(sch.approve);
-  const prevSend = addDays(send, -7), periodEnd = log, periodStart = addDays(log, -7);
-  return { now, monday, send, prevSend, checkpoints: { log, review, approve, send }, periodStart, periodEnd,
-    label: `${fmtShortDate(addDays(periodStart, 1))} – ${addDays(periodEnd, 0).getDate()}`,
-    sendLabel: `${fmtDay(send)} ${fmtTime(send)}`, sendDayName: DAY_NAMES[send.getDay()] };
+  const weekStart = dayStart(addDays(now, -(UPDATE_EVERY_DAYS - 1)));
+  return { now, weekStart, label: `${fmtShortDate(weekStart)} – ${fmtShortDate(now)}` };
+}
+// "today" · "Monday" · "Nov 12", for the middle of a sentence.
+function relDayLower(d){ const r = relDay(d); return r === 'Today' ? 'today' : r; }
+// A time today, else the day: "2:15 PM" · "Monday" · "Nov 12".
+function whenShort(d){ return daysBetween(d, rNow()) <= 0 ? fmtTime(new Date(d)) : relDay(d); }
+// When a client's next update is due: 7 days after its last one (today, if it never had one).
+function clientDue(c, now){
+  now = now || rNow();
+  const last = lastSentAt(c);
+  // Never had one: due a week after the client started (today, if the start date isn't known).
+  const start = c.startDate ? new Date(c.startDate + 'T00:00:00') : null;
+  const due = last ? dayStart(addDays(last, UPDATE_EVERY_DAYS)) : (start && start < now ? addDays(start, UPDATE_EVERY_DAYS) : dayStart(now));
+  return { last, due, daysLeft: daysBetween(now, due) };
+}
+function dueText(daysLeft, due){
+  if(daysLeft < 0) return `${-daysLeft} day${daysLeft === -1 ? '' : 's'} overdue`;
+  if(daysLeft === 0) return 'Due today';
+  if(daysLeft === 1) return 'Due tomorrow';
+  return 'Due ' + (daysLeft < 7 ? DAY_NAMES[due.getDay()] : fmtShortDate(due));
+}
+// The dates an update covers: the day after the last one to today ("November 11 to 17").
+function updateRangeLabel(c){
+  const now = rNow(), last = c ? lastSentAt(c) : null;
+  let a = last ? addDays(dayStart(last), 1) : addDays(dayStart(now), -(UPDATE_EVERY_DAYS - 1));
+  if(a > now) a = dayStart(now);
+  const long = d => d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  if(daysBetween(a, now) === 0) return long(now);
+  return `${long(a)} to ${a.getMonth() === now.getMonth() ? now.getDate() : long(now)}`;
 }
 
 // The person who looks after a client: the one who logged most of its work in the last 60 days
@@ -90,7 +107,7 @@ function monoHtml(c, cls){ return `<span class="mono${cls ? ' ' + cls : ''}" ari
 
 // ---- sent history (for "Last 8 weeks" and the late/missed signal) --------------------------
 // Kept in app_storage 'update-history' as { clientId: [ISO sent times] }; written whenever an
-// update is sent (sendDraftEmail → recordUpdateSent) and by the scheduled send.
+// update is sent (recordDraftSent → recordUpdateSent, on the desktop and the iPhone).
 let updateHistory = {};
 async function loadUpdateHistory(){
   const raw = await safeGet('update-history');
@@ -112,18 +129,17 @@ function sentTimes(c){
   return fromHist.sort((a, b) => a - b);
 }
 function lastSentAt(c){ const s = sentTimes(c); return s.length ? s[s.length - 1] : null; }
-// Last 8 weekly updates, oldest first: 'o' on time · 'l' late · 'm' missed · 'p' this week, not sent yet · 'n' before history began.
+// The last 8 weeks (Monday to Sunday), oldest first: 'o' sent on time · 'l' sent late (more than
+// 7 days after the one before) · 'm' nothing sent · 'p' this week, not sent yet · 'n' before history began.
 function weekHistory(c){
-  // Each send counts once, for the oldest week it can belong to: on time if it went out in the
-  // week before that send day, late if it went out within 4 days after it, otherwise missed.
-  const cyc = updateCycle(), sends = sentTimes(c), first = sends[0], used = new Set(), out = [];
-  const take = (from, to) => { const i = sends.findIndex((t, k) => !used.has(k) && t > from && t <= to); if(i < 0) return false; used.add(i); return true; };
+  const now = rNow(), sends = sentTimes(c), first = sends[0], out = [];
+  const monday = dayStart(addDays(now, -((now.getDay() + 6) % 7)));
   for(let k = 7; k >= 0; k--){
-    const due = addDays(cyc.send, -7 * k), from = addDays(due, -7);
-    if(take(from, due)){ out.push('o'); continue; }
-    if(k === 0){ out.push(rNow() > due ? (take(due, addDays(due, 4)) ? 'l' : 'm') : 'p'); continue; }
-    if(take(due, addDays(due, 4))){ out.push('l'); continue; }
-    out.push(!first || first > due ? 'n' : 'm');
+    const from = addDays(monday, -7 * k), to = addDays(from, 7);
+    const i = sends.findIndex(t => t >= from && t < to);
+    if(i >= 0){ out.push(i > 0 && daysBetween(sends[i - 1], sends[i]) > UPDATE_EVERY_DAYS ? 'l' : 'o'); continue; }
+    if(k === 0){ out.push('p'); continue; }
+    out.push(!first || first >= to ? 'n' : 'm');
   }
   return out;
 }
@@ -137,52 +153,64 @@ function histDotsHtml(seq){
   return `<span class="hist" role="img" aria-label="Last 8 weekly updates: ${late} late or missed">${seq.map(x => cls[x] ? `<i class="${cls[x]}"></i>` : '<i></i>').join('')}</span>`;
 }
 function weekStripHtml(c){
-  const cyc = updateCycle(), seq = weekHistory(c), words = { o: 'On time', l: 'Late', m: 'Missed', p: 'Due ' + fmtDay(cyc.send), n: '—' };
-  const cls = { o: '', l: 'l', m: 'm', p: 'p', n: 'p' };
+  const now = rNow(), seq = weekHistory(c), sends = sentTimes(c), monday = dayStart(addDays(now, -((now.getDay() + 6) % 7)));
+  const words = { o: 'On time', l: 'Late', m: 'Missed', n: '—' }, cls = { o: '', l: 'l', m: 'm', p: 'p', n: 'p' };
   return `<div class="wkstrip" role="list" aria-label="Weekly updates, last 8 weeks">${seq.map((x, i) => {
-    const d = addDays(cyc.send, -7 * (7 - i));
-    return `<div class="${cls[x]}" role="listitem"><i></i><b>${fmtShortDate(d)}</b><span>${x === 'p' && i < 7 ? '—' : words[x]}</span></div>`;
+    const from = addDays(monday, -7 * (7 - i)), sent = sends.find(t => t >= from && t < addDays(from, 7));
+    const word = x === 'p' ? dueText(clientDue(c).daysLeft, clientDue(c).due) : words[x];
+    return `<div class="${cls[x]}" role="listitem"><i></i><b>${fmtShortDate(sent || from)}</b><span>${word}</span></div>`;
   }).join('')}</div>`;
 }
 
 // ---- this week's update for one client ------------------------------------------------------
 const STEP_NAMES = ['Logged', 'Ready for review', 'Approved', 'Sent'];
 function clientWeek(c){
-  const cyc = updateCycle(), now = cyc.now, cp = cyc.checkpoints;
-  const drafts = c.drafts || [];
-  const owner = clientOwner(c);
-  const logged = (c.improvements || []).filter(i => new Date(i.date) > cyc.periodStart);
-  const sentThisCycle = drafts.filter(d => d.draftSentAt && new Date(d.draftSentAt) > cyc.prevSend).sort((a, b) => new Date(b.draftSentAt) - new Date(a.draftSentAt))[0];
-  const approved = drafts.find(d => d.draftStatus === 'approved');
+  const now = rNow(), drafts = c.drafts || [], owner = clientOwner(c);
+  const { last, due, daysLeft } = clientDue(c, now);
+  const since = last || addDays(now, -UPDATE_EVERY_DAYS);
+  const logged = (c.improvements || []).filter(i => new Date(i.date) > since);
+  const w = { c, owner, holder: owner, logged, since, last, due, daysLeft, dueText: dueText(daysLeft, due),
+    done: 0, behind: null, sent: false, late: false, state: 'due', draft: null };
+  const approved = drafts.find(d => d.draftStatus === 'approved' && !d.draftSentAt);
   const inReview = drafts.find(d => d.draftStatus === 'pending' && d.readyToNotify);
   const written = drafts.find(d => d.draftStatus === 'pending');
-  const w = { c, owner, holder: owner, logged, done: 0, behind: null, sent: false, late: false, state: 'track', draft: null };
-  if(sentThisCycle){ Object.assign(w, { done: 4, sent: true, state: 'sent', draft: sentThisCycle, note: `Sent ${relDay(sentThisCycle.draftSentAt).toLowerCase()}, ${fmtTime(new Date(sentThisCycle.draftSentAt))}` }); return w; }
-  if(approved){ Object.assign(w, { done: 3, draft: approved, note: `Approved · sends ${fmtDay(cp.send)} ${fmtTime(cp.send)}` }); }
-  else if(inReview){ Object.assign(w, { done: 2, draft: inReview, holder: 'approvers', note: `In Review since ${fmtTime(new Date(inReview.draftPendingSince || now))}` }); }
-  else if(written){ Object.assign(w, { done: 1, draft: written, holder: written.author, note: `Draft waiting on ${firstName(written.author)} since ${fmtTime(cp.review < now ? cp.review : new Date(written.draftPendingSince || now))}` }); }
-  else if(logged.length){ Object.assign(w, { done: 1, note: `${logged.length} improvement${logged.length === 1 ? '' : 's'} logged · no draft yet` }); }
+  if(approved) Object.assign(w, { done: 3, draft: approved, holder: 'approvers', note: 'Approved · ready to send' });
+  else if(inReview) Object.assign(w, { done: 2, draft: inReview, holder: 'approvers', note: `In Review since ${whenShort(inReview.draftPendingSince || now)}` });
+  else if(written) Object.assign(w, { done: 1, draft: written, holder: written.author, note: `Draft waiting on ${firstName(written.author)} since ${whenShort(written.draftPendingSince || now)}` });
+  else if(logged.length) Object.assign(w, { done: 1, note: `${logged.length} improvement${logged.length === 1 ? '' : 's'} logged · no draft yet` });
   else {
-    const last = (c.improvements || []).map(i => new Date(i.date)).sort((a, b) => b - a)[0];
-    Object.assign(w, { done: 0, note: last ? `Nothing logged since ${fmtShortDate(last)}` : 'Nothing logged yet' });
+    const lastLog = (c.improvements || []).map(i => new Date(i.date)).sort((a, b) => b - a)[0];
+    w.note = lastLog ? `Nothing logged since ${fmtShortDate(lastLog)}` : 'Nothing logged yet';
   }
-  // Behind: the step that's due next has passed its checkpoint.
-  const due = [cp.log, cp.review, cp.approve, cp.send];
-  if(w.done < 4 && now > due[w.done]){ w.behind = w.done; w.state = 'behind'; }
-  if(now > cp.send){ w.late = true; w.state = 'late'; }
+  // Sent in the last 7 days: done for this week. The next update's progress is kept in w.next.
+  if(last && daysLeft > 0){
+    const sentDraft = drafts.filter(d => d.draftSentAt).sort((a, b) => new Date(b.draftSentAt) - new Date(a.draftSentAt))[0] || null;
+    const ago = daysBetween(last, now), sentWord = ago === 0 ? 'today' : ago === 1 ? 'yesterday' : fmtShortDate(last);
+    w.next = { done: w.done, draft: w.draft, holder: w.holder, note: w.note };
+    return Object.assign(w, { done: 4, sent: true, state: 'sent', draft: sentDraft, holder: '',
+      note: `Sent ${sentWord} · next due ${daysLeft === 1 ? 'tomorrow' : (daysLeft < 7 ? DAY_NAMES[due.getDay()] : fmtShortDate(due))}` });
+  }
+  // Due or overdue: the next step is the one it's waiting on.
+  w.behind = w.done; w.late = daysLeft < 0; w.state = w.late ? 'late' : 'due';
   return w;
 }
+// Due within 2 days but sent last week: show the next update's progress, not last week's send.
+function weekView(w){ return w.sent && w.next && w.daysLeft <= 2 ? Object.assign({}, w, w.next, { sent: false, behind: null, upcoming: true }) : w; }
+function needsUpdate(w){ return w.state === 'due' || w.state === 'late'; }
 function stepsHtml(w){
   if(w.sent) return '<span class="steps sent" role="img" aria-label="Sent"><i></i><i></i><i></i><i></i></span>';
+  if(w.upcoming){ let o = ''; for(let k = 0; k < 4; k++) o += k < w.done ? '<i class="d"></i>' : '<i></i>'; return `<span class="steps" role="img" aria-label="${w.dueText}: ${w.done ? STEP_NAMES[w.done - 1].toLowerCase() : 'not started'}">${o}</span>`; }
   let out = '';
-  for(let k = 0; k < 4; k++) out += k < w.done ? '<i class="d"></i>' : (w.behind === k ? '<i class="b"></i>' : '<i></i>');
-  const label = w.behind != null ? `Behind: ${STEP_NAMES[w.behind].toLowerCase()} is late` : (w.done ? `${STEP_NAMES[w.done - 1]}, on track` : 'Not started, on track');
+  for(let k = 0; k < 4; k++) out += k < w.done ? '<i class="d"></i>' : (w.behind === k ? `<i class="b${w.late ? ' r' : ''}"></i>` : '<i></i>');
+  const label = `${w.dueText}: ${w.behind != null ? STEP_NAMES[w.behind].toLowerCase() + ' is next' : 'not started'}`;
   return `<span class="steps" role="img" aria-label="${label}">${out}</span>`;
 }
+// Overdue first (longest first), then due today; most important clients first within each.
+function dueOrder(a, b){ return a.daysLeft - b.daysLeft || (b.c.importance || 0) - (a.c.importance || 0); }
 function weekSummary(list){
   const ws = list.map(clientWeek);
-  return { ws, sent: ws.filter(w => w.sent).length, behind: ws.filter(w => w.state === 'behind' || w.state === 'late').length,
-    track: ws.filter(w => !w.sent && w.state === 'track').length, total: ws.length };
+  return { ws, sent: ws.filter(w => w.sent).length, behind: ws.filter(needsUpdate).length, late: ws.filter(w => w.state === 'late').length,
+    due: ws.filter(w => w.state === 'due').length, total: ws.length };
 }
 
 // ---- client health --------------------------------------------------------------------------
@@ -217,11 +245,12 @@ function clientHealth(c){
   const ll = lvl(lateN, T.lateOfLast4);
   if(ll){
     const ex = sig.find(s => s.key === 'noupdate');
-    const txt = `${lateN} of the last 4 were late or missed${w.behind != null ? '; this week’s is behind' : ''}.`;
+    const txt = `${lateN} of the last 4 were late or missed${w.late ? '; this week’s is overdue' : ''}.`;
     if(ex){ ex.text += ' ' + txt; if(ll === 'r') ex.l = 'r'; }
     else {
       const lastBad = [6, 5, 4, 3].find(i => seq[i] === 'l' || seq[i] === 'm');
-      sig.push({ l: ll, key: 'late', icon: 'mail', title: 'Updates keep slipping', since: lastBad != null ? addDays(updateCycle().send, -7 * (7 - lastBad)) : now, text: txt.charAt(0).toUpperCase() + txt.slice(1) });
+      const monday = dayStart(addDays(now, -((now.getDay() + 6) % 7)));
+      sig.push({ l: ll, key: 'late', icon: 'mail', title: 'Updates keep slipping', since: lastBad != null ? addDays(monday, -7 * (7 - lastBad)) : now, text: txt.charAt(0).toUpperCase() + txt.slice(1) });
     }
   }
   const hp = hoursPace(c);

@@ -21,22 +21,17 @@ function calColor(e){
   if(e.eventType === 'meeting') return e.clientId ? 'blue' : 'purple';
   return 'gray';
 }
-// Everything shown on the calendar: events, tasks due, the weekly send and the days updates went out.
+// Everything shown on the calendar: events, tasks due, the days client updates are due and the days they went out.
 function calItems(from, to){
   const out = calendarEvents.filter(e => new Date(e.startAt) < to && new Date(e.endAt || e.startAt) >= from).map(e => Object.assign({}, e));
   getTaskCalendarMarkers().filter(t => t.taskStatus !== 'done').forEach(t => { const d = new Date(t.startAt); if(d >= from && d < to) out.push(t); });
-  // The weekly deadline (approve by) in red, and the send itself in green.
-  const seen = new Set();
-  for(let d = addDays(from, -7); d < addDays(to, 7); d = addDays(d, 1)){
-    const cyc = updateCycle(d), key = cyc.send.toISOString();
-    if(seen.has(key)) continue; seen.add(key);
-    const due = cyc.checkpoints.approve;
-    if(due >= from && due < to) out.push({ id: 'due-' + key, kind: 'due', title: 'Weekly updates due', startAt: due.toISOString(), endAt: new Date(+due + 30 * 60000).toISOString() });
-    if(cyc.send >= from && cyc.send < to && cyc.send > rNow()){
-      const n = activeClients().length;
-      out.push({ id: 'send-' + key, kind: 'sent', title: 'Send approved updates', sub: `${n} client${n === 1 ? '' : 's'}`, startAt: key, endAt: new Date(+cyc.send + 60 * 60000).toISOString() });
-    }
-  }
+  // Client updates due, on the day each is due (anything overdue shows today), in red.
+  const today = dayStart(rNow()), dueByDay = {};
+  activeClients().forEach(c => { const { due } = clientDue(c); const d = due < today ? today : due; if(d >= dayStart(from) && d < to){ const k = toDateStr(d); (dueByDay[k] = dueByDay[k] || []).push(c.name); } });
+  Object.entries(dueByDay).forEach(([k, names]) => {
+    const at = atTime(new Date(k + 'T12:00:00'), '09:00');
+    out.push({ id: 'due-' + k, kind: 'due', title: `${names.length} update${names.length === 1 ? '' : 's'} due`, sub: names.slice(0, 3).join(', ') + (names.length > 3 ? '…' : ''), startAt: at.toISOString(), endAt: new Date(+at + 30 * 60000).toISOString() });
+  });
   const sentByDay = {};
   activeClients().forEach(c => sentTimes(c).forEach(t => { if(t >= from && t < to){ const k = toDateStr(t); (sentByDay[k] = sentByDay[k] || []).push(t); } }));
   Object.entries(sentByDay).forEach(([k, ts]) => { const first = ts.sort((a, b) => a - b)[0]; out.push({ id: 'sent-' + k, kind: 'sent', title: 'Updates sent', sub: `${ts.length} client${ts.length === 1 ? '' : 's'}`, startAt: first.toISOString(), endAt: new Date(+first + 45 * 60000).toISOString() }); });

@@ -187,3 +187,14 @@ body.mac.mobile { overflow: hidden; background: var(--ios-bg, #F2F2F7); -webkit-
 .ialert-btns button.danger { color: var(--red); }
 .ialert-btns button:active { background: var(--fill-2); }
 .iact button.iact-cancel { background: var(--menu); border-radius: 14px; }
+.steps i.b.r { background: var(--red); }
+
+/* motion and checks (js/ui/motion.js) */
+.seg-pill { position: absolute; z-index: 0; pointer-events: none; transform-origin: left center; }
+.app .iseg { position: relative; }
+:where(.app .iseg) > :not(.seg-pill) { position: relative; z-index: 1; }
+.app .iseg > .pill-under { background: transparent !important; box-shadow: none !important; }
+.app .ir .cb.checking { background: var(--label-2); box-shadow: none; color: #fff; display: inline-flex; align-items: center; justify-content: center; }
+.app .ir .cb.rem.checking, .app .ir .cb.rem.done { background: var(--green); box-shadow: none; color: #fff; display: inline-flex; align-items: center; justify-content: center; }
+.app .ir .cb.checking svg { width: 14px; height: 14px; }
+.app button, .app [onclick], .app [role="button"] { cursor: pointer; }

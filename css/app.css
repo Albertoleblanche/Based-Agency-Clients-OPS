@@ -392,10 +392,7 @@ label.well { display: inline-block; }
 #settingsRoot .mcol { width: 44px; }
 button.ck, button.rd { border: 0; padding: 0; font: inherit; cursor: default; }
 button.set-tab { font-size: 11px; }
-.when-pop { position: relative; display: inline-flex; }
-.when-pop .menu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 20; display: flex; gap: 6px; align-items: center; padding: 8px; }
-.when-pop .menu select { height: 26px; }
-.when-pop .menu[hidden], .menu[hidden] { display: none !important; }
+.menu[hidden] { display: none !important; }
 /* filter bars shared by history screens */
 .search-f { position: relative; display: inline-flex; align-items: center; }
 .search-f svg { position: absolute; left: 8px; width: 14px; height: 14px; color: var(--label-2); pointer-events: none; }
@@ -510,3 +507,36 @@ button.set-tab { font-size: 11px; }
 .nrow:hover .nrow-dot { display: none; }
 kbd.kbd, .kbd { font-family: inherit; }
 .kb-g .row.sm { min-height: 32px; padding-top: 5px; padding-bottom: 5px; }
+
+/* overdue: the step it's waiting on turns red */
+.steps i.b.r { background: var(--red); }
+.stp.b.r .m { background: var(--red); color: #fff; }
+
+/* ---- feel: pointer on things you can click, a line under the toolbar, motion ---- */
+/* Pointer wherever a click does something (asked for over the macOS default arrow). */
+body.mac :is(button:not(:disabled), a[href], [role="button"], [role="tab"], [role="checkbox"], [role="switch"], [role="menuitem"], [role="option"], [onclick], label.pop, select:not(:disabled), summary, .sw, .cb:not(:disabled), .nav-item, .src-i, tr.client-row) { cursor: pointer !important; }
+body.mac :is(button:disabled, [aria-disabled="true"], .cb:disabled) { cursor: default !important; }
+body.mac :is(input[type="text"], input:not([type]), input[type="email"], input[type="search"], input[type="number"], input[type="password"], input[type="url"], input[type="tel"], textarea) { cursor: text !important; }
+/* The toolbar sits on its own line above the content. */
+.mac #appTopbar { border-bottom: .5px solid var(--sep-strong); }
+/* Sidebar icons lift and tip a little on hover, and press in on click. */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .side .src-i svg { transition: transform 280ms cubic-bezier(.34, 1.56, .64, 1), color 150ms ease; }
+  .side .src-i:hover svg { transform: translateY(-1.5px) scale(1.14) rotate(-7deg); color: var(--label); }
+  .side .src-i:active svg { transform: scale(.9); transition-duration: 90ms; }
+}
+/* Buttons press in. */
+@media (prefers-reduced-motion: no-preference) {
+  .mac :is(.btn, .ib, .set-tab, .seg > button) { transition: transform 140ms cubic-bezier(.23, 1, .32, 1), background-color 150ms ease, box-shadow 150ms ease; }
+  .mac :is(.btn, .ib, .set-tab):active:not(:disabled) { transform: scale(.97); }
+  .mac .cb { transition: background-color 160ms ease, box-shadow 160ms ease; }
+}
+/* The selected tab's pill slides (js/ui/motion.js). */
+.seg-pill { position: absolute; z-index: 0; pointer-events: none; transform-origin: left center; }
+:where(.seg, .set-tabs) > :not(.seg-pill) { position: relative; z-index: 1; }
+:is(.seg, .set-tabs) > .pill-under { background: transparent !important; box-shadow: none !important; }
+/* A box being checked off: tasks fill grey, reminders fill green. */
+.cb.checking { background: var(--label-2); box-shadow: none; color: #fff; }
+.cb.rem.done, .cb.rem.checking { background: var(--green); box-shadow: none; color: #fff; }
+.cb.rem:not(.done):not(:disabled):hover { box-shadow: inset 0 0 0 1.5px var(--green); }
+.cb.checking svg, .cb.rem.done svg { width: 11px; height: 11px; }

@@ -81,7 +81,6 @@ function teamInspHtml(m){
   const sw = (label, on, js) => `<div class="kv" style="align-items:center"><span style="color:var(--label)">${label}</span><button class="sw${on ? ' on' : ''}" role="switch" aria-checked="${on}" aria-label="${escapeHtml(label)}" onclick="${js}"></button></div>`;
   let extras = '';
   if(admin){
-    extras += sw('Uses the Assistant', !!m.ai_chat_enabled, `toggleMemberAiChatEnabled('${m.id}', ${!!m.ai_chat_enabled})`);
     if(m.role !== 'admin') extras += sw('Can lower a client’s risk', extra.includes('lower_danger_score'), `changeTeamPermission('${m.id}','lower_danger_score',${!extra.includes('lower_danger_score')})`);
     if(m.role === 'member') EXTRA_PERMISSIONS_META.filter(p => p.key !== 'lower_danger_score').forEach(p => {
       const label = { view_team_queue: 'Sees everyone’s drafts', delete_tasks: 'Can delete tasks for good', delete_clients: 'Can restore and delete clients' }[p.key] || p.label;

@@ -121,15 +121,10 @@ ${rows}
 <div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal()">Done</button></div>`, 520);
 }
 
-// ---- Updates (the weekly deadline and client health) ------------------------------------------
-const TIME_OPTS = Array.from({ length: 48 }, (_, i) => { const h = Math.floor(i / 2), m = i % 2 ? '30' : '00'; const v = `${String(h).padStart(2, '0')}:${m}`; return [v, fmtTime(atTime(new Date(2026, 0, 1), v))]; });
 const DAY_OPTS = DAY_NAMES.map((d, i) => [i, d]);
+// ---- Updates (the weekly update and client health) ---------------------------------------------
 function setUpdates(){
-  const s = updateSchedule(), a = updateAutomation(), t = healthThresholds(), can = canApprove();
-  // one pop per checkpoint ("Thursday at 9:00 AM"); clicking it shows a day and a time to pick
-  const when = (k, title, sub) => fr(title, sub, `<span class="when-pop"><button class="pop" ${can ? `onclick="toggleWhenPop(event,'${k}')"` : 'disabled'} aria-haspopup="true">${DAY_NAMES[s[k].day]} at ${fmtTime(atTime(new Date(2026, 0, 1), s[k].time))}${icon('caret-up-down', { weight: 'bold' })}</button>
-<div class="menu" id="when-${k}" hidden onclick="event.stopPropagation()"><select aria-label="${esc(title)} day" onchange="saveSchedule('${k}','day',this.value)">${DAY_OPTS.map(([v, t]) => `<option value="${v}"${v === s[k].day ? ' selected' : ''}>${t}</option>`).join('')}</select><span class="t-2" style="font-size:12px">at</span><select aria-label="${esc(title)} time" onchange="saveSchedule('${k}','time',this.value)">${TIME_OPTS.map(([v, t]) => `<option value="${v}"${v === s[k].time ? ' selected' : ''}>${t}</option>`).join('')}</select></div></span>`);
-  const draftAt = `${fmtTime(atTime(new Date(2026, 0, 1), s.review.time === '00:00' ? '09:00' : '09:00'))} on ${DAY_NAMES[s.review.day]}`;
+  const a = updateAutomation(), t = healthThresholds(), can = canApprove();
   const auto = (k, title, sub) => fr(title, sub, swHtml(a[k], title, `saveAutomation('${k}')`, !can));
   const range = (a0, b0, step) => { const o = []; for(let v = a0; v <= b0; v += step) o.push(v); return o; };
   const pair = (key, title, wOpts, rOpts) => `<div class="fr"><div class="l"><b>${title}</b></div><span class="mcol" style="width:150px">${popSel(title + ' — watch', wOpts, t[key][0], `saveSignal('${key}',0,this.value)`, { disabled: !can })}</span><span class="mcol" style="width:150px">${rOpts ? popSel(title + ' — at risk', rOpts, t[key][1], `saveSignal('${key}',1,this.value)`, { disabled: !can }) : '<span class="t-2">—</span>'}</span></div>`;
@@ -141,17 +136,13 @@ function setUpdates(){
   const underO = [25, 30, 40, 50, 60, 70].map(v => [v, `Under ${v}%`]);
   return `<div class="set-h">Weekly client updates</div>
 <div class="form-grp">
-${when('send', 'Updates go out', 'Every client’s update is due at this time')}
-${when('log', 'Work logged by', 'Anything logged after this goes in next week’s update')}
-${when('review', 'Ready for review by', 'Owners check the draft and send it for review')}
-${when('approve', 'Approved by', '')}
+${fr('Once a week, for every client', 'Due 7 days after its last update. An approver checks each one and sends it the day it’s ready. Nothing is ever sent automatically.', '<span class="t-2" style="white-space:nowrap">Every 7 days</span>')}
 </div>
 <div class="set-h">Help the team keep up</div>
 <div class="form-grp">
-${auto('autoDraft', 'Write drafts automatically', `At ${draftAt}, from the work logged for each client`)}
-${auto('remindBehind', 'Remind whoever is behind', 'At each checkpoint they miss, in the app and on Slack')}
-${auto('scheduledSend', 'Send approved updates at the send time', 'Approve &amp; Send still sends right away')}
-${auto('mondaySummary', 'Monday summary for approvers', 'This week’s updates and any client health changes')}
+${auto('autoDraft', 'Write drafts automatically', 'Each morning, for clients due within a day, from the work logged. They still wait for an approver.')}
+${auto('remindBehind', 'Remind whoever has an overdue update', 'The morning after it’s due, in the app and on Slack')}
+${auto('mondaySummary', 'Monday summary for approvers', 'Last week’s updates and any client health changes')}
 </div>
 <div class="mhead" style="margin-top:20px"><span style="font-size:13px;color:var(--label);font-weight:600">Client health signals</span><span class="mcol" style="width:150px">Watch at</span><span class="mcol" style="width:150px">At risk at</span></div>
 <div class="form-grp">
@@ -168,17 +159,8 @@ ${fr('Flag important clients sooner', 'Importance 8 or more moves up one level',
 ${fr('Quiet a handled signal for', 'Comes back sooner if it gets worse', popSel('Quiet a handled signal for', [3, 5, 7, 10, 14].map(v => [v, `${v} days`]), t.quietDays, 'saveSignalValue(\'quietDays\',this.value)', { disabled: !can }))}
 </div>`;
 }
-function toggleWhenPop(e, k){
-  e.stopPropagation();
-  const m = document.getElementById('when-' + k); if(!m) return;
-  const open = m.hidden;
-  document.querySelectorAll('.when-pop .menu').forEach(x => x.hidden = true);
-  m.hidden = !open;
-  if(open) setTimeout(() => document.addEventListener('click', () => { m.hidden = true; }, { once: true }), 0);
-}
-// The schedule is in the team's local time; the daily automations read it in this time zone.
+// The daily automations work out "today" in the team's time zone, saved from the browser.
 function teamTimeZone(){ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; }catch(e){ return ''; } }
-function saveSchedule(k, part, v){ changeSettings(s => { const cur = updateSchedule(); cur[k] = Object.assign({}, cur[k], { [part]: part === 'day' ? Number(v) : v }); s.updatesSchedule = cur; if(teamTimeZone()) s.timezone = teamTimeZone(); }); }
 function saveAutomation(k){ changeSettings(s => { const cur = updateAutomation(); cur[k] = !cur[k]; s.updatesAutomation = cur; if(!s.timezone && teamTimeZone()) s.timezone = teamTimeZone(); }); }
 function saveSignal(key, i, v){ changeSettings(s => { const cur = healthThresholds(); const p = cur[key].slice(); p[i] = Number(v); if(i === 0 && p[1] < p[0]) p[1] = p[0]; if(i === 1 && p[0] > p[1]) p[0] = p[1]; cur[key] = p; s.healthSignals = cur; }); }
 function saveSignalValue(key, v){ changeSettings(s => { const cur = healthThresholds(); cur[key] = Number(v); s.healthSignals = cur; }); }
@@ -227,11 +209,9 @@ function setAi(){
   const sig = settings.emailSignature || {};
   const insightsOn = settings.proactiveInsightsEnabled !== false;
   const conn = p => `<div class="fr"><span class="ic lg">${icon('sparkle')}</span><div class="l"><b>${p === 'claude' ? 'Claude' : 'ChatGPT'}</b><span id="aiConnectionStatus-${p}">Checking…</span></div><input id="${p === 'claude' ? 'setClaudeModel' : 'setOpenaiModel'}" class="tf" style="width:180px" value="${esc(p === 'claude' ? settings.claudeModel || '' : settings.openaiModel || '')}" placeholder="${esc(p === 'claude' ? DEFAULT_CLAUDE_MODEL : DEFAULT_OPENAI_MODEL)}" aria-label="${p === 'claude' ? 'Claude' : 'ChatGPT'} model" onchange="saveAiModel('${p}', this.value)" title="Model"><button class="btn" id="aiConnectionBtn-${p}" onclick="openAiProviderConnectModal('${p}')">Connect</button></div>`;
-  return `${admin ? `<div class="set-h">Assistant</div>
+  return `${admin ? `<div class="set-h">Weekly insights</div>
 <div class="form-grp">
-${fr('AI provider', 'Billed separately from email drafting', `<div class="seg" role="radiogroup" aria-label="AI provider">${[['claude', 'Claude'], ['openai', 'ChatGPT']].map(([k, t]) => `<button role="radio" aria-checked="${provider === k}" class="${provider === k ? 'on' : ''}" ${admin ? `onclick="saveAiProvider('${k}').then(renderSettingsView)"` : 'disabled'}>${t}</button>`).join('')}</div>`)}
-${fr('Name', '', `<input id="setAssistantName" class="tf" style="width:220px" value="${esc(settings.assistantName || '')}" placeholder="Assistant" ${admin ? '' : 'disabled'} onchange="saveAssistantName(this.value)">`)}
-${fr('Instructions', 'Optional', `<textarea id="setAssistantInstructions" class="tf" style="width:340px" ${admin ? '' : 'disabled'} placeholder="How the Assistant should answer" onchange="saveAssistantInstructions(this.value)">${esc(settings.assistantCustomInstructions || '')}</textarea>`, { top: true })}
+${fr('AI provider', 'For the weekly insights in Focus Reports', `<div class="seg" role="radiogroup" aria-label="AI provider">${[['claude', 'Claude'], ['openai', 'ChatGPT']].map(([k, t]) => `<button role="radio" aria-checked="${provider === k}" class="${provider === k ? 'on' : ''}" ${admin ? `onclick="saveAiProvider('${k}').then(renderSettingsView)"` : 'disabled'}>${t}</button>`).join('')}</div>`)}
 ${fr('Weekly insights', 'A short note on patterns across your clients', `${popSel('Day', DAY_OPTS.map(([i, d]) => [i, 'Every ' + d]), settings.proactiveInsightsDayOfWeek ?? 3, 'saveProactiveInsightsDay(this.value).then(renderSettingsView)', { disabled: !admin })}${swHtml(insightsOn, 'Weekly insights', 'toggleProactiveInsightsEnabled().then(renderSettingsView)', !admin)}`)}
 </div>` : ''}
 ${admin ? `<div class="set-h">AI accounts</div><div class="form-grp">${conn('claude')}${conn('openai')}</div>` : ''}

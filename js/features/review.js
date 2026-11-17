@@ -3,12 +3,12 @@
 // beside it, and Approve & Send (⌘↩) on top. Exactly the canvas "Review" board.
 
 let reviewTab = 'waiting';
-function setReviewTab(t){ reviewTab = t; renderTeamQueue(); }
+function setReviewTab(t){ reviewTab = t; window._reviewSel = null; window._reviewEditing = null; renderTeamQueue(); } // a new tab starts at its first draft
 
 function reviewItems(){
   const cyc = updateCycle(), me = myName(), out = { waiting: [], approved: [], sent: [] };
   attentionEligibleClients().forEach(c => (c.drafts || []).forEach(d => {
-    if(d.draftSentAt && new Date(d.draftSentAt) > cyc.prevSend) out.sent.push({ c, d, at: d.draftSentAt });
+    if(d.draftSentAt){ if(new Date(d.draftSentAt) >= cyc.weekStart) out.sent.push({ c, d, at: d.draftSentAt }); }
     else if(d.draftStatus === 'approved') out.approved.push({ c, d, at: d.draftPendingSince });
     else if(d.draftStatus === 'pending' && d.draft && (d.readyToNotify || d.author === me)) out.waiting.push({ c, d, at: d.draftPendingSince });
   }));
@@ -32,6 +32,7 @@ function renderTeamQueue(){
   if(!root || typeof clients === 'undefined') return;
   const cyc = updateCycle(), items = reviewItems(), list = items[reviewTab];
   const key = x => x.c.id + '|' + x.d.author;
+  const dueN = items.waiting.filter(x => needsUpdate(clientWeek(x.c))).length;
   const want = window._reviewSel ? window._reviewSel.clientId + '|' + window._reviewSel.author : null;
   let sel = list.find(x => key(x) === want);
   if(!sel && want){ for(const t of ['waiting', 'approved', 'sent']){ const f = items[t].find(x => key(x) === want); if(f){ reviewTab = t; return renderTeamQueue(); } } }
@@ -50,26 +51,26 @@ function renderTeamQueue(){
   }).join('') || `<div class="empty"><b>${reviewTab === 'waiting' ? 'Nothing waiting' : 'Nothing here'}</b>${reviewTab === 'waiting' ? 'Drafts appear here when they’re sent for review.' : ''}</div>`;
   root.innerHTML = `<section class="list" aria-label="Drafts">
 <div class="list-h"><div class="seg" role="tablist" aria-label="Drafts">${tabs}</div><button class="ib" aria-label="Filter" title="Filter" style="margin-left:auto" onclick="switchView('approve')">${icon('funnel-simple')}</button></div>
-${reviewTab === 'waiting' ? `<div class="rv-due">${icon('clock')}<span>Approve by <b>${fmtDay(cyc.checkpoints.approve)} ${fmtTime(cyc.checkpoints.approve).replace(':00', '')}</b> · oldest first</span></div>` : ''}
+${reviewTab === 'waiting' && dueN ? `<div class="rv-due">${icon('clock')}<span><b>${dueN}</b> due today or overdue · oldest first</span></div>` : ''}
 <div style="padding:0 0 6px">${rows}</div></section>
 <section class="detail" aria-label="Selected draft">${sel ? reviewDetailHtml(sel, cyc) : ''}</section>`;
-  if(currentViewName === 'teamqueue') setToolbar(null, `${items.waiting.length} draft${items.waiting.length === 1 ? '' : 's'} waiting · approve by ${fmtDay(cyc.checkpoints.approve)} ${fmtTime(cyc.checkpoints.approve).replace(':00', '')}`);
+  if(currentViewName === 'teamqueue') setToolbar(null, `${items.waiting.length} draft${items.waiting.length === 1 ? '' : 's'} waiting${dueN ? ` · ${dueN} due today or overdue` : ''}`);
   const badge = document.getElementById('navTeamPendingBadge');
   if(badge){ badge.textContent = items.waiting.length; badge.style.display = items.waiting.length ? '' : 'none'; }
 }
 function selectReview(clientId, author){ window._reviewSel = { clientId, author }; renderTeamQueue(); }
 
 function reviewDetailHtml(x, cyc){
-  const c = x.c, d = x.d, h = clientHealth(c), seq = weekHistory(c), ots = onTimeSummary(seq);
-  const imps = (c.improvements || []).filter(i => (d.draftImprovementIds || []).includes(i.id) || (i.author === d.author && new Date(i.date) > cyc.periodStart && !(d.draftImprovementIds || []).length));
+  const c = x.c, d = x.d, h = clientHealth(c), seq = weekHistory(c), ots = onTimeSummary(seq), w = clientWeek(c);
+  const imps = (c.improvements || []).filter(i => (d.draftImprovementIds || []).includes(i.id) || (i.author === d.author && new Date(i.date) > w.since && !(d.draftImprovementIds || []).length));
   const editing = window._reviewEditing === c.id + '|' + d.author;
-  const status = d.draftSentAt ? ['green', `Sent ${relDay(d.draftSentAt).toLowerCase()}`] : d.draftStatus === 'approved' ? ['purple', 'Approved'] : ['blue', 'Draft ready for review'];
+  const status = d.draftSentAt ? ['green', `Sent ${relDayLower(d.draftSentAt)}`] : d.draftStatus === 'approved' ? ['purple', 'Approved'] : ['blue', 'Draft ready for review'];
   const canAct = canApprove() && !d.draftSentAt;
   const actions = canAct ? (d.draftStatus === 'approved'
       ? `<button class="btn btn-p" onclick="sendApprovedDraft('${c.id}',${jsArg(d.author)})">${icon('paper-plane-tilt')}Send Now</button>`
       : `<button class="btn" onclick="toggleReviewEdit('${c.id}',${jsArg(d.author)})">${icon('pencil-simple')}${editing ? 'Done' : 'Edit'}</button>
 <button class="btn" onclick="generateDraft('${c.id}',${jsArg(d.author)})">${icon('sparkle')}Rewrite</button>
-<button class="btn" onclick="approveDraft('${c.id}',${jsArg(d.author)})" title="Approve now; it goes out ${cyc.sendLabel} with the others">Approve</button>
+<button class="btn" onclick="approveDraft('${c.id}',${jsArg(d.author)})" title="Approve now and send it later from Approved">Approve</button>
 <button class="btn btn-p" onclick="approveAndSendOwnDraft('${c.id}',${jsArg(d.author)})" title="Approve and send now (⌘↩)">${icon('paper-plane-tilt')}Approve &amp; Send</button>`)
     : (!canApprove() && !d.readyToNotify && d.author === myName() ? `<button class="btn btn-p" onclick="sendDraftForReview('${c.id}',${jsArg(d.author)})">${icon('paper-plane-tilt')}Send for Review</button>` : '');
   const impRows = imps.map(i => `<div class="row sm"><span class="ok-ic">${icon('check-circle')}</span><div class="tx"><span class="t" style="font-weight:400">${escapeHtml(i.text)}</span><span class="s">${escapeHtml(c.service || '')} · ${fmtShortDate(new Date(i.date))}</span></div></div>`).join('');
@@ -79,8 +80,8 @@ function reviewDetailHtml(x, cyc){
 <div class="doc-h">${monoHtml(c)}<div class="meta"><b>${escapeHtml(c.name)}</b><span>To ${escapeHtml(c.email || 'no email on file')}</span><span>Drafted by ${escapeHtml(d.author)}${imps.length ? ` from ${imps.length} improvement${imps.length === 1 ? '' : 's'}` : ''}</span></div>
 ${when ? `<div class="when">${relDay(when)}<br>${fmtTime(when)}</div>` : ''}</div>
 <div class="rv-ctx">${hstateHtml(h.level)}<span style="display:inline-flex;align-items:center;gap:8px">${histDotsHtml(seq)}${ots.total ? `On time ${ots.onTime} of the last ${ots.total}` : ''}</span>
-${d.draftStatus !== 'approved' && !d.draftSentAt ? `<span style="margin-left:auto">Approve sends it ${cyc.sendLabel} with the others</span>` : ''}</div>
-<h2 class="subject">Your weekly update — ${escapeHtml(cycleLongLabel(cyc))}</h2>
+${!d.draftSentAt ? `<span style="margin-left:auto"${w.late ? ' class="t-red"' : ''}>${escapeHtml(w.dueText)}</span>` : ''}</div>
+<h2 class="subject">Your weekly update — ${escapeHtml(updateRangeLabel(c))}</h2>
 ${editing ? `<textarea spellcheck="true" class="draft rv-edit" id="draft-${c.id}">${escapeHtml(d.draft || '')}</textarea>` : `<div class="body">${draftBodyHtml(d.draft)}</div>`}
 ${!c.email ? '<p class="t-red" style="font-size:12px">No client email on file — add one in All Clients to send.</p>' : ''}
 ${impRows ? `<div class="src-note">${icon('list-checks')}<span>Written from these improvements</span></div><div class="grp">${impRows}</div>` : ''}

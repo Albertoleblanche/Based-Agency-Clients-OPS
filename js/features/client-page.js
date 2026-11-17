@@ -17,7 +17,7 @@ function renderClientPage(){
   const top = document.getElementById('cdTop');
   if(!top || !c) return;
   setToolbar(c.name, 'All Clients');
-  const h = clientHealth(c), w = clientWeek(c), owner = clientOwner(c), cyc = updateCycle(), next = nextStepTask(c);
+  const h = clientHealth(c), w = weekView(clientWeek(c)), owner = clientOwner(c), next = nextStepTask(c);
   const myNotes = (typeof notes !== 'undefined' ? notes : []).filter(n => n.clientId === c.id);
   const start = c.startDate ? new Date(c.startDate + 'T12:00:00') : null;
   const tabs = [['overview', 'Overview', ''], ['improvements', 'Improvements', (c.improvements || []).length], ['time', 'Time', ''], ['notes', 'Notes', myNotes.length], ['activity', 'Activity', '']]
@@ -36,13 +36,11 @@ ${callout}`;
   document.querySelectorAll('#cdRoot .cd-tab').forEach(t => { t.hidden = t.dataset.tab !== cdTab; });
 
   // ---- Overview
-  const pts = [cyc.checkpoints.log, cyc.checkpoints.review, cyc.checkpoints.approve, cyc.checkpoints.send];
-  const hr = t => t.getMinutes() ? fmtTime(t) : t.toLocaleTimeString('en-US', { hour: 'numeric' });
-  const stepTxt = [`${w.logged.length} improvement${w.logged.length === 1 ? '' : 's'}`,
-    w.done > 1 ? 'Sent for review' : `Due ${fmtDay(pts[1])} ${hr(pts[1])}${w.draft && w.done === 1 ? ' · waiting on ' + firstName(w.draft.author) : ''}`,
-    w.done > 2 ? 'Approved' : `By ${fmtDay(pts[2])} ${hr(pts[2])}`, w.sent ? `Sent ${relDay(w.draft.draftSentAt).toLowerCase()}` : `${fmtDay(pts[3])} ${fmtTime(pts[3])}`];
+  const stepTxt = [w.sent ? 'Logged' : `${w.logged.length} improvement${w.logged.length === 1 ? '' : 's'}`,
+    w.sent || w.done > 1 ? 'Sent for review' : w.draft && w.done === 1 ? 'Waiting on ' + firstName(w.draft.author) : 'Draft not written',
+    w.sent || w.done > 2 ? 'Approved' : 'By an approver', w.sent ? `Sent ${relDayLower(w.last)}` : w.dueText];
   const stepper = STEP_NAMES.map((n, k) => {
-    const cls = w.sent ? 's d' : k < w.done ? 'd' : (w.behind === k ? 'b' : '');
+    const cls = w.sent ? 's d' : k < w.done ? 'd' : (w.behind === k ? 'b' + (w.late ? ' r' : '') : '');
     const mark = (w.sent || k < w.done) ? icon('check', { weight: 'bold' }) : (w.behind === k ? icon('exclamation-mark', { weight: 'bold' }) : '');
     return `<div class="stp ${cls}"><span class="m">${mark}</span><b>${n}</b><span>${escapeHtml(stepTxt[k])}</span></div>`;
   }).join('');
@@ -57,7 +55,7 @@ ${callout}`;
   const kv = (k, v) => `<div class="kv"><span>${k}</span><b style="font-weight:500">${v}</b></div>`;
   const cf = (settings.customFields || []).filter(f => (c.customFieldValues || {})[f.id]).map(f => kv(escapeHtml(f.label || f.name || 'Field'), escapeHtml(String(c.customFieldValues[f.id])))).join('');
   document.getElementById('cdOverviewMain').innerHTML = `
-<div class="h2"><h2>This week’s update</h2><span class="t-2" style="font-size:12px">Sends ${fmtDay(cyc.send)} ${fmtTime(cyc.send)}</span></div>
+<div class="h2"><h2>This week’s update</h2><span class="${w.late ? 't-red' : 't-2'}" style="font-size:12px">${escapeHtml(w.sent ? w.note : w.upcoming ? `${w.dueText} · last sent ${fmtShortDate(w.last)}` : w.dueText)}</span></div>
 <div class="panel" style="padding:18px 18px 16px"><div class="stepper">${stepper}</div>${weekBtns}</div>
 ${h.signals.length ? `<div class="h2"><h2>${h.level === 'r' ? 'Why it’s at risk' : 'Why it’s on Watch'}<span class="c">${h.signals.length}</span></h2><a href="#settings" onclick="openSettingsTab('updates');return false;">Adjust signals</a></div><div class="grp">${signalRowsHtml(h)}</div>` : ''}
 <div class="h2"><h2>Improvements<span class="c">${imps.length}</span></h2><a href="#" onclick="openQueueLogImprovementModal('${c.id}');return false;">Log Improvement</a></div>

@@ -341,7 +341,7 @@ async function saveAiProvider(provider){
   if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
   settings.aiProvider = provider;
   const ok = await persistSettings();
-  ok ? showToast('success','Saved', provider==='openai' ? 'The Assistant now uses ChatGPT.' : 'The Assistant now uses Claude.') : showToast('error','Save failed','Could not save — try again.');
+  ok ? showToast('success','Saved', provider==='openai' ? 'Weekly insights now use ChatGPT.' : 'Weekly insights now use Claude.') : showToast('error','Save failed','Could not save — try again.');
 }
 
 function renderAiProviderChoice(){
@@ -535,7 +535,7 @@ async function submitAiProviderConnect(provider){
 async function disconnectAiProvider(provider){
   if(!isAdmin()){ showToast('error','Not allowed','Only admins can disconnect a provider.'); return; }
   const label = provider==='claude' ? 'Claude' : 'ChatGPT';
-  if(!(await confirmDialog(`Disconnect ${label}? The Assistant won't be able to use it until reconnected (or until a Vercel environment variable is set instead).`, {confirmLabel:'Disconnect', destructive:true}))) return;
+  if(!(await confirmDialog(`Disconnect ${label}? Weekly insights won't be able to use it until reconnected (or until a Vercel environment variable is set instead).`, {confirmLabel:'Disconnect', destructive:true}))) return;
   try{
     await adminActionCall('disconnect-ai-provider', { provider });
     showToast('success','Disconnected', `${label} disconnected.`);

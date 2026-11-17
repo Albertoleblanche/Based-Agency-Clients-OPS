@@ -332,7 +332,15 @@ function selectClientRow(id){
   renderClientInspector();
 }
 
-function closeClientInspector(){
+function closeClientInspector(now){
+  // Slides back out to the right edge it came from.
+  const el = document.getElementById('clientInspector');
+  if(!now && el && !el.hidden && typeof animateThen === 'function' && motionOK()){
+    if(el.dataset.leaving) return;
+    el.dataset.leaving = '1';
+    animateThen(el, [{ transform: 'none' }, { transform: 'translateX(100%)' }], 220, 'cubic-bezier(.32,.72,0,1)', () => { closeClientInspector(true); delete el.dataset.leaving; el.getAnimations?.().forEach(a => a.cancel()); });
+    return;
+  }
   inspectedClientId = null;
   document.querySelectorAll('#clientsTbody tr.client-row.sel').forEach(tr=>{ tr.classList.remove('sel'); tr.setAttribute('aria-selected','false'); });
   renderClientInspector();

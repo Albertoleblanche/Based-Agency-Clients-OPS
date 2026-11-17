@@ -278,16 +278,15 @@ async function saveQueueLogImprovement(another){
 }
 
 // ---- Group & Send: each client's logged work becomes one draft --------------------------------
-let gsWeek = 0, gsList = [], gsPick = new Set();
-function gsCycle(k){ return updateCycle(addDays(rNow(), -7 * k)); }
-function gsCandidates(k){
-  const cyc = gsCycle(k), me = myName(), mineOnly = !canApprove(), cur = k === 0;
+// Each client's work since its last update. Clients due within 2 days are picked to start with.
+let gsList = [], gsPick = new Set();
+function gsCandidates(){
+  const me = myName(), mineOnly = !canApprove();
   const out = [];
   weekVisibleClients().forEach(c => {
-    const drafts = c.drafts || [];
-    if(drafts.some(d => d.draftSentAt && new Date(d.draftSentAt) > cyc.prevSend)) return;            // already went out
-    if(drafts.some(d => d.draftStatus === 'approved' || (d.draftStatus === 'pending' && d.readyToNotify))) return; // in Review or approved
-    let imps = (c.improvements || []).filter(i => { const t = new Date(i.date); return t > cyc.periodStart && (cur || t <= cyc.periodEnd); });
+    const drafts = c.drafts || [], w = clientWeek(c);
+    if(drafts.some(d => (d.draftStatus === 'approved' && !d.draftSentAt) || (d.draftStatus === 'pending' && d.readyToNotify))) return; // in Review or approved
+    let imps = (c.improvements || []).filter(i => new Date(i.date) > w.since);
     if(mineOnly) imps = imps.filter(i => i.author === me);
     const inEmail = imps.filter(i => i.includeInEmail !== false);
     if(!inEmail.length) return;
@@ -300,23 +299,21 @@ function gsCandidates(k){
     const by = writer === me ? 'you write it' : `${writer} writes it`;
     const sub = redraft ? `Redraft with the ${redraft} new improvement${s(redraft)} · ${writer === me ? 'you' : writer}`
       : `${imps.length} improvement${s(imps.length)}${inEmail.length !== imps.length ? ` · ${inEmail.length} in the email` : ''} · ${by}`;
-    out.push({ c, writer, items: inEmail.slice().sort((a, b) => new Date(a.date) - new Date(b.date)), sub });
+    out.push({ c, writer, items: inEmail.slice().sort((a, b) => new Date(a.date) - new Date(b.date)), sub: `${w.dueText} · ${sub}`, daysLeft: w.daysLeft });
   });
-  return out.sort((a, b) => a.c.name.localeCompare(b.c.name));
+  return out.sort((a, b) => a.daysLeft - b.daysLeft || a.c.name.localeCompare(b.c.name));
 }
 // Clients with approved drafts from more than one person: offered as "Combine Them…".
 function gsCombinable(){ return activeClients().filter(c => (c.drafts || []).filter(d => d.draftStatus === 'approved' && !d.draftSentAt).length >= 2); }
 function openGroupAndSendModal(){
-  gsList = gsCandidates(gsWeek);
-  gsPick = new Set(gsList.map(x => x.c.id));
+  gsList = gsCandidates();
+  gsPick = new Set(gsList.filter(x => x.daysLeft <= 2).map(x => x.c.id));
   gsRender();
 }
-function gsSetWeek(v){ gsWeek = +v || 0; gsList = gsCandidates(gsWeek); gsPick = new Set(gsList.map(x => x.c.id)); gsRender(true); }
 function gsToggle(id){ gsPick.has(id) ? gsPick.delete(id) : gsPick.add(id); gsRender(true); }
 function gsRender(keep){
-  const weeks = [0, 1, 2, 3].map(k => [k, gsCycle(k).label]);
   const rows = gsList.map(x => `<div class="row" style="cursor:default" onclick="gsToggle('${x.c.id}')">${sheetCk(gsPick.has(x.c.id), 'Include ' + x.c.name, `event.stopPropagation();gsToggle('${x.c.id}')`)}${monoHtml(x.c)}<div class="tx"><span class="t">${escapeHtml(x.c.name)}</span><span class="s">${escapeHtml(x.sub)}</span></div></div>`).join('')
-    || `<div class="row"><div class="tx"><span class="t">Nothing to group</span><span class="s">${gsWeek ? 'Every client with work logged that week already has a draft.' : 'Every client with work logged this week already has a draft.'}</span></div></div>`;
+    || `<div class="row"><div class="tx"><span class="t">Nothing to group</span><span class="s">Every client with work logged since its last update already has a draft.</span></div></div>`;
   const comb = gsCombinable();
   const combLine = comb.length && canApprove() ? `<p class="t-2" style="margin:12px 0 0;font-size:12px;line-height:1.45">${escapeHtml(comb[0].name)}${comb.length > 1 ? ` and ${comb.length - 1} more have` : ' has'} approved drafts from more than one person. <button class="link-btn" onclick="openCombineDraftsModal()">Combine Them…</button></p>` : '';
   const n = gsPick.size;
@@ -325,7 +322,6 @@ function gsRender(keep){
 <div class="grp gs-list" style="box-shadow:0 0 0 .5px var(--sep-strong)">${rows}</div>
 <div class="form-grp" style="margin-top:14px">
 <div class="fr"><div class="l"><b>Write the drafts with AI</b><span>Uses your email structure and signature from Settings</span></div>${sheetSw('gsAI', gsAIOn(), 'Write the drafts with AI', 'gsSaveAI()')}</div>
-<div class="fr"><div class="l"><b>Week</b></div>${sheetPop('gsWeekSel', 'Week', weeks, gsWeek, 'gsSetWeek(this.value)')}</div>
 </div>${combLine}
 <div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" id="gsGo" onclick="createGroupDrafts()"${n ? '' : ' disabled'}>Create ${n ? n + ' ' : ''}Draft${n === 1 ? '' : 's'}</button></div>`;
   const card = document.querySelector('#appModalOverlay .modal-card');

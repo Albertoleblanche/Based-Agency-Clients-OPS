@@ -1,6 +1,6 @@
 // The window around every screen, as on the canvas: toolbar title and subtitle, the
 // screen's own toolbar buttons, the New menu (⌘N), and the window shortcuts
-// (⌘J Assistant, ⌘[ / ⌘] back and forward).
+// (⌘[ / ⌘] back and forward).
 
 // Short client names for tight spots (the toolbar timer, chips): "Cedar & Stone Builders" → "Cedar & Stone".
 function shortClientName(name){
@@ -20,7 +20,7 @@ function setToolbar(title, sub){
 const VIEW_TOOLBAR_ACTIONS = {
   approve: () => `<button class="btn" onclick="openGroupAndSendModal()">${icon('layers')}Group &amp; Send</button>`,
   clientdetail: () => `<button class="btn" onclick="openQueueLogImprovementModal(currentDetailClientId)">${icon('plus')}Log Improvement</button>`,
-  time: () => (typeof timeToolbarTabsHtml === 'function' ? timeToolbarTabsHtml() : ''),
+  time: () => (typeof timeToolbarTabsHtml === 'function' ? timeToolbarTabsHtml() : '') + `<button class="btn" onclick="openManualEntryModal()">${icon('plus')}Add Time</button>`,
 };
 function setToolbarActions(view){
   const el = document.getElementById('tbActions');
@@ -38,6 +38,7 @@ function newMenuItems(){
     ['Note', 'notebook-pen', "openNoteModal()"],
     ['Event', 'calendar-plus', "openNewEventModal()"],
     ['Start Timer', 'timer', "openTimerModal()"],
+    ['Time Worked', 'clock', "openManualEntryModal()"],
   ];
   if(typeof canApprove === 'function' && canApprove()) items.push(['Client', 'building-2', "openAddClientForm()"]);
   return items;
@@ -50,7 +51,7 @@ function toggleNewMenu(){
     `<button class="mi" role="menuitem" onclick="closeNewMenu(); ${fn}">${icon(ic)}<span>${label}</span>${kbd ? `<span class="kbd">${kbd}</span>` : ''}</button>`).join('');
   m.style.display = 'block';
 }
-function closeNewMenu(){ const m = document.getElementById('newMenu'); if(m) m.style.display = 'none'; }
+function closeNewMenu(){ const m = document.getElementById('newMenu'); if(m && m.style.display === 'block') typeof hidePop === 'function' ? hidePop(m) : (m.style.display = 'none'); }
 document.addEventListener('click', e => { if(!e.target.closest('.new-wrap')) closeNewMenu(); });
 
 document.addEventListener('keydown', e => {
@@ -61,7 +62,6 @@ document.addEventListener('keydown', e => {
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '') || document.activeElement?.isContentEditable;
   const k = e.key.toLowerCase();
   if(k === 'n' && !e.shiftKey){ e.preventDefault(); closeAppModal(); openQueueLogImprovementModal(); }
-  else if(k === 'j'){ e.preventDefault(); if(document.getElementById('claudeNavItem')?.style.display !== 'none') switchView('claude'); }
   else if(e.key === '[' && !typing){ e.preventDefault(); history.back(); }
   else if(e.key === ']' && !typing){ e.preventDefault(); history.forward(); }
 });

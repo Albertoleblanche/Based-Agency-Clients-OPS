@@ -38,7 +38,15 @@ function openAppModal(innerHtml, maxWidth){
 
 function closeAppModal(){
   const el = document.getElementById('appModalOverlay');
-  if(el) el.remove();
+  if(el){
+    // Out the way it came in: the sheet lifts and fades while the dimming clears.
+    el.id = ''; el.style.pointerEvents = 'none';
+    const card = el.querySelector('.modal-card');
+    if(typeof animateThen === 'function'){
+      animateThen(el, [{ opacity: 1 }, { opacity: 0 }], 180, 'ease-out', () => el.remove());
+      if(card) card.animate?.([{ transform: 'none', opacity: 1 }, { transform: 'translateY(-10px) scale(.98)', opacity: 0 }], { duration: 160, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
+    } else el.remove();
+  }
   // Any open date-picker calendar dropdown gets moved to document.body
   // when opened (see toggleDatePickerCalendar) so position:fixed can
   // escape .modal-card's overflow-y:auto cleanly in every browser — some
