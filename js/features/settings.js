@@ -195,7 +195,7 @@ function applyAppBranding(){
   if(colorLabel) colorLabel.textContent = brandColor.toUpperCase();
   if(settings.brandColor) applyBrandColor(settings.brandColor);
 
-  if(tourSteps[0]) tourSteps[0].title = `Welcome to ${name} 👋`;
+
 }
 
 // Default labels match each tab's original hardcoded text exactly — the

@@ -1157,33 +1157,18 @@
 <div class="mobile-nav-scrim" id="mobileNavScrim" onclick="closeMobileNav()"></div>
 
 <div class="cmdk-overlay" id="cmdkOverlay" style="display:none;" onclick="if(event.target===this) closeCommandPalette();">
-  <div class="cmdk-palette">
-    <div class="cmdk-input-row">
-      <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/></svg>
-      <input id="cmdkInput" placeholder="Search clients, tasks, or jump to a page…" oninput="renderCommandPaletteResults()" autocomplete="off">
-      <span class="cmdk-esc-hint">Esc</span>
-    </div>
-    <div class="cmdk-results" id="cmdkResults"></div>
+  <div class="spot" role="dialog" aria-label="Search">
+    <label class="spot-in"><span class="spot-ic" aria-hidden="true"></span><input id="cmdkInput" placeholder="Search clients, tasks and notes, or go to a screen" oninput="renderCommandPaletteResults()" autocomplete="off" spellcheck="false" aria-controls="cmdkResults"></label>
+    <div class="spot-g" id="cmdkResults" role="listbox" aria-label="Results"></div>
+    <div class="spot-foot"><span>↑↓ to move</span><span>↩ to open</span><span class="spot-jump"></span><span style="margin-left:auto">esc to close</span></div>
   </div>
 </div>
 
-<div class="tour-card" id="tourCard" style="display:none;">
-  <div class="tour-head">
-    <span class="tour-step-count" id="tourStepCount"></span>
-    <span class="toast-close" onclick="endTour()">✕</span>
-  </div>
-  <div class="tour-title-row">
-    <div id="tourIcon"></div>
-    <div style="flex:1;min-width:0;">
-      <div class="tour-title" id="tourTitle"></div>
-    </div>
-  </div>
+<div class="tour-card" id="tourCard" role="dialog" aria-labelledby="tourTitle" style="display:none;">
+  <div class="tour-top"><span class="tour-ic" id="tourIcon" aria-hidden="true"></span><span class="tour-step-count" id="tourStepCount"></span><button class="ib" id="tourCloseBtn" aria-label="Close the tour" onclick="endTour()"></button></div>
+  <div class="tour-title" id="tourTitle"></div>
   <div class="tour-body" id="tourBody"></div>
-  <div class="tour-actions">
-    <button class="btn btn-outline" id="tourPrevBtn" onclick="tourPrev()">Back</button>
-    <button class="btn btn-outline" onclick="endTour()">Skip</button>
-    <button class="btn btn-brand" id="tourNextBtn" onclick="tourNext()">Next</button>
-  </div>
+  <div class="tour-actions"><button class="btn btn-q" id="tourSkipBtn" onclick="endTour()">Skip</button><button class="btn" id="tourPrevBtn" onclick="tourPrev()">Back</button><button class="btn btn-p" id="tourNextBtn" onclick="tourNext()">Next</button></div>
 </div>
 
 <!-- App code: classic scripts sharing one global scope, loaded in this
@@ -1247,6 +1232,7 @@
 <script src="js/features/history-canvas.js"></script>
 <script src="js/features/sheets-canvas.js"></script>
 <script src="js/features/sheets2-canvas.js"></script>
+<script src="js/features/spotlight-canvas.js"></script>
 <script src="js/app.js"></script>
 
 </body>

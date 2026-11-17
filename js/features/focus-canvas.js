@@ -108,3 +108,6 @@ function openWeeklyFocusReportModal(reportId){
   if(reportId) focusSelId = reportId;
   switchView('focusreports');
 }
+
+// Today has no Focus Report banner on the canvas: reports live in Focus Reports.
+function refreshWeeklyFocusReportBanner(){}

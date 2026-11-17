@@ -17,6 +17,8 @@ Run new `.sql` files once in Supabase → SQL Editor. The current one:
 - `addendum-team-activity-log.sql` — moves the Overview activity log into its own
   table. Safe to run more than once; the app keeps working on the old storage until
   it's run, then switches over by itself.
+- `addendum-improvement-details.sql` — adds a service and screenshots to each logged
+  improvement. Until it's run, Log Improvement works as before and hides Screenshots.
 
 ---
 

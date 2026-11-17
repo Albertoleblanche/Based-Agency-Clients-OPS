@@ -451,3 +451,62 @@ button.set-tab { font-size: 11px; }
 .pick-people { display: flex; flex-wrap: wrap; gap: 6px; }
 .f label.pick { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px 0 8px; border-radius: 7px; background: var(--fill-2); font-size: 12.5px; color: var(--label); text-align: left; cursor: default; }
 .pick .av { width: 18px; height: 18px; font-size: 8px; }
+
+/* ---- ⌘K: Spotlight ---- */
+.mac .cmdk-overlay { position: fixed; inset: 0; z-index: 2000; display: block; padding: 0; background: var(--scrim); animation: none; }
+.cmdk-overlay .spot { position: absolute; top: 112px; max-height: calc(100vh - 160px); display: flex; flex-direction: column; animation: sheetIn 160ms cubic-bezier(.32,.72,0,1); }
+.spot-in { cursor: text; }
+.mac .spot-in input { flex: 1; min-width: 0; height: 100%; border: 0 !important; outline: 0; background: transparent !important; box-shadow: none !important; padding: 0 !important; font: inherit; font-size: 20px; color: var(--label); }
+.mac .spot-in input::placeholder { color: var(--label-3); }
+.spot-ic { display: inline-flex; }
+.spot-g { overflow: auto; min-height: 0; }
+.spot-r { color: var(--label); text-decoration: none; cursor: default; }
+.spot-r .spot-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spot-r .s { white-space: nowrap; }
+.spot-r svg { flex: 0 0 auto; }
+.spot-empty { padding: 18px 12px; font-size: 13px; color: var(--label-2); }
+.spot-foot { display: flex; gap: 16px; padding: 9px 18px; border-top: .5px solid var(--sep); font-size: 11px; color: var(--label-2); flex: 0 0 auto; }
+
+/* ---- Take a tour ---- */
+.mac .tour-card { position: fixed; z-index: 1600; top: 22px; left: 22px; right: auto; width: 300px; padding: 14px 16px 14px; border-radius: 12px; border: 0;
+  background: var(--menu); -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6); box-shadow: var(--shadow-pop); color: var(--label); animation: sheetIn 200ms cubic-bezier(.32,.72,0,1); }
+.mac .tour-card.tour-card-centered { left: 50% !important; top: 40% !important; transform: translate(-50%, -50%); width: 340px; }
+.mac .tour-card.tour-card-final { text-align: left; animation: sheetIn 200ms cubic-bezier(.32,.72,0,1); }
+.tour-top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.tour-ic { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: var(--fill-2); color: var(--label-2); }
+.tour-ic svg { width: 15px; height: 15px; }
+.mac .tour-step-count { font-size: 11px; letter-spacing: 0; color: var(--label-2); font-family: inherit; }
+.tour-top .ib { margin-left: auto; }
+.mac .tour-title { margin: 0 0 4px; font-size: 15px; font-weight: 600; letter-spacing: -.01em; font-family: inherit; }
+.mac .tour-body { margin: 0 0 14px; font-size: 13px; line-height: 1.5; color: var(--label-2); }
+.mac .tour-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.mac .tour-actions .btn { padding: 0 12px; font-size: 13px; }
+.mac .tour-actions #tourSkipBtn { margin-right: auto; padding: 0 6px; }
+.mac .tour-spotlight { position: relative; z-index: 1601; border-radius: 6px; background: var(--select) !important; box-shadow: 0 0 0 2px var(--label-3); }
+.mac .tour-actions .btn[hidden] { display: none !important; }
+.kb-g + .kb-g { margin-top: 14px; }
+.kb-h { margin: 0 0 6px 2px; font-size: 11px; font-weight: 600; color: var(--label-2); }
+.kb-keys { gap: 3px; }
+.kb-keys .kbd { min-width: 20px; justify-content: center; }
+
+/* ---- The bell ---- */
+.notif-panel .btn.sm { height: 22px; padding: 0 6px; font-size: 12px; }
+.notif-empty { padding: 26px 16px; text-align: center; font-size: 13px; color: var(--label-2); }
+.nrow { display: flex; gap: 10px; padding: 10px 12px; border-bottom: .5px solid var(--sep); cursor: default; }
+.nrow:last-child { border-bottom: 0; }
+.nrow:hover, .nrow:focus-visible { background: var(--fill); outline: none; }
+.nrow-ic { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: var(--fill-2); color: var(--label-2); flex: 0 0 auto; }
+.nrow-ic svg { width: 14px; height: 14px; }
+.nrow-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.nrow-tx b { font-size: 13px; font-weight: 500; line-height: 1.35; }
+.nrow.unread .nrow-tx b { font-weight: 600; }
+.nrow-tx span { font-size: 12px; color: var(--label-2); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.nrow-r { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: 0 0 auto; }
+.nrow-r time { font-size: 11px; color: var(--label-2); white-space: nowrap; }
+.nrow-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); }
+.nrow-r .ib { width: 20px; height: 20px; opacity: 0; }
+.nrow-r .ib svg { width: 12px; height: 12px; }
+.nrow:hover .nrow-r .ib, .nrow:focus-within .nrow-r .ib { opacity: 1; }
+.nrow:hover .nrow-dot { display: none; }
+kbd.kbd, .kbd { font-family: inherit; }
+.kb-g .row.sm { min-height: 32px; padding-top: 5px; padding-bottom: 5px; }
