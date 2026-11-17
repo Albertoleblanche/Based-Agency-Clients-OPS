@@ -708,6 +708,22 @@
     </div>
 
     <div class="view" id="view-time">
+      <div class="content tview" id="timeRoot-timesheet"></div>
+      <div class="content tview" id="timeRoot-reports" hidden>
+        <div class="rp-bar">
+          <select class="pop" id="reportRange" aria-label="Date range" onchange="onReportRangeChange()"><option value="month" selected>This month</option></select>
+          <span id="reportMemberFilterWrap"><select class="pop" id="reportMemberFilter" aria-label="Teammate" onchange="renderReports()"><option value="all">Everyone</option></select></span>
+          <span id="reportCustomRange" style="display:none;align-items:center;gap:6px"><input type="date" class="tf" id="reportFromDate" aria-label="From" onchange="renderReports()"><span class="t-2" style="font-size:12px">to</span><input type="date" class="tf" id="reportToDate" aria-label="To" onchange="renderReports()"></span>
+          <span style="flex:1"></span>
+          <button class="btn" onclick="exportReportCsv()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v13" /> <path d="m16 6-4-4-4 4" /> <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /></svg>Export CSV</button><button class="btn" onclick="exportReportPdf()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></svg>Export PDF</button>
+        </div>
+        <section class="panel" id="reportChartPanel"></section>
+        <div class="h2" id="reportGroupH"></div>
+        <div class="grp" id="reportTableGrp"></div>
+      </div>
+      <div class="content tview" id="timeRoot-dailysummary" hidden></div>
+      <div class="content tview" id="timeRoot-payroll" hidden></div>
+      <div hidden class="legacy">
       <div class="icon-tab-group" id="timeMainTabs">
         <div class="icon-tab active" data-ttab="timesheet" onclick="switchTimeTab('timesheet')">
           <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M224,48V208a16,16,0,0,1-16,16H136a8,8,0,0,1,0-16h72V48H48v96a8,8,0,0,1-16,0V48A16,16,0,0,1,48,32H208A16,16,0,0,1,224,48ZM125.66,154.34a8,8,0,0,0-11.32,0L64,204.69,45.66,186.34a8,8,0,0,0-11.32,11.32l24,24a8,8,0,0,0,11.32,0l56-56A8,8,0,0,0,125.66,154.34Z"/></svg>
@@ -769,25 +785,25 @@
         <div class="clients-filter-bar" style="margin-bottom:16px;">
           <div class="select-field" style="min-width:150px;">
             <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z"/></svg>
-            <select id="reportRange" onchange="onReportRangeChange()">
+            <select id="reportRangeLegacy" onchange="onReportRangeChange()">
               <option value="week">This week</option>
               <option value="month">This month</option>
               <option value="all">All time</option>
               <option value="custom">Custom range…</option>
             </select>
           </div>
-          <div class="select-field" style="min-width:170px;" id="reportMemberFilterWrap">
+          <div class="select-field" style="min-width:170px;" id="reportMemberFilterWrapLegacy">
             <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M117.25,157.92a60,60,0,1,0-66.5,0A95.83,95.83,0,0,0,3.53,195.63a8,8,0,1,0,13.4,8.74,80,80,0,0,1,134.14,0,8,8,0,0,0,13.4-8.74A95.83,95.83,0,0,0,117.25,157.92ZM40,108a44,44,0,1,1,44,44A44.05,44.05,0,0,1,40,108Zm210.14,98.7a8,8,0,0,1-11.07-2.33A79.83,79.83,0,0,0,172,168a8,8,0,0,1,0-16,44,44,0,1,0-16.34-84.87,8,8,0,1,1-5.94-14.85,60,60,0,0,1,55.53,105.64,95.83,95.83,0,0,1,47.22,37.71A8,8,0,0,1,250.14,206.7Z"/></svg>
-            <select id="reportMemberFilter" onchange="reportsPage=1;renderReports()"><option value="all">All team members</option></select>
+            <select id="reportMemberFilterLegacy" onchange="reportsPage=1;renderReports()"><option value="all">All team members</option></select>
           </div>
-          <div class="date-nav" id="reportCustomRange" style="display:none;">
-            <div class="date-nav-label" style="border-left:none;" onclick="document.getElementById('reportFromDate').showPicker ? document.getElementById('reportFromDate').showPicker() : document.getElementById('reportFromDate').focus()">
+          <div class="date-nav" id="reportCustomRangeLegacy" style="display:none;">
+            <div class="date-nav-label" style="border-left:none;" onclick="document.getElementById('reportFromDateLegacy').showPicker ? document.getElementById('reportFromDateLegacy').showPicker() : document.getElementById('reportFromDateLegacy').focus()">
               <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM72,48v8a8,8,0,0,0,16,0V48h80v8a8,8,0,0,0,16,0V48h24V80H48V48ZM208,208H48V96H208V208Z"/></svg>
-              <input type="date" id="reportFromDate" onchange="reportsPage=1;renderReports()" style="border:none;background:transparent;font-family:var(--font);font-size:13px;color:var(--ink);">
+              <input type="date" id="reportFromDateLegacy" onchange="reportsPage=1;renderReports()" style="border:none;background:transparent;font-family:var(--font);font-size:13px;color:var(--ink);">
             </div>
             <span style="padding:0 4px;color:var(--muted-lt);font-size:11.5px;">to</span>
-            <div class="date-nav-label" style="border-right:none;" onclick="document.getElementById('reportToDate').showPicker ? document.getElementById('reportToDate').showPicker() : document.getElementById('reportToDate').focus()">
-              <input type="date" id="reportToDate" onchange="reportsPage=1;renderReports()" style="border:none;background:transparent;font-family:var(--font);font-size:13px;color:var(--ink);">
+            <div class="date-nav-label" style="border-right:none;" onclick="document.getElementById('reportToDateLegacy').showPicker ? document.getElementById('reportToDateLegacy').showPicker() : document.getElementById('reportToDateLegacy').focus()">
+              <input type="date" id="reportToDateLegacy" onchange="reportsPage=1;renderReports()" style="border:none;background:transparent;font-family:var(--font);font-size:13px;color:var(--ink);">
             </div>
           </div>
           <label class="report-checkbox-label">
@@ -913,9 +929,9 @@
             <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Calculated per calendar week (Mon–Sun), not per pay period — someone who works 45 hours one week and 35 the next gets 5 overtime hours, even though the two-week total is a normal 80.</p>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
               <span style="font-size:13px;">Overtime after</span>
-              <input type="number" min="0" step="1" id="overtimeThresholdInput" value="40" style="width:70px;font-family:var(--font);font-size:13px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);">
+              <input type="number" min="0" step="1" id="overtimeThresholdInputLegacy" value="40" style="width:70px;font-family:var(--font);font-size:13px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);">
               <span style="font-size:13px;">hours/week, paid at</span>
-              <input type="number" min="1" step="0.1" id="overtimeMultiplierInput" value="1.5" style="width:70px;font-family:var(--font);font-size:13px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);">
+              <input type="number" min="1" step="0.1" id="overtimeMultiplierInputLegacy" value="1.5" style="width:70px;font-family:var(--font);font-size:13px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);">
               <span style="font-size:13px;">× the normal rate.</span>
               <button class="btn btn-outline" onclick="saveOvertimeRules()">Save</button>
             </div>
@@ -954,6 +970,7 @@
           </div>
         </div>
       </div>
+    </div>
     </div>
 
     <!-- SETTINGS -->
@@ -1696,6 +1713,7 @@
 <script src="js/features/client-page.js"></script>
 <script src="js/features/work-canvas.js"></script>
 <script src="js/features/calendar-canvas.js"></script>
+<script src="js/features/time-canvas.js"></script>
 <script src="js/features/settings.js"></script>
 <script src="js/features/sheet-sync.js"></script>
 <script src="js/features/team.js"></script>

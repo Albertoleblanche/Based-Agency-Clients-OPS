@@ -303,6 +303,7 @@ function canOpenViewFromAddress(name){
 function syncAddressToView(name){
   currentViewName = name;
   updateDocumentTitle(name);
+  if(typeof updateFloatingTimerPill === 'function' && typeof timerState !== 'undefined' && timerState.running) updateFloatingTimerPill();
   if(_routingFromAddress) return;
   const target = routeHashFor(name);
   if(location.hash !== target) history.pushState(null, '', target);
@@ -420,7 +421,7 @@ async function switchView(name){
     renderImprovementsHistory();
   }
   if(name==='teamqueue') renderTeamQueue();
-  if(name==='time') renderTimesheet();
+  if(name==='time') (typeof renderTimeView === 'function' ? renderTimeView() : renderTimesheet());
 }
 
 function switchSettingsTab(name){

@@ -103,7 +103,6 @@ function calScrollToMorning(root, keep){
   if(!root._ro && window.ResizeObserver){ root._ro = new ResizeObserver(() => { if(root.clientHeight && !root.dataset.ready) go(); }); root._ro.observe(root); }
 }
 // "Synced with Google Calendar" at the end of the legend, as on the canvas.
-const GOOGLE_LOGO = '<svg viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round" aria-hidden="true"><path d="M224,128a96,96,0,1,1-21.95-61.09,8,8,0,1,1-12.33,10.18A80,80,0,1,0,207.6,136H128a8,8,0,0,1,0-16h88A8,8,0,0,1,224,128Z"/></svg>';
 async function renderCalendarGoogleSyncWidget(){
   const el = document.getElementById('calGoogleSyncStatus');
   if(!el) return;
@@ -111,5 +110,5 @@ async function renderCalendarGoogleSyncWidget(){
   if(!data || !data.googleConfigured || !data.connected){ el.style.display = 'none'; el.innerHTML = ''; return; }
   const last = data.lastSyncedAt ? new Date(data.lastSyncedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'not yet';
   el.style.display = '';
-  el.innerHTML = `<button class="st cal-sync" onclick="syncGoogleCalendarFromTab()" title="Last synced ${last} · click to sync now">${GOOGLE_LOGO}Synced with Google Calendar</button>`;
+  el.innerHTML = `<button class="st cal-sync" onclick="syncGoogleCalendarFromTab()" title="Last synced ${last} · click to sync now">${icon('google-logo')}Synced with Google Calendar</button>`;
 }

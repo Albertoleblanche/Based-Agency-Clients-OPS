@@ -31,7 +31,7 @@ let timesheetAnchor = new Date();
 async function loadTimeEntries(){
   const { data, error } = await supabaseClient.from('time_entries').select('*').is('deleted_at', null).order('entry_date', { ascending:false });
   if(error){ console.error('loadTimeEntries error', error); timeEntries = []; timeEntriesDataLoaded = true; return; }
-  timeEntries = (data||[]).map(e=>({ id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes, description:e.description||'', service:e.service||'', createdAt:e.created_at, logged:!!e.logged }));
+  timeEntries = (data||[]).map(e=>({ id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes, description:e.description||'', service:e.service||'', createdAt:e.created_at, logged:!!e.logged, harvestStatus:e.harvest_sync_status||'', harvestId:e.harvest_entry_id||null }));
   timeEntriesDataLoaded = true;
   if(typeof renderToday === 'function') renderToday();
 }
@@ -210,10 +210,12 @@ function updateTimerDisplay(){
 // Keeps a persistent pill visible on every tab while a timer is running, so
 // leaving the Time Tracker page doesn't mean losing track of it.
 function updateFloatingTimerPill(timeStr){
+  if(typeof tickTimesheetClock === 'function') tickTimesheetClock();
   // The running timer lives in the toolbar, as on the canvas (red dot · time · client).
   const tb = document.getElementById('tbTimer');
   if(tb){
-    tb.style.display = timerState.running ? 'inline-flex' : 'none';
+    // On Time itself the timer is the big card, so the toolbar leaves it out (as on the canvas).
+    tb.style.display = timerState.running && (typeof currentViewName === 'undefined' || currentViewName !== 'time') ? 'inline-flex' : 'none';
     if(timerState.running){
       const tc = clients.find(x=>x.id===timerState.clientId);
       document.getElementById('tbTimerTime').textContent = (timeStr || '0:00:00').replace(/^0(\d):/, '$1:');
@@ -324,7 +326,8 @@ function syncEntryToHarvestBackground(entryId){
   });
 }
 
-async function stopAndSaveTimer(){
+async function stopAndSaveTimer(opts){
+  opts = opts || {};
   if(timerIntervalId){ clearInterval(timerIntervalId); timerIntervalId = null; }
   const elapsedMs = Date.now() - timerState.startedAt;
   const minutes = Math.max(1, Math.round(elapsedMs/60000));
@@ -341,7 +344,7 @@ async function stopAndSaveTimer(){
   if(descInput) descInput.value = '';
 
   const c = clients.find(x=>x.id===clientId);
-  let error, mergedIntoExisting = false;
+  let error, mergedIntoExisting = false, savedId = resumeEntryId || null;
 
   if(resumeEntryId){
     // Re-fetch the current minutes fresh (not from local cache) so we don't
@@ -360,22 +363,24 @@ async function stopAndSaveTimer(){
         user_id: currentUser.id, client_id: clientId, entry_date: toDateStr(new Date()), minutes, description, service
       }).select('id').single();
       error = insertErr;
-      if(newRow) syncEntryToHarvestBackground(newRow.id);
+      if(newRow){ savedId = newRow.id; syncEntryToHarvestBackground(newRow.id); }
     }
   } else {
     const mergeResult = await mergeOrInsertTimeEntry({
       clientId, service, dateStr: toDateStr(new Date()), minutes, description
     });
-    error = mergeResult.error; mergedIntoExisting = mergeResult.merged;
+    error = mergeResult.error; mergedIntoExisting = mergeResult.merged; savedId = mergeResult.entryId || null;
     if(!error) syncEntryToHarvestBackground(mergeResult.entryId);
   }
 
   await loadTimeEntries();
   renderTimesheet(); renderReports();
-  if(error){ showToast('error','Save failed', error.message); return; }
-  mergedIntoExisting
+  if(error){ showToast('error','Save failed', error.message); return null; }
+  if(opts.pause) showToast('success','Timer paused', `${formatMinutes(minutes)} saved for ${c?c.name:'client'}.`);
+  else mergedIntoExisting
     ? showToast('success','Time added', `${formatMinutes(minutes)} added to the existing entry for ${c?c.name:'client'}.`)
     : showToast('success','Time logged', `${formatMinutes(minutes)} logged for ${c?c.name:'client'}.`);
+  return savedId;
 }
 
 /* --- Manual entry --- */

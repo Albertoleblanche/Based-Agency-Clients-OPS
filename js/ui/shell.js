@@ -87,3 +87,17 @@ function updateShellBadges(){
 ICON_PATHS['exclamation-mark'] = '<line x1="12" y1="5" x2="12" y2="13.5"/><line x1="12" y1="18.5" x2="12" y2="18.51"/>';
 VIEW_TOOLBAR_ACTIONS.reminders = () => `<button class="btn" onclick="openNewReminderModal()">${icon('plus')}New Reminder</button>`;
 VIEW_TOOLBAR_ACTIONS.notes = () => `<button class="btn" onclick="openNoteModal()">${icon('square-pen')}New Note</button>`;
+
+// Brand marks (Google, Slack) come from Phosphor on the canvas, drawn on a 256 grid.
+const BRAND_ICONS = {
+  'google-logo': '<path d="M224,128a96,96,0,1,1-21.95-61.09,8,8,0,1,1-12.33,10.18A80,80,0,1,0,207.6,136H128a8,8,0,0,1,0-16h88A8,8,0,0,1,224,128Z"/>',
+  'slack-logo': '<path d="M221.13,128A32,32,0,0,0,184,76.31V56a32,32,0,0,0-56-21.13A32,32,0,0,0,76.31,72H56a32,32,0,0,0-21.13,56A32,32,0,0,0,72,179.69V200a32,32,0,0,0,56,21.13A32,32,0,0,0,179.69,184H200a32,32,0,0,0,21.13-56ZM72,152a16,16,0,1,1-16-16H72Zm48,48a16,16,0,0,1-32,0V152a16,16,0,0,1,16-16h16Zm0-80H56a16,16,0,0,1,0-32h48a16,16,0,0,1,16,16Zm0-48H104a16,16,0,1,1,16-16Zm16-16a16,16,0,0,1,32,0v48a16,16,0,0,1-16,16H136Zm16,160a16,16,0,0,1-16-16V184h16a16,16,0,0,1,0,32Zm48-48H152a16,16,0,0,1-16-16V136h64a16,16,0,0,1,0,32Zm0-48H184V104a16,16,0,1,1,16,16Z"/>',
+};
+icon = (function(base){
+  return function(name, o){
+    if(!BRAND_ICONS[name]) return base(name, o);
+    o = o || {};
+    const size = o.size ? ` width="${o.size}" height="${o.size}"` : '';
+    return `<svg${o.cls ? ` class="${o.cls}"` : ''}${size} viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round" ${o.label ? `role="img" aria-label="${o.label}"` : 'aria-hidden="true"'}>${BRAND_ICONS[name]}</svg>`;
+  };
+})(icon);
