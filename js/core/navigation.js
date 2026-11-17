@@ -130,7 +130,7 @@ const VIEW_TITLES = {
   trash: ['Recently Deleted', 'Restore anything here, or delete it for good'],
   settings: ['Settings', 'Workspace, client fields, AI, integrations and notifications'],
   claude: ['Assistant', 'Knows your clients, drafts, tasks and time'],
-  profile: ['My Profile', 'Your info, visible to the rest of the team the same way it always has been'],
+  profile: ['My Profile', 'How the team sees you'],
 };
 
 const CMDK_PAGE_ICONS = {
@@ -382,18 +382,12 @@ async function switchView(name){
   // (Google Calendar, push, email) each do their own independent fetch.
   // Called here, ahead of 7 unrelated network requests, instead of after
   // them — there was never a reason for this page specifically to wait.
-  if(name==='profile'){ renderProfilePage(); loadGoogleCalendarStatus(); loadPushStatus(); }
+  if(name==='profile'){ renderProfilePage(); }
+  if(name==='settings' && typeof renderSettingsView === 'function'){ renderSettingsView(); if(settingsTab === 'integrations') loadIntegrationStatuses(); if(settingsTab === 'ai' && isAdmin()) loadAiProviderConnectionStatus(); }
   // weekly_focus_reports is a completely independent table — none of the
   // 7 requests in fullRefresh() below touch it, so this page gains
   // nothing from waiting behind them either.
   if(name==='focusreports') renderFocusReportsPage();
-  // Same reasoning — ai_visibility_reports is its own independent table.
-  // Permission-gated redirect happens here rather than earlier, since it
-  // needs hasPermission() reading a myProfile that's reliably loaded by
-  // this point in the app's lifecycle. Grantable per-member now (see
-  // EXTRA_PERMISSIONS_META) rather than hardcoded to admins only —
-  // hasPermission() still covers every admin/approver automatically, so
-  // nothing changes for them.
   await fullRefresh();
   if(name==='trash') renderTrash();
   if(name==='payroll') renderPayroll();

@@ -215,7 +215,7 @@ function updateFloatingTimerPill(timeStr){
   const tb = document.getElementById('tbTimer');
   if(tb){
     // On Time itself the timer is the big card, so the toolbar leaves it out (as on the canvas).
-    tb.style.display = timerState.running && (typeof currentViewName === 'undefined' || currentViewName !== 'time') ? 'inline-flex' : 'none';
+    tb.style.display = timerState.running && (typeof currentViewName === 'undefined' || currentViewName !== 'time') && (typeof toolbarTimerPref !== 'function' || toolbarTimerPref()) ? 'inline-flex' : 'none';
     if(timerState.running){
       const tc = clients.find(x=>x.id===timerState.clientId);
       document.getElementById('tbTimerTime').textContent = (timeStr || '0:00:00').replace(/^0(\d):/, '$1:');

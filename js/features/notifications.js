@@ -48,13 +48,18 @@ const NOTIFICATION_TYPE_META = {
 // can't trigger a toast or sit in their bell either, since it was never
 // stored in the first place.
 async function sendNotification(userId, type, title, body, targetView, targetId, alreadyToasted){
+  // Muting a type mutes it everywhere; "app:", "push:" or "slack:" before it mutes one place
+  // only (Settings → Notifications).
   const recipient = teamProfiles.find(p=>p.id===userId);
-  if(recipient && (recipient.muted_notification_types||[]).includes(type)) return;
-  const row = { user_id:userId, type, title, body, target_view:targetView, read:!!alreadyToasted };
-  if(targetId) row.target_id = targetId;
-  await supabaseClient.from('notifications').insert(row);
-  sendPushNotification(userId, title, body, notificationUrl(targetView, targetId));
-  sendSlackNotification(userId, type, title, body);
+  const muted = (recipient && recipient.muted_notification_types) || [];
+  if(muted.includes(type)) return;
+  if(!muted.includes('app:'+type)){
+    const row = { user_id:userId, type, title, body, target_view:targetView, read:!!alreadyToasted };
+    if(targetId) row.target_id = targetId;
+    await supabaseClient.from('notifications').insert(row);
+  }
+  if(!muted.includes('push:'+type)) sendPushNotification(userId, title, body, notificationUrl(targetView, targetId));
+  if(!muted.includes('slack:'+type)) sendSlackNotification(userId, type, title, body);
 }
 
 // Best-effort Slack DM alongside the in-app notification above — same
