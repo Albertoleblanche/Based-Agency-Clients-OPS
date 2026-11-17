@@ -335,10 +335,6 @@ function gsRender(keep){
 }
 function gsAIOn(){ try{ return localStorage.getItem('bda_gs_ai') !== '0'; }catch(e){ return true; } }
 function gsSaveAI(){ try{ localStorage.setItem('bda_gs_ai', sheetIsOn('gsAI') ? '1' : '0'); }catch(e){} }
-function plainUpdateDraft(c, items){
-  const name = c.contactName || c.contact_name || '';
-  return `Hi${name ? ' ' + firstName(name) : ''},\n\nHere’s what we worked on for ${c.name} this week:\n\n${items.map(i => '- ' + i.text).join('\n')}\n\nNothing is needed from you right now. We’ll keep you posted on what’s next.`;
-}
 async function createGroupDrafts(){
   const picks = gsList.filter(x => gsPick.has(x.c.id));
   if(!picks.length) return;
