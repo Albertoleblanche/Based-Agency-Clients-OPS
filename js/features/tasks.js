@@ -135,7 +135,15 @@ function toggleKanbanCardMenu(taskId){
 }
 
 function closeKanbanMenus(){
-  document.querySelectorAll('.kanban-card-menu').forEach(m=>m.style.display='none');
+  document.querySelectorAll('.kanban-card-menu').forEach(m=>{
+    m.style.display='none';
+    // a right-click opens the menu at the pointer (desktop-app.js); put it
+    // back next to its ⋯ button for the next normal open
+    if(m.classList.contains('ctx-at-pointer')){
+      m.classList.remove('ctx-at-pointer');
+      ['position','left','top','right','bottom','transformOrigin','animation'].forEach(k=>{ m.style[k]=''; });
+    }
+  });
 }
 
 document.addEventListener('click', (e)=>{

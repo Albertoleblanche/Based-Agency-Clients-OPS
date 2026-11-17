@@ -131,9 +131,11 @@ function applyBrandColor(hex){
   const darkBg = hslToHex(h, Math.min(s,36), 13);
   const lightRgb = hexToRgbTriplet(lightBrand);
   const darkRgb = hexToRgbTriplet(darkBrand);
+  // The sidebar's hover/selected fills stay neutral (only the selected
+  // icon takes the brand colour), as in Apple's own sidebars.
   styleEl.textContent = `
-    :root{--brand:${lightBrand} !important;--brand-dark:${lightDark} !important;--brand-bg:${lightBg} !important;--sidebar-hover:rgba(${lightRgb},.14) !important;--sidebar-active:rgba(${lightRgb},.22) !important;}
-    body[data-theme="dark"]{--brand:${darkBrand} !important;--brand-dark:${darkDark} !important;--brand-bg:${darkBg} !important;--sidebar-hover:rgba(${darkRgb},.14) !important;--sidebar-active:rgba(${darkRgb},.22) !important;}
+    :root{--brand:${lightBrand} !important;--brand-dark:${lightDark} !important;--brand-bg:${lightBg} !important;--ring:rgba(${lightRgb},.38) !important;}
+    body[data-theme="dark"]{--brand:${darkBrand} !important;--brand-dark:${darkDark} !important;--brand-bg:${darkBg} !important;--ring:rgba(${darkRgb},.45) !important;}
   `;
 }
 

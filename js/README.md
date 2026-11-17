@@ -5,7 +5,8 @@ in plain JavaScript files — no build step, no bundler. Vercel serves them as-i
 
 ```
 index.html         page shell + screen markup; loads everything below in order
-css/               base → layout → overview → screens → components → responsive
+css/               base → layout → overview → screens → components → macos →
+                   desktop-app → responsive
 js/core/           shared foundation (state, Supabase client, helpers, toasts,
                    modals, loading/saving, live updates, navigation)
 js/ui/             reusable display pieces (date/time pickers, pills, badges)
@@ -57,3 +58,11 @@ Back/Forward, bookmarks and shared links all work. The code is in
   `lib/push-notify.js`); tapping one focuses an open tab and opens that screen.
 - On phones the address is forwarded to `mobile.html`, which opens the closest
   matching screen once and then clears it.
+
+## Desktop-app behaviour
+`js/core/desktop-app.js` (styles in `css/desktop-app.css`) is what makes the app
+behave like an installed desktop app: installing it from the profile menu (own
+window, title bar drawn by the app — see `manifest.webmanifest`), window colour
+that follows the theme, scrollbars that show while scrolling, right-click menus
+(they reuse each item's own ⋯ menu), and the keyboard shortcuts ⌘/Ctrl+1–9,
+⌘/Ctrl+, (Settings), ⌘/Ctrl+\ (sidebar) and ⌘/Ctrl+/ (shortcut list).

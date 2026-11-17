@@ -1,0 +1,84 @@
+/* ==========================================================================
+   Desktop-app behaviour — the rules that make this feel like an installed
+   Mac/PC app instead of a web page. Behaviour lives in js/core/desktop-app.js.
+   ========================================================================== */
+
+/* ---------- pointer: the arrow, as in desktop apps ----------
+   Native apps don't switch to the hand cursor over buttons, tabs, rows or
+   cards; only real links do. Text fields keep the I-beam. */
+body :not(input):not(textarea):not(select):not([contenteditable="true"]):not([contenteditable="true"] *):not(a[href]):not(a[href] *):not(.cropper-container):not(.cropper-container *){
+  cursor:default !important;
+}
+.attachment-thumb, .lightbox-img{cursor:zoom-in !important;}
+.lightbox-img.zoomed{cursor:zoom-out !important;}
+.claude-float-btn.dragging{cursor:grabbing !important;}
+rect[style*="crosshair"]{cursor:crosshair !important;}
+
+/* ---------- interface text isn't selectable ----------
+   Dragging across a toolbar or double-clicking a button shouldn't highlight
+   it. Content stays selectable: client details, notes, drafts, messages,
+   table cells, anything in a text field. */
+.sidebar, .app-topbar, .btn, button, .nav-item, label, th,
+.icon-tab-group, .view-toggle, .filter-bar, .settings-tabs, .pagination, .pagination-btn,
+.kanban-column-head, .kanban-card-menu, .kanban-card-menu-btn, .icon-menu-btn,
+.calendar-grid-head, .calendar-day-num, .ov-card-title-row, .ov-card-btn, .ov-mini-cal-head,
+.modal-head, .modal-actions, .sidebar-profile-menu, .dropdown-menu, .actions-menu, .team-actions-menu,
+.notif-panel-head, .toast, .cmdk-results, .tq-select-list, .q-card-actions, .rating-pill, .pill,
+.claude-sidebar, .claude-quick-action, .row-link, .switch, .theme-toggle-switch, .metric-label, .kpi-label{
+  -webkit-user-select:none;user-select:none;
+}
+/* icons and logos can't be dragged out of the window like web images */
+svg, .brand-mark img, .avatar-circle img, .sidebar img{-webkit-user-drag:none;user-drag:none;}
+
+/* ---------- scrollbars appear while scrolling, as on macOS ---------- */
+*{scrollbar-color:transparent transparent;}
+.is-scrolling{scrollbar-color:var(--fill-3) transparent;}
+::-webkit-scrollbar-thumb{background:transparent;}
+.is-scrolling::-webkit-scrollbar-thumb{background:var(--fill-3);}
+@media (prefers-contrast: more){
+  *{scrollbar-color:var(--muted-lt) transparent;}
+}
+
+/* ---------- motion ----------
+   Switching sections is near-instant, like a sidebar app (no slide);
+   menus and popovers grow out of the button that opened them. */
+.view.active{animation:viewSwap 120ms ease-out;}
+@keyframes viewSwap{from{opacity:.0;}to{opacity:1;}}
+
+.kanban-card-menu, .actions-menu.open, .team-actions-menu, .claude-sidebar-menu, .sidebar-profile-menu,
+.notif-panel, .dropdown-menu, .filters-popover, .tq-select-list, .calendar-dropdown, .claude-popup-menu{
+  animation:menuIn 150ms cubic-bezier(.2,.8,.2,1);
+}
+.kanban-card-menu, .actions-menu, .team-actions-menu, .notif-panel, .claude-sidebar-menu{transform-origin:top right;}
+.dropdown-menu, .filters-popover, .tq-select-list, .calendar-dropdown, .claude-popup-menu{transform-origin:top left;}
+.sidebar-profile-menu{transform-origin:bottom center;}
+#clientActionsMenu, #teamActionsMenu{transform-origin:top right;}
+@keyframes menuIn{from{opacity:0;transform:scale(.96);}to{opacity:1;transform:none;}}
+/* opened by right-click: sits at the pointer, above everything */
+.ctx-at-pointer{z-index:3000 !important;}
+
+/* ---------- keyboard shortcut hints ---------- */
+.cmdk-shortcut{margin-left:auto;font-size:11.5px;color:var(--muted-lt);letter-spacing:.02em;font-variant-numeric:tabular-nums;}
+.cmdk-item.active .cmdk-shortcut{color:rgba(255,255,255,.8);}
+.modal-body.shortcut-list{display:flex;flex-direction:column;gap:0;padding-top:4px;padding-bottom:8px;}
+.shortcut-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:7px 0;font-size:13px;color:var(--ink);border-bottom:.5px solid var(--border);}
+.shortcut-row:last-child{border-bottom:0;}
+.shortcut-keys{display:inline-flex;gap:4px;}
+.kbd{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:6px;
+  background:var(--fill);box-shadow:inset 0 -1px 0 var(--fill-2);font:500 11.5px/1 var(--font);color:var(--ink);}
+
+/* ---------- installed app: the window draws its own title bar ----------
+   With "Install as desktop app" in Chrome/Edge, the toolbar becomes the
+   window's title bar (drag it to move the window, double-click to maximise)
+   and the window's own minimise/maximise/close buttons sit on top of it. */
+@media (display-mode: window-controls-overlay){
+  .app-topbar{-webkit-app-region:drag;app-region:drag;}
+  .app-topbar :is(button, a, input, select, textarea, [onclick], .notif-bell-wrap, .notif-panel, #harvestTimerWrap),
+  .sidebar :is(button, a, input, [onclick], .nav-item, .sidebar-profile-menu){-webkit-app-region:no-drag;app-region:no-drag;}
+  /* the top of the sidebar is title bar too */
+  .sidebar .brand{-webkit-app-region:drag;app-region:drag;}
+  /* keep the toolbar's buttons clear of the window controls on the right (Windows)… */
+  .topbar-right{margin-right:max(0px, calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) - 16px));}
+  /* …and the sidebar's logo clear of the traffic lights on the left (Mac) */
+  .sidebar .brand{margin-top:calc(min(env(titlebar-area-x, 0px), 1px) * 26);}
+}
