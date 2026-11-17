@@ -103,7 +103,23 @@ function initialsOf(name){ const w = String(name || '?').trim().split(/\s+/); re
 function avatarColorIndex(name){ const ps = (typeof teamProfiles !== 'undefined' ? teamProfiles : []); const i = ps.findIndex(p => p.name === name); return ((i < 0 ? String(name).length : i) % 4) + 1; }
 function avHtml(name, extra){ return `<span class="av a${avatarColorIndex(name)}"${extra ? ' ' + extra : ''} title="${escapeHtml(name)}" aria-label="${escapeHtml(name)}">${escapeHtml(initialsOf(name))}</span>`; }
 function clientMono(c){ return String(c?.name || '?').replace(/[^A-Za-z0-9& ]/g, '').split(/\s+/).filter(w => w && w !== '&').map(w => w[0]).join('').slice(0, 2).toUpperCase(); }
-function monoHtml(c, cls){ return `<span class="mono${cls ? ' ' + cls : ''}" aria-hidden="true">${escapeHtml(clientMono(c))}</span>`; }
+// Each client keeps its own color behind its letters (from its id, so a rename doesn't change it).
+// Logo colors go round the eight tints in A–Z order, so no color covers more than ⌈n/8⌉ clients
+// and neighbors in an alphabetical list never match. Unknown clients fall back to a hash.
+let _monoColors = { sig: '', map: new Map() };
+function clientColor(c){
+  const all = typeof clients !== 'undefined' && Array.isArray(clients) ? clients : [];
+  const sig = all.map(x => x.id + ':' + x.name).join('|');
+  if(sig !== _monoColors.sig){
+    const map = new Map();
+    all.slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' }) || String(a.id).localeCompare(String(b.id)))
+      .forEach((x, i) => map.set(x.id, 'mc' + (i % 8 + 1)));
+    _monoColors = { sig, map };
+  }
+  if(c && _monoColors.map.has(c.id)) return _monoColors.map.get(c.id);
+  const k = String((c && (c.id || c.name)) || '?'); let h = 0; for(let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0; return 'mc' + (h % 8 + 1);
+}
+function monoHtml(c, cls){ return `<span class="mono ${clientColor(c)}${cls ? ' ' + cls : ''}" aria-hidden="true">${escapeHtml(clientMono(c))}</span>`; }
 
 // ---- sent history (for "Last 8 weeks" and the late/missed signal) --------------------------
 // Kept in app_storage 'update-history' as { clientId: [ISO sent times] }; written whenever an
@@ -281,7 +297,43 @@ function clientHealth(c){
   const short = sig.length ? (sig.find(s => s.l === 'r') || sig[0]) : null;
   return { level: quiet ? 'g' : level, rawLevel: level, quiet, signals: sig, since, short, hp, seq };
 }
+// ---- glanceable pieces: colored tags and signal chips instead of sentences ----------------------
+function tagHtml(kind, text, ic){ return `<span class="tag ${kind}">${ic && typeof icon === 'function' ? icon(ic, { weight: 'bold' }) : ''}${escapeHtml(text)}</span>`; }
+function shortDay(d){ const n = daysBetween(d, rNow()); return n <= 0 ? 'today' : n === 1 ? 'yesterday' : n < 7 ? DAY_NAMES[new Date(d).getDay()].slice(0, 3) : fmtShortDate(new Date(d)); }
+// When it's due: red overdue, yellow today, grey later, green sent.
+function dueTag(w){
+  if(w.sent) return tagHtml('green', 'Sent ' + shortDay(w.last), 'check');
+  if(w.late) return tagHtml('red', `${-w.daysLeft}d overdue`, 'warning');
+  if(w.state === 'due') return tagHtml('yellow', 'Due today', 'clock');
+  return tagHtml('gray', w.daysLeft === 1 ? 'Due tomorrow' : 'Due ' + (w.daysLeft < 7 ? DAY_NAMES[w.due.getDay()].slice(0, 3) : fmtShortDate(w.due)), 'clock');
+}
+// The next due date, even for a client sent this week (used where the last send isn't the point).
+function nextDueTag(w){ return w.sent ? tagHtml('gray', w.daysLeft === 1 ? 'Due tomorrow' : 'Due ' + (w.daysLeft < 7 ? DAY_NAMES[w.due.getDay()].slice(0, 3) : fmtShortDate(w.due)), 'clock') : dueTag(w); }
+// Where the update is: one word, colored by stage.
+function stageTag(w){
+  if(w.sent) return '';
+  const d = w.draft;
+  if(w.done >= 3) return tagHtml('purple', 'Approved');
+  if(w.done === 2) return tagHtml('blue', 'In Review');
+  if(d) return tagHtml('gray', 'Draft');
+  if(w.done === 1) return tagHtml('gray', `${w.logged.length} logged`);
+  return tagHtml('gray', 'Nothing logged');
+}
+// Each health signal as an icon and a few words: "Over budget" · "2/4 late" · "8d quiet".
+function signalChips(h, max){
+  const lateM = h.signals.map(s => s.text.match(/(\d) of the last 4 were late or missed/)).find(Boolean);
+  const word = s => ({
+    hours: h.hp.used > h.hp.budget ? 'Over budget' : `${Math.round(h.hp.projected / h.hp.budget * 100)}% of hours`,
+    under: 'Hours under-used',
+    noupdate: (s.text.match(/No update in (\d+) days/) || [])[1] ? `${s.text.match(/No update in (\d+) days/)[1]}d no update` : 'No update',
+    late: lateM ? `${lateM[1]}/4 late` : 'Late updates',
+    quiet: (s.text.match(/(\d+) days/) || [])[1] ? `${s.text.match(/(\d+) days/)[1]}d quiet` : 'Quiet',
+    tasks: s.title.replace(' tasks overdue', ' overdue tasks'),
+    flag: 'Owner flag' }[s.key] || s.title);
+  return h.signals.slice(0, max || 3).map(s => `<span class="chip c${s.l}" title="${escapeHtml(s.title + ' — ' + s.text)}">${typeof icon === 'function' ? icon(s.icon) : ''}${escapeHtml(word(s))}</span>`).join('');
+}
 function healthWord(l){ return { r: 'At risk', y: 'Watch', g: 'Healthy' }[l]; }
+function healthTag(l){ return l === 'g' ? tagHtml('gray', 'Healthy') : tagHtml(l === 'r' ? 'red' : 'yellow', healthWord(l), 'heart-pulse'); }
 function hstateHtml(l, text){
   const dot = l === 'g' ? '' : `<span class="dot ${l === 'r' ? 'red' : 'yellow'}"></span>`;
   return `<span class="hstate ${l}">${dot}${escapeHtml(text || healthWord(l))}</span>`;

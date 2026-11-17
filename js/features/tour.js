@@ -65,7 +65,7 @@ function renderTourStep(){
   if(step.view) switchView(step.view);
   const card = document.getElementById('tourCard');
   card.classList.toggle('tour-card-final', !!step.isFinal);
-  const appName = (typeof settings !== 'undefined' && settings.appName) || 'Based Radar';
+  const appName = (typeof settings !== 'undefined' && settings.appName) || 'Based Agency';
   const target = step.view ? tourNavItem(step.view) : null;
   document.getElementById('tourIcon').innerHTML = step.icon ? icon(step.icon) : (target?.querySelector('svg')?.outerHTML || '');
   document.getElementById('tourTitle').textContent = tourIndex === 0 ? `Welcome to ${appName}` : step.title;

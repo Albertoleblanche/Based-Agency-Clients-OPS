@@ -18,8 +18,9 @@ function renderHealth(){
   const item = x => {
     const on = x === sel, color = { r: 'red', y: 'yellow-fill', g: 'label-3' }[x.h.level];
     return `<a class="msg${on ? ' sel' : ''}" href="#health" onclick="selectHealthClient('${x.c.id}');return false;"${on ? ' aria-current="true"' : ''}>${x.h.level !== 'g' ? `<span class="ud" style="background:var(--${color})" aria-label="${healthWord(x.h.level)}"></span>` : ''}
-<div class="top"><b>${escapeHtml(x.c.name)}</b><time>${x.h.since ? relDay(x.h.since) : ''}</time></div><span class="by">${escapeHtml(x.h.level === 'g' ? 'No signals' : (x.h.level === 'r' && !nextStepTask(x.c) ? (x.h.signals[0].key === 'hours' && x.h.hp.used > x.h.hp.budget ? 'Over budget and speeding up' : tableSignal(x.h, x.c).split(' · ')[0]) + ' · no next step' : tableSignal(x.h, x.c)))}</span>
-<span class="pv" style="display:flex;align-items:center;gap:8px">${histDotsHtml(x.h.seq)}<span>${escapeHtml(clientOwner(x.c) || '—')}</span></span></a>`;
+<div class="top">${monoHtml(x.c, 'sm')}<b>${escapeHtml(x.c.name)}</b><time>${x.h.since ? relDay(x.h.since) : ''}</time></div>
+<div class="tags">${x.h.level === 'g' ? tagHtml('gray', 'No signals', 'check') : signalChips(x.h, 2) + (x.h.level === 'r' && !nextStepTask(x.c) ? tagHtml('red', 'No next step') : '')}</div>
+<span class="pv" style="display:flex;align-items:center;gap:8px">${histDotsHtml(x.h.seq)}${clientOwner(x.c) ? avHtml(clientOwner(x.c)) : ''}</span></a>`;
   };
   const grp = (t, xs) => xs.length ? `<div class="lgh" style="padding-left:28px">${t}<span class="c">${xs.length}</span></div>${xs.map(item).join('')}` : '';
   const healthyTail = healthFilter === 'all' ? grp('Healthy', ok)
@@ -46,7 +47,7 @@ function healthDetailHtml(c, h){
     nextBox = next
       ? `<div class="next" style="margin-top:18px"><span class="sig">${icon('route')}</span><div class="tx"><b>Next step: ${escapeHtml(next.title)}</b><span>${escapeHtml((teamProfiles.find(p => p.id === next.assigneeId) || {}).name || '')}${next.dueDate ? ' · due ' + fmtShortDate(new Date(next.dueDate + 'T12:00:00')) : ''}</span></div>
 <button class="btn" onclick="markHealthHandled('${c.id}')">Mark Handled</button><button class="btn" onclick="openTaskDetailModal('${next.id}')">Open Task</button></div>`
-      : `<div class="next" style="margin-top:18px"><span class="sig">${icon('path')}</span><div class="tx"><b>No next step yet</b><span>${h.level === 'r' ? 'At-risk clients need someone and a date.' : 'Worth a look before it becomes a risk.'} Plan a call, a fix or a check-in — it becomes a task.</span></div>
+      : `<div class="next" style="margin-top:18px"><span class="sig">${icon('path')}</span><div class="tx"><b>No next step yet</b><span>Plan a call, fix or check-in. It becomes a task.</span></div>
 <button class="btn" onclick="markHealthHandled('${c.id}')">Mark Handled…</button><button class="btn btn-p" onclick="planNextStep('${c.id}')">${icon('plus')}Plan Next Step</button></div>`;
   }
   const events = healthEvents(c, h).slice(0, 4);

@@ -44,28 +44,29 @@ function renderToday(){
     .sort((a, b) => (a.h.level === 'r' ? 0 : 1) - (b.h.level === 'r' ? 0 : 1) || (b.h.since || 0) - (a.h.since || 0));
   const atRisk = health.filter(x => x.h.level === 'r').length;
   const waiting = todayWaitingDrafts();
-  let h1;
-  if(sum.sent === sum.total && sum.total) h1 = `All ${sum.total} updates are sent`;
-  else if(lateN) h1 = `${todayPlural(lateN, 'update')} ${lateN === 1 ? 'is' : 'are'} overdue`;
-  else if(behind.length) h1 = `${todayPlural(behind.length, 'update')} ${behind.length === 1 ? 'is' : 'are'} due today`;
-  else if(waiting.length) h1 = `${todayPlural(waiting.length, 'update')} ${waiting.length === 1 ? 'is' : 'are'} waiting for you`;
-  else h1 = 'You’re all caught up';
   const dueToday = behind.length - lateN;
-  const subBits = [`<b>${sum.sent} of ${sum.total}</b> sent in the last 7 days`];
-  if(lateN && dueToday) subBits.push(`<b>${dueToday}</b> more due today`);
-  if(atRisk) subBits.push(`<b>${atRisk}</b> ${atRisk === 1 ? 'client' : 'clients'} at risk`);
-  if(waiting.length) subBits.push(`<b>${waiting.length}</b> ${waiting.length === 1 ? 'draft' : 'drafts'} waiting for your review`);
+  // Five tiles you can read at a glance; each opens the place to act on it.
+  const sentPct = sum.total ? Math.round(sum.sent / sum.total * 100) : 0;
+  const tile = (n, label, ic, tone, go, extra) => `<button class="kpi${n && tone ? ' ' + tone : ''}" onclick="${go}"><span class="k-top"><span class="k-ic ${tone || ''}">${icon(ic)}</span>${extra || ''}</span><b>${n}</b><span>${label}</span></button>`;
+  const tiles = `<div class="kpis">
+${tile(lateN, 'Overdue', 'warning', 'red', "weekFilter='behind';switchView('approve')")}
+${tile(dueToday, 'Due today', 'clock', 'yellow', "weekFilter='behind';switchView('approve')")}
+${tile(waiting.length, canApprove() ? 'To review' : 'Your drafts', 'tray', 'blue', canApprove() ? "switchView('teamqueue')" : "switchView('approve')")}
+${tile(atRisk, 'At risk', 'heart-pulse', 'red', "switchView('health')")}
+<button class="kpi" onclick="weekFilter='all';switchView('approve')"><span class="k-top"><span class="k-ic green">${icon('check')}</span><span class="k-pct">${sentPct}%</span></span><b>${sum.sent}<small>/${sum.total}</small></b><span>Sent this week</span><i class="kbar"><i style="width:${sentPct}%"></i></i></button>
+</div>`;
 
-  const behindRows = behind.map(w => {
-    const sub = (w.done === 0 ? `${w.note} · ${w.owner || '—'}` : w.note);
+  const MAX = 5;
+  const more = (n, label, go) => n > MAX ? `<a class="row sm more-row" href="#" onclick="${go};return false;"><span class="t-2">Show all ${n}</span>${CHEV()}</a>` : '';
+  const behindRows = behind.slice(0, MAX).map(w => {
     const who = w.holder && w.holder !== 'approvers' ? w.holder : w.owner;
-    return `<a class="row" href="#approve" onclick="openWeekClient('${w.c.id}');return false;">${monoHtml(w.c)}<div class="tx"><span class="t">${escapeHtml(w.c.name)}</span><span class="s"><span class="${w.late ? 't-red' : ''}">${escapeHtml(w.dueText)}</span> · ${escapeHtml(sub)}</span></div>
-<div class="r">${stepsHtml(w)}${who ? avHtml(who) : ''}<button class="btn act sm" onclick="event.stopPropagation();event.preventDefault();remindHolder('${w.c.id}')">Remind ${escapeHtml(firstName(who) || '')}</button>${CHEV()}</div></a>`;
-  }).join('');
-  const healthRows = health.slice(0, 6).map(({ c, h }) => `<a class="row" href="#health" onclick="openHealthClient('${c.id}');return false;">${monoHtml(c)}<div class="tx"><span class="t">${escapeHtml(c.name)}</span><span class="s">${escapeHtml(shortSignal(h))}</span></div>
-<div class="r">${hstateHtml(h.level)}<span style="width:52px;text-align:right">${relDay(h.since || rNow())}</span>${CHEV()}</div></a>`).join('');
-  const waitRows = waiting.slice(0, 6).map(({ c, d, count }) => `<a class="row" href="#teamqueue" onclick="openReviewDraft('${c.id}','${jsArg(d.author)}');return false;">${monoHtml(c)}<div class="tx"><span class="t">${escapeHtml(c.name)}</span><span class="s">${escapeHtml(d.author)} · ${todayPlural(count, 'improvement')}</span></div>
-<div class="r"><span class="st"><span class="dot blue"></span>Draft ready</span><span style="width:76px;text-align:right">Waiting ${fmtWait(d.draftPendingSince || rNow())}</span>${CHEV()}</div></a>`).join('');
+    return `<a class="row" href="#approve" onclick="openWeekClient('${w.c.id}');return false;" title="${escapeHtml(w.note || '')}">${monoHtml(w.c)}<div class="tx one"><span class="t">${escapeHtml(w.c.name)}</span></div>
+<div class="r">${dueTag(w)}${stageTag(w)}${who ? avHtml(who) : ''}<button class="btn act sm" onclick="event.stopPropagation();event.preventDefault();remindHolder('${w.c.id}')">Remind</button>${CHEV()}</div></a>`;
+  }).join('') + more(behind.length, 'due', "weekFilter='behind';switchView('approve')");
+  const healthRows = health.slice(0, MAX).map(({ c, h }) => `<a class="row" href="#health" onclick="openHealthClient('${c.id}');return false;">${monoHtml(c)}<div class="tx one"><span class="t">${escapeHtml(c.name)}</span></div>
+<div class="r"><span class="tags">${signalChips(h, 2)}</span>${healthTag(h.level)}${CHEV()}</div></a>`).join('') + more(health.length, 'health', "switchView('health')");
+  const waitRows = waiting.slice(0, MAX).map(({ c, d, count }) => `<a class="row" href="#teamqueue" onclick="openReviewDraft('${c.id}',${jsArg(d.author)});return false;">${monoHtml(c)}<div class="tx one"><span class="t">${escapeHtml(c.name)}</span></div>
+<div class="r">${nextDueTag(clientWeek(c))}${avHtml(d.author)}<span class="tag blue">${icon('clock', { weight: 'bold' })}${fmtWait(d.draftPendingSince || rNow())}</span>${CHEV()}</div></a>`).join('') + more(waiting.length, 'review', canApprove() ? "switchView('teamqueue')" : "switchView('approve')");
 
   const todayStr = toDateStr(new Date());
   const due = (typeof tasks !== 'undefined' ? tasks : []).filter(t => t.assigneeId === currentUser?.id && t.status !== 'done' && !t.cancelledAt && t.dueDate && t.dueDate <= todayStr)
@@ -91,11 +92,10 @@ function renderToday(){
 
   const section = (title, n, link, label, rows, empty) => `<div class="h2"><h2>${title}<span class="c">${n}</span></h2>${link ? `<a href="#${link}" onclick="switchView('${link}');return false;">${label}</a>` : ''}</div>
 <div class="grp">${rows || `<div class="row sm"><span class="s t-2" style="font-size:12px">${empty}</span></div>`}</div>`;
-  root.innerHTML = `<h1 class="lt">${escapeHtml(h1)}</h1>
-<p class="lt-sub">${subBits.join(' · ')}</p>
+  root.innerHTML = `${tiles}
 <div class="cols">
 <div class="col-main">
-${section(lateN ? 'Overdue and due today' : 'Due today', behind.length, 'approve', 'Open This Week', behindRows, `Nothing is due. ${nextDueText(sum.ws.filter(w => myClientsFilter(w.c)))}`)}
+${section('Updates due', behind.length, 'approve', 'Open This Week', behindRows, `Nothing is due. ${nextDueText(sum.ws.filter(w => myClientsFilter(w.c)))}`)}
 ${section('Health changes', health.length, 'health', 'Open Health', healthRows, 'Every client looks healthy.')}
 ${section(canApprove() ? 'Waiting for your review' : 'Your drafts', waiting.length, canApprove() ? 'teamqueue' : 'approve', canApprove() ? 'Open Review' : 'Open This Week', waitRows, 'Nothing is waiting for you.')}
 </div>
@@ -117,4 +117,4 @@ function nextDueText(ws){
 // Older helpers other screens still call.
 function todayInitials(name){ return clientMono({ name }); }
 function todayLastSent(c){ return lastSentAt(c); }
-function todayMono(name){ return `<span class="mono" aria-hidden="true">${escapeHtml(clientMono({ name }))}</span>`; }
+function todayMono(name){ const c = (typeof clients !== 'undefined' ? clients : []).find(x => x.name === name) || { name }; return monoHtml(c); }

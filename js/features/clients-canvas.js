@@ -28,11 +28,11 @@ function renderClientsTable(){
     const lastTxt = last ? `<span class="${stale ? 't-red' : ''}">${weekDay(last)}</span>${stale ? ` <span class="t-2">· ${days} days</span>` : ''}` : '<span class="t-2">None yet</span>';
     const hp = h.hp, hrs = hp.budget ? `<span class="${hp.used > hp.budget ? 't-red' : ''}">${Math.round(hp.used)}</span><span class="t-2"> / ${hp.budget} h</span>` : `<span class="t-2">${Math.round(hp.used)} h</span>`;
     const healthCell = h.level === 'g' ? '<span class="t-2">Healthy</span>'
-      : `<span style="display:flex;flex-direction:column;gap:1px"><span class="st" style="color:var(--label)"><span class="dot ${h.level === 'r' ? 'red' : 'yellow'}"></span><b style="font-weight:600">${healthWord(h.level)}</b></span><span class="t-2" style="font-size:12px;padding-left:14px">${escapeHtml(tableSignal(h, c))}</span></span>`;
+      : `<span class="tags">${healthTag(h.level)}${signalChips(h, 1)}</span>`;
     const sel = c.id === inspectedClientId;
     return `<tr class="client-row${sel ? ' sel' : ''}" data-id="${c.id}" tabindex="0" aria-selected="${sel}" onclick="clientRowClick(event,'${c.id}')" ondblclick="openClientDetail('${c.id}')">
-<td><span class="cell-c">${monoHtml(c)}<span style="font-weight:500">${escapeHtml(c.name)}</span></span></td><td>${escapeHtml(owner || '—')}</td><td>${healthCell}</td>
-<td>${lastTxt}</td><td>${histDotsHtml(h.seq)}</td><td class="num">${hrs}</td><td>${stepsHtml(w)}</td></tr>`;
+<td><span class="cell-c">${monoHtml(c)}<span style="font-weight:500">${escapeHtml(c.name)}</span></span></td><td>${owner ? `<span class="cell-c">${avHtml(owner)}<span>${escapeHtml(firstName(owner))}</span></span>` : '<span class="t-2">—</span>'}</td><td>${healthCell}</td>
+<td>${lastTxt}</td><td>${histDotsHtml(h.seq)}</td><td class="num">${hrs}</td><td><span class="tags" style="flex-wrap:nowrap">${stepsHtml(w)}${needsUpdate(w) ? dueTag(w) : ''}</span></td></tr>`;
   }).join('');
   const seg = [['all', 'All', rows.length], ['attention', 'Needs attention', needs.length], ['behind', 'Update due', behind.length]]
     .map(([k, t, n]) => `<button class="${clientsSeg === k ? 'on' : ''}" role="tab" aria-selected="${clientsSeg === k}" onclick="setClientsSeg('${k}')">${t} <span class="c">${n}</span></button>`).join('');
@@ -63,7 +63,7 @@ function renderClientInspector(){
   el.hidden = false;
   el.innerHTML = `<button class="ib" aria-label="Close panel" title="Close (Esc)" style="position:absolute;top:14px;right:14px" onclick="closeClientInspector()">${icon('x', { weight: 'bold' })}</button>
 <div style="display:flex;flex-direction:column;align-items:flex-start;gap:10px">
-<span class="mono" style="width:48px;height:48px;border-radius:12px;font-size:16px" aria-hidden="true">${escapeHtml(clientMono(c))}</span>
+<span class="mono ${clientColor(c)}" style="width:48px;height:48px;border-radius:12px;font-size:16px" aria-hidden="true">${escapeHtml(clientMono(c))}</span>
 <div><div style="font-size:17px;font-weight:600;letter-spacing:-.01em">${escapeHtml(c.name)}</div><div class="t-2" style="font-size:12px;margin-top:2px">${escapeHtml([c.service, owner].filter(Boolean).join(' · '))}${since}</div></div>
 <div style="display:flex;gap:8px;flex-wrap:wrap">${primary}</div></div>
 <div style="margin-top:20px;display:flex;align-items:center;justify-content:space-between"><span class="set-h" style="margin:0">Health</span>${hstateHtml(h.level, h.level === 'g' ? 'Healthy' : `${healthWord(h.level)} since ${relDay(h.since || rNow()).toLowerCase() === 'today' ? 'today' : relDay(h.since || rNow())}`)}</div>

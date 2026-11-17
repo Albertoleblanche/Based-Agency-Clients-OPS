@@ -43,11 +43,13 @@ function renderTeamQueue(){
   const rows = list.map(x => {
     const h = clientHealth(x.c), on = x === sel;
     const mark = reviewTab === 'waiting' ? '<span class="ud" aria-label="Not opened yet"></span>' : '';
-    const when = reviewTab === 'waiting' ? `Waiting ${fmtWait(x.at || rNow())}` : relDay(x.at || rNow());
+    const when = reviewTab === 'waiting' ? fmtWait(x.at || rNow()) : relDay(x.at || rNow());
+    const w = clientWeek(x.c);
+    const state = reviewTab === 'sent' ? dueTag(w) : (reviewTab === 'approved' ? tagHtml('purple', 'Approved', 'check') : '') + nextDueTag(w);
     return `<a class="msg${on ? ' sel' : ''}" href="#teamqueue" onclick="selectReview('${x.c.id}',${jsArg(x.d.author)});return false;"${on ? ' aria-current="true"' : ''}>${mark}
-<div class="top"><b>${escapeHtml(x.c.name)}</b><time>${when}</time></div>
-<span class="by" style="display:flex;align-items:center;gap:4px">Weekly update · ${escapeHtml(x.d.author)}${h.level !== 'g' ? ' · ' + hstateHtml(h.level) : ''}</span>
-<span class="pv">${escapeHtml(String(x.d.draft || '').replace(/\s+/g, ' ').slice(0, 160))}</span></a>`;
+<div class="top">${monoHtml(x.c, 'sm')}<b>${escapeHtml(x.c.name)}</b><time>${when}</time></div>
+<div class="tags">${avHtml(x.d.author)}${state}${h.level !== 'g' ? healthTag(h.level) : ''}</div>
+<span class="pv">${escapeHtml(String(x.d.draft || '').replace(/\s+/g, ' ').slice(0, 120))}</span></a>`;
   }).join('') || `<div class="empty"><b>${reviewTab === 'waiting' ? 'Nothing waiting' : 'Nothing here'}</b>${reviewTab === 'waiting' ? 'Drafts appear here when they’re sent for review.' : ''}</div>`;
   root.innerHTML = `<section class="list" aria-label="Drafts">
 <div class="list-h"><div class="seg" role="tablist" aria-label="Drafts">${tabs}</div><button class="ib" aria-label="Filter" title="Filter" style="margin-left:auto" onclick="switchView('approve')">${icon('funnel-simple')}</button></div>

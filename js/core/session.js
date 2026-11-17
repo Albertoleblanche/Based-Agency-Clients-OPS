@@ -218,7 +218,7 @@ function renderWhoAmI(){
   if(nameEl && roleEl){
     if(myProfile){
       nameEl.textContent = myProfile.name;
-      roleEl.textContent = `${(settings && settings.brandName) || 'Based Radar'} · ${roleDisplayLabel(myProfile.role)}`;
+      roleEl.textContent = `${(settings && (settings.appName || settings.brandName)) || 'Based Agency'} · ${roleDisplayLabel(myProfile.role)}`;
     } else {
       nameEl.textContent = '—'; roleEl.textContent = '';
     }

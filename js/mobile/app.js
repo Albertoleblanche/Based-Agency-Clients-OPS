@@ -25,7 +25,7 @@ function mIr(lead, t, s, right, onclick, opts){
   opts = opts || {};
   // A row that holds its own control (a checkbox, a call button) can't be a <button>, so it's a div acting as one.
   const tag = onclick && !opts.div ? 'button' : 'div';
-  const sub = s ? `<span class="${opts.s2 ? 's2' : 's'}">${s}</span>` : '';
+  const sub = s ? (opts.tags ? `<span class="tags">${s}</span>` : `<span class="${opts.s2 ? 's2' : 's'}">${s}</span>`) : '';
   const chev = onclick && !opts.noChev ? icon('caret-right', { cls: 'chev', weight: 'bold' }) : '';
   const role = onclick && opts.div ? ` role="button" tabindex="0" onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();this.click()}"` : '';
   return `<${tag} class="ir${onclick && opts.div ? ' tap' : ''}${opts.cls ? ' ' + opts.cls : ''}"${onclick ? ` onclick="${onclick}"` : ''}${role}${opts.attrs || ''}>${lead || ''}<div class="tx"><span class="t${opts.n ? ' n' : ''}">${t}</span>${sub}</div><div class="r">${right || ''}${chev}</div></${tag}>`;
@@ -69,7 +69,7 @@ function mAlertDone(ok){
 function mRenderLogin(err){
   $m('mApp').className = 'phone app';
   $m('mApp').innerHTML = `<div class="stage"><div class="iscroll"><div class="ilogin">
-<span class="logo" aria-hidden="true">B</span>
+<span class="logo brand-mark" aria-hidden="true">BA</span>
 <h1>${mEsc(settings.appName || 'Based Radar')}</h1>
 <p>Sign in with your work email</p>
 <form onsubmit="mSignIn();return false;">
@@ -344,19 +344,26 @@ function mTodayHtml(){
   const waiting = mWaitingDrafts();
   const me = myProfile || {}, unread = notifications.filter(n => !n.read).length;
   const sub = sum.total ? `${sum.sent} of ${sum.total} sent this week${lateN ? ` · ${lateN} overdue` : ''}` : 'No clients yet';
-  const behindRows = behind.slice(0, 3).map(w => mIr(monoHtml(w.c), mEsc(w.c.name), `<span class="${w.late ? 't-red' : ''}">${mEsc(w.dueText)}</span> · ${mEsc(String(w.note || '').replace(/ since .*$/, ''))}`, stepsHtml(w), mBehindTap(w))).join('');
-  const healthRows = health.slice(0, 2).map(({ c, h }) => mIr(monoHtml(c), mEsc(c.name), mEsc(mSignal(h)), hstateHtml(h.level), `mOpenClient('${c.id}')`)).join('');
-  const waitRows = waiting.slice(0, 2).map(({ c, d }) => mIr(monoHtml(c), mEsc(c.name), `${mEsc(d.author)} · waiting ${fmtWait(d.draftPendingSince || rNow())}`, mDot('blue', ''), `mOpenDraft('${c.id}',${jsArg(d.author)})`)).join('');
+  const behindRows = behind.slice(0, 3).map(w => mIr(monoHtml(w.c), mEsc(w.c.name), dueTag(w) + stageTag(w), w.holder && w.holder !== 'approvers' ? avHtml(w.holder) : stepsHtml(w), mBehindTap(w), { tags: true })).join('');
+  const healthRows = health.slice(0, 2).map(({ c, h }) => mIr(monoHtml(c), mEsc(c.name), signalChips(h, 1), healthTag(h.level), `mOpenClient('${c.id}')`, { tags: true })).join('');
+  const waitRows = waiting.slice(0, 2).map(({ c, d }) => mIr(monoHtml(c), mEsc(c.name), nextDueTag(clientWeek(c)) + tagHtml('blue', fmtWait(d.draftPendingSince || rNow()), 'clock'), avHtml(d.author), `mOpenDraft('${c.id}',${jsArg(d.author)})`, { tags: true })).join('');
   const todayStr = toDateStr(new Date());
   const due = tasks.filter(t => t.assigneeId === currentUser.id && t.status !== 'done' && !t.cancelledAt && t.dueDate && t.dueDate <= todayStr).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   return `<div class="ihead"><button onclick="mOpenProfile()" aria-label="My profile">${avHtml(me.name || '?')}</button><div class="r"><button aria-label="Search" onclick="mOpenSearch()">${icon('magnifying-glass')}</button><button aria-label="Notifications${unread ? ', ' + unread + ' new' : ''}" onclick="mOpenNotifications()">${icon('bell')}${unread ? '<span class="bd"></span>' : ''}</button></div></div>
 <h1 class="big">Today</h1><p class="big-sub">${mEsc(sub)}</p>
+${mGlanceHtml(behind, waiting, health)}
 ${mTimerCardHtml()}
 ${behind.length ? mIsh(lateN ? `${behind.length} due or overdue` : `${behind.length} due today`, "mOpenWeek()") + `<div class="ig">${behindRows}</div>` : ''}
 ${health.length ? mIsh('Health', "mOpenClients('health')") + `<div class="ig">${healthRows}</div>` : ''}
 ${waiting.length ? mIsh(`${waiting.length} waiting for ${canApprove() ? 'review' : 'you'}`, "mSwitchTab('review')") + `<div class="ig">${waitRows}</div>` : ''}
 ${due.length ? mIsh('Due today', "mSwitchTab('tasks')") + `<div class="ig">${due.slice(0, 5).map(mTaskRow).join('')}</div>` : ''}
 ${!behind.length && !health.length && !waiting.length && !due.length ? `<div style="margin-top:22px">${mEmpty('You’re all caught up', mNextDue(sum.ws.filter(w => mMine(w.c))))}</div>` : ''}`;
+}
+// Three numbers to read at a glance; each opens the list behind it.
+function mGlanceHtml(behind, waiting, health){
+  const lateN = behind.filter(w => w.late).length, dueN = behind.length - lateN, riskN = health.filter(x => x.h.level === 'r').length;
+  const tile = (n, label, ic, cls, tap) => `<button class="ikpi${n ? ' ' + cls : ''}" onclick="${tap}"><span class="k-ic">${icon(ic, { weight: 'bold' })}</span><b>${n}</b><span>${label}</span></button>`;
+  return `<div class="ikpis">${tile(lateN, 'Overdue', 'warning', 'red', 'mOpenWeek()')}${tile(dueN, 'Due today', 'clock', 'yellow', 'mOpenWeek()')}${canApprove() ? tile(waiting.length, 'To review', 'tray', 'blue', "mSwitchTab('review')") : tile(riskN, 'At risk', 'heart-pulse', 'red', "mOpenClients('health')")}</div>`;
 }
 // "Next up: Oakridge Flooring, due tomorrow."
 function mNextDue(ws){ const n = ws.filter(w => w.sent).sort((a, b) => a.daysLeft - b.daysLeft)[0]; return n ? `Next up: ${mEsc(n.c.name)}, ${n.dueText.toLowerCase()}.` : ''; }
@@ -368,7 +375,7 @@ function mOpenWeek(){
       ['Due soon', ws.filter(w => w.upcoming).sort((a, b) => a.daysLeft - b.daysLeft)], ['Sent this week', ws.filter(w => w.sent).sort((a, b) => new Date(b.last) - new Date(a.last))]];
     const sent = ws.filter(w => w.sent || w.upcoming).length;
     return `<h1 class="big">This Week</h1><p class="big-sub">${sent} of ${ws.length} sent in the last 7 days</p>
-${groups.filter(g => g[1].length).map(([t, list, cls]) => mIsh(t, null, cls) + `<div class="ig">${list.map(w => mIr(monoHtml(w.c), mEsc(w.c.name), w.sent ? mEsc(w.note) : `<span class="${w.late ? 't-red' : ''}">${mEsc(w.dueText)}</span> · ${mEsc(String(w.note || '').replace(/ since .*$/, ''))}`, stepsHtml(w), w.sent ? `mOpenClient('${w.c.id}')` : mBehindTap(w))).join('')}</div>`).join('')}`;
+${groups.filter(g => g[1].length).map(([t, list, cls]) => mIsh(t, null, cls) + `<div class="ig">${list.map(w => mIr(monoHtml(w.c), mEsc(w.c.name), (w.upcoming ? nextDueTag(w) : dueTag(w)) + (w.sent && !w.upcoming ? '' : stageTag(w)), stepsHtml(w), w.sent && !w.upcoming ? `mOpenClient('${w.c.id}')` : mBehindTap(w), { tags: true })).join('')}</div>`).join('')}`;
   });
 }
 // A due client opens its draft when one is waiting, otherwise the client.
@@ -683,7 +690,7 @@ function mOpenClients(mode){
     const vis = list.filter(x => !q || x.c.name.toLowerCase().includes(q));
     return `<h1 class="big">${mode === 'health' ? 'Health' : 'Clients'}</h1><p class="big-sub">${list.filter(x => x.h.level === 'r').length} at risk · ${list.filter(x => x.h.level === 'y').length} to watch</p>
 <div class="isearch">${icon('magnifying-glass')}<input placeholder="Search" value="${mEsc(q)}" oninput="mClientsQ(this.value)" aria-label="Search clients"></div>
-<div class="ig" style="margin-top:14px">${vis.map(({ c, h }) => mIr(monoHtml(c), mEsc(c.name), mEsc(h.level === 'g' ? (c.service || '') : mSignal(h)), h.level === 'g' ? '' : hstateHtml(h.level), `mOpenClient('${c.id}')`)).join('') || '<div class="ir"><span class="t n">No clients match</span></div>'}</div>`;
+<div class="ig" style="margin-top:14px">${vis.map(({ c, h }) => (h.level === 'g' ? mIr(monoHtml(c), mEsc(c.name), mEsc(c.service || ''), '', `mOpenClient('${c.id}')`) : mIr(monoHtml(c), mEsc(c.name), signalChips(h, 1), healthTag(h.level), `mOpenClient('${c.id}')`, { tags: true }))).join('') || '<div class="ir"><span class="t n">No clients match</span></div>'}</div>`;
   });
   window.mClientsQ = v => { q = v.toLowerCase(); const top = mTop(); const inp = top.el.querySelector('.isearch input'); const pos = inp.selectionStart; top.refresh(); const i2 = top.el.querySelector('.isearch input'); i2.focus(); i2.setSelectionRange(pos, pos); };
 }
@@ -694,7 +701,7 @@ function mOpenClient(id){
     const imps = (c.improvements || []).slice().sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8);
     const steps = STEP_NAMES.map((n, k) => mIr(`<span class="gl" style="color:${w.sent || k < w.done ? 'var(--green)' : w.behind === k ? (w.late ? 'var(--red)' : 'var(--yellow)') : 'var(--label-3)'}">${icon(w.sent || k < w.done ? 'check-circle' : w.behind === k ? 'warning' : 'circle')}</span>`, n, '', k === 3 ? (w.sent ? mEsc(relDay(w.last)) : `<span class="${w.late ? 't-red' : ''}">${mEsc(w.dueText)}</span>`) : '', null, { n: true })).join('');
     return `<div class="idetail" style="display:flex;gap:12px;align-items:center;margin-top:4px">${monoHtml(c, 'lg')}<div style="min-width:0"><h1 style="font-size:24px;font-weight:700;letter-spacing:-.02em;margin:0">${mEsc(c.name)}</h1><div class="ikv">${mEsc([c.service, w.owner].filter(Boolean).join(' · '))}</div></div></div>
-${h.level !== 'g' ? `<div class="inote" style="margin-top:14px">${hstateHtml(h.level)} ${mEsc(shortSignal(h, 3))}</div>` : ''}
+${h.level !== 'g' ? `<div class="tags iwrap" style="margin:14px 16px 0">${healthTag(h.level)}${signalChips(h, 4)}</div>` : ''}
 ${mIsh('This week’s update')}<div class="ig">${steps}</div>
 <div style="margin:12px 16px 0"><button class="ibtn s" onclick="mOpenLog('${c.id}')">${icon('plus')}Log Improvement</button></div>
 ${mIsh('Logged')}<div class="ig">${imps.map(i => mIr('', mEsc(i.text), `${mEsc(i.author)} · ${fmtShortDate(new Date(i.date))}${i.includeInEmail === false ? ' · internal' : ''}`, '', null, { n: true })).join('') || '<div class="ir"><span class="t n" style="color:var(--label-2)">Nothing logged yet</span></div>'}</div>`;

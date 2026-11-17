@@ -13,8 +13,9 @@ function weekVisibleClients(){
 function weekRowHtml(w, sel){
   const h = clientHealth(w.c);
   const ud = h.level === 'g' ? '' : `<span class="ud" style="background:var(--${h.level === 'r' ? 'red' : 'yellow-fill'})" aria-label="${healthWord(h.level)}"></span>`;
+  const who = w.sent ? w.owner : (w.holder || w.owner);
   return `<a class="wk${sel ? ' sel' : ''}" href="#approve" data-id="${w.c.id}" onclick="selectWeekClient('${w.c.id}');return false;"${sel ? ' aria-current="true"' : ''}>${ud}${monoHtml(w.c)}
-<div class="tx"><b>${escapeHtml(w.c.name)}</b><span>${w.sent ? '' : `<span class="${w.late ? 't-red' : ''}">${escapeHtml(w.dueText)}</span> · `}${escapeHtml(String(w.note || '').replace(/ since .*$/, ''))}</span></div><div class="r">${stepsHtml(w)}<span>${escapeHtml(w.owner || '—')}</span></div></a>`;
+<div class="tx"><b>${escapeHtml(w.c.name)}</b><span class="tags">${w.upcoming ? nextDueTag(w) : dueTag(w)}${w.sent && !w.upcoming ? '' : stageTag(w)}</span></div><div class="r">${stepsHtml(w)}${who ? avHtml(who) : ''}</div></a>`;
 }
 function selectWeekClient(id){ window._weekSel = id; renderThisWeek(); }
 
@@ -64,18 +65,19 @@ function weekDetailHtml(w, cyc){
   }
   else if(d.draftStatus === 'pending') primary = canApprove() ? `<button class="btn btn-p" onclick="openReviewDraft('${c.id}',${jsArg(d.author)})">${icon('envelope-open')}Open in Review</button>` : '';
   else if(d.draftStatus === 'approved') primary = canApprove() ? `<button class="btn btn-p" onclick="sendApprovedDraft('${c.id}',${jsArg(d.author)})">${icon('paper-plane-tilt')}Send Now</button>` : '';
+  const lastTxt = w.last ? 'Last sent ' + fmtShortDate(w.last) : 'No update sent yet';
   if(w.upcoming){
-    callout = `<div class="next" style="margin-top:18px"><span class="sig">${icon('clock-countdown')}</span><div class="tx"><b>${escapeHtml(w.dueText)}: the last update went out ${fmtShortDate(w.last)}</b><span>${escapeHtml(w.note || '')}</span></div>${secondary}${primary}</div>`;
+    callout = `<div class="next" style="margin-top:18px"><span class="sig">${icon('clock-countdown')}</span><div class="tx"><b>Next update ${escapeHtml(w.dueText.replace(/^Due /, 'due '))}</b><span>${escapeHtml(lastTxt)}</span></div>${secondary}${primary}</div>`;
   } else if(!w.sent){
-    const why = w.done === 0 ? `Nothing has been logged for ${escapeHtml(c.name)} since the last update.`
-      : !d ? 'Work is logged but nobody has written the draft yet.'
-      : d.draftStatus === 'pending' && !d.readyToNotify ? `The draft is written. ${escapeHtml(firstName(d.author))} hasn’t sent it for review.`
-      : d.draftStatus === 'pending' ? 'The draft is waiting in Review.' : 'Approved, not sent yet.';
-    const head = w.late ? `Overdue: the last update went out ${w.last ? fmtShortDate(w.last) : 'never'}, ${-w.daysLeft + UPDATE_EVERY_DAYS} days ago` : (w.last ? `Due today: the last update went out ${fmtShortDate(w.last)}` : 'Due today: no update has gone out yet');
+    const why = w.done === 0 ? 'Nothing logged yet'
+      : !d ? 'Work logged, no draft yet'
+      : d.draftStatus === 'pending' && !d.readyToNotify ? `Draft written, ${escapeHtml(firstName(d.author))} hasn’t sent it for review`
+      : d.draftStatus === 'pending' ? 'Waiting in Review' : 'Approved, ready to send';
+    const head = w.late ? `Overdue by ${-w.daysLeft} day${w.daysLeft === -1 ? '' : 's'}` : 'Due today';
     callout = `<div class="next" style="margin-top:18px"><span class="sig ${w.late ? 'r' : 'y'}">${icon('clock-countdown')}</span>
-<div class="tx"><b>${escapeHtml(head)}</b><span>${why}</span></div>${secondary}${primary}</div>`;
+<div class="tx"><b>${escapeHtml(head)}</b><span>${why} · ${escapeHtml(lastTxt)}</span></div>${secondary}${primary}</div>`;
   } else if(primary || secondary){
-    callout = `<div class="next" style="margin-top:18px"><span class="sig">${icon('check')}</span><div class="tx"><b>Sent</b><span>${escapeHtml(w.note || '')}</span></div>${secondary}${primary}</div>`;
+    callout = `<div class="next" style="margin-top:18px"><span class="sig">${icon('check')}</span><div class="tx"><b>Sent ${escapeHtml(relDayLower(w.last))}</b><span>Next one ${escapeHtml(w.dueText.replace(/^Due /, 'due '))}</span></div>${secondary}${primary}</div>`;
   }
   const stepTxt = [
     w.sent ? 'Logged' : w.done > 0 ? `${w.logged.length} improvement${w.logged.length === 1 ? '' : 's'} since the last update` : 'Nothing yet',

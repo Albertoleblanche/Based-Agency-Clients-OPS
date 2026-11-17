@@ -64,13 +64,13 @@ function renderSettingsView(){
 function setGeneral(){
   const canWs = canApprove();
   const brand = settings.brandColor || '#C64C19';
-  const logo = settings.appIcon ? `<img src="${esc(settings.appIcon)}" alt="" class="logo" style="object-fit:cover">` : `<span class="logo">${esc((settings.appName || 'Based Radar').trim().charAt(0).toUpperCase())}</span>`;
+  const logo = settings.appIcon ? `<img src="${esc(settings.appIcon)}" alt="" class="logo" style="object-fit:cover">` : `<span class="logo brand-mark">BA</span>`;
   const pref = myProfile && myProfile.theme != null ? myProfile.theme : (localStorage.getItem('bda_theme') || 'auto');
   const thumb = (bg, side) => `<i style="background:linear-gradient(90deg,${side} 0 30%,${bg} 30% 100%)"></i>`;
   const ap = (k, t, i) => `<div role="radio" tabindex="0" aria-checked="${pref === k}" class="${pref === k ? 'on' : ''}" onclick="setThemePref('${k}')" onkeydown="if(event.key==='Enter'||event.key===' ')setThemePref('${k}')">${i}${t}</div>`;
   return `${canWs ? `<div class="set-h">Workspace</div>
 <div class="form-grp">
-${fr('Name', 'Shown in the sidebar and on emails', `<input id="appNameInput" class="tf" style="width:240px" value="${esc(settings.appName || '')}" placeholder="Based Radar" onchange="saveWorkspaceName(this.value)">`)}
+${fr('Name', 'Shown in the sidebar and on emails', `<input id="appNameInput" class="tf" style="width:240px" value="${esc(settings.appName || '')}" placeholder="Based Agency" onchange="saveWorkspaceName(this.value)">`)}
 ${fr('Logo', 'Square image, at least 256 px', `${logo}<input type="file" id="iconFileInput" accept="image/*" hidden onchange="onIconFileSelected(event)"><button class="btn" onclick="document.getElementById('iconFileInput').click()">Change…</button>${settings.appIcon ? `<button class="btn btn-q" onclick="removeAppIcon().then(renderSettingsView)">Remove</button>` : ''}`)}
 ${fr('Accent color', 'Used only for the main button on each screen', `<label class="well" style="background:${esc(brand)};position:relative;cursor:default"><input type="color" id="brandColorInput" value="${esc(brand)}" style="position:absolute;inset:0;opacity:0" onchange="saveAccentColor(this.value)" aria-label="Accent color"></label><span class="t-2" style="font-family:var(--mono);font-size:12px">${esc(brand.toUpperCase())}</span><button class="btn" onclick="document.getElementById('brandColorInput').click()">Change…</button>`)}
 ${fr('Names in the sidebar', 'Rename screens for everyone, and the line under the app name', `<button class="btn" onclick="openSidebarNamesSheet()">Edit…</button>`)}

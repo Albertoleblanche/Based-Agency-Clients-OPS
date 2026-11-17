@@ -29,7 +29,7 @@ function renderClientPage(){
 <button class="btn" onclick="openHealthClient('${c.id}')">See Why</button>${next ? `<button class="btn" onclick="openTaskDetailModal('${next.id}')">Open Next Step</button>` : `<button class="btn btn-p" onclick="planNextStep('${c.id}')">${icon('plus')}Plan Next Step</button>`}</div>`;
   }
   top.innerHTML = `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:16px">
-<span class="mono" style="width:56px;height:56px;border-radius:14px;font-size:18px" aria-hidden="true">${escapeHtml(clientMono(c))}</span>
+<span class="mono ${clientColor(c)}" style="width:56px;height:56px;border-radius:14px;font-size:18px" aria-hidden="true">${escapeHtml(clientMono(c))}</span>
 <div style="min-width:0"><h1 class="lt">${escapeHtml(c.name)}</h1><p class="lt-sub" style="margin-top:4px">${escapeHtml([c.service, c.status !== 'Active' ? c.status : '', start ? 'client since ' + start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : ''].filter(Boolean).join(' · '))}</p></div>
 <span style="flex:1"></span><div class="seg" role="tablist" aria-label="Client sections">${tabs}</div></div>
 ${callout}`;
