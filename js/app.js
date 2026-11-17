@@ -37,8 +37,10 @@ function renderLog(){
   const rows = log.length ? log.map(l=>`<div class="log-row"><span class="log-time">${escapeHtml(logEntryTime(l))}</span><span><span class="tag ${l.tag==='auto'?'auto':'you'}">${escapeHtml(logEntryLabel(l))}</span>${sanitizeInlineHtml(l.text)}</span></div>`).join('') : `<div class="empty">No activity yet.</div>`;
   const logListEl = document.getElementById('logList');
   if(logListEl) logListEl.innerHTML = rows;
-  document.getElementById('logListOverview').innerHTML = rows;
-  document.getElementById('logCountOverview').textContent = log.length ? `${log.length} event${log.length!==1?'s':''}` : '';
+  const logOverviewEl = document.getElementById('logListOverview');
+  if(logOverviewEl) logOverviewEl.innerHTML = rows;
+  const logCountEl = document.getElementById('logCountOverview');
+  if(logCountEl) logCountEl.textContent = log.length ? `${log.length} event${log.length!==1?'s':''}` : '';
 }
 
 function pad2(n){ return String(n).padStart(2,'0'); }

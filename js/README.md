@@ -6,7 +6,7 @@ in plain JavaScript files — no build step, no bundler. Vercel serves them as-i
 ```
 index.html         page shell + screen markup; loads everything below in order
 css/               base → layout → overview → screens → components → macos →
-                   desktop-app → responsive
+                   desktop-app → radar (the Mac redesign) → responsive
 js/core/           shared foundation (state, Supabase client, helpers, toasts,
                    modals, loading/saving, live updates, navigation)
 js/ui/             reusable display pieces (date/time pickers, pills, badges)

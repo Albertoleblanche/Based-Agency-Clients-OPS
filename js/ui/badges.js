@@ -22,8 +22,8 @@
 function statusMeta(c, author){
   const d = getDraftFor(c, author);
   if(d.draftStatus==='approved'){
-    if(d.draftSentAt) return {label:'Sent', color:'var(--muted)', bg:'var(--border)'};
-    return {label:'✓ Approved', color:'var(--green)', bg:'var(--green-bg)'};
+    if(d.draftSentAt) return {label:'Sent', color:'var(--green)', bg:'var(--green-bg)'};
+    return {label:'Approved', color:'var(--purple)', bg:'var(--purple-bg)'};
   }
   if(d.draftStatus==='pending'){
     // Distinguishes "still working on this draft" from "I've flagged it
@@ -31,8 +31,8 @@ function statusMeta(c, author){
     // actually visible in Team Queue (see renderTeamQueue()'s
     // readyForReview), so the card should reflect that transition rather
     // than showing the same "Draft ready" label before and after it.
-    if(d.readyToNotify===true) return {label:'Sent for approval', color:'#3A63C9', bg:'#3A63C918'};
-    return {label:'Draft ready', color:'var(--brand)', bg:'var(--brand-bg)'};
+    if(d.readyToNotify===true) return {label:'Sent for approval', color:'var(--blue)', bg:'var(--blue-bg)'};
+    return {label:'Draft ready', color:'var(--blue)', bg:'var(--blue-bg)'};
   }
   return {label:'No draft yet', color:'var(--muted-lt)', bg:'var(--border)'};
 }

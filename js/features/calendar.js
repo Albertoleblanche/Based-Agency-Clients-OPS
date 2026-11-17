@@ -52,6 +52,7 @@ async function loadCalendarEvents(){
   }));
   calendarDataLoaded = true;
   updateCalendarNavBadge();
+  if(typeof renderToday === 'function') renderToday();
 }
 
 function updateCalendarNavBadge(){
