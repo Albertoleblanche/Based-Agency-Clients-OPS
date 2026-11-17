@@ -458,7 +458,11 @@ function renderQueue(){
   // clients they logged something for, but the card itself (count, list)
   // should reflect only their own contribution too, not a combined total
   // that happens to include a colleague's work on the same client.
-  el.innerHTML = `<div class="queue-grid">` + rows.map(c=>queueCardHtml(c, me)).join('') + `</div>`;
+  const keptDraft = captureQueuePaneDraft(el);
+  el.innerHTML = queueSplitActive()
+    ? queueSplitHtml('approve', rows.map(c => ({ c, author: me })))
+    : `<div class="queue-grid">` + rows.map(c=>queueCardHtml(c, me)).join('') + `</div>`;
+  restoreQueuePaneDraft(el, keptDraft);
 }
 
 // The single source of truth for Team Queue: which of one member's clients
@@ -555,7 +559,11 @@ function renderTeamQueue(){
     return;
   }
 
-  el.innerHTML = `<div class="queue-grid">${pairs.map(p => queueCardHtml(p.c, p.member.name, true)).join('')}</div>`;
+  const keptDraft = captureQueuePaneDraft(el);
+  el.innerHTML = queueSplitActive()
+    ? queueSplitHtml('teamqueue', pairs.map(p => ({ c: p.c, author: p.member.name })))
+    : `<div class="queue-grid">${pairs.map(p => queueCardHtml(p.c, p.member.name, true)).join('')}</div>`;
+  restoreQueuePaneDraft(el, keptDraft);
 }
 
 
@@ -683,10 +691,10 @@ async function notifyForMemberInternally(memberId){
 // section (or the viewer's own personal Queue), so someone doesn't see a
 // combined count/list that includes colleagues' contributions mixed into
 // theirs. Left undefined shows everyone's, unchanged from before.
-function queueCardHtml(c, scopeAuthor, showAuthor){
+function queueCardHtml(c, scopeAuthor, showAuthor, selected, view){
   const status = statusMeta(c, scopeAuthor);
   const d = getDraftFor(c, scopeAuthor);
-  return `<div class="q-card" id="q-${c.id}">
+  return `<div class="q-card${selected ? ' sel' : ''}" id="q-${c.id}"${view ? ` role="option" aria-selected="${selected ? 'true' : 'false'}" onclick="queueRowClick(event,'${view}','${c.id}',${jsArg(scopeAuthor||'')})"` : ''}>
     <div class="q-card-top">
       <div class="avatar-circle" style="background:${avatarColorForName(c.name)};color:#fff;border:2px solid var(--card);box-shadow:none;">${escapeHtml(c.name.trim().charAt(0).toUpperCase())}</div>
       <div style="flex:1;min-width:0;">
@@ -809,23 +817,24 @@ function loggedPill(c){
   return `<span class="pill pill-history">${timeAgo(mostRecent.date)}</span>`;
 }
 
-function openQueueCardModal(id, author){
-  const c = clients.find(x=>x.id===id);
-  if(!c) return;
+// The draft's full detail: who wrote it, what it was written from, the
+// draft itself and every action on it. Shown in the side pane of Review
+// and Team Queue on wide windows, and in a sheet everywhere else.
+function queueDetailHtml(c, author){
   const d = getDraftFor(c, author);
   // Scoped to this author's own logged work — this modal represents one
   // specific person's draft for this client, not a combined view of
   // everyone who's ever logged something here.
   const shownImprovements = c.improvements.filter(i=>improvementInDateRange(i, false) && i.author===author);
   const status = statusMeta(c, author);
-  openAppModal(`
+  return `
     <div class="modal-head">
       <div>
         <div class="q-name">${escapeHtml(c.name)} <span style="font-weight:400;color:var(--muted-lt);font-size:13px;">— ${escapeHtml(author)}</span></div>
         <div class="q-service-caption">${escapeHtml(c.service)} · ${riskCaptionHtml(c.danger)}</div>
         <div class="q-ratings" style="margin-top:12px;">
           ${dotRating('Importance', c.importance, 'ink', 10)}
-          ${dotRating('Danger', c.danger, 'brand')}
+          ${dotRating('Danger', c.danger, 'ink')}
         </div>
       </div>
       <span class="toast-close" onclick="closeAppModal()">✕</span>
@@ -849,7 +858,70 @@ function openQueueCardModal(id, author){
       ${d.draft && !canApprove() && d.draftStatus!=='approved' ? `<span class="warn-text" style="color:var(--muted-lt);">Only admins and approvers can approve or skip drafts.</span>` : ''}
       ${d.draftStatus==='approved' && !canApprove() ? `<span style="font-size:13px;color:var(--muted-lt);">✓ ${escapeHtml(author)}'s update was approved.</span>` : ''}
       `}
-    </div>`, 560);
+    </div>`;
+}
+
+// Review and Team Queue work like Mail on wide windows: the list on the
+// left, the selected draft on the right. Every action is the same code
+// the sheet uses — after approving, sending or skipping, the list redraws
+// and the same draft stays selected with its new state.
+const queueSelection = { approve: null, teamqueue: null };
+const QUEUE_SPLIT_QUERY = window.matchMedia('(min-width: 1100px)');
+function queueSplitActive(){ return QUEUE_SPLIT_QUERY.matches; }
+if(QUEUE_SPLIT_QUERY.addEventListener) QUEUE_SPLIT_QUERY.addEventListener('change', ()=>{ renderQueue(); renderTeamQueue(); });
+
+function selectQueueItem(view, id, author){
+  queueSelection[view] = { id, author };
+  view === 'approve' ? renderQueue() : renderTeamQueue();
+}
+
+function queueRowClick(event, view, id, author){
+  if(!queueSplitActive()) return;
+  if(event.target.closest('button, a, input, textarea, select, .kanban-card-menu-wrap')) return;
+  selectQueueItem(view, id, author);
+}
+
+// Background redraws (live updates, other actions) must never wipe a
+// draft someone is in the middle of editing in the pane. Unsaved text,
+// focus and cursor survive a redraw — unless the saved draft itself
+// changed underneath (e.g. it was just rewritten by AI), in which case
+// the new text wins.
+function captureQueuePaneDraft(el){
+  const ta = el && el.querySelector('.q-pane textarea.draft');
+  if(!ta) return null;
+  const focused = document.activeElement === ta;
+  if(!focused && ta.value === ta.defaultValue) return null;
+  return { id: ta.id, value: ta.value, base: ta.defaultValue, focused, start: ta.selectionStart, end: ta.selectionEnd };
+}
+function restoreQueuePaneDraft(el, kept){
+  if(!kept) return;
+  const ta = el.querySelector('.q-pane textarea.draft');
+  if(!ta || ta.id !== kept.id || ta.defaultValue !== kept.base) return;
+  ta.value = kept.value;
+  if(kept.focused){ ta.focus(); try{ ta.setSelectionRange(kept.start, kept.end); }catch(e){} }
+}
+
+function queueSplitHtml(view, items){
+  let sel = queueSelection[view];
+  if(!sel || !items.some(it => it.c.id === sel.id && it.author === sel.author)){
+    sel = queueSelection[view] = { id: items[0].c.id, author: items[0].author };
+  }
+  const selected = items.find(it => it.c.id === sel.id && it.author === sel.author);
+  const rows = items.map(it => queueCardHtml(it.c, it.author, view === 'teamqueue', it === selected, view)).join('');
+  return `<div class="q-split"><div class="queue-grid q-list" role="listbox" aria-label="Drafts">${rows}</div>
+    <section class="q-pane" aria-label="Selected draft" data-client-id="${selected.c.id}" data-author="${escapeHtml(selected.author)}">${queueDetailHtml(selected.c, selected.author)}</section></div>`;
+}
+
+function openQueueCardModal(id, author){
+  const c = clients.find(x=>x.id===id);
+  if(!c) return;
+  if(queueSplitActive() && (currentViewName === 'approve' || currentViewName === 'teamqueue')){
+    selectQueueItem(currentViewName, id, author);
+    const pane = document.querySelector(`#view-${currentViewName} .q-pane`);
+    if(pane) pane.scrollTop = 0;
+    return;
+  }
+  openAppModal(queueDetailHtml(c, author), 560);
   const card = document.querySelector('#appModalOverlay .modal-card');
   if(card){ card.dataset.clientId = id; card.dataset.author = author; }
   const list = document.querySelector('#appModalOverlay .q-bulk-list');
@@ -1224,9 +1296,19 @@ function getIncludedAuthorProfiles(c, d){
   return includedAuthors.map(name => teamProfiles.find(p=>p.name===name)).filter(Boolean);
 }
 
+// The draft box being edited: the open sheet's, else the one in the pane
+// of the screen you're on. (Review and Team Queue both keep a pane, so the
+// same draft can be on the page twice — the hidden copy must never win.)
+function queueDraftTextarea(id){
+  const sel = 'textarea#draft-' + CSS.escape(id);
+  const inSheet = document.querySelector('#appModalOverlay ' + sel);
+  if(inSheet && inSheet.offsetParent) return inSheet;
+  return document.querySelector('.view.active ' + sel) || document.getElementById('draft-' + id);
+}
+
 async function approveDraft(id, author){
   if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can approve drafts.'); return; }
-  const ta = document.getElementById('draft-'+id);
+  const ta = queueDraftTextarea(id);
   setBtnLoading(clickedBtn(), 'Approving…');
 
   await loadAll();
