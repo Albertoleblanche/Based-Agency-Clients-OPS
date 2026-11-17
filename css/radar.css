@@ -387,3 +387,19 @@ body[data-theme="dark"] .login-card{box-shadow:0 0 0 .5px rgba(255,255,255,.12),
   .client-insp{position:static;flex-basis:auto;width:100%;max-height:none;}
 }
 #clientsTbody .client-cell .avatar-circle{border-radius:8px !important;background:var(--fill-2) !important;color:var(--ink) !important;font-weight:600;}
+
+/* The client panel is docked to the window's right edge — full height
+   under the toolbar, like an inspector in Finder or Mail — and the list
+   gives it room instead of being covered. Narrow windows keep it below. */
+@keyframes ciIn{from{transform:translateX(24px);opacity:0;}to{transform:none;opacity:1;}}
+@media (min-width:1100px){
+  .client-insp{position:fixed;top:64px;right:0;bottom:0;width:340px;max-height:none;z-index:90;border-radius:0;
+    background:var(--side-bg);box-shadow:inset .5px 0 0 var(--side-line);padding:18px 20px 28px;animation:ciIn 180ms cubic-bezier(.23,1,.32,1);}
+  .main:has(#view-clients.active #clientInspector:not([hidden])){margin-right:340px;}
+  .client-insp .cd-kv, .client-insp .ci-work, .client-insp .ci-act{border-color:var(--side-line);}
+  .client-insp .ci-log{background:var(--card);}
+}
+@media (prefers-reduced-motion: reduce){ .client-insp{animation:none;} }
+@media (min-width:1100px){
+  body:has(#view-clients.active #clientInspector:not([hidden])) .claude-float-btn{right:364px !important;}
+}
