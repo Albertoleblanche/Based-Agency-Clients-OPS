@@ -248,7 +248,7 @@ function renderClientsTable(){
   }
   const ac = activeClients();
   if(!ac.length){
-    tbody.innerHTML = `<tr><td colspan="8">${emptyStateHtml(
+    tbody.innerHTML = `<tr><td colspan="7">${emptyStateHtml(
       '<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M117.25,157.92a60,60,0,1,0-66.5,0A95.83,95.83,0,0,0,3.53,195.63a8,8,0,1,0,13.4,8.74,80,80,0,0,1,134.14,0,8,8,0,0,0,13.4-8.74A95.83,95.83,0,0,0,117.25,157.92ZM40,108a44,44,0,1,1,44,44A44.05,44.05,0,0,1,40,108Zm210.14,98.7a8,8,0,0,1-11.07-2.33A79.83,79.83,0,0,0,172,168a8,8,0,0,1,0-16,44,44,0,1,0-16.34-84.87,8,8,0,1,1-5.94-14.85,60,60,0,0,1,55.53,105.64,95.83,95.83,0,0,1,47.22,37.71A8,8,0,0,1,250.14,206.7Z"/></svg>',
       'No clients yet',
       canApprove() ? 'This is where your whole roster lives — add your first client to start tracking their work.' : 'This is where your whole roster lives — ask an admin or approver to add the first client.',
@@ -271,7 +271,7 @@ function renderClientsTable(){
     countEl.textContent = isFiltered ? `${filtered.length} of ${ac.length} shown` : '';
   }
   if(!filtered.length){
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty">Nothing matches these filters — try adjusting or clearing them.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty">Nothing matches these filters — try adjusting or clearing them.</div></td></tr>`;
     renderWhoAmI();
     renderClientsPagination(0);
     return;
@@ -282,7 +282,8 @@ function renderClientsTable(){
   const pageItems = filtered.slice(pageStart, pageStart+CLIENTS_PAGE_SIZE);
 
   tbody.innerHTML = pageItems.map(c=>`
-    <tr>
+    <tr class="client-row${c.id===inspectedClientId ? ' sel' : ''}" data-id="${c.id}" tabindex="0" aria-selected="${c.id===inspectedClientId}"
+        onclick="clientRowClick(event,'${c.id}')" ondblclick="openClientDetail('${c.id}')">
       <td class="client-bulk-checkbox-cell" style="border-left:3px solid ${c.danger>=4 ? 'var(--brand)' : 'transparent'};width:36px;display:none;">
         <input type="checkbox" class="client-row-checkbox" value="${c.id}" ${selectedClientIds.has(c.id)?'checked':''} onchange="onClientRowCheck(this)">
       </td>
@@ -292,33 +293,14 @@ function renderClientsTable(){
       <td>${ratingPillCompact(c.importance,'ink',10)}</td>
       <td>${dangerPillCompact(c.danger)}</td>
       <td>${loggedPill(c)}</td>
-      <td class="actions-cell">
-        <button class="icon-menu-btn" onclick="toggleActionsMenu(event, '${c.id}')" title="Actions">
-          <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M112,60a16,16,0,1,1,16,16A16,16,0,0,1,112,60Zm16,52a16,16,0,1,0,16,16A16,16,0,0,0,128,112Zm0,68a16,16,0,1,0,16,16A16,16,0,0,0,128,180Z"/></svg>
-        </button>
-      </td>
-    </tr>
-    <tr class="drawer-row" id="drawer-${c.id}" style="display:none;">
-      <td colspan="8">
-        ${c.improvements.length ? miniImprovementsHtml(c) : ''}
-        <div class="log-inline" style="margin-top:8px;">
-          <textarea spellcheck="true" placeholder="What did you improve for this client this week?" id="imp-${c.id}"></textarea>
-          <button class="btn btn-brand" onclick="logImprovement('${c.id}')">Log it</button>
-          <button class="btn btn-outline" onclick="toggleDrawer('${c.id}')">Cancel</button>
-        </div>
-        <div class="who-am-i" style="font-size:11px;color:var(--muted-lt);margin-top:6px;"></div>
-      </td>
     </tr>
   `).join('');
   updateSelectAllCheckboxState();
   updateClientsBulkBar();
   renderWhoAmI();
+  renderClientInspector();
 }
 
-function toggleDrawer(id){
-  const row = document.getElementById('drawer-'+id);
-  row.style.display = row.style.display==='none' ? 'table-row' : 'none';
-}
 
 // Used to pause the periodic auto-refresh — a full table re-render while someone
 // is typing would wipe out their open drawer and unsaved text.
@@ -327,42 +309,121 @@ function isLoggingActive(){
   return !!(active && active.tagName==='TEXTAREA' && active.id && active.id.startsWith('imp-'));
 }
 
-let currentActionsMenuClientId = null;
+// ---------- client panel ----------
+// Clicking a client opens its details in a panel on the right, like
+// Finder's or Mail's inspector: health, this month's hours, recent work, a
+// quick way to log an improvement, and every action that used to sit
+// behind the row's ⋯ menu. Double-click (or Enter) opens the full client
+// page; ↑/↓ move through the list; Esc closes the panel.
+let inspectedClientId = null;
 
-function toggleActionsMenu(event, id){
-  event.stopPropagation();
-  const menu = document.getElementById('clientActionsMenu');
-  const wasOpenForThisRow = menu.classList.contains('open') && currentActionsMenuClientId === id;
-  closeActionsMenus();
-  if(wasOpenForThisRow) return;
+function clientRowClick(event, id){
+  if(event.target.closest('input, button, a, label')) return;
+  selectClientRow(id);
+}
 
-  currentActionsMenuClientId = id;
-  const editItem = document.getElementById('clientActionsMenuEdit');
-  if(editItem) editItem.style.display = canApprove() ? '' : 'none';
-  const deleteItem = document.getElementById('clientActionsMenuDelete');
-  if(deleteItem) deleteItem.style.display = canApprove() ? '' : 'none';
+function selectClientRow(id){
+  inspectedClientId = id;
+  document.querySelectorAll('#clientsTbody tr.client-row').forEach(tr=>{
+    const on = tr.dataset.id === id;
+    tr.classList.toggle('sel', on);
+    tr.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  renderClientInspector();
+}
 
-  // Position relative to the viewport (not any ancestor), so it's
-  // completely unaffected by the table's own scroll/overflow clipping —
-  // this is what actually fixes the last-row-gets-cut-off issue, not a
-  // z-index or overflow tweak on the table itself.
-  const rect = event.currentTarget.getBoundingClientRect();
-  menu.style.top = (rect.bottom + 4) + 'px';
-  menu.style.left = 'auto';
-  menu.style.right = (window.innerWidth - rect.right) + 'px';
-  // Flip above the button instead, if there isn't enough room below.
-  const menuHeightEstimate = 210;
-  if(rect.bottom + menuHeightEstimate > window.innerHeight){
-    menu.style.top = (rect.top - menuHeightEstimate - 4) + 'px';
+function closeClientInspector(){
+  inspectedClientId = null;
+  document.querySelectorAll('#clientsTbody tr.client-row.sel').forEach(tr=>{ tr.classList.remove('sel'); tr.setAttribute('aria-selected','false'); });
+  renderClientInspector();
+}
+
+function renderClientInspector(){
+  const el = document.getElementById('clientInspector');
+  const wrap = document.getElementById('clientsSplit');
+  if(!el) return;
+  const c = inspectedClientId ? activeClients().find(x=>x.id===inspectedClientId) : null;
+  if(!c){ el.hidden = true; el.innerHTML = ''; wrap?.classList.remove('has-insp'); return; }
+
+  // Keep anything typed into the log field across redraws.
+  const prev = document.getElementById('imp-'+c.id);
+  const kept = prev ? prev.value : '';
+  const wasFocused = prev && document.activeElement === prev;
+
+  const budget = monthBudgetInfo(c);
+  const since = c.startDate ? ` · client since ${new Date(c.startDate+'T00:00:00').toLocaleDateString('en-US',{month:'long',year:'numeric'})}` : '';
+  const kv = (label, value) => `<div class="cd-kv"><span>${label}</span><b>${value}</b></div>`;
+  const recent = [...c.improvements].filter(i=>i.date).sort((a,b)=> new Date(b.date)-new Date(a.date)).slice(0,4);
+  let riskHtml = '';
+  if((c.danger||0) >= 4){
+    const last = todayLastSent(c);
+    const days = last ? Math.floor((Date.now() - last) / 86400000) : null;
+    const why = [last ? (days === 0 ? 'Update sent today.' : `No update in ${days} day${days===1?'':'s'}.`) : 'No update sent yet.'];
+    if(budget && budget.tier === 'over') why.push('Over this month’s hours.');
+    riskHtml = `<div class="cd-risk ci-risk" role="note"><svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M236.8,188.09,149.35,36.22a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM120,104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm8,88a12,12,0,1,1,12-12A12,12,0,0,1,128,192Z"/></svg><div><b>Risk ${c.danger} of 5.</b> ${escapeHtml(why.join(' '))}</div></div>`;
   }
-  menu.classList.add('open');
+  const action = (label, fn, extra) => `<button type="button" class="ci-act${extra ? ' ' + extra : ''}" onclick="${fn}">${label}</button>`;
+
+  el.hidden = false;
+  wrap?.classList.add('has-insp');
+  el.innerHTML = `
+    <div class="ci-top">
+      <span class="cd-mono" aria-hidden="true">${escapeHtml(todayInitials(c.name))}</span>
+      <button type="button" class="ci-close" onclick="closeClientInspector()" aria-label="Close panel" title="Close (Esc)"><svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg></button>
+    </div>
+    <h2 class="ci-name">${escapeHtml(c.name)}</h2>
+    <p class="ci-sub">${escapeHtml(c.service||'')}${escapeHtml(since)}</p>
+    <div class="ci-btns">
+      <button type="button" class="btn btn-brand" onclick="openClientDetail('${c.id}')">Open Client</button>
+      ${canApprove() ? `<button type="button" class="btn btn-outline" onclick="openEditClientForm('${c.id}')">Edit</button>` : ''}
+    </div>
+    ${riskHtml}
+    <div class="ci-sec">Health</div>
+    ${kv('Status', `<span class="pill ${statusPillClass(c.status)}">${escapeHtml(c.status)}</span>`)}
+    ${kv('Risk', `<span class="${(c.danger||0)>=4 ? 'cd-red' : ''}">${c.danger} of 5</span>`)}
+    ${kv('Importance', `${c.importance} of 10`)}
+    ${kv('This week', loggedPill(c))}
+    ${budget ? `<div class="cd-kv cd-kv-budget"><span>This month</span><b class="${budget.tier==='over'?'cd-red':''}">${(budget.usedMinutes/60).toFixed(1)}h <i>of ${(budget.budgetMinutes/60).toFixed(1)}h</i></b></div>
+      <div class="cd-bar"><i style="width:${Math.min(budget.pct,100)}%;background:${budget.tier==='over'?'var(--red)':budget.tier==='warn'?'var(--amber)':'var(--muted-lt)'}"></i></div>` : ''}
+    <div class="ci-sec">Log an improvement</div>
+    <textarea spellcheck="true" class="ci-log" id="imp-${c.id}" placeholder="What did you do for this client?" aria-label="What did you do for ${escapeHtml(c.name)}?"></textarea>
+    <div class="ci-log-row"><span class="ci-who">Logged as ${escapeHtml(myName() || 'you')}</span><button type="button" class="btn btn-outline" onclick="logImprovement('${c.id}')">Log It</button></div>
+    <div class="ci-sec">Recent work</div>
+    ${recent.length ? recent.map(i=>`<div class="ci-work"><time>${new Date(i.date).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</time><div><span>${escapeHtml(i.text)}</span><i>${escapeHtml(i.author||'')}</i></div></div>`).join('') : '<p class="ci-quiet">Nothing logged yet.</p>'}
+    <div class="ci-sec">Actions</div>
+    <div class="ci-acts">
+      ${action('Track Time', `openTimerModal('${c.id}')`)}
+      ${action('New Note', `openNoteModal(null, '${c.id}')`)}
+      ${action('New Reminder', `openNewReminderModal('${c.id}')`)}
+      ${c.email ? `<a class="ci-act" href="mailto:${escapeHtml(c.email)}">Email ${escapeHtml(c.email)}</a>` : ''}
+      ${c.website ? `<a class="ci-act" href="${safeUrl(c.website.startsWith('http') ? c.website : 'https://'+c.website)}" target="_blank" rel="noopener">Open Website</a>` : ''}
+      ${canApprove() ? action('Delete Client…', `deleteClient('${c.id}')`, 'ci-danger') : ''}
+    </div>`;
+  if(kept){
+    const ta = document.getElementById('imp-'+c.id);
+    if(ta){ ta.value = kept; if(wasFocused){ ta.focus(); ta.setSelectionRange(kept.length, kept.length); } }
+  }
 }
-function closeActionsMenus(){
-  document.getElementById('clientActionsMenu')?.classList.remove('open');
-  currentActionsMenuClientId = null;
-}
-document.addEventListener('click', function(e){
-  if(!e.target.closest('#clientActionsMenu')) closeActionsMenus();
+
+// Keyboard: ↑/↓ move through the clients on this page, Enter opens the
+// selected one, Esc closes the panel. Ignored while typing anywhere.
+document.addEventListener('keydown', function(e){
+  if(!document.getElementById('view-clients')?.classList.contains('active')) return;
+  if(e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+  if(document.querySelector('#appModalOverlay[style*="flex"], .cmdk-overlay[style*="flex"]')) return;
+  const rows = [...document.querySelectorAll('#clientsTbody tr.client-row')];
+  if(!rows.length) return;
+  const idx = rows.findIndex(r => r.dataset.id === inspectedClientId);
+  if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){
+    e.preventDefault();
+    const next = e.key === 'ArrowDown' ? Math.min(rows.length - 1, idx + 1) : Math.max(0, idx < 0 ? 0 : idx - 1);
+    selectClientRow(rows[next].dataset.id);
+    rows[next].focus({ preventScroll: false });
+  } else if(e.key === 'Enter' && inspectedClientId){
+    e.preventDefault(); openClientDetail(inspectedClientId);
+  } else if(e.key === 'Escape' && inspectedClientId){
+    closeClientInspector();
+  }
 });
 
 let currentTeamActionsMember = null;

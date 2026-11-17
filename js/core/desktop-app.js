@@ -74,7 +74,7 @@ document.addEventListener('scroll', (e) => {
 // selected text keep the browser's menu (copy/paste), and Shift+right-click
 // always does.
 const CONTEXT_MENU_TRIGGERS = '.kanban-card-menu-btn, .icon-menu-btn, .claude-sidebar-menu-btn';
-const CONTEXT_MENUS = '.kanban-card-menu, #clientActionsMenu, #teamActionsMenu, .claude-sidebar-menu';
+const CONTEXT_MENUS = '.kanban-card-menu, #teamActionsMenu, .claude-sidebar-menu';
 
 function isShown(el){
   if(!el) return false;
