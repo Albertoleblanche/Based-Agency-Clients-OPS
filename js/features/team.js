@@ -99,7 +99,6 @@ function teamCardAvatarHtml(m){
 // not new HTML in the modal below.
 const EXTRA_PERMISSIONS_META = [
   { key:'view_team_queue', label: "See Team Queue (everyone's drafts)" },
-  { key:'view_ai_visibility', label: 'View AI SEO Reports' },
   { key:'delete_tasks', label: 'Permanently delete tasks' },
   { key:'delete_clients', label: 'Manage & permanently delete clients from Trash' },
   { key:'lower_danger_score', label: "Lower a client's danger score" },

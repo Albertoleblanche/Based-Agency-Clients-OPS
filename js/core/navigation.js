@@ -15,8 +15,6 @@ function applyRoleVisibility(){
   const memberFilterField = document.getElementById('improvementsMemberFilterField');
   if(memberFilterField) memberFilterField.style.display = canApprove() ? 'block' : 'none';
   const addClientBtn = document.getElementById('addClientBtn');
-  const navAiVisibility = document.getElementById('navAiVisibility');
-  if(navAiVisibility) navAiVisibility.style.display = hasPermission('view_ai_visibility') ? 'flex' : 'none';
   if(addClientBtn) addClientBtn.style.display = canApprove() ? 'inline-flex' : 'none';
   const editClientDetailBtn = document.getElementById('editClientDetailBtn');
   if(editClientDetailBtn) editClientDetailBtn.style.display = canApprove() ? 'inline-flex' : 'none';
@@ -116,7 +114,7 @@ function populateReportMemberFilter(){
 }
 
 const VIEW_TITLES = {
-  focusreports: ['Focus Reports', 'Every weekly brief on what needs the team'],
+  focusreports: ['Focus Reports', 'A weekly brief on what needs the team'],
   clients: ['All Clients', ''],
   health: ['Health', ''],
   improvements: ['Past Improvements', "The team's full history of client work, searchable by date"],
@@ -133,14 +131,12 @@ const VIEW_TITLES = {
   settings: ['Settings', 'Workspace, client fields, AI, integrations and notifications'],
   claude: ['Assistant', "Ask about a client, get a recommendation, or have it check a website"],
   profile: ['My Profile', 'Your info, visible to the rest of the team the same way it always has been'],
-  aivisibility: ['AI Visibility', 'Client-facing reports on how AI assistants describe and recommend them'],
 };
 
 const CMDK_PAGE_ICONS = {
   focusreports: '<svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M168,152a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,168,152Zm-8-40H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16Zm56-64V216a16,16,0,0,1-16,16H56a16,16,0,0,1-16-16V48A16,16,0,0,1,56,32H92.26a47.92,47.92,0,0,1,71.48,0H200A16,16,0,0,1,216,48ZM96,64h64a32,32,0,0,0-64,0ZM200,48H173.25A47.93,47.93,0,0,1,176,64v8a8,8,0,0,1-8,8H88a8,8,0,0,1-8-8V64a47.93,47.93,0,0,1,2.75-16H56V216H200Z"/></svg>',
   teamqueue: '<svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M208,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32Zm0,16V152h-28.7A15.86,15.86,0,0,0,168,156.69L148.69,176H107.31L88,156.69A15.86,15.86,0,0,0,76.69,152H48V48Zm0,160H48V168H76.69L96,187.31A15.86,15.86,0,0,0,107.31,192h41.38A15.86,15.86,0,0,0,160,187.31L179.31,168H208v40Z"/></svg>',
   claude: '<svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M197.58,129.06,146,110l-19-51.62a15.92,15.92,0,0,0-29.88,0L78,110l-51.62,19a15.92,15.92,0,0,0,0,29.88L78,178l19,51.62a15.92,15.92,0,0,0,29.88,0L146,178l51.62-19a15.92,15.92,0,0,0,0-29.88ZM137,164.22a8,8,0,0,0-4.74,4.74L112,223.85,91.78,169A8,8,0,0,0,87,164.22L32.15,144,87,123.78A8,8,0,0,0,91.78,119L112,64.15,132.22,119a8,8,0,0,0,4.74,4.74L191.85,144ZM144,40a8,8,0,0,1,8-8h16V16a8,8,0,0,1,16,0V32h16a8,8,0,0,1,0,16H184V64a8,8,0,0,1-16,0V48H152A8,8,0,0,1,144,40ZM248,88a8,8,0,0,1-8,8h-8v8a8,8,0,0,1-16,0V96h-8a8,8,0,0,1,0-16h8V72a8,8,0,0,1,16,0v8h8A8,8,0,0,1,248,88Z"/></svg>',
-  aivisibility: '<svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M247.31,124.76c-.35-.79-8.82-19.58-27.65-38.41C194.57,61.26,162.88,48,128,48S61.43,61.26,36.34,86.35C17.51,105.18,9,124,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208s66.57-13.26,91.66-38.34c18.83-18.83,27.3-37.61,27.65-38.4A8,8,0,0,0,247.31,124.76ZM128,192c-30.78,0-57.67-11.19-79.93-33.25A133.47,133.47,0,0,1,25,128,133.33,133.33,0,0,1,48.07,97.25C70.33,75.19,97.22,64,128,64s57.67,11.19,79.93,33.25A133.46,133.46,0,0,1,231.05,128C223.84,141.46,192.43,192,128,192Zm0-112a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z"/></svg>',
   overview: '<svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M104,40H56A16,16,0,0,0,40,56v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,104,40Zm0,64H56V56h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,200,40Zm0,64H152V56h48v48Zm-96,32H56a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,104,136Zm0,64H56V152h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,200,136Zm0,64H152V152h48v48Z"/></svg>',
   clients: '<svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M240,208H224V96a16,16,0,0,0-16-16H144V32a16,16,0,0,0-24.88-13.32L39.12,72A16,16,0,0,0,32,85.34V208H16a8,8,0,0,0,0,16H240a8,8,0,0,0,0-16ZM208,96V208H144V96ZM48,85.34,128,32V208H48ZM112,112v16a8,8,0,0,1-16,0V112a8,8,0,1,1,16,0Zm-32,0v16a8,8,0,0,1-16,0V112a8,8,0,1,1,16,0Zm0,56v16a8,8,0,0,1-16,0V168a8,8,0,0,1,16,0Zm32,0v16a8,8,0,0,1-16,0V168a8,8,0,0,1,16,0Z"/></svg>',
   improvements: '<svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M213.66,82.34l-56-56A8,8,0,0,0,152,24H56A16,16,0,0,0,40,40V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V88A8,8,0,0,0,213.66,82.34ZM160,51.31,188.69,80H160ZM200,216H56V40h88V88a8,8,0,0,0,8,8h48V216Z"/></svg>',
@@ -296,7 +292,6 @@ function canOpenViewFromAddress(name){
   const navView = ROUTE_PARENT_VIEW[name] || name;
   const nav = document.querySelector(`.nav-item[data-view="${navView}"]`);
   if(nav && getComputedStyle(nav).display === 'none') return false;
-  if(name === 'aivisibility' && !hasPermission('view_ai_visibility')) return false;
   return true;
 }
 // Keeps the address in step when a screen opens from inside the app.
@@ -399,10 +394,6 @@ async function switchView(name){
   // EXTRA_PERMISSIONS_META) rather than hardcoded to admins only —
   // hasPermission() still covers every admin/approver automatically, so
   // nothing changes for them.
-  if(name==='aivisibility'){
-    if(!hasPermission('view_ai_visibility')){ switchView('overview'); showToast('error','Not allowed','You don\'t have access to AI SEO Reports.'); return; }
-    renderAiVisibilityMain();
-  }
   await fullRefresh();
   if(name==='trash') renderTrash();
   if(name==='payroll') renderPayroll();
@@ -435,9 +426,6 @@ function switchSettingsTab(name){
     if(isAdmin()) loadAiProviderConnectionStatus();
   }
   if(name==='integrations'){
-    const adminOnly = document.getElementById('adminOnlyIntegrations');
-    if(adminOnly) adminOnly.style.display = isAdmin() ? 'block' : 'none';
-    if(isAdmin()) loadInhouseMetricsConnectionStatus();
     const approverOnly = document.getElementById('approverOnlyIntegrations');
     if(approverOnly) approverOnly.style.display = canApprove() ? 'block' : 'none';
     if(canApprove()){ loadHarvestPanel(); loadSlackChannelsPanel(); }

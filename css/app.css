@@ -210,3 +210,4 @@ button.cb:hover { box-shadow: inset 0 0 0 1.5px var(--label-2); }
 .pop-sel { position: relative; }
 .pop-sel select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: default; font: inherit; }
 .pop-sel:focus-within { box-shadow: 0 0 0 3px var(--focus, rgba(0,122,255,.35)); }
+.ag.link-row { padding: 7px 0; gap: 12px; }

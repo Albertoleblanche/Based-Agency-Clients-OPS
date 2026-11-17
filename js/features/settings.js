@@ -208,7 +208,6 @@ const NAV_LABEL_DEFAULTS = {
   overview: 'Today', focusreports: 'Focus Reports', clients: 'All Clients', health: 'Health', approve: 'This Week', teamqueue: 'Review',
   notes: 'Notes', tasks: 'Tasks', reminders: 'Reminders', calendar: 'Calendar',
   time: 'Time', team: 'Team', trash: 'Recently Deleted', settings: 'Settings',
-  aivisibility: 'AI Visibility',
 };
 
 // Updates both the visible expanded-sidebar label AND the collapsed-
