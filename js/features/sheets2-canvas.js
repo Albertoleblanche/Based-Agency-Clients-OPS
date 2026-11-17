@@ -353,3 +353,48 @@ function openEditClientForm(id){
     nudge.textContent = `Overdue follow-ups, quiet weeks and waiting drafts suggest ${suggested}. Worth a second look.`;
   }
 }
+
+// ---- Send Email: the last look before a client email goes out ----------------------------------
+function showSendEmailConfirm(to, subject, body, onSent, includeSignature){
+  _emailSentCallback = onSent || null;
+  _emailIncludeSignature = !!includeSignature;
+  openAppModal(`<h3>Send Email</h3>
+<div class="f">
+<label>To</label><div style="font-size:13px;padding:4px 0">${escapeHtml(to)}<input type="hidden" id="mailModalTo" value="${escapeHtml(to)}"></div>
+<label for="mailModalSubject">Subject</label><input id="mailModalSubject" class="tf">
+<label class="top" for="mailModalBody">Message</label><textarea id="mailModalBody" class="tf" spellcheck="true" style="height:280px"></textarea>
+<span></span><div class="t-2" style="font-size:12px;line-height:1.45">${includeSignature ? 'Goes out from the app with your signature as soon as you click Send.' : 'Goes out from the app as soon as you click Send.'}</div>
+</div>
+<div class="sheet-a"><button class="link-btn" id="mailModalCopyBtn" style="margin-right:auto" onclick="copyMailModalBody()">Copy Email</button><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" id="sendEmailConfirmBtn" onclick="confirmSendEmail()">${icon('paper-plane-tilt')}Send</button></div>`, 600);
+  document.getElementById('mailModalSubject').value = subject;
+  document.getElementById('mailModalBody').value = body;
+  sheetFocusPrimary();
+}
+async function confirmSendEmail(){
+  const to = document.getElementById('mailModalTo').value;
+  const subject = document.getElementById('mailModalSubject').value;
+  const body = document.getElementById('mailModalBody').value;
+  const btn = document.getElementById('sendEmailConfirmBtn');
+  setBtnLoading(btn, 'Sending…');
+  try{
+    const response = await fetch('/api/send-email', { method: 'POST', headers: await apiAuthHeaders(), body: JSON.stringify({ to, subject, body, includeSignature: _emailIncludeSignature }) });
+    const data = await response.json().catch(() => ({}));
+    restoreBtn(btn);
+    if(!response.ok){ showToast('error', 'The email didn’t go out', (data.error || 'The mail service said no.') + ' Try again, or copy it and send it from your mail app.'); return; }
+    closeAppModal();
+    showToast('success', 'Email sent', `To ${to}.`);
+    notifyOthersOfEmailSent(to, subject);
+    _emailIncludeSignature = false;
+    if(_emailSentCallback){ const cb = _emailSentCallback; _emailSentCallback = null; cb(); }
+  }catch(e){
+    restoreBtn(btn);
+    showToast('error', 'The email didn’t go out', 'Check your connection and try again, or copy it and send it from your mail app.');
+  }
+}
+async function copyMailModalBody(){
+  const btn = document.getElementById('mailModalCopyBtn');
+  const full = `Subject: ${document.getElementById('mailModalSubject').value}\n\n${document.getElementById('mailModalBody').value}`;
+  try{ await navigator.clipboard.writeText(full); btn.textContent = 'Copied'; }
+  catch(e){ const ta = document.getElementById('mailModalBody'); ta.focus(); ta.select(); btn.textContent = 'Press ⌘C to copy'; }
+  setTimeout(() => { if(btn.isConnected) btn.textContent = 'Copy Email'; }, 2000);
+}
