@@ -141,7 +141,7 @@ function renderKpis(){
   // Uses the page's own card rule (queueCardEligible) so the badge never
   // counts a client the page wouldn't show a card for.
   const myPending = aec.filter(c=>getDraftFor(c, me).draftStatus==='pending' && queueCardEligible(getDraftFor(c, me), c.improvements.filter(i=>i.author===me && improvementInDateRange(i, false)))).length;
-  document.getElementById('navPendingBadge').textContent = myPending;
+  (document.getElementById('navPendingBadge')||{}).textContent = myPending;
   // Team Queue shows every APPROVED draft, plus pending drafts the owning
   // member has explicitly marked Ready to Notify — not every pending draft
   // team-wide (a draft just sitting generated-but-unsent is still that
@@ -183,8 +183,8 @@ function renderKpis(){
   }
 
   // --- Total Clients ---
-  document.getElementById('kpiTotal').textContent = ac.length;
-  document.getElementById('totalChips').innerHTML = ac.length
+  (document.getElementById('kpiTotal')||{}).textContent = ac.length;
+  (document.getElementById('totalChips')||{}).innerHTML = ac.length
     ? `<span style="font-size:11px;color:var(--green);font-weight:600;">${active} active</span>`
     : '';
   renderTotalClientsDonut();
@@ -197,9 +197,9 @@ function renderKpis(){
     const avgDanger = aec.reduce((s,c)=>s+c.danger,0) / aec.length;
     healthPct = Math.round(100 - (avgDanger/5)*100);
   }
-  document.getElementById('kpiHealth').textContent = aec.length ? healthPct + '%' : '—';
+  (document.getElementById('kpiHealth')||{}).textContent = aec.length ? healthPct + '%' : '—';
   const healthTier = healthPct>=70 ? {cls:'pill-good',label:'Healthy',color:'#117F3A'} : healthPct>=40 ? {cls:'pill-mid',label:'Needs attention',color:'#A65B05'} : {cls:'pill-bad',label:'Critical',color:'#CF2424'};
-  document.getElementById('healthChips').innerHTML = aec.length ? `<span class="pill ${healthTier.cls}">${escapeHtml(healthTier.label)}</span>` : '';
+  (document.getElementById('healthChips')||{}).innerHTML = aec.length ? `<span class="pill ${healthTier.cls}">${escapeHtml(healthTier.label)}</span>` : '';
   const healthBarsFillEl = document.getElementById('healthBarsFill');
   if(healthBarsFillEl){
     healthBarsFillEl.style.width = (aec.length ? healthPct : 0) + '%';
@@ -217,9 +217,9 @@ function renderKpis(){
     : myOpenTasks.length ? `<span class="pill pill-status">None overdue</span>` : `<span class="pill pill-status">All clear</span>`;
 
   // --- Pending Approval ---
-  document.getElementById('kpiPendingLabel').textContent = admin ? 'Pending Approval' : 'Drafts Ready';
-  document.getElementById('kpiPending').textContent = pending;
-  document.getElementById('pendingChips').innerHTML = pending
+  (document.getElementById('kpiPendingLabel')||{}).textContent = admin ? 'Pending Approval' : 'Drafts Ready';
+  (document.getElementById('kpiPending')||{}).textContent = pending;
+  (document.getElementById('pendingChips')||{}).innerHTML = pending
     ? `<span class="pill pill-mid">${pending} draft${pending!==1?'s':''} ready</span>`
     : `<span class="pill pill-status">All caught up</span>`;
 
@@ -232,9 +232,9 @@ function renderKpis(){
   // the same admin/personal split withRecentLogs itself already uses.
   const approvedWithLogs = withRecentLogs.filter(c => admin ? (c.drafts||[]).some(d=>d.draftStatus==='approved') : getDraftFor(c, me).draftStatus==='approved').length;
   const completionPct = withRecentLogs.length ? Math.round((approvedWithLogs/withRecentLogs.length)*100) : 0;
-  document.getElementById('kpiCompletionLabel').textContent = 'Weekly Completion';
-  document.getElementById('kpiCompletion').textContent = withRecentLogs.length ? completionPct + '%' : '—';
-  document.getElementById('completionChips').innerHTML = withRecentLogs.length
+  (document.getElementById('kpiCompletionLabel')||{}).textContent = 'Weekly Completion';
+  (document.getElementById('kpiCompletion')||{}).textContent = withRecentLogs.length ? completionPct + '%' : '—';
+  (document.getElementById('completionChips')||{}).innerHTML = withRecentLogs.length
     ? `<span class="pill pill-status">${approvedWithLogs} of ${withRecentLogs.length} updated</span>`
     : `<span class="pill pill-status">No logs yet</span>`;
 
@@ -245,6 +245,7 @@ function renderKpis(){
   renderOverviewMiniCalendar();
   renderOverviewActiveQueue();
   renderGreeting();
+  if(typeof renderToday === 'function') renderToday();
   refreshWeeklyFocusReportBanner();
 }
 
@@ -481,9 +482,6 @@ function renderGreeting(){
   const titleEl = document.getElementById('topbarTitle');
   const subEl = document.getElementById('topbarSub');
   if(!titleEl) return;
-  const hour = new Date().getHours();
-  const period = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
-  const first = myProfile && myProfile.name ? myProfile.name.split(' ')[0] : '';
-  titleEl.textContent = `Good ${period}${first ? ', ' + first : ''}`;
-  if(subEl) subEl.textContent = "Here's what's happening with your clients today.";
+  titleEl.textContent = (settings.navLabels && settings.navLabels.overview) || 'Today';
+  if(subEl) subEl.textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 }

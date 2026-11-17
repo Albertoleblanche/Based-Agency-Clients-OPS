@@ -20,6 +20,7 @@ async function loadMyTasks(){
     attachments:t.attachments||[], completionNotes:t.completion_notes||'', completionLink:t.completion_link||''
   }));
   tasksDataLoaded = true;
+  if(typeof renderToday === 'function') renderToday();
 }
 
 const TASK_PRIORITY_META = {

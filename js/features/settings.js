@@ -133,10 +133,30 @@ function applyBrandColor(hex){
   const darkRgb = hexToRgbTriplet(darkBrand);
   // The sidebar's hover/selected fills stay neutral (only the selected
   // icon takes the brand colour), as in Apple's own sidebars.
+  // Filled buttons carry white text, so the fill is darkened until white
+  // reads at 4.5:1 or better; in dark mode, orange *text* is lightened
+  // until it reads at 4.5:1 on the dark window. Whatever colour an admin
+  // picks, buttons and links stay readable.
+  let fillL = 55;
+  while(fillL > 18 && brandContrast(hslToHex(h, s, fillL), '#FFFFFF') < 5) fillL--;
+  const fill = hslToHex(h, s, fillL);
+  let textL = 58;
+  while(textL < 92 && brandContrast(hslToHex(h, s, textL), '#1E1E20') < 4.6) textL++;
+  const darkText = hslToHex(h, s, textL);
   styleEl.textContent = `
-    :root{--brand:${lightBrand} !important;--brand-dark:${lightDark} !important;--brand-bg:${lightBg} !important;--ring:rgba(${lightRgb},.38) !important;}
-    body[data-theme="dark"]{--brand:${darkBrand} !important;--brand-dark:${darkDark} !important;--brand-bg:${darkBg} !important;--ring:rgba(${darkRgb},.45) !important;}
+    :root{--brand:${fill} !important;--brand-fill:${fill} !important;--brand-dark:${lightDark} !important;--brand-bg:${lightBg} !important;--ring:rgba(${lightRgb},.38) !important;}
+    body[data-theme="dark"]{--brand:${darkText} !important;--brand-fill:${fill} !important;--brand-dark:${darkDark} !important;--brand-bg:${darkBg} !important;--ring:rgba(${darkRgb},.45) !important;}
   `;
+}
+
+function brandLuminance(hex){
+  const ch = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map(v => v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4));
+  return .2126 * ch[0] + .7152 * ch[1] + .0722 * ch[2];
+}
+function brandContrast(a, b){
+  const la = brandLuminance(a), lb = brandLuminance(b);
+  return (Math.max(la, lb) + .05) / (Math.min(la, lb) + .05);
 }
 
 function hexToRgbTriplet(hex){
@@ -149,8 +169,8 @@ function resetBrandColor(){
   document.getElementById('customBrandColorStyle')?.remove();
   const input = document.getElementById('brandColorInput');
   const label = document.getElementById('brandColorHex');
-  if(input) input.value = '#E8622C';
-  if(label) label.textContent = '#E8622C';
+  if(input) input.value = '#BF4716';
+  if(label) label.textContent = '#BF4716';
 }
 
 function applyAppBranding(){
@@ -170,7 +190,7 @@ function applyAppBranding(){
 
   const colorInput = document.getElementById('brandColorInput');
   const colorLabel = document.getElementById('brandColorHex');
-  const brandColor = settings.brandColor || '#E8622C';
+  const brandColor = settings.brandColor || '#BF4716';
   if(colorInput) colorInput.value = brandColor;
   if(colorLabel) colorLabel.textContent = brandColor.toUpperCase();
   if(settings.brandColor) applyBrandColor(settings.brandColor);
@@ -185,9 +205,9 @@ function applyAppBranding(){
 // duplicating that as a second editable field here would just be
 // confusing about which one actually takes effect.
 const NAV_LABEL_DEFAULTS = {
-  overview: 'Overview', focusreports: 'Past Reports', clients: 'Clients', approve: 'Approval Queue', teamqueue: 'Team Queue',
+  overview: 'Today', focusreports: 'Focus Reports', clients: 'All Clients', approve: 'Review', teamqueue: 'Team Queue',
   notes: 'Notes', tasks: 'Tasks', reminders: 'Reminders', calendar: 'Calendar',
-  time: 'Time Tracker', team: 'Team', trash: 'Trash', settings: 'Settings & Integrations',
+  time: 'Time', team: 'Team', trash: 'Recently Deleted', settings: 'Settings',
   aivisibility: 'AI Visibility',
 };
 

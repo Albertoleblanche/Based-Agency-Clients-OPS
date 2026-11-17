@@ -33,6 +33,7 @@ async function loadTimeEntries(){
   if(error){ console.error('loadTimeEntries error', error); timeEntries = []; timeEntriesDataLoaded = true; return; }
   timeEntries = (data||[]).map(e=>({ id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes, description:e.description||'', service:e.service||'', createdAt:e.created_at, logged:!!e.logged }));
   timeEntriesDataLoaded = true;
+  if(typeof renderToday === 'function') renderToday();
 }
 
 // Turns one time entry's description into a real improvement log — a
