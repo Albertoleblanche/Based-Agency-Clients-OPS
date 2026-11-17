@@ -99,7 +99,10 @@ async function loadUpdateHistory(){
 async function recordUpdateSent(clientId, at){
   await loadUpdateHistory();
   const list = updateHistory[clientId] || (updateHistory[clientId] = []);
-  list.push((at ? new Date(at) : rNow()).toISOString());
+  const t = at ? new Date(at) : rNow();
+  // One send can stamp several drafts (Group & Send, a combined email): count it once.
+  if(list.some(x => Math.abs(new Date(x) - t) < 10 * 60000)) return;
+  list.push(t.toISOString());
   updateHistory[clientId] = list.slice(-40);
   await safeSet('update-history', JSON.stringify(updateHistory));
 }
@@ -237,7 +240,7 @@ function clientHealth(c){
   const overdue = (typeof tasks !== 'undefined' ? tasks : []).filter(t => t.clientId === c.id && t.status !== 'done' && !t.cancelledAt && t.dueDate && dayStart(new Date(t.dueDate + 'T12:00:00')) < dayStart(now));
   const lo = lvl(overdue.length, T.overdueTasks);
   if(lo) sig.push({ l: lo, key: 'tasks', icon: 'list-checks', title: `${overdue.length} tasks overdue`, since: now, text: overdue.map(t => t.title).slice(0, 2).join(' · ') });
-  const lf = lvl(c.danger || 0, T.ownerFlag);
+  const lf = (typeof settings !== 'undefined' && settings.ownerRiskFlag === false) ? null : lvl(c.danger || 0, T.ownerFlag);
   if(lf) sig.push({ l: lf, key: 'flag', icon: 'flag', title: `Flagged by ${firstName(clientOwner(c)) || 'the owner'}`, since: now, text: `Risk set to ${c.danger} of 5.` });
   const prio = ['hours', 'noupdate', 'late', 'quiet', 'under', 'tasks', 'flag'];
   sig.sort((a, b) => (a.l === 'r' ? 0 : 1) - (b.l === 'r' ? 0 : 1) || prio.indexOf(a.key) - prio.indexOf(b.key));

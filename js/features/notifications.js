@@ -20,6 +20,10 @@ let notifications = [];
 // mute toggle for those to someone who could never receive them is just
 // confusing clutter, not a real preference.
 const NOTIFICATION_TYPE_META = {
+  update_behind:           { label:'A client update you hold is behind', section:'Weekly Updates' },
+  draft_written:           { label:'A draft is written for you to check', section:'Weekly Updates' },
+  updates_sent:            { label:'Approved updates go out on schedule', section:'Weekly Updates', visibleTo:'approver' },
+  monday_summary:          { label:'The Monday summary', section:'Weekly Updates', visibleTo:'approver' },
   task_assigned:           { label:'A task is assigned to you', section:'Tasks' },
   task_completed:          { label:'A task you assigned is completed', section:'Tasks' },
   task_cancelled:          { label:'A task assigned to you is cancelled', section:'Tasks' },

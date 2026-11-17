@@ -21,7 +21,12 @@
 //      admin-only on-demand preview — kept in one place so the preview
 //      can never silently drift from what this real run actually does.
 //
-// Both responsibilities run every invocation (after their own day-check
+//   3. The weekly-update automations from Settings -> Updates (automatic
+//      drafts, reminders for whoever is behind, the scheduled send and the
+//      Monday summary) — see lib/update-automations.js. Each decides its
+//      own day from the team's schedule.
+//
+// All of them run every invocation (after their own day-check
 // passes), independently, in their own try/catch — one failing (say, the
 // email send) shouldn't block the other.
 //
@@ -35,6 +40,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { sendPushToUser, pushUrlFor } = require('../lib/push-notify');
 const { clientRowFromDb, improvementRowFromDb, runProactiveInsights } = require('../lib/proactive-insights');
+const { runUpdateAutomations } = require('../lib/update-automations');
 
 const EMAIL_DIGEST_DAY_OF_WEEK = 3; // Wednesday, hardcoded — not admin-configurable, unlike proactive insights
 
@@ -112,6 +118,7 @@ module.exports = async function handler(req, res) {
   }
 
   const admin = createClient(supabaseUrl, serviceKey);
+  const started = Date.now();
 
   try {
     const [
@@ -148,7 +155,16 @@ module.exports = async function handler(req, res) {
     // it" consistent with when the function actually runs, rather than
     // drifting by timezone.
     const todayDow = new Date().getUTCDay();
-    const result = { emailDigest: null, proactiveInsights: null };
+    const result = { weeklyUpdates: null, emailDigest: null, proactiveInsights: null };
+
+    // The weekly-update automations (Settings -> Updates): scheduled send, reminders for
+    // whoever is behind, the Monday summary and automatic drafts. First, since the send is
+    // the one thing that's due at a set time. See lib/update-automations.js.
+    try {
+      result.weeklyUpdates = await runUpdateAutomations(admin, settings, { started });
+    } catch (e) {
+      result.weeklyUpdates = { error: String(e) };
+    }
 
     if (todayDow === EMAIL_DIGEST_DAY_OF_WEEK) {
       try {

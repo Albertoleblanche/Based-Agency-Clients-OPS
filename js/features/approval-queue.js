@@ -1139,7 +1139,11 @@ async function sendApprovedDraft(id, author){
 async function recordDraftSent(id, author){
   const c = clients.find(x=>x.id===id);
   if(!c) return;
-  await saveDraftFor(id, author, { draftSentAt: new Date().toISOString(), draftSentBy: myName() || 'Someone' });
+  const at = new Date().toISOString();
+  await saveDraftFor(id, author, { draftSentAt: at, draftSentBy: myName() || 'Someone' });
+  // Kept apart from the draft row, which the next week's draft overwrites: the on-time
+  // history in This Week and Health reads from here.
+  if(typeof recordUpdateSent === 'function') await recordUpdateSent(id, at);
 }
 
 // Archives a sent draft off the board. Clears the sent draft's text —

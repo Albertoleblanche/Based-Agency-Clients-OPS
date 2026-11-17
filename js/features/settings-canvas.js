@@ -176,8 +176,10 @@ function toggleWhenPop(e, k){
   m.hidden = !open;
   if(open) setTimeout(() => document.addEventListener('click', () => { m.hidden = true; }, { once: true }), 0);
 }
-function saveSchedule(k, part, v){ changeSettings(s => { const cur = updateSchedule(); cur[k] = Object.assign({}, cur[k], { [part]: part === 'day' ? Number(v) : v }); s.updatesSchedule = cur; }); }
-function saveAutomation(k){ changeSettings(s => { const cur = updateAutomation(); cur[k] = !cur[k]; s.updatesAutomation = cur; }); }
+// The schedule is in the team's local time; the daily automations read it in this time zone.
+function teamTimeZone(){ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; }catch(e){ return ''; } }
+function saveSchedule(k, part, v){ changeSettings(s => { const cur = updateSchedule(); cur[k] = Object.assign({}, cur[k], { [part]: part === 'day' ? Number(v) : v }); s.updatesSchedule = cur; if(teamTimeZone()) s.timezone = teamTimeZone(); }); }
+function saveAutomation(k){ changeSettings(s => { const cur = updateAutomation(); cur[k] = !cur[k]; s.updatesAutomation = cur; if(!s.timezone && teamTimeZone()) s.timezone = teamTimeZone(); }); }
 function saveSignal(key, i, v){ changeSettings(s => { const cur = healthThresholds(); const p = cur[key].slice(); p[i] = Number(v); if(i === 0 && p[1] < p[0]) p[1] = p[0]; if(i === 1 && p[0] > p[1]) p[0] = p[1]; cur[key] = p; s.healthSignals = cur; }); }
 function saveSignalValue(key, v){ changeSettings(s => { const cur = healthThresholds(); cur[key] = Number(v); s.healthSignals = cur; }); }
 function saveSignalToggle(key){ changeSettings(s => { const cur = healthThresholds(); cur[key] = !cur[key]; s.healthSignals = cur; }); }
