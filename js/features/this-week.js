@@ -86,8 +86,8 @@ function weekDetailHtml(w, cyc){
     return `<div class="stp ${cls}"><span class="m">${mark}</span><b>${n}</b><span>${escapeHtml(stepTxt[k])}</span></div>`;
   }).join('');
   const imps = w.logged.slice().sort((a, b) => new Date(a.date) - new Date(b.date));
-  const impRows = imps.map(i => `<div class="row sm"><div class="tx"><span class="t" style="font-weight:400">${escapeHtml(i.text)}</span><span class="s">${escapeHtml(c.service || '')} · ${fmtShortDate(new Date(i.date))}</span></div>
-<div class="r">${i.includeInEmail === false ? `<span class="st">${icon('lock-simple')}Internal, not in the email</span>` : ''}${avHtml(i.author)}</div></div>`).join('');
+  const impRows = imps.map(i => `<div class="row sm"><div class="tx"><span class="t" style="font-weight:400">${escapeHtml(i.text)}</span><span class="s">${escapeHtml(i.service || c.service || '')} · ${fmtShortDate(new Date(i.date))}</span></div>
+<div class="r">${i.includeInEmail === false ? `<span class="st">${icon('lock-simple')}Internal, not in the email</span>` : ''}${typeof impFilesBtn === 'function' ? impFilesBtn({ ...i, clientId: c.id }) : ''}${avHtml(i.author)}</div></div>`).join('');
   const seq = weekHistory(c), ots = onTimeSummary(seq);
   const preview = d && d.draft ? `<div class="h2"><h2>The draft</h2><span class="t-2" style="font-size:12px">${d.author ? 'By ' + escapeHtml(d.author) : ''}${d.draftPendingSince ? ' · ' + relDay(d.draftPendingSince).toLowerCase() + ' ' + fmtTime(new Date(d.draftPendingSince)) : ''}</span></div>
 <div class="preview"><b>Your weekly update — ${escapeHtml(cycleLongLabel(cyc))}</b><br>${escapeHtml(d.draft.replace(/\s+/g, ' ').slice(0, 260))}${d.draft.length > 260 ? '…' : ''}</div>` : '';

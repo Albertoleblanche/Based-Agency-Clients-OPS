@@ -10,8 +10,9 @@ function taskDueHtml(t){
   if(t.status === 'in_review' && t.assignerId === currentUser?.id) return 'Waiting on you';
   if(!t.dueDate) return '';
   const today = toDateStr(new Date()), d = new Date(t.dueDate + 'T12:00:00');
-  if(t.status !== 'done' && t.dueDate < today) return `<span class="t-red">${t.dueDate === toDateStr(addDays(new Date(), -1)) ? 'Yesterday' : fmtShortDate(d)}</span>`;
-  return t.dueDate === today ? 'Today' : fmtShortDate(d);
+  const hhmm = typeof taskDueTimes !== 'undefined' ? taskDueTimes[t.id] : '', tm = hhmm ? ', ' + fmtTime(atTime(d, hhmm)) : '';
+  if(t.status !== 'done' && t.dueDate < today) return `<span class="t-red">${t.dueDate === toDateStr(addDays(new Date(), -1)) ? 'Yesterday' : fmtShortDate(d)}${tm}</span>`;
+  return (t.dueDate === today ? 'Today' : t.dueDate === toDateStr(addDays(new Date(), 1)) ? 'Tomorrow' : fmtShortDate(d)) + tm;
 }
 function taskCardHtml(t){
   const c = clients.find(x => x.id === t.clientId), who = teamProfiles.find(p => p.id === t.assigneeId);

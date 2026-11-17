@@ -81,7 +81,7 @@ function renderTasks(){
 
   board.innerHTML = KANBAN_STAGES.map(stage=>{
     const stageTasks = visible.filter(t=>t.status===stage.key).sort((a,b)=>{
-      const pDiff = TASK_PRIORITY_META[a.priority].order - TASK_PRIORITY_META[b.priority].order;
+      const pDiff = (TASK_PRIORITY_META[a.priority]?.order ?? 9) - (TASK_PRIORITY_META[b.priority]?.order ?? 9);
       if(pDiff!==0) return pDiff;
       return new Date(b.createdAt) - new Date(a.createdAt);
     });

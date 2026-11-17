@@ -27,7 +27,7 @@ function renderTimeView(){
 function timeTitle(sub){ if(currentViewName === 'time') setToolbar('Time', sub); }
 
 // A native <select> under a pop button, so the button reads like the canvas ("Client ⌄").
-function syncPopSel(sel){ const l = sel.parentElement.querySelector('span'); if(l) l.textContent = sel.options[sel.selectedIndex]?.text || ''; }
+function syncPopSel(sel){ const l = sel.parentElement.querySelector('.pl') || sel.parentElement.querySelector('span'); if(l) l.textContent = sel.options[sel.selectedIndex]?.text || ''; }
 
 // ---- small formatters ----------------------------------------------------------------------
 function hmm(min){ min = Math.max(0, Math.round(min || 0)); return `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`; }

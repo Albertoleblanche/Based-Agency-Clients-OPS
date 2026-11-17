@@ -182,6 +182,7 @@ async function fullRefresh(showFeedback){
     loadMyNotes(), loadTimeEntries(), loadMyTasks(),
     loadNotifications(), loadCalendarEvents(), loadClientReminders(),
     loadUpdateHistory(), loadHealthHandled(),
+    typeof loadTaskDueTimes === 'function' ? loadTaskDueTimes() : null,
   ]);
   renderAll();
   updateTasksNavBadge();

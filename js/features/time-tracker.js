@@ -376,6 +376,7 @@ async function stopAndSaveTimer(opts){
   await loadTimeEntries();
   renderTimesheet(); renderReports();
   if(error){ showToast('error','Save failed', error.message); return null; }
+  if(opts.quiet) return savedId;
   if(opts.pause) showToast('success','Timer paused', `${formatMinutes(minutes)} saved for ${c?c.name:'client'}.`);
   else mergedIntoExisting
     ? showToast('success','Time added', `${formatMinutes(minutes)} added to the existing entry for ${c?c.name:'client'}.`)
@@ -390,6 +391,8 @@ async function stopAndSaveTimer(opts){
 function parseDurationInput(str){
   str = (str||'').trim().toLowerCase().replace(',', '.');
   if(!str) return null;
+  const colon = str.match(/^(\d{1,3}):(\d{2})$/);
+  if(colon) return parseInt(colon[1], 10)*60 + parseInt(colon[2], 10);
   const hm = str.match(/^(?:(\d+(?:\.\d+)?)\s*h)?\s*(?:(\d+(?:\.\d+)?)\s*m)?$/);
   if(hm && (hm[1]!==undefined || hm[2]!==undefined)){
     const h = parseFloat(hm[1]||0), m = parseFloat(hm[2]||0);
@@ -784,13 +787,13 @@ async function saveTimeEntryEdit(id){
 }
 
 async function deleteTimeEntry(id){
-  if(!(await confirmDialog('Move this time entry to Trash? You can restore it later from Settings.', {confirmLabel:'Move to Trash'}))) return;
+  if(!(await confirmDialog('Move this time entry to Recently Deleted? You can restore it from there.', {confirmLabel:'Move to Trash'}))) return;
   const { data: entry } = await supabaseClient.from('time_entries').select('harvest_entry_id').eq('id', id).maybeSingle();
   const { error } = await supabaseClient.from('time_entries').update({ deleted_at: new Date().toISOString() }).eq('id', id);
   await loadTimeEntries();
   renderTimesheet(); renderReports();
   if(error){ showToast('error','Delete failed', error.message); return; }
-  showToast('success','Entry moved to Trash','Restore it anytime from Trash.');
+  showToast('success','Moved to Recently Deleted','Restore it from Recently Deleted anytime.');
   if(entry?.harvest_entry_id){
     const { data: { session } } = await supabaseClient.auth.getSession();
     fetch('/api/integrations', {

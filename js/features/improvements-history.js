@@ -34,7 +34,7 @@ function getAllImprovementsFlat(){
   activeClients().forEach(c=>{
     (c.improvements||[]).forEach(imp=>{
       if(restrictToSelf && imp.author !== me) return;
-      list.push({ id:imp.id, clientId:c.id, clientName:c.name, author:imp.author||'Team member', text:imp.text, date:imp.date, includeInEmail: imp.includeInEmail!==false, source: imp.source||'manual' });
+      list.push({ id:imp.id, clientId:c.id, clientName:c.name, author:imp.author||'Team member', text:imp.text, date:imp.date, includeInEmail: imp.includeInEmail!==false, source: imp.source||'manual', service: imp.service||'', attachments: imp.attachments||[] });
     });
   });
   return list.sort((a,b)=> new Date(b.date||0) - new Date(a.date||0));

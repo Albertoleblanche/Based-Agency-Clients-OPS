@@ -362,8 +362,9 @@ async function saveClientForm(){
       logDangerHistory(loggedClientId, fields.danger, null);
     }
   }
+  const wasEditing = !!editingClientId;
   closeClientForm();
   restoreBtn(btn);
   renderAll();
-  ok ? showToast('success', editingClientId ? 'Client updated' : 'Client added', msg) : showToast('error','Save failed','Could not save — check your connection and try again.');
+  ok ? showToast('success', wasEditing ? 'Client updated' : 'Client added', msg) : showToast('error','Save failed','Could not save — check your connection and try again.');
 }

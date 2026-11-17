@@ -984,15 +984,9 @@ async function generateDraft(id, author){
     </div>`, 520);
 }
 
-async function confirmGenerateDraftSelection(id, author){
-  const c = clients.find(x=>x.id===id);
-  if(!c) return;
-  const d = getDraftFor(c, author);
-  const checkedIds = [...document.querySelectorAll('.draft-select-checkbox:checked')].map(el=>el.value);
-  if(!checkedIds.length){ showToast('error','Nothing selected','Check at least one improvement to include.'); return; }
-  const includedImprovements = c.improvements.filter(i => checkedIds.includes(i.id));
-  const btn = clickedBtn();
-  setBtnLoading(btn, 'Generating…');
+// The prompt for a client's weekly update, from the improvements going into it. Used by
+// Write Draft and by Group & Send.
+function buildUpdatePrompt(c, includedImprovements){
   const bullets = includedImprovements.map(i=>'- '+i.text).join('\n');
   const customStructure = ((myProfile && myProfile.email_instructions) || '').trim();
   const contentRules = `Content rules that apply no matter what — never overridden by anything above:
@@ -1001,7 +995,7 @@ async function confirmGenerateDraftSelection(id, author){
 - Never say anything that could make the agency look bad: no admitting mistakes, no exposing internal problems, no hedging language that implies something isn't working, no comparisons that read as excuses. State what was done factually and confidently without overstating results.
 - No subject line, no meta-commentary about the email itself — output only the email body.`;
 
-  const prompt = customStructure
+  return customStructure
     ? `Write a weekly client update email for a home-services/construction client from their marketing agency (${settings.appName || 'Based Agency'}).
 
 The agency has specified an exact structure below. Follow it precisely and completely — every element it describes (greeting, paragraph order, sign-off, length, tone) — and do NOT fall back to any generic or default email structure, even partially:
@@ -1027,6 +1021,18 @@ ${bullets}
 Structure: 2-4 short paragraphs max, no fluff or filler compliments, plain language, no subject line, no signature block, sound like a competent account manager not a sales email. End by noting nothing is needed from them unless something explicitly requires their input.
 
 ${contentRules}`;
+}
+
+async function confirmGenerateDraftSelection(id, author){
+  const c = clients.find(x=>x.id===id);
+  if(!c) return;
+  const d = getDraftFor(c, author);
+  const checkedIds = [...document.querySelectorAll('.draft-select-checkbox:checked')].map(el=>el.value);
+  if(!checkedIds.length){ showToast('error','Nothing selected','Check at least one improvement to include.'); return; }
+  const includedImprovements = c.improvements.filter(i => checkedIds.includes(i.id));
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Generating…');
+  const prompt = buildUpdatePrompt(c, includedImprovements);
   try{
     const response = await fetch("/api/generate-draft", {
       method:"POST", headers: await apiAuthHeaders(),
@@ -1179,30 +1185,21 @@ let _groupSendAuthors = [];
 // sending each person's update to that client separately. Only surfaces
 // clients where this actually applies — one approved draft doesn't need
 // grouping, the regular per-card Send button already covers that case.
-function openGroupAndSendModal(){
+function openCombineDraftsModal(){
   const eligibleClients = activeClients().filter(c => {
     const approvedNotSent = (c.drafts||[]).filter(d => d.draftStatus==='approved' && !d.draftSentAt);
     return approvedNotSent.length >= 2;
   }).sort((a,b)=>a.name.localeCompare(b.name));
-  if(!eligibleClients.length){ showToast('info','Nothing to group', 'No client currently has approved, unsent drafts from more than one team member.'); return; }
-
-  openAppModal(`
-    <div class="modal-head"><span class="panel-title">Group &amp; Send</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
-    <div class="modal-body">
-      <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">These clients have approved, unsent drafts from more than one team member. Pick one to combine into a single send.</p>
-      <div style="display:flex;flex-direction:column;gap:2px;max-height:360px;overflow-y:auto;">
-        ${eligibleClients.map(c=>{
-          const count = (c.drafts||[]).filter(d => d.draftStatus==='approved' && !d.draftSentAt).length;
-          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 4px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="openGroupSendDraftPicker('${c.id}')">
-            <span style="font-size:13px;color:var(--ink);font-weight:600;">${escapeHtml(c.name)}</span>
-            <span style="font-size:11.5px;color:var(--muted-lt);">${count} drafts ready</span>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
-    </div>`, 480);
+  if(!eligibleClients.length){ showToast('info','Nothing to combine', 'No client has approved, unsent drafts from more than one person.'); return; }
+  openAppModal(`<h3>Combine Drafts</h3>
+<p style="margin:-8px 0 14px;font-size:13px;color:var(--label-2);line-height:1.5">These clients have approved drafts from more than one person. Pick one to send as a single email.</p>
+<div class="grp" style="box-shadow:0 0 0 .5px var(--sep-strong);max-height:360px;overflow:auto">
+${eligibleClients.map(c=>{
+  const count = (c.drafts||[]).filter(d => d.draftStatus==='approved' && !d.draftSentAt).length;
+  return `<a class="row" href="#" onclick="openGroupSendDraftPicker('${c.id}');return false;">${monoHtml(c)}<div class="tx"><span class="t">${escapeHtml(c.name)}</span><span class="s">${count} approved drafts</span></div><div class="r">${icon('caret-right', { weight: 'bold' })}</div></a>`;
+}).join('')}
+</div>
+<div class="sheet-a"><button class="btn" onclick="openGroupAndSendModal()">Back</button><button class="btn" onclick="closeAppModal()">Cancel</button></div>`, 520);
 }
 
 function openGroupSendDraftPicker(clientId){
@@ -1212,25 +1209,14 @@ function openGroupSendDraftPicker(clientId){
   // screen — another approver could have sent one of these in the
   // meantime, or the underlying draft could have changed.
   const approvedNotSent = (c.drafts||[]).filter(d => d.draftStatus==='approved' && !d.draftSentAt);
-  if(approvedNotSent.length < 2){ showToast('info','Nothing to group', `${c.name} no longer has drafts from more than one team member ready.`); closeAppModal(); return; }
+  if(approvedNotSent.length < 2){ showToast('info','Nothing to combine', `${c.name} no longer has approved drafts from more than one person.`); closeAppModal(); return; }
 
-  openAppModal(`
-    <div class="modal-head"><span class="panel-title">Combine drafts for ${escapeHtml(c.name)}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
-    <div class="modal-body">
-      <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">Uncheck any you'd rather send separately. At least two are needed to combine.</p>
-      <div style="display:flex;flex-direction:column;gap:2px;max-height:320px;overflow-y:auto;">
-        ${approvedNotSent.map(d=>`
-          <label style="display:flex;align-items:flex-start;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border);cursor:pointer;">
-            <input type="checkbox" class="group-send-draft-checkbox" value="${escapeHtml(d.author)}" checked style="margin-top:3px;flex:none;">
-            <span style="flex:1;font-size:13px;color:var(--ink);">${escapeHtml(d.author)}</span>
-          </label>
-        `).join('')}
-      </div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-outline" onclick="openGroupAndSendModal()">Back</button>
-      <button class="btn btn-brand" onclick="confirmGroupSendSelection('${clientId}')">Continue</button>
-    </div>`, 480);
+  openAppModal(`<h3>Combine Drafts for ${escapeHtml(c.name)}</h3>
+<p style="margin:-8px 0 14px;font-size:13px;color:var(--label-2);line-height:1.5">Uncheck any you’d rather send on their own. It takes two to combine.</p>
+<div class="grp" style="box-shadow:0 0 0 .5px var(--sep-strong);max-height:320px;overflow:auto">
+${approvedNotSent.map(d=>`<label class="row" style="cursor:default"><input type="checkbox" class="group-send-draft-checkbox ck-native" value="${escapeHtml(d.author)}" checked>${avHtml(d.author)}<div class="tx"><span class="t">${escapeHtml(d.author)}</span><span class="s">${escapeHtml((d.draft||'').replace(/\s+/g,' ').slice(0,90))}${(d.draft||'').length>90?'…':''}</span></div></label>`).join('')}
+</div>
+<div class="sheet-a"><button class="btn" onclick="openCombineDraftsModal()">Back</button><button class="btn btn-p" onclick="confirmGroupSendSelection('${clientId}')">Continue</button></div>`, 520);
 }
 
 // Combines the selected authors' approved draft text into one starting

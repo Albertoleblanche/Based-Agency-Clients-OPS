@@ -1356,7 +1356,7 @@ function mOpenTaskDetail(taskId){
         <div style="display:flex;justify-content:space-between;align-items:center;"><span style="color:var(--muted);">Assigned by</span><span style="display:flex;align-items:center;gap:8px;font-weight:600;">${mPersonAvatarHtml(assigner)}${assigner?escapeHtml(assigner.name):'—'}</span></div>
         ${client ? `<div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Client</span><span style="font-weight:600;">${escapeHtml(client.name)}</span></div>` : ''}
         ${t.dueDate ? `<div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Due</span><span style="font-weight:600;">${new Date(t.dueDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span></div>` : ''}
-        <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Priority</span><span style="font-weight:600;text-transform:capitalize;">${t.priority}</span></div>
+        <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Priority</span><span style="font-weight:600;text-transform:capitalize;">${t.priority || 'None'}</span></div>
       </div>
     </div>
     ${isMine ? `
