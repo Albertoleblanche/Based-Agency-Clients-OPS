@@ -1281,6 +1281,8 @@
 
     <!-- TEAM -->
     <div class="view" id="view-team">
+      <div class="split" id="teamRoot"></div>
+      <div hidden class="legacy">
       <div class="icon-tab-group" id="teamTabsBar" style="display:none;">
         <div class="icon-tab active" data-ttab="roster" onclick="switchTeamTab('roster')">
           <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M117.25,157.92a60,60,0,1,0-66.5,0A95.83,95.83,0,0,0,3.53,195.63a8,8,0,1,0,13.4,8.74,80,80,0,0,1,134.14,0,8,8,0,0,0,13.4-8.74A95.83,95.83,0,0,0,117.25,157.92ZM40,108a44,44,0,1,1,44,44A44.05,44.05,0,0,1,40,108Zm210.14,98.7a8,8,0,0,1-11.07-2.33A79.83,79.83,0,0,0,172,168a8,8,0,0,1,0-16,44,44,0,1,0-16.34-84.87,8,8,0,1,1-5.94-14.85,60,60,0,0,1,55.53,105.64,95.83,95.83,0,0,1,47.22,37.71A8,8,0,0,1,250.14,206.7Z"/></svg>
@@ -1317,11 +1319,11 @@
           <div class="panel-body">
             <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Creates a real login for this person and assigns their role. You'll get a one-time temporary password to send them directly — they should change it after logging in.</p>
             <div class="form-grid" style="margin-bottom:12px;">
-              <div><label>Name</label><input id="tmName" placeholder="e.g. Priya"></div>
-              <div><label>Email</label><input id="tmEmail" placeholder="priya@basedagency.com"></div>
-              <div><label>Job title</label><select id="tmTitle"></select></div>
+              <div><label>Name</label><input id="tmNameLegacy" placeholder="e.g. Priya"></div>
+              <div><label>Email</label><input id="tmEmailLegacy" placeholder="priya@basedagency.com"></div>
+              <div><label>Job title</label><select id="tmTitleLegacy"></select></div>
               <div><label>Permission role</label>
-                <select id="tmRole">
+                <select id="tmRoleLegacy">
                   <option value="member">Member — can log improvements, can't approve</option>
                   <option value="approver">Approver — can approve/skip drafts</option>
                   <option value="admin">Admin — full access, can manage team &amp; roles</option>
@@ -1340,7 +1342,7 @@
             <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Manage the job titles available when adding team members (e.g. Web Developer, SEO Specialist). Purely descriptive — doesn't affect permissions.</p>
             <div id="titleOptionsList" class="options-list"></div>
             <div style="display:flex;gap:8px;margin-top:10px;">
-              <input id="titleOptionInput" placeholder="New job title" style="flex:1;font-family:var(--font);font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);">
+              <input id="titleOptionInputLegacy" placeholder="New job title" style="flex:1;font-family:var(--font);font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);">
               <button class="btn btn-outline" onclick="addFieldOption('title')">Add</button>
             </div>
           </div>
@@ -1356,9 +1358,12 @@
         </div>
       </div>
     </div>
+    </div>
 
     <!-- TRASH -->
     <div class="view" id="view-trash">
+      <div class="content" id="trashRoot"></div>
+      <div hidden class="legacy">
       <div class="icon-tab-group" id="trashTabsBar">
         <div class="icon-tab active" data-ttab="clients" id="trashClientsTab" onclick="switchTrashTab('clients')">
           <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M117.25,157.92a60,60,0,1,0-66.5,0A95.83,95.83,0,0,0,3.53,195.63a8,8,0,1,0,13.4,8.74,80,80,0,0,1,134.14,0,8,8,0,0,0,13.4-8.74A95.83,95.83,0,0,0,117.25,157.92ZM40,108a44,44,0,1,1,44,44A44.05,44.05,0,0,1,40,108Zm210.14,98.7a8,8,0,0,1-11.07-2.33A79.83,79.83,0,0,0,172,168a8,8,0,0,1,0-16,44,44,0,1,0-16.34-84.87,8,8,0,1,1-5.94-14.85,60,60,0,0,1,55.53,105.64,95.83,95.83,0,0,1,47.22,37.71A8,8,0,0,1,250.14,206.7Z"/></svg>
@@ -1399,6 +1404,7 @@
           </div>
         </div>
       </div>
+    </div>
     </div>
 
     <!-- PROFILE -->
@@ -1505,64 +1511,36 @@
 
     <!-- ASSISTANT (full tab) -->
     <div class="view" id="view-claude">
-      <div style="height:calc(100vh - 150px);display:flex;overflow:hidden;">
-        <div class="claude-sidebar">
-          <div class="claude-sidebar-btn-group">
-            <button type="button" class="claude-sidebar-new-btn" onclick="startNewClaudeConversation()">
-              <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"/></svg>
-              New chat
-            </button>
-            <button type="button" class="claude-sidebar-new-btn" onclick="openClaudeProjectsView()">
-              <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M216,72H130.67L102.93,51.2a16.12,16.12,0,0,0-9.6-3.2H40A16,16,0,0,0,24,64V200a16,16,0,0,0,16,16H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72Zm0,128H40V64H93.33L123.2,86.4A8,8,0,0,0,128,88h88Z"/></svg>
-              Projects
-            </button>
-          </div>
-          <div class="claude-sidebar-heading">Projects</div>
-          <div class="claude-sidebar-list" id="claudeSidebarProjectsList" style="margin-bottom:26px;"></div>
-          <div class="claude-sidebar-heading-row">
-            <div class="claude-sidebar-heading">Chats and Tasks</div>
-            <span class="claude-bulk-select-link" id="claudeBulkSelectLink" onclick="toggleClaudeBulkMode()">Select</span>
-          </div>
+      <div class="split" id="claudeSplit">
+        <section class="list" aria-label="Chats" style="flex-basis:280px">
+          <div class="list-h"><b style="font-size:13px">Chats</b><span style="flex:1"></span>
+            <button class="btn btn-q sm" id="claudeBulkSelectLink" onclick="toggleClaudeBulkMode()">Select</button>
+            <button class="ib" aria-label="New chat" title="New chat" onclick="startNewClaudeConversation()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /> <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" /></svg></button></div>
           <div class="claude-bulk-bar" id="claudeBulkBar" style="display:none;"></div>
-          <div class="claude-sidebar-list" id="claudeSidebarList"></div>
-          <div class="claude-sidebar-footer">
-            <span>Floating button</span>
-            <button class="theme-toggle-switch" id="claudeFloatButtonToggle" onclick="toggleClaudeFloatButtonPref()" title="Just for you — shows or hides the floating Assistant button on every page"></button>
+          <div id="claudeSidebarList" style="padding-bottom:12px"></div>
+          <div id="claudeSidebarProjectsList" hidden></div>
+        </section>
+        <section class="chat" aria-label="Conversation">
+          <div class="chat-scroll claude-chat-messages" id="claudeTabMessages"></div>
+          <div class="claude-empty-hero" id="claudeTabEmptyHero" style="display:none;">
+            <div class="claude-empty-greeting" id="claudeTabGreeting"></div>
+            <div class="claude-empty-inputwrap" id="claudeTabInputSlot"></div>
+            <div class="sugg claude-quick-actions" id="claudeQuickActionsList"></div>
           </div>
-        </div>
-        <div style="position:relative;flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;">
-        <div class="claude-chat-messages" id="claudeTabMessages"></div>
-        <div class="claude-empty-hero" id="claudeTabEmptyHero" style="display:none;">
-          <div class="claude-empty-greeting" id="claudeTabGreeting"></div>
-          <div class="claude-empty-inputwrap" id="claudeTabInputSlot"></div>
-          <div class="claude-quick-actions" id="claudeQuickActionsList"></div>
-        </div>
-        <div class="claude-projects-view" id="claudeProjectsView" style="display:none;"></div>
-        <div class="claude-chat-input-dock" id="claudeTabInputDock" style="max-width:600px;margin:0 auto;width:100%;">
-          <div class="claude-chat-input-row" id="claudeTabInputRow">
-            <textarea spellcheck="true" class="claude-chat-input" id="claudeTabInput" rows="1" placeholder="Ask about a client, or paste a link to review…" onkeydown="handleClaudeInputKey(event, 'tab')" oninput="autoGrowClaudeInput(this)"></textarea>
-            <div class="claude-input-toolbar">
-              <div style="position:relative;">
-                <button type="button" class="claude-input-icon-btn" id="claudePlusBtn" onclick="toggleClaudePlusMenu(event)" title="Add">
-                  <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"/></svg>
-                </button>
-                <div class="claude-provider-menu" id="claudePlusMenu" style="display:none;width:200px;"></div>
+          <div class="claude-projects-view" id="claudeProjectsView" style="display:none;"></div>
+          <div class="dock claude-chat-input-dock" id="claudeTabInputDock">
+            <div class="sugg" id="claudeDockSugg"></div>
+            <div class="dock-in claude-chat-input-row" id="claudeTabInputRow">
+              <textarea spellcheck="true" class="claude-chat-input" id="claudeTabInput" rows="1" aria-label="Message" placeholder="Ask about your clients, drafts or time…" onkeydown="handleClaudeInputKey(event, 'tab')" oninput="autoGrowClaudeInput(this)"></textarea>
+              <div class="bar2 claude-input-toolbar">
+                <div style="position:relative"><button type="button" class="pop" id="claudeProviderBtn" onclick="toggleClaudeProviderMenu(event)" title="Which AI answers you"><span id="claudeProviderBtnLabel">ChatGPT</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 15 5 5 5-5" /> <path d="m7 9 5-5 5 5" /></svg></button><div class="claude-provider-menu" id="claudeProviderMenu" style="display:none;"></div></div>
+                <div style="position:relative"><button type="button" class="ib" id="claudePlusBtn" aria-label="Add" title="Add an image or put this chat in a project" onclick="toggleClaudePlusMenu(event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551" /></svg></button><div class="claude-provider-menu" id="claudePlusMenu" style="display:none;width:220px;"></div></div>
+                <button type="button" class="send" aria-label="Send" onclick="sendClaudeMessage('tab')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 7-7 7 7" /> <path d="M12 19V5" /></svg></button>
               </div>
-              <div style="position:relative;">
-                <button type="button" class="claude-provider-btn" id="claudeProviderBtn" onclick="toggleClaudeProviderMenu(event)" title="Which AI answers your messages — just for you, this conversation">
-                  <span id="claudeProviderBtnLabel">ChatGPT</span>
-                  <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M216.49,104.49l-80,80a12,12,0,0,1-17,0l-80-80a12,12,0,0,1,17-17L128,159l71.51-71.52a12,12,0,0,1,17,17Z"/></svg>
-                </button>
-                <div class="claude-provider-menu" id="claudeProviderMenu" style="display:none;"></div>
-              </div>
-              <div style="flex:1;"></div>
-              <button type="button" class="claude-clear-chat-inline" onclick="clearClaudeChat()">Delete chat</button>
-              <button class="claude-chat-send" id="claudeTabSendBtn" onclick="sendClaudeMessage('tab')" title="Send"><svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M227.32,28.68a16,16,0,0,0-15.66-4.08l-.15,0L19.57,82.84a16,16,0,0,0-2.49,29.8L102,154l41.3,84.87A15.86,15.86,0,0,0,157.74,248q.69,0,1.38-.06a15.88,15.88,0,0,0,14-11.51l58.2-191.94c0-.05,0-.1,0-.15A16,16,0,0,0,227.32,28.68ZM157.83,231.85l-.05.14,0-.07-40.06-82.3,48-48a8,8,0,0,0-11.31-11.31l-48,48L24.08,98.25l-.07,0,.14,0L216,40Z"/></svg></button>
             </div>
+            <div class="claude-chat-cap" id="claudeTabCap"></div>
           </div>
-          <div class="claude-chat-cap" id="claudeTabCap"></div>
-        </div>
-        </div>
+        </section>
       </div>
     </div>
 
@@ -1689,6 +1667,10 @@
 <script src="js/features/assistant.js"></script>
 <script src="js/features/reports.js"></script>
 <script src="js/features/approval-queue.js"></script>
+<script src="js/features/settings.js"></script>
+<script src="js/features/sheet-sync.js"></script>
+<script src="js/features/team.js"></script>
+<!-- the canvas rebuild: these load last so their screens replace the older ones -->
 <script src="js/features/this-week.js"></script>
 <script src="js/features/review.js"></script>
 <script src="js/features/health.js"></script>
@@ -1698,9 +1680,9 @@
 <script src="js/features/calendar-canvas.js"></script>
 <script src="js/features/time-canvas.js"></script>
 <script src="js/features/focus-canvas.js"></script>
-<script src="js/features/settings.js"></script>
-<script src="js/features/sheet-sync.js"></script>
-<script src="js/features/team.js"></script>
+<script src="js/features/team-canvas.js"></script>
+<script src="js/features/trash-canvas.js"></script>
+<script src="js/features/assistant-canvas.js"></script>
 <script src="js/app.js"></script>
 
 </body>

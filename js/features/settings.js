@@ -643,7 +643,7 @@ function applyAssistantName(){
   const navItem = document.getElementById('claudeNavItem');
   if(navItem) navItem.setAttribute('data-tooltip', name);
   const tabInput = document.getElementById('claudeTabInput');
-  if(tabInput) tabInput.placeholder = `Ask ${name} about a client, or paste a link to review…`;
+  if(tabInput) tabInput.placeholder = `Ask about your clients, drafts or time…`;
   const floatInput = document.getElementById('claudeFloatInput');
   if(floatInput) floatInput.placeholder = `Ask ${name} anything…`;
 }

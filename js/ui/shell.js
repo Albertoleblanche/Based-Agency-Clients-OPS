@@ -101,3 +101,6 @@ icon = (function(base){
     return `<svg${o.cls ? ` class="${o.cls}"` : ''}${size} viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round" ${o.label ? `role="img" aria-label="${o.label}"` : 'aria-hidden="true"'}>${BRAND_ICONS[name]}</svg>`;
   };
 })(icon);
+
+// Lucide icons used by the rebuild that the generated set doesn't carry.
+ICON_PATHS['pin'] = '<path d="M12 17v5" /> <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />';

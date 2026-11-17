@@ -129,7 +129,7 @@ const VIEW_TITLES = {
   team: ['Team', "Everyone on the team, and what they do here"],
   trash: ['Recently Deleted', 'Restore anything here, or delete it for good'],
   settings: ['Settings', 'Workspace, client fields, AI, integrations and notifications'],
-  claude: ['Assistant', "Ask about a client, get a recommendation, or have it check a website"],
+  claude: ['Assistant', 'Knows your clients, drafts, tasks and time'],
   profile: ['My Profile', 'Your info, visible to the rest of the team the same way it always has been'],
 };
 
