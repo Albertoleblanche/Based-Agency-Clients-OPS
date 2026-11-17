@@ -23,13 +23,21 @@ body[data-theme="dark"]{
 }
 
 /* Filled orange surfaces always use the deep orange with white on top. */
-.btn-brand, #loginBtn, .nav-item.active .nav-badge, .notif-badge, .timer-quick-start-btn,
-.icon-tab.active .icon-tab-count, .theme-toggle-switch.on, .include-toggle input:checked + .toggle-track,
-.cmdk-item.active, .calendar-day.today .calendar-day-num, .ov-mini-cal-day.today, .claude-msg-user,
-.claude-float-btn, .claude-chat-send, .dp-calendar-day.selected, .time-picker-option.selected,
-.tq-select-item.active, .kanban-add-btn:hover, .brand-mark{background:var(--brand-fill);color:#fff;}
+/* Orange is kept for the things you act on (buttons, the + and send
+   buttons, switches that are on) and a few true accents (today's date,
+   the app icon). Selection, hover and highlighted rows are neutral grey,
+   so orange never competes with the one action on a screen. */
+.btn-brand, #loginBtn, .timer-quick-start-btn, .theme-toggle-switch.on, .include-toggle input:checked + .toggle-track,
+.calendar-day.today .calendar-day-num, .ov-mini-cal-day.today, .claude-float-btn, .claude-chat-send,
+.brand-mark{background:var(--brand-fill);color:#fff;}
+.cmdk-item.active, .dp-calendar-day.selected, .time-picker-option.selected, .tq-select-item.active,
 .sidebar-profile-menu-item:not(.theme-row):hover, .dropdown-item:hover, .kanban-card-menu-item:hover,
-.tq-select-item:hover, .client-search-item:hover{background:var(--brand-fill);color:#fff;}
+.tq-select-item:hover, .client-search-item:hover, .kanban-add-btn:hover{background:var(--sidebar-active) !important;color:var(--ink) !important;}
+.cmdk-item.active .cmdk-item-title{color:var(--ink) !important;}
+.cmdk-item.active svg{color:var(--ink);}
+.icon-tab.active .icon-tab-count, .nav-item.active .nav-badge{background:transparent;color:var(--muted);}
+.notif-badge{background:var(--red);color:#fff;}
+.claude-msg-user{background:var(--fill-2);color:var(--ink);}
 .btn-brand:hover{background:var(--brand-fill);filter:brightness(1.08);}
 .btn-dark{background:var(--fill-2);color:var(--ink);box-shadow:none;}
 .btn-dark:hover{background:var(--fill-3);filter:none;}
@@ -51,7 +59,7 @@ body[data-theme="dark"]{
 .nav-badge{min-width:0;height:auto;padding:0;background:transparent;color:var(--muted);font-size:12px;font-weight:500;}
 .nav-item.active .nav-badge{background:transparent;color:var(--ink);}
 #navPendingBadge, #navTeamPendingBadge{color:var(--brand);font-weight:600;}
-body.sidebar-collapsed .nav-badge{min-width:15px;height:15px;padding:0 4px;background:var(--brand-fill);color:#fff;border-radius:999px;}
+body.sidebar-collapsed .nav-badge{min-width:15px;height:15px;padding:0 4px;background:var(--fill-3);color:var(--ink);border-radius:999px;}
 
 /* ---------- toolbar ---------- */
 .page-title{font-size:17px;font-weight:600;letter-spacing:-.015em;}
@@ -223,7 +231,7 @@ body[data-theme="dark"] .login-card{box-shadow:0 0 0 .5px rgba(255,255,255,.12),
   flex:0 0 auto;padding:0;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform 100ms ease-out;}
 .rem-cb:hover{box-shadow:inset 0 0 0 1.5px var(--brand);}
 .rem-cb:active{transform:scale(.92);}
-.rem-cb.done{background:var(--brand-fill);box-shadow:none;color:#fff;cursor:default;}
+.rem-cb.done{background:var(--muted-lt);box-shadow:none;color:#fff;cursor:default;}
 .rem-cb.done svg{width:12px;height:12px;}
 .rem-tx{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 auto;}
 .rem-t{font-size:13.5px;font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -245,14 +253,14 @@ body[data-theme="dark"] .login-card{box-shadow:0 0 0 .5px rgba(255,255,255,.12),
 .note-row + .note-row{margin-top:1px;}
 .note-row:hover{background:var(--fill);}
 .note-row:focus-visible{outline:2px solid var(--ring);outline-offset:-2px;}
-.note-row.sel{background:var(--brand-fill);color:#fff;}
+.note-row.sel{background:var(--sidebar-active);}
 .note-row-top{display:flex;align-items:baseline;gap:8px;}
 .note-row-top b{flex:1;min-width:0;font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .note-row-top time{font-size:12px;color:var(--muted);flex:0 0 auto;}
 .note-row-client{font-size:12px;color:var(--ink);}
 .note-row-pv{font-size:12px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .note-row-pv .pill{margin-right:4px;}
-.note-row.sel time, .note-row.sel .note-row-client, .note-row.sel .note-row-pv, .note-row.sel .note-row-pv .pill{color:rgba(255,255,255,.88) !important;}
+
 .notes-pane{flex:999 1 420px;min-width:0;padding:22px 32px 32px;max-height:calc(100vh - 220px);overflow:auto;}
 .note-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:18px;}
 .note-status select{height:28px;border-radius:7px;font-size:13px;padding:0 28px 0 10px;}
@@ -308,3 +316,31 @@ body[data-theme="dark"] .login-card{box-shadow:0 0 0 .5px rgba(255,255,255,.12),
 #view-settings > .icon-tab-group .icon-tab:hover{background:var(--fill);}
 #view-settings > .icon-tab-group .icon-tab.active{background:var(--sidebar-active);color:var(--ink);box-shadow:none;}
 #view-settings > .icon-tab-group .icon-tab.active svg{color:var(--brand);}
+
+/* ---------- Review & Team Queue on wide windows: list + selected draft ---------- */
+.q-split{display:flex;align-items:stretch;background:var(--card);border-radius:12px;box-shadow:0 0 0 .5px var(--grp-line);
+  overflow:hidden;height:calc(100vh - 250px);min-height:460px;}
+.q-split > .q-list{flex:0 0 360px;min-width:0;height:100%;overflow:auto;border-radius:0 !important;box-shadow:none !important;
+  border-right:.5px solid var(--grp-line);padding:6px;background:transparent !important;}
+.q-list .q-card{cursor:pointer;min-height:58px;padding:10px 12px !important;border-radius:8px !important;gap:4px 10px;}
+.q-list .q-card + .q-card::before{left:56px;right:8px;}
+.q-list .q-card.sel{background:var(--sidebar-active) !important;}
+.q-list .q-card.sel::before, .q-list .q-card.sel + .q-card::before{display:none;}
+.q-list .q-card-actions, .q-list .q-pill-row, .q-list .kanban-card-menu-wrap{display:none !important;}
+.q-list .q-card > :not(.q-card-top):not(.q-pill-row):not(.q-card-actions){margin-left:42px !important;}
+.q-list .q-card:focus-visible{outline:2px solid var(--ring);outline-offset:-2px;}
+.q-pane{flex:1 1 auto;min-width:0;height:100%;overflow:auto;display:flex;flex-direction:column;padding:6px 10px 24px;}
+.q-pane .toast-close{display:none;}
+.q-pane .modal-actions{order:-1;justify-content:flex-end;padding:14px 20px 4px;}
+.q-pane .modal-head{padding:12px 20px 6px;cursor:default;}
+.q-pane .modal-head .q-name{font-size:20px !important;font-weight:700 !important;letter-spacing:-.015em;}
+.q-pane .modal-body{padding:10px 20px 0;max-width:760px;}
+.q-pane textarea.draft{min-height:340px;font-size:14px;line-height:1.6;padding:16px 18px;border-radius:10px;
+  border:.5px solid var(--border-strong);background:var(--bg);resize:vertical;}
+.q-pane .q-bulk-list{max-height:none;}
+
+/* selected days and chips: neutral, not orange */
+.week-strip-day.selected{background:var(--sidebar-active) !important;box-shadow:none !important;}
+.week-strip-day.selected .wsd-label{color:var(--ink) !important;}
+.attendee-chip.selected{background:var(--sidebar-active) !important;border-color:transparent !important;}
+#clientsBulkModeBtn.active{background:var(--sidebar-active) !important;border-color:transparent !important;color:var(--ink) !important;}
