@@ -60,25 +60,27 @@ function renderTeam(){
   if(titlesPanel) titlesPanel.style.display = isAdmin() ? 'block' : 'none';
   if(isAdmin()){ populateAddMemberTitleSelect(); renderOptionsManager('title'); renderPendingEmailRequests(); }
   if(noteEl) noteEl.textContent = isAdmin()
-    ? 'Tap View on a card to change someone\'s role or title, except your own role.'
+    ? 'Open View to change someone\'s role or title, except your own role.'
     : 'Only admins can add members or change roles.';
   if(!el) return;
   if(!teamProfiles.length){ el.innerHTML = `<div class="empty" style="padding:14px 0;">No team members yet.</div>`; return; }
-  el.innerHTML = `<div class="team-grid">` + teamProfiles.map(m=>{
+  // A list, like Apple's Users & Groups: one row per person with their
+  // title, role and what you can do with them; View opens the details.
+  el.innerHTML = `<div class="team-list">` + teamProfiles.map(m=>{
     const isSelf = currentUser && m.id === currentUser.id;
     const isRevoked = !!m.access_revoked;
     const roleAtCompany = m.title || roleDisplayLabel(m.role);
-    return `<div class="team-card ${isRevoked?'revoked':''}">
-      ${isAdmin() ? `<button class="icon-menu-btn team-card-menu-btn" onclick='toggleTeamActionsMenu(event, ${escapeHtml(JSON.stringify({id:m.id,name:m.name,access_revoked:isRevoked}))})' title="Actions">
+    return `<div class="team-row ${isRevoked?'revoked':''}">
+      ${teamCardAvatarHtml(m)}
+      <div class="team-row-tx"><b>${escapeHtml(m.name)}${isSelf?' (you)':''}</b><span>${escapeHtml(roleAtCompany)}${isRevoked ? ' · Access revoked' : ''}</span></div>
+      <span class="team-row-role">${escapeHtml(roleDisplayLabel(m.role))}</span>
+      <div class="team-row-actions">
+        ${(!isSelf && !isRevoked) ? `<button class="btn btn-outline" onclick="openNewTaskModal('${m.id}')">Assign Task</button>` : ''}
+        ${m.email ? `<a class="btn btn-outline" href="mailto:${escapeHtml(m.email)}" style="text-decoration:none;">Email</a>` : ''}
+        <button class="btn btn-outline" onclick="openTeamMemberDetail('${m.id}')">View</button>
+        ${isAdmin() ? `<button class="icon-menu-btn team-card-menu-btn" onclick='toggleTeamActionsMenu(event, ${escapeHtml(JSON.stringify({id:m.id,name:m.name,access_revoked:isRevoked}))})' title="Actions">
         <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M112,60a16,16,0,1,1,16,16A16,16,0,0,1,112,60Zm16,52a16,16,0,1,0,16,16A16,16,0,0,0,128,112Zm0,68a16,16,0,1,0,16,16A16,16,0,0,0,128,180Z"/></svg>
       </button>` : ''}
-      ${teamCardAvatarHtml(m)}
-      <div class="team-card-name">${escapeHtml(m.name)}${isSelf?' · you':''}</div>
-      <div class="team-card-role">${roleAtCompany}${isRevoked ? ' · Access revoked' : ''}</div>
-      <button class="btn btn-outline team-card-view" onclick="openTeamMemberDetail('${m.id}')">View</button>
-      <div class="team-card-actions">
-        ${(!isSelf && !isRevoked) ? `<button class="btn btn-outline" onclick="openNewTaskModal('${m.id}')">Assign task</button>` : ''}
-        ${m.email ? `<a class="btn btn-outline" href="mailto:${escapeHtml(m.email)}" style="text-decoration:none;">Email</a>` : ''}
       </div>
     </div>`;
   }).join('') + `</div>`;

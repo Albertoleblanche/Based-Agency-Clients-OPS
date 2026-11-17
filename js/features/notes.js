@@ -229,71 +229,65 @@ const NOTE_STAGES = [
   { key:'done',         label:'Done',        color:'#117F3A', icon:'<svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg>' },
 ];
 
+// Notes works like Mail and Apple Notes: the list on the left, the note
+// you picked on the right. Status, client and editing live in the note
+// itself; the list stays a calm scan of titles.
+let selectedNoteId = null;
+
+function selectNote(id){
+  selectedNoteId = id;
+  renderNotes();
+}
+
 function renderNotes(){
   const board = document.getElementById('notesBoard');
   if(!board) return;
   if(!notesDataLoaded){ board.innerHTML = loadingStateHtml('Loading notes…'); return; }
   updateNotesBadge();
   const clientFilter = document.getElementById('notesClientFilter')?.value || 'all';
+  const visible = notes.filter(n=> clientFilter==='all' || n.clientId===clientFilter)
+    .sort((a,b)=> new Date(b.updatedAt||b.createdAt) - new Date(a.updatedAt||a.createdAt));
 
-  const visible = notes.filter(n=> clientFilter==='all' || n.clientId===clientFilter);
+  if(!visible.length){
+    board.innerHTML = `<div class="cd-grp notes-empty">${emptyStateHtml(NOTE_STAGES[0].icon.replace(/width="14" height="14"/,'width="20" height="20"'),
+      clientFilter==='all' ? 'No notes yet' : 'No notes for this client',
+      'Notes are private to you — ideas and plans you want to get to.',
+      '<button class="btn btn-brand" onclick="openNoteModal()">New Note</button>')}</div>`;
+    return;
+  }
+  if(!visible.some(n=>n.id===selectedNoteId)) selectedNoteId = visible[0].id;
 
-  board.innerHTML = NOTE_STAGES.map(stage=>{
-    const stageNotes = visible.filter(n=>n.status===stage.key)
-      .sort((a,b)=> new Date(b.updatedAt||b.createdAt) - new Date(a.updatedAt||a.createdAt));
-    return `<div class="kanban-column">
-      <div class="kanban-column-head" style="background:${stage.color}22;border:1px solid ${stage.color}66;">
-        <span class="kanban-column-icon" style="color:${stage.color};">${stage.icon}</span>
-        <span class="kanban-column-title">${escapeHtml(stage.label)}</span>
-        <span class="kanban-column-count">${stageNotes.length}</span>
-        <button class="kanban-add-btn" onclick="openNoteModal(undefined,undefined,'${stage.key}')" title="New note in ${escapeHtml(stage.label)}">+</button>
-      </div>
-      <div class="kanban-cards">
-        ${stageNotes.length ? stageNotes.map(n=>noteCardHtml(n)).join('') : `<div class="empty" style="padding:18px 8px;font-size:11.5px;">Nothing here yet.</div>`}
-      </div>
+  const fmt = d => new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const list = visible.map(n=>{
+    const c = clients.find(x=>x.id===n.clientId);
+    const meta = noteStatusMeta(n.status);
+    const sel = n.id===selectedNoteId;
+    return `<div class="note-row${sel ? ' sel' : ''}" role="option" aria-selected="${sel}" tabindex="0" onclick="selectNote('${n.id}')" onkeydown="if(event.key==='Enter')selectNote('${n.id}')">
+      <div class="note-row-top"><b>${escapeHtml(n.title || 'Untitled note')}</b><time>${fmt(n.updatedAt||n.createdAt)}</time></div>
+      <span class="note-row-client">${c ? escapeHtml(c.name) : 'No client'}</span>
+      <span class="note-row-pv"><span class="pill ${meta.cls}">${escapeHtml(meta.label)}</span> ${escapeHtml((n.text||'').slice(0,140))}</span>
     </div>`;
   }).join('');
-}
 
-function noteCardMenuHtml(n){
-  const moveOptions = NOTE_STAGES.filter(s=>s.key!==n.status).map(s=>
-    `<div class="kanban-card-menu-item" onclick="event.stopPropagation();changeNoteStatus('${n.id}','${s.key}')"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M221.66,133.66l-72,72a8,8,0,0,1-11.32-11.32L196.69,136H40a8,8,0,0,1,0-16H196.69L138.34,61.66a8,8,0,0,1,11.32-11.32l72,72A8,8,0,0,1,221.66,133.66Z"/></svg>Move to ${escapeHtml(s.label)}</div>`
-  ).join('');
-  return moveOptions
-    + `<div class="kanban-card-menu-divider"></div>`
-    + `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();openNoteModal('${n.id}')"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M229.66,58.34l-32-32a8,8,0,0,0-11.32,0l-96,96A8,8,0,0,0,88,128v32a8,8,0,0,0,8,8h32a8,8,0,0,0,5.66-2.34l96-96A8,8,0,0,0,229.66,58.34ZM124.69,152H104V131.31l64-64L188.69,88ZM200,76.69,179.31,56,192,43.31,212.69,64ZM224,128v80a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V48A16,16,0,0,1,48,32h80a8,8,0,0,1,0,16H48V208H208V128a8,8,0,0,1,16,0Z"/></svg>Edit</div>`
-    + `<div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();deleteNote('${n.id}')"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/></svg>Delete</div>`;
-}
-
-function noteCardHtml(n){
+  const n = visible.find(x=>x.id===selectedNoteId);
   const c = clients.find(x=>x.id===n.clientId);
-  const dateStr = new Date(n.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
-  const isDone = n.status==='done';
-
-  return `<div class="kanban-card" onclick="openNotePreview('${n.id}')">
-    <div class="kanban-card-top">
-      ${isDone
-        ? `<span class="kanban-card-due" style="color:var(--green);font-weight:700;">
-            <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M176.49,95.51a12,12,0,0,1,0,17l-56,56a12,12,0,0,1-17,0l-24-24a12,12,0,1,1,17-17L112,143l47.51-47.52A12,12,0,0,1,176.49,95.51ZM236,128A108,108,0,1,1,128,20,108.12,108.12,0,0,1,236,128Zm-24,0a84,84,0,1,0-84,84A84.09,84.09,0,0,0,212,128Z"/></svg>
-            Done ${dateStr}
-          </span>`
-        : `<span class="kanban-card-due">
-            <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor"><path d="M208,28H188V24a12,12,0,0,0-24,0v4H92V24a12,12,0,0,0-24,0v4H48A20,20,0,0,0,28,48V208a20,20,0,0,0,20,20H208a20,20,0,0,0,20-20V48A20,20,0,0,0,208,28ZM68,52a12,12,0,0,0,24,0h72a12,12,0,0,0,24,0h16V76H52V52ZM52,204V100H204V204Z"/></svg>
-            ${dateStr}
-          </span>`}
-      <div class="kanban-card-menu-wrap">
-        <span class="kanban-card-menu-btn" onclick="event.stopPropagation();toggleKanbanCardMenu('note-${n.id}')">⋯</span>
-        <div class="kanban-card-menu" id="kanbanMenu-note-${n.id}" style="display:none;">${noteCardMenuHtml(n)}</div>
-      </div>
+  const statusOptions = NOTE_STAGES.map(st=>`<option value="${st.key}"${st.key===n.status?' selected':''}>${escapeHtml(st.label)}</option>`).join('');
+  const pane = `
+    <div class="note-bar">
+      ${c ? `<span class="row-link" onclick="openClientDetail('${c.id}')">${escapeHtml(c.name)}</span>` : ''}
+      <label class="note-status"><span class="sr-only">Status</span><select onchange="changeNoteStatus('${n.id}', this.value)">${statusOptions}</select></label>
+      <span class="note-private"><svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208,80H176V56a48,48,0,0,0-96,0V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80ZM96,56a32,32,0,0,1,64,0V80H96ZM208,208H48V96H208V208Z"/></svg>Only you can see this note</span>
     </div>
-    <div class="kanban-card-title">${escapeHtml(n.title || 'Untitled note')}</div>
-    <div class="kanban-card-desc" style="white-space:normal;-webkit-line-clamp:1;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;color:var(--muted-lt);cursor:pointer;" onclick="event.stopPropagation(); goToClientInQueue('${n.clientId}','all')">${c ? escapeHtml(c.name) : 'Unknown client'}</div>
-    <div class="kanban-card-desc" style="white-space:normal;-webkit-line-clamp:3;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtml(n.text)}</div>
-    ${n.link ? `<a href="${safeUrl(normalizeUrl(n.link))}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${truncateLinkDisplay(n.link, 40)}</a>` : ''}
-    <div class="kanban-card-footer">
-      ${!isDone ? `<button class="btn btn-brand" style="padding:6px 12px;font-size:11px;" onclick="event.stopPropagation();logNoteNow('${n.id}')">Log it now</button>` : `<span style="font-size:11px;color:var(--muted-lt);">Logged as an improvement</span>`}
+    <h2 class="note-title">${escapeHtml(n.title || 'Untitled note')}</h2>
+    <div class="note-text">${escapeHtml(n.text || '')}</div>
+    ${n.link ? `<a href="${safeUrl(normalizeUrl(n.link))}" target="_blank" rel="noopener" class="note-link">${escapeHtml(truncateLinkDisplay(n.link, 60))}</a>` : ''}
+    <div class="note-actions">
+      ${n.status!=='done' ? `<button class="btn btn-brand" onclick="logNoteNow('${n.id}')">Log It as an Improvement</button>` : ''}
+      <button class="btn btn-outline" onclick="openNoteModal('${n.id}')">Edit</button>
+      <button class="btn btn-outline note-delete" onclick="deleteNote('${n.id}')">Delete</button>
     </div>
-  </div>`;
+    <p class="note-meta">Created ${fmt(n.createdAt)}${n.updatedAt && n.updatedAt!==n.createdAt ? ` · edited ${fmt(n.updatedAt)}` : ''}</p>`;
+  board.innerHTML = `<div class="notes-list" role="listbox" aria-label="Notes">${list}</div><section class="notes-pane" aria-label="Selected note">${pane}</section>`;
 }
 
 function updateNotesBadge(){
