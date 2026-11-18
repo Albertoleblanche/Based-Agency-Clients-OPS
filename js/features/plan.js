@@ -11,7 +11,7 @@ let planSprints = [];
 let planReady = null;          // null: not loaded yet · false: the table isn't there yet · true
 let planWeeklyHours = 20;      // hours a week you keep for planned work (you set it)
 let planRange = (() => { try{ return localStorage.getItem('bda_plan_range') === '13' ? 13 : 6; }catch(e){ return 6; } })();
-let planClient = 'all', planFilter = 'all';
+let planClient = 'all';
 
 function planRowFromDb(r){
   return { id: r.id, title: r.title || 'Untitled sprint', clientId: r.client_id || null, start: r.start_date, end: r.end_date,
@@ -94,29 +94,34 @@ function planBudgetWarning(s){
 }
 
 // ---- the look-ahead: everything with a date, from every part of the app -----------------------
-const PLAN_KINDS = [['all', 'All'], ['task', 'Tasks'], ['note', 'Notes'], ['reminder', 'Reminders'], ['event', 'Events']];
+// Coming up, in three lists: your tasks; follow-ups (waiting on a client, a note to revisit, a
+// follow-up on the calendar); and the rest of your calendar. Sprint reminders live in the side.
+const PLAN_GROUPS = [['task', 'Tasks', 'No tasks due.'], ['follow', 'Follow-ups', 'Nothing to follow up on.'], ['event', 'Calendar', 'Nothing on your calendar.']];
+const PLAN_SHOW = 5;
+function planIsFollowEvent(e){ return e.eventType === 'reminder' && /^(follow[ -]?up|client follow-up)/i.test(e.title || ''); }
 function planAheadItems(toDs){
   const me = currentUser?.id, today = toDateStr(rNow()), out = [];
   const cName = id => (clients.find(c => c.id === id) || {}).name || '';
   tasks.filter(t => t.assigneeId === me && t.status !== 'done' && !t.cancelledAt && t.dueDate && t.dueDate <= toDs).forEach(t => {
     const sp = t.sprintId && planSprint(t.sprintId);
-    out.push({ kind: 'task', id: t.id, date: t.dueDate, time: typeof taskDueTimes !== 'undefined' ? taskDueTimes[t.id] || '' : '', title: t.title,
-      sub: sp ? sp.title : (cName(t.clientId) || 'Task'), color: t.color || (sp && sp.color) || null, late: t.dueDate < today });
+    out.push({ kind: 'task', group: 'task', id: t.id, date: t.dueDate, time: typeof taskDueTimes !== 'undefined' ? taskDueTimes[t.id] || '' : '', title: t.title,
+      sub: sp ? `Sprint · ${sp.title}` : (cName(t.clientId) || 'No client'), color: t.color || (sp && sp.color) || null, late: t.dueDate < today, inSprint: !!sp });
   });
   (typeof notes !== 'undefined' ? notes : []).filter(n => n.followUpDate && n.status !== 'done' && n.followUpDate <= toDs).forEach(n =>
-    out.push({ kind: 'note', id: n.id, date: n.followUpDate, title: n.title || 'Untitled note', sub: `Follow up · ${cName(n.clientId) || 'note'}`, color: n.color, late: n.followUpDate < today }));
+    out.push({ kind: 'note', group: 'follow', id: n.id, date: n.followUpDate, title: n.title || 'Untitled note', sub: `Note${cName(n.clientId) ? ' · ' + cName(n.clientId) : ''}`, color: n.color, late: n.followUpDate < today }));
   (typeof clientReminders !== 'undefined' ? clientReminders : []).filter(r => r.status === 'waiting' && r.askedBy === me && r.followUpDate && r.followUpDate <= toDs).forEach(r =>
-    out.push({ kind: 'reminder', id: r.id, date: r.followUpDate, title: r.question, sub: `Follow up with ${cName(r.clientId) || 'the client'}`, late: r.followUpDate < today }));
+    out.push({ kind: 'reminder', group: 'follow', id: r.id, date: r.followUpDate, title: r.question, sub: `Waiting on ${cName(r.clientId) || 'the client'}`, late: r.followUpDate < today }));
   (typeof calendarEvents !== 'undefined' ? calendarEvents : []).filter(e => !e.relatedTaskId && !e.relatedNoteId && !e.relatedReminderId && (e.createdBy === me || (e.attendeeIds || []).includes(me)))
     .forEach(e => { const st = new Date(e.startAt), ds = toDateStr(st); if(ds < today || ds > toDs) return;
-      out.push({ kind: 'event', id: e.id, date: ds, time: e.allDay ? '' : String(st.getHours()).padStart(2, '0') + ':' + String(st.getMinutes()).padStart(2, '0'), title: e.title, sub: `Event${cName(e.clientId) ? ' · ' + cName(e.clientId) : ''}` }); });
+      const fu = planIsFollowEvent(e), type = e.eventType && e.eventType !== 'other' && typeof CALENDAR_TYPE_META !== 'undefined' && CALENDAR_TYPE_META[e.eventType] ? CALENDAR_TYPE_META[e.eventType].label : 'Event';
+      out.push({ kind: 'event', group: fu ? 'follow' : 'event', id: e.id, date: ds, time: e.allDay ? '' : String(st.getHours()).padStart(2, '0') + ':' + String(st.getMinutes()).padStart(2, '0'), title: e.title,
+        sub: fu ? 'On your calendar' : `${type}${cName(e.clientId) ? ' · ' + cName(e.clientId) : ''}` }); });
   planSprints.filter(s => !s.doneAt).forEach(s => (s.reminders || []).forEach((r, i) => {
     if(r.sent) return; const at = new Date(r.at), ds = toDateStr(at); if(ds < today || ds > toDs) return;
-    out.push({ kind: 'alert', id: s.id, idx: i, date: ds, time: String(at.getHours()).padStart(2, '0') + ':' + String(at.getMinutes()).padStart(2, '0'), title: r.label, sub: `${s.title} · reminder`, color: s.color });
+    out.push({ kind: 'alert', group: 'alert', id: s.id, idx: i, date: ds, time: String(at.getHours()).padStart(2, '0') + ':' + String(at.getMinutes()).padStart(2, '0'), title: r.label, sub: `${s.title} · reminder`, color: s.color });
   }));
   return out.sort((a, b) => a.date.localeCompare(b.date) || (a.time || '99').localeCompare(b.time || '99'));
 }
-function planKindOf(it){ return it.kind === 'alert' ? 'reminder' : it.kind; }
 function planItemOpen(kind, id){
   if(kind === 'task') openTaskDetailModal(id);
   else if(kind === 'note') openNoteSheet(id);
@@ -130,14 +135,15 @@ function planItemHtml(it){
     ? `<button class="pl-cb" role="checkbox" aria-checked="false" aria-label="Mark done" title="Mark done" onclick="event.stopPropagation();moveTaskToStatus('${it.id}','done')"></button>`
     : `<span class="pl-ic">${icon(ic)}</span>`;
   const when = (it.late ? (it.date === toDateStr(addDays(rNow(), -1)) ? 'Yesterday' : 'Was ' + planDayLabel(it.date)) : planDayLabel(it.date)) + (it.time ? ', ' + fmtTime(atTime(new Date(it.date + 'T12:00:00'), it.time)) : '');
+  const plan = it.kind === 'task' && !it.inSprint ? `<button class="btn btn-sm pl-plan" title="Plan a sprint around this task" onclick="event.stopPropagation();openNewSprintModal({ taskId: '${it.id}' })">Plan Sprint</button>` : '';
   return `<div class="pl-r${it.color ? ' c-' + it.color : ''}" role="button" tabindex="0" onclick="planItemOpen('${it.kind}','${it.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)planItemOpen('${it.kind}','${it.id}')">${lead}
-<div class="tx"><b>${escapeHtml(it.title)}</b><span class="s">${it.color ? `<i class="cc-dot c-${it.color}" aria-hidden="true"></i>` : ''}${escapeHtml(it.sub)}</span></div><span class="pl-when${it.late ? ' t-red' : ''}">${escapeHtml(when)}</span></div>`;
+<div class="tx"><b>${escapeHtml(it.title)}</b><span class="s">${it.color ? `<i class="cc-dot c-${it.color}" aria-hidden="true"></i>` : ''}${escapeHtml(it.sub)}</span></div>${plan}<span class="pl-when${it.late ? ' t-red' : ''}">${escapeHtml(when)}</span></div>`;
 }
 
 // ---- the screen ------------------------------------------------------------------------------
 function setPlanRange(n){ planRange = n; try{ localStorage.setItem('bda_plan_range', String(n)); }catch(e){} renderPlan(); }
 function setPlanClient(v){ planClient = v; renderPlan(); }
-function setPlanFilter(v){ planFilter = v; renderPlan(); }
+function togglePlanGroup(g){ window._planOpen = { ...(window._planOpen || {}), [g]: !(window._planOpen || {})[g] }; renderPlan(); }
 function selectPlanSprint(id){ window._planSel = window._planSel === id ? null : id; renderPlan(); }
 function closePlanPanel(){ window._planSel = null; window._planAddStep = null; window._planAddRem = null; renderPlan(); }
 function openPlanSprint(id){ closeAppModal?.(); window._planSel = id; if(currentViewName === 'plan') renderPlan(); else switchView('plan'); }
@@ -196,19 +202,15 @@ function renderPlan(){
 <b>${escapeHtml(s.title)}</b><span>${s.hours ? `${Math.round(s.hours)} h · ` : ''}${st.steps.length ? `${st.done} of ${st.steps.length} steps` : 'No steps yet'}</span></button>`;
   }).join('')).join('');
   const ghost = `<button class="pl-ghost" style="grid-row:${lanes.length + 1}" onclick="openNewSprintModal()">${icon('plus')}${planReady === false ? 'Plan needs a one-time database update' : lanes.length ? 'Plan a sprint' : 'Plan your first sprint'}</button>`;
-  // look-ahead list, grouped by week
-  const counts = Object.fromEntries(PLAN_KINDS.map(([k]) => [k, k === 'all' ? items.length : items.filter(it => planKindOf(it) === k).length]));
-  const list = items.filter(it => planFilter === 'all' || planKindOf(it) === planFilter);
-  const groups = [];
-  list.forEach(it => { const w = Math.max(0, Math.floor(daysBetween(mon, new Date(it.date + 'T12:00:00')) / 7)); (groups[w] = groups[w] || []).push(it); });
-  const gName = w => w === 0 ? 'This week' : w === 1 ? 'Next week' : `Week of ${fmtShortDate(addDays(mon, w * 7))}`;
-  const later = window._planLater;
-  const groupHtml = groups.map((g, w) => g && (w < 2 || later) ? `<div class="pl-sec pl-ws"><b>${gName(w)}</b><span class="n">${g.length}</span></div>${g.map(planItemHtml).join('')}` : '').join('');
-  const laterN = groups.reduce((n, g, w) => n + (g && w >= 2 ? g.length : 0), 0);
-  const seg = `<div class="seg pl-kinds" role="tablist" aria-label="Show">${PLAN_KINDS.map(([k, t]) => `<button class="${planFilter === k ? 'on' : ''}" role="tab" aria-selected="${planFilter === k}" onclick="setPlanFilter('${k}')">${t}${counts[k] ? ` <span class="c">${counts[k]}</span>` : ''}</button>`).join('')}</div>`;
-  const ahead = `<div class="pl-ah"><div class="pl-ah-h"><h3>Coming up</h3>${seg}</div>
-<div data-grow-key="pl-later">${groupHtml || `<p class="pl-empty">Nothing with a date in the next ${weeks} weeks${planFilter === 'all' ? '' : ' here'}.</p>`}</div>
-${laterN ? `<a class="x-lnk pl-more" href="#" data-grow="pl-later" onclick="window._planLater=!window._planLater;renderPlan();return false;">${later ? 'Show less' : `${laterN} more in later weeks`}</a>` : ''}</div>`;
+  // the look-ahead, in three lists side by side (stacked when narrow), soonest first
+  const opened = window._planOpen || {};
+  const colsHtml = PLAN_GROUPS.map(([g, name, none]) => {
+    const all = items.filter(it => it.group === g), open = opened[g] && all.length > PLAN_SHOW, list = open ? all : all.slice(0, PLAN_SHOW);
+    const more = all.length > PLAN_SHOW ? `<button class="pl-more" data-grow="pl-g-${g}" data-turn="180" aria-expanded="${!!open}" onclick="togglePlanGroup('${g}')">${open ? 'Show less' : `${all.length - PLAN_SHOW} more`}${icon('caret-down', { weight: 'bold' })}</button>` : '';
+    return `<section class="pl-col" aria-label="${name}"><div class="pl-sec pl-gh"><b>${name}</b>${all.length ? `<span class="n">${all.length}</span>` : ''}</div>
+<div class="pl-gl" data-grow-key="pl-g-${g}">${list.map(planItemHtml).join('') || `<p class="pl-empty">${none}</p>`}</div>${more}</section>`;
+  }).join('');
+  const ahead = `<div class="pl-ah"><div class="pl-ah-h"><h3>Coming up</h3><span class="pl-ah-r">Next ${weeks === 6 ? '6 weeks' : '3 months'}</span></div><div class="pl-cols">${colsHtml}</div></div>`;
   // the side: sprint reminders coming up, and what's worth planning
   const rems = items.filter(it => it.kind === 'alert').slice(0, 3);
   const remHtml = rems.length ? rems.map(it => `<div class="pl-rm${it.color ? ' c-' + it.color : ''}" role="button" tabindex="0" onclick="selectPlanSprint('${it.id}')"><span class="pl-ic">${icon('bell')}</span><div class="tx"><b>${escapeHtml(it.title)}</b><span class="s">${escapeHtml(it.sub.replace(/ · reminder$/, ''))}</span></div><span class="pl-rw">${escapeHtml(planDayLabel(it.date))}<em>${it.time ? fmtTime(atTime(new Date(it.date + 'T12:00:00'), it.time)) : ''}</em></span></div>`).join('')
@@ -404,7 +406,7 @@ async function checkPlanReminders(){
 setInterval(() => { if(typeof currentUser !== 'undefined' && currentUser) checkPlanReminders(); }, 60000);
 
 // ---- New Sprint / Edit Sprint ----------------------------------------------------------------
-let planSheet = null;   // { edit, steps[], hours, noteId }
+let planSheet = null;   // { edit, steps[], hours, noteId, taskId }
 function planDefaultStart(){ let d = dayStart(rNow()); if(rNow().getHours() >= 15) d = addDays(d, 1); while(!isPlanWorkday(d)) d = addDays(d, 1); return toDateStr(d); }
 function planAddWorkdays(ds, n){ let d = new Date(ds + 'T12:00:00'), k = 0; while(k < n){ d = addDays(d, 1); if(isPlanWorkday(d)) k++; } return toDateStr(d); }
 function planPresetReminders(start, end){
@@ -421,14 +423,25 @@ function openNewSprintModal(o){
   }
   const s = o.edit ? planSprint(o.edit) : null;
   const note = o.noteId && (typeof notes !== 'undefined' ? notes : []).find(n => n.id === o.noteId);
-  const start = s ? s.start : planDefaultStart(), end = s ? s.end : planAddWorkdays(start, 9);
-  planSheet = { edit: s ? s.id : null, steps: s ? [] : [''], hours: s ? Math.round(s.hours) : 10, noteId: o.noteId || null };
-  const clientId = s ? (s.clientId || '') : (o.clientId || (note && note.clientId) || '');
+  // planned around a task: that task becomes the sprint's last step, and the sprint ends when it's due
+  // (within two weeks; a task due later gets a two-week sprint)
+  const task = !s && o.taskId ? tasks.find(t => t.id === o.taskId) : null;
+  const start = s ? s.start : planDefaultStart();
+  let end = s ? s.end : planAddWorkdays(start, 9);
+  if(task){
+    const cap = planAddWorkdays(start, 9);
+    let due = task.dueDate && task.dueDate > start ? (task.dueDate < cap ? task.dueDate : cap) : planAddWorkdays(start, 4);
+    while(due > start && !isPlanWorkday(new Date(due + 'T12:00:00'))) due = toDateStr(addDays(new Date(due + 'T12:00:00'), -1));
+    end = due;
+  }
+  planSheet = { edit: s ? s.id : null, steps: s ? [] : [''], hours: s ? Math.round(s.hours) : 10, noteId: o.noteId || null, taskId: task ? task.id : null };
+  const clientId = s ? (s.clientId || '') : (o.clientId || (note && note.clientId) || (task && task.clientId) || '');
   const remOn = s ? new Set((s.reminders || []).filter(r => r.kind && r.kind !== 'custom').map(r => r.kind)) : new Set(['start', 'half', 'end']);
-  const noteMenu = !s ? `<span style="position:relative;margin-right:auto"><button type="button" class="btn" id="psFillBtn" onclick="psToggleNoteMenu()">${icon('sparkle')}Fill from a note</button><div class="menu" id="psNoteMenu" hidden style="bottom:34px;left:0;width:300px;max-height:260px;overflow:auto"></div></span>` : '';
+  const noteMenu = task ? `<span style="margin-right:auto"><button type="button" class="btn" id="psFillBtn" onclick="psFillFromTask()">${icon('sparkle')}Suggest Steps</button></span>`
+    : !s ? `<span style="position:relative;margin-right:auto"><button type="button" class="btn" id="psFillBtn" onclick="psToggleNoteMenu()">${icon('sparkle')}Fill from a note</button><div class="menu" id="psNoteMenu" hidden style="bottom:34px;left:0;width:300px;max-height:260px;overflow:auto"></div></span>` : '';
   openAppModal(`<h3>${s ? 'Edit Sprint' : 'New Sprint'}</h3>
 <div class="f pls">
-<label for="psTitle">Title</label><input id="psTitle" class="tf" spellcheck="true" placeholder="e.g. Brightway website refresh" value="${escapeHtml(s ? s.title : (note ? note.title || '' : ''))}">
+<label for="psTitle">Title</label><input id="psTitle" class="tf" spellcheck="true" placeholder="e.g. Brightway website refresh" value="${escapeHtml(s ? s.title : note ? note.title || '' : task ? task.title : '')}">
 <label for="psClient">Client</label><div>${sheetPop('psClient', 'Client', [['', 'No client'], ...activeClients().slice().sort((a, b) => a.name.localeCompare(b.name)).map(c => [c.id, c.name])], clientId, 'psSync()')}</div>
 <label>Dates</label><div class="pls-row">${sheetDateField('psStart', start, { from: 0, to: 60, label: 'Starts', after: 'psSync' })}<span class="pls-to">to</span>${sheetDateField('psEnd', end, { from: 0, to: 45, label: 'Ends', after: 'psSync' })}<span class="pls-h" id="psDays"></span></div>
 <label>Hours</label><div class="pls-row"><span class="pls-num"><button type="button" aria-label="Fewer hours" onclick="psHours(-1)">−</button><b id="psHours">${planSheet.hours} h</b><button type="button" aria-label="More hours" onclick="psHours(1)">+</button></span><span class="pls-h" id="psBudget"></span></div>
@@ -443,11 +456,15 @@ ${s ? '' : `<span></span><div style="display:flex;align-items:center;gap:10px;fo
   psSync();
   setTimeout(() => document.getElementById('psTitle')?.focus(), 30);
   if(note && !s) psFillFromNote(note.id);
+  if(task) psFillFromTask();
 }
 function psRenderSteps(focus){
   const el = document.getElementById('psSteps'); if(!el || !planSheet) return;
+  const task = planSheet.taskId && tasks.find(t => t.id === planSheet.taskId);
   el.innerHTML = planSheet.steps.map((t, i) => `<div class="pls-st"><span class="pl-cb"></span><input class="tf" value="${escapeHtml(t)}" placeholder="${i ? 'Another step' : 'First step, e.g. pull analytics and the top pages'}" aria-label="Step ${i + 1}" oninput="planSheet.steps[${i}]=this.value" onkeydown="psStepKey(event, ${i})">${planSheet.steps.length > 1 ? `<button type="button" class="ib" aria-label="Remove step" onclick="planSheet.steps.splice(${i},1);psRenderSteps()">${icon('x')}</button>` : ''}</div>`).join('')
-    + `<button type="button" class="pls-st pls-add" onclick="planSheet.steps.push('');psRenderSteps(${planSheet.steps.length})">${icon('plus')}<span>Add a step</span></button><p class="pls-note">Each step becomes a task for you, dated across the sprint.</p>`;
+    + `<button type="button" class="pls-st pls-add" onclick="planSheet.steps.push('');psRenderSteps(${planSheet.steps.length})">${icon('plus')}<span>Add a step</span></button>`
+    + (task ? `<div class="pls-st pls-own"><span class="pl-cb"></span><span class="pls-ot">${escapeHtml(task.title)}</span><em class="${task.dueDate && task.dueDate < toDateStr(rNow()) ? 't-red' : ''}">${task.dueDate ? 'Due ' + escapeHtml(task.dueDate === toDateStr(addDays(rNow(), -1)) ? 'yesterday' : planDayLabel(task.dueDate)) : 'This task'}</em></div>` : '')
+    + `<p class="pls-note">${task ? 'Each new step becomes a task for you, dated across the sprint. The task itself joins the sprint as it is, due date and all.' : 'Each step becomes a task for you, dated across the sprint.'}</p>`;
   if(focus != null) el.querySelectorAll('input')[focus]?.focus();
 }
 function psStepKey(e, i){
@@ -514,6 +531,36 @@ ${String(n.text || '').slice(0, 4000)}`;
   psSync();
   if(!out) showToast('info', 'Filled from the note', 'The AI didn’t answer, so the note’s own title and checklist were used.');
 }
+// A task's sprint: the AI suggests the steps that lead up to it (the task itself is the last step).
+// Without the AI, the task's own unchecked checklist is used.
+async function psFillFromTask(){
+  const ps = planSheet, t = ps && ps.taskId && tasks.find(x => x.id === ps.taskId); if(!t) return;
+  const btn = document.getElementById('psFillBtn');
+  if(btn){ btn.disabled = true; btn.innerHTML = `${icon('sparkle')}Suggesting…`; }
+  const { notes: tNotes, ck } = typeof tkSplitDesc === 'function' ? tkSplitDesc(t.description) : { notes: t.description || '', ck: [] };
+  const c = clients.find(x => x.id === t.clientId);
+  let out = null;
+  try{
+    const prompt = `Plan a short sprint of focused work for a marketing agency that ends with finishing this task. Reply with JSON only, no other text: {"goal": "...", "steps": ["...", "..."]}.
+- goal: what's done when the sprint is done, one sentence under 160 characters
+- steps: 3 to 6 steps in order that lead up to the task, each starting with a verb, under 60 characters. Don't include the task itself; it's the last step.
+
+Task: ${t.title}
+${c ? `Client: ${c.name}\n` : ''}${tNotes ? `Details:\n${String(tNotes).slice(0, 3000)}\n` : ''}${ck.length ? `Checklist:\n${ck.map(x => `- [${x.on ? 'x' : ' '}] ${x.t}`).join('\n')}` : ''}`;
+    const r = await fetch('/api/generate-draft', { method: 'POST', headers: await apiAuthHeaders(), body: JSON.stringify({ prompt, model: settings.openaiModel }) });
+    const data = await r.json();
+    const mm = String(data.text || '').match(/\{[\s\S]*\}/);
+    if(mm) out = JSON.parse(mm[0]);
+  }catch(e){ console.error('Suggest steps failed', e); }
+  if(planSheet !== ps || !document.getElementById('psTitle')) return;
+  const g = id => document.getElementById(id);
+  if(out && out.goal && !g('psGoal').value.trim()) g('psGoal').value = String(out.goal).slice(0, 2000);
+  const steps = out && Array.isArray(out.steps) ? out.steps.filter(x => typeof x === 'string' && x.trim() && x.trim().toLowerCase() !== t.title.trim().toLowerCase()).slice(0, 10)
+    : ck.filter(x => !x.on).map(x => x.t).slice(0, 10);
+  if(steps.length && !ps.steps.some(x => x.trim())){ ps.steps = steps; psRenderSteps(); }
+  if(btn){ btn.disabled = false; btn.innerHTML = `${icon('sparkle')}Suggest Steps`; }
+  if(!out && !steps.length) showToast('info', 'No steps suggested', 'The AI didn’t answer. Add the steps yourself, or try again.');
+}
 async function savePlanSprint(){
   const g = id => document.getElementById(id), ps = planSheet; if(!ps) return;
   const title = (g('psTitle').value || '').trim(), start = g('psStart').value, end = g('psEnd').value;
@@ -539,8 +586,14 @@ async function savePlanSprint(){
     if(error || !data){ restoreBtn(btn); showToast('error', 'Sprint not created', error?.message || 'Try again in a moment.'); return; }
     id = data.id;
     const sp = planRowFromDb(data), steps = ps.steps.map(x => x.trim()).filter(Boolean), days = planWorkdays(start, end);
+    if(ps.taskId){
+      const { error: e1 } = await supabaseClient.from('tasks').update({ sprint_id: id }).eq('id', ps.taskId);
+      if(e1) showToast('error', 'The task wasn’t added to the sprint', e1.message);
+    }
+    // around a task, the new steps finish the day before the task's own last day
+    const span = ps.taskId && days.length > 1 ? days.slice(0, -1) : days;
     for(let i = 0; i < steps.length; i++){
-      const due = days[Math.max(0, Math.round((i + 1) * days.length / steps.length) - 1)] || end;
+      const due = span[Math.max(0, Math.round((i + 1) * span.length / steps.length) - 1)] || end;
       const { error: e2 } = await insertTaskRow(planStepRow(sp, steps[i], due));
       if(e2){ showToast('error', 'A step wasn’t added', e2.message); break; }
     }

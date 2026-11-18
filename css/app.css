@@ -1878,3 +1878,22 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .ds-nt-more svg{width:11px;height:11px;color:var(--label-2)}
 .ds-nt-more[aria-expanded="true"] svg{transform:rotate(180deg)}
 .ds-nt-none{margin:0;font-size:14px;color:var(--label-2)}
+
+/* ---------- Plan · Coming up in three lists ---------- */
+.pl-main{container-type:inline-size}
+.pl-ah-r{font-size:12.5px;color:var(--label-2)}
+.pl-cols{display:grid;grid-template-columns:minmax(0,1fr);gap:30px 48px;margin-top:12px;align-items:start}
+@container (min-width: 880px){ .pl-cols{grid-template-columns:repeat(3,minmax(0,1fr))} }
+.pl-col{min-width:0}
+.pl-gh{margin:0 0 4px;padding-bottom:9px;border-bottom:.5px solid var(--sep)}
+.pl-gl .pl-empty{margin:10px 0 0}
+.pl-more{display:inline-flex;align-items:center;gap:5px;margin-top:6px;padding:4px 0;border:0;background:none;font:inherit;font-size:13px;font-weight:500;color:var(--label);cursor:default}
+.pl-more svg{width:11px;height:11px;color:var(--label-2)}
+.pl-more[aria-expanded="true"] svg{transform:rotate(180deg)}
+.pl-r .pl-plan{display:none;flex:0 0 auto}
+.pl-r:hover .pl-plan,.pl-r:focus-within .pl-plan{display:inline-flex}
+@media (hover:none){ .pl-r .pl-plan{display:inline-flex} }
+/* New Sprint from a task: the task closes out the steps */
+.pls-own{border-bottom:0;border-top:.5px solid var(--sep);margin-top:2px}
+.pls-ot{flex:1 1 auto;min-width:0;font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pls-own em{font-style:normal;font-size:12px;color:var(--label-2);white-space:nowrap}

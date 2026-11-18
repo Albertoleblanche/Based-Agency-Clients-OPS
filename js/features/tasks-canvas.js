@@ -208,6 +208,7 @@ function taskPanelHtml(t){
   const evHtml = ev.map(e => `<div class="tkp-a"><span class="tkp-ad">${when(e.at)}</span><span>${e.html}</span></div>`).join('');
   const more = [];
   if(t.dueDate && !linked && !done) more.push(`<button class="mi" onclick="addTaskToCalendar('${t.id}')">${icon('calendar-plus')}Add to Calendar</button>`);
+  if(amAssignee && !done && !sp && typeof openNewSprintModal === 'function') more.push(`<button class="mi" onclick="openNewSprintModal({ taskId: '${t.id}' })">${icon('route')}Plan a Sprint…</button>`);
   if(amAssigner && !done) more.push(`${more.length ? '<div class="msep"></div>' : ''}<button class="mi danger" onclick="cancelTask('${t.id}')">${icon('x')}Cancel Task…</button>`);
   if(done && hasPermission('delete_tasks')) more.push(`<div class="msep"></div><button class="mi danger" onclick="deleteTaskPermanently('${t.id}')">${icon('trash')}Delete…</button>`);
   return `<aside class="sp tkp" aria-label="${escapeHtml(t.title)}">
