@@ -419,7 +419,7 @@ document.addEventListener('keydown', function(e){
   if(!document.getElementById('view-clients')?.classList.contains('active')) return;
   if(e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
   if(document.querySelector('#appModalOverlay[style*="flex"], .cmdk-overlay[style*="flex"]')) return;
-  const rows = [...document.querySelectorAll('#clientsTbody tr.client-row')];
+  const rows = [...document.querySelectorAll('#clientsTbody .client-row')];
   if(!rows.length) return;
   const idx = rows.findIndex(r => r.dataset.id === inspectedClientId);
   if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){

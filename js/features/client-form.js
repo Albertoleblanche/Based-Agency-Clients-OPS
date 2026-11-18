@@ -300,7 +300,9 @@ async function saveClientForm(){
     sow:document.getElementById('ncSow').value.trim(),
     startDate: document.getElementById('ncStartDate').value || null,
   };
-  const customFieldValues = {};
+  // The owner chosen in the client panel isn't one of the form's fields: keep it.
+  const keptOwner = editingClientId ? ((clients.find(x=>x.id===editingClientId) || {}).customFieldValues || {}).owner : null;
+  const customFieldValues = keptOwner ? { owner: keptOwner } : {};
   (settings.customFields||[]).forEach(f=>{
     const el = document.getElementById('ncCustom_'+f.id);
     if(el) customFieldValues[f.id] = el.value.trim();

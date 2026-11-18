@@ -1,7 +1,9 @@
-// This Week (canvas option B, approved): a to-do list in plain words. "Do now" is what only you
-// can move forward, "Waiting on someone" is everything that isn't yours yet, then what went out.
-// Clicking a row opens that client's update in a panel on the right; the row's own button acts
-// without opening anything. Members see their own clients; approvers see the whole team's.
+// This Week (canvas "This Week — a long week", approved): the work grouped by what you do
+// (Review drafts, Send approved updates, Write drafts, Log this week's work…), late first, a few
+// rows each with the rest one click away, and one button per group that works through all of it.
+// What other people owe is one row per person on the right, with the week's progress and what went
+// out. Clicking a client opens its update in the panel on the right. Members see their own
+// clients; approvers see the whole team's.
 
 let weekFilter = 'all';
 function setWeekFilter(f){ weekFilter = f; renderThisWeek(); }
@@ -18,59 +20,157 @@ function weekTodo(w){
   const me = myName(), approver = canApprove(), c = w.c, d = w.draft;
   const holder = w.holder && w.holder !== 'approvers' ? w.holder : null, who = firstName(holder || w.owner || '');
   const remind = [`remindHolder('${c.id}')`, 'Remind ' + who];
-  if(w.done >= 3) return approver ? { b: 'now', what: 'Send the approved update', act: [`sendApprovedDraft('${c.id}',${jsArg(d.author)})`, 'Send'] }
-    : { b: 'wait', what: 'Approved, an approver sends it', act: null };
-  if(w.done === 2) return approver ? { b: 'now', what: d.author === me ? 'Review your draft' : `Review ${firstName(d.author)}’s draft`, act: [`openReviewDraft('${c.id}',${jsArg(d.author)})`, 'Review'] }
-    : { b: 'wait', what: 'Waiting on review', act: null };
+  if(w.done >= 3) return approver ? { b: 'now', k: 'send', what: 'Send the approved update', act: [`sendApprovedDraft('${c.id}',${jsArg(d.author)})`, 'Send'] }
+    : { b: 'wait', k: 'w-approver', what: 'Approved, an approver sends it', act: null };
+  if(w.done === 2) return approver ? { b: 'now', k: 'review', what: d.author === me ? 'Review your draft' : `Review ${firstName(d.author)}’s draft`, act: [`openReviewDraft('${c.id}',${jsArg(d.author)})`, 'Review'] }
+    : { b: 'wait', k: 'w-review', what: 'Waiting on review', act: null };
   if(d){
-    if(d.author === me) return { b: 'now', what: 'Send your draft for review', act: [`sendDraftForReview('${c.id}',${jsArg(d.author)})`, 'Send for Review'] };
-    if(approver && w.late) return { b: 'now', what: `Send ${firstName(d.author)}’s draft for review`, act: [`openReviewDraft('${c.id}',${jsArg(d.author)})`, 'Open Draft'] };
-    return { b: 'wait', what: `${firstName(d.author)} hasn’t sent the draft for review`, act: remind };
+    if(d.author === me) return { b: 'now', k: 'forreview', what: 'Send your draft for review', act: [`sendDraftForReview('${c.id}',${jsArg(d.author)})`, 'Send for Review'] };
+    if(approver && w.late) return { b: 'now', k: 'latedraft', what: `Send ${firstName(d.author)}’s draft for review`, act: [`openReviewDraft('${c.id}',${jsArg(d.author)})`, 'Open Draft'] };
+    return { b: 'wait', k: 'w-draft', what: `${firstName(d.author)} hasn’t sent the draft for review`, act: remind };
   }
   const mine = !holder || holder === me;
-  if(w.logged.length) return mine ? { b: 'now', what: 'Write this week’s draft', act: [`generateDraft('${c.id}',${jsArg(me)})`, 'Write Draft'] }
-    : { b: 'wait', what: `${who} hasn’t written the draft`, act: remind };
-  return mine ? { b: 'now', what: 'Log this week’s work', act: [`openQueueLogImprovementModal('${c.id}')`, 'Log Improvement'] }
-    : { b: 'wait', what: `${who} hasn’t logged this week’s work`, act: remind };
+  if(w.logged.length) return mine ? { b: 'now', k: 'write', what: 'Write this week’s draft', act: [`generateDraft('${c.id}',${jsArg(me)})`, 'Write Draft'] }
+    : { b: 'wait', k: 'w-write', what: `${who} hasn’t written the draft`, act: remind };
+  return mine ? { b: 'now', k: 'log', what: 'Log this week’s work', act: [`openQueueLogImprovementModal('${c.id}')`, 'Log Improvement'] }
+    : { b: 'wait', k: 'w-log', what: `${who} hasn’t logged this week’s work`, act: remind };
+}
+
+// The groups, in the order they're shown. Each has its rows' words and, where one exists, a
+// button that works through the whole group.
+const WEEK_GROUPS = [
+  { k: 'review', title: 'Review drafts', ic: 'tray', tone: 'blue', batch: n => [`startReviewQueue()`, 'Start Review', 'tray'] },
+  { k: 'send', title: 'Send approved updates', ic: 'paper-plane-tilt', tone: 'green', batch: n => [`openApprovedInReview()`, 'Send in Review', ''] },
+  { k: 'forreview', title: 'Send your drafts for review', ic: 'paper-plane-tilt', tone: 'blue', batch: n => [`sendAllForReview()`, n > 1 ? `Send All ${n} for Review` : 'Send for Review', ''] },
+  { k: 'latedraft', title: 'Late drafts not sent for review', ic: 'warning', tone: 'red', batch: null },
+  { k: 'write', title: 'Write drafts', ic: 'sparkle', tone: 'purple', batch: n => [`openGroupAndSendModal()`, n > 1 ? `Write All ${n}` : 'Write Draft', 'sparkle'] },
+  { k: 'log', title: 'Log this week’s work', ic: 'square-pen', tone: 'yellow', batch: n => [`openQueueLogImprovementModal()`, 'Log Work', 'square-pen'] },
+];
+function setWeekFind(v){
+  window._weekFind = v; renderThisWeek();
+  const el = document.getElementById('weekFind'); if(el){ el.focus(); el.setSelectionRange(v.length, v.length); }
+}
+function toggleWeekGroup(k){ window._weekOpen = Object.assign({}, window._weekOpen, { [k]: !(window._weekOpen || {})[k] }); renderThisWeek(); }
+function startReviewQueue(){ if(typeof reviewTab !== 'undefined') reviewTab = 'waiting'; window._reviewSel = null; switchView('teamqueue'); }
+function openApprovedInReview(){ if(typeof reviewTab !== 'undefined') reviewTab = 'approved'; window._reviewSel = null; switchView('teamqueue'); }
+// Every draft of yours that's written but not sent for review, sent in one go (one note to approvers).
+async function sendAllForReview(){
+  const me = myName(), list = weekVisibleClients().map(c => weekView(clientWeek(c))).filter(w => !w.sent && weekTodo(w).k === 'forreview');
+  if(!list.length) return;
+  let ok = 0;
+  for(const w of list) if(await saveDraftFor(w.c.id, w.draft.author, { readyToNotify: true })) ok++;
+  if(!ok){ showToast('error', 'Couldn’t send for review', 'Try again in a moment.'); return; }
+  const names = list.map(w => shortClientName(w.c.name));
+  const approvers = teamProfiles.filter(p => (p.role === 'admin' || p.role === 'approver') && p.id !== currentUser?.id);
+  for(const a of approvers) await sendNotification(a.id, 'draft_ready', `${ok} draft${ok === 1 ? '' : 's'} ready for review`, `${me}: ${joinNames(names)}.`, 'teamqueue', list[0].c.id);
+  showToast('success', `Sent ${ok} draft${ok === 1 ? '' : 's'} for review`, joinNames(names));
+  renderAll();
+}
+// "2 days late", "3 weeks late"; how long a draft has waited, in words.
+function lateWords(w){
+  if(!w.last && w.late) return 'No update yet';
+  const d = -w.daysLeft;
+  return d <= 0 ? w.dueText : d === 1 ? '1 day late' : d < 14 ? `${d} days late` : d < 60 ? `${Math.floor(d / 7)} weeks late` : 'Months late';
+}
+function waitWords(since){
+  if(!since) return '';
+  const m = Math.max(0, Math.round((rNow() - new Date(since)) / 60000));
+  return m < 60 ? `waiting ${Math.max(1, m)} min` : m < 1440 ? `waiting ${Math.round(m / 60)} hour${Math.round(m / 60) === 1 ? '' : 's'}` : `waiting ${Math.round(m / 1440)} day${Math.round(m / 1440) === 1 ? '' : 's'}`;
+}
+// The second part of a row: who it's with and where it stands.
+function weekRowWho(w){
+  const d = w.draft, k = w.todo.k, me = myName();
+  if(k === 'review') return `${d.author === me ? 'You' : firstName(d.author)} · ${waitWords(d.draftPendingSince)}`;
+  if(k === 'send') return `${d.author === me ? 'Your' : firstName(d.author) + '’s'} draft, approved`;
+  if(k === 'forreview') return `Your draft · ${todayPlural(w.logged.length, 'improvement')}`;
+  if(k === 'latedraft') return `${firstName(d.author)} hasn’t sent it for review`;
+  if(k === 'write') return `${todayPlural(w.logged.length, 'improvement')} logged`;
+  if(k === 'log'){ const t = (w.c.improvements || []).map(i => new Date(i.date)).filter(x => x <= rNow()).sort((a, b) => b - a)[0]; return t ? `nothing since ${fmtShortDate(t)}` : 'nothing logged yet'; }
+  return w.todo.what;
 }
 
 function renderThisWeek(){
   const root = document.getElementById('weekRoot');
   if(!root || typeof clients === 'undefined') return;
-  const me = myName();
+  const me = myName(), everyone = seesEveryone();
   const all = weekVisibleClients().map(c => weekView(clientWeek(c)));
   const mine = all.filter(w => w.owner === me || w.holder === me);
-  const everyone = seesEveryone();
-  const shown = weekFilter === 'mine' || !everyone ? mine : all;
-  const open = shown.filter(w => !w.sent).map(w => Object.assign(w, { todo: weekTodo(w) }))
+  if(weekFilter === 'mine' && !everyone) weekFilter = 'all';
+  const base = weekFilter === 'mine' || !everyone ? mine : all;
+  const find = String(window._weekFind || '').trim().toLowerCase();
+  const pass = w => (!find || w.c.name.toLowerCase().includes(find)) && (weekFilter !== 'late' || w.late);
+  const open = base.filter(w => !w.sent).map(w => Object.assign(w, { todo: weekTodo(w) }))
     .sort((a, b) => (b.late - a.late) || a.daysLeft - b.daysLeft || (b.c.importance || 0) - (a.c.importance || 0));
-  const now = open.filter(w => w.todo.b === 'now'), wait = open.filter(w => w.todo.b === 'wait');
-  const sent = shown.filter(w => w.sent).sort((a, b) => new Date(b.last || 0) - new Date(a.last || 0));
+  const nowAll = open.filter(w => w.todo.b === 'now'), waitAll = open.filter(w => w.todo.b === 'wait');
+  const now = nowAll.filter(pass), wait = waitAll.filter(pass);
+  const sent = base.filter(w => w.sent && (!find || w.c.name.toLowerCase().includes(find))).sort((a, b) => new Date(b.last || 0) - new Date(a.last || 0));
   const sel = window._weekSel ? all.find(w => w.c.id === window._weekSel) : null;
+  const lateN = open.filter(w => w.late).length;
 
-  const row = (w, primary) => {
-    const t = w.todo, when = w.late ? `<span class="t-red">${escapeHtml(overdueShort(w))}</span>` : escapeHtml(w.dueText);
-    const btn = t.act ? `<button class="btn sm${primary ? ' btn-p' : ''}" onclick="event.stopPropagation();${t.act[0]}">${escapeHtml(t.act[1])}</button>` : '<span class="tw-nobtn"></span>';
-    return `<div class="tw-row${sel && sel.c.id === w.c.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectWeekClient('${w.c.id}')" onkeydown="if(event.key==='Enter')selectWeekClient('${w.c.id}')">${monoHtml(w.c)}
-<div class="tx"><span class="cl">${escapeHtml(w.c.name)}</span><b>${escapeHtml(t.what)}</b></div><span class="when">${when}</span>${btn}</div>`;
-  };
-  const sec = (title, sub, rows) => rows ? `<div class="tw-h"><b>${title}</b><span class="n">${rows.length}</span><span class="s">${sub}</span></div>${rows.join('')}` : '';
-  const nowRows = now.map((w, i) => row(w, i === 0)), waitRows = wait.map(w => row(w, false));
-  const names = sent.map(w => shortClientName(w.c.name));
-  const doneOpen = !!window._weekShowDone;
-  const done = sent.length ? `<div class="tw-h"><b>Done this week</b><span class="n">${sent.length}</span><span class="s">Sent in the last 7 days</span></div>
-${doneOpen ? sent.map(w => `<div class="tw-row" role="button" tabindex="0" onclick="selectWeekClient('${w.c.id}')">${monoHtml(w.c)}<div class="tx"><span class="cl">${escapeHtml(w.c.name)}</span><b class="tw-sent">${escapeHtml(w.note || 'Sent')}</b></div></div>`).join('')
-    + `<a class="x-lnk tw-show" href="#" onclick="window._weekShowDone=false;renderThisWeek();return false;">Hide</a>`
-    : `<div class="tw-done">${icon('check-circle')}<span class="tw-stack">${sent.slice(0, 9).map(w => monoHtml(w.c, 'sm')).join('')}</span><span class="tw-dn">${escapeHtml(names.length > 3 ? names.slice(0, 3).join(', ') + ` and ${names.length - 3} more` : names.join(', '))}</span><a class="x-lnk" href="#" onclick="window._weekShowDone=true;renderThisWeek();return false;">Show</a></div>`}` : '';
-  const empty = !open.length && !sent.length ? `<div class="empty"><b>Nothing here</b>${weekFilter === 'mine' || !everyone ? 'None of your clients have an update this week.' : 'No clients yet.'}</div>`
-    : !open.length ? `<div class="tw-clear">${icon('check-circle')}<b>Every update is out</b><span>Nothing to do until the next ones are due.</span></div>` : '';
-  const sum = weekSummary(everyone ? weekVisibleClients() : mine.map(w => w.c));
-  const seg = [['all', 'All', all.length], ['mine', 'Mine', mine.length]].map(([k, t, n]) => `<button class="${weekFilter === k ? 'on' : ''}" role="tab" aria-selected="${weekFilter === k}" onclick="setWeekFilter('${k}')">${t} <span class="c">${n}</span></button>`).join('');
-  root.innerHTML = `<div class="spw"><div class="sp-page"><div class="tw">
-<div class="tw-top">${everyone ? `<div class="seg" role="tablist" aria-label="Show">${seg}</div>` : ''}<span class="sum"><b>${sum.sent} of ${sum.total}</b> sent in the last 7 days${sum.late ? ` · <span class="t-red">${sum.late} late</span>` : ''}</span></div>
-${empty}${sec('Do now', 'Things only you can move forward', nowRows.length ? nowRows : null)}${sec('Waiting on someone', 'Nothing for you to do yet', waitRows.length ? waitRows : null)}${done}
+  // ---- Do now, grouped by what you do --------------------------------------------------------
+  const row = w => `<div class="twl-r${sel && sel.c.id === w.c.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectWeekClient('${w.c.id}')" onkeydown="if(event.key==='Enter')selectWeekClient('${w.c.id}')">${monoHtml(w.c, 'sm')}<b>${escapeHtml(w.c.name)}</b><span class="twl-who">${escapeHtml(weekRowWho(w))}</span><span class="twl-due${w.late ? ' is-late' : ''}">${escapeHtml(w.late ? lateWords(w) : w.dueText)}</span></div>`;
+  let primaryUsed = false;
+  const groups = WEEK_GROUPS.map(g => {
+    const items = now.filter(w => w.todo.k === g.k);
+    if(!items.length) return '';
+    const late = items.filter(w => w.late).length, rest = items.length - late;
+    const dues = [...new Set(items.filter(w => !w.late).map(w => w.dueText))];
+    const sub = [late ? `<span class="t-red">${late} late</span>` : '', rest ? `${rest} ${escapeHtml(dues[0].replace(/^Due /, 'due '))}${dues.length > 1 ? ' or later' : ''}` : ''].filter(Boolean).join(' · ');
+    const openAll = !!(window._weekOpen || {})[g.k], showN = items.length <= 3 || openAll ? items.length : Math.max(2, Math.min(3, late));
+    const b = g.batch ? g.batch(items.length) : null, prim = b && !primaryUsed; if(prim) primaryUsed = true;
+    const more = items.length > showN ? `<a class="twl-more" href="#" onclick="toggleWeekGroup('${g.k}');return false;">${items.length - showN} more${icon('caret-down', { weight: 'bold' })}</a>`
+      : openAll && items.length > 3 ? `<a class="twl-more" href="#" onclick="toggleWeekGroup('${g.k}');return false;">Show less${icon('chevron-up', { weight: 'bold' })}</a>` : '';
+    return `<section class="twl-g" aria-label="${escapeHtml(g.title)}">
+<div class="twl-gh"><span class="twl-ic ${g.tone}">${icon(g.ic)}</span><div class="twl-gt"><b>${escapeHtml(g.title)} <span class="n">${items.length}</span></b><span>${sub}</span></div>${b ? `<button class="btn${prim ? ' btn-p' : ''}" onclick="${b[0]}">${b[2] ? icon(b[2]) : ''}${escapeHtml(b[1])}</button>` : ''}</div>
+${items.slice(0, showN).map(row).join('')}${more}</section>`;
+  }).join('');
+  const clear = !open.length && !sent.length && !find ? `<div class="empty"><b>Nothing here</b>${weekFilter === 'mine' || !everyone ? 'None of your clients have an update this week.' : 'No clients yet.'}</div>`
+    : !nowAll.length ? `<div class="tw-clear">${icon('check-circle')}<b>Nothing waiting on you</b><span>${waitAll.length ? 'The rest is with your team, on the right.' : 'Every update is out until the next ones are due.'}</span></div>`
+    : !now.length ? `<div class="twl-none">${weekFilter === 'late' ? 'Nothing late waiting on you.' : 'No client matches.'}</div>` : '';
+
+  // ---- the right side: progress, who owes what, what went out ---------------------------------
+  const sum = weekSummary(base.map(w => w.c)), tot = Math.max(1, sum.total);
+  const pct = n => (n / tot * 100).toFixed(1) + '%';
+  const byPerson = {};
+  wait.forEach(w => {
+    const key = w.todo.k === 'w-approver' || w.holder === 'approvers' ? 'Approvers' : (w.holder || w.owner || 'Someone');
+    (byPerson[key] = byPerson[key] || []).push(w);
+  });
+  const KIND = { 'w-log': ['with nothing logged', 'with nothing logged'], 'w-write': ['with work logged, no draft yet', 'with work logged, no draft yet'], 'w-draft': ['draft not sent for review', 'drafts not sent for review'],
+    'w-review': ['waiting on review', 'waiting on review'], 'w-approver': ['approved, waiting to be sent', 'approved, waiting to be sent'] };
+  const people = Object.entries(byPerson).sort((a, b) => b[1].length - a[1].length).map(([name, ws]) => {
+    const counts = {}; ws.forEach(w => { counts[w.todo.k] = (counts[w.todo.k] || 0) + 1; });
+    const what = Object.entries(counts).map(([k, n]) => `${n} ${(KIND[k] || ['', ''])[n === 1 ? 0 : 1]}`).join(', ');
+    const late = ws.filter(w => w.late).length;
+    const canRemind = name !== 'Approvers' && name !== me && profileByName(name);
+    return `<div class="twl-p"><div class="twl-ph"><b>${escapeHtml(name === 'Approvers' ? 'An approver' : name)}</b><span class="n">${ws.length}</span>${canRemind ? `<button class="btn" onclick="remindHolders(${escapeHtml(JSON.stringify(ws.map(w => w.c.id)))})">Remind ${escapeHtml(firstName(name))}</button>` : ''}</div>
+<span class="twl-pw">${escapeHtml(what)}${late ? ` · <span class="t-red">${late} late</span>` : ''}</span>
+<span class="twl-pc">${ws.slice(0, 4).map(w => `<a href="#" onclick="selectWeekClient('${w.c.id}');return false;">${escapeHtml(shortClientName(w.c.name))}</a>`).join(', ')}${ws.length > 4 ? ` and ${ws.length - 4} more` : ''}</span></div>`;
+  }).join('');
+  const names = sent.map(w => shortClientName(w.c.name)), doneOpen = !!window._weekShowDone;
+  const done = sent.length ? (doneOpen
+      ? `<div class="twl-dl">${sent.map(w => `<div class="twl-dr" role="button" tabindex="0" onclick="selectWeekClient('${w.c.id}')">${monoHtml(w.c, 'sm')}<span>${escapeHtml(w.c.name)}</span><span class="twl-dw">${escapeHtml(relDay(w.last))}</span></div>`).join('')}</div>`
+      : `<div class="twl-done">${icon('check-circle')}<span class="tw-stack">${sent.slice(0, 8).map(w => monoHtml(w.c, 'sm')).join('')}</span></div><p class="twl-dn">${escapeHtml(names.length > 3 ? names.slice(0, 3).join(', ') + ` and ${names.length - 3} more` : joinNames(names))}</p>`)
+    : '<p class="twl-dn">Nothing sent yet this week.</p>';
+  const seg = [['all', 'All', base.length], ['late', 'Late', lateN]].concat(everyone ? [['mine', 'Mine', mine.length]] : [])
+    .map(([k, t, n]) => `<button class="${weekFilter === k ? 'on' : ''}" role="tab" aria-selected="${weekFilter === k}" onclick="setWeekFilter('${k}')">${t} <span class="c">${n}</span></button>`).join('');
+  root.innerHTML = `<div class="spw"><div class="sp-page"><div class="twl">
+<div class="twl-main">
+<div class="twl-top"><div class="seg" role="tablist" aria-label="Show">${seg}</div><label class="twl-find">${icon('magnifying-glass')}<input id="weekFind" type="search" placeholder="Find a client" aria-label="Find a client" value="${escapeHtml(window._weekFind || '')}" oninput="setWeekFind(this.value)"></label></div>
+${now.length ? `<div class="twl-h"><b>Do now</b><span class="n">${now.length}</span><span class="s">Grouped by what you do, late first</span></div>` : ''}
+${groups}${clear}
+</div>
+<aside class="twl-side" aria-label="The week">
+<div class="twl-big"><b>${sum.sent}</b><span>of ${sum.total} sent in the last 7 days</span>${sum.late ? `<span class="twl-late">${sum.late} late</span>` : ''}</div>
+<div class="twl-prog" role="img" aria-label="${sum.sent} sent, ${nowAll.length} waiting on you, ${waitAll.length} on someone else"><i class="s" style="width:${pct(sum.sent)}"></i><i class="y" style="width:${pct(nowAll.length)}"></i><i class="o" style="width:${pct(waitAll.length)}"></i></div>
+<div class="twl-key"><span><i class="s"></i>Sent ${sum.sent}</span><span><i class="y"></i>On you ${nowAll.length}</span><span><i class="o"></i>On someone ${waitAll.length}</span></div>
+<div class="twl-ss"><b>Waiting on someone</b><span class="n">${wait.length}</span></div>
+${people || '<p class="twl-dn">Nothing is waiting on anyone else.</p>'}
+<div class="twl-ss"><b>Done this week</b><span class="n">${sent.length}</span>${sent.length ? `<a class="x-lnk" href="#" onclick="window._weekShowDone=${doneOpen ? 'false' : 'true'};renderThisWeek();return false;">${doneOpen ? 'Hide' : 'Show'}</a>` : ''}</div>
+${done}
+</aside>
 </div></div>${sel ? weekPanelHtml(sel) : ''}</div>`;
-  if(currentViewName === 'approve') setToolbar('This Week', everyone ? 'What to do next, client by client' : 'What to do next for your clients');
+  if(currentViewName === 'approve') setToolbar('This Week', 'What to do next, grouped by what you do');
 }
 // Keep the old name working: everything that redraws "the queue" redraws This Week now.
 function renderQueue(){ renderThisWeek(); }
