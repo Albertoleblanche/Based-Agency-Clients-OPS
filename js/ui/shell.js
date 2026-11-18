@@ -20,7 +20,7 @@ function setToolbar(title, sub){
 const VIEW_TOOLBAR_ACTIONS = {
   approve: () => `<button class="btn" onclick="openGroupAndSendModal()">${icon('layers')}Group &amp; Send</button>`,
   clientdetail: () => `<button class="btn" onclick="openQueueLogImprovementModal(currentDetailClientId)">${icon('plus')}Log Improvement</button>`,
-  time: () => (typeof timeToolbarTabsHtml === 'function' ? timeToolbarTabsHtml() : '') + `<button class="btn harvest-btn" onclick="toggleHarvestTimer(this)" title="Open the Harvest timer">${icon('history')}Track Time</button><button class="btn" onclick="openManualEntryModal()">${icon('plus')}Add Time</button>`,
+  time: () => (typeof timeToolbarTabsHtml === 'function' ? timeToolbarTabsHtml() : '') + `<button class="btn harvest-btn" onclick="toggleHarvestTimer(this)" title="Open the Harvest timer">${icon('timer')}Track Time</button>`,
 };
 function setToolbarActions(view){
   const el = document.getElementById('tbActions');

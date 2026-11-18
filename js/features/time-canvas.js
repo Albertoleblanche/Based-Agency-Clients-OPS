@@ -44,7 +44,9 @@ function dayLabel(dStr){
 function weeklyHoursTarget(){ return parseFloat(settings.overtimeThresholdHours) || 40; }
 
 // ================================================================ Timesheet
-let tsDays = 14;
+// As on the canvas (TimeNewDay / Week / Month): a Day, Week or Month switch with a calendar to
+// step back through earlier work. The running timer lives in the sidebar corner on every page.
+let tsView = 'day', tsAnchor = null;   // tsAnchor: a 'YYYY-MM-DD' inside the period shown
 let timerPaused = (() => { try{ return JSON.parse(localStorage.getItem('bda_timer_paused') || 'null'); }catch(e){ return null; } })();
 function savePaused(){ try{ timerPaused ? localStorage.setItem('bda_timer_paused', JSON.stringify(timerPaused)) : localStorage.removeItem('bda_timer_paused'); }catch(e){} }
 
@@ -55,23 +57,11 @@ function clockText(){
   return `${Math.floor(s / 3600)}:${String(Math.floor(s % 3600 / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 function tickTimesheetClock(){
-  const c = document.getElementById('tsClock'); if(c) c.textContent = clockText();
   const r = document.getElementById('tsRunDur'); if(r) r.textContent = hmm(runningMinutes());
+  const t = document.getElementById('tsTotal'); if(t && t.dataset.base != null) t.textContent = hmm(+t.dataset.base + runningMinutes());
 }
 function startTimerInterval(){ if(timerIntervalId) clearInterval(timerIntervalId); timerIntervalId = setInterval(updateTimerDisplay, 1000); updateTimerDisplay(); }
 
-async function startTimerFromRow(){
-  const clientId = document.getElementById('tsClient')?.value;
-  const description = (document.getElementById('tsDesc')?.value || '').trim();
-  if(!clientId){ showToast('error', 'Pick a client', "Choose the client you're working on."); document.getElementById('tsClient')?.focus(); return; }
-  if(typeof isClientPaused === 'function' && isClientPaused(clientId)){ showPausedClientWarning(clientId); return; }
-  if(timerState.running) await stopAndSaveTimer();
-  const c = clients.find(x => x.id === clientId);
-  timerState = { running: true, startedAt: Date.now(), clientId, service: c?.service || '', description, resumeEntryId: null };
-  saveTimerState(); startTimerInterval();
-  timerPaused = null; savePaused();
-  renderTimesheet();
-}
 async function pauseTimer(){
   if(!timerState.running) return;
   const snap = { clientId: timerState.clientId, service: timerState.service, description: timerState.description };
@@ -91,98 +81,156 @@ async function continueEntry(btn){
   if(timerState.running) await stopAndSaveTimer();
   timerPaused = null; savePaused();
   resumeEntryTimerFromBtn(btn);
-  renderTimesheet();
+  renderTimesheet(); renderSideTimer();
 }
 
-function tsRowHtml(e){
+// ---- periods ------------------------------------------------------------------------------
+const tsD = k => new Date(k + 'T12:00:00');
+function tsMonday(d){ return dayStart(addDays(d, -((d.getDay() + 6) % 7))); }
+function tsPeriod(view, anchor){
+  const a = tsD(anchor);
+  if(view === 'day') return { from: dayStart(a), to: dayStart(a) };
+  if(view === 'week'){ const m = tsMonday(a); return { from: m, to: addDays(m, 6) }; }
+  return { from: new Date(a.getFullYear(), a.getMonth(), 1), to: new Date(a.getFullYear(), a.getMonth() + 1, 0) };
+}
+function setTsView(v){ tsView = v; renderTimesheet(); }
+function tsGo(dir){
+  const a = tsD(tsAnchor || toDateStr(rNow()));
+  const n = tsView === 'day' ? addDays(a, dir) : tsView === 'week' ? addDays(a, 7 * dir) : new Date(a.getFullYear(), a.getMonth() + dir, 1);
+  const today = dayStart(rNow());
+  tsAnchor = toDateStr(n > today ? today : n);
+  renderTimesheet();
+}
+function tsToday(){ tsAnchor = toDateStr(rNow()); renderTimesheet(); }
+function tsOpenDay(k){ tsView = 'day'; tsAnchor = k; renderTimesheet(); }
+
+// When an entry ran, from when it was saved: the timer saves it as it stops, so the end is its
+// save time and the start is that minus its length. Entries added by hand or merged later have
+// no reliable time of day; they show their length only.
+function tsRange(e){
+  if(!e.createdAt || !(e.minutes > 0) || e.minutes > 12 * 60) return null;
+  const end = new Date(e.createdAt), start = new Date(end - e.minutes * 60000);
+  return toDateStr(start) === e.date && toDateStr(end) === e.date ? { start, end } : null;
+}
+function tsClientMono(c){ return c ? monoHtml(c, 'sm') : '<span class="mono sm" aria-hidden="true">?</span>'; }
+function tsRowHtml(e, rng){
   const c = clients.find(x => x.id === e.clientId);
   const sub = [c ? c.name : 'Client removed', e.service].filter(Boolean).map(escapeHtml).join(' · ');
-  const sync = e.harvestStatus === 'error' ? `<span class="st t-red" title="Will retry when you edit the entry">${icon('warning')}Harvest sync failed</span>`
-    : e.harvestId ? `<span class="st" title="Synced to Harvest"><span class="ic sm" style="color:var(--label-3)">${icon('check', { weight: 'bold' })}</span>Harvest</span>` : '';
-  return `<div class="row sm ts-row" role="button" tabindex="0" onclick="openTimeEntryModal('${e.id}')" onkeydown="if(event.key==='Enter')openTimeEntryModal('${e.id}')">
-<div class="tx"><span class="t" style="font-weight:400">${escapeHtml(e.description || 'No description')}</span><span class="s">${sub}</span></div>
-<div class="r">${sync}<button class="ib act" aria-label="Continue this" title="Continue this" data-resume-client="${e.clientId}" data-resume-desc="${encodeURIComponent(e.description || '')}" data-resume-entry="${e.id}" onclick="event.stopPropagation();continueEntry(this)">${icon('play')}</button><span class="dur" style="width:56px;text-align:right">${hmm(e.minutes)}</span></div></div>`;
+  const sync = e.harvestStatus === 'error' ? `<span class="tmi-sync is-err" title="Will retry when you edit the entry">${icon('warning')}Harvest sync failed</span>`
+    : e.harvestId ? `<span class="tmi-sync" title="Synced to Harvest">${icon('check', { weight: 'bold' })}Harvest</span>` : '';
+  return `<div class="tmi-r" role="button" tabindex="0" onclick="openTimeEntryModal('${e.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)openTimeEntryModal('${e.id}')">
+<span class="tmi-rng">${rng ? `${fmtTime(rng.start).replace(/ [AP]M$/, '')} – ${fmtTime(rng.end).replace(/ [AP]M$/, '')}` : ''}</span>${tsClientMono(c)}
+<div class="tx"><b>${escapeHtml(e.description || 'No description')}</b><span class="s">${sub}</span></div>
+${sync}<button class="ib tmi-cont" aria-label="Continue this" title="Continue this" data-resume-client="${e.clientId}" data-resume-desc="${encodeURIComponent(e.description || '')}" data-resume-entry="${e.id}" onclick="event.stopPropagation();continueEntry(this)">${icon('play')}</button><span class="tmi-dur">${hmm(e.minutes)}</span></div>`;
+}
+function tsRunRowHtml(){
+  const tc = clients.find(x => x.id === timerState.clientId), svc = timerState.service || tc?.service || '';
+  return `<div class="tmi-r is-run"><span class="tmi-rng">${fmtTime(new Date(timerState.startedAt)).replace(/ [AP]M$/, '')} – now</span>${tsClientMono(tc)}
+<div class="tx"><b>${escapeHtml(timerState.description || 'No description')}</b><span class="s">${[tc?.name, svc].filter(Boolean).map(escapeHtml).join(' · ')}</span></div>
+<span class="tmi-live"><i class="tmx-rec"></i>Running</span><span class="tmi-dur" id="tsRunDur">${hmm(runningMinutes())}</span></div>`;
+}
+function tsPausedRowHtml(){
+  const pc = clients.find(x => x.id === timerPaused.clientId);
+  return `<div class="tmi-r is-run"><span class="tmi-rng">Paused</span>${tsClientMono(pc)}
+<div class="tx"><b>${escapeHtml(timerPaused.description || 'No description')}</b><span class="s">${escapeHtml(pc?.name || '')}</span></div>
+<button class="btn" onclick="resumePausedTimer()">${icon('play')}Resume</button><button class="btn" onclick="finishPausedTimer()">Done</button></div>`;
+}
+// A day's rows, newest first, with any gap of half an hour or more between timed entries.
+function tsDayRows(k, list, withGaps){
+  const isToday = k === toDateStr(rNow());
+  const items = list.map(e => ({ e, r: tsRange(e) })).sort((a, b) => (b.r ? b.r.end : new Date(b.e.createdAt)) - (a.r ? a.r.end : new Date(a.e.createdAt)));
+  // A range that runs into the one after it can't be right (merged time): show it without one.
+  for(let i = 1; i < items.length; i++) if(items[i].r && items[i - 1].r && items[i].r.end - items[i - 1].r.start > 2 * 60000) items[i].r = null;
+  let out = isToday && timerState.running ? tsRunRowHtml() : (isToday && timerPaused ? tsPausedRowHtml() : '');
+  let after = isToday && timerState.running ? new Date(timerState.startedAt) : null;
+  items.forEach(({ e, r }) => {
+    if(withGaps && r && after && after - r.end >= 30 * 60000){
+      const gap = Math.round((after - r.end) / 60000);
+      out += `<div class="tmi-r tmi-gap"><span class="tmi-rng">${fmtTime(r.end).replace(/ [AP]M$/, '')} – ${fmtTime(after).replace(/ [AP]M$/, '')}</span><span class="tmi-gi" aria-hidden="true"></span><div class="tx"><b>Not tracked</b></div>
+<a class="x-lnk" href="#" onclick="openManualEntryModal('${k}', ${gap});return false;">Fill it in</a><span class="tmi-dur">${hmm(gap)}</span></div>`;
+    }
+    out += tsRowHtml(e, r);
+    after = r ? r.start : null;
+  });
+  return out;
 }
 
 function renderTimesheet(){
   const root = document.getElementById('timeRoot-timesheet');
   if(!root) return;
-  if(timeTab === 'timesheet') timeTitle(rNow().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }));
-  const now = rNow(), today = toDateStr(now), running = timerState.running;
+  const now = rNow(), today = toDateStr(now);
+  if(!tsAnchor || tsAnchor > today) tsAnchor = today;
+  if(timeTab === 'timesheet') timeTitle(now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }));
   const mine = myOwnTimeEntries();
-  const tc = running ? clients.find(x => x.id === timerState.clientId) : null;
-  const svc = running ? (timerState.service || tc?.service || '') : '';
+  const { from, to } = tsPeriod(tsView, tsAnchor);
+  const fk = toDateStr(from), tk = toDateStr(to);
+  const inP = mine.filter(e => e.date >= fk && e.date <= tk);
+  const runToday = timerState.running && today >= fk && today <= tk ? runningMinutes() : 0;
+  const totalMin = inP.reduce((s, e) => s + e.minutes, 0);
+  const isCur = today >= fk && today <= tk;
+  const fmtLong = d => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const label = tsView === 'day' ? (tsAnchor === today ? 'Today, ' + fmtLong(tsD(tsAnchor)) : tsAnchor === toDateStr(addDays(now, -1)) ? 'Yesterday, ' + fmtLong(tsD(tsAnchor)) : fmtLong(tsD(tsAnchor)))
+    : tsView === 'week' ? (() => { const hasWkend = inP.some(e => tsD(e.date).getDay() % 6 === 0), end = hasWkend ? to : addDays(from, 4);
+        return from.getMonth() === end.getMonth() ? `${from.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} – ${end.getDate()}` : `${from.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`; })()
+    : from.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const days = [...new Set(inP.map(e => e.date))];
+  const totTxt = tsView === 'day' ? `<b id="tsTotal" data-base="${totalMin}">${hmm(totalMin + runToday)}</b> ${tsAnchor === today ? 'today' : 'logged'}`
+    : tsView === 'week' ? `<b id="tsTotal" data-base="${totalMin}">${hmm(totalMin + runToday)}</b> of ${weeklyHoursTarget()} h`
+    : `<b id="tsTotal" data-base="${totalMin}">${hmm(totalMin + runToday)}</b> ${isCur ? 'so far' : 'logged'} · ${days.length} day${days.length === 1 ? '' : 's'} worked`;
+  const seg = `<div class="seg" role="tablist" aria-label="Show">${[['day', 'Day'], ['week', 'Week'], ['month', 'Month']].map(([k, t]) => `<button class="${tsView === k ? 'on' : ''}" role="tab" aria-selected="${tsView === k}" onclick="setTsView('${k}')">${t}</button>`).join('')}</div>`;
+  const head = `<div class="tmi-hd"><div class="tmi-nav"><button class="ib" aria-label="Previous ${tsView}" title="Previous ${tsView}" onclick="tsGo(-1)">${icon('caret-left')}</button><b>${escapeHtml(label)}</b><button class="ib" aria-label="Next ${tsView}" title="Next ${tsView}" onclick="tsGo(1)"${isCur ? ' disabled' : ''}>${icon('caret-right')}</button>${isCur ? '' : `<button class="btn tmi-now" onclick="tsToday()">Today</button>`}</div><span class="tmi-tot">${totTxt}</span>${seg}</div>`;
 
-  let card = '';
-  if(running){
-    card = `<section class="timer" aria-label="Running timer">
-<span class="dot red" style="width:10px;height:10px;box-shadow:0 0 0 4px var(--red-soft)"></span>
-<div class="tx"><b>${escapeHtml(timerState.description || 'No description')}</b><span>${[tc?.name, svc].filter(Boolean).map(escapeHtml).join(' · ')} · started ${fmtTime(new Date(timerState.startedAt))}</span></div>
-<span class="clock" id="tsClock">${clockText()}</span>
-<button class="btn" onclick="pauseTimer()">${icon('pause', { fill: true })}Pause</button>
-<button class="btn" style="color:var(--red)" onclick="stopTimerNow()">${icon('stop', { fill: true })}Stop</button>
-</section>`;
-  } else if(timerPaused){
-    const pc = clients.find(x => x.id === timerPaused.clientId), pe = timeEntries.find(x => x.id === timerPaused.entryId);
-    card = `<section class="timer" aria-label="Paused timer">
-<span class="dot" style="width:10px;height:10px;background:var(--label-3)"></span>
-<div class="tx"><b>${escapeHtml(timerPaused.description || 'No description')}</b><span>${escapeHtml(pc?.name || '')} · paused</span></div>
-<span class="clock" style="color:var(--label-2)">${pe ? hmm(pe.minutes) + ':00' : '0:00:00'}</span>
-<button class="btn" onclick="resumePausedTimer()">${icon('play', { fill: true })}Resume</button>
-<button class="btn" onclick="finishPausedTimer()">Done</button>
-</section>`;
+  const byDay = {}; inP.forEach(e => (byDay[e.date] = byDay[e.date] || []).push(e));
+  const add = k => `<a class="tmi-add" href="#" onclick="openManualEntryModal('${k}');return false;">${icon('plus')}Add time manually</a>`;
+  let main, side;
+  const budgets = n => {
+    const list = activeClients().filter(c => c.monthlyHourBudget > 0).map(c => ({ c, u: monthHours(c), b: c.monthlyHourBudget })).sort((a, b) => b.u / b.b - a.u / a.b).slice(0, n);
+    return list.map(({ c, u, b }) => `<div class="tmx-bud"><span>${escapeHtml(c.name)}</span><b class="${u > b ? 'over' : ''}">${Math.round(u)} / ${b} h</b><i><em class="${u > b ? 'over' : ''}" style="width:${Math.min(u / b, 1) * 100}%"></em></i></div>`).join('')
+      || '<p class="tmi-none">No hour budgets set. Add one on a client.</p>';
+  };
+  const monthSec = `<div class="tmx-sec tmi-s2"><b>Hours this month</b><a class="x-lnk" href="#" onclick="switchTimeTab('reports');return false;">Reports</a></div>${budgets(4)}`;
+  if(tsView === 'day'){
+    const rows = tsDayRows(tsAnchor, byDay[tsAnchor] || [], true);
+    main = `<div class="tmi-sec tmi-sec0"></div>${rows || `<p class="tmi-none">${tsAnchor === today ? 'Nothing tracked yet today. Start the timer in the corner, or add time.' : 'No time on this day.'}</p>`}${add(tsAnchor)}`;
+    const byC = {};
+    (byDay[tsAnchor] || []).forEach(e => { byC[e.clientId] = (byC[e.clientId] || 0) + e.minutes; });
+    if(tsAnchor === today && timerState.running) byC[timerState.clientId] = (byC[timerState.clientId] || 0) + runningMinutes();
+    const by = Object.entries(byC).sort((a, b) => b[1] - a[1]).map(([id, m]) => { const c = clients.find(x => x.id === id); return `<div class="tm1-by">${tsClientMono(c)}<span class="tm1-bn">${escapeHtml(c ? c.name : 'Client removed')}</span><b>${hmm(m)}</b></div>`; }).join('');
+    side = `<div class="tmx-sec"><b>${tsAnchor === today ? 'Today' : tsD(tsAnchor).toLocaleDateString('en-US', { weekday: 'long' })} by client</b></div>${by || '<p class="tmi-none">Nothing yet.</p>'}${monthSec}`;
+  } else if(tsView === 'week'){
+    const ks = Object.keys(byDay); if(isCur && !ks.includes(today)) ks.push(today);
+    ks.sort().reverse();
+    main = ks.map(k => { const list = byDay[k] || [], m = list.reduce((s, e) => s + e.minutes, 0) + (k === today ? runningMinutes() : 0);
+      return `<div class="tmi-sec"><b>${fmtLong(tsD(k))}</b><span>${hmm(m)}</span></div>${tsDayRows(k, list, false) || '<p class="tmi-none">Nothing tracked yet today.</p>'}`; }).join('') || '<p class="tmi-none" style="margin-top:18px">No time this week.</p>';
+    main += add(isCur ? today : fk);
+    const week = Array.from({ length: 7 }, (_, i) => { const d = addDays(from, i), k = toDateStr(d); return { d, k, m: (byDay[k] || []).reduce((s, e) => s + e.minutes, 0) + (k === today ? runningMinutes() : 0) }; })
+      .filter((x, i) => i < 5 || x.m > 0);
+    const bars = week.map(x => `<button class="tmi-wb${x.k === today ? ' on' : ''}" onclick="tsOpenDay('${x.k}')" aria-label="${fmtLong(x.d)}, ${hmLong(x.m)}"><span class="tmi-wv">${x.m ? hmm(x.m) : ''}</span><i style="height:${Math.max(Math.min(x.m / 60 / 8, 1), .02) * 100}%"></i><span>${x.d.toLocaleDateString('en-US', { weekday: 'short' })}</span></button>`).join('');
+    side = `<div class="tmx-sec"><b>${isCur ? 'This week' : 'That week'}</b><span>${hmm(totalMin + runToday)} of ${weeklyHoursTarget()} h</span></div><div class="tmi-week">${bars}</div>${monthSec}`;
+  } else {
+    const g0 = tsMonday(from), weeks = Math.ceil((daysBetween(g0, to) + 1) / 7);
+    let cells = '';
+    for(let w = 0; w < weeks; w++){
+      let tot = 0;
+      for(let d = 0; d < 7; d++){
+        const day = addDays(g0, w * 7 + d), k = toDateStr(day), inm = day.getMonth() === from.getMonth();
+        const m = inm ? (byDay[k] || []).reduce((s, e) => s + e.minutes, 0) + (k === today ? runningMinutes() : 0) : 0;
+        tot += m;
+        const cls = (d >= 5 ? ' is-wk' : '') + (inm ? '' : ' is-out') + (k === today ? ' is-today' : '') + (inm && k > today ? ' is-fut' : '');
+        const val = m ? `<b>${hmm(m)}</b><i><em style="width:${Math.min(m / 480, 1) * 100}%"></em></i>` : '';
+        cells += inm && k <= today ? `<button class="tmi-mc${cls}" onclick="tsOpenDay('${k}')" aria-label="${fmtLong(day)}${m ? ', ' + hmLong(m) : ''}"><span class="tmi-dn">${day.getDate()}</span>${val}</button>` : `<div class="tmi-mc${cls}"><span class="tmi-dn">${day.getDate()}</span>${val}</div>`;
+      }
+      cells += `<div class="tmi-mc tmi-mt">${tot ? hmm(tot) : ''}</div>`;
+    }
+    main = `<div class="tmi-mh">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => `<span class="${i >= 5 ? 'is-wk' : ''}">${d}</span>`).join('')}<span>Week</span></div><div class="tmi-mg">${cells}</div><p class="tmi-mnote">Click a day to see its entries.</p>`;
+    // Each client's whole-team hours that month against its budget, fullest first.
+    const upto = isCur ? rNow() : new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59);
+    const rowsC = activeClients().map(c => ({ c, u: monthHours(c, upto), b: c.monthlyHourBudget || 0 })).filter(x => x.u > 0 || (isCur && x.b > 0))
+      .sort((a, b) => (b.b ? b.u / b.b : 0) - (a.b ? a.u / a.b : 0) || b.u - a.u).slice(0, 8);
+    side = `<div class="tmx-sec"><b>By client ${isCur ? 'this month' : 'that month'}</b><span>vs budget</span></div>${rowsC.map(({ c, u, b }) =>
+      `<div class="tmx-bud"><span>${escapeHtml(c.name)}</span><b class="${b && u > b ? 'over' : ''}">${b ? `${Math.round(u)} / ${b} h` : `${Math.round(u)} h`}</b>${b ? `<i><em class="${u > b ? 'over' : ''}" style="width:${Math.min(u / b, 1) * 100}%"></em></i>` : ''}</div>`).join('') || '<p class="tmi-none">No time this month.</p>'}`;
   }
-  const opts = activeClients().slice().sort((a, b) => a.name.localeCompare(b.name)).map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
-  const prevClient = document.getElementById('tsClient')?.value || '', prevDesc = document.getElementById('tsDesc')?.value || '';
-  const newRow = `<div class="grp ts-new"${card ? ' style="margin-top:12px"' : ''}>
-<label class="pop pop-sel"><span id="tsClientLabel">Client</span>${icon('caret-up-down', { weight: 'bold' })}<select id="tsClient" aria-label="Client" onchange="syncPopSel(this)"><option value="">Client</option>${opts}</select></label>
-<input class="tf" id="tsDesc" placeholder="What are you working on?" aria-label="What are you working on?" onkeydown="if(event.key==='Enter')startTimerFromRow()">
-<button class="btn" onclick="startTimerFromRow()">${icon('play', { fill: true })}Start</button></div>`;
-
-  // days, newest first: today always, then any day in the window with time on it
-  const since = toDateStr(addDays(dayStart(now), -(tsDays - 1)));
-  const byDay = {};
-  mine.forEach(e => { if(e.date >= since && e.date <= today) (byDay[e.date] = byDay[e.date] || []).push(e); });
-  const days = Object.keys(byDay); if(!days.includes(today)) days.push(today);
-  days.sort().reverse();
-  const groups = days.map((d, i) => {
-    const list = (byDay[d] || []).slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    const isToday = d === today, total = list.reduce((s, e) => s + e.minutes, 0) + (isToday ? runningMinutes() : 0);
-    const runRow = isToday && running ? `<div class="row sm"><div class="tx"><span class="t" style="font-weight:400">${escapeHtml(timerState.description || 'No description')}</span><span class="s">${[tc?.name, svc].filter(Boolean).map(escapeHtml).join(' · ')}</span></div><div class="r"><span class="st" style="color:var(--red)"><span class="dot red"></span>Running</span><span class="dur" id="tsRunDur" style="width:56px;text-align:right">${hmm(runningMinutes())}</span></div></div>` : '';
-    const rows = runRow + list.map(tsRowHtml).join('');
-    return `<div class="h2"><h2>${dayLabel(d)}<span class="c">${hmLong(total)}</span></h2>${i === 0 ? `<a href="#" onclick="event.preventDefault();openManualEntryModal()">Add Time</a>` : ''}</div>
-<div class="grp">${rows || `<div class="row sm"><span class="t-2" style="font-size:14px">Nothing logged yet today.</span></div>`}</div>`;
-  }).join('');
-  const older = mine.some(e => e.date < since);
-  const more = older ? `<div style="margin-top:14px"><button class="btn btn-q" onclick="tsDays+=14;renderTimesheet()">Show Earlier</button></div>` : '';
-
-  // this week, Mon–Fri (and the weekend when there is time on it)
-  const wk0 = addDays(dayStart(now), -((now.getDay() + 6) % 7));
-  const week = Array.from({ length: 7 }, (_, i) => { const d = addDays(wk0, i), k = toDateStr(d); return { d, k, min: mine.filter(e => e.date === k).reduce((s, e) => s + e.minutes, 0) + (k === today ? runningMinutes() : 0) }; })
-    .filter((x, i) => i < 5 || x.min > 0);
-  const weekTotal = week.reduce((s, x) => s + x.min, 0);
-  const bars = week.map(x => `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:1">
-<div style="height:96px;width:100%;display:flex;align-items:flex-end;justify-content:center"><i title="${hmLong(x.min)}" style="display:block;width:26px;border-radius:5px;height:${Math.max(Math.min(x.min / 60 / 8, 1) * 96, 3).toFixed(0)}px;background:${x.k === today ? 'var(--accent-fill)' : 'var(--label-2)'};opacity:${x.min ? 1 : .35}"></i></div>
-<span style="font-size:12px;color:var(--label-2)">${x.d.toLocaleDateString('en-US', { weekday: 'short' })}</span></div>`).join('');
-
-  const budgets = activeClients().filter(c => c.monthlyHourBudget > 0).map(c => ({ c, used: monthHours(c), b: c.monthlyHourBudget }))
-    .map(x => Object.assign(x, { pct: x.used / x.b })).sort((a, b) => b.pct - a.pct).slice(0, 7);
-  const brows = budgets.map(({ c, used, b, pct }) => {
-    const col = pct > 1 ? 'var(--red)' : (pct >= .9 ? 'var(--yellow)' : 'var(--label-2)');
-    return `<div style="display:flex;flex-direction:column;gap:5px;padding:7px 0">
-<div style="display:flex;justify-content:space-between;font-size:13px"><span>${escapeHtml(c.name)}</span><span><b class="${pct > 1 ? 't-red' : ''}" style="font-weight:600">${Math.round(used)}</b><span class="t-2"> / ${b} h</span></span></div>
-<div class="bar"><i style="width:${Math.min(pct, 1) * 100}%;background:${col}"></i></div></div>`;
-  }).join('') || '<p class="t-2" style="font-size:13px;margin:0">No hour budgets set. Add one on a client.</p>';
-
-  const keepFocus = document.activeElement && document.activeElement.id;
-  root.innerHTML = `<div class="cols"><div class="col-main">${card}${newRow}${groups}${more}</div>
-<aside class="col-side">
-<section class="panel"><h3>This week<span>${hmLong(weekTotal)} of ${weeklyHoursTarget()}h</span></h3><div style="display:flex;gap:6px;margin-top:4px">${bars}</div></section>
-<section class="panel"><h3>Hour budgets<span>${now.toLocaleDateString('en-US', { month: 'long' })}</span></h3>${brows}</section>
-</aside></div>`;
-  const sel = document.getElementById('tsClient'); if(sel && prevClient){ sel.value = prevClient; syncPopSel(sel); }
-  const inp = document.getElementById('tsDesc'); if(inp) inp.value = prevDesc;
-  if(keepFocus === 'tsDesc' || keepFocus === 'tsClient') document.getElementById(keepFocus)?.focus();
+  root.innerHTML = `<div class="tmi"><div class="tmi-cols"><section aria-label="Time">${head}${main}</section><aside>${side}</aside></div></div>`;
 }
 
 // ================================================================ Reports

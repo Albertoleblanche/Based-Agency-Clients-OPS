@@ -229,7 +229,8 @@ function renderSideTimer(timeStr){
   const label = timerState.running ? (timerState.description || clients.find(x => x.id === timerState.clientId)?.name || 'Tracking time')
     : paused ? (paused.description || clients.find(x => x.id === paused.clientId)?.name || 'Paused') : '';
   const key = state + '|' + label;
-  const t = (timeStr || '0:00:00').replace(/^0(\d):/, '$1:');
+  // Called without a time (after Pause, Resume…): work it out now rather than flash 0:00:00.
+  const t = (timeStr || (timerState.running && typeof clockText === 'function' ? clockText() : '0:00:00')).replace(/^0(\d):/, '$1:');
   el.hidden = false;
   el.className = 'stm is-' + state;
   if(key === _sideTimerKey){ const b = el.querySelector('.stm-tx b'); if(b && state === 'run') b.textContent = t; return; }

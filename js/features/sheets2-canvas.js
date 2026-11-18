@@ -205,14 +205,14 @@ function openTimerModal(presetClientId){
 <div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="startTimerFromModal()">${icon('play')}Start Timer</button></div>`, 500);
   setTimeout(() => document.getElementById(cid ? 'timerModalDesc' : 'timerModalClient')?.focus(), 30);
 }
-function openManualEntryModal(){
-  const today = toDateStr(new Date());
+function openManualEntryModal(presetDate, presetMinutes){
+  const today = toDateStr(new Date()), day = presetDate && presetDate <= today ? presetDate : today;
   openAppModal(`<h3>Add Time</h3>
 <div class="f">
 <label for="manualClient">Client</label><div>${sheetPop('manualClient', 'Client', sheetClientOptions(), '', "timeClientChanged('manualClient','manualService')", { placeholder: 'Choose a client' })}</div>
 <label for="manualService">Service</label><div>${sheetPop('manualService', 'Service', timeServiceOpts(null), (settings.serviceOptions || [])[0] || '')}</div>
-<label for="manualDate">Date</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sheetDateField('manualDate', today, { past: true, from: -30, to: 0, max: today })}</div>
-<label for="manualDuration">Time</label><input id="manualDuration" class="tf" style="width:110px" placeholder="1:30" autocomplete="off">
+<label for="manualDate">Date</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sheetDateField('manualDate', day, { past: true, from: -30, to: 0, max: today })}</div>
+<label for="manualDuration">Time</label><input id="manualDuration" class="tf" style="width:110px" placeholder="1:30" autocomplete="off"${presetMinutes ? ` value="${hmm(presetMinutes)}"` : ''}>
 <label class="top" for="manualDesc">Description</label><textarea id="manualDesc" class="tf" spellcheck="true" placeholder="What did you work on?"></textarea>
 </div>
 <div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="addManualEntry()">Add Time</button></div>`, 500);
