@@ -341,8 +341,25 @@ async function openScreenFromAddress(hash){
   await opened;
 }
 
+// Leaving a screen closes its right-hand panel, so the screen is back to its list when you return.
+// It redraws once the screen is hidden, so nothing animates out of sight or on the way back.
+const PANEL_STATE = { approve: ['_weekSel', '_weekDraftEdit'], health: ['_healthSel'], focusreports: ['_focusSel'], tasks: ['_taskSel'] };
+function closePanelOnLeave(view){
+  if(view === 'clients'){
+    if(typeof inspectedClientId === 'undefined' || !inspectedClientId) return;
+    inspectedClientId = null; if(typeof renderClientsTable === 'function') renderClientsTable();
+    return;
+  }
+  const keys = PANEL_STATE[view];
+  if(!keys || !keys.some(k => window[k])) return;
+  keys.forEach(k => { window[k] = null; });
+  const redraw = { approve: 'renderThisWeek', health: 'renderHealth', focusreports: 'drawFocusReports', tasks: 'renderTasks' }[view];
+  if(typeof window[redraw] === 'function') window[redraw]();
+}
+
 async function switchView(name){
   if(name === 'claude') name = 'overview'; // the Assistant was removed; old links land on Today
+  const leaving = currentViewName;
   closeMobileNav();
   document.querySelectorAll('.nav-item').forEach(n=>{ const on = n.dataset.view===name; n.classList.toggle('active', on); n.classList.toggle('on', on); if(on) n.setAttribute('aria-current','page'); else n.removeAttribute('aria-current'); });
   if(typeof setToolbarActions === 'function') setToolbarActions(name);
@@ -353,6 +370,7 @@ async function switchView(name){
   if(typeof enterIn === 'function' && switchView._last !== name){ const pinned = viewEl.querySelector('.client-insp:not([hidden])'); pinned ? viewEl.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' }) : enterIn(viewEl, 'translateY(8px)'); }
   switchView._last = name;
   syncAddressToView(name);
+  if(leaving && leaving !== name) closePanelOnLeave(leaving);
   // The floating "open the Assistant" button is redundant (and visually
   // odd sitting on top of the tab's own dark background) while you're
   // already looking at the Assistant tab itself — hidden here rather than
