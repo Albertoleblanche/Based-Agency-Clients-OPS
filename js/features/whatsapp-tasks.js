@@ -16,6 +16,8 @@ let waWho = null;              // 'mine' | 'all' | an owner key (leads only); nu
 let waTab = 'open';            // 'open' | 'done'
 let waRealtimeStarted = false;
 let waAccessLevel = null;      // 'manage' | 'own' | 'none' from the database; null = it doesn't say (older setup)
+let waContact = null;          // leads: when the team last wrote in each group it reads (wa_last_contact); null = the database doesn't say
+let waQuietAll = false;        // Quiet clients: show them all
 let waCheckAt = null;          // when Check Now was pressed in this tab (ISO)
 let waCheckTimer = null;
 const waChat = {};             // item id -> its messages ([] when there are none) · 'loading' · 'none' (the database can't say)
@@ -24,7 +26,8 @@ const WA_OWNERS = [['albert', 'Albert'], ['stan', 'Stan'], ['eric', 'Eric'], ['c
 const WA_KIND = { request: 'Request', question: 'Question', promise: 'We promised', issue: 'Problem' };
 const WA_KIND_IC = { request: 'list-checks', question: 'circle-help', promise: 'handshake', issue: 'warning' };
 const WA_STALE_MS = 120000;    // the connector writes a heartbeat about every 30 s
-const WA_LATE_DAYS = 2;
+const WA_QUIET_DAYS = 7;       // no message or update from us in this many days: a quiet client
+const WA_QUIET_SHOWN = 4;
 
 // Who sees what (wa_access(), read with the rest in waLoadNow). Before the test-mode update the
 // database doesn't say, so the role decides.
@@ -48,12 +51,13 @@ function loadWaTasks(){
 // anyone else, so asking for them up front costs nothing.
 async function waLoadNow(){
   const safe = q => Promise.resolve(q).catch(e => ({ error: { message: e?.message || String(e) } }));
-  const [acc, tk, r, s, g] = await Promise.all([
+  const [acc, tk, r, s, g, lc] = await Promise.all([
     safe(supabaseClient.rpc('wa_access')),
     safe(supabaseClient.from('wa_tasks').select('*').order('first_seen', { ascending: true })),
     safe(supabaseClient.from('wa_runs').select('*').order('started_at', { ascending: false }).limit(20)),
     safe(supabaseClient.from('wa_settings').select('*').eq('id', 1).maybeSingle()),
     safe(supabaseClient.from('wa_groups').select('*').order('name', { ascending: true })),
+    safe(supabaseClient.rpc('wa_last_contact')),
   ]);
   waAccessLevel = !acc.error && ['manage', 'own', 'none'].includes(acc.data) ? acc.data : null;
   waLoadError = null;
@@ -66,7 +70,7 @@ async function waLoadNow(){
   }
   waTasks = tk.data || []; waReady = true;
   updateWaNav();
-  if(waCanManage()){ waRuns = r.data || []; waSettings = s.data || null; waGroups = g.data || []; }
+  if(waCanManage()){ waRuns = r.data || []; waSettings = s.data || null; waGroups = g.data || []; waContact = lc.error ? null : (lc.data || []); }
   waLoaded = true;
   updateWaNavBadge();
   waStartRealtime();
@@ -99,11 +103,24 @@ function updateWaNavBadge(){
   b.textContent = n; b.style.display = n ? 'flex' : 'none';
 }
 function waDays(t){ return Math.max(0, daysBetween(dayStart(new Date(t.first_seen)), dayStart(rNow()))); }
-function waLate(t){ return t.status === 'open' && waDays(t) >= WA_LATE_DAYS; }
+// Business days since it came in, today included: Monday's message on Tuesday is 1 (answer it today),
+// Friday's on Monday is 1 too. Clients get a first reply within 1 business day, so 2 is late.
+function waBizDays(t){
+  let d = dayStart(new Date(t.first_seen)), n = 0;
+  const end = dayStart(rNow());
+  while(d < end){ d = addDays(d, 1); const w = d.getDay(); if(w !== 0 && w !== 6) n++; }
+  return n;
+}
+function waLate(t){ return t.status === 'open' && waBizDays(t) >= 2; }
+function waDueToday(t){ return t.status === 'open' && waDays(t) > 0 && waBizDays(t) === 1; }
 function waAgeWord(t){ const d = waDays(t); return d === 0 ? 'New today' : d === 1 ? '1 day' : `${d} days`; }
+// The row's word: new today, answer today, or how long it has waited.
+function waWaitWord(t){ return waDays(t) === 0 ? 'New today' : waDueToday(t) ? 'Answer today' : waAgeWord(t); }
 // Group names without the agency's own suffix: "Brightway Electric | Marketing" → "Brightway Electric".
 function waCleanName(n){
   let s = String(n || '').trim();
+  // "CaliFirst Remodel - Based Agency Marketing - daniel" → "CaliFirst Remodel": from "Based Agency" on is ours
+  s = s.replace(/(?:\s*[|\-–—:&+×]\s*|\s+x\s+)based\s+agency\b.*$/i, '').trim();
   for(let i = 0; i < 3; i++){
     const t = s.replace(/\s*[|\-–—:]\s*(based\s+agency(\s+marketing)?|marketing)\s*$/i, '').trim();
     if(t === s) break; s = t;
@@ -290,8 +307,9 @@ function waDraw(root){
     : open.length ? `${open.length} waiting on ${whoName}` : `Nothing waiting on ${whoName}`;
   const subBits = [];
   if(waTab === 'open' && open.length){
-    if(late.length) subBits.push(`<span class="t-red">${late.length} ${late.length === 1 ? 'has' : 'have'} waited ${WA_LATE_DAYS} days or more</span>`);
-    const today = open.filter(t => waDays(t) === 0).length;
+    if(late.length) subBits.push(`<span class="t-red">${late.length} waiting over 1 business day</span>`);
+    const due = open.filter(waDueToday).length, today = open.filter(t => waDays(t) === 0).length;
+    if(due) subBits.push(`${due} to answer today`);
     if(today) subBits.push(`${today} new today`);
   }
   if(lead && conn.key === 'connected'){
@@ -337,7 +355,7 @@ function waRowHtml(t, sel, who){
   } else {
     const showWho = lead && who !== 'mine';
     const due = t.due_date ? `Due ${t.due_date === toDateStr(rNow()) ? 'today' : fmtShortDate(new Date(t.due_date + 'T12:00:00'))}` : '';
-    right = `<span class="rmi-when${waLate(t) ? ' is-late' : waDays(t) === 0 ? ' is-new' : ''}">${escapeHtml(waAgeWord(t))}</span><span class="rmi-d">${escapeHtml(showWho ? waOwnerName(t) : due)}</span>`;
+    right = `<span class="rmi-when${waLate(t) ? ' is-late' : waDays(t) === 0 ? ' is-new' : ''}">${escapeHtml(waWaitWord(t))}</span><span class="rmi-d">${escapeHtml(showWho ? waOwnerName(t) : due)}</span>`;
   }
   return `<div class="rmi-r wa-r${closed ? ' is-done' : ''}${sel && sel.id === t.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectWa('${t.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)selectWa('${t.id}')">${cb}
 <div class="tx"><b>${escapeHtml(t.title)}</b><span class="s">${kind}${quote}</span></div><div class="rmi-w">${right}</div></div>`;
@@ -383,9 +401,47 @@ function waSideHtml(who, conn){
     : `<p class="wa-lock">${icon('settings')}<span><a href="#" onclick="openSettingsTab('whatsapp');return false;">WhatsApp settings</a></span></p>`;
   return `<aside class="wa-side">
 ${open.length ? `<div class="rmi-sec"><b>Who has what</b></div><div class="wa-ppl">${people}</div>` : ''}
+${waQuietHtml()}
 <div class="rmi-sec"><b>Checks</b></div>
 <div class="wa-chk"><div class="wa-st">${st}</div><p>${escapeHtml(txt)}</p>${act}</div>
 ${lock}</aside>`;
+}
+// ---- Quiet clients -----------------------------------------------------------------------------
+// Clients whose group Radar reads where nobody from the team has written, and no update or win went
+// out, in WA_QUIET_DAYS days. Only groups it has read for that long count, so a new group isn't
+// called quiet just because Radar hasn't seen its history.
+function waContactFor(c){
+  if(!Array.isArray(waContact) || !c) return null;
+  const linked = waContact.find(r => String(r.client_id || '') === String(c.id));
+  if(linked) return linked;
+  const n = typeof winNorm === 'function' ? winNorm(c.name) : '';
+  return n ? waContact.find(r => !r.client_id && winNorm(waCleanName(r.name)) === n) || null : null;
+}
+function waQuietClients(){
+  if(!Array.isArray(waContact) || typeof activeClients !== 'function') return [];
+  const today = dayStart(rNow()), out = [];
+  activeClients().forEach(c => {
+    const r = waContactFor(c);
+    if(!r || !r.reading_since || daysBetween(dayStart(new Date(r.reading_since)), today) < WA_QUIET_DAYS) return;
+    const sent = typeof lastSentAt === 'function' ? lastSentAt(c) : null;
+    const last = Math.max(r.last_team_at ? new Date(r.last_team_at).getTime() : 0, sent ? new Date(sent).getTime() : 0);
+    const days = last ? daysBetween(dayStart(new Date(last)), today) : null;
+    if(days !== null && days < WA_QUIET_DAYS) return;
+    out.push({ c, days, owner: (c.customFieldValues && c.customFieldValues.owner) || '' });
+  });
+  return out.sort((a, b) => (b.days ?? 1e6) - (a.days ?? 1e6) || a.c.name.localeCompare(b.c.name));
+}
+function waQuietHtml(){
+  if(!Array.isArray(waContact)) return '';
+  const q = waQuietClients();
+  if(!q.length) return '';
+  const shown = waQuietAll ? q : q.slice(0, WA_QUIET_SHOWN);
+  const row = x => `<button class="wa-qc" onclick="openClientInspectorFor('${escapeHtml(String(x.c.id))}')" title="Open ${escapeHtml(x.c.name)}"><b>${escapeHtml(x.c.name)}</b><span>${escapeHtml([x.owner ? firstName(x.owner) : '', x.days === null ? 'nothing yet' : `${x.days} days`].filter(Boolean).join(' · '))}</span></button>`;
+  const more = q.length > WA_QUIET_SHOWN
+    ? `<button class="lnk-b wa-qc-more" data-grow="wa-quiet" data-turn="180" aria-expanded="${waQuietAll}" onclick="waQuietAll=!waQuietAll;renderWhatsapp()">${waQuietAll ? 'Show less' : `Show all ${q.length}`}${icon('caret-down', { weight: 'bold' })}</button>` : '';
+  return `<div class="rmi-sec"><b>Quiet clients</b><span class="n">${q.length}</span></div>
+<div class="wa-quiet" data-grow-key="wa-quiet">${shown.map(row).join('')}</div>${more}
+<p class="wa-qc-note">No message or update from us in ${WA_QUIET_DAYS} days or more.</p>`;
 }
 // Before WhatsApp is linked: three steps, each with its one thing to do.
 function waSetupHtml(){
@@ -482,20 +538,24 @@ function waPanelHtml(t){
   const c = waClient(t), g = waGroup(t);
   const linkedTask = t.task_id && typeof tasks !== 'undefined' ? tasks.find(x => String(x.id) === String(t.task_id)) : null;
   const taskBtn = t.task_id ? `<button class="btn" onclick="waOpenTask('${t.id}')">${icon('list-checks')}Open Task</button>` : `<button class="btn" onclick="waMakeTask('${t.id}')">${icon('plus')}Make a Task</button>`;
-  let eyebrow, title, sub, acts;
+  // Read top down: whose it is, what they want, the facts in one line, the agent's summary, what to do.
+  const cname = c ? c.name : waCleanName(t.client || (g || {}).name || 'Unknown client');
+  const who = c ? `<a href="#" class="wap-cl" onclick="openClientDetail('${c.id}');return false;">${escapeHtml(c.name)}</a>`
+    : `<span class="wap-cl">${escapeHtml(cname)}</span><em>not in Radar</em>`;
+  const facts = [`<span>${escapeHtml(kind)}</span>`];
+  let acts;
   if(!closed){
-    eyebrow = `<span class="sp-eb">${icon(WA_KIND_IC[t.kind] || 'list-checks', { weight: 'bold' })}${escapeHtml(kind)}${t.priority === 'high' ? ' · high priority' : ''}</span>`;
-    const age = waAgeWord(t);
-    title = `<b class="${waLate(t) ? 'is-red' : ''}">${escapeHtml(age === 'New today' ? 'New today' : `Waiting ${age}`)}</b>`;
-    sub = t.detail || `First seen ${waWhen(t.first_seen)}.`;
+    if(t.priority === 'high') facts.push('<em class="wa-hi">High priority</em>');
+    const d = waDays(t), word = d === 0 ? 'New today' : waDueToday(t) ? `Answer today · waiting ${waAgeWord(t)}` : `Waiting ${waAgeWord(t)}`;
+    facts.push(`<b class="${waLate(t) ? 'is-red' : d === 0 ? 'is-new' : ''}">${escapeHtml(word)}</b>`);
     acts = can ? `${taskBtn}<button class="btn" onclick="waDismiss('${t.id}')">Not a Task</button><button class="btn btn-p" onclick="waMarkDone('${t.id}')">${icon('check')}Mark Done</button>` : '';
   } else {
-    const word = t.status === 'dismissed' ? 'Not a task' : t.status === 'answered' ? 'Answered in the group' : 'Done';
-    eyebrow = `<span class="sp-eb${t.status === 'dismissed' ? '' : ' ok'}">${icon(t.status === 'dismissed' ? 'x' : 'check', { weight: 'bold' })}${word}</span>`;
-    title = `<b>${escapeHtml(t.status === 'answered' && t.answered_at ? `Answered ${claudeWhen(t.answered_at).toLowerCase()}` : `Closed ${t.updated_at ? claudeWhen(t.updated_at).toLowerCase() : ''}`.trim())}</b>`;
-    sub = `${kind} from ${t.client}, first seen ${waWhen(t.first_seen)}.`;
+    const word = t.status === 'dismissed' ? 'Not a task' : t.status === 'answered' && t.answered_at ? `Answered in the group ${claudeWhen(t.answered_at).toLowerCase()}`
+      : `${t.status === 'answered' ? 'Answered in the group' : 'Done'}${t.updated_at ? ' ' + claudeWhen(t.updated_at).toLowerCase() : ''}`;
+    facts.push(`<b class="${t.status === 'dismissed' ? '' : 'is-ok'}">${escapeHtml(word)}</b>`);
     acts = can ? `${t.task_id ? taskBtn : ''}<button class="btn" onclick="waReopen('${t.id}')">Reopen</button>` : '';
   }
+  const sum = t.detail || `First seen ${waWhen(t.first_seen)}.`;
   const owner = can && !closed
     ? `<label class="pop pop-sel"><span class="pl">${escapeHtml(waOwnerName(t))}</span>${icon('caret-down')}<select aria-label="Assigned to" onchange="waReassign('${t.id}', this.value)">${t.owner_key ? '' : '<option value="" selected>Unassigned</option>'}${WA_OWNERS.map(([k, n]) => `<option value="${k}"${t.owner_key === k ? ' selected' : ''}>${n}</option>`).join('')}</select></label>`
     : escapeHtml(waOwnerName(t));
@@ -506,21 +566,19 @@ function waPanelHtml(t){
   const due = can && !closed
     ? `<span class="wap-due${t.due_date && t.due_date < today ? ' tkp-late' : ''}">${sheetDateField('waDue', t.due_date || '', { none: 'Add a date', from: 0, to: 20, after: 'waDueChanged', label: 'Due date' })}</span>`
     : t.due_date ? `<span${!closed && t.due_date < today ? ' class="tkp-late"' : ''}>${escapeHtml(fmtShortDate(new Date(t.due_date + 'T12:00:00')))}</span>` : '<span class="t-3">No date</span>';
-  const client = c ? `<a href="#" class="wap-cl" onclick="openClientDetail('${c.id}');return false;">${monoHtml(c, 'sm')}${escapeHtml(c.name)}</a>`
-    : `<span>${escapeHtml(t.client)}</span><em>not in Radar</em>`;
-  const meta = `<div class="tkp-meta">
+  const gname = g ? waCleanName(g.name) : '';
+  const meta = `<div class="sp-sec"><b>Details</b></div><div class="tkp-meta wap-meta">
 <span class="tkp-k">Assigned to</span><span class="tkp-v">${owner}${lead && t.ai_owner_key && t.owner_key && t.ai_owner_key !== t.owner_key ? `<em>the agent picked ${escapeHtml((WA_OWNERS.find(o => o[0] === t.ai_owner_key) || [, t.ai_owner_key])[1])}</em>` : ''}</span>
 <span class="tkp-k">Priority</span><span class="tkp-v">${prio}</span>
 <span class="tkp-k">Due</span><span class="tkp-v">${due}</span>
-<span class="tkp-k">Client</span><span class="tkp-v">${client}</span>
+${g && waNorm(gname) !== waNorm(cname) ? `<span class="tkp-k">Group</span><span class="tkp-v"><span title="${escapeHtml(g.name)}">${escapeHtml(gname)}</span></span>` : ''}
 ${t.task_id ? `<span class="tkp-k">Task</span><span class="tkp-v"><a href="#" onclick="waOpenTask('${t.id}');return false;">${escapeHtml(linkedTask ? linkedTask.title : 'Open the task')}</a>${linkedTask && linkedTask.status === 'done' ? '<em>done</em>' : ''}</span>` : ''}
 </div>`;
-  const cname = c ? c.name : t.client, gname = g ? waCleanName(g.name) : '';
-  const where = escapeHtml(cname) + (g ? (waNorm(gname) === waNorm(cname) ? ' · from their WhatsApp group' : ` · from the ${escapeHtml(gname)} group`) : '');
   return `<aside class="sp wap" aria-label="${escapeHtml(t.title)}">
 <div class="sp-bar"><button class="ib" aria-label="Close" title="Close (Esc)" onclick="closeWaPanel()">${icon('x')}</button></div>
-<div class="wap-h">${waMono(t, 'lg')}<div class="tx"><h3>${t.priority === 'high' && !closed ? `<span class="tk-flag" title="High priority">${icon('flag', { fill: true })}</span>` : ''}${escapeHtml(t.title)}</h3><span>${where}</span></div></div>
-<div class="sp-status">${eyebrow}${title}<span class="sub">${escapeHtml(sub)}</span>${acts ? `<div class="sp-acts">${acts}</div>` : ''}</div>
+<div class="wap-top"><div class="wap-who">${who}</div><h3>${escapeHtml(t.title)}</h3><div class="wap-facts">${facts.join('<i>·</i>')}</div></div>
+<p class="wap-sum">${escapeHtml(sum)}</p>
+${acts ? `<div class="sp-acts">${acts}</div>` : ''}
 ${waChatHtml(t)}
 ${meta}
 ${can && !closed ? `<p class="wa-learn">${icon('sparkle')}<span>Changing who has it, or Not a Task, teaches the agent for its next check.</span></p>` : ''}

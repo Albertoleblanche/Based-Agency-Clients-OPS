@@ -23,6 +23,8 @@
 --   win_claim(client, author, force)  copy for WhatsApp: claim the send (refused if someone else has it,
 --                                      unless force, after the app has warned you)
 --   win_mark_sent(client, author)     Mark as Sent
+--   wa_last_contact()                 for WhatsApp leads: when the team last wrote in each group it reads
+--                                      (Quiet clients on the WhatsApp screen)
 -- and a trigger that marks a win sent when the same message shows up in its client's group.
 --
 -- Run after schema-whatsapp-tasks.sql, in Supabase -> SQL Editor. Safe to run more than once.
@@ -161,6 +163,19 @@ end $$;
 drop trigger if exists wa_messages_mark_win_sent on public.wa_messages;
 create trigger wa_messages_mark_win_sent after insert on public.wa_messages
   for each row execute function public.wa_mark_win_sent();
+
+-- ---- Quiet clients: when the team last wrote in each group Radar reads (WhatsApp leads only) ----
+-- reading_since: when Radar started reading the group, so a new group isn't called quiet too soon.
+create or replace function public.wa_last_contact()
+returns table (jid text, name text, client_id text, reading_since timestamptz, last_team_at timestamptz)
+language sql stable security definer set search_path = public as $$
+  select g.jid, g.name, g.client_id,
+         least(g.created_at, (select min(m.ts) from public.wa_messages m where m.group_jid = g.jid)),
+         (select max(m.ts) from public.wa_messages m where m.group_jid = g.jid and m.from_team)
+  from public.wa_groups g
+  where g.active and public.wa_access() = 'manage';
+$$;
+grant execute on function public.wa_last_contact() to authenticated;
 
 -- ---- live updates: the app hears when a win is marked sent --------------------------
 do $$ begin
