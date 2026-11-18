@@ -207,7 +207,7 @@ function checkDuplicateClientName(){
   if(!input || !warningEl) return;
   const name = input.value.trim().toLowerCase();
   if(!name){ warningEl.style.display = 'none'; return; }
-  const duplicate = activeClients().find(c => c.id !== editingClientId && c.name.trim().toLowerCase() === name);
+  const duplicate = liveClients().find(c => c.id !== editingClientId && c.name.trim().toLowerCase() === name);
   if(duplicate){
     warningEl.textContent = `A client named "${duplicate.name}" already exists.`;
     warningEl.style.display = 'block';
@@ -282,7 +282,7 @@ async function saveClientForm(){
   setBtnLoading(btn, 'Saving…');
   await loadAll();
   const normalizedName = name.toLowerCase();
-  const duplicate = activeClients().find(c => c.id !== editingClientId && c.name.trim().toLowerCase() === normalizedName);
+  const duplicate = liveClients().find(c => c.id !== editingClientId && c.name.trim().toLowerCase() === normalizedName);
   if(duplicate){
     restoreBtn(btn);
     showToast('error','Client already exists', `${duplicate.name} is already in the system — pick a different name, or open that client instead.`);
@@ -300,9 +300,9 @@ async function saveClientForm(){
     sow:document.getElementById('ncSow').value.trim(),
     startDate: document.getElementById('ncStartDate').value || null,
   };
-  // The owner chosen in the client panel isn't one of the form's fields: keep it.
-  const keptOwner = editingClientId ? ((clients.find(x=>x.id===editingClientId) || {}).customFieldValues || {}).owner : null;
-  const customFieldValues = keptOwner ? { owner: keptOwner } : {};
+  // What's set outside this form stays: the owner and weekly win chosen in the client panel, and
+  // a client's Harvest setup. Only the custom fields below change here.
+  const customFieldValues = editingClientId ? Object.assign({}, (clients.find(x=>x.id===editingClientId) || {}).customFieldValues || {}) : {};
   (settings.customFields||[]).forEach(f=>{
     const el = document.getElementById('ncCustom_'+f.id);
     if(el) customFieldValues[f.id] = el.value.trim();

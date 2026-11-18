@@ -132,7 +132,7 @@ function waGroupName(t){ const g = waGroup(t); return g ? g.name : ''; }
 function waNorm(s){ return String(s || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim(); }
 // The Radar client an item is about: the group's link if it has one, else the same (or a longer) name.
 function waClient(t){
-  const all = typeof activeClients === 'function' ? activeClients() : [];
+  const all = typeof liveClients === 'function' ? liveClients() : [];
   const g = waGroup(t);
   if(g && g.client_id){ const c = all.find(x => String(x.id) === String(g.client_id)); if(c) return c; }
   const n = waNorm(t.client); if(!n) return null;

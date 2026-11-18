@@ -393,7 +393,7 @@ function renderCalendarWeekView(container){
 }
 
 function populateCalendarClientSelect(selectedId){
-  return `<option value="">No related client</option>` + activeClients().sort((a,b)=>a.name.localeCompare(b.name))
+  return `<option value="">No related client</option>` + liveClients().sort((a,b)=>a.name.localeCompare(b.name))
     .map(c=>`<option value="${c.id}" ${c.id===selectedId?'selected':''}>${escapeHtml(c.name)}</option>`).join('');
 }
 

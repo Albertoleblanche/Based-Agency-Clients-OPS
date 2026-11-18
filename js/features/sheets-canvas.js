@@ -77,7 +77,7 @@ function sheetSwCk(id, on, label, extra){
   return `<button type="button" class="sw${on ? ' on' : ''}" role="switch" aria-checked="${!!on}" aria-label="${escapeHtml(label)}" onclick="sheetToggle(this);document.getElementById('${id}').checked=this.classList.contains('on')${extra ? ';' + extra : ''}"></button><input type="checkbox" id="${id}" hidden${on ? ' checked' : ''}>`;
 }
 function sheetClientOptions(extraId){
-  const list = activeClients().slice();
+  const list = liveClients().slice();
   if(extraId && !list.some(c => c.id === extraId)){ const c = clients.find(x => x.id === extraId); if(c) list.push(c); }
   return list.sort((a, b) => a.name.localeCompare(b.name)).map(c => [c.id, c.name + (c.deletedAt ? ' (deleted)' : '')]);
 }
@@ -163,7 +163,7 @@ function logSheetServices(c){
 function openQueueLogImprovementModal(presetClientId){
   logSheet = { files: [], useTimer: false, serviceTouched: false };
   const me = myName() || 'Team member';
-  const list = activeClients().slice().sort((a, b) => a.name.localeCompare(b.name));
+  const list = liveClients().slice().sort((a, b) => a.name.localeCompare(b.name));
   const fromView = typeof currentViewName !== 'undefined' && currentViewName === 'clientdetail' && typeof currentDetailClientId !== 'undefined' ? currentDetailClientId : '';
   const cid = (typeof presetClientId === 'string' && presetClientId) || fromView || (timerState.running ? timerState.clientId : '') || '';
   const c = list.find(x => x.id === cid);
@@ -430,7 +430,7 @@ function taskFormHtml(editing, presetAssigneeId, presetContext){
   return `<h3>${t ? 'Edit Task' : 'New Task'}</h3>
 <div class="f">
 <label for="taskTitleInput">Title</label><input id="taskTitleInput" class="tf" spellcheck="true" placeholder="What needs doing?" value="${escapeHtml(title)}">
-<label for="taskClientSelect">Client</label><div>${sheetPop('taskClientSelect', 'Client', [['', 'No client'], ...activeClients().slice().sort((a, b) => a.name.localeCompare(b.name)).map(c => [c.id, c.name])], clientId)}</div>
+<label for="taskClientSelect">Client</label><div>${sheetPop('taskClientSelect', 'Client', [['', 'No client'], ...liveClients().slice().sort((a, b) => a.name.localeCompare(b.name)).map(c => [c.id, c.name])], clientId)}</div>
 <label for="taskAssigneeSelect">Assignee</label><div>${sheetPop('taskAssigneeSelect', 'Assignee', people.map(p => [p.id, p.name + (p.id === currentUser.id ? ' (you)' : '')]), assignee, 'ntAssigneeChanged(this)', { lead: aName ? avHtml(aName, 'id="ntAv"') : '' })}</div>
 <label for="taskDueInput">Due</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap" id="ntDueRow">${sheetDateField('taskDueInput', due, { none: 'No date', from: 0, to: 20, min: toDateStr(new Date()), after: 'ntSyncDue', label: 'Due date' })}${sheetPop('taskTimeInput', 'Due time', taskTimeOptions(), time, '', { disabled: !due })}</div>
 <label>Priority</label><div><div class="seg" role="radiogroup" aria-label="Priority" id="ntPriority">${priSeg}</div></div>

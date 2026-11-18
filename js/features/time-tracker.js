@@ -135,7 +135,7 @@ function setupClientSearchSelect(searchId, hiddenId, dropdownId){
 
   function showMatches(term){
     const lower = (term||'').toLowerCase();
-    const ac = activeClients();
+    const ac = liveClients();
     const matches = [...ac]
       .filter(c=>c.name.toLowerCase().includes(lower))
       .sort((a,b)=>a.name.localeCompare(b.name))

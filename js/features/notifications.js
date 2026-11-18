@@ -36,6 +36,7 @@ const NOTIFICATION_TYPE_META = {
   weekly_focus_report:     { label:'The weekly focus report is ready', section:'Client Work' },
   client_danger_maxed:     { label:'A client\'s danger score hits 5/5', section:'Client Work' },
   client_danger_decreased: { label:'A client\'s danger score goes down', section:'Client Work' },
+  harvest_client:          { label:'A client is added from Harvest or archived there', section:'Client Work', visibleTo:'approver' },
   event_rsvp:              { label:'Someone RSVPs or requests a change to your event', section:'Calendar' },
   event_invited:           { label:"You're invited to a calendar event", section:'Calendar' },
   event_updated:           { label:'A calendar event you\'re on changes', section:'Calendar' },
@@ -237,6 +238,12 @@ async function handleNotifClick(id){
   if(n.target_view==='client-detail' && n.target_id){
     hidePop(document.getElementById('notifPanel'));
     openClientDetail(n.target_id);
+    return;
+  }
+  if(n.target_view==='clients' && n.target_id){
+    hidePop(document.getElementById('notifPanel'));
+    if(clients.some(c=>c.id===n.target_id && !c.deletedAt)) openClientInspectorFor(n.target_id);
+    else switchView('clients');
     return;
   }
   if(n.target_view==='weekly-focus-report'){

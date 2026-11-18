@@ -15,7 +15,15 @@ let clientsDataLoaded = false;
 // lookups by id — old time entries, notes, activity log — still resolve a
 // trashed client's name correctly. Anywhere building a list, dropdown, or
 // aggregate for active work should use this instead.
-function activeClients(){ return clients.filter(c=>!c.deletedAt); }
+//
+// A client Radar added from Harvest waits for an approver to finish its info ("Needs setup",
+// custom_field_values.harvestSetup = 'needed'). Until then it's left out of activeClients(), so
+// This Week, Health, Today, Review and the counts don't count it; liveClients() includes it, for
+// All Clients, search and the client pickers (time is still logged for it).
+function clientInSetup(c){ return !!(c && c.customFieldValues && c.customFieldValues.harvestSetup === 'needed'); }
+function activeClients(){ return clients.filter(c=>!c.deletedAt && !clientInSetup(c)); }
+function liveClients(){ return clients.filter(c=>!c.deletedAt); }
+function setupClients(){ return clients.filter(c=>!c.deletedAt && clientInSetup(c)); }
 function isClientPaused(clientId){
   const c = clients.find(x=>x.id===clientId);
   return !!(c && c.status==='Paused');

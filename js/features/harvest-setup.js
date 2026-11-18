@@ -16,7 +16,7 @@ const HV_SHOWN = 8;
 // Harvest isn't connected, the database isn't set up, or it read less than 10 minutes ago.
 function harvestSyncInBackground(){
   if(!myProfile || typeof harvestApiCall !== 'function') return;
-  harvestApiCall('sync-setup').catch(() => {});
+  harvestApiCall('sync-setup').catch(() => {}).then(() => { if(typeof hvLoadLinks === 'function') hvLoadLinks(); });
 }
 
 async function hvLoad(){
@@ -52,12 +52,20 @@ async function hvSyncNow(){
 function hvToggleClient(id){ hvOpen[id] = !hvOpen[id]; renderSettingsView(); }
 function hvToggleAll(){ hvShowAll = !hvShowAll; renderSettingsView(); }
 
-// The Radar client a Harvest client is: linked by id (step 2), else the same name.
+// The Radar client a Harvest client is: its link (step 2; it may be in Trash), else the same name.
 function hvRadarClient(hc){
-  const all = typeof activeClients === 'function' ? activeClients() : [];
-  if(hc.radar_client_id){ const c = all.find(x => String(x.id) === String(hc.radar_client_id)); if(c) return c; }
-  const n = typeof winNorm === 'function' ? winNorm(hc.name) : String(hc.name || '').toLowerCase();
-  return all.find(c => (typeof winNorm === 'function' ? winNorm(c.name) : c.name.toLowerCase()) === n) || null;
+  if(hc.radar_client_id) return clients.find(x => String(x.id) === String(hc.radar_client_id)) || null;
+  const n = winNorm(hc.name);
+  return liveClients().find(c => winNorm(c.name) === n) || null;
+}
+// Where it stands in Radar, for the Clients in Harvest list.
+function hvRadarStatus(hc){
+  const rc = hvRadarClient(hc), st = (color, text) => `<span class="st"><span class="dot ${color}"></span>${text}</span>`;
+  if(!rc) return st('hollow', 'Not in Radar yet');
+  const cfv = rc.customFieldValues || {};
+  if(rc.deletedAt) return st('hollow', cfv.harvestSetup === 'skipped' ? 'Left out of Radar' : 'In Trash');
+  if(clientInSetup(rc)) return st('yellow', 'Needs setup');
+  return st('green', `In Radar${winNorm(rc.name) !== winNorm(hc.name) ? ` as ${escapeHtml(rc.name)}` : ''}`);
 }
 function hvBudget(p){
   if(p.budget == null || !p.budget_by || p.budget_by === 'none') return '';
@@ -121,10 +129,11 @@ ${fr('Clients, projects and tasks', `${c.clients || 0} clients · ${c.projects |
   const taskName = new Map(d.tasks.map(t => [t.harvest_id, t.name]));
   const tasksOf = pid => d.taskAssignments.filter(a => a.project_harvest_id === pid && a.is_active)
     .map(a => ({ name: taskName.get(a.task_harvest_id) || 'Task', billable: a.billable })).sort((a, b) => (b.billable === true) - (a.billable === true) || a.name.localeCompare(b.name));
-  const inRadar = active.filter(hvRadarClient).length;
+  const inRadar = active.filter(hc => { const rc = hvRadarClient(hc); return rc && !rc.deletedAt && !clientInSetup(rc); }).length;
+  const waiting = active.filter(hc => { const rc = hvRadarClient(hc); return rc && !rc.deletedAt && clientInSetup(rc); }).length;
   const shown = hvShowAll ? active : active.slice(0, HV_SHOWN);
   const clientRow = hc => {
-    const ps = projOf(hc.harvest_id), rc = hvRadarClient(hc), open = !!hvOpen[hc.harvest_id];
+    const ps = projOf(hc.harvest_id), open = !!hvOpen[hc.harvest_id];
     const sub = ps.length ? ps.map(p => p.name).join(', ') : 'No active projects';
     const body = open ? `<div class="hv-ps">${ps.map(p => {
       const ts = tasksOf(p.harvest_id), b = hvBudget(p);
@@ -132,13 +141,15 @@ ${fr('Clients, projects and tasks', `${c.clients || 0} clients · ${c.projects |
 ${ts.length ? ts.map(t => `<div class="hv-t"><span>${escapeHtml(t.name)}</span><em class="${t.billable ? 'is-b' : ''}">${t.billable ? 'Billable' : 'Non-billable'}</em></div>`).join('') : '<div class="hv-t"><span class="t-3">No tasks</span></div>'}</div>`;
     }).join('') || '<p class="t-2 hv-none">Nothing to log time to yet.</p>'}</div>` : '';
     return `<div class="hv-c${open ? ' is-open' : ''}"><button class="fr hv-ch" aria-expanded="${open}" data-grow="hv-c-${hc.harvest_id}" onclick="hvToggleClient(${hc.harvest_id})">${icon('caret-right', { weight: 'bold' })}<div class="l"><b>${escapeHtml(hc.name)}</b><span>${escapeHtml(sub)}</span></div>
-${rc ? `<span class="st"><span class="dot green"></span>In Radar${winNorm(rc.name) !== winNorm(hc.name) ? ` as ${escapeHtml(rc.name)}` : ''}</span>` : '<span class="st"><span class="dot hollow"></span>Not in Radar yet</span>'}</button>
+${hvRadarStatus(hc)}</button>
 <div data-grow-key="hv-c-${hc.harvest_id}">${body}</div></div>`;
   };
   html += `<div class="hv-sec"><div class="set-h">Clients in Harvest <span class="n">${active.length}</span></div>
 <div class="form-grp hv-cl" data-grow-key="hv-clients">${shown.map(clientRow).join('') || fr('No clients yet', 'They show here after the first read.', '')}</div>
 ${active.length > HV_SHOWN ? `<button class="lnk-b hv-more" data-grow="hv-clients" data-turn="180" aria-expanded="${hvShowAll}" onclick="hvToggleAll()">${hvShowAll ? 'Show less' : `Show all ${active.length}`}${icon('caret-down', { weight: 'bold' })}</button>` : ''}
-<p class="t-2 hv-p">${inRadar} of ${active.length} are in Radar under the same name.${archived ? ` ${archived} archived in Harvest ${archived === 1 ? 'isn’t' : 'aren’t'} shown.` : ''} Adding the rest to Radar comes next.</p></div>`;
+<p class="t-2 hv-p">${s.clientsReady
+  ? `${inRadar} of ${active.length} are in Radar.${waiting ? ` ${waiting} added from Harvest ${waiting === 1 ? 'needs' : 'need'} setup: <a class="x-lnk" href="#" onclick="clientsSeg='all';switchView('clients');return false;">finish ${waiting === 1 ? 'it' : 'them'} in All Clients</a>.` : ''} Radar adds every active Harvest client and asks approvers to finish their info.`
+  : `${inRadar} of ${active.length} are in Radar under the same name. To add the rest, run <code>addendum-harvest-clients.sql</code> in Supabase → SQL Editor.`}${archived ? ` ${archived} archived in Harvest ${archived === 1 ? 'isn’t' : 'aren’t'} shown.` : ''}</p></div>`;
 
   // ---- the team, matched by email
   const people = d.users.filter(u => u.is_active).sort((a, b) => hvUserName(a).localeCompare(hvUserName(b)));

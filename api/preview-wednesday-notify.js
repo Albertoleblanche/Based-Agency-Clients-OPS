@@ -90,7 +90,7 @@ async function previewProactive(admin, callerProfile, res) {
     return;
   }
 
-  const clients = (clientsData || []).map(clientRowFromDb);
+  const clients = (clientsData || []).filter(r => !(r.custom_field_values && r.custom_field_values.harvestSetup === 'needed')).map(clientRowFromDb);
   const improvementsByClient = {};
   (impData || []).forEach(r => {
     (improvementsByClient[r.client_id] = improvementsByClient[r.client_id] || []).push(improvementRowFromDb(r));

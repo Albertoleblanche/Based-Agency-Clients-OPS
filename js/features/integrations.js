@@ -40,7 +40,7 @@ function renderSlackChannelsList(){
   if(!el) return;
   const canEdit = isAdmin();
   const query = slackChannelsSearchQuery.trim().toLowerCase();
-  const matching = activeClients()
+  const matching = liveClients()
     .filter(c => !query || c.name.toLowerCase().includes(query))
     .sort((a,b)=>a.name.localeCompare(b.name));
   const start = (slackChannelsPage - 1) * SLACK_CHANNELS_PAGE_SIZE;

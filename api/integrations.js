@@ -15,7 +15,10 @@
 //        | 'sync-entry' | 'delete-entry' | 'sync-now' | 'sync-setup' }
 //   sync-setup: reads Harvest's clients, projects, tasks, assignments and people into Radar.
 //   Anyone signed in may ask (the app does when it opens); it runs at most every 10 minutes
-//   unless an admin or approver forces it (Sync Now, a full read).
+//   unless an admin or approver forces it (Sync Now, a full read). It also keeps Radar's client
+//   list in step with Harvest's (step 2): see syncHarvestClients in lib/harvest-sync.js.
+//   link-client (admins and approvers): { clientId, targetId } — a client added from Harvest is
+//   one Radar already has; the link and anything logged on it move to that client.
 // POST /api/integrations  body: { provider: 'push', action: 'send',
 //        targetUserId, title, body, url }
 //
@@ -27,6 +30,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { syncGoogleCalendarForUser } = require('../lib/google-calendar-sync');
 const {
   syncHarvestSetup,
+  linkHarvestClient,
   validateHarvestCredentials,
   fetchHarvestProjectsAndTasks,
   syncTimeEntryToHarvest,
@@ -135,6 +139,8 @@ module.exports = async function handler(req, res) {
       const [clients, projects, tasks, people] = await Promise.all([
         countOf('harvest_clients', true), countOf('harvest_projects', true), countOf('harvest_tasks', true), countOf('harvest_users', true),
       ]);
+      // step 2 needs addendum-harvest-clients.sql
+      const { error: linkColErr } = clients === null ? { error: true } : await admin.from('harvest_clients').select('name_at_link').limit(1);
       res.status(200).json({
         connected: !!connection,
         accountId: connection?.account_id || null,
@@ -144,6 +150,7 @@ module.exports = async function handler(req, res) {
         serviceMappingCount: serviceMappingCount || 0,
         setup: {
           ready: clients !== null,                       // false until addendum-harvest-sync.sql is run
+          clientsReady: !linkColErr,                     // false until addendum-harvest-clients.sql is run
           syncedAt: connection?.setup_synced_at || null,
           fullAt: connection?.setup_full_at || null,
           error: connection?.setup_sync_error || null,
@@ -204,6 +211,15 @@ module.exports = async function handler(req, res) {
       if (!force && Date.now() - last < 10 * 60000) { res.status(200).json({ skipped: 'recent', syncedAt: connection.setup_synced_at }); return; }
       const result = await syncHarvestSetup(admin, connection, { full: force });
       res.status(200).json(result);
+      return;
+    }
+
+    if (action === 'link-client') {
+      if (!isApprover) { res.status(403).json({ error: 'Only admins and approvers link clients.' }); return; }
+      const { clientId, targetId } = req.body || {};
+      if (!clientId || !targetId || clientId === targetId) { res.status(400).json({ error: 'Pick the client it’s the same as.' }); return; }
+      const r = await linkHarvestClient(admin, String(clientId), String(targetId));
+      res.status(r.status).json(r.error ? { error: r.error } : r);
       return;
     }
 

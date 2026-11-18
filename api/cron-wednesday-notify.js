@@ -143,7 +143,7 @@ module.exports = async function handler(req, res) {
     const settings = settingsRow ? JSON.parse(settingsRow.value) : {};
     const log = appData.log || [];
 
-    const clients = (clientsData || []).map(clientRowFromDb);
+    const clients = (clientsData || []).filter(r => !(r.custom_field_values && r.custom_field_values.harvestSetup === 'needed')).map(clientRowFromDb);
     const improvementsByClient = {};
     (impData || []).forEach(r => {
       (improvementsByClient[r.client_id] = improvementsByClient[r.client_id] || []).push(improvementRowFromDb(r));

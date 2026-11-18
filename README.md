@@ -39,6 +39,9 @@ Run new `.sql` files once in Supabase → SQL Editor. The current one:
 - `addendum-harvest-sync.sql` — Radar reads Harvest's setup: clients, projects, tasks (billable
   or not), who is assigned where, and the team, matched to Radar people by email. Read only;
   no rates or costs are kept. Until it's run, Settings → Harvest says so and the rest works.
+- `addendum-harvest-clients.sql` — run after the one above. Radar's client list follows
+  Harvest's: each Harvest client stays linked to its Radar client through renames and
+  archives. Until it's run, Radar reads Harvest as before and adds no clients.
 
 ## Weekly wins
 
@@ -55,6 +58,17 @@ changed whenever someone opens Radar (at most every 10 minutes), everything each
 daily cron, and on Sync Now in Settings → Harvest, where admins and approvers see the
 connection, what was read, each client's projects and tasks, and the team matched by email.
 Use a Harvest administrator's token: it can read the whole setup and log time for everyone.
+
+Every active Harvest client is in Radar (step 2). Each read links a Harvest client to the Radar
+client with the same name (ignoring endings like "LLC"), or adds it marked **Needs setup** and
+tells admins and approvers (one note for a batch of four or more). It waits at the top of All
+Clients, out of This Week, Health, Today and the reminders, until an approver picks its owner,
+service and how it gets its weekly win (its group or an email) and presses Finish Setup. Time
+can be logged for it meanwhile. **Same as…** moves the link to a client Radar already has under
+another name, with anything logged on the added one; **Not a Radar Client** sends it to Trash
+and Harvest won't add it again. A rename in Harvest carries over while Radar still uses the old
+name; a client archived in Harvest is mentioned to approvers once, and one still waiting for
+setup just leaves.
 
 ---
 

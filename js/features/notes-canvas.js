@@ -133,7 +133,7 @@ function openNoteSheet(id, presetClientId, presetStatus){
 
 function noteClientPopHtml(cid){
   const c = clients.find(x => x.id === cid);
-  const list = activeClients().slice();
+  const list = liveClients().slice();
   if(c && !list.includes(c)) list.push(c);
   list.sort((a, b) => a.name.localeCompare(b.name));
   return `<label class="pop pop-sel${c ? '' : ' n1-need'}">${c ? monoHtml(c, 'sm') : icon('buildings')}<span class="pl">${escapeHtml(c ? c.name : 'Choose a client')}</span>${icon('caret-down')}<select id="nsClient" aria-label="Client" onchange="noteSetClient(this)">${c ? '' : '<option value="" selected disabled hidden>Choose a client</option>'}${list.map(x => `<option value="${x.id}"${x === c ? ' selected' : ''}>${escapeHtml(x.name)}${x.deletedAt ? ' (in Trash)' : ''}</option>`).join('')}</select></label>`;

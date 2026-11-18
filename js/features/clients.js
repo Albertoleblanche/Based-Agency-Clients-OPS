@@ -350,7 +350,7 @@ function renderClientInspector(){
   const el = document.getElementById('clientInspector');
   const wrap = document.getElementById('clientsSplit');
   if(!el) return;
-  const c = inspectedClientId ? activeClients().find(x=>x.id===inspectedClientId) : null;
+  const c = inspectedClientId ? liveClients().find(x=>x.id===inspectedClientId) : null;
   if(!c){ el.hidden = true; el.innerHTML = ''; wrap?.classList.remove('has-insp'); return; }
 
   // Keep anything typed into the log field across redraws.
@@ -478,8 +478,10 @@ async function deleteClient(id){
   const stillThere = clients.find(x=>x.id===id);
   if(!stillThere){ showToast('info','Already gone', `${c.name} was already removed.`); renderAll(); return; }
   const deletedAt = new Date().toISOString();
-  const ok = await updateClientRow(id, { deletedAt });
-  if(ok) stillThere.deletedAt = deletedAt;
+  // one added from Harvest and never set up stays out: Harvest won't add it again
+  const cfv = clientInSetup(stillThere) ? Object.assign({}, stillThere.customFieldValues, { harvestSetup: 'skipped' }) : null;
+  const ok = await updateClientRow(id, cfv ? { deletedAt, customFieldValues: cfv } : { deletedAt });
+  if(ok){ stillThere.deletedAt = deletedAt; if(cfv) stillThere.customFieldValues = cfv; }
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Moved client <b>${escapeHtml(c.name)}</b> to Trash.`});
   if(ok) await persistLog();
   renderAll();
@@ -520,8 +522,10 @@ async function restoreClient(id){
   await loadAll();
   const c = clients.find(x=>x.id===id);
   if(!c) return;
-  const ok = await updateClientRow(id, { deletedAt: null });
-  if(ok) delete c.deletedAt;
+  // one added from Harvest and left out comes back to finish its setup
+  const cfv = c.customFieldValues && c.customFieldValues.harvestSetup === 'skipped' ? Object.assign({}, c.customFieldValues, { harvestSetup: 'needed' }) : null;
+  const ok = await updateClientRow(id, cfv ? { deletedAt: null, customFieldValues: cfv } : { deletedAt: null });
+  if(ok){ delete c.deletedAt; if(cfv) c.customFieldValues = cfv; }
   renderAll();
   renderTrash();
   ok ? showToast('success','Client restored', `${c.name} is back on the roster.`) : showToast('error','Restore failed','Could not save — try again.');

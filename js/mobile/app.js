@@ -708,16 +708,23 @@ function mOpenClients(mode){
   mPush('Clients', () => {
     const list = activeClients().map(c => ({ c, h: clientHealth(c) })).sort((a, b) => mode === 'health' ? ({ r: 0, y: 1, g: 2 }[a.h.level] - { r: 0, y: 1, g: 2 }[b.h.level]) || a.c.name.localeCompare(b.c.name) : a.c.name.localeCompare(b.c.name));
     const vis = list.filter(x => !q || x.c.name.toLowerCase().includes(q));
+    // added from Harvest, waiting for an approver to finish their info (on a computer)
+    const su = mode === 'health' ? [] : setupClients().filter(c => !q || c.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name));
     return `<h1 class="big">${mode === 'health' ? 'Health' : 'Clients'}</h1><p class="big-sub">${list.filter(x => x.h.level === 'r').length} at risk · ${list.filter(x => x.h.level === 'y').length} to watch</p>
 <div class="isearch">${icon('magnifying-glass')}<input placeholder="Search" value="${mEsc(q)}" oninput="mClientsQ(this.value)" aria-label="Search clients"></div>
-<div class="ig" style="margin-top:14px">${vis.map(({ c, h }) => (h.level === 'g' ? mIr(monoHtml(c), mEsc(c.name), mEsc(c.service || ''), '', `mOpenClient('${c.id}')`) : mIr(monoHtml(c), mEsc(c.name), signalChips(h, 1), healthTag(h.level), `mOpenClient('${c.id}')`, { tags: true }))).join('') || '<div class="ir"><span class="t n">No clients match</span></div>'}</div>`;
+${su.length ? `${mIsh('Needs setup')}<div class="ig">${su.map(c => mIr(monoHtml(c), mEsc(c.name), 'Added from Harvest', '', `mOpenClient('${c.id}')`)).join('')}</div>${mIsh('Clients')}` : ''}
+<div class="ig"${su.length ? '' : ' style="margin-top:14px"'}>${vis.map(({ c, h }) => (h.level === 'g' ? mIr(monoHtml(c), mEsc(c.name), mEsc(c.service || ''), '', `mOpenClient('${c.id}')`) : mIr(monoHtml(c), mEsc(c.name), signalChips(h, 1), healthTag(h.level), `mOpenClient('${c.id}')`, { tags: true }))).join('') || '<div class="ir"><span class="t n">No clients match</span></div>'}</div>`;
   });
   window.mClientsQ = v => { q = v.toLowerCase(); const top = mTop(); const inp = top.el.querySelector('.isearch input'); const pos = inp.selectionStart; top.refresh(); const i2 = top.el.querySelector('.isearch input'); i2.focus(); i2.setSelectionRange(pos, pos); };
 }
 function mOpenClient(id){
   const c0 = clients.find(x => x.id === id); if(!c0) return;
   mPush(c0.name, () => {
-    const c = clients.find(x => x.id === id) || c0, w = weekView(clientWeek(c)), h = clientHealth(c);
+    const c = clients.find(x => x.id === id) || c0;
+    if(clientInSetup(c)) return `<div class="idetail" style="display:flex;gap:12px;align-items:center;margin-top:4px">${monoHtml(c, 'lg')}<div style="min-width:0"><h1 style="font-size:24px;font-weight:700;letter-spacing:-.02em;margin:0">${mEsc(c.name)}</h1><div class="ikv">Added from Harvest</div></div></div>
+${mIsh('Needs setup')}<div class="ig"><div class="ir"><span class="t n" style="white-space:normal;line-height:1.4">An approver finishes its info in All Clients on a computer: who owns it, its service and how it gets its weekly win. Then it shows here like the rest.</span></div></div>
+<div style="margin:12px 16px 0"><button class="ibtn s" onclick="mOpenDesktop()">Open the Computer Version</button></div>`;
+    const w = weekView(clientWeek(c)), h = clientHealth(c);
     const imps = (c.improvements || []).slice().sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8);
     const steps = STEP_NAMES.map((n, k) => mIr(`<span class="gl" style="color:${w.sent || k < w.done ? 'var(--green)' : w.behind === k ? (w.late ? 'var(--red)' : 'var(--yellow)') : 'var(--label-3)'}">${icon(w.sent || k < w.done ? 'check-circle' : w.behind === k ? 'warning' : 'circle')}</span>`, n, '', k === 3 ? (w.sent ? mEsc(relDay(w.last)) : `<span class="${w.late ? 't-red' : ''}">${mEsc(w.dueText)}</span>`) : '', null, { n: true })).join('');
     return `<div class="idetail" style="display:flex;gap:12px;align-items:center;margin-top:4px">${monoHtml(c, 'lg')}<div style="min-width:0"><h1 style="font-size:24px;font-weight:700;letter-spacing:-.02em;margin:0">${mEsc(c.name)}</h1><div class="ikv">${mEsc([c.service, w.owner].filter(Boolean).join(' · '))}</div></div></div>
@@ -904,7 +911,7 @@ function mOpenFromHash(hash){
 function mOpenSearch(){
   let q = '';
   mPush('Search', () => {
-    const cl = q ? activeClients().filter(c => c.name.toLowerCase().includes(q)).slice(0, 8) : [];
+    const cl = q ? liveClients().filter(c => c.name.toLowerCase().includes(q)).slice(0, 8) : [];
     const ts = q ? mVisibleTasks().filter(t => t.status !== 'done' && t.title.toLowerCase().includes(q)).slice(0, 6) : [];
     const ns = q ? notes.filter(n => (n.title || '').toLowerCase().includes(q) || (n.text || '').toLowerCase().includes(q)).slice(0, 4) : [];
     return `<div class="isearch" style="margin-top:4px">${icon('magnifying-glass')}<input id="mSearchQ" placeholder="Clients, tasks and notes" value="${mEsc(q)}" oninput="mSearchQ(this.value)" autocapitalize="none" aria-label="Search"></div>
@@ -922,7 +929,7 @@ function mRowPick(label, valueText, onclick, set){ return `<button class="ir" on
 function mSw(id, on, label){ return `<button class="ios-sw${on ? ' on' : ''}" id="${id}" role="switch" aria-checked="${!!on}" aria-label="${mEsc(label)}" onclick="this.classList.toggle('on');this.setAttribute('aria-checked',this.classList.contains('on'))"></button>`; }
 function mIsOn(id){ return !!$m(id)?.classList.contains('on'); }
 function mClientName(id){ return clients.find(c => c.id === id)?.name || ''; }
-function mPickClient(cur, cb, none){ mPick('Client', [...(none ? [['', none]] : []), ...activeClients().slice().sort((a, b) => a.name.localeCompare(b.name)).map(c => [c.id, c.name, c.service || ''])], cur, cb); }
+function mPickClient(cur, cb, none){ mPick('Client', [...(none ? [['', none]] : []), ...liveClients().slice().sort((a, b) => a.name.localeCompare(b.name)).map(c => [c.id, c.name, c.service || ''])], cur, cb); }
 function mDayPick(title, cur, from, to, none, cb){ const opts = sheetDayOptions(from, to); if(from < 0) opts.reverse(); mPick(title, [...(none ? [['', none]] : []), ...opts], cur, cb); }
 
 let mLog_ = {};

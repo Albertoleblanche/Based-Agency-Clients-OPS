@@ -56,6 +56,11 @@ function renderClientsTable(){
   if(!root || typeof clients === 'undefined') return;
   const ac = activeClients();
   const rows = ac.map(c => ({ c, h: clientHealth(c), w: weekView(clientWeek(c)), owner: clientOwner(c) }));
+  // added from Harvest, waiting for an approver to finish their info (client-setup.js)
+  const su = setupClients(), suOwner = c => (c.customFieldValues || {}).owner || '';
+  const suShown = clientsSeg !== 'all' ? [] : su.filter(c => (clientFilters.service === 'all' || c.service === clientFilters.service) && (clientsOwnerFilter === 'all' || suOwner(c) === clientsOwnerFilter)
+    && (!clientFilters.search || c.name.toLowerCase().includes(clientFilters.search) || (c.email || '').toLowerCase().includes(clientFilters.search)))
+    .sort((a, b) => String((b.customFieldValues || {}).harvestAdded || '').localeCompare(String((a.customFieldValues || {}).harvestAdded || '')) || a.name.localeCompare(b.name));
   const needs = rows.filter(r => r.h.level !== 'g'), notSent = rows.filter(r => !r.w.sent);
   let shown = clientsSeg === 'attention' ? needs : clientsSeg === 'behind' ? notSent : rows;
   shown = shown.filter(r => (clientFilters.service === 'all' || r.c.service === clientFilters.service) && (clientsOwnerFilter === 'all' || r.owner === clientsOwnerFilter)
@@ -65,8 +70,8 @@ function renderClientsTable(){
   shown.sort(clientSort.field === 'name' && clientSort.explicit ? (a, b) => dir * a.c.name.localeCompare(b.c.name)
     : (a, b) => rank[a.h.level] - rank[b.h.level] || b.h.signals.filter(s => s.l === 'r').length - a.h.signals.filter(s => s.l === 'r').length || (b.c.importance || 0) - (a.c.importance || 0) || a.c.name.localeCompare(b.c.name));
   const services = [...new Set(ac.map(c => c.service).filter(Boolean))].sort();
-  const owners = [...new Set(rows.map(r => r.owner).filter(Boolean))].sort();
-  if(inspectedClientId && !ac.some(c => c.id === inspectedClientId)) inspectedClientId = null;
+  const owners = [...new Set(rows.map(r => r.owner).concat(su.map(suOwner)).filter(Boolean))].sort();
+  if(inspectedClientId && !ac.some(c => c.id === inspectedClientId) && !su.some(c => c.id === inspectedClientId)) inspectedClientId = null;
   const row = ({ c, h, w, owner }) => {
     const sel = c.id === inspectedClientId, reason = h.level === 'g' ? '' : tableSignal(h, c);
     const [wk, wkCls, wkSub] = clientWeekCell(w), hp = h.hp, over = hp.budget && hp.used > hp.budget;
@@ -81,13 +86,15 @@ function renderClientsTable(){
   };
   const sNeeds = shown.filter(r => r.h.level !== 'g'), sOk = shown.filter(r => r.h.level === 'g');
   const group = (title, list) => list.length ? `<div class="cl-g" role="presentation"><b>${title}</b><span>${list.length}</span></div>${list.map(row).join('')}` : '';
-  const body = shown.length ? group('Needs attention', sNeeds) + group('On track', sOk)
-    : ac.length ? `<div class="cl-empty">No clients match.<a class="x-lnk" href="#" onclick="clearClientsCanvasFilters();return false;">Clear Filters</a></div>`
+  const suGroup = suShown.length ? `<div class="cl-g" role="presentation"><b>Needs setup</b><span>${suShown.length}</span></div>${suShown.map(clientSetupRowHtml).join('')}` : '';
+  const body = shown.length || suShown.length ? suGroup + group('Needs attention', sNeeds) + group('On track', sOk)
+    : ac.length || su.length ? `<div class="cl-empty">No clients match.<a class="x-lnk" href="#" onclick="clearClientsCanvasFilters();return false;">Clear Filters</a></div>`
     : emptyNoClients('Every client lives here: who owns it, its health, this week’s update and hours this month.');
-  const seg = [['all', 'All', rows.length], ['attention', 'Needs attention', needs.length], ['behind', 'Not sent yet', notSent.length]]
+  const seg = [['all', 'All', rows.length + su.length], ['attention', 'Needs attention', needs.length], ['behind', 'Not sent yet', notSent.length]]
     .map(([k, t, n]) => `<button class="${clientsSeg === k ? 'on' : ''}" role="tab" aria-selected="${clientsSeg === k}" onclick="setClientsSeg('${k}')">${t} <span class="c">${n}</span></button>`).join('');
   const sortIc = icon('caret-down', { weight: 'bold' });
   const sel = inspectedClientId ? rows.find(r => r.c.id === inspectedClientId) : null;
+  const suSel = !sel && inspectedClientId ? su.find(c => c.id === inspectedClientId) : null;
   const prev = root.querySelector('.sp-page')?.scrollTop || 0;
   root.innerHTML = `<div class="spw"><div class="sp-page"><div class="cl">
 <div class="cl-bar0"><div class="seg" role="tablist" aria-label="Show">${seg}</div><span class="cl-sp"></span>
@@ -97,11 +104,11 @@ function renderClientsTable(){
 <div class="cl-table" role="table" aria-label="Clients">
 <div class="cl-head" role="row"><button role="columnheader" class="${clientSort.field === 'name' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'name',dir:clientSort.field==='name'&&clientSort.explicit&&clientSort.dir==='asc'?'desc':'asc',explicit:true};renderClientsTable()">Client${clientSort.field === 'name' && clientSort.explicit ? sortIc : ''}</button><span role="columnheader">Owner</span><button role="columnheader" class="${clientSort.explicit ? '' : 'is-sort'}" onclick="clientSort={field:'health'};renderClientsTable()">Health${clientSort.explicit ? '' : sortIc}</button><span role="columnheader">This week</span><span role="columnheader">Last 8 weeks</span><span role="columnheader" class="r">Hours this month</span></div>
 <div id="clientsTbody" role="rowgroup">${body}</div></div>
-</div></div>${sel ? clientPanelHtml(sel) : ''}</div>`;
+</div></div>${sel ? clientPanelHtml(sel) : suSel ? clientSetupPanelHtml(suSel) : ''}</div>`;
   const sp = root.querySelector('.sp-page'); if(sp) sp.scrollTop = prev;
   if(currentViewName === 'clients'){
     const used = rows.reduce((a, r) => a + r.h.hp.used, 0), budget = rows.reduce((a, r) => a + (r.h.hp.budget || 0), 0);
-    setToolbar(null, `${ac.length} client${ac.length === 1 ? '' : 's'} · ${needs.length} need attention${budget ? ` · ${Math.round(used)} of ${Math.round(budget)} h this month` : ''}`);
+    setToolbar(null, `${ac.length} client${ac.length === 1 ? '' : 's'} · ${needs.length} need attention${su.length ? ` · ${su.length} need setup` : ''}${budget ? ` · ${Math.round(used)} of ${Math.round(budget)} h this month` : ''}`);
   }
   const old = document.getElementById('clientInspector'); if(old){ old.hidden = true; old.innerHTML = ''; }
 }

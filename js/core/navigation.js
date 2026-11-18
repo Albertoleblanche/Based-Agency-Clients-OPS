@@ -183,7 +183,7 @@ function getCommandPaletteIndex(query){
   if(!q) return { pages: pages.slice(0,6), clients: [] };
 
   const matchedPages = pages.filter(p=>p.title.toLowerCase().includes(q));
-  const matchedClients = (typeof clients!=='undefined' ? activeClients() : [])
+  const matchedClients = (typeof clients!=='undefined' ? liveClients() : [])
     .filter(c=> c.name.toLowerCase().includes(q) || (c.service||'').toLowerCase().includes(q))
     .slice(0, 8)
     .map(c=>({ type:'client', id:c.id, title:c.name, sub:c.service }));
