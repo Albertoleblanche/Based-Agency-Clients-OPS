@@ -230,15 +230,17 @@ async function saveQueueLogImprovement(another){
   const dateStr = g('liDate')?.value || toDateStr(new Date());
   const include = sheetIsOn('liInclude');
   const author = myName() || 'Team member';
-  const files = logSheet.files.slice(), useTimer = logSheet.useTimer;
+  const files = logSheet.files.slice(), useTimer = logSheet.useTimer, fromNote = logSheet.fromNote || null;
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
   await loadAll();
   const c = clients.find(x => x.id === clientId);
   if(!c){ restoreBtn(btn); showToast('error', 'Client not found', 'This client may have been removed by someone else.'); return; }
   const when = dateStr === toDateStr(new Date()) ? new Date() : new Date(dateStr + 'T12:00:00');
-  const imp = await insertImprovementFull(clientId, { author, text, includeInEmail: include, source: 'manual', date: when.toISOString(), service });
+  const imp = await insertImprovementFull(clientId, { author, text, includeInEmail: include, source: fromNote ? 'note' : 'manual', date: when.toISOString(), service });
   if(!imp){ restoreBtn(btn); showToast('error', 'Save failed', 'Could not save this improvement. Try again.'); return; }
+  // Logged from a note (Notes → Log as Improvement): that note is now done.
+  if(fromNote){ logSheet.fromNote = null; if(typeof noteMarkLogged === 'function') await noteMarkLogged(fromNote); }
   // Work for the email changes what the writer's draft should say; internal work doesn't.
   if(include){ const inv = invalidateStaleDraft(c, author); if(inv) await saveDraftFor(clientId, author, { draftStatus: 'none', draft: '' }); }
   let timeOk = true;

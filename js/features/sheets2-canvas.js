@@ -76,26 +76,7 @@ function openReminderDetailModal(id){
   sheetFocusPrimary();
 }
 
-// ---- Notes ----------------------------------------------------------------------------------
-function openNoteModal(noteId, presetClientId, presetStatus){
-  const editing = noteId ? notes.find(n => n.id === noteId) : null;
-  if(!activeClients().length && !editing){ showToast('error', 'Add a client first', 'Notes belong to a client. Add one in All Clients.'); return; }
-  const status = editing ? editing.status : (presetStatus || 'idea');
-  const cid = editing ? editing.clientId : (presetClientId || (typeof currentViewName !== 'undefined' && currentViewName === 'clientdetail' ? currentDetailClientId : '') || '');
-  openAppModal(`<h3>${editing ? 'Edit Note' : 'New Note'}</h3>
-<div class="f">
-<label for="noteTitleInput">Title</label><input id="noteTitleInput" class="tf" placeholder="A short title" value="${editing && editing.title ? escapeHtml(editing.title) : ''}">
-<label class="top" for="noteTextInput">Note</label><textarea id="noteTextInput" class="tf" style="height:110px" spellcheck="true" placeholder="An idea, a plan, something to try for this client">${editing ? escapeHtml(editing.text || '') : ''}</textarea>
-<label for="noteClientSelect">Client</label><div>${sheetPop('noteClientSelect', 'Client', sheetClientOptions(cid), cid, '', { placeholder: 'Choose a client' })}</div>
-<label for="noteStatusSelect">Status</label><div>${sheetPop('noteStatusSelect', 'Status', [['idea', 'Idea'], ['planned', 'Planned'], ['in-progress', 'In progress'], ['done', 'Done']], status)}</div>
-<label for="noteLinkInput">Link</label><input id="noteLinkInput" class="tf" type="url" placeholder="https://" value="${editing && editing.link ? escapeHtml(editing.link) : ''}">
-${editing ? '' : `<label for="noteFollowUpInput">Follow up</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sheetDateField('noteFollowUpInput', '', { none: 'No date', from: 0, to: 30, min: toDateStr(new Date()), after: 'noteSyncFollowUp' })}</div>
-<span></span><div class="sw-line off" id="noteCalRow">${sheetSwCk('noteAddToCalendarInput', false, 'Add to my calendar')}Add to my calendar</div>`}
-</div>
-<div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="saveNote(${editing ? `'${editing.id}'` : 'null'})">${editing ? 'Save' : 'Create Note'}</button></div>`, 520);
-  setTimeout(() => document.getElementById('noteTitleInput')?.focus(), 30);
-}
-function noteSyncFollowUp(v){ document.getElementById('noteCalRow')?.classList.toggle('off', !v); }
+// ---- Notes: see notes-canvas.js (the note sheet) ------------------------------------------
 
 // ---- Events ---------------------------------------------------------------------------------
 const EVENT_TYPE_DOT = { meeting: 'blue', deadline: 'red', reminder: 'yellow', other: 'hollow' };

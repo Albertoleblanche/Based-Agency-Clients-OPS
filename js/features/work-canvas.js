@@ -1,4 +1,4 @@
-// Tasks, Reminders and Notes, as on their canvas boards.
+// Tasks and Reminders, as on their canvas boards.
 
 // ---- Tasks: columns (or a list), Everyone / Mine, by client -------------------------------
 let tasksScope = 'everyone', tasksClient = 'all', tasksLayout = (localStorage.getItem('bda_tasks_layout') || 'columns');
@@ -99,68 +99,4 @@ function renderReminders(){
   if(currentViewName === 'reminders') setToolbar(null, 'Client follow-ups');
 }
 
-// ---- Notes: like Mail — the list on the left, your private note on the right -------------
-let notesClient = 'all', notesScope = 'all';
-function setNotesFilter(k, v){ if(k === 'client') notesClient = v; else notesScope = v; renderNotes(); }
-function selectNote(id){ window._noteSel = id; renderNotes(); }
-function noteBodyHtml(text){
-  return String(text || '').split('\n').map(l => {
-    const m = l.match(/^\s*[-*]\s*\[( |x|X)\]\s*(.*)$/);
-    if(m) return `<div class="ck-row${m[1].trim() ? ' done' : ''}"><span class="cb${m[1].trim() ? ' done' : ''}">${m[1].trim() ? icon('check', { weight: 'bold' }) : ''}</span><span>${escapeHtml(m[2])}</span></div>`;
-    return l.trim() ? `<p>${escapeHtml(l)}</p>` : '';
-  }).join('');
-}
-let _noteSaveT = null;
-function noteAutosave(id){
-  clearTimeout(_noteSaveT);
-  _noteSaveT = setTimeout(async () => {
-    const t = document.getElementById('noteTitleInput'), b = document.getElementById('noteBodyInput');
-    if(!t || !b) return;
-    const n = notes.find(x => x.id === id); if(!n) return;
-    n.title = t.value; n.text = b.value; n.updatedAt = new Date().toISOString();
-    const { error } = await supabaseClient.from('notes').update({ title: t.value, text: b.value, updated_at: n.updatedAt }).eq('id', id);
-    if(error) showToast('error', 'Note not saved', error.message);
-    const li = document.querySelector(`.msg[data-note="${id}"] .top b`); if(li) li.textContent = t.value || 'Untitled';
-  }, 600);
-}
-function renderNotes(){
-  const root = document.getElementById('notesRoot');
-  if(typeof updateNotesBadge === 'function') updateNotesBadge();
-  if(!root || typeof notes === 'undefined') return;
-  let ns = notes.slice().sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
-  if(notesClient !== 'all') ns = ns.filter(n => n.clientId === notesClient);
-  if(notesScope === 'open') ns = ns.filter(n => n.status !== 'done');
-  let sel = ns.find(n => n.id === window._noteSel) || ns[0];
-  if(sel) window._noteSel = sel.id;
-  const usedClients = [...new Set(notes.map(n => n.clientId))].map(id => clients.find(c => c.id === id)).filter(Boolean);
-  const label = s => noteStatusMeta(s).label;
-  const items = ns.map(n => { const c = clients.find(x => x.id === n.clientId), on = n === sel;
-    return `<a class="msg${on ? ' sel' : ''}" data-note="${n.id}" href="#notes" onclick="selectNote('${n.id}');return false;"${on ? ' aria-current="true"' : ''}><div class="top"><b>${escapeHtml(n.title || 'Untitled')}</b><time>${fmtShortDate(new Date(n.updatedAt || n.createdAt))}</time></div>
-<span class="by">${escapeHtml(c ? c.name : '')}</span><span class="pv">${escapeHtml(label(n.status))} · ${escapeHtml(String(n.text || '').replace(/\[( |x)\]/g, '').replace(/\s+/g, ' ').slice(0, 120))}</span></a>`; }).join('')
-    || '<div class="empty"><b>No notes yet</b>Notes are private to you — ideas and plans you want to get to.</div>';
-  let detail = '';
-  if(sel){
-    const c = clients.find(x => x.id === sel.clientId);
-    detail = `<div class="doc note-doc">
-<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:18px">
-<label class="pop-wrap"><select class="pop" onchange="moveNoteToClient('${sel.id}',this.value)">${activeClients().map(x => `<option value="${x.id}"${x.id === sel.clientId ? ' selected' : ''}>${escapeHtml(x.name)}</option>`).join('')}</select></label>
-<label class="pop-wrap"><span class="dot ${{ idea: 'gray', planned: 'gray', 'in-progress': 'blue', done: 'green' }[sel.status] || 'gray'}" style="margin-right:6px"></span><select class="pop" onchange="changeNoteStatus('${sel.id}',this.value)">${['idea', 'planned', 'in-progress', 'done'].map(s => `<option value="${s}"${s === sel.status ? ' selected' : ''}>${label(s)}</option>`).join('')}</select></label>
-<button class="btn" onclick="openNewEventModal()">${icon('calendar-plus')}Add to Calendar</button>
-${sel.status !== 'done' ? `<button class="btn" onclick="logNoteNow('${sel.id}')">${icon('square-pen')}Log as Improvement</button>` : ''}
-<span style="margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--label-2)">${icon('lock-simple', { size: 13 })}Only you can see this note</span>
-<button class="ib" aria-label="Delete note" title="Delete" onclick="deleteNote('${sel.id}')">${icon('trash')}</button></div>
-<input class="note-title" id="noteTitleInput" value="${escapeHtml(sel.title || '')}" placeholder="Title" oninput="noteAutosave('${sel.id}')">
-<textarea class="note-body" id="noteBodyInput" placeholder="Write here. Start a line with [ ] for a checklist." oninput="noteAutosave('${sel.id}')">${escapeHtml(sel.text || '')}</textarea>
-<p class="t-2" style="font-size:13px;margin-top:14px">Created ${fmtShortDate(new Date(sel.createdAt))}${sel.updatedAt && sel.updatedAt !== sel.createdAt ? ' · Edited ' + relDay(sel.updatedAt).toLowerCase() : ''}</p></div>`;
-  }
-  root.innerHTML = `<section class="list" aria-label="Notes"><div class="list-h">
-<label class="pop-wrap"><select class="pop" onchange="setNotesFilter('client',this.value)"><option value="all">All clients</option>${usedClients.map(c => `<option value="${c.id}"${notesClient === c.id ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></label>
-<div class="seg" style="margin-left:auto"><button class="${notesScope === 'all' ? 'on' : ''}" onclick="setNotesFilter('scope','all')">All</button><button class="${notesScope === 'open' ? 'on' : ''}" onclick="setNotesFilter('scope','open')">Open</button></div></div>
-<div style="padding:6px 0">${items}</div></section><section class="detail" aria-label="Note">${detail}</section>`;
-  if(currentViewName === 'notes') setToolbar(null, `Private to you · ${notes.length} note${notes.length === 1 ? '' : 's'}`);
-}
-async function moveNoteToClient(id, clientId){
-  const { error } = await supabaseClient.from('notes').update({ client_id: clientId }).eq('id', id);
-  if(error){ showToast('error', 'Not moved', error.message); return; }
-  const n = notes.find(x => x.id === id); if(n) n.clientId = clientId; renderNotes();
-}
+// Notes moved to notes-canvas.js (the gallery and the note sheet).
