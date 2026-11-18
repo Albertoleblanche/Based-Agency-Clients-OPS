@@ -656,6 +656,30 @@ body.mac :is(input[type="text"], input:not([type]), input[type="email"], input[t
 .mac[data-theme="dark"] #navTasksBadge, .mac[data-theme="dark"] #navRemindersBadge { background: rgba(255,214,10,.18) !important; }
 #navClientsBadge { display: none !important; }
 
+/* ---- the sidebar, a size down (Nov 18): the logo sits in a row as tall as the toolbar, with the
+   same line under it, and the items are 14px like the rest of the app ---- */
+.app-win .side { flex-basis: 240px; padding-top: 0; }
+.side-top { display: none; }
+.side-head { flex: 0 0 auto; display: flex; align-items: center; height: 52px; margin: 0 -12px; padding: 0 12px; border-bottom: .5px solid var(--sep-strong); }
+.side-head .side-brand { flex: 1 1 auto; min-width: 0; margin: 0; padding: 5px 6px; }
+.side-brand .brand-mark { width: 30px; height: 30px; border-radius: 8px; font-size: 12.5px; }
+.side-brand .brand-name { font-size: 14px; }
+.side-brand .brand-sub { font-size: 9.5px; }
+.app-win .side .src { margin-top: 14px; gap: 2px; }
+.app-win .side .src-i { height: 34px; gap: 10px; padding: 0 10px; border-radius: 8px; font-size: 14px; }
+.app-win .side .src-i svg { width: 18px; height: 18px; }
+.app-win .side .src-i .n { min-width: 20px; height: 19px; padding: 0 6px; font-size: 12px; }
+.app-win .side .src-h { font-size: 12px; padding: 16px 10px 6px; }
+.app-win .side .src-h:first-child { padding-top: 0; }
+/* light: a white sidebar, black text and icons */
+.mac[data-theme="light"] .app-win .side { background: #fff; -webkit-backdrop-filter: none; backdrop-filter: none; border-right-color: var(--sep-strong); }
+.mac[data-theme="light"] .app-win .side :is(.src-i, .src-i svg, .side-brand, .side-foot .who b, .side-foot > .ib) { color: #000; }
+/* installed as a desktop app: the row is title bar too, and the logo clears the Mac's window buttons */
+@media (display-mode: window-controls-overlay) {
+  .side-head { -webkit-app-region: drag; app-region: drag; padding-left: max(12px, env(titlebar-area-x, 0px)); }
+  .side-head .side-brand { -webkit-app-region: no-drag; app-region: no-drag; }
+}
+
 /* ---- running timer: a small counter in the sidebar's bottom corner, on every page ---- */
 .stm{display:flex;align-items:center;gap:2px;margin:auto 4px 10px;padding:6px 5px 6px 6px;border-radius:11px;background:var(--fill-2);contain:inline-size}
 .stm[hidden]{display:none}
