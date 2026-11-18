@@ -126,7 +126,7 @@ ${lanes}
 }
 
 // The panel: how bad, the next step, why, hours, the last 8 updates and what changed.
-function healthPanelHtml(c, h){
+function healthPanelHtml(c, h, closeFn){
   const owner = clientOwner(c), next = nextStepTask(c), lvl = h.quiet ? h.rawLevel : h.level;
   const start = c.startDate ? new Date(c.startDate + 'T12:00:00') : null;
   const meta = [owner, c.service, start ? 'client since ' + start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : ''].filter(Boolean).map(escapeHtml).join(' · ');
@@ -150,7 +150,7 @@ function healthPanelHtml(c, h){
   const ots = onTimeSummary(h.seq);
   const events = healthEvents(c, h).slice(0, 3).map(e => `<div class="hp-ev"><span>${escapeHtml(relDay(e.at))}</span><b>${escapeHtml(e.t)}</b></div>`).join('');
   return `<aside class="sp" aria-label="${escapeHtml(c.name)}, health">
-<div class="sp-bar"><button class="ib" aria-label="Close" onclick="closeHealthPanel()">${icon('x')}</button><a class="x-lnk" href="#" onclick="openClientDetail('${c.id}');return false;">Open client</a></div>
+<div class="sp-bar"><button class="ib" aria-label="Close" onclick="${closeFn || 'closeHealthPanel()'}">${icon('x')}</button><a class="x-lnk" href="#" onclick="openClientDetail('${c.id}');return false;">Open client</a></div>
 <div class="sp-head">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}</b><span>${meta}</span></div></div>
 <div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b><span class="sub">${sub}</span>${acts}</div>
 ${h.signals.length ? `<div class="sp-sec"><b>Why</b><span>${todayPlural(h.signals.length, 'signal')}</span></div>${why}` : ''}
