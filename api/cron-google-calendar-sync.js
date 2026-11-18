@@ -13,7 +13,7 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const { syncGoogleCalendarForUser } = require('../lib/google-calendar-sync');
-const { syncTimeEntryToHarvest } = require('../lib/harvest-sync');
+const { syncTimeEntryToHarvest, syncHarvestSetup } = require('../lib/harvest-sync');
 const { sendPushToUser, pushUrlFor } = require('../lib/push-notify');
 const { sendSlackDM } = require('../lib/slack-notify');
 
@@ -163,7 +163,7 @@ module.exports = async function handler(req, res) {
   }
 
   const admin = createClient(supabaseUrl, serviceKey);
-  const result = { calendarSync: null, reminders: null, escalations: null, harvestSync: null };
+  const result = { calendarSync: null, reminders: null, escalations: null, harvestSync: null, harvestSetup: null };
 
   try { result.reminders = await notifyDueReminders(admin); }
   catch (e) { result.reminders = { error: String(e) }; }
@@ -176,6 +176,15 @@ module.exports = async function handler(req, res) {
 
   try { result.harvestSync = await syncHarvestCatchUp(admin); }
   catch (e) { result.harvestSync = { error: String(e) }; }
+
+  // Harvest's setup, read in full once a night (drops what Harvest no longer has); during the day
+  // the app reads only what changed when someone opens it.
+  try {
+    const { data: connection } = await admin.from('harvest_connection').select('*').eq('id', 1).maybeSingle();
+    result.harvestSetup = !connection ? { skipped: 'not-connected' }
+      : !('setup_synced_at' in connection) ? { skipped: 'needs-sql' }
+      : await syncHarvestSetup(admin, connection, { full: true });
+  } catch (e) { result.harvestSetup = { error: String(e) }; }
 
   res.status(200).json(result);
 };

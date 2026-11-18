@@ -2227,3 +2227,29 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .wa-r .tx .s{gap:6px}
 .wa-r .wa-x{margin-left:4px}
 .rmi-when.is-new{color:var(--blue)}
+
+/* ---- Settings → Harvest: what Radar reads from Harvest ---- */
+.hv-sec{break-inside:avoid}
+.hv-sec > .set-h:first-child{margin-top:22px}
+.hv-sec:first-child > .set-h:first-child{margin-top:0}
+.hv-sec .set-h .n{margin-left:6px;font-weight:500;color:var(--label-3)}
+.hv-p{font-size:12.5px;line-height:1.45;margin:8px 4px 0}
+.hv-warn .l b{font-weight:600;color:var(--yellow)}
+.mac .hv-ch{width:100%;border:0;background:none;font:inherit;color:var(--label);text-align:left;cursor:default}
+.hv-ch > svg{width:11px;height:11px;flex:0 0 auto;color:var(--label-3);transition:transform 240ms cubic-bezier(.23,1,.32,1)}
+.hv-c.is-open .hv-ch > svg{transform:rotate(90deg)}
+.hv-ch:hover{background:var(--fill)}
+.hv-cl > .hv-c + .hv-c{box-shadow:0 -.5px 0 var(--sep)}
+.hv-cl{overflow:hidden}
+.hv-ps{padding:2px 14px 12px 41px;display:flex;flex-direction:column;gap:12px}
+.hv-ph{display:flex;align-items:baseline;gap:8px;padding-bottom:4px;border-bottom:.5px solid var(--sep)}
+.hv-ph b{font-size:13px;font-weight:600}
+.hv-ph span{font-size:12px;color:var(--label-2)}
+.hv-t{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:26px;font-size:13px}
+.hv-t em{font-style:normal;font-size:12px;color:var(--label-3)}
+.hv-t em.is-b{color:var(--label-2)}
+.hv-none{font-size:12.5px;margin:0}
+.mac .hv-more{display:inline-flex;align-items:center;gap:4px;margin:8px 4px 0;color:var(--label)}
+.hv-more svg{width:11px;height:11px;color:var(--label-2);transition:transform 240ms cubic-bezier(.23,1,.32,1)}
+.hv-more[aria-expanded="true"] svg{transform:rotate(180deg)}
+.hv-sec .spin{animation:spin 1s linear infinite}

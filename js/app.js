@@ -178,6 +178,8 @@ async function showApp(session){
     if(myProfile?.ai_chat_enabled){ loadClaudeHistory().then(renderClaudeMessages); }
     await checkForNewNotificationToasts();
     setupRealtimeSubscriptions();
+    // Read what changed in Harvest's clients, projects and tasks (the server skips it if it read in the last 10 minutes).
+    if(typeof harvestSyncInBackground === 'function') harvestSyncInBackground();
     // Open the screen the address points at (a refresh, bookmark, shared
     // link or push notification). The Google Calendar return is handled
     // separately in init() below.

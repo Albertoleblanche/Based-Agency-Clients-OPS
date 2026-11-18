@@ -12,7 +12,10 @@
 // POST /api/integrations  body: { provider: 'google', action: 'sync' | 'disconnect' }
 // POST /api/integrations  body: { provider: 'harvest', action: 'connect' | 'disconnect'
 //        | 'get-projects' | 'save-client-mapping' | 'save-service-mapping'
-//        | 'sync-entry' | 'delete-entry' | 'sync-now' }
+//        | 'sync-entry' | 'delete-entry' | 'sync-now' | 'sync-setup' }
+//   sync-setup: reads Harvest's clients, projects, tasks, assignments and people into Radar.
+//   Anyone signed in may ask (the app does when it opens); it runs at most every 10 minutes
+//   unless an admin or approver forces it (Sync Now, a full read).
 // POST /api/integrations  body: { provider: 'push', action: 'send',
 //        targetUserId, title, body, url }
 //
@@ -23,6 +26,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { syncGoogleCalendarForUser } = require('../lib/google-calendar-sync');
 const {
+  syncHarvestSetup,
   validateHarvestCredentials,
   fetchHarvestProjectsAndTasks,
   syncTimeEntryToHarvest,
@@ -117,9 +121,20 @@ module.exports = async function handler(req, res) {
     const isAdmin = profile?.role === 'admin';
 
     if (req.method === 'GET') {
-      const { data: connection } = await admin.from('harvest_connection').select('account_id, connected_at, last_synced_at').eq('id', 1).maybeSingle();
+      // select('*') so this still answers before addendum-harvest-sync.sql adds its columns;
+      // the token itself never leaves the server
+      const { data: connection } = await admin.from('harvest_connection').select('*').eq('id', 1).maybeSingle();
       const { count: clientMappingCount } = await admin.from('harvest_client_mappings').select('*', { count: 'exact', head: true });
       const { count: serviceMappingCount } = await admin.from('harvest_service_mappings').select('*', { count: 'exact', head: true });
+      const countOf = async (table, active) => {
+        let q = admin.from(table).select('*', { count: 'exact', head: true });
+        if (active) q = q.eq('is_active', true);
+        const { count, error } = await q;
+        return error ? null : (count || 0);
+      };
+      const [clients, projects, tasks, people] = await Promise.all([
+        countOf('harvest_clients', true), countOf('harvest_projects', true), countOf('harvest_tasks', true), countOf('harvest_users', true),
+      ]);
       res.status(200).json({
         connected: !!connection,
         accountId: connection?.account_id || null,
@@ -127,6 +142,15 @@ module.exports = async function handler(req, res) {
         lastSyncedAt: connection?.last_synced_at || null,
         clientMappingCount: clientMappingCount || 0,
         serviceMappingCount: serviceMappingCount || 0,
+        setup: {
+          ready: clients !== null,                       // false until addendum-harvest-sync.sql is run
+          syncedAt: connection?.setup_synced_at || null,
+          fullAt: connection?.setup_full_at || null,
+          error: connection?.setup_sync_error || null,
+          tokenUser: connection?.token_user_name || null,
+          tokenRoles: connection?.token_user_roles || null,
+          counts: { clients, projects, tasks, people },
+        },
       });
       return;
     }
@@ -170,6 +194,19 @@ module.exports = async function handler(req, res) {
     }
 
     const { data: connection } = await admin.from('harvest_connection').select('*').eq('id', 1).maybeSingle();
+
+    if (action === 'sync-setup') {
+      if (!profile) { res.status(403).json({ error: 'Only team members can sync Harvest.' }); return; }
+      if (!connection) { res.status(200).json({ skipped: 'not-connected' }); return; }
+      const force = !!(req.body || {}).force && isApprover;
+      if (!('setup_synced_at' in connection)) { res.status(200).json({ skipped: 'needs-sql' }); return; }
+      const last = connection.setup_synced_at ? new Date(connection.setup_synced_at).getTime() : 0;
+      if (!force && Date.now() - last < 10 * 60000) { res.status(200).json({ skipped: 'recent', syncedAt: connection.setup_synced_at }); return; }
+      const result = await syncHarvestSetup(admin, connection, { full: force });
+      res.status(200).json(result);
+      return;
+    }
+
     if (!connection && action !== 'sync-entry' && action !== 'delete-entry') {
       res.status(400).json({ error: 'Harvest is not connected yet.' });
       return;

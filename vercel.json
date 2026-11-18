@@ -12,6 +12,12 @@
   "functions": {
     "api/cron-wednesday-notify.js": {
       "maxDuration": 60
+    },
+    "api/cron-google-calendar-sync.js": {
+      "maxDuration": 60
+    },
+    "api/integrations.js": {
+      "maxDuration": 60
     }
   }
 }

@@ -35,6 +35,10 @@ Run new `.sql` files once in Supabase → SQL Editor. The current one:
   each win, WhatsApp copy and send with one sender per win (copying claims it; anyone else is
   warned first), and Radar marking a win sent when it shows up in the client's group. Until
   it's run, wins have no tier and copying isn't shared with the team; the rest works.
+  It also adds `wa_last_contact()` for Quiet clients on the WhatsApp screen.
+- `addendum-harvest-sync.sql` — Radar reads Harvest's setup: clients, projects, tasks (billable
+  or not), who is assigned where, and the team, matched to Radar people by email. Read only;
+  no rates or costs are kept. Until it's run, Settings → Harvest says so and the rest works.
 
 ## Weekly wins
 
@@ -43,6 +47,14 @@ panel on All Clients with how it's sent (WhatsApp, email or both) and its WhatsA
 Radar never posts to WhatsApp: an approved WhatsApp win goes back to whoever wrote it, they
 copy it, paste it in the group, and it counts as sent. A client with no win day keeps the old
 rule: due 7 days after its last update.
+
+## Harvest
+
+Harvest owns the setup; Radar mirrors it (step 1 of the Harvest plan). The server reads what
+changed whenever someone opens Radar (at most every 10 minutes), everything each night in the
+daily cron, and on Sync Now in Settings → Harvest, where admins and approvers see the
+connection, what was read, each client's projects and tasks, and the team matched by email.
+Use a Harvest administrator's token: it can read the whole setup and log time for everyone.
 
 ---
 

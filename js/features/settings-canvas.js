@@ -10,6 +10,7 @@ const SETTINGS_TABS = [
   ['fields', 'Client Fields', 'buildings', () => canApprove()],
   ['ai', 'AI & Email', 'envelope-simple', () => true],
   ['integrations', 'Integrations', 'plugs-connected', () => true],
+  ['harvest', 'Harvest', 'timer', () => canApprove() && typeof setHarvest === 'function'],
   ['whatsapp', 'WhatsApp', 'message-circle', () => typeof waCanManage === 'function' && waCanManage() && !waHidden()],
   ['notifications', 'Notifications', 'bell', () => true],
 ];
@@ -18,6 +19,7 @@ function switchSettingsTab(name){
   settingsTab = name; renderSettingsView();
   if(name === 'ai' && isAdmin()) loadAiProviderConnectionStatus();
   if(name === 'integrations') loadIntegrationStatuses();
+  if(name === 'harvest' && typeof hvRefreshAll === 'function') hvRefreshAll();
   if(name === 'whatsapp' && typeof waStartPoll === 'function') waStartPoll();
 }
 function openSettingsTab(tab){ settingsTab = tab === 'clients' ? 'fields' : tab; switchView('settings'); setTimeout(() => switchSettingsTab(settingsTab), 0); }
@@ -54,7 +56,7 @@ function renderSettingsView(){
   const cur = tabs.find(t => t[0] === settingsTab);
   if(currentViewName === 'settings') setToolbar(cur[1], 'Settings');
   const keep = document.activeElement && document.activeElement.id;
-  const body = { general: setGeneral, updates: setUpdates, fields: setFields, ai: setAi, integrations: setIntegrations, notifications: setNotifications, whatsapp: typeof setWhatsapp === 'function' ? setWhatsapp : setGeneral }[settingsTab]();
+  const body = { general: setGeneral, updates: setUpdates, fields: setFields, ai: setAi, integrations: setIntegrations, harvest: typeof setHarvest === 'function' ? setHarvest : setGeneral, notifications: setNotifications, whatsapp: typeof setWhatsapp === 'function' ? setWhatsapp : setGeneral }[settingsTab]();
   root.innerHTML = `<div class="set-tb"><div class="set-tabs" role="toolbar" aria-label="Settings sections">${tabs.map(([k, t, ic]) => `<button class="set-tab${k === settingsTab ? ' on' : ''}" ${k === settingsTab ? 'aria-current="page"' : ''} onclick="switchSettingsTab('${k}')">${icon(ic)}<span>${t}</span></button>`).join('')}</div></div>
 <div class="set-body">${body}<p class="t-2" style="font-size:13px;margin:14px 4px 0">Changes save as you make them.</p></div>`;
   if(keep){ const el = document.getElementById(keep); if(el && el.tagName !== 'BUTTON') el.focus(); }
@@ -285,8 +287,8 @@ function setIntegrations(){
   }
   if(g && g.googleConfigured) rows.push(['google-logo', 'Google Calendar', g.connected ? `Your meetings, deadlines and send days${g.lastSyncedAt ? ' · synced ' + claudeWhen(g.lastSyncedAt).toLowerCase() : ''}` : 'Bring your meetings into the team calendar',
     g.connected ? st('green', 'Connected') : st('hollow', 'Not connected'), g.connected ? `<button class="btn" onclick="syncGoogleCalendar().then(loadIntegrationStatuses)">Sync Now</button>` : `<button class="btn" onclick="connectGoogleCalendar()">Connect…</button>`]);
-  if(approver) rows.push(['timer', 'Harvest', h && h.connected ? `Time entries sync${h.lastSyncedAt ? ' · ' + claudeWhen(h.lastSyncedAt).toLowerCase() : ''}` : 'Send time logged here to Harvest',
-    h == null ? st('', 'Checking…') : h.connected ? st('green', 'Connected') : st('hollow', 'Not connected'), `<button class="btn" onclick="openIntegrationSheet('harvest')">${h && h.connected ? 'Settings…' : 'Connect…'}</button>`]);
+  if(approver) rows.push(['timer', 'Harvest', h && h.connected ? `Clients, projects and tasks${h.setup && h.setup.syncedAt && typeof hvWhen === 'function' ? ' · read ' + hvWhen(h.setup.syncedAt) : ''}` : 'Track time the way Harvest is set up',
+    h == null ? st('', 'Checking…') : h.connected ? st('green', 'Connected') : st('hollow', 'Not connected'), `<button class="btn" onclick="switchSettingsTab('harvest')">${h && h.connected ? 'Open' : 'Connect…'}</button>`]);
   if(approver) rows.push(['slack-logo', 'Slack', 'Client channels and daily summaries',
     integ.slackUnlinked == null ? st('', 'Checking…') : integ.slackUnlinked ? st('yellow', `${integ.slackUnlinked} client${integ.slackUnlinked === 1 ? '' : 's'} not linked`) : st('green', 'Connected'), `<button class="btn" onclick="openIntegrationSheet('slack')">Link…</button>`]);
   const wa = typeof waIntegrationRow === 'function' ? waIntegrationRow() : null;
