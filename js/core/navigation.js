@@ -415,6 +415,9 @@ async function switchView(name){
   // 7 requests in fullRefresh() below touch it, so this page gains
   // nothing from waiting behind them either.
   if(name==='focusreports') renderFocusReportsPage();
+  // WhatsApp shows what it has straight away and loads its own tables, instead of waiting for
+  // everything else below to load first.
+  if(name==='whatsapp' && typeof openWhatsappView === 'function') openWhatsappView();
   await fullRefresh();
   if(name==='trash') renderTrash();
   if(name==='payroll') renderPayroll();
@@ -434,7 +437,7 @@ async function switchView(name){
   }
   if(name==='teamqueue') renderTeamQueue();
   if(name==='plan' && typeof renderPlan === 'function') renderPlan();
-  if(name==='whatsapp' && typeof openWhatsappView === 'function') openWhatsappView();
+  if(name==='whatsapp' && currentViewName === 'whatsapp' && typeof renderWhatsapp === 'function') renderWhatsapp();
   if(name==='time') (typeof renderTimeView === 'function' ? renderTimeView() : renderTimesheet());
 }
 

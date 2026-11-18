@@ -26,12 +26,8 @@ const WA_KIND_IC = { request: 'list-checks', question: 'circle-help', promise: '
 const WA_STALE_MS = 120000;    // the connector writes a heartbeat about every 30 s
 const WA_LATE_DAYS = 2;
 
-// Who sees what. Before the test-mode update the database doesn't say, so the role decides.
-async function loadWaAccess(){
-  let lvl = null;
-  try{ const { data, error } = await supabaseClient.rpc('wa_access'); if(!error && ['manage', 'own', 'none'].includes(data)) lvl = data; }catch(e){}
-  waAccessLevel = lvl;
-}
+// Who sees what (wa_access(), read with the rest in waLoadNow). Before the test-mode update the
+// database doesn't say, so the role decides.
 function waCanManage(){ return waAccessLevel ? waAccessLevel === 'manage' : canApprove(); }
 function waHidden(){ return waAccessLevel ? waAccessLevel === 'none' : (waReady === false && !canApprove()); }
 function waTesters(){ return (waSettings && Array.isArray(waSettings.pilot_user_ids)) ? waSettings.pilot_user_ids : []; }
@@ -42,24 +38,35 @@ function updateWaNav(){
 }
 function waMissing(error){ return /relation|schema cache|PGRST205|42P01|does not exist/i.test(`${error?.code || ''} ${error?.message || ''}`); }
 function waMissingCol(error){ return /column|PGRST204|42703|schema cache/i.test(`${error?.code || ''} ${error?.message || ''}`); }
-async function loadWaTasks(){
-  await loadWaAccess();
+// One load at a time: the screen, fullRefresh() and Check Now can all ask at once, and they share it.
+let waLoading = null, waLoadError = null;
+function loadWaTasks(){
+  if(!waLoading) waLoading = waLoadNow().finally(() => { waLoading = null; });
+  return waLoading;
+}
+// Everything in one round trip. Row security returns nothing from the lead-only tables to
+// anyone else, so asking for them up front costs nothing.
+async function waLoadNow(){
+  const safe = q => Promise.resolve(q).catch(e => ({ error: { message: e?.message || String(e) } }));
+  const [acc, tk, r, s, g] = await Promise.all([
+    safe(supabaseClient.rpc('wa_access')),
+    safe(supabaseClient.from('wa_tasks').select('*').order('first_seen', { ascending: true })),
+    safe(supabaseClient.from('wa_runs').select('*').order('started_at', { ascending: false }).limit(20)),
+    safe(supabaseClient.from('wa_settings').select('*').eq('id', 1).maybeSingle()),
+    safe(supabaseClient.from('wa_groups').select('*').order('name', { ascending: true })),
+  ]);
+  waAccessLevel = !acc.error && ['manage', 'own', 'none'].includes(acc.data) ? acc.data : null;
+  waLoadError = null;
   if(waAccessLevel === 'none'){ waTasks = []; waLoaded = true; waReady = true; updateWaNav(); updateWaNavBadge(); return false; }
-  const { data, error } = await supabaseClient.from('wa_tasks').select('*').order('first_seen', { ascending: true });
-  if(error){
-    if(!waMissing(error)) console.error('loadWaTasks error', error);
-    waTasks = []; waLoaded = true; waReady = waMissing(error) ? false : waReady; updateWaNav(); updateWaNavBadge(); return false;
+  if(tk.error){
+    const missing = waMissing(tk.error);
+    if(!missing){ console.error('loadWaTasks error', tk.error); waLoadError = tk.error.message || 'Couldn’t reach the database'; }
+    if(missing || !waLoaded) waTasks = [];
+    waLoaded = true; waReady = missing ? false : waReady; updateWaNav(); updateWaNavBadge(); return false;
   }
-  waTasks = data || []; waReady = true;
+  waTasks = tk.data || []; waReady = true;
   updateWaNav();
-  if(waCanManage()){
-    const [r, s, g] = await Promise.all([
-      supabaseClient.from('wa_runs').select('*').order('started_at', { ascending: false }).limit(20),
-      supabaseClient.from('wa_settings').select('*').eq('id', 1).maybeSingle(),
-      supabaseClient.from('wa_groups').select('*').order('name', { ascending: true }),
-    ]);
-    waRuns = r.data || []; waSettings = s.data || null; waGroups = g.data || [];
-  }
+  if(waCanManage()){ waRuns = r.data || []; waSettings = s.data || null; waGroups = g.data || []; }
   waLoaded = true;
   updateWaNavBadge();
   return true;
@@ -217,10 +224,24 @@ function setWa(k, v){ if(k === 'tab') waTab = v; if(k === 'who') waWho = v; wind
 function selectWa(id){ window._waSel = window._waSel === id ? null : id; renderWhatsapp(); if(window._waSel) waLoadChat(id); }
 function closeWaPanel(){ window._waSel = null; renderWhatsapp(); }
 function renderWhatsappTasks(){ renderWhatsapp(); }   // the old name, still called by realtime
+// Never a blank screen: before the first load a spinner, and if drawing fails, what happened and Try Again.
 function renderWhatsapp(){
   const root = document.getElementById('whatsappRoot');
   if(!root || !currentUser) return;
+  if(currentViewName === 'whatsapp') setToolbar(null, 'Client chats');
+  if(!waLoaded){ root.innerHTML = `<div class="spw"><div class="sp-page"><div class="wa">${loadingStateHtml('Loading WhatsApp…')}</div></div></div>`; return; }
+  try{ waDraw(root); }
+  catch(e){
+    console.error('WhatsApp screen', e);
+    root.innerHTML = `<div class="spw"><div class="sp-page"><div class="wa">${emptyState({ icon: 'warning', title: 'WhatsApp couldn’t be shown', text: String(e && e.message || e), action: 'Try Again', onAction: 'openWhatsappView()' })}</div></div></div>`;
+  }
+}
+function waDraw(root){
   if(waHidden()){ root.innerHTML = ''; return; }
+  if(waLoadError && !waTasks.length && !waSettings){
+    root.innerHTML = `<div class="spw"><div class="sp-page"><div class="wa">${emptyState({ icon: 'warning', title: 'WhatsApp didn’t load', text: `${waLoadError}. Check your connection and try again.`, action: 'Try Again', onAction: 'openWhatsappView()' })}</div></div></div>`;
+    return;
+  }
   const lead = waCanManage();
   const who = lead ? (waWho || 'all') : 'mine';
   const pick = t => who === 'all' ? true : who === 'mine' ? t.owner_user_id === currentUser.id : t.owner_key === who;
@@ -230,7 +251,6 @@ function renderWhatsapp(){
     .sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
   const sel = window._waSel && waTasks.find(t => t.id === window._waSel);
   if(window._waSel && !sel) window._waSel = null;
-  if(currentViewName === 'whatsapp') setToolbar(null, 'Client chats');
 
   const conn = lead ? waConnState() : null;
   const never = lead && !waTasks.length && !waRuns.some(r => r.kind === 'digest');
@@ -501,6 +521,7 @@ function waOpenTask(id){
 }
 
 async function openWhatsappView(){
+  renderWhatsapp();            // what's already loaded (the app loads it at sign-in), or a spinner
   await loadWaTasks();
   renderWhatsapp();
   if(window._waSel) waLoadChat(window._waSel);
