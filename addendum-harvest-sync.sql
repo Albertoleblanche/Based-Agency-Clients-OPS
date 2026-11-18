@@ -95,15 +95,41 @@ alter table public.harvest_connection add column if not exists setup_sync_error 
 alter table public.harvest_connection add column if not exists token_user_name text;
 alter table public.harvest_connection add column if not exists token_user_roles text[];
 
--- ---- who can read -----------------------------------------------------------------------
-do $$
-declare t text;
-begin
-  foreach t in array array['harvest_clients','harvest_projects','harvest_tasks','harvest_task_assignments','harvest_user_assignments','harvest_users'] loop
-    execute format('alter table public.%I enable row level security', t);
-    execute format('drop policy if exists "team reads harvest setup" on public.%I', t);
-    execute format($p$create policy "team reads harvest setup" on public.%I for select to authenticated
-      using (exists (select 1 from public.team_profiles tp where tp.id = auth.uid() and coalesce(tp.access_revoked, false) = false))$p$, t);
-    execute format('grant select on public.%I to authenticated', t);
-  end loop;
-end $$;
+-- ---- who can read ------------------------------------------------------------------------
+-- Row level security on every table; anyone signed in to Radar reads, only the server writes.
+-- (The drop before each create lets this file run again; it only replaces this same rule.)
+alter table public.harvest_clients enable row level security;
+drop policy if exists "team reads harvest setup" on public.harvest_clients;
+create policy "team reads harvest setup" on public.harvest_clients for select to authenticated
+  using (exists (select 1 from public.team_profiles tp where tp.id = auth.uid() and coalesce(tp.access_revoked, false) = false));
+grant select on public.harvest_clients to authenticated;
+
+alter table public.harvest_projects enable row level security;
+drop policy if exists "team reads harvest setup" on public.harvest_projects;
+create policy "team reads harvest setup" on public.harvest_projects for select to authenticated
+  using (exists (select 1 from public.team_profiles tp where tp.id = auth.uid() and coalesce(tp.access_revoked, false) = false));
+grant select on public.harvest_projects to authenticated;
+
+alter table public.harvest_tasks enable row level security;
+drop policy if exists "team reads harvest setup" on public.harvest_tasks;
+create policy "team reads harvest setup" on public.harvest_tasks for select to authenticated
+  using (exists (select 1 from public.team_profiles tp where tp.id = auth.uid() and coalesce(tp.access_revoked, false) = false));
+grant select on public.harvest_tasks to authenticated;
+
+alter table public.harvest_task_assignments enable row level security;
+drop policy if exists "team reads harvest setup" on public.harvest_task_assignments;
+create policy "team reads harvest setup" on public.harvest_task_assignments for select to authenticated
+  using (exists (select 1 from public.team_profiles tp where tp.id = auth.uid() and coalesce(tp.access_revoked, false) = false));
+grant select on public.harvest_task_assignments to authenticated;
+
+alter table public.harvest_user_assignments enable row level security;
+drop policy if exists "team reads harvest setup" on public.harvest_user_assignments;
+create policy "team reads harvest setup" on public.harvest_user_assignments for select to authenticated
+  using (exists (select 1 from public.team_profiles tp where tp.id = auth.uid() and coalesce(tp.access_revoked, false) = false));
+grant select on public.harvest_user_assignments to authenticated;
+
+alter table public.harvest_users enable row level security;
+drop policy if exists "team reads harvest setup" on public.harvest_users;
+create policy "team reads harvest setup" on public.harvest_users for select to authenticated
+  using (exists (select 1 from public.team_profiles tp where tp.id = auth.uid() and coalesce(tp.access_revoked, false) = false));
+grant select on public.harvest_users to authenticated;
