@@ -25,6 +25,9 @@ Run new `.sql` files once in Supabase → SQL Editor. The current one:
 - `schema-whatsapp-tasks.sql` — the WhatsApp tables (client groups, the open items the
   connector finds, its runs and settings). Until it's run, the WhatsApp screen says it isn't
   set up. The connector itself runs on the office PC: see `whatsapp-connector/README.md`.
+- `addendum-whatsapp-test-mode.sql` — puts WhatsApp in test mode for one person (put your
+  sign-in email in it first): only they see it in Radar and get its Slack messages. Its last
+  line turns test mode off.
 
 ---
 

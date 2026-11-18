@@ -20,6 +20,7 @@ async function main(){
 
   if(args.has('--digest-now') && !args.has('--live')){
     // Analyze what is already stored, no WhatsApp connection needed.
+    applySettings(await loadSettings());
     await safeDigest({ dry });
     process.exit(0);
   }

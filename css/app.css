@@ -1927,3 +1927,7 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .wa-sec{break-inside:avoid}
 .wa-sec > .set-h:first-child{margin-top:22px}
 .wa-sec:first-child > .set-h:first-child{margin-top:0}
+.wa-tm{display:inline-flex;align-items:center;height:20px;margin-left:10px;padding:0 8px;border-radius:10px;background:var(--fill-2);font-size:12px;font-weight:500;color:var(--label-2)}
+.wa-tmn{display:flex;gap:8px;align-items:flex-start;margin:10px 4px 0;line-height:1.45}
+.wa-tmn svg{width:13px;height:13px;flex:0 0 auto;margin-top:3px}
+.wa-tmn b{font-weight:600;color:var(--label)}

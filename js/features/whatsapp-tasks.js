@@ -1,5 +1,7 @@
 // WhatsApp: open requests and questions the connector found in client WhatsApp groups.
 // Everyone sees their own; admins and approvers see everyone's and set it up in Settings.
+// In test mode (wa_settings.pilot_user_ids) only the testers see any of it, whatever their role;
+// the database says which applies to whoever is signed in (wa_access()).
 // The data is written by whatsapp-connector/ (read-only); this screen reads the items and lets
 // people mark them done, reassign them, or say they weren't tasks (which teaches the agent).
 // Same tables and columns as schema-whatsapp-tasks.sql.
@@ -13,21 +15,39 @@ let waReady = null;            // null: not loaded · false: the tables aren't t
 let waWho = null;              // 'mine' | 'all' | an owner key (leads only); null = the default
 let waTab = 'open';            // 'open' | 'closed'
 let waRealtimeStarted = false;
+let waAccessLevel = null;      // 'manage' | 'own' | 'none' from the database; null = it doesn't say (older setup)
 
 const WA_OWNERS = [['albert', 'Albert'], ['stan', 'Stan'], ['eric', 'Eric'], ['charlie', 'Charlie'], ['dan', 'Dan'], ['joey', 'Joey']];
 const WA_KIND = { request: 'Request', question: 'Question', promise: 'Promise', issue: 'Issue' };
 const WA_KIND_IC = { request: 'list-checks', question: 'circle-help', promise: 'clock', issue: 'warning' };
 const WA_STALE_MS = 120000;    // the connector writes a heartbeat about every 30 s
 
+// Who sees what. Before the test-mode update the database doesn't say, so the role decides.
+async function loadWaAccess(){
+  let lvl = null;
+  try{ const { data, error } = await supabaseClient.rpc('wa_access'); if(!error && ['manage', 'own', 'none'].includes(data)) lvl = data; }catch(e){}
+  waAccessLevel = lvl;
+}
+function waCanManage(){ return waAccessLevel ? waAccessLevel === 'manage' : canApprove(); }
+function waHidden(){ return waAccessLevel ? waAccessLevel === 'none' : (waReady === false && !canApprove()); }
+function waTesters(){ return (waSettings && Array.isArray(waSettings.pilot_user_ids)) ? waSettings.pilot_user_ids : []; }
+function updateWaNav(){
+  const nav = document.querySelector('.nav-item[data-view="whatsapp"]');
+  if(nav) nav.style.display = waHidden() ? 'none' : '';
+  if(waHidden() && typeof currentViewName !== 'undefined' && currentViewName === 'whatsapp' && typeof switchView === 'function') switchView('overview');
+}
 function waMissing(error){ return /relation|schema cache|PGRST205|42P01|does not exist/i.test(`${error?.code || ''} ${error?.message || ''}`); }
 async function loadWaTasks(){
+  await loadWaAccess();
+  if(waAccessLevel === 'none'){ waTasks = []; waLoaded = true; waReady = true; updateWaNav(); updateWaNavBadge(); return false; }
   const { data, error } = await supabaseClient.from('wa_tasks').select('*').order('first_seen', { ascending: true });
   if(error){
     if(!waMissing(error)) console.error('loadWaTasks error', error);
-    waTasks = []; waLoaded = true; waReady = waMissing(error) ? false : waReady; updateWaNavBadge(); return false;
+    waTasks = []; waLoaded = true; waReady = waMissing(error) ? false : waReady; updateWaNav(); updateWaNavBadge(); return false;
   }
   waTasks = data || []; waReady = true;
-  if(canApprove()){
+  updateWaNav();
+  if(waCanManage()){
     const [r, s, g] = await Promise.all([
       supabaseClient.from('wa_runs').select('*').order('started_at', { ascending: false }).limit(20),
       supabaseClient.from('wa_settings').select('*').eq('id', 1).maybeSingle(),
@@ -44,12 +64,12 @@ function waOwnerName(t){
   if(p) return firstName(p.name);
   return (WA_OWNERS.find(o => o[0] === t.owner_key) || [, 'Unassigned'])[1];
 }
-function waCanEdit(t){ return canApprove() || t.owner_user_id === currentUser?.id; }
+function waCanEdit(t){ return waCanManage() || t.owner_user_id === currentUser?.id; }
 function waOpenForMe(){ return waTasks.filter(t => t.status === 'open' && t.owner_user_id === currentUser?.id); }
 function updateWaNavBadge(){
   const b = document.getElementById('navWhatsappBadge');
   if(!b) return;
-  const n = waOpenForMe().length;   // your own, like Tasks; leads see the rest on the screen
+  const n = waHidden() ? 0 : waOpenForMe().length;   // your own, like Tasks; leads see the rest on the screen
   b.textContent = n; b.style.display = n ? 'flex' : 'none';
 }
 function waAge(iso, to){
@@ -89,7 +109,8 @@ function renderWhatsappTasks(){ renderWhatsapp(); }   // the old name, still cal
 function renderWhatsapp(){
   const root = document.getElementById('whatsappRoot');
   if(!root || !currentUser) return;
-  const lead = canApprove();
+  if(waHidden()){ root.innerHTML = ''; return; }
+  const lead = waCanManage();
   const who = lead ? (waWho || 'all') : 'mine';
   const closedSt = ['done', 'answered', 'dismissed'];
   const mineOrAll = waTasks.filter(t => who === 'all' ? true : who === 'mine' ? t.owner_user_id === currentUser.id : t.owner_key === who);
@@ -129,8 +150,9 @@ function renderWhatsapp(){
     : who === 'mine' ? `${open.length} waiting on you`
     : `${open.length} open from client chats`;
   const conn = lead ? waConnState() : null;
+  const testers = waTesters();
   const sub = lead
-    ? `<span class="wa-st"><span class="dot ${conn.dot}"></span>${escapeHtml(conn.text)}</span>`
+    ? `<span class="wa-st"><span class="dot ${conn.dot}"></span>${escapeHtml(conn.text)}</span>${testers.length ? `<span class="wa-tm" title="Only ${testers.length === 1 && testers[0] === currentUser.id ? 'you see' : 'the testers see'} WhatsApp in Radar and get its Slack messages">Test mode · ${testers.length === 1 && testers[0] === currentUser.id ? 'only you' : testers.length + ' testers'}</span>` : ''}`
     : 'Requests and questions from client WhatsApp groups that are yours.';
   const whoOpts = [['all', 'Everyone'], ['mine', 'Mine'], ...WA_OWNERS];
   const curWho = whoOpts.find(o => o[0] === who) || whoOpts[0];
@@ -147,7 +169,7 @@ ${list || empty}</div></div>${sel ? waPanelHtml(sel) : ''}</div>`;
 
 // ---- one item, in the panel --------------------------------------------------------------------
 function waPanelHtml(t){
-  const done = t.status !== 'open', can = waCanEdit(t), lead = canApprove();
+  const done = t.status !== 'open', can = waCanEdit(t), lead = waCanManage();
   const kind = WA_KIND[t.kind] || 'Request';
   let eyebrow, title, sub, acts;
   if(!done){
@@ -273,12 +295,14 @@ function setWhatsapp(){
   const timeChips = times.map((t, i) => `<span class="wa-tc"><input class="tf" type="time" value="${escapeHtml(t)}" aria-label="Check time ${i + 1}" onchange="waSetTime(${i}, this.value)">${times.length > 1 ? `<button class="ib" aria-label="Remove this time" title="Remove" onclick="waRemoveTime(${i})">${icon('x')}</button>` : ''}</span>`).join('');
   const roles = WA_OWNERS.map(([k, n]) => fr(n, '', `<textarea class="tf wa-role" rows="2" placeholder="${escapeHtml(WA_ROLE_DEFAULTS[k])}" aria-label="What ${n} handles" onchange="waSaveRole('${k}', this.value)">${escapeHtml((s.role_notes || {})[k] || '')}</textarea>`, { top: true })).join('');
   const sec = html => `<div class="wa-sec">${html}</div>`;
-  return sec(`<div class="set-h">Connection</div><div class="form-grp" id="waConnBox">${waConnHtml()}</div>`)
+  const testers = waTesters(), onlyMe = testers.length === 1 && testers[0] === currentUser?.id;
+  const testNote = testers.length ? `<p class="t-2 wa-p wa-tmn">${icon('lock-simple')}<span><b>Test mode.</b> ${onlyMe ? 'Only you see' : `Only the ${testers.length} testers see`} WhatsApp in Radar and get its Slack messages; nobody else is told. To go live, run the last line of <code>addendum-whatsapp-test-mode.sql</code>.</span></p>` : '';
+  return sec(`<div class="set-h">Connection</div><div class="form-grp" id="waConnBox">${waConnHtml()}</div>${testNote}`)
     + sec(`<div class="set-h">Groups it reads<span class="wa-n">${on} of ${waGroups.length} on</span></div>
 <p class="t-2 wa-p">Groups with “Marketing” in the name are on to start with. Personal chats are never read.</p>
 <div class="form-grp">${groups}</div>`)
     + sec(`<div class="set-h">When it checks</div>
-<p class="t-2 wa-p">At these times it reads the groups, then sends each person their list in Slack.</p>
+<p class="t-2 wa-p">${testers.length ? `At these times it reads the groups, then sends ${onlyMe ? 'you' : 'the testers'} the full list in Slack.` : 'At these times it reads the groups, then sends each person their list in Slack.'}</p>
 <div class="form-grp">${fr('Every day at', '', `<div class="wa-times">${timeChips}${times.length < 6 ? `<button class="btn" onclick="waAddTime()">${icon('plus')}Add</button>` : ''}</div>`)}
 ${fr('Time zone', '', popSel('Time zone', tzs.map(z => [z, z.replace(/_/g, ' ')]), s.timezone, 'waSetZone(this.value)'))}</div>`)
     + sec(`<div class="set-h">Who handles what</div>
@@ -353,7 +377,7 @@ async function waRelink(){
 }
 // Settings → Integrations shows WhatsApp with the others.
 function waIntegrationRow(){
-  if(!canApprove()) return null;
+  if(!waCanManage() || waHidden()) return null;
   const st = waConnState();
   return ['message-circle', 'WhatsApp', 'Reads client groups and sorts what they ask for', `<span class="st"><span class="dot ${st.dot}"></span>${escapeHtml(st.text)}</span>`, `<button class="btn" onclick="switchSettingsTab('whatsapp')">Settings…</button>`];
 }

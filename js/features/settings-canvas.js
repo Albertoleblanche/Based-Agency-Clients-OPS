@@ -10,7 +10,7 @@ const SETTINGS_TABS = [
   ['fields', 'Client Fields', 'buildings', () => canApprove()],
   ['ai', 'AI & Email', 'envelope-simple', () => true],
   ['integrations', 'Integrations', 'plugs-connected', () => true],
-  ['whatsapp', 'WhatsApp', 'message-circle', () => canApprove() && typeof setWhatsapp === 'function'],
+  ['whatsapp', 'WhatsApp', 'message-circle', () => typeof waCanManage === 'function' && waCanManage() && !waHidden()],
   ['notifications', 'Notifications', 'bell', () => true],
 ];
 function switchSettingsTab(name){
@@ -269,7 +269,7 @@ async function loadIntegrationStatuses(){
   if(canApprove() && typeof loadSlackClientChannels === 'function'){
     try{ if(!slackChannelsLoaded) await loadSlackClientChannels(); integ.slackUnlinked = activeClients().filter(c => !slackClientChannels[c.id]).length; }catch(e){}
   }
-  if(canApprove() && typeof loadWaTasks === 'function'){ try{ await loadWaTasks(); }catch(e){} }
+  if(typeof loadWaTasks === 'function'){ try{ await loadWaTasks(); }catch(e){} }
   if(currentViewName === 'settings' && settingsTab === 'integrations') renderSettingsView();
 }
 function setIntegrations(){

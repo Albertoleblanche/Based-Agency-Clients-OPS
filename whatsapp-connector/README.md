@@ -39,6 +39,19 @@ Changes reach the connector within about a minute. Still on the PC: running `npm
 `.env` secrets (they never go in a web screen). Run the second half of `schema-whatsapp-tasks.sql`
 (already included in the file) so the settings tables exist.
 
+## Test mode (only you, while you try it)
+
+Run `addendum-whatsapp-test-mode.sql` in Supabase → SQL Editor with your sign-in email in it.
+While test mode is on:
+- Only you see WhatsApp in Radar (the sidebar item, the screen, Settings → WhatsApp and the
+  Integrations row), whatever your role. Everyone else, admins included, sees nothing.
+- You see every item and can change everything.
+- The Slack messages go only to you: one full list per check, and the logged-out alert. Nobody
+  else is messaged, Eric and Dan included.
+- Until the connector has loaded Radar's settings, it sends no Slack messages at all.
+
+To go live, run the last line of that file. Radar and the connector switch over within a minute.
+
 ## Keep it running
 
 The PC must be on and awake at 9:00 and 15:00. Easiest: Task Scheduler → create a task

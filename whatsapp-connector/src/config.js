@@ -22,6 +22,9 @@ export const config = {
   radarUrl: process.env.RADAR_URL || '',
   contextDays: Number(process.env.CONTEXT_DAYS || 7),
   authDir: process.env.AUTH_DIR || 'auth',
+  // Test mode, from Radar (wa_settings.pilot_user_ids). null until Radar's settings load:
+  // no Slack messages go out before then. [] = live.
+  pilotIds: null,
 };
 
 export function isClientGroup(name){

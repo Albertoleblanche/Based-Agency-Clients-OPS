@@ -33,24 +33,41 @@ export async function runDigest({ dry = false } = {}){
   let sent = 0;
 
   const byOwner = (key) => open.filter(t => t.owner_key === key);
-  for(const role of ROLES){
+  const muted = p => (p.muted_notification_types || []).includes('whatsapp_digest');
+  // The whole team's list, with the reader's own items first.
+  const fullView = (key, heading) => {
+    const sections = [...ROLES].sort((a, b) => (b.key === key) - (a.key === key)).map(r => ({ r, items: byOwner(r.key) })).filter(s => s.items.length)
+      .map(s => `*${s.r.name}* (${s.items.length})\n${s.items.slice(0, 12).map(line).join('\n')}`);
+    return `*${heading}, ${label}*\n${open.length} open · +${created} new · ${resolved} answered since last check\n\n${sections.join('\n\n') || '_Nothing open. 🎉_'}${link}`;
+  };
+  const testers = config.pilotIds;
+
+  if(testers === null){
+    console.log('Radar settings not loaded, so no Slack messages this time.');
+  } else if(testers.length){
+    // Test mode: only the testers hear about it, and they get the full view. Nobody else is messaged.
+    for(const id of testers){
+      const p = profiles.find(x => String(x.id) === id);
+      if(!p?.slack_user_id || muted(p)) continue;
+      const role = ROLES.find(r => matchProfile(r, [p]));
+      const text = fullView(role ? role.key : '', 'WhatsApp client items (test mode, only you get this)');
+      if(dry) console.log(`\n[dry] TEST MODE → ${p.name}\n${text}`); else if(await slackDM(p.slack_user_id, text)) sent++;
+    }
+  } else for(const role of ROLES){
     const p = matchProfile(role, profiles);
     if(!p?.slack_user_id || config.adminKeys.includes(role.key)) continue; // admins get the full view below
-    if((p.muted_notification_types || []).includes('whatsapp_digest')) continue;
+    if(muted(p)) continue;
     const mine = byOwner(role.key);
     if(!mine.length) continue;
     const text = `*WhatsApp client items for you — ${label}* (${mine.length} open)\n${mine.slice(0, 25).map(line).join('\n')}${mine.length > 25 ? `\n…and ${mine.length - 25} more` : ''}${link}`;
     if(dry) console.log(`\n[dry] DM → ${role.name}\n${text}`); else if(await slackDM(p.slack_user_id, text)) sent++;
   }
 
-  // Full view for Eric and Dan.
-  for(const key of config.adminKeys){
+  // Full view for Eric and Dan (live only).
+  if(testers && !testers.length) for(const key of config.adminKeys){
     const role = ROLES.find(r => r.key === key); const p = role && matchProfile(role, profiles);
-    if(!p?.slack_user_id) continue;
-    if((p.muted_notification_types || []).includes('whatsapp_digest')) continue;
-    const sections = [...ROLES].sort((a, b) => (b.key === key) - (a.key === key)).map(r => ({ r, items: byOwner(r.key) })).filter(s => s.items.length)
-      .map(s => `*${s.r.name}* (${s.items.length})\n${s.items.slice(0, 12).map(line).join('\n')}`);
-    const text = `*WhatsApp client items — full team view, ${label}*\n${open.length} open · +${created} new · ${resolved} answered since last check\n\n${sections.join('\n\n') || '_Nothing open. 🎉_'}${link}`;
+    if(!p?.slack_user_id || muted(p)) continue;
+    const text = fullView(key, 'WhatsApp client items — full team view');
     if(dry) console.log(`\n[dry] FULL VIEW → ${role.name}\n${text}`); else if(await slackDM(p.slack_user_id, text)) sent++;
   }
 
@@ -63,6 +80,12 @@ export async function runDigest({ dry = false } = {}){
 
 export async function alertAdmins(text){
   const profiles = await loadProfiles();
+  const testers = config.pilotIds;
+  if(testers === null){ console.error('Not sent to Slack (Radar settings not loaded):', text); return; }
+  if(testers.length){   // test mode: only the testers
+    for(const id of testers){ const p = profiles.find(x => String(x.id) === id); if(p?.slack_user_id) await slackDM(p.slack_user_id, text); }
+    return;
+  }
   for(const key of config.adminKeys){
     const role = ROLES.find(r => r.key === key); const p = role && matchProfile(role, profiles);
     if(p?.slack_user_id) await slackDM(p.slack_user_id, text);

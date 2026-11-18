@@ -198,3 +198,77 @@ create policy "leads read wa_settings" on public.wa_settings
 drop policy if exists "leads update wa_settings" on public.wa_settings;
 create policy "leads update wa_settings" on public.wa_settings
   for update to authenticated using (public.wa_is_lead()) with check (public.wa_is_lead());
+
+-- ============================================================================
+-- Test mode
+--
+-- While pilot_user_ids has anyone in it, WhatsApp is in test mode: only those people
+-- see the WhatsApp screen and Settings → WhatsApp (whatever their role in Radar), they
+-- see every item, and the connector sends its Slack messages only to them. Nobody else
+-- sees it or hears about it. Run addendum-whatsapp-test-mode.sql to put yourself in it.
+-- Empty the list to go live: then admins and approvers manage it and everyone sees
+-- their own items.
+-- ============================================================================
+alter table public.wa_settings add column if not exists pilot_user_ids uuid[] not null default '{}';
+
+create or replace function public.wa_in_test_mode() returns boolean
+language sql stable security definer set search_path = public as $$
+  select coalesce((select cardinality(s.pilot_user_ids) > 0 from public.wa_settings s where s.id = 1), false);
+$$;
+
+-- Leads: the testers while testing, otherwise admins and approvers.
+create or replace function public.wa_is_lead() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.team_profiles tp
+                 where tp.id = auth.uid() and coalesce(tp.access_revoked, false) = false)
+     and case when public.wa_in_test_mode()
+              then exists (select 1 from public.wa_settings s where s.id = 1 and auth.uid() = any(s.pilot_user_ids))
+              else exists (select 1 from public.team_profiles tp where tp.id = auth.uid() and tp.role in ('admin','approver'))
+         end;
+$$;
+
+-- What Radar shows this person: 'manage' (every item and Settings → WhatsApp),
+-- 'own' (their own items) or 'none'.
+create or replace function public.wa_access() returns text
+language sql stable security definer set search_path = public as $$
+  select case
+    when public.wa_is_lead() then 'manage'
+    when public.wa_in_test_mode() then 'none'
+    when exists (select 1 from public.team_profiles tp
+                 where tp.id = auth.uid() and coalesce(tp.access_revoked, false) = false) then 'own'
+    else 'none'
+  end;
+$$;
+grant execute on function public.wa_in_test_mode() to authenticated;
+grant execute on function public.wa_access() to authenticated;
+
+-- While testing, nobody but the testers reads or changes items, not even their own.
+drop policy if exists "read own or all wa_tasks" on public.wa_tasks;
+create policy "read own or all wa_tasks" on public.wa_tasks
+  for select to authenticated
+  using (
+    public.wa_is_lead()
+    or (
+      not public.wa_in_test_mode()
+      and owner_user_id = auth.uid()
+      and exists (select 1 from public.team_profiles tp
+                  where tp.id = auth.uid() and coalesce(tp.access_revoked, false) = false)
+    )
+  );
+
+drop policy if exists "update own or all wa_tasks" on public.wa_tasks;
+create policy "update own or all wa_tasks" on public.wa_tasks
+  for update to authenticated
+  using (
+    public.wa_is_lead()
+    or (
+      not public.wa_in_test_mode()
+      and owner_user_id = auth.uid()
+      and exists (select 1 from public.team_profiles tp
+                  where tp.id = auth.uid() and coalesce(tp.access_revoked, false) = false)
+    )
+  )
+  with check (
+    public.wa_is_lead()
+    or (not public.wa_in_test_mode() and owner_user_id = auth.uid())
+  );

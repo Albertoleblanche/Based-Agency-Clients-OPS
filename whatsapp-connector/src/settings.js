@@ -15,6 +15,7 @@ export async function loadSettings(){
 export function applySettings(s){
   if(!s) return false;
   applyRoleNotes(s.role_notes || {});
+  config.pilotIds = Array.isArray(s.pilot_user_ids) ? s.pilot_user_ids.map(String) : [];
   const times = (s.digest_times || []).map(t => t.trim()).filter(t => TIME.test(t));
   const tz = validTz(s.timezone) ? s.timezone : config.tz;
   const changed = JSON.stringify(times) !== JSON.stringify(config.digestTimes) || tz !== config.tz;
