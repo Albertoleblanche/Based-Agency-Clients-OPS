@@ -17,7 +17,8 @@ drops every personal chat and non-client group before anything is stored.
    (Supabase URL + service-role key, Anthropic key, Slack bot token). Never commit `.env`.
 4. Make sure each teammate's **Slack user ID** is set in Radar → Team (the DMs need it)
    and their Radar name starts with their first name (Albert, Stan, Eric, Charlie, Dan/Daniel, Joey).
-5. `npm install`
+5. `npm install` (the `.npmrc` here lets npm 12 fetch the one package Baileys takes from GitHub;
+   on its own, npm 12 stops with EALLOWGIT)
 6. `npm run link` — a QR code appears. On the phone: WhatsApp → Settings → Linked devices →
    Link a device → scan. When it says *WhatsApp connected*, press Ctrl+C.
 7. `npm start` — leave this running (see "Keep it running").
