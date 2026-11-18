@@ -70,6 +70,8 @@ function clientDue(c, now){
   return { last, due, daysLeft: daysBetween(now, due) };
 }
 function dueText(daysLeft, due){
+  if(daysLeft < -59) return 'Months overdue';
+  if(daysLeft < -13) return `${Math.floor(-daysLeft / 7)} weeks overdue`;
   if(daysLeft < 0) return `${-daysLeft} day${daysLeft === -1 ? '' : 's'} overdue`;
   if(daysLeft === 0) return 'Due today';
   if(daysLeft === 1) return 'Due tomorrow';
@@ -301,9 +303,17 @@ function clientHealth(c){
 function tagHtml(kind, text, ic){ return `<span class="tag ${kind}">${ic && typeof icon === 'function' ? icon(ic, { weight: 'bold' }) : ''}${escapeHtml(text)}</span>`; }
 function shortDay(d){ const n = daysBetween(d, rNow()); return n <= 0 ? 'today' : n === 1 ? 'yesterday' : n < 7 ? DAY_NAMES[new Date(d).getDay()].slice(0, 3) : fmtShortDate(new Date(d)); }
 // When it's due: red overdue, yellow today, grey later, green sent.
+// How late, in words that stay readable for long gaps: "6d overdue", "3 weeks overdue",
+// "Months overdue"; a client with no update on record says so instead of counting from its start date.
+function overdueShort(w){
+  if(!w.late) return '';
+  if(!w.last) return 'No update yet';
+  const d = -w.daysLeft;
+  return d < 14 ? `${d}d overdue` : d < 60 ? `${Math.floor(d / 7)} weeks overdue` : 'Months overdue';
+}
 function dueTag(w){
   if(w.sent) return tagHtml('green', 'Sent ' + shortDay(w.last), 'check');
-  if(w.late) return tagHtml('red', `${-w.daysLeft}d overdue`, 'warning');
+  if(w.late) return tagHtml('red', overdueShort(w), 'warning');
   if(w.state === 'due') return tagHtml('yellow', 'Due today', 'clock');
   return tagHtml('gray', w.daysLeft === 1 ? 'Due tomorrow' : 'Due ' + (w.daysLeft < 7 ? DAY_NAMES[w.due.getDay()].slice(0, 3) : fmtShortDate(w.due)), 'clock');
 }

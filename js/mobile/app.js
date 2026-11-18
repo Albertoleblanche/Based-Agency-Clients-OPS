@@ -375,7 +375,7 @@ function mOpenWeek(){
       ['Due soon', ws.filter(w => w.upcoming).sort((a, b) => a.daysLeft - b.daysLeft)], ['Sent this week', ws.filter(w => w.sent).sort((a, b) => new Date(b.last) - new Date(a.last))]];
     const sent = ws.filter(w => w.sent || w.upcoming).length;
     return `<h1 class="big">This Week</h1><p class="big-sub">${sent} of ${ws.length} sent in the last 7 days</p>
-${groups.filter(g => g[1].length).map(([t, list, cls]) => mIsh(t, null, cls) + `<div class="ig">${list.map(w => mIr(monoHtml(w.c), mEsc(w.c.name), (w.upcoming ? nextDueTag(w) : dueTag(w)) + (w.sent && !w.upcoming ? '' : stageTag(w)), stepsHtml(w), w.sent && !w.upcoming ? `mOpenClient('${w.c.id}')` : mBehindTap(w), { tags: true })).join('')}</div>`).join('')}`;
+${groups.filter(g => g[1].length).map(([t, list, cls]) => mIsh(t, null, cls) + `<div class="ig">${list.map(w => mIr(monoHtml(w.c), mEsc(w.c.name), (w.late ? `<span class="t-red">${mEsc(overdueShort(w))}</span> · ` : '') + mEsc(w.note || ''), stepsHtml(w), w.sent && !w.upcoming ? `mOpenClient('${w.c.id}')` : mBehindTap(w))).join('')}</div>`).join('')}`;
   });
 }
 // A due client opens its draft when one is waiting, otherwise the client.

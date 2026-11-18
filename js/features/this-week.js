@@ -13,9 +13,12 @@ function weekVisibleClients(){
 function weekRowHtml(w, sel){
   const h = clientHealth(w.c);
   const ud = h.level === 'g' ? '' : `<span class="ud" style="background:var(--${h.level === 'r' ? 'red' : 'yellow-fill'})" aria-label="${healthWord(h.level)}"></span>`;
-  const who = w.sent ? w.owner : (w.holder || w.owner);
+  // One quiet line under the name: where the update is. The group header already says due or overdue,
+  // so only an overdue row adds how late it is.
+  const late = w.late ? `<span class="t-red">${escapeHtml(overdueShort(w))}</span> · ` : '';
+  const who = w.sent ? w.owner : (w.holder && w.holder !== 'approvers' ? w.holder : w.owner);
   return `<a class="wk${sel ? ' sel' : ''}" href="#approve" data-id="${w.c.id}" onclick="selectWeekClient('${w.c.id}');return false;"${sel ? ' aria-current="true"' : ''}>${ud}${monoHtml(w.c)}
-<div class="tx"><b>${escapeHtml(w.c.name)}</b><span class="tags">${w.upcoming ? nextDueTag(w) : dueTag(w)}${w.sent && !w.upcoming ? '' : stageTag(w)}</span></div><div class="r">${stepsHtml(w)}${who ? avHtml(who) : ''}</div></a>`;
+<div class="tx"><b>${escapeHtml(w.c.name)}</b><span>${late}${escapeHtml(w.note || '')}</span></div><div class="r">${stepsHtml(w)}<span>${escapeHtml(who || '—')}</span></div></a>`;
 }
 function selectWeekClient(id){ window._weekSel = id; renderThisWeek(); }
 
@@ -73,7 +76,7 @@ function weekDetailHtml(w, cyc){
       : !d ? 'Work logged, no draft yet'
       : d.draftStatus === 'pending' && !d.readyToNotify ? `Draft written, ${escapeHtml(firstName(d.author))} hasn’t sent it for review`
       : d.draftStatus === 'pending' ? 'Waiting in Review' : 'Approved, ready to send';
-    const head = w.late ? `Overdue by ${-w.daysLeft} day${w.daysLeft === -1 ? '' : 's'}` : 'Due today';
+    const head = w.late ? (w.last && w.daysLeft > -14 ? `Overdue by ${-w.daysLeft} day${w.daysLeft === -1 ? '' : 's'}` : overdueShort(w)) : 'Due today';
     callout = `<div class="next" style="margin-top:18px"><span class="sig ${w.late ? 'r' : 'y'}">${icon('clock-countdown')}</span>
 <div class="tx"><b>${escapeHtml(head)}</b><span>${why} · ${escapeHtml(lastTxt)}</span></div>${secondary}${primary}</div>`;
   } else if(primary || secondary){
