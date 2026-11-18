@@ -658,9 +658,9 @@ body.mac :is(input[type="text"], input:not([type]), input[type="email"], input[t
 
 /* ---- the sidebar, a size down (Nov 18): the logo sits in a row as tall as the toolbar, with the
    same line under it, and the items are 14px like the rest of the app ---- */
-.app-win .side { flex-basis: 240px; padding-top: 0; }
+.app-win .side { flex-basis: 220px; padding: 0 10px 10px; }
 .side-top { display: none; }
-.side-head { flex: 0 0 auto; display: flex; align-items: center; height: 52px; margin: 0 -12px; padding: 0 12px; border-bottom: .5px solid var(--sep-strong); }
+.side-head { flex: 0 0 auto; display: flex; align-items: center; height: 52px; margin: 0 -10px; padding: 0 10px; border-bottom: .5px solid var(--sep-strong); }
 .side-head .side-brand { flex: 1 1 auto; min-width: 0; margin: 0; padding: 5px 6px; }
 .side-brand .brand-mark { width: 30px; height: 30px; border-radius: 8px; font-size: 12.5px; }
 .side-brand .brand-name { font-size: 14px; }
@@ -676,7 +676,7 @@ body.mac :is(input[type="text"], input:not([type]), input[type="email"], input[t
 .mac[data-theme="light"] .app-win .side :is(.src-i, .src-i svg, .side-brand, .side-foot .who b, .side-foot > .ib) { color: #000; }
 /* installed as a desktop app: the row is title bar too, and the logo clears the Mac's window buttons */
 @media (display-mode: window-controls-overlay) {
-  .side-head { -webkit-app-region: drag; app-region: drag; padding-left: max(12px, env(titlebar-area-x, 0px)); }
+  .side-head { -webkit-app-region: drag; app-region: drag; padding-left: max(10px, env(titlebar-area-x, 0px)); }
   .side-head .side-brand { -webkit-app-region: no-drag; app-region: no-drag; }
 }
 
