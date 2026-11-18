@@ -21,17 +21,22 @@ function parseJson(text){
 
 // Reassignments made in Radar become teaching examples for the next run.
 async function recentCorrections(){
-  const { data } = await db().from('wa_tasks').select('title,ai_owner_key,owner_key')
-    .not('ai_owner_key', 'is', null).order('updated_at', { ascending: false }).limit(60);
-  return (data || []).filter(t => t.owner_key && t.owner_key !== t.ai_owner_key).slice(0, 15);
+  const { data } = await db().from('wa_tasks').select('title,ai_owner_key,owner_key,status')
+    .not('ai_owner_key', 'is', null).order('updated_at', { ascending: false }).limit(80);
+  const rows = data || [];
+  return {
+    reassigned: rows.filter(t => t.status !== 'dismissed' && t.owner_key && t.owner_key !== t.ai_owner_key).slice(0, 15),
+    notTasks: rows.filter(t => t.status === 'dismissed').slice(0, 15),
+  };
 }
 
-const SYSTEM = (corrections) => `You read WhatsApp group chats between a marketing agency (Based Agency) and one client, and keep the agency's to-do list honest.
+const SYSTEM = ({ reassigned, notTasks }) => `You read WhatsApp group chats between a marketing agency (Based Agency) and one client, and keep the agency's to-do list honest.
 
 TEAM AND WHO HANDLES WHAT:
 ${ROLES.map(r => `- ${r.key}: ${r.does}`).join('\n')}
 If it is unclear, assign "eric" (main point of contact). Never invent other owners.
-${corrections.length ? '\nLEARN FROM PAST CORRECTIONS (the team reassigned these):\n' + corrections.map(c => `- "${c.title}" → ${c.owner_key} (not ${c.ai_owner_key})`).join('\n') : ''}
+${reassigned.length ? '\nLEARN FROM PAST CORRECTIONS (the team reassigned these):\n' + reassigned.map(c => `- "${c.title}" → ${c.owner_key} (not ${c.ai_owner_key})`).join('\n') : ''}
+${notTasks.length ? '\nTHE TEAM MARKED THESE AS NOT REAL TASKS — do not create similar ones:\n' + notTasks.map(c => `- "${c.title}"`).join('\n') : ''}
 
 Messages are marked [CLIENT] or [TEAM]. Find what the agency still owes the client:
 - request: the client asked for something to be done
