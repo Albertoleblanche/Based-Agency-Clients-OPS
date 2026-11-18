@@ -813,6 +813,10 @@ body.sidebar-collapsed .stm{display:none}
 .sp-draft{padding:2px 0 2px 12px;border-left:2px solid var(--fill-3)}
 .sp-draft b{font-size:13px;font-weight:600}
 .sp-draft p{margin:3px 0 0;font-size:12.5px;line-height:1.5;color:var(--label-2);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.sp-draft-body{margin-top:8px;font-size:13px;line-height:1.6;color:var(--label)}
+.sp-draft-body p{margin:0 0 10px}
+.sp-draft-body ul{margin:0 0 10px;padding-left:18px}
+.sp-draft-body li{margin:0 0 4px}
 .sp-imp{display:flex;flex-direction:column;gap:1px;padding:8px 0}
 .sp-imp + .sp-imp{border-top:.5px solid var(--sep)}
 .sp-imp b{font-size:13px;font-weight:500}

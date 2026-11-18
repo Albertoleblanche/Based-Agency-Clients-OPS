@@ -113,8 +113,11 @@ function weekPanelHtml(w){
   const showAll = window._weekImpsAll === c.id;
   const impRows = (showAll ? imps : imps.slice(0, 3)).map(i => `<div class="sp-imp"><b>${escapeHtml(i.text)}</b><span>${escapeHtml(i.service || c.service || '')} · ${fmtShortDate(new Date(i.date))}${i.includeInEmail === false ? ' · internal' : ''}</span></div>`).join('');
   const more = imps.length > 3 && !showAll ? `<a class="sp-more" href="#" onclick="window._weekImpsAll='${c.id}';renderThisWeek();return false;">${imps.length - 3} more</a>` : '';
-  const draft = d && d.draft ? `<div class="sp-sec"><b>The draft</b><a class="x-lnk" href="#" onclick="openReviewDraft('${c.id}',${jsArg(d.author)});return false;">Read in full</a></div>
-<div class="sp-draft"><b>Your weekly update — ${escapeHtml(updateRangeLabel(c))}</b><p>${escapeHtml(d.draft.replace(/\s+/g, ' ').slice(0, 320))}</p></div>` : '';
+  // The draft reads in full right here, so it works whoever wrote it and wherever it is in review.
+  const full = window._weekDraftFull === c.id, flat = d && d.draft ? d.draft.replace(/\s+/g, ' ').trim() : '';
+  const long = flat.length > 220 || (d && /\n\s*\n/.test(d.draft || ''));
+  const draft = d && d.draft ? `<div class="sp-sec"><b>The draft</b>${long ? `<a class="x-lnk" href="#" onclick="window._weekDraftFull=${full ? 'null' : `'${c.id}'`};renderThisWeek();return false;">${full ? 'Show less' : 'Read in full'}</a>` : ''}</div>
+<div class="sp-draft${full ? ' is-full' : ''}"><b>Your weekly update — ${escapeHtml(updateRangeLabel(c))}</b>${full ? `<div class="sp-draft-body">${draftBodyHtml(d.draft)}</div>` : `<p>${escapeHtml(flat.slice(0, 320))}</p>`}</div>` : '';
   const seq = weekHistory(c), ots = onTimeSummary(seq);
   return `<aside class="sp" aria-label="${escapeHtml(c.name)}, this week’s update">
 <div class="sp-bar"><button class="ib" aria-label="Close" onclick="closeWeekPanel()">${icon('x')}</button><a class="x-lnk" href="#" onclick="openClientDetail('${c.id}');return false;">Open client</a></div>
