@@ -23,6 +23,7 @@ function getCommandPaletteIndex(query){
     return [
       { group: 'Create', icon: 'note-pencil', title: 'Log Improvement', kbd: (typeof MOD_LABEL !== 'undefined' ? MOD_LABEL : '⌘') + 'N', run: () => openQueueLogImprovementModal() },
       { group: 'Create', icon: 'list-checks', title: 'New Task', run: () => openNewTaskModal() },
+      { group: 'Create', icon: 'route', title: 'New Sprint', run: () => openNewSprintModal() },
       { group: 'Create', icon: 'timer', title: timerState.running ? 'Stop the Timer' : 'Start a Timer', run: () => timerState.running ? stopAndSaveTimer() : openTimerModal() },
       ...screens.slice(0, 9)
     ];

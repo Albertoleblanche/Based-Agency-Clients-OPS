@@ -63,7 +63,7 @@ function noteTileHtml(n){
     foot += `<span class="nt-fu${late ? ' is-late' : ''}">${icon('calendar-blank')}Follow up ${noteFuLabel(n.followUpDate)}</span>`;
   } else if(ck) foot += `<span class="nt-fu">${icon('check-square')}${ck[0]} of ${ck[1]}</span>`;
   if(noteIsLogged(n)) foot += `<span class="nt-fu">${icon('check-circle')}Logged</span>`;
-  return `<article class="n1-t${n.status === 'done' ? ' is-done' : ''}" data-note="${n.id}" role="button" tabindex="0" aria-label="${escapeHtml(title)}" onclick="openNoteSheet('${n.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openNoteSheet('${n.id}')}">
+  return `<article class="n1-t${n.color ? ' has-c c-' + n.color : ''}${n.status === 'done' ? ' is-done' : ''}" data-note="${n.id}" role="button" tabindex="0" aria-label="${escapeHtml(title)}" onclick="openNoteSheet('${n.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openNoteSheet('${n.id}')}">
 <div class="n1-tc">${c ? monoHtml(c, 'sm') : ''}<span class="n1-cl">${escapeHtml(c ? c.name : 'No client')}</span><time>${fmtShortDate(new Date(n.createdAt))}</time></div>
 <h3>${escapeHtml(title)}</h3><div class="n1-b">${notePreviewHtml(n.text)}</div>
 <div class="n1-tf">${foot}</div></article>`;
@@ -116,7 +116,7 @@ function openNoteSheet(id, presetClientId, presetStatus){
   const inView = typeof currentViewName !== 'undefined' && currentViewName === 'notes' && !!host;
   const cid = n ? n.clientId : (presetClientId && clients.some(c => c.id === presetClientId) ? presetClientId : '');
   noteSheet = { id: n ? n.id : null, clientId: cid, status: n ? n.status : (presetStatus || 'idea'), followUp: n ? (n.followUpDate || '') : '',
-    link: n ? (n.link || '') : '', cal: false, modal: !inView, edited: false, pending: null, prevFocus: document.activeElement };
+    link: n ? (n.link || '') : '', color: n ? (n.color || null) : null, cal: false, modal: !inView, edited: false, pending: null, prevFocus: document.activeElement };
   const html = noteSheetHtml(n);
   if(inView) host.innerHTML = `<div class="n1-scrim" onclick="closeNoteSheet()"></div>${html}`;
   else {
@@ -170,6 +170,7 @@ function noteSheetHtml(n){
 ${noteClientPopHtml(s.clientId)}
 ${noteStatusPopHtml(s.status)}
 ${noteFuPopHtml(s.followUp)}
+<span class="n1-cc">${colorSwatchesHtml('nsColor', s.color, 'noteSetColor', { small: true })}</span>
 <span class="n1-sp"></span>
 ${n ? `<button type="button" class="ib" aria-label="More" title="More" onclick="noteMore(event)">${icon('dots-three')}</button>` : ''}<button type="button" class="ib" aria-label="Close" title="Close" onclick="closeNoteSheet()">${icon('x')}</button>
 </header>`;
@@ -179,7 +180,7 @@ ${n ? `<button type="button" class="ib" aria-label="More" title="More" onclick="
 <span>${icon('paperclip')}Paste a link to attach it</span>
 <span>${icon('calendar-blank')}A follow-up date can go on your calendar</span>
 </div>`;
-  return `<section class="n1-sheet${n ? '' : ' is-new'}" role="dialog" aria-modal="true" aria-label="${escapeHtml(n ? (n.title || 'Note') : 'New note')}" tabindex="-1" onkeydown="noteSheetKey(event)">
+  return `<section class="n1-sheet${n ? '' : ' is-new'}${s.color ? ' has-c c-' + s.color : ''}" role="dialog" aria-modal="true" aria-label="${escapeHtml(n ? (n.title || 'Note') : 'New note')}" tabindex="-1" onkeydown="noteSheetKey(event)">
 ${head}
 <div class="n1-doc">
 <textarea class="n1-h2" id="nsTitle" rows="1" spellcheck="true" placeholder="Title" aria-label="Title" oninput="noteFit(this);noteDirty()" onkeydown="if(event.key==='Enter'&&!event.isComposing){event.preventDefault();noteFocusBlock(0,'start')}">${escapeHtml(n ? (n.title || '') : '')}</textarea>
@@ -337,6 +338,18 @@ async function noteSetClient(sel){
   const n = notes.find(x => x.id === noteSheet?.id); if(n) n.clientId = v;
   renderNotes();
 }
+// The color shows straight away on the open note (its edge) and its tile.
+async function noteSetColor(v){
+  if(!noteSheet) return;
+  noteSheet.color = v;
+  const sh = document.querySelector('.n1-sheet');
+  if(sh){ sh.classList.forEach(k => { if(/^c-/.test(k)) sh.classList.remove(k); }); sh.classList.toggle('has-c', !!v); if(v) sh.classList.add('c-' + v); }
+  if(!noteSheet.id) return;
+  const n = notes.find(x => x.id === noteSheet.id), before = n ? n.color : null;
+  if(n){ n.color = v; renderNotes(); }
+  const { error } = await supabaseClient.from('notes').update({ color: v }).eq('id', noteSheet.id).eq('user_id', currentUser.id);
+  if(error){ if(n){ n.color = before; renderNotes(); } isMissingColumnError(error) ? warnNoColorColumn('Color not saved') : showToast('error', 'Color not saved', error.message); }
+}
 async function noteSetStatus(sel){
   if(!noteSheet) return;
   const v = sel.value;
@@ -407,7 +420,10 @@ async function noteCreate(btn){
   const first = (noteBlocks(text)[0] || { t: '' }).t.split('\n')[0];
   const title = t || (first.length > 70 ? first.slice(0, 69).trimEnd() + '…' : first) || 'Untitled note';
   setBtnLoading(btn, 'Adding…');
-  const { data, error } = await supabaseClient.from('notes').insert({ user_id: currentUser.id, title, client_id: s.clientId, status: s.status, text, link: s.link || null, follow_up_date: s.followUp || null }).select().single();
+  const row = { user_id: currentUser.id, title, client_id: s.clientId, status: s.status, text, link: s.link || null, follow_up_date: s.followUp || null };
+  if(s.color) row.color = s.color;
+  let { data, error } = await supabaseClient.from('notes').insert(row).select().single();
+  if(error && s.color && isMissingColumnError(error)){ delete row.color; warnNoColorColumn(); ({ data, error } = await supabaseClient.from('notes').insert(row).select().single()); }
   restoreBtn(btn);
   if(error){ showToast('error', 'Note not added', error.message); return; }
   noteSheet = null; noteSheetDomClose(s);

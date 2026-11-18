@@ -246,6 +246,7 @@ async function handleNotifClick(id){
   }
   if(n.target_view){
     hidePop(document.getElementById('notifPanel'));
+    if(n.target_view==='plan' && n.target_id) window._planSel = n.target_id;
     switchView(n.target_view);
     if(n.target_view==='approve' && n.target_id && clients.find(c=>c.id===n.target_id)){
       openQueueCardModal(n.target_id);

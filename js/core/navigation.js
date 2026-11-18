@@ -121,6 +121,7 @@ const VIEW_TITLES = {
   teamqueue: ['Review', ''],
   notes: ['Notes', "Private to you — improvements you're planning or want to get to. Nobody else on the team can see these."],
   tasks: ['Tasks', 'Assign tasks to anyone on the team — only you and the other person can see it'],
+  plan: ['Plan', 'Your next six weeks — private to you'],
   'task-archive': ['Finished Tasks', 'Everything that’s been done'],
   reminders: ['Reminders', "Client questions waiting on a response, visible to the whole team"],
   calendar: ['Calendar', "The whole team's calendar in one place — meetings, deadlines, and reminders"],
@@ -343,7 +344,7 @@ async function openScreenFromAddress(hash){
 
 // Leaving a screen closes its right-hand panel, so the screen is back to its list when you return.
 // It redraws once the screen is hidden, so nothing animates out of sight or on the way back.
-const PANEL_STATE = { approve: ['_weekSel', '_weekDraftEdit'], health: ['_healthSel'], focusreports: ['_focusSel'], tasks: ['_taskSel'] };
+const PANEL_STATE = { approve: ['_weekSel', '_weekDraftEdit'], health: ['_healthSel'], focusreports: ['_focusSel'], tasks: ['_taskSel'], plan: ['_planSel', '_planAddStep', '_planAddRem'] };
 function closePanelOnLeave(view){
   if(view === 'clients'){
     if(typeof inspectedClientId === 'undefined' || !inspectedClientId) return;
@@ -353,7 +354,7 @@ function closePanelOnLeave(view){
   const keys = PANEL_STATE[view];
   if(!keys || !keys.some(k => window[k])) return;
   keys.forEach(k => { window[k] = null; });
-  const redraw = { approve: 'renderThisWeek', health: 'renderHealth', focusreports: 'drawFocusReports', tasks: 'renderTasks' }[view];
+  const redraw = { approve: 'renderThisWeek', health: 'renderHealth', focusreports: 'drawFocusReports', tasks: 'renderTasks', plan: 'renderPlan' }[view];
   if(typeof window[redraw] === 'function') window[redraw]();
 }
 
@@ -430,6 +431,7 @@ async function switchView(name){
     renderImprovementsHistory();
   }
   if(name==='teamqueue') renderTeamQueue();
+  if(name==='plan' && typeof renderPlan === 'function') renderPlan();
   if(name==='time') (typeof renderTimeView === 'function' ? renderTimeView() : renderTimesheet());
 }
 

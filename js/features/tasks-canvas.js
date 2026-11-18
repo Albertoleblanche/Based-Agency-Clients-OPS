@@ -44,7 +44,7 @@ function tkCb(t, cls){
 function tkCardHtml(t){
   const c = clients.find(x => x.id === t.clientId), [due, kind] = tkDue(t);
   const flag = t.priority === 'high' ? `<span class="tk-flag" title="High priority">${icon('flag', { fill: true })}</span>` : '';
-  return `<article class="tk-c${window._taskSel === t.id ? ' is-sel' : ''}" role="button" tabindex="0" aria-label="${escapeHtml(t.title)}" onclick="selectTask('${t.id}')" onkeydown="if((event.key==='Enter'||event.key===' ')&&event.target===this){event.preventDefault();selectTask('${t.id}')}">
+  return `<article class="tk-c${t.color ? ' has-c c-' + t.color : ''}${window._taskSel === t.id ? ' is-sel' : ''}" role="button" tabindex="0" aria-label="${escapeHtml(t.title)}" onclick="selectTask('${t.id}')" onkeydown="if((event.key==='Enter'||event.key===' ')&&event.target===this){event.preventDefault();selectTask('${t.id}')}">
 <div class="tk-ct">${tkCb(t)}<b>${escapeHtml(t.title)}</b>${flag}</div>
 ${c ? `<div class="tk-cm">${tkLogo(c)}<span class="tk-cl">${escapeHtml(c.name)}</span></div>` : ''}
 <div class="tk-cf"><span class="tk-due ${kind}">${escapeHtml(due)}</span><span class="tk-who">${escapeHtml(tkWho(t.assigneeId))}</span></div></article>`;
@@ -52,7 +52,7 @@ ${c ? `<div class="tk-cm">${tkLogo(c)}<span class="tk-cl">${escapeHtml(c.name)}<
 function tkListRowHtml(t){
   const c = clients.find(x => x.id === t.clientId), [due, kind] = tkDue(t), done = t.status === 'done';
   return `<div class="tk-lr${done ? ' is-done' : ''}${window._taskSel === t.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectTask('${t.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)selectTask('${t.id}')">${tkCb(t)}
-<div class="tx"><b>${escapeHtml(t.title)}${t.priority === 'high' && !done ? `<span class="tk-flag" title="High priority">${icon('flag', { fill: true })}</span>` : ''}</b><span class="s">${c ? escapeHtml(c.name) + ' · ' : ''}${escapeHtml(tkWho(t.assigneeId))}</span></div>
+<div class="tx"><b>${t.color && !done ? `<i class="cc-dot c-${t.color}" aria-hidden="true"></i>` : ''}${escapeHtml(t.title)}${t.priority === 'high' && !done ? `<span class="tk-flag" title="High priority">${icon('flag', { fill: true })}</span>` : ''}</b><span class="s">${c ? escapeHtml(c.name) + ' · ' : ''}${escapeHtml(tkWho(t.assigneeId))}</span></div>
 <span class="tk-due ${kind}">${escapeHtml(done && t.completedAt ? 'Done ' + fmtShortDate(new Date(t.completedAt)) : due)}</span></div>`;
 }
 
@@ -133,6 +133,13 @@ async function remindTaskAssignee(id){
   showToast('success', `Reminded ${firstName(who.name)}`, 'They’ll see it in their notifications.');
   renderTasks();
 }
+// The color, changed from the panel (only the person who assigned it can change it).
+async function setTaskColor(v){
+  const t = tasks.find(x => x.id === window._taskSel); if(!t || t.assignerId !== currentUser?.id) return;
+  const before = t.color; t.color = v; renderTasks();
+  const { error } = await supabaseClient.from('tasks').update({ color: v }).eq('id', t.id);
+  if(error){ t.color = before; renderTasks(); if(isMissingColumnError(error)) warnNoColorColumn('Color not saved'); else showToast('error', 'Color not saved', error.message); }
+}
 // Things that happened this session that aren't stored anywhere (a reminder sent).
 const taskSessionActivity = {};
 function addTaskActivity(id, ev){ (taskSessionActivity[id] = taskSessionActivity[id] || []).push(ev); }
@@ -189,6 +196,7 @@ function taskPanelHtml(t){
   const ckDone = ck.filter(x => x.on).length;
   const ckHtml = ck.map(x => `<div class="tkp-ck${x.on ? ' on' : ''}"><button class="tk-cb${x.on ? ' on' : ''}" role="checkbox" aria-checked="${x.on}" aria-label="${escapeHtml(x.t)}"${amAssigner || amAssignee ? ` onclick="toggleTaskCheck('${t.id}', ${x.i})"` : ' disabled'}>${x.on ? icon('check', { weight: 'bold' }) : ''}</button><span>${escapeHtml(x.t)}</span></div>`).join('');
   const linked = (typeof calendarEvents !== 'undefined' ? calendarEvents : []).find(e => e.relatedTaskId === t.id);
+  const sp = t.sprintId && typeof planSprints !== 'undefined' ? planSprints.find(x => x.id === t.sprintId) : null;
   // what happened: comments, plus what the task's own dates say
   const ev = [];
   if(t.createdAt) ev.push({ at: t.createdAt, html: amAssigner ? (amAssignee ? '<b>You</b> created this' : `<b>You</b> assigned this to ${escapeHtml(firstName(assignee ? assignee.name : 'someone'))}`) : `<b>${escapeHtml(firstName(assigner ? assigner.name : 'Someone'))}</b> assigned this to you` });
@@ -210,6 +218,8 @@ ${c ? `<span class="tkp-k">Client</span><span class="tkp-v"><a href="#" onclick=
 <span class="tkp-k">Assigned to</span><span class="tkp-v">${assigned}</span>
 <span class="tkp-k">Due</span><span class="tkp-v${late ? ' tkp-late' : ''}">${escapeHtml(dueTxt)}${linked ? `<em>on your calendar</em>` : ''}</span>
 <span class="tkp-k">Status</span><span class="tkp-v">${status}</span>
+${amAssigner ? `<span class="tkp-k">Color</span><span class="tkp-v">${colorSwatchesHtml('tkpColor', t.color, 'setTaskColor', { small: true })}</span>` : t.color ? `<span class="tkp-k">Color</span><span class="tkp-v"><i class="cc-dot c-${t.color}" aria-hidden="true"></i>${itemColorName(t.color)}</span>` : ''}
+${sp ? `<span class="tkp-k">Sprint</span><span class="tkp-v"><a href="#" onclick="openPlanSprint('${sp.id}');return false;"><i class="cc-dot${sp.color ? ' c-' + sp.color : ''}" aria-hidden="true"></i>${escapeHtml(sp.title)}</a></span>` : ''}
 ${t.link ? `<span class="tkp-k">Link</span><span class="tkp-v"><a href="${safeUrl(normalizeUrl(t.link))}" target="_blank" rel="noopener">${escapeHtml(truncateLinkDisplay(t.link, 40))}</a></span>` : ''}
 </div>
 ${acts}

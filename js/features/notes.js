@@ -93,7 +93,7 @@ async function loadMyNotes(){
     .is('deleted_at', null)
     .order('updated_at', { ascending: false });
   if(error){ console.error('loadMyNotes error', error); notes = []; notesDataLoaded = true; return; }
-  notes = (data||[]).map(n => ({ id:n.id, clientId:n.client_id, title:n.title, text:n.text, status:n.status, link:n.link, followUpDate:n.follow_up_date, createdAt:n.created_at, updatedAt:n.updated_at }));
+  notes = (data||[]).map(n => ({ id:n.id, clientId:n.client_id, title:n.title, text:n.text, status:n.status, link:n.link, followUpDate:n.follow_up_date, color:n.color||null, createdAt:n.created_at, updatedAt:n.updated_at }));
   notesDataLoaded = true;
 }
 

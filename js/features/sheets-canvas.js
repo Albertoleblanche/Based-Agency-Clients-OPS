@@ -368,6 +368,35 @@ async function createGroupDrafts(){
   else showToast('success', `${ok} draft${ok === 1 ? ' is' : 's are'} in Review`, aiMissed ? `${aiMissed} ${aiMissed === 1 ? 'was' : 'were'} started from the logged work because the AI didn’t answer. Edit ${aiMissed === 1 ? 'it' : 'them'} in Review.` : 'An approver reads each one before it goes to the client.');
 }
 
+// ---- Colors for tasks, notes and sprints: None and six colors (orange stays the main button's) ----
+const ITEM_COLORS = [['red', 'Red'], ['yellow', 'Yellow'], ['green', 'Green'], ['blue', 'Blue'], ['purple', 'Purple'], ['gray', 'Gray']];
+function itemColorName(v){ return (ITEM_COLORS.find(c => c[0] === v) || [, 'None'])[1]; }
+// A row of swatches. onpick is called with the color (or null) after a pick.
+function colorSwatchesHtml(id, value, onpick, opts){
+  const o = opts || {}, v = ITEM_COLORS.some(c => c[0] === value) ? value : null;
+  const sw = (k, label) => `<button type="button" class="cc${k ? ' c-' + k : ' none'}${(k || null) === v ? ' on' : ''}" role="radio" aria-checked="${(k || null) === v}" aria-label="${label}" title="${label}" data-v="${k || ''}" onclick="pickItemColor(this${onpick ? `,'${onpick}'` : ''})" onkeydown="colorSwatchKey(event,this)"></button>`;
+  return `<div class="cc-row${o.small ? ' is-sm' : ''}" id="${id}" role="radiogroup" aria-label="Color">${sw('', 'None')}${ITEM_COLORS.map(([k, l]) => sw(k, l)).join('')}${o.small ? '' : `<span class="cc-name">${itemColorName(v)}</span>`}</div>`;
+}
+function pickItemColor(b, onpick){
+  const row = b.parentElement;
+  row.querySelectorAll('.cc').forEach(x => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', on); });
+  const v = b.dataset.v || null, nm = row.querySelector('.cc-name'); if(nm) nm.textContent = itemColorName(v);
+  if(onpick && typeof window[onpick] === 'function') window[onpick](v);
+}
+function colorSwatchKey(e, b){
+  if(!['ArrowRight', 'ArrowLeft'].includes(e.key)) return;
+  e.preventDefault();
+  const all = [...b.parentElement.querySelectorAll('.cc')], i = all.indexOf(b), n = all[(i + (e.key === 'ArrowRight' ? 1 : all.length - 1)) % all.length];
+  n.focus(); n.click();
+}
+function pickedItemColor(id){ const b = document.querySelector(`#${id} .cc.on`); return b ? (b.dataset.v || null) : null; }
+// Until addendum-colors-and-plan.sql has run there's no color column: save without it, and say so once.
+let _colorColumnWarned = false;
+function warnNoColorColumn(title){
+  if(_colorColumnWarned && !title) return; _colorColumnWarned = true;
+  showToast('info', title || 'Saved without the color', 'Colors need a one-time database update (addendum-colors-and-plan.sql). Ask an admin to run it.');
+}
+
 // ---- New Task / Edit Task -------------------------------------------------------------------
 let taskDueTimes = {};
 async function loadTaskDueTimes(){
@@ -405,6 +434,7 @@ function taskFormHtml(editing, presetAssigneeId, presetContext){
 <label for="taskAssigneeSelect">Assignee</label><div>${sheetPop('taskAssigneeSelect', 'Assignee', people.map(p => [p.id, p.name + (p.id === currentUser.id ? ' (you)' : '')]), assignee, 'ntAssigneeChanged(this)', { lead: aName ? avHtml(aName, 'id="ntAv"') : '' })}</div>
 <label for="taskDueInput">Due</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap" id="ntDueRow">${sheetDateField('taskDueInput', due, { none: 'No date', from: 0, to: 20, min: toDateStr(new Date()), after: 'ntSyncDue', label: 'Due date' })}${sheetPop('taskTimeInput', 'Due time', taskTimeOptions(), time, '', { disabled: !due })}</div>
 <label>Priority</label><div><div class="seg" role="radiogroup" aria-label="Priority" id="ntPriority">${priSeg}</div></div>
+<label>Color</label><div>${colorSwatchesHtml('ntColor', t ? t.color : (presetContext?.color || null))}</div>
 <label class="top" for="taskDescInput">Notes</label><textarea id="taskDescInput" class="tf" spellcheck="true" placeholder="Add details, links or a checklist">${escapeHtml(notes)}</textarea>
 ${t ? '' : `<span></span><div style="display:flex;align-items:center;gap:10px;font-size:14px" id="ntCalRow" class="${due ? '' : 'off'}">${sheetSw('ntCal', true, 'Add to my calendar')}Add to my calendar</div>`}
 </div>
@@ -472,10 +502,15 @@ function ntReadForm(){
   const notesTxt = g('taskDescInput').value.trim();
   const url = (notesTxt.match(/https?:\/\/[^\s<>"]+|www\.[^\s<>"]+/i) || [])[0];
   return { title, assigneeId: g('taskAssigneeSelect').value, priority: ntPriority(), description: notesTxt, dueDate,
-    dueTime: dueDate ? (g('taskTimeInput')?.value || '') : '', clientId: g('taskClientSelect').value || null, link: url ? normalizeUrl(url.replace(/[).,;]+$/, '')) : null };
+    dueTime: dueDate ? (g('taskTimeInput')?.value || '') : '', clientId: g('taskClientSelect').value || null, link: url ? normalizeUrl(url.replace(/[).,;]+$/, '')) : null,
+    color: pickedItemColor('ntColor') };
 }
 async function insertTaskRow(row){
   let res = await supabaseClient.from('tasks').insert(row).select().single();
+  if(res.error && isMissingColumnError(res.error) && ('color' in row || 'sprint_id' in row)){
+    const { color, sprint_id, ...rest } = row; if(color) warnNoColorColumn();
+    row = rest; res = await supabaseClient.from('tasks').insert(row).select().single();
+  }
   // "None" is stored as no priority; if the database insists on one, Low behaves the same (no flag).
   if(res.error && row.priority == null) res = await supabaseClient.from('tasks').insert({ ...row, priority: 'low' }).select().single();
   return res;
@@ -499,8 +534,10 @@ async function saveNewTask(){
   if(f.clientId && isClientPaused(f.clientId)){ showPausedClientWarning(f.clientId); return; }
   const addCal = sheetIsOn('ntCal') && !!f.dueDate;
   const btn = clickedBtn(); setBtnLoading(btn, 'Creating…');
-  const { data, error } = await insertTaskRow({ title: f.title, description: f.description, priority: f.priority === 'none' ? null : f.priority,
-    assigner_id: currentUser.id, assignee_id: f.assigneeId, client_id: f.clientId, due_date: f.dueDate, link: f.link, status: newTaskPresetStatus });
+  const row = { title: f.title, description: f.description, priority: f.priority === 'none' ? null : f.priority,
+    assigner_id: currentUser.id, assignee_id: f.assigneeId, client_id: f.clientId, due_date: f.dueDate, link: f.link, status: newTaskPresetStatus };
+  if(f.color) row.color = f.color;
+  const { data, error } = await insertTaskRow(row);
   newTaskPresetStatus = 'todo';
   restoreBtn(btn);
   if(error || !data){ showToast('error', 'Save failed', error?.message || 'Try again in a moment.'); return; }
@@ -525,7 +562,9 @@ async function saveEditTask(taskId){
   const reassigned = f.assigneeId !== t.assigneeId;
   const row = { title: f.title, description: f.description, priority: f.priority === 'none' ? null : f.priority, assignee_id: f.assigneeId, client_id: f.clientId,
     due_date: f.dueDate, link: f.link, assignee_notified: reassigned ? false : t.assigneeNotified };
+  if((f.color || null) !== (t.color || null)) row.color = f.color;
   let { error } = await supabaseClient.from('tasks').update(row).eq('id', taskId);
+  if(error && isMissingColumnError(error) && 'color' in row){ delete row.color; warnNoColorColumn(); ({ error } = await supabaseClient.from('tasks').update(row).eq('id', taskId)); }
   if(error && row.priority == null) ({ error } = await supabaseClient.from('tasks').update({ ...row, priority: 'low' }).eq('id', taskId));
   if(!error && (taskDueTimes[taskId] || '') !== (f.dueTime || '')) await setTaskDueTime(taskId, f.dueTime);
   closeAppModal();

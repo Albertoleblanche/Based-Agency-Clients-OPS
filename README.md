@@ -19,6 +19,9 @@ Run new `.sql` files once in Supabase → SQL Editor. The current one:
   it's run, then switches over by itself.
 - `addendum-improvement-details.sql` — adds a service and screenshots to each logged
   improvement. Until it's run, Log Improvement works as before and hides Screenshots.
+- `addendum-colors-and-plan.sql` — colors on tasks and notes, and the Plan tab's
+  sprints and weekly hours (private to each person). Until it's run, tasks and notes
+  save without a color and Plan shows what's coming up but can't save sprints.
 
 ---
 

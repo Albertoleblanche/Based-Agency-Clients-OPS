@@ -17,7 +17,8 @@ async function loadMyTasks(){
     createdAt:t.created_at, completedAt:t.completed_at, cancelledAt:t.cancelled_at,
     hiddenByAssigner:t.hidden_by_assigner, hiddenByAssignee:t.hidden_by_assignee,
     assigneeNotified:t.assignee_notified, assignerNotified:t.assigner_notified,
-    attachments:t.attachments||[], completionNotes:t.completion_notes||'', completionLink:t.completion_link||''
+    attachments:t.attachments||[], completionNotes:t.completion_notes||'', completionLink:t.completion_link||'',
+    color:t.color||null, sprintId:t.sprint_id||null
   }));
   tasksDataLoaded = true;
   if(typeof renderToday === 'function') renderToday();

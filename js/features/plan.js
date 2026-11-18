@@ -1,0 +1,571 @@
+// Plan, as on the canvas boards PlanNew, PlanSprintOpen and PlanNewSprint: your next six weeks.
+// A sprint is a few days of focused work, usually for one client: dates, a goal, the hours you'll
+// spend, steps and reminders. Sprints are private to you (plan_sprints). Their steps are ordinary
+// tasks (tasks.sprint_id), so they also show in Tasks, Today and your calendar; nothing to keep in
+// sync. Under the timeline, everything else with a date is pulled in so you can look ahead: your
+// tasks, note follow-ups, client reminders you asked, calendar events and sprint reminders.
+// Off days are US holidays. Needs addendum-colors-and-plan.sql; until then the look-ahead still
+// works and New Sprint says what to run. Loaded after tasks-canvas.js.
+
+let planSprints = [];
+let planReady = null;          // null: not loaded yet · false: the table isn't there yet · true
+let planWeeklyHours = 20;      // hours a week you keep for planned work (you set it)
+let planRange = (() => { try{ return localStorage.getItem('bda_plan_range') === '13' ? 13 : 6; }catch(e){ return 6; } })();
+let planClient = 'all', planFilter = 'all';
+
+function planRowFromDb(r){
+  return { id: r.id, title: r.title || 'Untitled sprint', clientId: r.client_id || null, start: r.start_date, end: r.end_date,
+    hours: Number(r.hours) || 0, goal: r.goal || '', color: r.color || null, doneAt: r.done_at || null,
+    reminders: Array.isArray(r.reminders) ? r.reminders : [], noteId: r.note_id || null, createdAt: r.created_at };
+}
+async function loadPlan(){
+  if(!currentUser){ planSprints = []; return; }
+  const { data, error } = await supabaseClient.from('plan_sprints').select('*').eq('user_id', currentUser.id).order('start_date', { ascending: true });
+  if(error){ planReady = false; planSprints = []; return; }
+  planReady = true;
+  planSprints = (data || []).map(planRowFromDb);
+  const s = await supabaseClient.from('plan_settings').select('*').eq('user_id', currentUser.id).maybeSingle();
+  if(!s.error && s.data && Number(s.data.weekly_hours) > 0) planWeeklyHours = Number(s.data.weekly_hours);
+  checkPlanReminders();
+}
+function planSprint(id){ return planSprints.find(s => s.id === id); }
+
+// ---- days: weekdays, US holidays (the ones businesses close for) -------------------------------
+function planNth(y, m, dow, n){
+  if(n > 0){ const d = new Date(y, m, 1); return new Date(y, m, 1 + (dow - d.getDay() + 7) % 7 + 7 * (n - 1)); }
+  const d = new Date(y, m + 1, 0); return new Date(y, m, d.getDate() - (d.getDay() - dow + 7) % 7);
+}
+function planObserved(d){ const w = d.getDay(); return w === 6 ? addDays(d, -1) : w === 0 ? addDays(d, 1) : d; }
+const _planHol = {};
+function usHolidays(y){
+  if(_planHol[y]) return _planHol[y];
+  const thanks = planNth(y, 10, 4, 4), out = {};
+  [[planObserved(new Date(y, 0, 1)), 'New Year’s Day'], [planNth(y, 0, 1, 3), 'Martin Luther King Jr. Day'], [planNth(y, 1, 1, 3), 'Presidents’ Day'],
+   [planNth(y, 4, 1, -1), 'Memorial Day'], [planObserved(new Date(y, 5, 19)), 'Juneteenth'], [planObserved(new Date(y, 6, 4)), 'Independence Day'],
+   [planNth(y, 8, 1, 1), 'Labor Day'], [thanks, 'Thanksgiving'], [addDays(thanks, 1), 'Day after Thanksgiving'],
+   [planObserved(new Date(y, 11, 24)), 'Christmas Eve'], [planObserved(new Date(y, 11, 25)), 'Christmas Day']]
+    .forEach(([d, n]) => { out[toDateStr(d)] = n; });
+  return (_planHol[y] = out);
+}
+function planHoliday(ds){ return usHolidays(Number(ds.slice(0, 4)))[ds] || usHolidays(Number(ds.slice(0, 4)) + 1)[ds] || ''; }
+function isPlanWeekend(d){ const w = d.getDay(); return w === 0 || w === 6; }
+function isPlanWorkday(d){ return !isPlanWeekend(d) && !planHoliday(toDateStr(d)); }
+function planWorkdays(start, end){
+  const out = []; let d = new Date(start + 'T12:00:00'); const e = new Date(end + 'T12:00:00');
+  for(let i = 0; d <= e && i < 400; i++, d = addDays(d, 1)) if(isPlanWorkday(d)) out.push(toDateStr(d));
+  return out;
+}
+function planMonday(d){ const x = dayStart(d); return addDays(x, -((x.getDay() + 6) % 7)); }
+function planDayLabel(ds){
+  const d = new Date(ds + 'T12:00:00'), k = daysBetween(dayStart(rNow()), d);
+  if(k === 0) return 'Today'; if(k === 1) return 'Tomorrow'; if(k === -1) return 'Yesterday';
+  if(k > 1 && k < 7) return DAY_NAMES[d.getDay()].slice(0, 3);
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+// ---- what a sprint is doing ------------------------------------------------------------------
+function planSteps(s){ return tasks.filter(t => t.sprintId === s.id && !t.cancelledAt).sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999')); }
+function planTracked(s){
+  const to = s.end < toDateStr(rNow()) ? s.end : toDateStr(rNow());
+  return (typeof timeEntries !== 'undefined' ? timeEntries : []).filter(e => s.clientId && e.clientId === s.clientId && e.userId === currentUser?.id && e.date >= s.start && e.date <= to)
+    .reduce((n, e) => n + (e.minutes || 0), 0) / 60;
+}
+function planState(s){
+  const today = toDateStr(rNow()), days = planWorkdays(s.start, s.end), steps = planSteps(s), done = steps.filter(t => t.status === 'done').length;
+  const elapsed = days.filter(d => d <= today).length;
+  const kind = s.doneAt ? 'done' : today < s.start ? 'upcoming' : today > s.end ? 'ended' : 'running';
+  const behind = kind === 'running' && steps.length && elapsed / Math.max(days.length, 1) - done / steps.length > .3;
+  return { kind, days, elapsed, steps, done, behind, next: steps.find(t => t.status !== 'done') };
+}
+// Hours a sprint puts on a client this month, from today on, against what's left of its budget.
+function planBudgetWarning(s){
+  const c = s.clientId && clients.find(x => x.id === s.clientId);
+  if(!c || !c.monthlyHourBudget || s.doneAt) return '';
+  const now = rNow(), today = toDateStr(now), monthEnd = toDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+  const all = planWorkdays(s.start, s.end), left = all.filter(d => d >= today && d <= monthEnd);
+  if(!all.length || !left.length) return '';
+  const tracked = planTracked(s), remaining = Math.max(s.hours - tracked, 0) * left.length / all.filter(d => d >= today).length;
+  const used = monthHours(c, now), month = now.toLocaleDateString('en-US', { month: 'long' });
+  if(used + remaining <= c.monthlyHourBudget + .5) return '';
+  const r = Math.round(remaining);
+  return used > c.monthlyHourBudget
+    ? `${escapeHtml(c.name)} is already over its ${c.monthlyHourBudget} h for ${month} (${Math.round(used)} h). The ${r} h left in this sprint this month go over too.`
+    : `${escapeHtml(c.name)} has ${Math.round(c.monthlyHourBudget - used)} h left for ${month}. The ${r} h left in this sprint this month would go over.`;
+}
+
+// ---- the look-ahead: everything with a date, from every part of the app -----------------------
+const PLAN_KINDS = [['all', 'All'], ['task', 'Tasks'], ['note', 'Notes'], ['reminder', 'Reminders'], ['event', 'Events']];
+function planAheadItems(toDs){
+  const me = currentUser?.id, today = toDateStr(rNow()), out = [];
+  const cName = id => (clients.find(c => c.id === id) || {}).name || '';
+  tasks.filter(t => t.assigneeId === me && t.status !== 'done' && !t.cancelledAt && t.dueDate && t.dueDate <= toDs).forEach(t => {
+    const sp = t.sprintId && planSprint(t.sprintId);
+    out.push({ kind: 'task', id: t.id, date: t.dueDate, time: typeof taskDueTimes !== 'undefined' ? taskDueTimes[t.id] || '' : '', title: t.title,
+      sub: sp ? sp.title : (cName(t.clientId) || 'Task'), color: t.color || (sp && sp.color) || null, late: t.dueDate < today });
+  });
+  (typeof notes !== 'undefined' ? notes : []).filter(n => n.followUpDate && n.status !== 'done' && n.followUpDate <= toDs).forEach(n =>
+    out.push({ kind: 'note', id: n.id, date: n.followUpDate, title: n.title || 'Untitled note', sub: `Follow up · ${cName(n.clientId) || 'note'}`, color: n.color, late: n.followUpDate < today }));
+  (typeof clientReminders !== 'undefined' ? clientReminders : []).filter(r => r.status === 'waiting' && r.askedBy === me && r.followUpDate && r.followUpDate <= toDs).forEach(r =>
+    out.push({ kind: 'reminder', id: r.id, date: r.followUpDate, title: r.question, sub: `Follow up with ${cName(r.clientId) || 'the client'}`, late: r.followUpDate < today }));
+  (typeof calendarEvents !== 'undefined' ? calendarEvents : []).filter(e => !e.relatedTaskId && !e.relatedNoteId && !e.relatedReminderId && (e.createdBy === me || (e.attendeeIds || []).includes(me)))
+    .forEach(e => { const st = new Date(e.startAt), ds = toDateStr(st); if(ds < today || ds > toDs) return;
+      out.push({ kind: 'event', id: e.id, date: ds, time: e.allDay ? '' : String(st.getHours()).padStart(2, '0') + ':' + String(st.getMinutes()).padStart(2, '0'), title: e.title, sub: `Event${cName(e.clientId) ? ' · ' + cName(e.clientId) : ''}` }); });
+  planSprints.filter(s => !s.doneAt).forEach(s => (s.reminders || []).forEach((r, i) => {
+    if(r.sent) return; const at = new Date(r.at), ds = toDateStr(at); if(ds < today || ds > toDs) return;
+    out.push({ kind: 'alert', id: s.id, idx: i, date: ds, time: String(at.getHours()).padStart(2, '0') + ':' + String(at.getMinutes()).padStart(2, '0'), title: r.label, sub: `${s.title} · reminder`, color: s.color });
+  }));
+  return out.sort((a, b) => a.date.localeCompare(b.date) || (a.time || '99').localeCompare(b.time || '99'));
+}
+function planKindOf(it){ return it.kind === 'alert' ? 'reminder' : it.kind; }
+function planItemOpen(kind, id){
+  if(kind === 'task') openTaskDetailModal(id);
+  else if(kind === 'note') openNoteSheet(id);
+  else if(kind === 'reminder') switchView('reminders');
+  else if(kind === 'event') (typeof openEventDetailModal === 'function' ? openEventDetailModal(id) : switchView('calendar'));
+  else if(kind === 'alert') selectPlanSprint(id);
+}
+function planItemHtml(it){
+  const ic = { task: '', note: 'note-pencil', reminder: 'bell', event: 'calendar-blank', alert: 'bell' }[it.kind];
+  const lead = it.kind === 'task'
+    ? `<button class="pl-cb" role="checkbox" aria-checked="false" aria-label="Mark done" title="Mark done" onclick="event.stopPropagation();moveTaskToStatus('${it.id}','done')"></button>`
+    : `<span class="pl-ic">${icon(ic)}</span>`;
+  const when = (it.late ? (it.date === toDateStr(addDays(rNow(), -1)) ? 'Yesterday' : 'Was ' + planDayLabel(it.date)) : planDayLabel(it.date)) + (it.time ? ', ' + fmtTime(atTime(new Date(it.date + 'T12:00:00'), it.time)) : '');
+  return `<div class="pl-r${it.color ? ' c-' + it.color : ''}" role="button" tabindex="0" onclick="planItemOpen('${it.kind}','${it.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)planItemOpen('${it.kind}','${it.id}')">${lead}
+<div class="tx"><b>${escapeHtml(it.title)}</b><span class="s">${it.color ? `<i class="cc-dot c-${it.color}" aria-hidden="true"></i>` : ''}${escapeHtml(it.sub)}</span></div><span class="pl-when${it.late ? ' t-red' : ''}">${escapeHtml(when)}</span></div>`;
+}
+
+// ---- the screen ------------------------------------------------------------------------------
+function setPlanRange(n){ planRange = n; try{ localStorage.setItem('bda_plan_range', String(n)); }catch(e){} renderPlan(); }
+function setPlanClient(v){ planClient = v; renderPlan(); }
+function setPlanFilter(v){ planFilter = v; renderPlan(); }
+function selectPlanSprint(id){ window._planSel = window._planSel === id ? null : id; renderPlan(); }
+function closePlanPanel(){ window._planSel = null; window._planAddStep = null; window._planAddRem = null; renderPlan(); }
+function openPlanSprint(id){ closeAppModal?.(); window._planSel = id; if(currentViewName === 'plan') renderPlan(); else switchView('plan'); }
+async function setPlanWeeklyHours(v){
+  const n = Math.max(1, Math.min(60, Number(v) || 20)); planWeeklyHours = n; renderPlan();
+  const { error } = await supabaseClient.from('plan_settings').upsert({ user_id: currentUser.id, weekly_hours: n }, { onConflict: 'user_id' });
+  if(error) showToast('error', 'Not saved', 'Your weekly hours couldn’t be saved. Try again in a moment.');
+}
+
+function renderPlan(){
+  const root = document.getElementById('planRoot');
+  if(!root || !currentUser) return;
+  const now = rNow(), today = toDateStr(now), weeks = planRange, mon = planMonday(now);
+  const cols = weeks * 5, rangeEnd = toDateStr(addDays(mon, weeks * 7 - 1));
+  const dayAt = k => addDays(mon, Math.floor(k / 5) * 7 + (k % 5));
+  const colOf = (ds, edge) => {   // weekday column for a date; weekends snap forward (start) or back (end)
+    let d = new Date(ds + 'T12:00:00');
+    if(isPlanWeekend(d)) d = edge === 'end' ? addDays(d, d.getDay() === 6 ? -1 : -2) : addDays(d, d.getDay() === 6 ? 2 : 1);
+    const w = Math.floor(daysBetween(mon, d) / 7); return w * 5 + (d.getDay() + 6) % 7;
+  };
+  const sprints = planSprints.filter(s => planClient === 'all' || s.clientId === planClient);
+  const shown = sprints.filter(s => s.end >= toDateStr(mon) && s.start <= rangeEnd && (!s.doneAt || s.end >= today));
+  // lanes: a sprint takes the first lane free of overlap
+  const lanes = [];
+  shown.slice().sort((a, b) => a.start.localeCompare(b.start)).forEach(s => {
+    const a = Math.max(0, colOf(s.start < toDateStr(mon) ? toDateStr(mon) : s.start, 'start')), b = Math.min(cols - 1, colOf(s.end > rangeEnd ? rangeEnd : s.end, 'end'));
+    if(b < a) return;
+    let li = lanes.findIndex(l => l.every(x => x.b < a || x.a > b)); if(li < 0){ lanes.push([]); li = lanes.length - 1; }
+    lanes[li].push({ s, a, b });
+  });
+  // hours per week: a sprint's hours spread over its workdays
+  const planned = Array(weeks).fill(0), cap = Array(weeks).fill(0);
+  for(let w = 0; w < weeks; w++){ const wd = [0, 1, 2, 3, 4].filter(k => isPlanWorkday(addDays(mon, w * 7 + k))).length; cap[w] = planWeeklyHours * wd / 5; }
+  planSprints.filter(s => !s.doneAt).forEach(s => { const days = planWorkdays(s.start, s.end); if(!days.length) return;
+    days.forEach(ds => { const w = Math.floor(daysBetween(mon, new Date(ds + 'T12:00:00')) / 7); if(w >= 0 && w < weeks) planned[w] += s.hours / days.length; }); });
+  const wkHtml = Array.from({ length: weeks }, (_, w) => {
+    const p = Math.round(planned[w]), c = Math.round(cap[w]), over = planned[w] > cap[w] + .5;
+    return `<div class="pl-wk${w === 0 ? ' is-now' : ''}"><b>${fmtShortDate(addDays(mon, w * 7))}</b>${weeks <= 6 ? `<span class="${over ? 't-red' : ''}">${p} of ${c} h</span><i><em class="${over ? 'is-over' : ''}" style="width:${Math.min(100, c ? Math.round(planned[w] / c * 100) : 0)}%"></em></i>` : ''}</div>`;
+  }).join('');
+  // the look-ahead, and how busy each day is
+  const items = planAheadItems(rangeEnd);
+  const perDay = {}; items.forEach(it => { if(it.kind !== 'alert' && it.date >= toDateStr(mon)) perDay[it.date] = (perDay[it.date] || 0) + 1; });
+  const days = Array.from({ length: cols }, (_, k) => { const d = dayAt(k), ds = toDateStr(d), n = perDay[ds] || 0;
+    return `<span class="${ds === today ? 'is-today' : ''}${ds < today ? ' is-past' : ''}" title="${escapeHtml(d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }))}${n ? ` · ${n} due` : ''}">${weeks <= 6 ? 'MTWTF'[k % 5] : ''}${n ? `<i class="pl-dd">${'<em></em>'.repeat(Math.min(3, Math.ceil(n / 2)))}</i>` : ''}</span>`; }).join('');
+  // off days (holidays), merged when they sit side by side
+  const off = []; for(let k = 0; k < cols; k++){ const ds = toDateStr(dayAt(k)), h = planHoliday(ds); if(!h) continue;
+    const last = off[off.length - 1]; if(last && last.b === k - 1){ last.b = k; last.names.push(h); } else off.push({ a: k, b: k, names: [h] }); }
+  const offHtml = off.map(o => `<div class="pl-off" style="grid-column:${o.a + 1}/${o.b + 2};grid-row:1/${lanes.length + 2}" title="${escapeHtml([...new Set(o.names)].join(', '))}"><span>Off</span></div>`).join('');
+  const nowCol = colOf(today, 'start'), frac = isPlanWeekend(now) ? 0 : Math.min(1, Math.max(0, (now.getHours() + now.getMinutes() / 60 - 9) / 9));
+  const nowLeft = (nowCol + frac) / cols * 100;
+  const sel = window._planSel && planSprint(window._planSel);
+  if(window._planSel && !sel) window._planSel = null;
+  const bars = lanes.map((l, li) => l.map(({ s, a, b }) => {
+    const st = planState(s);
+    return `<button class="pl-b${s.color ? ' c-' + s.color : ''}${sel && sel.id === s.id ? ' is-sel' : ''}${s.doneAt ? ' is-done' : ''}" style="grid-column:${a + 1}/${b + 2};grid-row:${li + 1}" onclick="selectPlanSprint('${s.id}')" title="${escapeHtml(s.title)}">
+<b>${escapeHtml(s.title)}</b><span>${s.hours ? `${Math.round(s.hours)} h · ` : ''}${st.steps.length ? `${st.done} of ${st.steps.length} steps` : 'No steps yet'}</span></button>`;
+  }).join('')).join('');
+  const ghost = `<button class="pl-ghost" style="grid-row:${lanes.length + 1}" onclick="openNewSprintModal()">${icon('plus')}${planReady === false ? 'Plan needs a one-time database update' : lanes.length ? 'Plan a sprint' : 'Plan your first sprint'}</button>`;
+  // look-ahead list, grouped by week
+  const counts = Object.fromEntries(PLAN_KINDS.map(([k]) => [k, k === 'all' ? items.length : items.filter(it => planKindOf(it) === k).length]));
+  const list = items.filter(it => planFilter === 'all' || planKindOf(it) === planFilter);
+  const groups = [];
+  list.forEach(it => { const w = Math.max(0, Math.floor(daysBetween(mon, new Date(it.date + 'T12:00:00')) / 7)); (groups[w] = groups[w] || []).push(it); });
+  const gName = w => w === 0 ? 'This week' : w === 1 ? 'Next week' : `Week of ${fmtShortDate(addDays(mon, w * 7))}`;
+  const later = window._planLater;
+  const groupHtml = groups.map((g, w) => g && (w < 2 || later) ? `<div class="pl-sec pl-ws"><b>${gName(w)}</b><span class="n">${g.length}</span></div>${g.map(planItemHtml).join('')}` : '').join('');
+  const laterN = groups.reduce((n, g, w) => n + (g && w >= 2 ? g.length : 0), 0);
+  const seg = `<div class="seg pl-kinds" role="tablist" aria-label="Show">${PLAN_KINDS.map(([k, t]) => `<button class="${planFilter === k ? 'on' : ''}" role="tab" aria-selected="${planFilter === k}" onclick="setPlanFilter('${k}')">${t}${counts[k] ? ` <span class="c">${counts[k]}</span>` : ''}</button>`).join('')}</div>`;
+  const ahead = `<div class="pl-ah"><div class="pl-ah-h"><h3>Coming up</h3>${seg}</div>
+<div data-grow-key="pl-later">${groupHtml || `<p class="pl-empty">Nothing with a date in the next ${weeks} weeks${planFilter === 'all' ? '' : ' here'}.</p>`}</div>
+${laterN ? `<a class="x-lnk pl-more" href="#" data-grow="pl-later" onclick="window._planLater=!window._planLater;renderPlan();return false;">${later ? 'Show less' : `${laterN} more in later weeks`}</a>` : ''}</div>`;
+  // the side: sprint reminders coming up, and what's worth planning
+  const rems = items.filter(it => it.kind === 'alert').slice(0, 3);
+  const remHtml = rems.length ? rems.map(it => `<div class="pl-rm${it.color ? ' c-' + it.color : ''}" role="button" tabindex="0" onclick="selectPlanSprint('${it.id}')"><span class="pl-ic">${icon('bell')}</span><div class="tx"><b>${escapeHtml(it.title)}</b><span class="s">${escapeHtml(it.sub.replace(/ · reminder$/, ''))}</span></div><span class="pl-rw">${escapeHtml(planDayLabel(it.date))}<em>${it.time ? fmtTime(atTime(new Date(it.date + 'T12:00:00'), it.time)) : ''}</em></span></div>`).join('')
+    : `<p class="pl-empty">Sprint reminders show here. Add them when you plan a sprint.</p>`;
+  const ideas = (typeof notes !== 'undefined' ? notes : []).filter(n => n.status === 'idea' && n.clientId && !planSprints.some(s => s.noteId === n.id))
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 2)
+    .map(n => ({ ic: 'note-pencil', t: n.title || 'Untitled note', s: `${(clients.find(c => c.id === n.clientId) || {}).name || ''} · from your notes`, run: `openNewSprintModal({ clientId: '${n.clientId}', noteId: '${n.id}' })` }));
+  const me = myName();
+  const room = activeClients().filter(c => c.monthlyHourBudget && clientOwner(c) === me && !planSprints.some(s => !s.doneAt && s.clientId === c.id && s.end >= today))
+    .map(c => ({ c, left: c.monthlyHourBudget - monthHours(c, now) })).filter(x => x.left >= 8).sort((a, b) => b.left - a.left).slice(0, 3 - Math.min(ideas.length, 1))
+    .map(({ c, left }) => ({ ic: 'clock', t: c.name, s: `${Math.round(left)} h of budget left this month`, run: `openNewSprintModal({ clientId: '${c.id}' })` }));
+  const worth = [...ideas, ...room].slice(0, 3);
+  const worthHtml = worth.length ? worth.map(x => `<div class="pl-id"><span class="pl-xi">${icon(x.ic)}</span><div class="tx"><b>${escapeHtml(x.t)}</b><span class="s">${escapeHtml(x.s)}</span></div><button class="btn btn-sm" onclick="${x.run}">Plan</button></div>`).join('')
+    : `<p class="pl-empty">Ideas in your notes and clients with budget left show here.</p>`;
+  const hoursOpts = [5, 10, 15, 20, 25, 30, 35, 40];
+  if(!hoursOpts.includes(planWeeklyHours)) hoursOpts.push(planWeeklyHours), hoursOpts.sort((a, b) => a - b);
+  const side = `<aside class="pl-side">
+<div class="pl-sec"><b>Sprint reminders</b>${rems.length ? `<span class="n">${rems.length}</span>` : ''}</div>${remHtml}
+<div class="pl-sec"><b>Worth planning</b></div>${worthHtml}
+<div class="pl-sec"><b>Your hours</b></div>
+<div class="pl-hrs"><span>Planned work</span><label class="pop pop-sel"><span class="pl">${planWeeklyHours} h a week</span>${icon('caret-down')}<select aria-label="Hours a week for planned work" onchange="setPlanWeeklyHours(this.value)">${hoursOpts.map(h => `<option value="${h}"${h === planWeeklyHours ? ' selected' : ''}>${h} h a week</option>`).join('')}</select></label></div>
+<p class="pl-lock">${icon('lock-simple')}Only you see your plan. Steps you give to someone else show in their Tasks.</p>
+</aside>`;
+  // header
+  const live = planSprints.filter(s => !s.doneAt && s.end >= today);
+  const totalP = Math.round(planned.reduce((a, b) => a + b, 0)), totalC = Math.round(cap.reduce((a, b) => a + b, 0));
+  const nextRem = items.find(it => it.kind === 'alert');
+  const sub = [`${live.length} sprint${live.length === 1 ? '' : 's'}`, `${totalP} of ${totalC} h planned`].join(' · ')
+    + (nextRem ? ` · next reminder <b>${escapeHtml(planDayLabel(nextRem.date))}${nextRem.time ? ', ' + fmtTime(atTime(new Date(nextRem.date + 'T12:00:00'), nextRem.time)) : ''}</b>` : '');
+  const used = [...new Set(planSprints.map(s => s.clientId).filter(Boolean))].map(id => clients.find(c => c.id === id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
+  if(planClient !== 'all' && !used.some(c => c.id === planClient)) planClient = 'all';
+  const curC = used.find(c => c.id === planClient);
+  const setup = planReady === false ? `<div class="pl-setup">${icon('warning')}<span><b>Plan needs a one-time database update.</b> An admin runs <code>addendum-colors-and-plan.sql</code> in Supabase → SQL Editor, and sprints turn on by themselves. Everything coming up below already works.</span></div>` : '';
+  const head = `<div class="pl-hd"><div><h2>Your next ${weeks === 6 ? '6 weeks' : '3 months'}</h2><p>${sub}</p></div>
+<div class="pl-f"><div class="seg" role="tablist" aria-label="Range"><button class="${weeks === 6 ? 'on' : ''}" role="tab" aria-selected="${weeks === 6}" onclick="setPlanRange(6)">6 Weeks</button><button class="${weeks === 13 ? 'on' : ''}" role="tab" aria-selected="${weeks === 13}" onclick="setPlanRange(13)">3 Months</button></div>
+${used.length ? `<label class="pop pop-sel"><span class="pl">Client: ${escapeHtml(curC ? curC.name : 'All')}</span>${icon('caret-down')}<select aria-label="Client" onchange="setPlanClient(this.value)"><option value="all">All</option>${used.map(c => `<option value="${c.id}"${c === curC ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></label>` : ''}</div></div>`;
+  const timeline = `<section class="pl-tl${weeks > 6 ? ' is-long' : ''}" aria-label="The next ${weeks} weeks" style="--cols:${cols}">
+<div class="pl-wks" style="grid-template-columns:repeat(${weeks},minmax(0,1fr))">${wkHtml}</div>
+<div class="pl-days" aria-hidden="true">${days}</div>
+<div class="pl-lanes" style="--wk:${weeks}">${offHtml}<span class="pl-now" aria-hidden="true" style="left:${nowLeft.toFixed(2)}%"></span>${bars}${ghost}</div>
+</section>`;
+  const prev = root.querySelector('.sp-page')?.scrollTop || 0, prevSp = root.querySelector('.sp:not(.sp-leaving)')?.scrollTop || 0;
+  const keep = { step: document.getElementById('plpStepIn')?.value || '' };
+  root.innerHTML = `<div class="spw"><div class="sp-page"><div class="pln">${head}${setup}<div class="pl-body"><div class="pl-main">${timeline}${ahead}</div>${side}</div></div></div>${sel ? planPanelHtml(sel) : ''}</div>`;
+  const sp = root.querySelector('.sp-page'); if(sp) sp.scrollTop = prev;
+  const pn = root.querySelector('.sp:not(.sp-leaving)'); if(pn){ pn.scrollTop = prevSp; pn._st = prevSp; }
+  const si = document.getElementById('plpStepIn'); if(si && keep.step) si.value = keep.step;
+  if(currentViewName === 'plan') setToolbar(null, `${live.length} sprint${live.length === 1 ? '' : 's'} · next ${weeks === 6 ? '6 weeks' : '3 months'}`);
+}
+
+// ---- a sprint open (right panel) -------------------------------------------------------------
+function planPanelHtml(s){
+  const c = s.clientId && clients.find(x => x.id === s.clientId), st = planState(s), today = toDateStr(rNow());
+  const tracked = planTracked(s), hrs = Math.round(s.hours);
+  const dates = `${fmtShortDate(new Date(s.start + 'T12:00:00'))} – ${fmtShortDate(new Date(s.end + 'T12:00:00'))}`;
+  const nextTxt = st.next ? ` Next up: ${st.next.title}${st.next.dueDate ? ` by ${planDayLabel(st.next.dueDate).replace(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)$/, d => DAY_NAMES.find(x => x.startsWith(d)))}` : ''}.` : '';
+  let eyebrow, title, sub, main = '';
+  const trackTxt = c ? `${Math.round(tracked)} of ${hrs} h tracked.` : `${hrs} h planned.`;
+  if(st.kind === 'done'){ eyebrow = `<span class="sp-eb ok">${icon('check', { weight: 'bold' })}Done</span>`; title = `${st.done} of ${st.steps.length} steps done`; sub = `Finished ${escapeHtml(relDayLower(new Date(s.doneAt)))}. ${trackTxt}`; }
+  else if(st.kind === 'upcoming'){ const k = daysBetween(dayStart(rNow()), new Date(s.start + 'T12:00:00'));
+    eyebrow = `<span class="sp-eb">${icon('clock', { weight: 'bold' })}Starts ${k === 1 ? 'tomorrow' : k < 7 ? DAY_NAMES[new Date(s.start + 'T12:00:00').getDay()] : 'in ' + k + ' days'}</span>`;
+    title = st.steps.length ? `${st.steps.length} step${st.steps.length === 1 ? '' : 's'} planned` : 'No steps yet'; sub = `${hrs} h over ${st.days.length} workdays.`; }
+  else if(st.kind === 'ended'){ eyebrow = `<span class="sp-eb warn">${icon('warning', { weight: 'bold' })}Ended ${escapeHtml(relDayLower(new Date(s.end + 'T12:00:00')))}</span>`;
+    title = `${st.done} of ${st.steps.length} steps done`; sub = `${trackTxt} Mark it done, or move the end date.`;
+    main = `<button class="btn btn-p" onclick="setPlanSprintDone('${s.id}', true)">${icon('check')}Mark Done</button>`; }
+  else { eyebrow = `<span class="sp-eb plp-blue">${icon('clock', { weight: 'bold' })}Day ${st.elapsed} of ${st.days.length}</span>`;
+    title = st.steps.length ? `${st.behind ? 'Behind' : 'On track'}: ${st.done} of ${st.steps.length} steps done` : 'Add the steps for this sprint';
+    sub = `${trackTxt}${nextTxt}`;
+    if(c) main = `<button class="btn btn-p" onclick="openTimerModal('${c.id}')">${icon('timer')}Start Timer</button>`; }
+  const acts = s.doneAt ? `<button class="btn" onclick="setPlanSprintDone('${s.id}', false)">Reopen</button>` : `<button class="btn" onclick="planShowAddStep()">${icon('plus')}Add Step</button>${main}`;
+  const warn = planBudgetWarning(s);
+  const steps = st.steps.map(t => { const done = t.status === 'done', mine = t.assigneeId === currentUser?.id;
+    const cb = done ? `<span class="plp-cb on">${icon('check', { weight: 'bold' })}</span>` : mine ? `<button class="plp-cb" role="checkbox" aria-checked="false" aria-label="Mark done" onclick="event.stopPropagation();moveTaskToStatus('${t.id}','done')"></button>` : `<span class="plp-cb is-off" title="${escapeHtml(tkWho(t.assigneeId))}’s"></span>`;
+    return `<div class="plp-s${done ? ' on' : ''}" role="button" tabindex="0" onclick="openTaskDetailModal('${t.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)openTaskDetailModal('${t.id}')">${cb}<span class="t">${escapeHtml(t.title)}</span>${!mine ? `<em>${escapeHtml(tkWho(t.assigneeId))}</em>` : ''}<time${!done && t.dueDate && t.dueDate < today ? ' class="t-red"' : ''}>${t.dueDate ? escapeHtml(planDayLabel(t.dueDate)) : ''}</time></div>`; }).join('');
+  const addStep = window._planAddStep === s.id ? `<div class="plp-add"><span class="plp-cb"></span><input id="plpStepIn" class="tf" placeholder="What’s the step? Return to add" aria-label="New step" onkeydown="if(event.key==='Enter'){event.preventDefault();planAddStep('${s.id}')}else if(event.key==='Escape'){event.stopPropagation();window._planAddStep=null;renderPlan()}"><button class="btn btn-sm" onclick="planAddStep('${s.id}')">Add</button></div>` : '';
+  const rems = (s.reminders || []).map((r, i) => ({ r, i })).sort((a, b) => new Date(a.r.at) - new Date(b.r.at));
+  const remHtml = rems.map(({ r, i }) => { const at = new Date(r.at);
+    return `<div class="plp-r${r.sent ? ' is-past' : ''}"><span class="pl-ic">${icon('bell')}</span><b>${escapeHtml(r.label || 'Reminder')}</b><span>${at.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}, ${fmtTime(at)}${r.sent ? ' · sent' : ''}</span>${r.sent ? '' : `<button class="ib" aria-label="Remove reminder" title="Remove" onclick="planRemoveReminder('${s.id}', ${i})">${icon('x')}</button>`}</div>`; }).join('');
+  const addRem = window._planAddRem === s.id ? `<div class="plp-ra">${sheetDateField('plpRemDate', s.start > today ? s.start : today, { from: 0, to: 60, min: today, label: 'Reminder date' })}${sheetPop('plpRemTime', 'Time', taskTimeOptions().slice(1), '09:00')}<input id="plpRemLabel" class="tf" placeholder="Check in" aria-label="What to remind you"><button class="btn btn-sm btn-p" onclick="planAddReminder('${s.id}')">Add</button></div>` : '';
+  const more = `<button class="mi" onclick="openNewSprintModal({ edit: '${s.id}' })">${icon('pencil-simple')}Edit Sprint</button>${s.doneAt ? '' : `<button class="mi" onclick="setPlanSprintDone('${s.id}', true)">${icon('check-circle')}Mark Done</button>`}<div class="msep"></div><button class="mi danger" onclick="deletePlanSprint('${s.id}')">${icon('trash')}Delete Sprint…</button>`;
+  return `<aside class="sp plp${s.color ? ' c-' + s.color : ''}" aria-label="${escapeHtml(s.title)}">
+<div class="sp-bar"><button class="ib" aria-label="Close" title="Close (Esc)" onclick="closePlanPanel()">${icon('x')}</button><span class="plp-br"><button class="ib" aria-label="More" title="More" onclick="planMore(event)">${icon('dots-three')}</button><template id="plpMoreItems">${more}</template><a class="x-lnk" href="#" onclick="openNewSprintModal({ edit: '${s.id}' });return false;">Edit</a></span></div>
+<div class="plp-h"><span class="plp-sw"></span><div class="tx"><b>${escapeHtml(s.title)}</b><span>${[c ? c.name : 'No client', dates, `${st.days.length} workday${st.days.length === 1 ? '' : 's'}`].map(escapeHtml).join(' · ')}</span></div></div>
+<div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b><span class="sub">${escapeHtml(sub)}</span><div class="sp-acts">${acts}</div></div>
+${warn ? `<p class="plp-warn">${icon('warning')}<span>${warn}</span></p>` : ''}
+${s.goal ? `<div class="sp-sec"><b>Goal</b></div><p class="plp-goal">${escapeHtml(s.goal)}</p>` : ''}
+<div class="sp-sec"><b>Steps</b>${st.steps.length ? `<span>${st.done} of ${st.steps.length}</span>` : ''}${st.steps.length ? `<a class="x-lnk" href="#" onclick="planOpenInTasks('${s.id}');return false;">Open in Tasks</a>` : ''}</div>
+${steps || (addStep ? '' : `<p class="sp-empty">No steps yet. Each step is a task for you, with a date inside the sprint.</p>`)}${addStep}
+${!addStep && !s.doneAt ? `<button class="plp-new" onclick="planShowAddStep()">${icon('plus')}Add a step</button>` : ''}
+<div class="sp-sec"><b>Reminders</b>${s.doneAt ? '' : `<a class="x-lnk" href="#" onclick="window._planAddRem=window._planAddRem==='${s.id}'?null:'${s.id}';renderPlan();return false;">${window._planAddRem === s.id ? 'Cancel' : 'Add'}</a>`}</div>
+${remHtml || (addRem ? '' : '<p class="sp-empty">No reminders.</p>')}${addRem}
+</aside>`;
+}
+function planMore(e){
+  e.stopPropagation();
+  const had = document.getElementById('plpMenu'); had?.remove(); if(had) return;
+  const tpl = document.getElementById('plpMoreItems'); if(!tpl) return;
+  const m = document.createElement('div');
+  m.className = 'menu'; m.id = 'plpMenu'; m.style.position = 'fixed';
+  const r = e.currentTarget.getBoundingClientRect();
+  m.style.top = (r.bottom + 4) + 'px'; m.style.right = (window.innerWidth - r.right) + 'px';
+  m.innerHTML = tpl.innerHTML;
+  document.body.appendChild(m);
+  setTimeout(() => document.addEventListener('click', () => m.remove(), { once: true }), 0);
+}
+function planShowAddStep(){ window._planAddStep = window._planSel; renderPlan(); setTimeout(() => document.getElementById('plpStepIn')?.focus(), 30); }
+function planOpenInTasks(id){ const s = planSprint(id); if(s && s.clientId && typeof setTasksClient === 'function') tasksClient = s.clientId; switchView('tasks'); }
+
+// The next workday in the sprint without a step due, so new steps fill the sprint in order.
+function planNextStepDate(s){
+  const days = planWorkdays(s.start, s.end), today = toDateStr(rNow()), taken = new Set(planSteps(s).map(t => t.dueDate));
+  return days.find(d => d >= today && !taken.has(d)) || days.filter(d => d >= today).pop() || s.end;
+}
+function planStepRow(s, title, due){
+  const row = { title, description: '', priority: null, assigner_id: currentUser.id, assignee_id: currentUser.id, client_id: s.clientId, due_date: due, status: 'todo', sprint_id: s.id };
+  if(s.color) row.color = s.color;
+  return row;
+}
+async function planAddStep(id){
+  const s = planSprint(id), inp = document.getElementById('plpStepIn'), title = (inp?.value || '').trim();
+  if(!s || !title){ inp?.focus(); return; }
+  const { error } = await insertTaskRow(planStepRow(s, title, planNextStepDate(s)));
+  if(error){ showToast('error', 'Step not added', error.message); return; }
+  if(inp) inp.value = '';
+  await loadMyTasks(); renderPlan(); renderTasks?.();
+  setTimeout(() => document.getElementById('plpStepIn')?.focus(), 30);
+}
+async function savePlanReminders(s){
+  const { error } = await supabaseClient.from('plan_sprints').update({ reminders: s.reminders, updated_at: new Date().toISOString() }).eq('id', s.id).eq('user_id', currentUser.id);
+  if(error) showToast('error', 'Not saved', error.message);
+  return !error;
+}
+async function planAddReminder(id){
+  const s = planSprint(id); if(!s) return;
+  const d = document.getElementById('plpRemDate')?.value, tm = document.getElementById('plpRemTime')?.value || '09:00';
+  const label = (document.getElementById('plpRemLabel')?.value || '').trim() || 'Check in';
+  if(!d){ showToast('error', 'Pick a date', 'Choose when to remind you.'); return; }
+  const at = atTime(new Date(d + 'T12:00:00'), tm);
+  if(at < rNow()){ showToast('error', 'That time has passed', 'Pick a later time.'); return; }
+  s.reminders = [...(s.reminders || []), { kind: 'custom', at: at.toISOString(), label, sent: false }];
+  window._planAddRem = null; renderPlan();
+  await savePlanReminders(s);
+}
+async function planRemoveReminder(id, i){
+  const s = planSprint(id); if(!s) return;
+  s.reminders = (s.reminders || []).filter((_, k) => k !== i); renderPlan();
+  await savePlanReminders(s);
+}
+async function setPlanSprintDone(id, done){
+  const s = planSprint(id); if(!s) return;
+  const doneAt = done ? new Date().toISOString() : null;
+  const { error } = await supabaseClient.from('plan_sprints').update({ done_at: doneAt }).eq('id', id).eq('user_id', currentUser.id);
+  if(error){ showToast('error', 'Not saved', error.message); return; }
+  s.doneAt = doneAt; renderPlan();
+  if(done) showToast('success', 'Sprint done', `${s.title} is marked done.`);
+}
+async function deletePlanSprint(id){
+  const s = planSprint(id); if(!s) return;
+  const open = planSteps(s).filter(t => t.status !== 'done').length;
+  if(!(await confirmDialog(`Delete “${s.title}”?${open ? ` Its ${open} open step${open === 1 ? '' : 's'} stay in Tasks.` : ''} This can’t be undone.`, { confirmLabel: 'Delete Sprint', cancelLabel: 'Cancel', destructive: true }))) return;
+  const { error } = await supabaseClient.from('plan_sprints').delete().eq('id', id).eq('user_id', currentUser.id);
+  if(error){ showToast('error', 'Not deleted', error.message); return; }
+  planSprints = planSprints.filter(x => x.id !== id); window._planSel = null;
+  tasks.forEach(t => { if(t.sprintId === id) t.sprintId = null; });
+  renderPlan(); showToast('success', 'Sprint deleted', open ? 'Its steps are still in Tasks.' : '');
+}
+
+// Reminders go out as notifications (in the app, push and Slack, as you've set them) when they're
+// due and the app is open on any of your devices; with "Add to my calendar" the sprint is on your
+// calendar too.
+let _planRemBusy = false;
+async function checkPlanReminders(){
+  if(_planRemBusy || !currentUser || !planReady) return;
+  _planRemBusy = true;
+  try{
+    const now = rNow();
+    for(const s of planSprints){
+      if(s.doneAt) continue;
+      const due = (s.reminders || []).map((r, i) => ({ r, i })).filter(({ r }) => !r.sent && new Date(r.at) <= now);
+      if(!due.length) continue;
+      due.forEach(({ r }) => { r.sent = true; });
+      if(!(await savePlanReminders(s))) continue;
+      const st = planState(s);
+      for(const { r } of due){
+        const body = st.kind === 'running' && st.steps.length ? `${st.done} of ${st.steps.length} steps done.${st.next ? ' Next: ' + st.next.title + '.' : ''}` : `${fmtShortDate(new Date(s.start + 'T12:00:00'))} – ${fmtShortDate(new Date(s.end + 'T12:00:00'))}`;
+        await sendNotification(currentUser.id, 'plan_reminder', `${r.label}: ${s.title}`, body, 'plan', s.id, true);
+        showToast('info', `${r.label}: ${s.title}`, body);
+      }
+    }
+  } finally { _planRemBusy = false; }
+  if(currentViewName === 'plan') renderPlan();
+}
+setInterval(() => { if(typeof currentUser !== 'undefined' && currentUser) checkPlanReminders(); }, 60000);
+
+// ---- New Sprint / Edit Sprint ----------------------------------------------------------------
+let planSheet = null;   // { edit, steps[], hours, noteId }
+function planDefaultStart(){ let d = dayStart(rNow()); if(rNow().getHours() >= 15) d = addDays(d, 1); while(!isPlanWorkday(d)) d = addDays(d, 1); return toDateStr(d); }
+function planAddWorkdays(ds, n){ let d = new Date(ds + 'T12:00:00'), k = 0; while(k < n){ d = addDays(d, 1); if(isPlanWorkday(d)) k++; } return toDateStr(d); }
+function planPresetReminders(start, end){
+  const days = planWorkdays(start, end), half = days[Math.floor((days.length - 1) / 2)] || start;
+  const beforeEnd = days.length > 1 ? days[days.length - 2] : start;
+  return [['start', 'When it starts', start, '09:00'], ['half', 'Halfway check-in', half, '09:00'], ['end', 'The day before it ends', beforeEnd, '16:00']]
+    .map(([kind, label, d, t]) => ({ kind, label, at: atTime(new Date(d + 'T12:00:00'), t).toISOString() }));
+}
+function openNewSprintModal(o){
+  o = o || {};
+  if(planReady === false){
+    openAppModal(`<h3>Plan needs a database update</h3><p class="pls-p">Sprints are saved in a new private table. An admin runs <code>addendum-colors-and-plan.sql</code> once in Supabase → SQL Editor, and Plan turns on by itself. Until then, everything coming up still shows in Plan.</p><div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal()">OK</button></div>`, 460);
+    return;
+  }
+  const s = o.edit ? planSprint(o.edit) : null;
+  const note = o.noteId && (typeof notes !== 'undefined' ? notes : []).find(n => n.id === o.noteId);
+  const start = s ? s.start : planDefaultStart(), end = s ? s.end : planAddWorkdays(start, 9);
+  planSheet = { edit: s ? s.id : null, steps: s ? [] : [''], hours: s ? Math.round(s.hours) : 10, noteId: o.noteId || null };
+  const clientId = s ? (s.clientId || '') : (o.clientId || (note && note.clientId) || '');
+  const remOn = s ? new Set((s.reminders || []).filter(r => r.kind && r.kind !== 'custom').map(r => r.kind)) : new Set(['start', 'half', 'end']);
+  const noteMenu = !s ? `<span style="position:relative;margin-right:auto"><button type="button" class="btn" id="psFillBtn" onclick="psToggleNoteMenu()">${icon('sparkle')}Fill from a note</button><div class="menu" id="psNoteMenu" hidden style="bottom:34px;left:0;width:300px;max-height:260px;overflow:auto"></div></span>` : '';
+  openAppModal(`<h3>${s ? 'Edit Sprint' : 'New Sprint'}</h3>
+<div class="f pls">
+<label for="psTitle">Title</label><input id="psTitle" class="tf" spellcheck="true" placeholder="e.g. Brightway website refresh" value="${escapeHtml(s ? s.title : (note ? note.title || '' : ''))}">
+<label for="psClient">Client</label><div>${sheetPop('psClient', 'Client', [['', 'No client'], ...activeClients().slice().sort((a, b) => a.name.localeCompare(b.name)).map(c => [c.id, c.name])], clientId, 'psSync()')}</div>
+<label>Dates</label><div class="pls-row">${sheetDateField('psStart', start, { from: 0, to: 60, label: 'Starts', after: 'psSync' })}<span class="pls-to">to</span>${sheetDateField('psEnd', end, { from: 0, to: 45, label: 'Ends', after: 'psSync' })}<span class="pls-h" id="psDays"></span></div>
+<label>Hours</label><div class="pls-row"><span class="pls-num"><button type="button" aria-label="Fewer hours" onclick="psHours(-1)">−</button><b id="psHours">${planSheet.hours} h</b><button type="button" aria-label="More hours" onclick="psHours(1)">+</button></span><span class="pls-h" id="psBudget"></span></div>
+<label class="top" for="psGoal">Goal</label><textarea id="psGoal" class="tf pls-goal" spellcheck="true" placeholder="What’s done when this sprint is done?">${escapeHtml(s ? s.goal : '')}</textarea>
+${s ? '' : `<label class="top">Steps</label><div class="pls-steps" id="psSteps"></div>`}
+<label class="top">Remind me</label><div class="pls-rms" id="psRems">${[['start', 'When it starts'], ['half', 'Halfway check-in'], ['end', 'The day before it ends']].map(([k, l]) => `<div class="pls-rm">${sheetCk(remOn.has(k), l, 'psRemToggle(this)').replace('<button', `<button data-k="${k}"`)}<b>${l}</b><span id="psRem-${k}"></span></div>`).join('')}</div>
+<label>Color</label><div>${colorSwatchesHtml('psColor', s ? s.color : null)}</div>
+${s ? '' : `<span></span><div style="display:flex;align-items:center;gap:10px;font-size:14px">${sheetSw('psCal', true, 'Add to my calendar')}Add to my calendar</div>`}
+</div>
+<div class="sheet-a">${noteMenu}<button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="savePlanSprint()">${s ? 'Save' : 'Create Sprint'}</button></div>`, 600);
+  if(!s) psRenderSteps();
+  psSync();
+  setTimeout(() => document.getElementById('psTitle')?.focus(), 30);
+  if(note && !s) psFillFromNote(note.id);
+}
+function psRenderSteps(focus){
+  const el = document.getElementById('psSteps'); if(!el || !planSheet) return;
+  el.innerHTML = planSheet.steps.map((t, i) => `<div class="pls-st"><span class="pl-cb"></span><input class="tf" value="${escapeHtml(t)}" placeholder="${i ? 'Another step' : 'First step, e.g. pull analytics and the top pages'}" aria-label="Step ${i + 1}" oninput="planSheet.steps[${i}]=this.value" onkeydown="psStepKey(event, ${i})">${planSheet.steps.length > 1 ? `<button type="button" class="ib" aria-label="Remove step" onclick="planSheet.steps.splice(${i},1);psRenderSteps()">${icon('x')}</button>` : ''}</div>`).join('')
+    + `<button type="button" class="pls-st pls-add" onclick="planSheet.steps.push('');psRenderSteps(${planSheet.steps.length})">${icon('plus')}<span>Add a step</span></button><p class="pls-note">Each step becomes a task for you, dated across the sprint.</p>`;
+  if(focus != null) el.querySelectorAll('input')[focus]?.focus();
+}
+function psStepKey(e, i){
+  if(e.key === 'Enter' && !e.isComposing){ e.preventDefault(); planSheet.steps.splice(i + 1, 0, ''); psRenderSteps(i + 1); }
+  else if(e.key === 'Backspace' && !e.target.value && planSheet.steps.length > 1){ e.preventDefault(); planSheet.steps.splice(i, 1); psRenderSteps(Math.max(0, i - 1)); }
+}
+function psHours(d){ if(!planSheet) return; planSheet.hours = Math.max(0, Math.min(200, planSheet.hours + d)); document.getElementById('psHours').textContent = planSheet.hours + ' h'; psSync(); }
+function psRemToggle(b){ const on = !b.classList.contains('on'); b.classList.toggle('on', on); b.setAttribute('aria-checked', on); b.innerHTML = on ? icon('check', { weight: 'bold' }) : ''; }
+function psSync(){
+  const g = id => document.getElementById(id);
+  const start = g('psStart')?.value, end = g('psEnd')?.value; if(!start || !end) return;
+  const days = end >= start ? planWorkdays(start, end) : [];
+  if(g('psDays')) g('psDays').textContent = end < start ? 'Ends before it starts' : `${days.length} workday${days.length === 1 ? '' : 's'}`;
+  g('psDays')?.classList.toggle('t-red', end < start);
+  const c = clients.find(x => x.id === g('psClient')?.value), b = g('psBudget');
+  if(b){
+    if(c && c.monthlyHourBudget){
+      const m = new Date(start + 'T12:00:00'), now = rNow(), same = m.getMonth() === now.getMonth() && m.getFullYear() === now.getFullYear();
+      const left = c.monthlyHourBudget - (same ? monthHours(c, now) : 0);
+      b.textContent = `${c.name} has ${Math.max(0, Math.round(left))} h left in ${m.toLocaleDateString('en-US', { month: 'long' })}`;
+      b.classList.toggle('t-red', planSheet && planSheet.hours > left);
+    } else b.textContent = '';
+  }
+  planPresetReminders(start, end >= start ? end : start).forEach(r => { const el = g('psRem-' + r.kind); if(el){ const d = new Date(r.at); el.textContent = `${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}, ${fmtTime(d)}`; } });
+}
+function psToggleNoteMenu(){
+  const m = document.getElementById('psNoteMenu'); if(!m) return;
+  if(!m.hidden){ m.hidden = true; return; }
+  const mine = (typeof notes !== 'undefined' ? notes : []).filter(n => (n.text || n.title)).sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0)).slice(0, 10);
+  m.innerHTML = '<div class="mh">Pick a note</div>' + (mine.length ? mine.map(n => { const c = clients.find(x => x.id === n.clientId); return `<button type="button" class="mi" style="height:auto;padding:6px 9px;flex-direction:column;align-items:flex-start;gap:1px" onclick="psFillFromNote('${n.id}')"><span style="font-weight:500">${escapeHtml(n.title || 'Untitled note')}</span><span class="t-2" style="font-size:12.5px">${escapeHtml(c ? c.name : (n.text || '').slice(0, 48))}</span></button>`; }).join('') : '<div class="mi" style="color:var(--label-2)">No notes yet</div>');
+  m.hidden = false;
+}
+async function psFillFromNote(noteId){
+  const n = (typeof notes !== 'undefined' ? notes : []).find(x => x.id === noteId);
+  const m = document.getElementById('psNoteMenu'); if(m) m.hidden = true;
+  if(!n || !planSheet) return;
+  planSheet.noteId = n.id;
+  const btn = document.getElementById('psFillBtn');
+  if(btn){ btn.disabled = true; btn.innerHTML = `${icon('sparkle')}Filling…`; }
+  let out = null;
+  try{
+    const prompt = `Turn this note into a short sprint of focused work for a marketing agency. Reply with JSON only, no other text: {"title": "...", "goal": "...", "steps": ["...", "..."]}.
+- title: the sprint's name, under 50 characters
+- goal: what's done when the sprint is done, one sentence under 160 characters
+- steps: 3 to 7 steps in order, each starting with a verb, under 60 characters
+
+Note title: ${n.title || ''}
+Note:
+${String(n.text || '').slice(0, 4000)}`;
+    const r = await fetch('/api/generate-draft', { method: 'POST', headers: await apiAuthHeaders(), body: JSON.stringify({ prompt, model: settings.openaiModel }) });
+    const data = await r.json();
+    const mm = String(data.text || '').match(/\{[\s\S]*\}/);
+    if(mm) out = JSON.parse(mm[0]);
+  }catch(e){ console.error('Fill from a note failed', e); }
+  if(!document.getElementById('psTitle') || !planSheet) return;
+  const g = id => document.getElementById(id);
+  g('psTitle').value = (out && out.title) || n.title || g('psTitle').value;
+  if(!g('psGoal').value.trim()) g('psGoal').value = (out && out.goal) || '';
+  if(n.clientId && g('psClient')){ g('psClient').value = n.clientId; syncPopSel(g('psClient')); }
+  const steps = out && Array.isArray(out.steps) ? out.steps.filter(x => typeof x === 'string' && x.trim()).slice(0, 10)
+    : noteBlocks(n.text || '').filter(b => b.k === 'c' && !b.on).map(b => b.t).slice(0, 10);
+  if(steps.length && !planSheet.steps.some(x => x.trim())){ planSheet.steps = steps; psRenderSteps(); }
+  if(btn){ btn.disabled = false; btn.innerHTML = `${icon('sparkle')}Fill from a note`; }
+  psSync();
+  if(!out) showToast('info', 'Filled from the note', 'The AI didn’t answer, so the note’s own title and checklist were used.');
+}
+async function savePlanSprint(){
+  const g = id => document.getElementById(id), ps = planSheet; if(!ps) return;
+  const title = (g('psTitle').value || '').trim(), start = g('psStart').value, end = g('psEnd').value;
+  if(!title){ showToast('error', 'Title required', 'Give the sprint a name.'); g('psTitle').focus(); return; }
+  if(!start || !end || end < start){ showToast('error', 'Check the dates', 'The sprint has to end on or after the day it starts.'); return; }
+  if(!planWorkdays(start, end).length){ showToast('error', 'No workdays', 'Those dates are all weekend or holidays.'); return; }
+  const clientId = g('psClient').value || null, goal = (g('psGoal').value || '').trim(), color = pickedItemColor('psColor');
+  const kinds = [...document.querySelectorAll('#psRems .ck.on')].map(b => b.dataset.k);
+  const old = ps.edit ? planSprint(ps.edit) : null;
+  const presets = planPresetReminders(start, end).filter(r => kinds.includes(r.kind)).map(r => {
+    const was = old && (old.reminders || []).find(x => x.kind === r.kind);
+    return was && was.sent && was.at === r.at ? was : { ...r, sent: new Date(r.at) <= rNow() };
+  });
+  const custom = old ? (old.reminders || []).filter(r => !r.kind || r.kind === 'custom') : [];
+  const row = { title, client_id: clientId, start_date: start, end_date: end, hours: ps.hours, goal: goal || null, color, reminders: [...presets, ...custom], updated_at: new Date().toISOString() };
+  const btn = clickedBtn(); setBtnLoading(btn, ps.edit ? 'Saving…' : 'Creating…');
+  let id = ps.edit;
+  if(ps.edit){
+    const { error } = await supabaseClient.from('plan_sprints').update(row).eq('id', ps.edit).eq('user_id', currentUser.id);
+    if(error){ restoreBtn(btn); showToast('error', 'Not saved', error.message); return; }
+  } else {
+    const { data, error } = await supabaseClient.from('plan_sprints').insert({ ...row, user_id: currentUser.id, note_id: ps.noteId || null }).select().single();
+    if(error || !data){ restoreBtn(btn); showToast('error', 'Sprint not created', error?.message || 'Try again in a moment.'); return; }
+    id = data.id;
+    const sp = planRowFromDb(data), steps = ps.steps.map(x => x.trim()).filter(Boolean), days = planWorkdays(start, end);
+    for(let i = 0; i < steps.length; i++){
+      const due = days[Math.max(0, Math.round((i + 1) * days.length / steps.length) - 1)] || end;
+      const { error: e2 } = await insertTaskRow(planStepRow(sp, steps[i], due));
+      if(e2){ showToast('error', 'A step wasn’t added', e2.message); break; }
+    }
+    if(sheetIsOn('psCal')){
+      await supabaseClient.from('calendar_events').insert({ title: `Sprint: ${title}`, description: goal || null, start_at: `${start}T00:00:00`, end_at: `${end}T23:59:59`, all_day: true,
+        client_id: clientId, created_by: currentUser.id, event_type: 'reminder', attendee_ids: [currentUser.id] });
+      if(typeof loadCalendarEvents === 'function') await loadCalendarEvents();
+    }
+  }
+  restoreBtn(btn);
+  // a changed color carries over to the steps that still have the old one
+  if(old && (old.color || null) !== (color || null)){
+    const ids = planSteps(old).filter(t => (t.color || null) === (old.color || null) && t.assignerId === currentUser.id).map(t => t.id);
+    if(ids.length) await supabaseClient.from('tasks').update({ color }).in('id', ids);
+  }
+  closeAppModal(); planSheet = null;
+  await Promise.all([loadPlan(), loadMyTasks()]);
+  window._planSel = id;
+  if(currentViewName !== 'plan') switchView('plan'); else renderPlan();
+  renderTasks?.();
+  showToast('success', ps.edit ? 'Sprint saved' : 'Sprint planned', ps.edit ? '' : 'Its steps are in your Tasks.');
+}
+
+// Escape closes the sprint panel.
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Escape' || document.getElementById('appModalOverlay') || document.querySelector('.sheet-overlay, .modal-overlay')) return;
+  if(typeof currentViewName !== 'undefined' && currentViewName === 'plan' && window._planSel) closePlanPanel();
+});
