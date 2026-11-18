@@ -775,10 +775,9 @@ body.sidebar-collapsed .stm{display:none}
 /* ---- the right-hand panel shared by This Week, Health, Focus Reports and Tasks ---- */
 .spw{position:relative;flex:1 1 auto;display:flex;min-height:0;min-width:0}
 .sp-page{flex:1 1 auto;min-width:0;overflow:auto}
-.sp{position:absolute;top:0;right:0;bottom:0;width:500px;max-width:100%;overflow:auto;z-index:5;background:var(--window);border-left:.5px solid var(--sep-strong);box-shadow:-24px 0 48px rgba(0,0,0,.35);padding:10px 26px 28px;animation:sp-in .22s cubic-bezier(.23,1,.32,1)}
+.sp{position:absolute;top:0;right:0;bottom:0;width:500px;max-width:100%;overflow:auto;z-index:5;background:var(--window);border-left:.5px solid var(--sep-strong);box-shadow:-24px 0 48px rgba(0,0,0,.35);padding:10px 26px 28px}
+.sp.sp-leaving{pointer-events:none;z-index:6}
 .mac[data-theme="light"] .sp{box-shadow:-18px 0 40px rgba(0,0,0,.12)}
-@keyframes sp-in{from{transform:translateX(24px);opacity:0}}
-@media (prefers-reduced-motion:reduce){.sp{animation:none}}
 .sp .tx{display:flex;flex-direction:column;min-width:0}
 .sp-bar{display:flex;align-items:center;justify-content:space-between;margin:0 -8px 8px}
 .sp-bar .ib{width:28px;height:28px}

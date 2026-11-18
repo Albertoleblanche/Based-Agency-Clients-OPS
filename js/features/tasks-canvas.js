@@ -99,10 +99,10 @@ function renderTasks(){
   }
   const sel = window._taskSel && tasks.find(t => t.id === window._taskSel);
   if(window._taskSel && !sel) window._taskSel = null;
-  const prev = root.querySelector('.sp-page')?.scrollTop || 0, prevSp = root.querySelector('.sp')?.scrollTop || 0, cmt = document.getElementById('tkpCmt')?.value || '';
+  const prev = root.querySelector('.sp-page')?.scrollTop || 0, prevSp = root.querySelector('.sp:not(.sp-leaving)')?.scrollTop || 0, cmt = document.getElementById('tkpCmt')?.value || '';
   root.innerHTML = `<div class="spw"><div class="sp-page"><div class="tk">${head}${body}</div></div>${sel ? taskPanelHtml(sel) : ''}</div>`;
   const sp = root.querySelector('.sp-page'); if(sp) sp.scrollTop = prev;
-  const pn = root.querySelector('.sp'); if(pn) pn.scrollTop = prevSp;
+  const pn = root.querySelector('.sp:not(.sp-leaving)'); if(pn){ pn.scrollTop = prevSp; pn._st = prevSp; }
   const ci = document.getElementById('tkpCmt'); if(ci && cmt) ci.value = cmt;
   if(currentViewName === 'tasks') setToolbar(null, `${open.length} open${overdue.length ? ` · ${overdue.length} overdue` : ''}`);
   if(typeof updateTasksNavBadge === 'function') updateTasksNavBadge();

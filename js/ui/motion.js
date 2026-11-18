@@ -35,7 +35,7 @@ function hidePop(el){
 // the redraw, and slides a pill from the old spot to the new one behind the labels.
 const SEG_SEL = '.seg, .iseg, .set-tabs';
 function segKey(seg){
-  const view = seg.closest('.view, .ipush, #mMain, .modal-card, #mSheet');
+  const view = seg.closest('.view, .ipush, #mMain, .modal-card, #mSheet, #tbActions');
   const all = view ? [...view.querySelectorAll(SEG_SEL)] : [];
   return { view, label: seg.getAttribute('aria-label') || '', index: all.indexOf(seg) };
 }
@@ -79,6 +79,15 @@ function slidePill(seg, on, from, segFrom){
 }
 // What the tab shows: a quick fade as it swaps.
 function fadeSegContent(seg, scopeBefore){
+  // Tabs in the window toolbar (Time's Timesheet / Reports / Daily Summary) switch the whole
+  // screen below, so the screen that's now showing comes in.
+  if(seg.closest('#tbActions')){
+    const view = document.querySelector('.view.active');
+    if(!view) return;
+    [...view.children].filter(ch => !ch.hidden && ch.offsetParent !== null).slice(0, 3)
+      .forEach(ch => ch.animate?.([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: EASE_OUT }));
+    return;
+  }
   const scope = seg.closest('section, .view, .ipush, #mMain') || scopeBefore;
   if(!scope) return;
   [...scope.children].filter(ch => !ch.contains(seg) && !ch.matches('.seg-pill, .client-insp, [hidden]') && ch.offsetParent !== null).slice(0, 6)
@@ -100,3 +109,51 @@ function checkOff(btn, then){
     setTimeout(() => { if(then) then(); }, 320);
   } else if(then) then();
 }
+
+// ---- the panel on the right (This Week, Health, Focus Reports, Tasks) ----------------------------
+// These screens redraw everything on every change, panel included. Watching the redraws lets the
+// panel slide in only when it first opens, stay perfectly still while the page or its own content
+// redraws (comments arriving, a box ticked), cross-fade when you pick another row, and slide back
+// out to the right when it closes, however it was closed.
+document.addEventListener('scroll', e => { const t = e.target; if(t && t.classList && (t.classList.contains('sp') || t.classList.contains('sp-page'))) t._st = t.scrollTop; }, true);
+const SP_SEL = ':scope > .sp:not(.sp-leaving)';
+function panelIn(p){
+  p.animate?.([{ opacity: 0, transform: 'translateX(32px)' }, { opacity: 1, transform: 'none' }], { duration: 240, easing: EASE_OUT });
+}
+function panelSwap(p){
+  p.scrollTop = 0; p._st = 0;
+  [...p.children].filter(ch => !ch.classList.contains('sp-bar')).slice(0, 8)
+    .forEach(ch => ch.animate?.([{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }], { duration: 180, easing: EASE_OUT }));
+}
+function panelOut(old, wrap){
+  const ghost = old.cloneNode(true);
+  ghost.classList.add('sp-leaving');
+  ghost.removeAttribute('id'); ghost.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
+  ghost.setAttribute('aria-hidden', 'true'); ghost.inert = true;
+  wrap.appendChild(ghost);
+  ghost.scrollTop = old._st || 0;
+  animateThen(ghost, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(32px)' }], 180, EASE_IN, () => ghost.remove());
+}
+new MutationObserver(recs => {
+  for(const r of recs){
+    let oldW = null, newW = null;
+    r.removedNodes.forEach(n => { if(n.nodeType === 1 && n.classList.contains('spw')) oldW = n; });
+    r.addedNodes.forEach(n => { if(n.nodeType === 1 && n.classList.contains('spw')) newW = n; });
+    if(!newW || !newW.isConnected || newW.offsetParent === null) continue;
+    const oldP = oldW && oldW.querySelector(SP_SEL), newP = newW.querySelector(SP_SEL);
+    const same = oldP && newP && oldP.getAttribute('aria-label') === newP.getAttribute('aria-label');
+    // A redraw keeps both scroll positions (Read in full, "3 more", a box ticked).
+    const oldPage = oldW && oldW.querySelector(':scope > .sp-page'), newPage = newW.querySelector(':scope > .sp-page');
+    if(oldPage && newPage && !newPage.scrollTop && oldPage._st){ newPage.scrollTop = oldPage._st; newPage._st = oldPage._st; }
+    if(same && !newP.scrollTop && oldP._st){ newP.scrollTop = oldP._st; newP._st = oldP._st; }
+    if(!motionOK()) continue;
+    if(newP && !oldP) panelIn(newP);
+    else if(newP && oldP && !same) panelSwap(newP);
+    else if(same){
+      // Read in full: the rest of the draft fades in where it stands.
+      const body = newP.querySelector('.sp-draft.is-full .sp-draft-body');
+      if(body && !oldP.querySelector('.sp-draft.is-full')) body.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: EASE_OUT });
+    }
+    else if(oldP && !newP) panelOut(oldP, newW);
+  }
+}).observe(document.documentElement, { childList: true, subtree: true });
