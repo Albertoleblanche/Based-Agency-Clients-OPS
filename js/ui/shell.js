@@ -85,6 +85,7 @@ function updateShellBadges(){
     const el = document.getElementById(id); if(el) el.style.display = Number(el.textContent) ? '' : 'none';
   });
 }
+ICON_PATHS['arrow-down'] = '<path d="M12 5v14" /> <path d="m19 12-7 7-7-7" />';
 ICON_PATHS['exclamation-mark'] = '<line x1="12" y1="5" x2="12" y2="13.5"/><line x1="12" y1="18.5" x2="12" y2="18.51"/>';
 VIEW_TOOLBAR_ACTIONS.reminders = () => `<button class="btn" onclick="openNewReminderModal()">${icon('plus')}New Reminder</button>`;
 VIEW_TOOLBAR_ACTIONS.notes = () => `<button class="btn" onclick="openNoteModal()">${icon('square-pen')}New Note</button>`;
