@@ -77,16 +77,16 @@ async function pauseTimer(){
   const snap = { clientId: timerState.clientId, service: timerState.service, description: timerState.description };
   const id = await stopAndSaveTimer({ pause: true });
   timerPaused = id ? Object.assign(snap, { entryId: id }) : null; savePaused();
-  renderTimesheet();
+  renderTimesheet(); renderSideTimer();
 }
-async function stopTimerNow(){ await stopAndSaveTimer(); timerPaused = null; savePaused(); renderTimesheet(); }
+async function stopTimerNow(){ await stopAndSaveTimer(); timerPaused = null; savePaused(); renderTimesheet(); renderSideTimer(); }
 function resumePausedTimer(){
   if(!timerPaused) return;
   const p = timerPaused; timerPaused = null; savePaused();
   resumeEntryTimer(p.clientId, p.description, p.entryId);
-  renderTimesheet();
+  renderTimesheet(); renderSideTimer();
 }
-function finishPausedTimer(){ timerPaused = null; savePaused(); renderTimesheet(); }
+function finishPausedTimer(){ timerPaused = null; savePaused(); renderTimesheet(); renderSideTimer(); }
 async function continueEntry(btn){
   if(timerState.running) await stopAndSaveTimer();
   timerPaused = null; savePaused();

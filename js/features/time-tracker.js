@@ -212,24 +212,40 @@ function updateTimerDisplay(){
 function updateFloatingTimerPill(timeStr){
   if(typeof tickTimesheetClock === 'function') tickTimesheetClock();
   // The running timer lives in the toolbar, as on the canvas (red dot · time · client).
-  const tb = document.getElementById('tbTimer');
-  if(tb){
-    // On Time itself the timer is the big card, so the toolbar leaves it out (as on the canvas).
-    tb.style.display = timerState.running && (typeof currentViewName === 'undefined' || currentViewName !== 'time') && (typeof toolbarTimerPref !== 'function' || toolbarTimerPref()) ? 'inline-flex' : 'none';
-    if(timerState.running){
-      const tc = clients.find(x=>x.id===timerState.clientId);
-      document.getElementById('tbTimerTime').textContent = (timeStr || '0:00:00').replace(/^0(\d):/, '$1:');
-      document.getElementById('tbTimerClient').textContent = tc ? shortClientName(tc.name) : '';
-    }
+  // The running timer is a small counter in the sidebar's bottom corner, on every page (canvas:
+  // "goes with me to every page"). The old toolbar pill and floating pill stay hidden.
+  const tb = document.getElementById('tbTimer'); if(tb) tb.style.display = 'none';
+  const pill = document.getElementById('floatingTimerPill'); if(pill) pill.style.display = 'none';
+  renderSideTimer(timeStr);
+}
+
+// Sidebar counter: running (time, task, pause, stop), paused (resume), or idle (start a timer).
+let _sideTimerKey = '';
+function renderSideTimer(timeStr){
+  const el = document.getElementById('sideTimer');
+  if(!el) return;
+  const paused = typeof timerPaused !== 'undefined' && timerPaused;
+  const state = timerState.running ? 'run' : paused ? 'pause' : 'idle';
+  const label = timerState.running ? (timerState.description || clients.find(x => x.id === timerState.clientId)?.name || 'Tracking time')
+    : paused ? (paused.description || clients.find(x => x.id === paused.clientId)?.name || 'Paused') : '';
+  const key = state + '|' + label;
+  const t = (timeStr || '0:00:00').replace(/^0(\d):/, '$1:');
+  el.hidden = false;
+  el.className = 'stm is-' + state;
+  if(key === _sideTimerKey){ const b = el.querySelector('.stm-tx b'); if(b && state === 'run') b.textContent = t; return; }
+  _sideTimerKey = key;
+  if(state === 'run'){
+    el.setAttribute('aria-label', 'Running timer');
+    el.innerHTML = `<button class="stm-main" onclick="switchViewIfNotOnTimer()" title="Open Time"><i class="stm-dot"></i><span class="stm-tx"><b>${t}</b><span>${escapeHtml(label)}</span></span></button>
+<button class="stm-b" aria-label="Pause" title="Pause" onclick="pauseTimer()">${icon('pause')}</button><button class="stm-b stm-stop" aria-label="Stop" title="Stop" onclick="stopTimerNow()">${icon('stop')}</button>`;
+  } else if(state === 'pause'){
+    el.setAttribute('aria-label', 'Paused timer');
+    el.innerHTML = `<button class="stm-main" onclick="switchViewIfNotOnTimer()" title="Open Time"><i class="stm-dot paused"></i><span class="stm-tx"><b>Paused</b><span>${escapeHtml(label)}</span></span></button>
+<button class="stm-b" aria-label="Resume" title="Resume" onclick="resumePausedTimer()">${icon('play')}</button><button class="stm-b" aria-label="Done" title="Done" onclick="finishPausedTimer()">${icon('check')}</button>`;
+  } else {
+    el.setAttribute('aria-label', 'Timer');
+    el.innerHTML = `<button class="stm-main" onclick="openTimerModal()" title="Start a timer"><span class="stm-ic">${icon('play')}</span><span class="stm-tx"><b class="stm-idle">Start timer</b></span></button>`;
   }
-  const pill = document.getElementById('floatingTimerPill');
-  if(!pill) return;
-  if(!timerState.running){ pill.style.display = 'none'; return; }
-  pill.style.display = 'flex';
-  const c = clients.find(x=>x.id===timerState.clientId);
-  document.getElementById('ftpClient').textContent = c ? c.name : 'Tracking time…';
-  document.getElementById('ftpDesc').textContent = timerState.description || '';
-  document.getElementById('ftpTime').textContent = timeStr || '00:00:00';
 }
 
 function switchViewIfNotOnTimer(){
