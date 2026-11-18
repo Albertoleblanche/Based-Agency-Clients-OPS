@@ -54,10 +54,13 @@ Use priority high only for urgent wording, site down, money, or an angry client.
 
 export async function analyzeGroup(group, since){
   const cutoff = new Date(Date.now() - config.contextDays * 86400000).toISOString();
-  const msgs = check(await db().from('wa_messages').select('id,wa_msg_id,sender,from_team,text,ts')
-    .eq('group_jid', group.jid).gte('ts', cutoff).order('ts', { ascending: true }).limit(150), 'load messages');
+  // The newest 150 of the last few days (asking for the oldest would miss what's new in a busy group).
+  const msgs = check(await db().from('wa_messages').select('id,wa_msg_id,sender,from_team,text,ts,created_at')
+    .eq('group_jid', group.jid).gte('ts', cutoff).order('ts', { ascending: false }).limit(150), 'load messages').reverse();
   if(!msgs.length) return { created: 0, resolved: 0, seen: 0 };
-  const fresh = since ? msgs.filter(m => m.ts > since).length : msgs.length;
+  // New to the agent = stored since the last check, whenever it was sent (history that arrives
+  // late, or a phone that was offline, still gets read).
+  const fresh = since ? msgs.filter(m => (m.created_at || m.ts) > since).length : msgs.length;
   const openTasks = check(await db().from('wa_tasks').select('id,title,kind,owner_key,status')
     .eq('group_jid', group.jid).eq('status', 'open'), 'load open tasks');
   if(!fresh && !openTasks.length) return { created: 0, resolved: 0, seen: 0 };

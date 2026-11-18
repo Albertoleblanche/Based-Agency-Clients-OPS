@@ -149,7 +149,7 @@ function waLastRun(){ return waRuns.find(r => r.kind === 'digest') || null; }
 function waRunning(){ return !!(waSettings && waSettings.heartbeat_at && Date.now() - new Date(waSettings.heartbeat_at).getTime() <= WA_STALE_MS); }
 function waRunText(r){
   if(!r) return 'No check yet.';
-  const bits = [`read ${r.messages_seen || 0} message${r.messages_seen === 1 ? '' : 's'}`];
+  const bits = [`read ${r.messages_seen || 0} new message${r.messages_seen === 1 ? '' : 's'}`];
   bits.push(r.tasks_new ? `found ${r.tasks_new} new` : 'nothing new');
   if(r.tasks_closed) bits.push(`closed ${r.tasks_closed} the team answered`);
   const k = daysBetween(dayStart(rNow()), dayStart(new Date(r.started_at)));
@@ -204,6 +204,15 @@ async function waCheckNow(){
   const before = waLastRun()?.id;
   waCheckTimer = setInterval(async () => {
     await loadWaTasks();
+    const asked = waSettings && waSettings.check_requested_at;
+    if(asked && Date.now() - new Date(asked).getTime() > 90000){
+      // still waiting to be picked up: the PC is running an older version, or isn't running
+      clearInterval(waCheckTimer); waCheckTimer = null; waCheckAt = null;
+      await supabaseClient.from('wa_settings').update({ check_requested_at: null }).eq('id', 1);
+      if(waSettings) waSettings.check_requested_at = null;
+      showToast('error', 'The office PC didn’t start the check', waRunning() ? 'It needs the update: copy the src folder from connector-update.zip into radar-whatsapp, then start it again.' : 'Radar WhatsApp isn’t running on it.');
+      waRedraw(); return;
+    }
     if(!waChecking()){
       clearInterval(waCheckTimer); waCheckTimer = null;
       const r = waLastRun();
@@ -249,8 +258,9 @@ function waDraw(root){
   const wk = waWeekStart().getTime();
   const done = waTasks.filter(t => t.status !== 'open' && pick(t) && new Date(t.answered_at || t.updated_at || t.first_seen).getTime() >= wk)
     .sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
-  const sel = window._waSel && waTasks.find(t => t.id === window._waSel);
-  if(window._waSel && !sel) window._waSel = null;
+  const reading = window._waSel === 'read' && lead;
+  const sel = !reading && window._waSel && waTasks.find(t => t.id === window._waSel);
+  if(window._waSel && !sel && !reading) window._waSel = null;
 
   const conn = lead ? waConnState() : null;
   const never = lead && !waTasks.length && !waRuns.some(r => r.kind === 'digest');
@@ -294,7 +304,7 @@ ${lead ? `<label class="pop pop-sel"><span class="pl">${escapeHtml(curWho[1])}</
   root.innerHTML = `<div class="spw"><div class="sp-page"><div class="wa${lead ? '' : ' wa-solo'}">
 <div class="rmi-hd"><div><h2>${escapeHtml(h2)}</h2><p>${subBits.join(' · ').replace(/^[a-z]/, x => x.toUpperCase())}</p></div><div class="rmi-f">${filters}</div></div>
 <div class="wa-body"><div class="wa-main">${list}</div>${side}</div>
-</div></div>${sel ? waPanelHtml(sel) : ''}</div>`;
+</div></div>${sel ? waPanelHtml(sel) : reading ? waReadPanelHtml() : ''}</div>`;
   const sp = root.querySelector('.sp-page'); if(sp) sp.scrollTop = prev;
 }
 function waRowHtml(t, sel, who){
@@ -342,7 +352,7 @@ function waSideHtml(who, conn){
   if(conn.key === 'connected'){
     st = `<span class="dot green"></span><b>Connected</b><span>reading ${reading} group${reading === 1 ? '' : 's'}</span>`;
     txt = `${waRunText(waLastRun()).replace(/^Today at /, 'Last at ')} ${waNextText()}`;
-    act = waCheckBtn();
+    act = `<div class="wa-chk-a">${waCheckBtn()}<button class="lnk-b" onclick="waShowRead()">What it read</button></div>`;
   } else if(conn.key === 'qr' || conn.key === 'reconnecting'){
     st = `<span class="dot ${conn.dot}"></span><b>${escapeHtml(conn.text)}</b>`;
     txt = conn.long;
@@ -382,6 +392,48 @@ function waSetupHtml(){
 <aside class="wa-side"><div class="rmi-sec"><b>Checks</b></div><div class="wa-chk"><div class="wa-st"><span class="dot ${linked ? 'green' : 'gray'}"></span><b>${linked ? 'Connected' : 'Not linked'}</b><span>${linked ? '' : 'nothing is read yet'}</span></div>
 <p>Once WhatsApp is linked it checks at ${waTimes().map(waHm).join(' and ')}${waSettings ? ` (${escapeHtml(waCity(waTz()))} time)` : ''}, and sends ${waTesters().length ? 'you' : 'each person'} the list in Slack.</p></div>
 <p class="wa-lock">${icon('lock-simple')}<span>Personal chats are never read, and it never sends anything to WhatsApp.</span></p></aside></div>`;
+}
+
+// ---- What it read: the messages the agent has to go on, group by group -----------------------
+// So you can check it against WhatsApp: if a group shows messages but no items, the agent read
+// them and found nothing owed; if it shows none, nothing reached the office PC.
+let waRead = null;             // null · 'loading' · { groups: Map(jid -> {n, last, who}), first, error }
+async function waShowRead(){
+  window._waSel = 'read'; waRead = 'loading'; renderWhatsapp();
+  const since = new Date(Date.now() - 7 * 86400000).toISOString();
+  const [m, f] = await Promise.all([
+    supabaseClient.from('wa_messages').select('group_jid,sender,from_team,ts').gte('ts', since).order('ts', { ascending: false }).limit(5000),
+    supabaseClient.from('wa_messages').select('created_at,ts').order('created_at', { ascending: true }).limit(1),
+  ]);
+  const groups = new Map();
+  (m.data || []).forEach(x => {
+    const g = groups.get(x.group_jid) || { n: 0, last: null, who: '', client: 0 };
+    g.n++; if(!x.from_team) g.client++;
+    if(!g.last || x.ts > g.last){ g.last = x.ts; g.who = x.sender || (x.from_team ? 'the team' : 'the client'); }
+    groups.set(x.group_jid, g);
+  });
+  waRead = { groups, first: f.data && f.data[0] ? (f.data[0].created_at || f.data[0].ts) : null, error: m.error ? m.error.message : null, capped: (m.data || []).length >= 5000 };
+  if(window._waSel === 'read') renderWhatsapp();
+}
+function waReadPanelHtml(){
+  const reading = waGroups.filter(g => g.active);
+  const head = `<div class="sp-bar"><button class="ib" aria-label="Close" title="Close (Esc)" onclick="closeWaPanel()">${icon('x')}</button></div>
+<div class="tkp-h"><h3>What it read</h3></div>
+<p class="wap-rd-p">The messages from the last 7 days in the ${reading.length} group${reading.length === 1 ? '' : 's'} it reads. At each check the agent goes through the new ones and lists what a client is still waiting on.</p>`;
+  if(waRead === 'loading' || !waRead) return `<aside class="sp wap" aria-label="What it read">${head}${loadingStateHtml('Loading…')}</aside>`;
+  if(waRead.error) return `<aside class="sp wap" aria-label="What it read">${head}${emptyState({ compact: true, icon: 'warning', title: 'Couldn’t load the messages', text: waRead.error, action: 'Try Again', onAction: 'waShowRead()' })}</aside>`;
+  const open = waTasks.filter(t => t.status === 'open');
+  const rows = reading.map(g => ({ g, s: waRead.groups.get(g.jid) || { n: 0 }, items: open.filter(t => t.group_jid === g.jid).length }))
+    .sort((a, b) => (b.s.last || '').localeCompare(a.s.last || '') || waCleanName(a.g.name).localeCompare(waCleanName(b.g.name)));
+  const withMsgs = rows.filter(r => r.s.n).length, total = rows.reduce((n, r) => n + r.s.n, 0);
+  const since = waRead.first ? `Messages are stored from ${waAt(waRead.first)}, when it started reading. Older ones are only here if WhatsApp sent them when it was linked.` : 'Nothing is stored yet.';
+  const row = r => `<div class="wap-rd-r${r.s.n ? '' : ' is-none'}"><div class="tx"><b title="${escapeHtml(r.g.name)}">${escapeHtml(waCleanName(r.g.name))}</b><span>${r.s.n ? `${r.s.n} message${r.s.n === 1 ? '' : 's'} · last from ${escapeHtml(r.s.who)}, ${escapeHtml(waAt(r.s.last))}` : 'No messages in the last 7 days'}</span></div><em>${r.items ? `${r.items} open` : ''}</em></div>`;
+  return `<aside class="sp wap" aria-label="What it read">${head}
+<div class="sp-status"><span class="sp-eb">${icon('message-circle', { weight: 'bold' })}Last 7 days</span><b>${total}${waRead.capped ? '+' : ''} message${total === 1 ? '' : 's'} in ${withMsgs} of ${reading.length} groups</b><span class="sub">${escapeHtml(since)}</span></div>
+<div class="sp-sec"><b>By group</b><span>newest first</span></div>
+<div class="wap-rd">${rows.map(row).join('') || '<p class="t-2" style="font-size:13px">No groups are being read. Turn some on in Settings.</p>'}</div>
+<p class="wa-learn">${icon('sparkle')}<span>To test it, ask for something in one of these groups from another phone, then press Check Now. It should show up here within a couple of minutes.</span></p>
+</aside>`;
 }
 
 // ---- one item, in the panel --------------------------------------------------------------------

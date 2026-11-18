@@ -8,6 +8,11 @@ import { db, logRun } from './db.js';
 import { setQr } from './settings.js';
 
 const groupNames = new Map(); // jid -> subject (client groups only)
+// Messages (group chats only) that arrive before the list of groups to read is known, as happens
+// with the history WhatsApp sends right after linking. Kept in memory only, then stored for the
+// groups that are read and dropped for the rest.
+let pending = [];
+const PENDING_MAX = 20000;
 let groupsLoaded = false;     // the group list has reached Radar at least once since connecting
 let emptyTries = 0;
 let sock = null;
@@ -74,6 +79,19 @@ export async function syncActiveGroups(){
   if(error) return;
   groupNames.clear();
   for(const g of data || []) groupNames.set(g.jid, g.name);
+  if(pending.length && groupNames.size){
+    const held = pending; pending = [];
+    await ingest(held);
+    console.log(`Stored the messages WhatsApp sent before the group list arrived (${held.length} looked at; only groups that are read are kept).`);
+  }
+}
+// Until the groups to read are known, hold group messages instead of dropping them.
+function intake(messages){
+  if(groupNames.size) return ingest(messages);
+  const groupMsgs = (messages || []).filter(m => (m.key?.remoteJid || '').endsWith('@g.us'));
+  pending.push(...groupMsgs);
+  if(pending.length > PENDING_MAX) pending = pending.slice(-PENDING_MAX);
+  return Promise.resolve();
 }
 
 async function ingest(messages){
@@ -122,8 +140,8 @@ export async function connect({ onReady, onLogout } = {}){
   sock.readMessages = async () => {};   // never send read receipts
 
   sock.ev.on('creds.update', saveCreds);
-  sock.ev.on('messages.upsert', ({ messages }) => { ingest(messages).catch(e => console.error('ingest error', e.message)); });
-  sock.ev.on('messaging-history.set', ({ messages }) => { ingest(messages || []).catch(e => console.error('history ingest error', e.message)); });
+  sock.ev.on('messages.upsert', ({ messages }) => { intake(messages).catch(e => console.error('ingest error', e.message)); });
+  sock.ev.on('messaging-history.set', ({ messages }) => { intake(messages || []).catch(e => console.error('history ingest error', e.message)); });
   sock.ev.on('groups.upsert', () => refreshGroups().catch(() => {}));
   sock.ev.on('groups.update', () => refreshGroups().catch(() => {}));
 
