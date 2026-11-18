@@ -45,6 +45,12 @@ function renderLog(){
 
 function pad2(n){ return String(n).padStart(2,'0'); }
 
+// A refresh nobody should notice: reload the data and redraw without entrance animations.
+function silentRefresh(){
+  document.body.classList.add('silent-refresh');
+  return fullRefresh().finally(()=> setTimeout(()=> document.body.classList.remove('silent-refresh'), 200));
+}
+
 function renderGauge(){
   if(document.hidden) return; // nothing to see in a background tab
   const now = new Date();
@@ -230,7 +236,11 @@ async function showApp(session){
   let ignoreNextAuthEvent = true;
   supabaseClient.auth.onAuthStateChange(async (event, session) => {
     if(ignoreNextAuthEvent){ ignoreNextAuthEvent = false; return; }
-    if(event === 'SIGNED_IN' && session){ await showApp(session); }
+    // Supabase reports SIGNED_IN again every time the tab comes back into view (it re-checks
+    // the saved session). The app is already open for that person, so there's nothing to do:
+    // running showApp() again reloaded everything, redrew every screen and replayed the
+    // screen's entrance, which was the "glitch" when switching back to the window.
+    if(event === 'SIGNED_IN' && session){ if(currentUser && currentUser.id === session.user?.id) return; await showApp(session); }
     if(event === 'SIGNED_OUT'){ showLoginScreen(); }
   });
 
@@ -247,24 +257,19 @@ async function showApp(session){
   // just a safety net in case a connection silently drops and doesn't
   // reconnect on its own, which does happen occasionally with websockets.
   // Infrequent on purpose: if realtime is working, this rarely finds
-  // anything new to show.
-  setInterval(()=>{
-    if(currentUser && !isLoggingActive()){
-      document.body.classList.add('silent-refresh');
-      fullRefresh().finally(()=>{
-        setTimeout(()=> document.body.classList.remove('silent-refresh'), 200);
-      });
-    }
-  }, 180000);
+  // anything new to show. Silent: nothing on screen should move.
+  setInterval(()=>{ if(currentUser && !isLoggingActive() && !document.hidden) silentRefresh(); }, 180000);
 
   // Browsers throttle background tabs, including websocket activity — catch
-  // up on anything potentially missed the moment the tab becomes visible
-  // again, rather than waiting for the next safety-net poll.
+  // up on anything potentially missed when the tab comes back after a real
+  // absence. Switching between windows for a few seconds redraws nothing.
+  let hiddenAt = 0;
   document.addEventListener('visibilitychange', ()=>{
-    if(document.visibilityState==='visible' && currentUser && !isLoggingActive()){
-      fullRefresh();
-      setupRealtimeSubscriptions();
-    }
+    if(document.visibilityState === 'hidden'){ hiddenAt = Date.now(); return; }
+    if(!currentUser || isLoggingActive()) return;
+    if(!realtimeChannel || realtimeChannel.state !== 'joined' && realtimeChannel.state !== 'joining') setupRealtimeSubscriptions();
+    if(hiddenAt && Date.now() - hiddenAt < 60000) return;
+    silentRefresh();
   });
 
   const toastStackEl = document.getElementById('toastStack');
