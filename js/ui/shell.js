@@ -118,3 +118,23 @@ icon = (function(base){
 
 // Lucide icons used by the rebuild that the generated set doesn't carry.
 ICON_PATHS['pin'] = '<path d="M12 17v5" /> <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />';
+
+// The panel on the right closes when you click outside it, the same as its ×. Clicking another row
+// switches to that item instead (the page redraws, so the old panel is gone by the time the click
+// lands), and clicks in menus, sheets, popovers, form fields or while selecting text leave it open.
+(function(){
+  let panel = null, from = null;
+  document.addEventListener('mousedown', e => {
+    const p = document.querySelector('.view.active .spw > aside.sp');
+    panel = p && !p.contains(e.target) ? p : null; from = e.target;
+  }, true);
+  document.addEventListener('click', e => {
+    const p = panel; panel = null;
+    if(!p || !p.isConnected || e.button !== 0) return;
+    const t = e.target;
+    if(!t || !t.isConnected || p.contains(t) || t !== from && !(from && from.isConnected && from.contains(t))) return;
+    if(t.closest('input, select, textarea, label, [contenteditable="true"], .menu, [role="menu"], [role="dialog"], [role="alertdialog"], .wn-pop-card, .modal-overlay, #appModalOverlay, .sheet-overlay, .cmdk-overlay, .toast, #toasts')) return;
+    if(String(window.getSelection ? window.getSelection() : '').trim()) return;
+    p.querySelector('.sp-bar [aria-label="Close"]')?.click();
+  });
+})();

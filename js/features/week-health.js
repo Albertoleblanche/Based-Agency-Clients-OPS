@@ -213,7 +213,7 @@ function clientWeek(c){
   const w = { c, owner, holder: owner, logged, since, last, due, daysLeft, dueText: dueText(daysLeft, due),
     done: 0, behind: null, sent: false, late: false, state: 'due', draft: null };
   const approved = drafts.find(d => d.draftStatus === 'approved' && !d.draftSentAt);
-  const inReview = drafts.find(d => d.draftStatus === 'pending' && d.readyToNotify);
+  const inReview = drafts.find(d => d.draftStatus === 'pending' && d.readyToNotify && !draftHasNoWork(c, d, logged));
   const written = drafts.find(d => d.draftStatus === 'pending');
   if(approved) Object.assign(w, { done: 3, draft: approved, holder: 'approvers', note: 'Approved · ready to send' });
   else if(inReview) Object.assign(w, { done: 2, draft: inReview, holder: 'approvers', note: `In Review since ${whenShort(inReview.draftPendingSince || now)}` });
@@ -235,6 +235,15 @@ function clientWeek(c){
   // Not sent: late, due today, or (a client with a win day later this week) coming up.
   w.behind = w.done; w.late = daysLeft < 0; w.state = w.late ? 'late' : daysLeft > 0 ? 'upcoming' : 'due';
   return w;
+}
+// A written draft with nothing behind it any more: everything it was written from was deleted
+// (or, for a draft that never recorded its work, nothing of the writer's is logged for it). It
+// can't be sent for review or approved until it's rewritten from what's logged now.
+function draftHasNoWork(c, d, logged){
+  if(!c || !d || !d.draft || d.draftSentAt || d.draftStatus !== 'pending') return false;
+  const ids = d.draftImprovementIds || [], imps = c.improvements || [];
+  if(ids.length) return !ids.some(id => imps.some(i => i.id === id));
+  return !(logged || clientWeek(c).logged).some(i => i.author === d.author && i.includeInEmail !== false);
 }
 // Due within 2 days but sent last week: show the next update's progress, not last week's send.
 function weekView(w){ return w.sent && w.next && w.daysLeft <= 2 ? Object.assign({}, w, w.next, { sent: false, behind: null, upcoming: true }) : w; }

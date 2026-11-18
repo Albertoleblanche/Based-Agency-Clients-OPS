@@ -333,7 +333,7 @@ function mWaitingDrafts(){
   const me = myName(), approver = canApprove(), out = [];
   attentionEligibleClients().forEach(c => (c.drafts || []).forEach(d => {
     if(d.draftStatus !== 'pending' || !d.draft) return;
-    if(approver ? (d.author === me || d.readyToNotify) : d.author === me) out.push({ c, d });
+    if(approver ? (d.author === me || (d.readyToNotify && !draftHasNoWork(c, d))) : d.author === me) out.push({ c, d });
   }));
   return out.sort((a, b) => new Date(b.d.draftPendingSince || 0) - new Date(a.d.draftPendingSince || 0));
 }
@@ -502,7 +502,7 @@ function mReviewItems(allClients){
     if(!approver && d.author !== me) return;
     if(d.draftSentAt){ if(new Date(d.draftSentAt) >= cyc.weekStart) out.sent.push({ c, d, at: d.draftSentAt }); }
     else if(d.draftStatus === 'approved') out.approved.push({ c, d, at: d.draftPendingSince });
-    else if(d.draftStatus === 'pending' && d.draft && (d.readyToNotify || d.author === me)) out.waiting.push({ c, d, at: d.draftPendingSince });
+    else if(d.draftStatus === 'pending' && d.draft && (d.author === me || (d.readyToNotify && !draftHasNoWork(c, d)))) out.waiting.push({ c, d, at: d.draftPendingSince });
   }));
   out.waiting.sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0));
   out.sent.sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0));
@@ -572,12 +572,12 @@ function mOpenDraft(clientId, author){
         : `<button class="ibtn p" onclick="mWinCopy('${c.id}',${jsArg(d.author)})">${icon('copy')}Copy for WhatsApp</button>`;
       else if(d.draftStatus === 'approved') bar = '';
       else if(canApprove()) bar = `<button class="ibtn p" onclick="mApproveDraft('${c.id}',${jsArg(d.author)}, true)">${icon('check')}Approve</button>`;
-      else if(d.author === me && !d.readyToNotify) bar = `<button class="ibtn p" onclick="mSendForReview('${c.id}',${jsArg(d.author)})">${icon('paper-plane-tilt')}Send for Review</button>`;
+      else if(d.author === me && !d.readyToNotify && !draftHasNoWork(c, d)) bar = `<button class="ibtn p" onclick="mSendForReview('${c.id}',${jsArg(d.author)})">${icon('paper-plane-tilt')}Send for Review</button>`;
     }
     else if(!d.draftSentAt){
       if(canApprove() && d.draftStatus === 'approved') bar = `<button class="ibtn p" onclick="mSendDraft('${c.id}',${jsArg(d.author)})">${icon('paper-plane-tilt')}Send Now</button>`;
       else if(canApprove()) bar = `<button class="ibtn s" style="flex:0 0 116px" onclick="mApproveDraft('${c.id}',${jsArg(d.author)}, true)">Approve</button><button class="ibtn p" onclick="mApproveAndSend('${c.id}',${jsArg(d.author)})">${icon('paper-plane-tilt')}Approve &amp; Send</button>`;
-      else if(d.author === myName() && !d.readyToNotify) bar = `<button class="ibtn p" onclick="mSendForReview('${c.id}',${jsArg(d.author)})">${icon('paper-plane-tilt')}Send for Review</button>`;
+      else if(d.author === myName() && !d.readyToNotify && !draftHasNoWork(c, d)) bar = `<button class="ibtn p" onclick="mSendForReview('${c.id}',${jsArg(d.author)})">${icon('paper-plane-tilt')}Send for Review</button>`;
     }
     return `<div class="idraft">
 <div style="display:flex;gap:12px;align-items:center">${monoHtml(c, 'lg')}<div style="min-width:0"><div style="font-size:17px;font-weight:600">${mEsc(c.name)}</div><div style="font-size:14px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${wa ? 'To their WhatsApp group' : `To ${mEsc(contact || 'no email on file')}`} · by ${mEsc(d.author)}</div></div></div>
@@ -643,7 +643,8 @@ async function mSkipDraft(clientId, author){
   await mRefresh(); showToast('info', 'Skipped', `${c.name}: nothing was sent.`);
 }
 async function mSendForReview(clientId, author){
-  const { c } = mDraftFor(clientId, author);
+  const { c, d } = mDraftFor(clientId, author);
+  if(draftHasNoWork(c, d)){ showToast('error', 'Nothing left in this draft', 'Everything it was written from was deleted. Rewrite it on the desktop, or log the work first.'); return; }
   const v = $m('mDraftEdit')?.value;
   const ok = await saveDraftFor(clientId, author, { readyToNotify: true, ...(v != null ? { draft: v } : {}) });
   if(!ok){ showToast('error', 'Couldn’t send it for review', 'Try again.'); return; }

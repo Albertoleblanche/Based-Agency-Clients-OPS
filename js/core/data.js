@@ -230,12 +230,27 @@ async function deleteImprovementRow(id){
   // reporting success and removing the item locally while the row stayed
   // in the database — invisible until whatever fetched it fresh again
   // (a reload, the Team Queue) brought it right back.
+  const clientId = (clientImprovements.find(i=>i.id===id) || {}).clientId;
   const { data, error } = await supabaseClient.from('client_improvements').delete().eq('id', id).select();
   if(error){ console.error('deleteImprovementRow failed', id, error); return false; }
   if(!data || !data.length){ console.error('deleteImprovementRow: delete affected 0 rows (likely blocked by RLS)', id); return false; }
   clientImprovements = clientImprovements.filter(i=>i.id!==id);
   clients.forEach(c=>{ if(c.improvements) c.improvements = c.improvements.filter(i=>i.id!==id); });
+  if(clientId) await returnEmptyDraftsToWriter(clientId);
   return true;
+}
+// A draft in review whose work has all been deleted goes back to whoever wrote it, to rewrite:
+// approvers never get an empty draft.
+async function returnEmptyDraftsToWriter(clientId){
+  const c = clients.find(x=>x.id===clientId);
+  if(!c || typeof draftHasNoWork !== 'function') return;
+  const me = typeof myName === 'function' ? myName() : '';
+  for(const d of (c.drafts||[]).filter(x => x.draftStatus==='pending' && x.readyToNotify && draftHasNoWork(c, x))){
+    if(!(await saveDraftFor(clientId, d.author, { readyToNotify: false }))) continue;
+    if(d.author === me){ if(typeof showToast === 'function') showToast('info', 'Your draft came back from Review', `Everything your ${c.name} draft was written from is deleted. Rewrite it from what’s logged now.`); continue; }
+    const p = (typeof teamProfiles !== 'undefined' ? teamProfiles : []).find(x => x.name === d.author);
+    if(p && typeof sendNotification === 'function') sendNotification(p.id, 'draft_returned', `${c.name}: your draft came back to you`, 'Everything it was written from was deleted. Rewrite it from what’s logged now.', 'approve', c.id);
+  }
 }
 
 // Shared (team-wide) storage — backed by Supabase, replaces window.storage.

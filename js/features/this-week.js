@@ -33,6 +33,11 @@ function weekTodo(w){
   if(w.done === 2) return approver ? { b: 'now', k: 'review', what: d.author === me ? 'Review your draft' : `Review ${firstName(d.author)}’s draft`, act: [`openReviewDraft('${c.id}',${jsArg(d.author)})`, 'Review'] }
     : { b: 'wait', k: 'w-review', what: 'Waiting on review', act: null };
   if(d){
+    if(d.author === me && draftHasNoWork(c, d)){
+      const mineLogged = w.logged.some(i => i.author === me && i.includeInEmail !== false);
+      return mineLogged ? { b: 'now', k: 'write', empty: true, what: 'Its work was deleted: rewrite it', act: [`generateDraft('${c.id}',${jsArg(me)})`, 'Rewrite Draft'] }
+        : { b: 'now', k: 'log', empty: true, what: 'Its work was deleted: log this week’s work', act: [`openQueueLogImprovementModal('${c.id}')`, 'Log Improvement'] };
+    }
     if(d.author === me) return { b: 'now', k: 'forreview', what: 'Send your draft for review', act: [`sendDraftForReview('${c.id}',${jsArg(d.author)})`, 'Send for Review'] };
     if(approver && w.late) return { b: 'now', k: 'latedraft', what: `Send ${firstName(d.author)}’s draft for review`, act: [`openReviewDraft('${c.id}',${jsArg(d.author)})`, 'Open Draft'] };
     return { b: 'wait', k: 'w-draft', what: `${firstName(d.author)} hasn’t sent the draft for review`, act: remind };
@@ -68,7 +73,7 @@ function startReviewQueue(){ if(typeof reviewTab !== 'undefined') reviewTab = 'w
 function openApprovedInReview(){ if(typeof reviewTab !== 'undefined') reviewTab = 'approved'; window._reviewSel = null; switchView('teamqueue'); }
 // Every draft of yours that's written but not sent for review, sent in one go (one note to approvers).
 async function sendAllForReview(){
-  const me = myName(), list = weekVisibleClients().map(c => weekView(clientWeek(c))).filter(w => !w.sent && weekTodo(w).k === 'forreview');
+  const me = myName(), list = weekVisibleClients().map(c => weekView(clientWeek(c))).filter(w => !w.sent && weekTodo(w).k === 'forreview' && !draftHasNoWork(w.c, w.draft));
   if(!list.length) return;
   let ok = 0;
   for(const w of list) if(await saveDraftFor(w.c.id, w.draft.author, { readyToNotify: true })) ok++;
@@ -102,6 +107,7 @@ function weekRowWho(w){
   if(k === 'send') return `${d.author === me ? 'Your' : firstName(d.author) + '’s'} win, approved`;
   if(k === 'forreview') return `Your draft · ${todayPlural(w.logged.length, 'improvement')}`;
   if(k === 'latedraft') return `${firstName(d.author)} hasn’t sent it for review`;
+  if(w.todo.empty) return 'Draft’s work was deleted';
   if(k === 'write') return `${todayPlural(w.logged.length, 'improvement')} logged`;
   if(k === 'log'){ const t = (w.c.improvements || []).map(i => new Date(i.date)).filter(x => x <= rNow()).sort((a, b) => b - a)[0]; return t ? `nothing since ${fmtShortDate(t)}` : 'nothing logged yet'; }
   return w.todo.what;
@@ -275,6 +281,7 @@ function weekPanelHtml(w){
     }
     else if(w.done >= 3){ title = 'Approved and ready to send'; sub = lastTxt; }
     else if(w.done === 2){ title = `${d.author === me ? 'Your' : firstName(d.author) + '’s'} draft is waiting for ${approver ? 'you' : 'review'}`; sub = `Sent for review ${escapeHtml(relDayLower(d.draftPendingSince || rNow()))}${d.draftPendingSince ? ' at ' + fmtTime(new Date(d.draftPendingSince)) : ''}`; }
+    else if(d && draftHasNoWork(c, d)){ title = `Nothing left in ${d.author === me ? 'your' : firstName(d.author) + '’s'} draft`; sub = 'Everything it was written from was deleted. Rewrite it from what’s logged now, or log the work first.'; }
     else if(d){ title = `${d.author === me ? 'Your' : firstName(d.author) + '’s'} draft is written, not sent for review yet`; sub = lastTxt; }
     else if(w.logged.length){ title = `${todayPlural(w.logged.length, 'improvement')} logged, no draft yet`; sub = lastTxt; }
     else { title = 'Nothing logged yet'; sub = `${holder ? escapeHtml(firstName(holder)) + ' owns this client. ' : ''}${lastTxt}`; }
@@ -348,6 +355,7 @@ ${clientQuickActionsHtml(c)}
 
 async function sendDraftForReview(id, author){
   const c = clients.find(x => x.id === id); if(!c) return;
+  if(draftHasNoWork(c, getDraftFor(c, author))){ showToast('error', 'Nothing left in this draft', 'Everything it was written from was deleted. Rewrite it from what’s logged now, or log the work first.'); renderAll(); return; }
   const ok = await saveDraftFor(id, author, { readyToNotify: true });
   if(!ok){ showToast('error', 'Couldn’t send for review', 'Try again in a moment.'); return; }
   const approvers = teamProfiles.filter(p => (p.role === 'admin' || p.role === 'approver') && p.id !== currentUser?.id);

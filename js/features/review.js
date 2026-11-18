@@ -12,7 +12,7 @@ function reviewItems(){
     if(!all && d.author !== me) return;
     if(d.draftSentAt){ if(new Date(d.draftSentAt) >= cyc.weekStart) out.sent.push({ c, d, at: d.draftSentAt }); }
     else if(d.draftStatus === 'approved') out.approved.push({ c, d, at: d.draftPendingSince });
-    else if(d.draftStatus === 'pending' && d.draft && (d.readyToNotify || d.author === me)) out.waiting.push({ c, d, at: d.draftPendingSince });
+    else if(d.draftStatus === 'pending' && d.draft && (d.author === me || (d.readyToNotify && !draftHasNoWork(c, d)))) out.waiting.push({ c, d, at: d.draftPendingSince });
   }));
   out.waiting.sort((a, b) => new Date(a.at || 0) - new Date(b.at || 0));
   out.approved.sort((a, b) => new Date(a.at || 0) - new Date(b.at || 0));
@@ -182,9 +182,14 @@ ${dl.internal.length ? `<div class="rvn-rs rvn-s2"><b>Left out</b><span>${dl.int
   // The decision, under the email.
   const env = `${icon('envelope-simple')}`;
   let foot;
-  const waFoot = wa && !editing && !(dl.allGone && tab !== 'sent') ? reviewWaFootHtml(c, d, tab, A) : null;
+  const empty = tab === 'waiting' && (dl.allGone || draftHasNoWork(c, d));
+  const waFoot = wa && !editing && !empty ? reviewWaFootHtml(c, d, tab, A) : null;
   if(waFoot != null) foot = waFoot;
-  else if(dl.allGone && tab !== 'sent') foot = `<span class="rvn-ft-note t-red">${icon('warning')}Rewrite or discard this draft before sending</span><span class="rvn-sp"></span>${approver ? `<button class="btn" onclick="skipDraft(${A})">Discard Draft</button>` : ''}<button class="btn btn-p rvn-main" disabled>${icon('paper-plane-tilt')}${tab === 'approved' ? 'Send Now' : 'Approve &amp; Send'}</button>`;
+  else if((dl.allGone && tab !== 'sent') || empty){
+    // nothing left in it: rewrite it from what's logged now (or discard it); it can't go to review or out
+    const writer = mine && tab === 'waiting' && !approver;
+    foot = `<span class="rvn-ft-note t-red">${icon('warning')}Nothing left in this draft. Rewrite it${approver ? ' or discard it' : ''} first.</span><span class="rvn-sp"></span>${approver ? `<button class="btn" onclick="skipDraft(${A})">Discard Draft</button>` : ''}${rework ? `<button class="btn" onclick="generateDraft(${A})">${icon('sparkle')}Rewrite</button>` : ''}<button class="btn btn-p rvn-main" disabled>${icon('paper-plane-tilt')}${tab === 'approved' ? 'Send Now' : writer ? 'Send for Review' : wa ? 'Approve' : 'Approve &amp; Send'}</button>`;
+  }
   else if(!c.email && tab !== 'sent' && !wa) foot = `<span class="rvn-ft-note t-red">${env}No client email on file. Add one in All Clients to send.</span><span class="rvn-sp"></span>`;
   else if(editing) foot = `<span class="rvn-ft-note">Save first, then send</span><span class="rvn-sp"></span><button class="btn btn-p rvn-main" disabled>${icon('paper-plane-tilt')}Approve &amp; Send</button>`;
   else if(tab === 'sent'){

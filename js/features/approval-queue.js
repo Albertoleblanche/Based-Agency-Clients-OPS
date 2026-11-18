@@ -946,7 +946,7 @@ function draftWorkAllDeleted(c, d){
   return ids.length > 0 && !ids.some(id => (c.improvements || []).some(i => i.id === id));
 }
 function blockIfWorkDeleted(c, d){
-  if(!draftWorkAllDeleted(c, d)) return false;
+  if(!draftWorkAllDeleted(c, d) && !draftHasNoWork(c, d)) return false;
   showToast('error', 'Nothing left in this draft', `Everything ${d.author}'s draft for ${c.name} was written from has been deleted. Rewrite or discard it first.`);
   return true;
 }
