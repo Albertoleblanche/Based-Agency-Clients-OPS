@@ -181,6 +181,7 @@ async function fullRefresh(showFeedback){
   await Promise.all([
     loadMyNotes(), loadTimeEntries(), loadMyTasks(),
     loadNotifications(), loadCalendarEvents(), loadClientReminders(),
+    (typeof loadWaTasks === 'function' ? loadWaTasks() : null),
   ]);
   renderAll();
   updateTasksNavBadge();

@@ -133,6 +133,11 @@
         <span class="nav-label">Reminders</span>
         <span class="nav-badge" id="navRemindersBadge">0</span>
       </div>
+<div class="nav-item" data-view="whatsapp" data-tooltip="WhatsApp" onclick="switchView('whatsapp')">
+        <svg class="nav-ico" aria-hidden="true" width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-6.54-.67L40,216,52.47,178.6a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z"/></svg><svg class="nav-ico nav-ico-on" aria-hidden="true" width="15" height="15" viewBox="0 0 256 256" fill="currentColor"><path d="M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Z"/></svg>
+        <span class="nav-label">WhatsApp</span>
+        <span class="nav-badge" id="navWhatsappBadge" style="display:none;">0</span>
+      </div>
 <div class="nav-item" data-view="notes" data-tooltip="Notes" onclick="switchView('notes')">
         <svg class="nav-ico" aria-hidden="true" width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M229.66,58.34l-32-32a8,8,0,0,0-11.32,0l-96,96A8,8,0,0,0,88,128v32a8,8,0,0,0,8,8h32a8,8,0,0,0,5.66-2.34l96-96A8,8,0,0,0,229.66,58.34ZM124.69,152H104V131.31l64-64L188.69,88ZM200,76.69,179.31,56,192,43.31,212.69,64ZM224,128v80a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V48A16,16,0,0,1,48,32h80a8,8,0,0,1,0,16H48V208H208V128a8,8,0,0,1,16,0Z"/></svg><svg class="nav-ico nav-ico-on" aria-hidden="true" width="15" height="15" viewBox="0 0 256 256" fill="currentColor"><path d="M224,128v80a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V48A16,16,0,0,1,48,32h80a8,8,0,0,1,0,16H48V208H208V128a8,8,0,0,1,16,0Zm5.66-58.34-96,96A8,8,0,0,1,128,168H96a8,8,0,0,1-8-8V128a8,8,0,0,1,2.34-5.66l96-96a8,8,0,0,1,11.32,0l32,32A8,8,0,0,1,229.66,69.66Zm-17-5.66L192,43.31,179.31,56,200,76.69Z"/></svg>
         <span class="nav-label">Notes</span>
@@ -771,6 +776,11 @@
       </div>
 
       <div class="rem-list" id="remindersBoard"></div>
+    </div>
+
+    <!-- WHATSAPP CLIENT ITEMS -->
+    <div class="view" id="view-whatsapp">
+      <div id="whatsappBoard"></div>
     </div>
 
     <!-- CALENDAR -->
@@ -1774,6 +1784,7 @@
 <script src="js/features/approval-queue.js"></script>
 <script src="js/features/settings.js"></script>
 <script src="js/features/sheet-sync.js"></script>
+<script src="js/features/whatsapp-tasks.js"></script>
 <script src="js/features/team.js"></script>
 <script src="js/app.js"></script>
 

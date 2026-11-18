@@ -124,6 +124,7 @@ const VIEW_TITLES = {
   notes: ['Notes', "Private to you — improvements you're planning or want to get to. Nobody else on the team can see these."],
   tasks: ['Tasks', 'Assign tasks to anyone on the team — only you and the other person can see it'],
   'task-archive': ['Task Archive', "A record of everything the team has finished — search or filter to find anything"],
+  whatsapp: ['WhatsApp', "Open requests and questions from client WhatsApp groups, sorted by who handles them"],
   reminders: ['Reminders', "Client questions waiting on a response, visible to the whole team"],
   calendar: ['Calendar', "The whole team's calendar in one place — meetings, deadlines, and reminders"],
   time: ['Time', 'Your timesheet, reports and payroll'],
@@ -406,6 +407,7 @@ async function switchView(name){
   if(name==='task-archive'){ populateTaskArchiveFilters(); renderTaskArchive(); }
   if(name==='calendar'){ renderCalendar(); renderCalendarGoogleSyncWidget(); }
   if(name==='reminders') renderReminders();
+  if(name==='whatsapp') await openWhatsappView();
   if(name==='claude'){ await loadClaudeHistory(); renderClaudeMessages(); }
   if(name==='overview') refreshWeeklyFocusReportBanner();
   if(name==='improvements'){
