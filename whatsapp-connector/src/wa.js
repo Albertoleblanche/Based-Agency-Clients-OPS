@@ -1,8 +1,11 @@
 import makeWASocket, { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, Browsers } from '@whiskeysockets/baileys';
 import qrcode from 'qrcode-terminal';
 import pino from 'pino';
+import QRCode from 'qrcode';
+import fs from 'node:fs';
 import { config, isClientGroup } from './config.js';
 import { db, logRun } from './db.js';
+import { setQr } from './settings.js';
 
 const groupNames = new Map(); // jid -> subject (client groups only)
 let sock = null;
@@ -33,22 +36,34 @@ function looksLikeTeam(m){
   return !!n && config.teamHints.some(h => n === h || n.startsWith(h + ' '));
 }
 
-async function saveGroup(jid, name){
-  const { error } = await db().from('wa_groups').upsert({ jid, name, updated_at: new Date().toISOString() }, { onConflict: 'jid', ignoreDuplicates: false });
-  if(error) console.error('wa_groups upsert failed:', error.message);
+// Asks WhatsApp for the group list (infrequent), stores every group's NAME, and marks which are read.
+// A group is read when its name matches the client rule, unless an admin switched it by hand in Radar.
+export async function refreshGroups(){
+  if(!sock) return;
+  const all = await sock.groupFetchAllParticipating();
+  const { data: existing } = await db().from('wa_groups').select('jid,active,manual');
+  const ex = new Map((existing || []).map(g => [g.jid, g]));
+  const now = new Date().toISOString();
+  const rows = Object.entries(all).map(([jid, g]) => {
+    const auto = isClientGroup(g.subject);
+    const cur = ex.get(jid);
+    const manual = cur?.manual || false;
+    return { jid, name: g.subject, auto_match: auto, manual, active: manual ? cur.active : auto, updated_at: now };
+  });
+  if(rows.length){
+    const { error } = await db().from('wa_groups').upsert(rows, { onConflict: 'jid' });
+    if(error) console.error('wa_groups upsert failed:', error.message);
+  }
+  await syncActiveGroups();
+  console.log(`Reading ${groupNames.size} client groups (of ${rows.length} groups on this number). Personal chats are never read.`);
 }
 
-async function refreshGroups(){
-  const all = await sock.groupFetchAllParticipating();
-  let kept = 0;
-  for(const [jid, g] of Object.entries(all)){
-    if(isClientGroup(g.subject)){
-      groupNames.set(jid, g.subject);
-      await saveGroup(jid, g.subject);
-      kept++;
-    } else groupNames.delete(jid);
-  }
-  console.log(`Client groups being read: ${kept} (of ${Object.keys(all).length} groups on this number). Personal chats and other groups are ignored.`);
+// Cheap, database-only: picks up on/off switches changed in Radar.
+export async function syncActiveGroups(){
+  const { data, error } = await db().from('wa_groups').select('jid,name').eq('active', true);
+  if(error) return;
+  groupNames.clear();
+  for(const g of data || []) groupNames.set(g.jid, g.name);
 }
 
 async function ingest(messages){
@@ -78,7 +93,7 @@ export async function connect({ onReady, onLogout } = {}){
   if(onLogout) onLoggedOut = onLogout;
   const { state, saveCreds } = await useMultiFileAuthState(config.authDir);
   const { version } = await fetchLatestBaileysVersion();
-  sock = makeWASocket({
+  const mine = makeWASocket({
     version,
     auth: state,
     logger: pino({ level: 'silent' }),
@@ -87,6 +102,7 @@ export async function connect({ onReady, onLogout } = {}){
     markOnlineOnConnect: false,      // don't show the office PC as "online"
     generateHighQualityLinkPreview: false,
   });
+  sock = mine;
 
   // READ-ONLY GUARD: this service must never send anything to WhatsApp.
   const blocked = () => { throw new Error('Read-only connector: sending to WhatsApp is disabled.'); };
@@ -102,13 +118,16 @@ export async function connect({ onReady, onLogout } = {}){
   sock.ev.on('groups.update', () => refreshGroups().catch(() => {}));
 
   sock.ev.on('connection.update', async (u) => {
+    if(mine !== sock) return;   // events from a replaced socket (after re-link) are ignored
     if(u.qr){
       console.log('\nScan this QR with WhatsApp → Settings → Linked devices → Link a device:\n');
       qrcode.generate(u.qr, { small: true });
+      try { await setQr(await QRCode.toDataURL(u.qr, { width: 280, margin: 1 })); } catch(e){ console.error('QR to Radar failed:', e.message); }
     }
     if(u.connection === 'open'){
       status = 'open';
       console.log('WhatsApp connected (read-only).');
+      try { await setQr(null); } catch {}
       await logRun({ kind: 'status', connection: 'open', note: 'connected' });
       try { await refreshGroups(); } catch(e){ console.error('group refresh failed', e.message); }
       onReady && onReady();
@@ -129,6 +148,18 @@ export async function connect({ onReady, onLogout } = {}){
     }
   });
   return sock;
+}
+
+// Unlinks this number and starts a fresh QR (triggered from Radar's Setup panel).
+export async function relink(){
+  console.log('Re-link requested from Radar: clearing the saved login and showing a new QR code.');
+  const old = sock;
+  sock = null; status = 'closed';
+  try { await old?.logout(); } catch {}
+  try { old?.end?.(undefined); } catch {}
+  fs.rmSync(config.authDir, { recursive: true, force: true });
+  await logRun({ kind: 'status', connection: 'closed', note: 're-link requested from Radar' });
+  await connect({});
 }
 
 export function stop(){ try { sock?.end?.(undefined); } catch {} }

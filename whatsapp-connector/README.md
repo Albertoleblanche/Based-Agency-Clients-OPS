@@ -25,6 +25,20 @@ drops every personal chat and non-client group before anything is stored.
 Check without sending anything: `npm run dry-run` prints the Slack messages instead of sending them.
 Run a digest right now: `npm run digest-now`.
 
+## Managing it from Radar (Eric and Dan)
+
+After the connector is running once, open Radar → WhatsApp → **Setup**:
+- **Connection:** shows whether the connector is running and WhatsApp is linked. When a code is needed
+  (first link, or after Re-link) the QR code appears right there to scan. No Command Prompt needed.
+- **Groups being read:** switch any group on or off. Groups with "Marketing" in the name are on by
+  default. Only group *names* are stored for groups that are off, never their messages.
+- **When it runs:** the daily check times and time zone.
+- **Who handles what:** edit what each person is responsible for. Blank = the default.
+
+Changes reach the connector within about a minute. Still on the PC: running `npm start`, and the
+`.env` secrets (they never go in a web screen). Run the second half of `schema-whatsapp-tasks.sql`
+(already included in the file) so the Setup panel's tables exist.
+
 ## Keep it running
 
 The PC must be on and awake at 9:00 and 15:00. Easiest: Task Scheduler → create a task

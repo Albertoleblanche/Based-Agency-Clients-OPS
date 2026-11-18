@@ -9,6 +9,15 @@ export const ROLES = [
   { key: 'joey',    name: 'Joey',    aliases: ['joey','joe'],       does: 'Video production and client calls: shoots, edits, scheduling/attending calls and meetings.' },
 ];
 
+const DEFAULT_DOES = Object.fromEntries(ROLES.map(r => [r.key, r.does]));
+// Notes edited in Radar replace the built-in description; blank = back to the default.
+export function applyRoleNotes(notes){
+  for(const r of ROLES){
+    const n = typeof notes?.[r.key] === 'string' ? notes[r.key].trim() : '';
+    r.does = n || DEFAULT_DOES[r.key];
+  }
+}
+
 export const ROLE_KEYS = ROLES.map(r => r.key);
 
 export function matchProfile(role, profiles){

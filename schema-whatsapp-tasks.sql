@@ -158,3 +158,43 @@ begin
     alter publication supabase_realtime add table public.wa_tasks;
   end if;
 end $$;
+
+-- ============================================================================
+-- Setup panel (Radar -> WhatsApp -> Setup), for admin / approver only.
+-- ============================================================================
+
+-- Which groups are read. auto_match = the name rule matched; manual = an admin
+-- switched it on/off by hand (the connector then stops overriding it).
+-- Only group NAMES are stored for groups that are switched off, never messages.
+alter table public.wa_groups add column if not exists auto_match boolean not null default false;
+alter table public.wa_groups add column if not exists manual     boolean not null default false;
+
+grant update (active, manual, updated_at) on public.wa_groups to authenticated;
+drop policy if exists "leads update wa_groups" on public.wa_groups;
+create policy "leads update wa_groups" on public.wa_groups
+  for update to authenticated using (public.wa_is_lead()) with check (public.wa_is_lead());
+
+-- One settings row, shared by the connector and the Radar setup panel.
+create table if not exists public.wa_settings (
+  id               int primary key default 1 check (id = 1),
+  digest_times     text[] not null default '{09:00,15:00}' check (cardinality(digest_times) between 1 and 6),
+  timezone         text not null default 'America/New_York',
+  role_notes       jsonb not null default '{}'::jsonb,   -- {"albert": "what Albert handles", ...}
+  qr               text,                                  -- current QR code (PNG data URL), cleared once linked
+  qr_at            timestamptz,
+  relink_requested boolean not null default false,
+  heartbeat_at     timestamptz,                           -- connector writes this every ~30s
+  updated_at       timestamptz not null default now()
+);
+insert into public.wa_settings (id) values (1) on conflict (id) do nothing;
+
+alter table public.wa_settings enable row level security;
+grant select on public.wa_settings to authenticated;
+grant update (digest_times, timezone, role_notes, relink_requested, updated_at) on public.wa_settings to authenticated;
+
+drop policy if exists "leads read wa_settings" on public.wa_settings;
+create policy "leads read wa_settings" on public.wa_settings
+  for select to authenticated using (public.wa_is_lead());
+drop policy if exists "leads update wa_settings" on public.wa_settings;
+create policy "leads update wa_settings" on public.wa_settings
+  for update to authenticated using (public.wa_is_lead()) with check (public.wa_is_lead());

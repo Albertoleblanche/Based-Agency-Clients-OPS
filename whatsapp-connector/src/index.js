@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { config } from './config.js';
-import { connect, getStatus, stop } from './wa.js';
+import { connect, getStatus, stop, relink, syncActiveGroups, refreshGroups } from './wa.js';
+import { loadSettings, applySettings, heartbeat, clearRelinkFlag } from './settings.js';
 import { runDigest, alertAdmins } from './digest.js';
 
 const args = new Set(process.argv.slice(2));
@@ -33,12 +34,31 @@ async function main(){
   });
   if(args.has('--link-only')) return;
 
-  for(const t of config.digestTimes){
-    const [h, m] = t.split(':').map(Number);
-    if(Number.isNaN(h) || Number.isNaN(m)) { console.error(`Bad DIGEST_TIMES entry: ${t}`); continue; }
-    cron.schedule(`${m} ${h} * * *`, () => { if(getStatus() === 'open') safeDigest({ dry }); else console.log('Skipped digest: WhatsApp not connected.'); }, { timezone: config.tz });
-    console.log(`Digest scheduled daily at ${t} (${config.tz}).`);
-  }
+  let tasks = [];
+  const schedule = () => {
+    tasks.forEach(t => t.stop()); tasks = [];
+    for(const t of config.digestTimes){
+      const [h, m] = t.split(':').map(Number);
+      if(Number.isNaN(h) || Number.isNaN(m)) { console.error(`Bad digest time: ${t}`); continue; }
+      tasks.push(cron.schedule(`${m} ${h} * * *`, () => { if(getStatus() === 'open') safeDigest({ dry }); else console.log('Skipped digest: WhatsApp not connected.'); }, { timezone: config.tz }));
+    }
+    console.log(`Digest scheduled daily at ${config.digestTimes.join(', ')} (${config.tz}).`);
+  };
+  applySettings(await loadSettings());
+  schedule();
+
+  // Every 30s: tell Radar we're alive, pick up setup changes (times, roles, group switches, re-link).
+  setInterval(async () => {
+    try {
+      await heartbeat();
+      const s = await loadSettings();
+      if(applySettings(s)) schedule();
+      await syncActiveGroups();
+      if(s?.relink_requested){ await clearRelinkFlag(); await relink(); }
+    } catch(e){ console.error('Settings sync failed:', e.message); }
+  }, 30000);
+  // Ask WhatsApp for the group list every 30 minutes (switches in Radar are applied from the database every 30s).
+  setInterval(() => { if(getStatus() === 'open') refreshGroups().catch(() => {}); }, 30 * 60000);
   if(args.has('--digest-now')) setTimeout(() => safeDigest({ dry }), 20000);
 }
 
