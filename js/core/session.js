@@ -42,6 +42,7 @@ function watchSystemTheme(){
 }
 
 function toggleSidebar(){
+  document.body.classList.add('side-anim');   // slide it, only when toggled (not on load)
   const collapsed = document.body.classList.toggle('sidebar-collapsed');
   try{ localStorage.setItem('bda_sidebar_collapsed', collapsed ? '1' : '0'); }catch(e){}
   const btn = document.querySelector('.sidebar-collapse-btn');
