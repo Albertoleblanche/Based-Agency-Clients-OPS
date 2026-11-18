@@ -16,13 +16,31 @@ const SETTINGS_TABS = [
 ];
 function switchSettingsTab(name){
   if(name === 'clients') name = 'fields';
+  setInkSlide = settingsTab !== name;
   settingsTab = name; renderSettingsView();
+  const body = document.querySelector('#settingsRoot .set-body');
+  if(setInkSlide && body && typeof motionOK === 'function' && motionOK()) body.animate([{ opacity: .35, transform: 'translateY(3px)' }, { opacity: 1, transform: 'none' }], { duration: 200, easing: 'cubic-bezier(.23,1,.32,1)' });
+  setInkSlide = false;
   if(name === 'ai' && isAdmin()) loadAiProviderConnectionStatus();
   if(name === 'integrations') loadIntegrationStatuses();
   if(name === 'harvest' && typeof hvRefreshAll === 'function') hvRefreshAll();
   if(name === 'whatsapp' && typeof waStartPoll === 'function') waStartPoll();
 }
 function openSettingsTab(tab){ settingsTab = tab === 'clients' ? 'fields' : tab; switchView('settings'); setTimeout(() => switchSettingsTab(settingsTab), 0); }
+
+// The open tab is underlined; switching slides the line from the old tab to the new one.
+let setInkAt = null, setInkSlide = false;
+function placeSetInk(){
+  const bar = document.querySelector('#settingsRoot .set-tabs'), on = bar && bar.querySelector('.set-tab.on'), ink = bar && bar.querySelector('.set-ink');
+  if(!on || !ink) return;
+  const left = on.offsetLeft, width = on.offsetWidth;
+  ink.style.width = width + 'px'; ink.style.transform = `translateX(${left}px)`;
+  if(setInkSlide && setInkAt && width && (setInkAt.left !== left || setInkAt.width !== width) && typeof motionOK === 'function' && motionOK()){
+    ink.animate([{ transform: `translateX(${setInkAt.left}px) scaleX(${setInkAt.width / width})` }, { transform: `translateX(${left}px) scaleX(1)` }], { duration: 300, easing: 'cubic-bezier(.32,.72,0,1)' });
+  }
+  setInkAt = { left, width };
+  if(left < bar.scrollLeft || left + width > bar.scrollLeft + bar.clientWidth) bar.scrollTo({ left: Math.max(0, left - 28), behavior: setInkSlide ? 'smooth' : 'auto' });
+}
 
 // ---- small building blocks -----------------------------------------------------------------
 const esc = s => escapeHtml(s == null ? '' : String(s));
@@ -54,11 +72,12 @@ function renderSettingsView(){
   const tabs = SETTINGS_TABS.filter(t => t[3]());
   if(!tabs.some(t => t[0] === settingsTab)) settingsTab = 'general';
   const cur = tabs.find(t => t[0] === settingsTab);
-  if(currentViewName === 'settings') setToolbar(cur[1], 'Settings');
+  if(currentViewName === 'settings') setToolbar('Settings', '');   // the tabs say which section
   const keep = document.activeElement && document.activeElement.id;
   const body = { general: setGeneral, updates: setUpdates, fields: setFields, ai: setAi, integrations: setIntegrations, harvest: typeof setHarvest === 'function' ? setHarvest : setGeneral, notifications: setNotifications, whatsapp: typeof setWhatsapp === 'function' ? setWhatsapp : setGeneral }[settingsTab]();
-  root.innerHTML = `<div class="set-tb"><div class="set-tabs" role="toolbar" aria-label="Settings sections">${tabs.map(([k, t, ic]) => `<button class="set-tab${k === settingsTab ? ' on' : ''}" ${k === settingsTab ? 'aria-current="page"' : ''} onclick="switchSettingsTab('${k}')">${icon(ic)}<span>${t}</span></button>`).join('')}</div></div>
+  root.innerHTML = `<div class="set-tb"><div class="set-tabs" role="toolbar" aria-label="Settings sections">${tabs.map(([k, t]) => `<button class="set-tab${k === settingsTab ? ' on' : ''}" ${k === settingsTab ? 'aria-current="page"' : ''} onclick="switchSettingsTab('${k}')">${t}</button>`).join('')}<span class="set-ink" aria-hidden="true"></span></div></div>
 <div class="set-body">${body}<p class="t-2" style="font-size:13px;margin:14px 4px 0">Changes save as you make them.</p></div>`;
+  placeSetInk();
   if(keep){ const el = document.getElementById(keep); if(el && el.tagName !== 'BUTTON') el.focus(); }
   if(settingsTab === 'ai') applyAiConn();
   if(settingsTab === 'ai' && typeof updateEmailInstructionsStatus === 'function') updateEmailInstructionsStatus();

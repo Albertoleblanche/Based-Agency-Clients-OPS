@@ -33,7 +33,7 @@ function hidePop(el){
 // ---- the selected tab slides to the one you clicked -------------------------------------------
 // Segmented controls are redrawn on click, so this remembers where the selection was, waits for
 // the redraw, and slides a pill from the old spot to the new one behind the labels.
-const SEG_SEL = '.seg, .iseg, .set-tabs';
+const SEG_SEL = '.seg, .iseg';
 function segKey(seg){
   const view = seg.closest('.view, .ipush, #mMain, .modal-card, #mSheet, #tbActions');
   const all = view ? [...view.querySelectorAll(SEG_SEL)] : [];
@@ -45,7 +45,7 @@ function findSeg(key){
   return (key.label && all.find(s => s.getAttribute('aria-label') === key.label)) || all[key.index] || null;
 }
 document.addEventListener('click', e => {
-  const btn = e.target.closest && e.target.closest('.seg > button, .seg > a, .iseg > button, .set-tabs > button');
+  const btn = e.target.closest && e.target.closest('.seg > button, .seg > a, .iseg > button');
   if(!btn || !motionOK()) return;
   const seg = btn.parentElement, old = seg.querySelector('.on');
   if(!old || old === btn) return;
