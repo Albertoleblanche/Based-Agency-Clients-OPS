@@ -210,7 +210,7 @@ function renderToday(){
 <header class="ty-hd"><div class="ty-date"><span class="ty-dow">${now.toLocaleDateString('en-US', { weekday: 'long' })}</span><span class="ty-dm">${now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</span></div>${ring}</header>
 ${strip}
 <div class="ty-cols"><section class="ty-main">${leadHtml}
-${items.length ? `<div class="ty-sec"><b>Also today</b><span>${items.length}</span></div>${items.slice(0, window._todayAll ? items.length : MAX).map(itemRow).join('')}${items.length > MAX ? `<a class="ty-more" href="#" onclick="window._todayAll=${window._todayAll ? 'false' : 'true'};renderToday();return false;">${window._todayAll ? 'Show less' : `${items.length - MAX} more`}${window._todayAll ? '' : CHEV()}</a>` : ''}` : ''}
+${items.length ? `<div class="ty-sec"><b>Also today</b><span>${items.length}</span></div><div data-grow-key="today-also">${items.slice(0, window._todayAll ? items.length : MAX).map(itemRow).join('')}${items.length > MAX ? `<a class="ty-more" href="#" data-grow="today-also" onclick="window._todayAll=${window._todayAll ? 'false' : 'true'};renderToday();return false;">${window._todayAll ? 'Show less' : `${items.length - MAX} more`}${window._todayAll ? '' : CHEV()}</a>` : ''}</div>` : ''}
 ${waitLine}
 ${done.length ? `<div class="ty-sec"><b>Done today</b><span>${done.length}</span></div>${done.slice(0, 4).map(doneRow).join('')}` : ''}
 </section>

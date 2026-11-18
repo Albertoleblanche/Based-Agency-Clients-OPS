@@ -172,11 +172,54 @@ new MutationObserver(recs => {
     if(!motionOK()) continue;
     if(newP && !oldP) panelIn(newP);
     else if(newP && oldP && !same) panelSwap(newP);
-    else if(same){
-      // Read in full: the rest of the draft fades in where it stands.
-      const body = newP.querySelector('.sp-draft.is-full .sp-draft-body');
-      if(body && !oldP.querySelector('.sp-draft.is-full')) body.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: EASE_OUT });
-    }
     else if(oldP && !newP) panelOut(oldP, newW);
   }
 }).observe(document.documentElement, { childList: true, subtree: true });
+
+// ---- Show more / Show less ---------------------------------------------------------------------
+// A link or button with data-grow="key" toggles the block marked data-grow-key="key" (its rows are
+// its children, or data-grow-rows="selector" for a table). The screens redraw on click, so this
+// notes the block's height and rows first, then, before the redraw paints, eases the block from
+// the old height to the new one: rows that arrive fade in from just above, rows that leave fade
+// out while it closes, and a block that swaps its content cross-fades.
+function growRows(block){
+  const sel = block.getAttribute('data-grow-rows');
+  const list = sel ? [...block.querySelectorAll(sel)] : [...block.children];
+  return list.filter(ch => !ch.matches('[data-grow]') && !ch.querySelector('[data-grow]') && !ch.classList.contains('grow-ghost'));
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest && e.target.closest('[data-grow]');
+  if(!t || !motionOK()) return;
+  const key = t.getAttribute('data-grow');
+  const old = document.querySelector(`[data-grow-key="${CSS.escape(key)}"]`);
+  if(!old) return;
+  old.getAnimations?.().forEach(a => a.finish());
+  const h0 = old.getBoundingClientRect().height, oldRows = growRows(old).map(r => r.cloneNode(true));
+  requestAnimationFrame(() => {
+    const nu = document.querySelector(`[data-grow-key="${CSS.escape(key)}"]`);
+    if(!nu) return;
+    const rows = growRows(nu), h1 = nu.getBoundingClientRect().height;
+    if(Math.abs(h1 - h0) < 2) return;
+    const ghosts = [];
+    if(h1 > h0 && rows.length > oldRows.length){
+      rows.slice(oldRows.length).forEach((r, i) => r.animate([{ opacity: 0, transform: 'translateY(-4px)' }, { opacity: 1, transform: 'none' }],
+        { duration: 220, delay: Math.min(i * 16, 160), easing: EASE_OUT, fill: 'backwards' }));
+    } else if(h1 < h0 && oldRows.length > rows.length){
+      let at = rows[rows.length - 1] || null;
+      oldRows.slice(rows.length).forEach(g => {
+        g.classList.add('grow-ghost'); g.setAttribute('aria-hidden', 'true'); g.removeAttribute('id'); g.style.pointerEvents = 'none';
+        if(at) at.after(g); else nu.prepend(g);
+        at = g; ghosts.push(g);
+        g.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160, easing: EASE_OUT, fill: 'forwards' });
+      });
+    } else {
+      rows.forEach(r => r.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: EASE_OUT }));
+    }
+    const prevOverflow = nu.style.overflow;
+    nu.style.overflow = 'hidden';
+    const a = nu.animate([{ height: h0 + 'px' }, { height: h1 + 'px' }], { duration: 280, easing: 'cubic-bezier(.32,.72,0,1)' });
+    let done = false;
+    const end = () => { if(done) return; done = true; nu.style.overflow = prevOverflow; ghosts.forEach(g => g.remove()); };
+    a.onfinish = end; a.oncancel = end; setTimeout(end, 420);
+  });
+}, true);

@@ -335,7 +335,8 @@ ${withBudget ? `<td class="num t-2">${b ? b + 'h' : '—'}</td>` : ''}
     }).join('');
   }
   const cols = reportTab === 'clients' ? (withBudget ? 6 : 5) : 4;
-  const restRow = rest.length ? `<tr><td colspan="${reportTab === 'clients' ? 2 : 1}"><button class="link-row t-2" onclick="reportShowAll=true;renderReports()">${rest.length} more ${reportTab === 'clients' ? (rest.length === 1 ? 'client' : 'clients') : reportTab === 'services' ? (rest.length === 1 ? 'service' : 'services') : (rest.length === 1 ? 'teammate' : 'teammates')}</button></td><td class="num t-2">${hrs(restMin)}</td><td colspan="${cols - (reportTab === 'clients' ? 3 : 2)}"></td></tr>` : '';
+  const restRow = reportShowAll && rows.length > 9 ? `<tr><td colspan="${reportTab === 'clients' ? 2 : 1}"><button class="link-row t-2" data-grow="report-rows" onclick="reportShowAll=false;renderReports()">Show fewer</button></td></tr>` : rest.length ? `<tr><td colspan="${reportTab === 'clients' ? 2 : 1}"><button class="link-row t-2" data-grow="report-rows" onclick="reportShowAll=true;renderReports()">${rest.length} more ${reportTab === 'clients' ? (rest.length === 1 ? 'client' : 'clients') : reportTab === 'services' ? (rest.length === 1 ? 'service' : 'services') : (rest.length === 1 ? 'teammate' : 'teammates')}</button></td><td class="num t-2">${hrs(restMin)}</td><td colspan="${cols - (reportTab === 'clients' ? 3 : 2)}"></td></tr>` : '';
+  grp.setAttribute('data-grow-key', 'report-rows'); grp.setAttribute('data-grow-rows', 'tbody > tr');
   grp.innerHTML = `<table class="mtx" aria-label="Hours ${rangeWord}"><thead><tr>${head}</tr></thead><tbody>${body}${restRow}</tbody>
 <tfoot><tr>${reportTab === 'clients' ? '<td></td>' : ''}<td>Total</td><td class="num">${hrs(total)}</td><td colspan="${cols - (reportTab === 'clients' ? 3 : 2)}"></td></tr></tfoot></table>`;
 }

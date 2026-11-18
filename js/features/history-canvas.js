@@ -6,6 +6,7 @@ function impFilterChanged(){ impShown = 12; renderImprovementsHistory(); }
 function renderImprovementsHistory(){
   const el = document.getElementById('improvementsHistoryList');
   if(!el) return;
+  el.setAttribute('data-grow-key', 'hist-list');
   const mw = document.getElementById('improvementsMemberFilterField'); if(mw) mw.style.display = canApprove() ? '' : 'none';
   const all = getAllImprovementsFlat();
   const memberFilter = document.getElementById('improvementsMemberFilter')?.value || 'all';
@@ -27,7 +28,7 @@ function renderImprovementsHistory(){
 <div class="grp">${imps.map(i => `<div class="row sm"><span style="width:52px;flex:0 0 auto;font-size:13px;color:var(--label-2)">${i.date ? fmtShortDate(new Date(i.date)) : ''}</span>
 <div class="tx"><span class="t" style="font-weight:400">${escapeHtml(i.text)}</span><span class="s">${escapeHtml(i.author)}${i.service && i.service !== c.service ? ' · ' + escapeHtml(i.service) : ''}${i.source && i.source !== 'manual' ? ' · ' + escapeHtml(SRC[i.source] || i.source) : ''}</span></div>
 <div class="r">${typeof impFilesBtn === 'function' ? impFilesBtn(i) : ''}<button class="ck${i.includeInEmail ? ' on' : ''}" role="checkbox" aria-checked="${i.includeInEmail}" aria-label="In the client email" onclick="toggleImprovementIncludeInEmail('${i.clientId}','${i.id}',${!i.includeInEmail})">${i.includeInEmail ? icon('check', { weight: 'bold' }) : ''}</button><span style="width:70px">${i.includeInEmail ? 'In the email' : 'Left out'}</span></div></div>`).join('')}</div>`;
-  }).join('') + (ordered.length > impShown ? `<div style="margin-top:14px"><button class="btn btn-q" onclick="impShown+=12;renderImprovementsHistory()">Show More Clients</button></div>` : '');
+  }).join('') + (ordered.length > impShown ? `<div style="margin-top:14px"><button class="btn btn-q" data-grow="hist-list" onclick="impShown+=12;renderImprovementsHistory()">Show More Clients</button></div>` : '');
 }
 function populateImprovementsClientFilter(){
   const sel = document.getElementById('improvementsClientFilter'); if(!sel) return;

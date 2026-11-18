@@ -118,9 +118,9 @@ function renderThisWeek(){
     const sub = [late ? `<span class="t-red">${late} late</span>` : '', rest ? `${rest} ${escapeHtml(dues[0].replace(/^Due /, 'due '))}${dues.length > 1 ? ' or later' : ''}` : ''].filter(Boolean).join(' · ');
     const openAll = !!(window._weekOpen || {})[g.k], showN = items.length <= 3 || openAll ? items.length : Math.max(2, Math.min(3, late));
     const b = g.batch ? g.batch(items.length) : null, prim = b && !primaryUsed; if(prim) primaryUsed = true;
-    const more = items.length > showN ? `<a class="twl-more" href="#" onclick="toggleWeekGroup('${g.k}');return false;">${items.length - showN} more${icon('caret-down', { weight: 'bold' })}</a>`
-      : openAll && items.length > 3 ? `<a class="twl-more" href="#" onclick="toggleWeekGroup('${g.k}');return false;">Show less${icon('chevron-up', { weight: 'bold' })}</a>` : '';
-    return `<section class="twl-g" aria-label="${escapeHtml(g.title)}">
+    const more = items.length > showN ? `<a class="twl-more" href="#" data-grow="wk-${g.k}" onclick="toggleWeekGroup('${g.k}');return false;">${items.length - showN} more${icon('caret-down', { weight: 'bold' })}</a>`
+      : openAll && items.length > 3 ? `<a class="twl-more" href="#" data-grow="wk-${g.k}" onclick="toggleWeekGroup('${g.k}');return false;">Show less${icon('chevron-up', { weight: 'bold' })}</a>` : '';
+    return `<section class="twl-g" aria-label="${escapeHtml(g.title)}" data-grow-key="wk-${g.k}">
 <div class="twl-gh"><span class="twl-ic ${g.tone}">${icon(g.ic)}</span><div class="twl-gt"><b>${escapeHtml(g.title)} <span class="n">${items.length}</span></b><span>${sub}</span></div>${b ? `<button class="btn${prim ? ' btn-p' : ''}" onclick="${b[0]}">${b[2] ? icon(b[2]) : ''}${escapeHtml(b[1])}</button>` : ''}</div>
 ${items.slice(0, showN).map(row).join('')}${more}</section>`;
   }).join('');
@@ -166,8 +166,8 @@ ${groups}${clear}
 <div class="twl-key"><span><i class="s"></i>Sent ${sum.sent}</span><span><i class="y"></i>On you ${nowAll.length}</span><span><i class="o"></i>On someone ${waitAll.length}</span></div>
 <div class="twl-ss"><b>Waiting on someone</b><span class="n">${wait.length}</span></div>
 ${people || '<p class="twl-dn">Nothing is waiting on anyone else.</p>'}
-<div class="twl-ss"><b>Done this week</b><span class="n">${sent.length}</span>${sent.length ? `<a class="x-lnk" href="#" onclick="window._weekShowDone=${doneOpen ? 'false' : 'true'};renderThisWeek();return false;">${doneOpen ? 'Hide' : 'Show'}</a>` : ''}</div>
-${done}
+<div class="twl-ss"><b>Done this week</b><span class="n">${sent.length}</span>${sent.length ? `<a class="x-lnk" href="#" data-grow="wk-done" onclick="window._weekShowDone=${doneOpen ? 'false' : 'true'};renderThisWeek();return false;">${doneOpen ? 'Hide' : 'Show'}</a>` : ''}</div>
+<div data-grow-key="wk-done">${done}</div>
 </aside>
 </div></div>${sel ? weekPanelHtml(sel) : ''}</div>`;
   if(currentViewName === 'approve') setToolbar('This Week', 'What to do next, grouped by what you do');
@@ -242,7 +242,7 @@ function weekPanelHtml(w){
   const imps = w.logged.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
   const showAll = window._weekImpsAll === c.id;
   const impRows = (showAll ? imps : imps.slice(0, 3)).map(i => `<div class="sp-imp"><b>${escapeHtml(i.text)}</b><span>${escapeHtml(i.service || c.service || '')} · ${fmtShortDate(new Date(i.date))}${i.includeInEmail === false ? ' · internal' : ''}</span></div>`).join('');
-  const more = imps.length > 3 && !showAll ? `<a class="sp-more" href="#" onclick="window._weekImpsAll='${c.id}';renderThisWeek();return false;">${imps.length - 3} more</a>` : '';
+  const more = imps.length > 3 ? `<a class="sp-more" href="#" data-grow="wk-imps" onclick="window._weekImpsAll=${showAll ? 'null' : `'${c.id}'`};renderThisWeek();return false;">${showAll ? 'Show less' : `${imps.length - 3} more`}</a>` : '';
   // The draft reads in full right here, so it works whoever wrote it and wherever it is in review.
   const full = window._weekDraftFull === c.id, flat = d && d.draft ? d.draft.replace(/\s+/g, ' ').trim() : '';
   const long = flat.length > 220 || (d && /\n\s*\n/.test(d.draft || ''));
@@ -250,8 +250,8 @@ function weekPanelHtml(w){
   const draft = editingDraft ? `<div class="sp-sec"><b>The draft</b></div>
 <textarea class="sp-draft-edit" id="draft-${c.id}" spellcheck="true" aria-label="Draft">${escapeHtml(d.draft)}</textarea>
 <div class="sp-draft-acts"><button class="btn" onclick="cancelWeekDraftEdit()">Cancel</button><button class="btn btn-p" onclick="saveWeekDraftEdit('${c.id}',${jsArg(d.author)})">Save Changes</button></div>`
-    : d && d.draft ? `<div class="sp-sec"><b>The draft</b>${long ? `<a class="x-lnk" href="#" onclick="window._weekDraftFull=${full ? 'null' : `'${c.id}'`};renderThisWeek();return false;">${full ? 'Show less' : 'Read in full'}</a>` : ''}</div>
-<div class="sp-draft${full ? ' is-full' : ''}"><b>Your weekly update — ${escapeHtml(updateRangeLabel(c))}</b>${full ? `<div class="sp-draft-body">${draftBodyHtml(d.draft)}</div>` : `<p>${escapeHtml(flat.slice(0, 320))}</p>`}</div>` : '';
+    : d && d.draft ? `<div class="sp-sec"><b>The draft</b>${long ? `<a class="x-lnk" href="#" data-grow="wk-draft" onclick="window._weekDraftFull=${full ? 'null' : `'${c.id}'`};renderThisWeek();return false;">${full ? 'Show less' : 'Read in full'}</a>` : ''}</div>
+<div class="sp-draft${full ? ' is-full' : ''}" data-grow-key="wk-draft"><b>Your weekly update — ${escapeHtml(updateRangeLabel(c))}</b>${full ? `<div class="sp-draft-body">${draftBodyHtml(d.draft)}</div>` : `<p>${escapeHtml(flat.slice(0, 320))}</p>`}</div>` : '';
   const seq = weekHistory(c), ots = onTimeSummary(seq);
   return `<aside class="sp" aria-label="${escapeHtml(c.name)}, this week’s update">
 <div class="sp-bar"><button class="ib" aria-label="Close" onclick="closeWeekPanel()">${icon('x')}</button><a class="x-lnk" href="#" onclick="openClientDetail('${c.id}');return false;">Open client</a></div>
@@ -260,7 +260,7 @@ function weekPanelHtml(w){
 <div class="sp-steps">${steps}</div>
 ${draft}
 <div class="sp-sec"><b>In this update</b><span>${imps.length}</span><a class="x-lnk" href="#" onclick="openQueueLogImprovementModal('${c.id}');return false;">Log Improvement</a></div>
-${impRows || '<p class="sp-empty">Nothing logged since the last update.</p>'}${more}
+<div data-grow-key="wk-imps">${impRows || '<p class="sp-empty">Nothing logged since the last update.</p>'}${more}</div>
 <div class="sp-sec"><b>Last 8 weeks</b><span>${ots.total ? `${ots.onTime} of ${ots.total} on time` : 'History starts with the first update'}</span></div>
 ${weekStripHtml(c)}
 </aside>`;
