@@ -11,7 +11,7 @@ function weekVisibleClients(){
   return attentionEligibleClients().filter(c => canApprove() || clientOwner(c) === me || (c.improvements || []).some(i => i.author === me));
 }
 function selectWeekClient(id){ window._weekSel = id; renderThisWeek(); }
-function closeWeekPanel(){ window._weekSel = null; renderThisWeek(); }
+function closeWeekPanel(){ window._weekSel = null; window._weekDraftEdit = null; renderThisWeek(); }
 
 // Who the update waits on, the row's words and its one button. bucket: 'now' | 'wait'.
 function weekTodo(w){
@@ -76,6 +76,29 @@ ${empty}${sec('Do now', 'Things only you can move forward', nowRows.length ? now
 function renderQueue(){ renderThisWeek(); }
 
 // The panel: where this client's update is, its one main action, the steps, the draft, the work.
+// Under the panel's main action: work logged after the draft was written, or work in it that
+// was deleted, with a way to rewrite it where that's allowed.
+function weekDraftNote(w){
+  const d = w.draft;
+  if(w.sent || !d || typeof draftDelta !== 'function') return '';
+  const dl = draftDelta(w.c, d), A = `'${w.c.id}',${jsArg(d.author)}`, may = canReworkDraft(w.c, d);
+  if(dl.gone) return `<p class="sp-dnote is-red">${icon('warning')}<span>${dl.allGone ? 'Everything this draft was written from was deleted.' : `${dl.gone} improvement${dl.gone === 1 ? '' : 's'} in the draft ${dl.gone === 1 ? 'was' : 'were'} deleted; the email may still mention ${dl.gone === 1 ? 'it' : 'them'}.`}${may ? ` <a class="x-lnk" href="#" onclick="generateDraft(${A});return false;">Rewrite</a>` : ''}</span></p>`;
+  if(dl.added.length) return `<p class="sp-dnote">${icon('circle-plus')}<span>${dl.added.length} new improvement${dl.added.length === 1 ? ' isn’t' : 's aren’t'} in the draft yet.${may ? ` <a class="x-lnk" href="#" onclick="generateDraft(${A});return false;">Rewrite to include</a>` : d.draftStatus === 'approved' ? ' They go in the next update.' : ' An approver can rewrite to include them.'}</span></p>`;
+  return '';
+}
+// Editing your own draft in the panel (for anyone without Review).
+function startWeekDraftEdit(clientId, author){
+  window._weekDraftEdit = clientId + '|' + author; renderThisWeek();
+  setTimeout(() => { const ta = document.getElementById('draft-' + clientId); if(ta){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } }, 30);
+}
+function cancelWeekDraftEdit(){ window._weekDraftEdit = null; renderThisWeek(); }
+async function saveWeekDraftEdit(clientId, author){
+  const ta = document.getElementById('draft-' + clientId); if(!ta) return;
+  const ok = await saveDraftFor(clientId, author, { draft: ta.value });
+  if(!ok){ showToast('error', 'Couldn’t save the draft', 'Try again in a moment.'); return; }
+  window._weekDraftEdit = null; window._weekDraftFull = clientId;
+  renderThisWeek(); showToast('success', 'Draft saved', '');
+}
 function weekPanelHtml(w){
   const c = w.c, me = myName(), d = w.draft, approver = canApprove();
   const t = w.sent ? null : (w.todo || weekTodo(w));
@@ -92,11 +115,18 @@ function weekPanelHtml(w){
     else if(d){ title = `${d.author === me ? 'Your' : firstName(d.author) + '’s'} draft is written, not sent for review yet`; sub = lastTxt; }
     else if(w.logged.length){ title = `${todayPlural(w.logged.length, 'improvement')} logged, no draft yet`; sub = lastTxt; }
     else { title = 'Nothing logged yet'; sub = `${holder ? escapeHtml(firstName(holder)) + ' owns this client. ' : ''}${lastTxt}`; }
-    const edit = d && approver && w.done >= 1 ? `<button class="btn" onclick="openReviewDraft('${c.id}',${jsArg(d.author)})">${icon('pencil-simple')}Edit</button>` : '';
+    // Edit: in Review for whoever has Review (Edit and Rewrite live there); otherwise right here, for
+    // the writer, until they send it for review.
+    const own = d && d.author === me && w.done === 1, review = typeof hasPermission === 'function' && hasPermission('view_team_queue');
+    const A = d ? `'${c.id}',${jsArg(d.author)}` : '';
+    const editing = d && window._weekDraftEdit === c.id + '|' + d.author;
+    const edit = !d || editing ? ''
+      : review && w.done >= 1 && (approver || own) ? `<button class="btn" onclick="openReviewDraft(${A})">${icon('pencil-simple')}Edit</button>`
+      : own ? `<button class="btn" onclick="startWeekDraftEdit(${A})">${icon('pencil-simple')}Edit</button><button class="btn" onclick="generateDraft(${A})">${icon('sparkle')}Rewrite</button>` : '';
     // in Review, the panel's main action approves and sends in one go (Edit opens it in Review first)
     const main = w.done === 2 && approver ? `<button class="btn btn-p" onclick="approveAndSendOwnDraft('${c.id}',${jsArg(d.author)})">${icon('paper-plane-tilt')}Approve &amp; Send</button>`
       : t && t.act ? `<button class="btn btn-p" onclick="${t.act[0]}">${escapeHtml(t.act[1])}</button>` : '';
-    acts = edit || main ? `<div class="sp-acts">${edit}${main}</div>` : '';
+    acts = !editing && (edit || main) ? `<div class="sp-acts">${edit}${main}</div>` : '';
   }
   // the four steps
   const stepSub = [
@@ -116,13 +146,17 @@ function weekPanelHtml(w){
   // The draft reads in full right here, so it works whoever wrote it and wherever it is in review.
   const full = window._weekDraftFull === c.id, flat = d && d.draft ? d.draft.replace(/\s+/g, ' ').trim() : '';
   const long = flat.length > 220 || (d && /\n\s*\n/.test(d.draft || ''));
-  const draft = d && d.draft ? `<div class="sp-sec"><b>The draft</b>${long ? `<a class="x-lnk" href="#" onclick="window._weekDraftFull=${full ? 'null' : `'${c.id}'`};renderThisWeek();return false;">${full ? 'Show less' : 'Read in full'}</a>` : ''}</div>
+  const editingDraft = d && d.draft && !w.sent && window._weekDraftEdit === c.id + '|' + d.author;
+  const draft = editingDraft ? `<div class="sp-sec"><b>The draft</b></div>
+<textarea class="sp-draft-edit" id="draft-${c.id}" spellcheck="true" aria-label="Draft">${escapeHtml(d.draft)}</textarea>
+<div class="sp-draft-acts"><button class="btn" onclick="cancelWeekDraftEdit()">Cancel</button><button class="btn btn-p" onclick="saveWeekDraftEdit('${c.id}',${jsArg(d.author)})">Save Changes</button></div>`
+    : d && d.draft ? `<div class="sp-sec"><b>The draft</b>${long ? `<a class="x-lnk" href="#" onclick="window._weekDraftFull=${full ? 'null' : `'${c.id}'`};renderThisWeek();return false;">${full ? 'Show less' : 'Read in full'}</a>` : ''}</div>
 <div class="sp-draft${full ? ' is-full' : ''}"><b>Your weekly update — ${escapeHtml(updateRangeLabel(c))}</b>${full ? `<div class="sp-draft-body">${draftBodyHtml(d.draft)}</div>` : `<p>${escapeHtml(flat.slice(0, 320))}</p>`}</div>` : '';
   const seq = weekHistory(c), ots = onTimeSummary(seq);
   return `<aside class="sp" aria-label="${escapeHtml(c.name)}, this week’s update">
 <div class="sp-bar"><button class="ib" aria-label="Close" onclick="closeWeekPanel()">${icon('x')}</button><a class="x-lnk" href="#" onclick="openClientDetail('${c.id}');return false;">Open client</a></div>
 <div class="sp-head">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}</b><span>${[w.owner, c.service].filter(Boolean).map(escapeHtml).join(' · ')}</span></div></div>
-<div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b><span class="sub">${sub}</span>${acts}</div>
+<div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b><span class="sub">${sub}</span>${acts}${weekDraftNote(w)}</div>
 <div class="sp-steps">${steps}</div>
 ${draft}
 <div class="sp-sec"><b>In this update</b><span>${imps.length}</span><a class="x-lnk" href="#" onclick="openQueueLogImprovementModal('${c.id}');return false;">Log Improvement</a></div>
@@ -146,7 +180,8 @@ async function sendDraftForReview(id, author){
 document.addEventListener('keydown', e => {
   if(e.key !== 'Escape' || document.getElementById('appModalOverlay') || document.querySelector('.sheet-overlay, .modal-overlay')) return;
   const v = typeof currentViewName !== 'undefined' ? currentViewName : '';
-  if(v === 'approve' && window._weekSel){ closeWeekPanel(); }
+  if(v === 'approve' && window._weekDraftEdit){ cancelWeekDraftEdit(); }
+  else if(v === 'approve' && window._weekSel){ closeWeekPanel(); }
   else if(v === 'health' && window._healthSel && typeof closeHealthPanel === 'function'){ closeHealthPanel(); }
   else if(v === 'focusreports' && window._focusSel && typeof closeFocusPanel === 'function'){ closeFocusPanel(); }
   else if(v === 'tasks' && window._taskSel && typeof closeTaskPanel === 'function'){ closeTaskPanel(); }

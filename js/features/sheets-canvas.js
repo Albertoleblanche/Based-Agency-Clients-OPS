@@ -288,7 +288,7 @@ function gsCandidates(){
   weekVisibleClients().forEach(c => {
     const drafts = c.drafts || [], w = clientWeek(c);
     if(drafts.some(d => (d.draftStatus === 'approved' && !d.draftSentAt) || (d.draftStatus === 'pending' && d.readyToNotify))) return; // in Review or approved
-    let imps = (c.improvements || []).filter(i => new Date(i.date) > w.since);
+    let imps = w.logged.slice();
     if(mineOnly) imps = imps.filter(i => i.author === me);
     const inEmail = imps.filter(i => i.includeInEmail !== false);
     if(!inEmail.length) return;

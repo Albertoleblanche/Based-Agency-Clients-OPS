@@ -929,6 +929,28 @@ function openQueueCardModal(id, author){
 }
 
 
+// After writing or rewriting a draft: show it in Review, where it can be read, edited and sent on
+// (the old card sheet only if Review can't show it).
+function openDraftAfterWriting(id, author){
+  if(typeof openReviewDraft === 'function' && typeof reviewItems === 'function'){
+    closeAppModal();
+    if(hasPermission('view_team_queue') && Object.values(reviewItems()).some(l => l.some(x => x.c.id === id && x.d.author === author))){ openReviewDraft(id, author); return; }
+    // No Review: open the client on This Week with the draft showing in full.
+    if(typeof openWeekClient === 'function'){ window._weekDraftFull = id; openWeekClient(id); return; }
+  }
+  openQueueCardModal(id, author);
+}
+// Every improvement a draft was written from has been deleted: nothing left to send.
+function draftWorkAllDeleted(c, d){
+  const ids = d.draftImprovementIds || [];
+  return ids.length > 0 && !ids.some(id => (c.improvements || []).some(i => i.id === id));
+}
+function blockIfWorkDeleted(c, d){
+  if(!draftWorkAllDeleted(c, d)) return false;
+  showToast('error', 'Nothing left in this draft', `Everything ${d.author}'s draft for ${c.name} was written from has been deleted. Rewrite or discard it first.`);
+  return true;
+}
+
 async function generateDraft(id, author){
   await loadAll();
   const c = clients.find(x=>x.id===id);
@@ -1023,7 +1045,8 @@ async function confirmGenerateDraftSelection(id, author){
     // this specific content — Team Queue shouldn't surface it to
     // approvers as awaiting review until the owning member explicitly
     // clicks Ready to Notify again.
-    fields.readyToNotify = false;
+    // An approver rewriting a draft that's in Review keeps it there: they're the one reviewing it.
+    fields.readyToNotify = !!(d.readyToNotify && canApprove() && !stayedApproved);
     // Exactly what's in this draft cycle, from the picker's selection —
     // not re-derived from a date range. Read back by approveDraft() to
     // know precisely which rows to flip include_in_email off for.
@@ -1043,7 +1066,7 @@ async function confirmGenerateDraftSelection(id, author){
     renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
     logClientActivity(id, 'draft_generated', `AI ${stayedApproved?'re-worded':'generated'} ${author}'s draft from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''} (of ${c.improvements.filter(i=>i.author===author).length} logged by them)${stayedApproved?' — approval carried over':''}.`);
     refreshClientDetailActivityIfOpen(id);
-    openQueueCardModal(id, author);
+    openDraftAfterWriting(id, author);
     showToast('success','Draft generated', stayedApproved ? `${author}'s draft for ${c.name} was re-worded — still approved, no need to re-approve.` : `AI wrote ${author}'s update for ${c.name}.`);
     // No automatic notification here at all — the only way admins/
     // approvers get notified is the explicit "Ready to Notify" button,
@@ -1063,7 +1086,7 @@ async function confirmGenerateDraftSelection(id, author){
       readyToNotify: false, draftImprovementIds: checkedIds,
     });
     renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
-    openQueueCardModal(id, author);
+    openDraftAfterWriting(id, author);
     showToast('error', saved ? 'AI generation failed' : 'AI generation failed, and the fallback state failed to save too', saved ? 'Write the draft manually below, or try again.' : 'Try refreshing before writing a draft manually — this client\'s saved state may be stale.');
   }
 }
@@ -1075,6 +1098,7 @@ async function sendApprovedDraft(id, author){
   const c = clients.find(x=>x.id===id);
   if(!c) return;
   const d = getDraftFor(c, author);
+  if(blockIfWorkDeleted(c, d)) return;
   if(!c.email){ showToast('error','No email on file', `Add an email for ${c.name} in Clients to send.`); return; }
   // Already sent this exact draft once — require an explicit
   // confirmation naming who sent it and when, rather than silently
@@ -1258,8 +1282,9 @@ function queueDraftTextarea(id){
 }
 
 async function approveDraft(id, author){
-  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can approve drafts.'); return; }
+  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can approve drafts.'); return false; }
   const ta = queueDraftTextarea(id);
+  { const c0 = clients.find(x=>x.id===id); if(c0 && blockIfWorkDeleted(c0, getDraftFor(c0, author))) return false; }
   setBtnLoading(clickedBtn(), 'Approving…');
 
   await loadAll();
@@ -1290,7 +1315,7 @@ async function approveDraft(id, author){
   if(ok) await persistLog();
   renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
   if(modalOpenForThis) openQueueCardModal(id, author);
-  if(!ok){ showToast('error','Save failed','Approval may not have synced — refresh and check.'); return; }
+  if(!ok){ showToast('error','Save failed','Approval may not have synced — refresh and check.'); return false; }
   logClientActivity(id, 'draft_approved', `${myName()||'Someone'} approved ${author}'s draft.`);
   refreshClientDetailActivityIfOpen(id);
 
@@ -1314,7 +1339,7 @@ async function approveDraft(id, author){
 // anyway since every improvement in your own draft is authored by you,
 // and that loop already excludes yourself).
 async function approveAndSendOwnDraft(id, author){
-  await approveDraft(id, author);
+  if((await approveDraft(id, author)) === false) return;
   await sendApprovedDraft(id, author);
 }
 
@@ -1331,6 +1356,7 @@ async function skipDraft(id, author){
   // notification loop at the end of this function.
   const includedAuthorProfiles = getIncludedAuthorProfiles(c, d);
   const includedIds = d.draftImprovementIds || [];
+  const nothingLeft = draftWorkAllDeleted(c, d); // discarding a draft whose work was all deleted
   // Same treatment as approveDraft(): flipping include_in_email off for
   // exactly the improvements that were part of THIS draft is what keeps
   // them from silently reappearing in a future draft. Previously this was
@@ -1354,7 +1380,7 @@ async function skipDraft(id, author){
   renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
   if(ok){ logClientActivity(id, 'draft_skipped', `${myName()||'Someone'} skipped ${author}'s update.`); refreshClientDetailActivityIfOpen(id); }
   if(modalOpenForThis) openQueueCardModal(id, author);
-  ok ? showToast('info','Skipped', `${author}'s update for ${c.name} won't be sent — those improvements are now excluded from future drafts too.`) : showToast('error','Save failed','Could not save — try again.');
+  ok ? (nothingLeft ? showToast('info','Draft discarded', `${author}'s draft for ${c.name} was discarded.`) : showToast('info','Skipped', `${author}'s update for ${c.name} won't be sent — those improvements are now excluded from future drafts too.`)) : showToast('error','Save failed','Could not save — try again.');
   if(ok){
     for(const authorProfile of includedAuthorProfiles){
       sendNotification(authorProfile.id, 'draft_skipped', 'Draft skipped', `${myName()||'An approver'} skipped ${author}'s draft for ${c.name}, which included your logged work — no email was sent.`, 'approve');

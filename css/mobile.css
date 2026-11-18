@@ -192,7 +192,7 @@ body.mac.mobile { overflow: hidden; background: var(--ios-bg, #F2F2F7); -webkit-
 /* motion and checks (js/ui/motion.js) */
 .seg-pill { position: absolute; z-index: 0; pointer-events: none; transform-origin: left center; }
 .app .iseg { position: relative; }
-:where(.app .iseg) > :not(.seg-pill) { position: relative; z-index: 1; }
+:where(.app .iseg) > :not(.seg-pill):not(.seg-hl) { position: relative; z-index: 1; }
 .app .iseg > .pill-under { background: transparent !important; box-shadow: none !important; }
 .app .ir .cb.checking { background: var(--label-2); box-shadow: none; color: #fff; display: inline-flex; align-items: center; justify-content: center; }
 .app .ir .cb.rem.checking, .app .ir .cb.rem.done { background: var(--green); box-shadow: none; color: #fff; display: inline-flex; align-items: center; justify-content: center; }
@@ -250,3 +250,11 @@ body.mac.mobile { overflow: hidden; background: var(--ios-bg, #F2F2F7); -webkit-
 .ikpi.blue .k-ic { background: var(--blue-soft); color: var(--blue); }
 .tags.iwrap { flex-wrap: wrap; overflow: visible; }
 .app .ir .r .tag { margin-left: 2px; }
+
+/* Segmented controls: the selection slides with its label colours (motion.js slidePill) */
+.seg-hl { position: absolute; inset: 0; z-index: 2; pointer-events: none; border-radius: inherit; box-sizing: border-box; }
+.seg-hl > * { background: transparent !important; box-shadow: none !important; transition: none !important; }
+.seg-moving > :not(.seg-hl), .seg-still > * { transition: none !important; }
+.seg-moving > .pill-under { color: var(--label) !important; }
+.seg-moving > .pill-under .c { color: var(--label-2) !important; }
+.set-tabs.seg-moving > .pill-under, .set-tabs.seg-moving > .pill-under svg { color: var(--label-2) !important; }

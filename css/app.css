@@ -536,7 +536,7 @@ body.mac :is(input[type="text"], input:not([type]), input[type="email"], input[t
 }
 /* The selected tab's pill slides (js/ui/motion.js). */
 .seg-pill { position: absolute; z-index: 0; pointer-events: none; transform-origin: left center; }
-:where(.seg, .set-tabs) > :not(.seg-pill) { position: relative; z-index: 1; }
+:where(.seg, .set-tabs) > :not(.seg-pill):not(.seg-hl) { position: relative; z-index: 1; }
 :is(.seg, .set-tabs) > .pill-under { background: transparent !important; box-shadow: none !important; }
 /* A box being checked off: tasks fill grey, reminders fill green. */
 .cb.checking { background: var(--label-2); box-shadow: none; color: #fff; }
@@ -1431,7 +1431,17 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .rvn-i time{flex:0 0 auto;font-size:11.5px;color:var(--label-3);font-variant-numeric:tabular-nums}
 .rvn-i.is-out > svg{color:var(--label-3)}
 .rvn-i.is-out .rvn-it{color:var(--label-2)}
-.rvn-rnote{margin:10px 0 0;font-size:12px;color:var(--label-3)}
+.rvn-rnote{margin:10px 0 0;font-size:12px;line-height:1.45;color:var(--label-3)}
+.rvn-i.is-new > svg{color:var(--blue)}
+.rvn-note{font-size:11.5px;font-weight:600;color:var(--yellow);white-space:nowrap}
+.rvn-note.is-red{color:var(--red)}
+.rvn-rail .btn.rvn-sm{height:28px;padding:0 11px;margin-top:10px;font-size:12.5px}
+.rvn-warn{display:flex;gap:10px;margin:0 0 22px;padding:12px 14px;border-radius:10px;background:color-mix(in srgb,var(--red) 12%,transparent)}
+.rvn-warn > svg{width:16px;height:16px;flex:0 0 auto;margin-top:1px;color:var(--red)}
+.rvn-warn > div{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0}
+.rvn-warn b{font-size:13px;font-weight:600;color:var(--label)}
+.rvn-warn span{font-size:12.5px;line-height:1.45;color:var(--label-2)}
+.rvn-warn .btn.rvn-sm{margin-top:7px}
 .rvn-ft{display:flex;align-items:center;gap:8px;padding:14px 24px 16px 36px;border-top:.5px solid var(--sep);flex:0 0 auto}
 .rvn-ft-note{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--label-2);min-width:0}
 .rvn-ft-note svg{width:14px;height:14px;color:var(--label-3);flex:0 0 auto}
@@ -1443,3 +1453,19 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
   .rvn-cols{grid-template-columns:minmax(0,1fr);row-gap:32px;padding:24px 24px 28px}
   .rvn-ft{padding-left:24px}
 }
+
+/* Segmented controls: the selection slides with its label colours (motion.js slidePill) */
+.seg-hl { position: absolute; inset: 0; z-index: 2; pointer-events: none; border-radius: inherit; box-sizing: border-box; }
+.seg-hl > * { background: transparent !important; box-shadow: none !important; transition: none !important; }
+.seg-moving > :not(.seg-hl), .seg-still > * { transition: none !important; }
+.seg-moving > .pill-under { color: var(--label) !important; }
+.seg-moving > .pill-under .c { color: var(--label-2) !important; }
+.set-tabs.seg-moving > .pill-under, .set-tabs.seg-moving > .pill-under svg { color: var(--label-2) !important; }
+.sp-dnote{display:flex;gap:8px;margin:12px 0 0;font-size:12.5px;line-height:1.45;color:var(--label-2)}
+.sp-dnote > svg{width:15px;height:15px;flex:0 0 auto;margin-top:1px;color:var(--blue)}
+.sp-dnote.is-red > svg{color:var(--red)}
+.sp-dnote .x-lnk{margin-left:2px}
+.mac .sp-draft-edit{display:block;width:100%;min-height:220px;margin-top:2px;padding:10px 12px;border:0;border-radius:10px;background:transparent;box-shadow:inset 0 0 0 1px var(--sep-strong),0 0 0 3px var(--fill);font:inherit;font-size:13.5px;line-height:1.55;color:var(--label);resize:vertical;outline:none}
+.mac .sp-draft-edit:focus-visible{box-shadow:inset 0 0 0 1px var(--accent),0 0 0 3px var(--fill)}
+.sp-draft-acts{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
+.sp-draft-acts .btn{height:30px;padding:0 12px}

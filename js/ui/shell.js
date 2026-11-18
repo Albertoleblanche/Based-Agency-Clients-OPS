@@ -75,7 +75,7 @@ function openHealthClient(id){ window._healthSel = id; switchView('health'); if(
 function openReviewDraft(clientId, author){
   const c = clients.find(x => x.id === clientId), d = (c && c.drafts || []).find(x => x.author === author);
   const listed = typeof reviewItems === 'function' && Object.values(reviewItems()).some(l => l.some(x => x.c.id === clientId && x.d.author === author));
-  if(!listed){ openWeekClient(clientId); return; }
+  if(!listed || (typeof hasPermission === 'function' && !hasPermission('view_team_queue'))){ openWeekClient(clientId); return; }
   if(typeof reviewTab !== 'undefined' && d) reviewTab = d.draftSentAt ? 'sent' : d.draftStatus === 'approved' ? 'approved' : 'waiting';
   window._reviewSel = { clientId, author }; window._reviewEditing = null;
   switchView('teamqueue');

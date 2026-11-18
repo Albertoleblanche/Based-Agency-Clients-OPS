@@ -60,22 +60,45 @@ document.addEventListener('click', e => {
   };
   requestAnimationFrame(step);
 }, true);
+// The highlight and the label colours move together: a copy of the labels in their selected
+// colours, on the selected background, is clipped to a rounded box that travels from the old tab
+// to the new one. Underneath, every label keeps its unselected look until the box arrives, so no
+// label is ever dark on dark or light on light, and nothing fades in twice.
 function slidePill(seg, on, from, segFrom){
   const to = on.getBoundingClientRect(), sr = seg.getBoundingClientRect();
   if(Math.abs(to.left - from.left) < 2 && Math.abs(to.top - from.top) < 2) return;
-  const cs = getComputedStyle(on);
-  const pill = document.createElement('span');
-  pill.className = 'seg-pill';
-  pill.setAttribute('aria-hidden', 'true');
-  Object.assign(pill.style, { left: (to.left - sr.left) + 'px', top: (to.top - sr.top) + 'px', width: to.width + 'px', height: to.height + 'px',
-    background: cs.backgroundColor, boxShadow: cs.boxShadow, borderRadius: cs.borderRadius });
-  if(getComputedStyle(seg).position === 'static') seg.style.position = 'relative';
-  seg.prepend(pill);
+  seg.querySelectorAll(':scope > .seg-hl').forEach(n => n.remove());
+  const cs = getComputedStyle(on), ss = getComputedStyle(seg);
+  const hl = document.createElement('span');
+  hl.className = 'seg-hl'; hl.setAttribute('aria-hidden', 'true');
+  ['display', 'flexDirection', 'flexWrap', 'alignItems', 'justifyContent', 'gap', 'rowGap', 'columnGap',
+   'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'gridTemplateColumns'].forEach(k => { hl.style[k] = ss[k]; });
+  hl.style.background = cs.backgroundColor;
+  [...seg.children].forEach(ch => {
+    if(ch.classList.contains('seg-hl') || ch.classList.contains('seg-pill')) return;
+    const c = ch.cloneNode(true);
+    c.classList.add('on'); c.removeAttribute('id'); c.removeAttribute('onclick'); c.tabIndex = -1;
+    c.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
+    hl.appendChild(c);
+  });
+  if(ss.position === 'static') seg.style.position = 'relative';
+  const rad = parseFloat(cs.borderTopLeftRadius) || 6;
+  const box = (r, ref) => { const t = r.top - ref.top, l = r.left - ref.left; return `inset(${t}px ${ref.width - l - r.width}px ${ref.height - t - r.height}px ${l}px round ${rad}px)`; };
+  // the old tab's box, measured against the old control, placed on the new one
+  const fromBox = { top: from.top - segFrom.top + sr.top, left: from.left - segFrom.left + sr.left, width: from.width, height: from.height };
+  seg.classList.add('seg-moving');
   on.classList.add('pill-under');
-  const dx = (from.left - segFrom.left) - (to.left - sr.left), dy = (from.top - segFrom.top) - (to.top - sr.top), sx = from.width / to.width;
-  const a = pill.animate([{ transform: `translate(${dx}px, ${dy}px) scaleX(${sx})` }, { transform: 'none' }], { duration: 260, easing: 'cubic-bezier(.32,.72,0,1)' });
-  const done = () => { pill.remove(); on.classList.remove('pill-under'); };
-  a.onfinish = done; a.oncancel = done; setTimeout(done, 400);
+  seg.appendChild(hl);
+  const a = hl.animate([{ clipPath: box(fromBox, sr) }, { clipPath: box(to, sr) }], { duration: 260, easing: 'cubic-bezier(.32,.72,0,1)', fill: 'forwards' });
+  let finished = false;
+  const done = () => {
+    if(finished) return; finished = true;
+    // swap back in one frame with no transitions, so the real tab doesn't fade in afterwards
+    seg.classList.add('seg-still');
+    on.classList.remove('pill-under'); seg.classList.remove('seg-moving'); hl.remove();
+    requestAnimationFrame(() => requestAnimationFrame(() => seg.classList.remove('seg-still')));
+  };
+  a.onfinish = done; a.oncancel = done; setTimeout(done, 420);
 }
 // What the tab shows: a quick fade as it swaps.
 function fadeSegContent(seg, scopeBefore){

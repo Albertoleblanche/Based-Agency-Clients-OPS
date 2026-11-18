@@ -191,7 +191,16 @@ function clientWeek(c){
   const now = rNow(), drafts = c.drafts || [], owner = clientOwner(c);
   const { last, due, daysLeft } = clientDue(c, now);
   const since = last || addDays(now, -UPDATE_EVERY_DAYS);
-  const logged = (c.improvements || []).filter(i => new Date(i.date) > since && new Date(i.date) <= now);
+  // This update's work: everything logged since the last one went out, plus anything meant for
+  // the email that was logged before it but didn't make it in (logged after that draft was
+  // written, for example). Sent work is marked out of the email when it's approved, so it never
+  // comes back; the carry-over only looks two weeks back.
+  const logged = (c.improvements || []).filter(i => {
+    const t = new Date(i.date);
+    if(t > now) return false;
+    if(t > since) return true;
+    return !!last && i.includeInEmail !== false && t > addDays(since, -14);
+  });
   const w = { c, owner, holder: owner, logged, since, last, due, daysLeft, dueText: dueText(daysLeft, due),
     done: 0, behind: null, sent: false, late: false, state: 'due', draft: null };
   const approved = drafts.find(d => d.draftStatus === 'approved' && !d.draftSentAt);
