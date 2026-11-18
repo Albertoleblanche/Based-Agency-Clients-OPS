@@ -113,7 +113,8 @@ function fadeSegContent(seg, scopeBefore){
   }
   const scope = seg.closest('section, .view, .ipush, #mMain') || scopeBefore;
   if(!scope) return;
-  [...scope.children].filter(ch => !ch.contains(seg) && !ch.matches('.seg-pill, .client-insp, [hidden]') && ch.offsetParent !== null).slice(0, 6)
+  // (a screen that already animates its own change, like the timesheet, is left to it)
+  [...scope.children].filter(ch => !ch.contains(seg) && !ch.matches('.seg-pill, .client-insp, [hidden]') && ch.offsetParent !== null && !ch.getAnimations?.().length).slice(0, 6)
     .forEach(ch => ch.animate?.([{ opacity: .35, transform: 'translateY(3px)' }, { opacity: 1, transform: 'none' }], { duration: 200, easing: EASE_OUT }));
 }
 
@@ -202,8 +203,8 @@ document.addEventListener('click', e => {
     const t1 = t.hasAttribute('aria-expanded') && document.querySelector(`[data-grow="${CSS.escape(key)}"][aria-expanded]`);
     const chev = t1 && t1.querySelector(':scope > svg');
     if(chev && t1.getAttribute('aria-expanded') !== t.getAttribute('aria-expanded')){
-      const a0 = t.getAttribute('aria-expanded') === 'true' ? 90 : 0;
-      chev.animate([{ transform: `rotate(${a0}deg)` }, { transform: `rotate(${90 - a0}deg)` }], { duration: 240, easing: EASE_OUT });
+      const turn = +(t1.getAttribute('data-turn') || 90), a0 = t.getAttribute('aria-expanded') === 'true' ? turn : 0;
+      chev.animate([{ transform: `rotate(${a0}deg)` }, { transform: `rotate(${turn - a0}deg)` }], { duration: 240, easing: EASE_OUT });
     }
     const rows = growRows(nu), h1 = nu.getBoundingClientRect().height;
     if(Math.abs(h1 - h0) < 2) return;

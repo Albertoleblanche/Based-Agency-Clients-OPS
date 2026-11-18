@@ -93,16 +93,29 @@ function tsPeriod(view, anchor){
   if(view === 'week'){ const m = tsMonday(a); return { from: m, to: addDays(m, 6) }; }
   return { from: new Date(a.getFullYear(), a.getMonth(), 1), to: new Date(a.getFullYear(), a.getMonth() + 1, 0) };
 }
-function setTsView(v){ tsView = v; renderTimesheet(); }
+function setTsView(v){ tsView = v; renderTimesheet(); tsMotion(0); }
 function tsGo(dir){
   const a = tsD(tsAnchor || toDateStr(rNow()));
   const n = tsView === 'day' ? addDays(a, dir) : tsView === 'week' ? addDays(a, 7 * dir) : new Date(a.getFullYear(), a.getMonth() + dir, 1);
   const today = dayStart(rNow());
   tsAnchor = toDateStr(n > today ? today : n);
-  renderTimesheet();
+  renderTimesheet(); tsMotion(dir);
 }
-function tsToday(){ tsAnchor = toDateStr(rNow()); renderTimesheet(); }
-function tsOpenDay(k){ tsView = 'day'; tsAnchor = k; renderTimesheet(); }
+function tsToday(){ tsAnchor = toDateStr(rNow()); renderTimesheet(); tsMotion(1); }
+function tsOpenDay(k){ tsView = 'day'; tsAnchor = k; renderTimesheet(); tsMotion(0); }
+// Moving to another day, week or month: the date and what's under it slide in from the side you
+// moved toward, so the timesheet reads as one strip of time. Switching Day / Week / Month, or
+// opening a day from the week or the month, settles in place instead.
+function tsMotion(dir){
+  if(typeof motionOK !== 'function' || !motionOK()) return;
+  const root = document.getElementById('timeRoot-timesheet');
+  if(!root || root.offsetParent === null) return;
+  const from = dir ? `translateX(${dir * 18}px)` : 'translateY(6px)';
+  [root.querySelector('.tmi-lbl'), root.querySelector('.tmi-tot')].forEach(el => el && el.animate?.(
+    [{ opacity: 0, transform: dir ? `translateX(${dir * 10}px)` : 'none' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: EASE_OUT }));
+  root.querySelectorAll('.tmi-body').forEach((el, i) => el.animate?.(
+    [{ opacity: 0, transform: from }, { opacity: 1, transform: 'none' }], { duration: 280, delay: i * 30, easing: EASE_OUT, fill: 'backwards' }));
+}
 
 // When an entry ran, from when it was saved: the timer saves it as it stops, so the end is its
 // save time and the start is that minus its length. Entries added by hand or merged later have
@@ -178,7 +191,7 @@ function renderTimesheet(){
     : tsView === 'week' ? `<b id="tsTotal" data-base="${totalMin}">${hmm(totalMin + runToday)}</b> of ${weeklyHoursTarget()} h`
     : `<b id="tsTotal" data-base="${totalMin}">${hmm(totalMin + runToday)}</b> ${isCur ? 'so far' : 'logged'} · ${days.length} day${days.length === 1 ? '' : 's'} worked`;
   const seg = `<div class="seg" role="tablist" aria-label="Show">${[['day', 'Day'], ['week', 'Week'], ['month', 'Month']].map(([k, t]) => `<button class="${tsView === k ? 'on' : ''}" role="tab" aria-selected="${tsView === k}" onclick="setTsView('${k}')">${t}</button>`).join('')}</div>`;
-  const head = `<div class="tmi-hd"><div class="tmi-nav"><button class="ib" aria-label="Previous ${tsView}" title="Previous ${tsView}" onclick="tsGo(-1)">${icon('caret-left')}</button><b>${escapeHtml(label)}</b><button class="ib" aria-label="Next ${tsView}" title="Next ${tsView}" onclick="tsGo(1)"${isCur ? ' disabled' : ''}>${icon('caret-right')}</button>${isCur ? '' : `<button class="btn tmi-now" onclick="tsToday()">Today</button>`}</div><span class="tmi-tot">${totTxt}</span>${seg}</div>`;
+  const head = `<div class="tmi-hd"><div class="tmi-nav"><div class="tb-grp"><button class="ib" aria-label="Previous ${tsView}" title="Previous ${tsView}" onclick="tsGo(-1)">${icon('caret-left')}</button><button class="ib" aria-label="Next ${tsView}" title="Next ${tsView}" onclick="tsGo(1)"${isCur ? ' disabled' : ''}>${icon('caret-right')}</button></div><b class="tmi-lbl">${escapeHtml(label)}</b>${isCur ? '' : `<button class="btn tmi-now" onclick="tsToday()">Today</button>`}</div><span class="tmi-tot">${totTxt}</span>${seg}</div>`;
 
   const byDay = {}; inP.forEach(e => (byDay[e.date] = byDay[e.date] || []).push(e));
   const add = k => `<a class="tmi-add" href="#" onclick="openManualEntryModal('${k}');return false;">${icon('plus')}Add time manually</a>`;
@@ -230,7 +243,7 @@ function renderTimesheet(){
     side = `<div class="tmx-sec"><b>By client ${isCur ? 'this month' : 'that month'}</b><span>vs budget</span></div>${rowsC.map(({ c, u, b }) =>
       `<div class="tmx-bud"><span>${escapeHtml(c.name)}</span><b class="${b && u > b ? 'over' : ''}">${b ? `${Math.round(u)} / ${b} h` : `${Math.round(u)} h`}</b>${b ? `<i><em class="${u > b ? 'over' : ''}" style="width:${Math.min(u / b, 1) * 100}%"></em></i>` : ''}</div>`).join('') || '<p class="tmi-none">No time this month.</p>'}`;
   }
-  root.innerHTML = `<div class="tmi"><div class="tmi-cols"><section aria-label="Time">${head}${main}</section><aside>${side}</aside></div></div>`;
+  root.innerHTML = `<div class="tmi"><div class="tmi-cols"><section aria-label="Time">${head}<div class="tmi-body">${main}</div></section><aside><div class="tmi-body">${side}</div></aside></div></div>`;
 }
 
 // ================================================================ Reports
@@ -346,33 +359,63 @@ dailySummaryDate = (() => { const d = dayStart(rNow()); do { d.setDate(d.getDate
 function shiftDailySummaryDate(dir){
   const d = new Date(dailySummaryDate); d.setDate(d.getDate() + dir);
   if(d > rNow()) return;
-  dailySummaryDate = d; loadDailySummary();
+  dailySummaryDate = d; loadDailySummary(dir);
 }
 function dsHeaderHtml(sub){
   const isToday = toDateStr(dailySummaryDate) === toDateStr(rNow());
-  return `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+  return `<div class="ds-hd"><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
 <div class="tb-grp"><button class="ib" aria-label="Previous day" onclick="shiftDailySummaryDate(-1)">${icon('caret-left')}</button><button class="ib" aria-label="Next day" ${isToday ? 'disabled' : ''} onclick="shiftDailySummaryDate(1)">${icon('caret-right')}</button></div>
-<h1 class="lt" style="font-size:22px">${dailySummaryDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</h1><span style="flex:1"></span>
+<h1 class="lt ds-day" style="font-size:22px">${dailySummaryDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</h1><span style="flex:1"></span>
 <button class="btn" onclick="openSlackSummaryConfirm()">${icon('slack-logo')}Send to Slack…</button></div>
-<p class="lt-sub">${sub}</p>`;
+<p class="lt-sub">${sub}</p></div>`;
 }
-async function loadDailySummary(){
+// Days already opened show again straight away (and quietly refresh); a day that's still loading
+// keeps the last one on screen, dimmed under the new date, instead of blanking to "Loading…".
+const dsCache = {};
+let dsWant = '';
+async function loadDailySummary(dir){
   const root = document.getElementById('timeRoot-dailysummary');
   if(!root) return;
   if(timeTab === 'dailysummary') timeTitle('Daily Summary');
-  root.innerHTML = dsHeaderHtml('Loading…');
+  const key = toDateStr(dailySummaryDate), cached = dsCache[key], body = root.querySelector('.ds-body');
+  dsWant = key;
+  if(cached){ lastDailySummaryData = cached; renderDailySummaryList(cached, dir); }
+  else if(body && root.querySelector('.ds-hd')){
+    lastDailySummaryData = null; // Send to Slack waits for this day
+    root.querySelector('.ds-hd').outerHTML = dsHeaderHtml('Loading…');
+    body.classList.add('is-loading');
+    dsMotion(dir, 'date');
+  } else root.innerHTML = dsHeaderHtml('Loading…') + '<div class="ds-body"></div>';
+  const fail = msg => { if(dsWant !== key || cached) return; root.innerHTML = dsHeaderHtml(msg); };
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch(`/api/get-daily-summary?date=${toDateStr(dailySummaryDate)}`, { headers: { 'Authorization': `Bearer ${session.access_token}` } });
+    const response = await fetch(`/api/get-daily-summary?date=${key}`, { headers: { 'Authorization': `Bearer ${session.access_token}` } });
     const data = await response.json();
-    if(!response.ok){ root.innerHTML = dsHeaderHtml(escapeHtml(data.error || 'Could not load the summary.')); return; }
+    if(!response.ok) return fail(escapeHtml(data.error || 'Could not load the summary.'));
+    dsCache[key] = data;
+    if(dsWant !== key) return; // they've moved on to another day
+    if(cached && JSON.stringify(cached) === JSON.stringify(data)) return;
     lastDailySummaryData = data;
-    renderDailySummaryList(data);
+    // after a dimmed wait the date has already moved; only the day itself comes in
+    renderDailySummaryList(data, cached ? undefined : dir, body && !cached ? 'body' : undefined);
   }catch(e){
-    root.innerHTML = dsHeaderHtml('Could not load the summary. Check your connection.');
+    fail('Could not load the summary. Check your connection.');
   }
 }
-function renderDailySummaryList(data){
+// The new day slides in from the side you moved toward (only the date while it's still loading).
+function dsMotion(dir, part){
+  if(!dir || typeof motionOK !== 'function' || !motionOK()) return;
+  const root = document.getElementById('timeRoot-dailysummary');
+  if(!root || root.offsetParent === null) return;
+  if(part !== 'body') [root.querySelector('.ds-day'), root.querySelector('.ds-hd .lt-sub')].forEach(el => el && el.animate?.(
+    [{ opacity: 0, transform: `translateX(${dir * 10}px)` }, { opacity: 1, transform: 'none' }], { duration: 220, easing: EASE_OUT }));
+  if(part === 'date') return;
+  root.querySelectorAll('.ds-body > .cols > *').forEach((el, i) => el.animate?.(
+    [{ opacity: 0, transform: `translateX(${dir * 18}px)` }, { opacity: 1, transform: 'none' }], { duration: 280, delay: i * 30, easing: EASE_OUT, fill: 'backwards' }));
+}
+let dsUntouchedOpen = false;
+function toggleDsUntouched(){ dsUntouchedOpen = !dsUntouchedOpen; if(lastDailySummaryData) renderDailySummaryList(lastDailySummaryData); }
+function renderDailySummaryList(data, dir, part){
   const root = document.getElementById('timeRoot-dailysummary');
   if(!root) return;
   const dStr = data.date || toDateStr(dailySummaryDate), dayName = new Date(dStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' });
@@ -380,7 +423,8 @@ function renderDailySummaryList(data){
   const impsBy = name => clients.reduce((s, c) => s + (c.improvements || []).filter(i => i.author === name && String(i.date || '').slice(0, 10) === dStr).length, 0);
   const total = people.reduce((s, p) => s + p.totalMinutes, 0), totalImps = people.reduce((s, p) => s + impsBy(p.name), 0);
   if(!people.length){
-    root.innerHTML = dsHeaderHtml(canApprove() ? `Nobody logged time on ${dayName}.` : `You didn't log any time on ${dayName}.`);
+    root.innerHTML = dsHeaderHtml(canApprove() ? `Nobody logged time on ${dayName}.` : `You didn't log any time on ${dayName}.`) + '<div class="ds-body"></div>';
+    if(part !== 'body') dsMotion(dir, 'date');
     return;
   }
   const cards = people.map(person => {
@@ -397,19 +441,33 @@ ${more > 0 ? `<div class="og-i" style="padding-left:52px"><button class="link-ro
   }).join('');
   const worked = new Set(people.flatMap(p => p.entries.map(e => e.client)));
   const act = activeClients();
-  const untouched = act.filter(c => !worked.has(c.name)).map(c => c.name);
+  const untouched = act.filter(c => !worked.has(c.name));
   const long = people.filter(p => p.totalMinutes > 9 * 60).map(p => p.name);
+  // Clients nobody touched that day, longest without time first, so the ones slipping stand out
+  // instead of a wall of names. Clients with no time ever go last.
+  const lastBy = {};
+  visibleTimeEntries().forEach(e => { if(e.date < dStr && !(lastBy[e.clientId] >= e.date)) lastBy[e.clientId] = e.date; });
+  const dsD = tsD(dStr);
+  const quiet = untouched.map(c => ({ c, n: lastBy[c.id] ? daysBetween(tsD(lastBy[c.id]), dsD) : null }))
+    .sort((a, b) => (a.n == null) - (b.n == null) || (b.n || 0) - (a.n || 0) || a.c.name.localeCompare(b.c.name));
+  const ago = n => n == null ? 'Never logged' : n < 14 ? `${n} day${n === 1 ? '' : 's'}` : n < 60 ? `${Math.round(n / 7)} weeks` : `${Math.round(n / 30.4)} months`;
+  const SHOW = 6, openNt = dsUntouchedOpen && quiet.length > SHOW;
+  const ntRows = (openNt ? quiet : quiet.slice(0, SHOW)).map(({ c, n }) => `<button class="ds-nt-r" onclick="openClientDetail('${c.id}')"><span>${escapeHtml(c.name)}</span><b>${ago(n)}</b></button>`).join('');
+  const ntMore = quiet.length > SHOW ? `<button class="ds-nt-more" data-grow="ds-nt" data-turn="180" aria-expanded="${openNt}" onclick="toggleDsUntouched()">${openNt ? 'Show less' : `Show all ${quiet.length}`}${icon('caret-down', { weight: 'bold' })}</button>` : '';
+  const ntSec = untouched.length
+    ? `<div class="ds-nt-cap">Longest without time first</div><div class="ds-nt" data-grow-key="ds-nt">${ntRows}</div>${ntMore}`
+    : '<p class="ds-nt-none">Every client got time.</p>';
   root.innerHTML = dsHeaderHtml(`${hmLong(total)} logged by ${people.length} ${people.length === 1 ? 'person' : 'people'} · ${totalImps} improvement${totalImps === 1 ? '' : 's'} · each person gets their own summary`) +
-`<div class="cols" style="margin-top:18px"><div class="col-main">${cards}</div>
+`<div class="ds-body"><div class="cols" style="margin-top:18px"><div class="col-main">${cards}</div>
 <aside class="col-side">
 <section class="panel"><h3>Team total<span>${dayName}</span></h3>
 <div class="kv"><span>Hours logged</span><b style="font-weight:500" class="dur">${hmLong(total)}</b></div>
 <div class="kv"><span>Improvements</span><b style="font-weight:500">${totalImps}</b></div>
 <div class="kv"><span>Clients worked on</span><b style="font-weight:500">${act.filter(c => worked.has(c.name)).length} of ${act.length}</b></div>
 <div class="kv"><span>Over 9 hours</span><b style="font-weight:500">${long.length ? long.map(escapeHtml).join(', ') : 'Nobody'}</b></div></section>
-<section class="panel"><h3>Not touched ${dayName}</h3>
-<p style="font-size:14px;margin:0;line-height:1.5">${untouched.length ? untouched.map(escapeHtml).join(' · ') : '<span class="t-2">Every client got time.</span>'}</p></section>
-</aside></div>`;
+<section class="panel ds-ntp"><h3>Not touched ${dayName}<span>${untouched.length ? `${untouched.length} of ${act.length}` : ''}</span></h3>${ntSec}</section>
+</aside></div></div>`;
+  dsMotion(dir, part);
 }
 
 // ================================================================ Payroll
