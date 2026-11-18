@@ -97,7 +97,7 @@ function renderAttentionList(){
 function renderClientOptionsSelects(){
   ['ncService','ncStatus'].forEach(id=>{
     const sel = document.getElementById(id);
-    if(!sel) return;
+    if(!sel || sel.tagName!=='SELECT') return;
     const options = id==='ncService' ? settings.serviceOptions : settings.statusOptions;
     const current = sel.value;
     sel.innerHTML = (options||[]).map(o=>`<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('');

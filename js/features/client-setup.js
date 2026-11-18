@@ -2,7 +2,8 @@
 // Radar: linked to the client with the same name, or added and marked "Needs setup" for an
 // approver to finish (custom_field_values.harvestSetup = 'needed'). They wait at the top of All
 // Clients, out of This Week, Health, Today and the reminders, until someone fills in who owns
-// them, their service and how they get their weekly win, then presses Finish Setup.
+// them and how they get their weekly win, then presses Finish Setup. What they buy is their
+// Harvest projects (harvest-time.js).
 //   Not a Radar Client  sends it to Trash for good: Harvest won't add it again.
 //   Same as…            it's a client Radar already has under another name: the Harvest link
 //                       moves there, with anything logged on the added one (the server does it).
@@ -34,7 +35,8 @@ function clientSetupSteps(c){
   const needEmail = ch !== 'whatsapp' && !c.email, needGroup = ch !== 'email' && !winGroupFor(c);
   return [
     { k: 'owner', ok: !!cfv.owner, word: 'owner' },
-    { k: 'service', ok: !!c.service, word: 'service' },
+    // a client in Harvest buys its Harvest projects, so there's no service to pick
+    ...(serviceFromHarvest(c) ? [] : [{ k: 'service', ok: !!c.service, word: 'service' }]),
     { k: 'win', ok: !needEmail && !needGroup, word: needEmail && needGroup ? 'WhatsApp group and email' : needEmail ? 'email' : 'WhatsApp group' },
   ];
 }
@@ -91,9 +93,12 @@ function clientSetupPanelHtml(c){
   // owner and service
   const people = (typeof teamProfiles !== 'undefined' ? teamProfiles : []).filter(p => p.name && !p.access_revoked).map(p => p.name).sort();
   const services = [...new Set([...(settings.serviceOptions || []), c.service].filter(Boolean))];
+  const parts = serviceParts(c);
   let rows = row('owner', 'Owner', pick('suOwner', 'Owner', people.map(n => [n, n]), cfv.owner || '', `setClientOwner(${A}, this.value)`, 'Choose someone'), ok('owner'))
-    + row('service', 'Service', pick('suService', 'Service', services.map(s => [s, s]), c.service || '', `setClientSetupField(${A}, 'service', this.value)`, 'Choose a service'), ok('service'),
-      ps.length ? `In Harvest: ${ps.map(p => escapeHtml(p.name)).join(' · ')}` : '');
+    + (serviceFromHarvest(c)
+      ? row('projects', 'Projects', parts.length ? parts.map(escapeHtml).join(' · ') : '<span class="t-3">None in Harvest yet</span>', null, 'From Harvest.')
+      : row('service', 'Service', pick('suService', 'Service', services.map(s => [s, s]), c.service || '', `setClientSetupField(${A}, 'service', this.value)`, 'Choose a service'), ok('service'),
+        ps.length ? `In Harvest: ${ps.map(p => escapeHtml(p.name)).join(' · ')}` : ''));
 
   // the weekly win: how it's sent, then the group and/or the email it needs
   const seg = approver ? `<span class="seg wn-seg" role="radiogroup" aria-label="Sends by">${[['whatsapp', 'WhatsApp'], ['email', 'Email'], ['both', 'Both']]
@@ -123,7 +128,7 @@ function clientSetupPanelHtml(c){
   const sub = approver ? (left.length ? `${clientSetupLeftWords(c)}. Then it joins This Week, Health and the reminders.` : 'All set. It joins This Week, Health and the reminders.')
     : 'An approver finishes its info, then it joins This Week and Health.';
   const acts = approver ? `<div class="sp-acts su-acts"><button class="btn" onclick="clientNotRadar(${A})">Not a Radar Client</button><button class="btn btn-p" onclick="finishClientSetup(${A})"${left.length ? ' disabled' : ''}>Finish Setup</button></div>` : '';
-  const meta = [hc && winNorm(hc.name) !== winNorm(c.name) ? `${hc.name} in Harvest` : '', c.service].filter(Boolean).map(escapeHtml).join(' · ');
+  const meta = [hc && winNorm(hc.name) !== winNorm(c.name) ? `${hc.name} in Harvest` : '', serviceFromHarvest(c) ? '' : c.service].filter(Boolean).map(escapeHtml).join(' · ');
   return `<aside class="sp cl-p has-foot" aria-label="${escapeHtml(c.name)}">
 <div class="sp-bar"><button class="ib" aria-label="Close" title="Close (Esc)" onclick="closeClientInspector()">${icon('x')}</button><span class="cl-pbar-r">${approver ? `<button class="ib" aria-label="More" title="More" onclick="clientSetupMore(event, ${A})">${icon('dots-three')}</button>` : ''}</span></div>
 <div class="sp-main">
@@ -232,7 +237,7 @@ function openAddInHarvestSheet(){
 <ol class="hvn">
 <li><b>Add the client in Harvest</b><span>With its project, tasks, budget and who’s on it.</span></li>
 <li><b>Radar brings it in</b><span>Within 10 minutes, or now with Sync Now. It waits under Needs setup in All Clients.</span></li>
-<li><b>Finish its info here</b><span>Owner, service and how it gets its weekly win.</span></li>
+<li><b>Finish its info here</b><span>Owner and how it gets its weekly win.</span></li>
 </ol>
 <div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn" id="hvnSync" onclick="hvNewClientSync()">Sync Now</button><a class="btn btn-p" id="hvnOpen" href="${escapeHtml(href)}" target="_blank" rel="noopener" onclick="closeAppModal()">Open Harvest</a></div>`, 480);
   if(!hvCompanyUrl && typeof harvestApiCall === 'function') harvestApiCall(null).then(st => {

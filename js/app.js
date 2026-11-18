@@ -159,6 +159,8 @@ async function showApp(session){
       typeof loadTaskDueTimes === 'function' ? loadTaskDueTimes() : null,
       typeof loadPlan === 'function' ? loadPlan() : null,
       typeof loadWaTasks === 'function' ? loadWaTasks() : null,
+      // Harvest's clients and projects: what each client buys, and the lists Log Time uses
+      typeof hvTimeLoad === 'function' ? hvTimeLoad() : null,
     ]);
     document.getElementById('appRoot').style.display = 'flex';
     renderAll();

@@ -12,10 +12,10 @@ let hvShowAll = false;       // Clients in Harvest: show them all
 let hvSyncing = false;
 const HV_SHOWN = 8;
 
-// When the app opens: ask the server to read what changed in Harvest. Quiet: it skips itself when
-// Harvest isn't connected, the database isn't set up, or it read less than 10 minutes ago.
+// When the app opens (the lists as they are were read before the first screen): ask the server to
+// read what changed in Harvest. Quiet: it skips itself when Harvest isn't connected, the database
+// isn't set up, or it read less than 10 minutes ago.
 function harvestSyncInBackground(){
-  if(typeof hvTimeLoad === 'function') hvTimeLoad(); // the lists Log Time uses, as they are now
   if(!myProfile || typeof harvestApiCall !== 'function') return;
   harvestApiCall('sync-setup').catch(() => {}).then(() => { if(typeof hvLoadLinks === 'function') hvLoadLinks(); if(typeof hvTimeLoad === 'function') hvTimeLoad(); });
 }

@@ -35,6 +35,20 @@ async function hvTimeLoad(){
 }
 function hvTimeOn(){ return !!(hvTime && hvTime.ready); }
 
+// Harvest is the source of truth for what each client buys. The server writes a linked client's
+// active Harvest projects into its service ("MDF - Tier 3 · Website Hosting and Maintenance"),
+// so every screen shows them; Radar only asks for a service for clients that aren't in Harvest.
+function hvHarvestClientOf(clientId){
+  return hvTime && Array.isArray(hvTime.clients) && clientId != null ? hvTime.clients.find(x => String(x.radar_client_id || '') === String(clientId)) || null : null;
+}
+function serviceFromHarvest(c){ return !!(c && hvHarvestClientOf(c.id)); }
+function harvestOwnsServices(){ return !!(hvTime && Array.isArray(hvTime.clients) && hvTime.clients.some(x => x.radar_client_id)); }
+// The service's parts: its projects, or the one service picked in Radar.
+function serviceParts(c){ return String((c && c.service) || '').split(' · ').map(s => s.trim()).filter(Boolean); }
+function serviceHas(c, v){ return serviceParts(c).includes(v); }
+// For a client's improvement: the project when it has just one, else nothing (it says which when time is logged).
+function improvementServiceFor(c){ const p = serviceParts(c); return serviceFromHarvest(c) ? (p.length === 1 ? p[0] : '') : (c && c.service) || ''; }
+
 // The client's Harvest projects: { all, mine } (mine = the ones you're assigned to).
 function hvClientProjects(clientId){
   if(!hvTimeOn() || !clientId) return { all: [], mine: [], linked: false };

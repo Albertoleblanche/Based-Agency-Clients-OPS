@@ -723,7 +723,7 @@ function mOpenClient(id){
   mPush(c0.name, () => {
     const c = clients.find(x => x.id === id) || c0;
     if(clientInSetup(c)) return `<div class="idetail" style="display:flex;gap:12px;align-items:center;margin-top:4px">${monoHtml(c, 'lg')}<div style="min-width:0"><h1 style="font-size:24px;font-weight:700;letter-spacing:-.02em;margin:0">${mEsc(c.name)}</h1><div class="ikv">Added from Harvest</div></div></div>
-${mIsh('Needs setup')}<div class="ig"><div class="ir"><span class="t n" style="white-space:normal;line-height:1.4">An approver finishes its info in All Clients on a computer: who owns it, its service and how it gets its weekly win. Then it shows here like the rest.</span></div></div>
+${mIsh('Needs setup')}<div class="ig"><div class="ir"><span class="t n" style="white-space:normal;line-height:1.4">An approver finishes its info in All Clients on a computer: who owns it and how it gets its weekly win. Then it shows here like the rest.</span></div></div>
 <div style="margin:12px 16px 0"><button class="ibtn s" onclick="mOpenDesktop()">Open the Computer Version</button></div>`;
     const w = weekView(clientWeek(c)), h = clientHealth(c);
     const imps = (c.improvements || []).slice().sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8);
@@ -942,13 +942,15 @@ function mOpenLog(presetClientId){
   mOpenSheet('Log Improvement', mLogBody(), { done: 'mSaveLog()', doneLabel: 'Log' });
 }
 function mLogBody(){
-  const L = mLog_;
+  const L = mLog_, lc = clients.find(x => x.id === L.clientId);
+  // a client in Harvest buys its projects, so there's no service to pick (harvest-time.js)
+  const svcRow = (lc ? serviceFromHarvest(lc) : harvestOwnsServices()) ? '' : mRowPick('Service', mEsc(L.service || 'None'), 'mLogPick(\'service\')', !!L.service);
   const dateLabel = L.date === toDateStr(new Date()) ? 'Today' : sheetDayLabel(new Date(L.date + 'T12:00:00'));
   return `<div class="ig flat" style="margin-top:12px">${mRowPick('Client', mEsc(mClientName(L.clientId) || 'Choose'), 'mLogPick(\'client\')', !!L.clientId)}</div>
 <div class="ig flat" style="margin-top:20px"><div class="ir" style="align-items:flex-start"><textarea class="iarea" id="mLogText" placeholder="What did you do?" spellcheck="true" oninput="mKeep('mLogText',this.value)"></textarea></div></div>
 <p class="ifoot">What you did, in a sentence the client would understand.</p>
 <div class="ig flat" style="margin-top:20px">
-${mRowPick('Service', mEsc(L.service || 'None'), 'mLogPick(\'service\')', !!L.service)}
+${svcRow}
 ${mRowPick('Date', dateLabel, 'mLogPick(\'date\')', true)}
 <div class="ir"><label class="ilab" for="mLogTime">Time spent</label><input class="tm" id="mLogTime" inputmode="decimal" placeholder="0:30" oninput="mKeep('mLogTime',this.value);mLog_.useTimer=false" onchange="mLogTimeSet()">${timerState.running ? `<button class="link" onclick="mLogUseTimer()">Use timer</button>` : ''}</div>
 ${hvTimeOn() && L.hasTime ? mHvRows(L, 'mLogPick') : ''}</div>${hvTimeOn() && L.hasTime && mHvBill(L) ? `<p class="ifoot">Time spent is ${mHvBill(L).toLowerCase()}.</p>` : ''}
@@ -992,13 +994,14 @@ async function mSaveLog(){
   const include = mIsOn('mLogInclude'), author = myName() || 'Team member';
   const btn = $m('mSheetDone'); if(btn) btn.disabled = true;
   const when = L.date === toDateStr(new Date()) ? new Date() : new Date(L.date + 'T12:00:00');
-  const imp = await insertImprovementFull(L.clientId, { author, text, includeInEmail: include, source: 'manual', date: when.toISOString(), service: L.service });
-  if(!imp){ if(btn) btn.disabled = false; showToast('error', 'Couldn’t save it', 'Try again in a moment.'); return; }
   const c = clients.find(x => x.id === L.clientId);
+  const service = c && serviceFromHarvest(c) ? (pick.projectId ? pick.service : improvementServiceFor(c)) : L.service;
+  const imp = await insertImprovementFull(L.clientId, { author, text, includeInEmail: include, source: 'manual', date: when.toISOString(), service });
+  if(!imp){ if(btn) btn.disabled = false; showToast('error', 'Couldn’t save it', 'Try again in a moment.'); return; }
   if(include && c){ const d = (c.drafts || []).find(x => x.author === author); if(d && d.draftStatus !== 'none') await saveDraftFor(L.clientId, author, { draftStatus: 'none', draft: '' }); }
   if(minutes){
-    if(L.useTimer && timerState.running && timerState.clientId === L.clientId){ timerState.service = pick.projectId ? pick.service : L.service; timerState.projectId = pick.projectId; timerState.taskId = pick.taskId; timerState.description = text; await mStopTimer(true, true); }
-    else await mAddTime({ clientId: L.clientId, service: pick.projectId ? pick.service : L.service, dateStr: L.date, minutes, description: text, logged: true, projectId: pick.projectId, taskId: pick.taskId });
+    if(L.useTimer && timerState.running && timerState.clientId === L.clientId){ timerState.service = pick.projectId ? pick.service : service; timerState.projectId = pick.projectId; timerState.taskId = pick.taskId; timerState.description = text; await mStopTimer(true, true); }
+    else await mAddTime({ clientId: L.clientId, service: pick.projectId ? pick.service : service, dateStr: L.date, minutes, description: text, logged: true, projectId: pick.projectId, taskId: pick.taskId });
   }
   mLog(L.clientId, 'improvement_logged', `${author} logged an improvement: "${text.slice(0, 80)}"`, `Logged an improvement for <b>${escapeHtml(c ? c.name : '')}</b>.`);
   mCloseSheet(true);

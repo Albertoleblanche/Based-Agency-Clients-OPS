@@ -201,9 +201,14 @@ function setFields(){
   const fields = settings.customFields || [];
   const frows = fields.map((f, i) => `<div class="fr"><div class="l"><b>${esc(f.label)}</b>${f.type === 'select' ? `<span>${(f.options || []).length} choices</span>` : ''}</div><span class="t-2" style="font-size:13px">${esc(CUSTOM_FIELD_TYPE_LABELS[f.type] || f.type)}${f.required ? ' · required' : ''}</span>
 <div class="pop-wrap" style="background:none;padding:0"><button class="ib" aria-label="More options for ${esc(f.label)}" onclick="cfMenu(event,'${f.id}',${i},${fields.length})">${icon('dots-three', { weight: 'bold' })}</button></div></div>`).join('');
+  // Harvest is the source of truth for what clients buy: the list is only for clients outside it
+  const hv = typeof harvestOwnsServices === 'function' && harvestOwnsServices();
+  const outside = hv ? liveClients().filter(c => !serviceFromHarvest(c)).length : 0;
+  const svcList = `<div class="form-grp"><div class="fr" style="flex-wrap:wrap;padding:12px 14px">${optChips('service')}</div>
+<div class="fr"><input class="tf" id="serviceOptionInput" style="flex:1" placeholder="Add a service" aria-label="Add a service" onkeydown="if(event.key==='Enter')addOpt('service')"><button class="btn" onclick="addOpt('service')">Add</button></div></div>`;
   return `<div class="set-h">Services</div>
-<div class="form-grp"><div class="fr" style="flex-wrap:wrap;padding:12px 14px">${optChips('service')}</div>
-<div class="fr"><input class="tf" id="serviceOptionInput" style="flex:1" placeholder="Add a service" aria-label="Add a service" onkeydown="if(event.key==='Enter')addOpt('service')"><button class="btn" onclick="addOpt('service')">Add</button></div></div>
+${!hv ? svcList : outside ? `${svcList}<p class="t-2 hv-p">For the ${outside === 1 ? 'client that isn’t' : `${outside} clients that aren’t`} in Harvest. Clients in Harvest show their projects.</p>`
+    : `<div class="form-grp">${fr('From Harvest', 'Each client shows its active projects in Harvest. Change them there.', '')}</div>`}
 <div class="set-h">Client statuses</div>
 <div class="form-grp"><div class="fr" style="flex-wrap:wrap;padding:12px 14px">${optChips('status')}</div>
 <div class="fr"><input class="tf" id="statusOptionInput" style="flex:1" placeholder="Add a status" aria-label="Add a status" onkeydown="if(event.key==='Enter')addOpt('status')"><button class="btn" onclick="addOpt('status')">Add</button></div></div>

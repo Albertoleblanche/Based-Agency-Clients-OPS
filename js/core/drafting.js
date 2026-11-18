@@ -24,7 +24,7 @@ ${customStructure}
 --- END REQUIRED STRUCTURE ---
 
 Client: ${c.name}
-Service: ${c.service}
+Services: ${c.service ? `${c.service} (our internal names, for context only: describe the work in plain words and never name these to the client)` : 'n/a'}
 Scope notes: ${c.sow || 'n/a'}
 Improvements made this week:
 ${bullets}
@@ -32,7 +32,7 @@ ${bullets}
 ${contentRules}`
     : `Write a short, warm, professional weekly update email to a home-services/construction client from their marketing agency (${settings.appName || 'Based Agency'}).
 Client: ${c.name}
-Service: ${c.service}
+Services: ${c.service ? `${c.service} (our internal names, for context only: describe the work in plain words and never name these to the client)` : 'n/a'}
 Scope notes: ${c.sow || 'n/a'}
 Improvements made this week:
 ${bullets}
@@ -46,7 +46,7 @@ ${contentRules}`;
 function buildWhatsappWinPrompt(c, bullets, contentRules){
   return `Write this week's "win" message for a home-services/construction client's WhatsApp group, from their marketing agency (${settings.appName || 'Based Agency'}). Someone at the agency pastes it into the group.
 Client: ${c.name}
-Service: ${c.service}
+Services: ${c.service ? `${c.service} (our internal names, for context only: describe the work in plain words and never name these to the client)` : 'n/a'}
 Scope notes: ${c.sow || 'n/a'}
 Improvements made this week:
 ${bullets}

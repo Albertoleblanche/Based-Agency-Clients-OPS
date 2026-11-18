@@ -58,18 +58,19 @@ function renderClientsTable(){
   const rows = ac.map(c => ({ c, h: clientHealth(c), w: weekView(clientWeek(c)), owner: clientOwner(c) }));
   // added from Harvest, waiting for an approver to finish their info (client-setup.js)
   const su = setupClients(), suOwner = c => (c.customFieldValues || {}).owner || '';
-  const suShown = clientsSeg !== 'all' ? [] : su.filter(c => (clientFilters.service === 'all' || c.service === clientFilters.service) && (clientsOwnerFilter === 'all' || suOwner(c) === clientsOwnerFilter)
+  const services = [...new Set(ac.concat(su).flatMap(serviceParts))].sort((a, b) => a.localeCompare(b));
+  if(clientFilters.service !== 'all' && !services.includes(clientFilters.service)) clientFilters.service = 'all'; // a project that's gone
+  const suShown = clientsSeg !== 'all' ? [] : su.filter(c => (clientFilters.service === 'all' || serviceHas(c, clientFilters.service)) && (clientsOwnerFilter === 'all' || suOwner(c) === clientsOwnerFilter)
     && (!clientFilters.search || c.name.toLowerCase().includes(clientFilters.search) || (c.email || '').toLowerCase().includes(clientFilters.search)))
     .sort((a, b) => String((b.customFieldValues || {}).harvestAdded || '').localeCompare(String((a.customFieldValues || {}).harvestAdded || '')) || a.name.localeCompare(b.name));
   const needs = rows.filter(r => r.h.level !== 'g'), notSent = rows.filter(r => !r.w.sent);
   let shown = clientsSeg === 'attention' ? needs : clientsSeg === 'behind' ? notSent : rows;
-  shown = shown.filter(r => (clientFilters.service === 'all' || r.c.service === clientFilters.service) && (clientsOwnerFilter === 'all' || r.owner === clientsOwnerFilter)
+  shown = shown.filter(r => (clientFilters.service === 'all' || serviceHas(r.c, clientFilters.service)) && (clientsOwnerFilter === 'all' || r.owner === clientsOwnerFilter)
     && (!clientFilters.search || r.c.name.toLowerCase().includes(clientFilters.search) || (r.c.email || '').toLowerCase().includes(clientFilters.search)));
   const rank = { r: 0, y: 1, g: 2 };
   const dir = clientSort.dir === 'desc' ? -1 : 1;
   shown.sort(clientSort.field === 'name' && clientSort.explicit ? (a, b) => dir * a.c.name.localeCompare(b.c.name)
     : (a, b) => rank[a.h.level] - rank[b.h.level] || b.h.signals.filter(s => s.l === 'r').length - a.h.signals.filter(s => s.l === 'r').length || (b.c.importance || 0) - (a.c.importance || 0) || a.c.name.localeCompare(b.c.name));
-  const services = [...new Set(ac.map(c => c.service).filter(Boolean))].sort();
   const owners = [...new Set(rows.map(r => r.owner).concat(su.map(suOwner)).filter(Boolean))].sort();
   if(inspectedClientId && !ac.some(c => c.id === inspectedClientId) && !su.some(c => c.id === inspectedClientId)) inspectedClientId = null;
   const row = ({ c, h, w, owner }) => {
@@ -100,7 +101,7 @@ function renderClientsTable(){
 <div class="cl-bar0"><div class="seg" role="tablist" aria-label="Show">${seg}</div><span class="cl-sp"></span>
 <label class="cl-find">${icon('magnifying-glass')}<input id="clientsFind" type="search" placeholder="Filter clients" aria-label="Filter clients" value="${escapeHtml(clientFilters.search || '')}" oninput="setClientsFind(this.value)"></label>
 <label class="pop-wrap">Owner: <select class="pop" onchange="setClientsOwner(this.value)"><option value="all">All</option>${owners.map(o => `<option${clientsOwnerFilter === o ? ' selected' : ''}>${escapeHtml(o)}</option>`).join('')}</select></label>
-<label class="pop-wrap">Service: <select class="pop" onchange="setClientsService(this.value)"><option value="all">All</option>${services.map(s => `<option${clientFilters.service === s ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('')}</select></label></div>
+<label class="pop-wrap">${harvestOwnsServices() ? 'Project' : 'Service'}: <select class="pop" onchange="setClientsService(this.value)"><option value="all">All</option>${services.map(s => `<option${clientFilters.service === s ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('')}</select></label></div>
 <div class="cl-table" role="table" aria-label="Clients">
 <div class="cl-head" role="row"><button role="columnheader" class="${clientSort.field === 'name' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'name',dir:clientSort.field==='name'&&clientSort.explicit&&clientSort.dir==='asc'?'desc':'asc',explicit:true};renderClientsTable()">Client${clientSort.field === 'name' && clientSort.explicit ? sortIc : ''}</button><span role="columnheader">Owner</span><button role="columnheader" class="${clientSort.explicit ? '' : 'is-sort'}" onclick="clientSort={field:'health'};renderClientsTable()">Health${clientSort.explicit ? '' : sortIc}</button><span role="columnheader">This week</span><span role="columnheader">Last 8 weeks</span><span role="columnheader" class="r">Hours this month</span></div>
 <div id="clientsTbody" role="rowgroup">${body}</div></div>

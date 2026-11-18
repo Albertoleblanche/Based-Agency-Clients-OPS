@@ -300,14 +300,19 @@ function customFieldInputHtml(field, value){
   const type = { text: 'text', url: 'url', email: 'email', phone: 'tel', number: 'number' }[field.type] || 'text';
   return label + `<input type="${type}" id="${id}" class="tf" value="${escapeHtml(val)}">`;
 }
-function clientFormHtml(title, submitLabel, customValues){
+function clientFormHtml(title, submitLabel, customValues, c){
   const opt = list => (list || []).map(o => [o, o]);
+  // a client in Harvest buys its Harvest projects: shown here, changed there (harvest-time.js)
+  const hvSvc = c && typeof serviceFromHarvest === 'function' && serviceFromHarvest(c), parts = hvSvc ? serviceParts(c) : [];
+  const service = hvSvc
+    ? `<label>Projects</label><div class="nc-ro"><span${parts.length ? '' : ' class="t-3"'}>${parts.length ? parts.map(escapeHtml).join(' · ') : 'None in Harvest yet'}</span><span class="t-2">From Harvest. Change them there.</span><input type="hidden" id="ncService" value="${escapeHtml(c.service || '')}"></div>`
+    : `<label for="ncService">Service</label><div>${sheetPop('ncService', 'Service', opt(settings.serviceOptions), (settings.serviceOptions || [])[0] || '')}</div>`;
   return `<h3>${escapeHtml(title === 'Add client' ? 'New Client' : title === 'Edit client' ? 'Edit Client' : title)}</h3>
 <div class="f">
 <label for="ncName">Name</label><div><input id="ncName" class="tf" placeholder="e.g. Premium Homes" oninput="checkDuplicateClientName()"><div id="ncNameWarning" class="t-red" style="display:none;font-size:13px;margin-top:5px"></div></div>
 <label for="ncWebsite">Website</label><input id="ncWebsite" class="tf" placeholder="https://client.com">
 <label for="ncEmail">Email</label><div><input id="ncEmail" class="tf" placeholder="contact@client.com, billing@client.com"><div class="t-2" style="font-size:13px;margin-top:5px">Separate addresses with commas. Updates go to everyone listed.</div></div>
-<label for="ncService">Service</label><div>${sheetPop('ncService', 'Service', opt(settings.serviceOptions), (settings.serviceOptions || [])[0] || '')}</div>
+${service}
 <label for="ncStatus">Status</label><div>${sheetPop('ncStatus', 'Status', opt(settings.statusOptions), (settings.statusOptions || [])[0] || '')}</div>
 <label for="ncImportance">Importance</label><div style="display:flex;gap:10px;align-items:center">${sheetPop('ncImportance', 'Importance', Array.from({ length: 10 }, (_, i) => [String(i + 1), `${i + 1} of 10`]), '5')}<span class="t-2" style="font-size:13px">How much this client matters to the agency</span></div>
 <label for="ncDanger">Risk</label><div><div style="display:flex;gap:10px;align-items:center">${sheetPop('ncDanger', 'Risk', [['1', '1 · Low'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5 · High']], '1')}<span class="t-2" style="font-size:13px">Your read on how likely they are to leave</span></div><div id="ncDangerNudge" class="t-2" style="display:none;font-size:13px;margin-top:5px"></div></div>
@@ -338,14 +343,15 @@ function openEditClientForm(id){
   const c = clients.find(x => x.id === id);
   if(!c){ showToast('error', 'Client not found', 'Someone may have removed it. Refreshing.'); fullRefresh(); return; }
   editingClientId = id;
-  openAppModal(clientFormHtml('Edit client', 'Save changes', c.customFieldValues), 560);
+  openAppModal(clientFormHtml('Edit client', 'Save changes', c.customFieldValues, c), 560);
   const g = k => document.getElementById(k);
   g('ncName').value = c.name; g('ncEmail').value = c.email || ''; g('ncWebsite').value = c.website || '';
   g('ncBudget').value = c.monthlyHourBudget || ''; g('ncSow').value = c.sow || '';
   // monthly hours that come from Harvest's budget are changed there (step 4)
   const hvB = typeof hvClientBudget === 'function' ? hvClientBudget(id) : 0;
   if(hvB){ g('ncBudget').value = hvB; g('ncBudget').disabled = true; const n = g('ncBudget').nextElementSibling; if(n) n.textContent = 'From Harvest’s monthly budget. Change it there.'; }
-  sheetSetSelect('ncService', c.service); sheetSetSelect('ncStatus', c.status);
+  if(g('ncService').tagName === 'SELECT') sheetSetSelect('ncService', c.service);
+  sheetSetSelect('ncStatus', c.status);
   sheetSetSelect('ncImportance', c.importance); sheetSetSelect('ncDanger', c.danger);
   if(c.startDate) sheetSetSelect('ncStartDate', c.startDate);
   const suggested = computeSuggestedDanger(c), nudge = g('ncDangerNudge');

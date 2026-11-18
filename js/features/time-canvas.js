@@ -314,19 +314,22 @@ function renderReports(){
 <div style="display:flex;flex-wrap:wrap;gap:4px 28px;align-items:baseline;margin:2px 0 14px"><div><b style="font-size:22px;font-weight:600;letter-spacing:-.02em" class="dur">${hrs(total)}</b> <span class="t-2" style="font-size:13px">${rangeWord}</span></div>${busiest ? `<div class="t-2" style="font-size:13px">Busiest ${busyWord}: ${busyLabel} · ${hrs(busiest.minutes)}</div>` : ''}</div>
 <div class="chart" style="gap:6px">${bars}</div><div class="chart-x" style="gap:6px">${xs}</div>`;
 
-  // By client / service / teammate
-  const tabs = [['clients', 'Clients'], ['services', 'Services'], ['teammates', 'Teammates']].filter(([k]) => k !== 'teammates' || isAdmin());
+  // By client / service / teammate. With Harvest, what clients buy is their projects, so the
+  // middle tab groups hours by Harvest project (the same package across clients adds up).
+  const hvP = typeof harvestOwnsServices === 'function' && harvestOwnsServices();
+  const sw = hvP ? { tab: 'Projects', one: 'project', many: 'projects', col: 'Project', none: 'No project' } : { tab: 'Services', one: 'service', many: 'services', col: 'Service', none: 'No service set' };
+  const tabs = [['clients', 'Clients'], ['services', sw.tab], ['teammates', 'Teammates']].filter(([k]) => k !== 'teammates' || isAdmin());
   if(!tabs.some(([k]) => k === reportTab)) reportTab = 'clients';
-  document.getElementById('reportGroupH').innerHTML = `<h2>By ${{ clients: 'client', services: 'service', teammates: 'teammate' }[reportTab]}</h2><div class="seg" role="tablist" aria-label="Group by">${tabs.map(([k, t]) => `<button class="${reportTab === k ? 'on' : ''}" role="tab" aria-selected="${reportTab === k}" onclick="switchReportTab('${k}')">${t}</button>`).join('')}</div>`;
+  document.getElementById('reportGroupH').innerHTML = `<h2>By ${{ clients: 'client', services: sw.one, teammates: 'teammate' }[reportTab]}</h2><div class="seg" role="tablist" aria-label="Group by">${tabs.map(([k, t]) => `<button class="${reportTab === k ? 'on' : ''}" role="tab" aria-selected="${reportTab === k}" onclick="switchReportTab('${k}')">${t}</button>`).join('')}</div>`;
   const grouped = {};
   relevant.forEach(e => {
     const c = clients.find(x => x.id === e.clientId);
-    const key = reportTab === 'clients' ? e.clientId : reportTab === 'services' ? (e.service || c?.service || 'No service set') : (e.userId || (e.harvestUserId ? 'hv:' + e.harvestUserId : null));
+    const key = reportTab === 'clients' ? e.clientId : reportTab === 'services' ? ((e.harvestProjectId && hvProjectName(e.harvestProjectId)) || e.service || (c && !(hvP && serviceFromHarvest(c)) ? c.service : '') || sw.none) : (e.userId || (e.harvestUserId ? 'hv:' + e.harvestUserId : null));
     grouped[key] = (grouped[key] || 0) + e.minutes;
   });
   const rows = Object.entries(grouped).sort((a, b) => b[1] - a[1]);
   const grp = document.getElementById('reportTableGrp');
-  if(!rows.length){ grp.innerHTML = emptyState({ compact: true, icon: 'timer', title: `No time logged ${rangeWord}`, text: 'Hours show here by client, service or teammate once time is tracked.', action: 'Open Timesheet', onAction: "switchTimeTab('timesheet')", link: range !== 'all' ? 'Show All Time' : '', onLink: "setReportRangeAll()" }); return; }
+  if(!rows.length){ grp.innerHTML = emptyState({ compact: true, icon: 'timer', title: `No time logged ${rangeWord}`, text: `Hours show here by client, ${sw.one} or teammate once time is tracked.`, action: 'Open Timesheet', onAction: "switchTimeTab('timesheet')", link: range !== 'all' ? 'Show All Time' : '', onLink: "setReportRangeAll()" }); return; }
   const shown = reportShowAll ? rows : rows.slice(0, 9), rest = rows.slice(shown.length);
   const restMin = rest.reduce((s, [, m]) => s + m, 0);
   const withBudget = reportTab === 'clients' && range === 'month';
@@ -345,7 +348,7 @@ ${withBudget ? `<td class="num t-2">${b ? b + 'h' : '—'}</td>` : ''}
 <td style="width:30%">${pct == null ? '' : `<div class="bar"><i style="width:${Math.min(pct, 1) * 100}%;background:${col}"></i></div>`}</td><td class="num t-2">${pct == null ? '' : Math.round(pct * 100) + '%'}</td></tr>`;
     }).join('');
   } else {
-    head = `<th>${reportTab === 'services' ? 'Service' : 'Teammate'}</th><th class="num">Hours</th><th>Share</th><th class="num"></th>`;
+    head = `<th>${reportTab === 'services' ? sw.col : 'Teammate'}</th><th class="num">Hours</th><th>Share</th><th class="num"></th>`;
     body = shown.map(([k, m]) => {
       const p = reportTab === 'teammates' ? teamProfiles.find(x => x.id === k) : null;
       const hvName = reportTab === 'teammates' && !p && String(k).startsWith('hv:') && typeof hvPersonName === 'function' ? hvPersonName(String(k).slice(3)) : '';
@@ -354,7 +357,7 @@ ${withBudget ? `<td class="num t-2">${b ? b + 'h' : '—'}</td>` : ''}
     }).join('');
   }
   const cols = reportTab === 'clients' ? (withBudget ? 6 : 5) : 4;
-  const restRow = reportShowAll && rows.length > 9 ? `<tr><td colspan="${reportTab === 'clients' ? 2 : 1}"><button class="link-row t-2" data-grow="report-rows" onclick="reportShowAll=false;renderReports()">Show fewer</button></td></tr>` : rest.length ? `<tr><td colspan="${reportTab === 'clients' ? 2 : 1}"><button class="link-row t-2" data-grow="report-rows" onclick="reportShowAll=true;renderReports()">${rest.length} more ${reportTab === 'clients' ? (rest.length === 1 ? 'client' : 'clients') : reportTab === 'services' ? (rest.length === 1 ? 'service' : 'services') : (rest.length === 1 ? 'teammate' : 'teammates')}</button></td><td class="num t-2">${hrs(restMin)}</td><td colspan="${cols - (reportTab === 'clients' ? 3 : 2)}"></td></tr>` : '';
+  const restRow = reportShowAll && rows.length > 9 ? `<tr><td colspan="${reportTab === 'clients' ? 2 : 1}"><button class="link-row t-2" data-grow="report-rows" onclick="reportShowAll=false;renderReports()">Show fewer</button></td></tr>` : rest.length ? `<tr><td colspan="${reportTab === 'clients' ? 2 : 1}"><button class="link-row t-2" data-grow="report-rows" onclick="reportShowAll=true;renderReports()">${rest.length} more ${reportTab === 'clients' ? (rest.length === 1 ? 'client' : 'clients') : reportTab === 'services' ? (rest.length === 1 ? sw.one : sw.many) : (rest.length === 1 ? 'teammate' : 'teammates')}</button></td><td class="num t-2">${hrs(restMin)}</td><td colspan="${cols - (reportTab === 'clients' ? 3 : 2)}"></td></tr>` : '';
   grp.setAttribute('data-grow-key', 'report-rows'); grp.setAttribute('data-grow-rows', 'tbody > tr');
   grp.innerHTML = `<table class="mtx" aria-label="Hours ${rangeWord}"><thead><tr>${head}</tr></thead><tbody>${body}${restRow}</tbody>
 <tfoot><tr>${reportTab === 'clients' ? '<td></td>' : ''}<td>Total</td><td class="num">${hrs(total)}</td><td colspan="${cols - (reportTab === 'clients' ? 3 : 2)}"></td></tr></tfoot></table>`;

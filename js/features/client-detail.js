@@ -141,7 +141,7 @@ function renderClientDetail(){
     // them), which is exactly the big dead gap in the screenshot. Flex-wrap
     // has no such artifact — compact fields sit side by side and wrap
     // naturally, full-width ones just break to their own line.
-    const serviceHtml = `<div class="info-grid-item"><label class="info-grid-label">Service</label><div class="info-grid-value">${c.service ? escapeHtml(c.service) : '<span style="color:var(--muted-lt);">—</span>'}</div></div>`;
+    const serviceHtml = `<div class="info-grid-item"><label class="info-grid-label">${typeof serviceFromHarvest === 'function' && serviceFromHarvest(c) ? 'Projects' : 'Service'}</label><div class="info-grid-value">${c.service ? escapeHtml(c.service) : '<span style="color:var(--muted-lt);">—</span>'}</div></div>`;
     const sowHtml = `<div class="info-grid-item info-grid-full"><label class="info-grid-label">SOW / Scope Notes</label><div class="info-grid-value" style="white-space:pre-wrap;">${c.sow ? escapeHtml(c.sow) : '<span style="color:var(--muted-lt);">—</span>'}</div></div>`;
     // Website gets its own real button (not a plain link like custom
     // URL-type fields below) — shown only when the client actually has

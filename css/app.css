@@ -2280,6 +2280,9 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .su-v{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0;line-height:26px}
 .su-v > .seg{margin:0}
 .su-n{font-size:11.5px;line-height:1.4;color:var(--label-3)}
+/* Edit Client: a Harvest client's projects, read-only */
+.nc-ro{display:flex;flex-direction:column;gap:2px;min-width:0;font-size:14px;line-height:1.45}
+.nc-ro .t-2{font-size:13px}
 .mac .su-in{width:100%;max-width:250px;height:28px;font-size:13px}
 .mac .su-num{width:72px}
 .su-h{display:inline-flex;align-items:center;gap:7px;color:var(--label-2)}

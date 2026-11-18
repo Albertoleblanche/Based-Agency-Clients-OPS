@@ -91,6 +91,12 @@ clients page, and Sync Now brings a new one in under Needs setup. The old client
 service→task mapping lists are gone; Settings → Harvest lists time that didn't reach Harvest, each
 one opening to pick its project and task.
 
+Harvest is the source of truth for what clients buy: on every read, a linked client's service
+becomes its active Harvest projects ("MDF - Tier 3 · Website Hosting and Maintenance"). All Clients
+filters by project, Reports groups hours by project, and Finish Setup, Edit Client and Log
+Improvement stop asking for a service. Clients that aren't in Harvest keep the service picked in
+Radar. Email and WhatsApp drafts get the project names as context only, never to quote to the client.
+
 ---
 
 # Original setup guide (first deployment)

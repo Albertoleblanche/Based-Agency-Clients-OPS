@@ -160,6 +160,13 @@ function logSheetServices(c){
   if(c && c.service && !opts.includes(c.service)) opts.unshift(c.service);
   return opts;
 }
+// The Service row, for clients that aren't in Harvest. A client in Harvest buys its projects:
+// the improvement takes the one you log time to, or the client's only project.
+function liServiceRowHtml(c){
+  if(c ? serviceFromHarvest(c) : harvestOwnsServices()) return '';
+  const services = logSheetServices(c);
+  return `<label for="liService">Service</label><div>${sheetPop('liService', 'Service', services.map(s => [s, s]), (c && c.service) || services[0] || '', 'logSheet.serviceTouched=true')}</div>`;
+}
 function openQueueLogImprovementModal(presetClientId){
   logSheet = { files: [], useTimer: false, serviceTouched: false };
   const me = myName() || 'Team member';
@@ -167,14 +174,12 @@ function openQueueLogImprovementModal(presetClientId){
   const fromView = typeof currentViewName !== 'undefined' && currentViewName === 'clientdetail' && typeof currentDetailClientId !== 'undefined' ? currentDetailClientId : '';
   const cid = (typeof presetClientId === 'string' && presetClientId) || fromView || (timerState.running ? timerState.clientId : '') || '';
   const c = list.find(x => x.id === cid);
-  const services = logSheetServices(c);
-  const svc = c && c.service ? c.service : (services[0] || '');
   const timerLink = timerState.running ? `<button type="button" class="btn btn-q" id="liTimerBtn" style="padding:0 4px" onclick="liUseTimer()">Use the running timer (${hmm((Date.now() - timerState.startedAt) / 60000)})</button>` : '';
   openAppModal(`<h3>Log Improvement</h3>
 <div class="f">
 <label for="liClient">Client</label><div>${sheetPop('liClient', 'Client', list.map(x => [x.id, x.name]), cid, 'liClientChanged()', { placeholder: 'Choose a client' })}</div>
 <label class="top" for="liText">What did you do?</label><textarea id="liText" class="tf" style="height:84px" spellcheck="true" placeholder="What changed, with the number or result if there is one"></textarea>
-<label for="liService">Service</label><div id="liServiceWrap">${sheetPop('liService', 'Service', services.map(s => [s, s]), svc, 'logSheet.serviceTouched=true')}</div>
+<div id="liSvc" class="hvp">${liServiceRowHtml(c)}</div>
 <label for="liDate">Date</label><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${sheetDateField('liDate', toDateStr(new Date()), { past: true, from: -13, to: 0, max: toDateStr(new Date()) })}</div>
 <label for="liTime">Time spent</label><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><input id="liTime" class="tf" style="width:80px" placeholder="0:30" autocomplete="off" oninput="logSheet.useTimer=false;liTimeChanged()">${timerLink}</div>
 <div id="liPick" class="hvp"></div>
@@ -200,10 +205,9 @@ function liTimeChanged(force){
 function liClientChanged(){
   liTimeChanged(true);
   const c = clients.find(x => x.id === document.getElementById('liClient')?.value);
-  if(!c || logSheet.serviceTouched) return;
-  const wrap = document.getElementById('liServiceWrap');
-  const services = logSheetServices(c);
-  if(wrap) wrap.innerHTML = sheetPop('liService', 'Service', services.map(s => [s, s]), c.service || services[0] || '', 'logSheet.serviceTouched=true');
+  const wrap = document.getElementById('liSvc');
+  if(!c || !wrap || (logSheet.serviceTouched && !serviceFromHarvest(c) && document.getElementById('liService'))) return;
+  wrap.innerHTML = liServiceRowHtml(c);
 }
 function liUseTimer(){
   if(!timerState.running) return;
@@ -241,7 +245,7 @@ async function saveQueueLogImprovement(another){
   const pick = minutes && g('liPick') && g('liPick').innerHTML && typeof hvPickValue === 'function' ? hvPickValue('li', clientId) : { ok: true, projectId: null, taskId: null };
   if(!pick.ok){ showToast('error', 'Almost there', pick.msg); return; }
   if(minutes > 960 && !(await confirmDialog(`That’s ${hmLong(minutes)} for one improvement. Log it anyway?`, { confirmLabel: 'Log It', cancelLabel: 'Fix It' }))) return;
-  const service = g('liService')?.value || '';
+  const picked = g('liService')?.value || '';
   const dateStr = g('liDate')?.value || toDateStr(new Date());
   const include = sheetIsOn('liInclude');
   const author = myName() || 'Team member';
@@ -251,6 +255,7 @@ async function saveQueueLogImprovement(another){
   await loadAll();
   const c = clients.find(x => x.id === clientId);
   if(!c){ restoreBtn(btn); showToast('error', 'Client not found', 'This client may have been removed by someone else.'); return; }
+  const service = serviceFromHarvest(c) ? (pick.projectId ? pick.service : improvementServiceFor(c)) : picked || c.service || '';
   const when = dateStr === toDateStr(new Date()) ? new Date() : new Date(dateStr + 'T12:00:00');
   const imp = await insertImprovementFull(clientId, { author, text, includeInEmail: include, source: fromNote ? 'note' : 'manual', date: when.toISOString(), service });
   if(!imp){ restoreBtn(btn); showToast('error', 'Save failed', 'Could not save this improvement. Try again.'); return; }
@@ -261,12 +266,12 @@ async function saveQueueLogImprovement(another){
   let timeOk = true;
   if(minutes){
     if(useTimer && timerState.running && timerState.clientId === clientId){
-      if(!timerState.service){ timerState.service = service || c.service || ''; saveTimerState(); }
+      if(!timerState.service){ timerState.service = service; saveTimerState(); }
       if(pick.projectId){ timerState.projectId = pick.projectId; timerState.taskId = pick.taskId; timerState.service = pick.service; saveTimerState(); }
       const id = await stopAndSaveTimer({ quiet: true });
       if(id) await supabaseClient.from('time_entries').update({ logged: true }).eq('id', id); else timeOk = false;
     } else {
-      const r = await mergeOrInsertTimeEntry({ clientId, service: pick.projectId ? pick.service : service || c.service || '', dateStr, minutes, description: text, projectId: pick.projectId, taskId: pick.taskId });
+      const r = await mergeOrInsertTimeEntry({ clientId, service: pick.projectId ? pick.service : service, dateStr, minutes, description: text, projectId: pick.projectId, taskId: pick.taskId });
       if(r.error) timeOk = false;
       else {
         if(!r.merged && r.entryId) await supabaseClient.from('time_entries').update({ logged: true }).eq('id', r.entryId);
