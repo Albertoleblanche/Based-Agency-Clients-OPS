@@ -137,7 +137,7 @@ function renderThisWeek(){
   const lateN = open.filter(w => w.late).length;
 
   // ---- Do now, grouped by what you do --------------------------------------------------------
-  const row = w => `<div class="twl-r wn-r${sel && sel.c.id === w.c.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectWeekClient('${w.c.id}')" onkeydown="if(event.key==='Enter')selectWeekClient('${w.c.id}')">${monoHtml(w.c, 'sm')}<b>${escapeHtml(w.c.name)}</b><span class="twl-who">${escapeHtml(weekRowWho(w))}</span><span class="wn-rt">${w.draft && w.done >= 2 ? tierTag(winTier(w.draft)) : ''}</span>${chGlyph(w.c)}<span class="twl-due${w.late ? ' is-late' : ''}">${escapeHtml(w.late ? lateWords(w) : w.dueText)}</span></div>`;
+  const row = w => `<div class="twl-r wn-r${sel && sel.c.id === w.c.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectWeekClient('${w.c.id}')" onkeydown="if(event.key==='Enter')selectWeekClient('${w.c.id}')"><b>${escapeHtml(w.c.name)}</b><span class="twl-who">${escapeHtml(weekRowWho(w))}</span><span class="wn-rt">${w.draft && w.done >= 2 ? tierTag(winTier(w.draft)) : ''}</span>${chGlyph(w.c)}<span class="twl-due${w.late ? ' is-late' : ''}">${escapeHtml(w.late ? lateWords(w) : w.dueText)}</span></div>`;
   let primaryUsed = false;
   const groups = WEEK_GROUPS.map(g => {
     const items = now.filter(w => w.todo.k === g.k);
@@ -185,12 +185,12 @@ ${items.slice(0, showN).map(row).join('')}${more}</section>`;
   }).join('');
   const names = sent.map(w => shortClientName(w.c.name)), doneOpen = !!window._weekShowDone;
   const done = sent.length ? (doneOpen
-      ? `<div class="twl-dl">${sent.map(w => `<div class="twl-dr" role="button" tabindex="0" onclick="selectWeekClient('${w.c.id}')">${monoHtml(w.c, 'sm')}<span>${escapeHtml(w.c.name)}</span><span class="twl-dw">${escapeHtml(relDay(w.last))}</span></div>`).join('')}</div>`
-      : `<div class="twl-done">${icon('check-circle')}<span class="tw-stack">${sent.slice(0, 8).map(w => monoHtml(w.c, 'sm')).join('')}</span></div><p class="twl-dn">${escapeHtml(names.length > 3 ? names.slice(0, 3).join(', ') + ` and ${names.length - 3} more` : joinNames(names))}</p>`)
+      ? `<div class="twl-dl">${sent.map(w => `<div class="twl-dr" role="button" tabindex="0" onclick="selectWeekClient('${w.c.id}')"><span>${escapeHtml(w.c.name)}</span><span class="twl-dw">${escapeHtml(relDay(w.last))}</span></div>`).join('')}</div>`
+      : `<div class="twl-done">${icon('check-circle')}<p class="twl-dn">${escapeHtml(names.length > 3 ? names.slice(0, 3).join(', ') + ` and ${names.length - 3} more` : joinNames(names))}</p></div>`)
     : '<p class="twl-dn">Nothing sent yet this week.</p>';
   // the week's wins: how many clients got theirs, the tiers, and each win day
   const st = winsWeekStats(base.map(w => clientWeek(w.c)));
-  const sideRow = (w, right) => `<div class="wn-sr" role="button" tabindex="0" onclick="selectWeekClient('${w.c.id}')" onkeydown="if(event.key==='Enter')selectWeekClient('${w.c.id}')">${monoHtml(w.c, 'sm')}<b>${escapeHtml(w.c.name)}</b>${tierTag(winTier(w.draft))}<span>${escapeHtml(right)}</span></div>`;
+  const sideRow = (w, right) => `<div class="wn-sr" role="button" tabindex="0" onclick="selectWeekClient('${w.c.id}')" onkeydown="if(event.key==='Enter')selectWeekClient('${w.c.id}')"><b>${escapeHtml(w.c.name)}</b>${tierTag(winTier(w.draft))}<span>${escapeHtml(right)}</span></div>`;
   const APPROVER_K = ['w-review', 'w-approver'];
   const withApprover = everyone ? [] : wait.filter(w => APPROVER_K.includes(w.todo.k) || (w.todo.holder && profileByName(w.todo.holder) && ['admin', 'approver'].includes(profileByName(w.todo.holder).role)));
   const others = everyone ? people : Object.entries(byPerson).filter(([, ws]) => ws.some(w => !withApprover.includes(w))).length ? people : '';

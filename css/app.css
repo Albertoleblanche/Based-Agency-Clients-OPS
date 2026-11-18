@@ -658,7 +658,7 @@ body.mac :is(input[type="text"], input:not([type]), input[type="email"], input[t
 
 /* ---- the sidebar, a size down (Nov 18): the logo sits in a row as tall as the toolbar, with the
    same line under it, and the items are 14px like the rest of the app ---- */
-.app-win .side { flex-basis: 220px; padding: 0 10px 10px; }
+.app-win .side { flex-basis: 220px; min-width: 0; width: 220px; padding: 0 10px 10px; }
 .side-top { display: none; }
 .side-head { flex: 0 0 auto; display: flex; align-items: center; height: 52px; margin: 0 -10px; padding: 0 10px; border-bottom: .5px solid var(--sep-strong); }
 .side-head .side-brand { flex: 1 1 auto; min-width: 0; margin: 0; padding: 5px 6px; }
@@ -1499,7 +1499,7 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 
 /* ---- This Week, as on the canvas board "This Week — a long week" ---- */
 #weekRoot .sp-page{container-type:inline-size}
-.twl{display:grid;grid-template-columns:minmax(0,1fr) 300px;column-gap:44px;padding:20px 40px 40px;width:100%}
+.twl{display:grid;grid-template-columns:minmax(0,1fr) 300px;column-gap:48px;padding:30px 40px 40px;width:100%}
 .twl-main{min-width:0}
 .twl-top{display:flex;align-items:center;gap:14px}
 .twl-find{margin-left:auto;display:inline-flex;align-items:center;gap:7px;width:220px;height:28px;padding:0 10px;border-radius:7px;background:var(--fill-2);color:var(--label-3)}
@@ -1564,11 +1564,12 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .twl-pc{font-size:12px;line-height:1.45;color:var(--label-3)}
 .twl-pc a{color:var(--label-2);text-decoration:none}
 .twl-pc a:hover{color:var(--label);text-decoration:underline}
-.twl-done{display:flex;align-items:center;gap:10px;padding:12px 0 0}
-.twl-done > svg{width:18px;height:18px;color:var(--green);flex:0 0 auto}
+.twl-done{display:flex;align-items:flex-start;gap:10px;padding:12px 0 0}
+.twl-done .twl-dn{margin:0}
+.twl-done > svg{width:16px;height:16px;color:var(--green);flex:0 0 auto;margin-top:1px}
 .twl-dn{margin:8px 0 0;font-size:12.5px;line-height:1.45;color:var(--label-2)}
 .twl-dl{display:flex;flex-direction:column;padding-top:4px}
-.twl-dr{display:flex;align-items:center;gap:9px;height:32px;margin:0 -8px;padding:0 8px;border-radius:7px;font-size:13px;cursor:default}
+.twl-dr{display:flex;align-items:center;gap:9px;height:38px;margin:0 -8px;padding:0 8px;border-radius:7px;font-size:13px;cursor:default}
 .twl-dr:hover{background:var(--fill)}
 .twl-dr > span:nth-child(2){flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .twl-dw{font-size:12px;color:var(--label-3)}
@@ -2130,7 +2131,16 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .wn-rs > span:last-child{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wn-rs .wn-ch svg{width:12px;height:12px}
 /* This Week rows: name · who · tier · channel · due */
-.twl-r.wn-r{grid-template-columns:22px minmax(140px,240px) minmax(0,1fr) 52px 14px minmax(80px,auto)}
+.twl-r.wn-r{grid-template-columns:minmax(160px,260px) minmax(0,1fr) 52px 14px minmax(80px,auto)}
+/* Nov 18: room to breathe. Taller rows with a hairline between them, more space around each group,
+   and the client's name without a logo. */
+.twl-h{margin-top:28px;padding-bottom:12px}
+.twl-g{padding:4px 0 16px}
+.twl-gh{padding:20px 0 10px}
+.twl-r{height:44px}
+.twl-r + .twl-r::before{content:"";position:absolute;top:0;left:10px;right:10px;height:.5px;background:var(--sep)}
+.twl-r:hover::before,.twl-r:hover + .twl-r::before,.twl-r.is-sel::before,.twl-r.is-sel + .twl-r::before{opacity:0}
+.twl-more{margin:8px 0 0 42px}
 .wn-r .wn-rt{display:flex;justify-content:flex-end}
 /* Review: how it will look in the group */
 .wn-chat{margin-top:22px;padding:18px 18px 20px;border-radius:14px;background:var(--fill);display:flex;flex-direction:column;align-items:flex-end}
@@ -2180,7 +2190,7 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .wn-d.is-today b,.wn-d.is-today span{color:var(--label)}
 .wn-d.is-none b,.wn-d.is-none span{color:var(--label-3)}
 .wn-dn{margin:10px 0 0;font-size:12px;line-height:1.45;color:var(--label-3)}
-.wn-sr{display:grid;grid-template-columns:22px minmax(0,1fr) auto auto;align-items:center;gap:9px;min-height:38px;border-bottom:.5px solid var(--sep);font-size:13px;cursor:default}
+.wn-sr{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:10px;min-height:42px;border-bottom:.5px solid var(--sep);font-size:13px;cursor:default}
 .wn-sr:hover b{text-decoration:underline;text-decoration-color:var(--label-3)}
 .wn-sr .mono.sm{width:22px;height:22px;border-radius:6px;font-size:9.5px}
 .wn-sr b{font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
