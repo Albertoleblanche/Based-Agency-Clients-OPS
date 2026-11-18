@@ -216,3 +216,37 @@ function clientSetupMore(e, clientId){
   document.body.appendChild(m);
   setTimeout(() => document.addEventListener('click', () => m.remove(), { once: true }), 0);
 }
+
+// ---- New Client, with Harvest connected (step 5): clients start in Harvest -----------------------
+// Each client is set up once: in Harvest, with its project, tasks, budget and people. Radar brings
+// it in (when someone opens Radar, at most every 10 minutes, or now with Sync Now) and asks an
+// approver to finish what only Radar holds, under Needs setup.
+function harvestOwnsClients(){
+  return typeof hvTime !== 'undefined' && hvTime && Array.isArray(hvTime.clients) && hvTime.clients.some(c => c.radar_client_id);
+}
+let hvCompanyUrl = null;
+function openAddInHarvestSheet(){
+  const href = hvCompanyUrl ? hvCompanyUrl.replace(/\/$/, '') + '/clients' : 'https://id.getharvest.com/harvest';
+  openAppModal(`<h3>New Client</h3>
+<p class="t-2 hvn-p">Clients start in Harvest, so each one is set up once.</p>
+<ol class="hvn">
+<li><b>Add the client in Harvest</b><span>With its project, tasks, budget and who’s on it.</span></li>
+<li><b>Radar brings it in</b><span>Within 10 minutes, or now with Sync Now. It waits under Needs setup in All Clients.</span></li>
+<li><b>Finish its info here</b><span>Owner, service and how it gets its weekly win.</span></li>
+</ol>
+<div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn" id="hvnSync" onclick="hvNewClientSync()">Sync Now</button><a class="btn btn-p" id="hvnOpen" href="${escapeHtml(href)}" target="_blank" rel="noopener" onclick="closeAppModal()">Open Harvest</a></div>`, 480);
+  if(!hvCompanyUrl && typeof harvestApiCall === 'function') harvestApiCall(null).then(st => {
+    if(st && st.companyUrl){ hvCompanyUrl = st.companyUrl; const a = document.getElementById('hvnOpen'); if(a) a.href = st.companyUrl.replace(/\/$/, '') + '/clients'; }
+  }).catch(() => {});
+}
+async function hvNewClientSync(){
+  const b = document.getElementById('hvnSync'); if(b){ b.disabled = true; b.textContent = 'Reading Harvest…'; }
+  try{
+    const r = await harvestApiCall('sync-setup', { force: true });
+    const added = (r && r.clients && (r.clients.added || 0) + (r.clients.back || 0)) || 0;
+    closeAppModal();
+    await loadAll(); await Promise.all([hvLoadLinks(), typeof hvTimeLoad === 'function' ? hvTimeLoad() : null]);
+    if(added){ showToast('success', `${added} new from Harvest`, 'Finish their info under Needs setup.'); clientsSeg = 'all'; switchView('clients'); renderAll(); }
+    else showToast('info', 'Nothing new in Harvest yet', 'Add the client there first, then Sync Now.');
+  }catch(e){ if(b){ b.disabled = false; b.textContent = 'Sync Now'; } showToast('error', 'Couldn’t read Harvest', e.message); }
+}

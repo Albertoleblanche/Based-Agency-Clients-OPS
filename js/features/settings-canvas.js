@@ -321,8 +321,7 @@ function setIntegrations(){
 }
 function openIntegrationSheet(which){
   if(which === 'harvest'){
-    openAppModal(`<h3>Harvest</h3><div id="harvestPanelBody" class="integ-sheet">Loading…</div><div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal();loadIntegrationStatuses()">Done</button></div>`, 620);
-    loadHarvestPanel();
+    switchSettingsTab('harvest'); // everything Harvest lives in its own tab now
   } else if(which === 'slack'){
     openAppModal(`<h3>Slack channels</h3><p class="t-2" style="font-size:13px;margin:-8px 0 12px">Link each client to its Slack channel so updates and alerts land there.</p><div id="slackChannelsPanelBody" class="integ-sheet">Loading…</div><div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal();loadIntegrationStatuses()">Done</button></div>`, 620);
     loadSlackChannelsPanel();

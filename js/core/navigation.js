@@ -454,6 +454,6 @@ function switchSettingsTab(name){
   if(name==='integrations'){
     const approverOnly = document.getElementById('approverOnlyIntegrations');
     if(approverOnly) approverOnly.style.display = canApprove() ? 'block' : 'none';
-    if(canApprove()){ loadHarvestPanel(); loadSlackChannelsPanel(); }
+    if(canApprove()) loadSlackChannelsPanel();
   }
 }

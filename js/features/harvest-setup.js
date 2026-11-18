@@ -168,11 +168,24 @@ ${people.map(u => { const p = profiles.find(x => x.id === u.team_profile_id);
 ${notInHarvest.map(p => fr(escapeHtml(p.name), escapeHtml(p.email || ''), '<span class="st"><span class="dot yellow"></span>Not in Harvest</span>')).join('')}
 </div><p class="t-2 hv-p">Matched by email. Time someone logs in Radar goes to Harvest as them.</p></div>`;
 
-  // ---- how time reaches Harvest today (until time is logged by project and task)
-  html += `<div class="hv-sec"><div class="set-h">Time sync today</div><div class="form-grp">
-${fr('Client and service mappings', 'How time logged here reaches Harvest until it’s logged by project and task', `<button class="btn" onclick="openIntegrationSheet('harvest')">Edit…</button>`)}
-</div></div>`;
+  // ---- time that didn't reach Harvest: open one, pick its project and task, and it goes
+  const unsent = hvUnsentEntries();
+  if(unsent.length){
+    const people = new Map((typeof teamProfiles !== 'undefined' ? teamProfiles : []).map(p => [p.id, p.name]));
+    const row = e => { const c = clients.find(x => x.id === e.clientId);
+      return `<button class="fr hv-un" onclick="openTimeEntryModal('${e.id}')"><div class="l"><b>${escapeHtml(c ? c.name : 'Client')} · ${hmm(e.minutes)}</b><span>${escapeHtml([fmtShortDate(new Date(e.date + 'T12:00:00')), people.get(e.userId) ? firstName(people.get(e.userId)) : '', e.harvestError || 'No project and task yet'].filter(Boolean).join(' · '))}</span></div>${icon('caret-right', { weight: 'bold' })}</button>`; };
+    html += `<div class="hv-sec"><div class="set-h">Not in Harvest <span class="n">${unsent.length}</span></div><div class="form-grp">${unsent.slice(0, 6).map(row).join('')}</div>
+<p class="t-2 hv-p">Time logged here that hasn’t reached Harvest${unsent.length > 6 ? `, newest first: ${unsent.length - 6} more on the Time screen` : ''}. Open one and pick its project and task to send it.</p></div>`;
+  }
   return html;
+}
+
+// Time since the first of last month, for a client in Harvest, that didn't get there (newest first).
+function hvUnsentEntries(){
+  if(typeof timeEntries === 'undefined' || typeof hvClientProjects !== 'function') return [];
+  const n = rNow(), from = toDateStr(new Date(n.getFullYear(), n.getMonth() - 1, 1));
+  return timeEntries.filter(e => e.date >= from && !e.harvestId && (e.harvestStatus === 'failed' || e.harvestStatus === 'unmapped') && hvClientProjects(e.clientId).linked)
+    .sort((a, b) => b.date.localeCompare(a.date));
 }
 
 async function hvConnect(){

@@ -78,13 +78,18 @@ Time is logged as in Harvest (step 3): Add Time, Start Timer, Edit Time and Log 
 a time is typed) ask for Client → Project → Task, with the client's projects you're on in Harvest
 and each task's Billable or Non-billable. Entries go to Harvest as the person who logged them
 (matched by email); someone not in Harvest, or a client that isn't, keeps the time in Radar.
-Older entries without a project still go through the client and service mappings.
+Older entries without a project still go through the client and service mappings saved before step 5.
 
 Time logged in Harvest shows in Radar (step 4): from the first of last month on, what changed
 whenever someone opens Radar and everything each night, the same entry in both. It shows From
 Harvest on the Time screen; invoiced ones are read only; a full read with an administrator's token
 removes what was deleted in Harvest. People only in Harvest count by name. A client's monthly hours
 follow its Harvest projects' monthly hour budgets.
+
+Clients start in Harvest (step 5): with Harvest connected, New Client explains it and opens Harvest's
+clients page, and Sync Now brings a new one in under Needs setup. The old client→project and
+service→task mapping lists are gone; Settings → Harvest lists time that didn't reach Harvest, each
+one opening to pick its project and task.
 
 ---
 

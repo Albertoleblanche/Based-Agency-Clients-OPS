@@ -327,6 +327,8 @@ function sheetSetSelect(id, value){
 }
 function openAddClientForm(){
   if(!canApprove()){ showToast('error', 'Not allowed', 'Only admins and approvers can add clients.'); return; }
+  // with Harvest connected, clients start there and come in on their own (client-setup.js)
+  if(typeof harvestOwnsClients === 'function' && harvestOwnsClients()){ openAddInHarvestSheet(); return; }
   editingClientId = null;
   openAppModal(clientFormHtml('Add client', 'Save client'), 560);
   setTimeout(() => document.getElementById('ncName')?.focus(), 30);
