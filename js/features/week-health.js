@@ -18,7 +18,11 @@ function updateAutomation(){ return Object.assign({}, DEFAULT_UPDATE_AUTOMATION,
 function healthThresholds(){ return Object.assign({}, DEFAULT_HEALTH_SIGNALS, (typeof settings !== 'undefined' && settings.healthSignals) || {}); }
 
 // ---- time helpers ------------------------------------------------------------------------
-function rNow(){ return new Date(); }
+// rNow() is "now" for every rule here. Health's trend re-runs the same rules as of a past day
+// (withAsOf), and every rule only counts what already existed by then.
+let _asOf = null;
+function rNow(){ return _asOf ? new Date(_asOf) : new Date(); }
+function withAsOf(d, fn){ const prev = _asOf; _asOf = d; try{ return fn(); } finally { _asOf = prev; } }
 function dayStart(d){ const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
 function addDays(d, n){ const x = new Date(d); x.setDate(x.getDate() + n); return x; }
 function atTime(day, hhmm){ const [h, m] = String(hhmm || '00:00').split(':').map(Number); const x = new Date(day); x.setHours(h || 0, m || 0, 0, 0); return x; }
@@ -144,7 +148,8 @@ async function recordUpdateSent(clientId, at){
 function sentTimes(c){
   const fromHist = (updateHistory[c.id] || []).map(t => new Date(t));
   (c.drafts || []).forEach(d => { if(d.draftSentAt){ const t = new Date(d.draftSentAt); if(!fromHist.some(x => Math.abs(x - t) < 60000)) fromHist.push(t); } });
-  return fromHist.sort((a, b) => a - b);
+  const now = rNow();
+  return fromHist.filter(t => t <= now).sort((a, b) => a - b);
 }
 function lastSentAt(c){ const s = sentTimes(c); return s.length ? s[s.length - 1] : null; }
 // The last 8 weeks (Monday to Sunday), oldest first: 'o' sent on time · 'l' sent late (more than
@@ -186,7 +191,7 @@ function clientWeek(c){
   const now = rNow(), drafts = c.drafts || [], owner = clientOwner(c);
   const { last, due, daysLeft } = clientDue(c, now);
   const since = last || addDays(now, -UPDATE_EVERY_DAYS);
-  const logged = (c.improvements || []).filter(i => new Date(i.date) > since);
+  const logged = (c.improvements || []).filter(i => new Date(i.date) > since && new Date(i.date) <= now);
   const w = { c, owner, holder: owner, logged, since, last, due, daysLeft, dueText: dueText(daysLeft, due),
     done: 0, behind: null, sent: false, late: false, state: 'due', draft: null };
   const approved = drafts.find(d => d.draftStatus === 'approved' && !d.draftSentAt);
@@ -197,7 +202,7 @@ function clientWeek(c){
   else if(written) Object.assign(w, { done: 1, draft: written, holder: written.author, note: `Draft waiting on ${firstName(written.author)} since ${whenShort(written.draftPendingSince || now)}` });
   else if(logged.length) Object.assign(w, { done: 1, note: `${logged.length} improvement${logged.length === 1 ? '' : 's'} logged · no draft yet` });
   else {
-    const lastLog = (c.improvements || []).map(i => new Date(i.date)).sort((a, b) => b - a)[0];
+    const lastLog = (c.improvements || []).map(i => new Date(i.date)).filter(d => d <= now).sort((a, b) => b - a)[0];
     w.note = lastLog ? `Nothing logged since ${fmtShortDate(lastLog)}` : 'Nothing logged yet';
   }
   // Sent in the last 7 days: done for this week. The next update's progress is kept in w.next.
@@ -279,12 +284,13 @@ function clientHealth(c){
     else if(hp.day >= 15 && hp.used < hp.expected * T.underUsedPct / 100) sig.push({ l: 'y', key: 'under', icon: 'clock', title: 'Hours under-used', since: new Date(now.getFullYear(), now.getMonth(), 16),
       text: `${Math.round(hp.used)} of ${hp.budget} hours used with the month half gone.` });
   }
-  const lastLog = (c.improvements || []).map(i => new Date(i.date)).sort((a, b) => b - a)[0];
+  const lastLog = (c.improvements || []).map(i => new Date(i.date)).filter(d => d <= now).sort((a, b) => b - a)[0];
   if(lastLog){
     const n = daysBetween(lastLog, now), l = lvl(n, T.nothingLoggedDays);
     if(l) sig.push({ l, key: 'quiet', icon: 'notepad', title: 'Nothing logged', since: addDays(lastLog, T.nothingLoggedDays[0]), text: `Nothing logged in ${n} days.` });
   }
-  const overdue = (typeof tasks !== 'undefined' ? tasks : []).filter(t => t.clientId === c.id && t.status !== 'done' && !t.cancelledAt && t.dueDate && dayStart(new Date(t.dueDate + 'T12:00:00')) < dayStart(now));
+  const openAt = t => (t.status !== 'done' || (t.completedAt && new Date(t.completedAt) > now)) && (!t.cancelledAt || new Date(t.cancelledAt) > now) && (!t.createdAt || new Date(t.createdAt) <= now);
+  const overdue = (typeof tasks !== 'undefined' ? tasks : []).filter(t => t.clientId === c.id && openAt(t) && t.dueDate && dayStart(new Date(t.dueDate + 'T12:00:00')) < dayStart(now));
   const lo = lvl(overdue.length, T.overdueTasks);
   if(lo) sig.push({ l: lo, key: 'tasks', icon: 'list-checks', title: `${overdue.length} tasks overdue`, since: now, text: overdue.map(t => t.title).slice(0, 2).join(' · ') });
   const lf = (typeof settings !== 'undefined' && settings.ownerRiskFlag === false) ? null : lvl(c.danger || 0, T.ownerFlag);
@@ -294,7 +300,7 @@ function clientHealth(c){
   let level = sig.some(s => s.l === 'r') ? 'r' : (sig.length ? 'y' : 'g');
   if(level === 'y' && T.importantBump && (c.importance || 0) >= 8) level = 'r';
   const h = healthHandled[c.id];
-  const quiet = h && addDays(new Date(h.at), T.quietDays) > now && (h.level === level || (h.level === 'r' && level === 'y'));
+  const quiet = h && new Date(h.at) <= now && addDays(new Date(h.at), T.quietDays) > now && (h.level === level || (h.level === 'r' && level === 'y'));
   const since = sig.length ? sig.map(s => s.since).sort((a, b) => b - a)[0] : null;
   const short = sig.length ? (sig.find(s => s.l === 'r') || sig[0]) : null;
   return { level: quiet ? 'g' : level, rawLevel: level, quiet, signals: sig, since, short, hp, seq };
