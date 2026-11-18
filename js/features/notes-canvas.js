@@ -86,7 +86,7 @@ function renderNotes(){
   const shown = (notesScope === 'open' ? open : notesScope === 'done' ? done : mine).slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   const seg = [['all', 'All', mine.length], ['open', 'Open', open.length], ['done', 'Done', done.length]]
     .map(([k, t, n]) => `<button class="${notesScope === k ? 'on' : ''}" role="tab" aria-selected="${notesScope === k}" onclick="setNotesFilter('scope','${k}')">${t} <span class="c">${n}</span></button>`).join('');
-  const empty = !notes.length ? ['No notes yet', 'Ideas and plans for a client, just for you. Jot the first one down above.']
+  const empty = !notes.length ? ['No notes yet', 'Ideas and plans for a client, just for you. When you do one, mark it done or log it as an improvement.']
     : notesScope === 'open' ? ['Nothing open', cur ? `Every note for ${escapeHtml(cur.name)} is done.` : 'Every note is done.']
     : ['Nothing done yet', 'Notes you finish, or log as an improvement, show up here.'];
   gal.innerHTML = `<div class="n1">
@@ -95,7 +95,8 @@ function renderNotes(){
 <label class="pop pop-sel n1-pop"><span class="pl">${escapeHtml(cur ? cur.name : 'All clients')}</span>${icon('caret-down')}<select aria-label="Client" onchange="setNotesFilter('client',this.value)"><option value="all">All clients</option>${used.map(c => `<option value="${c.id}"${c === cur ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></label>
 <div class="seg" role="tablist" aria-label="Show">${seg}</div>
 </div>
-${shown.length ? `<div class="n1-grid">${shown.map(noteTileHtml).join('')}</div>` : `<div class="empty n1-empty"><b>${empty[0]}</b>${empty[1]}</div>`}
+${shown.length ? `<div class="n1-grid">${shown.map(noteTileHtml).join('')}</div>` : emptyState({ icon: !notes.length ? 'note-pencil' : notesScope === 'open' ? 'check-circle' : 'notepad', tone: !notes.length ? 'blue' : notesScope === 'open' ? 'ok' : '', title: empty[0], text: empty[1], html: true,
+    action: !notes.length || notesScope === 'open' ? 'New Note' : '', actionIcon: 'plus', onAction: "openNoteSheet('new')" })}
 <p class="n1-foot nt-lock">${icon('lock-simple')}Only you can see your notes</p>
 </div>`;
 }

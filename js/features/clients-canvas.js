@@ -12,6 +12,7 @@ function setClientsFind(v){
   const el = document.getElementById('clientsFind'); if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
 }
 // The panel opens and closes with the table (the shared panel motion slides it in and out).
+function clearClientsCanvasFilters(){ clientsSeg = 'all'; clientsOwnerFilter = 'all'; clientFilters.service = 'all'; clientFilters.search = ''; const f = document.querySelector('#clientsRoot input[type="search"]'); if(f) f.value = ''; renderClientsTable(); }
 function selectClientRow(id){ inspectedClientId = id; renderClientsTable(); }
 function closeClientInspector(){ inspectedClientId = null; renderClientsTable(); }
 
@@ -81,7 +82,8 @@ function renderClientsTable(){
   const sNeeds = shown.filter(r => r.h.level !== 'g'), sOk = shown.filter(r => r.h.level === 'g');
   const group = (title, list) => list.length ? `<div class="cl-g" role="presentation"><b>${title}</b><span>${list.length}</span></div>${list.map(row).join('')}` : '';
   const body = shown.length ? group('Needs attention', sNeeds) + group('On track', sOk)
-    : `<div class="cl-empty">${ac.length ? 'No clients match.' : 'No clients yet. Add one from New → Client.'}</div>`;
+    : ac.length ? `<div class="cl-empty">No clients match.<a class="x-lnk" href="#" onclick="clearClientsCanvasFilters();return false;">Clear Filters</a></div>`
+    : emptyNoClients('Every client lives here: who owns it, its health, this week’s update and hours this month.');
   const seg = [['all', 'All', rows.length], ['attention', 'Needs attention', needs.length], ['behind', 'Not sent yet', notSent.length]]
     .map(([k, t, n]) => `<button class="${clientsSeg === k ? 'on' : ''}" role="tab" aria-selected="${clientsSeg === k}" onclick="setClientsSeg('${k}')">${t} <span class="c">${n}</span></button>`).join('');
   const sortIc = icon('caret-down', { weight: 'bold' });

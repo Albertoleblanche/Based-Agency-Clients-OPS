@@ -130,7 +130,12 @@ function drawFocusReports(){
   const r = focusReportsCache.find(x => x.id === focusSelId);
   if(!r){
     const day = DAY_NAMES[settings.proactiveInsightsDayOfWeek ?? 3];
-    root.innerHTML = `<div class="spw"><div class="sp-page"><div class="fq"><div class="empty fq-empty"><b>No focus report yet</b>The first one goes out to the team on ${escapeHtml(day)} morning.</div></div></div></div>`;
+    const es = !activeClients().length
+      ? emptyNoClients('Each week a short report says which clients need the team, and why.', { title: 'No focus report yet' })
+      : emptyState({ icon: 'clipboard-text', tone: 'blue', title: 'No focus report yet',
+          text: `Each ${day} morning a short report goes to the team: which clients need attention this week, and why. The first one comes this ${day}.`,
+          action: isAdmin() ? 'Change the Day' : '', onAction: "openSettingsTab('ai')" });
+    root.innerHTML = `<div class="spw"><div class="sp-page"><div class="fq">${es}</div></div></div>`;
     return;
   }
   const idx = focusReportsCache.indexOf(r), latest = idx === 0, g = new Date(r.generated_at), d = r.data || {};

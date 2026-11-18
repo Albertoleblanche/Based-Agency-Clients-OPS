@@ -419,9 +419,9 @@ function taskFormHtml(editing, presetAssigneeId, presetContext){
   const assignee = t ? t.assigneeId : (presetAssigneeId || currentUser.id);
   const aName = (people.find(p => p.id === assignee) || {}).name || '';
   const clientId = t ? (t.clientId || '') : (presetContext?.clientId || '');
-  const due = t ? (t.dueDate || '') : '';
+  const due = t ? (t.dueDate || '') : (presetContext?.due || '');
   const time = t ? (taskDueTimes[t.id] || '') : '';
-  const pri = t ? (t.priority || 'none') : 'medium';
+  const pri = t ? (t.priority || 'none') : (presetContext?.priority || 'medium');
   let notes = t ? (t.description || '') : (presetContext?.description || '');
   if(t && t.link && !notes.includes(t.link)) notes = (notes ? notes + '\n\n' : '') + t.link;
   const title = t ? t.title : (presetContext?.title || '');
@@ -443,6 +443,7 @@ ${t ? '' : `<span></span><div style="display:flex;align-items:center;gap:10px;fo
 function openNewTaskModal(presetAssigneeId, presetStatus, presetContext){
   if(!teamProfiles.length){ showToast('error', 'No team members', 'Add team members in Team before assigning tasks.'); return; }
   newTaskPresetStatus = presetStatus || 'todo';
+  window._ntAfterCreate = presetContext?.afterCreate || null;   // e.g. a WhatsApp item links to the task it became
   openAppModal(taskFormHtml(null, presetAssigneeId, presetContext), 520);
   setTimeout(() => document.getElementById('taskTitleInput')?.focus(), 30);
 }
@@ -542,12 +543,14 @@ async function saveNewTask(){
   restoreBtn(btn);
   if(error || !data){ showToast('error', 'Save failed', error?.message || 'Try again in a moment.'); return; }
   closeAppModal();
+  const afterCreate = window._ntAfterCreate; window._ntAfterCreate = null;
   if(f.dueTime) await setTaskDueTime(data.id, f.dueTime);
   let calOk = true;
   if(addCal) calOk = await addTaskToMyCalendar(data, f.dueTime);
   await loadMyTasks();
   renderTasks(); updateTasksNavBadge();
   if(typeof renderCalendar === 'function') renderCalendar();
+  if(afterCreate) await afterCreate(data);
   const assignee = teamProfiles.find(p => p.id === f.assigneeId);
   if(f.assigneeId !== currentUser.id) sendNotification(f.assigneeId, 'task_assigned', 'New task assigned to you', `${myName() || 'Someone'}: "${f.title}"`, 'tasks');
   if(!calOk) showToast('info', 'Task created', 'It couldn’t be added to your calendar. Try again from the task.');

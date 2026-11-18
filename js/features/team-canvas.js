@@ -49,6 +49,8 @@ function drawTeam(){
     const waiting = admin && emailRequests.length ? `<div class="h2"><h2>Waiting for you<span class="c">${emailRequests.length}</span></h2></div><div class="grp">${emailRequests.map(emailReqRow).join('')}</div>` : '';
     body = `<div class="mhead" style="padding:0 14px 6px 58px"><span>Name</span><span style="width:84px;flex:0 0 auto">Role</span><span style="width:70px;flex:0 0 auto">Owns</span>${admin ? '<span style="width:64px;flex:0 0 auto;text-align:right">This week</span>' : ''}</div>
 <div class="grp">${rows || '<div class="empty">No one on the team yet.</div>'}</div>${waiting}
+${admin && people.filter(m => !m.access_revoked).length <= 1 ? emptyState({ compact: true, icon: 'users-three', tone: 'blue', title: 'It’s just you so far',
+  text: 'Add your teammates to give them clients to own, tasks to do and updates to write. They get an email to sign in.', action: 'Add Member', actionIcon: 'user-plus', onAction: 'openAddMemberSheet()', cls: 'tm-es' }) : ''}
 ${admin ? '' : '<p class="t-2" style="font-size:13px;margin:12px 4px 0">Only admins can add people or change roles.</p>'}`;
   } else if(teamTab === 'titles'){
     const opts = (settings.teamTitleOptions || []).map(o => `<span class="opt">${escapeHtml(o)}<button class="ib" style="width:16px;height:16px" aria-label="Remove ${escapeHtml(o)}" onclick="removeTitle(${jsArg(o)})">${icon('x', { weight: 'bold' })}</button></span>`).join('');

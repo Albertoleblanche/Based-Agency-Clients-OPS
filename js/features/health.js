@@ -69,7 +69,7 @@ function renderHealth(){
     .sort((a, b) => b.worse - a.worse || order[b.to] - order[a.to]);
   const worse = moves.find(m => m.worse), better = moves.find(m => !m.worse);
   const story = [worse ? `${worse.x.c.name} ${healthWorseWords(worse.x.h.short)}.` : '', better ? `${better.x.c.name} is ${better.to === 'g' ? 'healthy again' : 'doing better'}.` : ''].filter(Boolean).join(' ')
-    || (cur.r + cur.y ? 'No changes since last week.' : 'Every client looks healthy.');
+    || (cur.r + cur.y ? 'No changes since last week.' : all.length ? 'Every client looks healthy.' : 'No clients yet.');
   const delta = (a, b, bad) => a === b ? 'Same as last week' : `${Math.abs(a - b)} ${a > b ? 'more' : 'fewer'} than last week`;
   const score = [['r', 'At risk', cur.r, prev.r], ['y', 'To watch', cur.y, prev.y], ['g', 'Healthy', cur.g, prev.g]]
     .map(([k, l, n, p]) => `<div class="hl-st"><span class="hl-lab"><i class="hl-dot ${k}"></i>${l}</span><b>${n}</b><span class="hl-d${k === 'r' && n > p ? ' up' : ''}">${delta(n, p)}</span></div>`).join('');
@@ -103,6 +103,7 @@ function renderHealth(){
   });
   const lane = (dot, title, sub, cards) => `<section class="hl-lane"><div class="hl-lh"><span class="hl-dot ${dot}"></span><b>${title}</b><span class="n">${cards.length}</span></div><p class="hl-ls">${sub}</p>${cards.join('') || '<p class="hl-none">Nothing here.</p>'}</section>`;
   const lanes = need.length || recovering.length ? `<div class="hl-lanes">${lane('r', 'No plan yet', 'Needs a next step', noPlanCards)}${lane('b', 'Plan underway', 'Someone is on it', underwayCards)}${lane('g', 'Recovering', 'Handled, settling', recCards)}</div>`
+    : !activeClients().length ? emptyNoClients('Health watches each client’s updates, hours and follow-ups, and flags the ones slipping.')
     : `<div class="hl-clear">${icon('check-circle')}<b>Every client looks healthy</b><span>Nothing needs care right now.</span></div>`;
 
   // ---- moved this week, and what makes clients slip (the last 13 weeks, about 90 days) ----

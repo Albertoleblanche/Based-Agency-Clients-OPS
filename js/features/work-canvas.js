@@ -56,8 +56,11 @@ function renderReminders(){
   if(remTab === 'open') main = sec('Due', due, 'is-due') + sec('Waiting on the client', waiting) + sec('Answered this week', recent);
   else main = sec(remTab === 'answered' ? 'Answered' : 'Closed', remTab === 'answered' ? answered : closed);
   if(!main) main = remTab === 'open'
-    ? `<div class="empty rmi-empty"><b>Nothing is waiting on clients</b>When you ask a client something, add it here so the team knows you’re waiting on an answer.</div>`
-    : `<div class="empty rmi-empty"><b>Nothing ${remTab === 'answered' ? 'answered' : 'closed'} yet</b></div>`;
+    ? emptyState({ icon: 'bell', tone: clientReminders.length ? 'ok' : 'blue', title: clientReminders.length ? 'Nothing is waiting on clients' : 'No follow-ups yet',
+        text: 'When you ask a client something, add it here with when to chase it. Radar reminds you, and the team can see you’re waiting on an answer.',
+        action: 'New Reminder', actionIcon: 'plus', onAction: 'openNewReminderModal()' })
+    : emptyState({ icon: remTab === 'answered' ? 'check-circle' : 'archive', title: `Nothing ${remTab === 'answered' ? 'answered' : 'closed'} yet`,
+        text: remTab === 'answered' ? 'Follow-ups the client answered show here.' : 'Follow-ups you closed without an answer show here.' });
   const usedClients = [...new Set(base.map(r => r.clientId))].map(id => clients.find(c => c.id === id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
   const askers = [...new Set(clientReminders.map(r => r.askedBy))].map(id => teamProfiles.find(p => p.id === id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
   const curC = usedClients.find(c => c.id === remClient), curW = askers.find(p => p.id === remWho);

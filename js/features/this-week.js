@@ -124,7 +124,10 @@ function renderThisWeek(){
 <div class="twl-gh"><span class="twl-ic ${g.tone}">${icon(g.ic)}</span><div class="twl-gt"><b>${escapeHtml(g.title)} <span class="n">${items.length}</span></b><span>${sub}</span></div>${b ? `<button class="btn${prim ? ' btn-p' : ''}" onclick="${b[0]}">${b[2] ? icon(b[2]) : ''}${escapeHtml(b[1])}</button>` : ''}</div>
 ${items.slice(0, showN).map(row).join('')}${more}</section>`;
   }).join('');
-  const clear = !open.length && !sent.length && !find ? `<div class="empty"><b>Nothing here</b>${weekFilter === 'mine' || !everyone ? 'None of your clients have an update this week.' : 'No clients yet.'}</div>`
+  const clear = !open.length && !sent.length && !find ? (!activeClients().length
+      ? emptyNoClients('This Week lists the update each client is due, who’s writing it and what went out.')
+      : emptyState({ icon: 'calendar-blank', title: 'None of your clients have an update this week', text: 'Updates for the clients you own show here when they’re due.',
+          action: everyone ? 'Show All Clients' : '', onAction: "setWeekFilter('all')" }))
     : !nowAll.length ? `<div class="tw-clear">${icon('check-circle')}<b>Nothing waiting on you</b><span>${waitAll.length ? 'The rest is with your team, on the right.' : 'Every update is out until the next ones are due.'}</span></div>`
     : !now.length ? `<div class="twl-none">${weekFilter === 'late' ? 'Nothing late waiting on you.' : 'No client matches.'}</div>` : '';
 

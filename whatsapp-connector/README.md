@@ -28,11 +28,14 @@ Run a digest right now: `npm run digest-now`.
 
 ## Managing it from Radar (Eric and Dan)
 
-After the connector is running once, open Radar → Settings → **WhatsApp** (or the gear on the WhatsApp screen):
-- **Connection:** shows whether the connector is running and WhatsApp is linked. When a code is needed
+After the connector is running once, open Radar → Settings → **WhatsApp** (or WhatsApp settings on the WhatsApp screen):
+- **Connection:** shows whether the office PC is running it and WhatsApp is linked. When a code is needed
   (first link, or after Re-link) the QR code appears right there to scan. No Command Prompt needed.
-- **Groups it reads:** switch any group on or off. Groups with "Marketing" in the name are on by
-  default. Only group *names* are stored for groups that are off, never their messages.
+  **Check Now** reads the groups right away (within 30 seconds of pressing it) and updates the list;
+  it sends no Slack messages, those go at the set times.
+- **Groups it reads:** switch any group on or off, or Turn All On / Turn All Off (with Find, just the
+  groups that match). Groups with "Marketing" in the name are on by default. Only group *names* are
+  stored for groups that are off, never their messages.
 - **When it checks:** the daily check times and time zone.
 - **Who handles what:** edit what each person is responsible for. Blank = the default.
 

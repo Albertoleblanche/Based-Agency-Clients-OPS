@@ -82,7 +82,7 @@ function renderTeamQueue(){
 <div class="rvn-rows">${rows}</div>
 ${list.length > 1 ? `<p class="rvn-keys"><span><kbd>J</kbd><kbd>K</kbd> next and previous</span>${canApprove() && reviewTab === 'waiting' ? '<span><kbd>⌘</kbd><kbd>↩</kbd> approve &amp; send</span>' : ''}</p>` : ''}
 </section>
-<section class="rvn-read" aria-label="Selected draft">${sel ? reviewReadHtml(sel, list) : `<div class="rvn-none">${icon('tray')}<span>${reviewTab === 'waiting' ? 'Nothing to review right now' : 'Nothing to show'}</span></div>`}</section>
+<section class="rvn-read" aria-label="Selected draft">${sel ? reviewReadHtml(sel, list) : `<div class="rvn-none">${reviewEmptyHtml(items)}</div>`}</section>
 </div>`;
   root.dataset.sel = sel ? key(sel) : '';
   if(sel && prevKey === key(sel)){ const m = root.querySelector('.rvn-mail'); if(m) m.scrollTop = prevRead; }
@@ -232,3 +232,16 @@ document.addEventListener('keydown', e => {
   if(e.key === 'j' || e.key === 'J'){ e.preventDefault(); reviewStep(1); }
   else if(e.key === 'k' || e.key === 'K'){ e.preventDefault(); reviewStep(-1); }
 });
+
+// Nothing selected because there's nothing in this tab: say what comes here, and where it starts.
+function reviewEmptyHtml(items){
+  if(!activeClients().length) return emptyNoClients('Updates written for clients come here to be read and approved before they go out.');
+  if(reviewTab === 'waiting') return emptyState({ icon: 'inbox', tone: 'ok', title: 'Nothing to review',
+    text: 'When a teammate sends a client update for review, it opens here so you can read it, edit it and approve it.',
+    action: 'Open This Week', onAction: "switchView('approve')",
+    link: items.approved.length ? `${items.approved.length} approved, not sent` : '', onLink: "setReviewTab('approved')" });
+  if(reviewTab === 'approved') return emptyState({ icon: 'inbox', title: 'Nothing approved and unsent',
+    text: 'Approved updates wait here until they go out.', link: items.waiting.length ? `Review the ${items.waiting.length} waiting` : '', onLink: "setReviewTab('waiting')" });
+  return emptyState({ icon: 'send', title: 'Nothing sent this week', text: 'Updates sent to clients this week show here, newest first.',
+    link: items.waiting.length ? `Review the ${items.waiting.length} waiting` : '', onLink: "setReviewTab('waiting')" });
+}

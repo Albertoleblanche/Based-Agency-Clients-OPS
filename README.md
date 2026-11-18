@@ -28,6 +28,9 @@ Run new `.sql` files once in Supabase → SQL Editor. The current one:
 - `addendum-whatsapp-test-mode.sql` — puts WhatsApp in test mode for one person (put your
   sign-in email in it first): only they see it in Radar and get its Slack messages. Its last
   line turns test mode off.
+- `addendum-whatsapp-check-now.sql` — Check Now, Make a Task (an item links to the task it
+  became) and the chat around each item in its panel. Until it's run, those three say so when
+  used and the rest of WhatsApp works as before. (Also at the end of `schema-whatsapp-tasks.sql`.)
 
 ---
 

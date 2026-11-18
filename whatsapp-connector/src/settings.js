@@ -33,3 +33,6 @@ export async function setQr(dataUrl){
 export async function clearRelinkFlag(){
   await db().from('wa_settings').update({ relink_requested: false }).eq('id', 1);
 }
+export async function clearCheckFlag(){
+  await db().from('wa_settings').update({ check_requested_at: null }).eq('id', 1);
+}

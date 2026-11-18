@@ -79,7 +79,7 @@ function renderTasks(){
   const usedClients = [...new Set(tasks.map(t => t.clientId).filter(Boolean))].map(id => clients.find(c => c.id === id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
   const curC = usedClients.find(c => c.id === tasksClient);
   const sub = [overdue.length ? `<b>${overdue.length} ${overdue.length === 1 ? 'is' : 'are'} overdue.</b>` : '', review.length ? `${review.length} ${review.length === 1 ? 'is' : 'are'} waiting on your review.` : ''].filter(Boolean).join(' ') || (open.length ? 'Nothing is overdue.' : 'Nothing open right now.');
-  const head = `<div class="tk-hd"><div><h2>${open.length} open task${open.length === 1 ? '' : 's'}</h2><p>${sub}</p></div>
+  const head = `<div class="tk-hd"><div><h2>${open.length ? `${open.length} open task${open.length === 1 ? '' : 's'}` : 'No open tasks'}</h2><p>${sub}</p></div>
 <div class="tk-f">${(everyone ? [['everyone', 'Everyone', ''], ['mine', 'Mine', mineN]] : byMe.length ? [['mine', 'Mine', mineN], ['byme', 'Assigned by Me', byMeN]] : [])
   .map(([k, t, n], i, a) => (i ? '' : '<div class="seg" role="tablist" aria-label="Whose">') + `<button class="${tasksScope === k ? 'on' : ''}" role="tab" aria-selected="${tasksScope === k}" onclick="setTasksScope('${k}')">${t}${n !== '' ? ` <span class="c">${n}</span>` : ''}</button>` + (i === a.length - 1 ? '</div>' : '')).join('')}
 <label class="pop pop-sel"><span class="pl">Client: ${escapeHtml(curC ? curC.name : 'All')}</span>${icon('caret-down')}<select aria-label="Client" onchange="setTasksClient(this.value)"><option value="all">All</option>${usedClients.map(c => `<option value="${c.id}"${c === curC ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></label>
@@ -88,11 +88,19 @@ function renderTasks(){
     return `<div class="tk-d" role="button" tabindex="0" onclick="selectTask('${t.id}')" onkeydown="if(event.key==='Enter')selectTask('${t.id}')">${tkCb(t)}<div class="tx"><b>${escapeHtml(t.title)}</b><span class="s">${[c ? c.name : '', tkWho(t.assigneeId), t.completedAt ? fmtShortDate(new Date(t.completedAt)) : ''].filter(Boolean).map(escapeHtml).join(' · ')}</span></div></div>`; }).join('');
   const doneCol = `<section class="tk-col tk-done" aria-label="Done"><div class="tk-ch"><b>Done</b><span>${doneWeek.length ? `${doneWeek.length} this week` : 'None this week'}</span></div>${doneRows}<a class="x-lnk tk-arch" href="#" onclick="switchView('task-archive');return false;">Finished tasks</a></section>`;
   let body;
-  if(tasksLayout === 'list'){
+  // Nothing at all to show here: say what goes here and give the way in, instead of empty columns.
+  const anyMine = tasks.some(t => !t.cancelledAt && (t.assignerId === me || t.assigneeId === me));
+  const tkEmpty = !open.length && !done.length ? (tasksClient !== 'all'
+      ? emptyState({ icon: 'list-checks', title: 'No tasks for this client', text: 'Tasks for a client show here, with who has them and when they’re due.', action: 'New Task', actionIcon: 'plus', onAction: "openNewTaskModal(undefined,'todo',{clientId:'" + tasksClient + "'})", link: 'All Clients', onLink: "setTasksClient('all')" })
+    : tasksScope !== 'everyone' && anyMine
+      ? emptyState({ icon: 'check-circle', tone: 'ok', title: tasksScope === 'byme' ? 'Nothing you’ve handed out is open' : 'Nothing on you', text: tasksScope === 'byme' ? 'Tasks you give someone else show here until they’re done.' : 'Tasks given to you show here, with when they’re due.', action: 'New Task', actionIcon: 'plus', onAction: 'openNewTaskModal()', link: everyone ? 'Show Everyone' : '', onLink: "setTasksScope('everyone')" })
+    : emptyState({ icon: 'list-checks', tone: 'blue', title: 'No tasks yet', text: 'Give yourself or a teammate something to do, for a client or not. Tasks show here by stage, and on Today and your calendar when they’re due.', action: 'New Task', actionIcon: 'plus', onAction: 'openNewTaskModal()' })) : '';
+  if(tkEmpty) body = `<div class="tk-list">${tkEmpty}</div>`;
+  else if(tasksLayout === 'list'){
     body = TASK_COLS.map(([k, label]) => { const ts = open.filter(t => t.status === k).sort(order);
       return ts.length ? `<div class="tk-ls"><b>${label}</b><span>${ts.length}</span><button class="ib" aria-label="Add a task to ${label}" title="New task" onclick="openNewTaskModal(undefined,'${k}')">${icon('plus')}</button></div>${ts.map(tkListRowHtml).join('')}` : ''; }).join('')
       + (done.length ? `<div class="tk-ls"><b>Done</b><span>${doneWeek.length ? `${doneWeek.length} this week` : ''}</span></div>${(doneWeek.length ? doneWeek : done.slice(0, 3)).map(tkListRowHtml).join('')}<a class="x-lnk tk-arch" href="#" onclick="switchView('task-archive');return false;">Finished tasks</a>` : '');
-    body = `<div class="tk-list">${body || '<div class="empty tk-empty"><b>No tasks</b>Create one with New Task.</div>'}</div>`;
+    body = `<div class="tk-list">${body}</div>`;
   } else {
     body = `<div class="tk-board">${TASK_COLS.map(([k, label]) => { const ts = open.filter(t => t.status === k).sort(order);
       return `<section class="tk-col" aria-label="${label}"><div class="tk-ch"><b>${label}</b><span>${ts.length}</span><button class="ib" aria-label="Add a task to ${label}" title="New task" onclick="openNewTaskModal(undefined,'${k}')">${icon('plus')}</button></div>${ts.map(tkCardHtml).join('') || `<p class="tk-none">Nothing here.</p>`}</section>`; }).join('')}${doneCol}</div>`;

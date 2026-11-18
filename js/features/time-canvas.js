@@ -204,7 +204,7 @@ function renderTimesheet(){
   const monthSec = `<div class="tmx-sec tmi-s2"><b>Hours this month</b><a class="x-lnk" href="#" onclick="switchTimeTab('reports');return false;">Reports</a></div>${budgets(4)}`;
   if(tsView === 'day'){
     const rows = tsDayRows(tsAnchor, byDay[tsAnchor] || [], true);
-    main = `<div class="tmi-sec tmi-sec0"></div>${rows || `<p class="tmi-none">${tsAnchor === today ? 'Nothing tracked yet today. Start the timer in the corner, or add time.' : 'No time on this day.'}</p>`}${add(tsAnchor)}`;
+    main = `<div class="tmi-sec tmi-sec0"></div>${rows ? rows + add(tsAnchor) : tsEmptyHtml(tsAnchor === today ? 'today' : 'day', tsAnchor)}`;
     const byC = {};
     (byDay[tsAnchor] || []).forEach(e => { byC[e.clientId] = (byC[e.clientId] || 0) + e.minutes; });
     if(tsAnchor === today && timerState.running) byC[timerState.clientId] = (byC[timerState.clientId] || 0) + runningMinutes();
@@ -214,8 +214,8 @@ function renderTimesheet(){
     const ks = Object.keys(byDay); if(isCur && !ks.includes(today)) ks.push(today);
     ks.sort().reverse();
     main = ks.map(k => { const list = byDay[k] || [], m = list.reduce((s, e) => s + e.minutes, 0) + (k === today ? runningMinutes() : 0);
-      return `<div class="tmi-sec"><b>${fmtLong(tsD(k))}</b><span>${hmm(m)}</span></div>${tsDayRows(k, list, false) || '<p class="tmi-none">Nothing tracked yet today.</p>'}`; }).join('') || '<p class="tmi-none" style="margin-top:18px">No time this week.</p>';
-    main += add(isCur ? today : fk);
+      return `<div class="tmi-sec"><b>${fmtLong(tsD(k))}</b><span>${hmm(m)}</span></div>${tsDayRows(k, list, false) || '<p class="tmi-none">Nothing tracked yet today.</p>'}`; }).join('');
+    main = Object.keys(byDay).length || (isCur && timerState.running) ? main + add(isCur ? today : fk) : tsEmptyHtml(isCur ? 'week' : 'pastweek', isCur ? today : fk);
     const week = Array.from({ length: 7 }, (_, i) => { const d = addDays(from, i), k = toDateStr(d); return { d, k, m: (byDay[k] || []).reduce((s, e) => s + e.minutes, 0) + (k === today ? runningMinutes() : 0) }; })
       .filter((x, i) => i < 5 || x.m > 0);
     const bars = week.map(x => `<button class="tmi-wb${x.k === today ? ' on' : ''}" onclick="tsOpenDay('${x.k}')" aria-label="${fmtLong(x.d)}, ${hmLong(x.m)}"><span class="tmi-wv">${x.m ? hmm(x.m) : ''}</span><i style="height:${Math.max(Math.min(x.m / 60 / 8, 1), .02) * 100}%"></i><span>${x.d.toLocaleDateString('en-US', { weekday: 'short' })}</span></button>`).join('');
@@ -321,7 +321,7 @@ function renderReports(){
   });
   const rows = Object.entries(grouped).sort((a, b) => b[1] - a[1]);
   const grp = document.getElementById('reportTableGrp');
-  if(!rows.length){ grp.innerHTML = `<div class="empty">No time logged ${rangeWord}.</div>`; return; }
+  if(!rows.length){ grp.innerHTML = emptyState({ compact: true, icon: 'timer', title: `No time logged ${rangeWord}`, text: 'Hours show here by client, service or teammate once time is tracked.', action: 'Open Timesheet', onAction: "switchTimeTab('timesheet')", link: range !== 'all' ? 'Show All Time' : '', onLink: "setReportRangeAll()" }); return; }
   const shown = reportShowAll ? rows : rows.slice(0, 9), rest = rows.slice(shown.length);
   const restMin = rest.reduce((s, [, m]) => s + m, 0);
   const withBudget = reportTab === 'clients' && range === 'month';
@@ -423,7 +423,11 @@ function renderDailySummaryList(data, dir, part){
   const impsBy = name => clients.reduce((s, c) => s + (c.improvements || []).filter(i => i.author === name && String(i.date || '').slice(0, 10) === dStr).length, 0);
   const total = people.reduce((s, p) => s + p.totalMinutes, 0), totalImps = people.reduce((s, p) => s + impsBy(p.name), 0);
   if(!people.length){
-    root.innerHTML = dsHeaderHtml(canApprove() ? `Nobody logged time on ${dayName}.` : `You didn't log any time on ${dayName}.`) + '<div class="ds-body"></div>';
+    const isToday = dStr === toDateStr(rNow());
+    root.innerHTML = dsHeaderHtml(canApprove() ? `Nobody logged time on ${dayName}.` : `You didn't log any time on ${dayName}.`) + `<div class="ds-body">${emptyState({ icon: 'clipboard-text',
+      title: isToday ? 'Nothing logged yet today' : `Nothing logged on ${dayName}`,
+      text: canApprove() ? 'The summary fills in as the team tracks time and logs improvements: who worked on which client, and what got done.' : 'Your summary fills in as you track time and log improvements.',
+      action: isToday ? 'Track Time' : 'Go to the Day Before', actionIcon: isToday ? 'timer' : '', onAction: isToday ? 'openTimerModal()' : 'shiftDailySummaryDate(-1)' })}</div>`;
     if(part !== 'body') dsMotion(dir, 'date');
     return;
   }
@@ -528,7 +532,7 @@ function renderPayrollView(){
   const sum = k => rated.reduce((s, r) => s + r[k], 0);
   const table = rated.length ? `<table class="mtx" aria-label="Pay period summary"><thead><tr><th>Person</th><th class="num">Regular hours</th><th class="num">Overtime</th><th class="num">Rate</th><th class="num">Total</th></tr></thead>
 <tbody>${trs}</tbody><tfoot><tr><td>${rated.length} ${rated.length === 1 ? 'person' : 'people'}</td><td class="num">${sum('regularHours').toFixed(1)}</td><td class="num">${sum('otHours').toFixed(1)}</td><td></td><td class="num">${money(sum('pay'))}</td></tr></tfoot></table>`
-    : `<div class="empty">Nobody has an hourly rate yet. Add one on the right.</div>`;
+    : emptyState({ compact: true, icon: 'currency-circle-dollar', title: 'Nobody has an hourly rate yet', text: 'Pay for the period is worked out from the timesheet once someone has a rate. Add one under Hourly rates, on the right.', action: (teamProfiles || []).some(p => !p.access_revoked) ? 'Add a Rate' : '', onAction: `editPayrollRate('${((teamProfiles || []).find(p => !p.access_revoked) || {}).id}')` });
 
   // why there is overtime, in plain words
   const thr = parseFloat(settings.overtimeThresholdHours) || 0, w2 = addDays(sel, 7);
@@ -583,3 +587,14 @@ async function markPayrollPeriodPaid(){
   await renderPayrollHistory();
   showToast('success', 'Marked as paid', `${fmt(payrollPeriodStart)} – ${fmt(end)}`);
 }
+
+// The timesheet with nothing in it: start the timer (today), or add time you already spent.
+function tsEmptyHtml(kind, k){
+  const now = kind === 'today' || kind === 'week';
+  return emptyState({ icon: 'timer', tone: now ? 'blue' : '',
+    title: kind === 'today' ? 'Nothing tracked yet today' : kind === 'week' ? 'Nothing tracked yet this week' : kind === 'pastweek' ? 'No time that week' : 'No time on this day',
+    text: now ? 'Start the timer when you begin work for a client, or add time you already spent. It counts toward each client’s hours and the team’s reports.' : 'Add time you spent that day, for a client.',
+    action: now ? 'Start Timer' : 'Add Time', actionIcon: now ? 'play' : 'plus', onAction: now ? 'openTimerModal()' : `openManualEntryModal('${k}')`,
+    link: now ? 'Add Time Manually' : '', onLink: `openManualEntryModal('${k}')`, cls: 'tmi-es' });
+}
+function setReportRangeAll(){ const sel = document.getElementById('reportRange'); if(sel){ sel.value = 'all'; if(typeof syncPopSel === 'function') syncPopSel(sel); } reportsPage = 1; renderReports(); }

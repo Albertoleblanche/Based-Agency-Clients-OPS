@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { config } from './config.js';
 import { connect, getStatus, stop, relink, syncActiveGroups, refreshGroups, groupsReady } from './wa.js';
-import { loadSettings, applySettings, heartbeat, clearRelinkFlag } from './settings.js';
+import { loadSettings, applySettings, heartbeat, clearRelinkFlag, clearCheckFlag } from './settings.js';
 import { runDigest, alertAdmins } from './digest.js';
 
 const args = new Set(process.argv.slice(2));
@@ -58,6 +58,12 @@ async function main(){
       // until the group list has reached Radar (WhatsApp can be slow right after linking), keep asking
       if(getStatus() === 'open' && !groupsReady()) await refreshGroups().catch(e => console.error(`Couldn't get the group list yet (${e.message}). Trying again in 30 seconds.`));
       if(s?.relink_requested){ await clearRelinkFlag(); await relink(); }
+      // Check Now, from Radar: read the groups right away. No Slack messages; those go at the set times.
+      if(s?.check_requested_at && getStatus() === 'open' && !running){
+        await clearCheckFlag();
+        console.log('Check Now from Radar: reading the groups now.');
+        safeDigest({ dry, notify: false });
+      }
     } catch(e){ console.error('Settings sync failed:', e.message); }
   }, 30000);
   // Ask WhatsApp for the group list every 30 minutes (switches in Radar are applied from the database every 30s).

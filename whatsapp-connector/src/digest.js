@@ -8,7 +8,9 @@ const ICON = { request: '🛠', question: '❓', promise: '🤝', issue: '🚨' 
 const ago = (iso) => { const d = Math.floor((Date.now() - new Date(iso)) / 86400000); return d <= 0 ? 'today' : d === 1 ? '1d' : `${d}d`; };
 const line = (t) => `${ICON[t.kind] || '•'} ${t.priority === 'high' ? '*[HIGH]* ' : ''}*${t.client}* — ${t.title} _(${ago(t.first_seen)})_`;
 
-export async function runDigest({ dry = false } = {}){
+// notify: false for Check Now from Radar — it reads the groups and updates the list, but sends no
+// Slack messages (those go at the set times).
+export async function runDigest({ dry = false, notify = true } = {}){
   const startedAt = new Date().toISOString();
   const since = await lastDigestTime();
   const profiles = await loadProfiles();
@@ -42,7 +44,9 @@ export async function runDigest({ dry = false } = {}){
   };
   const testers = config.pilotIds;
 
-  if(testers === null){
+  if(!notify){
+    console.log('Checked from Radar, so no Slack messages this time.');
+  } else if(testers === null){
     console.log('Radar settings not loaded, so no Slack messages this time.');
   } else if(testers.length){
     // Test mode: only the testers hear about it, and they get the full view. Nobody else is messaged.
@@ -64,17 +68,17 @@ export async function runDigest({ dry = false } = {}){
   }
 
   // Full view for Eric and Dan (live only).
-  if(testers && !testers.length) for(const key of config.adminKeys){
+  if(notify && testers && !testers.length) for(const key of config.adminKeys){
     const role = ROLES.find(r => r.key === key); const p = role && matchProfile(role, profiles);
     if(!p?.slack_user_id || muted(p)) continue;
     const text = fullView(key, 'WhatsApp client items — full team view');
     if(dry) console.log(`\n[dry] FULL VIEW → ${role.name}\n${text}`); else if(await slackDM(p.slack_user_id, text)) sent++;
   }
 
-  await db().from('wa_tasks').update({ last_reminded_at: new Date().toISOString() }).eq('status', 'open');
+  if(notify) await db().from('wa_tasks').update({ last_reminded_at: new Date().toISOString() }).eq('status', 'open');
   await logRun({ kind: 'digest', started_at: startedAt, finished_at: new Date().toISOString(), ok: failures === 0 || failures < groups.length,
     connection: 'open', messages_seen: seen, tasks_new: created, tasks_closed: resolved,
-    note: `${groups.length} groups, ${open.length} open, ${sent} Slack messages${failures ? `, ${failures} groups failed` : ''}${dry ? ' (dry run)' : ''}` });
+    note: `${groups.length} groups, ${open.length} open, ${sent} Slack messages${failures ? `, ${failures} groups failed` : ''}${notify ? '' : ', Check Now from Radar'}${dry ? ' (dry run)' : ''}` });
   console.log(`Digest done: ${groups.length} groups, +${created} new, ${resolved} answered, ${open.length} open, ${sent} Slack DMs.`);
 }
 

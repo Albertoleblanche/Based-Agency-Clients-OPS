@@ -53,6 +53,6 @@ function drawTrash(){
       return trashRow('timer', `${e.description || e.service || 'Time'} · ${hmm(e.minutes)}`, `${escapeHtml(c ? c.name : 'Client removed')} · deleted ${trashDay(e.deletedAt)}`, `restoreTimeEntry('${e.id}')`, `permanentlyDeleteTimeEntry('${e.id}')`);
     }).join('') || '<div class="row"><span class="t-2" style="font-size:14px">No deleted time entries.</span></div>'}</div>`;
   }
-  if(!html) html = `<div class="empty"><b>Nothing deleted</b>Clients, notes and time entries you delete wait here, so you can bring them back.</div>`;
+  if(!html) html = emptyState({ icon: 'trash', title: 'Nothing deleted', text: 'Clients, notes and time entries you delete wait here, so you can bring them back.' });
   root.innerHTML = `${seg}<div class="tr-list">${html}</div>`;
 }

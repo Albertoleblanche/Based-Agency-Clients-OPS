@@ -67,6 +67,7 @@ function renderCalendar(){
       return `<div class="mcell${d.getMonth() !== a.getMonth() ? ' out' : ''}${k === today ? ' today' : ''}" ondblclick="openNewEventModal('${k}')"><span class="mday"><b>${d.getDate()}</b></span>${its.slice(0, 4).map(e => `<button class="mchip ${calColor(e)}" onclick="calOpen('${e.id}')"><span class="dot ${calColor(e) === 'gray' ? '' : calColor(e)}"></span>${e.allDay || e.isTaskMarker ? '' : `<i>${fmtTime(new Date(e.startAt)).replace(':00', '')}</i>`}${escapeHtml(e.title)}</button>`).join('')}${its.length > 4 ? `<span class="more">${its.length - 4} more</span>` : ''}</div>`; }).join('');
     root.scrollTop = 0; delete root.dataset.ready;
     root.innerHTML = `<div class="mgrid">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => `<div class="mhd">${d}</div>`).join('')}${cells}</div>`;
+    calEmptyCard(!items.length, 'this month');
     if(currentViewName === 'calendar') setToolbar(a.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }), '');
     return;
   }
@@ -82,6 +83,7 @@ function renderCalendar(){
     return `<div class="cal-day${[0, 6].includes(d.getDay()) ? ' wknd' : ''}" style="height:${(CAL_END - CAL_START) * CAL_H}px" ondblclick="openNewEventModal('${k}')">${nowLine}${calTimedHtml(its, d)}</div>`; }).join('');
   const keepScroll = root.dataset.ready ? root.scrollTop : null;
   root.innerHTML = `<div class="cal" style="${cols}">${head}${allRow}${gut}${body}</div>`;
+  calEmptyCard(!items.length, calendarViewMode === 'day' ? (toDateStr(from) === today ? 'today' : 'that day') : 'this week');
   // all-day tasks stay pinned under the day names, like Calendar on the Mac
   const hd = root.querySelector('.cal-hd');
   root.querySelectorAll('.cal-all, .cal-all-l').forEach(el => el.style.top = hd.offsetHeight + 'px');
@@ -102,8 +104,22 @@ async function renderCalendarGoogleSyncWidget(){
   const el = document.getElementById('calGoogleSyncStatus');
   if(!el) return;
   const data = await fetchGoogleCalendarStatus();
+  window._gcalStatus = data || null;
   if(!data || !data.googleConfigured || !data.connected){ el.style.display = 'none'; el.innerHTML = ''; return; }
   const last = data.lastSyncedAt ? new Date(data.lastSyncedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'not yet';
   el.style.display = '';
   el.innerHTML = `<button class="st cal-sync" onclick="syncGoogleCalendarFromTab()" title="Last synced ${last} · click to sync now">${icon('google-logo')}Synced with Google Calendar</button>`;
+}
+
+// Nothing in the range shown: a small card over the grid with the way to add something.
+function calEmptyCard(show, when){
+  const view = document.getElementById('view-calendar');
+  let el = document.getElementById('calEmpty');
+  if(!show){ if(el) el.remove(); return; }
+  if(!view) return;
+  if(!el){ el = document.createElement('div'); el.id = 'calEmpty'; el.className = 'cal-es'; view.appendChild(el); }
+  const g = window._gcalStatus, connect = g && g.googleConfigured && !g.connected;
+  el.innerHTML = emptyState({ compact: true, icon: 'calendar-blank', title: `Nothing on your calendar ${when}`,
+    text: connect ? 'Add a meeting or deadline, or connect Google Calendar to see your meetings here.' : 'Meetings, deadlines and tasks with a due date show here. Double-click a day to add one.',
+    action: 'New Event', actionIcon: 'plus', onAction: 'openNewEventModal()', link: connect ? 'Connect Google Calendar' : '', onLink: 'connectGoogleCalendar()' });
 }
