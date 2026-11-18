@@ -1699,7 +1699,8 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 
 /* Plan: your next six weeks (canvas boards PlanNew, PlanSprintOpen, PlanNewSprint) */
 .mac .btn.btn-sm{height:26px;padding:0 10px;font-size:12.5px}
-.pln{max-width:1240px;margin:0 auto;padding:28px 36px 48px}
+#planRoot{padding:0;display:flex;flex-direction:column;overflow:hidden}
+.pln{width:100%;padding:30px 40px 48px}
 .pl-hd{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap}
 .pl-hd h2{margin:0;font-size:26px;font-weight:700;letter-spacing:-.025em}
 .pl-hd p{margin:6px 0 0;font-size:13.5px;color:var(--label-2)}
@@ -1709,7 +1710,7 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .pl-setup{display:flex;gap:10px;margin:18px 0 0;padding:12px 14px;border-radius:10px;background:var(--yellow-soft);font-size:13px;line-height:1.45}
 .pl-setup svg{width:16px;height:16px;flex:0 0 auto;margin-top:1px;color:var(--yellow)}
 .pl-setup code{font-size:12px;padding:1px 5px;border-radius:4px;background:var(--fill-2)}
-.pl-body{display:grid;grid-template-columns:minmax(0,1fr) 272px;column-gap:36px;margin-top:28px;align-items:start}
+.pl-body{display:grid;grid-template-columns:minmax(0,1fr) 300px;column-gap:56px;margin-top:28px;align-items:start}
 .pl-main{min-width:0}
 .pl-sec{display:flex;align-items:baseline;gap:8px;margin:26px 0 6px}
 .pl-sec:first-child{margin-top:0}
