@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { config } from './config.js';
-import { connect, getStatus, stop, relink, syncActiveGroups, refreshGroups } from './wa.js';
+import { connect, getStatus, stop, relink, syncActiveGroups, refreshGroups, groupsReady } from './wa.js';
 import { loadSettings, applySettings, heartbeat, clearRelinkFlag } from './settings.js';
 import { runDigest, alertAdmins } from './digest.js';
 
@@ -55,6 +55,8 @@ async function main(){
       const s = await loadSettings();
       if(applySettings(s)) schedule();
       await syncActiveGroups();
+      // until the group list has reached Radar (WhatsApp can be slow right after linking), keep asking
+      if(getStatus() === 'open' && !groupsReady()) await refreshGroups().catch(e => console.error(`Couldn't get the group list yet (${e.message}). Trying again in 30 seconds.`));
       if(s?.relink_requested){ await clearRelinkFlag(); await relink(); }
     } catch(e){ console.error('Settings sync failed:', e.message); }
   }, 30000);

@@ -8,11 +8,14 @@ import { db, logRun } from './db.js';
 import { setQr } from './settings.js';
 
 const groupNames = new Map(); // jid -> subject (client groups only)
+let groupsLoaded = false;     // the group list has reached Radar at least once since connecting
+let emptyTries = 0;
 let sock = null;
 let status = 'closed';
 let onLoggedOut = async () => {};
 
 export const getStatus = () => status;
+export const groupsReady = () => groupsLoaded || emptyTries >= 10;
 
 function textOf(m){
   const msg = m.message;
@@ -41,6 +44,12 @@ function looksLikeTeam(m){
 export async function refreshGroups(){
   if(!sock) return;
   const all = await sock.groupFetchAllParticipating();
+  if(!Object.keys(all || {}).length){
+    // Right after linking WhatsApp can still be syncing and answer with no groups: try again shortly.
+    emptyTries++;
+    console.log('WhatsApp sent no groups yet (still syncing). Trying again in 30 seconds.');
+    return;
+  }
   const { data: existing } = await db().from('wa_groups').select('jid,active,manual');
   const ex = new Map((existing || []).map(g => [g.jid, g]));
   const now = new Date().toISOString();
@@ -52,8 +61,9 @@ export async function refreshGroups(){
   });
   if(rows.length){
     const { error } = await db().from('wa_groups').upsert(rows, { onConflict: 'jid' });
-    if(error) console.error('wa_groups upsert failed:', error.message);
+    if(error){ console.error('Saving the group list to Radar failed:', error.message); return; }
   }
+  groupsLoaded = true;
   await syncActiveGroups();
   console.log(`Reading ${groupNames.size} client groups (of ${rows.length} groups on this number). Personal chats are never read.`);
 }
@@ -125,11 +135,11 @@ export async function connect({ onReady, onLogout } = {}){
       try { await setQr(await QRCode.toDataURL(u.qr, { width: 280, margin: 1 })); } catch(e){ console.error('QR to Radar failed:', e.message); }
     }
     if(u.connection === 'open'){
-      status = 'open';
+      status = 'open'; groupsLoaded = false; emptyTries = 0;
       console.log('WhatsApp connected (read-only).');
       try { await setQr(null); } catch {}
       await logRun({ kind: 'status', connection: 'open', note: 'connected' });
-      try { await refreshGroups(); } catch(e){ console.error('group refresh failed', e.message); }
+      try { await refreshGroups(); } catch(e){ console.error(`Couldn't get the group list yet (${e.message}). Trying again in 30 seconds.`); }
       onReady && onReady();
     }
     if(u.connection === 'close'){
