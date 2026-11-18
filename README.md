@@ -31,6 +31,18 @@ Run new `.sql` files once in Supabase → SQL Editor. The current one:
 - `addendum-whatsapp-check-now.sql` — Check Now, Make a Task (an item links to the task it
   became) and the chat around each item in its panel. Until it's run, those three say so when
   used and the rest of WhatsApp works as before. (Also at the end of `schema-whatsapp-tasks.sql`.)
+- `addendum-weekly-wins.sql` (run after `schema-whatsapp-tasks.sql`) — weekly wins: a tier on
+  each win, WhatsApp copy and send with one sender per win (copying claims it; anyone else is
+  warned first), and Radar marking a win sent when it shows up in the client's group. Until
+  it's run, wins have no tier and copying isn't shared with the team; the rest works.
+
+## Weekly wins
+
+Every client gets a win each week on its own win day (Monday to Friday), set in the client's
+panel on All Clients with how it's sent (WhatsApp, email or both) and its WhatsApp group.
+Radar never posts to WhatsApp: an approved WhatsApp win goes back to whoever wrote it, they
+copy it, paste it in the group, and it counts as sent. A client with no win day keeps the old
+rule: due 7 days after its last update.
 
 ---
 

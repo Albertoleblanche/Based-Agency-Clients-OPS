@@ -64,16 +64,19 @@ function renderTeamQueue(){
     const [due, kind] = reviewTab === 'sent' ? ['Sent ' + relDay(x.at || rNow()).replace(/^Today$/, 'today'), '']
       : [w.dueText, w.late ? 'is-late' : w.daysLeft === 0 ? 'is-soon' : ''];
     const when = reviewTab === 'sent' ? (x.at ? fmtTime(new Date(x.at)) : '') : x.at ? fmtWait(x.at) : '';
-    const dl = reviewTab === 'sent' ? null : draftDelta(x.c, x.d);
+    const dl = reviewTab === 'sent' ? null : draftDelta(x.c, x.d), tier = winTier(x.d);
     const flag = dl && dl.gone ? `<span class="rvn-note is-red">${dl.allGone ? 'Work deleted' : `${dl.gone} deleted`}</span>`
       : dl && dl.added.length ? `<span class="rvn-note">${dl.added.length} new since draft</span>`
-      : h.level !== 'g' ? tagHtml(h.level === 'r' ? 'red' : 'yellow', healthWord(h.level)) : '';
+      : tier ? tierTag(tier) : h.level !== 'g' ? tagHtml(h.level === 'r' ? 'red' : 'yellow', healthWord(h.level)) : '';
+    // Approved: who sends it (WhatsApp wins go back to whoever wrote them; copying one claims it)
+    const line = reviewTab === 'approved' ? escapeHtml(reviewSendWords(x.c, x.d))
+      : `${escapeHtml(firstName(x.d.author))} · <span class="rvn-due ${kind}">${escapeHtml(due)}</span>`;
     return `<a class="rvn-r${on ? ' is-sel' : ''}" href="#teamqueue" onclick="selectReview('${x.c.id}',${jsArg(x.d.author)});return false;"${on ? ' aria-current="true"' : ''}>${unread}${monoHtml(x.c, 'sm')}
-<div class="tx"><b>${escapeHtml(x.c.name)}</b><span class="s">${escapeHtml(firstName(x.d.author))} · <span class="rvn-due ${kind}">${escapeHtml(due)}</span></span></div>
-<div class="rvn-rr">${when ? `<time>${escapeHtml(when)}</time>` : ''}${flag}</div></a>`;
+<div class="tx"><b>${escapeHtml(x.c.name)}</b><span class="s wn-rs">${chGlyph(x.c)}<span>${line}</span></span></div>
+<div class="rvn-rr">${reviewTab === 'approved' ? '' : when ? `<time>${escapeHtml(when)}</time>` : ''}${flag}</div></a>`;
   }).join('') || `<div class="rvn-empty"><b>${reviewTab === 'waiting' ? 'Nothing waiting' : reviewTab === 'approved' ? 'Nothing approved and unsent' : 'Nothing sent this week'}</b>${reviewTab === 'waiting' ? 'Drafts show up here when they’re sent for review.' : ''}</div>`;
   const sortNote = reviewTab === 'waiting' ? `Oldest first${dueN ? ` · ${lateN ? `${lateN} late` + (dueN > lateN ? `, ${dueN - lateN} due today` : '') : `${dueN} due today`}` : ''}`
-    : reviewTab === 'approved' ? 'Approved, not sent yet' : 'Sent this week · newest first';
+    : reviewTab === 'approved' ? (list.some(x => winViaWhatsapp(x.c)) ? 'Not sent yet · whoever copies a win sends it' : 'Approved, not sent yet') : 'Sent this week · newest first';
   const prevRead = root.querySelector('.rvn-mail')?.scrollTop || 0, prevKey = root.dataset.sel || '';
   root.innerHTML = `<div class="rvn">
 <section class="rvn-list" aria-label="Drafts">
@@ -86,9 +89,17 @@ ${list.length > 1 ? `<p class="rvn-keys"><span><kbd>J</kbd><kbd>K</kbd> next and
 </div>`;
   root.dataset.sel = sel ? key(sel) : '';
   if(sel && prevKey === key(sel)){ const m = root.querySelector('.rvn-mail'); if(m) m.scrollTop = prevRead; }
-  if(currentViewName === 'teamqueue') setToolbar(null, `${items.waiting.length} draft${items.waiting.length === 1 ? '' : 's'} waiting${dueN ? ` · ${lateN ? lateN + ' late' : dueN + ' due today'}` : ''}`);
+  if(currentViewName === 'teamqueue') setToolbar(null, `${items.waiting.length} win${items.waiting.length === 1 ? '' : 's'} waiting${dueN ? ` · ${lateN ? lateN + ' late' : dueN + ' due today'}` : ''}`);
   const badge = document.getElementById('navTeamPendingBadge');
   if(badge){ badge.textContent = items.waiting.length; badge.style.display = items.waiting.length ? '' : 'none'; }
+}
+// "Maya copied it 2:22 PM" · "Bruno sends it, not copied yet" · "Email · you send it"
+function reviewSendWords(c, d){
+  const me = myName();
+  if(!winViaWhatsapp(c)) return `Email · ${canApprove() ? 'you send it' : 'an approver sends it'}`;
+  const st = winSendState(d);
+  if(st.k === 'copied') return `${st.by === me ? 'You' : firstName(st.by)} copied it ${st.at ? fmtTime(new Date(st.at)) : ''}`.trim();
+  return d.author === me ? 'You send it, not copied yet' : `${firstName(d.author)} sends it, not copied yet`;
 }
 function selectReview(clientId, author){
   if(window._reviewEditing && window._reviewEditing !== clientId + '|' + author) window._reviewEditing = null;
@@ -143,10 +154,15 @@ function reviewReadHtml(x, list){
     ? `${nav}<span class="rvn-editing">${icon('pencil-simple')}Editing ${mine ? 'your' : escapeHtml(firstName(d.author)) + '’s'} draft</span><span class="rvn-sp"></span><button class="btn" onclick="cancelReviewEdit()">Cancel</button><button class="btn btn-p" onclick="toggleReviewEdit(${A})">Save Changes</button>`
     : `${nav}<span class="rvn-sp"></span>${rework ? `<button class="btn rvn-q" onclick="toggleReviewEdit(${A})">${icon('pencil-simple')}Edit</button><button class="btn rvn-q" onclick="generateDraft(${A})">${icon('sparkle')}Rewrite</button>` : ''}${more}`;
   // The client, as the email's header.
-  const to = c.contactName || c.contact_name;
-  const drafted = d.draftPendingSince ? ` · ${fmtWait(d.draftPendingSince)} ago` : '';
-  const head = `<div class="rvn-hd">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}</b><span class="s">To ${escapeHtml(to || c.email || 'no email on file')}</span><span class="s">Drafted by ${mine ? 'you' : escapeHtml(d.author)}${drafted}</span></div></div>`;
-  const body = editing ? `<textarea spellcheck="true" class="rvn-edit" id="draft-${c.id}" aria-label="Draft">${escapeHtml(d.draft || '')}</textarea>` : `<div class="rvn-body">${draftBodyHtml(d.draft)}</div>`;
+  const to = c.contactName || c.contact_name, ch = winChannel(c), wa = ch === 'whatsapp';
+  const drafted = tab === 'approved' && d.approvedBy ? ` · approved by ${d.approvedBy === myName() ? 'you' : escapeHtml(firstName(d.approvedBy))}${d.approvedAt ? ' at ' + escapeHtml(fmtTime(new Date(d.approvedAt))) : ''}`
+    : d.draftPendingSince ? ` · ${fmtWait(d.draftPendingSince)} ago` : '';
+  const toWords = wa ? 'To their WhatsApp group' : `To ${escapeHtml(to || c.email || 'no email on file')}${ch === 'both' ? ' and their WhatsApp group' : ''}`;
+  const head = `<div class="rvn-hd">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}</b><span class="s">${toWords}</span><span class="s">Drafted by ${mine ? 'you' : escapeHtml(d.author)}${drafted}</span></div></div>`;
+  // WhatsApp: as it will look in the group
+  const body = editing ? `<textarea spellcheck="true" class="rvn-edit" id="draft-${c.id}" aria-label="Draft">${escapeHtml(d.draft || '')}</textarea>`
+    : wa ? `${waBubbleHtml(d.draft, d.draftSentAt ? new Date(d.draftSentAt) : null)}<p class="wn-cap">As it will look in the group. Bold, line breaks and bullets copy as WhatsApp formatting.</p>`
+    : `<div class="rvn-body">${draftBodyHtml(d.draft)}</div>`;
   // Before you send.
   const row = (it, kind) => `<div class="rvn-i${kind ? ' is-' + kind : ''}" title="${escapeHtml(it.text + ' · ' + (it.service || c.service || '') + ' · ' + fmtShortDate(new Date(it.date)))}">${icon(kind === 'out' ? 'minus-circle' : kind === 'new' ? 'circle-plus' : 'check-circle')}<span class="rvn-it">${escapeHtml(it.text)}</span><time>${escapeHtml(fmtShortDate(new Date(it.date)))}</time></div>`;
   const htag = tagHtml(h.level === 'r' ? 'red' : h.level === 'y' ? 'yellow' : 'green', healthWord(h.level));
@@ -155,6 +171,7 @@ function reviewReadHtml(x, list){
   const goneNote = dl.gone ? `<div class="rvn-warn">${icon('warning')}<div><b>${dl.allGone ? 'Everything this email was written from was deleted' : `${dl.gone} improvement${dl.gone === 1 ? '' : 's'} in this email ${dl.gone === 1 ? 'was' : 'were'} deleted`}</b><span>${dl.allGone ? 'Rewrite it from what’s logged now, or discard it.' : 'The email may still mention ' + (dl.gone === 1 ? 'it' : 'them') + '. Rewrite it, or edit it by hand.'}</span>${rework ? `<button class="btn rvn-sm" onclick="generateDraft(${A})">${icon('sparkle')}Rewrite</button>` : ''}</div></div>` : '';
   const rail = `<aside class="rvn-rail" aria-label="${tab === 'sent' ? 'About this update' : 'Before you send'}">
 ${goneNote}<div class="rvn-rs"><b>${tab === 'sent' ? 'About this update' : 'Before you send'}</b></div>
+${reviewWinRowsHtml(c, d, tab)}
 <div class="rvn-kv"><span>Health</span><span>${htag}</span></div>
 ${tab !== 'sent' && dueTxt ? `<div class="rvn-kv"><span>Due</span><span${w.late ? ' class="t-red"' : ''}>${escapeHtml(w.late ? w.dueText : dueTxt)}</span></div>` : ''}
 <div class="rvn-kv"><span>Last 8 weeks</span><span class="rvn-hist">${histDotsHtml(seq)}${ots.total ? `<em>${ots.onTime} of ${ots.total} on time</em>` : ''}</span></div>
@@ -165,12 +182,14 @@ ${dl.internal.length ? `<div class="rvn-rs rvn-s2"><b>Left out</b><span>${dl.int
   // The decision, under the email.
   const env = `${icon('envelope-simple')}`;
   let foot;
-  if(dl.allGone && tab !== 'sent') foot = `<span class="rvn-ft-note t-red">${icon('warning')}Rewrite or discard this draft before sending</span><span class="rvn-sp"></span>${approver ? `<button class="btn" onclick="skipDraft(${A})">Discard Draft</button>` : ''}<button class="btn btn-p rvn-main" disabled>${icon('paper-plane-tilt')}${tab === 'approved' ? 'Send Now' : 'Approve &amp; Send'}</button>`;
-  else if(!c.email && tab !== 'sent') foot = `<span class="rvn-ft-note t-red">${env}No client email on file. Add one in All Clients to send.</span><span class="rvn-sp"></span>`;
+  const waFoot = wa && !editing && !(dl.allGone && tab !== 'sent') ? reviewWaFootHtml(c, d, tab, A) : null;
+  if(waFoot != null) foot = waFoot;
+  else if(dl.allGone && tab !== 'sent') foot = `<span class="rvn-ft-note t-red">${icon('warning')}Rewrite or discard this draft before sending</span><span class="rvn-sp"></span>${approver ? `<button class="btn" onclick="skipDraft(${A})">Discard Draft</button>` : ''}<button class="btn btn-p rvn-main" disabled>${icon('paper-plane-tilt')}${tab === 'approved' ? 'Send Now' : 'Approve &amp; Send'}</button>`;
+  else if(!c.email && tab !== 'sent' && !wa) foot = `<span class="rvn-ft-note t-red">${env}No client email on file. Add one in All Clients to send.</span><span class="rvn-sp"></span>`;
   else if(editing) foot = `<span class="rvn-ft-note">Save first, then send</span><span class="rvn-sp"></span><button class="btn btn-p rvn-main" disabled>${icon('paper-plane-tilt')}Approve &amp; Send</button>`;
   else if(tab === 'sent'){
     const by = d.draftSentBy ? (d.draftSentBy === myName() ? 'you' : d.draftSentBy) : '';
-    foot = `<span class="rvn-ft-note">${icon('check-circle')}Sent ${escapeHtml(relDay(d.draftSentAt).replace(/^Today$/, 'today'))} at ${escapeHtml(fmtTime(new Date(d.draftSentAt)))} to ${escapeHtml(c.email || '')}${by ? ` by ${escapeHtml(by)}` : ''}</span><span class="rvn-sp"></span>`;
+    foot = `<span class="rvn-ft-note">${icon('check-circle')}Sent ${escapeHtml(relDay(d.draftSentAt).replace(/^Today$/, 'today'))} at ${escapeHtml(fmtTime(new Date(d.draftSentAt)))} to ${escapeHtml(c.email || '')}${by ? ` by ${escapeHtml(by)}` : ''}</span><span class="rvn-sp"></span>${ch === 'both' ? `<button class="btn" onclick="copyWinText(${A})">${icon('copy')}Copy for WhatsApp</button>` : ''}`;
   }
   else if(approver) foot = `<span class="rvn-ft-note">${env}Goes to ${escapeHtml(c.email)}</span><span class="rvn-sp"></span>${tab === 'approved'
     ? `<button class="btn btn-p rvn-main" onclick="sendApprovedDraft(${A})">${icon('paper-plane-tilt')}Send Now</button>`
@@ -179,9 +198,59 @@ ${dl.internal.length ? `<div class="rvn-rs rvn-s2"><b>Left out</b><span>${dl.int
   else foot = `<span class="rvn-ft-note">${icon('clock')}${tab === 'approved' ? 'Approved. An approver sends it.' : 'Waiting for an approver'}</span><span class="rvn-sp"></span>`;
   return `<div class="rvn-top">${top}</div>
 <div class="rvn-mail"><div class="rvn-cols"><div class="rvn-doc">${head}
-<h2 class="rvn-subj">Your weekly update${tab === 'sent' ? '' : ' — ' + escapeHtml(updateRangeLabel(c))}</h2>
+${wa && !editing ? '' : `<h2 class="rvn-subj">Your weekly update${tab === 'sent' ? '' : ' — ' + escapeHtml(updateRangeLabel(c))}</h2>`}
 ${body}</div>${rail}</div></div>
 <div class="rvn-ft">${foot}</div>`;
+}
+// The win's rows in the rail: its tier, how the client gets it, the group, and who sends it.
+function reviewWinRowsHtml(c, d, tab){
+  const approver = canApprove(), me = myName(), ch = winChannel(c), A = `'${c.id}',${jsArg(d.author)}`, t = winTier(d);
+  const rows = [];
+  if(winsDbReady()) rows.push(`<div class="rvn-kv"><span>Win</span><span>${approver && tab !== 'sent'
+    ? `<button class="pop wn-pop" onclick="winTierMenu(event,${A})" aria-label="Tier">${t ? tierTag(t, true) : '<span class="t-3">Pick a tier</span>'}${icon('caret-down', { weight: 'bold' })}</button>` : t ? tierTag(t, true) : '<span class="t-3">No tier</span>'}</span></div>`);
+  const chWords = { whatsapp: 'WhatsApp', email: 'Email', both: 'Both' }[ch], chIc = ch === 'email' ? 'envelope-simple' : ch === 'both' ? 'layers' : 'message-circle';
+  rows.push(`<div class="rvn-kv"><span>Sends by</span><span>${approver && tab !== 'sent'
+    ? `<button class="pop wn-pop" onclick="winChannelMenu(event,'${c.id}')" aria-label="Sends by">${icon(chIc)}${chWords}${icon('caret-down', { weight: 'bold' })}</button>` : `${chWords}`}</span></div>`);
+  if(ch !== 'email'){
+    const g = winGroupFor(c);
+    rows.push(`<div class="rvn-kv"><span>Group</span><span class="wn-g">${g ? escapeHtml(g.name) : `<span class="t-3">Not linked yet</span>${approver ? ` <a class="x-lnk" href="#" onclick="openClientInspectorFor('${c.id}');return false;">Link It</a>` : ''}`}</span></div>`);
+  }
+  if(ch === 'whatsapp' && tab !== 'sent'){
+    const st = winSendState(d), who = n => n === me ? 'You' : n;
+    const v = tab === 'waiting' ? `${who(d.author)}, once approved` : st.k === 'copied' ? `${who(st.by)} · copied ${st.at ? fmtTime(new Date(st.at)) : ''}` : `${who(d.author)} · not copied yet`;
+    rows.push(`<div class="rvn-kv"><span>Sends it</span><span>${escapeHtml(v)}</span></div>`);
+  }
+  return rows.join('');
+}
+// Under a WhatsApp win: approving hands it back to whoever wrote it; once approved, copying it
+// claims it, and anyone else is warned before sending it too.
+function reviewWaFootHtml(c, d, tab, A){
+  const me = myName(), approver = canApprove(), mine = d.author === me, first = firstName(d.author), wa = icon('message-circle');
+  const auto = winsDbReady() && winGroupFor(c), group = winGroupFor(c) ? escapeHtml(winCleanGroupName(winGroupFor(c).name)) : 'the group';
+  const note = (ic, html, cls) => `<span class="rvn-ft-note${cls ? ' ' + cls : ''}">${ic}<span>${html}</span></span><span class="rvn-sp"></span>`;
+  if(tab === 'sent'){
+    const by = d.draftSentBy ? (d.draftSentBy === me ? 'you' : escapeHtml(d.draftSentBy)) : '';
+    return note(icon('check-circle'), `Sent in ${group} ${escapeHtml(relDayLower(new Date(d.draftSentAt)))} at ${escapeHtml(fmtTime(new Date(d.draftSentAt)))}${by ? ' by ' + by : ''}${d.waSeenAt ? ' · Radar saw it in the group' : ''}`);
+  }
+  if(tab === 'waiting'){
+    if(approver && !mine) return note(wa, `Once you approve it, ${escapeHtml(first)} sends it in the group. Radar never posts there.`)
+      + `<button class="btn btn-p rvn-main" onclick="approveWin(${A})" title="Approve (⌘↩)">${icon('check')}Approve</button>`;
+    if(approver) return note(wa, `Goes in ${group} on WhatsApp. You paste it; Radar never posts there.`)
+      + `<button class="btn btn-p rvn-main" onclick="approveAndCopyWin(${A})" title="Approve, and copy it formatted for WhatsApp (⌘↩)">${icon('copy')}Approve &amp; Copy</button>`;
+    if(mine && !d.readyToNotify) return note(wa, 'Goes in their WhatsApp group once it’s approved. You send it.')
+      + `<button class="btn btn-p rvn-main" onclick="sendDraftForReview(${A})">${icon('paper-plane-tilt')}Send for Review</button>`;
+    return note(icon('clock'), 'Waiting for an approver');
+  }
+  // approved, not sent
+  const st = winSendState(d);
+  if(st.k === 'copied' && st.by === me) return note(icon('copy'), `<b>Copied at ${escapeHtml(fmtTime(new Date(st.at)))}.</b> ${auto ? 'Radar marks it sent when it shows up in the group.' : 'Paste it in the group, then mark it sent.'}`, 'wn-claim')
+    + `<button class="btn" onclick="copyWinForWhatsapp(${A})">${icon('copy')}Copy Again</button><button class="btn btn-p rvn-main" onclick="markWinSent(${A})">${icon('check')}Mark as Sent</button>`;
+  if(st.k === 'copied') return note(icon('copy'), `<b>${escapeHtml(firstName(st.by))} copied it at ${escapeHtml(fmtTime(new Date(st.at)))}.</b> ${auto ? 'Radar marks it sent when it shows up in the group.' : 'They mark it sent once it’s in the group.'}`, 'wn-claim')
+    + (approver ? `<button class="btn" onclick="markWinSent(${A})">Mark as Sent</button><button class="btn wn-mine" onclick="copyWinForWhatsapp(${A},false,this)">Send It Myself…</button>` : '');
+  if(mine) return note(wa, `Approved. Copy it, paste it in ${group}${auto ? ', and Radar marks it sent when it sees it there' : ', then mark it sent'}.`)
+    + `<button class="btn btn-p rvn-main" onclick="copyWinForWhatsapp(${A})">${icon('copy')}Copy for WhatsApp</button>`;
+  return note(wa, `${escapeHtml(first)} sends it. Approved${d.approvedAt ? ' at ' + escapeHtml(fmtTime(new Date(d.approvedAt))) : ''}, not copied yet.`)
+    + (approver ? `<button class="btn" onclick="copyWinForWhatsapp(${A},false,this)">${icon('copy')}Send It Myself</button>` : '');
 }
 // "…": approve now and send later, open the client, copy the text.
 function reviewMore(e, clientId, author){
@@ -199,7 +268,7 @@ function reviewMore(e, clientId, author){
   const A = `'${clientId}',${jsArg(author)}`;
   m.innerHTML = `${waiting && canApprove() ? `<button class="mi" role="menuitem" onclick="approveDraft(${A})">${icon('check-circle')}Approve, Send Later</button><div class="msep"></div>` : ''}
 <button class="mi" role="menuitem" onclick="openClientDetail('${clientId}')">${icon('buildings')}Open Client Page</button>
-<button class="mi" role="menuitem" onclick="reviewCopy(${A})">${icon('clipboard-text')}Copy Text</button>`;
+${winViaWhatsapp(c) && !waiting ? '' : `<button class="mi" role="menuitem" onclick="reviewCopy(${A})">${icon('clipboard-text')}Copy Text</button>`}`;
   document.body.appendChild(m);
   setTimeout(() => document.addEventListener('click', () => m.remove(), { once: true }), 0);
 }

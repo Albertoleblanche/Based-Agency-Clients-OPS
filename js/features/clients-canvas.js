@@ -118,16 +118,17 @@ function clientQuickActionsHtml(c){
 function clientPanelHtml({ c, h, w, owner }){
   const next = nextStepTask(c), lvl = h.quiet ? h.rawLevel : h.level, approver = canApprove();
   const start = c.startDate ? new Date(c.startDate + 'T12:00:00') : null;
-  const meta = [owner, c.service, start ? 'since ' + start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : ''].filter(Boolean).map(escapeHtml).join(' · ');
+  const meta = [owner, c.service].filter(Boolean).map(escapeHtml).join(' · ');
+  const why = healthPhrase(h, c);
   const A = `'${c.id}'`;
   let eyebrow, title, sub, acts = '';
   if(lvl !== 'g'){
     const sinceTxt = h.since ? (relDay(h.since).toLowerCase() === 'today' ? 'today' : relDay(h.since)) : 'today';
     eyebrow = h.quiet ? `<span class="sp-eb">${icon('check', { weight: 'bold' })}Handled, settling</span>` : `<span class="sp-eb ${lvl === 'r' ? 'red' : 'warn'}">${icon('warning', { weight: 'bold' })}${lvl === 'r' ? 'At risk' : 'Watch'} since ${escapeHtml(sinceTxt)}</span>`;
-    if(next){ title = `Next step: ${next.title}`; sub = `${escapeHtml((teamProfiles.find(p => p.id === next.assigneeId) || {}).name || '')}${next.dueDate ? ' · due ' + fmtShortDate(new Date(next.dueDate + 'T12:00:00')) : ''}`;
+    if(next){ title = `Next step: ${next.title}`; sub = `${why ? escapeHtml(why) + ' · ' : ''}${escapeHtml((teamProfiles.find(p => p.id === next.assigneeId) || {}).name || '')}${next.dueDate ? ' · due ' + fmtShortDate(new Date(next.dueDate + 'T12:00:00')) : ''}`;
       acts = `<button class="btn" onclick="markHealthHandled(${A})">Mark Handled</button><button class="btn btn-p" onclick="openTaskDetailModal('${next.id}')">Open Task</button>`; }
     else if(h.quiet){ title = 'Handled, waiting for the numbers to settle'; sub = ''; }
-    else { title = 'No next step yet'; sub = 'Plan a fix or a check-in with a date, and it becomes a task for the owner.';
+    else { title = why || 'No next step yet'; sub = `Plan a next step and it becomes a task for ${escapeHtml(firstName(owner) || 'the owner')}.`;
       acts = `<button class="btn" onclick="markHealthHandled(${A})">Mark Handled</button><button class="btn btn-p" onclick="planNextStep(${A})">${icon('plus')}Plan Next Step</button>`; }
   } else if(w.sent){
     eyebrow = `<span class="sp-eb ok">${icon('check', { weight: 'bold' })}Healthy</span>`;
@@ -141,16 +142,15 @@ function clientPanelHtml({ c, h, w, owner }){
   // three numbers: this week's update (opens it in This Week), hours this month, on time
   const hp = h.hp, ots = onTimeSummary(h.seq), lateNow = w.late && !w.sent;
   const weekB = w.sent ? 'Sent' : lateNow ? lateWords(w) : w.dueText;
-  const weekS = w.sent ? relDay(w.last) : w.done >= 3 ? 'Approved, not sent yet' : w.done === 2 ? (approver ? 'Draft waiting for you' : 'Draft waiting for review')
-    : w.draft ? 'Draft not sent for review' : w.logged.length ? `${todayPlural(w.logged.length, 'improvement')}, no draft` : 'Nothing logged yet';
+  const weekS = w.sent ? relDay(w.last) : w.done >= 3 ? 'Approved, not sent yet' : w.done === 2 ? (approver ? 'Waiting for you' : 'Waiting for review')
+    : w.draft ? 'Not sent for review' : w.logged.length ? 'Not written yet' : 'Nothing logged yet';
   const hoursB = hp.budget ? `<span${hp.used > hp.budget ? ' class="t-red"' : ''}>${Math.round(hp.used)}</span> / ${hp.budget} h` : `${Math.round(hp.used)} h`;
   const hoursS = hp.budget ? `<span class="s${hp.projected > hp.budget ? ' t-red' : ''}">On pace for ${Math.round(hp.projected)} h</span>` : '<span class="s">No monthly budget</span>';
   const nums = `<div class="cl-m">
-<button class="cl-mc" onclick="openWeekClient(${A})" title="Open in This Week"><span class="k">This week</span><b${lateNow ? ' class="t-red"' : ''}>${escapeHtml(weekB)}</b><span class="s">${escapeHtml(weekS)}</span></button>
+<button class="cl-mc" onclick="openWeekClient(${A})" title="Open in This Week"><span class="k">This week’s win</span><b${lateNow ? ' class="t-red"' : ''}>${escapeHtml(weekB)}</b><span class="s">${escapeHtml(weekS)}</span></button>
 <div class="cl-mc"><span class="k">Hours</span><b>${hoursB}</b>${hoursS}</div>
-<div class="cl-mc"><span class="k">On time</span><b>${ots.total ? `${ots.onTime} of ${ots.total}` : '—'}</b><span class="s">${ots.total ? histDotsHtml(h.seq) : 'No updates yet'}</span></div>
+<div class="cl-mc"><span class="k">Updates on time</span><b>${ots.total ? `${ots.onTime} of ${ots.total}` : '—'}</b><span class="s">${ots.total ? histDotsHtml(h.seq) : 'No updates yet'}</span></div>
 </div>`;
-  const why = h.signals.map(s => `<div class="hp-w"><span class="sig ${s.l}">${icon(s.icon)}</span><div class="tx"><b>${escapeHtml(s.title)}</b><span>${escapeHtml(s.text)}</span></div><span class="hp-since">${escapeHtml(relDay(s.since))}</span></div>`).join('');
   // details
   const [how, why2] = ownerReason(c);
   const people = (typeof teamProfiles !== 'undefined' ? teamProfiles : []).filter(p => p.name && !p.access_revoked).map(p => p.name).sort();
@@ -161,18 +161,52 @@ function clientPanelHtml({ c, h, w, owner }){
   const site = c.website ? `<a class="cl-link" href="${safeUrl(c.website.startsWith('http') ? c.website : 'https://' + c.website)}" target="_blank" rel="noopener">${escapeHtml(c.website.replace(/^https?:\/\//, '').replace(/\/$/, ''))}</a>` : '';
   const kv = (k, v) => v ? `<div class="cl-kv"><span>${k}</span><span>${v}</span></div>` : '';
   const details = kv('Owner', ownerCell) + (why2 ? `<p class="cl-own-note">${escapeHtml(why2)}${approver ? ' Choose someone to make it fixed.' : ''}</p>` : '')
-    + kv('Contact', contact) + kv('Website', site) + kv('Monthly hours', hp.budget ? `${hp.budget} h` : '');
+    + kv('Contact', contact) + kv('Website', site) + kv('Monthly hours', hp.budget ? `${hp.budget} h` : '')
+    + kv('Client since', start ? start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '');
+  const detSum = [owner || 'No owner yet', hp.budget ? `${hp.budget} h a month` : ''].filter(Boolean).join(' · ');
   return `<aside class="sp cl-p has-foot" aria-label="${escapeHtml(c.name)}">
 <div class="sp-bar"><button class="ib" aria-label="Close" title="Close (Esc)" onclick="closeClientInspector()">${icon('x')}</button><span class="cl-pbar-r">${approver || c.website ? `<button class="ib" aria-label="More" title="More" onclick="clientPanelMore(event, ${A})">${icon('dots-three')}</button>` : ''}<a class="x-lnk" href="#" onclick="openClientDetail(${A});return false;">Open client page</a></span></div>
 <div class="sp-main">
 <div class="sp-head">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}</b><span>${meta}</span></div></div>
 <div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b>${sub ? `<span class="sub">${sub}</span>` : ''}${acts ? `<div class="sp-acts">${acts}</div>` : ''}</div>
 ${nums}
-${h.signals.length ? `<div class="sp-sec"><b>Why it needs attention</b><span>${todayPlural(h.signals.length, 'signal')}</span></div>${why}` : ''}
-<div class="sp-sec"><b>Details</b>${approver ? `<a class="x-lnk" href="#" onclick="openEditClientForm(${A});return false;">Edit</a>` : ''}</div><div class="cl-kvs">${details}</div>
+<div class="sp-folds cl-folds">
+${clientFoldHtml('win', 'Weekly win', clientWinSummary(c), clientWinHtml(c))}
+${clientFoldHtml('det', 'Details', escapeHtml(detSum), `<div class="cl-kvs">${details}</div>${approver ? `<a class="x-lnk cl-edit" href="#" onclick="openEditClientForm(${A});return false;">Edit Client</a>` : ''}`)}
+</div>
 </div>
 ${clientQuickActionsHtml(c)}
 </aside>`;
+}
+// Folded rows in the client panel: Weekly win starts open, Details closed; they stay as you leave them.
+let CL_FOLDS = (() => { try { return Object.assign({ win: true }, JSON.parse(localStorage.getItem('cl-folds') || '{}') || {}); } catch(e){ return { win: true }; } })();
+function toggleClientFold(k){
+  CL_FOLDS[k] = !CL_FOLDS[k];
+  try { localStorage.setItem('cl-folds', JSON.stringify(CL_FOLDS)); } catch(e){}
+  renderClientsTable();
+}
+function clientFoldHtml(k, title, summary, body){
+  const open = !!CL_FOLDS[k];
+  return `<div class="sp-fold${open ? ' is-open' : ''}"><button class="sp-fold-h" aria-expanded="${open}" data-grow="cl-f-${k}" onclick="toggleClientFold('${k}')">${icon('caret-right', { weight: 'bold' })}<b>${title}</b><span class="sm">${summary}</span></button><div class="sp-fold-b" data-grow-key="cl-f-${k}">${open ? body : ''}</div></div>`;
+}
+// "WhatsApp · Thursdays" on the Weekly win row
+function clientWinSummary(c){
+  const ch = winChannel(c), d = winDay(c);
+  return `${ch !== 'email' ? `<span class="wn-sic">${icon('message-circle')}</span>` : ''}${escapeHtml(winChannelWords(c))} · ${d ? escapeHtml(WIN_DAY_NAMES[d]) + 's' : 'no set day'}`;
+}
+// How the client gets its win: email, its WhatsApp group or both, which group, and the day.
+function clientWinHtml(c){
+  const approver = canApprove(), ch = winChannel(c), g = winGroupFor(c), d = winDay(c), A = `'${c.id}'`;
+  const kv = (k, v) => `<div class="cl-kv"><span>${k}</span><span>${v}</span></div>`;
+  const seg = approver ? `<span class="seg wn-seg" role="radiogroup" aria-label="Sends by">${[['whatsapp', 'WhatsApp', 'message-circle'], ['email', 'Email', ''], ['both', 'Both', '']]
+    .map(([k, t, ic]) => `<button class="${ch === k ? 'on' : ''}" role="radio" aria-checked="${ch === k}" onclick="setWinChannel(${A},'${k}')">${ic ? icon(ic) : ''}${t}</button>`).join('')}</span>` : escapeHtml(winChannelWords(c));
+  const group = ch === 'email' ? '' : kv('Group', approver
+    ? `<button class="pop wn-pop" onclick="winGroupMenu(event,${A})" title="${g ? escapeHtml(g.name) : ''}">${g ? `<span>${escapeHtml(g.name)}</span>` : '<span class="t-3">Pick the group</span>'}${icon('caret-down', { weight: 'bold' })}</button>`
+    : g ? escapeHtml(g.name) : '<span class="t-3">Not linked yet</span>');
+  const day = kv('Win day', approver ? `<button class="pop wn-pop" onclick="winDayMenu(event,${A})">${d ? WIN_DAY_NAMES[d] : '<span class="t-3">Pick a day</span>'}${icon('caret-down', { weight: 'bold' })}</button>`
+    : d ? WIN_DAY_NAMES[d] : 'Every 7 days');
+  const noEmail = ch !== 'whatsapp' && !c.email ? `<p class="wn-note is-red">${icon('warning')}No email on file. Add one with Edit Client to send by email.</p>` : '';
+  return `<div class="cl-kvs wn-kvs">${kv('Sends by', seg)}${group}${day}</div>${noEmail}${ch !== 'email' ? `<p class="wn-note">${icon('lock')}You paste it in the group. Radar never posts there.</p>` : ''}`;
 }
 // "…" in the panel: website, edit, delete.
 function clientPanelMore(e, clientId){

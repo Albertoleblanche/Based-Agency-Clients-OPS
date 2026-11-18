@@ -15,12 +15,13 @@ const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 let _loadAllSeq = 0;
 async function loadAll(){
   const mySeq = ++_loadAllSeq;
-  const [activityRows, s, clientsRes, impRes, draftsRes] = await Promise.all([
+  const [activityRows, s, clientsRes, impRes, draftsRes, winGroupsRes] = await Promise.all([
     fetchActivityLog(),
     safeGet('settings'),
     supabaseClient.from('clients').select('*'),
     supabaseClient.from('client_improvements').select('*').order('date', { ascending:true }),
     supabaseClient.from('client_drafts').select('*'),
+    typeof winsGroupsFetch === 'function' ? winsGroupsFetch() : null,
   ]);
   // A newer loadAll() call has started since this one began — its data (or
   // data from whichever call turns out to resolve last) is what should win,
@@ -59,6 +60,7 @@ async function loadAll(){
   clients = (clientsRes.data || []).map(clientRowFromDb);
   clientImprovements = (impRes.data || []).map(improvementRowFromDb);
   clientDrafts = (draftsRes.data || []).map(draftRowFromDb);
+  if(typeof winsAfterLoad === 'function') winsAfterLoad(draftsRes.data, winGroupsRes);
   clients.forEach(c => {
     c.improvements = clientImprovements.filter(i => i.clientId === c.id);
     c.drafts = clientDrafts.filter(d => d.clientId === c.id);

@@ -1099,6 +1099,8 @@ async function sendApprovedDraft(id, author){
   if(!c) return;
   const d = getDraftFor(c, author);
   if(blockIfWorkDeleted(c, d)) return;
+  // WhatsApp clients: Radar never posts there. Copy it for the group instead.
+  if(typeof winViaWhatsapp === 'function' && winViaWhatsapp(c)) return copyWinForWhatsapp(id, author);
   if(!c.email){ showToast('error','No email on file', `Add an email for ${c.name} in Clients to send.`); return; }
   // Already sent this exact draft once — require an explicit
   // confirmation naming who sent it and when, rather than silently
@@ -1125,7 +1127,7 @@ async function recordDraftSent(id, author){
   const c = clients.find(x=>x.id===id);
   if(!c) return;
   const at = new Date().toISOString();
-  await saveDraftFor(id, author, { draftSentAt: at, draftSentBy: myName() || 'Someone' });
+  await saveDraftFor(id, author, { draftSentAt: at, draftSentBy: myName() || 'Someone', sentVia: 'email' });
   // Kept apart from the draft row, which the next week's draft overwrites: the on-time
   // history in This Week and Health reads from here.
   if(typeof recordUpdateSent === 'function') await recordUpdateSent(id, at);
@@ -1295,6 +1297,8 @@ async function approveDraft(id, author){
   const modalOpenForThis = modalCard && modalCard.dataset.clientId === id && modalCard.dataset.author === author;
   const fields = { draftStatus: 'approved' };
   if(ta) fields.draft = ta.value;
+  // who approved it and when (This Week: "Approved by Albert 20 min ago"); nobody has copied it yet
+  if(typeof winsDbReady === 'function' && winsDbReady()) Object.assign(fields, { approvedBy: myName() || '', approvedAt: new Date().toISOString(), waCopiedBy: '', waCopiedAt: null });
   // Captured before draftImprovementIds gets cleared below —
   // getIncludedAuthorProfiles() needs it.
   const includedAuthorProfiles = getIncludedAuthorProfiles(c, d);
@@ -1322,6 +1326,8 @@ async function approveDraft(id, author){
   // Notify whoever's actual logged work was included in what just got
   // approved.
   for(const authorProfile of includedAuthorProfiles){
+    // A WhatsApp win's writer hears from approveWin() instead: it's theirs to send now.
+    if(authorProfile.name === author && typeof winViaWhatsapp === 'function' && winViaWhatsapp(c)) continue;
     await sendNotification(authorProfile.id, 'draft_approved', 'Your submission was approved', `${myName()||'An approver'} approved ${author}'s draft for ${c.name}, which included your logged work.`, 'approve');
   }
 
@@ -1339,6 +1345,9 @@ async function approveDraft(id, author){
 // anyway since every improvement in your own draft is authored by you,
 // and that loop already excludes yourself).
 async function approveAndSendOwnDraft(id, author){
+  // Someone else's WhatsApp win goes back to them to send once it's approved.
+  const c0 = clients.find(x=>x.id===id);
+  if(c0 && typeof winViaWhatsapp === 'function' && winViaWhatsapp(c0) && author !== myName()) return approveWin(id, author);
   if((await approveDraft(id, author)) === false) return;
   await sendApprovedDraft(id, author);
 }

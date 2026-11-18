@@ -68,10 +68,19 @@ function whenShort(d){ return daysBetween(d, rNow()) <= 0 ? fmtTime(new Date(d))
 function clientDue(c, now){
   now = now || rNow();
   const last = lastSentAt(c);
+  // A client with a win day (Monday to Friday) gets its win that day, every calendar week: sent
+  // any day this week counts, and next week's is due on next week's win day.
+  const wd = typeof winDay === 'function' ? winDay(c) : null;
+  if(wd){
+    const monday = dayStart(addDays(now, -((now.getDay() + 6) % 7))), thisDue = addDays(monday, wd - 1);
+    const done = !!last && last >= monday, due = done ? addDays(thisDue, 7) : thisDue;
+    return { last, due, daysLeft: daysBetween(now, due), done };
+  }
   // Never had one: due a week after the client started (today, if the start date isn't known).
   const start = c.startDate ? new Date(c.startDate + 'T00:00:00') : null;
   const due = last ? dayStart(addDays(last, UPDATE_EVERY_DAYS)) : (start && start < now ? addDays(start, UPDATE_EVERY_DAYS) : dayStart(now));
-  return { last, due, daysLeft: daysBetween(now, due) };
+  const daysLeft = daysBetween(now, due);
+  return { last, due, daysLeft, done: !!last && daysLeft > 0 };
 }
 function dueText(daysLeft, due){
   if(daysLeft < -59) return 'Months overdue';
@@ -189,7 +198,7 @@ function weekStripHtml(c){
 const STEP_NAMES = ['Logged', 'Ready for review', 'Approved', 'Sent'];
 function clientWeek(c){
   const now = rNow(), drafts = c.drafts || [], owner = clientOwner(c);
-  const { last, due, daysLeft } = clientDue(c, now);
+  const { last, due, daysLeft, done: doneThisWeek } = clientDue(c, now);
   const since = last || addDays(now, -UPDATE_EVERY_DAYS);
   // This update's work: everything logged since the last one went out, plus anything meant for
   // the email that was logged before it but didn't make it in (logged after that draft was
@@ -215,7 +224,7 @@ function clientWeek(c){
     w.note = lastLog ? `Nothing logged since ${fmtShortDate(lastLog)}` : 'Nothing logged yet';
   }
   // Sent in the last 7 days: done for this week. The next update's progress is kept in w.next.
-  if(last && daysLeft > 0){
+  if(doneThisWeek){
     const sentDraft = drafts.filter(d => d.draftSentAt).sort((a, b) => new Date(b.draftSentAt) - new Date(a.draftSentAt))[0] || null;
     const ago = daysBetween(last, now), sentWord = ago === 0 ? 'today' : ago === 1 ? 'yesterday' : fmtShortDate(last);
     w.next = { done: w.done, draft: w.draft, holder: w.holder, note: w.note };
@@ -223,7 +232,8 @@ function clientWeek(c){
       note: `Sent ${sentWord} · next due ${daysLeft === 1 ? 'tomorrow' : (daysLeft < 7 ? DAY_NAMES[due.getDay()] : fmtShortDate(due))}` });
   }
   // Due or overdue: the next step is the one it's waiting on.
-  w.behind = w.done; w.late = daysLeft < 0; w.state = w.late ? 'late' : 'due';
+  // Not sent: late, due today, or (a client with a win day later this week) coming up.
+  w.behind = w.done; w.late = daysLeft < 0; w.state = w.late ? 'late' : daysLeft > 0 ? 'upcoming' : 'due';
   return w;
 }
 // Due within 2 days but sent last week: show the next update's progress, not last week's send.

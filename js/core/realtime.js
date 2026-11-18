@@ -129,6 +129,8 @@ function setupRealtimeSubscriptions(){
     .on('postgres_changes', { event:'*', schema:'public', table:'app_storage' }, onAppStorageChange)
     .on('postgres_changes', { event:'*', schema:'public', table:'clients' }, onClientsChange)
     .on('postgres_changes', { event:'*', schema:'public', table:'client_improvements' }, onClientsChange)
+    // a win marked sent when Radar sees it in the client's WhatsApp group (addendum-weekly-wins.sql)
+    .on('postgres_changes', { event:'*', schema:'public', table:'client_drafts' }, onClientsChange)
     .on('postgres_changes', { event:'*', schema:'public', table:'client_reminders' }, onRemindersChange)
     .on('postgres_changes', { event:'*', schema:'public', table:'team_profiles' }, onTeamProfilesChange)
     .on('postgres_changes', { event:'*', schema:'public', table:'notes' }, onNotesChange)

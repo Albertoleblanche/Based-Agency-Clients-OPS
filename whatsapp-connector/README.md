@@ -39,6 +39,11 @@ After the connector is running once, open Radar → Settings → **WhatsApp** (o
 - **When it checks:** the daily check times and time zone.
 - **Who handles what:** edit what each person is responsible for. Blank = the default.
 
+**Weekly wins:** when someone pastes an approved win in a client's group, Radar marks it sent by
+itself (a database trigger in `addendum-weekly-wins.sql` compares new messages with the client's
+approved win). That needs the group linked to the client (All Clients → the client → Weekly win →
+Group) and the group switched on here. Nothing changes in the connector itself.
+
 Changes reach the connector within about a minute. Still on the PC: running `npm start`, and the
 `.env` secrets (they never go in a web screen). Run the second half of `schema-whatsapp-tasks.sql`
 (already included in the file) so the settings tables exist.

@@ -102,19 +102,21 @@ async function mSignOut(){ await supabaseClient.auth.signOut(); location.reload(
 async function mLoadAll(){
   const uid = currentUser.id;
   const q = t => supabaseClient.from(t);
-  const [s, cr, ir, dr, tr, rr, nr, er, nf, pr, ev] = await Promise.all([
+  const [s, cr, ir, dr, tr, rr, nr, er, nf, pr, ev, wg] = await Promise.all([
     safeGet('settings'), q('clients').select('*'), q('client_improvements').select('*').order('date', { ascending: true }), q('client_drafts').select('*'),
     q('tasks').select('*').order('created_at', { ascending: false }), q('client_reminders').select('*').order('follow_up_date', { ascending: true }),
     q('notes').select('*').eq('user_id', uid).is('deleted_at', null).order('updated_at', { ascending: false }),
     q('time_entries').select('*').is('deleted_at', null).order('entry_date', { ascending: false }),
     q('notifications').select('*').eq('user_id', uid).order('created_at', { ascending: false }).limit(50),
     q('team_profiles').select('*'), q('calendar_events').select('*').order('start_at', { ascending: true }),
+    typeof winsGroupsFetch === 'function' ? winsGroupsFetch() : null,
   ]);
   try{ settings = s ? (typeof s === 'string' ? JSON.parse(s) : s) : {}; }catch(e){ settings = {}; }
   settings.serviceOptions = (settings.serviceOptions && settings.serviceOptions.length) ? settings.serviceOptions : ['Google Ads (PPC)', 'Meta Ads', 'SEO / Local Search', 'AI Domination Framework', 'Full Framework'];
   clients = (cr.data || []).map(clientRowFromDb);
   clientImprovements = (ir.data || []).map(improvementRowFromDb);
   clientDrafts = (dr.data || []).map(draftRowFromDb);
+  if(typeof winsAfterLoad === 'function') winsAfterLoad(dr.data, wg);
   clients.forEach(c => { c.improvements = clientImprovements.filter(i => i.clientId === c.id); c.drafts = clientDrafts.filter(d => d.clientId === c.id); });
   tasks = (tr.data || []).map(t => ({ id: t.id, title: t.title, description: t.description || '', priority: t.priority, status: t.status, assignerId: t.assigner_id, assigneeId: t.assignee_id,
     clientId: t.client_id, dueDate: t.due_date, link: t.link, createdAt: t.created_at, completedAt: t.completed_at, cancelledAt: t.cancelled_at,
@@ -562,13 +564,23 @@ function mOpenDraft(clientId, author){
     const status = d.draftSentAt ? ['green', `Sent ${relDay(d.draftSentAt).toLowerCase()}`] : d.draftStatus === 'approved' ? ['purple', 'Approved'] : d.readyToNotify ? ['blue', `Draft ready · written from ${mPlural(n, 'improvement')}`] : ['hollow', 'Not sent for review yet'];
     const contact = (c.email || '').split(',')[0].trim();
     let bar = '';
-    if(!d.draftSentAt){
+    const wa = typeof winViaWhatsapp === 'function' && winViaWhatsapp(c), me = myName();
+    if(!d.draftSentAt && wa){
+      const st = winSendState(d), sender = st.k === 'copied' ? st.by : d.author;
+      if(d.draftStatus === 'approved' && sender === me) bar = st.k === 'copied'
+        ? `<button class="ibtn s" style="flex:0 0 116px" onclick="mWinCopy('${c.id}',${jsArg(d.author)})">Copy Again</button><button class="ibtn p" onclick="mWinSent('${c.id}',${jsArg(d.author)})">${icon('check')}Mark as Sent</button>`
+        : `<button class="ibtn p" onclick="mWinCopy('${c.id}',${jsArg(d.author)})">${icon('copy')}Copy for WhatsApp</button>`;
+      else if(d.draftStatus === 'approved') bar = '';
+      else if(canApprove()) bar = `<button class="ibtn p" onclick="mApproveDraft('${c.id}',${jsArg(d.author)}, true)">${icon('check')}Approve</button>`;
+      else if(d.author === me && !d.readyToNotify) bar = `<button class="ibtn p" onclick="mSendForReview('${c.id}',${jsArg(d.author)})">${icon('paper-plane-tilt')}Send for Review</button>`;
+    }
+    else if(!d.draftSentAt){
       if(canApprove() && d.draftStatus === 'approved') bar = `<button class="ibtn p" onclick="mSendDraft('${c.id}',${jsArg(d.author)})">${icon('paper-plane-tilt')}Send Now</button>`;
       else if(canApprove()) bar = `<button class="ibtn s" style="flex:0 0 116px" onclick="mApproveDraft('${c.id}',${jsArg(d.author)}, true)">Approve</button><button class="ibtn p" onclick="mApproveAndSend('${c.id}',${jsArg(d.author)})">${icon('paper-plane-tilt')}Approve &amp; Send</button>`;
       else if(d.author === myName() && !d.readyToNotify) bar = `<button class="ibtn p" onclick="mSendForReview('${c.id}',${jsArg(d.author)})">${icon('paper-plane-tilt')}Send for Review</button>`;
     }
     return `<div class="idraft">
-<div style="display:flex;gap:12px;align-items:center">${monoHtml(c, 'lg')}<div style="min-width:0"><div style="font-size:17px;font-weight:600">${mEsc(c.name)}</div><div style="font-size:14px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">To ${mEsc(contact || 'no email on file')} · by ${mEsc(d.author)}</div></div></div>
+<div style="display:flex;gap:12px;align-items:center">${monoHtml(c, 'lg')}<div style="min-width:0"><div style="font-size:17px;font-weight:600">${mEsc(c.name)}</div><div style="font-size:14px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${wa ? 'To their WhatsApp group' : `To ${mEsc(contact || 'no email on file')}`} · by ${mEsc(d.author)}</div></div></div>
 <div style="margin-top:12px">${mDot(status[0], status[1])}</div>
 <h2>Your weekly update — ${mEsc(updateRangeLabel(c))}</h2>
 ${editing ? `<textarea id="mDraftEdit" spellcheck="true">${mEsc(d.draft || '')}</textarea>` : `<div class="body">${mDraftBody(d.draft)}</div>`}
@@ -607,12 +619,15 @@ async function mApproveDraft(clientId, author, stay, quiet){
   const { c, d } = mDraftFor(clientId, author); if(!d) return;
   const edited = $m('mDraftEdit')?.value;
   const ids = d.draftImprovementIds || [];
-  const ok = await saveDraftFor(clientId, author, { draftStatus: 'approved', draftImprovementIds: [], ...(edited != null ? { draft: edited } : {}) });
+  const ok = await saveDraftFor(clientId, author, { draftStatus: 'approved', draftImprovementIds: [], ...(edited != null ? { draft: edited } : {}),
+    ...(typeof winsDbReady === 'function' && winsDbReady() ? { approvedBy: myName() || '', approvedAt: new Date().toISOString(), waCopiedBy: '', waCopiedAt: null } : {}) });
   if(!ok){ showToast('error', 'Couldn’t approve', 'Try again in a moment.'); return; }
   if(ids.length) await supabaseClient.from('client_improvements').update({ include_in_email: false }).in('id', ids);
   mLog(clientId, 'draft_approved', `${myName()} approved ${author}'s draft.`, `Approved ${escapeHtml(author)}'s draft for <b>${escapeHtml(c.name)}</b>.`);
   const p = teamProfiles.find(x => x.name === author);
-  if(p && p.id !== currentUser.id) mNotify(p.id, 'draft_approved', 'Your submission was approved', `${myName()} approved your update for ${c.name}.`, 'approve');
+  const wa = typeof winViaWhatsapp === 'function' && winViaWhatsapp(c);
+  if(p && p.id !== currentUser.id) mNotify(p.id, wa ? 'win_approved' : 'draft_approved', wa ? `${c.name}: your win is approved` : 'Your submission was approved',
+    wa ? 'Copy it for WhatsApp and paste it in the group.' : `${myName()} approved your update for ${c.name}.`, 'approve');
   await mRefresh();
   if(!quiet) showToast('success', 'Approved', 'Send it from Review when you’re ready.');
   if(!stay && mStack.length) mPop();
@@ -635,10 +650,14 @@ async function mSendForReview(clientId, author){
   for(const a of teamProfiles.filter(p => (p.role === 'admin' || p.role === 'approver') && p.id !== currentUser.id && !p.access_revoked)) mNotify(a.id, 'draft_ready', `${c.name}: draft ready for review`, `${author}'s weekly update is ready.`, 'teamqueue', c.id);
   await mRefresh(); showToast('success', 'Sent for review', `${c.name} is in Review.`);
 }
+// WhatsApp wins: copy it (which claims it, so nobody sends it twice), then Mark as Sent.
+async function mWinCopy(clientId, author){ await copyWinForWhatsapp(clientId, author); await mRefresh(); }
+async function mWinSent(clientId, author){ await markWinSent(clientId, author); await mRefresh(); }
 async function mApproveAndSend(clientId, author){ await mApproveDraft(clientId, author, true, true); await mSendDraft(clientId, author); }
 // The email goes out from the app, with the agency's signature, the same as on the desktop.
 async function mSendDraft(clientId, author){
   const { c, d } = mDraftFor(clientId, author); if(!d) return;
+  if(typeof winViaWhatsapp === 'function' && winViaWhatsapp(c)) return mWinCopy(clientId, author);
   if(!c.email){ showToast('error', 'No email on file', `Add an email for ${c.name} on the desktop first.`); return; }
   if(!(await confirmDialog(`It goes to ${c.email}, with your signature.`, { title: `Send ${c.name}’s update now?`, confirmLabel: 'Send' }))) return;
   const subject = `Your weekly update from ${settings.appName || 'Based Agency'}`;

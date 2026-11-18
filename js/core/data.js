@@ -131,6 +131,9 @@ function draftRowFromDb(r){
     draftImprovementIds: r.draft_improvement_ids || [],
     draftSentAt: r.draft_sent_at || null, draftSentBy: r.draft_sent_by || '',
     readyToNotify: !!r.ready_to_notify,
+    // Weekly wins (addendum-weekly-wins.sql): the tier, how it went out, and who copied it for WhatsApp.
+    winTier: r.win_tier || null, sentVia: r.sent_via || '', waCopiedBy: r.wa_copied_by || '', waCopiedAt: r.wa_copied_at || null,
+    waSeenAt: r.wa_seen_at || null, approvedBy: r.approved_by || '', approvedAt: r.approved_at || null,
   };
 }
 // Returns the draft object for this (client, author) pair, or a fresh
@@ -141,7 +144,8 @@ function draftRowFromDb(r){
 function getDraftFor(c, author){
   const existing = (c.drafts||[]).find(d => d.author === author);
   if(existing) return existing;
-  return { id:null, clientId:c.id, author, draft:'', draftStatus:'none', draftPendingSince:null, draftImprovementIds:[], draftSentAt:null, draftSentBy:'', readyToNotify:false };
+  return { id:null, clientId:c.id, author, draft:'', draftStatus:'none', draftPendingSince:null, draftImprovementIds:[], draftSentAt:null, draftSentBy:'', readyToNotify:false,
+    winTier:null, sentVia:'', waCopiedBy:'', waCopiedAt:null, waSeenAt:null, approvedBy:'', approvedAt:null };
 }
 // Upserts a (client, author) draft row and keeps c.drafts / clientDrafts in
 // memory consistent with what was actually persisted — mirrors
@@ -151,7 +155,18 @@ async function saveDraftFor(clientId, author, fields){
   const c = clients.find(x=>x.id===clientId);
   const dbFields = {};
   const DRAFT_FIELD_DB_MAP = { draft:'draft', draftStatus:'draft_status', draftPendingSince:'draft_pending_since', draftImprovementIds:'draft_improvement_ids', draftSentAt:'draft_sent_at', draftSentBy:'draft_sent_by', readyToNotify:'ready_to_notify' };
-  Object.keys(fields).forEach(k=>{ const col = DRAFT_FIELD_DB_MAP[k]; if(col) dbFields[col] = fields[k]; });
+  // The weekly-wins columns only exist once addendum-weekly-wins.sql has run; until then they're left out.
+  const WIN_FIELD_DB_MAP = { winTier:'win_tier', sentVia:'sent_via', waCopiedBy:'wa_copied_by', waCopiedAt:'wa_copied_at', waSeenAt:'wa_seen_at', approvedBy:'approved_by', approvedAt:'approved_at' };
+  if(typeof winsDbReady === 'function' && winsDbReady()){
+    Object.assign(DRAFT_FIELD_DB_MAP, WIN_FIELD_DB_MAP);
+    // A new week's win starts clean: no tier, nobody sending it, not approved.
+    // Back to pending (rewritten after approval): it needs approving, and copying, again.
+    const fresh = 'draftSentAt' in fields && fields.draftSentAt === null;
+    if(fresh || fields.draftStatus === 'pending' || fields.draftStatus === 'none'){
+      fields = Object.assign({ waCopiedBy: '', waCopiedAt: null, waSeenAt: null, approvedBy: '', approvedAt: null }, fresh ? { winTier: null, sentVia: '' } : {}, fields);
+    }
+  }
+  Object.keys(fields).forEach(k=>{ const col = DRAFT_FIELD_DB_MAP[k]; if(col) dbFields[col] = ['sentVia', 'winTier', 'waCopiedBy', 'approvedBy'].includes(k) && !fields[k] ? null : fields[k]; });
   const { data, error } = await supabaseClient.from('client_drafts')
     .upsert({ client_id: clientId, author, ...dbFields, updated_at: new Date().toISOString() }, { onConflict: 'client_id,author' })
     .select();

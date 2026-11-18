@@ -2067,3 +2067,84 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .wap-rd-r.is-none .tx b{color:var(--label-2)}
 .wap-rd-r.is-none .tx span{color:var(--label-3)}
 .wap-rd-r em{font-style:normal;font-size:12px;color:var(--label-2);flex:0 0 auto}
+
+/* ---------- Weekly wins: tiers, WhatsApp clients, who sends it (canvas "Weekly wins") ---------- */
+.wn-t{display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:5px;font-size:11px;font-weight:600;white-space:nowrap;flex:0 0 auto}
+.wn-t.t1{background:color-mix(in srgb,var(--green) 18%,transparent);color:var(--green)}
+.wn-t.t2{background:color-mix(in srgb,var(--blue) 18%,transparent);color:var(--blue)}
+.wn-t.t3{background:var(--fill-2);color:var(--label-2)}
+.wn-ch{display:inline-flex;align-items:center;color:var(--label-3);flex:0 0 auto}
+.wn-ch svg{width:13px;height:13px}
+/* Review list: the channel before who wrote it */
+.wn-rs{display:flex !important;align-items:center;gap:5px;min-width:0}
+.wn-rs > span:last-child{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wn-rs .wn-ch svg{width:12px;height:12px}
+/* This Week rows: name · who · tier · channel · due */
+.twl-r.wn-r{grid-template-columns:22px minmax(140px,240px) minmax(0,1fr) 52px 14px minmax(80px,auto)}
+.wn-r .wn-rt{display:flex;justify-content:flex-end}
+/* Review: how it will look in the group */
+.wn-chat{margin-top:22px;padding:18px 18px 20px;border-radius:14px;background:var(--fill);display:flex;flex-direction:column;align-items:flex-end}
+.wn-b{position:relative;max-width:560px;padding:10px 12px 18px;border-radius:12px 12px 4px 12px;background:color-mix(in srgb,var(--green) 22%,var(--window));font-size:14px;line-height:1.5;color:var(--label);overflow-wrap:anywhere}
+.wn-b p{margin:0 0 10px}.wn-b p:last-of-type{margin:0}
+.wn-b b{font-weight:650}
+.wn-b time{position:absolute;right:10px;bottom:5px;font-size:10.5px;color:var(--label-3)}
+.wn-cap{margin:10px 0 0;font-size:12px;color:var(--label-3)}
+.mac .wn-pop{height:26px;gap:5px;font-size:13px;max-width:230px}
+.wn-pop svg{width:12px;height:12px;color:var(--label-3)}
+.wn-pop .wn-t{height:auto;padding:0;background:none !important}
+.wn-pop > span:not(.wn-t){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wn-g{font-size:12.5px;color:var(--label);text-align:right}
+.rvn-ft-note.wn-claim{color:var(--label-2);line-height:1.4}
+.rvn-ft-note.wn-claim b{color:var(--label);font-weight:600}
+.rvn-ft-note.wn-claim svg{color:var(--green)}
+.mac .btn.wn-mine{box-shadow:inset 0 0 0 1.5px var(--blue)}
+/* menus: a check beside the current choice */
+.menu .mi .mi-sp{width:16px;flex:0 0 auto}
+.menu .mi .wn-mt{margin-left:auto;padding-left:14px;font-size:12px;color:var(--label-3);white-space:nowrap}
+.menu .mi .wn-t + .wn-mt{margin-left:8px;padding-left:0;color:var(--label-2)}
+/* the warning before sending a win someone already copied */
+.wn-pop-card{position:fixed;z-index:1300;width:330px;padding:18px 18px 16px;border-radius:14px;background:var(--window);box-shadow:0 0 0 .5px var(--sep-strong),0 18px 48px rgba(0,0,0,.35);font-size:13px;animation:wnPop .16s cubic-bezier(.23,1,.32,1)}
+.wn-pop-card:after{content:"";position:absolute;left:calc(var(--tip,50%) - 6px);width:12px;height:12px;background:var(--window);transform:rotate(45deg)}
+.wn-pop-card.is-up:after{bottom:-6px;box-shadow:.5px .5px 0 var(--sep-strong)}
+.wn-pop-card.is-down:after{top:-6px;box-shadow:-.5px -.5px 0 var(--sep-strong)}
+@keyframes wnPop{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.wn-pop-card{animation:none}}
+.wn-gi{display:inline-flex;width:30px;height:30px;align-items:center;justify-content:center;border-radius:8px;background:color-mix(in srgb,var(--yellow) 18%,transparent);color:var(--yellow)}
+.wn-gi svg{width:16px;height:16px}
+.wn-pop-card > b{display:block;margin-top:10px;font-size:14px;font-weight:650}
+.wn-pop-card p{margin:6px 0 0;line-height:1.45;color:var(--label-2)}
+.wn-pop-card .wn-gs{font-size:12px;color:var(--label-3)}
+.wn-ga{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+/* This Week's side: tiers, win days, short lists */
+.wn-prog i.t1,.wn-key i.t1{background:var(--green)}
+.wn-prog i.t2,.wn-key i.t2{background:var(--blue)}
+.wn-prog i.t3,.wn-key i.t3{background:var(--label-3)}
+.wn-prog i.t0,.wn-key i.t0{background:color-mix(in srgb,var(--label-3) 45%,transparent)}
+.wn-key i:not([class]){background:var(--fill-3)}
+.wn-days{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.wn-d{display:grid;grid-template-columns:36px minmax(0,1fr) 46px;align-items:center;gap:10px;font-size:12.5px}
+.wn-d b{font-weight:600;color:var(--label-2)}
+.wn-d i{height:6px;border-radius:3px;background:var(--fill-2);overflow:hidden}
+.wn-d em{display:block;height:100%;background:var(--green);border-radius:3px}
+.wn-d span{text-align:right;color:var(--label-2);font-variant-numeric:tabular-nums}
+.wn-d.is-today b,.wn-d.is-today span{color:var(--label)}
+.wn-d.is-none b,.wn-d.is-none span{color:var(--label-3)}
+.wn-dn{margin:10px 0 0;font-size:12px;line-height:1.45;color:var(--label-3)}
+.wn-sr{display:grid;grid-template-columns:22px minmax(0,1fr) auto auto;align-items:center;gap:9px;min-height:38px;border-bottom:.5px solid var(--sep);font-size:13px;cursor:default}
+.wn-sr:hover b{text-decoration:underline;text-decoration-color:var(--label-3)}
+.wn-sr .mono.sm{width:22px;height:22px;border-radius:6px;font-size:9.5px}
+.wn-sr b{font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wn-sr > span:last-child{font-size:12.5px;color:var(--label-2);white-space:nowrap}
+.wn-sr + .wn-dn{margin-top:8px}
+/* the client's panel: Weekly win */
+.cl-folds{margin-top:8px}
+.cl-folds .sp-fold-b{padding-bottom:14px}
+.wn-kvs .cl-kv{grid-template-columns:90px minmax(0,1fr);min-height:32px}
+.wn-seg button{display:inline-flex;align-items:center;gap:5px}
+.wn-seg svg{width:13px;height:13px}
+.wn-sic{display:inline-flex;margin-right:5px;color:var(--green)}
+.wn-sic svg{width:13px;height:13px}
+.wn-note{display:flex;gap:7px;margin:8px 0 0;font-size:12px;line-height:1.45;color:var(--label-3)}
+.wn-note svg{width:13px;height:13px;flex:0 0 auto;margin-top:2px}
+.wn-note.is-red,.wn-note.is-red svg{color:var(--red)}
+.cl-edit{display:inline-block;margin-top:10px;font-size:12.5px}

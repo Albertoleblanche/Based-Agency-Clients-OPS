@@ -56,6 +56,12 @@ function todayWeekCodes(c, weeks){
 function todayRowAction(w){
   const me = myName(), d = w.draft, c = w.c;
   const holder = w.holder && w.holder !== 'approvers' ? w.holder : null;
+  if(w.done >= 3 && typeof winViaWhatsapp === 'function' && winViaWhatsapp(c)){
+    // a WhatsApp win: its sender copies it (whoever wrote it, unless someone else already copied it)
+    const st = winSendState(d), sender = st.k === 'copied' ? st.by : d.author;
+    if(sender === me) return st.k === 'copied' ? [`markWinSent('${c.id}',${jsArg(d.author)})`, 'Mark as Sent'] : [`copyWinForWhatsapp('${c.id}',${jsArg(d.author)})`, 'Copy for WhatsApp'];
+    return [`openWeekClient('${c.id}')`, 'Open'];
+  }
   if(w.done >= 3) return canApprove() ? [`sendApprovedDraft('${c.id}',${jsArg(d.author)})`, 'Send Now'] : [`openWeekClient('${c.id}')`, 'Open'];
   if(w.done === 2) return canApprove() ? [`openReviewDraft('${c.id}',${jsArg(d.author)})`, 'Open'] : [`openWeekClient('${c.id}')`, 'Open'];
   if(holder && holder !== me) return [`remindHolder('${c.id}')`, 'Remind ' + firstName(holder)];
