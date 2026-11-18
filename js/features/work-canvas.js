@@ -41,7 +41,9 @@ function renderReminders(){
   const root = document.getElementById('remindersRoot');
   if(typeof updateRemindersNavBadge === 'function') updateRemindersNavBadge();
   if(!root || typeof clientReminders === 'undefined') return;
-  let rs = clientReminders.slice();
+  const everyone = seesEveryone(), base = everyone ? clientReminders : clientReminders.filter(r => r.askedBy === currentUser?.id);
+  if(!everyone) remWho = 'all';
+  let rs = base.slice();
   if(remClient !== 'all') rs = rs.filter(r => r.clientId === remClient);
   if(remWho !== 'all') rs = rs.filter(r => r.askedBy === remWho);
   const byFu = (a, b) => (a.followUpDate || '9999').localeCompare(b.followUpDate || '9999') || (a.askedDate || '').localeCompare(b.askedDate || '');
@@ -56,16 +58,16 @@ function renderReminders(){
   if(!main) main = remTab === 'open'
     ? `<div class="empty rmi-empty"><b>Nothing is waiting on clients</b>When you ask a client something, add it here so the team knows you’re waiting on an answer.</div>`
     : `<div class="empty rmi-empty"><b>Nothing ${remTab === 'answered' ? 'answered' : 'closed'} yet</b></div>`;
-  const usedClients = [...new Set(clientReminders.map(r => r.clientId))].map(id => clients.find(c => c.id === id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
+  const usedClients = [...new Set(base.map(r => r.clientId))].map(id => clients.find(c => c.id === id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
   const askers = [...new Set(clientReminders.map(r => r.askedBy))].map(id => teamProfiles.find(p => p.id === id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
   const curC = usedClients.find(c => c.id === remClient), curW = askers.find(p => p.id === remWho);
-  const all = clientReminders.filter(r => (remClient === 'all' || r.clientId === remClient) && (remWho === 'all' || r.askedBy === remWho));
+  const all = base.filter(r => (remClient === 'all' || r.clientId === remClient) && (remWho === 'all' || r.askedBy === remWho));
   const n = k => all.filter(r => r.status === k).length;
   root.innerHTML = `<div class="rmi">
-<div class="rmi-hd"><div><h2>${due.length ? `${due.length} follow-up${due.length === 1 ? ' is' : 's are'} due` : 'No follow-ups are due'}</h2><p>Questions your team asked clients, and when to chase them.</p></div>
+<div class="rmi-hd"><div><h2>${due.length ? `${due.length} follow-up${due.length === 1 ? ' is' : 's are'} due` : 'No follow-ups are due'}</h2><p>${everyone ? 'Questions your team asked clients, and when to chase them.' : 'Questions you asked clients, and when to chase them.'}</p></div>
 <div class="rmi-f"><div class="seg" role="tablist" aria-label="Show">${[['open', 'Waiting', n('waiting')], ['answered', 'Answered', n('answered')], ['closed', 'Closed', n('closed')]].map(([k, t, c]) => `<button class="${remTab === k ? 'on' : ''}" role="tab" aria-selected="${remTab === k}" onclick="setRem('tab','${k}')">${t} <span class="c">${c}</span></button>`).join('')}</div>
 <label class="pop pop-sel"><span class="pl">Client: ${escapeHtml(curC ? curC.name : 'All')}</span>${icon('caret-down')}<select aria-label="Client" onchange="setRem('client',this.value)"><option value="all">All</option>${usedClients.map(c => `<option value="${c.id}"${c === curC ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></label>
-<label class="pop pop-sel"><span class="pl">${escapeHtml(curW ? curW.name : 'Everyone')}</span>${icon('caret-down')}<select aria-label="Asked by" onchange="setRem('who',this.value)"><option value="all">Everyone</option>${askers.map(p => `<option value="${p.id}"${p === curW ? ' selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}</select></label></div></div>
+${everyone ? `<label class="pop pop-sel"><span class="pl">${escapeHtml(curW ? curW.name : 'Everyone')}</span>${icon('caret-down')}<select aria-label="Asked by" onchange="setRem('who',this.value)"><option value="all">Everyone</option>${askers.map(p => `<option value="${p.id}"${p === curW ? ' selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}</select></label>` : ''}</div></div>
 ${main}</div>`;
   if(currentViewName === 'reminders') setToolbar(null, 'Client follow-ups');
 }

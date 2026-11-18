@@ -82,7 +82,7 @@ ${fr('Your name', 'Filled in for you whenever you log an improvement', `<input i
 <div class="set-h">Appearance</div>
 <div class="form-grp">
 ${fr('Theme', 'Auto follows your computer', `<div class="appear" role="radiogroup" aria-label="Theme">${ap('auto', 'Auto', '<i style="background:linear-gradient(90deg,#F4F4F7 0 15%,#FFFFFF 15% 50%,#262629 50% 65%,#1E1E20 65%)"></i>')}${ap('light', 'Light', thumb('#FFFFFF', '#F4F4F7'))}${ap('dark', 'Dark', thumb('#1E1E20', '#262629'))}</div>`)}
-${fr('Show the running timer in the toolbar', '', swHtml(toolbarTimerPref(), 'Show the running timer in the toolbar', 'toggleToolbarTimerPref()'))}
+${fr('Show the timer in the sidebar', 'A running timer always shows', swHtml(toolbarTimerPref(), 'Show the timer in the sidebar', 'toggleToolbarTimerPref()'))}
 </div>`;
 }
 async function saveWorkspaceName(v){ await changeSettings(s => { s.appName = v.trim(); }); if(typeof applyAppBranding === 'function') applyAppBranding(); }
@@ -94,7 +94,7 @@ async function saveYourName(v){
   myProfile.name = name; await loadTeamProfiles(); renderWhoAmI(); showToast('success', 'Saved', 'Your name is updated.');
 }
 function toolbarTimerPref(){ try{ return localStorage.getItem('bda_tb_timer') !== 'off'; }catch(e){ return true; } }
-function toggleToolbarTimerPref(){ try{ localStorage.setItem('bda_tb_timer', toolbarTimerPref() ? 'off' : 'on'); }catch(e){} updateFloatingTimerPill(); renderSettingsView(); }
+function toggleToolbarTimerPref(){ try{ localStorage.setItem('bda_tb_timer', toolbarTimerPref() ? 'off' : 'on'); }catch(e){} if(typeof renderSideTimer === 'function') renderSideTimer(); renderSettingsView(); }
 async function setThemePref(pref){
   document.body.classList.add('theme-switching'); setTimeout(() => document.body.classList.remove('theme-switching'), 260);
   if(pref === 'auto'){

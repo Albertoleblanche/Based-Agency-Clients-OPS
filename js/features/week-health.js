@@ -230,6 +230,12 @@ function stepsHtml(w){
 }
 // Overdue first (longest first), then due today; most important clients first within each.
 function dueOrder(a, b){ return a.daysLeft - b.daysLeft || (b.c.importance || 0) - (a.c.importance || 0); }
+// Approvers and admins see every client; a team member sees the clients they own.
+function seesEveryone(){ return typeof canApprove === 'function' && canApprove(); }
+function healthScopeClients(){
+  const all = attentionEligibleClients();
+  return seesEveryone() ? all : all.filter(c => clientOwner(c) === myName());
+}
 function weekSummary(list){
   const ws = list.map(clientWeek);
   return { ws, sent: ws.filter(w => w.sent).length, behind: ws.filter(needsUpdate).length, late: ws.filter(w => w.state === 'late').length,

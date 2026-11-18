@@ -40,7 +40,8 @@ function renderThisWeek(){
   const me = myName();
   const all = weekVisibleClients().map(c => weekView(clientWeek(c)));
   const mine = all.filter(w => w.owner === me || w.holder === me);
-  const shown = weekFilter === 'mine' ? mine : all;
+  const everyone = seesEveryone();
+  const shown = weekFilter === 'mine' || !everyone ? mine : all;
   const open = shown.filter(w => !w.sent).map(w => Object.assign(w, { todo: weekTodo(w) }))
     .sort((a, b) => (b.late - a.late) || a.daysLeft - b.daysLeft || (b.c.importance || 0) - (a.c.importance || 0));
   const now = open.filter(w => w.todo.b === 'now'), wait = open.filter(w => w.todo.b === 'wait');
@@ -61,15 +62,15 @@ function renderThisWeek(){
 ${doneOpen ? sent.map(w => `<div class="tw-row" role="button" tabindex="0" onclick="selectWeekClient('${w.c.id}')">${monoHtml(w.c)}<div class="tx"><span class="cl">${escapeHtml(w.c.name)}</span><b class="tw-sent">${escapeHtml(w.note || 'Sent')}</b></div></div>`).join('')
     + `<a class="x-lnk tw-show" href="#" onclick="window._weekShowDone=false;renderThisWeek();return false;">Hide</a>`
     : `<div class="tw-done">${icon('check-circle')}<span class="tw-stack">${sent.slice(0, 9).map(w => monoHtml(w.c, 'sm')).join('')}</span><span class="tw-dn">${escapeHtml(names.length > 3 ? names.slice(0, 3).join(', ') + ` and ${names.length - 3} more` : names.join(', '))}</span><a class="x-lnk" href="#" onclick="window._weekShowDone=true;renderThisWeek();return false;">Show</a></div>`}` : '';
-  const empty = !open.length && !sent.length ? `<div class="empty"><b>Nothing here</b>${weekFilter === 'mine' ? 'None of your clients have an update this week.' : 'No clients yet.'}</div>`
+  const empty = !open.length && !sent.length ? `<div class="empty"><b>Nothing here</b>${weekFilter === 'mine' || !everyone ? 'None of your clients have an update this week.' : 'No clients yet.'}</div>`
     : !open.length ? `<div class="tw-clear">${icon('check-circle')}<b>Every update is out</b><span>Nothing to do until the next ones are due.</span></div>` : '';
-  const sum = weekSummary(weekVisibleClients());
+  const sum = weekSummary(everyone ? weekVisibleClients() : mine.map(w => w.c));
   const seg = [['all', 'All', all.length], ['mine', 'Mine', mine.length]].map(([k, t, n]) => `<button class="${weekFilter === k ? 'on' : ''}" role="tab" aria-selected="${weekFilter === k}" onclick="setWeekFilter('${k}')">${t} <span class="c">${n}</span></button>`).join('');
   root.innerHTML = `<div class="spw"><div class="sp-page"><div class="tw">
-<div class="tw-top"><div class="seg" role="tablist" aria-label="Show">${seg}</div><span class="sum"><b>${sum.sent} of ${sum.total}</b> sent in the last 7 days${sum.late ? ` · <span class="t-red">${sum.late} late</span>` : ''}</span></div>
+<div class="tw-top">${everyone ? `<div class="seg" role="tablist" aria-label="Show">${seg}</div>` : ''}<span class="sum"><b>${sum.sent} of ${sum.total}</b> sent in the last 7 days${sum.late ? ` · <span class="t-red">${sum.late} late</span>` : ''}</span></div>
 ${empty}${sec('Do now', 'Things only you can move forward', nowRows.length ? nowRows : null)}${sec('Waiting on someone', 'Nothing for you to do yet', waitRows.length ? waitRows : null)}${done}
 </div></div>${sel ? weekPanelHtml(sel) : ''}</div>`;
-  if(currentViewName === 'approve') setToolbar('This Week', 'What to do next, client by client');
+  if(currentViewName === 'approve') setToolbar('This Week', everyone ? 'What to do next, client by client' : 'What to do next for your clients');
 }
 // Keep the old name working: everything that redraws "the queue" redraws This Week now.
 function renderQueue(){ renderThisWeek(); }

@@ -54,5 +54,5 @@ function drawTrash(){
     }).join('') || '<div class="row"><span class="t-2" style="font-size:14px">No deleted time entries.</span></div>'}</div>`;
   }
   if(!html) html = `<div class="empty"><b>Nothing deleted</b>Clients, notes and time entries you delete wait here, so you can bring them back.</div>`;
-  root.innerHTML = `${seg}<div style="max-width:860px">${html}</div>`;
+  root.innerHTML = `${seg}<div class="tr-list">${html}</div>`;
 }

@@ -375,7 +375,7 @@ a.chat-i { color: inherit; text-decoration: none; }
 /* Settings and My Profile */
 .settings-pane { padding: 0 !important; }
 .settings-pane .set-tb { position: sticky; top: 0; z-index: 3; padding-top: 10px; }
-.settings-pane .set-body { max-width: 760px; margin: 0 auto; }
+.settings-pane .set-body { max-width: none; margin: 0; }
 button.set-tab { border: 0; background: none; font: inherit; cursor: default; }
 button.set-tab:hover:not(.on) { background: var(--fill); }
 .opt { position: relative; }
@@ -683,7 +683,7 @@ body.sidebar-collapsed .stm{display:none}
 
 /* ---- Today: your day (canvas "Today — new design") ---- */
 #todayRoot{padding:0}
-.ty{max-width:1180px;margin:0 auto;padding:24px 32px 32px;width:100%}
+.ty{padding:24px 40px 32px;width:100%}
 .ty .tx{display:flex;flex-direction:column;min-width:0;flex:1 1 auto}
 .ty .tx b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ty .tx span{font-size:12.5px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -823,7 +823,7 @@ body.sidebar-collapsed .stm{display:none}
 
 /* ---- This Week (canvas option B) ---- */
 #weekRoot{flex-wrap:nowrap}
-.tw{max-width:920px;margin:0 auto;padding:22px 32px 40px}
+.tw{padding:22px 40px 40px;width:100%}
 .tw-top{display:flex;align-items:center;gap:14px;margin-bottom:6px}
 .tw-top .sum{font-size:13px;color:var(--label-2)}
 .tw-top .sum b{color:var(--label);font-weight:600}
@@ -858,7 +858,7 @@ body.sidebar-collapsed .stm{display:none}
 
 /* ---- Health (canvas "Health — new design") ---- */
 #healthRoot{flex-wrap:nowrap}
-.hl{max-width:1200px;margin:0 auto;padding:26px 40px 40px}
+.hl{padding:26px 40px 40px;width:100%}
 .hl .tx{display:flex;flex-direction:column;min-width:0;flex:1 1 auto}
 .hl-top{display:grid;grid-template-columns:minmax(0,1fr) 432px;column-gap:56px;align-items:end;padding-bottom:22px;border-bottom:.5px solid var(--sep)}
 .hl-score{display:grid;grid-template-columns:repeat(3,auto);justify-content:start;column-gap:52px}
@@ -971,7 +971,7 @@ body.sidebar-collapsed .stm{display:none}
 #notesRoot{padding:0}
 .n1-wrap{position:relative;flex:1 1 auto;display:flex;min-height:0;min-width:0}
 .n1-page{flex:1 1 auto;min-width:0;overflow:auto}
-.n1{max-width:1180px;width:100%;margin:0 auto;padding:28px 40px 36px}
+.n1{width:100%;padding:28px 40px 36px}
 .n1-top{display:flex;align-items:center;gap:12px}
 .mac .n1-cap{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:10px;height:42px;padding:0 14px;border:0;border-radius:11px;background:var(--fill);color:var(--label-3);font:inherit;font-size:14px;text-align:left;cursor:text;transition:background-color 150ms ease}
 .mac .n1-cap:hover{background:var(--fill-2)}
@@ -981,7 +981,7 @@ body.sidebar-collapsed .stm{display:none}
 .mac .n1-pop{height:32px;gap:8px;flex:0 0 auto;font-size:14px;color:var(--label)}
 .n1-pop > svg{width:12px;height:12px;color:var(--label-3)}
 .n1-top .seg{flex:0 0 auto}
-.n1-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px;margin-top:28px}
+.n1-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:22px;margin-top:28px}
 .n1-t{display:flex;flex-direction:column;height:254px;padding:20px 22px 18px;border-radius:14px;background:var(--fill);overflow:hidden;cursor:default;outline:none;transition:background-color 150ms ease,transform 160ms cubic-bezier(.23,1,.32,1)}
 .n1-t:hover{background:var(--fill-2)}
 .n1-t:active{transform:scale(.99)}
@@ -997,8 +997,7 @@ body.sidebar-collapsed .stm{display:none}
 .n1-t.is-done h3,.n1-t.is-done .n1-b{opacity:.55}
 .n1-empty{margin-top:28px;border-radius:14px;background:var(--fill)}
 .n1-foot{margin:24px 0 0}
-@media (max-width:1100px){.n1-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:720px){.n1{padding:20px}.n1-top{flex-wrap:wrap}.n1-cap{flex-basis:100%}.n1-grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:720px){.n1{padding:20px}.n1-top{flex-wrap:wrap}.n1-cap{flex-basis:100%}}
 
 /* the sheet */
 .n1-scrim{position:absolute;inset:0;z-index:20;background:rgba(0,0,0,.5);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);animation:n1-fade 200ms ease-out}
@@ -1072,18 +1071,18 @@ body.sidebar-collapsed .stm{display:none}
 
 /* ---- Focus Reports: the weekly brief as a memo (canvas FocusNew / FocusOpen) ---- */
 #focusRoot{padding:0}
-.fq{padding:22px 40px 40px;max-width:1220px;width:100%;margin:0 auto}
+.fq{padding:22px 40px 40px;width:100%}
 .fq-top{display:flex;align-items:center;justify-content:space-between;gap:24px;padding-bottom:16px;border-bottom:.5px solid var(--sep)}
 .fq-pick{display:flex;align-items:center;gap:6px}
 .mac .fq-pick .pop{height:30px;gap:8px;font-size:14px;color:var(--label)}
 .fq-pick .pop > svg{width:12px;height:12px;color:var(--label-3)}
 .fq-pick .ib[disabled]{opacity:.35}
 .fq-acts{display:flex;gap:8px}
-.fq-cols{display:grid;grid-template-columns:minmax(0,1fr) 290px;column-gap:72px;margin-top:26px}
-.fq-doc{max-width:700px;min-width:0}
+.fq-cols{display:grid;grid-template-columns:minmax(0,1fr) 320px;column-gap:72px;margin-top:26px}
+.fq-doc{min-width:0}
 .fq-k{font-size:12.5px;color:var(--label-2)}
 .fq-doc h1{margin:6px 0 0;font-size:30px;font-weight:750;letter-spacing:-.03em;line-height:1.15}
-.fq-lead{margin:14px 0 0;font-size:15.5px;line-height:1.6;color:var(--label)}
+.fq-lead{margin:14px 0 0;max-width:880px;font-size:15.5px;line-height:1.6;color:var(--label)}
 .fq-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin-top:28px}
 .fq-st{display:flex;flex-direction:column;gap:4px;padding:2px 20px;border-left:.5px solid var(--sep);min-width:0}
 .fq-st:first-child{padding-left:0;border-left:0}
@@ -1112,7 +1111,7 @@ body.sidebar-collapsed .stm{display:none}
 .fq-none{margin:10px 0 0;font-size:13px;color:var(--label-2)}
 .fq-ai{display:flex;align-items:flex-start;gap:12px;padding:10px 0}
 .fq-ai svg{width:16px;height:16px;color:var(--label-2);flex:0 0 auto;margin-top:3px}
-.fq-ai p{margin:0;font-size:13.5px;line-height:1.55;color:var(--label)}
+.fq-ai p{margin:0;max-width:880px;font-size:13.5px;line-height:1.55;color:var(--label)}
 .fq-ai b{font-weight:600}
 .fq-err{margin:22px 0 0;font-size:12.5px;color:var(--label-3)}
 .fq-rail{min-width:0}
@@ -1133,7 +1132,7 @@ body.sidebar-collapsed .stm{display:none}
 
 /* ---- Reminders: Due, Waiting on the client, Answered (canvas RemindersNew) ---- */
 #remindersRoot{padding:0}
-.rmi{padding:30px 40px 40px;max-width:1000px;width:100%;margin:0 auto}
+.rmi{padding:30px 40px 40px;width:100%}
 .rmi-hd{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap}
 .rmi-hd h2{margin:0;font-size:26px;font-weight:700;letter-spacing:-.025em}
 .rmi-hd p{margin:6px 0 0;font-size:13.5px;color:var(--label-2)}
@@ -1168,8 +1167,8 @@ body.sidebar-collapsed .stm{display:none}
 
 /* ---- Time: the timesheet by Day, Week or Month (canvas TimeNewDay / Week / Month) ---- */
 #timeRoot-timesheet{padding:0}
-.tmi{padding:30px 40px 40px;max-width:1220px;width:100%;margin:0 auto}
-.tmi-cols{display:grid;grid-template-columns:minmax(0,1fr) 280px;column-gap:56px;margin-top:4px}
+.tmi{padding:30px 40px 40px;width:100%}
+.tmi-cols{display:grid;grid-template-columns:minmax(0,1fr) 320px;column-gap:64px;margin-top:4px}
 .tmi-cols > *{min-width:0}
 .tmi-hd{display:flex;align-items:center;gap:16px;margin-bottom:6px;flex-wrap:wrap}
 .tmi-nav{display:flex;align-items:center;gap:4px;min-width:0}
@@ -1303,7 +1302,7 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .tk-d:hover .tx b{color:var(--label)}
 .tk-d .tk-cb{margin-top:0}
 .tk-arch{display:inline-flex;margin-top:14px}
-.tk-list{max-width:900px;margin-top:10px}
+.tk-list{margin-top:10px}
 .tk-ls{display:flex;align-items:center;gap:8px;margin:26px 0 4px}
 .tk-ls b{font-size:15px;font-weight:650}
 .tk-ls span{font-size:13px;font-weight:600;color:var(--label-3)}
@@ -1348,3 +1347,13 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .tkp-cmt{display:flex;gap:8px;margin-top:12px}
 .mac .tkp-cmt .tf{flex:1 1 auto;height:38px;border-radius:9px}
 .tkp-cmt .btn{height:38px}
+
+/* ---- Every tab fills the window. Text keeps a comfortable line length; lists and grids use the room. ---- */
+/* Review: the draft fills its pane; the email itself stays at an email's width. */
+#view-teamqueue .doc{max-width:none}
+#view-teamqueue .doc .subject,#view-teamqueue .doc .body,#view-teamqueue .doc .rv-edit{max-width:760px}
+/* Settings: sections flow into two columns when there's room, each kept whole. */
+.settings-pane .set-body{columns:2 460px;column-gap:48px}
+.settings-pane .set-body > .set-h{break-after:avoid;break-inside:avoid}
+.settings-pane .set-body > .set-h:first-child{margin-top:0}
+.settings-pane .set-body > .form-grp,.settings-pane .set-body > *{break-inside:avoid}

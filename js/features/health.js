@@ -16,7 +16,7 @@ function healthLevelsAt(day){
   if(_healthPast.at[k]) return _healthPast.at[k];
   const end = new Date(day); end.setHours(23, 59, 0, 0);
   const out = {};
-  withAsOf(end, () => attentionEligibleClients().forEach(c => {
+  withAsOf(end, () => healthScopeClients().forEach(c => {
     if(c.startDate && new Date(c.startDate + 'T00:00:00') > end) return;
     const h = clientHealth(c);
     out[c.id] = { level: h.level, raw: h.rawLevel, keys: h.signals.map(s => s.key), short: h.short };
@@ -39,7 +39,7 @@ function renderHealth(){
   if(!root || typeof clients === 'undefined') return;
   _healthPast = { key: '', at: {} };
   const now = rNow(), T = healthThresholds(), me = myName();
-  const all = attentionEligibleClients().map(c => ({ c, h: clientHealth(c) }));
+  const all = healthScopeClients().map(c => ({ c, h: clientHealth(c) }));
   const cur = healthCount(Object.fromEntries(all.map(x => [x.c.id, { level: x.h.level }])));
   const weekAgo = healthLevelsAt(addDays(now, -7)), prev = healthCount(weekAgo);
 
@@ -122,7 +122,7 @@ ${lanes}
 <div class="hl-bot"><section><div class="hl-sec sm"><b>Moved this week</b></div>${moveRows}</section>
 <section><div class="hl-sec sm"><b>What makes clients slip</b><span>Last 90 days</span></div>${causeRows}${causes.length && causes[0].label.startsWith('Updates') ? '<p class="hl-note">Most slips start with a late update.</p>' : ''}</section></div>
 </div></div>${sel ? healthPanelHtml(sel.c, sel.h) : ''}</div>`;
-  if(currentViewName === 'health') setToolbar('Health', 'How clients are doing, and who is fixing what');
+  if(currentViewName === 'health') setToolbar('Health', seesEveryone() ? 'How clients are doing, and who is fixing what' : 'How your clients are doing');
 }
 
 // The panel: how bad, the next step, why, hours, the last 8 updates and what changed.

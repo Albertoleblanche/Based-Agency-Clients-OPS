@@ -61,8 +61,14 @@ function renderTasks(){
   if(!root || !currentUser) return;
   const me = currentUser.id, today = toDateStr(new Date());
   let vis = tasks.filter(t => !t.cancelledAt && (t.assignerId === me || t.assigneeId === me) && !(t.status === 'done' && ((t.assignerId === me && t.hiddenByAssigner) || (t.assigneeId === me && t.hiddenByAssignee))));
+  // Approvers and admins switch between Everyone (every task they're part of) and Mine. A team
+  // member sees the tasks assigned to them, and the ones they handed to someone else on their own.
+  const everyone = seesEveryone();
   const mineN = vis.filter(t => t.assigneeId === me && t.status !== 'done').length;
+  const byMe = vis.filter(t => t.assignerId === me && t.assigneeId !== me), byMeN = byMe.filter(t => t.status !== 'done').length;
+  if(!everyone && (tasksScope === 'everyone' || (tasksScope === 'byme' && !byMe.length))) tasksScope = 'mine';
   if(tasksScope === 'mine') vis = vis.filter(t => t.assigneeId === me);
+  else if(tasksScope === 'byme') vis = byMe;
   if(tasksClient !== 'all') vis = vis.filter(t => t.clientId === tasksClient);
   const open = vis.filter(t => t.status !== 'done'), overdue = open.filter(t => t.dueDate && t.dueDate < today);
   const review = open.filter(t => t.status === 'in_review' && t.assignerId === me);
@@ -74,7 +80,8 @@ function renderTasks(){
   const curC = usedClients.find(c => c.id === tasksClient);
   const sub = [overdue.length ? `<b>${overdue.length} ${overdue.length === 1 ? 'is' : 'are'} overdue.</b>` : '', review.length ? `${review.length} ${review.length === 1 ? 'is' : 'are'} waiting on your review.` : ''].filter(Boolean).join(' ') || (open.length ? 'Nothing is overdue.' : 'Nothing open right now.');
   const head = `<div class="tk-hd"><div><h2>${open.length} open task${open.length === 1 ? '' : 's'}</h2><p>${sub}</p></div>
-<div class="tk-f"><div class="seg" role="tablist" aria-label="Whose"><button class="${tasksScope === 'everyone' ? 'on' : ''}" role="tab" aria-selected="${tasksScope === 'everyone'}" onclick="setTasksScope('everyone')">Everyone</button><button class="${tasksScope === 'mine' ? 'on' : ''}" role="tab" aria-selected="${tasksScope === 'mine'}" onclick="setTasksScope('mine')">Mine <span class="c">${mineN}</span></button></div>
+<div class="tk-f">${(everyone ? [['everyone', 'Everyone', ''], ['mine', 'Mine', mineN]] : byMe.length ? [['mine', 'Mine', mineN], ['byme', 'Assigned by Me', byMeN]] : [])
+  .map(([k, t, n], i, a) => (i ? '' : '<div class="seg" role="tablist" aria-label="Whose">') + `<button class="${tasksScope === k ? 'on' : ''}" role="tab" aria-selected="${tasksScope === k}" onclick="setTasksScope('${k}')">${t}${n !== '' ? ` <span class="c">${n}</span>` : ''}</button>` + (i === a.length - 1 ? '</div>' : '')).join('')}
 <label class="pop pop-sel"><span class="pl">Client: ${escapeHtml(curC ? curC.name : 'All')}</span>${icon('caret-down')}<select aria-label="Client" onchange="setTasksClient(this.value)"><option value="all">All</option>${usedClients.map(c => `<option value="${c.id}"${c === curC ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></label>
 <div class="seg tk-view" role="tablist" aria-label="Layout"><button class="${tasksLayout === 'list' ? 'on' : ''}" role="tab" aria-selected="${tasksLayout === 'list'}" onclick="setTasksLayout('list')">${icon('list-bullets')}List</button><button class="${tasksLayout === 'columns' ? 'on' : ''}" role="tab" aria-selected="${tasksLayout === 'columns'}" onclick="setTasksLayout('columns')">${icon('squares-four')}Columns</button></div></div></div>`;
   const doneRows = (doneWeek.length ? doneWeek : done.slice(0, 3)).slice(0, 6).map(t => { const c = clients.find(x => x.id === t.clientId);

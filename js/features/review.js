@@ -7,7 +7,9 @@ function setReviewTab(t){ reviewTab = t; window._reviewSel = null; window._revie
 
 function reviewItems(){
   const cyc = updateCycle(), me = myName(), out = { waiting: [], approved: [], sent: [] };
+  const all = seesEveryone();
   attentionEligibleClients().forEach(c => (c.drafts || []).forEach(d => {
+    if(!all && d.author !== me) return;
     if(d.draftSentAt){ if(new Date(d.draftSentAt) >= cyc.weekStart) out.sent.push({ c, d, at: d.draftSentAt }); }
     else if(d.draftStatus === 'approved') out.approved.push({ c, d, at: d.draftPendingSince });
     else if(d.draftStatus === 'pending' && d.draft && (d.readyToNotify || d.author === me)) out.waiting.push({ c, d, at: d.draftPendingSince });

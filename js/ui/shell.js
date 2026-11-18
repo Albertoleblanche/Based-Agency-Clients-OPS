@@ -79,7 +79,7 @@ function updateShellBadges(){
   if(typeof attentionEligibleClients === 'function'){
     const list = attentionEligibleClients();
     set('navClientsBadge', activeClients().length);
-    set('navHealthBadge', list.filter(c => clientHealth(c).level !== 'g').length);
+    set('navHealthBadge', (typeof healthScopeClients === 'function' ? healthScopeClients() : list).filter(c => clientHealth(c).level !== 'g').length);
   }
   ['navTeamPendingBadge', 'navTasksBadge', 'navRemindersBadge', 'navTeamBadge'].forEach(id => {
     const el = document.getElementById(id); if(el) el.style.display = Number(el.textContent) ? '' : 'none';
