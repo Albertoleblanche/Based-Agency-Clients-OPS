@@ -198,6 +198,13 @@ document.addEventListener('click', e => {
   requestAnimationFrame(() => {
     const nu = document.querySelector(`[data-grow-key="${CSS.escape(key)}"]`);
     if(!nu) return;
+    // a disclosure row's chevron turns with it (the redraw would otherwise snap it)
+    const t1 = t.hasAttribute('aria-expanded') && document.querySelector(`[data-grow="${CSS.escape(key)}"][aria-expanded]`);
+    const chev = t1 && t1.querySelector(':scope > svg');
+    if(chev && t1.getAttribute('aria-expanded') !== t.getAttribute('aria-expanded')){
+      const a0 = t.getAttribute('aria-expanded') === 'true' ? 90 : 0;
+      chev.animate([{ transform: `rotate(${a0}deg)` }, { transform: `rotate(${90 - a0}deg)` }], { duration: 240, easing: EASE_OUT });
+    }
     const rows = growRows(nu), h1 = nu.getBoundingClientRect().height;
     if(Math.abs(h1 - h0) < 2) return;
     const ghosts = [];

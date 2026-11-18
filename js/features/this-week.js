@@ -175,16 +175,29 @@ ${people || '<p class="twl-dn">Nothing is waiting on anyone else.</p>'}
 // Keep the old name working: everything that redraws "the queue" redraws This Week now.
 function renderQueue(){ renderThisWeek(); }
 
-// The panel: where this client's update is, its one main action, the steps, the draft, the work.
-// Under the panel's main action: work logged after the draft was written, or work in it that
-// was deleted, with a way to rewrite it where that's allowed.
+// The panel: where this client's update is and its one main action, then the draft. Everything
+// else folds into rows (Improvements, Progress, Last 8 weeks) whose summaries say enough to leave
+// them shut; the everyday actions sit in a toolbar at the foot.
+// Under the draft: work logged after it was written, or work in it that was deleted, with a way
+// to rewrite it where that's allowed.
 function weekDraftNote(w){
   const d = w.draft;
   if(w.sent || !d || typeof draftDelta !== 'function') return '';
   const dl = draftDelta(w.c, d), A = `'${w.c.id}',${jsArg(d.author)}`, may = canReworkDraft(w.c, d);
   if(dl.gone) return `<p class="sp-dnote is-red">${icon('warning')}<span>${dl.allGone ? 'Everything this draft was written from was deleted.' : `${dl.gone} improvement${dl.gone === 1 ? '' : 's'} in the draft ${dl.gone === 1 ? 'was' : 'were'} deleted; the email may still mention ${dl.gone === 1 ? 'it' : 'them'}.`}${may ? ` <a class="x-lnk" href="#" onclick="generateDraft(${A});return false;">Rewrite</a>` : ''}</span></p>`;
-  if(dl.added.length) return `<p class="sp-dnote">${icon('circle-plus')}<span>${dl.added.length} new improvement${dl.added.length === 1 ? ' isn’t' : 's aren’t'} in the draft yet.${may ? ` <a class="x-lnk" href="#" onclick="generateDraft(${A});return false;">Rewrite to include</a>` : d.draftStatus === 'approved' ? ' They go in the next update.' : ' An approver can rewrite to include them.'}</span></p>`;
+  if(dl.added.length) return `<p class="sp-dnote">${icon('circle-plus')}<span>${dl.added.length === 1 ? '1 improvement was' : `${dl.added.length} improvements were`} logged after this draft.${may ? ` <a class="x-lnk" href="#" onclick="generateDraft(${A});return false;">Rewrite to include ${dl.added.length === 1 ? 'it' : 'them'}</a>` : d.draftStatus === 'approved' ? ` ${dl.added.length === 1 ? 'It goes' : 'They go'} in the next update.` : ' An approver can rewrite to include them.'}</span></p>`;
   return '';
+}
+// Folded rows: closed until you open one, and they stay as you left them from client to client.
+let WEEK_FOLDS = (() => { try { return JSON.parse(localStorage.getItem('wk-folds') || '{}') || {}; } catch(e){ return {}; } })();
+function toggleWeekFold(k){
+  WEEK_FOLDS[k] = !WEEK_FOLDS[k];
+  try { localStorage.setItem('wk-folds', JSON.stringify(WEEK_FOLDS)); } catch(e){}
+  renderThisWeek();
+}
+function weekFoldHtml(k, title, summary, body){
+  const open = !!WEEK_FOLDS[k];
+  return `<div class="sp-fold${open ? ' is-open' : ''}"><button class="sp-fold-h" aria-expanded="${open}" data-grow="wk-f-${k}" onclick="toggleWeekFold('${k}')">${icon('caret-right', { weight: 'bold' })}<b>${title}</b><span class="sm">${summary}</span></button><div class="sp-fold-b" data-grow-key="wk-f-${k}">${open ? body : ''}</div></div>`;
 }
 // Editing your own draft in the panel (for anyone without Review).
 function startWeekDraftEdit(clientId, author){
@@ -211,7 +224,7 @@ function weekPanelHtml(w){
   } else {
     eyebrow = w.late ? `<span class="sp-eb red">${icon('warning', { weight: 'bold' })}${escapeHtml(overdueShort(w))}</span>` : `<span class="sp-eb">${icon('clock', { weight: 'bold' })}${escapeHtml(w.dueText)}</span>`;
     if(w.done >= 3){ title = 'Approved and ready to send'; sub = lastTxt; }
-    else if(w.done === 2){ title = `${d.author === me ? 'Your' : firstName(d.author) + '’s'} draft is waiting for ${approver ? 'your' : 'an approver’s'} review`; sub = `Sent for review ${escapeHtml(relDayLower(d.draftPendingSince || rNow()))}${d.draftPendingSince ? ' at ' + fmtTime(new Date(d.draftPendingSince)) : ''}. ${lastTxt}`; }
+    else if(w.done === 2){ title = `${d.author === me ? 'Your' : firstName(d.author) + '’s'} draft is waiting for ${approver ? 'you' : 'review'}`; sub = `Sent for review ${escapeHtml(relDayLower(d.draftPendingSince || rNow()))}${d.draftPendingSince ? ' at ' + fmtTime(new Date(d.draftPendingSince)) : ''}`; }
     else if(d){ title = `${d.author === me ? 'Your' : firstName(d.author) + '’s'} draft is written, not sent for review yet`; sub = lastTxt; }
     else if(w.logged.length){ title = `${todayPlural(w.logged.length, 'improvement')} logged, no draft yet`; sub = lastTxt; }
     else { title = 'Nothing logged yet'; sub = `${holder ? escapeHtml(firstName(holder)) + ' owns this client. ' : ''}${lastTxt}`; }
@@ -228,41 +241,57 @@ function weekPanelHtml(w){
       : t && t.act ? `<button class="btn btn-p" onclick="${t.act[0]}">${escapeHtml(t.act[1])}</button>` : '';
     acts = !editing && (edit || main) ? `<div class="sp-acts">${edit}${main}</div>` : '';
   }
-  // the four steps
+  // Progress: the four steps
   const stepSub = [
     w.sent || w.done > 0 ? todayPlural(w.sent ? (w.logged.length || 0) : w.logged.length, 'item') : 'Nothing yet',
     w.sent || w.done > 1 ? (d && d.draftPendingSince ? whenShort(d.draftPendingSince) : 'Done') : d ? 'Not yet' : 'No draft',
     w.sent || w.done > 2 ? 'Done' : w.done === 2 ? (approver ? 'Waiting on you' : 'Waiting on review') : '',
-    w.sent ? relDay(w.last) : w.dueText];
+    w.sent ? relDay(w.last) : w.late ? lateWords(w) : w.dueText];
   const cur = w.sent ? 4 : w.done;
   const steps = STEP_NAMES.map((n, k) => {
     const cls = k < cur ? 'd' : k === cur ? 'w' : '';
-    return `<div class="sp-st ${cls}"><span class="dot">${k < cur ? icon('check', { weight: 'bold' }) : ''}</span><b>${k === 1 ? 'Sent for review' : n}</b><span>${escapeHtml(stepSub[k])}</span></div>`;
+    return `<div class="sp-st ${cls}"><span class="dot">${k < cur ? icon('check', { weight: 'bold' }) : ''}</span><b>${k === 1 ? 'Sent for review' : n}</b><span${k === 3 && w.late && !w.sent ? ' class="t-red"' : ''}>${escapeHtml(stepSub[k])}</span></div>`;
   }).join('');
-  const imps = w.logged.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
-  const showAll = window._weekImpsAll === c.id;
-  const impRows = (showAll ? imps : imps.slice(0, 3)).map(i => `<div class="sp-imp"><b>${escapeHtml(i.text)}</b><span>${escapeHtml(i.service || c.service || '')} · ${fmtShortDate(new Date(i.date))}${i.includeInEmail === false ? ' · internal' : ''}</span></div>`).join('');
-  const more = imps.length > 3 ? `<a class="sp-more" href="#" data-grow="wk-imps" onclick="window._weekImpsAll=${showAll ? 'null' : `'${c.id}'`};renderThisWeek();return false;">${showAll ? 'Show less' : `${imps.length - 3} more`}</a>` : '';
+  const nowWords = [w.logged.length ? 'log this week’s work' : 'nothing logged yet', d ? 'draft not sent for review' : 'no draft yet',
+    approver ? 'waiting on you' : 'waiting on review', 'ready to send'][Math.min(cur, 3)];
+  const progSum = w.sent ? `All done ·&nbsp;sent ${escapeHtml(relDayLower(w.last))}` : `Step ${cur + 1} of 4 ·&nbsp;<span class="sp-blue">${escapeHtml(nowWords)}</span>`;
+  // Improvements: what's in the draft, what came after it, everything else logged for this update
+  const dl = d && !w.sent && typeof draftDelta === 'function' ? draftDelta(c, d) : null;
+  const inDraft = new Set(dl ? dl.inc.map(i => i.id) : []), isNew = new Set(dl ? dl.added.map(i => i.id) : []);
+  const imps = w.logged.slice().sort((a, b) => new Date(a.date) - new Date(b.date));
+  const impRows = imps.map(i => {
+    const k = inDraft.has(i.id) ? 'in' : isNew.has(i.id) ? 'new' : '';
+    const ic = k === 'in' ? 'check-circle' : k === 'new' ? 'circle-plus' : 'circle';
+    const who = i.author && i.author !== (d && d.author) ? firstName(i.author) + ' · ' : '';
+    return `<div class="sp-i${k ? ' is-' + k : ''}">${icon(ic)}<span title="${escapeHtml(i.text)}">${escapeHtml(i.text)}</span><time>${escapeHtml(who)}${i.includeInEmail === false ? 'internal · ' : ''}${fmtShortDate(new Date(i.date))}</time></div>`;
+  }).join('');
+  const impSum = dl ? `${dl.inc.length} in the draft${dl.added.length ? ` ·&nbsp;<span class="sp-blue">${dl.added.length} new</span>` : ''}${dl.gone ? ` ·&nbsp;<span class="t-red">${dl.gone} deleted</span>` : ''}`
+    : imps.length ? todayPlural(imps.length, 'logged', 'logged') : 'Nothing logged yet';
   // The draft reads in full right here, so it works whoever wrote it and wherever it is in review.
   const full = window._weekDraftFull === c.id, flat = d && d.draft ? d.draft.replace(/\s+/g, ' ').trim() : '';
   const long = flat.length > 220 || (d && /\n\s*\n/.test(d.draft || ''));
   const editingDraft = d && d.draft && !w.sent && window._weekDraftEdit === c.id + '|' + d.author;
+  const draftCount = dl ? `<span>${todayPlural(dl.inc.length, 'improvement')}</span>` : '';
   const draft = editingDraft ? `<div class="sp-sec"><b>The draft</b></div>
 <textarea class="sp-draft-edit" id="draft-${c.id}" spellcheck="true" aria-label="Draft">${escapeHtml(d.draft)}</textarea>
 <div class="sp-draft-acts"><button class="btn" onclick="cancelWeekDraftEdit()">Cancel</button><button class="btn btn-p" onclick="saveWeekDraftEdit('${c.id}',${jsArg(d.author)})">Save Changes</button></div>`
-    : d && d.draft ? `<div class="sp-sec"><b>The draft</b>${long ? `<a class="x-lnk" href="#" data-grow="wk-draft" onclick="window._weekDraftFull=${full ? 'null' : `'${c.id}'`};renderThisWeek();return false;">${full ? 'Show less' : 'Read in full'}</a>` : ''}</div>
-<div class="sp-draft${full ? ' is-full' : ''}" data-grow-key="wk-draft"><b>Your weekly update — ${escapeHtml(updateRangeLabel(c))}</b>${full ? `<div class="sp-draft-body">${draftBodyHtml(d.draft)}</div>` : `<p>${escapeHtml(flat.slice(0, 320))}</p>`}</div>` : '';
+    : d && d.draft ? `<div class="sp-sec"><b>The draft</b>${draftCount}${long ? `<a class="x-lnk" href="#" data-grow="wk-draft" onclick="window._weekDraftFull=${full ? 'null' : `'${c.id}'`};renderThisWeek();return false;">${full ? 'Show less' : 'Read in full'}</a>` : ''}</div>
+<div class="sp-draft${full ? ' is-full' : ''}" data-grow-key="wk-draft"><b>Your weekly update — ${escapeHtml(updateRangeLabel(c))}</b>${full ? `<div class="sp-draft-body">${draftBodyHtml(d.draft)}</div>` : `<p>${escapeHtml(flat.slice(0, 320))}</p>`}</div>${weekDraftNote(w)}` : '';
   const seq = weekHistory(c), ots = onTimeSummary(seq);
-  return `<aside class="sp" aria-label="${escapeHtml(c.name)}, this week’s update">
-<div class="sp-bar"><button class="ib" aria-label="Close" onclick="closeWeekPanel()">${icon('x')}</button><a class="x-lnk" href="#" onclick="openClientDetail('${c.id}');return false;">Open client</a></div>
+  const wkSum = ots.total ? `${histDotsHtml(seq)}${ots.onTime} of ${ots.total} on time` : 'Starts with the first update';
+  return `<aside class="sp sp-wk has-foot" aria-label="${escapeHtml(c.name)}, this week’s update">
+<div class="sp-bar"><button class="ib" aria-label="Close" title="Close (Esc)" onclick="closeWeekPanel()">${icon('x')}</button><a class="x-lnk" href="#" onclick="openClientDetail('${c.id}');return false;">Open client page</a></div>
+<div class="sp-main">
 <div class="sp-head">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}</b><span>${[w.owner, c.service].filter(Boolean).map(escapeHtml).join(' · ')}</span></div></div>
-<div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b><span class="sub">${sub}</span>${acts}${weekDraftNote(w)}</div>
-<div class="sp-steps">${steps}</div>
+<div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b><span class="sub">${sub}</span>${acts}</div>
 ${draft}
-<div class="sp-sec"><b>In this update</b><span>${imps.length}</span><a class="x-lnk" href="#" onclick="openQueueLogImprovementModal('${c.id}');return false;">Log Improvement</a></div>
-<div data-grow-key="wk-imps">${impRows || '<p class="sp-empty">Nothing logged since the last update.</p>'}${more}</div>
-<div class="sp-sec"><b>Last 8 weeks</b><span>${ots.total ? `${ots.onTime} of ${ots.total} on time` : 'History starts with the first update'}</span></div>
-${weekStripHtml(c)}
+<div class="sp-folds">
+${weekFoldHtml('imps', 'Improvements', impSum, impRows || '<p class="sp-empty">Nothing logged since the last update.</p>')}
+${weekFoldHtml('prog', 'Progress', progSum, `<div class="sp-steps">${steps}</div>`)}
+${weekFoldHtml('wks', 'Last 8 weeks', wkSum, weekStripHtml(c))}
+</div>
+</div>
+${clientQuickActionsHtml(c)}
 </aside>`;
 }
 

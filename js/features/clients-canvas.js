@@ -104,12 +104,19 @@ function renderClientsTable(){
   const old = document.getElementById('clientInspector'); if(old){ old.hidden = true; old.innerHTML = ''; }
 }
 
-// The client panel: the one thing to do, the everyday actions, why it needs attention, the
-// details you'd look up (owner settable), this week's update, hours, history, recent work.
+// The everyday actions for a client, in a toolbar at the foot of its panel (here and This Week).
+function clientQuickActionsHtml(c){
+  const A = `'${c.id}'`;
+  return `<div class="sp-foot" role="toolbar" aria-label="Quick actions">${[['Log Improvement', `openQueueLogImprovementModal(${A})`, 'square-pen'], ['Track Time', `openTimerModal(${A})`, 'timer'],
+    ['Note', `openNoteModal(null,${A})`, 'notebook-pen'], ['Reminder', `openNewReminderModal(${A})`, 'bell']]
+    .map(([t, fn, ic]) => `<button class="cl-act" onclick="${fn}">${icon(ic)}<span>${t}</span></button>`).join('')}${c.email ? `<a class="cl-act" href="mailto:${escapeHtml(c.email)}">${icon('envelope-simple')}<span>Email</span></a>` : ''}</div>`;
+}
+// The client panel: the one thing to do, then three numbers (this week, hours, on time), why it
+// needs attention and the details you'd look up (owner settable). The everyday actions sit at the foot.
 function clientPanelHtml({ c, h, w, owner }){
-  const next = nextStepTask(c), lvl = h.quiet ? h.rawLevel : h.level, me = myName(), approver = canApprove();
+  const next = nextStepTask(c), lvl = h.quiet ? h.rawLevel : h.level, approver = canApprove();
   const start = c.startDate ? new Date(c.startDate + 'T12:00:00') : null;
-  const meta = [c.service, start ? 'client since ' + start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : ''].filter(Boolean).map(escapeHtml).join(' · ');
+  const meta = [owner, c.service, start ? 'since ' + start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : ''].filter(Boolean).map(escapeHtml).join(' · ');
   const A = `'${c.id}'`;
   let eyebrow, title, sub, acts = '';
   if(lvl !== 'g'){
@@ -129,10 +136,18 @@ function clientPanelHtml({ c, h, w, owner }){
     title = t.what; sub = w.note ? escapeHtml(w.note) : '';
     if(t.act) acts = `<button class="btn" onclick="openWeekClient(${A})">Open in This Week</button><button class="btn btn-p" onclick="${t.act[0]}">${escapeHtml(t.act[1])}</button>`;
   }
-  const quick = [['Log Improvement', `openQueueLogImprovementModal(${A})`, 'square-pen'], ['Track Time', `openTimerModal(${A})`, 'timer'],
-    ['Note', `openNoteModal(null,${A})`, 'notebook-pen'], ['Reminder', `openNewReminderModal(${A})`, 'bell']]
-    .map(([t, fn, ic]) => `<button class="cl-act" onclick="${fn}">${icon(ic)}<span>${t}</span></button>`).join('')
-    + (c.email ? `<a class="cl-act" href="mailto:${escapeHtml(c.email)}">${icon('envelope-simple')}<span>Email</span></a>` : '');
+  // three numbers: this week's update (opens it in This Week), hours this month, on time
+  const hp = h.hp, ots = onTimeSummary(h.seq), lateNow = w.late && !w.sent;
+  const weekB = w.sent ? 'Sent' : lateNow ? lateWords(w) : w.dueText;
+  const weekS = w.sent ? relDay(w.last) : w.done >= 3 ? 'Approved, not sent yet' : w.done === 2 ? (approver ? 'Draft waiting for you' : 'Draft waiting for review')
+    : w.draft ? 'Draft not sent for review' : w.logged.length ? `${todayPlural(w.logged.length, 'improvement')}, no draft` : 'Nothing logged yet';
+  const hoursB = hp.budget ? `<span${hp.used > hp.budget ? ' class="t-red"' : ''}>${Math.round(hp.used)}</span> / ${hp.budget} h` : `${Math.round(hp.used)} h`;
+  const hoursS = hp.budget ? `<span class="s${hp.projected > hp.budget ? ' t-red' : ''}">On pace for ${Math.round(hp.projected)} h</span>` : '<span class="s">No monthly budget</span>';
+  const nums = `<div class="cl-m">
+<button class="cl-mc" onclick="openWeekClient(${A})" title="Open in This Week"><span class="k">This week</span><b${lateNow ? ' class="t-red"' : ''}>${escapeHtml(weekB)}</b><span class="s">${escapeHtml(weekS)}</span></button>
+<div class="cl-mc"><span class="k">Hours</span><b>${hoursB}</b>${hoursS}</div>
+<div class="cl-mc"><span class="k">On time</span><b>${ots.total ? `${ots.onTime} of ${ots.total}` : '—'}</b><span class="s">${ots.total ? histDotsHtml(h.seq) : 'No updates yet'}</span></div>
+</div>`;
   const why = h.signals.map(s => `<div class="hp-w"><span class="sig ${s.l}">${icon(s.icon)}</span><div class="tx"><b>${escapeHtml(s.title)}</b><span>${escapeHtml(s.text)}</span></div><span class="hp-since">${escapeHtml(relDay(s.since))}</span></div>`).join('');
   // details
   const [how, why2] = ownerReason(c);
@@ -144,34 +159,17 @@ function clientPanelHtml({ c, h, w, owner }){
   const site = c.website ? `<a class="cl-link" href="${safeUrl(c.website.startsWith('http') ? c.website : 'https://' + c.website)}" target="_blank" rel="noopener">${escapeHtml(c.website.replace(/^https?:\/\//, '').replace(/\/$/, ''))}</a>` : '';
   const kv = (k, v) => v ? `<div class="cl-kv"><span>${k}</span><span>${v}</span></div>` : '';
   const details = kv('Owner', ownerCell) + (why2 ? `<p class="cl-own-note">${escapeHtml(why2)}${approver ? ' Choose someone to make it fixed.' : ''}</p>` : '')
-    + kv('Contact', contact) + kv('Website', site) + kv('Monthly hours', h.hp.budget ? `${h.hp.budget} h` : '');
-  // this week's update: the four steps
-  const d = w.draft, cur = w.sent ? 4 : w.done;
-  const stepSub = [w.sent || w.done > 0 ? todayPlural(w.logged.length || 0, 'item') : 'Nothing yet',
-    w.sent || w.done > 1 ? (d && d.draftPendingSince ? whenShort(d.draftPendingSince) : 'Done') : d ? 'Not yet' : 'No draft',
-    w.sent || w.done > 2 ? 'Done' : w.done === 2 ? (approver ? 'Waiting on you' : 'Waiting on review') : '',
-    w.sent ? relDay(w.last) : w.late ? lateWords(w) : w.dueText];
-  const steps = STEP_NAMES.map((n, k) => `<div class="sp-st ${k < cur ? 'd' : k === cur ? 'w' : ''}"><span class="dot">${k < cur ? icon('check', { weight: 'bold' }) : ''}</span><b>${k === 1 ? 'Sent for review' : n}</b><span${k === 3 && w.late ? ' class="t-red"' : ''}>${escapeHtml(stepSub[k])}</span></div>`).join('');
-  const hp = h.hp, scale = Math.max(hp.budget, hp.projected, hp.used, 1);
-  const hours = hp.budget ? `<div class="sp-sec"><b>Hours this month</b><span>${Math.round(hp.used)} of ${hp.budget} h</span></div>
-<div class="hp-hb"><i class="${hp.used > hp.budget ? 'over' : ''}" style="width:${(hp.used / scale * 100).toFixed(1)}%"></i><span class="hp-proj" style="width:${(hp.projected / scale * 100).toFixed(1)}%"></span><span class="hp-bud" style="left:${(hp.budget / scale * 100).toFixed(1)}%"></span></div>
-<div class="hp-hl"><span><b>${Math.round(hp.used)} h</b> used</span><span>Budget ${hp.budget} h</span><span class="${hp.projected > hp.budget ? 't-red' : ''}">On pace for ${Math.round(hp.projected)} h</span></div>` : '';
-  const ots = onTimeSummary(h.seq);
-  const recent = [...(c.improvements || [])].filter(i => i.date && new Date(i.date) <= rNow()).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 3)
-    .map(i => `<div class="sp-imp"><b>${escapeHtml(i.text)}</b><span>${escapeHtml(firstName(i.author || ''))} · ${fmtShortDate(new Date(i.date))}${i.includeInEmail === false ? ' · internal' : ''}</span></div>`).join('');
-  const weekTxt = w.sent ? `Sent ${relDayLower(w.last)}` : w.late ? lateWords(w) : w.dueText;
-  return `<aside class="sp cl-p" aria-label="${escapeHtml(c.name)}">
+    + kv('Contact', contact) + kv('Website', site) + kv('Monthly hours', hp.budget ? `${hp.budget} h` : '');
+  return `<aside class="sp cl-p has-foot" aria-label="${escapeHtml(c.name)}">
 <div class="sp-bar"><button class="ib" aria-label="Close" title="Close (Esc)" onclick="closeClientInspector()">${icon('x')}</button><span class="cl-pbar-r">${approver || c.website ? `<button class="ib" aria-label="More" title="More" onclick="clientPanelMore(event, ${A})">${icon('dots-three')}</button>` : ''}<a class="x-lnk" href="#" onclick="openClientDetail(${A});return false;">Open client page</a></span></div>
+<div class="sp-main">
 <div class="sp-head">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}</b><span>${meta}</span></div></div>
 <div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b>${sub ? `<span class="sub">${sub}</span>` : ''}${acts ? `<div class="sp-acts">${acts}</div>` : ''}</div>
-<div class="cl-acts">${quick}</div>
+${nums}
 ${h.signals.length ? `<div class="sp-sec"><b>Why it needs attention</b><span>${todayPlural(h.signals.length, 'signal')}</span></div>${why}` : ''}
-<div class="sp-sec"><b>Details</b></div><div class="cl-kvs">${details}</div>
-<div class="sp-sec"><b>This week’s update</b><span${w.late && !w.sent ? ' class="t-red"' : ''}>${escapeHtml(weekTxt)}</span></div>
-<div class="sp-steps">${steps}</div>
-${hours}
-<div class="sp-sec"><b>Last 8 weekly updates</b><span>${ots.total ? `${ots.onTime} of ${ots.total} on time` : ''}</span></div>${weekStripHtml(c)}
-${recent ? `<div class="sp-sec"><b>Recent work</b><a class="x-lnk" href="#" onclick="openClientDetail(${A});return false;">See all</a></div>${recent}` : ''}
+<div class="sp-sec"><b>Details</b>${approver ? `<a class="x-lnk" href="#" onclick="openEditClientForm(${A});return false;">Edit</a>` : ''}</div><div class="cl-kvs">${details}</div>
+</div>
+${clientQuickActionsHtml(c)}
 </aside>`;
 }
 // "…" in the panel: website, edit, delete.

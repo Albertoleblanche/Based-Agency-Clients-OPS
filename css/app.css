@@ -1627,3 +1627,48 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .cl-own select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:default;font:inherit}
 .cl-own-note{margin:-2px 0 8px 110px;font-size:11.5px;line-height:1.4;color:var(--label-3)}
 .cl-p .sp-st span.t-red{color:var(--red);font-weight:500}
+
+/* Panels with a toolbar at the foot (This Week, All Clients): the page scrolls under the toolbar,
+   and when it's short the toolbar still sits at the bottom of the panel. */
+.sp.has-foot{padding-bottom:0}
+.sp.has-foot .sp-main{min-height:calc(100% - 64px);padding-bottom:24px}
+.sp-foot{position:sticky;bottom:0;z-index:2;display:flex;gap:2px;height:64px;box-sizing:border-box;margin:0 -26px;padding:6px 18px 8px;border-top:.5px solid var(--sep);background:var(--window)}
+.sp-foot .cl-act{flex:1 1 auto;min-width:0}
+.sp-foot .cl-act svg{width:18px;height:18px}
+.sp-foot .cl-act span{overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.sp-blue{color:var(--blue)}
+/* the draft note sits under the draft now */
+.sp-wk .sp-dnote{margin-top:14px}
+.sp-wk .sp-status{border-bottom:0;padding-bottom:4px}
+/* Folded rows: a disclosure row with a summary on the right; open, its content sits indented under it */
+.sp-folds{margin-top:22px;border-top:.5px solid var(--sep)}
+.sp-fold{border-bottom:.5px solid var(--sep)}
+.mac .sp-fold-h{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;margin:0;padding:0;border:0;background:none;color:var(--label);font:inherit;font-size:13.5px;text-align:left;cursor:default}
+.sp-fold-h > svg{width:12px;height:12px;flex:0 0 auto;color:var(--label-3)}
+.sp-fold-h[aria-expanded="true"] > svg{transform:rotate(90deg)}
+.sp-fold-h b{font-weight:600}
+.sp-fold-h .sm{margin-left:auto;display:inline-flex;align-items:center;min-width:0;font-size:12.5px;color:var(--label-2);white-space:nowrap}
+.sp-fold-h .sm .hist{margin-right:8px}
+.sp-fold-h:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.sp-fold-b{padding:0 0 0 20px}
+.sp-fold.is-open .sp-fold-b{padding-bottom:14px}
+.sp-fold-b .sp-steps{margin-top:6px}
+.sp-fold-b .wkstrip{margin-top:0}
+.sp-fold-b .sp-empty{margin:0}
+.sp-i{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12.5px;line-height:1.3}
+.sp-i > svg{width:14px;height:14px;flex:0 0 auto;color:var(--label-3)}
+.sp-i.is-in > svg{color:var(--green)}
+.sp-i.is-new > svg{color:var(--blue)}
+.sp-i > span{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sp-i time{flex:0 0 auto;font-size:11.5px;color:var(--label-3)}
+/* All Clients panel: three numbers under the status */
+.cl-p .sp-status{border-bottom:0;padding-bottom:4px}
+.cl-m{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-top:14px;border-bottom:.5px solid var(--sep)}
+.mac .cl-mc{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0;margin:0;padding:4px 14px 14px;border:0;border-left:.5px solid var(--sep);background:none;color:inherit;font:inherit;text-align:left;cursor:default}
+.cl-mc:first-child{padding-left:0;border-left:0}
+.mac button.cl-mc:hover b{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
+.cl-mc .k{font-size:11.5px;font-weight:500;color:var(--label-2)}
+.cl-mc b{font-size:17px;font-weight:650;letter-spacing:-.015em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cl-mc .s{max-width:100%;font-size:11.5px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cl-mc .s .hist{margin-top:5px}
+.cl-mc .t-red{color:var(--red)}
