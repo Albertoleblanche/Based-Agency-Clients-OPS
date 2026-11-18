@@ -22,6 +22,9 @@ Run new `.sql` files once in Supabase → SQL Editor. The current one:
 - `addendum-colors-and-plan.sql` — colors on tasks and notes, and the Plan tab's
   sprints and weekly hours (private to each person). Until it's run, tasks and notes
   save without a color and Plan shows what's coming up but can't save sprints.
+- `schema-whatsapp-tasks.sql` — the WhatsApp tables (client groups, the open items the
+  connector finds, its runs and settings). Until it's run, the WhatsApp screen says it isn't
+  set up. The connector itself runs on the office PC: see `whatsapp-connector/README.md`.
 
 ---
 

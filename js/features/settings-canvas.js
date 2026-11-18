@@ -10,6 +10,7 @@ const SETTINGS_TABS = [
   ['fields', 'Client Fields', 'buildings', () => canApprove()],
   ['ai', 'AI & Email', 'envelope-simple', () => true],
   ['integrations', 'Integrations', 'plugs-connected', () => true],
+  ['whatsapp', 'WhatsApp', 'message-circle', () => canApprove() && typeof setWhatsapp === 'function'],
   ['notifications', 'Notifications', 'bell', () => true],
 ];
 function switchSettingsTab(name){
@@ -17,6 +18,7 @@ function switchSettingsTab(name){
   settingsTab = name; renderSettingsView();
   if(name === 'ai' && isAdmin()) loadAiProviderConnectionStatus();
   if(name === 'integrations') loadIntegrationStatuses();
+  if(name === 'whatsapp' && typeof waStartPoll === 'function') waStartPoll();
 }
 function openSettingsTab(tab){ settingsTab = tab === 'clients' ? 'fields' : tab; switchView('settings'); setTimeout(() => switchSettingsTab(settingsTab), 0); }
 
@@ -52,7 +54,7 @@ function renderSettingsView(){
   const cur = tabs.find(t => t[0] === settingsTab);
   if(currentViewName === 'settings') setToolbar(cur[1], 'Settings');
   const keep = document.activeElement && document.activeElement.id;
-  const body = { general: setGeneral, updates: setUpdates, fields: setFields, ai: setAi, integrations: setIntegrations, notifications: setNotifications }[settingsTab]();
+  const body = { general: setGeneral, updates: setUpdates, fields: setFields, ai: setAi, integrations: setIntegrations, notifications: setNotifications, whatsapp: typeof setWhatsapp === 'function' ? setWhatsapp : setGeneral }[settingsTab]();
   root.innerHTML = `<div class="set-tb"><div class="set-tabs" role="toolbar" aria-label="Settings sections">${tabs.map(([k, t, ic]) => `<button class="set-tab${k === settingsTab ? ' on' : ''}" ${k === settingsTab ? 'aria-current="page"' : ''} onclick="switchSettingsTab('${k}')">${icon(ic)}<span>${t}</span></button>`).join('')}</div></div>
 <div class="set-body">${body}<p class="t-2" style="font-size:13px;margin:14px 4px 0">Changes save as you make them.</p></div>`;
   if(keep){ const el = document.getElementById(keep); if(el && el.tagName !== 'BUTTON') el.focus(); }
@@ -267,6 +269,7 @@ async function loadIntegrationStatuses(){
   if(canApprove() && typeof loadSlackClientChannels === 'function'){
     try{ if(!slackChannelsLoaded) await loadSlackClientChannels(); integ.slackUnlinked = activeClients().filter(c => !slackClientChannels[c.id]).length; }catch(e){}
   }
+  if(canApprove() && typeof loadWaTasks === 'function'){ try{ await loadWaTasks(); }catch(e){} }
   if(currentViewName === 'settings' && settingsTab === 'integrations') renderSettingsView();
 }
 function setIntegrations(){
@@ -286,6 +289,8 @@ function setIntegrations(){
     h == null ? st('', 'Checking…') : h.connected ? st('green', 'Connected') : st('hollow', 'Not connected'), `<button class="btn" onclick="openIntegrationSheet('harvest')">${h && h.connected ? 'Settings…' : 'Connect…'}</button>`]);
   if(approver) rows.push(['slack-logo', 'Slack', 'Client channels and daily summaries',
     integ.slackUnlinked == null ? st('', 'Checking…') : integ.slackUnlinked ? st('yellow', `${integ.slackUnlinked} client${integ.slackUnlinked === 1 ? '' : 's'} not linked`) : st('green', 'Connected'), `<button class="btn" onclick="openIntegrationSheet('slack')">Link…</button>`]);
+  const wa = typeof waIntegrationRow === 'function' ? waIntegrationRow() : null;
+  if(wa) rows.push(wa);
   rows.push(['table', 'Google Sheet', settings.sheetCsvUrl ? 'Pulls the client list from a published sheet' : 'Keep the client list in a Google Sheet',
     settings.sheetCsvUrl ? st('green', 'Connected') : st('hollow', 'Not connected'), `${settings.sheetCsvUrl ? `<button class="btn" onclick="syncFromSheetUrl()">Sync Now</button>` : ''}<button class="btn" onclick="openIntegrationSheet('sheet')">${settings.sheetCsvUrl ? 'Edit…' : 'Connect…'}</button>`]);
   const html = rows.map(([ic, n, d, s, b]) => `<div class="fr"><span class="ic lg">${icon(ic)}</span><div class="l"><b>${n}</b><span>${d}</span></div>${s}${b}</div>`).join('');

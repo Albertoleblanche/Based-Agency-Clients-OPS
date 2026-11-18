@@ -158,6 +158,7 @@ async function showApp(session){
       typeof loadClientReminders === 'function' ? loadClientReminders() : null,
       typeof loadTaskDueTimes === 'function' ? loadTaskDueTimes() : null,
       typeof loadPlan === 'function' ? loadPlan() : null,
+      typeof loadWaTasks === 'function' ? loadWaTasks() : null,
     ]);
     document.getElementById('appRoot').style.display = 'flex';
     renderAll();

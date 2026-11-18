@@ -184,6 +184,7 @@ async function fullRefresh(showFeedback){
     loadUpdateHistory(), loadHealthHandled(),
     typeof loadTaskDueTimes === 'function' ? loadTaskDueTimes() : null,
     typeof loadPlan === 'function' ? loadPlan() : null,
+    typeof loadWaTasks === 'function' ? loadWaTasks() : null,
   ]);
   renderAll();
   updateTasksNavBadge();

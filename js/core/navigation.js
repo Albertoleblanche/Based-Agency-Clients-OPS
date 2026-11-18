@@ -124,6 +124,7 @@ const VIEW_TITLES = {
   plan: ['Plan', 'Your next six weeks — private to you'],
   'task-archive': ['Finished Tasks', 'Everything that’s been done'],
   reminders: ['Reminders', "Client questions waiting on a response, visible to the whole team"],
+  whatsapp: ['WhatsApp', 'Open requests and questions from client WhatsApp groups'],
   calendar: ['Calendar', "The whole team's calendar in one place — meetings, deadlines, and reminders"],
   time: ['Time', 'Your timesheet, reports and payroll'],
   team: ['Team', "Everyone on the team, and what they do here"],
@@ -143,6 +144,7 @@ const CMDK_PAGE_ICONS = {
   notes: '<svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M229.66,58.34l-32-32a8,8,0,0,0-11.32,0l-96,96A8,8,0,0,0,88,128v32a8,8,0,0,0,8,8h32a8,8,0,0,0,5.66-2.34l96-96A8,8,0,0,0,229.66,58.34ZM124.69,152H104V131.31l64-64L188.69,88ZM200,76.69,179.31,56,192,43.31,212.69,64ZM224,128v80a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V48A16,16,0,0,1,48,32h80a8,8,0,0,1,0,16H48V208H208V128a8,8,0,0,1,16,0Z"/></svg>',
   tasks: '<svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M224,128a8,8,0,0,1-8,8H128a8,8,0,0,1,0-16h88A8,8,0,0,1,224,128ZM128,72h88a8,8,0,0,0,0-16H128a8,8,0,0,0,0,16Zm88,112H128a8,8,0,0,0,0,16h88a8,8,0,0,0,0-16ZM82.34,42.34,56,68.69,45.66,58.34A8,8,0,0,0,34.34,69.66l16,16a8,8,0,0,0,11.32,0l32-32A8,8,0,0,0,82.34,42.34Zm0,64L56,132.69,45.66,122.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32,0l32-32a8,8,0,0,0-11.32-11.32Zm0,64L56,196.69,45.66,186.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32,0l32-32a8,8,0,0,0-11.32-11.32Z"/></svg>',
   reminders: '<svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M221.8,175.94C216.25,166.38,208,139.33,208,104a80,80,0,1,0-160,0c0,35.34-8.26,62.38-13.81,71.94A16,16,0,0,0,48,200H88.81a40,40,0,0,0,78.38,0H208a16,16,0,0,0,13.8-24.06ZM128,216a24,24,0,0,1-22.62-16h45.24A24,24,0,0,1,128,216ZM48,184c7.7-13.24,16-43.92,16-80a64,64,0,1,1,128,0c0,36.05,8.28,66.73,16,80Z"/></svg>',
+  whatsapp: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" /></svg>',
   calendar: '<svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM72,48v8a8,8,0,0,0,16,0V48h80v8a8,8,0,0,0,16,0V48h24V80H48V48ZM208,208H48V96H208V208Z"/></svg>',
   time: '<svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M128,40a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,40Zm0,176a80,80,0,1,1,80-80A80.09,80.09,0,0,1,128,216ZM173.66,90.34a8,8,0,0,1,0,11.32l-40,40a8,8,0,0,1-11.32-11.32l40-40A8,8,0,0,1,173.66,90.34ZM96,16a8,8,0,0,1,8-8h48a8,8,0,0,1,0,16H104A8,8,0,0,1,96,16Z"/></svg>',
   team: '<svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M244.8,150.4a8,8,0,0,1-11.2-1.6A51.6,51.6,0,0,0,192,128a8,8,0,0,1-7.37-4.89,8,8,0,0,1,0-6.22A8,8,0,0,1,192,112a24,24,0,1,0-23.24-30,8,8,0,1,1-15.5-4A40,40,0,1,1,219,117.51a67.94,67.94,0,0,1,27.43,21.68A8,8,0,0,1,244.8,150.4ZM190.92,212a8,8,0,1,1-13.84,8,57,57,0,0,0-98.16,0,8,8,0,1,1-13.84-8,72.06,72.06,0,0,1,33.74-29.92,48,48,0,1,1,58.36,0A72.06,72.06,0,0,1,190.92,212ZM128,176a32,32,0,1,0-32-32A32,32,0,0,0,128,176ZM72,120a8,8,0,0,0-8-8A24,24,0,1,1,87.24,82a8,8,0,1,0,15.5-4A40,40,0,1,0,37,117.51,67.94,67.94,0,0,0,9.6,139.19a8,8,0,1,0,12.8,9.61A51.6,51.6,0,0,1,64,128,8,8,0,0,0,72,120Z"/></svg>',
@@ -344,7 +346,7 @@ async function openScreenFromAddress(hash){
 
 // Leaving a screen closes its right-hand panel, so the screen is back to its list when you return.
 // It redraws once the screen is hidden, so nothing animates out of sight or on the way back.
-const PANEL_STATE = { approve: ['_weekSel', '_weekDraftEdit'], health: ['_healthSel'], focusreports: ['_focusSel'], tasks: ['_taskSel'], plan: ['_planSel', '_planAddStep', '_planAddRem'] };
+const PANEL_STATE = { approve: ['_weekSel', '_weekDraftEdit'], health: ['_healthSel'], focusreports: ['_focusSel'], tasks: ['_taskSel'], plan: ['_planSel', '_planAddStep', '_planAddRem'], whatsapp: ['_waSel'] };
 function closePanelOnLeave(view){
   if(view === 'clients'){
     if(typeof inspectedClientId === 'undefined' || !inspectedClientId) return;
@@ -354,7 +356,7 @@ function closePanelOnLeave(view){
   const keys = PANEL_STATE[view];
   if(!keys || !keys.some(k => window[k])) return;
   keys.forEach(k => { window[k] = null; });
-  const redraw = { approve: 'renderThisWeek', health: 'renderHealth', focusreports: 'drawFocusReports', tasks: 'renderTasks', plan: 'renderPlan' }[view];
+  const redraw = { approve: 'renderThisWeek', health: 'renderHealth', focusreports: 'drawFocusReports', tasks: 'renderTasks', plan: 'renderPlan', whatsapp: 'renderWhatsapp' }[view];
   if(typeof window[redraw] === 'function') window[redraw]();
 }
 
@@ -408,7 +410,7 @@ async function switchView(name){
   // Called here, ahead of 7 unrelated network requests, instead of after
   // them — there was never a reason for this page specifically to wait.
   if(name==='profile'){ renderProfilePage(); }
-  if(name==='settings' && typeof renderSettingsView === 'function'){ renderSettingsView(); if(settingsTab === 'integrations') loadIntegrationStatuses(); if(settingsTab === 'ai' && isAdmin()) loadAiProviderConnectionStatus(); }
+  if(name==='settings' && typeof renderSettingsView === 'function'){ renderSettingsView(); if(settingsTab === 'integrations') loadIntegrationStatuses(); if(settingsTab === 'ai' && isAdmin()) loadAiProviderConnectionStatus(); if(settingsTab === 'whatsapp' && typeof waStartPoll === 'function') waStartPoll(); }
   // weekly_focus_reports is a completely independent table — none of the
   // 7 requests in fullRefresh() below touch it, so this page gains
   // nothing from waiting behind them either.
@@ -432,6 +434,7 @@ async function switchView(name){
   }
   if(name==='teamqueue') renderTeamQueue();
   if(name==='plan' && typeof renderPlan === 'function') renderPlan();
+  if(name==='whatsapp' && typeof openWhatsappView === 'function') openWhatsappView();
   if(name==='time') (typeof renderTimeView === 'function' ? renderTimeView() : renderTimesheet());
 }
 
