@@ -777,3 +777,12 @@ body.mac :is(input[type="text"], input:not([type]), input[type="email"], input[t
 .td-clear svg { width: 30px; height: 30px; color: var(--green); margin-bottom: 6px; }
 .td-clear b { font-size: 16px; font-weight: 600; }
 .td-clear span { font-size: 13.5px; color: var(--label-2); }
+/* Today on wide screens: one centered column; the chart fills its panel */
+.td { max-width: 1320px; margin: 0 auto; width: 100%; }
+.td-cols { height: 92px; gap: 6px; margin-top: auto; }
+.td-col { flex: 1 1 0; max-width: none; border-radius: 4px 4px 0 0; }
+.td-wks { display: flex; justify-content: space-between; margin-top: 6px; font-size: 12px; color: var(--label-3); }
+.td-kp:focus:not(:focus-visible) { background: none; }
+.td-kp:focus:not(:focus-visible):hover { background: var(--fill); }
+.td-cols { justify-content: space-between; }
+.td-col { max-width: 24px; }

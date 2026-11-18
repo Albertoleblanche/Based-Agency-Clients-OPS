@@ -145,6 +145,12 @@ async function showApp(session){
       loadTeamProfiles(), loadMyNotes(), loadTimeEntries(), loadMyTasks(),
       loadNotifications(), loadCalendarEvents(),
       loadDangerHistory().then(seedDangerHistoryIfEmpty),
+      // The weekly model reads these: without them the first screen counts every client
+      // as never updated until the next refresh.
+      typeof loadUpdateHistory === 'function' ? loadUpdateHistory() : null,
+      typeof loadHealthHandled === 'function' ? loadHealthHandled() : null,
+      typeof loadClientReminders === 'function' ? loadClientReminders() : null,
+      typeof loadTaskDueTimes === 'function' ? loadTaskDueTimes() : null,
     ]);
     document.getElementById('appRoot').style.display = 'flex';
     renderAll();

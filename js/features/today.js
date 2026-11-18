@@ -78,7 +78,8 @@ function renderToday(){
   const sentPct = sum.total ? Math.round(sum.sent / sum.total * 100) : 0;
   const upcoming = sum.ws.filter(w => w.sent).sort((x, y) => x.due - y.due);
   const nextDay = upcoming[0] ? upcoming.filter(w => toDateStr(w.due) === toDateStr(upcoming[0].due)) : [];
-  const nextLine = nextDay.length ? `Next due: ${nextDay.length} ${upcoming[0].daysLeft === 1 ? 'tomorrow' : 'on ' + (upcoming[0].daysLeft < 7 ? DAY_NAMES[upcoming[0].due.getDay()] : fmtShortDate(upcoming[0].due))}` : 'Nothing else due this week';
+  const dueNow = sum.ws.filter(needsUpdate).length;
+  const nextLine = dueNow ? `${dueNow} due or overdue now` : nextDay.length ? `Next due: ${nextDay.length} ${upcoming[0].daysLeft === 1 ? 'tomorrow' : 'on ' + (upcoming[0].daysLeft < 7 ? DAY_NAMES[upcoming[0].due.getDay()] : fmtShortDate(upcoming[0].due))}` : 'Nothing due this week';
   const kp = (label, ic, n, sub, go, red) => `<button class="td-kp" onclick="${go}"><span class="td-kl">${icon(ic, { weight: 'bold' })}${label}</span><span class="td-kv"><b class="${n && red ? 't-red' : ''}">${n}</b></span><span class="td-ks">${escapeHtml(sub)}</span></button>`;
   const oldest = waiting[0] ? fmtWait(waiting[0].d.draftPendingSince || rNow()) : '';
   const strip = `<div class="td-strip">
@@ -118,7 +119,7 @@ ${kp('At risk', 'heart-pulse', myRisk.length, myRisk.length ? todayNames(myRisk.
   });
   const MAX = 4, myCount = list.filter(myClientsFilter).length, rest = Math.max(0, myCount - used.size);
   const moreRow = rows.length > MAX ? `<a class="td-more" href="#approve" onclick="weekFilter='behind';switchView('approve');return false;">Show all ${rows.length}${CHEV()}</a>` : '';
-  const foot = used.size ? `<div class="td-foot">${icon('check-circle')}Nothing else needs you: the other ${todayPlural(rest, 'client')} ${rest === 1 ? 'is' : 'are'} on track.</div>`
+  const foot = rows.length > MAX ? '' : used.size ? `<div class="td-foot">${icon('check-circle')}${rest ? `Nothing else needs you: the other ${todayPlural(rest, 'client')} ${rest === 1 ? 'is' : 'are'} on track.` : 'That’s everything for now.'}</div>`
     : `<div class="td-clear">${icon('check-circle')}<b>You’re all caught up</b><span>${escapeHtml(nextDueText(mine) || 'Nothing is waiting on you right now.')}</span></div>`;
   const needs = `<section class="td-needs"><div class="td-h"><div><h2>Needs you</h2><span>${(lead ? 1 : 0) + rows.length ? todayPlural((lead ? 1 : 0) + rows.length, 'thing') : 'All clear'}</span></div></div>
 ${lead}${rows.length ? `<div class="td-also">${lead ? 'Also waiting on you' : ''}</div>${rows.slice(0, MAX).join('')}${moreRow}` : ''}${foot}</section>`;
@@ -163,7 +164,7 @@ ${evRows || '<div class="td-empty">No meetings today.</div>'}</aside>`;
     return `<i class="td-col" title="Week of ${fmtShortDate(mon)}: ${w.o} on time${w.l ? ', ' + w.l + ' late' : ''}${w.m ? ', ' + w.m + ' missed' : ''}" style="height:${Math.max(4, t / maxN * 100)}%">${w.m ? `<i class="miss" style="flex:${w.m}"></i>` : ''}${w.l ? `<i class="late" style="flex:${w.l}"></i>` : ''}${w.o ? `<i class="ok" style="flex:${w.o}"></i>` : ''}</i>`; }).join('');
   const ontime = `<section class="td-ag"><div class="td-h"><div><h2>Updates on time</h2><span>Last 7 weeks</span></div></div>
 ${pct == null ? '<div class="td-empty">Not enough history yet.</div>' : `<div class="td-big"><b>${pct}%</b>${delta != null && delta !== 0 ? `<span class="${delta > 0 ? 't-green' : 't-red'}">${icon(delta > 0 ? 'arrow-up' : 'arrow-down', { weight: 'bold' })}${Math.abs(delta)} pts</span>` : ''}</div>
-<div class="td-cols">${bars}</div><div class="td-lg"><span><i class="late"></i>Late <b>${cur.l}</b></span><span><i class="miss"></i>Missed <b>${cur.m}</b></span></div>`}</section>`;
+<div class="td-cols">${bars}</div><div class="td-wks"><span>${fmtShortDate(addDays(dayStart(addDays(now, -((now.getDay() + 6) % 7))), -49))}</span><span>${fmtShortDate(addDays(dayStart(addDays(now, -((now.getDay() + 6) % 7))), -7))}</span></div><div class="td-lg"><span><i class="late"></i>Late <b>${cur.l}</b></span><span><i class="miss"></i>Missed <b>${cur.m}</b></span></div>`}</section>`;
   const hc = { g: 0, y: 0, r: 0 }; health.forEach(x => hc[x.h.level]++);
   const risky = health.filter(x => x.h.level === 'r').slice(0, 2);
   const healthPanel = `<section class="td-ag"><div class="td-h"><div><h2>Client health</h2><span>${todayPlural(list.length, 'client')}</span></div><a class="td-link" href="#health" onclick="switchView('health');return false;">Open</a></div>
