@@ -124,7 +124,7 @@ async function mLoadAll(){
   clientReminders = (rr.data || []).map(r => ({ id: r.id, clientId: r.client_id, question: r.question, askedBy: r.asked_by, askedDate: r.asked_date, followUpDate: r.follow_up_date, status: r.status }));
   notes = (nr.data || []).map(n => ({ id: n.id, clientId: n.client_id, title: n.title, text: n.text, status: n.status, link: n.link, followUpDate: n.follow_up_date, updatedAt: n.updated_at }));
   timeEntries = (er.data || []).map(e => ({ id: e.id, userId: e.user_id, clientId: e.client_id, date: e.entry_date, minutes: e.minutes, description: e.description || '', service: e.service || '', logged: !!e.logged,
-    createdAt: e.created_at, harvestProjectId: e.harvest_project_id || null, harvestTaskId: e.harvest_task_id || null }));
+    createdAt: e.created_at, harvestProjectId: e.harvest_project_id || null, harvestTaskId: e.harvest_task_id || null, source: e.source || '', harvestLocked: !!e.harvest_locked }));
   notifications = nf.data || [];
   teamProfiles = pr.data || [];
   myProfile = teamProfiles.find(p => p.id === uid) || myProfile;

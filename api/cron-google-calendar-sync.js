@@ -13,7 +13,7 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const { syncGoogleCalendarForUser } = require('../lib/google-calendar-sync');
-const { syncTimeEntryToHarvest, syncHarvestSetup } = require('../lib/harvest-sync');
+const { syncTimeEntryToHarvest, syncHarvestSetup, syncHarvestTime } = require('../lib/harvest-sync');
 const { sendPushToUser, pushUrlFor } = require('../lib/push-notify');
 const { sendSlackDM } = require('../lib/slack-notify');
 
@@ -135,6 +135,7 @@ async function syncHarvestCatchUp(admin) {
   let synced = 0, failed = 0, unmapped = 0;
   for (const entry of pending) {
     const result = await syncTimeEntryToHarvest(admin, connection, entry);
+    if (result.harvestEntryId) await admin.from('time_entries').delete().eq('harvest_entry_id', result.harvestEntryId).eq('source', 'harvest').neq('id', entry.id);
     await admin.from('time_entries').update({
       harvest_sync_status: result.status,
       harvest_entry_id: result.harvestEntryId || entry.harvest_entry_id || null,
@@ -163,7 +164,7 @@ module.exports = async function handler(req, res) {
   }
 
   const admin = createClient(supabaseUrl, serviceKey);
-  const result = { calendarSync: null, reminders: null, escalations: null, harvestSync: null, harvestSetup: null };
+  const result = { calendarSync: null, reminders: null, escalations: null, harvestSync: null, harvestSetup: null, harvestTime: null };
 
   try { result.reminders = await notifyDueReminders(admin); }
   catch (e) { result.reminders = { error: String(e) }; }
@@ -185,6 +186,11 @@ module.exports = async function handler(req, res) {
       : !('setup_synced_at' in connection) ? { skipped: 'needs-sql' }
       : await syncHarvestSetup(admin, connection, { full: true });
   } catch (e) { result.harvestSetup = { error: String(e) }; }
+  // Time logged in Harvest, everything from the first of last month (drops what was deleted there).
+  try {
+    const { data: connection } = await admin.from('harvest_connection').select('*').eq('id', 1).maybeSingle();
+    result.harvestTime = !connection ? { skipped: 'not-connected' } : await syncHarvestTime(admin, connection, { full: true });
+  } catch (e) { result.harvestTime = { error: String(e) }; }
 
   res.status(200).json(result);
 };

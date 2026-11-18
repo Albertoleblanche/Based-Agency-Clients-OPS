@@ -44,6 +44,8 @@ Run new `.sql` files once in Supabase → SQL Editor. The current one:
   archives. Until it's run, Radar reads Harvest as before and adds no clients.
 - `addendum-harvest-time.sql` — time entries keep the Harvest project and task they were logged
   to. Until it's run, Log Time asks for a service as before.
+- `addendum-harvest-time-read.sql` — time logged in Harvest is read into Radar (source, Harvest
+  person, invoiced lock). Until it's run, Radar sends time to Harvest and reads none back.
 
 ## Weekly wins
 
@@ -77,6 +79,12 @@ a time is typed) ask for Client → Project → Task, with the client's projects
 and each task's Billable or Non-billable. Entries go to Harvest as the person who logged them
 (matched by email); someone not in Harvest, or a client that isn't, keeps the time in Radar.
 Older entries without a project still go through the client and service mappings.
+
+Time logged in Harvest shows in Radar (step 4): from the first of last month on, what changed
+whenever someone opens Radar and everything each night, the same entry in both. It shows From
+Harvest on the Time screen; invoiced ones are read only; a full read with an administrator's token
+removes what was deleted in Harvest. People only in Harvest count by name. A client's monthly hours
+follow its Harvest projects' monthly hour budgets.
 
 ---
 

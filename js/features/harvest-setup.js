@@ -76,6 +76,8 @@ function hvBudget(p){
   const amt = hours ? `${n % 1 ? n.toFixed(1) : n} h` : `$${Math.round(n).toLocaleString('en-US')}`;
   return `${amt}${p.budget_is_monthly ? ' a month' : ''}`;
 }
+// "October 1": time is read from the first of last month
+function hvMonthStart(){ const n = rNow(); return new Date(n.getFullYear(), n.getMonth() - 1, 1).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }); }
 // "at 2:05 PM", "yesterday at 3:00 PM", "Nov 14 at 9:00 AM"
 function hvWhen(iso){ const d = new Date(iso), k = daysBetween(dayStart(d), dayStart(rNow())); return (k === 0 ? 'at ' : '') + (typeof waAt === 'function' ? waAt(iso) : fmtTime(d)); }
 const hvUserName = u => [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email || 'Someone';
@@ -120,8 +122,10 @@ ${s.tokenUser && !isAdminToken ? `<div class="fr hv-warn"><div class="l"><b>Not 
   html += `<div class="hv-sec"><div class="set-h">Read from Harvest</div><div class="form-grp">
 ${fr('Clients, projects and tasks', `${c.clients || 0} clients · ${c.projects || 0} projects · ${c.tasks || 0} tasks · ${read}${s.error ? `<br><span class="t-red">${escapeHtml(s.error)}</span>` : ''}`,
   canApprove() ? `<button class="btn" onclick="hvSyncNow()"${hvSyncing ? ' disabled' : ''}>${hvSyncing ? icon('loader', { cls: 'spin' }) : icon('arrows-clockwise')}${hvSyncing ? 'Reading…' : 'Sync Now'}</button>` : '')}
+${s.timeReady ? fr('Time logged in Harvest', `From ${hvMonthStart()} on · ${s.timeSyncedAt ? `read ${hvWhen(s.timeSyncedAt)}` : 'not read yet'}. It shows on the Time screen and counts in hours and budgets.`, '')
+  : fr('Time logged in Harvest', 'Run <code>addendum-harvest-time-read.sql</code> in Supabase so Radar reads it.', '')}
 </div>
-<p class="t-2 hv-p">Read only: Radar never changes Harvest. It reads what changed whenever someone opens Radar, at most every 10 minutes, and everything each night.</p></div>`;
+<p class="t-2 hv-p">Radar never changes Harvest’s setup. It reads what changed whenever someone opens Radar, at most every 10 minutes, and everything each night.</p></div>`;
 
   // ---- clients, with their projects and tasks
   const active = d.clients.filter(x => x.is_active).sort((a, b) => a.name.localeCompare(b.name));

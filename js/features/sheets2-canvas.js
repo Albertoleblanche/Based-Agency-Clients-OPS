@@ -224,6 +224,15 @@ ${hvPickBlockHtml('manual', cid, d.projectId, d.taskId)}
 function openTimeEntryModal(id){
   const e = timeEntries.find(x => x.id === id);
   if(!e) return;
+  // invoiced or approved in Harvest: it can't change, there or here
+  if(e.harvestLocked){
+    const c = clients.find(x => x.id === e.clientId), kv = (k, v) => v ? `<label>${k}</label><div class="hvp-one">${escapeHtml(v)}</div>` : '';
+    openAppModal(`<h3>Time</h3>
+<div class="f">${kv('Client', c ? c.name : '')}${kv('Project', (e.harvestProjectId && typeof hvProjectName === 'function' && hvProjectName(e.harvestProjectId)) || e.service)}${kv('Task', e.harvestTaskId && typeof hvTaskName === 'function' ? hvTaskName(e.harvestTaskId) : '')}${kv('Date', fmtShortDate(new Date(e.date + 'T12:00:00')))}${kv('Time', hmm(e.minutes))}${kv('Notes', e.description)}</div>
+<p class="t-2" style="margin:14px 0 0;font-size:13px;line-height:1.45">Invoiced in Harvest, so it can’t change here.</p>
+<div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal()">Done</button></div>`, 460);
+    return;
+  }
   const c = clients.find(x => x.id === e.clientId);
   const mine = e.userId ? e.userId === currentUser.id : true;
   openAppModal(`<h3>Edit Time</h3>
@@ -331,6 +340,9 @@ function openEditClientForm(id){
   const g = k => document.getElementById(k);
   g('ncName').value = c.name; g('ncEmail').value = c.email || ''; g('ncWebsite').value = c.website || '';
   g('ncBudget').value = c.monthlyHourBudget || ''; g('ncSow').value = c.sow || '';
+  // monthly hours that come from Harvest's budget are changed there (step 4)
+  const hvB = typeof hvClientBudget === 'function' ? hvClientBudget(id) : 0;
+  if(hvB){ g('ncBudget').value = hvB; g('ncBudget').disabled = true; const n = g('ncBudget').nextElementSibling; if(n) n.textContent = 'From Harvest’s monthly budget. Change it there.'; }
   sheetSetSelect('ncService', c.service); sheetSetSelect('ncStatus', c.status);
   sheetSetSelect('ncImportance', c.importance); sheetSetSelect('ncDanger', c.danger);
   if(c.startDate) sheetSetSelect('ncStartDate', c.startDate);

@@ -110,10 +110,10 @@ function clientSetupPanelHtml(c){
     : d ? WIN_DAY_NAMES[d] : 'Every 7 days', null);
   // hours: from Harvest's monthly budget when it has one
   const hvHours = ps.filter(p => p.budget_by === 'project' && p.budget_is_monthly && Number(p.budget) > 0).reduce((a, p) => a + Number(p.budget), 0);
-  rows += row('hours', 'Hours a month', approver
+  rows += row('hours', 'Hours a month', approver && !hvHours
     ? `<span class="su-h"><input class="tf su-in su-num" id="suHours" type="number" min="0" step="0.5" value="${c.monthlyHourBudget || ''}" placeholder="—" onchange="setClientSetupField(${A}, 'monthlyHourBudget', this.value)" aria-label="Hours a month"><span>h</span></span>`
-    : c.monthlyHourBudget ? `${c.monthlyHourBudget} h` : '<span class="t-3">No budget</span>', null,
-    hvHours && Number(c.monthlyHourBudget) === Math.round(hvHours * 10) / 10 ? 'From Harvest’s monthly budget.' : approver ? 'Leave empty if there’s no budget.' : '');
+    : hvHours ? `${Math.round(hvHours * 10) / 10} h` : c.monthlyHourBudget ? `${c.monthlyHourBudget} h` : '<span class="t-3">No budget</span>', null,
+    hvHours ? 'From Harvest’s monthly budget. Change it there.' : approver ? 'Leave empty if there’s no budget.' : '');
 
   // it may be a client Radar already has
   const guess = approver ? clientSameAsGuesses(c)[0] : null;

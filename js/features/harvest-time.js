@@ -14,11 +14,11 @@ async function hvTimeLoad(){
   try{
     const [c, p, t, ta, ua, u, probe] = await Promise.all([
       q('harvest_clients', 'harvest_id, name, is_active, radar_client_id'),
-      q('harvest_projects', 'harvest_id, client_harvest_id, name, is_active'),
+      q('harvest_projects', 'harvest_id, client_harvest_id, name, is_active, budget, budget_by, budget_is_monthly'),
       q('harvest_tasks', 'harvest_id, name, is_active'),
       q('harvest_task_assignments', 'project_harvest_id, task_harvest_id, billable, is_active'),
       q('harvest_user_assignments', 'project_harvest_id, user_harvest_id, is_active'),
-      q('harvest_users', 'harvest_id, team_profile_id, is_active'),
+      q('harvest_users', 'harvest_id, first_name, last_name, team_profile_id, is_active'),
       supabaseClient.from('time_entries').select('harvest_project_id').limit(1),
     ]);
     if(c.error || p.error || t.error || ta.error || ua.error || u.error){ hvTime = { ready: false }; return; }
@@ -29,6 +29,7 @@ async function hvTimeLoad(){
       clients: c.data || [], projects: (p.data || []).filter(x => x.is_active),
       tasks: new Map((t.data || []).map(x => [Number(x.harvest_id), x])),
       taskAssign: (ta.data || []).filter(x => x.is_active), userAssign: (ua.data || []).filter(x => x.is_active),
+      people: u.data || [],
     };
   }catch(e){ hvTime = { ready: false }; }
 }
@@ -49,6 +50,21 @@ function hvProjectTasks(projectId){
   return hvTime.taskAssign.filter(a => Number(a.project_harvest_id) === Number(projectId))
     .map(a => { const t = hvTime.tasks.get(Number(a.task_harvest_id)); return t && t.is_active !== false ? { id: Number(t.harvest_id), name: t.name, billable: a.billable !== false } : null; })
     .filter(Boolean).sort((a, b) => (b.billable - a.billable) || a.name.localeCompare(b.name));
+}
+// Step 4: a client's monthly hours from Harvest (its projects' monthly hour budgets), or 0.
+// The server keeps the client's budget in step; this tells the screens it comes from Harvest.
+function hvClientBudget(clientId){
+  if(!hvTime || !hvTime.projects || !clientId) return 0;
+  const hc = (hvTime.clients || []).find(x => String(x.radar_client_id || '') === String(clientId));
+  if(!hc) return 0;
+  const h = hvTime.projects.filter(p => Number(p.client_harvest_id) === Number(hc.harvest_id) && p.budget_by === 'project' && p.budget_is_monthly && Number(p.budget) > 0)
+    .reduce((a, p) => a + Number(p.budget), 0);
+  return Math.round(h * 10) / 10;
+}
+// The name of a Harvest person with no Radar account (their time still counts).
+function hvPersonName(harvestUserId){
+  const u = hvTime && (hvTime.people || []).find(x => Number(x.harvest_id) === Number(harvestUserId));
+  return u ? [u.first_name, u.last_name].filter(Boolean).join(' ') : '';
 }
 function hvProjectName(id){ const p = hvTimeOn() && hvTime.projects.find(x => Number(x.harvest_id) === Number(id)); return p ? p.name : ''; }
 function hvTaskName(id){ const t = hvTimeOn() && hvTime.tasks.get(Number(id)); return t ? t.name : ''; }

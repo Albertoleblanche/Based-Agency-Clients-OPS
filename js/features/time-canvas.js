@@ -130,12 +130,15 @@ function tsRowHtml(e, rng){
   const c = clients.find(x => x.id === e.clientId);
   const sub = [c ? c.name : 'Client removed', typeof hvEntryWords === 'function' ? hvEntryWords(e) : e.service].filter(Boolean).map(escapeHtml).join(' · ');
   // in Harvest, or why not (a failed send is tried again when the entry is edited and each night)
+  // logged in Harvest (step 4), invoiced there, sent there, or why not (tried again when edited and each night)
   const sync = e.harvestStatus === 'failed' || (e.harvestStatus === 'unmapped' && e.harvestProjectId) ? `<span class="tmi-sync is-err" title="${escapeHtml(e.harvestError || 'Not in Harvest yet')}">${icon('warning')}Not in Harvest</span>`
+    : e.harvestLocked ? `<span class="tmi-sync" title="Invoiced in Harvest, so it can’t change here">Invoiced</span>`
+    : e.source === 'harvest' ? `<span class="tmi-sync" title="Logged in Harvest">From Harvest</span>`
     : e.harvestId ? `<span class="tmi-sync" title="In Harvest">${icon('check', { weight: 'bold' })}Harvest</span>` : '';
   return `<div class="tmi-r" role="button" tabindex="0" onclick="openTimeEntryModal('${e.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)openTimeEntryModal('${e.id}')">
 <span class="tmi-rng">${rng ? `${fmtTime(rng.start).replace(/ [AP]M$/, '')} – ${fmtTime(rng.end).replace(/ [AP]M$/, '')}` : ''}</span>${tsClientMono(c)}
 <div class="tx"><b>${escapeHtml(e.description || 'No description')}</b><span class="s">${sub}</span></div>
-${sync}<button class="ib tmi-cont" aria-label="Continue this" title="Continue this" data-resume-client="${e.clientId}" data-resume-desc="${encodeURIComponent(e.description || '')}" data-resume-entry="${e.id}" onclick="event.stopPropagation();continueEntry(this)">${icon('play')}</button><span class="tmi-dur">${hmm(e.minutes)}</span></div>`;
+${sync}${e.harvestLocked ? '<span class="tmi-cont"></span>' : `<button class="ib tmi-cont" aria-label="Continue this" title="Continue this" data-resume-client="${e.clientId}" data-resume-desc="${encodeURIComponent(e.description || '')}" data-resume-entry="${e.id}" onclick="event.stopPropagation();continueEntry(this)">${icon('play')}</button>`}<span class="tmi-dur">${hmm(e.minutes)}</span></div>`;
 }
 function tsRunRowHtml(){
   const tc = clients.find(x => x.id === timerState.clientId);
@@ -318,7 +321,7 @@ function renderReports(){
   const grouped = {};
   relevant.forEach(e => {
     const c = clients.find(x => x.id === e.clientId);
-    const key = reportTab === 'clients' ? e.clientId : reportTab === 'services' ? (e.service || c?.service || 'No service set') : e.userId;
+    const key = reportTab === 'clients' ? e.clientId : reportTab === 'services' ? (e.service || c?.service || 'No service set') : (e.userId || (e.harvestUserId ? 'hv:' + e.harvestUserId : null));
     grouped[key] = (grouped[key] || 0) + e.minutes;
   });
   const rows = Object.entries(grouped).sort((a, b) => b[1] - a[1]);
@@ -345,7 +348,8 @@ ${withBudget ? `<td class="num t-2">${b ? b + 'h' : '—'}</td>` : ''}
     head = `<th>${reportTab === 'services' ? 'Service' : 'Teammate'}</th><th class="num">Hours</th><th>Share</th><th class="num"></th>`;
     body = shown.map(([k, m]) => {
       const p = reportTab === 'teammates' ? teamProfiles.find(x => x.id === k) : null;
-      const name = reportTab === 'teammates' ? `<span style="display:inline-flex;align-items:center;gap:8px">${avHtml(p?.name || '?')}${escapeHtml(p?.name || 'Former teammate')}</span>` : escapeHtml(k);
+      const hvName = reportTab === 'teammates' && !p && String(k).startsWith('hv:') && typeof hvPersonName === 'function' ? hvPersonName(String(k).slice(3)) : '';
+      const name = reportTab === 'teammates' ? `<span style="display:inline-flex;align-items:center;gap:8px">${avHtml(p?.name || hvName || '?')}${escapeHtml(p?.name || hvName || 'Former teammate')}${hvName ? ' <span class="t-3">· Harvest only</span>' : ''}</span>` : escapeHtml(k);
       return `<tr><td>${name}</td><td class="num">${hrs(m)}</td><td style="width:34%"><div class="bar"><i style="width:${m / total * 100}%"></i></div></td><td class="num t-2">${Math.round(m / total * 100)}%</td></tr>`;
     }).join('');
   }

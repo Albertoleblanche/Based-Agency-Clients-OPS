@@ -30,6 +30,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { syncGoogleCalendarForUser } = require('../lib/google-calendar-sync');
 const {
   syncHarvestSetup,
+  syncHarvestTime,
   linkHarvestClient,
   validateHarvestCredentials,
   fetchHarvestProjectsAndTasks,
@@ -151,6 +152,8 @@ module.exports = async function handler(req, res) {
         setup: {
           ready: clients !== null,                       // false until addendum-harvest-sync.sql is run
           clientsReady: !linkColErr,                     // false until addendum-harvest-clients.sql is run
+          timeReady: !!connection && 'time_synced_at' in connection, // false until addendum-harvest-time-read.sql is run
+          timeSyncedAt: connection?.time_synced_at || null,
           syncedAt: connection?.setup_synced_at || null,
           fullAt: connection?.setup_full_at || null,
           error: connection?.setup_sync_error || null,
@@ -210,6 +213,9 @@ module.exports = async function handler(req, res) {
       const last = connection.setup_synced_at ? new Date(connection.setup_synced_at).getTime() : 0;
       if (!force && Date.now() - last < 10 * 60000) { res.status(200).json({ skipped: 'recent', syncedAt: connection.setup_synced_at }); return; }
       const result = await syncHarvestSetup(admin, connection, { full: force });
+      // step 4: time logged in Harvest (needs addendum-harvest-time-read.sql)
+      try { result.time = await syncHarvestTime(admin, connection, { full: force }); }
+      catch (e) { result.time = { error: e.status === 403 ? 'This token isn\'t allowed to read time entries.' : e.message }; }
       res.status(200).json(result);
       return;
     }
@@ -273,6 +279,8 @@ module.exports = async function handler(req, res) {
         return;
       }
       const result = await syncTimeEntryToHarvest(admin, connection, entry);
+      // a read from Harvest may have brought this entry in already, before its id was saved here
+      if (result.harvestEntryId) await admin.from('time_entries').delete().eq('harvest_entry_id', result.harvestEntryId).eq('source', 'harvest').neq('id', timeEntryId);
       await admin.from('time_entries').update({
         harvest_sync_status: result.status,
         harvest_entry_id: result.harvestEntryId || entry.harvest_entry_id || null,
@@ -295,6 +303,7 @@ module.exports = async function handler(req, res) {
         .in('harvest_sync_status', ['pending', 'failed']).is('deleted_at', null).limit(200);
       for (const entry of (pending || [])) {
         const result = await syncTimeEntryToHarvest(admin, connection, entry);
+        if (result.harvestEntryId) await admin.from('time_entries').delete().eq('harvest_entry_id', result.harvestEntryId).eq('source', 'harvest').neq('id', entry.id);
         await admin.from('time_entries').update({
           harvest_sync_status: result.status,
           harvest_entry_id: result.harvestEntryId || entry.harvest_entry_id || null,

@@ -31,7 +31,7 @@ let timesheetAnchor = new Date();
 async function loadTimeEntries(){
   const { data, error } = await supabaseClient.from('time_entries').select('*').is('deleted_at', null).order('entry_date', { ascending:false });
   if(error){ console.error('loadTimeEntries error', error); timeEntries = []; timeEntriesDataLoaded = true; return; }
-  timeEntries = (data||[]).map(e=>({ id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes, description:e.description||'', service:e.service||'', createdAt:e.created_at, logged:!!e.logged, harvestStatus:e.harvest_sync_status||'', harvestId:e.harvest_entry_id||null, harvestError:e.harvest_sync_error||'', harvestProjectId:e.harvest_project_id||null, harvestTaskId:e.harvest_task_id||null }));
+  timeEntries = (data||[]).map(e=>({ id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes, description:e.description||'', service:e.service||'', createdAt:e.created_at, logged:!!e.logged, harvestStatus:e.harvest_sync_status||'', harvestId:e.harvest_entry_id||null, harvestError:e.harvest_sync_error||'', harvestProjectId:e.harvest_project_id||null, harvestTaskId:e.harvest_task_id||null, source:e.source||'', harvestUserId:e.harvest_user_id||null, harvestLocked:!!e.harvest_locked }));
   timeEntriesDataLoaded = true;
   if(typeof renderToday === 'function') renderToday();
 }
