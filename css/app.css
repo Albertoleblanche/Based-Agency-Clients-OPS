@@ -2148,3 +2148,17 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .wn-note svg{width:13px;height:13px;flex:0 0 auto;margin-top:2px}
 .wn-note.is-red,.wn-note.is-red svg{color:var(--red)}
 .cl-edit{display:inline-block;margin-top:10px;font-size:12.5px}
+
+/* ---------- WhatsApp grouped by client (canvas "WhatsApp — grouped by client") ---------- */
+.wa-sort{margin:30px 0 4px;font-size:12px;color:var(--label-3)}
+.wa-g + .wa-g{margin-top:4px}
+.wa-gh{display:flex;align-items:baseline;gap:8px;padding:10px 0 5px;border-bottom:.5px solid var(--sep)}
+.wa-gh b{font-size:14.5px;font-weight:650;letter-spacing:-.01em}
+.wa-gh .n{font-size:12.5px;font-weight:600;color:var(--label-3)}
+.wa-g .rmi-r.wa-r{padding-top:10px;padding-bottom:10px}
+.wa-g .rmi-r + .rmi-r::before{left:46px}
+.wa-hi{flex:0 0 auto;font-style:normal;font-size:12px;font-weight:600;color:var(--accent)}
+.wa-dot{flex:0 0 auto;font-style:normal;color:var(--label-3)}
+.wa-r .tx .s{gap:6px}
+.wa-r .wa-x{margin-left:4px}
+.rmi-when.is-new{color:var(--blue)}

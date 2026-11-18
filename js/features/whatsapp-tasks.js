@@ -69,7 +69,18 @@ async function waLoadNow(){
   if(waCanManage()){ waRuns = r.data || []; waSettings = s.data || null; waGroups = g.data || []; }
   waLoaded = true;
   updateWaNavBadge();
+  waStartRealtime();
   return true;
+}
+// New items arrive while you work: the badge (and the screen, if it's open) update as they come,
+// not only when you open WhatsApp.
+function waStartRealtime(){
+  if(waRealtimeStarted || typeof supabaseClient.channel !== 'function' || !waReady || waHidden()) return;
+  waRealtimeStarted = true;
+  supabaseClient.channel('wa-tasks').on('postgres_changes', { event: '*', schema: 'public', table: 'wa_tasks' }, async () => {
+    await loadWaTasks();
+    if(currentViewName === 'whatsapp') renderWhatsapp();
+  }).subscribe();
 }
 
 // ---- small helpers ---------------------------------------------------------------------------
@@ -83,7 +94,8 @@ function waOpenForMe(){ return waTasks.filter(t => t.status === 'open' && t.owne
 function updateWaNavBadge(){
   const b = document.getElementById('navWhatsappBadge');
   if(!b) return;
-  const n = waHidden() ? 0 : waOpenForMe().length;   // your own, like Tasks; leads see the rest on the screen
+  // What's waiting, until it's answered or done: everyone's for admins and approvers, your own otherwise.
+  const n = waHidden() ? 0 : waCanManage() ? waTasks.filter(t => t.status === 'open').length : waOpenForMe().length;
   b.textContent = n; b.style.display = n ? 'flex' : 'none';
 }
 function waDays(t){ return Math.max(0, daysBetween(dayStart(new Date(t.first_seen)), dayStart(rNow()))); }
@@ -111,6 +123,7 @@ function waClient(t){
     || all.find(c => { const cn = waNorm(c.name); return Math.min(cn.length, n.length) > 4 && (cn.startsWith(n + ' ') || n.startsWith(cn + ' ')); })
     || null;
 }
+function waClientLabel(t){ const c = waClient(t); return c ? c.name : waCleanName(t.client || (waGroup(t) || {}).name || 'Unknown client'); }
 function waMono(t, cls){ const c = waClient(t); return monoHtml(c || { id: 'wa:' + t.client, name: t.client }, cls); }
 // When, in words: "11:00 AM", "yesterday at 3:00 PM", "tomorrow at 9:00 AM", "Nov 14 at 9:00 AM"
 function waAt(iso){
@@ -277,8 +290,9 @@ function waDraw(root){
     : open.length ? `${open.length} waiting on ${whoName}` : `Nothing waiting on ${whoName}`;
   const subBits = [];
   if(waTab === 'open' && open.length){
-    if(late.length) subBits.push(`${late.length} ${late.length === 1 ? 'has' : 'have'} waited ${WA_LATE_DAYS} days or more`);
-    if(high.length) subBits.push(`${high.length} high priority`);
+    if(late.length) subBits.push(`<span class="t-red">${late.length} ${late.length === 1 ? 'has' : 'have'} waited ${WA_LATE_DAYS} days or more</span>`);
+    const today = open.filter(t => waDays(t) === 0).length;
+    if(today) subBits.push(`${today} new today`);
   }
   if(lead && conn.key === 'connected'){
     const last = waLastRun(), next = waNextCheck();
@@ -291,13 +305,14 @@ function waDraw(root){
   const filters = `<div class="seg" role="tablist" aria-label="Show">${[['open', 'Waiting', open.length], ['done', 'Done this week', done.length]].map(([k, t, c]) => `<button class="${waTab === k ? 'on' : ''}" role="tab" aria-selected="${waTab === k}" onclick="setWa('tab','${k}')">${t} <span class="c">${c}</span></button>`).join('')}</div>
 ${lead ? `<label class="pop pop-sel"><span class="pl">${escapeHtml(curWho[1])}</span>${icon('caret-down')}<select aria-label="Whose items" onchange="setWa('who',this.value)">${whoOpts.map(([v, n]) => `<option value="${v}"${v === who ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('')}</select></label>` : ''}`;
 
+  // Grouped under the client's name, so two things split from one message read as one client.
+  // Waiting: the client who has waited longest first; done: the most recent first.
+  const byClient = items => { const m = new Map(); items.forEach(t => { const k = waClientLabel(t); if(!m.has(k)) m.set(k, []); m.get(k).push(t); }); return [...m.entries()]; };
+  const groupHtml = ([name, ts]) => `<section class="wa-g" aria-label="${escapeHtml(name)}"><div class="wa-gh"><b>${escapeHtml(name)}</b>${ts.length > 1 ? `<span class="n">${ts.length}</span>` : ''}</div>${ts.map(t => waRowHtml(t, sel, who)).join('')}</section>`;
   let list;
-  if(waTab === 'open' && open.length){
-    list = (late.length ? `<div class="rmi-sec"><b>Waiting ${WA_LATE_DAYS} days or more</b><span class="is-red">${late.length}</span></div>${late.map(t => waRowHtml(t, sel, who)).join('')}` : '')
-      + (fresh.length ? `<div class="rmi-sec"><b>New</b><span>${fresh.length}</span></div>${fresh.map(t => waRowHtml(t, sel, who)).join('')}` : '');
-  } else if(waTab === 'done' && done.length){
-    list = `<div class="wa-list">${done.map(t => waRowHtml(t, sel, who)).join('')}</div>`;
-  } else list = waEmptyHtml(who, open, done);
+  if(waTab === 'open' && open.length) list = `<p class="wa-sort">By client, longest wait first</p>${byClient(open).map(groupHtml).join('')}`;
+  else if(waTab === 'done' && done.length) list = `<p class="wa-sort">By client, most recent first</p>${byClient(done).map(groupHtml).join('')}`;
+  else list = waEmptyHtml(who, open, done);
 
   const side = lead ? waSideHtml(who, conn) : '';
   const prev = root.querySelector('.sp-page')?.scrollTop || 0;
@@ -312,8 +327,8 @@ function waRowHtml(t, sel, who){
   const cb = !closed
     ? (can ? `<button class="cb rem" role="checkbox" aria-checked="false" aria-label="Mark done" title="Mark done" onclick="event.stopPropagation();checkOff(this, () => waMarkDone('${t.id}'))"></button>` : '<span class="cb rem is-off"></span>')
     : `<span class="cb rem${t.status === 'dismissed' ? ' closed' : ' done'}" role="img" aria-label="${t.status === 'dismissed' ? 'Not a task' : 'Done'}">${icon(t.status === 'dismissed' ? 'x' : 'check', { weight: 'bold' })}</span>`;
-  const kind = `<em class="wa-k k-${t.kind}">${icon(WA_KIND_IC[t.kind] || 'list-checks')}${escapeHtml(WA_KIND[t.kind] || 'Request')}</em>`;
-  const quote = t.source_excerpt ? `<span class="wa-x">“${escapeHtml(t.source_excerpt)}”</span>` : `<span class="wa-x">${escapeHtml(t.client)}</span>`;
+  const kind = [t.priority === 'high' && !closed ? '<em class="wa-hi">High priority</em>' : '', `<em class="wa-k k-${t.kind}">${escapeHtml(WA_KIND[t.kind] || 'Request')}</em>`].filter(Boolean).join('<i class="wa-dot">·</i>');
+  const quote = t.source_excerpt ? `<span class="wa-x">“${escapeHtml(t.source_excerpt)}”</span>` : '';
   let right;
   if(closed){
     const word = t.status === 'dismissed' ? 'Not a task' : t.status === 'answered' ? 'Answered in the group' : 'Done';
@@ -322,10 +337,10 @@ function waRowHtml(t, sel, who){
   } else {
     const showWho = lead && who !== 'mine';
     const due = t.due_date ? `Due ${t.due_date === toDateStr(rNow()) ? 'today' : fmtShortDate(new Date(t.due_date + 'T12:00:00'))}` : '';
-    right = `<span class="rmi-when${waLate(t) ? ' is-late' : ''}">${escapeHtml(waAgeWord(t))}</span><span class="rmi-d">${escapeHtml(showWho ? waOwnerName(t) : due)}</span>`;
+    right = `<span class="rmi-when${waLate(t) ? ' is-late' : waDays(t) === 0 ? ' is-new' : ''}">${escapeHtml(waAgeWord(t))}</span><span class="rmi-d">${escapeHtml(showWho ? waOwnerName(t) : due)}</span>`;
   }
-  return `<div class="rmi-r wa-r${closed ? ' is-done' : ''}${sel && sel.id === t.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectWa('${t.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)selectWa('${t.id}')">${cb}${waMono(t, 'sm')}
-<div class="tx"><b>${t.priority === 'high' && !closed ? `<span class="tk-flag" title="High priority">${icon('flag', { fill: true })}</span>` : ''}${escapeHtml(t.title)}</b><span class="s">${kind}${quote}</span></div><div class="rmi-w">${right}</div></div>`;
+  return `<div class="rmi-r wa-r${closed ? ' is-done' : ''}${sel && sel.id === t.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectWa('${t.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)selectWa('${t.id}')">${cb}
+<div class="tx"><b>${escapeHtml(t.title)}</b><span class="s">${kind}${quote}</span></div><div class="rmi-w">${right}</div></div>`;
 }
 function waEmptyHtml(who, open, done){
   if(waTab === 'done') return emptyState({ icon: 'check-circle', title: 'Nothing done this week yet',
@@ -577,13 +592,7 @@ async function openWhatsappView(){
   await loadWaTasks();
   renderWhatsapp();
   if(window._waSel) waLoadChat(window._waSel);
-  if(!waRealtimeStarted && typeof supabaseClient.channel === 'function' && waReady){
-    waRealtimeStarted = true;
-    supabaseClient.channel('wa-tasks').on('postgres_changes', { event: '*', schema: 'public', table: 'wa_tasks' }, async () => {
-      await loadWaTasks();
-      if(currentViewName === 'whatsapp') renderWhatsapp();
-    }).subscribe();
-  }
+  waStartRealtime();
 }
 // Escape closes the panel.
 document.addEventListener('keydown', e => {
