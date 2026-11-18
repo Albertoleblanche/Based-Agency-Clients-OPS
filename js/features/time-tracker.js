@@ -31,7 +31,7 @@ let timesheetAnchor = new Date();
 async function loadTimeEntries(){
   const { data, error } = await supabaseClient.from('time_entries').select('*').is('deleted_at', null).order('entry_date', { ascending:false });
   if(error){ console.error('loadTimeEntries error', error); timeEntries = []; timeEntriesDataLoaded = true; return; }
-  timeEntries = (data||[]).map(e=>({ id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes, description:e.description||'', service:e.service||'', createdAt:e.created_at, logged:!!e.logged, harvestStatus:e.harvest_sync_status||'', harvestId:e.harvest_entry_id||null }));
+  timeEntries = (data||[]).map(e=>({ id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes, description:e.description||'', service:e.service||'', createdAt:e.created_at, logged:!!e.logged, harvestStatus:e.harvest_sync_status||'', harvestId:e.harvest_entry_id||null, harvestError:e.harvest_sync_error||'', harvestProjectId:e.harvest_project_id||null, harvestTaskId:e.harvest_task_id||null }));
   timeEntriesDataLoaded = true;
   if(typeof renderToday === 'function') renderToday();
 }
@@ -305,11 +305,14 @@ function toggleTimer(){
 // could plausibly be created in quick succession (e.g. a timer running
 // while also logging a manual entry) and a stale read would silently
 // lose one of them.
-async function mergeOrInsertTimeEntry({ clientId, service, dateStr, minutes, description }){
-  const { data: existing } = await supabaseClient
-    .from('time_entries').select('id, minutes, description')
-    .eq('user_id', currentUser.id).eq('client_id', clientId).eq('service', service||'')
-    .eq('entry_date', dateStr).is('deleted_at', null).maybeSingle();
+async function mergeOrInsertTimeEntry({ clientId, service, dateStr, minutes, description, projectId, taskId }){
+  // logged by project and task (step 3 of the Harvest plan): one entry per client, project, task and day
+  let q = supabaseClient.from('time_entries').select('id, minutes, description')
+    .eq('user_id', currentUser.id).eq('client_id', clientId).eq('entry_date', dateStr).is('deleted_at', null);
+  q = projectId ? q.eq('harvest_project_id', projectId) : q.eq('service', service||'');
+  if(projectId) q = taskId ? q.eq('harvest_task_id', taskId) : q.is('harvest_task_id', null);
+  const { data: rows } = await q.limit(1);
+  const existing = rows && rows[0];
 
   if(existing){
     const newTotal = existing.minutes + minutes;
@@ -322,7 +325,8 @@ async function mergeOrInsertTimeEntry({ clientId, service, dateStr, minutes, des
   }
 
   const { data, error } = await supabaseClient.from('time_entries').insert({
-    user_id: currentUser.id, client_id: clientId, entry_date: dateStr, minutes, description, service
+    user_id: currentUser.id, client_id: clientId, entry_date: dateStr, minutes, description, service,
+    ...(projectId ? { harvest_project_id: projectId, harvest_task_id: taskId || null } : {})
   }).select('id').single();
   return { error, merged: false, entryId: data?.id || null };
 }
@@ -354,6 +358,7 @@ async function stopAndSaveTimer(opts){
   const service = timerState.service || '';
   const description = timerState.description;
   const resumeEntryId = timerState.resumeEntryId;
+  const projectId = timerState.projectId || null, taskId = timerState.taskId || null;
   timerState = { running:false, startedAt:null, clientId:'', service:'', description:'', resumeEntryId:null };
   saveTimerState();
   const btn = document.getElementById('timerToggleBtn');
@@ -379,14 +384,15 @@ async function stopAndSaveTimer(opts){
       // Original entry is gone (deleted elsewhere) — fall back to a new entry
       // rather than silently losing the tracked time.
       const { data: newRow, error: insertErr } = await supabaseClient.from('time_entries').insert({
-        user_id: currentUser.id, client_id: clientId, entry_date: toDateStr(new Date()), minutes, description, service
+        user_id: currentUser.id, client_id: clientId, entry_date: toDateStr(new Date()), minutes, description, service,
+        ...(projectId ? { harvest_project_id: projectId, harvest_task_id: taskId } : {})
       }).select('id').single();
       error = insertErr;
       if(newRow){ savedId = newRow.id; syncEntryToHarvestBackground(newRow.id); }
     }
   } else {
     const mergeResult = await mergeOrInsertTimeEntry({
-      clientId, service, dateStr: toDateStr(new Date()), minutes, description
+      clientId, service, dateStr: toDateStr(new Date()), minutes, description, projectId, taskId
     });
     error = mergeResult.error; mergedIntoExisting = mergeResult.merged; savedId = mergeResult.entryId || null;
     if(!error) syncEntryToHarvestBackground(mergeResult.entryId);
@@ -460,9 +466,11 @@ function openTimerModal(presetClientId){
 function startTimerFromModal(){
   const clientId = document.getElementById('timerModalClient').value;
   if(!clientId){ showToast('error','Pick a client',"Select which client you're working on."); return; }
-  const service = document.getElementById('timerModalService')?.value || '';
+  const pick = typeof hvPickValue === 'function' ? hvPickValue('timerModal', clientId) : { ok: true, service: document.getElementById('timerModalService')?.value || '' };
+  if(!pick.ok){ showToast('error', 'Almost there', pick.msg); return; }
+  const service = pick.service || '';
   const description = document.getElementById('timerModalDesc').value.trim();
-  timerState = { running:true, startedAt:Date.now(), clientId, service, description, resumeEntryId:null };
+  timerState = { running:true, startedAt:Date.now(), clientId, service, description, resumeEntryId:null, projectId: pick.projectId || null, taskId: pick.taskId || null };
   saveTimerState();
   if(timerIntervalId) clearInterval(timerIntervalId);
   timerIntervalId = setInterval(updateTimerDisplay, 1000);
@@ -530,19 +538,21 @@ function openManualEntryFromTask(taskId){
 
 async function addManualEntry(){
   const clientId = document.getElementById('manualClient').value;
-  const service = document.getElementById('manualService')?.value || '';
+  const pick = typeof hvPickValue === 'function' && clientId ? hvPickValue('manual', clientId) : { ok: true, service: document.getElementById('manualService')?.value || '' };
+  const service = pick.service || '';
   const dateVal = document.getElementById('manualDate').value;
   const totalMinutes = parseDurationInput(document.getElementById('manualDuration').value);
   const description = document.getElementById('manualDesc').value.trim();
   if(!clientId){ showToast('error','Pick a client','Select which client this time is for.'); return; }
   if(isClientPaused(clientId)){ showPausedClientWarning(clientId); return; }
+  if(!pick.ok){ showToast('error', 'Almost there', pick.msg); return; }
   if(!dateVal){ showToast('error','Pick a date','Choose the date this time was worked.'); return; }
   if(!totalMinutes || totalMinutes<=0){ showToast('error','Enter a duration','Try something like "1h 30m" or "1.5".'); return; }
   if(totalMinutes > 960 && !(await confirmDialog(`That's ${formatMinutes(totalMinutes)} for a single entry — did you mean minutes instead of hours?`, {confirmLabel:'Log it anyway', cancelLabel:'Let me fix it'}))) return;
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
   const { error, merged, entryId } = await mergeOrInsertTimeEntry({
-    clientId, service, dateStr: dateVal, minutes: totalMinutes, description
+    clientId, service, dateStr: dateVal, minutes: totalMinutes, description, projectId: pick.projectId, taskId: pick.taskId
   });
   restoreBtn(btn);
   const c = clients.find(x=>x.id===clientId);
@@ -755,7 +765,9 @@ function resumeEntryTimer(clientId, description, entryId){
     showToast('error','Could not resume', "This client couldn't be found — try starting the timer manually.");
     return;
   }
-  timerState = { running:true, startedAt:Date.now(), clientId, service:'', description: description||'', resumeEntryId: entryId||null };
+  const was = entryId ? timeEntries.find(e => e.id === entryId) : null;
+  timerState = { running:true, startedAt:Date.now(), clientId, service: was ? was.service || '' : '', description: description||'', resumeEntryId: entryId||null,
+    projectId: was ? was.harvestProjectId || null : null, taskId: was ? was.harvestTaskId || null : null };
   saveTimerState();
   if(timerIntervalId) clearInterval(timerIntervalId);
   timerIntervalId = setInterval(updateTimerDisplay, 1000);
@@ -785,7 +797,9 @@ function openTimeEntryModal(id){
 
 async function saveTimeEntryEdit(id){
   const clientId = document.getElementById('editEntryClient').value;
-  const service = document.getElementById('editEntryService')?.value || '';
+  const pick = typeof hvPickValue === 'function' ? hvPickValue('editEntry', clientId) : { ok: true, service: document.getElementById('editEntryService')?.value || '' };
+  if(!pick.ok){ showToast('error', 'Almost there', pick.msg); return; }
+  const service = pick.service || '';
   const dateVal = document.getElementById('editEntryDate').value;
   const totalMinutes = parseDurationInput(document.getElementById('editEntryDuration').value);
   const description = document.getElementById('editEntryDesc').value.trim();
@@ -794,7 +808,8 @@ async function saveTimeEntryEdit(id){
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
   const { error } = await supabaseClient.from('time_entries').update({
-    client_id: clientId, entry_date: dateVal, minutes: totalMinutes, description, service, harvest_sync_status: 'pending'
+    client_id: clientId, entry_date: dateVal, minutes: totalMinutes, description, service, harvest_sync_status: 'pending',
+    ...(typeof hvTimeOn === 'function' && hvTimeOn() ? { harvest_project_id: pick.projectId || null, harvest_task_id: pick.taskId || null } : {})
   }).eq('id', id);
   restoreBtn(btn);
   closeAppModal();

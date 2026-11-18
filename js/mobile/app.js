@@ -123,12 +123,13 @@ async function mLoadAll(){
     hiddenByAssigner: t.hidden_by_assigner, hiddenByAssignee: t.hidden_by_assignee }));
   clientReminders = (rr.data || []).map(r => ({ id: r.id, clientId: r.client_id, question: r.question, askedBy: r.asked_by, askedDate: r.asked_date, followUpDate: r.follow_up_date, status: r.status }));
   notes = (nr.data || []).map(n => ({ id: n.id, clientId: n.client_id, title: n.title, text: n.text, status: n.status, link: n.link, followUpDate: n.follow_up_date, updatedAt: n.updated_at }));
-  timeEntries = (er.data || []).map(e => ({ id: e.id, userId: e.user_id, clientId: e.client_id, date: e.entry_date, minutes: e.minutes, description: e.description || '', service: e.service || '', logged: !!e.logged }));
+  timeEntries = (er.data || []).map(e => ({ id: e.id, userId: e.user_id, clientId: e.client_id, date: e.entry_date, minutes: e.minutes, description: e.description || '', service: e.service || '', logged: !!e.logged,
+    createdAt: e.created_at, harvestProjectId: e.harvest_project_id || null, harvestTaskId: e.harvest_task_id || null }));
   notifications = nf.data || [];
   teamProfiles = pr.data || [];
   myProfile = teamProfiles.find(p => p.id === uid) || myProfile;
   calendarEvents = (ev.data || []).map(e => ({ id: e.id, title: e.title, startAt: e.start_at, endAt: e.end_at, allDay: e.all_day, clientId: e.client_id, location: e.location, eventType: e.event_type, attendeeIds: e.attendee_ids || [], createdBy: e.created_by }));
-  await Promise.all([loadUpdateHistory(), loadHealthHandled(), loadTaskDueTimes()]);
+  await Promise.all([loadUpdateHistory(), loadHealthHandled(), loadTaskDueTimes(), typeof hvTimeLoad === 'function' ? hvTimeLoad() : null]);
 }
 
 async function mBoot(){
@@ -937,6 +938,7 @@ function mOpenLog(presetClientId){
   const cid = presetClientId || (timerState.running ? timerState.clientId : '') || '';
   const c = clients.find(x => x.id === cid);
   mLog_ = { clientId: cid, service: c && c.service || (settings.serviceOptions || [])[0] || '', date: toDateStr(new Date()), useTimer: false };
+  mHvClient(mLog_);
   mOpenSheet('Log Improvement', mLogBody(), { done: 'mSaveLog()', doneLabel: 'Log' });
 }
 function mLogBody(){
@@ -948,7 +950,8 @@ function mLogBody(){
 <div class="ig flat" style="margin-top:20px">
 ${mRowPick('Service', mEsc(L.service || 'None'), 'mLogPick(\'service\')', !!L.service)}
 ${mRowPick('Date', dateLabel, 'mLogPick(\'date\')', true)}
-<div class="ir"><label class="ilab" for="mLogTime">Time spent</label><input class="tm" id="mLogTime" inputmode="decimal" placeholder="0:30" oninput="mKeep('mLogTime',this.value);mLog_.useTimer=false">${timerState.running ? `<button class="link" onclick="mLogUseTimer()">Use timer</button>` : ''}</div></div>
+<div class="ir"><label class="ilab" for="mLogTime">Time spent</label><input class="tm" id="mLogTime" inputmode="decimal" placeholder="0:30" oninput="mKeep('mLogTime',this.value);mLog_.useTimer=false" onchange="mLogTimeSet()">${timerState.running ? `<button class="link" onclick="mLogUseTimer()">Use timer</button>` : ''}</div>
+${hvTimeOn() && L.hasTime ? mHvRows(L, 'mLogPick') : ''}</div>${hvTimeOn() && L.hasTime && mHvBill(L) ? `<p class="ifoot">Time spent is ${mHvBill(L).toLowerCase()}.</p>` : ''}
 <div class="ig flat" style="margin-top:20px"><div class="ir"><span class="ilab">Include in the client email</span>${mSw('mLogInclude', true, 'Include in the client email')}</div></div>
 <p class="ifoot">Turn off for internal work the client doesn’t need to hear about.</p>`;
 }
@@ -956,14 +959,25 @@ function mLogPick(what){
   const keepInc = mIsOn('mLogInclude');
   const back = () => { const t = mSheetVal('mLogText'), tm = mSheetVal('mLogTime'); $m('mSheet').querySelector('.sheet-scroll').innerHTML = mLogBody(); $m('mLogText').value = t; $m('mLogTime').value = tm; if(!keepInc){ $m('mLogInclude').classList.remove('on'); } };
   mKeep('mLogText', mSheetVal('mLogText')); mKeep('mLogTime', mSheetVal('mLogTime'));
-  if(what === 'client') mPickClient(mLog_.clientId, v => { mLog_.clientId = v; const c = clients.find(x => x.id === v); if(c && c.service) mLog_.service = c.service; back(); });
+  if(what === 'client') mPickClient(mLog_.clientId, v => { mLog_.clientId = v; const c = clients.find(x => x.id === v); if(c && c.service) mLog_.service = c.service; mHvClient(mLog_); back(); });
   if(what === 'service') mPick('Service', [...new Set([mLog_.service, ...(settings.serviceOptions || [])].filter(Boolean))].map(s => [s, s]), mLog_.service, v => { mLog_.service = v; back(); });
   if(what === 'date') mDayPick('Date', mLog_.date, -13, 0, null, v => { mLog_.date = v; back(); });
+  if(what === 'project' || what === 'task') mHvPick(mLog_, what, back);
+}
+// Time spent goes to Harvest by project and task: those rows show once there's time.
+function mLogTimeSet(){
+  const has = !!mSheetVal('mLogTime').trim();
+  if(!hvTimeOn() || has === !!mLog_.hasTime) return;
+  mLog_.hasTime = has;
+  const keepInc = mIsOn('mLogInclude'), t = mSheetVal('mLogText'), tm = mSheetVal('mLogTime');
+  $m('mSheet').querySelector('.sheet-scroll').innerHTML = mLogBody(); $m('mLogText').value = t; $m('mLogTime').value = tm; if(!keepInc) $m('mLogInclude').classList.remove('on');
 }
 function mLogUseTimer(){
   const m = Math.max(1, Math.round((Date.now() - timerState.startedAt) / 60000));
   $m('mLogTime').value = `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
   mLog_.useTimer = true;
+  if(timerState.projectId && timerState.clientId === mLog_.clientId){ mLog_.projectId = timerState.projectId; mLog_.taskId = timerState.taskId; }
+  mLogTimeSet();
   if(timerState.clientId && mLog_.clientId !== timerState.clientId){ mLog_.clientId = timerState.clientId; const t = mSheetVal('mLogText'), tm = mSheetVal('mLogTime'); $m('mSheet').querySelector('.sheet-scroll').innerHTML = mLogBody(); $m('mLogText').value = t || timerState.description || ''; $m('mLogTime').value = tm; mLog_.useTimer = true; }
   else if(!mSheetVal('mLogText').trim() && timerState.description) $m('mLogText').value = timerState.description;
 }
@@ -973,6 +987,8 @@ async function mSaveLog(){
   if(!text){ showToast('error', 'Nothing to log', 'Write what you did first.'); $m('mLogText').focus(); return; }
   const minutes = raw ? parseSpent(raw) : 0;
   if(raw && !minutes){ showToast('error', 'Check the time', 'Try 0:30, 45m or 1h 30m.'); return; }
+  const pick = minutes && hvTimeOn() ? mHvValue(L) : { ok: true, projectId: null, taskId: null };
+  if(!pick.ok){ showToast('error', 'Almost there', pick.msg); return; }
   const include = mIsOn('mLogInclude'), author = myName() || 'Team member';
   const btn = $m('mSheetDone'); if(btn) btn.disabled = true;
   const when = L.date === toDateStr(new Date()) ? new Date() : new Date(L.date + 'T12:00:00');
@@ -981,25 +997,69 @@ async function mSaveLog(){
   const c = clients.find(x => x.id === L.clientId);
   if(include && c){ const d = (c.drafts || []).find(x => x.author === author); if(d && d.draftStatus !== 'none') await saveDraftFor(L.clientId, author, { draftStatus: 'none', draft: '' }); }
   if(minutes){
-    if(L.useTimer && timerState.running && timerState.clientId === L.clientId){ timerState.service = L.service; timerState.description = text; await mStopTimer(true, true); }
-    else await mAddTime({ clientId: L.clientId, service: L.service, dateStr: L.date, minutes, description: text, logged: true });
+    if(L.useTimer && timerState.running && timerState.clientId === L.clientId){ timerState.service = pick.projectId ? pick.service : L.service; timerState.projectId = pick.projectId; timerState.taskId = pick.taskId; timerState.description = text; await mStopTimer(true, true); }
+    else await mAddTime({ clientId: L.clientId, service: pick.projectId ? pick.service : L.service, dateStr: L.date, minutes, description: text, logged: true, projectId: pick.projectId, taskId: pick.taskId });
   }
   mLog(L.clientId, 'improvement_logged', `${author} logged an improvement: "${text.slice(0, 80)}"`, `Logged an improvement for <b>${escapeHtml(c ? c.name : '')}</b>.`);
   mCloseSheet(true);
   await mRefresh();
   showToast('success', 'Improvement logged', `${c ? c.name : ''}${minutes ? ` · ${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')} on your timesheet` : ''}`);
 }
-// One entry per client, service and day, like the desktop timesheet.
-async function mAddTime({ clientId, service, dateStr, minutes, description, logged }){
-  const { data: ex } = await supabaseClient.from('time_entries').select('id, minutes, description').eq('user_id', currentUser.id).eq('client_id', clientId).eq('service', service || '').eq('entry_date', dateStr).is('deleted_at', null).maybeSingle();
-  if(ex){ await supabaseClient.from('time_entries').update({ minutes: ex.minutes + minutes, description: [ex.description, description].filter(Boolean).join(' · '), harvest_sync_status: 'pending' }).eq('id', ex.id); return ex.id; }
-  const { data } = await supabaseClient.from('time_entries').insert({ user_id: currentUser.id, client_id: clientId, entry_date: dateStr, minutes, description, service: service || '', ...(logged ? { logged: true } : {}) }).select('id').single();
-  return data?.id || null;
+// One entry per client, project, task and day (or client, service and day before Harvest), like
+// the desktop timesheet. It goes to Harvest straight away, as the desktop does.
+async function mAddTime({ clientId, service, dateStr, minutes, description, logged, projectId, taskId }){
+  let q = supabaseClient.from('time_entries').select('id, minutes, description').eq('user_id', currentUser.id).eq('client_id', clientId).eq('entry_date', dateStr).is('deleted_at', null);
+  q = projectId ? (taskId ? q.eq('harvest_project_id', projectId).eq('harvest_task_id', taskId) : q.eq('harvest_project_id', projectId).is('harvest_task_id', null)) : q.eq('service', service || '');
+  const { data: rows } = await q.limit(1), ex = rows && rows[0];
+  let id = null;
+  if(ex){ const { error } = await supabaseClient.from('time_entries').update({ minutes: ex.minutes + minutes, description: [ex.description, description].filter(Boolean).join(' · '), harvest_sync_status: 'pending' }).eq('id', ex.id); id = error ? null : ex.id; }
+  else {
+    const { data } = await supabaseClient.from('time_entries').insert({ user_id: currentUser.id, client_id: clientId, entry_date: dateStr, minutes, description, service: service || '', ...(logged ? { logged: true } : {}),
+      ...(projectId ? { harvest_project_id: projectId, harvest_task_id: taskId || null } : {}) }).select('id').single();
+    id = data?.id || null;
+  }
+  if(id) mSyncToHarvest(id);
+  return id;
+}
+function mSyncToHarvest(id){
+  supabaseClient.auth.getSession().then(({ data: { session } }) => session && fetch('/api/integrations', { method: 'POST',
+    headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ provider: 'harvest', action: 'sync-entry', timeEntryId: id }) }).catch(() => {}));
+}
+// ---- Project and Task, as in Harvest (js/features/harvest-time.js); Service until Harvest is set up
+function mHvClient(st){ const d = hvDefaultPick(st.clientId); st.projectId = d.projectId; st.taskId = d.taskId; }
+function mHvRows(st, pickFn){
+  if(!hvTimeOn()) return mRowPick('Service', mEsc(st.service || 'None'), `${pickFn}('service')`, !!st.service);
+  if(!st.clientId) return '';
+  const none = hvNoPickWords(st.clientId);
+  if(none) return `<div class="ir"><span class="ilab">Project</span><span class="t n" style="white-space:normal;text-align:right;color:var(--label-2);font-size:15px">${mEsc(none)}</span></div>`;
+  const { mine } = hvClientProjects(st.clientId);
+  const proj = mine.length === 1 ? `<div class="ir"><span class="ilab">Project</span><span class="t n" style="text-align:right">${mEsc(mine[0].name)}</span></div>`
+    : mRowPick('Project', mEsc(hvProjectName(st.projectId) || 'Choose'), `${pickFn}('project')`, !!st.projectId);
+  const t = st.projectId ? hvProjectTasks(st.projectId).find(x => x.id === Number(st.taskId)) : null;
+  const task = st.projectId ? mRowPick('Task', t ? mEsc(t.name) : 'Choose', `${pickFn}('task')`, !!t) : '';
+  return proj + task;
+}
+// "Billable" or "Non-billable" for the note under the rows (Harvest decides it by task)
+function mHvBill(st){
+  const t = hvTimeOn() && st.projectId ? hvProjectTasks(st.projectId).find(x => x.id === Number(st.taskId)) : null;
+  return t ? (t.billable ? 'Billable' : 'Non-billable') : '';
+}
+function mHvPick(st, what, back){
+  if(what === 'project') mPick('Project', hvClientProjects(st.clientId).mine.map(p => [String(p.harvest_id), p.name]), String(st.projectId || ''), v => { st.projectId = Number(v); st.taskId = (hvProjectTasks(st.projectId)[0] || {}).id || null; back(); });
+  if(what === 'task') mPick('Task', hvProjectTasks(st.projectId).map(t => [String(t.id), t.name, t.billable ? 'Billable' : 'Non-billable']), String(st.taskId || ''), v => { st.taskId = Number(v); back(); });
+}
+function mHvValue(st){
+  if(!hvTimeOn()) return { ok: true, service: st.service, projectId: null, taskId: null };
+  if(!st.clientId || hvNoPickWords(st.clientId)) return { ok: true, service: '', projectId: null, taskId: null };
+  if(!st.projectId) return { ok: false, msg: 'Tap Project to pick one.' };
+  if(!st.taskId && hvProjectTasks(st.projectId).length) return { ok: false, msg: 'Tap Task to pick one.' };
+  return { ok: true, service: hvProjectName(st.projectId), projectId: st.projectId, taskId: st.taskId || null };
 }
 function mOpenTimerSheet(){
   const cid = mTab === 'more' && mTop()?.title === 'Time' ? '' : '';
   mLog_ = { clientId: cid, service: (settings.serviceOptions || [])[0] || '' };
-  const body = () => `<div class="ig flat" style="margin-top:12px">${mRowPick('Client', mEsc(mClientName(mLog_.clientId) || 'Choose'), "mTimerPick('client')", !!mLog_.clientId)}${mRowPick('Service', mEsc(mLog_.service || 'None'), "mTimerPick('service')", !!mLog_.service)}</div>
+  const body = () => `<div class="ig flat" style="margin-top:12px">${mRowPick('Client', mEsc(mClientName(mLog_.clientId) || 'Choose'), "mTimerPick('client')", !!mLog_.clientId)}${mHvRows(mLog_, 'mTimerPick')}</div>${mHvBill(mLog_) ? `<p class="ifoot">${mHvBill(mLog_)}.</p>` : ''}
 <div class="ig flat" style="margin-top:20px"><div class="ir"><input class="itf" id="mTimerDesc" placeholder="What are you working on?" oninput="mKeep('mTimerDesc',this.value)"></div></div>`;
   window.mTimerBody = body;
   mOpenSheet('Start Timer', body(), { done: 'mStartTimer()', doneLabel: 'Start' });
@@ -1007,12 +1067,15 @@ function mOpenTimerSheet(){
 function mTimerPick(what){
   mKeep('mTimerDesc', mSheetVal('mTimerDesc'));
   const back = () => { const v = mSheetVal('mTimerDesc'); $m('mSheet').querySelector('.sheet-scroll').innerHTML = window.mTimerBody(); $m('mTimerDesc').value = v; };
-  if(what === 'client') mPickClient(mLog_.clientId, v => { mLog_.clientId = v; const c = clients.find(x => x.id === v); if(c && c.service) mLog_.service = c.service; back(); });
+  if(what === 'client') mPickClient(mLog_.clientId, v => { mLog_.clientId = v; const c = clients.find(x => x.id === v); if(c && c.service) mLog_.service = c.service; mHvClient(mLog_); back(); });
+  else if(what === 'project' || what === 'task') mHvPick(mLog_, what, back);
   else mPick('Service', settings.serviceOptions.map(s => [s, s]), mLog_.service, v => { mLog_.service = v; back(); });
 }
 function mStartTimer(){
   if(!mLog_.clientId){ showToast('error', 'Choose a client', 'Tap Client to pick one.'); return; }
-  timerState = { running: true, startedAt: Date.now(), clientId: mLog_.clientId, service: mLog_.service, description: mSheetVal('mTimerDesc').trim(), resumeEntryId: null };
+  const pick = mHvValue(mLog_);
+  if(!pick.ok){ showToast('error', 'Almost there', pick.msg); return; }
+  timerState = { running: true, startedAt: Date.now(), clientId: mLog_.clientId, service: pick.service || '', description: mSheetVal('mTimerDesc').trim(), resumeEntryId: null, projectId: pick.projectId, taskId: pick.taskId };
   try{ localStorage.setItem('bda_timer_state', JSON.stringify(timerState)); }catch(e){}
   mCloseSheet(true); mRenderTab(); mTop()?.refresh(); mTickTimer();
   showToast('success', 'Timer started', mClientName(timerState.clientId));
@@ -1022,17 +1085,19 @@ let mTime_ = {};
 function mOpenTimeSheet(presetClientId){
   const c = clients.find(x => x.id === presetClientId);
   mTime_ = { clientId: presetClientId || '', service: (c && c.service) || (settings.serviceOptions || [])[0] || '', date: toDateStr(new Date()) };
+  mHvClient(mTime_);
   mKeep('mTimeDur', ''); mKeep('mTimeDesc', '');
-  window.mTimeBody = () => `<div class="ig flat" style="margin-top:12px">${mRowPick('Client', mEsc(mClientName(mTime_.clientId) || 'Choose'), "mTimePick('client')", !!mTime_.clientId)}${mRowPick('Service', mEsc(mTime_.service || 'None'), "mTimePick('service')", !!mTime_.service)}${mRowPick('Date', mTime_.date === toDateStr(new Date()) ? 'Today' : sheetDayLabel(new Date(mTime_.date + 'T12:00:00')), "mTimePick('date')", true)}
+  window.mTimeBody = () => `<div class="ig flat" style="margin-top:12px">${mRowPick('Client', mEsc(mClientName(mTime_.clientId) || 'Choose'), "mTimePick('client')", !!mTime_.clientId)}${mHvRows(mTime_, 'mTimePick')}${mRowPick('Date', mTime_.date === toDateStr(new Date()) ? 'Today' : sheetDayLabel(new Date(mTime_.date + 'T12:00:00')), "mTimePick('date')", true)}
 <div class="ir"><label class="ilab" for="mTimeDur">Time worked</label><input class="tm" id="mTimeDur" inputmode="decimal" placeholder="1:30" oninput="mKeep('mTimeDur',this.value)"></div></div>
-<p class="ifoot">1:30, 45m or 1.5 all work.</p>
+<p class="ifoot">${mHvBill(mTime_) ? mHvBill(mTime_) + '. ' : ''}1:30, 45m or 1.5 all work.</p>
 <div class="ig flat" style="margin-top:20px"><div class="ir" style="align-items:flex-start"><textarea class="iarea" id="mTimeDesc" placeholder="What did you work on?" style="min-height:72px" oninput="mKeep('mTimeDesc',this.value)"></textarea></div></div>`;
   mOpenSheet('Add Time', window.mTimeBody(), { done: 'mSaveTime()', doneLabel: 'Add' });
 }
 function mTimePick(what){
   mKeep('mTimeDur', mSheetVal('mTimeDur')); mKeep('mTimeDesc', mSheetVal('mTimeDesc'));
   const back = () => { $m('mSheet').querySelector('.sheet-scroll').innerHTML = window.mTimeBody(); mRestoreSheetState(); };
-  if(what === 'client') mPickClient(mTime_.clientId, v => { mTime_.clientId = v; const c = clients.find(x => x.id === v); if(c && c.service) mTime_.service = c.service; back(); });
+  if(what === 'client') mPickClient(mTime_.clientId, v => { mTime_.clientId = v; const c = clients.find(x => x.id === v); if(c && c.service) mTime_.service = c.service; mHvClient(mTime_); back(); });
+  if(what === 'project' || what === 'task') mHvPick(mTime_, what, back);
   if(what === 'service') mPick('Service', [...new Set([mTime_.service, ...(settings.serviceOptions || [])].filter(Boolean))].map(x => [x, x]), mTime_.service, v => { mTime_.service = v; back(); });
   if(what === 'date') mDayPick('Date', mTime_.date, -30, 0, null, v => { mTime_.date = v; back(); });
 }
@@ -1040,9 +1105,11 @@ async function mSaveTime(){
   const T = mTime_, raw = mSheetVal('mTimeDur').trim(), minutes = parseSpent(raw), desc = mSheetVal('mTimeDesc').trim();
   if(!T.clientId){ showToast('error', 'Choose a client', 'Tap Client to pick one.'); return; }
   if(!minutes){ showToast('error', 'How long did you work?', 'Try 1:30, 45m or 1.5.'); $m('mTimeDur')?.focus(); return; }
+  const pick = mHvValue(T);
+  if(!pick.ok){ showToast('error', 'Almost there', pick.msg); return; }
   if(minutes > 16 * 60 && !(await confirmDialog(`That’s ${Math.floor(minutes / 60)} hours in one entry.`, { title: 'Log it anyway?', confirmLabel: 'Log It' }))) return;
   const btn = $m('mSheetDone'); if(btn) btn.disabled = true;
-  const id = await mAddTime({ clientId: T.clientId, service: T.service, dateStr: T.date, minutes, description: desc });
+  const id = await mAddTime({ clientId: T.clientId, service: pick.service, dateStr: T.date, minutes, description: desc, projectId: pick.projectId, taskId: pick.taskId });
   if(!id){ if(btn) btn.disabled = false; showToast('error', 'Couldn’t add the time', 'Try again in a moment.'); return; }
   mCloseSheet(true); await mRefresh();
   showToast('success', 'Time added', `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')} for ${mClientName(T.clientId)}`);
@@ -1053,7 +1120,7 @@ async function mStopTimer(quiet, logged){
   timerState = { running: false, startedAt: null, clientId: '', service: '', description: '', resumeEntryId: null };
   try{ localStorage.setItem('bda_timer_state', JSON.stringify(timerState)); }catch(e){}
   clearInterval(mTimerTick);
-  const id = await mAddTime({ clientId: t.clientId, service: t.service, dateStr: toDateStr(new Date()), minutes, description: t.description, logged });
+  const id = await mAddTime({ clientId: t.clientId, service: t.service, dateStr: toDateStr(new Date()), minutes, description: t.description, logged, projectId: t.projectId || null, taskId: t.taskId || null });
   if(!quiet){ await mRefresh(); showToast(id ? 'success' : 'error', id ? 'Time saved' : 'Couldn’t save the time', id ? `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')} for ${mClientName(t.clientId)}` : 'Add it on the desktop Timesheet.'); }
 }
 

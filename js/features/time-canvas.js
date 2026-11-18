@@ -64,7 +64,7 @@ function startTimerInterval(){ if(timerIntervalId) clearInterval(timerIntervalId
 
 async function pauseTimer(){
   if(!timerState.running) return;
-  const snap = { clientId: timerState.clientId, service: timerState.service, description: timerState.description };
+  const snap = { clientId: timerState.clientId, service: timerState.service, description: timerState.description, projectId: timerState.projectId || null, taskId: timerState.taskId || null };
   const id = await stopAndSaveTimer({ pause: true });
   timerPaused = id ? Object.assign(snap, { entryId: id }) : null; savePaused();
   renderTimesheet(); renderSideTimer();
@@ -128,16 +128,18 @@ function tsRange(e){
 function tsClientMono(c){ return c ? monoHtml(c, 'sm') : '<span class="mono sm" aria-hidden="true">?</span>'; }
 function tsRowHtml(e, rng){
   const c = clients.find(x => x.id === e.clientId);
-  const sub = [c ? c.name : 'Client removed', e.service].filter(Boolean).map(escapeHtml).join(' · ');
-  const sync = e.harvestStatus === 'error' ? `<span class="tmi-sync is-err" title="Will retry when you edit the entry">${icon('warning')}Harvest sync failed</span>`
-    : e.harvestId ? `<span class="tmi-sync" title="Synced to Harvest">${icon('check', { weight: 'bold' })}Harvest</span>` : '';
+  const sub = [c ? c.name : 'Client removed', typeof hvEntryWords === 'function' ? hvEntryWords(e) : e.service].filter(Boolean).map(escapeHtml).join(' · ');
+  // in Harvest, or why not (a failed send is tried again when the entry is edited and each night)
+  const sync = e.harvestStatus === 'failed' || (e.harvestStatus === 'unmapped' && e.harvestProjectId) ? `<span class="tmi-sync is-err" title="${escapeHtml(e.harvestError || 'Not in Harvest yet')}">${icon('warning')}Not in Harvest</span>`
+    : e.harvestId ? `<span class="tmi-sync" title="In Harvest">${icon('check', { weight: 'bold' })}Harvest</span>` : '';
   return `<div class="tmi-r" role="button" tabindex="0" onclick="openTimeEntryModal('${e.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)openTimeEntryModal('${e.id}')">
 <span class="tmi-rng">${rng ? `${fmtTime(rng.start).replace(/ [AP]M$/, '')} – ${fmtTime(rng.end).replace(/ [AP]M$/, '')}` : ''}</span>${tsClientMono(c)}
 <div class="tx"><b>${escapeHtml(e.description || 'No description')}</b><span class="s">${sub}</span></div>
 ${sync}<button class="ib tmi-cont" aria-label="Continue this" title="Continue this" data-resume-client="${e.clientId}" data-resume-desc="${encodeURIComponent(e.description || '')}" data-resume-entry="${e.id}" onclick="event.stopPropagation();continueEntry(this)">${icon('play')}</button><span class="tmi-dur">${hmm(e.minutes)}</span></div>`;
 }
 function tsRunRowHtml(){
-  const tc = clients.find(x => x.id === timerState.clientId), svc = timerState.service || tc?.service || '';
+  const tc = clients.find(x => x.id === timerState.clientId);
+  const svc = timerState.projectId && typeof hvEntryWords === 'function' ? hvEntryWords({ harvestProjectId: timerState.projectId, harvestTaskId: timerState.taskId }) : timerState.service || tc?.service || '';
   return `<div class="tmi-r is-run"><span class="tmi-rng">${fmtTime(new Date(timerState.startedAt)).replace(/ [AP]M$/, '')} – now</span>${tsClientMono(tc)}
 <div class="tx"><b>${escapeHtml(timerState.description || 'No description')}</b><span class="s">${[tc?.name, svc].filter(Boolean).map(escapeHtml).join(' · ')}</span></div>
 <span class="tmi-live"><i class="tmx-rec"></i>Running</span><span class="tmi-dur" id="tsRunDur">${hmm(runningMinutes())}</span></div>`;

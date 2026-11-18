@@ -42,6 +42,8 @@ Run new `.sql` files once in Supabase → SQL Editor. The current one:
 - `addendum-harvest-clients.sql` — run after the one above. Radar's client list follows
   Harvest's: each Harvest client stays linked to its Radar client through renames and
   archives. Until it's run, Radar reads Harvest as before and adds no clients.
+- `addendum-harvest-time.sql` — time entries keep the Harvest project and task they were logged
+  to. Until it's run, Log Time asks for a service as before.
 
 ## Weekly wins
 
@@ -69,6 +71,12 @@ another name, with anything logged on the added one; **Not a Radar Client** send
 and Harvest won't add it again. A rename in Harvest carries over while Radar still uses the old
 name; a client archived in Harvest is mentioned to approvers once, and one still waiting for
 setup just leaves.
+
+Time is logged as in Harvest (step 3): Add Time, Start Timer, Edit Time and Log Improvement (once
+a time is typed) ask for Client → Project → Task, with the client's projects you're on in Harvest
+and each task's Billable or Non-billable. Entries go to Harvest as the person who logged them
+(matched by email); someone not in Harvest, or a client that isn't, keeps the time in Radar.
+Older entries without a project still go through the client and service mappings.
 
 ---
 

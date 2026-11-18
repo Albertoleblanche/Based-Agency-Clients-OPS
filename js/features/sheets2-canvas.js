@@ -195,27 +195,31 @@ function timeClientChanged(clientSelId, serviceSelId){
 function openTimerModal(presetClientId){
   if(timerState.running){ showToast('error', 'A timer is already running', 'Stop it before starting another.'); return; }
   const cid = (typeof presetClientId === 'string' && presetClientId) || (typeof currentViewName !== 'undefined' && currentViewName === 'clientdetail' ? currentDetailClientId : '') || '';
-  const c = clients.find(x => x.id === cid);
+  const d = hvDefaultPick(cid);
   openAppModal(`<h3>Start Timer</h3>
 <div class="f">
-<label for="timerModalClient">Client</label><div>${sheetPop('timerModalClient', 'Client', sheetClientOptions(), cid, "timeClientChanged('timerModalClient','timerModalService')", { placeholder: 'Choose a client' })}</div>
-<label for="timerModalService">Service</label><div>${sheetPop('timerModalService', 'Service', timeServiceOpts(c), c && c.service ? c.service : (settings.serviceOptions || [])[0] || '')}</div>
+${hvRecentHtml('timerModal', 'timerModalClient')}
+<label for="timerModalClient">Client</label><div>${sheetPop('timerModalClient', 'Client', sheetClientOptions(), cid, "hvPickChanged('timerModal','client')", { placeholder: 'Choose a client' })}</div>
+${hvPickBlockHtml('timerModal', cid, d.projectId, d.taskId)}
 <label for="timerModalDesc">Working on</label><input id="timerModalDesc" class="tf" placeholder="e.g. Updating the Meta ad creative" onkeydown="if(event.key==='Enter') startTimerFromModal()">
 </div>
-<div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="startTimerFromModal()">${icon('play')}Start Timer</button></div>`, 500);
+<div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="startTimerFromModal()">${icon('play')}Start Timer</button></div>`, 520);
   setTimeout(() => document.getElementById(cid ? 'timerModalDesc' : 'timerModalClient')?.focus(), 30);
 }
-function openManualEntryModal(presetDate, presetMinutes){
+function openManualEntryModal(presetDate, presetMinutes, presetClientId){
   const today = toDateStr(new Date()), day = presetDate && presetDate <= today ? presetDate : today;
+  const cid = (typeof presetClientId === 'string' && presetClientId) || '';
+  const d = hvDefaultPick(cid);
   openAppModal(`<h3>Add Time</h3>
 <div class="f">
-<label for="manualClient">Client</label><div>${sheetPop('manualClient', 'Client', sheetClientOptions(), '', "timeClientChanged('manualClient','manualService')", { placeholder: 'Choose a client' })}</div>
-<label for="manualService">Service</label><div>${sheetPop('manualService', 'Service', timeServiceOpts(null), (settings.serviceOptions || [])[0] || '')}</div>
+${hvRecentHtml('manual', 'manualClient')}
+<label for="manualClient">Client</label><div>${sheetPop('manualClient', 'Client', sheetClientOptions(), cid, "hvPickChanged('manual','client')", { placeholder: 'Choose a client' })}</div>
+${hvPickBlockHtml('manual', cid, d.projectId, d.taskId)}
 <label for="manualDate">Date</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sheetDateField('manualDate', day, { past: true, from: -30, to: 0, max: today })}</div>
 <label for="manualDuration">Time</label><input id="manualDuration" class="tf" style="width:110px" placeholder="1:30" autocomplete="off"${presetMinutes ? ` value="${hmm(presetMinutes)}"` : ''}>
-<label class="top" for="manualDesc">Description</label><textarea id="manualDesc" class="tf" spellcheck="true" placeholder="What did you work on?"></textarea>
+<label class="top" for="manualDesc">Notes</label><textarea id="manualDesc" class="tf" spellcheck="true" placeholder="What did you work on?"></textarea>
 </div>
-<div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="addManualEntry()">Add Time</button></div>`, 500);
+<div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="addManualEntry()">Add Time</button></div>`, 520);
 }
 function openTimeEntryModal(id){
   const e = timeEntries.find(x => x.id === id);
@@ -224,13 +228,13 @@ function openTimeEntryModal(id){
   const mine = e.userId ? e.userId === currentUser.id : true;
   openAppModal(`<h3>Edit Time</h3>
 <div class="f">
-<label for="editEntryClient">Client</label><div>${sheetPop('editEntryClient', 'Client', sheetClientOptions(e.clientId), e.clientId)}</div>
-<label for="editEntryService">Service</label><div>${sheetPop('editEntryService', 'Service', timeServiceOpts(c, e.service, true), e.service || '')}</div>
+<label for="editEntryClient">Client</label><div>${sheetPop('editEntryClient', 'Client', sheetClientOptions(e.clientId), e.clientId, "hvPickChanged('editEntry','client')")}</div>
+${hvPickBlockHtml('editEntry', e.clientId, e.harvestProjectId || hvDefaultPick(e.clientId).projectId, e.harvestTaskId || null, e.service || '')}
 <label for="editEntryDate">Date</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sheetDateField('editEntryDate', e.date, { past: true, from: -30, to: 0 })}</div>
 <label for="editEntryDuration">Time</label><input id="editEntryDuration" class="tf" style="width:110px" value="${hmm(e.minutes)}" autocomplete="off">
-<label class="top" for="editEntryDesc">Description</label><textarea id="editEntryDesc" class="tf" spellcheck="true">${escapeHtml(e.description || '')}</textarea>
+<label class="top" for="editEntryDesc">Notes</label><textarea id="editEntryDesc" class="tf" spellcheck="true">${escapeHtml(e.description || '')}</textarea>
 </div>
-<div class="sheet-a">${mine ? `<button class="btn danger" style="margin-right:auto" onclick="closeAppModal();deleteTimeEntry('${id}')">Delete</button>` : ''}<button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="saveTimeEntryEdit('${id}')">Save</button></div>`, 500);
+<div class="sheet-a">${mine ? `<button class="btn danger" style="margin-right:auto" onclick="closeAppModal();deleteTimeEntry('${id}')">Delete</button>` : ''}<button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="saveTimeEntryEdit('${id}')">Save</button></div>`, 520);
 }
 
 // ---- Task detail and completion --------------------------------------------------------------

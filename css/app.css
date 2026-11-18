@@ -2290,3 +2290,15 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .su-pick > span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sp-acts .btn[disabled]{opacity:.45;cursor:default}
 .su-acts{margin-top:18px;padding-top:16px;border-top:.5px solid var(--sep)}
+
+/* ---- time by Harvest project and task (harvest-time.js) ---- */
+.f > .hvp{display:contents}
+.hvp-none{font-size:13px;line-height:1.45;padding:5px 0}
+.hvp-one{font-size:14px;padding:5px 0}
+.hvp-task{display:flex;align-items:center;gap:12px;min-width:0}
+.hvp-task > .pop{min-width:0;max-width:300px}
+.hvp-bill{flex:0 0 auto;font-size:12.5px;color:var(--label-2)}
+.hvp-recent{display:flex;flex-wrap:wrap;gap:6px}
+.mac .hvp-chip{max-width:100%;height:26px;padding:0 10px;border:0;border-radius:13px;background:var(--fill);color:var(--label);font:inherit;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:default;transition:background-color 150ms ease}
+.mac .hvp-chip:hover{background:var(--fill-2)}
+.mac .hvp-chip.on{background:var(--select);font-weight:500}

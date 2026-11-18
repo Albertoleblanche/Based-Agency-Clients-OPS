@@ -176,7 +176,8 @@ function openQueueLogImprovementModal(presetClientId){
 <label class="top" for="liText">What did you do?</label><textarea id="liText" class="tf" style="height:84px" spellcheck="true" placeholder="What changed, with the number or result if there is one"></textarea>
 <label for="liService">Service</label><div id="liServiceWrap">${sheetPop('liService', 'Service', services.map(s => [s, s]), svc, 'logSheet.serviceTouched=true')}</div>
 <label for="liDate">Date</label><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${sheetDateField('liDate', toDateStr(new Date()), { past: true, from: -13, to: 0, max: toDateStr(new Date()) })}</div>
-<label for="liTime">Time spent</label><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><input id="liTime" class="tf" style="width:80px" placeholder="0:30" autocomplete="off" oninput="logSheet.useTimer=false">${timerLink}</div>
+<label for="liTime">Time spent</label><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><input id="liTime" class="tf" style="width:80px" placeholder="0:30" autocomplete="off" oninput="logSheet.useTimer=false;liTimeChanged()">${timerLink}</div>
+<div id="liPick" class="hvp"></div>
 <span></span><div style="display:flex;align-items:flex-start;gap:10px;font-size:14px">${sheetSw('liInclude', true, 'Include in the client email')}<div><div>Include in the client email</div><div class="t-2" style="font-size:13px">Turn off for internal work the client doesn’t need to hear about</div></div></div>
 ${improvementExtrasReady === false ? '' : `<label>Screenshots</label><div class="fchips" id="liFiles"></div>`}
 <label>Logged by</label><div style="font-size:14px">${sheetWho(me)}</div>
@@ -186,7 +187,18 @@ ${improvementExtrasReady === false ? '' : `<label>Screenshots</label><div class=
   liRenderFiles();
   setTimeout(() => { const el = document.getElementById(cid ? 'liText' : 'liClient'); if(el) el.focus(); }, 30);
 }
+// Time spent goes to Harvest by project and task: those two rows show once there's time to log.
+function liTimeChanged(force){
+  const wrap = document.getElementById('liPick'); if(!wrap || typeof hvTimeOn !== 'function' || !hvTimeOn()) return;
+  const has = !!(document.getElementById('liTime')?.value || '').trim(), cid = document.getElementById('liClient')?.value || '';
+  if(!has){ if(wrap.innerHTML) wrap.innerHTML = ''; return; }
+  if(wrap.innerHTML && !force) return;
+  const fromTimer = logSheet.useTimer && timerState.running && timerState.clientId === cid && timerState.projectId;
+  const d = fromTimer ? { projectId: timerState.projectId, taskId: timerState.taskId } : hvDefaultPick(cid);
+  wrap.innerHTML = hvPickRowsHtml('li', cid, d.projectId, d.taskId);
+}
 function liClientChanged(){
+  liTimeChanged(true);
   const c = clients.find(x => x.id === document.getElementById('liClient')?.value);
   if(!c || logSheet.serviceTouched) return;
   const wrap = document.getElementById('liServiceWrap');
@@ -200,6 +212,7 @@ function liUseTimer(){
   if(sel && timerState.clientId && sel.value !== timerState.clientId){ sel.value = timerState.clientId; syncPopSel(sel); liClientChanged(); }
   if(txt && !txt.value.trim() && timerState.description) txt.value = timerState.description;
   logSheet.useTimer = true;
+  liTimeChanged(true);
 }
 function liAddFiles(input){
   const add = [...(input.files || [])];
@@ -225,6 +238,8 @@ async function saveQueueLogImprovement(another){
   const timeRaw = (g('liTime')?.value || '').trim();
   const minutes = timeRaw ? parseSpent(timeRaw) : 0;
   if(timeRaw && !minutes){ showToast('error', 'Check the time', 'Try 0:30, 45m or 1h 30m.'); g('liTime')?.focus(); return; }
+  const pick = minutes && g('liPick') && g('liPick').innerHTML && typeof hvPickValue === 'function' ? hvPickValue('li', clientId) : { ok: true, projectId: null, taskId: null };
+  if(!pick.ok){ showToast('error', 'Almost there', pick.msg); return; }
   if(minutes > 960 && !(await confirmDialog(`That’s ${hmLong(minutes)} for one improvement. Log it anyway?`, { confirmLabel: 'Log It', cancelLabel: 'Fix It' }))) return;
   const service = g('liService')?.value || '';
   const dateStr = g('liDate')?.value || toDateStr(new Date());
@@ -247,10 +262,11 @@ async function saveQueueLogImprovement(another){
   if(minutes){
     if(useTimer && timerState.running && timerState.clientId === clientId){
       if(!timerState.service){ timerState.service = service || c.service || ''; saveTimerState(); }
+      if(pick.projectId){ timerState.projectId = pick.projectId; timerState.taskId = pick.taskId; timerState.service = pick.service; saveTimerState(); }
       const id = await stopAndSaveTimer({ quiet: true });
       if(id) await supabaseClient.from('time_entries').update({ logged: true }).eq('id', id); else timeOk = false;
     } else {
-      const r = await mergeOrInsertTimeEntry({ clientId, service: service || c.service || '', dateStr, minutes, description: text });
+      const r = await mergeOrInsertTimeEntry({ clientId, service: pick.projectId ? pick.service : service || c.service || '', dateStr, minutes, description: text, projectId: pick.projectId, taskId: pick.taskId });
       if(r.error) timeOk = false;
       else {
         if(!r.merged && r.entryId) await supabaseClient.from('time_entries').update({ logged: true }).eq('id', r.entryId);
@@ -273,6 +289,7 @@ async function saveQueueLogImprovement(another){
     logSheet.files = []; logSheet.useTimer = false;
     if(g('liText')) g('liText').value = '';
     if(g('liTime')) g('liTime').value = '';
+    if(g('liPick')) g('liPick').innerHTML = '';
     const tb = g('liTimerBtn'); if(tb && !timerState.running) tb.remove();
     liRenderFiles();
     g('liText')?.focus();
