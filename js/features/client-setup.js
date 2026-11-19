@@ -199,6 +199,7 @@ async function hvLinkClient(clientId, targetId){
     await harvestApiCall('link-client', { clientId, targetId });
     inspectedClientId = targetId;
     await loadAll();
+    if(typeof hvTimeLoad === 'function') await hvTimeLoad();   // its projects come with the link
     showToast('success', `Linked to ${t.name}`, 'It has Harvest’s projects and time now.');
     renderAll();
     hvLoadLinks();
@@ -278,7 +279,7 @@ async function saveMatchClients(){
   }
   for(const id of skips){ const c = clients.find(x => x.id === id); if(c && (await leaveClientOut(c))) left++; else failed.push({ clientId: id, error: 'Couldn’t save it.' }); }
   if(links.some(l => l.clientId === inspectedClientId)) inspectedClientId = null;
-  await loadAll(); await hvLoadLinks();
+  await loadAll(); await Promise.all([hvLoadLinks(), typeof hvTimeLoad === 'function' ? hvTimeLoad() : null]);
   closeAppModal(); renderAll();
   if(typeof logClientActivity === 'function' && linked) links.forEach(l => { if(!failed.some(f => f.clientId === l.clientId)) logClientActivity(l.targetId, 'client_setup', `${myName() || 'Someone'} linked it to Harvest’s ${names[l.clientId] || 'client'}.`); });
   const done = [linked ? `${linked} linked` : '', left ? `${left} left out` : ''].filter(Boolean).join(' · ');

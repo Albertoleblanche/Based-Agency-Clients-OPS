@@ -1400,11 +1400,6 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 
 /* ---- Every tab fills the window. Text keeps a comfortable line length; lists and grids use the room. ---- */
 /* Review: the draft fills its pane; the email itself stays at an email's width. */
-/* Settings: sections flow into two columns when there's room, each kept whole. */
-.settings-pane .set-body{columns:2 460px;column-gap:48px}
-.settings-pane .set-body > .set-h{break-after:avoid;break-inside:avoid}
-.settings-pane .set-body > .set-h:first-child{margin-top:0}
-.settings-pane .set-body > .form-grp,.settings-pane .set-body > *{break-inside:avoid}
 
 /* ---- Review, as on the canvas board "Review — improved" ---- */
 #reviewRoot{flex-wrap:nowrap;overflow:hidden}
@@ -2361,3 +2356,77 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .hvn li b{font-weight:600}
 .hvn li span{color:var(--label-2);font-size:12.5px}
 .sheet-a a.btn{text-decoration:none}
+
+/* ---- Settings, Nov 18: five tabs, one centred column. Harvest, WhatsApp and AI are pages inside
+   Connections with a back button. Headings stay with their groups. ---- */
+.mac .set-tabs{max-width:720px;margin:0 auto}
+.settings-pane .set-body{max-width:776px;margin:0 auto;padding:30px 28px 64px}
+.settings-pane .set-body .set-h{margin:34px 4px 9px;font-size:14px;font-weight:600;color:var(--label)}
+.settings-pane .set-body > .set-h:first-child,.settings-pane .set-sub + .set-h,.settings-pane .set-sub + .hv-sec > .set-h:first-child,.settings-pane .set-sub + .wa-sec > .set-h:first-child{margin-top:0}
+.settings-pane .hv-sec > .set-h:first-child,.settings-pane .wa-sec > .set-h:first-child{margin-top:34px}
+.set-note{font-size:12.5px;line-height:1.5;color:var(--label-2);margin:9px 4px 0}
+.set-lnk{color:var(--label);font-weight:500;text-decoration:underline;text-decoration-color:color-mix(in srgb,currentColor 35%,transparent);text-underline-offset:3px;cursor:pointer;transition:text-decoration-color 150ms ease}
+.set-lnk:hover{text-decoration-color:currentColor}
+.set-foot{font-size:12.5px;color:var(--label-3);margin:30px 4px 0}
+.set-gap{margin-top:12px}
+.nowrap{white-space:nowrap}
+/* a page inside Connections */
+.set-sub{margin:-4px 0 24px}
+.set-back{display:inline-flex;align-items:center;gap:2px;height:26px;padding:0 9px 0 3px;margin-left:-3px;border:0;border-radius:6px;background:none;color:var(--label-2);font:inherit;font-size:13px;cursor:default;transition:background-color 150ms ease,color 150ms ease}
+.set-back:hover{background:var(--fill);color:var(--label)}
+.set-back:active{transform:scale(.97)}
+.set-back svg{width:14px;height:14px}
+.set-sub h2{margin:8px 4px 0;font-size:24px;line-height:1.15;font-weight:650;letter-spacing:-.015em}
+/* rows that open something */
+.mac button.fr.cn-r,.mac button.fr.set-go{width:100%;border:0;background:none;font:inherit;color:inherit;text-align:left;cursor:default;transition:background-color 150ms ease}
+.mac button.fr.cn-r:hover,.mac button.fr.set-go:hover{background:var(--fill)}
+.mac .form-grp > button.fr:first-child{border-radius:10px 10px 0 0}
+.mac .form-grp > button.fr:last-child{border-radius:0 0 10px 10px}
+.mac .form-grp > button.fr:only-child{border-radius:10px}
+.mac .fr.cn-r{min-height:56px}
+.fr.cn-r > svg:last-child,.fr.set-go > svg:last-child{width:14px;height:14px;flex:0 0 auto;color:var(--label-3);margin-left:-6px}
+.fr.set-go .l + .t-2{font-size:13px}
+.cn-live .st{font-size:12.5px;color:var(--label-2)}
+/* Updates */
+.mac .fr.fr-stack{flex-direction:column;align-items:stretch;gap:10px;padding-top:12px;padding-bottom:14px}
+.mac .fr.fr-stack textarea.tf{width:100%;height:92px}
+.set-st{font-size:12px;margin-top:-4px}
+.set-st:empty{display:none}
+.sig-p{display:flex;align-items:center;gap:10px;min-width:0;max-width:260px;padding:7px 12px 7px 8px;border-radius:9px;background:var(--fill);font-size:13px;line-height:1.35}
+.sig-p img,.sig-p .logo{width:30px;height:30px;border-radius:7px;flex:0 0 auto;object-fit:contain;background:#fff}
+.sig-p .logo{display:grid;place-items:center;background:var(--fill-2);color:var(--label);font-weight:600;font-size:13px}
+.sig-p div{min-width:0;display:flex;flex-direction:column}
+.sig-p b{font-weight:600}
+.sig-p span{color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.settings-pane .set-h.mhead{display:flex;align-items:flex-end;gap:16px;padding:0 10px 0 0}
+.settings-pane .set-h.mhead > span:first-child{flex:1 1 auto}
+#settingsRoot .set-h.mhead .mcol,#settingsRoot .hl-sig .mcol{width:150px;flex:0 0 auto;display:flex;justify-content:flex-start}
+#settingsRoot .set-h.mhead .mcol{font-size:12px;font-weight:600;color:var(--label-2)}
+.hl-sig .mcol .pop-sel{width:100%;justify-content:space-between}
+.hl-sig .mcol > .t-3{padding-left:10px}
+/* Clients: chips for services and statuses */
+.mac .fr.opt-row{flex-wrap:wrap;padding:12px 14px}
+.mac .opt{height:28px;gap:2px;padding:0 4px 0 11px;border-radius:14px;background:var(--fill-2);font-size:13px}
+.mac .opt .opt-x,.mac .opt .opt-mv{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:20px;height:20px;padding:0;border:0;border-radius:10px;background:none;color:var(--label-3);cursor:default;transition:background-color 150ms ease,color 150ms ease}
+.mac .opt .opt-x:hover,.mac .opt .opt-mv:hover{background:var(--fill);color:var(--label)}
+.mac .opt svg{width:12px;height:12px;color:inherit}
+.mac .opt .opt-mv{width:0;margin-left:-7px;opacity:0;overflow:hidden;transition:width 160ms cubic-bezier(.23,1,.32,1),margin 160ms cubic-bezier(.23,1,.32,1),opacity 120ms ease}
+.mac .opt:hover .opt-mv,.mac .opt .opt-mv:focus-visible{width:20px;margin-left:-8px;opacity:1}
+.mac .fr.opt-add .tf{flex:1 1 auto}
+.btn-q.set-add{padding:0}
+/* Clients not in Harvest */
+.oh-sub{margin:-4px 0 14px;font-size:13px;line-height:1.5}
+.oh-l{max-height:min(56vh,460px);overflow:auto;margin:0 -2px;padding:0 2px}
+.oh-r{display:flex;align-items:center;gap:10px;min-height:54px;padding:7px 0;border-top:.5px solid var(--sep)}
+.oh-r:first-child{border-top:0}
+.oh-n{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:1px}
+.oh-n b{font-size:14px;font-weight:500}
+.oh-n span{font-size:12.5px;color:var(--label-2)}
+.oh-r .pop-sel{min-width:200px;justify-content:space-between}
+.oh-empty{padding:18px 0;font-size:13.5px}
+.modal-card h3 .t-3{margin-left:6px;font-weight:500}
+a.mi{text-decoration:none;color:inherit}
+/* Notifications: a filled box for on */
+#settingsRoot .ck.on,#settingsRoot .ck.on svg{background:var(--label);color:var(--window) !important}
+.mhead.nt-h{margin-top:28px;padding-bottom:8px}
+.mhead.nt-h > span:first-child{font-size:14px;color:var(--label);font-weight:600}

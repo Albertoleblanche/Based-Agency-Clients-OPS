@@ -1,33 +1,52 @@
-// Settings and My Profile, as on the canvas. Settings has six panes (General, Updates, Client
-// Fields, AI & Email, Integrations, Notifications) chosen from the icon strip at the top; every
-// change saves as it is made. The save functions are the ones in settings.js, custom-fields.js,
-// integrations.js, sheet-sync.js and profile.js; this file draws the panes.
+// Settings and My Profile, as on the canvas. Settings has five tabs: General, Updates, Clients,
+// Connections and Notifications. Harvest, WhatsApp and AI are pages inside Connections, opened from
+// its list with a back button. The old tab names (fields, areas, integrations, ai…) still open the
+// right place. Every change saves as it is made. The save functions are the ones in settings.js,
+// custom-fields.js, integrations.js, sheet-sync.js and profile.js; this file draws the pages.
 
-let settingsTab = 'general';
+let settingsTab = 'general';   // the page shown: a tab, or a page inside Connections
 const SETTINGS_TABS = [
   ['general', 'General', 'gear-six', () => true],
-  ['updates', 'Updates', 'heartbeat', () => canApprove()],
-  ['fields', 'Client Fields', 'buildings', () => canApprove()],
-  ['areas', 'Areas', 'users', () => canApprove() && typeof WORK_AREAS !== 'undefined'],
-  ['ai', 'AI & Email', 'envelope-simple', () => true],
-  ['integrations', 'Integrations', 'plugs-connected', () => true],
-  ['harvest', 'Harvest', 'timer', () => canApprove() && typeof setHarvest === 'function'],
-  ['whatsapp', 'WhatsApp', 'message-circle', () => typeof waCanManage === 'function' && waCanManage() && !waHidden()],
+  ['updates', 'Updates', 'heartbeat', () => true],
+  ['clients', 'Clients', 'buildings', () => canApprove()],
+  ['connections', 'Connections', 'plugs-connected', () => true],
   ['notifications', 'Notifications', 'bell', () => true],
 ];
-function switchSettingsTab(name){
-  if(name === 'clients') name = 'fields';
-  setInkSlide = settingsTab !== name;
-  settingsTab = name; renderSettingsView();
-  const body = document.querySelector('#settingsRoot .set-body');
-  if(setInkSlide && body && typeof motionOK === 'function' && motionOK()) body.animate([{ opacity: .35, transform: 'translateY(3px)' }, { opacity: 1, transform: 'none' }], { duration: 200, easing: 'cubic-bezier(.23,1,.32,1)' });
-  setInkSlide = false;
-  if(name === 'ai' && isAdmin()) loadAiProviderConnectionStatus();
-  if(name === 'integrations') loadIntegrationStatuses();
-  if(name === 'harvest' && typeof hvRefreshAll === 'function') hvRefreshAll();
-  if(name === 'whatsapp' && typeof waStartPoll === 'function') waStartPoll();
+// pages inside Connections
+const SETTINGS_SUB = {
+  harvest: ['Harvest', () => canApprove() && typeof setHarvest === 'function'],
+  whatsapp: ['WhatsApp', () => typeof waCanManage === 'function' && waCanManage() && !waHidden()],
+  ai: ['AI', () => isAdmin()],
+};
+const SETTINGS_ALIAS = { fields: 'clients', areas: 'clients', integrations: 'connections' };
+let setScrollTo = null;   // a section to bring into view once the page is drawn
+function settingsPage(name){
+  name = SETTINGS_ALIAS[name] || name;
+  if(name === 'ai' && !isAdmin()) return 'updates';   // a member's AI setting is how their drafts are written
+  if(SETTINGS_SUB[name]) return SETTINGS_SUB[name][1]() ? name : 'connections';
+  const t = SETTINGS_TABS.find(x => x[0] === name);
+  return t && t[3]() ? name : 'general';
 }
-function openSettingsTab(tab){ settingsTab = tab === 'clients' ? 'fields' : tab; switchView('settings'); setTimeout(() => switchSettingsTab(settingsTab), 0); }
+function settingsTabOf(page){ return SETTINGS_SUB[page] ? 'connections' : page; }
+function switchSettingsTab(name){
+  if(name === 'areas') setScrollTo = 'setAreas';
+  const to = settingsPage(name), from = settingsTab;
+  setInkSlide = settingsTabOf(from) !== settingsTabOf(to);
+  settingsTab = to; renderSettingsView();
+  const body = document.querySelector('#settingsRoot .set-body'), pane = document.getElementById('settingsRoot');
+  if(from !== to && pane && !setScrollTo) pane.scrollTop = 0;
+  if(from !== to && body && typeof motionOK === 'function' && motionOK()){
+    // into a page of Connections from the right, back from the left; other tabs fade up
+    const dx = SETTINGS_SUB[to] && !SETTINGS_SUB[from] ? 14 : SETTINGS_SUB[from] && to === 'connections' ? -14 : 0;
+    body.animate([{ opacity: .35, transform: dx ? `translateX(${dx}px)` : 'translateY(3px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.23,1,.32,1)' });
+  }
+  setInkSlide = false;
+  if(to === 'ai' || to === 'connections'){ if(isAdmin()) loadAiProviderConnectionStatus(); }
+  if(to === 'connections') loadIntegrationStatuses();
+  if(to === 'harvest' && typeof hvRefreshAll === 'function') hvRefreshAll();
+  if(to === 'whatsapp' && typeof waStartPoll === 'function') waStartPoll();
+}
+function openSettingsTab(tab){ settingsTab = settingsPage(tab); switchView('settings'); setTimeout(() => switchSettingsTab(tab), 0); }
 
 // The open tab is underlined; switching slides the line from the old tab to the new one.
 let setInkAt = null, setInkSlide = false;
@@ -67,21 +86,26 @@ async function changeSettings(fn, okMsg){
 }
 
 // ---- the window -------------------------------------------------------------------------------
+// One column, centred, with the tabs above it. A page inside Connections has a back button and
+// its name instead of a second row of tabs.
 function renderSettingsView(){
   const root = document.getElementById('settingsRoot');
   if(!root) return;
+  settingsTab = settingsPage(settingsTab);
+  const tab = settingsTabOf(settingsTab), sub = SETTINGS_SUB[settingsTab];
   const tabs = SETTINGS_TABS.filter(t => t[3]());
-  if(!tabs.some(t => t[0] === settingsTab)) settingsTab = 'general';
-  const cur = tabs.find(t => t[0] === settingsTab);
   if(currentViewName === 'settings') setToolbar('Settings', '');   // the tabs say which section
   const keep = document.activeElement && document.activeElement.id;
-  const body = { general: setGeneral, updates: setUpdates, fields: setFields, areas: typeof WORK_AREAS !== 'undefined' ? setAreas : setGeneral, ai: setAi, integrations: setIntegrations, harvest: typeof setHarvest === 'function' ? setHarvest : setGeneral, notifications: setNotifications, whatsapp: typeof setWhatsapp === 'function' ? setWhatsapp : setGeneral }[settingsTab]();
-  root.innerHTML = `<div class="set-tb"><div class="set-tabs" role="toolbar" aria-label="Settings sections">${tabs.map(([k, t]) => `<button class="set-tab${k === settingsTab ? ' on' : ''}" ${k === settingsTab ? 'aria-current="page"' : ''} onclick="switchSettingsTab('${k}')">${t}</button>`).join('')}<span class="set-ink" aria-hidden="true"></span></div></div>
-<div class="set-body">${body}<p class="t-2" style="font-size:13px;margin:14px 4px 0">Changes save as you make them.</p></div>`;
+  const draw = { general: setGeneral, updates: setUpdates, clients: setClients, connections: setConnections, notifications: setNotifications,
+    harvest: typeof setHarvest === 'function' ? setHarvest : setConnections, whatsapp: typeof setWhatsapp === 'function' ? setWhatsapp : setConnections, ai: setAi }[settingsTab];
+  const head = sub ? `<div class="set-sub"><button class="set-back" onclick="switchSettingsTab('connections')">${icon('caret-left', { weight: 'bold' })}Connections</button><h2>${sub[0]}</h2></div>` : '';
+  root.innerHTML = `<div class="set-tb"><div class="set-tabs" role="toolbar" aria-label="Settings sections">${tabs.map(([k, t]) => `<button class="set-tab${k === tab ? ' on' : ''}" ${k === tab ? 'aria-current="page"' : ''} onclick="switchSettingsTab('${k}')">${t}</button>`).join('')}<span class="set-ink" aria-hidden="true"></span></div></div>
+<div class="set-body set-${settingsTab}">${head}${draw()}<p class="set-foot">Changes save as you make them.</p></div>`;
   placeSetInk();
   if(keep){ const el = document.getElementById(keep); if(el && el.tagName !== 'BUTTON') el.focus(); }
-  if(settingsTab === 'ai') applyAiConn();
-  if(settingsTab === 'ai' && typeof updateEmailInstructionsStatus === 'function') updateEmailInstructionsStatus();
+  if(settingsTab === 'ai' || settingsTab === 'connections') applyAiConn();
+  if(settingsTab === 'updates' && typeof updateEmailInstructionsStatus === 'function') updateEmailInstructionsStatus();
+  if(setScrollTo){ const el = document.getElementById(setScrollTo); setScrollTo = null; if(el) requestAnimationFrame(() => el.scrollIntoView({ block: 'start' })); }
 }
 
 // ---- General ----------------------------------------------------------------------------------
@@ -101,7 +125,7 @@ ${fr('Names in the sidebar', 'Rename screens for everyone, and the line under th
 </div>` : ''}
 <div class="set-h">You</div>
 <div class="form-grp">
-${fr('Your name', 'Filled in for you whenever you log an improvement', `<input id="setYourName" class="tf" style="width:240px" value="${esc(myProfile?.name || '')}" onchange="saveYourName(this.value)">`)}
+<button class="fr set-go" onclick="switchView('profile')"><div class="l"><b>${esc(myProfile?.name || 'Your profile')}</b><span>Your name, photo, phone and sign-in email</span></div><span class="t-2">My Profile</span>${icon('caret-right', { weight: 'bold' })}</button>
 </div>
 <div class="set-h">Appearance</div>
 <div class="form-grp">
@@ -148,19 +172,29 @@ ${rows}
 const DAY_OPTS = DAY_NAMES.map((d, i) => [i, d]);
 // ---- Updates (the weekly update and client health) ---------------------------------------------
 function setUpdates(){
-  const a = updateAutomation(), t = healthThresholds(), can = canApprove();
+  const a = updateAutomation(), t = healthThresholds(), can = canApprove(), admin = isAdmin();
+  const sig = settings.emailSignature || {};
   const auto = (k, title, sub) => fr(title, sub, swHtml(a[k], title, `saveAutomation('${k}')`, !can));
   const range = (a0, b0, step) => { const o = []; for(let v = a0; v <= b0; v += step) o.push(v); return o; };
-  const pair = (key, title, wOpts, rOpts) => `<div class="fr"><div class="l"><b>${title}</b></div><span class="mcol" style="width:150px">${popSel(title + ' — watch', wOpts, t[key][0], `saveSignal('${key}',0,this.value)`, { disabled: !can })}</span><span class="mcol" style="width:150px">${rOpts ? popSel(title + ' — at risk', rOpts, t[key][1], `saveSignal('${key}',1,this.value)`, { disabled: !can }) : '<span class="t-2">—</span>'}</span></div>`;
+  const pair = (key, title, wOpts, rOpts) => `<div class="fr"><div class="l"><b>${title}</b></div><span class="mcol">${popSel(title + ' — watch', wOpts, t[key][0], `saveSignal('${key}',0,this.value)`, { disabled: !can })}</span><span class="mcol">${rOpts ? popSel(title + ' — at risk', rOpts, t[key][1], `saveSignal('${key}',1,this.value)`, { disabled: !can }) : '<span class="t-3">—</span>'}</span></div>`;
   const days = range(3, 30, 1).map(v => [v, `${v} days`]);
   const lateO = [1, 2, 3, 4].map(v => [v, `${v} of the last 4`]);
   const paceO = range(100, 200, 10).map(v => [v, `${v}% of budget`]);
   const taskO = range(1, 10, 1).map(v => [v, String(v)]);
   const flagO = [1, 2, 3, 4, 5].map(v => [v, v === 5 ? '5' : v === 4 ? '4 or 5' : String(v)]);
   const underO = [25, 30, 40, 50, 60, 70].map(v => [v, `Under ${v}%`]);
-  return `<div class="set-h">Weekly client updates</div>
+  const flagOn = settings.ownerRiskFlag !== false;
+  // how your drafts are written (everyone), the signature under them (approvers)
+  const yours = `<div class="fr fr-stack"><div class="l"><b>How your drafts are written</b><span>The AI follows this for the drafts you write. Each person sets their own.</span></div>
+<textarea id="emailInstructions" class="tf" placeholder="Open with “Hi [first name],”. One sentence on the week, then a bulleted list of what we did." onchange="saveEmailInstructions()">${esc(myProfile?.email_instructions || '')}</textarea><div id="emailInstructionsStatus" class="t-2 set-st"></div></div>`;
+  const signature = can ? `<div class="fr"><div class="l"><b>Signature</b><span>Added under every update</span></div>
+<div class="sig-p">${sig.logoUrl ? `<img src="${safeUrl(sig.logoUrl)}" alt="">` : `<span class="logo">${esc((sig.companyName || settings.appName || 'B').charAt(0).toUpperCase())}</span>`}<div><b>${esc(sig.companyName || 'Your company')}</b><span>${esc(sig.teamLine || sig.website || 'Add a line under the name')}</span></div></div><button class="btn" onclick="openSignatureSheet()" ${admin ? '' : 'disabled'}>Edit…</button></div>` : '';
+  if(!can) return `<div class="set-h">Your drafts</div><div class="form-grp">${yours}</div>`;
+  return `<div class="set-h">Weekly updates</div>
 <div class="form-grp">
-${fr('Once a week, for every client', 'Due 7 days after its last update. An approver checks each one and sends it the day it’s ready. Nothing is ever sent automatically.', '<span class="t-2" style="white-space:nowrap">Every 7 days</span>')}
+${fr('Every client, once a week', 'Due 7 days after its last update. An approver checks each one and sends it the day it’s ready; nothing goes out by itself.', '<span class="t-2 nowrap">Every 7 days</span>')}
+${signature}
+${yours}
 </div>
 <div class="set-h">Help the team keep up</div>
 <div class="form-grp">
@@ -168,17 +202,18 @@ ${auto('autoDraft', 'Write drafts automatically', 'Each morning, for clients due
 ${auto('remindBehind', 'Remind whoever has an overdue update', 'The morning after it’s due, in the app and on Slack')}
 ${auto('mondaySummary', 'Monday summary for approvers', 'Last week’s updates and any client health changes')}
 </div>
-<div class="mhead" style="margin-top:20px"><span style="font-size:14px;color:var(--label);font-weight:600">Client health signals</span><span class="mcol" style="width:150px">Watch at</span><span class="mcol" style="width:150px">At risk at</span></div>
-<div class="form-grp">
+<div class="set-h mhead"><span>Client health</span><span class="mcol">Watch at</span><span class="mcol">At risk at</span></div>
+<div class="form-grp hl-sig">
 ${pair('noUpdateDays', 'No weekly update sent', days, days)}
 ${pair('lateOfLast4', 'Updates late or missed', lateO, lateO)}
 ${pair('hoursPacePct', 'Hours used, on pace for', paceO, paceO)}
-<div class="fr"><div class="l"><b>Hours under-used by mid-month</b></div><span class="mcol" style="width:150px">${popSel('Hours under-used — watch', underO, t.underUsedPct, 'saveSignalValue(\'underUsedPct\',this.value)', { disabled: !can })}</span><span class="mcol" style="width:150px"><span class="t-2">—</span></span></div>
+<div class="fr"><div class="l"><b>Hours under-used by mid-month</b></div><span class="mcol">${popSel('Hours under-used — watch', underO, t.underUsedPct, 'saveSignalValue(\'underUsedPct\',this.value)', { disabled: !can })}</span><span class="mcol"><span class="t-3">—</span></span></div>
 ${pair('nothingLoggedDays', 'Nothing logged', days, days)}
 ${pair('overdueTasks', 'Overdue tasks', taskO, taskO)}
-${settings.ownerRiskFlag === false ? '' : pair('ownerFlag', 'Owner’s own risk flag', flagO, flagO)}
+${flagOn ? pair('ownerFlag', 'Owner’s risk flag', flagO, flagO) : ''}
 </div>
-<div class="form-grp" style="margin-top:12px">
+<div class="form-grp set-gap">
+${fr('Owners can flag a client’s risk, 1 to 5', 'From the client’s panel. It counts as a signal above.', swHtml(flagOn, 'Owners can flag a client’s risk', 'changeSettings(s => { s.ownerRiskFlag = s.ownerRiskFlag === false; })'))}
 ${fr('Flag important clients sooner', 'Importance 8 or more moves up one level', swHtml(t.importantBump, 'Flag important clients sooner', 'saveSignalToggle(\'importantBump\')', !can))}
 ${fr('Quiet a handled signal for', 'Comes back sooner if it gets worse', popSel('Quiet a handled signal for', [3, 5, 7, 10, 14].map(v => [v, `${v} days`]), t.quietDays, 'saveSignalValue(\'quietDays\',this.value)', { disabled: !can }))}
 </div>`;
@@ -201,65 +236,146 @@ function areaLoggedTasks(profileId){
   timeEntries.filter(e => e.userId === profileId && e.harvestTaskId && e.date >= since).forEach(e => { const n = hvTaskName(e.harvestTaskId); if(n && waTaskArea(n)) tally[n] = (tally[n] || 0) + e.minutes; });
   return Object.entries(tally).sort((a, b) => b[1] - a[1]).slice(0, 3).map(x => x[0]).join(', ');
 }
-function setAreas(){
-  const role = { admin: 'Admin', approver: 'Approver', member: 'Member' };
-  const people = (typeof teamProfiles !== 'undefined' ? teamProfiles : []).filter(p => p.name && !p.access_revoked).sort((a, b) => a.name.localeCompare(b.name));
-  const prow = p => {
-    const on = waPersonAreas(p.id), logged = areaLoggedTasks(p.id);
-    const sub = [role[p.role] || '', on.length ? `${waWords(on)} clients` : 'Every client', logged ? `Logs ${logged}` : ''].filter(Boolean).join(' · ');
-    return fr(esc(p.name), esc(sub), areaChips('people', p.id, on));
-  };
-  // every project name in Harvest, with how many clients have it
-  const counts = {};
-  ((typeof hvTime !== 'undefined' && hvTime && hvTime.projects) || []).forEach(p => {
-    const hc = (hvTime.clients || []).find(x => Number(x.harvest_id) === Number(p.client_harvest_id));
-    if(!hc || !hc.radar_client_id) return;
-    const n = String(p.name || '').trim(); (counts[n] = counts[n] || new Set()).add(String(hc.radar_client_id));
-  });
-  const names = Object.keys(counts).sort((a, b) => counts[b].size - counts[a].size || a.localeCompare(b));
-  const own = waSet().projects || {};
-  const jrow = n => {
-    const on = waProjectAreas(n), k = counts[n].size;
-    const sub = `${k} client${k === 1 ? '' : 's'}${on.length ? '' : ' · every area'}${Array.isArray(own[n]) ? ` · <a class="ar-reset" href="#" onclick="waResetProject(${jsArg(n)});return false;">Reset</a>` : ''}`;
-    return fr(esc(n), sub, areaChips('projects', n, on));
-  };
-  return `<div class="set-h">People</div>
-<div class="form-grp ar-g">${people.map(prow).join('')}</div>
-<p class="t-2 hv-p">Each person works on the clients in their areas, and the ones they own. Members can only log time and work on those; admins and approvers can log on any client. No area picked means every client.</p>
-<div class="set-h">Projects in Harvest</div>
-<div class="form-grp ar-g">${names.length ? names.map(jrow).join('') : fr('No projects yet', 'They show here once Harvest is connected and read.', '')}</div>
-<p class="t-2 hv-p">What each project covers. A client’s areas are its projects’ areas. Tier 2 and Tier 3 cover the same areas; Legacy Retainer and projects Radar doesn’t know cover every area until you pick.</p>`;
-}
-
 // ---- Client Fields ----------------------------------------------------------------------------
 function optChips(kind){
   const list = settings[OPTION_KIND_KEYS[kind]] || [];
-  return list.length ? `<div class="opts">${list.map((o, i) => `<span class="opt">${i > 0 ? `<button class="ib opt-mv" aria-label="Move ${esc(o)} earlier" title="Move earlier" onclick="moveOpt('${kind}',${jsArg(o)},-1)">${icon('caret-left', { weight: 'bold' })}</button>` : ''}${esc(o)}<button class="ib" style="width:16px;height:16px" aria-label="Remove ${esc(o)}" onclick="removeOpt('${kind}',${jsArg(o)})">${icon('x', { weight: 'bold' })}</button></span>`).join('')}</div>` : '<span class="t-2" style="font-size:14px">None yet.</span>';
+  return list.length ? `<div class="opts">${list.map((o, i) => `<span class="opt">${i > 0 ? `<button class="opt-mv" aria-label="Move ${esc(o)} earlier" title="Move earlier" onclick="moveOpt('${kind}',${jsArg(o)},-1)">${icon('caret-left', { weight: 'bold' })}</button>` : ''}<span>${esc(o)}</span><button class="opt-x" aria-label="Remove ${esc(o)}" title="Remove" onclick="removeOpt('${kind}',${jsArg(o)})">${icon('x', { weight: 'bold' })}</button></span>`).join('')}</div>` : '<span class="t-2">None yet.</span>';
+}
+function optAddRow(kind, id, ph){
+  return `<div class="fr opt-add"><input class="tf" id="${id}" placeholder="${ph}" aria-label="${ph}" onkeydown="if(event.key==='Enter')addOpt('${kind}')"><button class="btn" onclick="addOpt('${kind}')">Add</button></div>`;
 }
 async function addOpt(kind){ await addFieldOption(kind); renderSettingsView(); }
 async function removeOpt(kind, v){ await removeFieldOption(kind, v); renderSettingsView(); }
 async function moveOpt(kind, v, d){ await moveFieldOption(kind, v, d); renderSettingsView(); }
-function setFields(){
-  const fields = settings.customFields || [];
-  const frows = fields.map((f, i) => `<div class="fr"><div class="l"><b>${esc(f.label)}</b>${f.type === 'select' ? `<span>${(f.options || []).length} choices</span>` : ''}</div><span class="t-2" style="font-size:13px">${esc(CUSTOM_FIELD_TYPE_LABELS[f.type] || f.type)}${f.required ? ' · required' : ''}</span>
-<div class="pop-wrap" style="background:none;padding:0"><button class="ib" aria-label="More options for ${esc(f.label)}" onclick="cfMenu(event,'${f.id}',${i},${fields.length})">${icon('dots-three', { weight: 'bold' })}</button></div></div>`).join('');
-  // Harvest is the source of truth for what clients buy: the list is only for clients outside it
+// ---- Clients: services, areas of work, statuses and custom fields ----------------------------------
+// With Harvest connected a client's services are its active Harvest projects, so the projects are
+// listed here with the areas each one covers (that's what decides who works on the client). The
+// service list is only for the clients that aren't in Harvest; the line under it opens them.
+function setClients(){
   const hv = typeof harvestOwnsServices === 'function' && harvestOwnsServices();
-  const outside = hv ? liveClients().filter(c => !serviceFromHarvest(c)).length : 0;
-  const svcList = `<div class="form-grp"><div class="fr" style="flex-wrap:wrap;padding:12px 14px">${optChips('service')}</div>
-<div class="fr"><input class="tf" id="serviceOptionInput" style="flex:1" placeholder="Add a service" aria-label="Add a service" onkeydown="if(event.key==='Enter')addOpt('service')"><button class="btn" onclick="addOpt('service')">Add</button></div></div>`;
-  return `<div class="set-h">Services</div>
-${!hv ? svcList : outside ? `${svcList}<p class="t-2 hv-p">For the ${outside === 1 ? 'client that isn’t' : `${outside} clients that aren’t`} in Harvest. Clients in Harvest show their projects.</p>`
-    : `<div class="form-grp">${fr('From Harvest', 'Each client shows its active projects in Harvest. Change them there.', '')}</div>`}
-<div class="set-h">Client statuses</div>
-<div class="form-grp"><div class="fr" style="flex-wrap:wrap;padding:12px 14px">${optChips('status')}</div>
-<div class="fr"><input class="tf" id="statusOptionInput" style="flex:1" placeholder="Add a status" aria-label="Add a status" onkeydown="if(event.key==='Enter')addOpt('status')"><button class="btn" onclick="addOpt('status')">Add</button></div></div>
+  const outside = hv ? outsideHarvestClients().length : 0;
+  const areas = typeof WORK_AREAS !== 'undefined';
+  let html = '';
+  // services: Harvest's projects, and the list for everyone else
+  if(hv){
+    const counts = {};
+    ((typeof hvTime !== 'undefined' && hvTime && hvTime.projects) || []).forEach(p => {
+      const hc = (hvTime.clients || []).find(x => Number(x.harvest_id) === Number(p.client_harvest_id));
+      if(!hc || !hc.radar_client_id || p.is_active === false) return;
+      const n = String(p.name || '').trim(); (counts[n] = counts[n] || new Set()).add(String(hc.radar_client_id));
+    });
+    const names = Object.keys(counts).sort((a, b) => counts[b].size - counts[a].size || a.localeCompare(b));
+    const own = areas ? (waSet().projects || {}) : {};
+    const jrow = n => {
+      const k = counts[n].size, on = areas ? waProjectAreas(n) : [];
+      const sub = `${k} client${k === 1 ? '' : 's'}${areas && !on.length ? ' · every area' : ''}${Array.isArray(own[n]) ? ` · <a class="ar-reset" href="#" onclick="waResetProject(${jsArg(n)});return false;">Reset</a>` : ''}`;
+      return fr(esc(n), sub, areas ? areaChips('projects', n, on) : '');
+    };
+    html += `<div class="set-h">Services from Harvest</div>
+<div class="form-grp ar-g">${names.length ? names.map(jrow).join('') : fr('No projects yet', 'They show here once Harvest is read.', '')}</div>
+<p class="set-note">Each client’s services are its active projects in Harvest; change them there.${areas ? ' Pick the areas each one covers: a client’s areas are its projects’ areas. Legacy Retainer and projects Radar doesn’t know cover every area until you pick.' : ''}</p>`;
+  }
+  if(!hv || outside){
+    html += `<div class="set-h">${hv ? 'Other services' : 'Services'}</div>
+<div class="form-grp"><div class="fr opt-row">${optChips('service')}</div>${optAddRow('service', 'serviceOptionInput', 'Add a service')}</div>
+${hv ? `<p class="set-note">For the <a class="set-lnk" href="#" onclick="openOutsideHarvestSheet();return false;">${outside === 1 ? 'client that isn’t' : `${outside} clients that aren’t`} in Harvest</a>. Clients in Harvest show their projects.</p>` : ''}`;
+  }
+  // areas of work: who works on which clients
+  if(areas){
+    const role = { admin: 'Admin', approver: 'Approver', member: 'Member' };
+    const people = (typeof teamProfiles !== 'undefined' ? teamProfiles : []).filter(p => p.name && !p.access_revoked).sort((a, b) => a.name.localeCompare(b.name));
+    const prow = p => {
+      const on = waPersonAreas(p.id), logged = areaLoggedTasks(p.id);
+      const sub = [role[p.role] || '', on.length ? `${waWords(on)} clients` : 'Every client', logged ? `Logs ${logged}` : ''].filter(Boolean).join(' · ');
+      return fr(esc(p.name), esc(sub), areaChips('people', p.id, on));
+    };
+    html += `<div class="set-h" id="setAreas">Areas of work</div>
+<div class="form-grp ar-g">${people.map(prow).join('')}</div>
+<p class="set-note">Each person works on the clients in their areas, and the ones they own. Members can only log time and work on those; admins and approvers can log on any client. No area picked means every client.</p>`;
+  }
+  const fields = settings.customFields || [];
+  const frows = fields.map((f, i) => `<div class="fr"><div class="l"><b>${esc(f.label)}</b><span>${esc(CUSTOM_FIELD_TYPE_LABELS[f.type] || f.type)}${f.type === 'select' ? ` · ${(f.options || []).length} choices` : ''}${f.required ? ' · required' : ''}</span></div>
+<button class="ib" aria-label="More options for ${esc(f.label)}" onclick="cfMenu(event,'${f.id}',${i},${fields.length})">${icon('dots-three', { weight: 'bold' })}</button></div>`).join('');
+  html += `<div class="set-h">Statuses</div>
+<div class="form-grp"><div class="fr opt-row">${optChips('status')}</div>${optAddRow('status', 'statusOptionInput', 'Add a status')}</div>
 <div class="set-h">Custom fields</div>
-<div class="form-grp">${frows}<div class="fr"><button class="btn btn-q" style="padding:0" onclick="openAddCustomFieldModal()">${icon('plus')}Add Field</button></div></div>
-<div class="set-h">Risk flag</div>
-<div class="form-grp">
-${fr('Owners can flag a client’s risk, 1 to 5', 'Counts toward client health. The other signals are in Updates.', swHtml(settings.ownerRiskFlag !== false, 'Owners can flag a client’s risk', 'changeSettings(s => { s.ownerRiskFlag = s.ownerRiskFlag === false; })'))}
-</div>`;
+<div class="form-grp">${frows}<div class="fr"><button class="btn btn-q set-add" onclick="openAddCustomFieldModal()">${icon('plus')}Add Field</button></div></div>
+<p class="set-note">Extra details kept on each client, shown in its panel and Edit Client.</p>`;
+  return html;
+}
+
+// ---- Clients that aren't in Harvest: a sheet with each one's service and what to do with it ------
+function outsideHarvestClients(){
+  return liveClients().filter(c => !(typeof serviceFromHarvest === 'function' && serviceFromHarvest(c))).sort((a, b) => a.name.localeCompare(b.name));
+}
+function ohRowsHtml(){
+  const list = outsideHarvestClients(), opts = settings.serviceOptions || [];
+  if(!list.length) return `<p class="t-2 oh-empty">Every client is in Harvest now.</p>`;
+  return list.map(c => {
+    const svc = c.service || '';
+    const options = [['', 'No service'], ...[...new Set([svc, ...opts].filter(Boolean))].map(x => [x, x])];
+    const sub = [clientOwner(c) ? `Owner ${firstName(clientOwner(c))}` : 'No owner', c.status || ''].filter(Boolean).join(' · ');
+    return `<div class="oh-r"><div class="oh-n"><b>${esc(c.name)}</b><span>${esc(sub)}</span></div>
+${popSel(`${c.name}’s service`, options, svc, `saveOutsideService('${c.id}', this.value)`, { placeholder: 'No service' })}
+<button class="ib" aria-label="More for ${esc(c.name)}" onclick="ohMenu(event,'${c.id}')">${icon('dots-three', { weight: 'bold' })}</button></div>`;
+  }).join('');
+}
+function openOutsideHarvestSheet(){
+  const n = outsideHarvestClients().length;
+  openAppModal(`<h3>Clients not in Harvest <span class="t-3" id="ohCount">${n}</span></h3>
+<p class="t-2 oh-sub">They keep the service picked here. Add one in Harvest with the same name and Radar links it the next time it reads Harvest, with its projects and time.</p>
+<div class="oh-l" id="ohList">${ohRowsHtml()}</div>
+<div class="sheet-a"><a class="btn" style="margin-right:auto" href="${esc(ohHarvestUrl())}" target="_blank" rel="noopener">${icon('external-link')}Open Harvest</a><button class="btn btn-p" onclick="closeAppModal()">Done</button></div>`, 600);
+  setTimeout(() => { const a = document.activeElement; if(a && a.closest('.oh-l')) a.blur(); }, 30);   // no ring on the first row until someone tabs
+  if(!hvCompanyUrl && typeof harvestApiCall === 'function') harvestApiCall(null).then(st => { if(st && st.companyUrl){ hvCompanyUrl = st.companyUrl; } }).catch(() => {});
+}
+function ohHarvestUrl(){ return typeof hvCompanyUrl !== 'undefined' && hvCompanyUrl ? hvCompanyUrl.replace(/\/$/, '') + '/clients' : 'https://id.getharvest.com/harvest'; }
+function ohRefresh(){
+  const l = document.getElementById('ohList'), n = document.getElementById('ohCount');
+  if(l) l.innerHTML = ohRowsHtml();
+  if(n) n.textContent = outsideHarvestClients().length;
+  if(currentViewName === 'settings') renderSettingsView();
+}
+async function saveOutsideService(id, v){
+  const c = clients.find(x => x.id === id); if(!c || !canApprove()) return;
+  if(!(await updateClientRow(id, { service: v }))){ showToast('error', 'Couldn’t save', 'Try again in a moment.'); ohRefresh(); return; }
+  c.service = v;
+  showToast('success', 'Saved', v ? `${c.name}: ${v}` : `${c.name} has no service`);
+  ohRefresh(); if(typeof renderAll === 'function') renderAll();
+}
+function ohMenu(e, id){
+  e.stopPropagation();
+  const had = document.getElementById('ohMenu'); had?.remove(); if(had && had.dataset.id === id) return;
+  const c = clients.find(x => x.id === id); if(!c) return;
+  const copies = typeof setupClients === 'function' ? setupClients() : [];
+  const m = document.createElement('div');
+  m.className = 'menu'; m.id = 'ohMenu'; m.dataset.id = id; m.setAttribute('role', 'menu'); Object.assign(m.style, { position: 'fixed', zIndex: '1200' });
+  const r = e.currentTarget.getBoundingClientRect();
+  m.style.top = (r.bottom + 4) + 'px'; m.style.right = (window.innerWidth - r.right) + 'px';
+  m.innerHTML = `<button class="mi" role="menuitem" onclick="ohOpenClient('${id}')">${icon('briefcase')}Open in All Clients</button>
+${copies.length ? `<button class="mi" role="menuitem" onclick="ohSameAs('${id}')">${icon('link')}Same as a Harvest Client…</button>` : ''}
+<a class="mi" role="menuitem" href="${esc(ohHarvestUrl())}" target="_blank" rel="noopener">${icon('external-link')}Add It in Harvest</a>
+<div class="msep"></div><button class="mi danger" role="menuitem" onclick="ohTrash('${id}')">${icon('trash')}Move to Trash…</button>`;
+  document.body.appendChild(m);
+  setTimeout(() => document.addEventListener('click', () => m.remove(), { once: true }), 0);
+}
+function ohOpenClient(id){
+  closeAppModal();
+  if(typeof clientsSeg !== 'undefined') clientsSeg = 'all';
+  inspectedClientId = id; switchView('clients');
+}
+// The Harvest copy this client is: Radar keeps this client, with Harvest's projects and time.
+function ohSameAs(id){
+  const c = clients.find(x => x.id === id), copies = setupClients().sort((a, b) => a.name.localeCompare(b.name));
+  if(!c || !copies.length) return;
+  openAppModal(`<h3>Which client is ${esc(c.name)} in Harvest?</h3>
+<p class="t-2" style="margin:-4px 0 14px;font-size:13px;line-height:1.45">These came from Harvest and are waiting under Needs setup. Radar keeps ${esc(c.name)}, with the projects and time of the one you pick, and removes the copy.</p>
+<div class="f"><label for="ohSameSel">In Harvest</label><div>${sheetPop('ohSameSel', 'In Harvest', copies.map(x => [x.id, x.name]), '', "document.getElementById('ohSameGo').disabled=!this.value", { placeholder: 'Choose a client' })}</div></div>
+<div class="sheet-a"><button class="btn" onclick="openOutsideHarvestSheet()">Back</button><button class="btn btn-p" id="ohSameGo" disabled onclick="hvLinkClient(document.getElementById('ohSameSel').value, '${c.id}').then(() => { if(currentViewName === 'settings') renderSettingsView(); })">Link</button></div>`, 460);
+}
+async function ohTrash(id){
+  await deleteClient(id);
+  ohRefresh();
 }
 function cfMenu(e, id, i, n){
   e.stopPropagation();
@@ -273,32 +389,35 @@ function cfMenu(e, id, i, n){
   setTimeout(() => document.addEventListener('click', () => m.remove(), { once: true }), 0);
 }
 
-// ---- AI & Email -------------------------------------------------------------------------------
+// ---- Connections → AI: the accounts, which one the Assistant uses, and the weekly insights ------
+// Drafts are written with ChatGPT; the Assistant and the weekly insights use the one picked here.
 function setAi(){
   const admin = isAdmin(), provider = settings.aiProvider === 'openai' ? 'openai' : 'claude';
-  const sig = settings.emailSignature || {};
   const insightsOn = settings.proactiveInsightsEnabled !== false;
-  const conn = p => `<div class="fr"><span class="ic lg">${icon('sparkle')}</span><div class="l"><b>${p === 'claude' ? 'Claude' : 'ChatGPT'}</b><span id="aiConnectionStatus-${p}">Checking…</span></div><input id="${p === 'claude' ? 'setClaudeModel' : 'setOpenaiModel'}" class="tf" style="width:180px" value="${esc(p === 'claude' ? settings.claudeModel || '' : settings.openaiModel || '')}" placeholder="${esc(p === 'claude' ? DEFAULT_CLAUDE_MODEL : DEFAULT_OPENAI_MODEL)}" aria-label="${p === 'claude' ? 'Claude' : 'ChatGPT'} model" onchange="saveAiModel('${p}', this.value)" title="Model"><button class="btn" id="aiConnectionBtn-${p}" onclick="openAiProviderConnectModal('${p}')">Connect</button></div>`;
-  return `${admin ? `<div class="set-h">Weekly insights</div>
+  const conn = p => `<div class="fr"><div class="l"><b>${p === 'claude' ? 'Claude' : 'ChatGPT'}</b><span id="aiConnectionStatus-${p}">Checking…</span></div><input id="${p === 'claude' ? 'setClaudeModel' : 'setOpenaiModel'}" class="tf" style="width:170px" value="${esc(p === 'claude' ? settings.claudeModel || '' : settings.openaiModel || '')}" placeholder="${esc(p === 'claude' ? DEFAULT_CLAUDE_MODEL : DEFAULT_OPENAI_MODEL)}" aria-label="${p === 'claude' ? 'Claude' : 'ChatGPT'} model" onchange="saveAiModel('${p}', this.value)" title="Model"><button class="btn" id="aiConnectionBtn-${p}" onclick="openAiProviderConnectModal('${p}')">Connect…</button></div>`;
+  return `<div class="set-h">Accounts</div><div class="form-grp">${conn('claude')}${conn('openai')}</div>
+<p class="set-note">Each account’s key stays on the server. The box is the model it uses. Drafts are written with ChatGPT.</p>
+<div class="set-h">Assistant and weekly insights</div>
 <div class="form-grp">
-${fr('AI provider', 'For the weekly insights in Focus Reports', `<div class="seg" role="radiogroup" aria-label="AI provider">${[['claude', 'Claude'], ['openai', 'ChatGPT']].map(([k, t]) => `<button role="radio" aria-checked="${provider === k}" class="${provider === k ? 'on' : ''}" ${admin ? `onclick="saveAiProvider('${k}').then(renderSettingsView)"` : 'disabled'}>${t}</button>`).join('')}</div>`)}
+${fr('Use', 'For the Assistant and the weekly insights in Focus Reports', `<div class="seg" role="radiogroup" aria-label="AI for the Assistant and insights">${[['claude', 'Claude'], ['openai', 'ChatGPT']].map(([k, t]) => `<button role="radio" aria-checked="${provider === k}" class="${provider === k ? 'on' : ''}" ${admin ? `onclick="saveAiProvider('${k}').then(renderSettingsView)"` : 'disabled'}>${t}</button>`).join('')}</div>`)}
 ${fr('Weekly insights', 'A short note on patterns across your clients', `${popSel('Day', DAY_OPTS.map(([i, d]) => [i, 'Every ' + d]), settings.proactiveInsightsDayOfWeek ?? 3, 'saveProactiveInsightsDay(this.value).then(renderSettingsView)', { disabled: !admin })}${swHtml(insightsOn, 'Weekly insights', 'toggleProactiveInsightsEnabled().then(renderSettingsView)', !admin)}`)}
-</div>` : ''}
-${admin ? `<div class="set-h">AI accounts</div><div class="form-grp">${conn('claude')}${conn('openai')}</div>` : ''}
-<div class="set-h">Client emails</div>
-<div class="form-grp">
-${fr('How your drafts are written', 'The AI follows this for the drafts you write. Each person sets their own.', `<div style="width:340px"><textarea id="emailInstructions" class="tf" style="width:100%;height:112px" placeholder="Open with “Hi [first name],”. One sentence on the week, then a bulleted list of what we did." onchange="saveEmailInstructions()">${esc(myProfile?.email_instructions || '')}</textarea><div id="emailInstructionsStatus" class="t-2" style="font-size:12px;margin-top:4px"></div></div>`, { top: true })}
-${canApprove() ? fr('Signature', 'Added under every update', `<div style="width:340px;display:flex;gap:12px;align-items:center;padding:12px;border-radius:8px;background:var(--fill)">${sig.logoUrl ? `<img src="${safeUrl(sig.logoUrl)}" alt="" style="width:36px;height:36px;border-radius:9px;object-fit:contain;background:#fff">` : `<span class="logo">${esc((sig.companyName || settings.appName || 'B').charAt(0).toUpperCase())}</span>`}<div style="font-size:13px;line-height:1.45;min-width:0"><b>${esc(sig.companyName || 'Your company')}</b><div class="t-2">${esc(sig.teamLine || sig.website || 'Add a line under the name')}</div></div><button class="btn" style="margin-left:auto" onclick="openSignatureSheet()" ${admin ? '' : 'disabled'}>Edit…</button></div>`, { top: true }) : ''}
-</div>
-${admin ? `<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button class="btn" onclick="previewProactiveInsights()">${icon('eye')}Preview Weekly Insights</button></div>` : ''}`;
+<div class="fr"><div class="l"><span>See what this week’s would say</span></div><button class="btn" onclick="previewProactiveInsights()">${icon('eye')}Preview</button></div>
+</div>`;
 }
 let aiConnCache = null;
 async function loadAiProviderConnectionStatus(){
   try{ aiConnCache = await adminActionCall('get-ai-connections'); }catch(e){ console.error('loadAiProviderConnectionStatus error', e); return; }
   applyAiConn();
 }
+function aiConnWords(){
+  if(!aiConnCache) return null;
+  const on = ['claude', 'openai'].filter(p => { const i = aiConnCache[p] || {}; return i.connected || i.envConfigured; });
+  return on.length === 2 ? 'Claude and ChatGPT' : on.length ? (on[0] === 'claude' ? 'Claude' : 'ChatGPT') : '';
+}
 function applyAiConn(){
   if(!aiConnCache) return;
+  const row = document.getElementById('cnAiSt');
+  if(row){ const w = aiConnWords(); row.innerHTML = w ? `<span class="dot green"></span>${w}` : '<span class="dot hollow"></span>Not connected'; }
   ['claude', 'openai'].forEach(p => {
     const info = aiConnCache[p] || {}, el = document.getElementById('aiConnectionStatus-' + p), btn = document.getElementById('aiConnectionBtn-' + p);
     if(el) el.innerHTML = info.connected ? `<span class="st"><span class="dot green"></span>Connected${info.baseUrl ? ' · custom endpoint' : ''}</span>` : info.envConfigured ? '<span class="st"><span class="dot green"></span>Set on the server</span>' : '<span class="st"><span class="dot hollow"></span>Not connected</span>';
@@ -325,7 +444,9 @@ ${f('setSignatureAddress', 'address', 'Address', '')}
 <div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal()">Done</button></div>`, 480);
 }
 
-// ---- Integrations -----------------------------------------------------------------------------
+// ---- Connections: the apps Radar works with -----------------------------------------------------
+// Harvest, WhatsApp and AI open as pages here; Slack and Google Sheet open a sheet; Google Calendar
+// is yours alone and connects in place.
 let integ = { google: null, harvest: null, slackUnlinked: null };
 async function loadIntegrationStatuses(){
   const [g, h] = await Promise.all([
@@ -338,33 +459,30 @@ async function loadIntegrationStatuses(){
     try{ if(!slackChannelsLoaded) await loadSlackClientChannels(); integ.slackUnlinked = activeClients().filter(c => !slackClientChannels[c.id]).length; }catch(e){}
   }
   if(typeof loadWaTasks === 'function'){ try{ await loadWaTasks(); }catch(e){} }
-  if(currentViewName === 'settings' && settingsTab === 'integrations') renderSettingsView();
+  if(currentViewName === 'settings' && settingsTab === 'connections') renderSettingsView();
 }
-function setIntegrations(){
-  const st = (color, text) => `<span class="st"><span class="dot ${color}"></span>${text}</span>`;
+function setConnections(){
+  const st = (color, text, id) => `<span class="st"${id ? ` id="${id}"` : ''}><span class="dot ${color}"></span>${text}</span>`;
   const g = integ.google, h = integ.harvest, approver = canApprove();
+  const go = (js, ic, name, sub, status) => `<button class="fr cn-r" onclick="${js}"><span class="ic lg">${icon(ic)}</span><div class="l"><b>${name}</b><span>${sub}</span></div>${status}${icon('caret-right', { weight: 'bold' })}</button>`;
   const rows = [];
-  // live data between everyone's windows
-  const live = (supabaseClient.getChannels ? supabaseClient.getChannels() : []).some(c => c.state === 'joined');
-  rows.push(['arrows-clockwise', 'Team sync', 'Clients, improvements and drafts stay in sync for everyone', live ? st('green', 'Connected') : st('yellow', 'Reconnecting…'), '']);
-  if(isAdmin() && aiConnCache){
-    const p = settings.aiProvider === 'openai' ? 'openai' : 'claude', info = aiConnCache[p] || {};
-    rows.push(['sparkle', 'AI drafting', `Writes each client’s weekly draft with ${p === 'openai' ? 'ChatGPT' : 'Claude'}`, info.connected || info.envConfigured ? st('green', 'Connected') : st('hollow', 'Not connected'), info.connected || info.envConfigured ? '' : `<button class="btn" onclick="switchSettingsTab('ai')">Set Up…</button>`]);
-  }
-  if(g && g.googleConfigured) rows.push(['google-logo', 'Google Calendar', g.connected ? `Your meetings, deadlines and send days${g.lastSyncedAt ? ' · synced ' + claudeWhen(g.lastSyncedAt).toLowerCase() : ''}` : 'Bring your meetings into the team calendar',
-    g.connected ? st('green', 'Connected') : st('hollow', 'Not connected'), g.connected ? `<button class="btn" onclick="syncGoogleCalendar().then(loadIntegrationStatuses)">Sync Now</button>` : `<button class="btn" onclick="connectGoogleCalendar()">Connect…</button>`]);
-  if(approver) rows.push(['timer', 'Harvest', h && h.connected ? `Clients, projects and tasks${h.setup && h.setup.syncedAt && typeof hvWhen === 'function' ? ' · read ' + hvWhen(h.setup.syncedAt) : ''}` : 'Track time the way Harvest is set up',
-    h == null ? st('', 'Checking…') : h.connected ? st('green', 'Connected') : st('hollow', 'Not connected'), `<button class="btn" onclick="switchSettingsTab('harvest')">${h && h.connected ? 'Open' : 'Connect…'}</button>`]);
-  if(approver) rows.push(['slack-logo', 'Slack', 'Client channels and daily summaries',
-    integ.slackUnlinked == null ? st('', 'Checking…') : integ.slackUnlinked ? st('yellow', `${integ.slackUnlinked} client${integ.slackUnlinked === 1 ? '' : 's'} not linked`) : st('green', 'Connected'), `<button class="btn" onclick="openIntegrationSheet('slack')">Link…</button>`]);
+  if(approver) rows.push(go("switchSettingsTab('harvest')", 'timer', 'Harvest',
+    h && h.connected ? `Clients, projects, tasks and time${h.setup && h.setup.syncedAt && typeof hvWhen === 'function' ? ' · read ' + hvWhen(h.setup.syncedAt) : ''}` : 'Time logged the way Harvest is set up',
+    h == null ? st('', 'Checking…') : h.connected ? st('green', 'Connected') : st('hollow', 'Not connected')));
   const wa = typeof waIntegrationRow === 'function' ? waIntegrationRow() : null;
-  if(wa) rows.push(wa);
-  rows.push(['table', 'Google Sheet', settings.sheetCsvUrl ? 'Pulls the client list from a published sheet' : 'Keep the client list in a Google Sheet',
-    settings.sheetCsvUrl ? st('green', 'Connected') : st('hollow', 'Not connected'), `${settings.sheetCsvUrl ? `<button class="btn" onclick="syncFromSheetUrl()">Sync Now</button>` : ''}<button class="btn" onclick="openIntegrationSheet('sheet')">${settings.sheetCsvUrl ? 'Edit…' : 'Connect…'}</button>`]);
-  const html = rows.map(([ic, n, d, s, b]) => `<div class="fr"><span class="ic lg">${icon(ic)}</span><div class="l"><b>${n}</b><span>${d}</span></div>${s}${b}</div>`).join('');
-  return `<div class="set-h">Connected apps</div><div class="form-grp">${html}</div><p class="t-2" style="font-size:13px;margin:8px 4px 0" id="sheetSyncStatus"></p>
-<div class="set-h">Client list</div>
-<div class="form-grp"><div class="fr"><div class="l"><b>Export the client list</b><span>A CSV you can paste back into the Google Sheet</span></div><button class="btn" onclick="exportRosterCsv()">${icon('export')}Export CSV</button></div></div>`;
+  if(wa) rows.push(go("switchSettingsTab('whatsapp')", 'message-circle', 'WhatsApp', 'Reads client groups and lists what clients are waiting on', wa[3]));
+  if(approver) rows.push(go("openIntegrationSheet('slack')", 'hash', 'Slack', 'Client channels, reminders and daily summaries',
+    integ.slackUnlinked == null ? st('', 'Checking…') : integ.slackUnlinked ? st('yellow', `${integ.slackUnlinked} client${integ.slackUnlinked === 1 ? '' : 's'} not linked`) : st('green', 'Connected')));
+  if(isAdmin()){ const w = aiConnWords(); rows.push(go("switchSettingsTab('ai')", 'sparkle', 'AI', 'Claude and ChatGPT: drafts, the Assistant and weekly insights', w == null ? st('', 'Checking…', 'cnAiSt') : w ? st('green', w, 'cnAiSt') : st('hollow', 'Not connected', 'cnAiSt'))); }
+  rows.push(go("openIntegrationSheet('sheet')", 'table', 'Google Sheet', settings.sheetCsvUrl ? 'Pulls the client list from a published sheet' : 'Keep a copy of the client list in a sheet',
+    settings.sheetCsvUrl ? st('green', 'Connected') : st('hollow', 'Not connected')));
+  const yours = g && g.googleConfigured ? `<div class="set-h">Yours</div><div class="form-grp"><div class="fr"><span class="ic lg">${icon('calendar-blank')}</span><div class="l"><b>Google Calendar</b><span>${g.connected ? `Your meetings in the team calendar${g.lastSyncedAt ? ' · synced ' + claudeWhen(g.lastSyncedAt).toLowerCase() : ''}` : 'Bring your meetings into the team calendar'}</span></div>
+${g.connected ? `${st('green', 'Connected')}<button class="btn" onclick="syncGoogleCalendar().then(loadIntegrationStatuses)">Sync Now</button>` : `<button class="btn" onclick="connectGoogleCalendar()">Connect…</button>`}</div></div>` : '';
+  const live = (supabaseClient.getChannels ? supabaseClient.getChannels() : []).some(c => c.state === 'joined');
+  return `<div class="set-h">Apps</div><div class="form-grp cn-g">${rows.join('')}</div>
+${yours}
+<p class="set-note cn-live">${st(live ? 'green' : 'yellow', live ? 'Live: changes show for everyone as they’re made' : 'Reconnecting… changes show for everyone once it’s back')}</p>
+<p class="t-2 set-note" id="sheetSyncStatus"></p>`;
 }
 function openIntegrationSheet(which){
   if(which === 'harvest'){
@@ -379,7 +497,7 @@ function openIntegrationSheet(which){
 <span></span><p class="t-2" style="font-size:13px;margin:0">In Google Sheets: File → Share → Publish to web → CSV. A normal edit link won’t work.</p>
 <label for="csvPasteArea" class="top">Or paste</label><textarea class="tf" id="csvPasteArea" style="height:90px" placeholder="Paste copied cells or CSV here"></textarea>
 </div>
-<div class="sheet-a"><button class="btn" style="margin-right:auto" onclick="importPastedCsv()">Import Pasted</button><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="saveAndSyncSheet().then(()=>{closeAppModal();renderSettingsView();})">Save &amp; Sync</button></div>`, 560);
+<div class="sheet-a"><button class="btn" onclick="importPastedCsv()">Import Pasted</button><button class="btn" style="margin-right:auto" onclick="exportRosterCsv()">${icon('export')}Export CSV</button><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="saveAndSyncSheet().then(()=>{closeAppModal();renderSettingsView();})">Save &amp; Sync</button></div>`, 560);
   }
 }
 
@@ -410,8 +528,8 @@ function setNotifications(){
     sections.get(s).push([type, meta]);
   });
   const ck = (type, ch, label) => { const on = notifOn(type, ch); return `<span class="mcol"><button class="ck${on ? ' on' : ''}" role="checkbox" aria-checked="${on}" aria-label="${esc(label)}" onclick="toggleNotifChannel('${type}','${ch}')">${on ? icon('check', { weight: 'bold' }) : ''}</button></span>`; };
-  return `<p class="t-2" style="font-size:13px;margin:0 4px">Choose where each kind of notification reaches you.</p>` + [...sections.entries()].map(([s, rows]) =>
-    `<div class="mhead" style="margin-top:20px"><span style="font-size:13px;color:var(--label);font-weight:600">${esc(s)}</span><span class="mcol">In app</span><span class="mcol">Slack</span><span class="mcol">Push</span></div>
+  return `<p class="set-note" style="margin:0 4px 4px">Choose where each kind of notification reaches you.</p>` + [...sections.entries()].map(([s, rows]) =>
+    `<div class="mhead nt-h"><span>${esc(s)}</span><span class="mcol">In app</span><span class="mcol">Slack</span><span class="mcol">Push</span></div>
 <div class="form-grp">${rows.map(([type, meta]) => `<div class="fr"><div class="l"><b style="font-weight:400">${esc(meta.label)}</b></div>${ck(type, 'app', meta.label + ' — in app')}${ck(type, 'slack', meta.label + ' — Slack')}${ck(type, 'push', meta.label + ' — push')}</div>`).join('')}</div>`).join('');
 }
 
