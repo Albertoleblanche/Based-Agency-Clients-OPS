@@ -76,8 +76,9 @@ function sheetTimeOpts(value, step, first){
 function sheetSwCk(id, on, label, extra){
   return `<button type="button" class="sw${on ? ' on' : ''}" role="switch" aria-checked="${!!on}" aria-label="${escapeHtml(label)}" onclick="sheetToggle(this);document.getElementById('${id}').checked=this.classList.contains('on')${extra ? ';' + extra : ''}"></button><input type="checkbox" id="${id}" hidden${on ? ' checked' : ''}>`;
 }
-function sheetClientOptions(extraId){
-  const list = liveClients().slice();
+// forWork: logging time or work, so members only get the clients in their areas (work-areas.js)
+function sheetClientOptions(extraId, forWork){
+  const list = forWork ? waWorkable(liveClients(), extraId) : liveClients().slice();
   if(extraId && !list.some(c => c.id === extraId)){ const c = clients.find(x => x.id === extraId); if(c) list.push(c); }
   return list.sort((a, b) => a.name.localeCompare(b.name)).map(c => [c.id, c.name + (c.deletedAt ? ' (deleted)' : '')]);
 }
@@ -170,9 +171,13 @@ function liServiceRowHtml(c){
 function openQueueLogImprovementModal(presetClientId){
   logSheet = { files: [], useTimer: false, serviceTouched: false };
   const me = myName() || 'Team member';
-  const list = liveClients().slice().sort((a, b) => a.name.localeCompare(b.name));
+  const list = waWorkable(liveClients(), '').sort((a, b) => a.name.localeCompare(b.name));
   const fromView = typeof currentViewName !== 'undefined' && currentViewName === 'clientdetail' && typeof currentDetailClientId !== 'undefined' ? currentDetailClientId : '';
-  const cid = (typeof presetClientId === 'string' && presetClientId) || fromView || (timerState.running ? timerState.clientId : '') || '';
+  // a client outside your areas: say so instead of opening (members; work-areas.js)
+  const pc = typeof presetClientId === 'string' && presetClientId ? clients.find(x => x.id === presetClientId) : null;
+  if(pc && !waCanWork(pc)){ showToast('info', `${pc.name} isn’t one of your clients`, waOutsideWords(pc)); return; }
+  let cid = (typeof presetClientId === 'string' && presetClientId) || fromView || (timerState.running ? timerState.clientId : '') || '';
+  if(cid && !list.some(x => x.id === cid)) cid = '';
   const c = list.find(x => x.id === cid);
   const timerLink = timerState.running ? `<button type="button" class="btn btn-q" id="liTimerBtn" style="padding:0 4px" onclick="liUseTimer()">Use the running timer (${hmm((Date.now() - timerState.startedAt) / 60000)})</button>` : '';
   openAppModal(`<h3>Log Improvement</h3>

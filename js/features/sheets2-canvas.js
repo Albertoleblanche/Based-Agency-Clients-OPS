@@ -194,12 +194,14 @@ function timeClientChanged(clientSelId, serviceSelId){
 }
 function openTimerModal(presetClientId){
   if(timerState.running){ showToast('error', 'A timer is already running', 'Stop it before starting another.'); return; }
-  const cid = (typeof presetClientId === 'string' && presetClientId) || (typeof currentViewName !== 'undefined' && currentViewName === 'clientdetail' ? currentDetailClientId : '') || '';
+  if(!waPresetOk(presetClientId)) return;
+  let cid = (typeof presetClientId === 'string' && presetClientId) || (typeof currentViewName !== 'undefined' && currentViewName === 'clientdetail' ? currentDetailClientId : '') || '';
+  if(cid && !waCanWork(clients.find(x => x.id === cid))) cid = '';
   const d = hvDefaultPick(cid);
   openAppModal(`<h3>Start Timer</h3>
 <div class="f">
 ${hvRecentHtml('timerModal', 'timerModalClient')}
-<label for="timerModalClient">Client</label><div>${sheetPop('timerModalClient', 'Client', sheetClientOptions(), cid, "hvPickChanged('timerModal','client')", { placeholder: 'Choose a client' })}</div>
+<label for="timerModalClient">Client</label><div>${sheetPop('timerModalClient', 'Client', sheetClientOptions('', true), cid, "hvPickChanged('timerModal','client')", { placeholder: 'Choose a client' })}</div>
 ${hvPickBlockHtml('timerModal', cid, d.projectId, d.taskId)}
 <label for="timerModalDesc">Working on</label><input id="timerModalDesc" class="tf" placeholder="e.g. Updating the Meta ad creative" onkeydown="if(event.key==='Enter') startTimerFromModal()">
 </div>
@@ -208,12 +210,13 @@ ${hvPickBlockHtml('timerModal', cid, d.projectId, d.taskId)}
 }
 function openManualEntryModal(presetDate, presetMinutes, presetClientId){
   const today = toDateStr(new Date()), day = presetDate && presetDate <= today ? presetDate : today;
+  if(!waPresetOk(presetClientId)) return;
   const cid = (typeof presetClientId === 'string' && presetClientId) || '';
   const d = hvDefaultPick(cid);
   openAppModal(`<h3>Add Time</h3>
 <div class="f">
 ${hvRecentHtml('manual', 'manualClient')}
-<label for="manualClient">Client</label><div>${sheetPop('manualClient', 'Client', sheetClientOptions(), cid, "hvPickChanged('manual','client')", { placeholder: 'Choose a client' })}</div>
+<label for="manualClient">Client</label><div>${sheetPop('manualClient', 'Client', sheetClientOptions('', true), cid, "hvPickChanged('manual','client')", { placeholder: 'Choose a client' })}</div>
 ${hvPickBlockHtml('manual', cid, d.projectId, d.taskId)}
 <label for="manualDate">Date</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sheetDateField('manualDate', day, { past: true, from: -30, to: 0, max: today })}</div>
 <label for="manualDuration">Time</label><input id="manualDuration" class="tf" style="width:110px" placeholder="1:30" autocomplete="off"${presetMinutes ? ` value="${hmm(presetMinutes)}"` : ''}>
@@ -237,7 +240,7 @@ function openTimeEntryModal(id){
   const mine = e.userId ? e.userId === currentUser.id : true;
   openAppModal(`<h3>Edit Time</h3>
 <div class="f">
-<label for="editEntryClient">Client</label><div>${sheetPop('editEntryClient', 'Client', sheetClientOptions(e.clientId), e.clientId, "hvPickChanged('editEntry','client')")}</div>
+<label for="editEntryClient">Client</label><div>${sheetPop('editEntryClient', 'Client', sheetClientOptions(e.clientId, true), e.clientId, "hvPickChanged('editEntry','client')")}</div>
 ${hvPickBlockHtml('editEntry', e.clientId, e.harvestProjectId || hvDefaultPick(e.clientId).projectId, e.harvestTaskId || null, e.service || '')}
 <label for="editEntryDate">Date</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sheetDateField('editEntryDate', e.date, { past: true, from: -30, to: 0 })}</div>
 <label for="editEntryDuration">Time</label><input id="editEntryDuration" class="tf" style="width:110px" value="${hmm(e.minutes)}" autocomplete="off">

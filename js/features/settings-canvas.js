@@ -8,6 +8,7 @@ const SETTINGS_TABS = [
   ['general', 'General', 'gear-six', () => true],
   ['updates', 'Updates', 'heartbeat', () => canApprove()],
   ['fields', 'Client Fields', 'buildings', () => canApprove()],
+  ['areas', 'Areas', 'users', () => canApprove() && typeof WORK_AREAS !== 'undefined'],
   ['ai', 'AI & Email', 'envelope-simple', () => true],
   ['integrations', 'Integrations', 'plugs-connected', () => true],
   ['harvest', 'Harvest', 'timer', () => canApprove() && typeof setHarvest === 'function'],
@@ -74,7 +75,7 @@ function renderSettingsView(){
   const cur = tabs.find(t => t[0] === settingsTab);
   if(currentViewName === 'settings') setToolbar('Settings', '');   // the tabs say which section
   const keep = document.activeElement && document.activeElement.id;
-  const body = { general: setGeneral, updates: setUpdates, fields: setFields, ai: setAi, integrations: setIntegrations, harvest: typeof setHarvest === 'function' ? setHarvest : setGeneral, notifications: setNotifications, whatsapp: typeof setWhatsapp === 'function' ? setWhatsapp : setGeneral }[settingsTab]();
+  const body = { general: setGeneral, updates: setUpdates, fields: setFields, areas: typeof WORK_AREAS !== 'undefined' ? setAreas : setGeneral, ai: setAi, integrations: setIntegrations, harvest: typeof setHarvest === 'function' ? setHarvest : setGeneral, notifications: setNotifications, whatsapp: typeof setWhatsapp === 'function' ? setWhatsapp : setGeneral }[settingsTab]();
   root.innerHTML = `<div class="set-tb"><div class="set-tabs" role="toolbar" aria-label="Settings sections">${tabs.map(([k, t]) => `<button class="set-tab${k === settingsTab ? ' on' : ''}" ${k === settingsTab ? 'aria-current="page"' : ''} onclick="switchSettingsTab('${k}')">${t}</button>`).join('')}<span class="set-ink" aria-hidden="true"></span></div></div>
 <div class="set-body">${body}<p class="t-2" style="font-size:13px;margin:14px 4px 0">Changes save as you make them.</p></div>`;
   placeSetInk();
@@ -188,6 +189,47 @@ function saveAutomation(k){ changeSettings(s => { const cur = updateAutomation()
 function saveSignal(key, i, v){ changeSettings(s => { const cur = healthThresholds(); const p = cur[key].slice(); p[i] = Number(v); if(i === 0 && p[1] < p[0]) p[1] = p[0]; if(i === 1 && p[0] > p[1]) p[0] = p[1]; cur[key] = p; s.healthSignals = cur; }); }
 function saveSignalValue(key, v){ changeSettings(s => { const cur = healthThresholds(); cur[key] = Number(v); s.healthSignals = cur; }); }
 function saveSignalToggle(key){ changeSettings(s => { const cur = healthThresholds(); cur[key] = !cur[key]; s.healthSignals = cur; }); }
+
+// ---- Areas: who works on which clients (work-areas.js) ------------------------------------------
+function areaChips(kind, key, on){
+  return `<span class="ar-chips" role="group" aria-label="Areas">${WORK_AREAS.map(([k, t]) => `<button class="ar-chip${on.includes(k) ? ' on' : ''}" aria-pressed="${on.includes(k)}" onclick="waToggle('${kind}', ${jsArg(key)}, '${k}')">${t}</button>`).join('')}</span>`;
+}
+// The Harvest tasks someone logged in the last 90 days, most first: a hint for picking their areas.
+function areaLoggedTasks(profileId){
+  if(typeof timeEntries === 'undefined' || typeof hvTaskName !== 'function') return '';
+  const since = toDateStr(addDays(rNow(), -90)), tally = {};
+  timeEntries.filter(e => e.userId === profileId && e.harvestTaskId && e.date >= since).forEach(e => { const n = hvTaskName(e.harvestTaskId); if(n && waTaskArea(n)) tally[n] = (tally[n] || 0) + e.minutes; });
+  return Object.entries(tally).sort((a, b) => b[1] - a[1]).slice(0, 3).map(x => x[0]).join(', ');
+}
+function setAreas(){
+  const role = { admin: 'Admin', approver: 'Approver', member: 'Member' };
+  const people = (typeof teamProfiles !== 'undefined' ? teamProfiles : []).filter(p => p.name && !p.access_revoked).sort((a, b) => a.name.localeCompare(b.name));
+  const prow = p => {
+    const on = waPersonAreas(p.id), logged = areaLoggedTasks(p.id);
+    const sub = [role[p.role] || '', on.length ? `${waWords(on)} clients` : 'Every client', logged ? `Logs ${logged}` : ''].filter(Boolean).join(' · ');
+    return fr(esc(p.name), esc(sub), areaChips('people', p.id, on));
+  };
+  // every project name in Harvest, with how many clients have it
+  const counts = {};
+  ((typeof hvTime !== 'undefined' && hvTime && hvTime.projects) || []).forEach(p => {
+    const hc = (hvTime.clients || []).find(x => Number(x.harvest_id) === Number(p.client_harvest_id));
+    if(!hc || !hc.radar_client_id) return;
+    const n = String(p.name || '').trim(); (counts[n] = counts[n] || new Set()).add(String(hc.radar_client_id));
+  });
+  const names = Object.keys(counts).sort((a, b) => counts[b].size - counts[a].size || a.localeCompare(b));
+  const own = waSet().projects || {};
+  const jrow = n => {
+    const on = waProjectAreas(n), k = counts[n].size;
+    const sub = `${k} client${k === 1 ? '' : 's'}${on.length ? '' : ' · every area'}${Array.isArray(own[n]) ? ` · <a class="ar-reset" href="#" onclick="waResetProject(${jsArg(n)});return false;">Reset</a>` : ''}`;
+    return fr(esc(n), sub, areaChips('projects', n, on));
+  };
+  return `<div class="set-h">People</div>
+<div class="form-grp ar-g">${people.map(prow).join('')}</div>
+<p class="t-2 hv-p">Each person works on the clients in their areas, and the ones they own. Members can only log time and work on those; admins and approvers can log on any client. No area picked means every client.</p>
+<div class="set-h">Projects in Harvest</div>
+<div class="form-grp ar-g">${names.length ? names.map(jrow).join('') : fr('No projects yet', 'They show here once Harvest is connected and read.', '')}</div>
+<p class="t-2 hv-p">What each project covers. A client’s areas are its projects’ areas. Tier 2 and Tier 3 cover the same areas; Legacy Retainer and projects Radar doesn’t know cover every area until you pick.</p>`;
+}
 
 // ---- Client Fields ----------------------------------------------------------------------------
 function optChips(kind){

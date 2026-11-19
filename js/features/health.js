@@ -136,7 +136,7 @@ function healthPanelHtml(c, h, closeFn){
   if(lvl === 'g'){ eyebrow = `<span class="sp-eb ok">${icon('check', { weight: 'bold' })}Healthy</span>`; title = 'Nothing needs care'; sub = 'No signals right now.'; acts = ''; }
   else {
     eyebrow = h.quiet ? `<span class="sp-eb">${icon('check', { weight: 'bold' })}Handled, settling</span>`
-      : `<span class="sp-eb ${lvl === 'r' ? 'red' : 'warn'}">${icon('warning', { weight: 'bold' })}${lvl === 'r' ? 'At risk' : 'Watch'} since ${escapeHtml(sinceTxt)}</span>`;
+      : `<span class="sp-eb ${lvl === 'r' ? 'red' : 'warn'}"><i class="eb-dot"></i>${lvl === 'r' ? 'At risk' : 'Watch'} since ${escapeHtml(sinceTxt)}</span>`;
     if(next){ title = `Next step: ${next.title}`; sub = `${escapeHtml((teamProfiles.find(p => p.id === next.assigneeId) || {}).name || '')}${next.dueDate ? ' · due ' + fmtShortDate(new Date(next.dueDate + 'T12:00:00')) : ''}`;
       acts = `<div class="sp-acts"><button class="btn" onclick="markHealthHandled('${c.id}')">Mark Handled</button><button class="btn btn-p" onclick="openTaskDetailModal('${next.id}')">Open Task</button></div>`; }
     else if(h.quiet){ const hd = healthHandled[c.id]; title = 'Handled, waiting for the numbers to settle'; sub = hd ? `Marked handled by ${escapeHtml(hd.by)} ${escapeHtml(relDayLower(new Date(hd.at)))}${hd.note ? ': ' + escapeHtml(hd.note) : ''}.` : ''; acts = `<div class="sp-acts"><button class="btn btn-p" onclick="planNextStep('${c.id}')">${icon('plus')}Plan Next Step</button></div>`; }

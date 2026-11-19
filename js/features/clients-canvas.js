@@ -3,8 +3,10 @@
 // owners as full names, hours against the budget. Clicking a client opens the same right-hand
 // panel as This Week, Health and Tasks; double-click (or Enter) opens the full client page.
 
-let clientsSeg = 'all', clientsOwnerFilter = 'all';
+let clientsSeg = 'all', clientsOwnerFilter = 'all', clientsMine = true;
 function setClientsSeg(k){ clientsSeg = k; renderClientsTable(); }
+// Someone with areas of work opens on their clients (work-areas.js); All clients shows the rest.
+function setClientsMine(v){ clientsMine = v === 'mine'; renderClientsTable(); }
 function setClientsOwner(v){ clientsOwnerFilter = v; renderClientsTable(); }
 function setClientsService(v){ clientFilters.service = v; renderClientsTable(); }
 function setClientsFind(v){
@@ -54,8 +56,10 @@ async function setClientOwner(clientId, name){
 function renderClientsTable(){
   const root = document.getElementById('clientsRoot');
   if(!root || typeof clients === 'undefined') return;
-  const ac = activeClients();
-  const rows = ac.map(c => ({ c, h: clientHealth(c), w: weekView(clientWeek(c)), owner: clientOwner(c) }));
+  const acAll = activeClients(), hasAreas = waMyAreas().length > 0, mineOn = hasAreas && clientsMine;
+  const ac = mineOn ? acAll.filter(waMine) : acAll;
+  const rowOf = c => ({ c, h: clientHealth(c), w: weekView(clientWeek(c)), owner: clientOwner(c) });
+  const rows = ac.map(rowOf);
   // added from Harvest, waiting for an approver to finish their info (client-setup.js)
   const su = setupClients(), suOwner = c => (c.customFieldValues || {}).owner || '';
   const services = [...new Set(ac.concat(su).flatMap(serviceParts))].sort((a, b) => a.localeCompare(b));
@@ -72,7 +76,7 @@ function renderClientsTable(){
   shown.sort(clientSort.field === 'name' && clientSort.explicit ? (a, b) => dir * a.c.name.localeCompare(b.c.name)
     : (a, b) => rank[a.h.level] - rank[b.h.level] || b.h.signals.filter(s => s.l === 'r').length - a.h.signals.filter(s => s.l === 'r').length || (b.c.importance || 0) - (a.c.importance || 0) || a.c.name.localeCompare(b.c.name));
   const owners = [...new Set(rows.map(r => r.owner).concat(su.map(suOwner)).filter(Boolean))].sort();
-  if(inspectedClientId && !ac.some(c => c.id === inspectedClientId) && !su.some(c => c.id === inspectedClientId)) inspectedClientId = null;
+  if(inspectedClientId && !acAll.some(c => c.id === inspectedClientId) && !su.some(c => c.id === inspectedClientId)) inspectedClientId = null;
   const row = ({ c, h, w, owner }) => {
     const sel = c.id === inspectedClientId, reason = h.level === 'g' ? '' : tableSignal(h, c);
     const [wk, wkCls, wkSub] = clientWeekCell(w), hp = h.hp, over = hp.budget && hp.used > hp.budget;
@@ -91,17 +95,20 @@ function renderClientsTable(){
   const suMatch = canApprove() && typeof openMatchClientsSheet === 'function' && ac.some(c => !hvLinkOf(c)) ? `<button class="x-lnk cl-g-act" onclick="openMatchClientsSheet()">Match to Radar Clients</button>` : '';
   const suGroup = suShown.length ? `<div class="cl-g" role="presentation"><b>Needs setup</b><span>${suShown.length}</span>${suMatch}</div>${suShown.map(clientSetupRowHtml).join('')}` : '';
   const body = shown.length || suShown.length ? suGroup + group('Needs attention', sNeeds) + group('On track', sOk)
+    : mineOn && !ac.length && acAll.length ? `<div class="cl-empty">None of the clients are in your areas yet (${escapeHtml(waWords(waMyAreas()))}).<a class="x-lnk" href="#" onclick="setClientsMine('all');return false;">Show All Clients</a></div>`
     : ac.length || su.length ? `<div class="cl-empty">No clients match.<a class="x-lnk" href="#" onclick="clearClientsCanvasFilters();return false;">Clear Filters</a></div>`
     : emptyNoClients('Every client lives here: who owns it, its health, this week’s update and hours this month.');
   const seg = [['all', 'All', rows.length + su.length], ['attention', 'Needs attention', needs.length], ['behind', 'Not sent yet', notSent.length]]
     .map(([k, t, n]) => `<button class="${clientsSeg === k ? 'on' : ''}" role="tab" aria-selected="${clientsSeg === k}" onclick="setClientsSeg('${k}')">${t} <span class="c">${n}</span></button>`).join('');
   const sortIc = icon('caret-down', { weight: 'bold' });
-  const sel = inspectedClientId ? rows.find(r => r.c.id === inspectedClientId) : null;
+  // a client outside your areas, opened from search or elsewhere, still opens
+  const sel = inspectedClientId ? (rows.find(r => r.c.id === inspectedClientId) || (acAll.find(c => c.id === inspectedClientId) ? rowOf(acAll.find(c => c.id === inspectedClientId)) : null)) : null;
   const suSel = !sel && inspectedClientId ? su.find(c => c.id === inspectedClientId) : null;
   const prev = root.querySelector('.sp-page')?.scrollTop || 0;
   root.innerHTML = `<div class="spw"><div class="sp-page"><div class="cl">
 <div class="cl-bar0"><div class="seg" role="tablist" aria-label="Show">${seg}</div><span class="cl-sp"></span>
 <label class="cl-find">${icon('magnifying-glass')}<input id="clientsFind" type="search" placeholder="Filter clients" aria-label="Filter clients" value="${escapeHtml(clientFilters.search || '')}" oninput="setClientsFind(this.value)"></label>
+${hasAreas ? `<label class="pop-wrap">Show: <select class="pop" onchange="setClientsMine(this.value)"><option value="mine"${mineOn ? ' selected' : ''}>My clients</option><option value="all"${mineOn ? '' : ' selected'}>All clients</option></select></label>` : ''}
 <label class="pop-wrap">Owner: <select class="pop" onchange="setClientsOwner(this.value)"><option value="all">All</option>${owners.map(o => `<option${clientsOwnerFilter === o ? ' selected' : ''}>${escapeHtml(o)}</option>`).join('')}</select></label>
 <label class="pop-wrap">${harvestOwnsServices() ? 'Project' : 'Service'}: <select class="pop" onchange="setClientsService(this.value)"><option value="all">All</option>${services.map(s => `<option${clientFilters.service === s ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('')}</select></label></div>
 <div class="cl-table" role="table" aria-label="Clients">
@@ -111,15 +118,15 @@ function renderClientsTable(){
   const sp = root.querySelector('.sp-page'); if(sp) sp.scrollTop = prev;
   if(currentViewName === 'clients'){
     const used = rows.reduce((a, r) => a + r.h.hp.used, 0), budget = rows.reduce((a, r) => a + (r.h.hp.budget || 0), 0);
-    setToolbar(null, `${ac.length} client${ac.length === 1 ? '' : 's'} · ${needs.length} need attention${su.length ? ` · ${su.length} need setup` : ''}${budget ? ` · ${Math.round(used)} of ${Math.round(budget)} h this month` : ''}`);
+    setToolbar(null, `${mineOn ? `${ac.length} of your clients` : `${ac.length} client${ac.length === 1 ? '' : 's'}`} · ${needs.length} need attention${su.length ? ` · ${su.length} need setup` : ''}${budget ? ` · ${Math.round(used)} of ${Math.round(budget)} h this month` : ''}`);
   }
   const old = document.getElementById('clientInspector'); if(old){ old.hidden = true; old.innerHTML = ''; }
 }
 
 // The everyday actions for a client, in a toolbar at the foot of its panel (here and This Week).
 function clientQuickActionsHtml(c){
-  const A = `'${c.id}'`;
-  return `<div class="sp-foot" role="toolbar" aria-label="Quick actions">${[['Log Improvement', `openQueueLogImprovementModal(${A})`, 'square-pen'], ['Track Time', `openTimerModal(${A})`, 'timer'],
+  const A = `'${c.id}'`, work = waCanWork(c); // outside your areas: no logging (work-areas.js)
+  return `<div class="sp-foot" role="toolbar" aria-label="Quick actions">${[...(work ? [['Log Improvement', `openQueueLogImprovementModal(${A})`, 'square-pen'], ['Track Time', `openTimerModal(${A})`, 'timer']] : []),
     ['Note', `openNoteModal(null,${A})`, 'notebook-pen'], ['Reminder', `openNewReminderModal(${A})`, 'bell']]
     .map(([t, fn, ic]) => `<button class="cl-act" onclick="${fn}">${icon(ic)}<span>${t}</span></button>`).join('')}${c.email ? `<a class="cl-act" href="mailto:${escapeHtml(c.email)}">${icon('envelope-simple')}<span>Email</span></a>` : ''}</div>`;
 }
@@ -134,7 +141,7 @@ function clientPanelHtml({ c, h, w, owner }){
   let eyebrow, title, sub, acts = '';
   if(lvl !== 'g'){
     const sinceTxt = h.since ? (relDay(h.since).toLowerCase() === 'today' ? 'today' : relDay(h.since)) : 'today';
-    eyebrow = h.quiet ? `<span class="sp-eb">${icon('check', { weight: 'bold' })}Handled, settling</span>` : `<span class="sp-eb ${lvl === 'r' ? 'red' : 'warn'}">${icon('warning', { weight: 'bold' })}${lvl === 'r' ? 'At risk' : 'Watch'} since ${escapeHtml(sinceTxt)}</span>`;
+    eyebrow = h.quiet ? `<span class="sp-eb">${icon('check', { weight: 'bold' })}Handled, settling</span>` : `<span class="sp-eb ${lvl === 'r' ? 'red' : 'warn'}"><i class="eb-dot"></i>${lvl === 'r' ? 'At risk' : 'Watch'} since ${escapeHtml(sinceTxt)}</span>`;
     if(next){ title = `Next step: ${next.title}`; sub = `${why ? escapeHtml(why) + ' · ' : ''}${escapeHtml((teamProfiles.find(p => p.id === next.assigneeId) || {}).name || '')}${next.dueDate ? ' · due ' + fmtShortDate(new Date(next.dueDate + 'T12:00:00')) : ''}`;
       acts = `<button class="btn" onclick="markHealthHandled(${A})">Mark Handled</button><button class="btn btn-p" onclick="openTaskDetailModal('${next.id}')">Open Task</button>`; }
     else if(h.quiet){ title = 'Handled, waiting for the numbers to settle'; sub = ''; }
@@ -184,6 +191,7 @@ ${nums}
 ${clientFoldHtml('win', 'Weekly win', clientWinSummary(c), clientWinHtml(c))}
 ${clientFoldHtml('det', 'Details', escapeHtml(detSum), `<div class="cl-kvs">${details}</div>${approver ? `<a class="x-lnk cl-edit" href="#" onclick="openEditClientForm(${A});return false;">Edit Client</a>` : ''}`)}
 </div>
+${waOutsideNoteHtml(c)}
 </div>
 ${clientQuickActionsHtml(c)}
 </aside>`;

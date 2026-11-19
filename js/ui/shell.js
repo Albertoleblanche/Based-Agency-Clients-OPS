@@ -19,7 +19,7 @@ function setToolbar(title, sub){
 // This Week, Log Improvement on a client page, the Time tabs on Time).
 const VIEW_TOOLBAR_ACTIONS = {
   approve: () => `<button class="btn" onclick="openGroupAndSendModal()">${icon('layers')}Group &amp; Send</button>`,
-  clientdetail: () => `<button class="btn" onclick="openQueueLogImprovementModal(currentDetailClientId)">${icon('plus')}Log Improvement</button>`,
+  clientdetail: () => typeof waCanWork === 'function' && !waCanWork(clients.find(x => x.id === currentDetailClientId)) ? '' : `<button class="btn" onclick="openQueueLogImprovementModal(currentDetailClientId)">${icon('plus')}Log Improvement</button>`,
   time: () => (typeof timeToolbarTabsHtml === 'function' ? timeToolbarTabsHtml() : '') + `<button class="btn" onclick="openTimerModal()">${icon('timer')}Start Timer</button>`,
 };
 function setToolbarActions(view){

@@ -731,7 +731,7 @@ ${mIsh('Needs setup')}<div class="ig"><div class="ir"><span class="t n" style="w
     return `<div class="idetail" style="display:flex;gap:12px;align-items:center;margin-top:4px">${monoHtml(c, 'lg')}<div style="min-width:0"><h1 style="font-size:24px;font-weight:700;letter-spacing:-.02em;margin:0">${mEsc(c.name)}</h1><div class="ikv">${mEsc([c.service, w.owner].filter(Boolean).join(' · '))}</div></div></div>
 ${h.level !== 'g' ? `<div class="tags iwrap" style="margin:14px 16px 0">${healthTag(h.level)}${signalChips(h, 4)}</div>` : ''}
 ${mIsh('This week’s update')}<div class="ig">${steps}</div>
-<div style="margin:12px 16px 0"><button class="ibtn s" onclick="mOpenLog('${c.id}')">${icon('plus')}Log Improvement</button></div>
+${waCanWork(c) ? `<div style="margin:12px 16px 0"><button class="ibtn s" onclick="mOpenLog('${c.id}')">${icon('plus')}Log Improvement</button></div>` : `<p class="ifoot" style="margin-top:12px">${mEsc(waOutsideWords(c))}</p>`}
 ${mIsh('Logged')}<div class="ig">${imps.map(i => mIr('', mEsc(i.text), `${mEsc(i.author)} · ${fmtShortDate(new Date(i.date))}${i.includeInEmail === false ? ' · internal' : ''}`, '', null, { n: true })).join('') || '<div class="ir"><span class="t n" style="color:var(--label-2)">Nothing logged yet</span></div>'}</div>`;
   });
 }
@@ -930,12 +930,14 @@ function mRowPick(label, valueText, onclick, set){ return `<button class="ir" on
 function mSw(id, on, label){ return `<button class="ios-sw${on ? ' on' : ''}" id="${id}" role="switch" aria-checked="${!!on}" aria-label="${mEsc(label)}" onclick="this.classList.toggle('on');this.setAttribute('aria-checked',this.classList.contains('on'))"></button>`; }
 function mIsOn(id){ return !!$m(id)?.classList.contains('on'); }
 function mClientName(id){ return clients.find(c => c.id === id)?.name || ''; }
-function mPickClient(cur, cb, none){ mPick('Client', [...(none ? [['', none]] : []), ...liveClients().slice().sort((a, b) => a.name.localeCompare(b.name)).map(c => [c.id, c.name, c.service || ''])], cur, cb); }
+function mPickClient(cur, cb, none){ mPick('Client', [...(none ? [['', none]] : []), ...waWorkable(liveClients(), cur).slice().sort((a, b) => a.name.localeCompare(b.name)).map(c => [c.id, c.name, c.service || ''])], cur, cb); }
 function mDayPick(title, cur, from, to, none, cb){ const opts = sheetDayOptions(from, to); if(from < 0) opts.reverse(); mPick(title, [...(none ? [['', none]] : []), ...opts], cur, cb); }
 
 let mLog_ = {};
 function mOpenLog(presetClientId){
-  const cid = presetClientId || (timerState.running ? timerState.clientId : '') || '';
+  if(!waPresetOk(presetClientId)) return;
+  let cid = presetClientId || (timerState.running ? timerState.clientId : '') || '';
+  if(cid && !waCanWork(clients.find(x => x.id === cid))) cid = '';
   const c = clients.find(x => x.id === cid);
   mLog_ = { clientId: cid, service: c && c.service || (settings.serviceOptions || [])[0] || '', date: toDateStr(new Date()), useTimer: false };
   mHvClient(mLog_);
@@ -1039,24 +1041,24 @@ function mHvRows(st, pickFn){
   const { mine } = hvClientProjects(st.clientId);
   const proj = mine.length === 1 ? `<div class="ir"><span class="ilab">Project</span><span class="t n" style="text-align:right">${mEsc(mine[0].name)}</span></div>`
     : mRowPick('Project', mEsc(hvProjectName(st.projectId) || 'Choose'), `${pickFn}('project')`, !!st.projectId);
-  const t = st.projectId ? hvProjectTasks(st.projectId).find(x => x.id === Number(st.taskId)) : null;
+  const t = st.projectId ? hvProjectTasks(st.projectId, st.taskId).find(x => x.id === Number(st.taskId)) : null;
   const task = st.projectId ? mRowPick('Task', t ? mEsc(t.name) : 'Choose', `${pickFn}('task')`, !!t) : '';
   return proj + task;
 }
 // "Billable" or "Non-billable" for the note under the rows (Harvest decides it by task)
 function mHvBill(st){
-  const t = hvTimeOn() && st.projectId ? hvProjectTasks(st.projectId).find(x => x.id === Number(st.taskId)) : null;
+  const t = hvTimeOn() && st.projectId ? hvProjectTasks(st.projectId, st.taskId).find(x => x.id === Number(st.taskId)) : null;
   return t ? (t.billable ? 'Billable' : 'Non-billable') : '';
 }
 function mHvPick(st, what, back){
   if(what === 'project') mPick('Project', hvClientProjects(st.clientId).mine.map(p => [String(p.harvest_id), p.name]), String(st.projectId || ''), v => { st.projectId = Number(v); st.taskId = (hvProjectTasks(st.projectId)[0] || {}).id || null; back(); });
-  if(what === 'task') mPick('Task', hvProjectTasks(st.projectId).map(t => [String(t.id), t.name, t.billable ? 'Billable' : 'Non-billable']), String(st.taskId || ''), v => { st.taskId = Number(v); back(); });
+  if(what === 'task') mPick('Task', hvProjectTasks(st.projectId, st.taskId).map(t => [String(t.id), t.name, t.billable ? 'Billable' : 'Non-billable']), String(st.taskId || ''), v => { st.taskId = Number(v); back(); });
 }
 function mHvValue(st){
   if(!hvTimeOn()) return { ok: true, service: st.service, projectId: null, taskId: null };
   if(!st.clientId || hvNoPickWords(st.clientId)) return { ok: true, service: '', projectId: null, taskId: null };
   if(!st.projectId) return { ok: false, msg: 'Tap Project to pick one.' };
-  if(!st.taskId && hvProjectTasks(st.projectId).length) return { ok: false, msg: 'Tap Task to pick one.' };
+  if(!st.taskId && hvProjectTasks(st.projectId, st.taskId).length) return { ok: false, msg: 'Tap Task to pick one.' };
   return { ok: true, service: hvProjectName(st.projectId), projectId: st.projectId, taskId: st.taskId || null };
 }
 function mOpenTimerSheet(){
@@ -1086,6 +1088,7 @@ function mStartTimer(){
 // Time worked without the timer: client, service, day, how long, what.
 let mTime_ = {};
 function mOpenTimeSheet(presetClientId){
+  if(!waPresetOk(presetClientId)) return;
   const c = clients.find(x => x.id === presetClientId);
   mTime_ = { clientId: presetClientId || '', service: (c && c.service) || (settings.serviceOptions || [])[0] || '', date: toDateStr(new Date()) };
   mHvClient(mTime_);

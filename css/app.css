@@ -815,6 +815,7 @@ body.side-anim.sidebar-collapsed .app-win .side { transition: margin-left 320ms 
 .sp-eb{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--label-2)}
 .sp-eb svg{width:13px;height:13px}
 .sp-eb.red{color:var(--red)}.sp-eb.ok{color:var(--green)}
+.sp-eb .eb-dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:0 0 auto}
 .sp-status > b{font-size:17px;font-weight:650;letter-spacing:-.015em}
 .sp-status .sub{font-size:12.5px;color:var(--label-2);line-height:1.45}
 .sp-acts{display:flex;gap:8px;margin-top:12px}
@@ -1661,6 +1662,8 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .sp.has-foot .sp-main{min-height:calc(100% - 64px);padding-bottom:24px}
 .sp-foot{position:sticky;bottom:0;z-index:2;display:flex;gap:2px;height:64px;box-sizing:border-box;margin:0 -26px;padding:6px 18px 8px;border-top:.5px solid var(--sep);background:var(--window)}
 .sp-foot .cl-act{flex:1 1 auto;min-width:0}
+.sp-main .cl-out{display:flex;align-items:flex-start;gap:7px;margin:14px 0 0;font-size:13px;line-height:1.45;color:var(--label-2)}
+.sp-main .cl-out svg{flex:0 0 auto;width:15px;height:15px;margin-top:2px}
 .sp-foot .cl-act svg{width:18px;height:18px}
 .sp-foot .cl-act span{overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .sp-blue{color:var(--blue)}
@@ -2200,6 +2203,7 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .wn-sr + .wn-dn{margin-top:8px}
 /* the client's panel: Weekly win */
 .cl-folds{margin-top:8px}
+.cl-m + .cl-folds{margin-top:0;border-top:0} /* one line under the numbers, not two */
 .cl-folds .sp-fold-b{padding-bottom:14px}
 .wn-kvs .cl-kv{grid-template-columns:90px minmax(0,1fr);min-height:32px}
 .wn-seg button{display:inline-flex;align-items:center;gap:5px}
@@ -2280,6 +2284,15 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .su-v{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0;line-height:26px}
 .su-v > .seg{margin:0}
 .su-n{font-size:11.5px;line-height:1.4;color:var(--label-3)}
+/* Settings → Areas: who works on which clients */
+.ar-g .fr{gap:14px}
+.ar-g .fr .l{flex:1 1 auto;min-width:0}
+.ar-chips{display:flex;flex-wrap:nowrap;justify-content:flex-end;gap:3px;flex:0 0 auto}
+.ar-chip{height:24px;padding:0 8px;white-space:nowrap;border:0;border-radius:12px;background:var(--fill-2);color:var(--label-2);font:inherit;font-size:12px;font-weight:500;cursor:default;transition:background-color .15s ease,color .15s ease}
+.ar-chip:hover{color:var(--label)}
+.ar-chip.on{background:var(--label);color:var(--window)}
+.ar-chip:active{transform:scale(.97)}
+.ar-reset{color:var(--label-2);text-decoration:underline;text-underline-offset:2px}
 /* Edit Client: a Harvest client's projects, read-only */
 /* All Clients: Match to Radar Clients on the Needs setup header */
 .cl-g .cl-g-act{margin-left:auto;align-self:center;background:none;border:0;padding:0}

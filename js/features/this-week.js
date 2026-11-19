@@ -348,6 +348,7 @@ ${weekFoldHtml('imps', 'Improvements', impSum, impRows || '<p class="sp-empty">N
 ${weekFoldHtml('prog', 'Progress', progSum, `<div class="sp-steps">${steps}</div>`)}
 ${weekFoldHtml('wks', 'Last 8 weeks', wkSum, weekStripHtml(c))}
 </div>
+${waOutsideNoteHtml(c)}
 </div>
 ${clientQuickActionsHtml(c)}
 </aside>`;

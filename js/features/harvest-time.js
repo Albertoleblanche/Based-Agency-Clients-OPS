@@ -59,11 +59,20 @@ function hvClientProjects(clientId){
   return { all, mine, linked: true };
 }
 // A project's tasks, billable first: [{ id, name, billable }]
-function hvProjectTasks(projectId){
+// Only the tasks in your areas of work (work-areas.js), plus keepId (the one an entry already has);
+// all = every task.
+function hvProjectTasks(projectId, keepId, all){
   if(!hvTimeOn() || !projectId) return [];
   return hvTime.taskAssign.filter(a => Number(a.project_harvest_id) === Number(projectId))
     .map(a => { const t = hvTime.tasks.get(Number(a.task_harvest_id)); return t && t.is_active !== false ? { id: Number(t.harvest_id), name: t.name, billable: a.billable !== false } : null; })
-    .filter(Boolean).sort((a, b) => (b.billable - a.billable) || a.name.localeCompare(b.name));
+    .filter(t => t && (all || t.id === Number(keepId) || typeof waTaskAllowed !== 'function' || waTaskAllowed(t.name)))
+    .sort((a, b) => (hvOwnTask(b) - hvOwnTask(a)) || (b.billable - a.billable) || a.name.localeCompare(b.name));
+}
+// a task in your own areas comes first (Web Design before Reporting for someone who does Web)
+function hvOwnTask(t){
+  if(typeof waMyAreas !== 'function') return 0;
+  const mine = waMyAreas(), a = waTaskArea(t.name);
+  return mine.length && a && mine.includes(a) ? 1 : 0;
 }
 // Step 4: a client's monthly hours from Harvest (its projects' monthly hour budgets), or 0.
 // The server keeps the client's budget in step; this tells the screens it comes from Harvest.
@@ -98,7 +107,7 @@ function hvRecentPicks(limit){
     const k = `${e.clientId}|${e.harvestProjectId}|${e.harvestTaskId}`;
     if(seen.has(k)) continue; seen.add(k);
     const c = clients.find(x => x.id === e.clientId && !x.deletedAt);
-    if(!c || !hvClientProjects(c.id).mine.some(p => Number(p.harvest_id) === Number(e.harvestProjectId))) continue;
+    if(!c || (typeof waCanWork === 'function' && !waCanWork(c)) || !hvClientProjects(c.id).mine.some(p => Number(p.harvest_id) === Number(e.harvestProjectId))) continue;
     if(!hvProjectTasks(e.harvestProjectId).some(t => t.id === Number(e.harvestTaskId))) continue;
     out.push({ clientId: c.id, projectId: Number(e.harvestProjectId), taskId: Number(e.harvestTaskId) });
     if(out.length >= (limit || 3)) break;
@@ -152,11 +161,11 @@ function hvPickRowsHtml(prefix, clientId, projectId, taskId, service){
     ? `<div class="hvp-one"><input type="hidden" id="${prefix}Project" value="${mine[0].harvest_id}">${escapeHtml(mine[0].name)}</div>`
     : `<div>${sheetPop(prefix + 'Project', 'Project', mine.map(p => [String(p.harvest_id), p.name]), pid ? String(pid) : '', `hvPickChanged('${prefix}','project')`, { placeholder: 'Choose a project' })}</div>`;
   const usePid = mine.length === 1 ? Number(mine[0].harvest_id) : pid;
-  const ts = usePid ? hvProjectTasks(usePid) : [];
+  const ts = usePid ? hvProjectTasks(usePid, taskId) : [];
   const tid = taskId && ts.some(t => t.id === Number(taskId)) ? Number(taskId) : null;
   const cur = ts.find(t => t.id === tid);
   const task = !usePid ? `<div class="hvp-none t-3">Pick a project first</div>`
-    : !ts.length ? `<div class="hvp-none t-2">This project has no tasks in Harvest yet.</div>`
+    : !ts.length ? `<div class="hvp-none t-2">${hvProjectTasks(usePid, null, true).length ? 'None of its tasks are in your areas.' : 'This project has no tasks in Harvest yet.'}</div>`
     : `<div class="hvp-task">${sheetPop(prefix + 'Task', 'Task', ts.map(t => [String(t.id), t.name]), tid ? String(tid) : '', `hvPickChanged('${prefix}','task')`, { placeholder: 'Choose a task' })}<span class="hvp-bill" id="${prefix}Bill">${cur ? (cur.billable ? 'Billable' : 'Non-billable') : ''}</span></div>`;
   return `<label${mine.length > 1 ? ` for="${prefix}Project"` : ''}>Project</label>${project}<label${ts.length ? ` for="${prefix}Task"` : ''}>Task</label>${task}`;
 }
@@ -182,7 +191,7 @@ function hvPickChanged(prefix, what, clientSelId){
   const cid = document.getElementById(clientSelId || (prefix === 'timerModal' ? 'timerModalClient' : prefix === 'editEntry' ? 'editEntryClient' : prefix === 'li' ? 'liClient' : prefix + 'Client'))?.value || '';
   if(what === 'task'){
     const tid = Number(document.getElementById(prefix + 'Task')?.value), pid = Number(document.getElementById(prefix + 'Project')?.value);
-    const t = hvProjectTasks(pid).find(x => x.id === tid), b = document.getElementById(prefix + 'Bill');
+    const t = hvProjectTasks(pid, tid).find(x => x.id === tid), b = document.getElementById(prefix + 'Bill');
     if(b) b.textContent = t ? (t.billable ? 'Billable' : 'Non-billable') : '';
     return;
   }

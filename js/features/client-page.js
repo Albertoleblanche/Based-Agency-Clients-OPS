@@ -58,7 +58,7 @@ ${callout}`;
 <div class="h2"><h2>This week’s update</h2><span class="${w.late ? 't-red' : 't-2'}" style="font-size:13px">${escapeHtml(w.sent ? w.note : w.upcoming ? `${w.dueText} · last sent ${fmtShortDate(w.last)}` : w.dueText)}</span></div>
 <div class="panel" style="padding:18px 18px 16px"><div class="stepper">${stepper}</div>${weekBtns}</div>
 ${h.signals.length ? `<div class="h2"><h2>${h.level === 'r' ? 'Why it’s at risk' : 'Why it’s on Watch'}<span class="c">${h.signals.length}</span></h2><a href="#settings" onclick="openSettingsTab('updates');return false;">Adjust signals</a></div><div class="grp">${signalRowsHtml(h)}</div>` : ''}
-<div class="h2"><h2>Improvements<span class="c">${imps.length}</span></h2><a href="#" onclick="openQueueLogImprovementModal('${c.id}');return false;">Log Improvement</a></div>
+<div class="h2"><h2>Improvements<span class="c">${imps.length}</span></h2>${waCanWork(c) ? `<a href="#" onclick="openQueueLogImprovementModal('${c.id}');return false;">Log Improvement</a>` : ''}</div>
 <div class="grp">${impRows(imps.slice(0, 6)) || '<div class="row sm"><span class="s t-2" style="font-size:13px">Nothing logged yet.</span></div>'}</div>
 ${imps.length > 6 ? `<p style="margin:8px 2px 0"><a class="btn btn-q sm" href="#" onclick="setCdTab('improvements');return false;">All ${imps.length} improvements</a></p>` : ''}`;
   document.getElementById('cdOverviewSide').innerHTML = `
@@ -74,11 +74,11 @@ ${cf}</section>
 ${c.sow ? `<section class="panel"><h3>Scope</h3><p style="margin:0;font-size:14px;line-height:1.55">${escapeHtml(c.sow)}</p></section>` : ''}`;
 
   // ---- other tabs
-  document.getElementById('cdImpTab').innerHTML = `<div class="h2"><h2>Improvements<span class="c">${imps.length}</span></h2><a href="#" onclick="openQueueLogImprovementModal('${c.id}');return false;">Log Improvement</a></div>
+  document.getElementById('cdImpTab').innerHTML = `<div class="h2"><h2>Improvements<span class="c">${imps.length}</span></h2>${waCanWork(c) ? `<a href="#" onclick="openQueueLogImprovementModal('${c.id}');return false;">Log Improvement</a>` : ''}</div>
 <div class="grp">${imps.map(i => { const idx = c.improvements.indexOf(i); return impRows([i]).replace('</div></div>', `${canApprove() || i.author === myName() ? `<button class="ib act" title="Edit" aria-label="Edit" onclick="startEditImprovement('${c.id}',${idx})">${icon('pencil-simple')}</button><button class="ib act" title="Delete" aria-label="Delete" onclick="deleteImprovement('${c.id}',${idx})">${icon('trash')}</button>` : ''}</div></div>`); }).join('') || '<div class="row sm"><span class="s t-2">Nothing logged yet.</span></div>'}</div>`;
   const entries = (typeof timeEntries !== 'undefined' ? timeEntries : []).filter(e => e.clientId === c.id).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 60);
   const total = entries.reduce((s, e) => s + e.minutes, 0);
-  document.getElementById('cdTimeTab').innerHTML = `<div class="h2"><h2>Time<span class="c">${Math.round(total / 6) / 10} h</span></h2><a href="#" onclick="openTimerModal('${c.id}');return false;">Track Time</a></div>
+  document.getElementById('cdTimeTab').innerHTML = `<div class="h2"><h2>Time<span class="c">${Math.round(total / 6) / 10} h</span></h2>${waCanWork(c) ? `<a href="#" onclick="openTimerModal('${c.id}');return false;">Track Time</a>` : ''}</div>
 <div class="grp">${entries.map(e => { const p = teamProfiles.find(x => x.id === e.userId); return `<div class="row sm"><span style="width:52px;flex:0 0 auto;font-size:13px;color:var(--label-2)">${fmtShortDate(new Date(e.date + 'T12:00:00'))}</span><div class="tx"><span class="t" style="font-weight:400">${escapeHtml(e.description || 'Time logged')}</span><span class="s">${escapeHtml([e.service, p?.name].filter(Boolean).join(' · '))}</span></div><div class="r"><span class="dur">${Math.floor(e.minutes / 60)}:${String(e.minutes % 60).padStart(2, '0')}</span></div></div>`; }).join('') || '<div class="row sm"><span class="s t-2">No time logged yet.</span></div>'}</div>`;
   const rems = (typeof clientReminders !== 'undefined' ? clientReminders : []).filter(r => r.clientId === c.id && r.status !== 'answered');
   document.getElementById('cdNotesTab').innerHTML = `<div class="h2"><h2>Waiting on the client<span class="c">${rems.length}</span></h2><a href="#" onclick="openNewReminderModal('${c.id}');return false;">New Reminder</a></div>
