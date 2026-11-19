@@ -44,7 +44,7 @@ function mCb(t){
 function showToast(type, title, detail){
   const el = $m('mToast'); if(!el) return;
   el.className = 'itoast ' + type;
-  el.innerHTML = `${icon(type === 'error' ? 'warning' : type === 'success' ? 'check-circle' : 'info')}<div><b>${mEsc(title)}</b>${detail ? `<span>${mEsc(detail)}</span>` : ''}</div>`;
+  el.innerHTML = `${icon(type === 'error' ? 'x' : type === 'success' ? 'check-circle' : 'info')}<div><b>${mEsc(title)}</b>${detail ? `<span>${mEsc(detail)}</span>` : ''}</div>`;
   requestAnimationFrame(() => el.classList.add('in'));
   clearTimeout(showToast._t); showToast._t = setTimeout(() => el.classList.remove('in'), 3200);
 }
@@ -366,7 +366,7 @@ ${!behind.length && !health.length && !waiting.length && !due.length ? `<div sty
 function mGlanceHtml(behind, waiting, health){
   const lateN = behind.filter(w => w.late).length, dueN = behind.length - lateN, riskN = health.filter(x => x.h.level === 'r').length;
   const tile = (n, label, ic, cls, tap) => `<button class="ikpi${n ? ' ' + cls : ''}" onclick="${tap}"><span class="k-ic">${icon(ic, { weight: 'bold' })}</span><b>${n}</b><span>${label}</span></button>`;
-  return `<div class="ikpis">${tile(lateN, 'Overdue', 'warning', 'red', 'mOpenWeek()')}${tile(dueN, 'Due today', 'clock', 'yellow', 'mOpenWeek()')}${canApprove() ? tile(waiting.length, 'To review', 'tray', 'blue', "mSwitchTab('review')") : tile(riskN, 'At risk', 'heart-pulse', 'red', "mOpenClients('health')")}</div>`;
+  return `<div class="ikpis">${tile(lateN, 'Overdue', 'clock', 'red', 'mOpenWeek()')}${tile(dueN, 'Due today', 'clock', 'yellow', 'mOpenWeek()')}${canApprove() ? tile(waiting.length, 'To review', 'tray', 'blue', "mSwitchTab('review')") : tile(riskN, 'At risk', 'heart-pulse', 'red', "mOpenClients('health')")}</div>`;
 }
 // "Next up: Oakridge Flooring, due tomorrow."
 function mNextDue(ws){ const n = ws.filter(w => w.sent).sort((a, b) => a.daysLeft - b.daysLeft)[0]; return n ? `Next up: ${mEsc(n.c.name)}, ${n.dueText.toLowerCase()}.` : ''; }
@@ -660,7 +660,7 @@ async function mApproveAndSend(clientId, author){ await mApproveDraft(clientId, 
 async function mSendDraft(clientId, author){
   const { c, d } = mDraftFor(clientId, author); if(!d) return;
   if(typeof winViaWhatsapp === 'function' && winViaWhatsapp(c)) return mWinCopy(clientId, author);
-  if(!c.email){ showToast('error', 'No email on file', `Add an email for ${c.name} on the desktop first.`); return; }
+  if(!c.email){ showToast('info', `Add ${c.name}’s email first`, 'Add it in Edit Client on your computer, then send it.'); return; }
   if(!(await confirmDialog(`It goes to ${c.email}, with your signature.`, { title: `Send ${c.name}’s update now?`, confirmLabel: 'Send' }))) return;
   const subject = `Your weekly update from ${settings.appName || 'Based Agency'}`;
   try{

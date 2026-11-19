@@ -223,12 +223,22 @@ function clientWinHtml(c){
     : g ? escapeHtml(g.name) : '<span class="t-3">Not linked yet</span>');
   const day = kv('Win day', approver ? `<button class="pop wn-pop" onclick="winDayMenu(event,${A})">${d ? WIN_DAY_NAMES[d] : '<span class="t-3">Pick a day</span>'}${icon('caret-down', { weight: 'bold' })}</button>`
     : d ? WIN_DAY_NAMES[d] : 'Every 7 days');
-  const noEmail = ch !== 'whatsapp' && !c.email ? `<p class="wn-note is-red">${icon('warning')}No email on file. Add one with Edit Client to send by email.</p>` : '';
+  const noEmail = ch !== 'whatsapp' && !c.email ? `<p class="wn-note"><span>${approver ? `<a class="fix-lnk" href="#" onclick="openClientEmailField(${A});return false;">Add the client’s email</a> so the win can go out by email.` : 'An admin or approver adds the client’s email so the win can go out by email.'}</span></p>` : '';
   const who = clientContact(c);
   const contact = kv('Main contact', approver
     ? `<input class="tf wn-in" value="${escapeHtml(who)}" placeholder="Who the win is for" aria-label="Main contact" onchange="setClientContact(${A}, this.value)" onkeydown="if(event.key==='Enter')this.blur()">`
     : who ? escapeHtml(who) : '<span class="t-3">Not set</span>');
   return `<div class="cl-kvs wn-kvs">${contact}${kv('Sends by', seg)}${group}${day}</div>${noEmail}${ch !== 'email' ? `<p class="wn-note">${icon('lock')}You paste it in the group. Radar never posts there.</p>` : ''}`;
+}
+// No email yet when sending: open Edit Client on the email field (or say who can add it).
+function askForClientEmail(c){
+  if(canApprove()){ openClientEmailField(c.id); showToast('info', `Add ${c.name}’s email`, 'Save it, then send.'); }
+  else showToast('info', `${c.name} needs an email`, 'An admin or approver adds it in Edit Client, then it can go out.');
+}
+// Edit Client, ready to type the email (the fix the Weekly win and Review point to).
+function openClientEmailField(clientId){
+  openEditClientForm(clientId);
+  setTimeout(() => { const el = document.getElementById('ncEmail'); if(el){ el.focus(); el.select(); } }, 220);
 }
 // The main contact, from the panel: saves as it's typed in (on change).
 async function setClientContact(clientId, value){

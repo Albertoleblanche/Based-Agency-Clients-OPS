@@ -1101,7 +1101,7 @@ async function sendApprovedDraft(id, author){
   if(blockIfWorkDeleted(c, d)) return;
   // WhatsApp clients: Radar never posts there. Copy it for the group instead.
   if(typeof winViaWhatsapp === 'function' && winViaWhatsapp(c)) return copyWinForWhatsapp(id, author);
-  if(!c.email){ showToast('error','No email on file', `Add an email for ${c.name} in Clients to send.`); return; }
+  if(!c.email){ askForClientEmail(c); return; }
   // Already sent this exact draft once — require an explicit
   // confirmation naming who sent it and when, rather than silently
   // allowing (or silently blocking) a second send. A genuinely new draft
@@ -1219,7 +1219,7 @@ function confirmGroupSendSelection(clientId){
   if(checkedAuthors.length < 2){ showToast('error','Pick at least two', "Select at least two team members' drafts to combine — one alone doesn't need grouping."); return; }
   const c = clients.find(x=>x.id===clientId);
   if(!c) return;
-  if(!c.email){ showToast('error','No email on file', `Add an email for ${c.name} in Clients to send.`); return; }
+  if(!c.email){ askForClientEmail(c); return; }
 
   _groupSendClientId = clientId;
   _groupSendAuthors = checkedAuthors;

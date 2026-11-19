@@ -145,7 +145,7 @@ function setupRealtimeSubscriptions(){
       console.log('Realtime subscription status:', status, err || '');
       if((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && !realtimeErrorToastShown){
         realtimeErrorToastShown = true;
-        showToast('warning','Live updates not connected','New tasks/notifications may take a few minutes to show up — try refreshing.');
+        showToast('info','Live updates are paused','Refresh the page to see new tasks and notifications as they come in.');
       }
     });
   if(activityTableAvailable !== false){

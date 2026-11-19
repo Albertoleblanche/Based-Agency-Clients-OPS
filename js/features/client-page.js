@@ -24,7 +24,7 @@ function renderClientPage(){
     .map(([k, t, n]) => `<button class="${cdTab === k ? 'on' : ''}" role="tab" aria-selected="${cdTab === k}" onclick="setCdTab('${k}')">${t}${n !== '' && n ? ` <span class="c">${n}</span>` : ''}</button>`).join('');
   let callout = '';
   if(h.level !== 'g'){
-    callout = `<div class="next" style="margin-top:20px"><span class="sig ${h.level}">${icon(h.level === 'r' ? 'warning' : 'eye')}</span>
+    callout = `<div class="next" style="margin-top:20px"><span class="sig ${h.level}">${icon(h.level === 'r' ? 'activity' : 'eye')}</span>
 <div class="tx"><b>${healthWord(h.level)} since ${relDay(h.since || rNow()).toLowerCase() === 'today' ? 'today' : relDay(h.since || rNow())}${next ? '' : ' — no next step yet'}</b><span>${escapeHtml(h.signals.map(s => s.title.charAt(0).toUpperCase() + s.title.slice(1)).join(' · '))}</span></div>
 <button class="btn" onclick="openHealthClient('${c.id}')">See Why</button>${next ? `<button class="btn" onclick="openTaskDetailModal('${next.id}')">Open Next Step</button>` : `<button class="btn btn-p" onclick="planNextStep('${c.id}')">${icon('plus')}Plan Next Step</button>`}</div>`;
   }

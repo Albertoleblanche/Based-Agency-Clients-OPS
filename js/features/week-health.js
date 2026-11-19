@@ -353,7 +353,7 @@ function overdueShort(w){
 }
 function dueTag(w){
   if(w.sent) return tagHtml('green', 'Sent ' + shortDay(w.last), 'check');
-  if(w.late) return tagHtml('red', overdueShort(w), 'warning');
+  if(w.late) return tagHtml('red', overdueShort(w));
   if(w.state === 'due') return tagHtml('yellow', 'Due today', 'clock');
   return tagHtml('gray', w.daysLeft === 1 ? 'Due tomorrow' : 'Due ' + (w.daysLeft < 7 ? DAY_NAMES[w.due.getDay()].slice(0, 3) : fmtShortDate(w.due)), 'clock');
 }

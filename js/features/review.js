@@ -157,7 +157,7 @@ function reviewReadHtml(x, list){
   const to = clientContact(c), ch = winChannel(c), wa = ch === 'whatsapp';
   const drafted = tab === 'approved' && d.approvedBy ? ` · approved by ${d.approvedBy === myName() ? 'you' : escapeHtml(firstName(d.approvedBy))}${d.approvedAt ? ' at ' + escapeHtml(fmtTime(new Date(d.approvedAt))) : ''}`
     : d.draftPendingSince ? ` · ${fmtWait(d.draftPendingSince)} ago` : '';
-  const toWords = wa ? 'To their WhatsApp group' : `To ${escapeHtml(to || c.email || 'no email on file')}${ch === 'both' ? ' and their WhatsApp group' : ''}`;
+  const toWords = wa ? 'To their WhatsApp group' : `${to || c.email ? `To ${escapeHtml(to || c.email)}` : 'By email'}${ch === 'both' ? ' and their WhatsApp group' : ''}`;
   const head = `<div class="rvn-hd">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}</b><span class="s">${toWords}</span><span class="s">Drafted by ${mine ? 'you' : escapeHtml(d.author)}${drafted}</span></div></div>`;
   // WhatsApp: as it will look in the group
   const body = editing ? `<textarea spellcheck="true" class="rvn-edit" id="draft-${c.id}" aria-label="Draft">${escapeHtml(d.draft || '')}</textarea>`
@@ -168,7 +168,7 @@ function reviewReadHtml(x, list){
   const htag = tagHtml(h.level === 'r' ? 'red' : h.level === 'y' ? 'yellow' : 'green', healthWord(h.level));
   const dueTxt = w.due ? w.due.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) : '';
   const rewriteBtn = rework ? `<button class="btn rvn-sm" onclick="generateDraft(${A})">${icon('sparkle')}Rewrite to Include</button>` : '';
-  const goneNote = dl.gone ? `<div class="rvn-warn">${icon('warning')}<div><b>${dl.allGone ? 'Everything this email was written from was deleted' : `${dl.gone} improvement${dl.gone === 1 ? '' : 's'} in this email ${dl.gone === 1 ? 'was' : 'were'} deleted`}</b><span>${dl.allGone ? 'Rewrite it from what’s logged now, or discard it.' : 'The email may still mention ' + (dl.gone === 1 ? 'it' : 'them') + '. Rewrite it, or edit it by hand.'}</span>${rework ? `<button class="btn rvn-sm" onclick="generateDraft(${A})">${icon('sparkle')}Rewrite</button>` : ''}</div></div>` : '';
+  const goneNote = dl.gone ? `<div class="rvn-warn"><div><b>${dl.allGone ? 'The work this email was written from was deleted' : `${dl.gone} improvement${dl.gone === 1 ? '' : 's'} in this email ${dl.gone === 1 ? 'was' : 'were'} deleted`}</b><span>${rework ? (dl.allGone ? 'Rewrite it from what’s logged now.' : 'Rewrite it from what’s logged now, or edit it by hand.') : 'An approver can rewrite it from what’s logged now.'}</span>${rework ? `<button class="btn rvn-sm" onclick="generateDraft(${A})">${icon('sparkle')}Rewrite</button>` : ''}</div></div>` : '';
   const rail = `<aside class="rvn-rail" aria-label="${tab === 'sent' ? 'About this update' : 'Before you send'}">
 ${goneNote}<div class="rvn-rs"><b>${tab === 'sent' ? 'About this update' : 'Before you send'}</b></div>
 ${reviewWinRowsHtml(c, d, tab)}
@@ -188,9 +188,9 @@ ${dl.internal.length ? `<div class="rvn-rs rvn-s2"><b>Left out</b><span>${dl.int
   else if((dl.allGone && tab !== 'sent') || empty){
     // nothing left in it: rewrite it from what's logged now (or discard it); it can't go to review or out
     const writer = mine && tab === 'waiting' && !approver;
-    foot = `<span class="rvn-ft-note t-red">${icon('warning')}Nothing left in this draft. Rewrite it${approver ? ' or discard it' : ''} first.</span><span class="rvn-sp"></span>${approver ? `<button class="btn" onclick="skipDraft(${A})">Discard Draft</button>` : ''}${rework ? `<button class="btn" onclick="generateDraft(${A})">${icon('sparkle')}Rewrite</button>` : ''}<button class="btn btn-p rvn-main" disabled>${icon('paper-plane-tilt')}${tab === 'approved' ? 'Send Now' : writer ? 'Send for Review' : wa ? 'Approve' : 'Approve &amp; Send'}</button>`;
+    foot = `<span class="rvn-ft-note">${rework ? 'Rewrite it from what’s logged now to send it.' : approver ? 'Nothing to send yet: discard it, or log work and rewrite it.' : 'Log this week’s work, then rewrite it to send it.'}</span><span class="rvn-sp"></span>${approver ? `<button class="btn" onclick="skipDraft(${A})">Discard Draft</button>` : ''}${rework ? `<button class="btn" onclick="generateDraft(${A})">${icon('sparkle')}Rewrite</button>` : ''}<button class="btn btn-p rvn-main" disabled>${icon('paper-plane-tilt')}${tab === 'approved' ? 'Send Now' : writer ? 'Send for Review' : wa ? 'Approve' : 'Approve &amp; Send'}</button>`;
   }
-  else if(!c.email && tab !== 'sent' && !wa) foot = `<span class="rvn-ft-note t-red">${env}No client email on file. Add one in All Clients to send.</span><span class="rvn-sp"></span>`;
+  else if(!c.email && tab !== 'sent' && !wa) foot = `<span class="rvn-ft-note"><span>${approver ? `<a class="fix-lnk" href="#" onclick="openClientEmailField('${c.id}');return false;">Add the client’s email</a> to send it.` : 'An admin or approver adds the client’s email, then it can go out.'}</span></span><span class="rvn-sp"></span>`;
   else if(editing) foot = `<span class="rvn-ft-note">Save first, then send</span><span class="rvn-sp"></span><button class="btn btn-p rvn-main" disabled>${icon('paper-plane-tilt')}Approve &amp; Send</button>`;
   else if(tab === 'sent'){
     const by = d.draftSentBy ? (d.draftSentBy === myName() ? 'you' : d.draftSentBy) : '';

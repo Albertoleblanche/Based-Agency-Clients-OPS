@@ -142,7 +142,7 @@ function tsTextHtml(c, projectId, taskId, service, notes){
 function tsRowHtml(e, rng){
   const c = clients.find(x => x.id === e.clientId);
   // logged in Harvest (step 4), invoiced there, sent there, or why not (tried again when edited and each night)
-  const sync = e.harvestStatus === 'failed' || (e.harvestStatus === 'unmapped' && e.harvestProjectId) ? `<span class="tmi-sync is-err" title="${escapeHtml(e.harvestError || 'Not in Harvest yet')}">${icon('warning')}Not in Harvest</span>`
+  const sync = e.harvestStatus === 'failed' || (e.harvestStatus === 'unmapped' && e.harvestProjectId) ? `<span class="tmi-sync is-fix" title="${escapeHtml((e.harvestError ? e.harvestError + '. ' : '') + 'Open it and pick its project and task to send it.')}">Send to Harvest</span>`
     : e.harvestLocked ? `<span class="tmi-sync" title="Invoiced in Harvest, so it can’t change here">Invoiced</span>`
     : e.source === 'harvest' ? `<span class="tmi-sync" title="Logged in Harvest">From Harvest</span>`
     : e.harvestId ? `<span class="tmi-sync" title="In Harvest">${icon('check', { weight: 'bold' })}Harvest</span>` : '';
@@ -455,7 +455,7 @@ function renderDailySummaryList(data, dir, part){
     const slack = prof && (prof.daily_summary_slack_id || prof.slack_user_id);
     const ents = person.entries.slice().sort((a, b) => b.minutes - a.minutes), more = ents.length - 3;
     const st = slack ? `<span class="st"><span class="dot green"></span>Sends to ${escapeHtml(firstName(person.name))} in Slack</span>`
-      : `<span class="st t-red"><span class="ic sm" style="color:var(--red)">${icon('warning', { fill: false })}</span>No Slack ID on file</span><button class="btn btn-q sm" onclick="event.stopPropagation();switchView('team')">Add in Team</button>`;
+      : `<button class="btn btn-q sm" onclick="event.stopPropagation();switchView('team')">Add ${escapeHtml(firstName(person.name))}’s Slack ID</button>`;
     const n = impsBy(person.name);
     return `<div class="grp og"><div class="og-h" role="button" tabindex="0" onclick="openDailySummaryDetail('${person.userId}')">${avHtml(person.name, 'style="width:28px;height:28px;font-size:12px"')}
 <div class="tx"><b>${escapeHtml(person.name)}</b><span>${hmLong(person.totalMinutes)} logged · ${n} improvement${n === 1 ? '' : 's'} · ${ents.length} entr${ents.length === 1 ? 'y' : 'ies'}</span></div><div class="r">${st}</div></div>

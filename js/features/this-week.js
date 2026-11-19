@@ -60,7 +60,7 @@ const WEEK_GROUPS = [
       return [`openApprovedInReview()`, 'Send in Review', ''];
     } },
   { k: 'forreview', title: () => 'Send your wins for review', ic: 'paper-plane-tilt', tone: 'blue', batch: n => [`sendAllForReview()`, n > 1 ? `Send All ${n} for Review` : 'Send for Review', ''] },
-  { k: 'latedraft', title: () => 'Late wins not sent for review', ic: 'warning', tone: 'red', batch: null },
+  { k: 'latedraft', title: () => 'Late wins not sent for review', ic: 'clock', tone: 'red', batch: null },
   { k: 'write', title: mine => mine ? 'Write your wins' : 'Write wins', ic: 'sparkle', tone: 'purple', batch: n => [`openGroupAndSendModal()`, n > 1 ? (n === 2 ? 'Write Both' : `Write All ${n}`) : 'Write Draft', 'sparkle'] },
   { k: 'log', title: () => 'Log this week’s work', ic: 'square-pen', tone: 'yellow', batch: n => [`openQueueLogImprovementModal()`, 'Log Work', 'square-pen'] },
 ];
@@ -233,8 +233,8 @@ function weekDraftNote(w){
   const d = w.draft;
   if(w.sent || !d || typeof draftDelta !== 'function') return '';
   const dl = draftDelta(w.c, d), A = `'${w.c.id}',${jsArg(d.author)}`, may = canReworkDraft(w.c, d);
-  if(dl.gone) return `<p class="sp-dnote is-red">${icon('warning')}<span>${dl.allGone ? 'Everything this draft was written from was deleted.' : `${dl.gone} improvement${dl.gone === 1 ? '' : 's'} in the draft ${dl.gone === 1 ? 'was' : 'were'} deleted; the email may still mention ${dl.gone === 1 ? 'it' : 'them'}.`}${may ? ` <a class="x-lnk" href="#" onclick="generateDraft(${A});return false;">Rewrite</a>` : ''}</span></p>`;
-  if(dl.added.length) return `<p class="sp-dnote">${icon('circle-plus')}<span>${dl.added.length === 1 ? '1 improvement was' : `${dl.added.length} improvements were`} logged after this draft.${may ? ` <a class="x-lnk" href="#" onclick="generateDraft(${A});return false;">Rewrite to include ${dl.added.length === 1 ? 'it' : 'them'}</a>` : d.draftStatus === 'approved' ? ` ${dl.added.length === 1 ? 'It goes' : 'They go'} in the next update.` : ' An approver can rewrite to include them.'}</span></p>`;
+  if(dl.gone) return `<p class="sp-dnote">${icon('sparkle')}<span>${dl.allGone ? 'The work this draft was written from was deleted.' : `${dl.gone} improvement${dl.gone === 1 ? '' : 's'} in the draft ${dl.gone === 1 ? 'was' : 'were'} deleted.`}${may ? ` <a class="fix-lnk" href="#" onclick="generateDraft(${A});return false;">Rewrite it from what’s logged now</a>` : ' An approver can rewrite it from what’s logged now.'}</span></p>`;
+  if(dl.added.length) return `<p class="sp-dnote">${icon('circle-plus')}<span>${dl.added.length === 1 ? '1 improvement was' : `${dl.added.length} improvements were`} logged after this draft.${may ? ` <a class="fix-lnk" href="#" onclick="generateDraft(${A});return false;">Rewrite to include ${dl.added.length === 1 ? 'it' : 'them'}</a>` : d.draftStatus === 'approved' ? ` ${dl.added.length === 1 ? 'It goes' : 'They go'} in the next update.` : ' An approver can rewrite to include them.'}</span></p>`;
   return '';
 }
 // Folded rows: closed until you open one, and they stay as you left them from client to client.
@@ -271,7 +271,7 @@ function weekPanelHtml(w){
     eyebrow = `<span class="sp-eb ok">${icon('check', { weight: 'bold' })}Sent ${escapeHtml(relDayLower(w.last))}</span>`;
     title = 'This week’s update is out'; sub = `Next one ${escapeHtml(w.dueText.replace(/^Due /, 'due '))}.`;
   } else {
-    eyebrow = w.late ? `<span class="sp-eb red">${icon('warning', { weight: 'bold' })}${escapeHtml(overdueShort(w))}</span>` : `<span class="sp-eb">${icon('clock', { weight: 'bold' })}${escapeHtml(w.dueText)}</span>`;
+    eyebrow = w.late ? `<span class="sp-eb red"><i class="eb-dot"></i>${escapeHtml(overdueShort(w))}</span>` : `<span class="sp-eb">${icon('clock', { weight: 'bold' })}${escapeHtml(w.dueText)}</span>`;
     if(w.done >= 3 && winViaWhatsapp(c)){
       // WhatsApp: who sends it, and whether it's been copied
       const st = winSendState(d), sender = st.k === 'copied' ? st.by : d.author;

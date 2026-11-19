@@ -243,7 +243,7 @@ function renderPlan(){
   const used = [...new Set(planSprints.map(s => s.clientId).filter(Boolean))].map(id => clients.find(c => c.id === id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
   if(planClient !== 'all' && !used.some(c => c.id === planClient)) planClient = 'all';
   const curC = used.find(c => c.id === planClient);
-  const setup = planReady === false ? `<div class="pl-setup">${icon('warning')}<span><b>Plan needs a one-time database update.</b> An admin runs <code>addendum-colors-and-plan.sql</code> in Supabase → SQL Editor, and sprints turn on by themselves. Everything coming up below already works.</span></div>` : '';
+  const setup = planReady === false ? `<div class="pl-setup"><span><b>Turn on sprints:</b> an admin runs <code>addendum-colors-and-plan.sql</code> in Supabase, and they switch on by themselves. Everything coming up below already works.</span>${canApprove() ? `<a class="x-lnk" href="${escapeHtml(SUPABASE_URL.replace(/^https:\/\/([^.]+)\..*$/, 'https://supabase.com/dashboard/project/$1/sql/new'))}" target="_blank" rel="noopener">Open the SQL Editor</a>` : ''}</div>` : '';
   const head = `<div class="pl-hd"><div><h2>Your next ${weeks === 6 ? '6 weeks' : '3 months'}</h2><p>${sub}</p></div>
 <div class="pl-f"><div class="seg" role="tablist" aria-label="Range"><button class="${weeks === 6 ? 'on' : ''}" role="tab" aria-selected="${weeks === 6}" onclick="setPlanRange(6)">6 Weeks</button><button class="${weeks === 13 ? 'on' : ''}" role="tab" aria-selected="${weeks === 13}" onclick="setPlanRange(13)">3 Months</button></div>
 ${used.length ? `<label class="pop pop-sel"><span class="pl">Client: ${escapeHtml(curC ? curC.name : 'All')}</span>${icon('caret-down')}<select aria-label="Client" onchange="setPlanClient(this.value)"><option value="all">All</option>${used.map(c => `<option value="${c.id}"${c === curC ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></label>` : ''}</div></div>`;
@@ -273,7 +273,7 @@ function planPanelHtml(s){
   else if(st.kind === 'upcoming'){ const k = daysBetween(dayStart(rNow()), new Date(s.start + 'T12:00:00'));
     eyebrow = `<span class="sp-eb">${icon('clock', { weight: 'bold' })}Starts ${k === 1 ? 'tomorrow' : k < 7 ? DAY_NAMES[new Date(s.start + 'T12:00:00').getDay()] : 'in ' + k + ' days'}</span>`;
     title = st.steps.length ? `${st.steps.length} step${st.steps.length === 1 ? '' : 's'} planned` : 'No steps yet'; sub = `${hrs} h over ${st.days.length} workdays.`; }
-  else if(st.kind === 'ended'){ eyebrow = `<span class="sp-eb warn">${icon('warning', { weight: 'bold' })}Ended ${escapeHtml(relDayLower(new Date(s.end + 'T12:00:00')))}</span>`;
+  else if(st.kind === 'ended'){ eyebrow = `<span class="sp-eb warn"><i class="eb-dot"></i>Ended ${escapeHtml(relDayLower(new Date(s.end + 'T12:00:00')))}</span>`;
     title = `${st.done} of ${st.steps.length} steps done`; sub = `${trackTxt} Mark it done, or move the end date.`;
     main = `<button class="btn btn-p" onclick="setPlanSprintDone('${s.id}', true)">${icon('check')}Mark Done</button>`; }
   else { eyebrow = `<span class="sp-eb plp-blue">${icon('clock', { weight: 'bold' })}Day ${st.elapsed} of ${st.days.length}</span>`;
@@ -295,7 +295,7 @@ function planPanelHtml(s){
 <div class="sp-bar"><button class="ib" aria-label="Close" title="Close (Esc)" onclick="closePlanPanel()">${icon('x')}</button><span class="plp-br"><button class="ib" aria-label="More" title="More" onclick="planMore(event)">${icon('dots-three')}</button><template id="plpMoreItems">${more}</template><a class="x-lnk" href="#" onclick="openNewSprintModal({ edit: '${s.id}' });return false;">Edit</a></span></div>
 <div class="plp-h"><span class="plp-sw"></span><div class="tx"><b>${escapeHtml(s.title)}</b><span>${[c ? c.name : 'No client', dates, `${st.days.length} workday${st.days.length === 1 ? '' : 's'}`].map(escapeHtml).join(' · ')}</span></div></div>
 <div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b><span class="sub">${escapeHtml(sub)}</span><div class="sp-acts">${acts}</div></div>
-${warn ? `<p class="plp-warn">${icon('warning')}<span>${warn}</span></p>` : ''}
+${warn ? `<p class="plp-warn"><span>${warn} <a class="fix-lnk" href="#" onclick="openNewSprintModal({ edit: '${s.id}' });return false;">Move or shorten the sprint</a></span></p>` : ''}
 ${s.goal ? `<div class="sp-sec"><b>Goal</b></div><p class="plp-goal">${escapeHtml(s.goal)}</p>` : ''}
 <div class="sp-sec"><b>Steps</b>${st.steps.length ? `<span>${st.done} of ${st.steps.length}</span>` : ''}${st.steps.length ? `<a class="x-lnk" href="#" onclick="planOpenInTasks('${s.id}');return false;">Open in Tasks</a>` : ''}</div>
 ${steps || (addStep ? '' : `<p class="sp-empty">No steps yet. Each step is a task for you, with a date inside the sprint.</p>`)}${addStep}

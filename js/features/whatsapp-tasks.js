@@ -24,7 +24,7 @@ const waChat = {};             // item id -> its messages ([] when there are non
 
 const WA_OWNERS = [['albert', 'Albert'], ['stan', 'Stan'], ['eric', 'Eric'], ['charlie', 'Charlie'], ['dan', 'Dan'], ['joey', 'Joey']];
 const WA_KIND = { request: 'Request', question: 'Question', promise: 'We promised', issue: 'Problem' };
-const WA_KIND_IC = { request: 'list-checks', question: 'circle-help', promise: 'handshake', issue: 'warning' };
+const WA_KIND_IC = { request: 'list-checks', question: 'circle-help', promise: 'handshake', issue: 'flag' };
 const WA_STALE_MS = 120000;    // the connector writes a heartbeat about every 30 s
 const WA_QUIET_DAYS = 7;       // no message or update from us in this many days: a quiet client
 const WA_QUIET_SHOWN = 4;
@@ -272,13 +272,13 @@ function renderWhatsapp(){
   try{ waDraw(root); }
   catch(e){
     console.error('WhatsApp screen', e);
-    root.innerHTML = `<div class="spw"><div class="sp-page"><div class="wa">${emptyState({ icon: 'warning', title: 'WhatsApp couldn’t be shown', text: String(e && e.message || e), action: 'Try Again', onAction: 'openWhatsappView()' })}</div></div></div>`;
+    root.innerHTML = `<div class="spw"><div class="sp-page"><div class="wa">${emptyState({ icon: 'refresh-cw', title: 'WhatsApp couldn’t be shown', text: String(e && e.message || e), action: 'Try Again', onAction: 'openWhatsappView()' })}</div></div></div>`;
   }
 }
 function waDraw(root){
   if(waHidden()){ root.innerHTML = ''; return; }
   if(waLoadError && !waTasks.length && !waSettings){
-    root.innerHTML = `<div class="spw"><div class="sp-page"><div class="wa">${emptyState({ icon: 'warning', title: 'WhatsApp didn’t load', text: `${waLoadError}. Check your connection and try again.`, action: 'Try Again', onAction: 'openWhatsappView()' })}</div></div></div>`;
+    root.innerHTML = `<div class="spw"><div class="sp-page"><div class="wa">${emptyState({ icon: 'refresh-cw', title: 'WhatsApp didn’t load', text: `${waLoadError}. Try again once you’re back online.`, action: 'Try Again', onAction: 'openWhatsappView()' })}</div></div></div>`;
     return;
   }
   const lead = waCanManage();
@@ -492,7 +492,7 @@ function waReadPanelHtml(){
 <div class="tkp-h"><h3>What it read</h3></div>
 <p class="wap-rd-p">The messages from the last 7 days in the ${reading.length} group${reading.length === 1 ? '' : 's'} it reads. At each check the agent goes through the new ones and lists what a client is still waiting on.</p>`;
   if(waRead === 'loading' || !waRead) return `<aside class="sp wap" aria-label="What it read">${head}${loadingStateHtml('Loading…')}</aside>`;
-  if(waRead.error) return `<aside class="sp wap" aria-label="What it read">${head}${emptyState({ compact: true, icon: 'warning', title: 'Couldn’t load the messages', text: waRead.error, action: 'Try Again', onAction: 'waShowRead()' })}</aside>`;
+  if(waRead.error) return `<aside class="sp wap" aria-label="What it read">${head}${emptyState({ compact: true, icon: 'refresh-cw', title: 'Couldn’t load the messages', text: waRead.error, action: 'Try Again', onAction: 'waShowRead()' })}</aside>`;
   const open = waTasks.filter(t => t.status === 'open');
   const rows = reading.map(g => ({ g, s: waRead.groups.get(g.jid) || { n: 0 }, items: open.filter(t => t.group_jid === g.jid).length }))
     .sort((a, b) => (b.s.last || '').localeCompare(a.s.last || '') || waCleanName(a.g.name).localeCompare(waCleanName(b.g.name)));

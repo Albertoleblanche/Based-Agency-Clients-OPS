@@ -1242,6 +1242,7 @@ body.sidebar-collapsed .app-win .side { margin-left: -220px; }
 .tmi-sync{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--label-3);flex:0 0 auto}
 .tmi-sync svg{width:11px;height:11px}
 .tmi-sync.is-err{color:var(--red)}
+.tmi-sync.is-fix{color:var(--blue);font-weight:500}
 .tmi-live{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--red);flex:0 0 auto}
 .tmx-rec{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--red);box-shadow:0 0 0 4px rgba(255,69,58,.18);flex:0 0 auto}
 .tmi-cont{width:26px;height:26px;opacity:0;flex:0 0 auto}
@@ -1478,7 +1479,7 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .rvn-note{font-size:11.5px;font-weight:600;color:var(--yellow);white-space:nowrap}
 .rvn-note.is-red{color:var(--red)}
 .rvn-rail .btn.rvn-sm{height:28px;padding:0 11px;margin-top:10px;font-size:12.5px}
-.rvn-warn{display:flex;gap:10px;margin:0 0 22px;padding:12px 14px;border-radius:10px;background:color-mix(in srgb,var(--red) 12%,transparent)}
+.rvn-warn{display:flex;gap:10px;margin:0 0 22px;padding:12px 14px;border-radius:10px;background:var(--fill)}
 .rvn-warn > svg{width:16px;height:16px;flex:0 0 auto;margin-top:1px;color:var(--red)}
 .rvn-warn > div{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0}
 .rvn-warn b{font-size:13px;font-weight:600;color:var(--label)}
@@ -1752,7 +1753,8 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .pl-hd p b{color:var(--label);font-weight:600}
 .pl-f{display:flex;align-items:center;gap:8px}
 .pl-f .pop > svg{width:12px;height:12px;color:var(--label-3)}
-.pl-setup{display:flex;gap:10px;margin:18px 0 0;padding:12px 14px;border-radius:10px;background:var(--yellow-soft);font-size:13px;line-height:1.45}
+.pl-setup{display:flex;align-items:baseline;gap:16px;margin:18px 0 0;padding:12px 14px;border-radius:10px;background:var(--fill);font-size:13px;line-height:1.45}
+.pl-setup .x-lnk{margin-left:auto;flex:0 0 auto;white-space:nowrap}
 .pl-setup svg{width:16px;height:16px;flex:0 0 auto;margin-top:1px;color:var(--yellow)}
 .pl-setup code{font-size:12px;padding:1px 5px;border-radius:4px;background:var(--fill-2)}
 .pl-body{display:grid;grid-template-columns:minmax(0,1fr) 300px;column-gap:56px;margin-top:28px;align-items:start}
@@ -1849,7 +1851,7 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .plp-h .tx span{font-size:12.5px;color:var(--label-2)}
 .plp .sp-status{border-bottom:0;padding-bottom:4px}
 .plp-blue{color:var(--blue) !important}
-.plp-warn{display:flex;gap:9px;margin:14px 0 0;padding:10px 12px;border-radius:9px;background:var(--red-soft);font-size:12.5px;line-height:1.45}
+.plp-warn{display:flex;gap:9px;margin:14px 0 0;padding:10px 12px;border-radius:9px;background:var(--fill);font-size:12.5px;line-height:1.45;color:var(--label-2)}
 .plp-warn svg{width:15px;height:15px;flex:0 0 auto;margin-top:1px;color:var(--red)}
 .plp-goal{margin:2px 0 0;font-size:13.5px;line-height:1.5}
 .plp-s{display:flex;align-items:center;gap:10px;padding:6px 8px;margin:0 -8px;border-radius:8px;font-size:13px;cursor:default;outline:none}
@@ -2220,14 +2222,15 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .cl-folds{margin-top:8px}
 .cl-m + .cl-folds{margin-top:0;border-top:0} /* one line under the numbers, not two */
 .cl-folds .sp-fold-b{padding-bottom:14px}
-.wn-kvs .cl-kv{grid-template-columns:90px minmax(0,1fr);min-height:32px}
+.wn-kvs .cl-kv{grid-template-columns:104px minmax(0,1fr);min-height:44px;padding:6px 0}
 .wn-seg button{display:inline-flex;align-items:center;gap:5px}
 .wn-seg svg{width:13px;height:13px}
 .wn-sic{display:inline-flex;margin-right:5px;color:var(--green)}
 .wn-sic svg{width:13px;height:13px}
-.wn-note{display:flex;gap:7px;margin:8px 0 0;font-size:12px;line-height:1.45;color:var(--label-3)}
+.wn-note{display:flex;gap:7px;margin:14px 0 0;font-size:12px;line-height:1.45;color:var(--label-3)}
 .wn-note svg{width:13px;height:13px;flex:0 0 auto;margin-top:2px}
 .wn-note.is-red,.wn-note.is-red svg{color:var(--red)}
+.wn-note + .wn-note{margin-top:8px}
 .cl-edit{display:inline-block;margin-top:10px;font-size:12.5px}
 
 /* ---------- WhatsApp grouped by client (canvas "WhatsApp — grouped by client") ---------- */
@@ -2448,4 +2451,7 @@ a.mi{text-decoration:none;color:inherit}
 .mac button.oh-r.oh-go:hover{background:var(--fill)}
 .mac button.oh-r.oh-go > svg{width:14px;height:14px;color:var(--label-3);flex:0 0 auto}
 /* Weekly win: the main contact, typed in place */
-.mac .wn-kvs .tf.wn-in{width:190px;height:28px;padding:0 9px;font-size:13px;border-radius:7px}
+.mac .wn-kvs .tf.wn-in{width:210px;height:28px;padding:0 10px;font-size:13px;border-radius:7px}
+/* a note that says what to do: calm text, the fix is the link */
+.mac .fix-lnk{color:var(--blue);font-weight:500;text-decoration:none;cursor:pointer}
+.mac .fix-lnk:hover{text-decoration:underline;text-underline-offset:3px}
