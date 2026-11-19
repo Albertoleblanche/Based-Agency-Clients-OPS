@@ -71,8 +71,9 @@ function clientSameAsGuesses(c){
 function clientSetupRowHtml(c){
   const sel = c.id === inspectedClientId, owner = (c.customFieldValues || {}).owner || '';
   const left = clientSetupSteps(c).filter(s => !s.ok).length;
-  return `<div class="cl-r client-row cl-su${sel ? ' is-sel' : ''}" data-id="${c.id}" role="row" tabindex="0" aria-selected="${sel}" onclick="clientRowClick(event,'${c.id}')">
-<span class="cl-c" role="cell">${monoHtml(c, 'sm')}<span class="cl-tx"><b>${escapeHtml(c.name)}</b><span class="cl-s">${escapeHtml(clientAddedWords(c))}</span></span></span>
+  const picked = typeof clBulk !== 'undefined' && clBulk && clBulk.has(c.id), bulk = typeof clBulk !== 'undefined' && !!clBulk;
+  return `<div class="cl-r client-row cl-su${sel ? ' is-sel' : ''}${picked ? ' is-picked' : ''}" data-id="${c.id}" role="row" tabindex="0" aria-selected="${bulk ? !!picked : sel}" onclick="${bulk ? `clBulkToggle('${c.id}')` : `clientRowClick(event,'${c.id}')`}"${bulk ? ` onkeydown="clBulkKey(event,'${c.id}')"` : ''}>
+<span class="cl-c" role="cell">${bulk ? clBulkCk(c) : ''}${monoHtml(c, 'sm')}<span class="cl-tx"><b>${escapeHtml(c.name)}</b><span class="cl-s">${escapeHtml(clientAddedWords(c))}</span></span></span>
 <span class="cl-o" role="cell">${owner ? escapeHtml(owner) : '<span class="t-3">—</span>'}</span>
 <span class="cl-need" role="cell"><span class="cl-wk${left ? '' : ' is-ready'}">${escapeHtml(clientSetupLeftWords(c))}</span></span>
 <span class="cl-hrs" role="cell">${c.monthlyHourBudget ? `<span><b>${c.monthlyHourBudget}</b> h a month</span>` : ''}</span></div>`;
@@ -215,7 +216,7 @@ function hvSameAsSheet(clientId){
 <div class="f"><label for="suSameSel">Client</label><div>${sheetPop('suSameSel', 'Client', list.map(x => [x.id, x.name]), '', "document.getElementById('suSameGo').disabled=!this.value", { placeholder: 'Choose a client' })}</div></div>
 <div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" id="suSameGo" disabled onclick="hvLinkClient('${c.id}', document.getElementById('suSameSel').value)">Link</button></div>`, 440);
 }
-// ---- Match Harvest Clients: every client waiting for setup in one sheet ---------------------------
+// ---- Match to Existing Clients: every client waiting for setup in one sheet --------------------
 // Harvest's name for a client often isn't Radar's ("AWA Kitchen Cabinets" and "AWA Cabinets"), so
 // Radar added a copy. Each row says which Radar client it is (Radar's guess picked), a new client
 // (it stays under Needs setup) or not a Radar client (Trash). One Save does them all.
@@ -240,8 +241,8 @@ async function openMatchClientsSheet(){
     return `<div class="mt-r" data-id="${c.id}"><div class="mt-n"><b>${escapeHtml(c.name)}</b><span>${escapeHtml(c.service || 'No projects yet')}</span></div>
 <label class="pop pop-sel mt-p"><span class="pl">${escapeHtml(label)}</span>${icon('caret-up-down', { weight: 'bold' })}<select aria-label="${escapeHtml(c.name)} in Radar" onchange="syncPopSel(this);hvMatchSet('${c.id}', this.value)">${sel}</select></label></div>`;
   };
-  openAppModal(`<h3>Match Harvest Clients</h3>
-<p class="t-2 mt-sub">Radar added these from Harvest because no client had the same name. Pick the Radar client each one is. Radar keeps that client, with Harvest’s projects and time, and removes the copy.</p>
+  openAppModal(`<h3>Match to Existing Clients</h3>
+<p class="t-2 mt-sub">Radar added these from Harvest because no Radar client had the same name. If one is a client you already have under another name, pick it on the right: Radar keeps your client, gives it Harvest’s projects and time, and removes the copy. Leave “New client” for ones that really are new.</p>
 <div class="mt-h"><span>In Harvest</span><span>In Radar</span></div>
 <div class="mt-l">${rows.map(row).join('')}</div>
 <div class="sheet-a"><span class="t-2 mt-sum" id="mtSum"></span><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" id="mtSave" onclick="saveMatchClients()">Save</button></div>`, 620);

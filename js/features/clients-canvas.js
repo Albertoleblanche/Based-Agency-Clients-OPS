@@ -15,7 +15,96 @@ function setClientsFind(v){
 }
 // The panel opens and closes with the table (the shared panel motion slides it in and out).
 function clearClientsCanvasFilters(){ clientsSeg = 'all'; clientsOwnerFilter = 'all'; clientFilters.service = 'all'; clientFilters.search = ''; const f = document.querySelector('#clientsRoot input[type="search"]'); if(f) f.value = ''; renderClientsTable(); }
-function selectClientRow(id){ inspectedClientId = id; renderClientsTable(); }
+function selectClientRow(id){ if(clBulk) return; inspectedClientId = id; renderClientsTable(); }
+
+// ---- Bulk edit: pick clients, then set their status, importance, risk or hours a month at once ----
+let clBulk = null; // the picked client ids while picking, otherwise null
+const CL_TIPS = {
+  match: 'Radar adds a client from Harvest when no Radar client has the same name, so the same client can end up twice under two names.\n\nThis lists each one Radar added and lets you pick the Radar client it really is. Radar keeps your client, gives it Harvest’s projects and time, and removes the copy. Pick “New client” when it really is new.',
+  hist: 'The last 8 weekly updates, oldest on the left: grey went out on time, yellow went out late, red was missed, and an empty circle isn’t due yet.',
+};
+function clBulkMenu(e){
+  e.stopPropagation();
+  const had = document.getElementById('clMenu'); had?.remove(); if(had) return;
+  const m = document.createElement('div');
+  m.className = 'menu cl-bmenu'; m.id = 'clMenu'; m.setAttribute('role', 'menu'); Object.assign(m.style, { position: 'fixed', zIndex: '1200' });
+  const r = e.currentTarget.getBoundingClientRect();
+  m.style.top = (r.bottom + 4) + 'px'; m.style.right = (window.innerWidth - r.right) + 'px';
+  const canMatch = typeof openMatchClientsSheet === 'function' && setupClients().length;
+  m.innerHTML = `<button class="mi" role="menuitem" onclick="clBulkStart()">${icon('list-checks')}<span><b>Edit Several Clients…</b><small>Tick clients, then set their status, importance, risk or hours a month at once.</small></span></button>`
+    + (canMatch ? `<button class="mi" role="menuitem" onclick="openMatchClientsSheet()">${icon('git-merge')}<span><b>Match to Existing Clients…</b><small>Clients added from Harvest that you already have under another name: merge them into yours.</small></span></button>` : '');
+  document.body.appendChild(m);
+  setTimeout(() => document.addEventListener('click', () => m.remove(), { once: true }), 0);
+}
+document.addEventListener('keydown', e => { if(e.key === 'Escape' && clBulk && !document.querySelector('#appModalOverlay[style*="flex"]') && document.getElementById('view-clients')?.classList.contains('active')) clBulkEnd(); });
+function clBulkStart(){ if(!canApprove()) return; clBulk = new Set(); inspectedClientId = null; renderClientsTable(); }
+function clBulkEnd(){ clBulk = null; renderClientsTable(); }
+function clBulkToggle(id){
+  if(!clBulk) return;
+  if(clBulk.has(id)) clBulk.delete(id); else clBulk.add(id);
+  renderClientsTable();
+  document.querySelector(`#clientsTbody .client-row[data-id="${CSS.escape(id)}"]`)?.focus({ preventScroll: true });
+}
+// Select All ticks every client showing (the filters decide which); Clear unticks them all
+function clBulkSetAll(on){
+  if(!clBulk) return;
+  if(on) [...document.querySelectorAll('#clientsTbody .client-row')].forEach(r => clBulk.add(r.dataset.id)); else clBulk.clear();
+  renderClientsTable();
+}
+// Space or Enter ticks the row you're on while picking
+function clBulkKey(e, id){ if(clBulk && (e.key === ' ' || e.key === 'Enter')){ e.preventDefault(); e.stopPropagation(); clBulkToggle(id); } }
+function clBulkCk(c){
+  const on = !!(clBulk && clBulk.has(c.id));
+  return clBulk ? `<span class="ck cl-ck${on ? ' on' : ''}" aria-hidden="true">${on ? icon('check', { weight: 'bold' }) : ''}</span>` : '';
+}
+// The bar at the foot while picking: how many, Select All or Clear, Cancel and Edit.
+function clBulkBarHtml(){
+  if(!clBulk) return '';
+  const n = clBulk.size;
+  return `<div class="cl-bulk" role="toolbar" aria-label="Edit several clients"><span class="cl-bk-n">${n ? `<b>${n}</b> selected` : 'Tick the clients to change'}</span>
+${n ? `<button class="lnk-b" onclick="clBulkSetAll(false)">Clear</button>` : ''}<button class="lnk-b" onclick="clBulkSetAll(true)">Select All Showing</button>
+<span class="cl-sp"></span><button class="btn" onclick="clBulkEnd()">Cancel</button><button class="btn btn-p" ${n ? '' : 'disabled'} onclick="openClientsBulkSheet()">Edit ${n || ''} Client${n === 1 ? '' : 's'}…</button></div>`;
+}
+// The sheet: every field starts on "Keep as is", so only what you change changes.
+function openClientsBulkSheet(){
+  if(!clBulk || !clBulk.size || !canApprove()) return;
+  const picked = clients.filter(c => clBulk.has(c.id)), n = picked.length;
+  const names = picked.slice(0, 3).map(c => c.name).join(', ') + (n > 3 ? ` and ${n - 3} more` : '');
+  const keep = [['', 'Keep as is']];
+  openAppModal(`<h3>Edit ${n} Client${n === 1 ? '' : 's'}</h3>
+<p class="t-2 bk-sub">${escapeHtml(names)}. Only what you change here changes; everything else stays as each client has it.</p>
+<div class="f bk-f">
+<label for="bkStatus">Status</label><div>${sheetPop('bkStatus', 'Status', keep.concat((settings.statusOptions || []).map(s => [s, s])), '')}</div>
+<label for="bkImportance">Importance${infoTip('How much this client matters to the agency, from 1 to 10. At 8 or more, a client on Watch counts as At risk, and it comes first when two updates are due the same day.', 'What does Importance do?')}</label><div>${sheetPop('bkImportance', 'Importance', keep.concat(Array.from({ length: 10 }, (_, i) => [String(i + 1), `${i + 1} of 10`])), '')}</div>
+<label for="bkDanger">Risk${infoTip('Your read on how likely the client is to leave, from 1 (low) to 5 (high). At 3 Health puts the client on Watch; at 4 or 5, At risk, flagged by its owner.', 'What does Risk do?')}</label><div>${sheetPop('bkDanger', 'Risk', keep.concat([['1', '1 · Low'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5 · High']]), '')}</div>
+<label for="bkHours">Hours a month</label><div class="bk-h"><input type="number" id="bkHours" class="tf" min="0" step="0.5" placeholder="Keep as is"><span class="t-2">0 removes it</span></div>
+</div>
+<div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" id="bkSave" onclick="saveClientsBulk()">Save to ${n} Client${n === 1 ? '' : 's'}</button></div>`, 520);
+}
+async function saveClientsBulk(){
+  if(!clBulk || !canApprove()) return;
+  const v = id => (document.getElementById(id) || {}).value || '';
+  const fields = {}, words = [];
+  if(v('bkStatus')){ fields.status = v('bkStatus'); words.push(`status to ${fields.status}`); }
+  if(v('bkImportance')){ fields.importance = Number(v('bkImportance')); words.push(`importance to ${fields.importance}`); }
+  if(v('bkDanger')){ fields.danger = Number(v('bkDanger')); words.push(`risk to ${fields.danger}`); }
+  const hrs = v('bkHours').trim();
+  if(hrs !== ''){ const h = Math.max(0, Number(hrs) || 0); fields.monthlyHourBudget = h || null; words.push(h ? `hours a month to ${h}` : 'no monthly hours'); }
+  if(!words.length){ showToast('info', 'Nothing to change yet', 'Pick a new value for at least one field.'); return; }
+  const btn = document.getElementById('bkSave'); if(btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
+  const picked = clients.filter(c => clBulk.has(c.id));
+  const results = await Promise.all(picked.map(async c => {
+    const ok = await updateClientRow(c.id, fields);
+    if(ok){ Object.assign(c, fields); if(typeof logClientActivity === 'function') logClientActivity(c.id, 'client_updated', `${myName() || 'Someone'} set ${words.join(', ')}${picked.length > 1 ? ` for ${picked.length} clients at once` : ''}.`); }
+    return ok;
+  }));
+  const done = results.filter(Boolean).length, failed = results.length - done;
+  closeAppModal();
+  if(failed){ picked.forEach((c, i) => { if(results[i]) clBulk.delete(c.id); }); showToast('error', `${failed} client${failed === 1 ? '' : 's'} didn’t save`, `${done} updated. The rest are still ticked: try Edit again.`); renderAll(); return; }
+  showToast('success', `Updated ${done} client${done === 1 ? '' : 's'}`, `Set ${words.join(', ')}.`);
+  clBulk = null; renderAll();
+}
+
 function closeClientInspector(){ inspectedClientId = null; renderClientsTable(); }
 
 // Where this week's update stands, in a word or two.
@@ -81,8 +170,9 @@ function renderClientsTable(){
     const sel = c.id === inspectedClientId, reason = h.level === 'g' ? '' : tableSignal(h, c);
     const [wk, wkCls, wkSub] = clientWeekCell(w), hp = h.hp, over = hp.budget && hp.used > hp.budget;
     const hrs = hp.budget ? `<span><b>${Math.round(hp.used)}</b> / ${hp.budget} h</span><span class="cl-bar"><i style="width:${Math.min(100, Math.round(hp.used / hp.budget * 100))}%"></i></span>` : `<span><b>${Math.round(hp.used)}</b> h</span>`;
-    return `<div class="cl-r client-row${sel ? ' is-sel' : ''}" data-id="${c.id}" role="row" tabindex="0" aria-selected="${sel}" onclick="clientRowClick(event,'${c.id}')" ondblclick="openClientDetail('${c.id}')">
-<span class="cl-c" role="cell">${monoHtml(c, 'sm')}<span class="cl-tx"><b>${escapeHtml(c.name)}</b><span class="cl-s">${escapeHtml(c.service || '—')}</span></span></span>
+    const picked = !!(clBulk && clBulk.has(c.id));
+    return `<div class="cl-r client-row${sel ? ' is-sel' : ''}${picked ? ' is-picked' : ''}" data-id="${c.id}" role="row" tabindex="0" aria-selected="${clBulk ? picked : sel}" onclick="${clBulk ? `clBulkToggle('${c.id}')` : `clientRowClick(event,'${c.id}')`}" ${clBulk ? `onkeydown="clBulkKey(event,'${c.id}')"` : `ondblclick="openClientDetail('${c.id}')"`}>
+<span class="cl-c" role="cell">${clBulkCk(c)}${monoHtml(c, 'sm')}<span class="cl-tx"><b>${escapeHtml(c.name)}</b><span class="cl-s">${escapeHtml(c.service || '—')}</span></span></span>
 <span class="cl-o" role="cell">${owner ? escapeHtml(owner) : '<span class="t-3">—</span>'}</span>
 <span class="cl-hc" role="cell"><span class="cl-h ${h.level}"><i></i>${healthWord(h.level)}</span>${reason ? `<span class="cl-s">${escapeHtml(reason)}</span>` : ''}</span>
 <span class="cl-w" role="cell"><span class="cl-wk ${wkCls}">${escapeHtml(wk)}</span><span class="cl-s">${escapeHtml(wkSub)}</span></span>
@@ -92,7 +182,7 @@ function renderClientsTable(){
   const sNeeds = shown.filter(r => r.h.level !== 'g'), sOk = shown.filter(r => r.h.level === 'g');
   const group = (title, list) => list.length ? `<div class="cl-g" role="presentation"><b>${title}</b><span>${list.length}</span></div>${list.map(row).join('')}` : '';
   // approvers match them all to Radar's clients in one sheet (client-setup.js)
-  const suMatch = canApprove() && typeof openMatchClientsSheet === 'function' && ac.some(c => !hvLinkOf(c)) ? `<button class="x-lnk cl-g-act" onclick="openMatchClientsSheet()">Match to Radar Clients</button>` : '';
+  const suMatch = canApprove() && typeof openMatchClientsSheet === 'function' && ac.some(c => !hvLinkOf(c)) ? `<span class="cl-g-act"><button class="x-lnk" onclick="openMatchClientsSheet()">Match to Existing Clients</button>${infoTip(CL_TIPS.match, 'What does Match to Existing Clients do?')}</span>` : '';
   const suGroup = suShown.length ? `<div class="cl-g" role="presentation"><b>Needs setup</b><span>${suShown.length}</span>${suMatch}</div>${suShown.map(clientSetupRowHtml).join('')}` : '';
   const body = shown.length || suShown.length ? suGroup + group('Needs attention', sNeeds) + group('On track', sOk)
     : mineOn && !ac.length && acAll.length ? `<div class="cl-empty">None of the clients are in your areas yet (${escapeHtml(waWords(waMyAreas()))}).<a class="x-lnk" href="#" onclick="setClientsMine('all');return false;">Show All Clients</a></div>`
@@ -110,11 +200,12 @@ function renderClientsTable(){
 <label class="cl-find">${icon('magnifying-glass')}<input id="clientsFind" type="search" placeholder="Filter clients" aria-label="Filter clients" value="${escapeHtml(clientFilters.search || '')}" oninput="setClientsFind(this.value)"></label>
 ${hasAreas ? `<label class="pop-wrap">Show: <select class="pop" onchange="setClientsMine(this.value)"><option value="mine"${mineOn ? ' selected' : ''}>My clients</option><option value="all"${mineOn ? '' : ' selected'}>All clients</option></select></label>` : ''}
 <label class="pop-wrap">Owner: <select class="pop" onchange="setClientsOwner(this.value)"><option value="all">All</option>${owners.map(o => `<option${clientsOwnerFilter === o ? ' selected' : ''}>${escapeHtml(o)}</option>`).join('')}</select></label>
-<label class="pop-wrap">${harvestOwnsServices() ? 'Project' : 'Service'}: <select class="pop" onchange="setClientsService(this.value)"><option value="all">All</option>${services.map(s => `<option${clientFilters.service === s ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('')}</select></label></div>
+<label class="pop-wrap">${harvestOwnsServices() ? 'Project' : 'Service'}: <select class="pop" onchange="setClientsService(this.value)"><option value="all">All</option>${services.map(s => `<option${clientFilters.service === s ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('')}</select></label>
+${canApprove() && !clBulk ? `<button class="btn cl-bulk-btn" onclick="clBulkMenu(event)" aria-haspopup="menu">${icon('list-checks')}Bulk Edit${icon('caret-down', { weight: 'bold' })}</button>` : ''}</div>
 <div class="cl-table" role="table" aria-label="Clients">
-<div class="cl-head" role="row"><button role="columnheader" class="${clientSort.field === 'name' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'name',dir:clientSort.field==='name'&&clientSort.explicit&&clientSort.dir==='asc'?'desc':'asc',explicit:true};renderClientsTable()">Client${clientSort.field === 'name' && clientSort.explicit ? sortIc : ''}</button><span role="columnheader">Owner</span><button role="columnheader" class="${clientSort.explicit ? '' : 'is-sort'}" onclick="clientSort={field:'health'};renderClientsTable()">Health${clientSort.explicit ? '' : sortIc}</button><span role="columnheader">This week</span><span role="columnheader">Last 8 weeks</span><span role="columnheader" class="r">Hours this month</span></div>
+<div class="cl-head" role="row"><button role="columnheader" class="${clientSort.field === 'name' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'name',dir:clientSort.field==='name'&&clientSort.explicit&&clientSort.dir==='asc'?'desc':'asc',explicit:true};renderClientsTable()">Client${clientSort.field === 'name' && clientSort.explicit ? sortIc : ''}</button><span role="columnheader">Owner</span><span role="columnheader" class="cl-hh"><button class="${clientSort.explicit ? '' : 'is-sort'}" onclick="clientSort={field:'health'};renderClientsTable()">Health${clientSort.explicit ? '' : sortIc}</button></span><span role="columnheader">This week</span><span role="columnheader">Last 8 weeks${infoTip(CL_TIPS.hist, 'What do the dots mean?')}</span><span role="columnheader" class="r">Hours this month</span></div>
 <div id="clientsTbody" role="rowgroup">${body}</div></div>
-</div></div>${sel ? clientPanelHtml(sel) : suSel ? clientSetupPanelHtml(suSel) : ''}</div>`;
+${clBulkBarHtml()}</div></div>${sel ? clientPanelHtml(sel) : suSel ? clientSetupPanelHtml(suSel) : ''}</div>`;
   const sp = root.querySelector('.sp-page'); if(sp) sp.scrollTop = prev;
   if(currentViewName === 'clients'){
     const used = rows.reduce((a, r) => a + r.h.hp.used, 0), budget = rows.reduce((a, r) => a + (r.h.hp.budget || 0), 0);
@@ -143,10 +234,10 @@ function clientPanelHtml({ c, h, w, owner }){
     const sinceTxt = h.since ? (relDay(h.since).toLowerCase() === 'today' ? 'today' : relDay(h.since)) : 'today';
     eyebrow = h.quiet ? `<span class="sp-eb">${icon('check', { weight: 'bold' })}Handled, settling</span>` : `<span class="sp-eb ${lvl === 'r' ? 'red' : 'warn'}"><i class="eb-dot"></i>${lvl === 'r' ? 'At risk' : 'Watch'} since ${escapeHtml(sinceTxt)}</span>`;
     if(next){ title = `Next step: ${next.title}`; sub = `${why ? escapeHtml(why) + ' · ' : ''}${escapeHtml((teamProfiles.find(p => p.id === next.assigneeId) || {}).name || '')}${next.dueDate ? ' · due ' + fmtShortDate(new Date(next.dueDate + 'T12:00:00')) : ''}`;
-      acts = `<button class="btn" onclick="markHealthHandled(${A})">Mark Handled</button><button class="btn btn-p" onclick="openTaskDetailModal('${next.id}')">Open Task</button>`; }
+      acts = `<button class="btn" onclick="markHealthHandled(${A})" title="You’ve dealt with it: the warning goes quiet for ${healthThresholds().quietDays} days, unless it gets worse">Mark Handled</button><button class="btn btn-p" onclick="openTaskDetailModal('${next.id}')">Open Task</button>`; }
     else if(h.quiet){ title = 'Handled, waiting for the numbers to settle'; sub = ''; }
     else { title = why || 'No next step yet'; sub = `Plan a next step and it becomes a task for ${escapeHtml(firstName(owner) || 'the owner')}.`;
-      acts = `<button class="btn" onclick="markHealthHandled(${A})">Mark Handled</button><button class="btn btn-p" onclick="planNextStep(${A})">${icon('plus')}Plan Next Step</button>`; }
+      acts = `<button class="btn" onclick="markHealthHandled(${A})" title="You’ve dealt with it: the warning goes quiet for ${healthThresholds().quietDays} days, unless it gets worse">Mark Handled</button><button class="btn btn-p" onclick="planNextStep(${A})">${icon('plus')}Plan Next Step</button>`; }
   } else if(w.sent){
     eyebrow = `<span class="sp-eb ok">${icon('check', { weight: 'bold' })}Healthy</span>`;
     title = 'This week’s update is out'; sub = `Sent ${escapeHtml(relDayLower(w.last))}. Next one ${escapeHtml(w.dueText.replace(/^Due /, 'due '))}.`;

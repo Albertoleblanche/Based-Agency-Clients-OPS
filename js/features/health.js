@@ -138,10 +138,10 @@ function healthPanelHtml(c, h, closeFn){
     eyebrow = h.quiet ? `<span class="sp-eb">${icon('check', { weight: 'bold' })}Handled, settling</span>`
       : `<span class="sp-eb ${lvl === 'r' ? 'red' : 'warn'}"><i class="eb-dot"></i>${lvl === 'r' ? 'At risk' : 'Watch'} since ${escapeHtml(sinceTxt)}</span>`;
     if(next){ title = `Next step: ${next.title}`; sub = `${escapeHtml((teamProfiles.find(p => p.id === next.assigneeId) || {}).name || '')}${next.dueDate ? ' · due ' + fmtShortDate(new Date(next.dueDate + 'T12:00:00')) : ''}`;
-      acts = `<div class="sp-acts"><button class="btn" onclick="markHealthHandled('${c.id}')">Mark Handled</button><button class="btn btn-p" onclick="openTaskDetailModal('${next.id}')">Open Task</button></div>`; }
+      acts = `<div class="sp-acts"><button class="btn" onclick="markHealthHandled('${c.id}')" title="You’ve dealt with it: the warning goes quiet for ${healthThresholds().quietDays} days, unless it gets worse">Mark Handled</button><button class="btn btn-p" onclick="openTaskDetailModal('${next.id}')">Open Task</button></div>`; }
     else if(h.quiet){ const hd = healthHandled[c.id]; title = 'Handled, waiting for the numbers to settle'; sub = hd ? `Marked handled by ${escapeHtml(hd.by)} ${escapeHtml(relDayLower(new Date(hd.at)))}${hd.note ? ': ' + escapeHtml(hd.note) : ''}.` : ''; acts = `<div class="sp-acts"><button class="btn btn-p" onclick="planNextStep('${c.id}')">${icon('plus')}Plan Next Step</button></div>`; }
     else { title = 'No next step yet'; sub = 'Plan a fix or a check-in with a date, and it becomes a task for the owner.';
-      acts = `<div class="sp-acts"><button class="btn" onclick="markHealthHandled('${c.id}')">Mark Handled</button><button class="btn btn-p" onclick="planNextStep('${c.id}')">${icon('plus')}Plan Next Step</button></div>`; }
+      acts = `<div class="sp-acts"><button class="btn" onclick="markHealthHandled('${c.id}')" title="You’ve dealt with it: the warning goes quiet for ${healthThresholds().quietDays} days, unless it gets worse">Mark Handled</button><button class="btn btn-p" onclick="planNextStep('${c.id}')">${icon('plus')}Plan Next Step</button></div>`; }
   }
   const why = h.signals.map(s => `<div class="hp-w"><span class="sig ${s.l}">${icon(s.icon)}</span><div class="tx"><b>${escapeHtml(s.title)}</b><span>${escapeHtml(s.text)}</span></div><span class="hp-since">${escapeHtml(relDay(s.since))}</span></div>`).join('');
   const hp = h.hp, scale = Math.max(hp.budget, hp.projected, hp.used, 1);
