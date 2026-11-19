@@ -175,13 +175,18 @@ async function finishClientSetup(clientId){
 async function clientNotRadar(clientId){
   const c = clients.find(x => x.id === clientId); if(!c || !canApprove()) return;
   if(!(await confirmDialog(`Leave ${c.name} out of Radar? It goes to Trash, and Harvest won’t add it again. You can restore it from Trash.`, { confirmLabel: 'Leave It Out' }))) return;
-  const cfv = Object.assign({}, c.customFieldValues || {}, { harvestSetup: 'skipped' });
-  const deletedAt = new Date().toISOString();
-  if(!(await updateClientRow(clientId, { deletedAt, customFieldValues: cfv }))){ showToast('error', 'Couldn’t save', 'Try again in a moment.'); return; }
-  c.deletedAt = deletedAt; c.customFieldValues = cfv;
-  if(inspectedClientId === clientId) inspectedClientId = null;
+  if(!(await leaveClientOut(c))){ showToast('error', 'Couldn’t save', 'Try again in a moment.'); return; }
   showToast('success', `${c.name} is left out`, 'Harvest won’t add it again.');
   renderAll();
+}
+
+async function leaveClientOut(c){
+  const cfv = Object.assign({}, c.customFieldValues || {}, { harvestSetup: 'skipped' });
+  const deletedAt = new Date().toISOString();
+  if(!(await updateClientRow(c.id, { deletedAt, customFieldValues: cfv }))) return false;
+  c.deletedAt = deletedAt; c.customFieldValues = cfv;
+  if(inspectedClientId === c.id) inspectedClientId = null;
+  return true;
 }
 
 // Same as a client Radar already has: the server moves the Harvest link and anything logged here.
@@ -189,12 +194,12 @@ async function hvLinkClient(clientId, targetId){
   const c = clients.find(x => x.id === clientId), t = clients.find(x => x.id === targetId);
   if(!c || !t || !canApprove()) return;
   closeAppModal();
-  if(!(await confirmDialog(`Link ${c.name} to ${t.name}? Harvest’s ${c.name} becomes ${t.name} in Radar. Anything logged on ${c.name} moves there, and ${c.name} goes to Trash.`, { confirmLabel: 'Link' }))) return;
+  if(!(await confirmDialog(`Harvest calls this client ${c.name}. Radar keeps ${t.name}, with Harvest’s projects and time, and removes the copy it added.`, { title: `Link to ${t.name}?`, confirmLabel: 'Link' }))) return;
   try{
     await harvestApiCall('link-client', { clientId, targetId });
     inspectedClientId = targetId;
     await loadAll();
-    showToast('success', `Linked to ${t.name}`, `Harvest’s ${c.name} is ${t.name} in Radar now.`);
+    showToast('success', `Linked to ${t.name}`, 'It has Harvest’s projects and time now.');
     renderAll();
     hvLoadLinks();
   }catch(e){ showToast('error', 'Couldn’t link it', e.message); }
@@ -205,10 +210,84 @@ function hvSameAsSheet(clientId){
   const list = activeClients().filter(x => !hvLinkOf(x)).sort((a, b) => (guesses.includes(b.id) - guesses.includes(a.id)) || a.name.localeCompare(b.name));
   if(!list.length){ showToast('info', 'Nothing to link to', 'Every client in Radar is already linked to Harvest.'); return; }
   openAppModal(`<h3>Same as which client?</h3>
-<p class="t-2" style="margin:-4px 0 14px;font-size:13px;line-height:1.45">Pick the client Radar already has for Harvest’s ${escapeHtml(c.name)}. Anything logged on ${escapeHtml(c.name)} moves there.</p>
+<p class="t-2" style="margin:-4px 0 14px;font-size:13px;line-height:1.45">Pick the Radar client that Harvest calls ${escapeHtml(c.name)}.</p>
 <div class="f"><label for="suSameSel">Client</label><div>${sheetPop('suSameSel', 'Client', list.map(x => [x.id, x.name]), '', "document.getElementById('suSameGo').disabled=!this.value", { placeholder: 'Choose a client' })}</div></div>
 <div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" id="suSameGo" disabled onclick="hvLinkClient('${c.id}', document.getElementById('suSameSel').value)">Link</button></div>`, 440);
 }
+// ---- Match Harvest Clients: every client waiting for setup in one sheet ---------------------------
+// Harvest's name for a client often isn't Radar's ("AWA Kitchen Cabinets" and "AWA Cabinets"), so
+// Radar added a copy. Each row says which Radar client it is (Radar's guess picked), a new client
+// (it stays under Needs setup) or not a Radar client (Trash). One Save does them all.
+let hvMatch = {}; // setup client id -> '' (new client) | '__skip' | Radar client id
+function hvMatchTargets(){ return activeClients().filter(x => !hvLinkOf(x)).sort((a, b) => a.name.localeCompare(b.name)); }
+async function openMatchClientsSheet(){
+  if(!canApprove()) return;
+  if(!hvLinks) await hvLoadLinks();
+  const su = setupClients(), targets = hvMatchTargets();
+  if(!su.length){ showToast('info', 'Nothing to match', 'Every client from Harvest is set up.'); return; }
+  // Radar's guesses, each Radar client offered once (the best match keeps it)
+  const guess = {}, taken = new Set();
+  su.map(c => ({ c, g: clientSameAsGuesses(c) })).sort((a, b) => b.g.length - a.g.length)
+    .forEach(({ c, g }) => { const t = g.find(x => !taken.has(x.id)); if(t){ guess[c.id] = t.id; taken.add(t.id); } });
+  hvMatch = {}; su.forEach(c => { hvMatch[c.id] = guess[c.id] || ''; });
+  const rows = su.slice().sort((a, b) => (!!guess[b.id] - !!guess[a.id]) || a.name.localeCompare(b.name));
+  const opt = (v, t, cur) => `<option value="${escapeHtml(v)}"${v === cur ? ' selected' : ''}>${escapeHtml(t)}</option>`;
+  const row = c => {
+    const cur = hvMatch[c.id], g = guess[c.id];
+    const sel = `${opt('', 'New client', cur)}${opt('__skip', 'Not a Radar client', cur)}<optgroup label="Radar clients">${(g ? [targets.find(t => t.id === g)] : []).concat(targets.filter(t => t.id !== g)).map(t => opt(t.id, t.name, cur)).join('')}</optgroup>`;
+    const label = cur === '__skip' ? 'Not a Radar client' : cur ? (targets.find(t => t.id === cur) || {}).name : 'New client';
+    return `<div class="mt-r" data-id="${c.id}"><div class="mt-n"><b>${escapeHtml(c.name)}</b><span>${escapeHtml(c.service || 'No projects yet')}</span></div>
+<label class="pop pop-sel mt-p"><span class="pl">${escapeHtml(label)}</span>${icon('caret-up-down', { weight: 'bold' })}<select aria-label="${escapeHtml(c.name)} in Radar" onchange="syncPopSel(this);hvMatchSet('${c.id}', this.value)">${sel}</select></label></div>`;
+  };
+  openAppModal(`<h3>Match Harvest Clients</h3>
+<p class="t-2 mt-sub">Radar added these from Harvest because no client had the same name. Pick the Radar client each one is. Radar keeps that client, with Harvest’s projects and time, and removes the copy.</p>
+<div class="mt-h"><span>In Harvest</span><span>In Radar</span></div>
+<div class="mt-l">${rows.map(row).join('')}</div>
+<div class="sheet-a"><span class="t-2 mt-sum" id="mtSum"></span><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" id="mtSave" onclick="saveMatchClients()">Save</button></div>`, 620);
+  hvMatchRefresh();
+}
+function hvMatchSet(id, v){ hvMatch[id] = v; hvMatchRefresh(); }
+// What Save will do, and the same Radar client picked twice (not allowed)
+function hvMatchRefresh(){
+  const vals = Object.values(hvMatch), n = k => vals.filter(k).length;
+  const link = n(v => v && v !== '__skip'), skip = n(v => v === '__skip'), keep = n(v => !v);
+  const count = {}; vals.forEach(v => { if(v && v !== '__skip') count[v] = (count[v] || 0) + 1; });
+  let dup = 0;
+  document.querySelectorAll('.mt-r').forEach(r => {
+    const v = hvMatch[r.dataset.id], twice = !!(v && count[v] > 1);
+    r.classList.toggle('is-dup', twice); if(twice) dup++;
+    r.classList.toggle('is-set', !!v);
+  });
+  const sum = document.getElementById('mtSum'), save = document.getElementById('mtSave');
+  if(sum) sum.textContent = dup ? 'A Radar client is picked twice.' : [link ? `${link} to link` : '', skip ? `${skip} left out` : '', keep ? `${keep} new` : ''].filter(Boolean).join(' · ');
+  if(sum) sum.classList.toggle('t-red', !!dup);
+  if(save) save.disabled = !!dup || !(link + skip);
+}
+async function saveMatchClients(){
+  if(!canApprove()) return;
+  const links = [], skips = [];
+  Object.entries(hvMatch).forEach(([id, v]) => { if(v === '__skip') skips.push(id); else if(v) links.push({ clientId: id, targetId: v }); });
+  if(!links.length && !skips.length) return;
+  const names = Object.fromEntries(clients.map(c => [c.id, c.name]));
+  const btn = document.getElementById('mtSave'); setBtnLoading(btn, 'Saving…');
+  let linked = 0, left = 0; const failed = [];
+  for(let i = 0; i < links.length; i += 15){
+    const chunk = links.slice(i, i + 15);
+    try{ const r = await harvestApiCall('link-clients', { links: chunk }); (r.results || []).forEach(x => { if(x.ok) linked++; else failed.push(x); }); }
+    catch(e){ chunk.forEach(x => failed.push({ clientId: x.clientId, error: e.message })); }
+  }
+  for(const id of skips){ const c = clients.find(x => x.id === id); if(c && (await leaveClientOut(c))) left++; else failed.push({ clientId: id, error: 'Couldn’t save it.' }); }
+  if(links.some(l => l.clientId === inspectedClientId)) inspectedClientId = null;
+  await loadAll(); await hvLoadLinks();
+  closeAppModal(); renderAll();
+  if(typeof logClientActivity === 'function' && linked) links.forEach(l => { if(!failed.some(f => f.clientId === l.clientId)) logClientActivity(l.targetId, 'client_setup', `${myName() || 'Someone'} linked it to Harvest’s ${names[l.clientId] || 'client'}.`); });
+  const done = [linked ? `${linked} linked` : '', left ? `${left} left out` : ''].filter(Boolean).join(' · ');
+  if(failed.length){
+    const c = clients.find(x => x.id === failed[0].clientId);
+    showToast('error', `${failed.length} couldn’t be saved`, `${c ? c.name + ': ' : ''}${failed[0].error || 'Try again.'}${done ? ' The rest: ' + done + '.' : ''}`);
+  } else showToast('success', done.charAt(0).toUpperCase() + done.slice(1), linked ? 'Linked clients have Harvest’s projects and time now.' : 'Harvest won’t add them again.');
+}
+
 function clientSetupMore(e, clientId){
   e.stopPropagation();
   const had = document.getElementById('clMenu'); had?.remove(); if(had) return;

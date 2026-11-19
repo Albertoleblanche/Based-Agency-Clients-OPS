@@ -11,7 +11,7 @@
 // GET  /api/integrations?provider=harvest  → Harvest status check
 // POST /api/integrations  body: { provider: 'google', action: 'sync' | 'disconnect' }
 // POST /api/integrations  body: { provider: 'harvest', action: 'connect' | 'disconnect'
-//        | 'sync-entry' | 'delete-entry' | 'sync-now' | 'sync-setup' | 'link-client' }
+//        | 'sync-entry' | 'delete-entry' | 'sync-now' | 'sync-setup' | 'link-client' | 'link-clients' }
 //   (the old client→project and service→task mapping lists are gone, step 5: time is logged by
 //   project and task; old entries without one still go through the mappings already saved)
 //   sync-setup: reads Harvest's clients, projects, tasks, assignments and people into Radar.
@@ -20,6 +20,8 @@
 //   list in step with Harvest's (step 2): see syncHarvestClients in lib/harvest-sync.js.
 //   link-client (admins and approvers): { clientId, targetId } — a client added from Harvest is
 //   one Radar already has; the link and anything logged on it move to that client.
+//   link-clients (admins and approvers): { links: [{ clientId, targetId }] } — the same for several
+//   at once (Match Harvest Clients); one result each.
 // POST /api/integrations  body: { provider: 'push', action: 'send',
 //        targetUserId, title, body, url }
 //
@@ -217,6 +219,23 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    // Match Harvest Clients: link several at once (the app sends up to 15 per request)
+    if (action === 'link-clients') {
+      if (!isApprover) { res.status(403).json({ error: 'Only admins and approvers link clients.' }); return; }
+      const links = Array.isArray((req.body || {}).links) ? req.body.links.slice(0, 30) : [];
+      if (!links.length) { res.status(400).json({ error: 'Pick the clients to link.' }); return; }
+      const results = [];
+      for (const l of links) {
+        const clientId = l && l.clientId ? String(l.clientId) : '', targetId = l && l.targetId ? String(l.targetId) : '';
+        if (!clientId || !targetId || clientId === targetId) { results.push({ clientId, error: 'Pick the client it’s the same as.' }); continue; }
+        try {
+          const r = await linkHarvestClient(admin, clientId, targetId);
+          results.push(r.error ? { clientId, targetId, error: r.error } : { clientId, targetId, ok: true });
+        } catch (e) { results.push({ clientId, targetId, error: e.message }); }
+      }
+      res.status(200).json({ results });
+      return;
+    }
     if (action === 'link-client') {
       if (!isApprover) { res.status(403).json({ error: 'Only admins and approvers link clients.' }); return; }
       const { clientId, targetId } = req.body || {};

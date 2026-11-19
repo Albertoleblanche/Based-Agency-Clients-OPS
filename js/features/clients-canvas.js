@@ -87,7 +87,9 @@ function renderClientsTable(){
   };
   const sNeeds = shown.filter(r => r.h.level !== 'g'), sOk = shown.filter(r => r.h.level === 'g');
   const group = (title, list) => list.length ? `<div class="cl-g" role="presentation"><b>${title}</b><span>${list.length}</span></div>${list.map(row).join('')}` : '';
-  const suGroup = suShown.length ? `<div class="cl-g" role="presentation"><b>Needs setup</b><span>${suShown.length}</span></div>${suShown.map(clientSetupRowHtml).join('')}` : '';
+  // approvers match them all to Radar's clients in one sheet (client-setup.js)
+  const suMatch = canApprove() && typeof openMatchClientsSheet === 'function' && ac.some(c => !hvLinkOf(c)) ? `<button class="x-lnk cl-g-act" onclick="openMatchClientsSheet()">Match to Radar Clients</button>` : '';
+  const suGroup = suShown.length ? `<div class="cl-g" role="presentation"><b>Needs setup</b><span>${suShown.length}</span>${suMatch}</div>${suShown.map(clientSetupRowHtml).join('')}` : '';
   const body = shown.length || suShown.length ? suGroup + group('Needs attention', sNeeds) + group('On track', sOk)
     : ac.length || su.length ? `<div class="cl-empty">No clients match.<a class="x-lnk" href="#" onclick="clearClientsCanvasFilters();return false;">Clear Filters</a></div>`
     : emptyNoClients('Every client lives here: who owns it, its health, this week’s update and hours this month.');
