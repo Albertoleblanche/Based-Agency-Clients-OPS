@@ -18,7 +18,7 @@ function setToolbar(title, sub){
 // The screen's own toolbar buttons, between the title and the timer (canvas: Group & Send on
 // This Week, Log Improvement on a client page, the Time tabs on Time).
 const VIEW_TOOLBAR_ACTIONS = {
-  approve: () => `<button class="btn" onclick="openGroupAndSendModal()">${icon('layers')}Group &amp; Send</button>`,
+  approve: () => (typeof weekSegHtml === 'function' ? weekSegHtml() : '') + `<button class="btn" onclick="openGroupAndSendModal()">${icon('layers')}Group &amp; Send</button>`,
   clientdetail: () => typeof waCanWork === 'function' && !waCanWork(clients.find(x => x.id === currentDetailClientId)) ? '' : `<button class="btn" onclick="openQueueLogImprovementModal(currentDetailClientId)">${icon('plus')}Log Improvement</button>`,
   time: () => (typeof timeToolbarTabsHtml === 'function' ? timeToolbarTabsHtml() : '') + `<button class="btn" onclick="openTimerModal()">${icon('timer')}Start Timer</button>`,
 };

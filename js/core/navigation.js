@@ -360,14 +360,24 @@ function closePanelOnLeave(view){
 async function switchView(name){
   if(name === 'claude' || name === 'focusreports') name = 'overview'; // the Assistant and the weekly report were removed; old links land on Today
   const leaving = currentViewName;
+  // Back to Today from the week (a click on Today in the sidebar): the other days fold into Today first.
+  const ev = window.event, wb = document.querySelector('#view-approve.active .wb');
+  if(leaving === 'approve' && name === 'overview' && ev && ev.type === 'click' && wb && wb.querySelector('.wd') && !switchView._folding
+     && !(typeof wkReducedMotion === 'function' && wkReducedMotion())){
+    switchView._folding = true; if(typeof wkSet === 'function') wkSet(toDateStr(rNow())); wb.classList.add('is-outro');
+    setTimeout(() => { switchView._folding = false; wb.classList.remove('is-outro'); switchView('overview'); }, 300);
+    return;
+  }
   closeMobileNav();
-  document.querySelectorAll('.nav-item').forEach(n=>{ const on = n.dataset.view===name; n.classList.toggle('active', on); n.classList.toggle('on', on); if(on) n.setAttribute('aria-current','page'); else n.removeAttribute('aria-current'); });
+  // This Week lives in the Today tab now (a Today / This Week switch in the toolbar), so Today stays lit on it.
+  const navName = name === 'approve' ? 'overview' : name;
+  document.querySelectorAll('.nav-item').forEach(n=>{ const on = n.dataset.view===navName; n.classList.toggle('active', on); n.classList.toggle('on', on); if(on) n.setAttribute('aria-current','page'); else n.removeAttribute('aria-current'); });
   if(typeof setToolbarActions === 'function') setToolbarActions(name);
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   const viewEl = document.getElementById('view-'+name);
   viewEl.classList.add('active');
   // The new screen fades in; it only moves too when nothing in it is pinned to the window.
-  if(typeof enterIn === 'function' && switchView._last !== name){ const pinned = viewEl.querySelector('.client-insp:not([hidden])'); pinned ? viewEl.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' }) : enterIn(viewEl, 'translateY(8px)'); }
+  if(typeof enterIn === 'function' && switchView._last !== name && !(name === 'approve' && window._wkIntro)){ const pinned = viewEl.querySelector('.client-insp:not([hidden])'); pinned ? viewEl.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' }) : enterIn(viewEl, 'translateY(8px)'); }
   switchView._last = name;
   syncAddressToView(name);
   if(leaving && leaving !== name) closePanelOnLeave(leaving);

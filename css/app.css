@@ -763,6 +763,18 @@ body.sidebar-collapsed .app-win .side { margin-left: -220px; }
 .ty .tx b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ty .tx span{font-size:12.5px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ty-hd{display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
+/* Today's header: Today (or Back to Today) over the day's name, › to the next day, Whole Week by the ring. */
+.ty-rel{display:block;font-size:13px;font-weight:600;color:var(--blue);margin-bottom:2px;text-decoration:none}
+.mac a.ty-rel,a.ty-rel.is-link{color:var(--blue);text-decoration:none}
+a.ty-rel:hover{opacity:.8}
+.ty-dayrow{display:flex;align-items:center;gap:4px}
+.ty-step-d{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;margin-top:4px;border:0;border-radius:10px;background:none;color:var(--label-2);cursor:pointer;transition:background-color 150ms ease,color 150ms ease,transform 160ms ease}
+.ty-step-d:first-of-type{margin-left:8px}
+.ty-step-d svg{width:20px;height:20px;stroke-width:2}
+.ty-step-d:hover{background:var(--fill);color:var(--label)}
+.ty-step-d:active{transform:scale(.94)}
+.ty-hr{display:flex;align-items:center;gap:22px}
+.wb-hl{flex:1 1 auto;display:flex;flex-direction:column;min-width:0}
 .ty-date{display:flex;flex-direction:column;line-height:1.05}
 .ty-dow{font-size:34px;font-weight:750;letter-spacing:-.035em}
 .ty-dm{font-size:15px;color:var(--label-2);margin-top:4px}
@@ -1486,15 +1498,7 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 
 /* ---- This Week, as on the canvas board "This Week — a long week" ---- */
 #weekRoot .sp-page{container-type:inline-size}
-/* Day columns stay equal. When they'd get narrower than 160 px, the days wrap into rows of equal
-   columns (Mon Tue Wed / Thu Fri) instead of squeezing. The page has 40 px padding each side. */
-.wb-cols{grid-template-columns:repeat(var(--per,var(--n,5)),minmax(0,1fr))}
-@container (max-width:927px){ .wb-cols.n5{--per:3} }
-@container (max-width:1099px){ .wb-cols.n6{--per:3} }
-@container (max-width:1271px){ .wb-cols.n7{--per:4} }
-@container (max-width:1443px){ .wb-cols.n8{--per:4} }
-@container (max-width:755px){ .wb-cols.n7, .wb-cols.n8{--per:3} }
-@container (max-width:583px){ .wb-cols.n5, .wb-cols.n6, .wb-cols.n7, .wb-cols.n8{--per:2} }
+
 
 /* ---- All Clients, as on the canvas board "All Clients — improved" ---- */
 #clientsRoot{overflow:hidden;display:flex;flex-direction:column}
@@ -2464,8 +2468,8 @@ a.mi{text-decoration:none;color:inherit}
 .ty-rest .x-lnk em{margin-left:4px}
 
 /* This Week, the board: the week in one line, who has the rest, then the days */
-.wb{padding:30px 40px 40px}
-.wb-top{display:flex;align-items:flex-start;gap:24px}
+.wb{padding:30px}
+.wb-top{display:flex;align-items:flex-start;gap:48px}
 .wb-sum{flex:1 1 auto;min-width:0}
 .wb-big{display:flex;align-items:baseline;gap:8px}
 .wb-big b{font-size:28px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
@@ -2473,8 +2477,9 @@ a.mi{text-decoration:none;color:inherit}
 .wb-big em{font-style:normal;font-size:15px;font-weight:600;color:var(--red);margin-left:6px}
 .wb-bar{display:flex;gap:2px;height:8px;margin-top:12px;border-radius:4px;overflow:hidden;background:var(--fill-2)}
 .wb-bar i{display:block;height:100%}
-.wb-key{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:13px;color:var(--label-2)}
-.wb-key span{display:inline-flex;align-items:center;gap:6px}
+.wb-key{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px;font-size:11.5px;color:var(--label-2)}
+.wb-key span{display:inline-flex;align-items:center;gap:4px}
+.wb-key .wb-dot{width:6px;height:6px}
 .wb-key b{color:var(--label);font-weight:600}
 .wb-dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex:0 0 auto;background:var(--label-3)}
 .wb-dot.green,.wb-bar i.green{background:var(--green)}
@@ -2482,44 +2487,114 @@ a.mi{text-decoration:none;color:inherit}
 .wb-dot.purple,.wb-bar i.purple{background:var(--purple)}
 .wb-dot.blue,.wb-bar i.blue{background:var(--blue)}
 .wb-dot.yellow,.wb-bar i.yellow{background:var(--yellow)}
+.wb-dot.red,.wb-bar i.red{background:var(--red)}
+.wb-key .is-late,.wb-key .is-late b{color:var(--red)}
 .wb-dot.gray{background:transparent;box-shadow:inset 0 0 0 1.5px var(--label-3)}
 .wb-bar i.gray{background:var(--fill-3)}
-.wb-sec{display:flex;align-items:baseline;gap:8px;margin:28px 0 10px}
-.wb-sec b{font-size:15px;font-weight:650}
-.wb-people{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:4px 28px}
-.wb-p{padding:8px 0;border-top:.5px solid var(--sep);min-width:0}
-.wb-ph{display:flex;align-items:baseline;gap:8px}
-.wb-ph b{font-size:14px;font-weight:600}
-.wb-ph > span{font-size:13px;color:var(--label-2)}
-.wb-ph em{font-style:normal;color:var(--red)}
-.wb-ph .x-lnk{margin-left:auto}
-.wb-ps{display:block;font-size:13px;color:var(--label-2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.wb-cols{display:grid;gap:12px;margin-top:28px;align-items:start}
-.wb-c{min-width:0;border-radius:10px;padding:0 0 6px;background:var(--fill)}
-.wb-ch{display:flex;flex-direction:column;gap:1px;padding:8px 8px 10px;border-bottom:.5px solid var(--sep);margin-bottom:6px}
-.wb-ch b{font-size:14px;font-weight:650}
-.wb-ch span{font-size:12.5px;color:var(--label-2);font-variant-numeric:tabular-nums}
-.wb-ch em{font-style:normal;color:var(--red)}
-.wb-c.is-late .wb-ch b{color:var(--red)}
-/* Where we are in the week: days gone by step back, today has a blue line on top and its name in blue. */
-.wb-c.is-past .wb-ch b{color:var(--label-2)}
-.wb-c.is-past .wb-ch span{color:var(--label-3)}
-.wb-c.is-today{box-shadow:inset 0 2.5px 0 var(--blue)}
-.wb-c.is-today .wb-ch b{color:var(--blue)}
-.wb-e{display:block;padding:7px 8px;border-radius:8px;cursor:pointer;min-width:0}
-.wb-e:hover{background:var(--fill-2)}
-.wb-e.is-sel{background:var(--accent-soft)}
-.wb-e b{display:block;font-size:14px;font-weight:550;overflow-wrap:anywhere}
-.wb-s{display:flex;align-items:flex-start;gap:6px;font-size:12.5px;line-height:16px;color:var(--label-2);margin-top:2px;overflow-wrap:anywhere}
-.wb-s .wb-dot{margin-top:4px}
-.wb-l{display:block;font-size:12.5px;color:var(--red);margin-top:1px}
-.wb-e.is-sent b{color:var(--label-2);font-weight:500}
-.wb-none{font-size:12.5px;color:var(--label-3);padding:6px 8px;margin:0}
-.wb-e.is-sent{display:flex;align-items:center;gap:8px;padding:5px 8px}
-.wb-e.is-sent b{font-size:13.5px}
-.wb-e.is-sent .wb-ck{display:inline-flex;color:var(--green);flex:0 0 auto}
-.wb-e.is-sent .wb-ck svg{width:13px;height:13px}
-.wb-top .seg{flex:0 0 auto}
+/* who has the rest, beside the count: one line per person; two show, the rest fold under Show more */
+.wb-who{flex:0 1 440px;min-width:0}
+.wb-who-h{margin:2px 0 6px;font-size:13px;font-weight:600;color:var(--label-2)}
+.wb-who-l{list-style:none;margin:0;padding:0}
+.wb-who-l li{display:flex;align-items:baseline;gap:8px;min-width:0;padding:4px 0;font-size:13px;line-height:18px}
+.wb-who-l li + li,.wb-who-l2 li:first-child{border-top:1px solid var(--sep)}
+.wb-who-l b{flex:0 0 auto;font-weight:600;color:var(--label)}
+.wb-who-l .c{flex:0 0 auto;min-width:12px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--label)}
+.wb-who-l .s{flex:1 1 auto;min-width:0;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wb-who-l em{font-style:normal;color:var(--red)}
+.wb-who-l .x-lnk{flex:0 0 auto;font-size:12.5px;color:var(--label-2)}
+.wb-who-l .x-lnk:hover{color:var(--label)}
+.wb-who-x{display:grid;grid-template-rows:0fr;transition:grid-template-rows 280ms cubic-bezier(.23,1,.32,1)}
+.wb-who-x.open{grid-template-rows:1fr}
+.wb-who-xi{min-height:0;overflow:hidden}
+.mac .wb-who-tg{margin-top:4px;padding:0;border:0;background:none;font:inherit;font-size:13px;font-weight:500;color:var(--blue);cursor:pointer}
+.mac .wb-who-tg:hover{opacity:.8}
+/* Whole Week: the days side by side; the open one is wide, the rest narrow (click or hover opens). */
+.wd{display:flex;align-items:stretch;margin:30px -30px 0;padding:0 30px;border-top:1px solid var(--sep);border-bottom:1px solid var(--sep)}
+/* the days fill the rest of the window; each day's rows scroll inside it */
+#weekRoot .sp-page{display:flex;flex-direction:column}
+#weekRoot .wb{flex:1 0 auto;display:flex;flex-direction:column}
+#weekRoot .wd{flex:1 1 0;min-height:420px}
+/* plain columns split by hairlines; the open one is wide */
+.wd-c{position:relative;display:flex;flex-direction:column;flex:1 1 0;min-width:0;min-height:0;padding:18px 18px 18px;cursor:pointer;container-type:inline-size;overflow:hidden;transition:flex-grow 420ms cubic-bezier(.23,1,.32,1),opacity 320ms ease,padding 420ms cubic-bezier(.23,1,.32,1)}
+.wd-h,.wd-strip{flex:0 0 auto}
+.wd-c + .wd-c{border-left:1px solid var(--sep)}
+.wd-c:first-child{padding-left:0}
+.wd-c:last-child{padding-right:0}
+.wd-c.on{flex-grow:4;cursor:default}
+.wd-c.is-today::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:0 0 2px 2px;background:var(--blue)}
+/* the day's header, like Today's: a small word over the day's name, then the date */
+.wd-rel{display:block;height:17px;margin-bottom:2px;font-size:13px;font-weight:600;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wd-c.is-today .wd-rel{color:var(--blue)}
+.wd-dow{display:block;font-size:clamp(19px,5.6cqi,25px);font-weight:750;letter-spacing:-.035em;line-height:1.08;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wd-c.is-past:not(.on) .wd-dow{color:var(--label-2)}
+.wd-dm{display:block;margin-top:4px;font-size:15px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wd-s{display:none}
+.wd-strip{margin:14px 0 10px;opacity:0;transition:opacity 180ms ease}
+/* only the open day shows its meetings line */
+.wd-c.on .wd-strip{opacity:1;transition:opacity 260ms ease 140ms}
+.wd-strip .ty-track{height:24px;border-radius:7px;background:var(--fill)}
+.wd-strip .ty-m{top:3px;bottom:3px;border-radius:4px}
+.wd-strip .ty-ml{line-height:24px;font-size:11.5px}
+.wd-strip .ty-none{padding-left:8px;font-size:11.5px}
+.wd-b .ty-i{margin:0 -6px;padding:8px 6px}
+.wd-b .ty-i + .ty-i::before{left:38px;right:6px}
+.wd-none{margin:6px 0 0;font-size:13px;color:var(--label-2)}
+.wd-done{display:flex;align-items:flex-start;gap:8px;margin:12px 0 0;font-size:12.5px;line-height:1.45;color:var(--label-2)}
+.wd-done > svg{width:13px;height:13px;color:var(--green);flex:0 0 auto;margin-top:2px}
+.wd-b .ty-wait{margin-top:8px;font-size:12.5px}
+/* a narrow (closed) day: names only, no buttons, no meeting titles */
+@container (max-width:280px){
+  .wd-b .ty-i{padding:5px 0;margin:0;cursor:pointer}
+  .wd-b .ty-i + .ty-i::before{left:0;right:0}
+  .wd-b .ty-cb,.wd-b .ty-cb-sp,.wd-b .ty-step,.wd-b .ty-when,.wd-b .tx span,.wd-b .ty-wait,.wd-strip .ty-ml,.wd-strip .ty-none,.wd-done{display:none}
+  .wd-b .tx b{display:block;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wd-dm{font-size:13px}
+  .wd-dm .wd-l{display:none}
+  .wd-dm .wd-s{display:inline}
+}
+/* very narrow: Wed, Nov 18 */
+@container (max-width:110px){ .wd-dow .wd-l{display:none} .wd-dow .wd-s{display:inline} .wd-c:not(.is-today) .wd-rel{visibility:hidden} }
+/* on a small window the open day takes more of the room */
+@container (max-width:1000px){ .wd-c.on{flex-grow:7} .wd-c{padding:16px 12px 16px} .wd-c:first-child{padding-left:0} .wd-c:last-child{padding-right:0} }
+.wd-b{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;margin:0 -6px;padding:0 6px 4px;overscroll-behavior:contain;opacity:1;visibility:visible;transition:opacity 240ms ease 160ms,visibility 0s linear 0s;
+  scrollbar-width:thin;scrollbar-color:transparent transparent}
+/* the scrollbar shows only while you point at the day's rows */
+.wd-b:hover{scrollbar-color:rgba(128,128,128,.45) transparent}
+.wd-b::-webkit-scrollbar{width:8px}
+.wd-b::-webkit-scrollbar-track{background:transparent}
+.wd-b::-webkit-scrollbar-thumb{background:transparent;border-radius:4px}
+.wd-b:hover::-webkit-scrollbar-thumb{background:rgba(128,128,128,.45)}
+/* an opened day's rows fade in one after another */
+@keyframes wdIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.wd-c.on .wd-b > *{animation:wdIn 360ms cubic-bezier(.23,1,.32,1) 180ms both}
+.wd-c.on .wd-b > :nth-child(2){animation-delay:215ms}
+.wd-c.on .wd-b > :nth-child(3){animation-delay:250ms}
+.wd-c.on .wd-b > :nth-child(4){animation-delay:285ms}
+.wd-c.on .wd-b > :nth-child(5){animation-delay:320ms}
+.wd-c.on .wd-b > :nth-child(6){animation-delay:355ms}
+.wd-c.on .wd-b > :nth-child(7){animation-delay:390ms}
+.wd-c.on .wd-b > :nth-child(8){animation-delay:425ms}
+.wd-c.on .wd-b > :nth-child(9){animation-delay:460ms}
+.wd-c.on .wd-b > :nth-child(n+10){animation-delay:495ms}
+/* a closed day says what's there before you open it: "2 updates", "1 task" */
+.wd-sum{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.wd-sk{display:flex;align-items:flex-start;flex-wrap:wrap;column-gap:5px;row-gap:1px;font-size:13px;line-height:17px;font-weight:500;color:var(--label)}
+.wd-sk svg{width:15px;height:15px;margin:1px 2px 0 0;color:var(--label-2);flex:0 0 auto}
+.wd-sk em{font-style:normal;color:var(--red)}
+.wd-sum-none{margin:14px 0 0;font-size:13px;color:var(--label-2)}
+.wd-c.on .wd-sum,.wd-c.on .wd-sum-none{display:none}
+.wd-c:not(.on) .wd-sum,.wd-c:not(.on) .wd-sum-none{animation:wdIn 300ms cubic-bezier(.23,1,.32,1) 120ms both}
+@container (max-width:110px){ .wd-sk .w,.wd-sk em{display:none} }
+/* Whole Week from Today: the other days grow in around Today, the header fades in last; back to Today folds them */
+.wb-top{transition:opacity 260ms ease 220ms}
+.wb.is-intro .wd-c{transition:none}
+.wb.is-intro .wd-c:not(.is-today),.wb.is-outro .wd-c:not(.is-today){flex-grow:0;opacity:0;padding-left:0;padding-right:0}
+.wb.is-intro .wd-c.is-today,.wb.is-outro .wd-c.is-today{flex-grow:40}
+.wb.is-intro .wb-top{opacity:0;transition:none}
+.wb.is-outro .wb-top{opacity:0;transition:opacity 150ms ease}
+/* a closed day stays blank under its name, date and meetings line */
+.wd-c:not(.on) .wd-b{opacity:0;visibility:hidden;transition:opacity 120ms ease,visibility 0s linear 120ms}
+@media (prefers-reduced-motion: reduce){ .wd-c,.wd-b,.wd-c:not(.on) .wd-b,.wd-strip,.wd-c.on .wd-strip,.wb-who-x,.wb-top{transition:none} .wd-c.on .wd-b > *,.wd-c:not(.on) .wd-sum,.wd-c:not(.on) .wd-sum-none{animation:none} }
 .ty-rest{gap:6px 4px}
 .ty-rk{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:0;border-radius:14px;background:transparent;color:var(--label);font:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:background-color .15s ease}
 .ty-rk svg{width:15px;height:15px;color:var(--label-2);flex:0 0 auto}

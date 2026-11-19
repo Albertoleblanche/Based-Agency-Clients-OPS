@@ -70,6 +70,11 @@ function todayRowAction(w){
   if(w.logged.length) return [`generateDraft('${c.id}',${jsArg(me)})`, 'Write Draft'];
   return [`openQueueLogImprovementModal('${c.id}')`, 'Log Improvement'];
 }
+// An approved WhatsApp win is sent by whoever copies it: its writer, unless someone else already did.
+function todayWaSender(w){
+  if(!(w.done >= 3 && w.draft && typeof winViaWhatsapp === 'function' && winViaWhatsapp(w.c))) return null;
+  const st = winSendState(w.draft); return st.k === 'copied' ? st.by : w.draft.author;
+}
 function todayNames(list){
   const names = list.map(c => shortClientName(c.name));
   return names.length <= 2 ? names.join(', ') : `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
@@ -108,7 +113,7 @@ function todayModel(){
     const mineW = waiting.filter(x => !x.d.readyToNotify); mineW.forEach(x => used.add(x.c.id));
     lead = { ic: 'send', tone: 'blue', title: `Send ${todayPlural(mineW.length, 'draft')} for review`, sub: joinNames(mineW.map(x => shortClientName(x.c.name))), go: `openWeekClient('${mineW[0].c.id}')`, label: 'Open Draft' };
   } else {
-    const w = behind.find(x => !x.holder || x.holder === me || x.holder === 'approvers' && approver);
+    const w = behind.find(x => todayWaSender(x) ? todayWaSender(x) === me || approver : !x.holder || x.holder === me || x.holder === 'approvers' && approver);
     if(w){ used.add(w.c.id); const [go, label] = todayRowAction(w);
       lead = { c: w.c, title: todayUpdateTitle(w), sub: `${w.late ? overdueShort(w) : 'Due today'} · ${w.note || ''}`, go, label }; }
   }
@@ -118,8 +123,9 @@ function todayModel(){
   behind.filter(w => !used.has(w.c.id)).forEach(w => {
     used.add(w.c.id);
     const holder = w.holder && w.holder !== 'approvers' ? w.holder : null;
-    if(holder && holder !== me){ others.push(w); return; }
-    if(w.holder === 'approvers' && !approver){ others.push(w); return; }
+    const wa = todayWaSender(w);
+    if(wa ? wa !== me && !approver : holder && holder !== me){ others.push(w); return; }
+    if(!wa && w.holder === 'approvers' && !approver){ others.push(w); return; }
     const [go, step] = todayRowAction(w);
     items.push({ src: 'update', age: w.late ? -w.daysLeft : 0, c: w.c, title: todayUpdateTitle(w), sub: `${escapeHtml(w.c.name)}${w.note ? ' · ' + escapeHtml(w.note) : ''}`, late: !!w.late, when: w.late ? overdueShort(w) : '', step, go });
   });
@@ -167,10 +173,178 @@ function todayModel(){
 
   return { me, approver, now, todayStr, list, ws, behind, waiting, myTasks, lead, items, next, rest, others, done };
 }
+// ---- The Today tab holds the whole week: › steps to the next day and shows what's due then;
+// Whole Week stretches it into the week board (This Week). ----
+function todayMonday(now){ now = now || rNow(); return dayStart(addDays(now, -((now.getDay() + 6) % 7))); }
+// The day Today shows: null for today, or another day of this week ('YYYY-MM-DD').
+function todaySelectedDay(){
+  const d = window._todayDay, now = rNow(), mon = todayMonday(now);
+  if(!d || d === toDateStr(now)) return null;
+  const t = new Date(d + 'T12:00:00');
+  return t >= mon && t < addDays(mon, 7) ? d : null;
+}
+function todayGoDay(ds){
+  window._todayDay = ds && ds !== toDateStr(rNow()) ? ds : null;
+  window._todayRest = null;
+  if(currentViewName !== 'overview') switchView('overview'); else renderToday();
+}
+// The days Today can step through: Monday to Friday of this week (and today, on a weekend).
+function todayWeekDays(now){
+  now = now || rNow(); const mon = todayMonday(now);
+  return [0, 1, 2, 3, 4].concat(now.getDay() === 6 ? [5] : now.getDay() === 0 ? [6] : []).map(k => toDateStr(addDays(mon, k)));
+}
+// ---- Whole Week: this week's days side by side. The open day is wide and the rest are narrow;
+// click or hover a day to open it. Each day has its name and date (a blue line on top of today),
+// its meetings strip (it widens with the day), and what's due that day with each one's button. ----
+function wkStripHtml(ds, isToday){
+  const now = rNow(), hour = d => d.getHours() + d.getMinutes() / 60, h0 = 8, h1 = 19, X = h => Math.max(0, Math.min(100, (h - h0) / (h1 - h0) * 100));
+  const evs = (typeof calendarEvents !== 'undefined' ? calendarEvents : []).filter(e => !e.allDay && e.startAt && toDateStr(new Date(e.startAt)) === ds).sort((a, b) => new Date(a.startAt) - new Date(b.startAt));
+  const blocks = evs.map((e, i) => {
+    const s = new Date(e.startAt), en = new Date(e.endAt || s.getTime() + 30 * 60000), past = en <= now;
+    const left = X(hour(s)), w = Math.max(1.5, X(hour(en)) - left), end = left + w, nx = evs[i + 1] ? X(hour(new Date(evs[i + 1].startAt))) : 100, room = nx - end;
+    return `<span class="ty-m${past ? ' past' : ''}" style="left:${left.toFixed(2)}%;width:${w.toFixed(2)}%" title="${escapeHtml(e.title)} · ${fmtTime(s)}" onclick="event.stopPropagation();openEventDetailModal('${e.id}')"></span>${room > 4 ? `<span class="ty-ml${past ? ' past' : ''}" style="left:calc(${end.toFixed(2)}% + 6px);max-width:calc(${room.toFixed(2)}% - 12px)">${escapeHtml(e.title)}</span>` : ''}`;
+  }).join('');
+  const nowM = isToday && hour(now) >= h0 && hour(now) <= h1 ? `<span class="ty-now" style="left:${X(hour(now)).toFixed(2)}%"></span>` : '';
+  return `<div class="wd-strip"><div class="ty-track">${blocks}${nowM}${evs.length ? '' : '<span class="ty-none">No meetings</span>'}</div></div>`;
+}
+// One day's rows: today's come from Today (so late ones are here too); other days from what's due then.
+function wkDay(ds){
+  const todayStr = toDateStr(rNow());
+  if(ds !== todayStr){
+    const dm = todayDayModel(ds);
+    return { items: dm.items, others: dm.others.map(e => ({ c: e.c, who: e.whoFull === 'approvers' ? 'an approver' : e.whoFull ? firstName(e.whoFull) : 'no owner yet' })), done: dm.done };
+  }
+  const m = todayModel(), mon = todayMonday(), today = dayStart(rNow());
+  // Today's lead can bundle drafts ("Review 3 drafts"); the week lists each client on its own row.
+  let lead = [];
+  if(m.lead && !m.lead.item){
+    if(m.lead.c) lead = [{ src: 'update', c: m.lead.c, title: m.lead.title, sub: m.lead.subHtml || escapeHtml(m.lead.sub || ''), go: m.lead.go, step: m.lead.label }];
+    else lead = todayWaitingDrafts().filter(x => canApprove() || !x.d.readyToNotify).map(x => {
+      const c = x.c, n = shortClientName(c.name), a = jsArg(x.d.author), me = myName(), sub = escapeHtml(c.name);
+      if(canApprove()) return { src: 'update', c, title: `Review ${n}’s draft`, sub, go: `openReviewDraft('${c.id}',${a})`, step: 'Open' };
+      if(!draftHasNoWork(c, x.d)) return { src: 'update', c, title: `Send ${n}’s draft for review`, sub, go: `sendDraftForReview('${c.id}',${a})`, step: 'Send for Review' };
+      const mineLogged = (clientWeek(c).logged || []).some(i => i.author === me && i.includeInEmail !== false);
+      return mineLogged ? { src: 'update', c, title: `Rewrite ${n}’s draft`, sub, go: `generateDraft('${c.id}',${jsArg(me)})`, step: 'Rewrite Draft' }
+        : { src: 'update', c, title: `Log this week’s work for ${n}`, sub, go: `openQueueLogImprovementModal('${c.id}')`, step: 'Log Improvement' };
+    });
+  }
+  // Who has each of the rest: the same as the board (a copied WhatsApp win is with whoever copied it).
+  const who = c => { const f = wbEntry(c, mon, today).whoFull; return f === 'approvers' ? 'an approver' : f ? firstName(f) : 'no owner yet'; };
+  return { items: lead.concat(m.items), others: m.others.map(w => ({ c: w.c, who: who(w.c) })), done: m.done };
+}
+// The icon for what a row asks you to do: review, send, write, log, plan, or open a note.
+function wkRowIcon(x){
+  if(x.src === 'health') return 'plan';
+  if(x.src === 'review') return 'clipboard-check';
+  if(x.src === 'note') return 'sticky-note';
+  if(x.src === 'wa') return 'messages-square';
+  const s = x.step || '';
+  if(/^Review /.test(x.title)) return 'scan-eye';
+  if(/Write|Rewrite/.test(s)) return 'pen-line';
+  if(s === 'Log Improvement') return 'circle-plus';
+  if(/^Remind/.test(s)) return 'bell';
+  return 'send';
+}
+function wkRow(x){
+  const step = x.step || (x.tick ? '' : 'Open');
+  return `<div class="ty-i" onclick="if(wkIsOpen(this)){${x.go}}">${x.tick
+      ? `<button class="ty-cb" role="checkbox" aria-checked="false" aria-label="${escapeHtml(x.tickLabel || 'Done')}: ${escapeHtml(x.title)}" onclick="event.stopPropagation();if(wkIsOpen(this)){${x.tick}}"></button>`
+      : `<span class="ty-ic" aria-hidden="true">${icon(wkRowIcon(x))}</span>`}<div class="tx"><b>${escapeHtml(x.title)}</b><span>${x.sub || ''}${x.flag ? ' · High priority' : ''}</span></div>${x.when ? `<span class="ty-when${x.late ? ' late' : ''}">${escapeHtml(x.when)}</span>` : ''}${step
+      ? `<button class="btn sm ty-step" onclick="event.stopPropagation();${x.go}">${escapeHtml(step)}</button>` : ''}</div>`;
+}
+// Whole Week from Today opens on today and plays the week growing in around it.
+function wkEnterWeek(){ window._weekOpen = toDateStr(rNow()); window._weekPinned = false; window._wkIntro = !wkReducedMotion(); switchView('approve'); renderThisWeek(); }
+function wkReducedMotion(){ try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(e){ return false; } }
+function wkIntroPlay(root){
+  const wb = root.querySelector('.wb.is-intro'); if(!wb) return;
+  if(!wb.querySelector('.wd')){ wb.classList.remove('is-intro'); return; }
+  wb.offsetWidth;   // lay out the start (Today full width) before letting it go
+  requestAnimationFrame(() => requestAnimationFrame(() => wb.classList.remove('is-intro')));
+}
+function wkIsOpen(el){ const c = el && el.closest('.wd-c'); return !c || c.classList.contains('on'); }
+function weekDaysHtml(){
+  const now = rNow(), todayStr = toDateStr(now), days = todayWeekDays(now);
+  if(!days.includes(window._weekOpen)) window._weekPinned = false;
+  const open = days.includes(window._weekOpen) ? window._weekOpen : days.includes(todayStr) ? todayStr : days[0];
+  return `<div class="wd" onmouseleave="wkHover(null)">${days.map(ds => {
+    const d = new Date(ds + 'T12:00:00'), isT = ds === todayStr, past = ds < todayStr, name = DAY_NAMES[d.getDay()];
+    const m = wkDay(ds), n = m.items.length, off = Math.round((d - new Date(todayStr + 'T12:00:00')) / 864e5);
+    const rel = off === 0 ? 'Today' : off === -1 ? 'Yesterday' : off === 1 ? 'Tomorrow' : '';
+    // Closed, a day says what's there in counts, like Today's "Also today": "2 updates", "3 tasks (1 late)".
+    const sumHtml = n ? `<ul class="wd-sum" aria-label="What’s due">${['update', 'task', 'wa', 'follow', 'review', 'health', 'note'].map(k => {
+      const xs = m.items.filter(x => (x.src || 'update') === k); if(!xs.length || !TODAY_SRC[k]) return '';
+      const [one, many, , ic] = TODAY_SRC[k], late = k === 'health' ? 0 : xs.filter(x => x.late).length;
+      return `<li class="wd-sk">${icon(ic)}<span class="n">${xs.length}</span><span class="w">${xs.length === 1 ? one : many}</span>${late ? `<em>(${late} late)</em>` : ''}</li>`;
+    }).join('')}</ul>` : '<p class="wd-sum-none">Nothing due</p>';
+    const what = past ? (n ? `${n} still open` : 'Done') : n ? `${n} to do` : 'Nothing to do';
+    // Grouped by who has them: "Harbor and Alder (an approver); Brightway (Ana)".
+    const byWho = new Map(); m.others.slice(0, 4).forEach(o => byWho.set(o.who, (byWho.get(o.who) || []).concat(shortClientName(o.c.name))));
+    const waitTxt = [...byWho].map(([who, names]) => `${joinNames(names)} (${who})`).join('; ') + (m.others.length > 4 ? `; ${m.others.length - 4} more` : '');
+    const wait = m.others.length ? `<div class="ty-wait">${icon('clock')}<span><b>With someone else:</b> ${escapeHtml(waitTxt)}</span></div>` : '';
+    const sentN = m.done.map(x => (x.title.match(/^Sent (.+)’s update$/) || [])[1]).filter(Boolean), otherD = m.done.filter(x => !/^Sent .+’s update$/.test(x.title)).map(x => x.title);
+    const doneTxt = [sentN.length ? `Sent ${joinNames(sentN.slice(0, 5).concat(sentN.length > 5 ? [`${sentN.length - 5} more`] : []))}` : '', otherD.length ? `Done: ${joinNames(otherD.slice(0, 3).concat(otherD.length > 3 ? [`${otherD.length - 3} more`] : []))}` : ''].filter(Boolean).join(' · ');
+    const done = m.done.length ? `<p class="wd-done">${icon('check', { weight: 'bold' })}<span>${escapeHtml(doneTxt)}</span></p>` : '';
+    return `<section class="wd-c${ds === open ? ' on' : ''}${isT ? ' is-today' : ''}${past ? ' is-past' : ''}" data-day="${ds}" aria-label="${name}" aria-expanded="${ds === open}" tabindex="0" onclick="wkOpen('${ds}')" onkeydown="if(event.key==='Enter')wkOpen('${ds}')" onmouseenter="wkHover('${ds}')">
+<header class="wd-h" title="${name}, ${fmtShortDate(d)} · ${what}"><span class="wd-rel">${rel || '&nbsp;'}</span><b class="wd-dow"><span class="wd-l">${name}</span><span class="wd-s">${name.slice(0, 3)}</span></b><span class="wd-dm"><span class="wd-l">${d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</span><span class="wd-s">${fmtShortDate(d)}</span></span></header>${sumHtml}${wkStripHtml(ds, isT)}
+<div class="wd-b">${n ? m.items.map(wkRow).join('') : `<p class="wd-none">${past ? 'Everything due that day is done.' : 'Nothing of yours is due.'}</p>`}${wait}${done}</div></section>`;
+  }).join('')}</div>`;
+}
+// Clicking a day opens it and keeps it open, even as the mouse crosses the other days. Until you click,
+// hovering a day opens it for a look, and leaving goes back.
+function wkSet(ds){ document.querySelectorAll('.wd-c').forEach(c => { const on = c.dataset.day === ds; c.classList.toggle('on', on); c.setAttribute('aria-expanded', on); }); }
+function wkOpen(ds){ clearTimeout(window._wkHoverT); window._weekOpen = ds; window._weekPinned = true; wkSet(ds); }
+function wkHover(ds){
+  clearTimeout(window._wkHoverT);
+  if(window._weekPinned) return;   // a day you clicked stays open: hovering the others doesn't move it
+  window._wkHoverT = setTimeout(() => {
+    const days = todayWeekDays(), todayStr = toDateStr(rNow());
+    wkSet(ds || (days.includes(window._weekOpen) ? window._weekOpen : days.includes(todayStr) ? todayStr : days[0]));
+  }, ds ? 160 : 260);
+}
+
+// What's due on another day of this week: wins due that day (yours, or waiting on approvers if you
+// are one), tasks due, follow-ups and notes to come back to. Past days also list what got done.
+function todayDayModel(ds){
+  const me = myName(), approver = canApprove(), now = rNow(), mon = todayMonday(now), wd = new Date(ds + 'T12:00:00').getDay();
+  const items = [], others = [], done = [];
+  // A later day skips what's already on Today (a draft to review now isn't also Thursday's), so each client shows once.
+  const onToday = ds > toDateStr(now) ? (t => new Set(t.items.concat(t.others).map(x => x.c && x.c.id).filter(Boolean)))(wkDay(toDateStr(now))) : new Set();
+  weekVisibleClients().forEach(c => {
+    const e = wbEntry(c, mon, dayStart(now));
+    if(e.col !== wd || (e.step !== 'sent' && onToday.has(c.id))) return;
+    if(e.step === 'sent'){ done.push({ t: new Date(e.w.last), title: `Sent ${shortClientName(c.name)}’s update`, sub: c.name }); return; }
+    const mine = e.whoFull === me || (approver && e.whoFull === 'approvers') || (!e.whoFull && myClientsFilter(c));
+    if(!mine){ others.push(e); return; }
+    const [go, step] = todayRowAction(e.w);
+    items.push({ src: 'update', c, title: todayUpdateTitle(e.w), sub: escapeHtml(c.name), step, go, at: '' });
+  });
+  (typeof tasks !== 'undefined' ? tasks : []).filter(t => t.assigneeId === currentUser?.id && !t.cancelledAt && t.dueDate === ds).forEach(t => {
+    const c = clients.find(x => x.id === t.clientId);
+    if(t.status === 'done'){ done.push({ t: new Date(t.completedAt || ds + 'T12:00:00'), title: t.title, sub: c ? c.name : 'Based Agency' }); return; }
+    items.push({ src: 'task', task: t, at: t.dueTime || '', title: t.title, sub: c ? escapeHtml(c.name) : 'Based Agency', when: t.dueTime ? fmtTime(new Date(ds + 'T' + t.dueTime)) : '',
+      flag: t.priority === 'high', go: `openTaskDetailModal('${t.id}')`, tick: `moveTaskToStatus('${t.id}','done')` });
+  });
+  (typeof clientReminders !== 'undefined' ? clientReminders : []).filter(r => r.status === 'waiting' && r.askedBy === currentUser?.id && r.followUpDate === ds).forEach(r => {
+    const c = clients.find(x => x.id === r.clientId);
+    items.push({ src: 'follow', c, title: `Ask ${c ? shortClientName(c.name) : 'the client'} again: “${r.question}”`, sub: 'If they haven’t answered by then', go: `openReminderDetailModal('${r.id}')`, tick: `todayFollowAnswered('${r.id}')`, tickLabel: 'They answered' });
+  });
+  (typeof notes !== 'undefined' ? notes : []).filter(n => n.followUpDate === ds && n.status !== 'done').forEach(n => {
+    const c = clients.find(x => x.id === n.clientId);
+    items.push({ src: 'note', c, title: `Come back to your note: ${n.title || 'Untitled'}`, sub: c ? escapeHtml(c.name) : 'Your note', go: `openNoteSheet('${n.id}')` });
+  });
+  items.sort((a, b) => (!!b.flag - !!a.flag) || (a.at || '~').localeCompare(b.at || '~'));
+  done.sort((a, b) => b.t - a.t);
+  return { items, others, done };
+}
+
 function renderToday(){
   const root = document.getElementById('todayRoot');
   if(!root || typeof clients === 'undefined') return;
   const { me, approver, now, todayStr, list, ws, waiting, lead, items, next, rest, others, done } = todayModel();
+  const selDay = todaySelectedDay(), dayStr = selDay || todayStr, dayDate = new Date(dayStr + 'T12:00:00'), dayName = DAY_NAMES[dayDate.getDay()];
+  // › steps to the next day of this week; ‹ comes back once you've stepped ahead.
+  const wdays = todayWeekDays(now), wi = wdays.indexOf(dayStr);
+  const nextDay = wi >= 0 && wi < wdays.length - 1 ? wdays[wi + 1] : null, prevDay = selDay && wi > 0 && dayStr > todayStr ? wdays[wi - 1] : null;
   // ---- header: the date and the done ring ----
   const open = (lead ? 1 : 0) + items.length, total = open + done.length;
   const C = 2 * Math.PI * 22, frac = total ? done.length / total : 0;
@@ -178,7 +352,7 @@ function renderToday(){
 <div><b>${done.length} of ${total} done</b><span>${open ? `${open} left today${lead ? ' · the first one is waiting on you' : ''}` : 'Nothing left for today'}</span></div></div>` : '';
 
   // ---- today's meetings: the strip, and the schedule on the side ----
-  const evs = (typeof calendarEvents !== 'undefined' ? calendarEvents : []).filter(e => !e.allDay && e.startAt && toDateStr(new Date(e.startAt)) === todayStr)
+  const evs = (typeof calendarEvents !== 'undefined' ? calendarEvents : []).filter(e => !e.allDay && e.startAt && toDateStr(new Date(e.startAt)) === dayStr)
     .sort((a, b) => new Date(a.startAt) - new Date(b.startAt));
   const hourOf = d => d.getHours() + d.getMinutes() / 60;
   let h0 = 8, h1 = 19;
@@ -195,11 +369,11 @@ function renderToday(){
   }).join('');
   const ticks = [];
   for(let h = h0; h <= h1; h += 2) ticks.push(`<span class="ty-tk" style="left:${X(h)}%">${(h + 11) % 12 + 1}</span>`);
-  const strip = `<div class="ty-day"><div class="ty-track">${blocks}${nowH >= h0 && nowH <= h1 ? `<span class="ty-now" style="left:${X(nowH)}%"></span>` : ''}${evs.length ? '' : '<span class="ty-none">No meetings today</span>'}</div><div class="ty-ticks">${ticks.join('')}</div></div>`;
-  let nowShown = false;
+  const strip = `<div class="ty-day"><div class="ty-track">${blocks}${!selDay && nowH >= h0 && nowH <= h1 ? `<span class="ty-now" style="left:${X(nowH)}%"></span>` : ''}${evs.length ? '' : `<span class="ty-none">No meetings ${selDay ? dayName : 'today'}</span>`}</div><div class="ty-ticks">${ticks.join('')}</div></div>`;
+  let nowShown = !!selDay;
   const nowLine = `<div class="ty-nowl"><span>${fmtTime(now)}</span><i></i></div>`;
-  const nextEv = evs.find(e => new Date(e.startAt) > now);
-  const allDay = (typeof calendarEvents !== 'undefined' ? calendarEvents : []).filter(e => e.allDay && !e.relatedTaskId && e.startAt && toDateStr(new Date(e.startAt)) === todayStr);
+  const nextEv = selDay ? null : evs.find(e => new Date(e.startAt) > now);
+  const allDay = (typeof calendarEvents !== 'undefined' ? calendarEvents : []).filter(e => e.allDay && !e.relatedTaskId && e.startAt && toDateStr(new Date(e.startAt)) === dayStr);
   const evTaskDone = e => !!e.relatedTaskId && (typeof tasks !== 'undefined' ? tasks : []).some(t => String(t.id) === String(e.relatedTaskId) && t.status === 'done');
   const allDayRows = allDay.map(e => `<div class="ty-ev" onclick="openEventDetailModal('${e.id}')"><span class="tm">All day</span><div class="tx"><b>${escapeHtml(e.title)}</b><span>${escapeHtml((e.description || '').split('\n')[0] || (CALENDAR_TYPE_META[e.eventType] || CALENDAR_TYPE_META.other).label)}</span></div></div>`).join('');
   const sched = allDayRows + evs.map(e => {
@@ -253,23 +427,37 @@ function renderToday(){
     const [one, many, , ic] = TODAY_SRC[k], late = xs.filter(x => x.late && x.src !== 'health').length;
     return `<button class="ty-rk${restOpen === k ? ' on' : ''}" aria-expanded="${restOpen === k}" data-grow="today-rest" onclick="todayToggleRest('${k}')">${icon(ic)}${xs.length} ${xs.length === 1 ? one : many}${late ? `<em>(${late} late)</em>` : ''}</button>`;
   }).join('')}</div><div class="ty-rest-l" data-grow-key="today-rest">${restOpen ? rest.filter(x => x.src === restOpen).map(itemRow).join('') + `<a class="x-lnk ty-rest-go" href="#" onclick="${TODAY_SRC[restOpen][2]};return false;">Open ${TODAY_SRC[restOpen][4]}</a>` : ''}</div>` : '';
+  // Another day of this week: what's due that day, what's with someone else, and (for a day gone by) what got done.
+  let dayMain = '';
+  if(selDay){
+    const dm = todayDayModel(selDay), past = selDay < todayStr;
+    const ppl = [...new Set(dm.others.map(e => e.whoFull === 'approvers' ? 'an approver' : e.whoFull ? firstName(e.whoFull) : 'no owner yet'))];
+    const wait = dm.others.length ? `<div class="ty-wait">${icon('clock')}<span><b>With someone else:</b> ${escapeHtml(joinNames(dm.others.map(e => shortClientName(e.c.name)).slice(0, 4).concat(dm.others.length > 4 ? [`${dm.others.length - 4} more`] : [])))} (${escapeHtml(joinNames(ppl))}).</span></div>` : '';
+    dayMain = `${dm.items.length ? `<div class="ty-sec"><b>${past ? `Still open from ${dayName}` : `Due ${dayName}`}</b><span>${dm.items.length}</span></div>${dm.items.map(itemRow).join('')}`
+      : `<div class="ty-clear">${icon('check-circle')}<div><b>${past ? `Nothing left from ${dayName}` : `Nothing due ${dayName}`}</b><span>${past ? 'Everything due that day is done.' : 'Nothing of yours is due that day yet.'}</span></div></div>`}
+${wait}
+${dm.done.length ? `<div class="ty-sec"><b>Done ${dayName}</b><span>${dm.done.length}</span></div>${dm.done.slice(0, 5).map(x => `<div class="ty-i is-done"><span class="ty-cb on">${icon('check', { weight: 'bold' })}</span><div class="tx"><b>${escapeHtml(x.title)}</b><span>${escapeHtml(x.sub)}</span></div></div>`).join('')}` : ''}`;
+  }
   root.innerHTML = `<div class="ty">
-<header class="ty-hd"><div class="ty-date"><span class="ty-dow">${now.toLocaleDateString('en-US', { weekday: 'long' })}</span><span class="ty-dm">${now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</span></div>${ring}</header>
+<header class="ty-hd"><div class="ty-date">${selDay ? `<a class="ty-rel is-link" href="#overview" onclick="todayGoDay(null);return false;">Back to Today</a>` : '<span class="ty-rel">Today</span>'}
+<div class="ty-dayrow"><span class="ty-dow">${dayName}</span>${prevDay ? `<button class="ty-step-d" aria-label="${DAY_NAMES[new Date(prevDay + 'T12:00:00').getDay()]}" title="${DAY_NAMES[new Date(prevDay + 'T12:00:00').getDay()]}" onclick="todayGoDay('${prevDay}')">${icon('chevron-left')}</button>` : ''}${nextDay ? `<button class="ty-step-d" aria-label="${DAY_NAMES[new Date(nextDay + 'T12:00:00').getDay()]}" title="${DAY_NAMES[new Date(nextDay + 'T12:00:00').getDay()]}" onclick="todayGoDay('${nextDay}')">${icon('chevron-right')}</button>` : ''}</div>
+<span class="ty-dm">${dayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</span></div>
+<div class="ty-hr"><button class="btn" onclick="wkEnterWeek()">${icon('calendar-days')}Whole Week</button>${selDay ? '' : ring}</div></header>
 ${strip}
-<div class="ty-cols"><section class="ty-main">${leadHtml}
+<div class="ty-cols"><section class="ty-main">${selDay ? dayMain : `${leadHtml}
 ${next.length ? `<div class="ty-sec"><b>Next</b></div>${next.map(itemRow).join('')}` : ''}${restLine}
 ${waitLine}
-${done.length ? `<div class="ty-sec"><b>Done today</b><span>${done.length}</span></div>${done.slice(0, 3).map(doneRow).join('')}` : ''}
+${done.length ? `<div class="ty-sec"><b>Done today</b><span>${done.length}</span></div>${done.slice(0, 3).map(doneRow).join('')}` : ''}`}
 </section>
 <aside class="ty-side">
-<div class="ty-sec"><b>Schedule</b><a class="x-lnk" href="#calendar" onclick="switchView('calendar');return false;">Calendar</a></div>${sched || '<p class="ty-empty">No meetings today.</p>'}
+<div class="ty-sec"><b>Schedule</b><a class="x-lnk" href="#calendar" onclick="switchView('calendar');return false;">Calendar</a></div>${sched || `<p class="ty-empty">No meetings ${selDay ? dayName : 'today'}.</p>`}
 <div class="ty-sec"><b>Your week</b></div>
 <div class="ty-st"><span>Updates you sent</span><b>${sentByMe}</b></div>
 <div class="ty-st"><span>Improvements you logged</span><b>${impsByMe}</b></div>
 <div class="ty-st"><span>Hours logged</span><b>${hmText(weekMin)} <small>of ${target}</small></b></div><div class="ty-bar"><i style="width:${Math.min(100, weekMin / 60 / target * 100).toFixed(1)}%"></i></div>
 ${owned.length ? `<div class="ty-st"><span>Your clients on time</span><b>${onTime} of ${owned.length}</b></div>` : ''}
 </aside></div></div>`;
-  if(currentViewName === 'overview') setToolbar('Today', 'What you need to do today');
+  if(currentViewName === 'overview') setToolbar('Today', selDay ? `What’s due ${dayName}` : 'What you need to do today');
 }
 // How many rows Today lists under Now; everything after is counted, not listed.
 const TODAY_NEXT = 3;
