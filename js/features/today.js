@@ -239,18 +239,20 @@ function renderToday(){
   const whenHtml = x => x.when ? `<span class="ty-when${x.late ? ' late' : ''}">${escapeHtml(x.when)}</span>` : '';
   const itemRow = x => `<div class="ty-i" onclick="${x.go}">${x.tick
       ? `<button class="ty-cb" role="checkbox" aria-checked="false" aria-label="${escapeHtml(x.tickLabel || 'Done')}: ${escapeHtml(x.title)}" onclick="event.stopPropagation();${x.tick}"></button>`
-      : '<span class="ty-cb-sp" aria-hidden="true"></span>'}<div class="tx"><b>${escapeHtml(x.title)}</b><span>${x.sub}</span></div>${x.flag ? `<span class="ty-flag" title="High priority">${icon('flag')}</span>` : ''}${whenHtml(x)}${x.step ? `<button class="btn sm ty-step" onclick="event.stopPropagation();${x.go}">${escapeHtml(x.step)}</button>` : ''}</div>`;
+      : '<span class="ty-cb-sp" aria-hidden="true"></span>'}<div class="tx"><b>${escapeHtml(x.title)}</b><span>${x.sub}${x.flag ? ' · High priority' : ''}</span></div>${whenHtml(x)}${x.step ? `<button class="btn sm ty-step" onclick="event.stopPropagation();${x.go}">${escapeHtml(x.step)}</button>` : ''}</div>`;
   const doneRow = x => `<div class="ty-i is-done"><span class="ty-cb on">${icon('check', { weight: 'bold' })}</span><div class="tx"><b>${escapeHtml(x.title)}</b><span>${escapeHtml(x.sub)} · ${fmtTime(x.t)}</span></div></div>`;
   const leadHtml = lead ? `<div class="ty-up"><span class="ty-lbl">Now</span><div class="ty-up-row">${lead.c ? monoHtml(lead.c, 'lg') : `<span class="ty-up-ic">${icon(lead.ic)}</span>`}
 <div class="tx"><b>${escapeHtml(lead.title)}</b><span>${lead.subHtml || escapeHtml(lead.sub)}</span></div><button class="btn btn-p ty-go" onclick="${lead.go}">${lead.ic && !lead.item ? icon(lead.ic) : ''}${escapeHtml(lead.label)}</button></div></div>`
     : !activeClients().length ? emptyNoClients('Today shows what needs you: updates due, tasks, follow-ups and meetings.', { title: 'Start with your first client', link: 'Add a Task', onLink: 'openNewTaskModal()', cls: 'ty-es' })
     : items.length ? '' : `<div class="ty-clear">${icon('check-circle')}<div><b>You’re all caught up</b><span>${escapeHtml(nextDueText(ws.filter(w => myClientsFilter(w.c))) || 'Nothing is waiting on you right now.')}</span></div><a class="x-lnk" href="#" onclick="switchView('plan');return false;">Plan Ahead</a></div>`;
-  // the rest, as one line: "6 tasks (2 late) · 3 WhatsApp requests · 1 follow-up", each opening its tab
-  const restLine = rest.length ? `<div class="ty-rest"><span>Also today</span>${TODAY_SRC_ORDER.map(k => {
+  // The rest, as one line of counts with their tab's icon: "5 tasks (1 late) · 3 WhatsApp requests".
+  // A count opens its rows right here, each with its circle or step, so you act without leaving Today.
+  const restOpen = rest.some(x => x.src === window._todayRest) ? window._todayRest : null;
+  const restLine = rest.length ? `<div class="ty-sec"><b>Also today</b></div><div class="ty-rest">${TODAY_SRC_ORDER.map(k => {
     const xs = rest.filter(x => x.src === k); if(!xs.length) return '';
-    const [one, many, go] = TODAY_SRC[k], late = xs.filter(x => x.late && x.src !== 'health').length;
-    return `<a class="x-lnk" href="#" onclick="${go};return false;">${xs.length} ${xs.length === 1 ? one : many}${late ? `<em>(${late} late)</em>` : ''}</a>`;
-  }).filter(Boolean).join('<i aria-hidden="true">·</i>')}</div>` : '';
+    const [one, many, , ic] = TODAY_SRC[k], late = xs.filter(x => x.late && x.src !== 'health').length;
+    return `<button class="ty-rk${restOpen === k ? ' on' : ''}" aria-expanded="${restOpen === k}" data-grow="today-rest" onclick="todayToggleRest('${k}')">${icon(ic)}${xs.length} ${xs.length === 1 ? one : many}${late ? `<em>(${late} late)</em>` : ''}</button>`;
+  }).join('')}</div><div class="ty-rest-l" data-grow-key="today-rest">${restOpen ? rest.filter(x => x.src === restOpen).map(itemRow).join('') + `<a class="ty-rest-go" href="#" onclick="${TODAY_SRC[restOpen][2]};return false;">Open ${TODAY_SRC[restOpen][4]}</a>` : ''}</div>` : '';
   root.innerHTML = `<div class="ty">
 <header class="ty-hd"><div class="ty-date"><span class="ty-dow">${now.toLocaleDateString('en-US', { weekday: 'long' })}</span><span class="ty-dm">${now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</span></div>${ring}</header>
 ${strip}
@@ -272,9 +274,12 @@ ${owned.length ? `<div class="ty-st"><span>Your clients on time</span><b>${onTim
 // How many rows Today lists under Now; everything after is counted, not listed.
 const TODAY_NEXT = 3;
 // What the counts line calls each kind of row, and the tab it opens.
-const TODAY_SRC = { task: ['task', 'tasks', "switchView('tasks')"], wa: ['WhatsApp request', 'WhatsApp requests', "switchView('whatsapp')"],
-  follow: ['follow-up', 'follow-ups', "switchView('reminders')"], review: ['review', 'reviews', "switchView('tasks')"],
-  update: ['update', 'updates', "switchView('approve')"], health: ['client at risk', 'clients at risk', "switchView('health')"], note: ['note', 'notes', "switchView('notes')"] };
+const TODAY_SRC = { task: ['task', 'tasks', "switchView('tasks')", 'list-todo', 'Tasks'], wa: ['WhatsApp request', 'WhatsApp requests', "switchView('whatsapp')", 'messages-square', 'WhatsApp'],
+  follow: ['follow-up', 'follow-ups', "switchView('reminders')", 'bell-ring', 'Reminders'], review: ['review', 'reviews', "switchView('tasks')", 'tray', 'Tasks'],
+  update: ['update', 'updates', "switchView('approve')", 'send', 'This Week'], health: ['client at risk', 'clients at risk', "switchView('health')", 'activity', 'Health'],
+  note: ['note', 'notes', "switchView('notes')", 'sticky-note', 'Notes'] };
+// Open a count's rows under the line (or close them); one kind at a time.
+function todayToggleRest(k){ window._todayRest = window._todayRest === k ? null : k; renderToday(); }
 const TODAY_SRC_ORDER = ['task', 'wa', 'follow', 'review', 'update', 'health', 'note'];
 function todayDaysSince(ds, todayStr){ return ds ? Math.max(0, Math.round((new Date(todayStr + 'T12:00:00') - new Date(ds + 'T12:00:00')) / 864e5)) : 0; }
 // "Yesterday", or the date for anything older.

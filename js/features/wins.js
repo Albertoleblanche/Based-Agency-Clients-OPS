@@ -226,42 +226,6 @@ async function approveAndCopyWin(clientId, author){
   await copyWinForWhatsapp(clientId, author);
 }
 
-// ---- the week's wins at a glance (This Week's side) ---------------------------------------------------
-// got: clients whose win is out this week · tiers of those wins · per win day, how many are out
-function winsWeekStats(ws){
-  const out = { got: 0, total: ws.length, tiers: { 1: 0, 2: 0, 3: 0, 0: 0 }, days: {}, noDay: 0, today: rNow().getDay() };
-  for(let k = 1; k <= 5; k++) out.days[k] = { n: 0, t: 0, late: [] };
-  ws.forEach(w => {
-    const day = winDay(w.c);
-    if(w.sent){ out.got++; out.tiers[winTier(w.draft) || 0]++; }
-    if(day){ out.days[day].t++; if(w.sent) out.days[day].n++; else if(w.late) out.days[day].late.push(w.c); }
-    else out.noDay++;
-  });
-  return out;
-}
-function winsTierBarHtml(st){
-  const tot = Math.max(1, st.total), pct = n => (n / tot * 100).toFixed(1) + '%', toGo = st.total - st.got;
-  const parts = [[1, 'Tier 1'], [2, 'Tier 2'], [3, 'Tier 3'], [0, 'No tier']].filter(([k]) => st.tiers[k]);
-  return `<div class="twl-prog wn-prog" role="img" aria-label="${parts.map(([k, t]) => `${t}: ${st.tiers[k]}`).join(', ')}${parts.length ? ', ' : ''}still to go: ${toGo}">${parts.map(([k]) => `<i class="t${k}" style="width:${pct(st.tiers[k])}"></i>`).join('')}</div>
-<div class="twl-key wn-key">${parts.map(([k, t]) => `<span><i class="t${k}"></i>${t} ${st.tiers[k]}</span>`).join('')}<span><i></i>To go ${toGo}</span></div>`;
-}
-function winsDaysHtml(st, mine){
-  const today = st.today, rows = [1, 2, 3, 4, 5].map(k => {
-    const d = st.days[k], cls = [k === today ? 'is-today' : '', !d.t ? 'is-none' : ''].filter(Boolean).join(' ');
-    return `<div class="wn-d${cls ? ' ' + cls : ''}"><b>${WIN_DAY_NAMES[k].slice(0, 3)}</b><i><em style="width:${d.t ? Math.round(d.n / d.t * 100) : 0}%"></em></i><span>${d.t ? `${d.n} of ${d.t}` : '–'}</span></div>`;
-  }).join('');
-  // one line under it: what's late, then how today is going
-  const late = [1, 2, 3, 4, 5].flatMap(k => st.days[k].late.map(c => [c, k]));
-  const bits = [];
-  if(late.length === 1) bits.push(`${typeof shortClientName === 'function' ? shortClientName(late[0][0].name) : late[0][0].name}’s win was due ${WIN_DAY_NAMES[late[0][1]]}.`);
-  else if(late.length) bits.push(`${late.length} wins are late.`);
-  const td = st.days[today];
-  if(td && td.t) bits.push(td.n === td.t ? `Today’s ${td.t === 1 ? 'win is' : td.t + ' are'} out.` : `${td.n} of today’s ${td.t} ${td.n === 1 ? 'is' : 'are'} out.`);
-  if(st.noDay) bits.push(`${st.noDay} client${st.noDay === 1 ? ' has' : 's have'} no win day yet${canApprove() ? ': set it in All Clients' : ''}.`);
-  return `<div class="twl-ss"><b>${mine ? 'Your win days' : 'By day'}</b>${mine ? '' : '<span class="s">each client has a win day</span>'}</div>
-<div class="wn-days">${rows}</div>${bits.length ? `<p class="wn-dn">${escapeHtml(bits.join(' '))}</p>` : ''}`;
-}
-
 // ---- the client's status in a sentence (client panel) -------------------------------------------------
 // "Over budget, and updates keep slipping"
 function healthPhrase(h, c){
