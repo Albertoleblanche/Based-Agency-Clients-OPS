@@ -2518,7 +2518,7 @@ a.mi{text-decoration:none;color:inherit}
 .ty-rest .x-lnk em{margin-left:4px}
 
 /* This Week, the board: the week in one line, who has the rest, then the days */
-.wb{padding:30px 40px 40px;max-width:1400px}
+.wb{padding:30px 40px 40px}
 .wb-top{display:flex;align-items:flex-start;gap:24px}
 .wb-sum{flex:1 1 auto;min-width:0}
 .wb-big{display:flex;align-items:baseline;gap:8px}
@@ -2540,7 +2540,7 @@ a.mi{text-decoration:none;color:inherit}
 .wb-bar i.gray{background:var(--fill-3)}
 .wb-sec{display:flex;align-items:baseline;gap:8px;margin:28px 0 10px}
 .wb-sec b{font-size:15px;font-weight:650}
-.wb-people{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 28px}
+.wb-people{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:4px 28px}
 .wb-p{padding:8px 0;border-top:.5px solid var(--sep);min-width:0}
 .wb-ph{display:flex;align-items:baseline;gap:8px}
 .wb-ph b{font-size:14px;font-weight:600}
@@ -2548,7 +2548,9 @@ a.mi{text-decoration:none;color:inherit}
 .wb-ph em{font-style:normal;color:var(--red)}
 .wb-ph .x-lnk{margin-left:auto}
 .wb-ps{display:block;font-size:13px;color:var(--label-2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.wb-cols{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:12px;margin-top:28px;align-items:start}
+.wb-cols{display:grid;gap:12px;margin-top:28px;align-items:start}
+.wb-es{column-width:190px;column-gap:8px}
+.wb-es .wb-e{break-inside:avoid}
 .wb-c{min-width:0;border-radius:10px;padding:0 0 6px}
 .wb-ch{display:flex;flex-direction:column;gap:1px;padding:8px 8px 10px;border-bottom:.5px solid var(--sep);margin-bottom:6px}
 .wb-ch b{font-size:14px;font-weight:650}
@@ -2576,8 +2578,8 @@ a.mi{text-decoration:none;color:inherit}
 .ty-rk.on{background:var(--fill-2)}
 .ty-rk em{font-style:normal;color:var(--red);margin-left:-2px}
 .ty-rest-l{margin-top:4px}
-.ty-rest-go{display:inline-block;margin:6px 0 0 32px;font-size:13px;color:var(--label-2);text-decoration:none}
-.ty-rest-go:hover{color:var(--label)}
+.ty-rest-l .x-lnk.ty-rest-go{margin:6px 0 0 32px;font-size:13.5px;color:var(--blue)}
+.ty-rest-l .x-lnk.ty-rest-go:hover{color:var(--blue);opacity:.8}
 .ty-rest{margin:0 0 0 -10px;padding-top:0;border-top:0;gap:4px 2px}
 .ty-rk{padding:0 8px;gap:5px}
 .ty-rest{margin-left:-8px}

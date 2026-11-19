@@ -252,7 +252,7 @@ function renderToday(){
     const xs = rest.filter(x => x.src === k); if(!xs.length) return '';
     const [one, many, , ic] = TODAY_SRC[k], late = xs.filter(x => x.late && x.src !== 'health').length;
     return `<button class="ty-rk${restOpen === k ? ' on' : ''}" aria-expanded="${restOpen === k}" data-grow="today-rest" onclick="todayToggleRest('${k}')">${icon(ic)}${xs.length} ${xs.length === 1 ? one : many}${late ? `<em>(${late} late)</em>` : ''}</button>`;
-  }).join('')}</div><div class="ty-rest-l" data-grow-key="today-rest">${restOpen ? rest.filter(x => x.src === restOpen).map(itemRow).join('') + `<a class="ty-rest-go" href="#" onclick="${TODAY_SRC[restOpen][2]};return false;">Open ${TODAY_SRC[restOpen][4]}</a>` : ''}</div>` : '';
+  }).join('')}</div><div class="ty-rest-l" data-grow-key="today-rest">${restOpen ? rest.filter(x => x.src === restOpen).map(itemRow).join('') + `<a class="x-lnk ty-rest-go" href="#" onclick="${TODAY_SRC[restOpen][2]};return false;">Open ${TODAY_SRC[restOpen][4]}</a>` : ''}</div>` : '';
   root.innerHTML = `<div class="ty">
 <header class="ty-hd"><div class="ty-date"><span class="ty-dow">${now.toLocaleDateString('en-US', { weekday: 'long' })}</span><span class="ty-dm">${now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</span></div>${ring}</header>
 ${strip}

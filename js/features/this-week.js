@@ -82,7 +82,13 @@ function wbEntry(c, monday, today){
     : wa ? (winSendState(w.draft).k === 'copied' ? winSendState(w.draft).by : w.draft.author)
     : step === 'draft' ? w.draft.author : (w.holder && w.holder !== 'approvers' ? w.holder : w.owner) || '';
   return { c, w, step, empty: step === 'draft' && draftHasNoWork(c, w.draft), at, lateDays: Math.max(0, lateDays), late: lateDays > 0, col: sentNow || at >= monday ? at.getDay() : 'late',
-    whoFull, who: whoFull === me ? 'You' : whoFull === 'approvers' ? 'An approver' : firstName(whoFull), mine: w0.owner === me || w.holder === me || whoFull === me };
+    whoFull, who: !whoFull ? 'No owner' : whoFull === me ? 'You' : whoFull === 'approvers' ? 'An approver' : firstName(whoFull), mine: w0.owner === me || w.holder === me || whoFull === me };
+}
+// "1 day late", "3 weeks late", "Months late"; "No update yet" for a client that never had one.
+function wbLateWords(e){
+  if(!e.w.last) return 'No update yet';
+  const d = e.lateDays;
+  return d === 1 ? '1 day late' : d < 14 ? `${d} days late` : d < 60 ? `${Math.floor(d / 7)} weeks late` : 'Months late';
 }
 function renderThisWeek(){
   const root = document.getElementById('weekRoot');
@@ -105,9 +111,10 @@ function renderThisWeek(){
   const byWho = {};
   base.filter(e => e.step !== 'sent').forEach(e => { (byWho[e.whoFull] = byWho[e.whoFull] || []).push(e); });
   const people = Object.entries(byWho).sort((a, b) => (b[0] === me) - (a[0] === me) || b[1].length - a[1].length).map(([full, es]) => {
-    const late = es.filter(e => e.late).length, name = full === me ? 'You' : full === 'approvers' ? 'Approvers' : full;
+    const late = es.filter(e => e.late).length, name = !full ? 'No owner yet' : full === me ? 'You' : full === 'approvers' ? 'Approvers' : full;
     const steps = WB_STEPS.filter(([k]) => es.some(e => e.step === k)).map(([k, t]) => `${es.filter(e => e.step === k).length} ${t.toLowerCase()}`).join(', ');
-    const remind = full !== me && full !== 'approvers' && profileByName(full) ? `<a class="x-lnk" href="#" onclick="remindHolders([${es.map(e => `'${e.c.id}'`).join(',')}]);return false;">Remind</a>` : '';
+    const remind = !full ? (canApprove() ? `<a class="x-lnk" href="#" onclick="switchView('clients');return false;">Set an Owner</a>` : '')
+      : full !== me && full !== 'approvers' && profileByName(full) ? `<a class="x-lnk" href="#" onclick="remindHolders([${es.map(e => `'${e.c.id}'`).join(',')}]);return false;">Remind</a>` : '';
     return `<div class="wb-p"><div class="wb-ph"><b>${escapeHtml(name)}</b><span>${es.length}${late ? ` · <em>${late} late</em>` : ''}</span>${remind}</div><span class="wb-ps">${escapeHtml(steps)}</span></div>`;
   }).join('');
 
@@ -118,7 +125,13 @@ function renderThisWeek(){
     const st = WB_STEP[e.step];
     if(e.step === 'sent') return `<div class="wb-e is-sent${selE && selE.c.id === e.c.id ? ' is-sel' : ''}" role="button" tabindex="0" title="Sent ${escapeHtml(fmtShortDate(new Date(e.w.last)))}" onclick="selectWeekClient('${e.c.id}')" onkeydown="if(event.key==='Enter')selectWeekClient('${e.c.id}')"><span class="wb-ck">${icon('check', { weight: 'bold' })}</span><b>${escapeHtml(shortClientName(e.c.name))}</b></div>`;
     return `<div class="wb-e${e.step === 'sent' ? ' is-sent' : ''}${selE && selE.c.id === e.c.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectWeekClient('${e.c.id}')" onkeydown="if(event.key==='Enter')selectWeekClient('${e.c.id}')">
-<b>${escapeHtml(shortClientName(e.c.name))}</b><span class="wb-s"><i class="wb-dot ${st.tone}"></i>${e.empty ? 'Draft’s work was deleted' : st.word}${e.who ? ` · ${escapeHtml(e.who)}` : ''}</span>${e.late ? `<span class="wb-l">${e.lateDays === 1 ? '1 day late' : `${e.lateDays} days late`}</span>` : ''}</div>`;
+<b>${escapeHtml(shortClientName(e.c.name))}</b><span class="wb-s"><i class="wb-dot ${st.tone}"></i>${e.empty ? 'Draft’s work was deleted' : st.word}${e.who ? ` · ${escapeHtml(e.who)}` : ''}</span>${e.late ? `<span class="wb-l">${wbLateWords(e)}</span>` : ''}</div>`;
+  };
+  // A day with nothing due stays narrow; a busy day gets the room, and its clients flow into
+  // side-by-side columns there instead of one long list.
+  const wbColWidth = k => {
+    const es = base.filter(e => e.col === k), n = es.filter(e => e.step !== 'sent').length + es.filter(e => e.step === 'sent').length * .4;   // sent ones are one short line
+    return es.length ? `minmax(180px,${Math.min(4, Math.max(1, Math.ceil(n / 5)))}fr)` : 'minmax(110px,.5fr)';
   };
   const order = (a, b) => (b.late - a.late) || (WB_STEP[a.step].i - WB_STEP[b.step].i) || a.c.name.localeCompare(b.c.name);
   const colHtml = k => {
@@ -128,7 +141,7 @@ function renderThisWeek(){
     const head = k === 'late' ? `<b>Overdue</b><span>from before this week</span>`
       : `<b>${isToday ? 'Today' : DAY_NAMES[k].slice(0, 3)}</b><span>${fmtShortDate(date)}${es.length ? ` · ${late ? `<em>${late} late</em>` : `${sent} of ${es.length} sent`}` : ''}</span>`;
     return `<section class="wb-c${isToday ? ' is-today' : ''}${k === 'late' ? ' is-late' : ''}${date && date < today && es.length && sent === es.length ? ' is-done' : ''}" aria-label="${k === 'late' ? 'Overdue' : DAY_NAMES[k]}">
-<header class="wb-ch">${head}</header>${es.length ? es.map(entry).join('') : '<p class="wb-none">No wins due</p>'}</section>`;
+<header class="wb-ch">${head}</header>${es.length ? `<div class="wb-es">${es.map(entry).join('')}</div>` : '<p class="wb-none">No wins due</p>'}</section>`;
   };
   const seg = everyone ? `<div class="seg" role="tablist" aria-label="Show">${[['all', 'Everyone', all.length], ['mine', 'Mine', all.filter(e => e.mine).length]]
     .map(([k, t, n]) => `<button class="${weekFilter === k ? 'on' : ''}" role="tab" aria-selected="${weekFilter === k}" onclick="setWeekFilter('${k}')">${t} <span class="c">${n}</span></button>`).join('')}</div>` : '';
@@ -138,7 +151,7 @@ function renderThisWeek(){
   root.innerHTML = `<div class="spw"><div class="sp-page"><div class="wb">
 <div class="wb-top">${summary}${seg}</div>
 ${people ? `<div class="wb-sec"><b>Who has the rest</b></div><div class="wb-people">${people}</div>` : ''}
-${empty || `<div class="wb-cols" style="--n:${cols.length}">${cols.map(colHtml).join('')}</div>`}
+${empty || `<div class="wb-cols" style="grid-template-columns:${cols.map(wbColWidth).join(' ')}">${cols.map(colHtml).join('')}</div>`}
 </div></div>${selE ? weekPanelHtml(selE.w) : ''}</div>`;
   if(currentViewName === 'approve') setToolbar('This Week', everyone ? 'Every client gets a win, on their day' : `Your ${base.length} client${base.length === 1 ? '' : 's'} · each gets a win on their day`);
 }
