@@ -313,8 +313,9 @@ function clientFormHtml(title, submitLabel, customValues, c){
   return `<h3>${escapeHtml(title === 'Add client' ? 'New Client' : title === 'Edit client' ? 'Edit Client' : title)}</h3>
 <div class="f">
 <label for="ncName">Name</label><div><input id="ncName" class="tf" placeholder="e.g. Premium Homes" oninput="checkDuplicateClientName()"><div id="ncNameWarning" class="t-red" style="display:none;font-size:13px;margin-top:5px"></div></div>
+<label class="top" for="ncContact">Main contact</label><div><input id="ncContact" class="tf" placeholder="e.g. Mike Johnson" autocomplete="off"><div class="t-2" style="font-size:13px;margin-top:5px">Wins and updates greet them by first name.</div></div>
 <label for="ncWebsite">Website</label><input id="ncWebsite" class="tf" placeholder="https://client.com">
-<label for="ncEmail">Email</label><div><input id="ncEmail" class="tf" placeholder="contact@client.com, billing@client.com"><div class="t-2" style="font-size:13px;margin-top:5px">Separate addresses with commas. Updates go to everyone listed.</div></div>
+<label class="top" for="ncEmail">Email</label><div><input id="ncEmail" class="tf" placeholder="contact@client.com, billing@client.com"><div class="t-2" style="font-size:13px;margin-top:5px">Separate addresses with commas. Updates go to everyone listed.</div></div>
 ${service}
 <label for="ncStatus">Status</label><div>${sheetPop('ncStatus', 'Status', opt(settings.statusOptions), (settings.statusOptions || [])[0] || '')}</div>
 <label for="ncImportance">Importance</label><div style="display:flex;gap:10px;align-items:center">${sheetPop('ncImportance', 'Importance', Array.from({ length: 10 }, (_, i) => [String(i + 1), `${i + 1} of 10`]), '5')}<span class="t-2" style="font-size:13px">How much this client matters to the agency</span></div>
@@ -349,6 +350,7 @@ function openEditClientForm(id){
   openAppModal(clientFormHtml('Edit client', 'Save changes', c.customFieldValues, c), 560);
   const g = k => document.getElementById(k);
   g('ncName').value = c.name; g('ncEmail').value = c.email || ''; g('ncWebsite').value = c.website || '';
+  g('ncContact').value = clientContact(c);
   g('ncBudget').value = c.monthlyHourBudget || ''; g('ncSow').value = c.sow || '';
   // monthly hours that come from Harvest's budget are changed there (step 4)
   const hvB = typeof hvClientBudget === 'function' ? hvClientBudget(id) : 0;

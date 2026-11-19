@@ -154,7 +154,7 @@ function reviewReadHtml(x, list){
     ? `${nav}<span class="rvn-editing">${icon('pencil-simple')}Editing ${mine ? 'your' : escapeHtml(firstName(d.author)) + '’s'} draft</span><span class="rvn-sp"></span><button class="btn" onclick="cancelReviewEdit()">Cancel</button><button class="btn btn-p" onclick="toggleReviewEdit(${A})">Save Changes</button>`
     : `${nav}<span class="rvn-sp"></span>${rework ? `<button class="btn rvn-q" onclick="toggleReviewEdit(${A})">${icon('pencil-simple')}Edit</button><button class="btn rvn-q" onclick="generateDraft(${A})">${icon('sparkle')}Rewrite</button>` : ''}${more}`;
   // The client, as the email's header.
-  const to = c.contactName || c.contact_name, ch = winChannel(c), wa = ch === 'whatsapp';
+  const to = clientContact(c), ch = winChannel(c), wa = ch === 'whatsapp';
   const drafted = tab === 'approved' && d.approvedBy ? ` · approved by ${d.approvedBy === myName() ? 'you' : escapeHtml(firstName(d.approvedBy))}${d.approvedAt ? ' at ' + escapeHtml(fmtTime(new Date(d.approvedAt))) : ''}`
     : d.draftPendingSince ? ` · ${fmtWait(d.draftPendingSince)} ago` : '';
   const toWords = wa ? 'To their WhatsApp group' : `To ${escapeHtml(to || c.email || 'no email on file')}${ch === 'both' ? ' and their WhatsApp group' : ''}`;

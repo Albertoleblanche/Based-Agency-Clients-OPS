@@ -23,6 +23,8 @@ let clientsDataLoaded = false;
 function clientInSetup(c){ return !!(c && c.customFieldValues && c.customFieldValues.harvestSetup === 'needed'); }
 function activeClients(){ return clients.filter(c=>!c.deletedAt && !clientInSetup(c)); }
 function liveClients(){ return clients.filter(c=>!c.deletedAt); }
+// The person at the client that updates and wins greet by name ("Mike", "Mike and Sarah").
+function clientContact(c){ return String((c && ((c.customFieldValues && c.customFieldValues.contact) || c.contactName || c.contact_name)) || '').trim(); }
 function setupClients(){ return clients.filter(c=>!c.deletedAt && clientInSetup(c)); }
 function isClientPaused(clientId){
   const c = clients.find(x=>x.id===clientId);

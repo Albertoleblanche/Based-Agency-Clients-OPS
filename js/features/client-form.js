@@ -307,6 +307,9 @@ async function saveClientForm(){
     const el = document.getElementById('ncCustom_'+f.id);
     if(el) customFieldValues[f.id] = el.value.trim();
   });
+  // the main contact: who wins and updates greet by name
+  const contactEl = document.getElementById('ncContact');
+  if(contactEl){ const v = contactEl.value.trim().replace(/\s+/g, ' ').slice(0, 80); if(v) customFieldValues.contact = v; else delete customFieldValues.contact; }
   const missingRequired = (settings.customFields||[]).find(f => f.required && !customFieldValues[f.id]);
   if(missingRequired){
     restoreBtn(btn);
@@ -340,6 +343,7 @@ async function saveClientForm(){
         .filter(key => key!=='customFieldValues' && String(before[key]||'') !== String(fields[key]||''))
         .map(key => `${fieldLabels[key]||key}: "${before[key]||'—'}" → "${fields[key]||'—'}"`);
       const beforeCustom = before.customFieldValues || {};
+      if((beforeCustom.contact || '') !== (customFieldValues.contact || '')) changes.push(`Main contact: "${beforeCustom.contact || '—'}" → "${customFieldValues.contact || '—'}"`);
       (settings.customFields||[]).forEach(f=>{
         const oldVal = beforeCustom[f.id] || '';
         const newVal = customFieldValues[f.id] || '';

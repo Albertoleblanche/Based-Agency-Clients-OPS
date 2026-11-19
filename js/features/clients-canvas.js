@@ -174,7 +174,7 @@ function clientPanelHtml({ c, h, w, owner }){
   const ownerCell = approver
     ? `<label class="cl-own"><select onchange="setClientOwner(${A}, this.value)" aria-label="Owner"><option value=""${how !== 'set' ? ' selected' : ''}>Automatic${how !== 'set' && owner ? ` (${escapeHtml(owner)})` : ''}</option>${people.map(n => `<option${how === 'set' && owner === n ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('')}</select><span>${escapeHtml(owner || 'Nobody yet')}</span>${icon('caret-down', { weight: 'bold' })}</label>`
     : escapeHtml(owner || 'Nobody yet');
-  const contact = [c.contactName || c.contact_name, c.email].filter(Boolean).map(escapeHtml).join(' · ');
+  const contact = [clientContact(c), c.email].filter(Boolean).map(escapeHtml).join(' · ');
   const site = c.website ? `<a class="cl-link" href="${safeUrl(c.website.startsWith('http') ? c.website : 'https://' + c.website)}" target="_blank" rel="noopener">${escapeHtml(c.website.replace(/^https?:\/\//, '').replace(/\/$/, ''))}</a>` : '';
   const kv = (k, v) => v ? `<div class="cl-kv"><span>${k}</span><span>${v}</span></div>` : '';
   const details = kv('Owner', ownerCell) + (why2 ? `<p class="cl-own-note">${escapeHtml(why2)}${approver ? ' Choose someone to make it fixed.' : ''}</p>` : '')
@@ -224,7 +224,23 @@ function clientWinHtml(c){
   const day = kv('Win day', approver ? `<button class="pop wn-pop" onclick="winDayMenu(event,${A})">${d ? WIN_DAY_NAMES[d] : '<span class="t-3">Pick a day</span>'}${icon('caret-down', { weight: 'bold' })}</button>`
     : d ? WIN_DAY_NAMES[d] : 'Every 7 days');
   const noEmail = ch !== 'whatsapp' && !c.email ? `<p class="wn-note is-red">${icon('warning')}No email on file. Add one with Edit Client to send by email.</p>` : '';
-  return `<div class="cl-kvs wn-kvs">${kv('Sends by', seg)}${group}${day}</div>${noEmail}${ch !== 'email' ? `<p class="wn-note">${icon('lock')}You paste it in the group. Radar never posts there.</p>` : ''}`;
+  const who = clientContact(c);
+  const contact = kv('Main contact', approver
+    ? `<input class="tf wn-in" value="${escapeHtml(who)}" placeholder="Who the win is for" aria-label="Main contact" onchange="setClientContact(${A}, this.value)" onkeydown="if(event.key==='Enter')this.blur()">`
+    : who ? escapeHtml(who) : '<span class="t-3">Not set</span>');
+  return `<div class="cl-kvs wn-kvs">${contact}${kv('Sends by', seg)}${group}${day}</div>${noEmail}${ch !== 'email' ? `<p class="wn-note">${icon('lock')}You paste it in the group. Radar never posts there.</p>` : ''}`;
+}
+// The main contact, from the panel: saves as it's typed in (on change).
+async function setClientContact(clientId, value){
+  const c = clients.find(x => x.id === clientId); if(!c || !canApprove()) return;
+  const v = String(value || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+  if(v === clientContact(c)) return;
+  const cfv = Object.assign({}, c.customFieldValues || {});
+  if(v) cfv.contact = v; else delete cfv.contact;
+  const prev = c.customFieldValues; c.customFieldValues = cfv;
+  if(!(await updateClientRow(c.id, { customFieldValues: cfv }))){ c.customFieldValues = prev; winsRerender(); showToast('error', 'Couldn’t save', 'Try again in a moment.'); return; }
+  showToast('success', v ? `Wins greet ${v.split(' ')[0]}` : 'Main contact cleared', v ? `Main contact for ${c.name}.` : 'Wins greet the team.');
+  if(typeof logClientActivity === 'function') logClientActivity(c.id, 'client_updated', `${myName() || 'Someone'} set the main contact to ${v || 'nobody'}.`);
 }
 // "…" in the panel: website, edit, delete.
 function clientPanelMore(e, clientId){
