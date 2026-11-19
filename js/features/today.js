@@ -120,48 +120,57 @@ function todayModel(){
     const holder = w.holder && w.holder !== 'approvers' ? w.holder : null;
     if(holder && holder !== me){ others.push(w); return; }
     if(w.holder === 'approvers' && !approver){ others.push(w); return; }
-    const [go] = todayRowAction(w);
-    items.push({ c: w.c, kind: TODAY_KIND.update, title: todayUpdateTitle(w), sub: `${escapeHtml(w.c.name)}${w.note ? ' · ' + escapeHtml(w.note) : ''}`, pill: w.late ? ['red', overdueShort(w)] : ['', 'Due today'], go });
+    const [go, step] = todayRowAction(w);
+    items.push({ src: 'update', age: w.late ? -w.daysLeft : 0, c: w.c, title: todayUpdateTitle(w), sub: `${escapeHtml(w.c.name)}${w.note ? ' · ' + escapeHtml(w.note) : ''}`, late: !!w.late, when: w.late ? overdueShort(w) : '', step, go });
   });
   list.filter(c => myClientsFilter(c) && !used.has(c.id) && clientHealth(c).level === 'r' && !nextStepTask(c)).forEach(c => {
     used.add(c.id);
-    items.push({ c, kind: TODAY_KIND.health, title: `Plan a next step for ${shortClientName(c.name)}`, sub: `${escapeHtml(c.name)} · ${escapeHtml(tableSignal(clientHealth(c), c) || 'no plan yet')}`, pill: ['red', 'At risk'], go: `planNextStep('${c.id}')` });
+    items.push({ src: 'health', c, title: `Plan a next step for ${shortClientName(c.name)}`, sub: `At risk · ${escapeHtml(tableSignal(clientHealth(c), c) || 'no plan yet')}`, late: true, step: 'Plan', go: `planNextStep('${c.id}')` });
   });
   myTasks.filter(t => t.status !== 'done' && t.dueDate && t.dueDate <= todayStr).sort((a, b) => a.dueDate.localeCompare(b.dueDate) || (a.dueTime || '').localeCompare(b.dueTime || '')).forEach(t => {
     const c = clients.find(x => x.id === t.clientId), late = t.dueDate < todayStr;
-    const when = late ? todayDayWord(t.dueDate, now) : (t.dueTime ? fmtTime(new Date(t.dueDate + 'T' + t.dueTime)) : 'Today');
-    items.push({ task: t, kind: TODAY_KIND.task, title: t.title, sub: c ? escapeHtml(c.name) : 'Based Agency', pill: [late ? 'red' : '', when], flag: t.priority === 'high', go: `openTaskDetailModal('${t.id}')` });
+    const from = t.assignerId && t.assignerId !== currentUser?.id ? (teamProfiles || []).find(p => p.id === t.assignerId) : null;
+    const when = late ? todayDueWord(t.dueDate, now) : (t.dueTime ? fmtTime(new Date(t.dueDate + 'T' + t.dueTime)) : '');
+    items.push({ src: 'task', age: late ? todayDaysSince(t.dueDate, todayStr) : 0, at: t.dueTime || '', task: t, title: t.title, sub: `${c ? escapeHtml(c.name) : 'Based Agency'}${from ? ' · from ' + escapeHtml(firstName(from.name)) : ''}`, late, when, flag: t.priority === 'high', go: `openTaskDetailModal('${t.id}')`, tick: `moveTaskToStatus('${t.id}','done')` });
   });
   // Everything else that's yours today, from the rest of the app: work you asked for that's back
   // for your review, WhatsApp requests waiting on you, follow-ups with clients, and notes to revisit.
   todayFromElsewhere(todayStr, now).forEach(x => items.push(x));
-  // what's late comes first, wherever it's from
-  items.sort((a, b) => (a.pill && a.pill[0] === 'red' ? 0 : 1) - (b.pill && b.pill[0] === 'red' ? 0 : 1));
+  // The app picks the order: late first, then high priority, then what has waited longest, then by time.
+  items.sort((a, b) => (!!b.late - !!a.late) || (!!b.flag - !!a.flag) || ((b.age || 0) - (a.age || 0)) || (a.at || '~').localeCompare(b.at || '~'));
+  // Today stays short: Now, the next three, and the rest as counts that open their tabs.
+  if(!lead && items.length){
+    const x = items[0];
+    lead = { item: x, c: x.c, ic: x.c ? null : 'list-todo', title: x.title, subHtml: `${x.when ? `<span class="t-red">${escapeHtml(x.when)}</span> · ` : ''}${x.sub}`,
+      go: x.src === 'task' ? x.tick : x.go, label: x.step || (x.src === 'task' ? 'Mark Done' : 'Open') };
+  }
+  const queue = lead && lead.item ? items.slice(1) : items.slice();
+  const next = queue.slice(0, TODAY_NEXT), rest = queue.slice(TODAY_NEXT);
 
   // ---- Done today ----
   const done = [];
-  list.forEach(c => (c.drafts || []).forEach(d => { if(d.draftSentAt && toDateStr(new Date(d.draftSentAt)) === todayStr && (d.draftSentBy === me || (!d.draftSentBy && d.author === me))) done.push({ t: new Date(d.draftSentAt), kind: TODAY_KIND.update, title: `Sent ${shortClientName(c.name)}’s update`, sub: c.name }); }));
+  list.forEach(c => (c.drafts || []).forEach(d => { if(d.draftSentAt && toDateStr(new Date(d.draftSentAt)) === todayStr && (d.draftSentBy === me || (!d.draftSentBy && d.author === me))) done.push({ t: new Date(d.draftSentAt), title: `Sent ${shortClientName(c.name)}’s update`, sub: c.name }); }));
   const logged = {};
   list.forEach(c => (c.improvements || []).forEach(i => { if(i.author === me && toDateStr(new Date(i.date)) === todayStr){ const k = c.id; logged[k] = logged[k] || { c, n: 0, t: new Date(i.date) }; logged[k].n++; if(new Date(i.date) > logged[k].t) logged[k].t = new Date(i.date); } }));
-  Object.values(logged).forEach(x => done.push({ t: x.t, kind: TODAY_KIND.update, title: `Logged ${todayPlural(x.n, 'improvement')}`, sub: x.c.name }));
+  Object.values(logged).forEach(x => done.push({ t: x.t, title: `Logged ${todayPlural(x.n, 'improvement')}`, sub: x.c.name }));
   myTasks.filter(t => t.status === 'done' && t.completedAt && toDateStr(new Date(t.completedAt)) === todayStr).forEach(t => {
-    const c = clients.find(x => x.id === t.clientId); done.push({ t: new Date(t.completedAt), kind: TODAY_KIND.task, title: t.title, sub: c ? c.name : 'Based Agency' });
+    const c = clients.find(x => x.id === t.clientId); done.push({ t: new Date(t.completedAt), title: t.title, sub: c ? c.name : 'Based Agency' });
   });
   // WhatsApp requests you answered today (one made into a task shows as the task)
   if(todayWaOn()) waTasks.filter(t => t.status === 'done' && t.owner_user_id === currentUser?.id && t.updated_at && toDateStr(new Date(t.updated_at)) === todayStr && !(waLinkedTask(t) && waLinkedTask(t).status === 'done'))
-    .forEach(t => done.push({ t: new Date(t.updated_at), kind: TODAY_KIND.wa, title: t.title, sub: waClientLabel(t) }));
+    .forEach(t => done.push({ t: new Date(t.updated_at), title: t.title, sub: `${waClientLabel(t)} asked on WhatsApp` }));
   // follow-ups the client answered today
   (typeof clientReminders !== 'undefined' ? clientReminders : []).filter(r => r.askedBy === currentUser?.id && r.status !== 'waiting' && r.resolvedAt && toDateStr(new Date(r.resolvedAt)) === todayStr).forEach(r => {
-    const c = clients.find(x => x.id === r.clientId); done.push({ t: new Date(r.resolvedAt), kind: TODAY_KIND.follow, title: r.question, sub: c ? `${c.name} answered` : 'Answered' });
+    const c = clients.find(x => x.id === r.clientId); done.push({ t: new Date(r.resolvedAt), title: `${c ? shortClientName(c.name) : 'The client'} answered “${r.question}”`, sub: c ? c.name : 'Answered' });
   });
   done.sort((a, b) => b.t - a.t);
 
-  return { me, approver, now, todayStr, list, ws, behind, waiting, myTasks, lead, items, others, done };
+  return { me, approver, now, todayStr, list, ws, behind, waiting, myTasks, lead, items, next, rest, others, done };
 }
 function renderToday(){
   const root = document.getElementById('todayRoot');
   if(!root || typeof clients === 'undefined') return;
-  const { me, approver, now, todayStr, list, ws, waiting, lead, items, others, done } = todayModel();
+  const { me, approver, now, todayStr, list, ws, waiting, lead, items, next, rest, others, done } = todayModel();
   // ---- header: the date and the done ring ----
   const open = (lead ? 1 : 0) + items.length, total = open + done.length;
   const C = 2 * Math.PI * 22, frac = total ? done.length / total : 0;
@@ -225,25 +234,30 @@ function renderToday(){
   }
 
   // ---- the page ----
-  const pill = p => p ? `<span class="ty-p${p[0] === 'red' ? ' red' : ''}">${escapeHtml(p[1])}</span>` : '';
-  // every row says what it is first, with its tab's icon: Task, WhatsApp, Follow-up, Note…
-  const kindHtml = (k, ic) => k ? `<span class="ty-kd">${ic ? icon(k[0]) : ''}${escapeHtml(k[1])}</span>` : '';
-  const itemRow = x => x.task || x.wa
-    ? `<div class="ty-i" onclick="${x.go}"><button class="ty-cb" role="checkbox" aria-checked="false" aria-label="Mark ${escapeHtml(x.title)} done" onclick="event.stopPropagation();${x.task ? `moveTaskToStatus('${x.task.id}','done')` : `waMarkDone(${jsArg(x.wa.id)})`}"></button><div class="tx"><b>${escapeHtml(x.title)}</b><span>${kindHtml(x.kind, true)}${x.sub}</span></div>${x.flag ? `<span class="ty-flag">${icon('flag')}</span>` : ''}${pill(x.pill)}</div>`
-    : `<div class="ty-i" onclick="${x.go}"><span class="ty-ic">${icon(x.kind ? x.kind[0] : 'circle')}</span><div class="tx"><b>${escapeHtml(x.title)}</b><span>${kindHtml(x.kind)}${x.sub}</span></div>${pill(x.pill)}</div>`;
-  const doneRow = x => `<div class="ty-i is-done"><span class="ty-cb on">${icon('check', { weight: 'bold' })}</span><div class="tx"><b>${escapeHtml(x.title)}</b><span>${kindHtml(x.kind, true)}${escapeHtml(x.sub)} · ${fmtTime(x.t)}</span></div></div>`;
-  const leadHtml = lead ? `<div class="ty-up"><span class="ty-lbl">Up next</span><div class="ty-up-row">${lead.c ? monoHtml(lead.c, 'lg') : `<span class="ty-up-ic">${icon(lead.ic)}</span>`}
-<div class="tx"><b>${escapeHtml(lead.title)}</b><span>${escapeHtml(lead.sub)}</span></div><button class="btn btn-p ty-go" onclick="${lead.go}">${lead.ic ? icon(lead.ic) : ''}${escapeHtml(lead.label)}</button></div></div>`
+  // Every row is something you do, written that way, so nothing needs working out:
+  // a circle where one click finishes it, the step's name where it needs you to open it.
+  const whenHtml = x => x.when ? `<span class="ty-when${x.late ? ' late' : ''}">${escapeHtml(x.when)}</span>` : '';
+  const itemRow = x => `<div class="ty-i" onclick="${x.go}">${x.tick
+      ? `<button class="ty-cb" role="checkbox" aria-checked="false" aria-label="${escapeHtml(x.tickLabel || 'Done')}: ${escapeHtml(x.title)}" onclick="event.stopPropagation();${x.tick}"></button>`
+      : '<span class="ty-cb-sp" aria-hidden="true"></span>'}<div class="tx"><b>${escapeHtml(x.title)}</b><span>${x.sub}</span></div>${x.flag ? `<span class="ty-flag" title="High priority">${icon('flag')}</span>` : ''}${whenHtml(x)}${x.step ? `<button class="btn sm ty-step" onclick="event.stopPropagation();${x.go}">${escapeHtml(x.step)}</button>` : ''}</div>`;
+  const doneRow = x => `<div class="ty-i is-done"><span class="ty-cb on">${icon('check', { weight: 'bold' })}</span><div class="tx"><b>${escapeHtml(x.title)}</b><span>${escapeHtml(x.sub)} · ${fmtTime(x.t)}</span></div></div>`;
+  const leadHtml = lead ? `<div class="ty-up"><span class="ty-lbl">Now</span><div class="ty-up-row">${lead.c ? monoHtml(lead.c, 'lg') : `<span class="ty-up-ic">${icon(lead.ic)}</span>`}
+<div class="tx"><b>${escapeHtml(lead.title)}</b><span>${lead.subHtml || escapeHtml(lead.sub)}</span></div><button class="btn btn-p ty-go" onclick="${lead.go}">${lead.ic && !lead.item ? icon(lead.ic) : ''}${escapeHtml(lead.label)}</button></div></div>`
     : !activeClients().length ? emptyNoClients('Today shows what needs you: updates due, tasks, follow-ups and meetings.', { title: 'Start with your first client', link: 'Add a Task', onLink: 'openNewTaskModal()', cls: 'ty-es' })
     : items.length ? '' : `<div class="ty-clear">${icon('check-circle')}<div><b>You’re all caught up</b><span>${escapeHtml(nextDueText(ws.filter(w => myClientsFilter(w.c))) || 'Nothing is waiting on you right now.')}</span></div><a class="x-lnk" href="#" onclick="switchView('plan');return false;">Plan Ahead</a></div>`;
-  const MAX = 6;
+  // the rest, as one line: "6 tasks (2 late) · 3 WhatsApp requests · 1 follow-up", each opening its tab
+  const restLine = rest.length ? `<div class="ty-rest"><span>Also today</span>${TODAY_SRC_ORDER.map(k => {
+    const xs = rest.filter(x => x.src === k); if(!xs.length) return '';
+    const [one, many, go] = TODAY_SRC[k], late = xs.filter(x => x.late && x.src !== 'health').length;
+    return `<a class="x-lnk" href="#" onclick="${go};return false;">${xs.length} ${xs.length === 1 ? one : many}${late ? `<em>(${late} late)</em>` : ''}</a>`;
+  }).filter(Boolean).join('<i aria-hidden="true">·</i>')}</div>` : '';
   root.innerHTML = `<div class="ty">
 <header class="ty-hd"><div class="ty-date"><span class="ty-dow">${now.toLocaleDateString('en-US', { weekday: 'long' })}</span><span class="ty-dm">${now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</span></div>${ring}</header>
 ${strip}
 <div class="ty-cols"><section class="ty-main">${leadHtml}
-${items.length ? `<div class="ty-sec"><b>${lead ? 'Also today' : 'Today'}</b><span>${items.length}</span></div><div data-grow-key="today-also">${items.slice(0, window._todayAll ? items.length : MAX).map(itemRow).join('')}${items.length > MAX ? `<a class="ty-more" href="#" data-grow="today-also" onclick="window._todayAll=${window._todayAll ? 'false' : 'true'};renderToday();return false;">${window._todayAll ? 'Show less' : `${items.length - MAX} more`}${window._todayAll ? '' : CHEV()}</a>` : ''}</div>` : ''}
+${next.length ? `<div class="ty-sec"><b>Next</b></div>${next.map(itemRow).join('')}` : ''}${restLine}
 ${waitLine}
-${done.length ? `<div class="ty-sec"><b>Done today</b><span>${done.length}</span></div>${done.slice(0, 4).map(doneRow).join('')}` : ''}
+${done.length ? `<div class="ty-sec"><b>Done today</b><span>${done.length}</span></div>${done.slice(0, 3).map(doneRow).join('')}` : ''}
 </section>
 <aside class="ty-side">
 <div class="ty-sec"><b>Schedule</b><a class="x-lnk" href="#calendar" onclick="switchView('calendar');return false;">Calendar</a></div>${sched || '<p class="ty-empty">No meetings today.</p>'}
@@ -255,39 +269,56 @@ ${owned.length ? `<div class="ty-st"><span>Your clients on time</span><b>${onTim
 </aside></div></div>`;
   if(currentViewName === 'overview') setToolbar('Today', 'What you need to do today');
 }
-// What each row in Today is, with the icon of the tab it comes from.
-const TODAY_KIND = { task: ['list-todo', 'Task'], review: ['list-todo', 'Task to review'], wa: ['messages-square', 'WhatsApp'], follow: ['bell-ring', 'Follow-up'],
-  note: ['sticky-note', 'Note'], update: ['send', 'Weekly update'], health: ['activity', 'Health'] };
+// How many rows Today lists under Now; everything after is counted, not listed.
+const TODAY_NEXT = 3;
+// What the counts line calls each kind of row, and the tab it opens.
+const TODAY_SRC = { task: ['task', 'tasks', "switchView('tasks')"], wa: ['WhatsApp request', 'WhatsApp requests', "switchView('whatsapp')"],
+  follow: ['follow-up', 'follow-ups', "switchView('reminders')"], review: ['review', 'reviews', "switchView('tasks')"],
+  update: ['update', 'updates', "switchView('approve')"], health: ['client at risk', 'clients at risk', "switchView('health')"], note: ['note', 'notes', "switchView('notes')"] };
+const TODAY_SRC_ORDER = ['task', 'wa', 'follow', 'review', 'update', 'health', 'note'];
+function todayDaysSince(ds, todayStr){ return ds ? Math.max(0, Math.round((new Date(todayStr + 'T12:00:00') - new Date(ds + 'T12:00:00')) / 864e5)) : 0; }
 // "Yesterday", or the date for anything older.
 function todayDayWord(ds, now){ return ds === toDateStr(addDays(now || rNow(), -1)) ? 'Yesterday' : fmtShortDate(new Date(ds + 'T12:00:00')); }
+// "Due yesterday", "Due Nov 12"
+function todayDueWord(ds, now){ const w = todayDayWord(ds, now); return 'Due ' + (w === 'Yesterday' ? 'yesterday' : w); }
+// One click from Today: the client answered, or you're done with the note.
+async function todayFollowAnswered(id){ await markReminderStatus(id, 'answered'); if(currentViewName === 'overview') renderToday(); }
+async function todayNoteDone(id){
+  const { error } = await supabaseClient.from('notes').update({ status: 'done' }).eq('id', id).eq('user_id', currentUser.id);
+  if(error){ showToast('error', 'Note not marked done', error.message); return; }
+  if(typeof loadMyNotes === 'function') await loadMyNotes();
+  if(typeof renderNotes === 'function') renderNotes();
+  if(currentViewName === 'overview') renderToday();
+  showToast('success', 'Done with the note', '');
+}
 function todayWaOn(){ return typeof waTasks !== 'undefined' && typeof waLinkedTask === 'function' && !(typeof waHidden === 'function' && waHidden()); }
 // What's yours today from the other screens, each opening where it lives.
 function todayFromElsewhere(todayStr, now){
   const me = currentUser?.id, out = [], cl = id => clients.find(x => x.id === id) || null;
-  const when = ds => ds < todayStr ? ['red', todayDayWord(ds, now)] : ['', 'Today'];
+  const since = ds => ds < todayStr ? todayDueWord(ds, now) : '';
   // tasks you gave someone, back with you to review
   (typeof tasks !== 'undefined' ? tasks : []).filter(t => t.assignerId === me && t.assigneeId !== me && t.status === 'in_review' && !t.cancelledAt).forEach(t => {
     const c = cl(t.clientId), who = (teamProfiles || []).find(p => p.id === t.assigneeId);
-    out.push({ c, kind: TODAY_KIND.review, title: t.title, sub: `${escapeHtml(firstName(who ? who.name : 'Someone'))} sent it back to you${c ? ' · ' + escapeHtml(c.name) : ''}`, pill: ['', 'To review'], go: `openTaskDetailModal('${t.id}')` });
+    out.push({ src: 'review', c, title: who ? `Review ${firstName(who.name)}’s work: ${t.title}` : `Review: ${t.title}`, sub: `${c ? escapeHtml(c.name) : 'Based Agency'} · ${who ? escapeHtml(firstName(who.name)) + ' says it’s ready' : 'ready for you to check'}`, step: 'Review', go: `openTaskDetailModal('${t.id}')` });
   });
   // WhatsApp requests waiting on you (one made into a task shows as the task)
   if(todayWaOn()) waTasks.filter(t => t.status === 'open' && t.owner_user_id === me && !(waLinkedTask(t) && waLinkedTask(t).status !== 'done')
       && (waLate(t) || waDueToday(t) || (t.due_date && t.due_date <= todayStr)))
     .sort((a, b) => new Date(a.first_seen) - new Date(b.first_seen)).forEach(t => {
       const late = waLate(t) || (t.due_date && t.due_date < todayStr);
-      out.push({ wa: t, kind: TODAY_KIND.wa, title: t.title, sub: escapeHtml(waClientLabel(t)), pill: late ? ['red', waAgeWord(t)] : ['', 'Answer today'], flag: t.priority === 'high', go: `waOpenItem(${jsArg(t.id)})` });
+      out.push({ src: 'wa', age: typeof waDays === 'function' ? waDays(t) : 0, wa: t, title: t.title, sub: `${escapeHtml(waClientLabel(t))} asked on WhatsApp`, late, when: late ? `Waiting ${waAgeWord(t)}` : '', flag: t.priority === 'high', go: `waOpenItem(${jsArg(t.id)})`, tick: `waMarkDone(${jsArg(t.id)})` });
     });
   // follow-ups you asked clients for
   (typeof clientReminders !== 'undefined' ? clientReminders : []).filter(r => r.status === 'waiting' && r.askedBy === me && r.followUpDate && r.followUpDate <= todayStr)
     .sort((a, b) => a.followUpDate.localeCompare(b.followUpDate)).forEach(r => {
       const c = cl(r.clientId);
-      out.push({ c, kind: TODAY_KIND.follow, title: r.question, sub: `${c ? escapeHtml(c.name) : 'The client'}${r.askedDate ? ' · asked ' + fmtShortDate(new Date(r.askedDate + 'T12:00:00')) : ''}`, pill: when(r.followUpDate), go: `openReminderDetailModal('${r.id}')` });
+      out.push({ src: 'follow', age: todayDaysSince(r.followUpDate, todayStr), c, title: `Ask ${c ? shortClientName(c.name) : 'the client'} again: “${r.question}”`, sub: `No answer yet${r.askedDate ? ' · you asked ' + fmtShortDate(new Date(r.askedDate + 'T12:00:00')) : ''}`, late: r.followUpDate < todayStr, when: since(r.followUpDate), go: `openReminderDetailModal('${r.id}')`, tick: `todayFollowAnswered('${r.id}')`, tickLabel: 'They answered' });
     });
   // notes you set to come back to
   (typeof notes !== 'undefined' ? notes : []).filter(n => n.followUpDate && n.status !== 'done' && n.followUpDate <= todayStr)
     .sort((a, b) => a.followUpDate.localeCompare(b.followUpDate)).forEach(n => {
       const c = cl(n.clientId);
-      out.push({ c, kind: TODAY_KIND.note, title: n.title || 'Untitled note', sub: c ? escapeHtml(c.name) : 'To revisit', pill: when(n.followUpDate), go: `openNoteSheet('${n.id}')` });
+      out.push({ src: 'note', age: todayDaysSince(n.followUpDate, todayStr), c, title: `Come back to your note: ${n.title || 'Untitled'}`, sub: c ? escapeHtml(c.name) : 'Your note', late: n.followUpDate < todayStr, when: since(n.followUpDate), go: `openNoteSheet('${n.id}')`, tick: `todayNoteDone('${n.id}')` });
     });
   return out;
 }

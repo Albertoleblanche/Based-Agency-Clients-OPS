@@ -2606,3 +2606,18 @@ a.mi{text-decoration:none;color:inherit}
 /* the next meeting on Today keeps its time beside it (the shared .next card wraps) */
 .ty-ev.next{flex-wrap:nowrap;gap:12px;padding:8px 10px;margin:2px -10px}
 .ty-ev.next .tx{flex:1 1 auto}
+
+/* Today: every row is something to do. A circle finishes it in one click; a step opens it. */
+.ty-cb-sp{width:20px;height:20px;flex:0 0 auto}
+.ty-when{font-size:13px;color:var(--label-2);white-space:nowrap;flex:0 0 auto;font-variant-numeric:tabular-nums}
+.ty-when.late{color:var(--red)}
+.ty-step{flex:0 0 auto;min-width:64px}
+.ty-i .tx{flex:1 1 auto;min-width:0}
+.ty-i .tx b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ty-rest{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px;margin-top:14px;padding-top:12px;border-top:.5px solid var(--sep);font-size:14px}
+.ty-rest > span{color:var(--label-2);margin-right:2px}
+.ty-rest i{font-style:normal;color:var(--label-3)}
+.ty-rest em{font-style:normal;color:var(--red)}
+.ty-rest .x-lnk{font-size:14px;gap:0}
+.ty-rest .x-lnk::after{display:none}
+.ty-rest .x-lnk em{margin-left:4px}
