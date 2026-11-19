@@ -91,11 +91,11 @@ function renderNotes(){
     : ['Nothing done yet', 'Notes you finish, or log as an improvement, show up here.'];
   gal.innerHTML = `<div class="n1">
 <div class="n1-top">
-<button type="button" class="n1-cap" onclick="openNoteSheet('new')">${icon('note-pencil')}<span>Jot something down for a client…</span><span class="kbd">N</span></button>
+<button type="button" class="n1-cap" onclick="openNoteSheet('new')">${icon('sticky-note')}<span>Jot something down for a client…</span><span class="kbd">N</span></button>
 <label class="pop pop-sel n1-pop"><span class="pl">${escapeHtml(cur ? cur.name : 'All clients')}</span>${icon('caret-down')}<select aria-label="Client" onchange="setNotesFilter('client',this.value)"><option value="all">All clients</option>${used.map(c => `<option value="${c.id}"${c === cur ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></label>
 <div class="seg" role="tablist" aria-label="Show">${seg}</div>
 </div>
-${shown.length ? `<div class="n1-grid">${shown.map(noteTileHtml).join('')}</div>` : emptyState({ icon: !notes.length ? 'note-pencil' : notesScope === 'open' ? 'check-circle' : 'notepad', tone: !notes.length ? 'blue' : notesScope === 'open' ? 'ok' : '', title: empty[0], text: empty[1], html: true,
+${shown.length ? `<div class="n1-grid">${shown.map(noteTileHtml).join('')}</div>` : emptyState({ icon: !notes.length ? 'sticky-note' : notesScope === 'open' ? 'check-circle' : 'sticky-note', tone: !notes.length ? 'blue' : notesScope === 'open' ? 'ok' : '', title: empty[0], text: empty[1], html: true,
     action: !notes.length || notesScope === 'open' ? 'New Note' : '', actionIcon: 'plus', onAction: "openNoteSheet('new')" })}
 <p class="n1-foot nt-lock">${icon('lock-simple')}Only you can see your notes</p>
 </div>`;

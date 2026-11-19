@@ -14,10 +14,11 @@ async function hvTimeLoad(){
   try{
     const [c, p, t, ta, ua, u, probe] = await Promise.all([
       q('harvest_clients', 'harvest_id, name, is_active, radar_client_id'),
-      q('harvest_projects', 'harvest_id, client_harvest_id, name, is_active, budget, budget_by, budget_is_monthly'),
+      selectAll(() => q('harvest_projects', 'harvest_id, client_harvest_id, name, is_active, budget, budget_by, budget_is_monthly').order('harvest_id')),
       q('harvest_tasks', 'harvest_id, name, is_active'),
-      q('harvest_task_assignments', 'project_harvest_id, task_harvest_id, billable, is_active'),
-      q('harvest_user_assignments', 'project_harvest_id, user_harvest_id, is_active'),
+      // one row per task on each project: well past 1000 with a hundred projects, so read in pages
+      selectAll(() => q('harvest_task_assignments', 'project_harvest_id, task_harvest_id, billable, is_active').order('project_harvest_id').order('task_harvest_id')),
+      selectAll(() => q('harvest_user_assignments', 'project_harvest_id, user_harvest_id, is_active').order('project_harvest_id').order('user_harvest_id')),
       q('harvest_users', 'harvest_id, first_name, last_name, team_profile_id, is_active'),
       supabaseClient.from('time_entries').select('harvest_project_id').limit(1),
     ]);

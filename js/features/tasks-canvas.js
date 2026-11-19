@@ -194,7 +194,7 @@ function taskPanelHtml(t){
     : amAssignee && !amAssigner ? `You <em>from ${escapeHtml(assigner ? assigner.name : 'someone')}</em>` : 'You';
   let acts = '';
   if(!done){
-    const remind = amAssigner && !amAssignee && assignee ? `<button class="btn${amAssignee ? '' : ' btn-p'}" onclick="remindTaskAssignee('${t.id}')">${icon('bell')}Remind ${escapeHtml(firstName(assignee.name))}</button>` : '';
+    const remind = amAssigner && !amAssignee && assignee ? `<button class="btn${amAssignee ? '' : ' btn-p'}" onclick="remindTaskAssignee('${t.id}')">${icon('bell-ring')}Remind ${escapeHtml(firstName(assignee.name))}</button>` : '';
     const mark = amAssignee ? `<button class="btn btn-p" onclick="moveTaskToStatus('${t.id}','done')">${icon('check')}Mark Done</button>` : '';
     acts = remind || mark ? `<div class="tkp-acts">${remind}${mark}</div>` : '';
   } else if(amAssignee || amAssigner){

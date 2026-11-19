@@ -130,7 +130,7 @@ function planItemOpen(kind, id){
   else if(kind === 'alert') selectPlanSprint(id);
 }
 function planItemHtml(it){
-  const ic = { task: '', note: 'note-pencil', reminder: 'bell', event: 'calendar-blank', alert: 'bell' }[it.kind];
+  const ic = { task: '', note: 'sticky-note', reminder: 'bell-ring', event: 'calendar-blank', alert: 'bell-ring' }[it.kind];
   const lead = it.kind === 'task'
     ? `<button class="pl-cb" role="checkbox" aria-checked="false" aria-label="Mark done" title="Mark done" onclick="event.stopPropagation();moveTaskToStatus('${it.id}','done')"></button>`
     : `<span class="pl-ic">${icon(ic)}</span>`;
@@ -213,11 +213,11 @@ function renderPlan(){
   const ahead = `<div class="pl-ah"><div class="pl-ah-h"><h3>Coming up</h3><span class="pl-ah-r">Next ${weeks === 6 ? '6 weeks' : '3 months'}</span></div><div class="pl-cols">${colsHtml}</div></div>`;
   // the side: sprint reminders coming up, and what's worth planning
   const rems = items.filter(it => it.kind === 'alert').slice(0, 3);
-  const remHtml = rems.length ? rems.map(it => `<div class="pl-rm${it.color ? ' c-' + it.color : ''}" role="button" tabindex="0" onclick="selectPlanSprint('${it.id}')"><span class="pl-ic">${icon('bell')}</span><div class="tx"><b>${escapeHtml(it.title)}</b><span class="s">${escapeHtml(it.sub.replace(/ · reminder$/, ''))}</span></div><span class="pl-rw">${escapeHtml(planDayLabel(it.date))}<em>${it.time ? fmtTime(atTime(new Date(it.date + 'T12:00:00'), it.time)) : ''}</em></span></div>`).join('')
+  const remHtml = rems.length ? rems.map(it => `<div class="pl-rm${it.color ? ' c-' + it.color : ''}" role="button" tabindex="0" onclick="selectPlanSprint('${it.id}')"><span class="pl-ic">${icon('bell-ring')}</span><div class="tx"><b>${escapeHtml(it.title)}</b><span class="s">${escapeHtml(it.sub.replace(/ · reminder$/, ''))}</span></div><span class="pl-rw">${escapeHtml(planDayLabel(it.date))}<em>${it.time ? fmtTime(atTime(new Date(it.date + 'T12:00:00'), it.time)) : ''}</em></span></div>`).join('')
     : `<p class="pl-empty">Sprint reminders show here. Add them when you plan a sprint.</p>`;
   const ideas = (typeof notes !== 'undefined' ? notes : []).filter(n => n.status === 'idea' && n.clientId && !planSprints.some(s => s.noteId === n.id))
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 2)
-    .map(n => ({ ic: 'note-pencil', t: n.title || 'Untitled note', s: `${(clients.find(c => c.id === n.clientId) || {}).name || ''} · from your notes`, run: `openNewSprintModal({ clientId: '${n.clientId}', noteId: '${n.id}' })` }));
+    .map(n => ({ ic: 'sticky-note', t: n.title || 'Untitled note', s: `${(clients.find(c => c.id === n.clientId) || {}).name || ''} · from your notes`, run: `openNewSprintModal({ clientId: '${n.clientId}', noteId: '${n.id}' })` }));
   const me = myName();
   const room = activeClients().filter(c => c.monthlyHourBudget && clientOwner(c) === me && !planSprints.some(s => !s.doneAt && s.clientId === c.id && s.end >= today))
     .map(c => ({ c, left: c.monthlyHourBudget - monthHours(c, now) })).filter(x => x.left >= 8).sort((a, b) => b.left - a.left).slice(0, 3 - Math.min(ideas.length, 1))
@@ -288,7 +288,7 @@ function planPanelHtml(s){
   const addStep = window._planAddStep === s.id ? `<div class="plp-add"><span class="plp-cb"></span><input id="plpStepIn" class="tf" placeholder="What’s the step? Return to add" aria-label="New step" onkeydown="if(event.key==='Enter'){event.preventDefault();planAddStep('${s.id}')}else if(event.key==='Escape'){event.stopPropagation();window._planAddStep=null;renderPlan()}"><button class="btn btn-sm" onclick="planAddStep('${s.id}')">Add</button></div>` : '';
   const rems = (s.reminders || []).map((r, i) => ({ r, i })).sort((a, b) => new Date(a.r.at) - new Date(b.r.at));
   const remHtml = rems.map(({ r, i }) => { const at = new Date(r.at);
-    return `<div class="plp-r${r.sent ? ' is-past' : ''}"><span class="pl-ic">${icon('bell')}</span><b>${escapeHtml(r.label || 'Reminder')}</b><span>${at.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}, ${fmtTime(at)}${r.sent ? ' · sent' : ''}</span>${r.sent ? '' : `<button class="ib" aria-label="Remove reminder" title="Remove" onclick="planRemoveReminder('${s.id}', ${i})">${icon('x')}</button>`}</div>`; }).join('');
+    return `<div class="plp-r${r.sent ? ' is-past' : ''}"><span class="pl-ic">${icon('bell-ring')}</span><b>${escapeHtml(r.label || 'Reminder')}</b><span>${at.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}, ${fmtTime(at)}${r.sent ? ' · sent' : ''}</span>${r.sent ? '' : `<button class="ib" aria-label="Remove reminder" title="Remove" onclick="planRemoveReminder('${s.id}', ${i})">${icon('x')}</button>`}</div>`; }).join('');
   const addRem = window._planAddRem === s.id ? `<div class="plp-ra">${sheetDateField('plpRemDate', s.start > today ? s.start : today, { from: 0, to: 60, min: today, label: 'Reminder date' })}${sheetPop('plpRemTime', 'Time', taskTimeOptions().slice(1), '09:00')}<input id="plpRemLabel" class="tf" placeholder="Check in" aria-label="What to remind you"><button class="btn btn-sm btn-p" onclick="planAddReminder('${s.id}')">Add</button></div>` : '';
   const more = `<button class="mi" onclick="openNewSprintModal({ edit: '${s.id}' })">${icon('pencil-simple')}Edit Sprint</button>${s.doneAt ? '' : `<button class="mi" onclick="setPlanSprintDone('${s.id}', true)">${icon('check-circle')}Mark Done</button>`}<div class="msep"></div><button class="mi danger" onclick="deletePlanSprint('${s.id}')">${icon('trash')}Delete Sprint…</button>`;
   return `<aside class="sp plp${s.color ? ' c-' + s.color : ''}" aria-label="${escapeHtml(s.title)}">

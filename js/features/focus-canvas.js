@@ -132,7 +132,7 @@ function drawFocusReports(){
     const day = DAY_NAMES[settings.proactiveInsightsDayOfWeek ?? 3];
     const es = !activeClients().length
       ? emptyNoClients('Each week a short report says which clients need the team, and why.', { title: 'No focus report yet' })
-      : emptyState({ icon: 'clipboard-text', tone: 'blue', title: 'No focus report yet',
+      : emptyState({ icon: 'crosshair', tone: 'blue', title: 'No focus report yet',
           text: `Each ${day} morning a short report goes to the team: which clients need attention this week, and why. The first one comes this ${day}.`,
           action: isAdmin() ? 'Change the Day' : '', onAction: "openSettingsTab('ai')" });
     root.innerHTML = `<div class="spw"><div class="sp-page"><div class="fq">${es}</div></div></div>`;

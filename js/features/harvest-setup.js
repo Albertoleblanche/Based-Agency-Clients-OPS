@@ -25,7 +25,9 @@ async function hvLoad(){
   hvLoading = true;
   const q = t => supabaseClient.from(t).select('*');
   try{
-    const [c, p, t, ta, ua, u] = await Promise.all([q('harvest_clients'), q('harvest_projects'), q('harvest_tasks'), q('harvest_task_assignments'), q('harvest_user_assignments'), q('harvest_users')]);
+    const all = (t, ...cols) => selectAll(() => cols.reduce((x, k) => x.order(k), q(t)));
+    const [c, p, t, ta, ua, u] = await Promise.all([q('harvest_clients'), all('harvest_projects', 'harvest_id'), q('harvest_tasks'),
+      all('harvest_task_assignments', 'project_harvest_id', 'task_harvest_id'), all('harvest_user_assignments', 'project_harvest_id', 'user_harvest_id'), q('harvest_users')]);
     hvData = c.error ? { missing: true } : { clients: c.data || [], projects: p.data || [], tasks: t.data || [], taskAssignments: ta.data || [], userAssignments: ua.data || [], users: u.data || [] };
   }catch(e){ hvData = { missing: true }; }
   hvLoading = false;

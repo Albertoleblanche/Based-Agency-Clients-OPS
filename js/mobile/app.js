@@ -103,10 +103,10 @@ async function mLoadAll(){
   const uid = currentUser.id;
   const q = t => supabaseClient.from(t);
   const [s, cr, ir, dr, tr, rr, nr, er, nf, pr, ev, wg] = await Promise.all([
-    safeGet('settings'), q('clients').select('*'), q('client_improvements').select('*').order('date', { ascending: true }), q('client_drafts').select('*'),
+    safeGet('settings'), q('clients').select('*'), selectAll(() => q('client_improvements').select('*').order('date', { ascending: true }).order('id')), q('client_drafts').select('*'),
     q('tasks').select('*').order('created_at', { ascending: false }), q('client_reminders').select('*').order('follow_up_date', { ascending: true }),
     q('notes').select('*').eq('user_id', uid).is('deleted_at', null).order('updated_at', { ascending: false }),
-    q('time_entries').select('*').is('deleted_at', null).order('entry_date', { ascending: false }),
+    selectAll(() => q('time_entries').select('*').is('deleted_at', null).order('entry_date', { ascending: false }).order('id')),
     q('notifications').select('*').eq('user_id', uid).order('created_at', { ascending: false }).limit(50),
     q('team_profiles').select('*'), q('calendar_events').select('*').order('start_at', { ascending: true }),
     typeof winsGroupsFetch === 'function' ? winsGroupsFetch() : null,
@@ -165,7 +165,7 @@ function mRenderShell(){
 <div class="imenu" id="mAddMenu" role="menu" aria-label="Add">
 <button role="menuitem" onclick="mToggleAdd(false);mOpenLog()">Log Improvement${icon('pencil-simple-line')}</button>
 <button role="menuitem" onclick="mToggleAdd(false);mOpenTaskSheet()">New Task${icon('check-square')}</button>
-<button role="menuitem" onclick="mToggleAdd(false);mOpenReminderSheet()">New Reminder${icon('bell')}</button>
+<button role="menuitem" onclick="mToggleAdd(false);mOpenReminderSheet()">New Reminder${icon('bell-ring')}</button>
 <button role="menuitem" onclick="mToggleAdd(false);mOpenNoteSheet()">New Note${icon('notepad')}</button>
 <button role="menuitem" onclick="mToggleAdd(false);mOpenEventSheet()">New Event${icon('calendar-plus')}</button>
 <div class="gap"></div><button role="menuitem" id="mAddTimer" onclick="mToggleAdd(false);timerState.running ? mStopTimer() : mOpenTimerSheet()">Start Timer${icon('timer')}</button>
@@ -698,7 +698,7 @@ function mMoreHtml(){
   const g = (ic, t, right, fn) => mIr(`<span class="gl">${icon(ic)}</span>`, t, '', right || '', fn, { n: true });
   return `<h1 class="big" style="margin-top:8px">More</h1>
 <div class="ig" style="margin-top:16px"><button class="ir prof" onclick="mOpenProfile()">${me.avatar_url ? `<img src="${safeUrl(me.avatar_url)}" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover">` : avHtml(me.name || '?')}<div class="tx"><b>${mEsc(me.name || '')}</b><span>${mEsc(roleDisplayLabel(me.role))} · ${mEsc(settings.appName || 'Based Radar')}</span></div>${icon('caret-right', { cls: 'chev', weight: 'bold' })}</button></div>
-<div class="ig" style="margin-top:20px">${g('buildings', 'Clients', String(activeClients().length), "mOpenClients()")}${g('calendar-blank', 'Calendar', '', 'mOpenCalendar()')}${g('bell', 'Reminders', due ? String(due) : '', 'mOpenReminders()')}${g('notepad', 'Notes', '', 'mOpenNotes()')}${g('timer', 'Time', timerState.running ? `<span class="mClk">${mClock()}</span>` : '', 'mOpenTime()')}${g('clipboard-text', 'Focus Reports', '', 'mOpenFocus()')}</div>
+<div class="ig" style="margin-top:20px">${g('buildings', 'Clients', String(activeClients().length), "mOpenClients()")}${g('calendar-blank', 'Calendar', '', 'mOpenCalendar()')}${g('bell-ring', 'Reminders', due ? String(due) : '', 'mOpenReminders()')}${g('notepad', 'Notes', '', 'mOpenNotes()')}${g('timer', 'Time', timerState.running ? `<span class="mClk">${mClock()}</span>` : '', 'mOpenTime()')}${g('clipboard-text', 'Focus Reports', '', 'mOpenFocus()')}</div>
 <div class="ig" style="margin-top:20px">${g('users-three', 'Team', '', 'mOpenTeam()')}${g('trash', 'Recently Deleted', '', 'mOpenDeleted()')}${g('gear-six', 'Settings', '', 'mOpenSettings()')}</div>
 <div class="ig" style="margin-top:20px">${g('desktop', 'Open the Desktop Version', '', "mOpenDesktop()")}</div>`;
 }

@@ -35,8 +35,8 @@ function newMenuItems(){
     ['Log Improvement', 'square-pen', "openQueueLogImprovementModal()", '⌘N'],
     ['Task', 'list-checks', "openNewTaskModal()"],
     ['Sprint', 'route', "openNewSprintModal()"],
-    ['Reminder', 'bell', "openNewReminderModal()"],
-    ['Note', 'notebook-pen', "openNoteModal()"],
+    ['Reminder', 'bell-ring', "openNewReminderModal()"],
+    ['Note', 'sticky-note', "openNoteModal()"],
     ['Event', 'calendar-plus', "openNewEventModal()"],
     ['Start Timer', 'timer', "openTimerModal()"],
     ['Time Worked', 'clock', "openManualEntryModal()"],
@@ -99,7 +99,7 @@ ICON_PATHS['exclamation-mark'] = '<line x1="12" y1="5" x2="12" y2="13.5"/><line 
 VIEW_TOOLBAR_ACTIONS.reminders = () => `<button class="btn" onclick="openNewReminderModal()">${icon('plus')}New Reminder</button>`;
 VIEW_TOOLBAR_ACTIONS.tasks = () => `<button class="btn" onclick="openNewTaskModal()">${icon('plus')}New Task</button>`;
 VIEW_TOOLBAR_ACTIONS.plan = () => `<button class="btn" onclick="openNewSprintModal()">${icon('plus')}New Sprint</button>`;
-VIEW_TOOLBAR_ACTIONS.notes = () => `<button class="btn" onclick="openNoteModal()">${icon('square-pen')}New Note</button>`;
+VIEW_TOOLBAR_ACTIONS.notes = () => `<button class="btn" onclick="openNoteModal()">${icon('sticky-note')}New Note</button>`;
 
 // Brand marks (Google, Slack) come from Phosphor on the canvas, drawn on a 256 grid.
 const BRAND_ICONS = {

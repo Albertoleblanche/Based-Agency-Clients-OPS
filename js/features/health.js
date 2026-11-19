@@ -30,7 +30,7 @@ function healthWorseWords(s){
   return { hours: s.title.startsWith('Over') ? 'went over budget' : 'is on pace to go over budget', noupdate: 'has updates slipping', late: 'has updates slipping',
     quiet: 'has had nothing logged', under: 'is under-using its hours', tasks: 'has overdue tasks', flag: 'was flagged by its owner' }[s.key] || s.title.toLowerCase();
 }
-const HEALTH_CAUSES = [['updates', 'envelope-simple', 'Updates late or missed', ['noupdate', 'late']], ['quiet', 'notepad', 'Nothing logged', ['quiet']],
+const HEALTH_CAUSES = [['updates', 'envelope-simple', 'Updates late or missed', ['noupdate', 'late']], ['quiet', 'square-pen', 'Nothing logged', ['quiet']],
   ['hours', 'currency-circle-dollar', 'Over budget', ['hours']], ['under', 'clock', 'Hours under-used', ['under']],
   ['tasks', 'list-checks', 'Tasks overdue', ['tasks']], ['flag', 'flag', 'Flagged by the owner', ['flag']]];
 

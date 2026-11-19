@@ -90,6 +90,17 @@ function waPresetOk(clientId){
 // The pickers: the clients you can work on (and the one already chosen).
 function waWorkable(list, keepId){ return list.filter(c => c.id === keepId || waCanWork(c)); }
 
+// The clients someone works on: their areas' clients and the ones they own (every client with no areas).
+function waClientsOf(profileId){
+  const areas = waPersonAreas(profileId), p = (typeof teamProfiles !== 'undefined' ? teamProfiles : []).find(x => x.id === profileId);
+  return activeClients().filter(c => {
+    if(!areas.length) return true;
+    if(p && c.customFieldValues && c.customFieldValues.owner === p.name) return true;
+    const ca = waClientAreas(c);
+    return !ca || ca.some(k => areas.includes(k));
+  });
+}
+
 // Settings → Areas: changes save as they're made.
 async function waToggle(kind, key, area){
   if(typeof canApprove !== 'function' || !canApprove()) return;
@@ -104,4 +115,20 @@ async function waToggle(kind, key, area){
 async function waResetProject(name){
   if(typeof canApprove !== 'function' || !canApprove()) return;
   await changeSettings(s => { if(s.workAreas && s.workAreas.projects) delete s.workAreas.projects[name]; });
+}
+// A package Harvest spells two ways ("MDF Tier 1" and "MDF - Tier 1") is one row in Settings; a change
+// there goes to every spelling.
+async function waToggleNames(names, area){
+  if(typeof canApprove !== 'function' || !canApprove() || !names.length) return;
+  await changeSettings(s => {
+    const w = s.workAreas = Object.assign({ people: {}, projects: {} }, s.workAreas || {});
+    w.projects = w.projects || {};
+    const cur = waProjectAreas(names[0]);
+    const next = cur.includes(area) ? cur.filter(k => k !== area) : cur.concat(area);
+    names.forEach(n => { w.projects[n] = WORK_AREAS.map(a => a[0]).filter(k => next.includes(k)); });
+  });
+}
+async function waResetNames(names){
+  if(typeof canApprove !== 'function' || !canApprove()) return;
+  await changeSettings(s => { if(s.workAreas && s.workAreas.projects) names.forEach(n => delete s.workAreas.projects[n]); });
 }

@@ -256,23 +256,19 @@ function setClients(){
   const outside = hv ? outsideHarvestClients().length : 0;
   const areas = typeof WORK_AREAS !== 'undefined';
   let html = '';
-  // services: Harvest's projects, and the list for everyone else
+  // services: Harvest's projects by package and tier, and the list for everyone else
   if(hv){
-    const counts = {};
-    ((typeof hvTime !== 'undefined' && hvTime && hvTime.projects) || []).forEach(p => {
-      const hc = (hvTime.clients || []).find(x => Number(x.harvest_id) === Number(p.client_harvest_id));
-      if(!hc || !hc.radar_client_id || p.is_active === false) return;
-      const n = String(p.name || '').trim(); (counts[n] = counts[n] || new Set()).add(String(hc.radar_client_id));
-    });
-    const names = Object.keys(counts).sort((a, b) => counts[b].size - counts[a].size || a.localeCompare(b));
-    const own = areas ? (waSet().projects || {}) : {};
-    const jrow = n => {
-      const k = counts[n].size, on = areas ? waProjectAreas(n) : [];
-      const sub = `${k} client${k === 1 ? '' : 's'}${areas && !on.length ? ' · every area' : ''}${Array.isArray(own[n]) ? ` · <a class="ar-reset" href="#" onclick="waResetProject(${jsArg(n)});return false;">Reset</a>` : ''}`;
-      return fr(esc(n), sub, areas ? areaChips('projects', n, on) : '');
+    const groups = setProjectGroups(), own = areas ? (waSet().projects || {}) : {};
+    const jrow = g => {
+      const on = areas ? waProjectAreas(g.names[0]) : [], k = g.clients.size, others = g.names.filter(n => n !== g.name);
+      const sub = [`<a class="set-lnk" href="#" onclick="openProjectClientsSheet(${jsArg(g.key)});return false;">${k} client${k === 1 ? '' : 's'}</a>`,
+        areas && !on.length ? 'every area' : '', others.length ? `also “${esc(others.join('”, “'))}” in Harvest` : '',
+        g.names.some(n => Array.isArray(own[n])) ? `<a class="ar-reset" href="#" onclick="waResetNames(setProjGroups[${jsArg(g.key)}].names);return false;">Reset</a>` : ''].filter(Boolean).join(' · ');
+      return fr(esc(g.name), sub, areas ? `<span class="ar-chips" role="group" aria-label="Areas">${WORK_AREAS.map(([a, t]) => `<button class="ar-chip${on.includes(a) ? ' on' : ''}" aria-pressed="${on.includes(a)}" onclick="waToggleNames(setProjGroups[${jsArg(g.key)}].names, '${a}')">${t}</button>`).join('')}</span>` : '');
     };
+    const fams = [...new Set(groups.map(g => g.fam))];
     html += `<div class="set-h">Services from Harvest</div>
-<div class="form-grp ar-g">${names.length ? names.map(jrow).join('') : fr('No projects yet', 'They show here once Harvest is read.', '')}</div>
+${fams.length ? fams.map(f => `<div class="set-h2">${esc(f)}</div><div class="form-grp ar-g">${groups.filter(g => g.fam === f).map(jrow).join('')}</div>`).join('') : `<div class="form-grp">${fr('No projects yet', 'They show here once Harvest is read.', '')}</div>`}
 <p class="set-note">Each client’s services are its active projects in Harvest; change them there.${areas ? ' Pick the areas each one covers: a client’s areas are its projects’ areas. Legacy Retainer and projects Radar doesn’t know cover every area until you pick.' : ''}</p>`;
   }
   if(!hv || outside){
@@ -286,8 +282,9 @@ ${hv ? `<p class="set-note">For the <a class="set-lnk" href="#" onclick="openOut
     const people = (typeof teamProfiles !== 'undefined' ? teamProfiles : []).filter(p => p.name && !p.access_revoked).sort((a, b) => a.name.localeCompare(b.name));
     const prow = p => {
       const on = waPersonAreas(p.id), logged = areaLoggedTasks(p.id);
-      const sub = [role[p.role] || '', on.length ? `${waWords(on)} clients` : 'Every client', logged ? `Logs ${logged}` : ''].filter(Boolean).join(' · ');
-      return fr(esc(p.name), esc(sub), areaChips('people', p.id, on));
+      const n = on.length ? waClientsOf(p.id).length : 0;
+      const sub = [esc(role[p.role] || ''), on.length ? `${esc(waWords(on))} · <a class="set-lnk" href="#" onclick="openPersonClientsSheet('${p.id}');return false;">${n} client${n === 1 ? '' : 's'}</a>` : 'Every client', logged ? esc(`Logs ${logged}`) : ''].filter(Boolean).join(' · ');
+      return fr(esc(p.name), sub, areaChips('people', p.id, on));
     };
     html += `<div class="set-h" id="setAreas">Areas of work</div>
 <div class="form-grp ar-g">${people.map(prow).join('')}</div>
@@ -302,6 +299,50 @@ ${hv ? `<p class="set-note">For the <a class="set-lnk" href="#" onclick="openOut
 <div class="form-grp">${frows}<div class="fr"><button class="btn btn-q set-add" onclick="openAddCustomFieldModal()">${icon('plus')}Add Field</button></div></div>
 <p class="set-note">Extra details kept on each client, shown in its panel and Edit Client.</p>`;
   return html;
+}
+
+// Harvest's active projects as packages: one row per package however Harvest spells it, grouped
+// by family (MDF, AI SEO, Paid Ads, Website, Branding, Legacy, Other) and ordered by tier.
+let setProjGroups = {};
+const SET_FAMS = [['MDF', /\bmdf\b|marketing domination/], ['AI SEO', /\bseo\b|ai domination|\badf\b/], ['Paid Ads', /\bgoogle ads\b|\bppc\b|\bmeta\b|\bfacebook\b|\bpaid\b/],
+  ['Website', /\bweb ?site\b|\bweb design\b|\bhosting\b|\bmaintenance\b/], ['Branding', /\bbrand|\blogo|\bgraphic/], ['Legacy', /\blegacy\b/]];
+function setProjectGroups(){
+  const by = {};
+  ((typeof hvTime !== 'undefined' && hvTime && hvTime.projects) || []).forEach(p => {
+    const hc = (hvTime.clients || []).find(x => Number(x.harvest_id) === Number(p.client_harvest_id));
+    if(!hc || !hc.radar_client_id || p.is_active === false) return;
+    const name = String(p.name || '').trim(), key = waNorm(name);
+    const g = by[key] = by[key] || { key, spell: {}, clients: new Set() };
+    g.spell[name] = (g.spell[name] || 0) + 1; g.clients.add(String(hc.radar_client_id));
+  });
+  const tier = n => { const m = waNorm(n).match(/\btier (\d+)/); return m ? Number(m[1]) : 99; };
+  const out = Object.values(by).map(g => {
+    const names = Object.keys(g.spell).sort((a, b) => g.spell[b] - g.spell[a] || a.length - b.length);
+    const fam = (SET_FAMS.find(([, re]) => re.test(g.key)) || ['Other'])[0];
+    return { key: g.key, name: names[0], names, clients: g.clients, fam, tier: tier(g.key) };
+  });
+  const famAt = f => { const i = SET_FAMS.findIndex(x => x[0] === f); return i < 0 ? 99 : i; };
+  out.sort((a, b) => famAt(a.fam) - famAt(b.fam) || a.tier - b.tier || a.name.localeCompare(b.name));
+  setProjGroups = Object.fromEntries(out.map(g => [g.key, g]));
+  return out;
+}
+// Who those clients are: a sheet with each one's projects and owner; a row opens it in All Clients.
+function openClientListSheet(title, sub, ids){
+  const list = ids.map(id => clients.find(c => c.id === id)).filter(c => c && !c.deletedAt).sort((a, b) => a.name.localeCompare(b.name));
+  const row = c => `<button class="oh-r oh-go" onclick="ohOpenClient('${c.id}')"><div class="oh-n"><b>${esc(c.name)}</b><span>${esc([c.service || 'No service', clientOwner(c) ? `Owner ${firstName(clientOwner(c))}` : 'No owner'].join(' · '))}</span></div>${icon('caret-right', { weight: 'bold' })}</button>`;
+  openAppModal(`<h3>${esc(title)} <span class="t-3">${list.length}</span></h3>${sub ? `<p class="t-2 oh-sub">${esc(sub)}</p>` : ''}
+<div class="oh-l">${list.map(row).join('') || '<p class="t-2 oh-empty">No clients right now.</p>'}</div>
+<div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal()">Done</button></div>`, 560);
+  setTimeout(() => { const a = document.activeElement; if(a && a.closest('.oh-l')) a.blur(); }, 30);   // no ring on the first row until someone tabs
+}
+function openProjectClientsSheet(key){
+  const g = setProjGroups[key]; if(!g) return;
+  openClientListSheet(g.name, g.names.length > 1 ? `Harvest calls it ${g.names.join(' and ')}.` : 'Clients with this project active in Harvest.', [...g.clients]);
+}
+function openPersonClientsSheet(pid){
+  const p = (typeof teamProfiles !== 'undefined' ? teamProfiles : []).find(x => x.id === pid); if(!p) return;
+  const on = waPersonAreas(pid);
+  openClientListSheet(`${firstName(p.name)}’s clients`, `${waWords(on)} clients, and the ones ${firstName(p.name)} owns.`, waClientsOf(pid).map(c => c.id));
 }
 
 // ---- Clients that aren't in Harvest: a sheet with each one's service and what to do with it ------

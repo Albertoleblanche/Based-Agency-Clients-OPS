@@ -321,7 +321,7 @@ function clientHealth(c){
   const lastLog = (c.improvements || []).map(i => new Date(i.date)).filter(d => d <= now).sort((a, b) => b - a)[0];
   if(lastLog){
     const n = daysBetween(lastLog, now), l = lvl(n, T.nothingLoggedDays);
-    if(l) sig.push({ l, key: 'quiet', icon: 'notepad', title: 'Nothing logged', since: addDays(lastLog, T.nothingLoggedDays[0]), text: `Nothing logged in ${n} days.` });
+    if(l) sig.push({ l, key: 'quiet', icon: 'square-pen', title: 'Nothing logged', since: addDays(lastLog, T.nothingLoggedDays[0]), text: `Nothing logged in ${n} days.` });
   }
   const openAt = t => (t.status !== 'done' || (t.completedAt && new Date(t.completedAt) > now)) && (!t.cancelledAt || new Date(t.cancelledAt) > now) && (!t.createdAt || new Date(t.createdAt) <= now);
   const overdue = (typeof tasks !== 'undefined' ? tasks : []).filter(t => t.clientId === c.id && openAt(t) && t.dueDate && dayStart(new Date(t.dueDate + 'T12:00:00')) < dayStart(now));

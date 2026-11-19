@@ -19,7 +19,7 @@ async function loadAll(){
     fetchActivityLog(),
     safeGet('settings'),
     supabaseClient.from('clients').select('*'),
-    supabaseClient.from('client_improvements').select('*').order('date', { ascending:true }),
+    selectAll(() => supabaseClient.from('client_improvements').select('*').order('date', { ascending:true }).order('id')),
     supabaseClient.from('client_drafts').select('*'),
     typeof winsGroupsFetch === 'function' ? winsGroupsFetch() : null,
   ]);

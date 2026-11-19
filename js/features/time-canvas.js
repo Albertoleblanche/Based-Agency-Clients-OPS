@@ -126,31 +126,41 @@ function tsRange(e){
   return toDateStr(start) === e.date && toDateStr(end) === e.date ? { start, end } : null;
 }
 function tsClientMono(c){ return c ? monoHtml(c, 'sm') : '<span class="mono sm" aria-hidden="true">?</span>'; }
+// A row reads like Harvest's: the project with the client in brackets, the task, then the notes.
+// Time that isn't in Harvest shows the client and its service the same way.
+function tsHead(c, projectId, taskId, service){
+  const p = projectId && typeof hvProjectName === 'function' ? hvProjectName(projectId) : '', t = taskId && typeof hvTaskName === 'function' ? hvTaskName(taskId) : '';
+  const name = c ? c.name : 'Client removed';
+  const head = p ? `<b>${escapeHtml(p)}</b> <span class="tmi-cl">(${escapeHtml(name)})</span>` : `<b>${escapeHtml(name)}</b>`;
+  const task = p ? t : (t || service || '');
+  return { head, task };
+}
+function tsTextHtml(c, projectId, taskId, service, notes){
+  const h = tsHead(c, projectId, taskId, service);
+  return `<div class="tx"><span class="tmi-h">${h.head}</span>${h.task ? `<span class="tmi-t">${escapeHtml(h.task)}</span>` : ''}${notes ? `<span class="s">${escapeHtml(notes)}</span>` : ''}</div>`;
+}
 function tsRowHtml(e, rng){
   const c = clients.find(x => x.id === e.clientId);
-  const sub = [c ? c.name : 'Client removed', typeof hvEntryWords === 'function' ? hvEntryWords(e) : e.service].filter(Boolean).map(escapeHtml).join(' · ');
-  // in Harvest, or why not (a failed send is tried again when the entry is edited and each night)
   // logged in Harvest (step 4), invoiced there, sent there, or why not (tried again when edited and each night)
   const sync = e.harvestStatus === 'failed' || (e.harvestStatus === 'unmapped' && e.harvestProjectId) ? `<span class="tmi-sync is-err" title="${escapeHtml(e.harvestError || 'Not in Harvest yet')}">${icon('warning')}Not in Harvest</span>`
     : e.harvestLocked ? `<span class="tmi-sync" title="Invoiced in Harvest, so it can’t change here">Invoiced</span>`
     : e.source === 'harvest' ? `<span class="tmi-sync" title="Logged in Harvest">From Harvest</span>`
     : e.harvestId ? `<span class="tmi-sync" title="In Harvest">${icon('check', { weight: 'bold' })}Harvest</span>` : '';
   return `<div class="tmi-r" role="button" tabindex="0" onclick="openTimeEntryModal('${e.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)openTimeEntryModal('${e.id}')">
-<span class="tmi-rng">${rng ? `${fmtTime(rng.start).replace(/ [AP]M$/, '')} – ${fmtTime(rng.end).replace(/ [AP]M$/, '')}` : ''}</span>${tsClientMono(c)}
-<div class="tx"><b>${escapeHtml(e.description || 'No description')}</b><span class="s">${sub}</span></div>
+<span class="tmi-rng">${rng ? `${fmtTime(rng.start).replace(/ [AP]M$/, '')} – ${fmtTime(rng.end).replace(/ [AP]M$/, '')}` : ''}</span>
+${tsTextHtml(c, e.harvestProjectId, e.harvestTaskId, e.service, e.description)}
 ${sync}${e.harvestLocked ? '<span class="tmi-cont"></span>' : `<button class="ib tmi-cont" aria-label="Continue this" title="Continue this" data-resume-client="${e.clientId}" data-resume-desc="${encodeURIComponent(e.description || '')}" data-resume-entry="${e.id}" onclick="event.stopPropagation();continueEntry(this)">${icon('play')}</button>`}<span class="tmi-dur">${hmm(e.minutes)}</span></div>`;
 }
 function tsRunRowHtml(){
   const tc = clients.find(x => x.id === timerState.clientId);
-  const svc = timerState.projectId && typeof hvEntryWords === 'function' ? hvEntryWords({ harvestProjectId: timerState.projectId, harvestTaskId: timerState.taskId }) : timerState.service || tc?.service || '';
-  return `<div class="tmi-r is-run"><span class="tmi-rng">${fmtTime(new Date(timerState.startedAt)).replace(/ [AP]M$/, '')} – now</span>${tsClientMono(tc)}
-<div class="tx"><b>${escapeHtml(timerState.description || 'No description')}</b><span class="s">${[tc?.name, svc].filter(Boolean).map(escapeHtml).join(' · ')}</span></div>
+  return `<div class="tmi-r is-run"><span class="tmi-rng">${fmtTime(new Date(timerState.startedAt)).replace(/ [AP]M$/, '')} – now</span>
+${tsTextHtml(tc, timerState.projectId, timerState.taskId, timerState.service || tc?.service || '', timerState.description)}
 <span class="tmi-live"><i class="tmx-rec"></i>Running</span><span class="tmi-dur" id="tsRunDur">${hmm(runningMinutes())}</span></div>`;
 }
 function tsPausedRowHtml(){
   const pc = clients.find(x => x.id === timerPaused.clientId);
-  return `<div class="tmi-r is-run"><span class="tmi-rng">Paused</span>${tsClientMono(pc)}
-<div class="tx"><b>${escapeHtml(timerPaused.description || 'No description')}</b><span class="s">${escapeHtml(pc?.name || '')}</span></div>
+  return `<div class="tmi-r is-run"><span class="tmi-rng">Paused</span>
+${tsTextHtml(pc, timerPaused.projectId, timerPaused.taskId, timerPaused.service || '', timerPaused.description)}
 <button class="btn" onclick="resumePausedTimer()">${icon('play')}Resume</button><button class="btn" onclick="finishPausedTimer()">Done</button></div>`;
 }
 // A day's rows, newest first, with any gap of half an hour or more between timed entries.
