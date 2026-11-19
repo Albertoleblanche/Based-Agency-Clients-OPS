@@ -16,7 +16,7 @@
 //
 // The actual Claude/OpenAI calling logic (model names, tool config,
 // response parsing) lives in lib/ai-client.js now, shared with
-// api/cron-wednesday-notify.js's weekly proactive-insights job — see
+// the weekly proactive-insights job (since removed) — see
 // that file's header comment for why this was pulled out rather than
 // hand-copied a second time.
 //

@@ -33,7 +33,6 @@ const NOTIFICATION_TYPE_META = {
   email_sent:              { label:'A client email is sent', section:'Client Work', visibleTo:'approver' },
   reminder_follow_up_due:  { label:'A client follow-up you own comes due', section:'Client Work' },
   reminder_escalated:      { label:'A client follow-up has gone unanswered for a week', section:'Client Work', visibleTo:'approver' },
-  weekly_focus_report:     { label:'The weekly focus report is ready', section:'Client Work' },
   client_danger_maxed:     { label:'A client\'s danger score hits 5/5', section:'Client Work' },
   client_danger_decreased: { label:'A client\'s danger score goes down', section:'Client Work' },
   harvest_client:          { label:'A client is added from Harvest or archived there', section:'Client Work', visibleTo:'approver' },
@@ -129,7 +128,7 @@ async function loadNotifications(){
   if(!currentUser){ notifications = []; return; }
   const { data, error } = await supabaseClient.from('notifications').select('*').eq('user_id', currentUser.id).order('created_at', { ascending:false }).limit(50);
   if(error){ console.error('loadNotifications error', error); notifications = []; return; }
-  notifications = data || [];
+  notifications = (data || []).filter(n => n.type !== 'weekly_focus_report');   // the weekly report was removed
   updateNotifBadge();
 }
 
@@ -216,11 +215,6 @@ async function handleNotifClick(id){
     hidePop(document.getElementById('notifPanel'));
     if(clients.some(c=>c.id===n.target_id && !c.deletedAt)) openClientInspectorFor(n.target_id);
     else switchView('clients');
-    return;
-  }
-  if(n.target_view==='weekly-focus-report'){
-    hidePop(document.getElementById('notifPanel'));
-    openWeeklyFocusReportModal(n.target_id);
     return;
   }
   if(n.target_view){

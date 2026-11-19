@@ -205,7 +205,7 @@ function applyAppBranding(){
 // duplicating that as a second editable field here would just be
 // confusing about which one actually takes effect.
 const NAV_LABEL_DEFAULTS = {
-  overview: 'Today', focusreports: 'Focus Reports', clients: 'All Clients', health: 'Health', approve: 'This Week', teamqueue: 'Review',
+  overview: 'Today', clients: 'All Clients', health: 'Health', approve: 'This Week', teamqueue: 'Review',
   notes: 'Notes', tasks: 'Tasks', reminders: 'Reminders', calendar: 'Calendar',
   time: 'Time', team: 'Team', trash: 'Recently Deleted', settings: 'Settings',
 };
@@ -397,41 +397,6 @@ function renderAiProviderChoice(){
     const el = document.getElementById(elId);
     if(el && document.activeElement !== el){ el.value = sig[sigFieldMap[elId]] || ''; el.disabled = !isAdmin(); }
   });
-  // Undefined means enabled — this feature predates the toggle, so an
-  // existing deployment that's never touched this setting keeps working
-  // exactly as before rather than silently going quiet.
-  const proactiveToggle = document.getElementById('proactiveInsightsToggle');
-  if(proactiveToggle){
-    const enabled = settings.proactiveInsightsEnabled !== false;
-    proactiveToggle.classList.toggle('on', enabled);
-    proactiveToggle.disabled = !isAdmin();
-  }
-  const daySelect = document.getElementById('proactiveInsightsDaySelect');
-  if(daySelect){
-    // Undefined means Wednesday (3) — matches the cron's own fallback, so
-    // an existing deployment that's never touched this shows the day it's
-    // actually already running on, not a misleading blank/default.
-    daySelect.value = String(settings.proactiveInsightsDayOfWeek ?? 3);
-    daySelect.disabled = !isAdmin();
-  }
-}
-
-async function saveProactiveInsightsDay(value){
-  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
-  settings.proactiveInsightsDayOfWeek = parseInt(value);
-  const ok = await persistSettings();
-  const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][settings.proactiveInsightsDayOfWeek];
-  ok ? showToast('success','Saved', `Weekly focus reports will now go out on ${dayName}s.`) : showToast('error','Save failed','Could not save — try again.');
-}
-
-async function toggleProactiveInsightsEnabled(){
-  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
-  const currentlyEnabled = settings.proactiveInsightsEnabled !== false;
-  settings.proactiveInsightsEnabled = !currentlyEnabled;
-  const ok = await persistSettings();
-  if(!ok){ settings.proactiveInsightsEnabled = currentlyEnabled; showToast('error','Save failed','Could not save — try again.'); return; }
-  renderAiProviderChoice();
-  showToast('success', settings.proactiveInsightsEnabled ? 'Enabled' : 'Disabled', settings.proactiveInsightsEnabled ? 'The weekly focus report is back on.' : 'The weekly focus report is paused until re-enabled.');
 }
 
 // Lets a redeployment-free response to a provider deprecating/renaming a

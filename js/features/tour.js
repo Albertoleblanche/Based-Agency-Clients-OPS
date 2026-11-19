@@ -6,7 +6,6 @@ const tourSteps = [
   { view: 'overview', title: 'Today', body: 'What needs you today: client updates due or overdue, health changes, tasks due and the calendar.' },
   { view: 'approve', title: 'This Week', body: 'Every client gets one update a week, sent by an approver the day it’s ready. Overdue ones come first, then the ones due today.' },
   { view: 'teamqueue', title: 'Review', body: 'Drafts waiting for an approver. Read them, edit, and send.' },
-  { view: 'focusreports', title: 'Focus Reports', body: 'A weekly brief on which clients need the team, and why.' },
   { view: 'clients', title: 'All Clients', body: 'Every client with its service, owner, hours and health. Open one to see its whole history.' },
   { view: 'health', title: 'Health', body: 'Clients at risk or worth watching, the signals behind it, and the next step.' },
   { view: 'tasks', title: 'Tasks', body: 'Work you hand out or get. Only the two people on a task can see it.' },

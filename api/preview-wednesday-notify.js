@@ -1,24 +1,9 @@
-// Two related but very different preview actions live here — still one
-// file/one function, matching the project's action-dispatch convention
-// (see send-slack-message.js) rather than a second endpoint:
-//
-//   action=email (default, or GET) — shows exactly what the Wednesday
-//     digest email would send right now. Free, read-only, any signed-in
-//     team member can call it — it only reads data already sitting in the
-//     database.
-//
-//   action=proactive — admin-only. Unlike the email preview, this ACTUALLY
-//     runs the real website-check + pattern-detection logic (via
-//     lib/proactive-insights.js, dryRun mode) to show what the Wednesday
-//     automation would currently find. That means it costs real AI API
-//     money every time someone clicks it — there's no way to preview
-//     "what would an AI website check find" without actually asking the AI
-//     to check the website. dryRun mode guarantees it never writes
-//     lastProactiveCheckAt (so it doesn't consume a client's spot in next
-//     week's real rotation) and never sends a notification to anyone.
+// Shows exactly what the Wednesday digest email would send right now. Free, read-only, any
+// signed-in team member can call it — it only reads data already sitting in the database.
+// (The weekly focus report's 'proactive' preview was removed with the report on Nov 19, 2026.)
 
 const { createClient } = require('@supabase/supabase-js');
-const { clientRowFromDb, improvementRowFromDb, runProactiveInsights } = require('../lib/proactive-insights');
+
 
 async function previewEmail(admin, res) {
   const [{ data: clientsData }, { data: settingsRow }, { data: profiles }] = await Promise.all([
@@ -59,51 +44,6 @@ async function previewEmail(admin, res) {
   res.status(200).json({ wouldSend: true, to, subject, body, pendingCount: pending.length });
 }
 
-async function previewProactive(admin, callerProfile, res) {
-  if (!['admin', 'approver'].includes(callerProfile.role)) {
-    res.status(403).json({ error: 'Only admins and approvers can run a proactive-insights preview — it costs real API calls, same as the actual weekly run.' });
-    return;
-  }
-  if (callerProfile.role !== 'admin') {
-    // Approvers can see the toggle's effects (they get the real weekly
-    // notifications too), but only admins can actually spend the API
-    // budget on a manual preview run — matches the AI Provider settings
-    // themselves being admin-only.
-    res.status(403).json({ error: 'Only admins can run a preview — it costs real API calls.' });
-    return;
-  }
-
-  const { data: settingsRow } = await admin.from('app_storage').select('value').eq('key', 'settings').maybeSingle();
-  const settings = settingsRow ? JSON.parse(settingsRow.value) : {};
-
-  if (settings.proactiveInsightsEnabled === false) {
-    res.status(200).json({ ran: false, reason: 'Proactive insights are turned off in Settings -> AI & Email — enable it there first.' });
-    return;
-  }
-
-  const [{ data: clientsData, error: clientsErr }, { data: impData, error: impErr }] = await Promise.all([
-    admin.from('clients').select('*'),
-    admin.from('client_improvements').select('id, client_id, author, text, date'),
-  ]);
-  if (clientsErr || impErr) {
-    res.status(500).json({ error: (clientsErr || impErr).message });
-    return;
-  }
-
-  const clients = (clientsData || []).filter(r => !(r.custom_field_values && r.custom_field_values.harvestSetup === 'needed')).map(clientRowFromDb);
-  const improvementsByClient = {};
-  (impData || []).forEach(r => {
-    (improvementsByClient[r.client_id] = improvementsByClient[r.client_id] || []).push(improvementRowFromDb(r));
-  });
-  clients.forEach(c => { c.improvements = improvementsByClient[c.id] || []; });
-
-  // log is passed but discarded — dryRun means runProactiveInsights never
-  // actually writes to it, this is just satisfying the function's shape.
-  const throwawayLog = [];
-  const result = await runProactiveInsights(admin, clients, throwawayLog, settings, { dryRun: true });
-  res.status(200).json({ ran: true, ...result });
-}
-
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST' && req.method !== 'GET') {
     res.status(405).json({ error: 'Method not allowed' });
@@ -131,19 +71,6 @@ module.exports = async function handler(req, res) {
     const { data: callerData, error: callerErr } = await admin.auth.getUser(callerToken);
     if (callerErr || !callerData?.user) {
       res.status(401).json({ error: 'Invalid or expired session — please log in again' });
-      return;
-    }
-
-    const action = req.method === 'GET' ? req.query.action : (req.body || {}).action;
-
-    if (action === 'proactive') {
-      const { data: callerProfile, error: profileErr } = await admin
-        .from('team_profiles').select('role').eq('id', callerData.user.id).maybeSingle();
-      if (profileErr || !callerProfile) {
-        res.status(403).json({ error: 'Could not verify your account' });
-        return;
-      }
-      await previewProactive(admin, callerProfile, res);
       return;
     }
 

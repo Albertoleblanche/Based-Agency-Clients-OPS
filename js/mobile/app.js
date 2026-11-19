@@ -701,7 +701,7 @@ function mMoreHtml(){
   const g = (ic, t, right, fn) => mIr(`<span class="gl">${icon(ic)}</span>`, t, '', right || '', fn, { n: true });
   return `<h1 class="big" style="margin-top:8px">More</h1>
 <div class="ig" style="margin-top:16px"><button class="ir prof" onclick="mOpenProfile()">${me.avatar_url ? `<img src="${safeUrl(me.avatar_url)}" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover">` : avHtml(me.name || '?')}<div class="tx"><b>${mEsc(me.name || '')}</b><span>${mEsc(roleDisplayLabel(me.role))} · ${mEsc(settings.appName || 'Based Radar')}</span></div>${icon('caret-right', { cls: 'chev', weight: 'bold' })}</button></div>
-<div class="ig" style="margin-top:20px">${g('buildings', 'Clients', String(activeClients().length), "mOpenClients()")}${g('calendar-blank', 'Calendar', '', 'mOpenCalendar()')}${g('bell-ring', 'Reminders', due ? String(due) : '', 'mOpenReminders()')}${g('notepad', 'Notes', '', 'mOpenNotes()')}${g('timer', 'Time', timerState.running ? `<span class="mClk">${mClock()}</span>` : '', 'mOpenTime()')}${g('clipboard-text', 'Focus Reports', '', 'mOpenFocus()')}</div>
+<div class="ig" style="margin-top:20px">${g('buildings', 'Clients', String(activeClients().length), "mOpenClients()")}${g('calendar-blank', 'Calendar', '', 'mOpenCalendar()')}${g('bell-ring', 'Reminders', due ? String(due) : '', 'mOpenReminders()')}${g('notepad', 'Notes', '', 'mOpenNotes()')}${g('timer', 'Time', timerState.running ? `<span class="mClk">${mClock()}</span>` : '', 'mOpenTime()')}</div>
 <div class="ig" style="margin-top:20px">${g('users-three', 'Team', '', 'mOpenTeam()')}${g('trash', 'Recently Deleted', '', 'mOpenDeleted()')}${g('gear-six', 'Settings', '', 'mOpenSettings()')}</div>
 <div class="ig" style="margin-top:20px">${g('desktop', 'Open the Desktop Version', '', "mOpenDesktop()")}</div>`;
 }
@@ -793,30 +793,6 @@ function mOpenTime(){
 ${mIsh('Today')}<div class="ig">${td.map(e => { const cc = clients.find(x => x.id === e.clientId); return mIr('', mEsc(cc ? cc.name : 'Client'), mEsc(e.description || e.service || ''), hm(e.minutes), null, { n: true }); }).join('') || '<div class="ir"><span class="t n" style="color:var(--label-2)">Nothing logged today</span></div>'}</div>`;
   });
 }
-function mOpenFocus(){
-  mPush('Focus Reports', () => `<h1 class="big">Focus Reports</h1><p class="big-sub">Loading…</p>`);
-  supabaseClient.from('weekly_focus_reports').select('id, generated_at, data').order('generated_at', { ascending: false }).limit(12).then(({ data }) => {
-    const top = mTop(); if(!top || top.title !== 'Focus Reports') return;
-    const rows = (data || []).map(r => { const d = r.data || {}, a = (d.attentionClients || []).length, p = (d.pendingDrafts || []).length;
-      return { r, t: 'Week of ' + new Date(r.generated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), s: [a ? `${a} need attention` : '', p ? `${p} pending drafts` : ''].filter(Boolean).join(' · ') || 'Nothing needed attention' }; });
-    window._mFocus = rows;
-    top.el.querySelector('.ipbody').innerHTML = `<h1 class="big">Focus Reports</h1><p class="big-sub">Every ${DAY_NAMES[settings.proactiveInsightsDayOfWeek ?? 3]}</p>
-<div class="ig" style="margin-top:16px">${rows.map((x, k) => mIr('', x.t, x.s, '', `mOpenFocusReport(${k})`, { n: true })).join('') || '<div class="ir"><span class="t n" style="color:var(--label-2)">No reports yet</span></div>'}</div>`;
-  });
-}
-function mOpenFocusReport(k){
-  const x = (window._mFocus || [])[k]; if(!x) return;
-  const d = x.r.data || {}, fc = id => clients.find(c => c.id === id);
-  mPush(x.t, () => {
-    const sec = (t, rows) => rows.length ? mIsh(t) + `<div class="ig">${rows.join('')}</div>` : '';
-    return `<h1 class="big" style="font-size:28px">${mEsc(x.t)}</h1><p class="big-sub">${mEsc(x.s)}</p>
-${sec('Need attention', (d.attentionClients || []).map(a => mIr(monoHtml(fc(a.id) || a), mEsc(a.name), mEsc(a.daysSinceImprovement == null ? 'Nothing logged yet' : `No update in ${a.daysSinceImprovement} days`) + ` · risk ${a.danger} of 5`, '', fc(a.id) ? `mOpenClient('${a.id}')` : null)))}
-${sec('Overdue follow-ups', (d.overdueFollowUps || []).map(f => mIr('', mEsc(f.question || 'Follow-up'), mEsc(f.clientName || ''), '', null, { n: true })))}
-${sec('Gone quiet', (d.staleClients || []).map(a => mIr(monoHtml(fc(a.id) || a), mEsc(a.name), a.daysSinceImprovement == null ? 'Nothing logged yet' : `Nothing logged in ${a.daysSinceImprovement} days`, '', fc(a.id) ? `mOpenClient('${a.id}')` : null)))}
-${sec('Pending drafts', (d.pendingDrafts || []).map(a => mIr(monoHtml(fc(a.id) || a), mEsc(a.name), 'Draft waiting for review', '', null)))}
-${(d.aiFindings || []).length ? mIsh('Patterns noticed') + d.aiFindings.map(f => `<div class="inote">${f.title ? `<b>${mEsc(f.title)}.</b> ` : ''}${mEsc(f.body || '')}</div>`).join('') : ''}`;
-  });
-}
 function mOpenTeam(){
   mPush('Team', () => `<h1 class="big">Team</h1><p class="big-sub">${teamProfiles.filter(p => !p.access_revoked).length} people</p>
 <div class="ig" style="margin-top:16px">${teamProfiles.filter(p => !p.access_revoked).sort((a, b) => a.name.localeCompare(b.name)).map(p => mIr(avHtml(p.name), mEsc(p.name), mEsc(p.title || roleDisplayLabel(p.role)), p.phone ? `<a href="tel:${mEsc(p.phone)}" aria-label="Call ${mEsc(p.name)}" onclick="event.stopPropagation()" style="display:inline-flex;width:22px;height:22px">${icon('phone')}</a>` : '', p.email ? `location.href='mailto:${mEsc(p.email)}'` : null, { div: true, cls: 'person' })).join('')}</div>`);
@@ -905,7 +881,7 @@ function mOpenFromHash(hash){
   else if(h === 'calendar'){ mSwitchTab('more'); mOpenCalendar(); }
   else if(h === 'health'){ mSwitchTab('today'); mOpenClients('health'); }
   else if(h === 'time' || h === 'timesheet'){ mSwitchTab('more'); mOpenTime(); }
-  else if(h === 'focusreports'){ mSwitchTab('more'); mOpenFocus(); }
+  else if(h === 'focusreports'){ mSwitchTab('today'); }
   else if(h === 'notes'){ mSwitchTab('more'); mOpenNotes(); }
   else if(h === 'clients'){ mSwitchTab('more'); mOpenClients(); }
   else if(h === 'team'){ mSwitchTab('more'); mOpenTeam(); }

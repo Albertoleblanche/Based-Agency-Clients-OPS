@@ -93,7 +93,6 @@
       <div class="src-sep" role="separator"></div>
       <a class="src-i nav-item" data-view="approve" href="#approve" onclick="switchView('approve');return false;" id="approveQueueNavItem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /> <path d="m21.854 2.147-10.94 10.939" /></svg><span class="nav-label">This Week</span><span class="n nav-badge" id="navPendingBadge" style="display:none">0</span></a>
       <a class="src-i nav-item" data-view="teamqueue" href="#teamqueue" onclick="switchView('teamqueue');return false;" id="teamQueueNavItem" style="display:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2" /> <path d="M17 3h2a2 2 0 0 1 2 2v2" /> <path d="M21 17v2a2 2 0 0 1-2 2h-2" /> <path d="M7 21H5a2 2 0 0 1-2-2v-2" /> <circle cx="12" cy="12" r="1" /> <path d="M18.944 12.33a1 1 0 0 0 0-.66 7.5 7.5 0 0 0-13.888 0 1 1 0 0 0 0 .66 7.5 7.5 0 0 0 13.888 0" /></svg><span class="nav-label">Review</span><span class="n hot nav-badge" id="navTeamPendingBadge" style="display:none">0</span></a>
-      <a class="src-i nav-item" data-view="focusreports" href="#focusreports" onclick="switchView('focusreports');return false;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <line x1="22" x2="18" y1="12" y2="12" /> <line x1="6" x2="2" y1="12" y2="12" /> <line x1="12" x2="12" y1="6" y2="2" /> <line x1="12" x2="12" y1="22" y2="18" /></svg><span class="nav-label">Focus Reports</span></a>
       <div class="src-sep" role="separator"></div>
       <a class="src-i nav-item" data-view="clients" href="#clients" onclick="switchView('clients');return false;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 12h.01" /> <path d="M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" /> <path d="M22 13a18.15 18.15 0 0 1-20 0" /> <rect width="20" height="14" x="2" y="6" rx="2" /></svg><span class="nav-label">All Clients</span><span class="n nav-badge" id="navClientsBadge" style="display:none">0</span></a>
       <a class="src-i nav-item" data-view="health" href="#health" onclick="switchView('health');return false;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></svg><span class="nav-label">Health</span><span class="n nav-badge" id="navHealthBadge" style="display:none">0</span></a>
@@ -156,42 +155,7 @@
     <!-- OVERVIEW -->
     <div class="view active" id="view-overview">
       <div class="content" id="todayRoot"></div>
-      <div id="weeklyFocusReportBanner" hidden><span id="weeklyFocusReportBannerDate"></span></div>
     </div>
-
-    <!-- PAST REPORTS -->
-    <div class="view" id="view-focusreports">
-      <div class="split" id="focusRoot"></div>
-      <div hidden class="legacy">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
-        <div style="display:flex;align-items:center;gap:6px;">
-          <label style="font-size:11px;font-weight:600;color:var(--muted);">From</label>
-          <input type="date" id="focusReportsFromDate" onchange="renderFocusReportsPage()" style="font-family:var(--font);font-size:12.5px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);">
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;">
-          <label style="font-size:11px;font-weight:600;color:var(--muted);">To</label>
-          <input type="date" id="focusReportsToDate" onchange="renderFocusReportsPage()" style="font-family:var(--font);font-size:12.5px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);">
-        </div>
-        <span class="row-link" onclick="clearFocusReportsDateFilter()">Clear</span>
-      </div>
-      <div class="panel">
-        <div class="table-scroll-wrap">
-          <table>
-            <thead><tr>
-              <th>Date</th>
-              <th>Needs attention</th>
-              <th>Overdue</th>
-              <th>Gone quiet</th>
-              <th>Pending drafts</th>
-              <th style="text-align:right;">Actions</th>
-            </tr></thead>
-            <tbody id="focusReportsTbody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-    </div>
-
 
     <!-- CLIENTS -->
     <div class="view" id="view-clients">
@@ -1228,7 +1192,6 @@
 <script src="js/features/calendar.js"></script>
 <script src="js/features/google-calendar-push.js"></script>
 <script src="js/features/notifications.js"></script>
-<script src="js/features/weekly-focus-report.js"></script>
 <script src="js/features/profile.js"></script>
 <script src="js/features/time-tracker.js"></script>
 <script src="js/features/attachments.js"></script>
@@ -1249,7 +1212,6 @@
 <script src="js/features/work-canvas.js"></script>
 <script src="js/features/calendar-canvas.js"></script>
 <script src="js/features/time-canvas.js"></script>
-<script src="js/features/focus-canvas.js"></script>
 <script src="js/features/team-canvas.js"></script>
 <script src="js/features/trash-canvas.js"></script>
 <script src="js/features/assistant-canvas.js"></script>

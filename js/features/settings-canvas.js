@@ -431,18 +431,15 @@ function cfMenu(e, id, i, n){
 }
 
 // ---- Connections → AI: the accounts, which one the Assistant uses, and the weekly insights ------
-// Drafts are written with ChatGPT; the Assistant and the weekly insights use the one picked here.
+// Drafts are written with ChatGPT; the Assistant uses the one picked here.
 function setAi(){
   const admin = isAdmin(), provider = settings.aiProvider === 'openai' ? 'openai' : 'claude';
-  const insightsOn = settings.proactiveInsightsEnabled !== false;
   const conn = p => `<div class="fr"><div class="l"><b>${p === 'claude' ? 'Claude' : 'ChatGPT'}</b><span id="aiConnectionStatus-${p}">Checking…</span></div><input id="${p === 'claude' ? 'setClaudeModel' : 'setOpenaiModel'}" class="tf" style="width:170px" value="${esc(p === 'claude' ? settings.claudeModel || '' : settings.openaiModel || '')}" placeholder="${esc(p === 'claude' ? DEFAULT_CLAUDE_MODEL : DEFAULT_OPENAI_MODEL)}" aria-label="${p === 'claude' ? 'Claude' : 'ChatGPT'} model" onchange="saveAiModel('${p}', this.value)" title="Model"><button class="btn" id="aiConnectionBtn-${p}" onclick="openAiProviderConnectModal('${p}')">Connect…</button></div>`;
   return `<div class="set-h">Accounts</div><div class="form-grp">${conn('claude')}${conn('openai')}</div>
 <p class="set-note">Each account’s key stays on the server. The box is the model it uses. Drafts are written with ChatGPT.</p>
-<div class="set-h">Assistant and weekly insights</div>
+<div class="set-h">Assistant</div>
 <div class="form-grp">
-${fr('Use', 'For the Assistant and the weekly insights in Focus Reports', `<div class="seg" role="radiogroup" aria-label="AI for the Assistant and insights">${[['claude', 'Claude'], ['openai', 'ChatGPT']].map(([k, t]) => `<button role="radio" aria-checked="${provider === k}" class="${provider === k ? 'on' : ''}" ${admin ? `onclick="saveAiProvider('${k}').then(renderSettingsView)"` : 'disabled'}>${t}</button>`).join('')}</div>`)}
-${fr('Weekly insights', 'A short note on patterns across your clients', `${popSel('Day', DAY_OPTS.map(([i, d]) => [i, 'Every ' + d]), settings.proactiveInsightsDayOfWeek ?? 3, 'saveProactiveInsightsDay(this.value).then(renderSettingsView)', { disabled: !admin })}${swHtml(insightsOn, 'Weekly insights', 'toggleProactiveInsightsEnabled().then(renderSettingsView)', !admin)}`)}
-<div class="fr"><div class="l"><span>See what this week’s would say</span></div><button class="btn" onclick="previewProactiveInsights()">${icon('eye')}Preview</button></div>
+${fr('Use', 'For the Assistant', `<div class="seg" role="radiogroup" aria-label="AI for the Assistant">${[['claude', 'Claude'], ['openai', 'ChatGPT']].map(([k, t]) => `<button role="radio" aria-checked="${provider === k}" class="${provider === k ? 'on' : ''}" ${admin ? `onclick="saveAiProvider('${k}').then(renderSettingsView)"` : 'disabled'}>${t}</button>`).join('')}</div>`)}
 </div>`;
 }
 let aiConnCache = null;

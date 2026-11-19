@@ -313,6 +313,5 @@ document.addEventListener('keydown', e => {
   if(v === 'approve' && window._weekDraftEdit){ cancelWeekDraftEdit(); }
   else if(v === 'approve' && window._weekSel){ closeWeekPanel(); }
   else if(v === 'health' && window._healthSel && typeof closeHealthPanel === 'function'){ closeHealthPanel(); }
-  else if(v === 'focusreports' && window._focusSel && typeof closeFocusPanel === 'function'){ closeFocusPanel(); }
   else if(v === 'tasks' && window._taskSel && typeof closeTaskPanel === 'function'){ closeTaskPanel(); }
 });

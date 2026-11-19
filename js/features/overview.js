@@ -246,7 +246,6 @@ function renderKpis(){
   renderOverviewActiveQueue();
   renderGreeting();
   if(typeof renderToday === 'function') renderToday();
-  refreshWeeklyFocusReportBanner();
 }
 
 function renderOverviewActiveQueue(){

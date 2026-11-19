@@ -113,7 +113,6 @@ function populateReportMemberFilter(){
 }
 
 const VIEW_TITLES = {
-  focusreports: ['Focus Reports', 'A weekly brief on what needs the team'],
   clients: ['All Clients', ''],
   health: ['Health', ''],
   improvements: ['Past Improvements', 'Everything the team has logged for clients'],
@@ -134,7 +133,6 @@ const VIEW_TITLES = {
 };
 
 const CMDK_PAGE_ICONS = {
-  focusreports: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="M12 11h4" /> <path d="M12 16h4" /> <path d="M8 11h.01" /> <path d="M8 16h.01" /></svg>',
   teamqueue: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2" /> <path d="M17 3h2a2 2 0 0 1 2 2v2" /> <path d="M21 17v2a2 2 0 0 1-2 2h-2" /> <path d="M7 21H5a2 2 0 0 1-2-2v-2" /> <circle cx="12" cy="12" r="1" /> <path d="M18.944 12.33a1 1 0 0 0 0-.66 7.5 7.5 0 0 0-13.888 0 1 1 0 0 0 0 .66 7.5 7.5 0 0 0 13.888 0" /></svg>',
   claude: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" /> <path d="M20 2v4" /> <path d="M22 4h-4" /> <circle cx="4" cy="20" r="2" /></svg>',
   overview: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1" /> <rect width="7" height="7" x="14" y="3" rx="1" /> <rect width="7" height="7" x="14" y="14" rx="1" /> <rect width="7" height="7" x="3" y="14" rx="1" /></svg>',
@@ -275,7 +273,6 @@ function routeHashFor(name){
 // Link for a notification's target (same targets the bell already uses).
 function notificationUrl(targetView, targetId){
   if(targetView === 'client-detail' && targetId) return '/#client/' + encodeURIComponent(targetId);
-  if(targetView === 'weekly-focus-report') return '/#focusreports';
   if(targetView && /^[a-z-]+$/.test(targetView)) return '/#' + targetView;
   return '/';
 }
@@ -346,7 +343,7 @@ async function openScreenFromAddress(hash){
 
 // Leaving a screen closes its right-hand panel, so the screen is back to its list when you return.
 // It redraws once the screen is hidden, so nothing animates out of sight or on the way back.
-const PANEL_STATE = { approve: ['_weekSel', '_weekDraftEdit'], health: ['_healthSel'], focusreports: ['_focusSel'], tasks: ['_taskSel'], plan: ['_planSel', '_planAddStep', '_planAddRem'], whatsapp: ['_waSel'] };
+const PANEL_STATE = { approve: ['_weekSel', '_weekDraftEdit'], health: ['_healthSel'], tasks: ['_taskSel'], plan: ['_planSel', '_planAddStep', '_planAddRem'], whatsapp: ['_waSel'] };
 function closePanelOnLeave(view){
   if(view === 'clients'){
     if(typeof inspectedClientId === 'undefined' || !inspectedClientId) return;
@@ -356,12 +353,12 @@ function closePanelOnLeave(view){
   const keys = PANEL_STATE[view];
   if(!keys || !keys.some(k => window[k])) return;
   keys.forEach(k => { window[k] = null; });
-  const redraw = { approve: 'renderThisWeek', health: 'renderHealth', focusreports: 'drawFocusReports', tasks: 'renderTasks', plan: 'renderPlan', whatsapp: 'renderWhatsapp' }[view];
+  const redraw = { approve: 'renderThisWeek', health: 'renderHealth', tasks: 'renderTasks', plan: 'renderPlan', whatsapp: 'renderWhatsapp' }[view];
   if(typeof window[redraw] === 'function') window[redraw]();
 }
 
 async function switchView(name){
-  if(name === 'claude') name = 'overview'; // the Assistant was removed; old links land on Today
+  if(name === 'claude' || name === 'focusreports') name = 'overview'; // the Assistant and the weekly report were removed; old links land on Today
   const leaving = currentViewName;
   closeMobileNav();
   document.querySelectorAll('.nav-item').forEach(n=>{ const on = n.dataset.view===name; n.classList.toggle('active', on); n.classList.toggle('on', on); if(on) n.setAttribute('aria-current','page'); else n.removeAttribute('aria-current'); });
@@ -411,10 +408,6 @@ async function switchView(name){
   // them — there was never a reason for this page specifically to wait.
   if(name==='profile'){ renderProfilePage(); }
   if(name==='settings' && typeof renderSettingsView === 'function'){ renderSettingsView(); if(settingsTab === 'integrations') loadIntegrationStatuses(); if(settingsTab === 'ai' && isAdmin()) loadAiProviderConnectionStatus(); if(settingsTab === 'whatsapp' && typeof waStartPoll === 'function') waStartPoll(); }
-  // weekly_focus_reports is a completely independent table — none of the
-  // 7 requests in fullRefresh() below touch it, so this page gains
-  // nothing from waiting behind them either.
-  if(name==='focusreports') renderFocusReportsPage();
   // WhatsApp shows what it has straight away and loads its own tables, instead of waiting for
   // everything else below to load first.
   if(name==='whatsapp' && typeof openWhatsappView === 'function') openWhatsappView();
@@ -425,7 +418,6 @@ async function switchView(name){
   if(name==='calendar'){ renderCalendar(); renderCalendarGoogleSyncWidget(); }
   if(name==='reminders') renderReminders();
   if(name==='claude'){ await loadClaudeHistory(); renderClaudeMessages(); }
-  if(name==='overview') refreshWeeklyFocusReportBanner();
   if(name==='improvements'){
     const fromEl = document.getElementById('improvementsFromDate');
     const toEl = document.getElementById('improvementsToDate');
