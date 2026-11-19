@@ -104,12 +104,16 @@ function updateRangeLabel(c){
 // (falls back to the latest draft's author). Shown as "Owner" and used for reminders.
 function clientOwner(c){
   if(!c) return '';
-  if(c.customFieldValues && c.customFieldValues.owner) return c.customFieldValues.owner;
+  // Someone removed from the team can't own a client: skip them (once the team has loaded), so
+  // the client falls to whoever does its work now, or to "No owner yet".
+  const ps = typeof teamProfiles !== 'undefined' ? teamProfiles : [];
+  const onTeam = n => !!n && (!ps.length || ps.some(p => p.name === n));
+  if(c.customFieldValues && onTeam(c.customFieldValues.owner)) return c.customFieldValues.owner;
   const since = addDays(rNow(), -60), tally = {};
-  (c.improvements || []).forEach(i => { if(i.author && new Date(i.date) >= since) tally[i.author] = (tally[i.author] || 0) + 1; });
+  (c.improvements || []).forEach(i => { if(onTeam(i.author) && new Date(i.date) >= since) tally[i.author] = (tally[i.author] || 0) + 1; });
   const top = Object.entries(tally).sort((a, b) => b[1] - a[1])[0];
   if(top) return top[0];
-  const d = (c.drafts || []).slice().sort((a, b) => new Date(b.draftPendingSince || 0) - new Date(a.draftPendingSince || 0))[0];
+  const d = (c.drafts || []).filter(x => onTeam(x.author)).sort((a, b) => new Date(b.draftPendingSince || 0) - new Date(a.draftPendingSince || 0))[0];
   return d ? d.author : '';
 }
 function firstName(name){ return String(name || '').split(' ')[0]; }
