@@ -237,8 +237,30 @@ function renderWhoAmI(){
 }
 
 async function handleLogout(){
+  closeFloatingUi();
   await supabaseClient.auth.signOut();
   // onAuthStateChange fires SIGNED_OUT → showLoginScreen() runs.
+}
+
+// Signing out: what floats over the app (the account menu, open menus and pickers, a sheet, the
+// bell's panel, an (i) tip) closes, and the ones made on the fly go, so nothing is left over the
+// sign-in screen or comes back after the next sign-in. While signed out, the body's "signed-out"
+// class hides everything but the sign-in screen and toasts (mac.css).
+const STATIC_EL = new WeakSet();
+document.addEventListener('DOMContentLoaded', () => document.querySelectorAll('*').forEach(el => STATIC_EL.add(el)));
+function closeFloatingUi(){
+  try{
+    if(typeof closeSidebarProfileMenu === 'function') closeSidebarProfileMenu();
+    if(typeof closeAppModal === 'function') closeAppModal();
+    if(typeof itipHide === 'function') itipHide();
+    if(typeof closeTeamActionsMenu === 'function') closeTeamActionsMenu();
+    const np = document.getElementById('notifPanel'); if(np) np.style.display = 'none';
+    const ts = document.getElementById('toastStack'); if(ts) ts.innerHTML = ''; // messages from before don't carry over
+    [...document.body.children].forEach(el => {
+      if(['SCRIPT', 'STYLE', 'LINK', 'TEMPLATE'].includes(el.tagName) || el.id === 'loginOverlay' || el.id === 'appRoot' || el.id === 'toastStack' || el.id === 'itipPop') return;
+      if(!STATIC_EL.has(el)) el.remove();
+    });
+  }catch(e){ console.warn('closeFloatingUi', e); }
 }
 
 /* ---------- Button loading state ---------- */

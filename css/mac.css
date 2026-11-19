@@ -716,3 +716,8 @@ textarea.tf{height:72px;padding:7px 9px;resize:none;line-height:1.4}
 .pipe .late .due{color:var(--yellow);font-weight:500}
 .pipe .done .n{color:var(--green)}
 .grp.flat .row+.row::before{left:14px}
+
+/* Signed out: only the sign-in screen and toasts show (app.js showLoginScreen, session.js closeFloatingUi) */
+body.signed-out > :not(#loginOverlay):not(#toastStack):not(script):not(style):not(link){display:none !important}
+/* the Team page's row menu: hidden until it's opened */
+#teamActionsMenu:not(.open){display:none}

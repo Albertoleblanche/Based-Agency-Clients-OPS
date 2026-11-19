@@ -98,6 +98,8 @@ async function handleLogin(){
 }
 
 function showLoginScreen(){
+  if(typeof closeFloatingUi === 'function') closeFloatingUi();
+  document.body.classList.add('signed-out');
   document.getElementById('loginOverlay').style.display = 'flex';
   document.getElementById('loginLoadingCard').style.display = 'none';
   document.getElementById('loginFormCard').style.display = 'block';
@@ -163,6 +165,7 @@ async function showApp(session){
       typeof hvTimeLoad === 'function' ? hvTimeLoad() : null,
     ]);
     document.getElementById('appRoot').style.display = 'flex';
+    document.body.classList.remove('signed-out');
     renderAll();
     document.getElementById('loginOverlay').style.display = 'none';
     updateTasksNavBadge();
