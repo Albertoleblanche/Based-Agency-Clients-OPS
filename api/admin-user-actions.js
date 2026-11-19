@@ -155,7 +155,18 @@ module.exports = async function handler(req, res) {
       if (!targetUserId) { res.status(400).json({ error: 'Missing targetUserId' }); return; }
       if (targetUserId === callerId) { res.status(400).json({ error: "You can't delete your own account" }); return; }
       const { error: deleteErr } = await admin.auth.admin.deleteUser(targetUserId);
-      if (deleteErr) { res.status(500).json({ error: deleteErr.message }); return; }
+      if (deleteErr) {
+        // Supabase's words when a table still points at the person with no rule for their delete
+        const blocked = /database error deleting user/i.test(deleteErr.message || '');
+        res.status(blocked ? 409 : 500).json({ error: blocked
+          ? 'Other records still point to this person, so Supabase stopped. Run addendum-user-delete.sql once in Supabase → SQL Editor, then delete again. Their time and improvements stay, without their name.'
+          : deleteErr.message });
+        return;
+      }
+      // the profile goes with them (a project without that link keeps it otherwise), and Harvest
+      // stops matching their time to a person who's gone
+      await admin.from('team_profiles').delete().eq('id', targetUserId);
+      await admin.from('harvest_users').update({ team_profile_id: null }).eq('team_profile_id', targetUserId);
       res.status(200).json({ success: true });
       return;
     }

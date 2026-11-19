@@ -46,6 +46,10 @@ Run new `.sql` files once in Supabase → SQL Editor. The current one:
   to. Until it's run, Log Time asks for a service as before.
 - `addendum-harvest-time-read.sql` — time logged in Harvest is read into Radar (source, Harvest
   person, invoiced lock). Until it's run, Radar sends time to Harvest and reads none back.
+- `addendum-user-delete.sql` — Team → Delete permanently works: every table that points at a
+  person gets a rule. Their profile, notifications and settings go with them; time,
+  improvements, tasks and history stay, without their name. Until it's run, Supabase may stop
+  the delete with "Database error deleting user". Safe to run more than once.
 
 ## Weekly wins
 
