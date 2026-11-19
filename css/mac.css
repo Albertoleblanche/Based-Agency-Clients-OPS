@@ -584,6 +584,8 @@ textarea.tf{height:72px;padding:7px 9px;resize:none;line-height:1.4}
 .ihead .r svg{width:24px;height:24px}
 .ihead .r a{position:relative}
 .ihead .bd{position:absolute;top:-4px;right:-6px;width:10px;height:10px;border-radius:50%;background:var(--red);box-shadow:0 0 0 2px var(--ios-bg)}
+.ihead .bd.is-yellow{background:var(--yellow)}
+.ihead .bd.is-blue{background:var(--blue)}
 .ilogin{display:flex;flex-direction:column;height:100%;padding:0 24px}
 .ilogin .logo{width:76px;height:76px;border-radius:18px;font-size:30px;margin:118px auto 0;box-shadow:0 8px 20px rgba(198,76,25,.3)}
 .ilogin h1{text-align:center;font-size:28px;font-weight:700;letter-spacing:-.02em;margin:20px 0 6px}

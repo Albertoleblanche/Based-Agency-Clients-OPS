@@ -132,3 +132,16 @@ function getWeekStart(d){
   date.setHours(0,0,0,0);
   return date;
 }
+
+// How urgent an unread notification is, for the dot on the bell (and each unread row): red when
+// something is late or at risk, yellow when it's waiting on you, blue for news.
+const NOTIF_RED = ['update_behind', 'reminder_escalated', 'client_danger_maxed'];
+const NOTIF_YELLOW = ['draft_ready', 'draft_written', 'task_assigned', 'reminder_follow_up_due', 'harvest_client', 'email_change_requested', 'event_invited', 'event_rsvp'];
+function notifSeverity(n){
+  const t = String((n && n.type) || '');
+  return NOTIF_RED.includes(t) || t.includes('denied') ? 'red' : NOTIF_YELLOW.includes(t) ? 'yellow' : 'blue';
+}
+function notifTopSeverity(list){
+  const s = (list || []).filter(n => !n.read).map(notifSeverity);
+  return s.includes('red') ? 'red' : s.includes('yellow') ? 'yellow' : s.length ? 'blue' : '';
+}

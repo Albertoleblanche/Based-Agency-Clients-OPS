@@ -133,12 +133,20 @@ async function loadNotifications(){
   updateNotifBadge();
 }
 
+// A dot on the bell, no number: red when something's urgent, yellow when something waits on you,
+// blue for news (notifSeverity in helpers.js). The count is in the button's label.
 function updateNotifBadge(){
   const badge = document.getElementById('notifBadge');
   if(!badge) return;
-  const unread = notifications.filter(n=>!n.read).length;
-  badge.textContent = unread > 9 ? '9+' : unread;
-  badge.style.display = unread ? 'flex' : 'none';
+  const unread = notifications.filter(n=>!n.read).length, sev = notifTopSeverity(notifications);
+  badge.textContent = '';
+  badge.className = 'notif-badge' + (sev ? ' is-' + sev : '');
+  badge.style.display = unread ? 'block' : 'none';
+  const btn = badge.closest('button');
+  if(btn){
+    const label = unread ? `Notifications: ${unread} unread${sev === 'red' ? ', something urgent' : sev === 'yellow' ? ', something waiting on you' : ''}` : 'Notifications';
+    btn.setAttribute('aria-label', label); btn.title = label;
+  }
 }
 
 function toggleNotifPanel(){

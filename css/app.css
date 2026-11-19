@@ -665,7 +665,7 @@ body.mac :is(input[type="text"], input:not([type]), input[type="email"], input[t
 .app-win .side .src { margin-top: 12px; gap: 1px; }
 .app-win .side .src-i { height: 32px; gap: 10px; padding: 0 9px; border-radius: 8px; font-size: 13px; }
 .app-win .side .src-i svg { width: 18px; height: 18px; }
-.app-win .side .src-i .n { min-width: 19px; height: 18px; padding: 0 6px; font-size: 11.5px; }
+.app-win .side .src-i .n { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; font-size: 11.5px; line-height: 1; font-variant-numeric: tabular-nums; }
 .app-win .side .src-h { font-size: 11.5px; padding: 14px 9px 5px; }
 .app-win .side .src-h:first-child { padding-top: 0; }
 /* light: a white sidebar, black text and icons */
@@ -2455,3 +2455,10 @@ a.mi{text-decoration:none;color:inherit}
 /* a note that says what to do: calm text, the fix is the link */
 .mac .fix-lnk{color:var(--blue);font-weight:500;text-decoration:none;cursor:pointer}
 .mac .fix-lnk:hover{text-decoration:underline;text-underline-offset:3px}
+/* the bell: a dot, no number; its color says how urgent (red, then yellow, then blue) */
+.mac .notif-badge{top:6px;right:6px;width:9px;height:9px;min-width:0;padding:0;border-radius:50%;font-size:0;background:var(--blue);box-shadow:0 0 0 2px var(--window)}
+.mac .notif-badge.is-red{background:var(--red)}
+.mac .notif-badge.is-yellow{background:var(--yellow)}
+.mac .nrow-dot.is-red{background:var(--red)}
+.mac .nrow-dot.is-yellow{background:var(--yellow)}
+.mac .nrow-dot.is-blue{background:var(--blue)}

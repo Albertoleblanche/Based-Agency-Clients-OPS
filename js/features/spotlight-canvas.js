@@ -107,5 +107,5 @@ function renderNotifPanel(){
   el.innerHTML = notifications.map(n => `<div class="nrow${n.read ? '' : ' unread'}" role="button" tabindex="0" onclick="handleNotifClick('${n.id}')" onkeydown="if(event.key==='Enter') handleNotifClick('${n.id}')">
 <span class="nrow-ic">${icon(NOTIF_ICON[n.type] || 'bell')}</span>
 <div class="nrow-tx"><b>${sanitizeInlineHtml(n.title)}</b>${n.body ? `<span>${sanitizeInlineHtml(n.body)}</span>` : ''}</div>
-<div class="nrow-r"><time>${notifWhen(n.created_at)}</time><span class="nrow-act">${n.read ? '' : '<i class="nrow-dot" aria-label="Unread"></i>'}<button class="ib" aria-label="Delete" onclick="event.stopPropagation();deleteNotification('${n.id}')">${icon('x')}</button></span></div></div>`).join('');
+<div class="nrow-r"><time>${notifWhen(n.created_at)}</time><span class="nrow-act">${n.read ? '' : `<i class="nrow-dot is-${notifSeverity(n)}" aria-label="Unread"></i>`}<button class="ib" aria-label="Delete" onclick="event.stopPropagation();deleteNotification('${n.id}')">${icon('x')}</button></span></div></div>`).join('');
 }

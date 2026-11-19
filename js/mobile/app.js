@@ -352,7 +352,7 @@ function mTodayHtml(){
   const waitRows = waiting.slice(0, 2).map(({ c, d }) => mIr(monoHtml(c), mEsc(c.name), nextDueTag(clientWeek(c)) + tagHtml('blue', fmtWait(d.draftPendingSince || rNow()), 'clock'), avHtml(d.author), `mOpenDraft('${c.id}',${jsArg(d.author)})`, { tags: true })).join('');
   const todayStr = toDateStr(new Date());
   const due = tasks.filter(t => t.assigneeId === currentUser.id && t.status !== 'done' && !t.cancelledAt && t.dueDate && t.dueDate <= todayStr).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-  return `<div class="ihead"><button onclick="mOpenProfile()" aria-label="My profile">${avHtml(me.name || '?')}</button><div class="r"><button aria-label="Search" onclick="mOpenSearch()">${icon('magnifying-glass')}</button><button aria-label="Notifications${unread ? ', ' + unread + ' new' : ''}" onclick="mOpenNotifications()">${icon('bell')}${unread ? '<span class="bd"></span>' : ''}</button></div></div>
+  return `<div class="ihead"><button onclick="mOpenProfile()" aria-label="My profile">${avHtml(me.name || '?')}</button><div class="r"><button aria-label="Search" onclick="mOpenSearch()">${icon('magnifying-glass')}</button><button aria-label="Notifications${unread ? ', ' + unread + ' new' : ''}" onclick="mOpenNotifications()">${icon('bell')}${unread ? `<span class="bd is-${notifTopSeverity(notifications)}"></span>` : ''}</button></div></div>
 <h1 class="big">Today</h1><p class="big-sub">${mEsc(sub)}</p>
 ${mGlanceHtml(behind, waiting, health)}
 ${mTimerCardHtml()}
