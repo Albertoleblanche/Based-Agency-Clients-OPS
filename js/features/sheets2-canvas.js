@@ -264,7 +264,7 @@ function openTaskDetailModal(taskId){
   const linked = calendarEvents.find(e => e.relatedTaskId === t.id);
   const moves = Object.keys(TASK_STAGE_LABEL).filter(k => k !== t.status && (k !== 'done' || amAssignee)).map(k => [k, TASK_STAGE_LABEL[k]]);
   const kv = (l, v) => `<label>${l}</label><div style="font-size:14px">${v}</div>`;
-  openAppModal(`<div class="sheet-meta"><span class="st"><span class="dot ${done ? 'green' : t.status === 'in_review' ? 'purple' : t.status === 'in_progress' ? 'blue' : 'hollow'}"></span>${TASK_STAGE_LABEL[t.status] || 'To Do'}</span>${overdue ? '<span class="t-red">Overdue</span>' : ''}${t.priority === 'high' && !done ? `<span class="st">${icon('flag', { cls: 'flag', fill: true })}High priority</span>` : ''}</div>
+  openAppModal(`<div class="sheet-meta"><span class="st"><span class="dot ${done ? 'green' : t.status === 'in_review' ? 'purple' : t.status === 'in_progress' ? 'blue' : 'hollow'}"></span>${TASK_STAGE_LABEL[t.status] || 'To Do'}</span>${overdue ? '<span class="t-red">Overdue</span>' : ''}${t.priority === 'high' && !done ? `<span class="st">${icon('flag', { cls: 'flag' })}High priority</span>` : ''}</div>
 <h3>${escapeHtml(t.title)}</h3>
 ${t.description ? `<p class="ev-desc" style="margin-top:-6px">${escapeHtml(t.description)}</p>` : ''}
 <div class="f kv-f">

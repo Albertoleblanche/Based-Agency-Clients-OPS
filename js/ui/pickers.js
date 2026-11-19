@@ -27,7 +27,7 @@ function datePickerFieldHtml(id, opts={}){
     <input type="hidden" id="${id}" value="${escapeHtml(value)}" data-min-date="${minDate}" data-max-date="${maxDate}">
     <button type="button" id="${id}Btn" onclick="toggleDatePickerCalendar('${id}', event)" ${disabled?'disabled':''} style="width:100%;text-align:left;font-family:var(--font);font-size:14px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--ink);cursor:${disabled?'not-allowed':'pointer'};display:flex;align-items:center;justify-content:space-between;${disabled?'opacity:.6;':''}">
       <span id="${id}Display" style="color:${hasValue?'var(--ink)':'var(--muted-lt)'};">${hasValue?formatDatePickerDisplay(value):'Select a date'}</span>
-      <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM72,48v8a8,8,0,0,0,16,0V48h80v8a8,8,0,0,0,16,0V48h24V80H48V48ZM208,208H48V96H208V208Z"/></svg>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3" /> <path d="M16 2v3" /> <rect x="3" y="3" width="18" height="18" rx="2" /> <path d="M3 9h18" /> <path d="M8 13h.01" /> <path d="M12 13h.01" /> <path d="M16 13h.01" /> <path d="M8 17h.01" /> <path d="M12 17h.01" /> <path d="M16 17h.01" /></svg>
     </button>
     <div class="calendar-dropdown" id="${id}Calendar" style="display:none;"></div>`;
 }
@@ -200,7 +200,7 @@ function timePickerFieldHtml(id, opts={}){
     <input type="hidden" id="${id}" value="${escapeHtml(value)}">
     <button type="button" id="${id}Btn" onclick="toggleTimePickerDropdown('${id}', event)" ${disabled?'disabled':''} style="width:100%;text-align:left;font-family:var(--font);font-size:14px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--ink);cursor:${disabled?'not-allowed':'pointer'};display:flex;align-items:center;justify-content:space-between;${disabled?'opacity:.6;':''}">
       <span id="${id}Display">${formatTimeDisplay(value)}</span>
-      <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z"/></svg>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>
     </button>
     <div class="calendar-dropdown" id="${id}Calendar" style="display:none;width:150px;max-height:240px;overflow-y:auto;"></div>`;
 }

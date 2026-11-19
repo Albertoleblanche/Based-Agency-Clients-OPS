@@ -421,7 +421,7 @@ function mTaskDue(t){
 function mTaskRow(t){
   const c = clients.find(x => x.id === t.clientId), who = teamProfiles.find(p => p.id === t.assigneeId);
   const sub = [c ? mEsc(shortClientName(c.name)) : '', mTaskDue(t)].filter(Boolean).join(' · ');
-  const right = (t.priority === 'high' && t.status !== 'done' ? `<span style="display:inline-flex;width:16px;height:16px;color:var(--label-2)">${icon('flag', { fill: true, label: 'High priority' })}</span>` : '') + (who ? avHtml(who.name) : '');
+  const right = (t.priority === 'high' && t.status !== 'done' ? `<span style="display:inline-flex;width:16px;height:16px;color:var(--label-2)">${icon('flag', { label: 'High priority' })}</span>` : '') + (who ? avHtml(who.name) : '');
   return mIr(mCb(t), mEsc(t.title), sub, right, `mOpenTask('${t.id}')`, { n: true, noChev: true, div: true, cls: t.status === 'done' ? 'done' : '' });
 }
 function mVisibleTasks(){
@@ -786,7 +786,7 @@ function mOpenTime(){
     const c = clients.find(x => x.id === timerState.clientId);
     const hm = m => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
     return `<h1 class="big">Time</h1><p class="big-sub">${hm(wk)} this week</p>
-<div class="ibig-timer">${timerState.running ? `<div class="clk mClk">${mClock()}</div><div class="who">${mEsc(c ? c.name : '')}${timerState.description ? ' · ' + mEsc(timerState.description) : ''}</div><button class="ibtn s" style="color:var(--red)" onclick="mStopTimer()">Stop and Save</button>` : `<div class="clk" style="color:var(--label-3)">0:00:00</div><button class="ibtn p" onclick="mOpenTimerSheet()">${icon('play', { fill: true })}Start Timer</button>`}<button class="ibtn s" style="margin-top:10px" onclick="mOpenTimeSheet()">${icon('plus')}Add Time Worked</button></div>
+<div class="ibig-timer">${timerState.running ? `<div class="clk mClk">${mClock()}</div><div class="who">${mEsc(c ? c.name : '')}${timerState.description ? ' · ' + mEsc(timerState.description) : ''}</div><button class="ibtn s" style="color:var(--red)" onclick="mStopTimer()">Stop and Save</button>` : `<div class="clk" style="color:var(--label-3)">0:00:00</div><button class="ibtn p" onclick="mOpenTimerSheet()">${icon('play')}Start Timer</button>`}<button class="ibtn s" style="margin-top:10px" onclick="mOpenTimeSheet()">${icon('plus')}Add Time Worked</button></div>
 ${mIsh('Today')}<div class="ig">${td.map(e => { const cc = clients.find(x => x.id === e.clientId); return mIr('', mEsc(cc ? cc.name : 'Client'), mEsc(e.description || e.service || ''), hm(e.minutes), null, { n: true }); }).join('') || '<div class="ir"><span class="t n" style="color:var(--label-2)">Nothing logged today</span></div>'}</div>`;
   });
 }

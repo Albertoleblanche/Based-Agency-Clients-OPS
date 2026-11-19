@@ -206,7 +206,7 @@ function renderToday(){
   // ---- the page ----
   const pill = p => p ? `<span class="ty-p${p[0] === 'red' ? ' red' : ''}">${escapeHtml(p[1])}</span>` : '';
   const itemRow = x => x.task
-    ? `<div class="ty-i" onclick="${x.go}"><button class="ty-cb" role="checkbox" aria-checked="false" aria-label="Mark ${escapeHtml(x.title)} done" onclick="event.stopPropagation();moveTaskToStatus('${x.task.id}','done')"></button><div class="tx"><b>${escapeHtml(x.title)}</b><span>${x.sub}</span></div>${x.flag ? `<span class="ty-flag">${icon('flag', { fill: true })}</span>` : ''}${pill(x.pill)}</div>`
+    ? `<div class="ty-i" onclick="${x.go}"><button class="ty-cb" role="checkbox" aria-checked="false" aria-label="Mark ${escapeHtml(x.title)} done" onclick="event.stopPropagation();moveTaskToStatus('${x.task.id}','done')"></button><div class="tx"><b>${escapeHtml(x.title)}</b><span>${x.sub}</span></div>${x.flag ? `<span class="ty-flag">${icon('flag')}</span>` : ''}${pill(x.pill)}</div>`
     : `<div class="ty-i" onclick="${x.go}">${monoHtml(x.c, 'sm')}<div class="tx"><b>${escapeHtml(x.title)}</b><span>${x.sub}</span></div>${pill(x.pill)}</div>`;
   const doneRow = x => `<div class="ty-i is-done"><span class="ty-cb on">${icon('check', { weight: 'bold' })}</span><div class="tx"><b>${escapeHtml(x.title)}</b><span>${escapeHtml(x.sub)} · ${fmtTime(x.t)}</span></div></div>`;
   const leadHtml = lead ? `<div class="ty-up"><span class="ty-lbl">Up next</span><div class="ty-up-row">${lead.c ? monoHtml(lead.c, 'lg') : `<span class="ty-up-ic">${icon(lead.ic)}</span>`}

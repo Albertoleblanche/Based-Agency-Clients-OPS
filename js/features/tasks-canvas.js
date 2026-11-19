@@ -43,7 +43,7 @@ function tkCb(t, cls){
 }
 function tkCardHtml(t){
   const c = clients.find(x => x.id === t.clientId), [due, kind] = tkDue(t);
-  const flag = t.priority === 'high' ? `<span class="tk-flag" title="High priority">${icon('flag', { fill: true })}</span>` : '';
+  const flag = t.priority === 'high' ? `<span class="tk-flag" title="High priority">${icon('flag')}</span>` : '';
   return `<article class="tk-c${t.color ? ' has-c c-' + t.color : ''}${window._taskSel === t.id ? ' is-sel' : ''}" role="button" tabindex="0" aria-label="${escapeHtml(t.title)}" onclick="selectTask('${t.id}')" onkeydown="if((event.key==='Enter'||event.key===' ')&&event.target===this){event.preventDefault();selectTask('${t.id}')}">
 <div class="tk-ct">${tkCb(t)}<b>${escapeHtml(t.title)}</b>${flag}</div>
 ${c ? `<div class="tk-cm">${tkLogo(c)}<span class="tk-cl">${escapeHtml(c.name)}</span></div>` : ''}
@@ -52,7 +52,7 @@ ${c ? `<div class="tk-cm">${tkLogo(c)}<span class="tk-cl">${escapeHtml(c.name)}<
 function tkListRowHtml(t){
   const c = clients.find(x => x.id === t.clientId), [due, kind] = tkDue(t), done = t.status === 'done';
   return `<div class="tk-lr${done ? ' is-done' : ''}${window._taskSel === t.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectTask('${t.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)selectTask('${t.id}')">${tkCb(t)}
-<div class="tx"><b>${t.color && !done ? `<i class="cc-dot c-${t.color}" aria-hidden="true"></i>` : ''}${escapeHtml(t.title)}${t.priority === 'high' && !done ? `<span class="tk-flag" title="High priority">${icon('flag', { fill: true })}</span>` : ''}</b><span class="s">${c ? escapeHtml(c.name) + ' · ' : ''}${escapeHtml(tkWho(t.assigneeId))}</span></div>
+<div class="tx"><b>${t.color && !done ? `<i class="cc-dot c-${t.color}" aria-hidden="true"></i>` : ''}${escapeHtml(t.title)}${t.priority === 'high' && !done ? `<span class="tk-flag" title="High priority">${icon('flag')}</span>` : ''}</b><span class="s">${c ? escapeHtml(c.name) + ' · ' : ''}${escapeHtml(tkWho(t.assigneeId))}</span></div>
 <span class="tk-due ${kind}">${escapeHtml(done && t.completedAt ? 'Done ' + fmtShortDate(new Date(t.completedAt)) : due)}</span></div>`;
 }
 
@@ -221,7 +221,7 @@ function taskPanelHtml(t){
   if(done && hasPermission('delete_tasks')) more.push(`<div class="msep"></div><button class="mi danger" onclick="deleteTaskPermanently('${t.id}')">${icon('trash')}Delete…</button>`);
   return `<aside class="sp tkp" aria-label="${escapeHtml(t.title)}">
 <div class="sp-bar"><button class="ib" aria-label="Close" onclick="closeTaskPanel()">${icon('x')}</button><span class="tkp-bar">${amAssigner && !done ? `<a class="x-lnk" href="#" onclick="openEditTaskModal('${t.id}');return false;">Edit</a>` : ''}${more.length ? `<button class="ib" aria-label="More" title="More" onclick="tkMore(event, '${t.id}')">${icon('dots-three')}</button><template id="tkMoreItems">${more.join('')}</template>` : ''}</span></div>
-<div class="tkp-h">${tkCb(t, 'lg')}<h3>${escapeHtml(t.title)}${t.priority === 'high' && !done ? `<span class="tk-flag" title="High priority">${icon('flag', { fill: true })}</span>` : ''}</h3></div>
+<div class="tkp-h">${tkCb(t, 'lg')}<h3>${escapeHtml(t.title)}${t.priority === 'high' && !done ? `<span class="tk-flag" title="High priority">${icon('flag')}</span>` : ''}</h3></div>
 <div class="tkp-meta">
 ${c ? `<span class="tkp-k">Client</span><span class="tkp-v"><a href="#" onclick="openClientDetail('${c.id}');return false;">${tkLogo(c)}${escapeHtml(c.name)}</a></span>` : ''}
 <span class="tkp-k">Assigned to</span><span class="tkp-v">${assigned}</span>

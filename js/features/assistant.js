@@ -121,7 +121,7 @@ function renderClaudeSidebarProjects(){
     ? claudeProjectsList.map(p=>`
         <div class="claude-sidebar-row${p.id===claudeCurrentProjectId?' active':''}">
           <button type="button" class="claude-sidebar-item" onclick="openClaudeProjectDetail('${p.id}')" title="${escapeHtml(p.name)}">
-            <svg width="12" height="12" viewBox="0 0 256 256" class="claude-sidebar-pin-icon" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.folder}</svg>
+            <svg width="12" height="12" class="claude-sidebar-pin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.folder}</svg>
             <span class="claude-sidebar-item-label">${escapeHtml(p.name)}</span>
           </button>
         </div>
@@ -170,7 +170,7 @@ function renderClaudeProjectsListView(el){
   el.innerHTML = `
     <div class="claude-projects-header">
       <div class="claude-search-wrap">
-        <svg class="claude-search-icon" width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/></svg>
+        <svg class="claude-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" /></svg>
         <input type="text" id="claudeProjectsSearchInput" placeholder="Search projects…" value="${escapeHtml(claudeProjectsSearchQuery)}" oninput="filterClaudeProjects(this.value)">
       </div>
       <button class="btn btn-brand" style="flex:none;" onclick="openNewClaudeProjectModal()">+ New project</button>
@@ -243,7 +243,7 @@ async function loadClaudeProjectConversations(projectId){
   listEl.innerHTML = (data && data.length)
     ? data.map((c,i)=>`
         <button type="button" class="claude-project-conv-row${i===data.length-1?' claude-project-conv-row-last':''}" onclick="openClaudeConversation('${c.id}')" title="${escapeHtml(c.title)}">
-          <svg width="14" height="14" viewBox="0 0 256 256" class="claude-project-conv-icon" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M88,104a8,8,0,0,1,8-8h64a8,8,0,0,1,0,16H96A8,8,0,0,1,88,104Zm8,40h64a8,8,0,0,0,0-16H96a8,8,0,0,0,0,16ZM232,56V184a16,16,0,0,1-16,16H155.57l-13.68,23.94a16,16,0,0,1-27.78,0L100.43,200H40a16,16,0,0,1-16-16V56A16,16,0,0,1,40,40H216A16,16,0,0,1,232,56Zm-16,0H40V184h65.07a8,8,0,0,1,7,4l16,28,16-28a8,8,0,0,1,7-4H216Z"/></svg>
+          <svg width="14" height="14" class="claude-project-conv-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z" /> <path d="M7 11h10" /> <path d="M7 15h6" /> <path d="M7 7h8" /></svg>
           <span class="claude-project-conv-title">${escapeHtml(c.title)}</span>
           <span class="claude-project-conv-date">${new Date(c.updated_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
         </button>`).join('')
@@ -316,12 +316,12 @@ async function deleteClaudeProject(id){
 
 const CLAUDE_SIDEBAR_ICONS = {
   pin: '<line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>',
-  rename: '<path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z"/>',
-  trash: '<path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/>',
-  folder: '<path d="M216,72H130.67L102.93,51.2a16.12,16.12,0,0,0-9.6-3.2H40A16,16,0,0,0,24,64V200a16,16,0,0,0,16,16H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72Zm0,128H40V64H93.33L123.2,86.4A8,8,0,0,0,128,88h88Z"/>',
-  chevronRight: '<path d="M181.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L164.69,128,90.34,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181.66,133.66Z"/>',
-  dot: '<path d="M232,128A104,104,0,1,1,128,24,104.13,104.13,0,0,1,232,128Z"/>',
-  pinFill: '<path d="M235.33,104l-53.47,53.65c4.56,12.67,6.45,33.89-13.19,60A15.93,15.93,0,0,1,157,224c-.38,0-.75,0-1.13,0a16,16,0,0,1-11.32-4.69L96.29,171,53.66,213.66a8,8,0,0,1-11.32-11.32L85,159.71l-48.3-48.3A16,16,0,0,1,38,87.63c25.42-20.51,49.75-16.48,60.4-13.14L152,20.7a16,16,0,0,1,22.63,0l60.69,60.68A16,16,0,0,1,235.33,104Z"/>',
+  rename: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" />',
+  trash: '<path d="M10 11v6" /> <path d="M14 11v6" /> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /> <path d="M3 6h18" /> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />',
+  folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />',
+  chevronRight: '<path d="m9 18 6-6-6-6" />',
+  dot: '<circle fill="currentColor" cx="12" cy="12" r="10" />',
+  pinFill: '<path d="M12 17v5" /> <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />',
 };
 
 function renderClaudeConversationsSidebar(){
@@ -343,36 +343,36 @@ function renderClaudeConversationsSidebar(){
           </label>` : ''}
           <button type="button" class="claude-sidebar-item" onclick="${claudeBulkMode ? `toggleClaudeBulkSelect('${c.id}')` : `openClaudeConversation('${c.id}')`}" title="${escapeHtml(c.title)}">
             ${c.pinned
-              ? `<svg width="11" height="11" viewBox="0 0 256 256" class="claude-sidebar-pin-icon" fill="currentColor">${CLAUDE_SIDEBAR_ICONS.pinFill}</svg>`
-              : `<svg width="7" height="7" viewBox="0 0 256 256" class="claude-sidebar-pin-icon" fill="currentColor">${CLAUDE_SIDEBAR_ICONS.dot}</svg>`}
+              ? `<svg width="11" height="11" class="claude-sidebar-pin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.pinFill}</svg>`
+              : `<svg width="7" height="7" class="claude-sidebar-pin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.dot}</svg>`}
             <span class="claude-sidebar-item-label">${escapeHtml(c.title)}</span>
           </button>
           ${claudeBulkMode ? '' : `
           <button type="button" class="claude-sidebar-menu-btn" id="claudeSidebarMenuBtn-${c.id}" onclick="toggleClaudeSidebarMenu(event,'${c.id}')" title="More">
-            <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M112,60a16,16,0,1,1,16,16A16,16,0,0,1,112,60Zm16,52a16,16,0,1,0,16,16A16,16,0,0,0,128,112Zm0,68a16,16,0,1,0,16,16A16,16,0,0,0,128,180Z"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1" /> <circle cx="12" cy="5" r="1" /> <circle cx="12" cy="19" r="1" /></svg>
           </button>
           <div class="claude-sidebar-menu" id="claudeSidebarMenu-${c.id}" style="display:none;">
-            <button type="button" onclick="renameClaudeConversation('${c.id}')"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.rename}</svg> Rename</button>
-            <button type="button" onclick="togglePinClaudeConversation('${c.id}', ${!c.pinned})"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.pin}</svg> ${c.pinned?'Unpin':'Pin'}</button>
+            <button type="button" onclick="renameClaudeConversation('${c.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.rename}</svg> Rename</button>
+            <button type="button" onclick="togglePinClaudeConversation('${c.id}', ${!c.pinned})"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.pin}</svg> ${c.pinned?'Unpin':'Pin'}</button>
             ${c.project_id ? `
             <div style="position:relative;">
               <button type="button" onclick="toggleClaudeSidebarProjectSubmenu(event,'${c.id}')" style="justify-content:space-between;">
-                <span style="display:flex;align-items:center;gap:8px;"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.folder}</svg> Change project</span>
-                <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.chevronRight}</svg>
+                <span style="display:flex;align-items:center;gap:8px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.folder}</svg> Change project</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.chevronRight}</svg>
               </button>
               <div class="claude-provider-menu" id="claudeSidebarProjectSubmenu-${c.id}" style="display:none;left:calc(100% + 6px);top:-6px;bottom:auto;width:180px;"></div>
             </div>
-            <button type="button" style="color:var(--muted);" onclick="removeClaudeConversationFromProjectMenu('${c.id}')"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.folder}</svg> Remove from project</button>
+            <button type="button" style="color:var(--muted);" onclick="removeClaudeConversationFromProjectMenu('${c.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.folder}</svg> Remove from project</button>
             ` : `
             <div style="position:relative;">
               <button type="button" onclick="toggleClaudeSidebarProjectSubmenu(event,'${c.id}')" style="justify-content:space-between;">
-                <span style="display:flex;align-items:center;gap:8px;"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.folder}</svg> Add to project</span>
-                <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.chevronRight}</svg>
+                <span style="display:flex;align-items:center;gap:8px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.folder}</svg> Add to project</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.chevronRight}</svg>
               </button>
               <div class="claude-provider-menu" id="claudeSidebarProjectSubmenu-${c.id}" style="display:none;left:calc(100% + 6px);top:-6px;bottom:auto;width:180px;"></div>
             </div>
             `}
-            <button type="button" style="color:var(--red);" onclick="deleteClaudeConversationFromMenu('${c.id}')"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.trash}</svg> Delete</button>
+            <button type="button" style="color:var(--red);" onclick="deleteClaudeConversationFromMenu('${c.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.trash}</svg> Delete</button>
           </div>`}
         </div>
       `).join('')
@@ -410,10 +410,10 @@ function renderClaudeBulkBar(){
       <span class="claude-bulk-select-link" onclick="toggleClaudeBulkMode()">Done</span>
     </div>
     <div class="claude-bulk-bar-actions">
-      <button type="button" class="claude-popup-menu-btn" ${n?'':'disabled'} onclick="bulkPinClaudeConversations(true)"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.pin}</svg> Pin selected</button>
-      <button type="button" class="claude-popup-menu-btn" ${n?'':'disabled'} onclick="bulkPinClaudeConversations(false)"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.pin}</svg> Unpin selected</button>
-      <button type="button" class="claude-popup-menu-btn" ${n?'':'disabled'} onclick="openClaudeBulkAddToProjectModal()"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.folder}</svg> Add to project</button>
-      <button type="button" class="claude-popup-menu-btn" style="color:var(--red);" ${n?'':'disabled'} onclick="bulkDeleteClaudeConversations()"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.trash}</svg> Delete selected</button>
+      <button type="button" class="claude-popup-menu-btn" ${n?'':'disabled'} onclick="bulkPinClaudeConversations(true)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.pin}</svg> Pin selected</button>
+      <button type="button" class="claude-popup-menu-btn" ${n?'':'disabled'} onclick="bulkPinClaudeConversations(false)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.pin}</svg> Unpin selected</button>
+      <button type="button" class="claude-popup-menu-btn" ${n?'':'disabled'} onclick="openClaudeBulkAddToProjectModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.folder}</svg> Add to project</button>
+      <button type="button" class="claude-popup-menu-btn" style="color:var(--red);" ${n?'':'disabled'} onclick="bulkDeleteClaudeConversations()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${CLAUDE_SIDEBAR_ICONS.trash}</svg> Delete selected</button>
     </div>`;
 }
 
@@ -900,16 +900,16 @@ function renderClaudePlusMenu(){
   const currentProject = currentConv?.project_id ? claudeProjectsList.find(p=>p.id===currentConv.project_id) : null;
   menuEl.innerHTML = `
     <button type="button" class="claude-popup-menu-btn" onclick="handleClaudeImageButtonClick()">
-      <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,16V158.75l-26.07-26.06a16,16,0,0,0-22.63,0l-20,20-44-44a16,16,0,0,0-22.62,0L40,149.37V56ZM40,172l52-52,80,80H40Zm176,28H194.63l-36-36,20-20L216,181.38V200ZM144,100a12,12,0,1,1,12,12A12,12,0,0,1,144,100Z"/></svg>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <circle cx="9" cy="9" r="2" /> <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>
       Add image
     </button>
     <div style="position:relative;">
       <button type="button" class="claude-popup-menu-btn" onclick="toggleClaudePlusSubmenu(event)" style="justify-content:space-between;">
         <span style="display:flex;align-items:center;gap:8px;min-width:0;">
-          <svg width="13" height="13" viewBox="0 0 256 256" style="flex:none;" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M216,72H130.67L102.93,51.2a16.12,16.12,0,0,0-9.6-3.2H40A16,16,0,0,0,24,64V200a16,16,0,0,0,16,16H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72Zm0,128H40V64H93.33L123.2,86.4A8,8,0,0,0,128,88h88Z"/></svg>
+          <svg width="13" height="13" style="flex:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg>
           <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${currentProject ? `In ${escapeHtml(currentProject.name)}` : 'Add to project'}</span>
         </span>
-        <svg width="12" height="12" viewBox="0 0 256 256" style="flex:none;" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M181.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L164.69,128,90.34,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181.66,133.66Z"/></svg>
+        <svg width="12" height="12" style="flex:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
       </button>
       <div class="claude-provider-menu" id="claudePlusSubmenu" style="display:none;"></div>
     </div>`;
@@ -984,14 +984,14 @@ function handleClaudeInputKey(e, source){
 // randomly picks a handful each time a genuinely NEW empty-chat session
 // starts, so they vary instead of always showing the identical fixed set.
 const CLAUDE_QUICK_ACTION_POOL = [
-  { text:'What needs my attention this week?', icon:'<path d="M236.8,188.09,149.35,36.22h0a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM222.93,203.8a8.5,8.5,0,0,1-7.48,4.2H40.55a8.5,8.5,0,0,1-7.48-4.2,7.59,7.59,0,0,1,0-7.72L120.52,44.21a8.75,8.75,0,0,1,15,0l87.45,151.87A7.59,7.59,0,0,1,222.93,203.8ZM120,144V104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,180Z"/>' },
-  { text:'Which clients have gone quiet lately?', icon:'<path d="M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23ZM188.9,190.34A88,88,0,0,1,65.66,67.11a89,89,0,0,1,31.4-26A106,106,0,0,0,96,56,104.11,104.11,0,0,0,200,160a106,106,0,0,0,14.92-1.06A89,89,0,0,1,188.9,190.34Z"/>' },
-  { text:'Help me draft a client update', icon:'<path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z"/>' },
-  { text:'Check a client\'s website for issues', icon:'<path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/>' },
-  { text:'Which clients are overdue for a follow-up?', icon:'<path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z"/>' },
-  { text:'Summarize this week\'s pending drafts', icon:'<path d="M213.66,82.34l-56-56A8,8,0,0,0,152,24H56A16,16,0,0,0,40,40V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V88A8,8,0,0,0,213.66,82.34ZM160,51.31,188.69,80H160ZM200,216H56V40h88V88a8,8,0,0,0,8,8h48V216Zm-32-80a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,168,136Zm0,32a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,168,168Z"/>' },
-  { text:'Which client has the highest risk right now?', icon:'<path d="M197.58,129.06,146,110l-19-51.62a15.92,15.92,0,0,0-29.88,0L78,110l-51.62,19a15.92,15.92,0,0,0,0,29.88L78,178l19,51.62a15.92,15.92,0,0,0,29.88,0L146,178l51.62-19a15.92,15.92,0,0,0,0-29.88ZM137,164.22a8,8,0,0,0-4.74,4.74L112,223.85,91.78,169A8,8,0,0,0,87,164.22L32.15,144,87,123.78A8,8,0,0,0,91.78,119L112,64.15,132.22,119a8,8,0,0,0,4.74,4.74L191.85,144ZM144,40a8,8,0,0,1,8-8h16V16a8,8,0,0,1,16,0V32h16a8,8,0,0,1,0,16H184V64a8,8,0,0,1-16,0V48H152A8,8,0,0,1,144,40ZM248,88a8,8,0,0,1-8,8h-8v8a8,8,0,0,1-16,0V96h-8a8,8,0,0,1,0-16h8V72a8,8,0,0,1,16,0v8h8A8,8,0,0,1,248,88Z"/>' },
-  { text:'Find a pattern worth flagging', icon:'<path d="M232,208a8,8,0,0,1-8,8H32a8,8,0,0,1-8-8V48a8,8,0,0,1,16,0v94.37L90.73,98a8,8,0,0,1,10.07-.38l58.81,44.11L218.73,90a8,8,0,1,1,10.54,12l-64,56a8,8,0,0,1-10.07.38L96.39,114.29,40,163.63V200H224A8,8,0,0,1,232,208Z"/>' },
+  { text:'What needs my attention this week?', icon:'<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" />' },
+  { text:'Which clients have gone quiet lately?', icon:'<path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" />' },
+  { text:'Help me draft a client update', icon:'<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" />' },
+  { text:'Check a client\'s website for issues', icon:'<path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" />' },
+  { text:'Which clients are overdue for a follow-up?', icon:'<circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" />' },
+  { text:'Summarize this week\'s pending drafts', icon:'<path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" />' },
+  { text:'Which client has the highest risk right now?', icon:'<path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" /> <path d="M20 2v4" /> <path d="M22 4h-4" /> <circle cx="4" cy="20" r="2" />' },
+  { text:'Find a pattern worth flagging', icon:'<path d="M3 3v16a2 2 0 0 0 2 2h16" /> <path d="m19 9-5 5-4-4-3 3" />' },
 ];
 let claudeQuickActionsPicked = []; // cleared to force a fresh pick the next time the empty hero actually shows — see startNewClaudeConversation()
 
@@ -1004,7 +1004,7 @@ function renderClaudeQuickActions(){
   if(!el) return;
   el.innerHTML = claudeQuickActionsPicked.map(qa=>`
     <button class="claude-quick-action" data-prompt="${escapeHtml(qa.text)}" onclick="sendClaudeQuickAction(this)">
-      <svg width="15" height="15" viewBox="0 0 256 256" class="claude-quick-action-icon" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round">${qa.icon}</svg>
+      <svg width="15" height="15" class="claude-quick-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${qa.icon}</svg>
       <span>${escapeHtml(qa.text)}</span>
     </button>`).join('');
 }

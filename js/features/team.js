@@ -79,7 +79,7 @@ function renderTeam(){
         ${m.email ? `<a class="btn btn-outline" href="mailto:${escapeHtml(m.email)}" style="text-decoration:none;">Email</a>` : ''}
         <button class="btn btn-outline" onclick="openTeamMemberDetail('${m.id}')">View</button>
         ${isAdmin() ? `<button class="icon-menu-btn team-card-menu-btn" onclick='toggleTeamActionsMenu(event, ${escapeHtml(JSON.stringify({id:m.id,name:m.name,access_revoked:isRevoked}))})' title="Actions">
-        <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M112,60a16,16,0,1,1,16,16A16,16,0,0,1,112,60Zm16,52a16,16,0,1,0,16,16A16,16,0,0,0,128,112Zm0,68a16,16,0,1,0,16,16A16,16,0,0,0,128,180Z"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1" /> <circle cx="12" cy="5" r="1" /> <circle cx="12" cy="19" r="1" /></svg>
       </button>` : ''}
       </div>
     </div>`;

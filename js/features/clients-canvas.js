@@ -218,7 +218,7 @@ ${clBulkBarHtml()}</div></div>${sel ? clientPanelHtml(sel) : suSel ? clientSetup
 function clientQuickActionsHtml(c){
   const A = `'${c.id}'`, work = waCanWork(c); // outside your areas: no logging (work-areas.js)
   return `<div class="sp-foot" role="toolbar" aria-label="Quick actions">${[...(work ? [['Log Improvement', `openQueueLogImprovementModal(${A})`, 'square-pen'], ['Track Time', `openTimerModal(${A})`, 'timer']] : []),
-    ['Note', `openNoteModal(null,${A})`, 'notebook-pen'], ['Reminder', `openNewReminderModal(${A})`, 'bell']]
+    ['Note', `openNoteModal(null,${A})`, 'notebook-pen'], ['Reminder', `openNewReminderModal(${A})`, 'bell-ring']]
     .map(([t, fn, ic]) => `<button class="cl-act" onclick="${fn}">${icon(ic)}<span>${t}</span></button>`).join('')}${c.email ? `<a class="cl-act" href="mailto:${escapeHtml(c.email)}">${icon('envelope-simple')}<span>Email</span></a>` : ''}</div>`;
 }
 // The client panel: the one thing to do, then three numbers (this week, hours, on time), why it

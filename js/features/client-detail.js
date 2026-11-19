@@ -176,7 +176,7 @@ function renderClientDetail(){
       const days = lastSent ? Math.floor((Date.now() - lastSent) / 86400000) : null;
       const bits = [lastSent ? (days === 0 ? 'Update sent today.' : `No update in ${days} day${days===1?'':'s'}.`) : 'No update sent yet.'];
       if(budget && budget.tier === 'over') bits.push(`Over this month’s hours (${(budget.usedMinutes/60).toFixed(1)} of ${(budget.budgetMinutes/60).toFixed(1)}).`);
-      riskEl.innerHTML = `<div class="cd-risk" role="note"><svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M236.8,188.09,149.35,36.22a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM120,104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm8,88a12,12,0,1,1,12-12A12,12,0,0,1,128,192Z"/></svg><div><b>Risk ${c.danger} of 5.</b> ${escapeHtml(bits.join(' '))}</div></div>`;
+      riskEl.innerHTML = `<div class="cd-risk" role="note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></svg><div><b>Risk ${c.danger} of 5.</b> ${escapeHtml(bits.join(' '))}</div></div>`;
     } else riskEl.innerHTML = '';
   }
 

@@ -56,7 +56,7 @@ function renderReminders(){
   if(remTab === 'open') main = sec('Due', due, 'is-due') + sec('Waiting on the client', waiting) + sec('Answered this week', recent);
   else main = sec(remTab === 'answered' ? 'Answered' : 'Closed', remTab === 'answered' ? answered : closed);
   if(!main) main = remTab === 'open'
-    ? emptyState({ icon: 'bell', tone: clientReminders.length ? 'ok' : 'blue', title: clientReminders.length ? 'Nothing is waiting on clients' : 'No follow-ups yet',
+    ? emptyState({ icon: 'bell-ring', tone: clientReminders.length ? 'ok' : 'blue', title: clientReminders.length ? 'Nothing is waiting on clients' : 'No follow-ups yet',
         text: 'When you ask a client something, add it here with when to chase it. Radar reminds you, and the team can see you’re waiting on an answer.',
         action: 'New Reminder', actionIcon: 'plus', onAction: 'openNewReminderModal()' })
     : emptyState({ icon: remTab === 'answered' ? 'check-circle' : 'archive', title: `Nothing ${remTab === 'answered' ? 'answered' : 'closed'} yet`,
