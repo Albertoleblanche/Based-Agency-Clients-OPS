@@ -138,11 +138,17 @@ async function seedDangerHistoryIfEmpty(){
   await loadDangerHistory();
 }
 
+// The account menu floats above your name, wider than the sidebar: it lives on the page itself
+// (the sidebar would clip it), placed from the button each time it opens.
 function toggleSidebarProfileMenu(){
   const trigger = document.querySelector('.sidebar-profile-trigger');
   const menu = document.getElementById('sidebarProfileMenu');
   const isOpen = menu.style.display === 'block';
   if(isOpen){ closeSidebarProfileMenu(); return; }
+  if(menu.parentElement !== document.body) document.body.appendChild(menu);
+  const foot = trigger.closest('.side-foot') || trigger, r = foot.getBoundingClientRect();
+  menu.style.left = Math.max(8, Math.round(r.left)) + 'px';
+  menu.style.bottom = Math.round(window.innerHeight - r.top + 6) + 'px';
   menu.style.display = 'block';
   trigger.classList.add('open');
 }
@@ -187,8 +193,12 @@ function syncDarkModeToggleUI(){
 }
 
 document.addEventListener('click', function(e){
-  if(!e.target.closest('.side-foot')) closeSidebarProfileMenu();
+  if(!e.target.closest('.side-foot') && !e.target.closest('#sidebarProfileMenu')) closeSidebarProfileMenu();
 });
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape' && document.getElementById('sidebarProfileMenu')?.style.display === 'block') closeSidebarProfileMenu();
+});
+window.addEventListener('resize', () => closeSidebarProfileMenu());
 
 function roleDisplayLabel(role){
   return role==='admin' ? 'Admin' : role==='approver' ? 'Approver' : 'Team member';
