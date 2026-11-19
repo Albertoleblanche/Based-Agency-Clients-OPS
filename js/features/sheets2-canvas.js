@@ -142,40 +142,116 @@ function openDeleteRecurringChoice(eventId){
 <div class="sheet-a"><button class="btn" style="margin-right:auto" onclick="closeAppModal()">Cancel</button><button class="btn danger" onclick="deleteRecurringSeries('${e.recurrenceGroupId}')">Delete All</button><button class="btn btn-p" onclick="deleteCalendarEvent('${eventId}')">Delete This One</button></div>`, 440);
   sheetFocusPrimary();
 }
-function openEventDetailModal(eventId){
-  const e = calendarEvents.find(x => x.id === eventId);
-  if(!e) return;
+// The event preview: a card beside the event, like Calendar on the Mac. Escape or a click
+// outside closes it. Opened from somewhere the event isn't on screen, it shows as a sheet.
+function eventPreviewHtml(e, inSheet){
   const c = e.clientId ? clients.find(x => x.id === e.clientId) : null;
-  const meta = CALENDAR_TYPE_META[e.eventType] || CALENDAR_TYPE_META.other;
-  const s = new Date(e.startAt), en = new Date(e.endAt);
+  const col = typeof calColor === 'function' ? calColor(e) : (EVENT_TYPE_DOT[e.eventType] || 'blue');
+  const kind = { blue: 'Client meeting', purple: 'Internal meeting', red: 'Deadline' }[col] || (e.eventType === 'reminder' ? 'Reminder' : 'Event');
+  const s = new Date(e.startAt), en = new Date(e.endAt || e.startAt);
   const day = s.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-  const when = e.allDay ? `${day} · All day` : `${day} · ${fmtTime(s)} – ${fmtTime(en)}`;
-  const mine = e.createdBy === currentUser.id, invited = (e.attendeeIds || []).includes(currentUser.id);
+  const time = e.allDay ? 'All day' : `${fmtTime(s)} – ${fmtTime(en)}`;
+  const mine = e.createdBy === currentUser.id, invited = (e.attendeeIds || []).includes(currentUser.id), google = !!e.googleEventId;
   const myRsvp = e.rsvps && e.rsvps[currentUser.id] ? e.rsvps[currentUser.id].status : 'pending';
   const organizer = teamProfiles.find(p => p.id === e.createdBy);
   const RS = { confirmed: ['green', 'Going'], declined: ['red', 'Not going'], change_requested: ['yellow', 'Asked for a change'], pending: ['hollow', 'No answer yet'] };
   const others = (e.attendeeIds || []).filter(id => id !== e.createdBy).map(id => {
     const p = teamProfiles.find(x => x.id === id); if(!p) return '';
     const r = (e.rsvps && e.rsvps[id]) || { status: 'pending' }, [dc, lab] = RS[r.status] || RS.pending;
-    return `<div class="row sm">${avHtml(p.name)}<div class="tx"><span class="t" style="font-weight:400">${escapeHtml(p.name)}</span>${r.status === 'change_requested' && r.message ? `<span class="s">“${escapeHtml(r.message)}”</span>` : ''}</div><div class="r"><span class="st"><span class="dot ${dc}"></span>${lab}</span></div></div>`;
-  }).join('');
-  const peopleRows = (organizer ? `<div class="row sm">${avHtml(organizer.name)}<div class="tx"><span class="t" style="font-weight:400">${escapeHtml(organizer.name)}</span></div><div class="r"><span class="t-2" style="font-size:13px">Organizer</span></div></div>` : '') + others;
-  const line = (ic, html) => `<div class="ev-line">${icon(ic)}<span>${html}</span></div>`;
-  const rsvp = !mine && invited && !e.googleEventId
-    ? `<button class="btn" onclick="openRequestChangeModal('${e.id}')">Ask for a Change</button><button class="btn" onclick="respondToEvent('${e.id}','declined')"${myRsvp === 'declined' ? ' disabled' : ''}>${myRsvp === 'declined' ? 'Not Going' : 'Decline'}</button><button class="btn btn-p" onclick="respondToEvent('${e.id}','confirmed')"${myRsvp === 'confirmed' ? ' disabled' : ''}>${myRsvp === 'confirmed' ? 'Going' : 'Accept'}</button>` : '';
-  openAppModal(`<div class="sheet-meta"><span class="st"><span class="dot ${EVENT_TYPE_DOT[e.eventType] || 'hollow'}"></span>${escapeHtml(meta.label)}</span>${e.recurrenceGroupId ? `<span class="t-2">Repeats ${escapeHtml((e.recurrenceLabel || '').toLowerCase())}</span>` : ''}${e.googleEventId ? `<span class="t-2" style="display:inline-flex;align-items:center;gap:5px">${icon('google-logo')}From Google Calendar</span>` : ''}</div>
-<h3>${escapeHtml(e.title)}</h3>
-<div class="ev-lines">${line('calendar-blank', escapeHtml(when))}${e.location ? line('map-pin', /^https?:\/\//i.test(e.location) ? `<a href="${safeUrl(e.location)}" target="_blank" rel="noopener">${escapeHtml(truncateLinkDisplay(e.location, 52))}</a>` : escapeHtml(e.location)) : ''}${c ? line('buildings', `<a href="#" onclick="closeAppModal();openClientDetail('${c.id}');return false;">${escapeHtml(c.name)}</a>`) : ''}${reminderLabel(e.reminderMinutes) ? line('bell', 'Alert ' + escapeHtml(reminderLabel(e.reminderMinutes).toLowerCase())) : ''}</div>
-${e.description ? `<p class="ev-desc">${escapeHtml(e.description)}</p>` : ''}
-${peopleRows ? `<div class="h2" style="margin-top:16px"><h2>Who’s coming</h2></div><div class="grp">${peopleRows}</div>` : ''}
-${e.googleEventId ? `<p class="t-2" style="margin:12px 0 0;font-size:13px">Change it in Google Calendar. Edits show up here at the next sync.</p>` : ''}
-<div class="sheet-a">${mine && !e.googleEventId ? `<button class="btn danger" style="margin-right:auto" onclick="${e.recurrenceGroupId ? `openDeleteRecurringChoice('${e.id}')` : `deleteCalendarEvent('${e.id}')`}">Delete</button>` : ''}${rsvp}<button class="btn${mine && !e.googleEventId || rsvp ? '' : ' btn-p'}" onclick="closeAppModal()">Close</button>${mine && !e.googleEventId ? `<button class="btn btn-p" onclick="openEditEventForm('${e.id}')">Edit</button>` : ''}</div>`, 520);
-  sheetFocusPrimary();
+    return `<div class="evp-p"><span class="n">${escapeHtml(p.id === currentUser.id ? `${p.name} (you)` : p.name)}${r.status === 'change_requested' && r.message ? `<small>“${escapeHtml(r.message)}”</small>` : ''}</span><span class="st"><span class="dot ${dc}"></span>${lab}</span></div>`;
+  }).filter(Boolean);
+  const people = organizer && (others.length || !mine) ? `<div class="evp-p"><span class="n">${escapeHtml(organizer.name)}</span><span class="st t-2">Organizer</span></div>` + others.join('') : others.join('');
+  const row = (ic, html) => `<div class="evp-r">${icon(ic)}<span>${html}</span></div>`;
+  const place = typeof calPlace === 'function' ? calPlace({ location: e.location }) : e.location;
+  const loc = !e.location ? '' : /^https?:\/\//i.test(e.location)
+    ? `<a href="${safeUrl(e.location)}" target="_blank" rel="noopener">${escapeHtml(place && place !== 'Online' ? 'Join ' + place : truncateLinkDisplay(e.location, 40))}</a>`
+    : escapeHtml(e.location);
+  const alert = reminderLabel(e.reminderMinutes);
+  const rows = [loc && row(/^https?:\/\//i.test(e.location) ? 'video' : 'map-pin', loc),
+    c && row('buildings', `<a href="#" onclick="closeEventPreview();closeAppModal();openClientDetail('${c.id}');return false;">${escapeHtml(c.name)}</a>`),
+    alert && row('bell', 'Alert ' + escapeHtml(alert.toLowerCase())),
+    e.recurrenceGroupId && row('repeat', 'Repeats ' + escapeHtml((e.recurrenceLabel || 'regularly').toLowerCase())),
+    google && row('google-logo', 'From Google Calendar')].filter(Boolean).join('');
+  const del = e.recurrenceGroupId ? `openDeleteRecurringChoice('${e.id}')` : `deleteCalendarEvent('${e.id}')`;
+  let foot = '';
+  if(mine && !google) foot = `<button class="ib evp-del" aria-label="Delete event" title="Delete" onclick="closeEventPreview();${del}">${icon('trash')}</button><span class="evp-sp"></span><button class="btn" onclick="closeEventPreview();openEditEventForm('${e.id}')">Edit</button>`;
+  else if(invited && !google) foot = `<button class="btn" onclick="closeEventPreview();openRequestChangeModal('${e.id}')">Ask for a Change</button><span class="evp-sp"></span><button class="btn" onclick="closeEventPreview();respondToEvent('${e.id}','declined')"${myRsvp === 'declined' ? ' disabled' : ''}>${myRsvp === 'declined' ? 'Not Going' : 'Decline'}</button><button class="btn" onclick="closeEventPreview();respondToEvent('${e.id}','confirmed')"${myRsvp === 'confirmed' ? ' disabled' : ''}>${myRsvp === 'confirmed' ? 'Going' : 'Accept'}</button>`;
+  else if(google) foot = `<span class="t-2 evp-note">Change it in Google Calendar; edits show here at the next sync.</span>`;
+  if(inSheet) foot = foot.replace(/closeEventPreview\(\);/g, 'closeAppModal();') + (foot.includes('class="btn"') ? '' : `<span class="evp-sp"></span><button class="btn" onclick="closeAppModal()">Close</button>`);
+  return `<div class="evp${inSheet ? ' in-sheet' : ''}">
+<div class="evp-k"><span class="dot ${col}"></span>${escapeHtml(kind)}</div>
+<h3 class="evp-t" tabindex="-1">${escapeHtml(e.title)}</h3>
+<div class="evp-when">${escapeHtml(day)}<br>${escapeHtml(time)}</div>
+${rows ? `<div class="evp-rows">${rows}</div>` : ''}
+${e.description ? `<p class="evp-d">${escapeHtml(e.description)}</p>` : ''}
+${people ? `<div class="evp-ppl">${people}</div>` : ''}
+${foot ? `<div class="evp-f">${foot}</div>` : ''}
+</div>`;
+}
+let _evpFor = null;
+function evpOutside(ev){
+  const p = document.getElementById('evPop'); if(!p || p.contains(ev.target)) return;
+  const hit = ev.target.closest && ev.target.closest('[data-id]');
+  if(hit && hit.dataset.id === _evpFor) return; // the same event: its click closes it
+  closeEventPreview();
+}
+function evpKey(ev){
+  if(ev.key === 'Escape'){ ev.stopPropagation(); ev.preventDefault(); closeEventPreview(); }
+  else if((ev.metaKey || ev.ctrlKey) && /^[a-z]$/i.test(ev.key)) closeEventPreview(true); // a shortcut opens something else
+}
+function evpScroll(ev){ const p = document.getElementById('evPop'); if(p && !p.contains(ev.target)) closeEventPreview(); }
+function closeEventPreview(instant){
+  document.querySelectorAll('.ev.sel, .mc.sel, .ad.sel').forEach(x => x.classList.remove('sel'));
+  document.removeEventListener('mousedown', evpOutside, true); document.removeEventListener('keydown', evpKey, true);
+  document.removeEventListener('scroll', evpScroll, true); window.removeEventListener('resize', closeEventPreview);
+  const p = document.getElementById('evPop'); _evpFor = null;
+  if(!p) return;
+  p.removeAttribute('id');
+  if(instant || matchMedia('(prefers-reduced-motion: reduce)').matches) return p.remove();
+  p.classList.remove('on'); setTimeout(() => p.remove(), 140);
+}
+function openEventDetailModal(eventId, anchor){
+  const e = calendarEvents.find(x => x.id === eventId);
+  if(!e) return;
+  const evt = window.event;
+  if(anchor === undefined && evt && evt.currentTarget instanceof Element) anchor = evt.currentTarget;
+  if(!anchor || !anchor.isConnected || anchor.closest('#appModalOverlay')){
+    closeEventPreview(true);
+    openAppModal(eventPreviewHtml(e, true), 400);
+    setTimeout(() => document.querySelector('#appModalOverlay .evp-t')?.focus({ preventScroll: true }), 40);
+    return;
+  }
+  if(_evpFor === eventId){ closeEventPreview(); return; }
+  closeEventPreview(true);
+  const p = document.createElement('div');
+  p.id = 'evPop'; p.className = 'evp-pop'; p.setAttribute('role', 'dialog'); p.setAttribute('aria-label', e.title);
+  p.innerHTML = eventPreviewHtml(e, false);
+  document.body.appendChild(p);
+  _evpFor = eventId; anchor.classList.add('sel');
+  // Beside the event: to its right, or its left when there's no room. A wide event (Day view)
+  // uses the spot that was clicked.
+  let r = anchor.getBoundingClientRect();
+  if(r.width > 360 && evt && typeof evt.clientX === 'number' && evt.clientX) r = { left: evt.clientX - 12, right: evt.clientX + 12, top: r.top, bottom: r.bottom, height: r.height, width: 24 };
+  const W = p.offsetWidth, H = p.offsetHeight, vw = window.innerWidth, vh = window.innerHeight, gap = 8;
+  let x = r.right + gap, side = 'r';
+  if(x + W > vw - 8){ x = r.left - gap - W; side = 'l'; }
+  if(x < 8){ x = Math.min(Math.max(8, r.left), vw - W - 8); side = 'b'; }
+  let y = side === 'b' ? r.bottom + gap : r.top - 6;
+  if(side === 'b' && y + H > vh - 8) y = r.top - gap - H;
+  y = Math.min(Math.max(8, y), vh - H - 8);
+  p.style.left = Math.round(x) + 'px'; p.style.top = Math.round(y) + 'px';
+  p.style.transformOrigin = side === 'r' ? `left ${Math.round(r.top - y + 12)}px` : side === 'l' ? `right ${Math.round(r.top - y + 12)}px` : 'center top';
+  requestAnimationFrame(() => p.classList.add('on'));
+  setTimeout(() => {
+    document.addEventListener('mousedown', evpOutside, true); document.addEventListener('keydown', evpKey, true);
+    document.addEventListener('scroll', evpScroll, true); window.addEventListener('resize', closeEventPreview);
+  }, 0);
+  p.querySelector('.evp-t').focus({ preventScroll: true });
 }
 function openRequestChangeModal(eventId){
   openAppModal(`<h3>Ask for a Change</h3>
 <div class="f"><label class="top" for="changeRequestInput">Message</label><textarea id="changeRequestInput" class="tf" spellcheck="true" placeholder="e.g. Could we move this to 3 PM?"></textarea></div>
-<div class="sheet-a"><button class="btn" onclick="openEventDetailModal('${eventId}')">Cancel</button><button class="btn btn-p" onclick="submitChangeRequest('${eventId}')">Send</button></div>`, 460);
+<div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="submitChangeRequest('${eventId}')">Send</button></div>`, 460);
   setTimeout(() => document.getElementById('changeRequestInput')?.focus(), 30);
 }
 
