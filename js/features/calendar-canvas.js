@@ -26,9 +26,17 @@ function calColor(e){
 function calTopRow(e){ return !!(e.allDay || e.isTaskMarker || e.kind === 'due' || e.kind === 'sent'); }
 function calTopRank(e){ return e.kind === 'due' ? 0 : e.isTaskMarker ? 2 : e.kind === 'sent' ? 3 : 1; }
 // Everything shown on the calendar: events, tasks due, the days client updates are due and the days they went out.
+// A task on the calendar follows the task: done there is done here (checked and crossed out).
+function calTaskOf(e){ return e.relatedTaskId && typeof tasks !== 'undefined' ? tasks.find(t => String(t.id) === String(e.relatedTaskId)) || null : null; }
 function calItems(from, to){
-  const out = calendarEvents.filter(e => new Date(e.startAt) < to && new Date(e.endAt || e.startAt) >= from).map(e => Object.assign({}, e));
-  getTaskCalendarMarkers().filter(t => t.taskStatus !== 'done').forEach(t => { const d = new Date(t.startAt); if(d >= from && d < to) out.push(t); });
+  const out = [];
+  calendarEvents.filter(e => new Date(e.startAt) < to && new Date(e.endAt || e.startAt) >= from).forEach(e => {
+    const t = calTaskOf(e);
+    if(t && t.cancelledAt) return;                       // a cancelled task's entry isn't on the calendar
+    out.push(Object.assign({}, e, t ? { _task: t, _done: t.status === 'done' } : {}));
+  });
+  const onCal = new Set(calendarEvents.filter(e => e.relatedTaskId).map(e => String(e.relatedTaskId)));
+  getTaskCalendarMarkers().filter(t => !onCal.has(String(t.taskId))).forEach(t => { const d = new Date(t.startAt); if(d >= from && d < to) out.push(Object.assign(t, { _done: t.taskStatus === 'done' })); });
   // Client updates due, on the day each is due (anything overdue shows today).
   const today = dayStart(rNow()), dueByDay = {};
   activeClients().forEach(c => { const { due } = clientDue(c); const d = due < today ? today : due; if(d >= dayStart(from) && d < to){ const k = toDateStr(d); (dueByDay[k] = dueByDay[k] || []).push(c.name); } });
@@ -85,20 +93,20 @@ function calTimedHtml(items, colW){
     const room = Math.max(1, Math.floor((h - 8) / 16)), withSub = Math.max(1, Math.floor((h - 8 - 15) / 16));
     const sub = h >= 36 && (need <= withSub || room === withSub) ? `<span>${escapeHtml(calShortTime(s))}${place ? ' · ' + escapeHtml(place) : ''}</span>` : '';
     const lines = sub ? withSub : room;
-    return `<button class="ev ${calColor(e)}${h < 36 ? ' short' : ''}" data-id="${e.id}" style="top:${top.toFixed(0)}px;height:${h.toFixed(0)}px;left:calc(${(e._lane * w).toFixed(3)}% + ${e._lane ? 1 : 3}px);width:calc(${w.toFixed(3)}% - ${e._lane ? 3 : 5}px);--l:${lines}" onclick="calOpen('${e.id}',this)" ondblclick="event.stopPropagation()" title="${escapeHtml(e.title)} · ${escapeHtml(when)}"><b>${escapeHtml(e.title)}</b>${sub}</button>`;
+    return `<button class="ev ${calColor(e)}${h < 36 ? ' short' : ''}${e._done ? ' done' : ''}" data-id="${e.id}" style="top:${top.toFixed(0)}px;height:${h.toFixed(0)}px;left:calc(${(e._lane * w).toFixed(3)}% + ${e._lane ? 1 : 3}px);width:calc(${w.toFixed(3)}% - ${e._lane ? 3 : 5}px);--l:${lines}" onclick="calOpen('${e.id}',this)" ondblclick="event.stopPropagation()" title="${escapeHtml(e.title)} · ${escapeHtml(when)}${e._done ? ' · done' : ''}"><b>${e._done ? icon('check', { weight: 'bold' }) : ''}${escapeHtml(e.title)}</b>${sub}</button>`;
   }).join('');
 }
 function calTopChip(e){
-  const c = calColor(e), tip = escapeHtml(e.sub ? `${e.title}: ${e.sub}` : e.title);
-  const lead = e.isTaskMarker ? '<span class="ad-ck" aria-hidden="true"></span>' : e.kind === 'sent' ? icon('check') : '';
-  return `<button class="ad ${e.isTaskMarker ? 'is-task' : c}${e.kind ? ' ' + e.kind : ''}" data-id="${e.id}" onclick="calOpen('${e.id}',this)" ondblclick="event.stopPropagation()" title="${tip}">${lead}<span class="t">${escapeHtml(e.title)}</span></button>`;
+  const c = calColor(e), tip = escapeHtml((e.sub ? `${e.title}: ${e.sub}` : e.title) + (e._done ? ' · done' : ''));
+  const lead = e.isTaskMarker || e._task ? `<span class="ad-ck" aria-hidden="true">${e._done ? icon('check', { weight: 'bold' }) : ''}</span>` : e.kind === 'sent' ? icon('check') : '';
+  return `<button class="ad ${e.isTaskMarker ? 'is-task' : c}${e.kind ? ' ' + e.kind : ''}${e._task ? ' has-task' : ''}${e._done ? ' done' : ''}" data-id="${e.id}" onclick="calOpen('${e.id}',this)" ondblclick="event.stopPropagation()" title="${tip}">${lead}<span class="t">${escapeHtml(e.title)}</span></button>`;
 }
 function calMonthChip(e){
   const c = calColor(e), timed = !calTopRow(e) || e.kind === 'sent';
   const tip = escapeHtml(e.sub ? `${e.title}: ${e.sub}` : e.title);
-  return `<button class="mc ${e.isTaskMarker ? 'is-task' : c}${e.kind ? ' ' + e.kind : ''}" data-id="${e.id}" onclick="calOpen('${e.id}',this)" ondblclick="event.stopPropagation()" title="${tip}"><span class="dot" aria-hidden="true"></span><span class="t">${escapeHtml(e.title)}</span>${timed && !e.kind ? `<i>${calShortTime(new Date(e.startAt))}</i>` : ''}</button>`;
+  return `<button class="mc ${e.isTaskMarker ? 'is-task' : c}${e.kind ? ' ' + e.kind : ''}${e._done ? ' done' : ''}" data-id="${e.id}" onclick="calOpen('${e.id}',this)" ondblclick="event.stopPropagation()" title="${tip}${e._done ? ' · done' : ''}">${e._done ? `<span class="dot ck" aria-hidden="true">${icon('check', { weight: 'bold' })}</span>` : '<span class="dot" aria-hidden="true"></span>'}<span class="t">${escapeHtml(e.title)}</span>${timed && !e.kind ? `<i>${calShortTime(new Date(e.startAt))}</i>` : ''}</button>`;
 }
-function calSortDay(list){ return list.sort((a, b) => (calTopRow(a) ? calTopRank(a) : 1.5) - (calTopRow(b) ? calTopRank(b) : 1.5) || new Date(a.startAt) - new Date(b.startAt)); }
+function calSortDay(list){ return list.sort((a, b) => (a._done ? 1 : 0) - (b._done ? 1 : 0) || (calTopRow(a) ? calTopRank(a) : 1.5) - (calTopRow(b) ? calTopRank(b) : 1.5) || new Date(a.startAt) - new Date(b.startAt)); }
 function renderCalendar(){
   const root = document.getElementById('calendarRoot');
   if(typeof updateCalendarNavBadge === 'function') updateCalendarNavBadge();

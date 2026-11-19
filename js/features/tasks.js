@@ -520,15 +520,19 @@ async function moveTaskToStatus(taskId, newStatus){
     return;
   }
 
+  const wasDone = t.status === 'done';
   const { error } = await supabaseClient.from('tasks').update({ status: newStatus }).eq('id', taskId);
+  const waOpened = !error && wasDone ? await syncWaItemsForTask(taskId, 'open') : 0;
   await loadMyTasks();
   renderTasks();
   updateTasksNavBadge();
   closeAppModal();
   closeKanbanMenus();
+  if(wasDone && typeof renderCalendar === 'function') renderCalendar();
+  if(typeof currentViewName !== 'undefined' && currentViewName === 'overview' && typeof renderToday === 'function') renderToday();
   const stageLabel = KANBAN_STAGES.find(s=>s.key===newStatus)?.label || newStatus;
   if(error){ showToast('error','Save failed', error.message); return; }
-  showToast('success','Task moved', `Moved to ${stageLabel}.`);
+  showToast('success','Task moved', `Moved to ${stageLabel}.${waOpened ? ' Its WhatsApp item is open again.' : ''}`);
 }
 
 function completeTaskModalHtml(taskId){
@@ -557,19 +561,44 @@ function completeTaskModalHtml(taskId){
 }
 
 async function confirmTaskCompletion(taskId){
-  const t = tasks.find(x=>x.id===taskId);
-  if(!t) return;
   const notes = document.getElementById('taskCompletionNotes').value.trim();
   const link = normalizeUrl(document.getElementById('taskCompletionLink').value) || null;
+  const today = toDateStr(new Date()), doneDate = document.getElementById('taskDoneDate')?.value || today;
+  if(doneDate > today){ showToast('error', 'Pick another day', 'A task can’t be finished in the future.'); return; }
+  // the time it took, for Time on that day
+  let time = null;
+  const raw = (document.getElementById('taskDoneTime')?.value || '').trim();
+  if(raw){
+    const minutes = parseDurationInput(raw), clientId = document.getElementById('tdClient')?.value || '';
+    if(!minutes || minutes <= 0){ showToast('error', 'Check the time', 'Try something like 45m, 1:30 or 1.5.'); return; }
+    if(!clientId){ showToast('error', 'Pick a client', 'Choose who this time was for.'); return; }
+    if(isClientPaused(clientId)){ showPausedClientWarning(clientId); return; }
+    const pick = typeof hvPickValue === 'function' ? hvPickValue('td', clientId) : { ok: true, service: '' };
+    if(!pick.ok){ showToast('error', 'Almost there', pick.msg); return; }
+    if(minutes > 960 && !(await confirmDialog(`That's ${formatMinutes(minutes)} for one task. Did you mean minutes instead of hours?`, { confirmLabel: 'Log It Anyway', cancelLabel: 'Let Me Fix It' }))) return;
+    time = { clientId, minutes, pick };
+  }
   const btn = document.getElementById('taskCompletionConfirmBtn');
   setBtnLoading(btn, 'Saving…');
+  await finishTask(taskId, notes, link, { doneDate, time });
+  restoreBtn(btn);
+}
 
+// Finishing a task, from the Mark Done sheet or from somewhere else (a WhatsApp item marked done).
+// A client's task goes into that client's history (not the email), the WhatsApp item it came from
+// is done too, and the person who assigned it hears about it.
+async function finishTask(taskId, notes, link, opts){
+  opts = opts || {};
+  const t = tasks.find(x=>x.id===taskId);
+  if(!t) return false;
   const wasAlreadyDone = t.status==='done';
-  const updatePayload = { status:'done', completed_at:new Date().toISOString(), completion_notes:notes||null, completion_link:link };
+  // finished on another day: that day, at the end of the working day
+  const today = toDateStr(new Date()), doneDate = opts.doneDate && opts.doneDate < today ? opts.doneDate : today;
+  const doneAt = doneDate === today ? new Date() : atTime(new Date(doneDate + 'T12:00:00'), '17:00');
+  const updatePayload = { status:'done', completed_at:doneAt.toISOString(), completion_notes:notes||null, completion_link:link||null };
   if(!wasAlreadyDone) updatePayload.assigner_notified = false;
   const { error } = await supabaseClient.from('tasks').update(updatePayload).eq('id', taskId);
-  restoreBtn(btn);
-  if(error){ showToast('error','Save failed', error.message); return; }
+  if(error){ showToast('error','Save failed', error.message); return false; }
 
   // Only tasks tied to a client have anywhere to log to — plenty of tasks
   // are internal and have no client attached, which is fine, they just
@@ -583,7 +612,8 @@ async function confirmTaskCompletion(taskId){
         author: myName()||'Team member',
         text: t.description ? `${t.title} — ${t.description}` : t.title,
         includeInEmail: false,
-        source: 'task'
+        source: 'task',
+        date: doneDate === today ? null : doneAt.toISOString()
       });
       const invalidated = invalidateStaleDraft(c, myName()||'Team member');
       if(invalidated) await saveDraftFor(t.clientId, myName()||'Team member', { draftStatus:'none', draft:'' });
@@ -593,13 +623,29 @@ async function confirmTaskCompletion(taskId){
       renderKpis();
     }
   }
+  const waClosed = opts.fromWhatsapp ? 0 : await syncWaItemsForTask(taskId, 'done');
+  // the time it took, into Time on the day it was finished
+  let timeNote = '';
+  if(opts.time){
+    const { clientId, minutes, pick } = opts.time;
+    const r = await mergeOrInsertTimeEntry({ clientId, service: pick.service || '', dateStr: doneDate, minutes, description: t.title, projectId: pick.projectId || null, taskId: pick.taskId || null });
+    if(r.error) showToast('error', 'The time wasn’t saved', `${r.error.message} Add it in Time.`);
+    else {
+      timeNote = ` ${formatMinutes(minutes)} logged in Time${doneDate === today ? '' : ' on ' + fmtShortDate(new Date(doneDate + 'T12:00:00'))}.`;
+      syncEntryToHarvestBackground(r.entryId);
+      await loadTimeEntries();
+      if(typeof renderTimesheet === 'function') renderTimesheet();
+      if(typeof renderReports === 'function') renderReports();
+    }
+  }
 
-  closeAppModal();
-  closeKanbanMenus();
+  if(!opts.quiet){ closeAppModal(); closeKanbanMenus(); }
   await loadMyTasks();
   renderTasks();
   updateTasksNavBadge();
-  showToast('success','Marked complete', `${t.assignerId===currentUser.id ? 'Nice work!' : `${teamProfiles.find(p=>p.id===t.assignerId)?.name||'They'} will be notified.`}${t.clientId ? ' Logged to Past Improvements.' : ''}`);
+  if(typeof renderCalendar === 'function') renderCalendar();            // done there too
+  if(typeof currentViewName !== 'undefined' && currentViewName === 'overview' && typeof renderToday === 'function') renderToday();
+  if(!opts.quiet) showToast('success','Marked complete', `${t.assignerId===currentUser.id ? 'Nice work!' : `${teamProfiles.find(p=>p.id===t.assignerId)?.name||'They'} will be notified.`}${t.clientId ? ' Logged to Past Improvements.' : ''}${timeNote}${waClosed ? ' The WhatsApp item is done too.' : ''}`);
 
   if(t.assignerId !== currentUser.id){
     // Enrich the notification with a preview of what was just added —
@@ -614,6 +660,7 @@ async function confirmTaskCompletion(taskId){
     if(link) notifBody += ` Link: ${link}`;
     sendNotification(t.assignerId, 'task_completed', 'Task completed', notifBody, 'tasks');
   }
+  return true;
 }
 
 async function cancelTask(taskId){
@@ -621,6 +668,13 @@ async function cancelTask(taskId){
   if(!t || t.assignerId!==currentUser.id) return;
   if(!(await confirmDialog(`Cancel "${t.title}"? This removes it for both of you.`, {confirmLabel:'Cancel task', cancelLabel:'Never mind', destructive:true}))) return;
   const { error } = await supabaseClient.from('tasks').update({ cancelled_at: new Date().toISOString() }).eq('id', taskId);
+  if(!error){
+    await syncWaItemsForTask(taskId, 'unlink');
+    // cancelled for both of you, so off the calendar too
+    await supabaseClient.from('calendar_events').delete().eq('related_task_id', taskId);
+    if(typeof loadCalendarEvents === 'function') await loadCalendarEvents();
+    if(typeof renderCalendar === 'function') renderCalendar();
+  }
   await loadMyTasks();
   renderTasks();
   updateTasksNavBadge();
@@ -653,7 +707,7 @@ async function deleteTaskPermanently(taskId){
   if(!t) return;
   if(!(await confirmDialog(`Permanently delete "${t.title}"? This can't be undone.`, {confirmLabel:'Delete permanently', destructive:true}))) return;
   const { error } = await supabaseClient.from('tasks').delete().eq('id', taskId);
-  if(!error) await supabaseClient.from('calendar_events').delete().eq('related_task_id', taskId);
+  if(!error){ await supabaseClient.from('calendar_events').delete().eq('related_task_id', taskId); await syncWaItemsForTask(taskId, 'unlink'); }
   await loadMyTasks();
   await loadCalendarEvents();
   renderTasks();

@@ -589,18 +589,50 @@ ${can && !closed ? `<p class="wa-learn">${icon('sparkle')}<span>Changing who has
 async function waUpdate(id, patch, okMsg, okSub){
   const t = waTasks.find(x => x.id === id), before = t ? { ...t } : null;
   if(t) Object.assign(t, patch, { updated_at: new Date().toISOString() });
-  updateWaNavBadge(); renderWhatsapp();
+  updateWaNavBadge(); renderWhatsapp(); waRedrawToday();
   const { error } = await supabaseClient.from('wa_tasks').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id);
   if(error){
     if(t && before) Object.assign(t, before);
-    updateWaNavBadge(); renderWhatsapp();
+    updateWaNavBadge(); renderWhatsapp(); waRedrawToday();
     showToast('error', 'Not saved', error.message); return false;
   }
   if(okMsg) showToast('success', okMsg, okSub || '');
   return true;
 }
-function waMarkDone(id){ return waUpdate(id, { status: 'done' }, 'Marked done'); }
-function waReopen(id){ return waUpdate(id, { status: 'open' }, 'Reopened'); }
+function waRedrawToday(){ if(typeof currentViewName !== 'undefined' && currentViewName === 'overview' && typeof renderToday === 'function') renderToday(); }
+// The task made from an item, if it's still there and not cancelled.
+function waLinkedTask(t){ return t && t.task_id != null && typeof tasks !== 'undefined' ? tasks.find(x => String(x.id) === String(t.task_id) && !x.cancelledAt) || null : null; }
+// Done here is done everywhere: the task made from it is finished too (when it's yours or you
+// assigned it; someone else's task stays with them, and they hear nothing new).
+async function waMarkDone(id){
+  const t = waTasks.find(x => x.id === id), task = waLinkedTask(t), open = !!task && task.status !== 'done';
+  const mine = open && (task.assigneeId === currentUser?.id || task.assignerId === currentUser?.id);
+  const ok = await waUpdate(id, { status: 'done' });
+  if(!ok) return false;
+  if(mine){
+    const done = await finishTask(task.id, 'Done in WhatsApp.', null, { fromWhatsapp: true, quiet: true });
+    showToast('success', 'Marked done', done ? 'Its task is done too.' : '');
+  } else showToast('success', 'Marked done', open ? `${firstName((teamProfiles.find(p => p.id === task.assigneeId) || {}).name || 'Its owner')} still has the task for it.` : '');
+  return true;
+}
+// Reopened here, the finished task made from it opens again too.
+async function waReopen(id){
+  const t = waTasks.find(x => x.id === id), task = waLinkedTask(t);
+  const ok = await waUpdate(id, { status: 'open' });
+  if(!ok) return ok;
+  let also = false;
+  if(task && task.status === 'done' && (task.assigneeId === currentUser?.id || task.assignerId === currentUser?.id)){
+    const { error } = await supabaseClient.from('tasks').update({ status: 'todo', completed_at: null }).eq('id', task.id);
+    if(!error){ also = true; if(typeof loadMyTasks === 'function') await loadMyTasks(); if(typeof updateTasksNavBadge === 'function') updateTasksNavBadge(); renderWhatsapp(); waRedrawToday(); }
+  }
+  showToast('success', 'Reopened', also ? 'Its task is back in To Do.' : '');
+  return ok;
+}
+// From another screen (Today, a task): the WhatsApp page with this item open.
+function waOpenItem(id){
+  switchView('whatsapp');
+  setTimeout(() => { window._waSel = id; renderWhatsapp(); waLoadChat(id); }, 0);
+}
 function waSetPriority(id, v){ return waUpdate(id, { priority: v }); }
 function waDueChanged(v){ const id = window._waSel; if(id) waUpdate(id, { due_date: v || null }, v ? 'Due date set' : 'Due date removed'); }
 async function waDismiss(id){

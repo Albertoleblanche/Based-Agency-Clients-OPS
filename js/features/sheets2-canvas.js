@@ -146,8 +146,11 @@ function openDeleteRecurringChoice(eventId){
 // outside closes it. Opened from somewhere the event isn't on screen, it shows as a sheet.
 function eventPreviewHtml(e, inSheet){
   const c = e.clientId ? clients.find(x => x.id === e.clientId) : null;
-  const col = typeof calColor === 'function' ? calColor(e) : (EVENT_TYPE_DOT[e.eventType] || 'blue');
-  const kind = { blue: 'Client meeting', purple: 'Internal meeting', red: 'Deadline' }[col] || (e.eventType === 'reminder' ? 'Reminder' : 'Event');
+  // an entry made from a task follows the task
+  const task = e.relatedTaskId && typeof tasks !== 'undefined' ? tasks.find(x => String(x.id) === String(e.relatedTaskId) && !x.cancelledAt) : null;
+  const tDone = !!task && task.status === 'done';
+  const col = tDone ? 'green' : typeof calColor === 'function' ? calColor(e) : (EVENT_TYPE_DOT[e.eventType] || 'blue');
+  const kind = task ? (tDone ? 'Task · Done' : 'Task') : { blue: 'Client meeting', purple: 'Internal meeting', red: 'Deadline' }[col] || (e.eventType === 'reminder' ? 'Reminder' : 'Event');
   const s = new Date(e.startAt), en = new Date(e.endAt || e.startAt);
   const day = s.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   const time = e.allDay ? 'All day' : `${fmtTime(s)} – ${fmtTime(en)}`;
@@ -167,20 +170,27 @@ function eventPreviewHtml(e, inSheet){
     ? `<a href="${safeUrl(e.location)}" target="_blank" rel="noopener">${escapeHtml(place && place !== 'Online' ? 'Join ' + place : truncateLinkDisplay(e.location, 40))}</a>`
     : escapeHtml(e.location);
   const alert = reminderLabel(e.reminderMinutes);
-  const rows = [loc && row(/^https?:\/\//i.test(e.location) ? 'video' : 'map-pin', loc),
+  const tStage = task ? (tDone ? `done${task.completedAt ? ' ' + fmtShortDate(new Date(task.completedAt)) : ''}` : ({ todo: 'to do', in_progress: 'in progress', in_review: 'in review' }[task.status] || 'to do')) : '';
+  const rows = [task && row('list-todo', `<a href="#" onclick="closeEventPreview();closeAppModal();openTaskDetailModal('${task.id}');return false;">Open the task</a><span class="t-2"> · ${escapeHtml(tStage)}</span>`),
+    loc && row(/^https?:\/\//i.test(e.location) ? 'video' : 'map-pin', loc),
     c && row('buildings', `<a href="#" onclick="closeEventPreview();closeAppModal();openClientDetail('${c.id}');return false;">${escapeHtml(c.name)}</a>`),
     alert && row('bell', 'Alert ' + escapeHtml(alert.toLowerCase())),
     e.recurrenceGroupId && row('repeat', 'Repeats ' + escapeHtml((e.recurrenceLabel || 'regularly').toLowerCase())),
     google && row('google-logo', 'From Google Calendar')].filter(Boolean).join('');
   const del = e.recurrenceGroupId ? `openDeleteRecurringChoice('${e.id}')` : `deleteCalendarEvent('${e.id}')`;
   let foot = '';
-  if(mine && !google) foot = `<button class="ib evp-del" aria-label="Delete event" title="Delete" onclick="closeEventPreview();${del}">${icon('trash')}</button><span class="evp-sp"></span><button class="btn" onclick="closeEventPreview();openEditEventForm('${e.id}')">Edit</button>`;
+  if(task){
+    // a task on the calendar: open it, or finish it right here (the Mark Done sheet, with its time)
+    const canFinish = !tDone && task.assigneeId === currentUser.id;
+    foot = `${mine && !google ? `<button class="ib evp-del" aria-label="Remove from the calendar" title="Remove from the calendar" onclick="closeEventPreview();${del}">${icon('trash')}</button>` : ''}<span class="evp-sp"></span><button class="btn" onclick="closeEventPreview();closeAppModal();openTaskDetailModal('${task.id}')">Open Task</button>${canFinish ? `<button class="btn" onclick="closeEventPreview();closeAppModal();moveTaskToStatus('${task.id}','done')">${icon('check')}Mark Done</button>` : ''}`;
+  }
+  else if(mine && !google) foot = `<button class="ib evp-del" aria-label="Delete event" title="Delete" onclick="closeEventPreview();${del}">${icon('trash')}</button><span class="evp-sp"></span><button class="btn" onclick="closeEventPreview();openEditEventForm('${e.id}')">Edit</button>`;
   else if(invited && !google) foot = `<button class="btn" onclick="closeEventPreview();openRequestChangeModal('${e.id}')">Ask for a Change</button><span class="evp-sp"></span><button class="btn" onclick="closeEventPreview();respondToEvent('${e.id}','declined')"${myRsvp === 'declined' ? ' disabled' : ''}>${myRsvp === 'declined' ? 'Not Going' : 'Decline'}</button><button class="btn" onclick="closeEventPreview();respondToEvent('${e.id}','confirmed')"${myRsvp === 'confirmed' ? ' disabled' : ''}>${myRsvp === 'confirmed' ? 'Going' : 'Accept'}</button>`;
   else if(google) foot = `<span class="t-2 evp-note">Change it in Google Calendar; edits show here at the next sync.</span>`;
   if(inSheet) foot = foot.replace(/closeEventPreview\(\);/g, 'closeAppModal();') + (foot.includes('class="btn"') ? '' : `<span class="evp-sp"></span><button class="btn" onclick="closeAppModal()">Close</button>`);
   return `<div class="evp${inSheet ? ' in-sheet' : ''}">
 <div class="evp-k"><span class="dot ${col}"></span>${escapeHtml(kind)}</div>
-<h3 class="evp-t" tabindex="-1">${escapeHtml(e.title)}</h3>
+<h3 class="evp-t${tDone ? ' is-done' : ''}" tabindex="-1">${escapeHtml(e.title)}</h3>
 <div class="evp-when">${escapeHtml(day)}<br>${escapeHtml(time)}</div>
 ${rows ? `<div class="evp-rows">${rows}</div>` : ''}
 ${e.description ? `<p class="evp-d">${escapeHtml(e.description)}</p>` : ''}
@@ -268,7 +278,7 @@ function timeClientChanged(clientSelId, serviceSelId){
   if(![...sv.options].some(o => o.value === c.service)){ const o = document.createElement('option'); o.value = o.textContent = c.service; sv.prepend(o); }
   sv.value = c.service; syncPopSel(sv);
 }
-function openTimerModal(presetClientId){
+function openTimerModal(presetClientId, presetDesc){
   if(timerState.running){ showToast('error', 'A timer is already running', 'Stop it before starting another.'); return; }
   if(!waPresetOk(presetClientId)) return;
   let cid = (typeof presetClientId === 'string' && presetClientId) || (typeof currentViewName !== 'undefined' && currentViewName === 'clientdetail' ? currentDetailClientId : '') || '';
@@ -279,7 +289,7 @@ function openTimerModal(presetClientId){
 ${hvRecentHtml('timerModal', 'timerModalClient')}
 <label for="timerModalClient">Client</label><div>${sheetPop('timerModalClient', 'Client', sheetClientOptions('', true), cid, "hvPickChanged('timerModal','client')", { placeholder: 'Choose a client' })}</div>
 ${hvPickBlockHtml('timerModal', cid, d.projectId, d.taskId)}
-<label for="timerModalDesc">Working on</label><input id="timerModalDesc" class="tf" placeholder="e.g. Updating the Meta ad creative" onkeydown="if(event.key==='Enter') startTimerFromModal()">
+<label for="timerModalDesc">Working on</label><input id="timerModalDesc" class="tf" placeholder="e.g. Updating the Meta ad creative"${typeof presetDesc === 'string' && presetDesc ? ` value="${escapeHtml(presetDesc)}"` : ''} onkeydown="if(event.key==='Enter') startTimerFromModal()">
 </div>
 <div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="startTimerFromModal()">${icon('play')}Start Timer</button></div>`, 520);
   setTimeout(() => document.getElementById(cid ? 'timerModalDesc' : 'timerModalClient')?.focus(), 30);
@@ -338,6 +348,7 @@ function openTaskDetailModal(taskId){
   const hhmm = typeof taskDueTimes !== 'undefined' ? taskDueTimes[t.id] : '';
   const due = t.dueDate ? new Date(t.dueDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) + (hhmm ? ' at ' + fmtTime(atTime(new Date(t.dueDate + 'T12:00:00'), hhmm)) : '') : '';
   const linked = calendarEvents.find(e => e.relatedTaskId === t.id);
+  const wa = typeof waTasks !== 'undefined' ? waTasks.find(x => x.task_id != null && String(x.task_id) === String(t.id)) : null;
   const moves = Object.keys(TASK_STAGE_LABEL).filter(k => k !== t.status && (k !== 'done' || amAssignee)).map(k => [k, TASK_STAGE_LABEL[k]]);
   const kv = (l, v) => `<label>${l}</label><div style="font-size:14px">${v}</div>`;
   openAppModal(`<div class="sheet-meta"><span class="st"><span class="dot ${done ? 'green' : t.status === 'in_review' ? 'purple' : t.status === 'in_progress' ? 'blue' : 'hollow'}"></span>${TASK_STAGE_LABEL[t.status] || 'To Do'}</span>${overdue ? '<span class="t-red">Overdue</span>' : ''}${t.priority === 'high' && !done ? `<span class="st">${icon('flag', { cls: 'flag' })}High priority</span>` : ''}</div>
@@ -347,6 +358,8 @@ ${t.description ? `<p class="ev-desc" style="margin-top:-6px">${escapeHtml(t.des
 ${kv(amAssigner ? 'Assigned to' : 'From', (amAssigner ? assignee : assigner) ? sheetWho((amAssigner ? assignee : assigner).name) : '<span class="t-2">Someone no longer on the team</span>')}
 ${due ? kv('Due', `<span${overdue ? ' class="t-red"' : ''}>${escapeHtml(due)}</span>`) : ''}
 ${c ? kv('Client', `<a href="#" onclick="closeAppModal();openClientDetail('${c.id}');return false;">${escapeHtml(c.name)}</a>`) : ''}
+${wa ? kv('WhatsApp', `<a href="#" onclick="closeAppModal();waOpenItem(${jsArg(wa.id)});return false;">${escapeHtml(waGroupName(wa) ? waCleanName(waGroupName(wa)) + ' group' : waClientLabel(wa))}</a>${wa.status === 'done' ? '<span class="t-2"> · done</span>' : ''}`) : ''}
+${amAssignee && !done && typeof timerState !== 'undefined' && !timerState.running ? kv('Time', `<button class="btn btn-q" style="padding:0 4px;margin-left:-4px" onclick="closeAppModal();openTimerModal(${jsArg(t.clientId || '')},${jsArg(t.title)})">${icon('play')}Start Timer</button>`) : ''}
 ${t.link ? kv('Link', `<a href="${safeUrl(normalizeUrl(t.link))}" target="_blank" rel="noopener">${escapeHtml(truncateLinkDisplay(t.link, 46))}</a>`) : ''}
 ${t.dueDate ? kv('Calendar', linked ? `On the calendar · <a href="#" onclick="closeAppModal();switchView('calendar');return false;">View</a>` : `<button class="btn btn-q" style="padding:0 4px;margin-left:-4px" onclick="addTaskToCalendar('${t.id}')">${icon('calendar-plus')}Add to Calendar</button>`) : ''}
 ${done && t.completedAt ? kv('Done', escapeHtml(new Date(t.completedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }))) : ''}
@@ -357,16 +370,31 @@ ${done && (t.completionNotes || t.completionLink) ? `<div class="callout" style=
     : `${moves.length ? `<span style="margin-right:auto">${sheetPop('tdMove', 'Move to', moves, '', `if(this.value) moveTaskToStatus('${t.id}', this.value)`, { placeholder: 'Move to…' })}</span>` : '<span style="margin-right:auto"></span>'}${amAssigner ? `<button class="btn danger" onclick="cancelTask('${t.id}')">Cancel Task</button><button class="btn${amAssignee ? '' : ' btn-p'}" onclick="openEditTaskModal('${t.id}')">Edit</button>` : ''}${amAssignee ? `<button class="btn btn-p" onclick="moveTaskToStatus('${t.id}','done')">${icon('check')}Mark Done</button>` : (amAssigner ? '' : `<button class="btn btn-p" onclick="closeAppModal()">Close</button>`)}`}</div>`, 520);
   sheetFocusPrimary();
 }
+// Mark Done: when it was finished and how long it took. The time goes into Time on that day,
+// for the task's client (and Harvest project and task, when Harvest is on).
 function completeTaskModalHtml(taskId){
   const t = tasks.find(x => x.id === taskId);
   if(!t) return '';
+  const today = toDateStr(new Date()), c = t.clientId ? clients.find(x => x.id === t.clientId) : null;
+  const canLog = !c || (typeof waCanWork !== 'function' || waCanWork(c));
+  const d = c && typeof hvDefaultPick === 'function' ? hvDefaultPick(c.id) : { projectId: null, taskId: null };
+  const who = firstName(teamProfiles.find(p => p.id === t.assignerId)?.name || 'they');
   openAppModal(`<h3>Mark Done</h3>
 <p class="t-2" style="margin:-8px 0 14px;font-size:14px">${escapeHtml(t.title)}</p>
 <div class="f">
-<label class="top" for="taskCompletionNotes">Notes</label><textarea id="taskCompletionNotes" class="tf" spellcheck="true" placeholder="Anything ${escapeHtml(firstName(teamProfiles.find(p => p.id === t.assignerId)?.name || 'they'))} should know: what you found, what’s left">${escapeHtml(t.completionNotes || '')}</textarea>
+<label for="taskDoneDate">Finished</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sheetDateField('taskDoneDate', today, { past: true, from: -14, to: 0, max: today })}</div>
+${canLog ? `<label for="taskDoneTime">Time spent</label><div class="td-dur"><input id="taskDoneTime" class="tf" style="width:96px" placeholder="1:30" autocomplete="off" oninput="taskDoneTimeTyped()"><span class="t-2">Optional. It goes into Time on that day.</span></div>
+<div id="tdTime" class="td-time">${c ? `<input type="hidden" id="tdClient" value="${c.id}">` : `<label for="tdClient">Client</label><div>${sheetPop('tdClient', 'Client', sheetClientOptions('', true), '', "hvPickChanged('td','client')", { placeholder: 'Choose a client' })}</div>`}${typeof hvPickBlockHtml === 'function' ? hvPickBlockHtml('td', c ? c.id : '', d.projectId, d.taskId) : ''}</div>` : ''}
+<label class="top" for="taskCompletionNotes">Notes</label><textarea id="taskCompletionNotes" class="tf" spellcheck="true" placeholder="Anything ${escapeHtml(who)} should know: what you found, what’s left">${escapeHtml(t.completionNotes || '')}</textarea>
 <label for="taskCompletionLink">Link</label><input id="taskCompletionLink" class="tf" value="${escapeHtml(t.completionLink || '')}" placeholder="A doc, a page you built, a file">
 </div>
-<div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" id="taskCompletionConfirmBtn" onclick="confirmTaskCompletion('${taskId}')">Mark Done</button></div>`, 500);
+<div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" id="taskCompletionConfirmBtn" onclick="confirmTaskCompletion('${taskId}')">Mark Done</button></div>`, 520);
+  setTimeout(() => document.getElementById('taskDoneTime')?.focus(), 30);
+}
+// The client and Harvest rows only matter once there's time to log.
+function taskDoneTimeTyped(){
+  const on = !!(document.getElementById('taskDoneTime')?.value || '').trim();
+  document.getElementById('tdTime')?.classList.toggle('on', on);
 }
 
 // ---- Client form ----------------------------------------------------------------------------

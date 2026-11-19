@@ -85,9 +85,9 @@ function todayUpdateTitle(w){
 }
 function hmText(min){ min = Math.round(min); const h = Math.floor(min / 60), m = min % 60; return h ? `${h} h${m ? ' ' + m + ' m' : ''}` : `${m} m`; }
 
-function renderToday(){
-  const root = document.getElementById('todayRoot');
-  if(!root || typeof clients === 'undefined') return;
+// Everything Today shows, worked out once: the lead, what else is yours, what's waiting on others,
+// and what's done. The page draws it; the layout can change without touching this.
+function todayModel(){
   const me = myName(), approver = canApprove(), now = rNow(), todayStr = toDateStr(now);
   const list = attentionEligibleClients();
   const ws = list.map(clientWeek);
@@ -121,29 +121,47 @@ function renderToday(){
     if(holder && holder !== me){ others.push(w); return; }
     if(w.holder === 'approvers' && !approver){ others.push(w); return; }
     const [go] = todayRowAction(w);
-    items.push({ c: w.c, title: todayUpdateTitle(w), sub: `${escapeHtml(w.c.name)} · ${escapeHtml(w.note || '')}`, pill: w.late ? ['red', overdueShort(w)] : ['', 'Due today'], go });
+    items.push({ c: w.c, kind: TODAY_KIND.update, title: todayUpdateTitle(w), sub: `${escapeHtml(w.c.name)}${w.note ? ' · ' + escapeHtml(w.note) : ''}`, pill: w.late ? ['red', overdueShort(w)] : ['', 'Due today'], go });
   });
   list.filter(c => myClientsFilter(c) && !used.has(c.id) && clientHealth(c).level === 'r' && !nextStepTask(c)).forEach(c => {
     used.add(c.id);
-    items.push({ c, title: `Plan a next step for ${shortClientName(c.name)}`, sub: `${escapeHtml(c.name)} · ${escapeHtml(tableSignal(clientHealth(c), c) || 'no plan yet')}`, pill: ['red', 'At risk'], go: `planNextStep('${c.id}')` });
+    items.push({ c, kind: TODAY_KIND.health, title: `Plan a next step for ${shortClientName(c.name)}`, sub: `${escapeHtml(c.name)} · ${escapeHtml(tableSignal(clientHealth(c), c) || 'no plan yet')}`, pill: ['red', 'At risk'], go: `planNextStep('${c.id}')` });
   });
   myTasks.filter(t => t.status !== 'done' && t.dueDate && t.dueDate <= todayStr).sort((a, b) => a.dueDate.localeCompare(b.dueDate) || (a.dueTime || '').localeCompare(b.dueTime || '')).forEach(t => {
     const c = clients.find(x => x.id === t.clientId), late = t.dueDate < todayStr;
-    const when = late ? (t.dueDate === toDateStr(addDays(now, -1)) ? 'Yesterday' : fmtShortDate(new Date(t.dueDate + 'T12:00:00'))) : (t.dueTime ? fmtTime(new Date(t.dueDate + 'T' + t.dueTime)) : 'Today');
-    items.push({ task: t, title: t.title, sub: c ? escapeHtml(c.name) : 'Based Agency', pill: [late ? 'red' : '', when], flag: t.priority === 'high', go: `openTaskDetailModal('${t.id}')` });
+    const when = late ? todayDayWord(t.dueDate, now) : (t.dueTime ? fmtTime(new Date(t.dueDate + 'T' + t.dueTime)) : 'Today');
+    items.push({ task: t, kind: TODAY_KIND.task, title: t.title, sub: c ? escapeHtml(c.name) : 'Based Agency', pill: [late ? 'red' : '', when], flag: t.priority === 'high', go: `openTaskDetailModal('${t.id}')` });
   });
+  // Everything else that's yours today, from the rest of the app: work you asked for that's back
+  // for your review, WhatsApp requests waiting on you, follow-ups with clients, and notes to revisit.
+  todayFromElsewhere(todayStr, now).forEach(x => items.push(x));
+  // what's late comes first, wherever it's from
+  items.sort((a, b) => (a.pill && a.pill[0] === 'red' ? 0 : 1) - (b.pill && b.pill[0] === 'red' ? 0 : 1));
 
   // ---- Done today ----
   const done = [];
-  list.forEach(c => (c.drafts || []).forEach(d => { if(d.draftSentAt && toDateStr(new Date(d.draftSentAt)) === todayStr && (d.draftSentBy === me || (!d.draftSentBy && d.author === me))) done.push({ t: new Date(d.draftSentAt), title: `Sent ${shortClientName(c.name)}’s update`, sub: c.name }); }));
+  list.forEach(c => (c.drafts || []).forEach(d => { if(d.draftSentAt && toDateStr(new Date(d.draftSentAt)) === todayStr && (d.draftSentBy === me || (!d.draftSentBy && d.author === me))) done.push({ t: new Date(d.draftSentAt), kind: TODAY_KIND.update, title: `Sent ${shortClientName(c.name)}’s update`, sub: c.name }); }));
   const logged = {};
   list.forEach(c => (c.improvements || []).forEach(i => { if(i.author === me && toDateStr(new Date(i.date)) === todayStr){ const k = c.id; logged[k] = logged[k] || { c, n: 0, t: new Date(i.date) }; logged[k].n++; if(new Date(i.date) > logged[k].t) logged[k].t = new Date(i.date); } }));
-  Object.values(logged).forEach(x => done.push({ t: x.t, title: `Logged ${todayPlural(x.n, 'improvement')}`, sub: x.c.name }));
+  Object.values(logged).forEach(x => done.push({ t: x.t, kind: TODAY_KIND.update, title: `Logged ${todayPlural(x.n, 'improvement')}`, sub: x.c.name }));
   myTasks.filter(t => t.status === 'done' && t.completedAt && toDateStr(new Date(t.completedAt)) === todayStr).forEach(t => {
-    const c = clients.find(x => x.id === t.clientId); done.push({ t: new Date(t.completedAt), title: t.title, sub: c ? c.name : 'Based Agency' });
+    const c = clients.find(x => x.id === t.clientId); done.push({ t: new Date(t.completedAt), kind: TODAY_KIND.task, title: t.title, sub: c ? c.name : 'Based Agency' });
+  });
+  // WhatsApp requests you answered today (one made into a task shows as the task)
+  if(todayWaOn()) waTasks.filter(t => t.status === 'done' && t.owner_user_id === currentUser?.id && t.updated_at && toDateStr(new Date(t.updated_at)) === todayStr && !(waLinkedTask(t) && waLinkedTask(t).status === 'done'))
+    .forEach(t => done.push({ t: new Date(t.updated_at), kind: TODAY_KIND.wa, title: t.title, sub: waClientLabel(t) }));
+  // follow-ups the client answered today
+  (typeof clientReminders !== 'undefined' ? clientReminders : []).filter(r => r.askedBy === currentUser?.id && r.status !== 'waiting' && r.resolvedAt && toDateStr(new Date(r.resolvedAt)) === todayStr).forEach(r => {
+    const c = clients.find(x => x.id === r.clientId); done.push({ t: new Date(r.resolvedAt), kind: TODAY_KIND.follow, title: r.question, sub: c ? `${c.name} answered` : 'Answered' });
   });
   done.sort((a, b) => b.t - a.t);
 
+  return { me, approver, now, todayStr, list, ws, behind, waiting, myTasks, lead, items, others, done };
+}
+function renderToday(){
+  const root = document.getElementById('todayRoot');
+  if(!root || typeof clients === 'undefined') return;
+  const { me, approver, now, todayStr, list, ws, waiting, lead, items, others, done } = todayModel();
   // ---- header: the date and the done ring ----
   const open = (lead ? 1 : 0) + items.length, total = open + done.length;
   const C = 2 * Math.PI * 22, frac = total ? done.length / total : 0;
@@ -172,14 +190,17 @@ function renderToday(){
   let nowShown = false;
   const nowLine = `<div class="ty-nowl"><span>${fmtTime(now)}</span><i></i></div>`;
   const nextEv = evs.find(e => new Date(e.startAt) > now);
-  const sched = evs.map(e => {
+  const allDay = (typeof calendarEvents !== 'undefined' ? calendarEvents : []).filter(e => e.allDay && !e.relatedTaskId && e.startAt && toDateStr(new Date(e.startAt)) === todayStr);
+  const evTaskDone = e => !!e.relatedTaskId && (typeof tasks !== 'undefined' ? tasks : []).some(t => String(t.id) === String(e.relatedTaskId) && t.status === 'done');
+  const allDayRows = allDay.map(e => `<div class="ty-ev" onclick="openEventDetailModal('${e.id}')"><span class="tm">All day</span><div class="tx"><b>${escapeHtml(e.title)}</b><span>${escapeHtml((e.description || '').split('\n')[0] || (CALENDAR_TYPE_META[e.eventType] || CALENDAR_TYPE_META.other).label)}</span></div></div>`).join('');
+  const sched = allDayRows + evs.map(e => {
     const s = new Date(e.startAt), past = new Date(e.endAt || e.startAt) <= now;
     let pre = ''; if(!nowShown && s > now){ nowShown = true; pre = nowLine; }
     const link = (e.description || '').match(/https?:\/\/(meet\.google\.com|[a-z0-9.-]*zoom\.us|teams\.microsoft\.com)\/\S+/i);
     const isNext = e === nextEv, mins = Math.round((s - now) / 60000);
     const sub = isNext ? `In ${hmText(mins)}${(e.description || '').split('\n')[0] ? ' · ' + escapeHtml((e.description || '').split('\n')[0]) : ''}` : escapeHtml((e.description || '').split('\n')[0]);
     const join = isNext && link ? `<a class="btn sm" href="${safeUrl(link[0])}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Join</a>` : '';
-    return `${pre}<div class="ty-ev${past ? ' past' : ''}${isNext ? ' next' : ''}" onclick="openEventDetailModal('${e.id}')"><span class="tm">${fmtTime(s).replace(/\s?[AP]M$/i, '')}</span><div class="tx"><b>${escapeHtml(e.title)}</b><span>${sub}</span></div>${join}</div>`;
+    return `${pre}<div class="ty-ev${past ? ' past' : ''}${isNext ? ' next' : ''}${evTaskDone(e) ? ' done' : ''}" onclick="openEventDetailModal('${e.id}')"><span class="tm">${fmtTime(s).replace(/\s?[AP]M$/i, '')}</span><div class="tx"><b>${escapeHtml(e.title)}</b><span>${sub}</span></div>${join}</div>`;
   }).join('') + (evs.length && !nowShown ? nowLine : '');
 
   // ---- your week ----
@@ -205,20 +226,22 @@ function renderToday(){
 
   // ---- the page ----
   const pill = p => p ? `<span class="ty-p${p[0] === 'red' ? ' red' : ''}">${escapeHtml(p[1])}</span>` : '';
-  const itemRow = x => x.task
-    ? `<div class="ty-i" onclick="${x.go}"><button class="ty-cb" role="checkbox" aria-checked="false" aria-label="Mark ${escapeHtml(x.title)} done" onclick="event.stopPropagation();moveTaskToStatus('${x.task.id}','done')"></button><div class="tx"><b>${escapeHtml(x.title)}</b><span>${x.sub}</span></div>${x.flag ? `<span class="ty-flag">${icon('flag')}</span>` : ''}${pill(x.pill)}</div>`
-    : `<div class="ty-i" onclick="${x.go}">${monoHtml(x.c, 'sm')}<div class="tx"><b>${escapeHtml(x.title)}</b><span>${x.sub}</span></div>${pill(x.pill)}</div>`;
-  const doneRow = x => `<div class="ty-i is-done"><span class="ty-cb on">${icon('check', { weight: 'bold' })}</span><div class="tx"><b>${escapeHtml(x.title)}</b><span>${escapeHtml(x.sub)} · ${fmtTime(x.t)}</span></div></div>`;
+  // every row says what it is first, with its tab's icon: Task, WhatsApp, Follow-up, Note…
+  const kindHtml = (k, ic) => k ? `<span class="ty-kd">${ic ? icon(k[0]) : ''}${escapeHtml(k[1])}</span>` : '';
+  const itemRow = x => x.task || x.wa
+    ? `<div class="ty-i" onclick="${x.go}"><button class="ty-cb" role="checkbox" aria-checked="false" aria-label="Mark ${escapeHtml(x.title)} done" onclick="event.stopPropagation();${x.task ? `moveTaskToStatus('${x.task.id}','done')` : `waMarkDone(${jsArg(x.wa.id)})`}"></button><div class="tx"><b>${escapeHtml(x.title)}</b><span>${kindHtml(x.kind, true)}${x.sub}</span></div>${x.flag ? `<span class="ty-flag">${icon('flag')}</span>` : ''}${pill(x.pill)}</div>`
+    : `<div class="ty-i" onclick="${x.go}"><span class="ty-ic">${icon(x.kind ? x.kind[0] : 'circle')}</span><div class="tx"><b>${escapeHtml(x.title)}</b><span>${kindHtml(x.kind)}${x.sub}</span></div>${pill(x.pill)}</div>`;
+  const doneRow = x => `<div class="ty-i is-done"><span class="ty-cb on">${icon('check', { weight: 'bold' })}</span><div class="tx"><b>${escapeHtml(x.title)}</b><span>${kindHtml(x.kind, true)}${escapeHtml(x.sub)} · ${fmtTime(x.t)}</span></div></div>`;
   const leadHtml = lead ? `<div class="ty-up"><span class="ty-lbl">Up next</span><div class="ty-up-row">${lead.c ? monoHtml(lead.c, 'lg') : `<span class="ty-up-ic">${icon(lead.ic)}</span>`}
 <div class="tx"><b>${escapeHtml(lead.title)}</b><span>${escapeHtml(lead.sub)}</span></div><button class="btn btn-p ty-go" onclick="${lead.go}">${lead.ic ? icon(lead.ic) : ''}${escapeHtml(lead.label)}</button></div></div>`
     : !activeClients().length ? emptyNoClients('Today shows what needs you: updates due, tasks, follow-ups and meetings.', { title: 'Start with your first client', link: 'Add a Task', onLink: 'openNewTaskModal()', cls: 'ty-es' })
-    : `<div class="ty-clear">${icon('check-circle')}<div><b>You’re all caught up</b><span>${escapeHtml(nextDueText(ws.filter(w => myClientsFilter(w.c))) || 'Nothing is waiting on you right now.')}</span></div><a class="x-lnk" href="#" onclick="switchView('plan');return false;">Plan Ahead</a></div>`;
+    : items.length ? '' : `<div class="ty-clear">${icon('check-circle')}<div><b>You’re all caught up</b><span>${escapeHtml(nextDueText(ws.filter(w => myClientsFilter(w.c))) || 'Nothing is waiting on you right now.')}</span></div><a class="x-lnk" href="#" onclick="switchView('plan');return false;">Plan Ahead</a></div>`;
   const MAX = 6;
   root.innerHTML = `<div class="ty">
 <header class="ty-hd"><div class="ty-date"><span class="ty-dow">${now.toLocaleDateString('en-US', { weekday: 'long' })}</span><span class="ty-dm">${now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</span></div>${ring}</header>
 ${strip}
 <div class="ty-cols"><section class="ty-main">${leadHtml}
-${items.length ? `<div class="ty-sec"><b>Also today</b><span>${items.length}</span></div><div data-grow-key="today-also">${items.slice(0, window._todayAll ? items.length : MAX).map(itemRow).join('')}${items.length > MAX ? `<a class="ty-more" href="#" data-grow="today-also" onclick="window._todayAll=${window._todayAll ? 'false' : 'true'};renderToday();return false;">${window._todayAll ? 'Show less' : `${items.length - MAX} more`}${window._todayAll ? '' : CHEV()}</a>` : ''}</div>` : ''}
+${items.length ? `<div class="ty-sec"><b>${lead ? 'Also today' : 'Today'}</b><span>${items.length}</span></div><div data-grow-key="today-also">${items.slice(0, window._todayAll ? items.length : MAX).map(itemRow).join('')}${items.length > MAX ? `<a class="ty-more" href="#" data-grow="today-also" onclick="window._todayAll=${window._todayAll ? 'false' : 'true'};renderToday();return false;">${window._todayAll ? 'Show less' : `${items.length - MAX} more`}${window._todayAll ? '' : CHEV()}</a>` : ''}</div>` : ''}
 ${waitLine}
 ${done.length ? `<div class="ty-sec"><b>Done today</b><span>${done.length}</span></div>${done.slice(0, 4).map(doneRow).join('')}` : ''}
 </section>
@@ -231,6 +254,42 @@ ${done.length ? `<div class="ty-sec"><b>Done today</b><span>${done.length}</span
 ${owned.length ? `<div class="ty-st"><span>Your clients on time</span><b>${onTime} of ${owned.length}</b></div>` : ''}
 </aside></div></div>`;
   if(currentViewName === 'overview') setToolbar('Today', 'What you need to do today');
+}
+// What each row in Today is, with the icon of the tab it comes from.
+const TODAY_KIND = { task: ['list-todo', 'Task'], review: ['list-todo', 'Task to review'], wa: ['messages-square', 'WhatsApp'], follow: ['bell-ring', 'Follow-up'],
+  note: ['sticky-note', 'Note'], update: ['send', 'Weekly update'], health: ['activity', 'Health'] };
+// "Yesterday", or the date for anything older.
+function todayDayWord(ds, now){ return ds === toDateStr(addDays(now || rNow(), -1)) ? 'Yesterday' : fmtShortDate(new Date(ds + 'T12:00:00')); }
+function todayWaOn(){ return typeof waTasks !== 'undefined' && typeof waLinkedTask === 'function' && !(typeof waHidden === 'function' && waHidden()); }
+// What's yours today from the other screens, each opening where it lives.
+function todayFromElsewhere(todayStr, now){
+  const me = currentUser?.id, out = [], cl = id => clients.find(x => x.id === id) || null;
+  const when = ds => ds < todayStr ? ['red', todayDayWord(ds, now)] : ['', 'Today'];
+  // tasks you gave someone, back with you to review
+  (typeof tasks !== 'undefined' ? tasks : []).filter(t => t.assignerId === me && t.assigneeId !== me && t.status === 'in_review' && !t.cancelledAt).forEach(t => {
+    const c = cl(t.clientId), who = (teamProfiles || []).find(p => p.id === t.assigneeId);
+    out.push({ c, kind: TODAY_KIND.review, title: t.title, sub: `${escapeHtml(firstName(who ? who.name : 'Someone'))} sent it back to you${c ? ' · ' + escapeHtml(c.name) : ''}`, pill: ['', 'To review'], go: `openTaskDetailModal('${t.id}')` });
+  });
+  // WhatsApp requests waiting on you (one made into a task shows as the task)
+  if(todayWaOn()) waTasks.filter(t => t.status === 'open' && t.owner_user_id === me && !(waLinkedTask(t) && waLinkedTask(t).status !== 'done')
+      && (waLate(t) || waDueToday(t) || (t.due_date && t.due_date <= todayStr)))
+    .sort((a, b) => new Date(a.first_seen) - new Date(b.first_seen)).forEach(t => {
+      const late = waLate(t) || (t.due_date && t.due_date < todayStr);
+      out.push({ wa: t, kind: TODAY_KIND.wa, title: t.title, sub: escapeHtml(waClientLabel(t)), pill: late ? ['red', waAgeWord(t)] : ['', 'Answer today'], flag: t.priority === 'high', go: `waOpenItem(${jsArg(t.id)})` });
+    });
+  // follow-ups you asked clients for
+  (typeof clientReminders !== 'undefined' ? clientReminders : []).filter(r => r.status === 'waiting' && r.askedBy === me && r.followUpDate && r.followUpDate <= todayStr)
+    .sort((a, b) => a.followUpDate.localeCompare(b.followUpDate)).forEach(r => {
+      const c = cl(r.clientId);
+      out.push({ c, kind: TODAY_KIND.follow, title: r.question, sub: `${c ? escapeHtml(c.name) : 'The client'}${r.askedDate ? ' · asked ' + fmtShortDate(new Date(r.askedDate + 'T12:00:00')) : ''}`, pill: when(r.followUpDate), go: `openReminderDetailModal('${r.id}')` });
+    });
+  // notes you set to come back to
+  (typeof notes !== 'undefined' ? notes : []).filter(n => n.followUpDate && n.status !== 'done' && n.followUpDate <= todayStr)
+    .sort((a, b) => a.followUpDate.localeCompare(b.followUpDate)).forEach(n => {
+      const c = cl(n.clientId);
+      out.push({ c, kind: TODAY_KIND.note, title: n.title || 'Untitled note', sub: c ? escapeHtml(c.name) : 'To revisit', pill: when(n.followUpDate), go: `openNoteSheet('${n.id}')` });
+    });
+  return out;
 }
 // "Next up: Oakridge Flooring, due tomorrow."
 function nextDueText(ws){

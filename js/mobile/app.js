@@ -465,7 +465,10 @@ async function mCompleteTask(id){
   const { error } = await supabaseClient.from('tasks').update({ status: 'done', completed_at: t.completedAt }).eq('id', id);
   if(error){ showToast('error', 'Couldn’t mark it done', error.message); await mRefresh(); return; }
   if(t.assignerId && t.assignerId !== currentUser.id) mNotify(t.assignerId, 'task_completed', 'A task you assigned is done', `${myName()}: "${t.title}"`, 'tasks');
-  showToast('success', 'Done', t.title);
+  // the same as on the computer: a client's task goes into its history, and its WhatsApp item is done too
+  if(t.clientId && typeof insertImprovementRow === 'function') await insertImprovementRow(t.clientId, { author: myName() || 'Team member', text: t.description ? `${t.title} — ${t.description}` : t.title, includeInEmail: false, source: 'task' });
+  const wa = typeof syncWaItemsForTask === 'function' ? await syncWaItemsForTask(id, 'done') : 0;
+  showToast('success', 'Done', wa ? `${t.title} · its WhatsApp item too` : t.title);
 }
 function mOpenTask(id){
   const t0 = tasks.find(x => x.id === id); if(!t0) return;

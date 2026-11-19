@@ -230,9 +230,9 @@ async function updateClientRow(id, fields){
 // (e.g. its real id, its server-side default date). Named insertImprovementRow,
 // not logImprovement — that name is already taken by the existing per-client
 // "Log improvement" UI handler below.
-async function insertImprovementRow(clientId, {author, text, includeInEmail=true, source}){
+async function insertImprovementRow(clientId, {author, text, includeInEmail=true, source, date}){
   const { data, error } = await supabaseClient.from('client_improvements')
-    .insert({ client_id:clientId, author, text, include_in_email:includeInEmail, source })
+    .insert({ client_id:clientId, author, text, include_in_email:includeInEmail, source, ...(date ? { date } : {}) })
     .select().single();
   if(error){ console.error('logImprovement failed', clientId, error); return null; }
   const entry = improvementRowFromDb(data);
@@ -299,3 +299,23 @@ async function safeSet(key, value){
 // real login would be — if that distinction matters, add real auth later.
 async function safeGetPersonal(key){ try{ return localStorage.getItem('bda_'+key); }catch(e){ return null; } }
 async function safeSetPersonal(key, value){ try{ localStorage.setItem('bda_'+key, value); return true; }catch(e){ return false; } }
+
+// A WhatsApp item and the task made from it are one piece of work. When the task is finished,
+// reopened, cancelled or deleted (here or on the iPhone), the item follows: 'done' closes it,
+// 'open' reopens it, 'unlink' lets it be made into a task again. Quiet when WhatsApp isn't set up.
+async function syncWaItemsForTask(taskId, change){
+  if(!taskId) return 0;
+  const patch = change === 'unlink' ? { task_id: null } : { status: change }, at = new Date().toISOString();
+  let q = supabaseClient.from('wa_tasks').update({ ...patch, updated_at: at }).eq('task_id', taskId);
+  if(change === 'done') q = q.eq('status', 'open'); else if(change === 'open') q = q.eq('status', 'done');
+  let res;
+  try { res = await q.select('id'); } catch(e){ return 0; }
+  if(res.error || !res.data) return 0;
+  const ids = new Set(res.data.map(r => String(r.id)));
+  if(typeof waTasks !== 'undefined') waTasks.forEach(x => { if(ids.has(String(x.id))) Object.assign(x, patch, { updated_at: at }); });
+  if(ids.size){
+    if(typeof updateWaNavBadge === 'function') updateWaNavBadge();
+    if(typeof currentViewName !== 'undefined' && currentViewName === 'whatsapp' && typeof renderWhatsapp === 'function') renderWhatsapp();
+  }
+  return ids.size;
+}

@@ -2569,3 +2569,40 @@ a.mi{text-decoration:none;color:inherit}
 .evp-note{font-size:12px;line-height:1.4;padding:0 4px}
 .evp.in-sheet{padding:2px 2px 0}
 .evp.in-sheet .evp-f{margin:16px 0 0}
+/* Today: rows from other screens without a client show what they are */
+.ty-ic{width:20px;height:20px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;color:var(--label-2)}
+.ty-ic svg{width:16px;height:16px}
+.ty-ev .tm{width:46px}
+/* Mark Done: time spent, and the rows it needs once there is some */
+.td-dur{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.td-dur .t-2{font-size:13px}
+.f > .td-time{display:none}
+.f > .td-time.on{display:contents}
+.td-time > .hvp{display:contents}
+.td-time.on > *, .td-time.on > .hvp > *{animation:tdIn 180ms cubic-bezier(.23,1,.32,1)}
+@keyframes tdIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){.td-time.on > *, .td-time.on > .hvp > *{animation:none}}
+/* Calendar: a finished task stays where it was, checked and crossed out */
+.ev.done{opacity:.55}
+.ev.done b{text-decoration:line-through;text-decoration-thickness:1px}
+.ev.done b svg{width:11px;height:11px;margin-right:4px;vertical-align:-1px}
+.ad.has-task .ad-ck{width:11px;height:11px;border-radius:50%;box-shadow:inset 0 0 0 1.25px currentColor;flex:0 0 auto}
+.ad .ad-ck{display:inline-flex;align-items:center;justify-content:center}
+.ad.done{opacity:.55;font-weight:400}
+.ad.done .t{text-decoration:line-through;text-decoration-thickness:1px}
+.ad.done .ad-ck{background:var(--label-3);box-shadow:none;color:var(--window)}
+.ad.done .ad-ck svg{width:8px;height:8px}
+.ad.done.red{background:transparent;box-shadow:none;color:var(--label);padding-left:7px}
+.mc.done{opacity:.55}
+.mc.done .t{text-decoration:line-through;text-decoration-thickness:1px}
+.mc .dot.ck{width:11px;height:11px;display:inline-flex;align-items:center;justify-content:center;background:var(--label-3);color:var(--window)}
+.mc .dot.ck svg{width:8px;height:8px}
+.evp-t.is-done{text-decoration:line-through;text-decoration-thickness:1px;color:var(--label-2)}
+/* Today: the kind of each row, first in its second line */
+.ty-kd{display:inline-flex;align-items:center;gap:4px;margin-right:6px;padding-right:7px;border-right:.5px solid var(--sep-strong);color:var(--label-2);font-weight:500;line-height:1;vertical-align:-1px}
+.ty-kd svg{width:12px;height:12px;flex:0 0 auto}
+.ty-i .tx > span{display:block;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ty-ev.done b{text-decoration:line-through;text-decoration-thickness:1px;color:var(--label-2)}
+/* the next meeting on Today keeps its time beside it (the shared .next card wraps) */
+.ty-ev.next{flex-wrap:nowrap;gap:12px;padding:8px 10px;margin:2px -10px}
+.ty-ev.next .tx{flex:1 1 auto}
