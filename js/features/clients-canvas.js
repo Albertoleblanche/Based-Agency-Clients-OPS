@@ -113,14 +113,14 @@ async function saveClientsBulk(){
 
 function closeClientInspector(){ inspectedClientId = null; renderClientsTable(); }
 
-// Importance, from 1 to 10, as a word and a signal-strength glyph: five rising bars, more of them lit the
-// more the client matters. High is 8 and up (where a client on Watch counts as At risk), Medium 4 to 7,
-// Low 1 to 3. The exact number is in the label for screen readers and in Edit Client.
+// Importance, from 1 to 10, as a word in a coloured pill: High (8 and up, where a client on Watch counts
+// as At risk) is purple, Medium (4 to 7) blue, Low (1 to 3) grey. Not health's colours, and not orange,
+// so it never reads as a warning or a button. The exact number is in the label and in Edit Client.
 function clientImportanceCell(c){
   const n = Math.max(0, Math.min(10, Math.round(Number(c.importance) || 0)));
   if(!n) return '<span class="cl-imp" role="cell" aria-label="Importance not set"><span class="t-3">—</span></span>';
-  const word = n >= 8 ? 'High' : n >= 4 ? 'Medium' : 'Low', lit = Math.ceil(n / 2);
-  return `<span class="cl-imp${n >= 8 ? ' hi' : ''}" role="cell" aria-label="Importance ${n} of 10, ${word.toLowerCase()}"><span class="imp-b" aria-hidden="true">${[1, 2, 3, 4, 5].map(i => `<i${i <= lit ? ' class="on"' : ''}></i>`).join('')}</span>${word}</span>`;
+  const [word, k] = n >= 8 ? ['High', 'hi'] : n >= 4 ? ['Medium', 'md'] : ['Low', 'lo'];
+  return `<span class="cl-imp" role="cell" aria-label="Importance ${n} of 10, ${word.toLowerCase()}"><span class="imp-p ${k}">${word}</span></span>`;
 }
 
 // Where this week's update stands, in a word or two.

@@ -67,8 +67,17 @@ function waMine(c){
   const ca = waClientAreas(c);
   return !ca || ca.some(k => mine.includes(k));
 }
-// May log time and improvements on it: admins and approvers always; members on their clients.
-function waCanWork(c){ return (typeof canApprove === 'function' && canApprove()) || waMine(c); }
+// A task someone assigned you makes its client yours to work on, even outside your areas: while it's
+// open, and for two weeks after you finish it, so its time can still be logged and fixed.
+function waAssignedTo(c){
+  if(!c || typeof tasks === 'undefined' || !Array.isArray(tasks) || typeof currentUser === 'undefined' || !currentUser) return false;
+  const since = addDays(rNow(), -14);
+  return tasks.some(t => t.clientId === c.id && t.assigneeId === currentUser.id && !t.cancelledAt && t.status !== 'cancelled'
+    && (t.status !== 'done' || (t.completedAt && new Date(t.completedAt) >= since)));
+}
+// May log time and improvements on it: admins and approvers always; members on their clients and on
+// the clients of the tasks assigned to them.
+function waCanWork(c){ return (typeof canApprove === 'function' && canApprove()) || waMine(c) || waAssignedTo(c); }
 function waTaskAllowed(name){
   if(typeof canApprove === 'function' && canApprove()) return true;
   const mine = waMyAreas(), a = waTaskArea(name);

@@ -2729,12 +2729,10 @@ a.mi{text-decoration:none;color:inherit}
 }
 /* a segment you press darkens on the track before it's picked */
 .mac .seg > button:not(.on):active{background:var(--fill-2);transition:none}
-/* Importance, in the column where hours used to be: a word and five rising bars, like signal strength.
-   High (8 and up) reads a shade stronger; nothing here is a warning, so no colour. */
-.cl-imp{display:inline-flex;align-items:center;gap:9px;min-width:0;font-size:13px;color:var(--label-2);white-space:nowrap}
-.cl-imp.hi{color:var(--label);font-weight:500}
-.imp-b{display:inline-flex;align-items:flex-end;gap:2px;height:13px;flex:0 0 auto}
-.imp-b i{display:block;width:3px;border-radius:1.5px;background:var(--cl-q)}
-.imp-b i:nth-child(1){height:5px} .imp-b i:nth-child(2){height:7px} .imp-b i:nth-child(3){height:9px} .imp-b i:nth-child(4){height:11px} .imp-b i:nth-child(5){height:13px}
-.imp-b i.on{background:var(--label-2)}
-.cl-imp.hi .imp-b i.on{background:var(--label)}
+/* Importance, in the column where hours used to be: the word in a pill. High purple, Medium blue,
+   Low grey: not health's red, yellow and green, and not the orange of a main button. */
+.cl-imp{display:flex;align-items:center;min-width:0}
+.imp-p{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:11px;font-size:12px;font-weight:600;letter-spacing:.005em;white-space:nowrap}
+.imp-p.hi{background:var(--purple-soft);color:var(--purple)}
+.imp-p.md{background:var(--blue-soft);color:var(--blue)}
+.imp-p.lo{background:var(--fill-2);color:var(--label-2);font-weight:500}
