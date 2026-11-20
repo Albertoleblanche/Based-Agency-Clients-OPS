@@ -159,7 +159,7 @@ function panelOut(old, wrap){
   ghost.setAttribute('aria-hidden', 'true'); ghost.inert = true;
   wrap.appendChild(ghost);
   ghost.scrollTop = old._st || 0;
-  animateThen(ghost, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(32px)' }], 180, EASE_IN, () => ghost.remove());
+  animateThen(ghost, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(32px)' }], 180, EASE_OUT, () => ghost.remove());
 }
 new MutationObserver(recs => {
   for(const r of recs){
@@ -173,6 +173,8 @@ new MutationObserver(recs => {
     const oldPage = oldW && oldW.querySelector(':scope > .sp-page'), newPage = newW.querySelector(':scope > .sp-page');
     if(oldPage && newPage && !newPage.scrollTop && oldPage._st){ newPage.scrollTop = oldPage._st; newPage._st = oldPage._st; }
     if(same && !newP.scrollTop && oldP._st){ newP.scrollTop = oldP._st; newP._st = oldP._st; }
+    // from the keyboard (arrows through a list, Esc) the panel opens, swaps and closes at once
+    if(window._lastInput === 'key'){ if(newP && oldP && !same){ newP.scrollTop = 0; newP._st = 0; } continue; }
     if(!motionOK()) continue;
     if(newP && !oldP) panelIn(newP);
     else if(newP && oldP && !same) panelSwap(newP);
@@ -234,3 +236,57 @@ document.addEventListener('click', e => {
     a.onfinish = end; a.oncancel = end; setTimeout(end, 420);
   });
 }, true);
+
+// ---- every press ---------------------------------------------------------------------------------
+// Anything you can click gives on the way down, the moment the pointer goes down, and comes back a
+// touch softer when you let go (or drag off it). Small controls go in a little more, wide rows only a
+// hair, so every press reads about the same. Text links dim instead. Things that already press in CSS
+// (buttons, icon buttons, the sidebar, task and note cards) keep their own. Only the innermost thing
+// under the pointer presses. Uses the `scale` property, so it never fights an element's own transform.
+const PRESS_SEL = 'button, a[href], [role=button], [role=tab], [role=radio], [onclick], summary, label.pop, label.pop-wrap, label.cl-own, .pop';
+const PRESS_CSS = '.btn, .ib, .set-tab, .ty-step-d, .n1-t, .tk-c, .cc, .ar-chip, .set-back, .src-i, .nav-item, .ikpi, .rem-cb, .timer-quick-start-btn, .brand-mark, .db-cb, #harvestTimerWrap, .kpi-click, .dsummary-card, .team-card, .kanban-card, .q-card, .row-link, .si-go';
+const PRESS_DIM = '.x-lnk, .lnk, .lnk-b, .db-more, .fix-lnk, .tk-arch, .tmi-add, .bn-open, .cl-link, .link-row, a:not([class])';
+const PRESS_SKIP = '.menu .mi, [role=menuitem], .seg-hl, .grow-ghost, [inert], [aria-hidden="true"], :disabled, [aria-disabled="true"], input, textarea';
+function pressScale(r){
+  const w = r.width;
+  const s = w <= 40 ? .9 : w <= 260 ? .97 : w <= 500 ? .98 : w <= 900 ? .99 : .995;
+  return r.height > 120 ? Math.max(s, .98) : s;   // a tall card moves less
+}
+let _press = null;
+function pressTarget(t){
+  const el = t && t.closest && t.closest(PRESS_SEL);
+  if(!el || el.closest(PRESS_SKIP) || el.matches(PRESS_CSS)) return null;
+  const oc = el.getAttribute('onclick');
+  if(oc && /^\s*event\.stopPropagation\(\);?\s*$/.test(oc)) return null;   // a card that only keeps clicks inside
+  const r = el.getBoundingClientRect();
+  if(r.width < 4 || r.height < 4 || r.height > 360 || r.width * r.height > 500000) return null;   // overlays, whole panels
+  return { el, dim: el.matches(PRESS_DIM), s: pressScale(r) };
+}
+function pressGo(p, down){
+  // with reduced motion nothing moves: a press dims a little instead
+  const el = p.el, still = !p.dim && !motionOK(), prop = p.dim || still ? 'opacity' : 'scale';
+  const cs = getComputedStyle(el), cur = prop === 'opacity' ? +cs.opacity : (cs.scale === 'none' ? 1 : parseFloat(cs.scale) || 1);
+  p.anim?.cancel();
+  const to = down ? (p.dim ? .5 : still ? .7 : p.s) : 1;
+  if(!el.animate) return;
+  p.anim = el.animate([{ [prop]: cur }, { [prop]: to }], down
+    ? { duration: 100, easing: 'ease-out', fill: 'forwards' }
+    : { duration: 160, easing: EASE_OUT, fill: 'forwards' });
+  if(!down){ const a = p.anim; a.onfinish = () => a.cancel(); }
+}
+function pressUp(){ if(_press && _press.on){ pressGo(_press, false); _press.on = false; } }
+function pressEnd(){ pressUp(); _press = null; }   // the button is up (or a drag took over): nothing can press again
+document.addEventListener('pointerdown', e => {
+  if(e.button !== 0) return;
+  pressEnd();
+  const p = pressTarget(e.target);
+  if(!p) { _press = null; return; }
+  _press = p; p.on = true; pressGo(p, true);
+  // a native pop-up menu takes the pointer away, so a select just taps
+  if(e.target.tagName === 'SELECT') setTimeout(() => { if(_press === p) pressEnd(); }, 120);
+}, true);
+['pointerup', 'pointercancel', 'dragstart'].forEach(t => document.addEventListener(t, pressEnd, true));
+window.addEventListener('blur', pressEnd);
+// drag off and it lets go; drag back on and it presses again
+document.addEventListener('pointerout', e => { if(_press && _press.on && _press.el.contains(e.target) && !_press.el.contains(e.relatedTarget)) pressUp(); }, true);
+document.addEventListener('pointerover', e => { if(_press && !_press.on && (e.buttons & 1) && _press.el.contains(e.target) && _press.el.isConnected){ _press.on = true; pressGo(_press, true); } }, true);

@@ -425,8 +425,9 @@ document.addEventListener('keydown', function(e){
   if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){
     e.preventDefault();
     const next = e.key === 'ArrowDown' ? Math.min(rows.length - 1, idx + 1) : Math.max(0, idx < 0 ? 0 : idx - 1);
-    selectClientRow(rows[next].dataset.id);
-    rows[next].focus({ preventScroll: false });
+    const id = rows[next].dataset.id;
+    selectClientRow(id);
+    document.querySelector(`#clientsTbody .client-row[data-id="${CSS.escape(id)}"]`)?.focus({ preventScroll: false });
   } else if(e.key === 'Enter' && inspectedClientId){
     e.preventDefault(); openClientDetail(inspectedClientId);
   } else if(e.key === 'Escape' && inspectedClientId){

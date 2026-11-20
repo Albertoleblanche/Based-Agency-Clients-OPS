@@ -73,10 +73,10 @@ function clientSetupRowHtml(c){
   const left = clientSetupSteps(c).filter(s => !s.ok).length;
   const picked = typeof clBulk !== 'undefined' && clBulk && clBulk.has(c.id), bulk = typeof clBulk !== 'undefined' && !!clBulk;
   return `<div class="cl-r client-row cl-su${sel ? ' is-sel' : ''}${picked ? ' is-picked' : ''}" data-id="${c.id}" role="row" tabindex="0" aria-selected="${bulk ? !!picked : sel}" onclick="${bulk ? `clBulkToggle('${c.id}')` : `clientRowClick(event,'${c.id}')`}"${bulk ? ` onkeydown="clBulkKey(event,'${c.id}')"` : ''}>
-<span class="cl-c" role="cell">${bulk ? clBulkCk(c) : ''}${monoHtml(c, 'sm')}<span class="cl-tx"><b>${escapeHtml(c.name)}</b><span class="cl-s">${escapeHtml(clientAddedWords(c))}</span></span></span>
+<span class="cl-c" role="cell">${bulk ? clBulkCk(c) : ''}<span class="cl-tx"><b>${escapeHtml(c.name)}</b><span class="cl-s">${escapeHtml(clientAddedWords(c))}</span></span></span>
 <span class="cl-o" role="cell">${owner ? escapeHtml(owner) : '<span class="t-3">—</span>'}</span>
-<span class="cl-need" role="cell"><span class="cl-wk${left ? '' : ' is-ready'}">${escapeHtml(clientSetupLeftWords(c))}</span></span>
-<span class="cl-hrs" role="cell">${c.monthlyHourBudget ? `<span><b>${c.monthlyHourBudget}</b> h a month</span>` : ''}</span></div>`;
+<span class="cl-need" role="cell"><span class="cl-wk${left ? '' : ' is-ready'}">${escapeHtml(clientSetupLeftWords(c))}</span>${c.monthlyHourBudget ? `<span class="cl-s">${c.monthlyHourBudget} h a month${typeof hvClientBudget === 'function' && hvClientBudget(c.id) ? ', from Harvest' : ''}</span>` : ''}</span>
+${typeof clientImportanceCell === 'function' ? clientImportanceCell(c) : ''}</div>`;
 }
 
 // ---- the panel: finish setup ------------------------------------------------------------------

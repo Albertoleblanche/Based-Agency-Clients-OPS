@@ -176,7 +176,7 @@
 /* rows open what they show */
 .db-go{position:relative;cursor:default}
 .db-go::after{content:"";position:absolute;inset:0 -8px;border-radius:8px;background:transparent;pointer-events:none;transition:background-color 120ms ease}
-.db-go:active::after{background:var(--fill-2);transition:none}
+.db-go:active:not(:has(:is(button,a,select,label,[role=button]):active))::after{background:var(--fill-2);transition:none}
 .db-card{min-height:0}
 /* without WhatsApp: five cards */
 .db-grid.no-wa{grid-template-columns:repeat(6,minmax(0,1fr))}
@@ -242,7 +242,7 @@
 .db-cl .db-dot{margin-top:0}
 .db-tbl tbody tr{cursor:default}
 .db-tbl tbody td{transition:background-color 120ms ease}
-.db-tbl tbody tr:active td{background:var(--fill-2);transition:none}
+.db-tbl tbody tr:active:not(:has(:is(button,a,select,label,[role=button]):active)) td{background:var(--fill-2);transition:none}
 .db-tbl tbody tr:active td:first-child{border-radius:8px 0 0 8px} .db-tbl tbody tr:active td:last-child{border-radius:0 8px 8px 0}
 .db-mute{color:var(--label-3)}
 .db-wide .bn-pair{min-height:0} .db-wide .bn-pair .db-card{flex:1 1 0;min-height:0}

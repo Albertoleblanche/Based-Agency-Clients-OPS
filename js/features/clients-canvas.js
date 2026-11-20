@@ -21,7 +21,7 @@ function selectClientRow(id){ if(clBulk) return; inspectedClientId = id; renderC
 let clBulk = null; // the picked client ids while picking, otherwise null
 const CL_TIPS = {
   match: 'Radar adds a client from Harvest when no Radar client has the same name, so the same client can end up twice under two names.\n\nThis lists each one Radar added and lets you pick the Radar client it really is. Radar keeps your client, gives it Harvest’s projects and time, and removes the copy. Pick “New client” when it really is new.',
-  hist: 'The last 8 weekly updates, oldest on the left: grey went out on time, yellow went out late, red was missed, and an empty circle isn’t due yet.',
+  hist: 'The last 8 weekly updates, oldest on the left. A dot went out on time, a short yellow bar went out late, a tall red bar was missed, and an empty circle isn’t due yet.',
 };
 function clBulkMenu(e){
   e.stopPropagation();
@@ -37,7 +37,13 @@ function clBulkMenu(e){
   setTimeout(() => document.addEventListener('click', () => m.remove(), { once: true }), 0);
 }
 document.addEventListener('keydown', e => { if(e.key === 'Escape' && clBulk && !document.querySelector('#appModalOverlay[style*="flex"]') && document.getElementById('view-clients')?.classList.contains('active')) clBulkEnd(); });
-function clBulkStart(){ if(!canApprove()) return; clBulk = new Set(); inspectedClientId = null; renderClientsTable(); }
+function clBulkStart(){
+  if(!canApprove()) return; clBulk = new Set(); inspectedClientId = null; renderClientsTable();
+  if(window._lastInput === 'key' || typeof motionOK !== 'function' || !motionOK()) return;
+  const bar = document.querySelector('#clientsRoot .cl-bulk');
+  bar?.animate?.([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.23,1,.32,1)' });
+  document.querySelectorAll('#clientsTbody .cl-ck').forEach(ck => ck.animate?.([{ opacity: 0, transform: 'scale(.8)' }, { opacity: 1, transform: 'none' }], { duration: 180, easing: 'cubic-bezier(.23,1,.32,1)' }));
+}
 function clBulkEnd(){ clBulk = null; renderClientsTable(); }
 function clBulkToggle(id){
   if(!clBulk) return;
@@ -107,6 +113,16 @@ async function saveClientsBulk(){
 
 function closeClientInspector(){ inspectedClientId = null; renderClientsTable(); }
 
+// Importance, from 1 to 10, as a word and a signal-strength glyph: five rising bars, more of them lit the
+// more the client matters. High is 8 and up (where a client on Watch counts as At risk), Medium 4 to 7,
+// Low 1 to 3. The exact number is in the label for screen readers and in Edit Client.
+function clientImportanceCell(c){
+  const n = Math.max(0, Math.min(10, Math.round(Number(c.importance) || 0)));
+  if(!n) return '<span class="cl-imp" role="cell" aria-label="Importance not set"><span class="t-3">—</span></span>';
+  const word = n >= 8 ? 'High' : n >= 4 ? 'Medium' : 'Low', lit = Math.ceil(n / 2);
+  return `<span class="cl-imp${n >= 8 ? ' hi' : ''}" role="cell" aria-label="Importance ${n} of 10, ${word.toLowerCase()}"><span class="imp-b" aria-hidden="true">${[1, 2, 3, 4, 5].map(i => `<i${i <= lit ? ' class="on"' : ''}></i>`).join('')}</span>${word}</span>`;
+}
+
 // Where this week's update stands, in a word or two.
 function clientStageWord(w){
   if(w.done >= 3) return 'Approved';
@@ -164,21 +180,21 @@ function renderClientsTable(){
   const rank = { r: 0, y: 1, g: 2 };
   const dir = clientSort.dir === 'desc' ? -1 : 1;
   shown.sort(clientSort.field === 'name' && clientSort.explicit ? (a, b) => dir * a.c.name.localeCompare(b.c.name)
+    : clientSort.field === 'importance' && clientSort.explicit ? (a, b) => dir * ((a.c.importance || 0) - (b.c.importance || 0)) || a.c.name.localeCompare(b.c.name)
     : (a, b) => rank[a.h.level] - rank[b.h.level] || b.h.signals.filter(s => s.l === 'r').length - a.h.signals.filter(s => s.l === 'r').length || (b.c.importance || 0) - (a.c.importance || 0) || a.c.name.localeCompare(b.c.name));
   const owners = [...new Set(rows.map(r => r.owner).concat(su.map(suOwner)).filter(Boolean))].sort();
   if(inspectedClientId && !acAll.some(c => c.id === inspectedClientId) && !setupClients().some(c => c.id === inspectedClientId)) inspectedClientId = null;
   const row = ({ c, h, w, owner }) => {
     const sel = c.id === inspectedClientId, reason = h.level === 'g' ? '' : tableSignal(h, c);
-    const [wk, wkCls, wkSub] = clientWeekCell(w), hp = h.hp, over = hp.budget && hp.used > hp.budget;
-    const hrs = hp.budget ? `<span><b>${Math.round(hp.used)}</b> / ${hp.budget} h</span><span class="cl-bar"><i style="width:${Math.min(100, Math.round(hp.used / hp.budget * 100))}%"></i></span>` : `<span><b>${Math.round(hp.used)}</b> h</span>`;
+    const [wk, wkCls, wkSub] = clientWeekCell(w);
     const picked = !!(clBulk && clBulk.has(c.id));
     return `<div class="cl-r client-row${sel ? ' is-sel' : ''}${picked ? ' is-picked' : ''}" data-id="${c.id}" role="row" tabindex="0" aria-selected="${clBulk ? picked : sel}" onclick="${clBulk ? `clBulkToggle('${c.id}')` : `clientRowClick(event,'${c.id}')`}" ${clBulk ? `onkeydown="clBulkKey(event,'${c.id}')"` : `ondblclick="openClientDetail('${c.id}')"`}>
-<span class="cl-c" role="cell">${clBulkCk(c)}${monoHtml(c, 'sm')}<span class="cl-tx"><b>${escapeHtml(c.name)}</b><span class="cl-s">${escapeHtml(c.service || '—')}</span></span></span>
+<span class="cl-c" role="cell">${clBulkCk(c)}<span class="cl-tx"><b>${escapeHtml(c.name)}</b><span class="cl-s">${escapeHtml(c.service || '—')}</span></span></span>
 <span class="cl-o" role="cell">${owner ? escapeHtml(owner) : '<span class="t-3">—</span>'}</span>
 <span class="cl-hc" role="cell"><span class="cl-h ${h.level}"><i></i>${healthWord(h.level)}</span>${reason ? `<span class="cl-s">${escapeHtml(reason)}</span>` : ''}</span>
 <span class="cl-w" role="cell"><span class="cl-wk ${wkCls}">${escapeHtml(wk)}</span><span class="cl-s">${escapeHtml(wkSub)}</span></span>
 <span class="cl-l" role="cell">${histDotsHtml(h.seq)}</span>
-<span class="cl-hrs${over ? ' over' : ''}" role="cell">${hrs}</span></div>`;
+${clientImportanceCell(c)}</div>`;
   };
   const sNeeds = shown.filter(r => r.h.level !== 'g'), sOk = shown.filter(r => r.h.level === 'g');
   const group = (title, list) => list.length ? `<div class="cl-g" role="presentation"><b>${title}</b><span>${list.length}</span></div>${list.map(row).join('')}` : '';
@@ -203,12 +219,14 @@ function renderClientsTable(){
 ${hasAreas ? `<label class="pop-wrap">Show: <select class="pop" onchange="setClientsMine(this.value)"><option value="mine"${mineOn ? ' selected' : ''}>My clients</option><option value="all"${mineOn ? '' : ' selected'}>All clients</option></select></label>` : ''}
 <label class="pop-wrap">Owner: <select class="pop" onchange="setClientsOwner(this.value)"><option value="all">All</option>${owners.map(o => `<option${clientsOwnerFilter === o ? ' selected' : ''}>${escapeHtml(o)}</option>`).join('')}</select></label>
 <label class="pop-wrap">${harvestOwnsServices() ? 'Project' : 'Service'}: <select class="pop" onchange="setClientsService(this.value)"><option value="all">All</option>${services.map(s => `<option${clientFilters.service === s ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('')}</select></label>
-${canApprove() && !clBulk ? `<button class="btn cl-bulk-btn" onclick="clBulkMenu(event)" aria-haspopup="menu">${icon('list-checks')}Bulk Edit${icon('caret-down', { weight: 'bold' })}</button>` : ''}</div>
+${canApprove() && !clBulk ? `<button class="btn cl-bulk-btn" onclick="clBulkMenu(event)" aria-haspopup="menu">Bulk Edit${icon('caret-down', { weight: 'bold' })}</button>` : ''}</div>
 <div class="cl-table" role="table" aria-label="Clients">
-<div class="cl-head" role="row"><button role="columnheader" class="${clientSort.field === 'name' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'name',dir:clientSort.field==='name'&&clientSort.explicit&&clientSort.dir==='asc'?'desc':'asc',explicit:true};renderClientsTable()">Client${clientSort.field === 'name' && clientSort.explicit ? sortIc : ''}</button><span role="columnheader">Owner</span><span role="columnheader" class="cl-hh"><button class="${clientSort.explicit ? '' : 'is-sort'}" onclick="clientSort={field:'health'};renderClientsTable()">Health${clientSort.explicit ? '' : sortIc}</button></span><span role="columnheader">This week</span><span role="columnheader">Last 8 weeks${infoTip(CL_TIPS.hist, 'What do the dots mean?')}</span><span role="columnheader" class="r">Hours this month</span></div>
+<div class="cl-head" role="row"><button role="columnheader" class="${clientSort.field === 'name' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'name',dir:clientSort.field==='name'&&clientSort.explicit&&clientSort.dir==='asc'?'desc':'asc',explicit:true};renderClientsTable()">Client${clientSort.field === 'name' && clientSort.explicit ? sortIc : ''}</button><span role="columnheader">Owner</span><span role="columnheader" class="cl-hh"><button class="${clientSort.explicit ? '' : 'is-sort'}" onclick="clientSort={field:'health'};renderClientsTable()">Health${clientSort.explicit ? '' : sortIc}</button></span><span role="columnheader">This week</span><span role="columnheader">Last 8 weeks${infoTip(CL_TIPS.hist, 'What do the dots mean?')}</span><span role="columnheader" class="cl-hh"><button class="${clientSort.field === 'importance' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'importance',dir:clientSort.field==='importance'&&clientSort.explicit&&clientSort.dir==='desc'?'asc':'desc',explicit:true};renderClientsTable()">Importance${clientSort.field === 'importance' && clientSort.explicit ? sortIc : ''}</button></span></div>
 <div id="clientsTbody" role="rowgroup">${body}</div></div>
 ${clBulkBarHtml()}</div></div>${sel ? clientPanelHtml(sel) : suSel ? clientSetupPanelHtml(suSel) : ''}</div>`;
   const sp = root.querySelector('.sp-page'); if(sp) sp.scrollTop = prev;
+  const clEl = root.querySelector('.cl'), tbl = root.querySelector('.cl-table');
+  if(sp && clEl && tbl){ const edge = () => clEl.classList.toggle('is-scrolled', tbl.getBoundingClientRect().top < sp.getBoundingClientRect().top - .5); sp.addEventListener('scroll', edge, { passive: true }); edge(); }
   if(currentViewName === 'clients'){
     const used = rows.reduce((a, r) => a + r.h.hp.used, 0), budget = rows.reduce((a, r) => a + (r.h.hp.budget || 0), 0);
     setToolbar(null, `${mineOn ? `${ac.length} of your clients` : `${ac.length} client${ac.length === 1 ? '' : 's'}`} · ${needs.length} need attention${su.length ? ` · ${su.length} need setup` : ''}${budget ? ` · ${Math.round(used)} of ${Math.round(budget)} h this month` : ''}`);

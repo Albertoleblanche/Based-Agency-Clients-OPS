@@ -547,8 +547,9 @@ body.mac :is(input[type="text"], input:not([type]), input[type="email"], input[t
 .mac #appTopbar { border-bottom: .5px solid var(--sep-strong); }
 /* Buttons press in. */
 @media (prefers-reduced-motion: no-preference) {
-  .mac :is(.btn, .ib, .set-tab, .seg > button) { transition: transform 140ms cubic-bezier(.23, 1, .32, 1), background-color 150ms ease, box-shadow 150ms ease; }
-  .mac :is(.btn, .ib, .set-tab):active:not(:disabled) { transform: scale(.97); }
+  .mac :is(.btn, .ib, .set-tab, .seg > button) { transition: transform 160ms cubic-bezier(.23, 1, .32, 1), background-color 150ms ease, box-shadow 150ms ease; }
+  /* quick on the way down, with the colour landing at once; a touch softer coming back */
+  .mac :is(.btn, .ib, .set-tab):active:not(:disabled) { transform: scale(.97); transition: transform 100ms ease-out, background-color 0s, box-shadow 150ms ease; }
   .mac .cb { transition: background-color 160ms ease, box-shadow 160ms ease; }
 }
 /* The selected tab's pill slides (js/ui/motion.js). */
@@ -959,7 +960,7 @@ a.ty-rel:hover{opacity:.8}
 .hx-i:focus .hx-tip{opacity:1;transform:none;transition:opacity 150ms ease-out,transform 150ms cubic-bezier(.23,1,.32,1)}
 .hx-row{position:relative;min-height:56px;padding:6px 10px;margin:0 -10px;border-radius:10px;cursor:pointer;transition:background-color 120ms ease}
 .hx-row.on{background:var(--select,var(--fill))}
-.hx-row:active{background:var(--fill-2);transition:none}
+.hx-row:active:not(:has(:is(button,a,select,label,[role=button]):active)){background:var(--fill-2);transition:none}
 .hx-row:focus-visible{outline:none;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--blue) 55%,transparent)}
 .hx-row.on .tl-s.now::before{background:var(--fill-2)}
 /* the line between rows is its own straight hairline, inset to the text; the rounding only shows on hover */
@@ -1093,7 +1094,7 @@ a.ty-rel:hover{opacity:.8}
 .n1-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:22px;margin-top:28px}
 .n1-t{display:flex;flex-direction:column;height:254px;padding:20px 22px 18px;border-radius:14px;background:var(--fill);overflow:hidden;cursor:default;outline:none;transition:background-color 150ms ease,transform 160ms cubic-bezier(.23,1,.32,1)}
 .n1-t:hover{background:var(--fill-2)}
-.n1-t:active{transform:scale(.99)}
+.n1-t:active:not(:has(:is(button,a,[onclick],[role=button],[role=checkbox]):active)){transform:scale(.99)}
 .n1-t:focus-visible{box-shadow:0 0 0 3px var(--fill-3)}
 .n1-tc{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--label-2)}
 .n1-tc .n1-cl{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1320,7 +1321,7 @@ button.tmi-mc.is-wk:hover{background:var(--fill-2)}
 .tk-none{margin:4px 0 0;font-size:13px;color:var(--label-3)}
 .tk-c{display:flex;flex-direction:column;gap:10px;padding:14px 16px 13px;border-radius:12px;background:var(--fill);margin-bottom:10px;cursor:default;outline:none;transition:background-color 150ms ease,transform 160ms cubic-bezier(.23,1,.32,1)}
 .tk-c:hover{background:var(--fill-2)}
-.tk-c:active{transform:scale(.99)}
+.tk-c:active:not(:has(:is(button,a,[onclick],[role=button],[role=checkbox]):active)){transform:scale(.99)}
 .tk-c:focus-visible{box-shadow:0 0 0 3px var(--fill-3)}
 .tk-c.is-sel{background:var(--select)}
 .tk-ct{display:flex;align-items:flex-start;gap:10px}
@@ -1409,7 +1410,7 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .rvn-rows{flex:1 1 auto;min-height:0;overflow:auto}
 .rvn-r{position:relative;display:flex;align-items:center;gap:10px;margin:0 8px;padding:13px 10px 13px 20px;border-radius:10px;color:inherit;text-decoration:none;cursor:default;transition:background-color 120ms ease}
 .rvn-r.is-sel{background:var(--select)}
-.rvn-r:active{background:var(--fill-2);transition:none}
+.rvn-r:active:not(:has(:is(button,a,select,label,[role=button]):active)){background:var(--fill-2);transition:none}
 .rvn-r:focus-visible{outline:none;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--blue) 55%,transparent)}
 .rvn-r + .rvn-r::before{content:"";position:absolute;top:0;left:20px;right:10px;height:.5px;background:var(--sep)}
 .rvn-r.is-sel::before,.rvn-r.is-sel + .rvn-r::before,.rvn-r:active::before,.rvn-r:active + .rvn-r::before{opacity:0}
@@ -1519,66 +1520,82 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 #weekRoot .sp-page{container-type:inline-size}
 
 
-/* ---- All Clients, as on the canvas board "All Clients — improved" ---- */
+/* ---- All Clients, as on the canvas board "All Clients — improved", with the Apple pass (Nov 20):
+   a Mac list. Rows are inset and rounded, the line between them is a hairline inset to the text, the
+   column header is a material the rows scroll under (its line shows only once they do), groups read
+   like Health's, and health is a system-colour dot and a word. Names, not avatars. ---- */
 #clientsRoot{overflow:hidden;display:flex;flex-direction:column}
 #clientsRoot .sp-page{container-type:inline-size}
-.cl{min-width:0}
-.cl-bar0{display:flex;align-items:center;gap:8px;padding:16px 28px 14px;flex-wrap:wrap}
+#clientsRoot{--cl-r:#FF3B30;--cl-y:var(--yellow-fill,#F2B300);--cl-g:#34C759;--cl-q:rgba(0,0,0,.16)}
+.mac[data-theme="dark"] #clientsRoot{--cl-r:#FF453A;--cl-y:var(--yellow-fill,#FFD60A);--cl-g:#30D158;--cl-q:rgba(255,255,255,.22)}
+.cl{min-width:0;padding-bottom:28px}
+.cl-bar0{display:flex;align-items:center;gap:8px;padding:16px 28px 10px;flex-wrap:wrap}
 .cl-sp{flex:1 1 auto}
 .cl-find{display:inline-flex;align-items:center;gap:7px;width:220px;height:28px;padding:0 10px;border-radius:7px;background:var(--fill-2);color:var(--label-3)}
 .cl-find svg{width:14px;height:14px;flex:0 0 auto}
 .mac .cl-find input{flex:1 1 auto;min-width:0;height:26px;padding:0;border:0;background:transparent;box-shadow:none;font:inherit;font-size:13px;color:var(--label);outline:none}
 .cl-find input::placeholder{color:var(--label-3)}
 .cl-find input::-webkit-search-cancel-button{display:none}
-.cl-find:focus-within{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 30%,transparent)}
-.cl-head,.cl-r{display:grid;grid-template-columns:minmax(200px,2.3fr) minmax(100px,1fr) minmax(180px,2fr) minmax(130px,1.4fr) 120px 140px;column-gap:20px;align-items:center;padding:0 28px}
-.cl-head{position:sticky;top:0;z-index:2;height:34px;background:var(--window);border-bottom:.5px solid var(--sep);font-size:12px;font-weight:500;color:var(--label-2)}
+.cl-find:focus-within{box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 30%,transparent)}
+.cl-head,.cl-r{display:grid;grid-template-columns:minmax(200px,2.3fr) minmax(100px,1fr) minmax(180px,2fr) minmax(130px,1.4fr) 120px 120px;column-gap:20px;align-items:center}
+.cl-head{position:sticky;top:0;z-index:2;height:32px;padding:0 28px;font-size:12px;font-weight:500;color:var(--label-2);
+  background:color-mix(in srgb,var(--window) 86%,transparent);-webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);
+  box-shadow:inset 0 -.5px 0 transparent;transition:box-shadow 150ms ease}
+.cl.is-scrolled .cl-head{box-shadow:inset 0 -.5px 0 var(--sep)}
+@media (prefers-reduced-transparency:reduce){ .cl-head{background:var(--window);-webkit-backdrop-filter:none;backdrop-filter:none} }
 .cl-head > *{display:inline-flex;align-items:center;gap:3px;min-width:0;padding:0;border:0;background:none;font:inherit;color:inherit;text-align:left;cursor:default}
 .cl-head .is-sort{color:var(--label)}
 .cl-head svg{width:10px;height:10px}
 .cl-head .r{justify-content:flex-end}
-.cl-g{display:flex;align-items:baseline;gap:8px;padding:18px 28px 8px}
-.cl-g b{font-size:13px;font-weight:650}
-.cl-g span{font-size:12px;font-weight:600;color:var(--label-3)}
-.cl-r{position:relative;min-height:58px;cursor:default}
-.cl-r:hover{background:var(--fill)}
+/* a group: its name at Health's size, a hairline under it inset to the text */
+.cl-g{position:relative;display:flex;align-items:baseline;gap:8px;padding:22px 28px 9px}
+.cl-g::after{content:"";position:absolute;left:28px;right:28px;bottom:0;height:.5px;background:var(--sep)}
+.cl-g:first-child{padding-top:10px}
+.cl-g b{font-size:15px;font-weight:650;letter-spacing:-.01em}
+.cl-g > span:not(.cl-g-act){font-size:13px;font-weight:500;color:var(--label-3);font-variant-numeric:tabular-nums}
+/* a row: inset and rounded; the rounding only shows when it's hovered, pressed or selected */
+.cl-r{position:relative;min-height:56px;margin:0 18px;padding:0 10px;border-radius:10px;cursor:default;transition:background-color 120ms ease}
 .cl-r.is-sel{background:var(--select)}
-.cl-r:focus-visible{outline:none;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--accent) 55%,transparent)}
-.cl-r::before{content:"";position:absolute;top:0;left:28px;right:28px;height:.5px;background:var(--sep)}
-.cl-g + .cl-r::before,.cl-r:hover::before,.cl-r:hover + .cl-r::before,.cl-r.is-sel::before,.cl-r.is-sel + .cl-r::before{opacity:0}
-.cl-c{display:flex;align-items:center;gap:11px;min-width:0}
-.cl-c .mono.sm{width:26px;height:26px;border-radius:7px;font-size:10.5px;flex:0 0 auto}
+.cl-r:focus-visible{outline:none;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--blue) 55%,transparent)}
+.cl-r::before{content:"";position:absolute;top:0;left:10px;right:10px;height:.5px;background:var(--sep);pointer-events:none}
+.cl-g + .cl-r::before,.cl-r:active::before,.cl-r:active + .cl-r::before,.cl-r:focus-visible::before,.cl-r:focus-visible + .cl-r::before,.cl-r.is-sel::before,.cl-r.is-sel + .cl-r::before{opacity:0}
+@media (hover:hover) and (pointer:fine){
+  .cl-r:not(.is-sel):not(.is-picked):hover{background:var(--fill)}
+  .cl-r:hover::before,.cl-r:hover + .cl-r::before{opacity:0}
+}
+.cl-r:not(.is-sel):not(.is-picked):active:not(:has(:is(button,a,select,label,[role=button]):active)){background:var(--fill-2);transition:none}
+.cl-c{display:flex;align-items:center;gap:10px;min-width:0}
 .cl-tx{display:flex;flex-direction:column;min-width:0}
-.cl-tx b{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cl-tx b{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cl-s{display:block;margin-top:2px;font-size:12px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cl-o{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cl-o{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* health, as on Health and the Dashboard: a system-colour dot and a word in the label colour */
 .cl-hc{display:flex;flex-direction:column;min-width:0}
-.cl-h{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;font-weight:600}
-.cl-h i{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
-.cl-h.r{color:var(--red)}.cl-h.r i{background:var(--red)}
-.cl-h.y{color:var(--yellow)}.cl-h.y i{background:var(--yellow)}
-.cl-h.g{font-weight:500;color:var(--label-2)}.cl-h.g i{background:var(--label-3)}
-.cl-hc .cl-s{margin-left:15px}
+.cl-h{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:500;color:var(--label);white-space:nowrap}
+.cl-h i{width:7px;height:7px;border-radius:50%;flex:0 0 auto;background:var(--cl-q)}
+.cl-h.r i{background:var(--cl-r)} .cl-h.y i{background:var(--cl-y)}
+.cl-h.g{font-weight:400;color:var(--label-2)}
+.cl-hc .cl-s{margin-left:14px}
 .cl-w{display:flex;flex-direction:column;min-width:0}
-.cl-wk{font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cl-wk{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cl-wk.is-late{color:var(--red);font-weight:600}
 .cl-wk.is-sent{color:var(--label-2);font-weight:400}
-.cl-hrs{display:flex;flex-direction:column;align-items:flex-end;gap:6px;font-size:13px;color:var(--label-2);font-variant-numeric:tabular-nums;justify-self:end;text-align:right}
+/* hours: the number, and under it a thin capsule against the month's budget */
+.cl-hrs{display:flex;flex-direction:column;align-items:flex-end;gap:7px;font-size:13px;color:var(--label-2);font-variant-numeric:tabular-nums;justify-self:end;text-align:right}
 .cl-hrs b{font-weight:600;color:var(--label)}
-.cl-bar{display:block;width:72px;height:4px;border-radius:2px;background:var(--fill-2);overflow:hidden}
-.cl-bar i{display:block;height:100%;border-radius:2px;background:var(--label-3)}
+.cl-bar{display:block;width:64px;height:3px;border-radius:1.5px;background:var(--fill-2);overflow:hidden}
+.cl-bar i{display:block;height:100%;border-radius:1.5px;background:var(--cl-q)}
 .cl-hrs.over b{color:var(--red)}
-.cl-hrs.over .cl-bar i{background:var(--red)}
-.cl-empty{padding:28px;font-size:13px;color:var(--label-2)}
+.cl-hrs.over .cl-bar i{background:var(--cl-r)}
+.cl-empty{padding:22px 28px;font-size:13px;color:var(--label-2)}
 @container (max-width:960px){
-  .cl-head,.cl-r{grid-template-columns:minmax(180px,2fr) minmax(90px,1fr) minmax(160px,2fr) minmax(120px,1.4fr) 140px}
+  .cl-head,.cl-r{grid-template-columns:minmax(180px,2fr) minmax(90px,1fr) minmax(160px,2fr) minmax(120px,1.4fr) 120px}
   .cl-head > :nth-child(5),.cl-r > .cl-l{display:none}
 }
 /* the client panel */
 .cl-pbar-r{display:inline-flex;align-items:center;gap:6px}
 .cl-acts{display:flex;gap:2px;margin:12px -8px 0}
 .mac .cl-act{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 4px 7px;border:0;border-radius:9px;background:none;color:var(--label-2);text-decoration:none;font:inherit;font-size:12px;font-weight:400;white-space:nowrap;cursor:default;transition:color 120ms ease,background-color 120ms ease}
-.mac .cl-act:hover{background:var(--fill);color:var(--label)}
 .cl-act svg{flex:0 0 auto;width:18px;height:18px;color:inherit}
 .cl-kvs{display:flex;flex-direction:column}
 .cl-kv{display:grid;grid-template-columns:110px minmax(0,1fr);align-items:center;min-height:34px;font-size:13px}
@@ -1586,9 +1603,7 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .cl-kv > span:first-child{color:var(--label-2)}
 .cl-kv > span:last-child{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cl-link{color:var(--blue);text-decoration:none}
-.cl-link:hover{text-decoration:underline}
 .cl-own{position:relative;display:inline-flex;align-items:center;gap:5px;height:26px;margin-left:-8px;padding:0 8px;border-radius:6px;font-weight:500}
-.cl-own:hover{background:var(--fill)}
 .cl-own svg{width:10px;height:10px;color:var(--label-3)}
 .cl-own select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:default;font:inherit}
 .cl-own-note{margin:-2px 0 8px 110px;font-size:11.5px;line-height:1.4;color:var(--label-3)}
@@ -1634,7 +1649,6 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .cl-m{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-top:14px;border-bottom:.5px solid var(--sep)}
 .mac .cl-mc{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0;margin:0;padding:4px 14px 14px;border:0;border-left:.5px solid var(--sep);background:none;color:inherit;font:inherit;text-align:left;cursor:default}
 .cl-mc:first-child{padding-left:0;border-left:0}
-.mac button.cl-mc:hover b{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
 .cl-mc .k{font-size:11.5px;font-weight:500;color:var(--label-2)}
 .cl-mc b{font-size:17px;font-weight:650;letter-spacing:-.015em;font-variant-numeric:tabular-nums;white-space:nowrap}
 .cl-mc .s{max-width:100%;font-size:11.5px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -2397,7 +2411,6 @@ a.mi{text-decoration:none;color:inherit}
 .f label .itip{margin-left:4px}
 .cl-head > span{white-space:nowrap}
 .mac .cl-g .cl-g-act > .x-lnk{height:auto;padding:0;border:0;background:none;box-shadow:none;font-size:13px;font-weight:500;color:var(--label)}
-.mac .cl-g .cl-g-act > .x-lnk:hover{color:var(--accent)}
 .cl-g .cl-g-act .itip{margin-left:4px}
 .cl-g > .itip{align-self:center;margin-left:-2px}
 /* every icon keeps its size in a row or column: never pinched (one style app-wide, like the sidebar) */
@@ -2672,3 +2685,56 @@ a.mi{text-decoration:none;color:inherit}
   .rvn-r:hover::before, .rvn-r:hover + .rvn-r::before { opacity: 0; }
   .mac .rvn-q:hover { background: var(--fill); color: var(--label); }
 }
+
+/* ---- All Clients, the Apple pass (Nov 20), continued ----
+   Hover only with a mouse, and every press shows on the way down. The weekly-update history (here, in
+   This Week, Review and the client page) reads like Health's twelve weeks: on time is a quiet dot,
+   late a short yellow bar, missed a tall red one, so trouble stands up off the line. */
+.hist{display:inline-flex;align-items:flex-end;gap:4px;height:14px;vertical-align:middle;
+  --hs-r:#FF3B30;--hs-y:var(--yellow-fill,#F2B300);--hs-q:rgba(0,0,0,.18)}
+.mac[data-theme="dark"] .hist{--hs-r:#FF453A;--hs-y:var(--yellow-fill,#FFD60A);--hs-q:rgba(255,255,255,.24)}
+.hist i{display:block;width:5px;height:5px;border-radius:2.5px;background:var(--hs-q);box-shadow:none}
+.hist i.l{height:9px;background:var(--hs-y)}
+.hist i.m{height:14px;background:var(--hs-r)}
+.hist i.p{background:transparent;box-shadow:inset 0 0 0 1.25px var(--hs-q)}
+.cl-mc .s .hist{margin-top:6px}
+.mac .cl-act:active{background:var(--fill-2);color:var(--label);transition:none}
+.cl-own:active{background:var(--fill-2)}
+.mac button.cl-mc:active b{opacity:.7}
+/* picking several: the tick box takes the avatar's old place; the bar at the foot is a material too */
+.cl-ck{margin-right:0}
+.cl-bulk{margin:12px 0 -28px;background:color-mix(in srgb,var(--window) 82%,transparent);-webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);border-top:.5px solid var(--sep)}
+@media (prefers-reduced-transparency:reduce){ .cl-bulk{background:var(--window);-webkit-backdrop-filter:none;backdrop-filter:none} }
+.mac .cl-bulk-btn{gap:5px}
+@media (hover:hover) and (pointer:fine){
+  .mac .cl-act:hover{background:var(--fill);color:var(--label)}
+  .cl-link:hover{text-decoration:underline}
+  .cl-own:hover{background:var(--fill)}
+  .mac button.cl-mc:hover b{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
+  .mac .cl-g .cl-g-act > .x-lnk:hover{color:var(--blue)}
+}
+/* in the Clients table the history has its own column, so it reads a size up */
+.cl-l .hist{gap:7px;height:18px}
+.cl-l .hist i{width:6px;height:6px;border-radius:3px}
+.cl-l .hist i.l{height:11px}
+.cl-l .hist i.m{height:18px}
+.cl-l .hist i.p{box-shadow:inset 0 0 0 1.5px var(--hs-q)}
+.cl-mc .s .hist{gap:6px;height:16px}
+.cl-mc .s .hist i{width:5px;height:5px}
+.cl-mc .s .hist i.l{height:10px}
+.cl-mc .s .hist i.m{height:16px}
+/* Reduced motion: presses keep their colour change but don't move (the JS presses skip it too). */
+@media (prefers-reduced-motion: reduce){
+  :is(.btn, .ib, .set-tab, .tk-c, .n1-t, .db-cb, .ty-step-d, .cc, .ar-chip, .set-back, .rem-cb, .si-go, .timer-quick-start-btn, .brand-mark, .row-link, #harvestTimerWrap):active{transform:none !important}
+}
+/* a segment you press darkens on the track before it's picked */
+.mac .seg > button:not(.on):active{background:var(--fill-2);transition:none}
+/* Importance, in the column where hours used to be: a word and five rising bars, like signal strength.
+   High (8 and up) reads a shade stronger; nothing here is a warning, so no colour. */
+.cl-imp{display:inline-flex;align-items:center;gap:9px;min-width:0;font-size:13px;color:var(--label-2);white-space:nowrap}
+.cl-imp.hi{color:var(--label);font-weight:500}
+.imp-b{display:inline-flex;align-items:flex-end;gap:2px;height:13px;flex:0 0 auto}
+.imp-b i{display:block;width:3px;border-radius:1.5px;background:var(--cl-q)}
+.imp-b i:nth-child(1){height:5px} .imp-b i:nth-child(2){height:7px} .imp-b i:nth-child(3){height:9px} .imp-b i:nth-child(4){height:11px} .imp-b i:nth-child(5){height:13px}
+.imp-b i.on{background:var(--label-2)}
+.cl-imp.hi .imp-b i.on{background:var(--label)}
