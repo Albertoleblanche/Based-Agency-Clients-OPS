@@ -78,7 +78,7 @@
 .db-prog{display:inline-flex;align-items:center;gap:8px;margin-top:6px;font-size:11.5px;color:var(--label-2)}
 .db-pb{width:56px;height:4px;border-radius:2px;background:var(--fill-2);overflow:hidden}
 .db-pb i{display:block;height:100%;border-radius:2px;background:var(--label-2)}
-@container (max-width: 1060px){ .db-grid{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@container (max-width: 900px){ .db-grid{grid-template-columns:repeat(2,minmax(0,1fr))} }
 .db-dot.g{background:var(--green)}
 .db-hok{padding:6px 0}
 .db-row1{flex-direction:row;align-items:baseline;gap:10px}
@@ -150,7 +150,7 @@
 .bn-seg i.on{background:var(--green)}
 .bn-dw{white-space:nowrap}
 .bn-last{margin-left:auto;color:var(--label-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-@container (max-width: 1060px){ .bn-grid{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:auto;grid-template-areas:"focus focus" "mid cal" "rem wa" "notes notes"} }
+@container (max-width: 900px){ .bn-grid{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:auto;grid-template-areas:"focus focus" "mid cal" "rem wa" "notes notes"} }
 /* a wide screen (2560 px): the bottom row moves up to the right, so every card sits in one row at one height */
 @container (min-width: 1800px){
   .bn-grid{gap:18px;grid-template-columns:minmax(0,2fr) repeat(4,minmax(0,1fr));grid-template-rows:auto;align-items:stretch;grid-template-areas:"focus mid cal pair notes"}
@@ -175,7 +175,7 @@
 .db-grid.no-wa > .db-card{grid-column:span 2}
 .db-grid.no-wa > .db-rem, .db-grid.no-wa > .db-notes{grid-column:span 3}
 .bn-grid.no-wa{grid-template-areas:"focus focus focus focus focus focus mid mid mid cal cal cal" "rem rem rem rem rem rem notes notes notes notes notes notes"}
-@container (max-width: 1060px){
+@container (max-width: 900px){
   .db-grid.no-wa{grid-template-columns:repeat(2,minmax(0,1fr))}
   .db-grid.no-wa > .db-card, .db-grid.no-wa > .db-rem, .db-grid.no-wa > .db-notes{grid-column:auto}
   .bn-grid.no-wa{grid-template-areas:"focus focus" "mid cal" "rem notes"}
@@ -186,3 +186,68 @@
   .bn-grid.no-wa{grid-template-areas:"focus mid cal pair notes"}
 }
 @media (prefers-reduced-motion: reduce){ .db-go{transition:none} }
+
+/* ---- fill the window, no scrolling (Nov 20) -----------------------------------------------
+   The dashboard takes the whole width and height. Rows share the height; each card lists what
+   fits and links to the rest (dashboard.js drops rows until it fits). A narrow window (two
+   columns) scrolls instead. */
+.db.db-normal, .db.db-wide{max-width:none;height:100%;min-height:600px;box-sizing:border-box;display:flex;flex-direction:column;gap:16px}
+.db-normal > .db-grid, .db-normal > .bn-grid, .db-wide > .db-grid, .db-wide > .bn-grid{flex:1 1 0;min-height:0}
+.db-normal .db-card, .db-wide .db-card{min-height:0;overflow:hidden}
+.db-normal .db-grid{grid-template-rows:minmax(0,1.1fr) minmax(0,1fr)}
+.db-normal .bn-grid{grid-template-rows:minmax(0,1.3fr) minmax(0,1fr)}
+.db-normal .bn-mid, .db-wide .bn-mid{min-height:0}
+.db-normal .bn-mid .db-tasks, .db-wide .bn-mid .db-tasks{flex:1 1 0;min-height:0}
+.db-normal .bn-mid .db-health, .db-wide .bn-mid .db-health{flex:0 0 auto}
+/* the lists keep their rows whole: a row that doesn't fit is dropped, never cut */
+.db-normal .db-l, .db-wide .db-l{flex:0 0 auto}
+/* Today's focus: Now and Next fill the box; the rest under "more" scrolls inside it */
+.bn-focus{min-height:0}
+.db-normal .bn-focus, .db-wide .bn-focus{display:flex;flex-direction:column}
+.db-normal .bn-cols, .db-wide .bn-cols{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+.db-normal .bn-next, .db-wide .bn-next{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+.db-normal .bn-rx.open, .db-wide .bn-rx.open{flex:1 1 auto;min-height:0}
+.db-normal .bn-rx.open .bn-rxi, .db-wide .bn-rx.open .bn-rxi{overflow:auto;overscroll-behavior:contain}
+.db-normal .bn-done, .db-wide .bn-done{flex:0 0 auto}
+.bn-tg[hidden], .db-more[hidden]{display:none!important}
+/* a wide screen: the cards in one row over the clients that need attention */
+.db-wide{gap:18px}
+.db-wide > .db-grid, .db-wide > .bn-grid{flex:1.15 1 0;grid-template-rows:minmax(0,1fr)}
+.db-wide > .db-clients{flex:0 1 auto;max-height:46%}
+@container (min-width: 1800px){ .db-wide .bn-cols{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr);column-gap:36px;align-items:stretch}
+  .db-wide .bn-cols > .bn-now{min-height:0} .db-wide .bn-cols .bn-next{min-height:0} }
+/* the clients table */
+.db-clients .db-tw{flex:0 0 auto;margin:0 -4px}
+.db-tbl{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px}
+.db-tbl th{text-align:left;font-size:12px;font-weight:600;color:var(--label-2);padding:6px 12px 8px 4px;border-bottom:.5px solid var(--sep);white-space:nowrap}
+.db-tbl td{padding:10px 12px 10px 4px;border-bottom:.5px solid var(--sep);color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+.db-tbl tbody tr:last-child td{border-bottom:0}
+.db-tbl th:nth-child(1){width:22%} .db-tbl th:nth-child(2){width:28%} .db-tbl th:nth-child(3){width:11%} .db-tbl th:nth-child(4){width:15%} .db-tbl th:nth-child(5){width:12%} .db-tbl th:nth-child(6){width:12%}
+.db-tbl .num{text-align:right;font-variant-numeric:tabular-nums}
+.db-tbl td:first-child{color:var(--label)}
+.db-cl{display:flex;align-items:center;gap:9px;min-width:0}
+.db-cl b{font-weight:600;overflow:hidden;text-overflow:ellipsis}
+.db-cl .db-dot{margin-top:0}
+.db-tbl tbody tr{transition:background-color 120ms ease}
+.db-tbl tbody tr:hover td{background:var(--fill)}
+.db-tbl tbody tr:hover td:first-child{border-radius:8px 0 0 8px} .db-tbl tbody tr:hover td:last-child{border-radius:0 8px 8px 0}
+.db-mute{color:var(--label-3)}
+.db-wide .bn-pair{min-height:0} .db-wide .bn-pair .db-card{flex:1 1 0;min-height:0}
+.bn-nl:empty{display:none}
+.bn-nl:empty + .bn-rx + .bn-tg{padding-top:0}
+/* a short window: Today's focus tightens before it hides its last Next row */
+.bn-focus.bn-tight .bn-hi h2{font-size:20px}
+.bn-focus.bn-tight .bn-hi p{margin-top:4px}
+.bn-focus.bn-tight .bn-now{margin-top:12px;padding-top:12px}
+.bn-focus.bn-tight .bn-next{margin-top:12px;padding-top:10px}
+.bn-focus.bn-tight .bn-nt > b{font-size:16px}
+.bn-focus.bn-tight .bn-ic{width:34px;height:34px;border-radius:10px}
+.bn-focus.bn-tight .bn-acts{margin-top:8px}
+.bn-focus.bn-tight .bn-next{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto minmax(0,1fr);align-content:start}
+.bn-focus.bn-tight .bn-next > .bn-lbl{grid-area:1/1;align-self:baseline}
+.bn-focus.bn-tight .bn-next > .bn-tg{grid-area:1/2;align-self:baseline;padding:0;font-size:12.5px}
+.bn-focus.bn-tight .bn-next > .bn-nl{grid-column:1/-1;grid-row:2}
+.bn-focus.bn-tight .bn-next > .bn-rx{grid-column:1/-1;grid-row:3;min-height:0}
+/* an empty card in the wide pair keeps to its message so the other gets the room */
+.db-wide .bn-pair .db-card:has(.db-none){flex:0 0 auto}
+.db-tbl th:last-child, .db-tbl td:last-child{padding-left:28px}

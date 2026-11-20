@@ -2,27 +2,33 @@
 // Approvers get six outlined cards: Health, Tasks and Calendar, then Reminders, WhatsApp and Notes.
 // Team members get the bento: Today's focus as the big first box (the one thing to do now, what's
 // next, and how much of the day is done), then Tasks over Health, Calendar, and Reminders, WhatsApp
-// and Notes. Each card shows what fits and links to the rest ("2 more in WhatsApp"). On a wide
-// screen (2560 px) every card sits in one row at one height.
+// and Notes. The dashboard fills the window, side to side and top to bottom, with no scrolling:
+// each card lists what fits its space and links to the rest ("2 more in WhatsApp"). On a wide
+// screen every card sits in one row, and under them a table lists the clients that need
+// attention, the most at risk first (Nov 20).
 
-const DB_WIDE = 1800;
-// How much each card lists, by who's looking and how wide the screen is.
-const DB_N = {
-  approver: { normal: { health: 4, tasks: 4, rem: 3, wa: 3, notes: 3 }, wide: { health: 5, tasks: 5, rem: 5, wa: 4, notes: 4 } },
-  member: { normal: { tasks: 4, rem: 2, wa: 3, notes: 2, next: 3 }, wide: { tasks: 4, rem: 2, wa: 2, notes: 4, next: 5 } },
-};
-const DB_CAL_ROWS = 6;   // meetings listed on the Calendar card; the rest of the week is "N more"
+const DB_WIDE = 1800, DB_NARROW = 900;
+// How much each card can list. On a laptop or a wide screen it lists up to this much, then drops
+// rows from the end until the card fits (dbFit). On a narrow window the page scrolls instead, so
+// each card keeps to a few.
+const DB_CAP = { health: 12, tasks: 12, rem: 10, wa: 10, notes: 8, next: 10, table: 30, cal: 14 };
+const DB_FEW = { health: 4, tasks: 4, rem: 3, wa: 3, notes: 3, next: 3, cal: 6 };
 
 function dbRoot(){ return document.getElementById('dashRoot'); }
-function dbIsWide(){ const r = dbRoot(); return !!r && r.clientWidth >= DB_WIDE; }
+function dbMode(){ const r = dbRoot(), w = r ? r.clientWidth : 0; return !w ? 'normal' : w >= DB_WIDE ? 'wide' : w <= DB_NARROW ? 'narrow' : 'normal'; }
+function dbIsWide(){ return dbMode() === 'wide'; }
 // Each card wears its tab's own sidebar icon, so a card and its tab read as the same thing.
 function dbNavIcon(view){ const s = document.querySelector(`#appSidebar .nav-item[data-view="${view}"] svg`); return s ? s.outerHTML : icon('circle'); }
 function dbTitle(view){ return typeof viewTitle === 'function' ? viewTitle(view) : ((VIEW_TITLES[view] || [view])[0]); }
-function dbCard(cls, view, title, count, body, link){
-  const go = link === false ? '' : `<a class="x-lnk" href="#${view}" onclick="switchView('${view}');return false;">Open ${escapeHtml(dbTitle(view))}</a>`;
-  return `<section class="db-card ${cls}" aria-label="${escapeHtml(title)}"><header class="db-h">${dbNavIcon(view)}<b>${escapeHtml(title)}</b>${count !== '' && count != null ? `<span class="n">${count}</span>` : ''}${go}</header>${body}</section>`;
+// A card. total: how many things it has (its "N more" link counts what isn't listed); min: the
+// fewest rows it keeps; soft: rows it keeps before giving up an optional part (data-opt).
+function dbCard(cls, view, title, count, body, o){
+  o = o || {};
+  const go = o.link === false ? '' : `<a class="x-lnk" href="#${view}" onclick="switchView('${view}');return false;">Open ${escapeHtml(dbTitle(view))}</a>`;
+  const more = o.total != null ? `<a class="db-more" href="#${view}" data-view="${view}" onclick="switchView('${view}');return false;" hidden></a>` : '';
+  const data = o.total != null ? ` data-total="${o.total}" data-min="${o.min ?? 1}"${o.soft ? ` data-soft="${o.soft}"` : ''}` : '';
+  return `<section class="db-card ${cls}" aria-label="${escapeHtml(title)}"${data}><header class="db-h">${dbNavIcon(view)}<b>${escapeHtml(title)}</b>${count !== '' && count != null ? `<span class="n">${count}</span>` : ''}${go}</header>${body}${more}</section>`;
 }
-function dbMore(n, view){ return n > 0 ? `<a class="db-more" href="#${view}" onclick="switchView('${view}');return false;">${n} more in ${escapeHtml(dbTitle(view))}</a>` : ''; }
 function dbNone(text){ return `<p class="db-none">${icon('circle-check')}${escapeHtml(text)}</p>`; }
 function dbPlural(n, one, many){ return `${n} ${n === 1 ? one : (many || one + 's')}`; }
 // A day in words, either side of today: "Yesterday", "Today", "Tomorrow", "Thursday", "Nov 12".
@@ -39,10 +45,14 @@ function dbFollowWord(ds){
 function dbSteps(text){ const all = (String(text || '').match(/^- \[[ xX]\]/gm) || []).length, done = (String(text || '').match(/^- \[[xX]\]/gm) || []).length; return { all, done }; }
 
 // ---- Health ----
+// The clients that need attention, the most at risk first: at risk before to watch, then the most
+// red signals, then the most signals, then the most important client.
 function dbHealthModel(){
   const hs = (typeof healthScopeClients === 'function' ? healthScopeClients() : attentionEligibleClients()).map(c => ({ c, h: clientHealth(c) }));
   const n = l => hs.filter(x => x.h.level === l).length;
-  const list = hs.filter(x => x.h.level === 'r' || x.h.level === 'y').sort((a, b) => (a.h.level === 'r' ? 0 : 1) - (b.h.level === 'r' ? 0 : 1));
+  const reds = x => x.h.signals.filter(s => s.l === 'r').length;
+  const list = hs.filter(x => x.h.level === 'r' || x.h.level === 'y').sort((a, b) => (a.h.level === 'r' ? 0 : 1) - (b.h.level === 'r' ? 0 : 1)
+    || reds(b) - reds(a) || b.h.signals.length - a.h.signals.length || (b.c.importance || 0) - (a.c.importance || 0) || (b.c.danger || 0) - (a.c.danger || 0));
   return { r: n('r'), y: n('y'), g: n('g'), tot: hs.length, list };
 }
 function dbHealthTop(m, of){
@@ -56,11 +66,10 @@ function dbOpenHealth(id){ window._healthSel = id; switchView('health'); }
 function dbHealthCard(n){
   const m = dbHealthModel();
   if(!m.tot) return dbCard('db-health', 'health', 'Health', '', dbNone('No clients to watch yet.'));
-  const rows = m.list.slice(0, n).map(x => `<li class="db-r db-hc db-go" onclick="dbOpenHealth('${x.c.id}')"><span class="db-dot ${x.h.level}" aria-label="${x.h.level === 'r' ? 'At risk' : 'To watch'}"></span><span class="db-tx"><b>${escapeHtml(x.c.name)}</b><span class="s">${escapeHtml(tableSignal(x.h, x.c) || '')}</span></span></li>`).join('');
+  const rows = m.list.slice(0, n).map(x => `<li class="db-r db-hc db-go" data-item onclick="dbOpenHealth('${x.c.id}')"><span class="db-dot ${x.h.level}" aria-label="${x.h.level === 'r' ? 'At risk' : 'To watch'}"></span><span class="db-tx"><b>${escapeHtml(x.c.name)}</b><span class="s">${escapeHtml(tableSignal(x.h, x.c) || '')}</span></span></li>`).join('');
   const body = dbHealthTop(m, canApprove() ? ' clients' : ' of your clients') + (m.list.length
-    ? `<p class="db-sub">Needs care</p><ul class="db-l">${rows}</ul>${dbMore(m.list.length - n, 'health')}`
-    : dbNone('Every client is healthy.'));
-  return dbCard('db-health', 'health', 'Health', '', body);
+    ? `<p class="db-sub">Needs care</p><ul class="db-l">${rows}</ul>` : dbNone('Every client is healthy.'));
+  return dbCard('db-health', 'health', 'Health', '', body, { total: m.list.length });
 }
 // The member's small Health box: the score, the bar, and who needs care on one line.
 function dbHealthSmall(){
@@ -68,6 +77,23 @@ function dbHealthSmall(){
   const body = !m.tot ? dbNone('No clients to watch yet.') : dbHealthTop(m, '') + (m.list.length
     ? `<p class="bn-hw">Needs care: ${escapeHtml(m.list.map(x => x.c.name).join(', '))}</p>` : `<p class="bn-hw">Every client is healthy.</p>`);
   return dbCard('db-health bn-hsm', 'health', 'Health', '', body);
+}
+// Wide screens: the clients that need attention as a table under the cards, the most at risk first.
+function dbClientsTable(n){
+  const m = dbHealthModel(), list = m.list.slice(0, n);
+  const head = `<tr><th>Client</th><th>Why</th><th>Owner</th><th>This week’s update</th><th class="num">Hours this month</th><th>Last update</th></tr>`;
+  const rows = list.map(x => {
+    const c = x.c, w = clientWeek(c), hp = x.h.hp || {}, last = lastSentAt(c), owner = clientOwner(c);
+    const week = w.sent ? `Sent ${relDayLower(new Date(w.last))}` : w.dueText;
+    const hrs = hp.budget ? `<span class="${hp.used > hp.budget ? 't-red' : ''}">${Math.round(hp.used)} / ${hp.budget} h</span>` : (hp.used ? `${Math.round(hp.used)} h` : '<span class="db-mute">—</span>');
+    return `<tr class="db-go" data-item onclick="dbOpenHealth('${c.id}')"><td><span class="db-cl"><span class="db-dot ${x.h.level}" aria-label="${x.h.level === 'r' ? 'At risk' : 'To watch'}"></span><b>${escapeHtml(c.name)}</b></span></td>
+<td class="db-why">${escapeHtml(tableSignal(x.h, c) || '')}</td><td>${owner ? escapeHtml(firstName(owner)) : '<span class="db-mute">No owner</span>'}</td>
+<td><span class="${w.late && !w.sent ? 't-red' : ''}">${escapeHtml(week)}</span></td><td class="num">${hrs}</td><td>${last ? escapeHtml(relDay(new Date(last))) : '<span class="db-mute">No update yet</span>'}</td></tr>`;
+  }).join('');
+  const sub = [m.r ? `${m.r} at risk` : '', m.y ? `${m.y} to watch` : '', 'the most at risk first'].filter(Boolean).join(' · ');
+  const body = m.list.length ? `<p class="db-sum">${sub}</p><div class="db-tw"><table class="db-tbl"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`
+    : dbNone(m.tot ? 'Every client is healthy.' : 'No clients to watch yet.');
+  return dbCard('db-clients', 'health', 'Clients that need attention', m.list.length || '', body, { total: m.list.length });
 }
 
 // ---- Tasks ----
@@ -86,7 +112,7 @@ function dbTaskRow(t){
   const today = toDateStr(rNow()), c = t.clientId && clients.find(x => x.id === t.clientId), late = t.dueDate && t.dueDate < today;
   const st = dbSteps(t.description), when = t.dueDate ? (t.dueTime && t.dueDate === today ? fmtTime(new Date(t.dueDate + 'T' + t.dueTime)) : dbDayWord(t.dueDate)) : '';
   const sub = [c ? escapeHtml(c.name) : '', when ? `<span class="${late ? 't-red' : ''}">${escapeHtml(when)}</span>` : '', st.all ? `${st.done} of ${st.all} steps` : ''].filter(Boolean).join(' · ');
-  return `<li class="db-tk"><div class="db-tki"><div class="db-r db-go" onclick="openTaskDetailModal('${t.id}')">
+  return `<li class="db-tk" data-item><div class="db-tki"><div class="db-r db-go" onclick="openTaskDetailModal('${t.id}')">
 <button class="db-cb" type="button" role="checkbox" aria-checked="false" aria-label="Mark done: ${escapeHtml(t.title)}" onclick="event.stopPropagation();moveTaskToStatus('${t.id}','done')">${icon('check', { weight: 'bold' })}</button>
 <span class="db-tx"><b>${escapeHtml(t.title)}</b><span class="s">${sub || 'No due date'}</span></span>${t.priority === 'high' ? `<span class="db-flag" title="High priority">${icon('flag')}</span>` : ''}</div></div></li>`;
 }
@@ -94,19 +120,19 @@ function dbTasksCard(n){
   const ts = dbMyTasks(), today = toDateStr(rNow());
   const over = ts.filter(t => t.dueDate && t.dueDate < today).length, due = ts.filter(t => t.dueDate === today).length;
   const summ = [over ? `<span class="t-red">${over} overdue</span>` : '', due ? `${due} due today` : ''].filter(Boolean).join(' · ');
-  // work you gave someone, back with you to check
+  // work you gave someone, back with you to check (given up first when the card runs out of room)
   const back = (typeof tasks !== 'undefined' ? tasks : []).filter(t => t.assignerId === currentUser?.id && t.assigneeId !== currentUser?.id && t.status === 'in_review' && !t.cancelledAt);
-  const check = back.length ? `<p class="db-sub">Ready for you to check</p><ul class="db-l">${back.slice(0, 1).map(t => {
+  const check = back.length ? `<div data-opt><p class="db-sub">Ready for you to check</p><ul class="db-l">${back.slice(0, 1).map(t => {
     const who = (teamProfiles || []).find(p => p.id === t.assigneeId);
     return `<li class="db-r db-go" onclick="openTaskDetailModal('${t.id}')"><span class="db-ic">${icon('clipboard-check')}</span><span class="db-tx"><b>${escapeHtml(t.title)}</b><span class="s">${who ? escapeHtml(firstName(who.name)) + ' marked it ready' : 'Marked ready'}${back.length > 1 ? ` · ${back.length - 1} more` : ''}</span></span></li>`;
-  }).join('')}</ul>` : '';
-  const body = (summ ? `<p class="db-sum">${summ}</p>` : '') + (ts.length ? `<ul class="db-l">${ts.slice(0, n).map(dbTaskRow).join('')}</ul>` : dbNone('No open tasks.')) + check + dbMore(ts.length - n, 'tasks');
-  return dbCard('db-tasks', 'tasks', 'Tasks', ts.length || '', body);
+  }).join('')}</ul></div>` : '';
+  const body = (summ ? `<p class="db-sum">${summ}</p>` : '') + (ts.length ? `<ul class="db-l">${ts.slice(0, n).map(dbTaskRow).join('')}</ul>` : dbNone('No open tasks.')) + check;
+  return dbCard('db-tasks', 'tasks', 'Tasks', ts.length || '', body, { total: ts.length, soft: 3 });
 }
 
-// ---- Calendar: today with a line at now, then the days after, up to six meetings ----
+// ---- Calendar: today with a line at now, then the days after ----
 const DB_EV_TONE = { meeting: 'blue', client_meeting: 'green', deadline: 'red', reminder: 'yellow', other: 'purple' };
-function dbCalendarCard(){
+function dbCalendarCard(cap){
   const now = rNow(), todayStr = toDateStr(now), end = toDateStr(addDays(now, 6));
   const evs = (typeof calendarEvents !== 'undefined' ? calendarEvents : []).filter(e => e.startAt && !e.deletedAt)
     .map(e => ({ e, ds: toDateStr(new Date(e.startAt)) })).filter(x => x.ds >= todayStr && x.ds <= end)
@@ -115,36 +141,27 @@ function dbCalendarCard(){
     const c = e.clientId && clients.find(x => x.id === e.clientId), first = (e.description || '').split('\n')[0];
     const sub = c ? c.name : first || (e.endAt && !e.allDay ? 'Until ' + fmtTime(new Date(e.endAt)) : '');
     const tone = DB_EV_TONE[e.eventType] || (c ? 'green' : 'blue');
-    return `<li class="db-ev db-go${past ? ' is-past' : ''}" onclick="openEventDetailModal('${e.id}')"><time>${e.allDay ? 'All day' : fmtTime(new Date(e.startAt))}</time><i class="db-evb ${tone}"></i><span class="db-tx"><b>${escapeHtml(e.title || 'Untitled')}</b><span class="s">${escapeHtml(sub)}</span></span></li>`;
+    return `<li class="db-ev db-go${past ? ' is-past' : ''}"${past ? '' : ' data-item'} onclick="openEventDetailModal('${e.id}')"><time>${e.allDay ? 'All day' : fmtTime(new Date(e.startAt))}</time><i class="db-evb ${tone}"></i><span class="db-tx"><b>${escapeHtml(e.title || 'Untitled')}</b><span class="s">${escapeHtml(sub)}</span></span></li>`;
   };
   const nowLi = `<li class="db-now" aria-label="Now, ${fmtTime(now)}"><time>${fmtTime(now)}</time><i></i></li>`;
-  // Today: what's left, after the last two that already happened
+  // Today: the last two that already happened, a line at now, and what's left
   const tod = evs.filter(x => x.ds === todayStr).map(x => x.e);
   const isPast = e => !e.allDay && new Date(e.endAt || e.startAt) <= now;
   const past = tod.filter(isPast), left = tod.filter(e => !isPast(e));
-  const todayList = past.slice(-2).concat(left), todayRows = [];
-  let rows = 0, placed = false, hidden = 0;
-  todayList.forEach(e => {
-    if(rows >= DB_CAL_ROWS){ if(!isPast(e)) hidden++; return; }
-    if(!placed && !e.allDay && !isPast(e) && new Date(e.startAt) > now){ todayRows.push(nowLi); placed = true; }
-    todayRows.push(row(e, isPast(e))); rows++;
-  });
-  if(!placed && rows < DB_CAL_ROWS) todayRows.push(nowLi);
-  let html = `<p class="db-day"><b>Today</b><span>${left.length ? `${left.length} left` : tod.length ? 'Nothing else today' : 'No meetings'}</span></p><ul class="db-l db-agenda">${todayRows.join('')}</ul>`;
-  // the days after, in order, while there's room
+  const todayRows = past.slice(-2).map(e => row(e, true));
+  let placed = false;
+  left.slice(0, cap).forEach(e => { if(!placed && !e.allDay && new Date(e.startAt) > now){ todayRows.push(nowLi); placed = true; } todayRows.push(row(e, false)); });
+  if(!placed && tod.length) todayRows.push(nowLi);
+  let html = `<div class="db-dayblk"><p class="db-day"><b>Today</b><span>${left.length ? `${left.length} left` : tod.length ? 'Nothing else today' : 'No meetings'}</span></p><ul class="db-l db-agenda">${todayRows.join('')}</ul></div>`;
+  // the days after, in order (the card drops them from the end until it fits)
   const later = evs.filter(x => x.ds > todayStr);
-  const days = [...new Set(later.map(x => x.ds))];
-  const seen = new Set();
-  for(const ds of days){
-    if(rows >= DB_CAL_ROWS) break;
-    seen.add(ds);
-    const es = later.filter(x => x.ds === ds).map(x => x.e), take = es.slice(0, DB_CAL_ROWS - rows);
-    html += `<p class="db-day"><b>${escapeHtml(dbDayWord(ds))}</b><span>${dbPlural(es.length, 'event')}</span></p><ul class="db-l db-agenda">${take.map(e => row(e, false)).join('')}</ul>`;
-    rows += take.length; hidden += es.length - take.length;
-  }
-  // what's left of the week that the card doesn't list
-  const more = hidden + later.filter(x => !seen.has(x.ds)).length;
-  return dbCard('db-cal', 'calendar', 'Calendar', '', html + dbMore(more, 'calendar'));
+  let room = cap - Math.min(left.length, cap);
+  [...new Set(later.map(x => x.ds))].forEach(ds => {
+    if(room <= 0) return;
+    const es = later.filter(x => x.ds === ds).map(x => x.e), take = es.slice(0, room); room -= take.length;
+    html += `<div class="db-dayblk" data-blk><p class="db-day"><b>${escapeHtml(dbDayWord(ds))}</b><span>${dbPlural(es.length, 'event')}</span></p><ul class="db-l db-agenda">${take.map(e => row(e, false)).join('')}</ul></div>`;
+  });
+  return dbCard('db-cal', 'calendar', 'Calendar', '', html, { total: left.length + later.length, min: 0 });
 }
 
 // ---- Reminders: questions waiting on clients ----
@@ -158,10 +175,10 @@ function dbRemindersCard(n){
     const c = clients.find(x => x.id === r.clientId), by = r.askedBy !== me && (teamProfiles || []).find(p => p.id === r.askedBy);
     const fw = r.followUpDate ? `<span class="${r.followUpDate < today ? 't-red' : ''}">${escapeHtml(dbFollowWord(r.followUpDate))}</span>` : (r.askedDate ? `Asked ${escapeHtml(dbDayWord(r.askedDate))}` : '');
     const sub = [c ? escapeHtml(c.name) : '', by ? `Asked by ${escapeHtml(firstName(by.name))}` : '', fw].filter(Boolean).join(' · ');
-    return `<li class="db-r db-go" onclick="openReminderDetailModal('${r.id}')"><span class="db-tx"><b class="db-q">${escapeHtml(r.question || '')}</b><span class="s">${sub}</span></span></li>`;
+    return `<li class="db-r db-go" data-item onclick="openReminderDetailModal('${r.id}')"><span class="db-tx"><b class="db-q">${escapeHtml(r.question || '')}</b><span class="s">${sub}</span></span></li>`;
   }).join('');
-  const body = `<p class="db-sum">${summ}</p>` + (rs.length ? `<ul class="db-l">${rows}</ul>` : dbNone('Nothing waiting on a client.')) + dbMore(rs.length - n, 'reminders');
-  return dbCard('db-rem', 'reminders', 'Reminders', rs.length || '', body);
+  const body = `<p class="db-sum">${summ}</p>` + (rs.length ? `<ul class="db-l">${rows}</ul>` : dbNone('Nothing waiting on a client.'));
+  return dbCard('db-rem', 'reminders', 'Reminders', rs.length || '', body, { total: rs.length });
 }
 
 // ---- WhatsApp: open requests from client groups ----
@@ -173,11 +190,11 @@ function dbWhatsappCard(n){
   const rows = ws.slice(0, n).map(t => {
     const ds = t.first_seen ? toDateStr(new Date(t.first_seen)) : today, wait = Math.max(0, -dbDayOffset(ds));
     const who = t.owner_user_id === me ? '<b class="db-you">Yours</b>' : escapeHtml(typeof waOwnerName === 'function' ? waOwnerName(t) : '');
-    return `<li class="db-r db-wa db-go" onclick="waOpenItem(${jsArg(t.id)})"><span class="db-tx"><span class="db-wt"><b>${escapeHtml(typeof waClientLabel === 'function' ? waClientLabel(t) : (t.client || ''))}</b><time>${escapeHtml(dbDayWord(ds))}</time></span><span class="db-wq">${escapeHtml(t.title || '')}</span><span class="s db-wo">${who}${wait >= 3 ? ` · <span class="t-red">Waiting ${wait} days</span>` : ''}</span></span></li>`;
+    return `<li class="db-r db-wa db-go" data-item onclick="waOpenItem(${jsArg(t.id)})"><span class="db-tx"><span class="db-wt"><b>${escapeHtml(typeof waClientLabel === 'function' ? waClientLabel(t) : (t.client || ''))}</b><time>${escapeHtml(dbDayWord(ds))}</time></span><span class="db-wq">${escapeHtml(t.title || '')}</span><span class="s db-wo">${who}${wait >= 3 ? ` · <span class="t-red">Waiting ${wait} days</span>` : ''}</span></span></li>`;
   }).join('');
   const summ = lead && mine ? `From client groups · ${mine} yours` : 'From client groups';
-  const body = `<p class="db-sum">${summ}</p>` + (ws.length ? `<ul class="db-l">${rows}</ul>` : dbNone('No open requests.')) + dbMore(ws.length - n, 'whatsapp');
-  return dbCard('db-wa', 'whatsapp', 'WhatsApp', ws.length || '', body);
+  const body = `<p class="db-sum">${summ}</p>` + (ws.length ? `<ul class="db-l">${rows}</ul>` : dbNone('No open requests.'));
+  return dbCard('db-wa', 'whatsapp', 'WhatsApp', ws.length || '', body, { total: ws.length });
 }
 
 // ---- Notes: latest first ----
@@ -188,10 +205,10 @@ function dbNotesCard(n, compact){
     const c = x.clientId && clients.find(y => y.id === x.clientId), st = dbSteps(x.text), when = x.updatedAt || x.createdAt;
     const sub = (c ? escapeHtml(c.name) : 'Your note') + (compact && st.all ? ` · ${st.done} of ${st.all} done` : '');
     const prog = !compact && st.all ? `<span class="db-prog"><span class="db-pb"><i style="width:${Math.round(st.done / st.all * 100)}%"></i></span>${st.done} of ${st.all} done</span>` : '';
-    return `<li class="db-r db-note db-go" onclick="openNoteSheet('${x.id}')"><span class="db-tx"><span class="db-wt"><b>${escapeHtml(x.title || 'Untitled')}</b>${when ? `<time>${escapeHtml(dbDayWord(toDateStr(new Date(when))))}</time>` : ''}</span><span class="s">${sub}</span>${snippet(x.text) ? `<span class="db-sn">${escapeHtml(snippet(x.text))}</span>` : ''}${prog}</span></li>`;
+    return `<li class="db-r db-note db-go" data-item onclick="openNoteSheet('${x.id}')"><span class="db-tx"><span class="db-wt"><b>${escapeHtml(x.title || 'Untitled')}</b>${when ? `<time>${escapeHtml(dbDayWord(toDateStr(new Date(when))))}</time>` : ''}</span><span class="s">${sub}</span>${snippet(x.text) ? `<span class="db-sn">${escapeHtml(snippet(x.text))}</span>` : ''}${prog}</span></li>`;
   }).join('');
-  const body = '<p class="db-sum">Latest first</p>' + (ns.length ? `<ul class="db-l">${rows}</ul>` : dbNone('No notes yet.')) + dbMore(ns.length - n, 'notes');
-  return dbCard('db-notes', 'notes', 'Notes', ns.length || '', body);
+  const body = '<p class="db-sum">Latest first</p>' + (ns.length ? `<ul class="db-l">${rows}</ul>` : dbNone('No notes yet.'));
+  return dbCard('db-notes', 'notes', 'Notes', ns.length || '', body, { total: ns.length });
 }
 
 // ---- Today's focus (members): the one thing to do now, what's next, and how much is done ----
@@ -199,7 +216,13 @@ const DB_SRC_ICON = { task: 'list-todo', wa: 'messages-square', follow: 'bell-ri
 function dbToggleRest(btn){
   window._dbRestOpen = !window._dbRestOpen;
   const rx = btn.closest('.bn-next')?.querySelector('.bn-rx'); if(rx) rx.classList.toggle('open', window._dbRestOpen);
-  btn.setAttribute('aria-expanded', window._dbRestOpen); btn.textContent = btn.dataset[window._dbRestOpen ? 'less' : 'more'];
+  btn.setAttribute('aria-expanded', window._dbRestOpen); dbRestLabel(btn.closest('.bn-focus'));
+}
+// "4 more" under Next (beside it when the window is short), or "Show less" while they're open.
+function dbRestLabel(card){
+  const btn = card && card.querySelector('.bn-tg'); if(!btn) return;
+  const n = card.querySelectorAll('.bn-rest > li').length;
+  btn.hidden = !n; btn.textContent = window._dbRestOpen ? 'Show less' : `${n} more`;
 }
 function dbFocusCard(nextN){
   const m = todayModel(), now = rNow(), todayStr = toDateStr(now);
@@ -233,52 +256,110 @@ function dbFocusCard(nextN){
       : `<span class="db-ic">${icon(DB_SRC_ICON[x.src] || 'circle')}</span>`;
     const when = x.when ? `<span class="${x.late ? 't-red' : ''}">${escapeHtml(x.when)}</span> · ` : '';
     const step = x.tick && x.src !== 'wa' ? '' : `<a class="x-lnk bn-open" href="#" onclick="event.stopPropagation();${x.go};return false;">${escapeHtml(x.step || 'Open')}</a>`;
-    return `<li class="db-tk"><div class="db-tki"><div class="db-r db-go" onclick="${x.go}">${lead}<span class="db-tx"><b>${escapeHtml(x.title)}</b><span class="s">${when}${x.sub || ''}</span></span>${x.flag ? `<span class="db-flag" title="High priority">${icon('flag')}</span>` : ''}${step}</div></div></li>`;
+    return `<li class="db-tk" data-item><div class="db-tki"><div class="db-r db-go" onclick="${x.go}">${lead}<span class="db-tx"><b>${escapeHtml(x.title)}</b><span class="s">${when}${x.sub || ''}</span></span>${x.flag ? `<span class="db-flag" title="High priority">${icon('flag')}</span>` : ''}${step}</div></div></li>`;
   };
-  const restOpen = !!window._dbRestOpen && rest.length;
-  const nextHtml = next.length ? `<div class="bn-next"><p class="bn-lbl">Next</p><ul class="db-l">${next.map(row).join('')}</ul>
-${rest.length ? `<div class="bn-rx${restOpen ? ' open' : ''}"><div class="bn-rxi"><ul class="db-l bn-rest">${rest.map(row).join('')}</ul></div></div>
-<button class="db-more bn-tg" type="button" aria-expanded="${restOpen}" data-more="${rest.length} more" data-less="Show less" onclick="dbToggleRest(this)">${restOpen ? 'Show less' : `${rest.length} more`}</button>` : ''}</div>` : '';
+  const restOpen = !!window._dbRestOpen;
+  const nextHtml = queue.length ? `<div class="bn-next"><p class="bn-lbl">Next</p><ul class="db-l bn-nl">${next.map(row).join('')}</ul>
+<div class="bn-rx${restOpen ? ' open' : ''}"><div class="bn-rxi"><ul class="db-l bn-rest">${rest.map(row).join('')}</ul></div></div>
+<button class="db-more bn-tg" type="button" aria-expanded="${restOpen}" onclick="dbToggleRest(this)" hidden></button></div>` : '';
   // how much of the day is done
   const total = m.done.length + open, segs = Math.min(total, 10), on = total ? Math.round(m.done.length / total * segs) : 0;
   const dots = segs ? `<span class="bn-seg" aria-hidden="true">${Array.from({ length: segs }, (_, i) => `<i${i < on ? ' class="on"' : ''}></i>`).join('')}</span>` : '';
   const last = m.done[0] ? `<span class="bn-last">Last: ${escapeHtml(m.done[0].title)}, ${fmtTime(m.done[0].t)}</span>` : '';
-  const foot = total ? `<footer class="bn-done">${dots}<span class="bn-dw">${m.done.length} of ${total} done today</span>${last}</footer>` : '';
+  const foot = total ? `<footer class="bn-done" data-opt>${dots}<span class="bn-dw">${m.done.length} of ${total} done today</span>${last}</footer>` : '';
   const name = firstName((typeof myName === 'function' ? myName() : '') || '');
-  return `<section class="db-card bn-focus" aria-label="Today’s focus"><header class="db-h">${icon('sun')}<b>Today’s focus</b></header>
+  return `<section class="db-card bn-focus" aria-label="Today’s focus" data-focus><header class="db-h">${icon('sun')}<b>Today’s focus</b></header>
 <div class="bn-hi"><h2>${hello}${name ? ', ' + escapeHtml(name) : ''}</h2><p>${sum}</p></div>
 <div class="bn-cols"><div class="bn-now"><p class="bn-lbl">Now</p>${nowHtml}</div>${nextHtml}</div>${foot}</section>`;
+}
+
+// ---- fitting: every card shows what fits its space, and says how many more ----
+function dbOver(card){
+  if(card.scrollHeight > card.clientHeight + 1) return true;
+  // Today's focus shrinks its Now/Next area, which then spills over the done line without growing the card
+  return [...card.querySelectorAll('.bn-cols, .bn-next')].some(b => b.scrollHeight > b.clientHeight + 1);
+}
+function dbFitCard(card){
+  const focus = card.hasAttribute('data-focus');
+  if(focus && window._dbRestOpen) return;   // the rest is open and scrolls inside the card
+  // Today's focus keeps one Next row, gives up its done line, tightens, then moves the last row under "more"
+  const min = focus ? 0 : +(card.dataset.min ?? 1), soft = focus ? 1 : +(card.dataset.soft || 0);
+  const gone = [];   // what came out, newest last, so a row that would fit after all can go back
+  const take = n => { gone.push([n, n.parentNode, n.nextSibling]); n.remove(); };
+  for(let guard = 0; guard < 80 && dbOver(card); guard++){
+    const items = focus ? [...card.querySelectorAll('.bn-nl > [data-item]')] : [...card.querySelectorAll('[data-item]')];
+    const opt = card.querySelector('[data-opt]');
+    if(opt && items.length <= Math.max(soft, min)){ take(opt); continue; }
+    if(focus && items.length <= 1 && !card.classList.contains('bn-tight')){ card.classList.add('bn-tight'); continue; }
+    if(items.length > min){
+      const last = items[items.length - 1];
+      if(focus){ card.querySelector('.bn-rest')?.prepend(last); dbRestLabel(card); continue; }
+      const blk = last.closest('[data-blk]'); take(last);
+      if(blk && !blk.querySelector('[data-item]')) take(blk);
+      dbMoreLabel(card);
+      continue;
+    }
+    // nothing left to give up but day headers with no rows
+    const blk = [...card.querySelectorAll('[data-blk]')].pop(); if(blk){ take(blk); continue; }
+    break;
+  }
+  // the "more" line takes room once it shows, so the last cut can be one too many: put back what fits
+  while(!focus && gone.length){   // Today's focus would rather keep a Next row than its done line
+    const [n, parent, next] = gone[gone.length - 1];
+    parent.insertBefore(n, next && next.parentNode === parent ? next : null);
+    if(!focus) dbMoreLabel(card);
+    if(dbOver(card)){ n.remove(); if(!focus) dbMoreLabel(card); break; }
+    gone.pop();
+  }
+  card.querySelectorAll('[data-blk]').forEach(b => { if(!b.querySelector('[data-item]')) b.remove(); });
+}
+function dbMoreLabel(card){
+  const a = card.querySelector('.db-more[data-view]'); if(!a || card.dataset.total == null) return;
+  const more = +card.dataset.total - card.querySelectorAll('[data-item]').length;
+  a.hidden = more <= 0; a.textContent = more > 0 ? `${more} more in ${dbTitle(a.dataset.view)}` : '';
+}
+function dbFit(root){
+  root.querySelectorAll('.db-card').forEach(dbMoreLabel);
+  root.querySelectorAll('.bn-focus').forEach(dbRestLabel);
+  if(dbMode() === 'narrow') return;   // a narrow window scrolls; the cards keep to a few rows
+  root.querySelectorAll('.db-card').forEach(dbFitCard);
 }
 
 // ---- the page ----
 function renderDashboard(){
   const root = dbRoot();
   if(!root || typeof clients === 'undefined' || typeof currentUser === 'undefined' || !currentUser) return;
-  const wide = dbIsWide(), role = canApprove() ? 'approver' : 'member', N = DB_N[role][wide ? 'wide' : 'normal'], wa = dbWaOn();
-  root._dbWide = wide;
+  const mode = dbMode(), role = canApprove() ? 'approver' : 'member', N = mode === 'narrow' ? DB_FEW : DB_CAP, wa = dbWaOn(), wide = mode === 'wide';
   if((typeof tasksDataLoaded !== 'undefined' && !tasksDataLoaded) || (typeof calendarDataLoaded !== 'undefined' && !calendarDataLoaded)){
-    root.innerHTML = skeletonHtml('dashboard', 'Loading your dashboard…'); dbWatchWidth(root); return;
+    root.innerHTML = skeletonHtml('dashboard', 'Loading your dashboard…'); dbWatchSize(root); return;
   }
   let html;
   try{
+    const table = wide ? dbClientsTable(DB_CAP.table) : '';
     if(role === 'approver'){
-      html = `<div class="db"><div class="db-grid${wa ? '' : ' no-wa'}">${dbHealthCard(N.health)}${dbTasksCard(N.tasks)}${dbCalendarCard()}${dbRemindersCard(N.rem)}${wa ? dbWhatsappCard(N.wa) : ''}${dbNotesCard(N.notes)}</div></div>`;
+      html = `<div class="db db-${mode}"><div class="db-grid${wa ? '' : ' no-wa'}">${dbHealthCard(N.health)}${dbTasksCard(N.tasks)}${dbCalendarCard(N.cal)}${dbRemindersCard(N.rem)}${wa ? dbWhatsappCard(N.wa) : ''}${dbNotesCard(N.notes)}</div>${table}</div>`;
     } else {
       const rw = dbRemindersCard(N.rem) + (wa ? dbWhatsappCard(N.wa) : '');
-      html = `<div class="db"><div class="bn-grid${wa ? '' : ' no-wa'}">${dbFocusCard(N.next)}<div class="bn-mid">${dbTasksCard(N.tasks)}${dbHealthSmall()}</div>${dbCalendarCard()}${wide ? `<div class="bn-pair">${rw}</div>` : rw}${dbNotesCard(N.notes, !wide)}</div></div>`;
+      html = `<div class="db db-${mode}"><div class="bn-grid${wa ? '' : ' no-wa'}">${dbFocusCard(N.next)}<div class="bn-mid">${dbTasksCard(N.tasks)}${dbHealthSmall()}</div>${dbCalendarCard(N.cal)}${wide ? `<div class="bn-pair">${rw}</div>` : rw}${dbNotesCard(N.notes, !wide)}</div>${table}</div>`;
     }
   } catch(e){
     console.error('Dashboard', e);
     html = `<div class="db">${emptyState({ icon: 'refresh-cw', title: 'The dashboard couldn’t be shown', text: String(e && e.message || e), action: 'Try Again', onAction: 'renderDashboard()' })}</div>`;
   }
   root.innerHTML = html;
+  dbFit(root);
   if(currentViewName === 'overview' && typeof renderGreeting === 'function') renderGreeting();
-  dbWatchWidth(root);
+  dbWatchSize(root);
 }
-// Crossing into (or out of) a wide screen changes how much each card lists, so it draws again.
-function dbWatchWidth(root){
+// When the window changes size, the cards fit again (and a wide screen gets its table).
+function dbWatchSize(root){
   if(root._dbRo || typeof ResizeObserver === 'undefined') return;
-  root._dbRo = new ResizeObserver(() => { if(root.clientWidth && (root.clientWidth >= DB_WIDE) !== !!root._dbWide) renderDashboard(); });
+  let w = root.clientWidth, h = root.clientHeight;
+  root._dbRo = new ResizeObserver(() => {
+    if(!root.clientWidth || (root.clientWidth === w && root.clientHeight === h)) return;
+    w = root.clientWidth; h = root.clientHeight;
+    clearTimeout(root._dbT); root._dbT = setTimeout(() => { if(root.offsetParent) renderDashboard(); }, 120);
+  });
   root._dbRo.observe(root);
 }
 // The week board (This Week) used to open from Today; it opens from the Dashboard's toolbar now.
