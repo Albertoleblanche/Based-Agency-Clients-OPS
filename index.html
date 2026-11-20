@@ -79,7 +79,7 @@
       <div class="si-panel is-out" id="siPanel" inert>
         <form class="si-f" data-pane="form" novalidate onsubmit="handleLogin();return false;" aria-label="Sign in">
           <label class="si-lab" for="loginEmail">Email</label>
-          <input class="si-in" id="loginEmail" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="you@basedagency.com">
+          <input class="si-in" id="loginEmail" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="you@based-agency.com">
           <div class="si-lab"><label for="loginPassword">Password</label><button class="si-link" type="button" onclick="siShow('forgot')">Forgot password?</button></div>
           <div class="si-pw"><input class="si-in" id="loginPassword" type="password" autocomplete="current-password"><button class="si-eye" type="button" aria-label="Show password" aria-pressed="false" onclick="siToggleEye(this)" data-ic="eye"></button></div>
           <p class="si-err" id="loginError" role="alert" hidden></p>
@@ -88,7 +88,7 @@
         <form class="si-f" data-pane="forgot" novalidate onsubmit="siSendLink();return false;" aria-label="Reset your password" hidden>
           <p class="si-p">Enter your work email and we’ll send a link to set a new password.</p>
           <label class="si-lab" for="siResetEmail">Email</label>
-          <input class="si-in" id="siResetEmail" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="you@basedagency.com">
+          <input class="si-in" id="siResetEmail" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="you@based-agency.com">
           <p class="si-err" id="siResetErr" role="alert" hidden></p>
           <button class="btn btn-p si-go" id="siResetBtn" type="submit">Send Link</button>
           <button class="si-back" type="button" onclick="siShow('form')"><span data-ic="arrow-left"></span>Back to Sign In</button>
@@ -950,7 +950,7 @@
             <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Creates a real login for this person and assigns their role. You'll get a one-time temporary password to send them directly — they should change it after logging in.</p>
             <div class="form-grid" style="margin-bottom:12px;">
               <div><label>Name</label><input id="tmNameLegacy" placeholder="e.g. Priya"></div>
-              <div><label>Email</label><input id="tmEmailLegacy" placeholder="priya@basedagency.com"></div>
+              <div><label>Email</label><input id="tmEmailLegacy" placeholder="priya@based-agency.com"></div>
               <div><label>Job title</label><select id="tmTitleLegacy"></select></div>
               <div><label>Permission role</label>
                 <select id="tmRoleLegacy">

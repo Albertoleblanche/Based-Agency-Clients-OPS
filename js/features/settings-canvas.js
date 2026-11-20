@@ -475,7 +475,7 @@ function openSignatureSheet(){
 ${f('setSignatureCompanyName', 'companyName', 'Company', 'Based Agency')}
 ${f('setSignatureTeamLine', 'teamLine', 'Line under it', 'Based Agency Team')}
 ${f('setSignaturePhone', 'phone', 'Phone', '(555) 123-4567')}
-${f('setSignatureEmail', 'email', 'Email', 'hello@basedagency.com')}
+${f('setSignatureEmail', 'email', 'Email', 'hello@based-agency.com')}
 ${f('setSignatureWebsite', 'website', 'Website', 'based-agency.com')}
 ${f('setSignatureAddress', 'address', 'Address', '')}
 </div>
@@ -588,7 +588,7 @@ ${fr('Phone', '', `<input id="profilePhoneInput" class="tf" style="width:240px" 
 </div>
 <div class="set-h">Sign-in email</div>
 <div class="form-grp">
-${fr(esc(currentUser.email || ''), admin ? 'You can change it here. A link goes to the new address to confirm.' : 'An admin approves changes to it.', `<input id="${admin ? 'directEmailInput' : 'requestEmailInput'}" class="tf" style="width:200px" placeholder="New email"><button class="btn" onclick="${admin ? 'saveDirectEmailChange()' : 'submitEmailChangeRequest()'}">${admin ? 'Change' : 'Ask to Change'}</button>`)}
+${fr(esc(currentUser.email || ''), admin ? 'You can change it here. A link goes to the new address to confirm.' : 'An admin approves changes to it.', `<input id="${admin ? 'directEmailInput' : 'requestEmailInput'}" class="tf" style="width:200px" placeholder="new@based-agency.com"><button class="btn" onclick="${admin ? 'saveDirectEmailChange()' : 'submitEmailChangeRequest()'}">${admin ? 'Change' : 'Ask to Change'}</button>`)}
 <div id="myEmailRequestsList"></div>
 </div>
 <div class="set-h">On this device</div>

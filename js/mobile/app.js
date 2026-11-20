@@ -100,13 +100,13 @@ function mLogin(st, o){
   const err = o.err ? `<p class="msi-err" role="alert">${mEsc(o.err)}</p>` : '';
   const html = {
     form: `<form class="msi-f" onsubmit="mSignIn();return false;" novalidate aria-label="Sign in">
-<div class="ig msi-ig"><div class="ir"><label class="ilab" for="mlEmail">Email</label><input id="mlEmail" class="itf${o.bad === 'email' ? ' bad' : ''}" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="you@basedagency.com" value="${email}"></div>
+<div class="ig msi-ig"><div class="ir"><label class="ilab" for="mlEmail">Email</label><input id="mlEmail" class="itf${o.bad === 'email' ? ' bad' : ''}" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="you@based-agency.com" value="${email}"></div>
 <div class="ir"><label class="ilab" for="mlPass">Password</label><input id="mlPass" class="itf${o.bad === 'pass' ? ' bad' : ''}" type="password" autocomplete="current-password" placeholder="Required">${mEyeBtn()}</div></div>
 ${err}<button class="ibtn p msi-go" id="mlBtn" type="submit">Sign In</button></form>
 <button class="msi-link" type="button" onclick="mLogin('forgot')">Forgot password?</button>`,
     forgot: `<form class="msi-f" onsubmit="mSendLink();return false;" novalidate aria-label="Reset your password">
 <p class="msi-p">Enter your work email and we’ll send a link to set a new password.</p>
-<div class="ig msi-ig"><div class="ir"><label class="ilab" for="mlResetEmail">Email</label><input id="mlResetEmail" class="itf" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="you@basedagency.com" value="${email}"></div></div>
+<div class="ig msi-ig"><div class="ir"><label class="ilab" for="mlResetEmail">Email</label><input id="mlResetEmail" class="itf" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="you@based-agency.com" value="${email}"></div></div>
 ${err}<button class="ibtn p msi-go" id="mlResetBtn" type="submit">Send Link</button></form>
 <button class="msi-link" type="button" onclick="mLogin('form')">Back to Sign In</button>`,
     sent: `<div class="msi-f msi-sent"><span class="si-ok">${icon('mail-check')}</span>
@@ -131,7 +131,8 @@ function mLoginBusy(id, label){ const b = $m(id); if(!b) return; b.disabled = tr
 function mRenderLogin(err){ mLogin('form', { err }); }
 async function mSignIn(){
   const email = $m('mlEmail').value.trim(), password = $m('mlPass').value;
-  if(!siLooksLikeEmail(email)){ mLogin('form', { email, err: email ? 'That doesn’t look like an email address.' : 'Enter your work email.', bad: 'email' }); return; }
+  const bad = teamEmailProblem(email);
+  if(bad){ mLogin('form', { email, err: bad, bad: 'email' }); return; }
   if(!password){ mLogin('form', { email, err: 'Enter your password.', bad: 'pass' }); return; }
   mLoginBusy('mlBtn', 'Signing In…');
   let error = null;
@@ -141,7 +142,8 @@ async function mSignIn(){
 }
 async function mSendLink(){
   const email = $m('mlResetEmail').value.trim();
-  if(!siLooksLikeEmail(email)){ mLogin('forgot', { email, err: 'Enter your work email.' }); return; }
+  const bad = teamEmailProblem(email);
+  if(bad){ mLogin('forgot', { email, err: bad }); return; }
   mLoginBusy('mlResetBtn', 'Sending…');
   let error = null;
   try{ ({ error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/' })); }catch(e){ error = e; }

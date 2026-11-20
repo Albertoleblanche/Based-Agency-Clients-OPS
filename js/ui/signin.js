@@ -115,12 +115,12 @@ function siAuthMessage(error, kind){
   if(/expired|invalid.*(token|link)|session/.test(m)) return 'This link has expired. Ask for a new one from Forgot password.';
   return (error && error.message) || 'Something went wrong. Try again.';
 }
-function siLooksLikeEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
 
 // ---- forgot password ----------------------------------------------------------------------------
 async function siSendLink(){
   const email = ($si('siResetEmail').value || '').trim(), btn = $si('siResetBtn');
-  if(!siLooksLikeEmail(email)){ siErr('siResetErr', 'Enter your work email.', ['siResetEmail']); $si('siResetEmail').focus(); return; }
+  const bad = teamEmailProblem(email);
+  if(bad){ siErr('siResetErr', bad, ['siResetEmail']); $si('siResetEmail').focus(); return; }
   siErr('siResetErr', '');
   siBusy(btn, 'Sending…', ['siResetEmail']);
   let error = null;

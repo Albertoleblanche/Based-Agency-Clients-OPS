@@ -84,7 +84,8 @@ async function handleLogin(){
   const password = document.getElementById('loginPassword').value;
   const btn = document.getElementById('loginBtn');
   if(btn.disabled) return;
-  if(!siLooksLikeEmail(email)){ siErr('loginError', email ? 'That doesn’t look like an email address.' : 'Enter your work email.', ['loginEmail']); document.getElementById('loginEmail').focus(); return; }
+  const bad = teamEmailProblem(email);
+  if(bad){ siErr('loginError', bad, ['loginEmail']); document.getElementById('loginEmail').focus(); return; }
   if(!password){ siErr('loginError', 'Enter your password.', ['loginPassword']); document.getElementById('loginPassword').focus(); return; }
   siErr('loginError', '');
   siBusy(btn, 'Signing In…', ['loginEmail', 'loginPassword']);

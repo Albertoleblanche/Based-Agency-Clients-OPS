@@ -37,6 +37,18 @@ function loadingStateHtml(label){
   return `<div class="empty-rich"><span class="spinner" style="width:16px;height:16px;border-width:2.5px;"></span><div class="empty-rich-sub" style="margin-top:10px;">${escapeHtml(label)||'Loading…'}</div></div>`;
 }
 
+// Only Based Agency addresses sign in, get an account or become someone's sign-in email (Nov 20).
+// The server checks the same (api/admin-user-actions.js, addendum-email-domain.sql).
+const TEAM_EMAIL_DOMAIN = 'based-agency.com';
+function isTeamEmail(v){ const e = String(v || '').trim().toLowerCase(); return /^[^\s@]+@[^\s@]+$/.test(e) && e.endsWith('@' + TEAM_EMAIL_DOMAIN); }
+// What to say about an address that isn't one: empty, not an email, or another domain.
+function teamEmailProblem(v, whose){
+  const e = String(v || '').trim();
+  if(!e) return whose === 'their' ? 'Enter their work email.' : 'Enter your work email.';
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return 'That doesn’t look like an email address.';
+  if(!isTeamEmail(e)) return whose === 'their' ? `Use their @${TEAM_EMAIL_DOMAIN} email.` : whose === 'new' ? `Use an @${TEAM_EMAIL_DOMAIN} email.` : `Use your @${TEAM_EMAIL_DOMAIN} email.`;
+  return '';
+}
 function escapeHtml(str){
   if(str===null || str===undefined) return '';
   return String(str)

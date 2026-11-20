@@ -17,6 +17,12 @@ const { createClient } = require('@supabase/supabase-js');
 const { CLAUDE_MODEL, OPENAI_MODEL } = require('../lib/ai-client');
 const { sendPushToUser, pushUrlFor } = require('../lib/push-notify');
 
+// Only Based Agency addresses get an account or become someone's sign-in email (Nov 20).
+// The app says so before it asks; this is the check that holds. addendum-email-domain.sql adds the same
+// rule in the database, for anything that reaches Supabase another way.
+const TEAM_EMAIL_DOMAIN = 'based-agency.com';
+function isTeamEmail(v) { const e = String(v || '').trim().toLowerCase(); return /^[^\s@]+@[^\s@]+$/.test(e) && e.endsWith('@' + TEAM_EMAIL_DOMAIN); }
+
 function generateTempPassword() {
   const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz';
   const digits = '23456789';
@@ -175,6 +181,7 @@ module.exports = async function handler(req, res) {
       const { name, email, role, title } = req.body || {};
       if (!name || !email || !role) { res.status(400).json({ error: 'Missing name, email, or role' }); return; }
       if (!['admin', 'approver', 'member'].includes(role)) { res.status(400).json({ error: 'Role must be admin, approver, or member' }); return; }
+      if (!isTeamEmail(email)) { res.status(400).json({ error: `Use their @${TEAM_EMAIL_DOMAIN} email.` }); return; }
       // Generate a temporary password — shown once so the admin can relay it directly.
       const tempPassword = Math.random().toString(36).slice(-8) + 'Aa1!';
       const { data: newUser, error: createErr } = await admin.auth.admin.createUser({
@@ -198,6 +205,7 @@ module.exports = async function handler(req, res) {
       if (!requestId || typeof approve !== 'boolean') { res.status(400).json({ error: 'Missing requestId or approve' }); return; }
       const { data: reqRow, error: reqErr } = await admin.from('email_change_requests').select('*').eq('id', requestId).maybeSingle();
       if (reqErr || !reqRow) { res.status(404).json({ error: 'Request not found' }); return; }
+      if (approve && !isTeamEmail(reqRow.requested_email)) { res.status(400).json({ error: `Only @${TEAM_EMAIL_DOMAIN} emails can sign in. Deny this request instead.` }); return; }
       if (reqRow.status !== 'pending') { res.status(400).json({ error: 'This request has already been resolved' }); return; }
       if (approve) {
         const { error: updateAuthErr } = await admin.auth.admin.updateUserById(reqRow.user_id, { email: reqRow.requested_email });

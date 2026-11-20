@@ -75,7 +75,7 @@ function renderProfileEmailPanel(){
       <p style="font-size:13px;color:var(--muted);margin:0 0 14px;line-height:1.5;">As an admin, you can change your own login email directly. Supabase will send a confirmation link to the new address before the change actually takes effect.</p>
       <div class="form-grid">
         <div><label>Current email</label><input value="${escapeHtml(currentUser.email)}" readonly style="color:var(--muted-lt);"></div>
-        <div><label>New email</label><input id="directEmailInput" placeholder="new@basedagency.com"></div>
+        <div><label>New email</label><input id="directEmailInput" placeholder="new@based-agency.com"></div>
       </div>
       <button class="btn btn-brand" style="margin-top:6px;" onclick="saveDirectEmailChange()">Update email</button>`;
   } else {
@@ -83,7 +83,7 @@ function renderProfileEmailPanel(){
       <p style="font-size:13px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Changing your login email needs admin approval — submit a request below and an admin will confirm or deny it.</p>
       <div class="form-grid">
         <div><label>Current email</label><input value="${escapeHtml(currentUser.email)}" readonly style="color:var(--muted-lt);"></div>
-        <div><label>Requested new email</label><input id="requestEmailInput" placeholder="new@basedagency.com"></div>
+        <div><label>Requested new email</label><input id="requestEmailInput" placeholder="new@based-agency.com"></div>
       </div>
       <button class="btn btn-brand" style="margin-top:6px;" onclick="submitEmailChangeRequest()">Submit request</button>
       <div id="myEmailRequestsList" style="margin-top:16px;"></div>`;
@@ -93,7 +93,8 @@ function renderProfileEmailPanel(){
 
 async function saveDirectEmailChange(){
   const newEmail = document.getElementById('directEmailInput').value.trim();
-  if(!newEmail || !newEmail.includes('@')){ showToast('error','Invalid email','Enter a valid email address.'); return; }
+  const bad = teamEmailProblem(newEmail, 'new');
+  if(bad){ showToast('error','Use a Based Agency email', bad); return; }
   const { error } = await supabaseClient.auth.updateUser({ email: newEmail });
   if(error){ showToast('error','Update failed', error.message); return; }
   showToast('success','Confirmation sent', `Check ${newEmail} for a link to confirm the change.`);
@@ -101,7 +102,8 @@ async function saveDirectEmailChange(){
 
 async function submitEmailChangeRequest(){
   const requested = document.getElementById('requestEmailInput').value.trim();
-  if(!requested || !requested.includes('@')){ showToast('error','Invalid email','Enter a valid email address.'); return; }
+  const bad = teamEmailProblem(requested, 'new');
+  if(bad){ showToast('error','Use a Based Agency email', bad); return; }
   const { error } = await supabaseClient.from('email_change_requests').insert({
     user_id: currentUser.id, current_email: currentUser.email, requested_email: requested
   });

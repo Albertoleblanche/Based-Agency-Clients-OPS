@@ -126,7 +126,7 @@ function openAddMemberSheet(){
   openAppModal(`<h3>Add Member</h3>
 <div class="f">
 <label for="tmName">Name</label><input class="tf" id="tmName" placeholder="Priya Shah">
-<label for="tmEmail">Email</label><input class="tf" id="tmEmail" type="email" placeholder="priya@basedagency.com">
+<label for="tmEmail">Email</label><input class="tf" id="tmEmail" type="email" placeholder="priya@based-agency.com">
 <label for="tmTitle">Job title</label><select id="tmTitle"><option value="">No title</option>${(settings.teamTitleOptions || []).map(o => `<option>${escapeHtml(o)}</option>`).join('')}</select>
 <label for="tmRole">Role</label><select id="tmRole">${ROLE_INFO.map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select>
 <span></span><p class="t-2" style="font-size:13px;margin:0">They get a sign-in right away. You’ll see a one-time password to send them.</p>

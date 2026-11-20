@@ -15,6 +15,8 @@ async function addTeamMember(){
   const role = document.getElementById('tmRole').value;
   const title = document.getElementById('tmTitle').value;
   if(!name || !email){ showToast('error','Missing info','Enter both a name and email.'); return; }
+  const bad = teamEmailProblem(email, 'their');
+  if(bad){ showToast('error','Use a Based Agency email', bad); document.getElementById('tmEmail')?.focus(); return; }
 
   const btn = clickedBtn();
   setBtnLoading(btn, 'Creating…');
