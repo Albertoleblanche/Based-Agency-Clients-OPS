@@ -215,7 +215,10 @@ function dbNotesCard(n, compact){
 const DB_SRC_ICON = { task: 'list-todo', wa: 'messages-square', follow: 'bell-ring', note: 'sticky-note', review: 'clipboard-check', health: 'activity', update: 'send' };
 function dbToggleRest(btn){
   window._dbRestOpen = !window._dbRestOpen;
-  const rx = btn.closest('.bn-next')?.querySelector('.bn-rx'); if(rx) rx.classList.toggle('open', window._dbRestOpen);
+  const nx = btn.closest('.bn-next'), rx = nx?.querySelector('.bn-rx');
+  nx?.classList.toggle('is-open', window._dbRestOpen);   // Next and the rest scroll together inside the card
+  if(rx) rx.classList.toggle('open', window._dbRestOpen);
+  if(!window._dbRestOpen) nx?.querySelector('.bn-nx')?.scrollTo({ top: 0 });
   btn.setAttribute('aria-expanded', window._dbRestOpen); dbRestLabel(btn.closest('.bn-focus'));
 }
 // "4 more" under Next (beside it when the window is short), or "Show less" while they're open.
@@ -259,8 +262,8 @@ function dbFocusCard(nextN){
     return `<li class="db-tk" data-item><div class="db-tki"><div class="db-r db-go" onclick="${x.go}">${lead}<span class="db-tx"><b>${escapeHtml(x.title)}</b><span class="s">${when}${x.sub || ''}</span></span>${x.flag ? `<span class="db-flag" title="High priority">${icon('flag')}</span>` : ''}${step}</div></div></li>`;
   };
   const restOpen = !!window._dbRestOpen;
-  const nextHtml = queue.length ? `<div class="bn-next"><p class="bn-lbl">Next</p><ul class="db-l bn-nl">${next.map(row).join('')}</ul>
-<div class="bn-rx${restOpen ? ' open' : ''}"><div class="bn-rxi"><ul class="db-l bn-rest">${rest.map(row).join('')}</ul></div></div>
+  const nextHtml = queue.length ? `<div class="bn-next${restOpen ? ' is-open' : ''}"><p class="bn-lbl">Next</p><div class="bn-nx"><ul class="db-l bn-nl">${next.map(row).join('')}</ul>
+<div class="bn-rx${restOpen ? ' open' : ''}"><div class="bn-rxi"><ul class="db-l bn-rest">${rest.map(row).join('')}</ul></div></div></div>
 <button class="db-more bn-tg" type="button" aria-expanded="${restOpen}" onclick="dbToggleRest(this)" hidden></button></div>` : '';
   // how much of the day is done
   const total = m.done.length + open, segs = Math.min(total, 10), on = total ? Math.round(m.done.length / total * segs) : 0;
@@ -277,11 +280,14 @@ function dbFocusCard(nextN){
 function dbOver(card){
   if(card.scrollHeight > card.clientHeight + 1) return true;
   // Today's focus shrinks its Now/Next area, which then spills over the done line without growing the card
-  return [...card.querySelectorAll('.bn-cols, .bn-next')].some(b => b.scrollHeight > b.clientHeight + 1);
+  return [...card.querySelectorAll('.bn-cols, .bn-next:not(.is-open)')].some(b => b.scrollHeight > b.clientHeight + 1);
 }
 function dbFitCard(card){
   const focus = card.hasAttribute('data-focus');
-  if(focus && window._dbRestOpen) return;   // the rest is open and scrolls inside the card
+  // Today's focus with the rest open: fit it as if closed (so a redraw, say when a task or WhatsApp
+  // reloads, never spills over the done line), then open it again without replaying the slide
+  const nx = focus && window._dbRestOpen ? card.querySelector('.bn-next.is-open') : null, rx = nx && nx.querySelector('.bn-rx');
+  if(nx){ rx.style.transition = 'none'; nx.classList.remove('is-open'); rx.classList.remove('open'); }
   // Today's focus keeps one Next row, gives up its done line, tightens, then moves the last row under "more"
   const min = focus ? 0 : +(card.dataset.min ?? 1), soft = focus ? 1 : +(card.dataset.soft || 0);
   const gone = [];   // what came out, newest last, so a row that would fit after all can go back
@@ -301,6 +307,8 @@ function dbFitCard(card){
     }
     // nothing left to give up but day headers with no rows
     const blk = [...card.querySelectorAll('[data-blk]')].pop(); if(blk){ take(blk); continue; }
+    // a very short window: the last rows go too (the "more" line still says where they are), so nothing spills
+    if(!focus && items.length){ const last = items[items.length - 1], b = last.closest('[data-blk]'); take(last); if(b && !b.querySelector('[data-item]')) take(b); dbMoreLabel(card); continue; }
     break;
   }
   // the "more" line takes room once it shows, so the last cut can be one too many: put back what fits
@@ -312,6 +320,12 @@ function dbFitCard(card){
     gone.pop();
   }
   card.querySelectorAll('[data-blk]').forEach(b => { if(!b.querySelector('[data-item]')) b.remove(); });
+  if(nx){
+    if(card.querySelector('.bn-rest > li')){ nx.classList.add('is-open'); rx.classList.add('open'); }
+    else { window._dbRestOpen = false; card.querySelector('.bn-tg')?.setAttribute('aria-expanded', 'false'); }   // everything fits: nothing to open
+    dbRestLabel(card);
+    void rx.offsetHeight; requestAnimationFrame(() => { rx.style.transition = ''; });
+  }
 }
 function dbMoreLabel(card){
   const a = card.querySelector('.db-more[data-view]'); if(!a || card.dataset.total == null) return;

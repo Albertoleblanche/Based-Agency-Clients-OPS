@@ -206,8 +206,10 @@
 .db-normal .bn-focus, .db-wide .bn-focus{display:flex;flex-direction:column}
 .db-normal .bn-cols, .db-wide .bn-cols{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
 .db-normal .bn-next, .db-wide .bn-next{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
-.db-normal .bn-rx.open, .db-wide .bn-rx.open{flex:1 1 auto;min-height:0}
-.db-normal .bn-rx.open .bn-rxi, .db-wide .bn-rx.open .bn-rxi{overflow:auto;overscroll-behavior:contain}
+.bn-nx{display:flex;flex-direction:column;flex:none}
+/* the rest open: Next and the rest scroll together in the room Next has, and the done line stays put */
+.db-normal .bn-next.is-open > .bn-nx, .db-wide .bn-next.is-open > .bn-nx{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;margin-right:-6px;padding-right:6px}
+.db-normal .bn-cols, .db-wide .bn-cols{overflow:hidden;margin:0 -4px;padding:0 4px}
 .db-normal .bn-done, .db-wide .bn-done{flex:0 0 auto}
 .bn-tg[hidden], .db-more[hidden]{display:none!important}
 /* a wide screen: the cards in one row over the clients that need attention */
@@ -234,7 +236,7 @@
 .db-mute{color:var(--label-3)}
 .db-wide .bn-pair{min-height:0} .db-wide .bn-pair .db-card{flex:1 1 0;min-height:0}
 .bn-nl:empty{display:none}
-.bn-nl:empty + .bn-rx + .bn-tg{padding-top:0}
+.bn-nx:has(> .bn-nl:empty) + .bn-tg{padding-top:0}
 /* a short window: Today's focus tightens before it hides its last Next row */
 .bn-focus.bn-tight .bn-hi h2{font-size:20px}
 .bn-focus.bn-tight .bn-hi p{margin-top:4px}
@@ -243,11 +245,10 @@
 .bn-focus.bn-tight .bn-nt > b{font-size:16px}
 .bn-focus.bn-tight .bn-ic{width:34px;height:34px;border-radius:10px}
 .bn-focus.bn-tight .bn-acts{margin-top:8px}
-.bn-focus.bn-tight .bn-next{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto minmax(0,1fr);align-content:start}
+.bn-focus.bn-tight .bn-next{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto minmax(0,1fr);align-content:start}
 .bn-focus.bn-tight .bn-next > .bn-lbl{grid-area:1/1;align-self:baseline}
 .bn-focus.bn-tight .bn-next > .bn-tg{grid-area:1/2;align-self:baseline;padding:0;font-size:12.5px}
-.bn-focus.bn-tight .bn-next > .bn-nl{grid-column:1/-1;grid-row:2}
-.bn-focus.bn-tight .bn-next > .bn-rx{grid-column:1/-1;grid-row:3;min-height:0}
+.bn-focus.bn-tight .bn-next > .bn-nx{grid-column:1/-1;grid-row:2;min-height:0}
 /* an empty card in the wide pair keeps to its message so the other gets the room */
 .db-wide .bn-pair .db-card:has(.db-none){flex:0 0 auto}
 .db-tbl th:last-child, .db-tbl td:last-child{padding-left:28px}
