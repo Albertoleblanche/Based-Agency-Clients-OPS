@@ -2654,7 +2654,10 @@ a.mi{text-decoration:none;color:inherit}
    focus ring for the keyboard, and hover only with a mouse. Counts are quiet grey; only Health (red)
    and Team (blue, someone waiting on you) keep a colour. Review's rows are inset and rounded like a
    Mac list, and health reads as a dot and a word, as on Health and the Dashboard. */
-.mac[data-theme] .app-win .side .src-i:active { background: var(--sb-on); color: var(--sb-strong); transition: none; }
+/* the whole row presses in: quick on the way down, a touch softer coming back */
+.mac[data-theme] .app-win .side .src-i { transition: background-color .12s ease, color .12s ease, transform 160ms cubic-bezier(.23,1,.32,1); }
+.mac[data-theme] .app-win .side .src-i:active { background: var(--sb-on); color: var(--sb-strong); transform: scale(.97); transition: background-color 0s, color 0s, transform 100ms ease-out; }
+@media (prefers-reduced-motion: reduce) { .mac[data-theme] .app-win .side .src-i:active { transform: none; } }
 .mac[data-theme] .app-win .side .src-i:focus-visible { outline: none; box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--blue) 55%, transparent); }
 .rvn-hl{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;color:var(--label);white-space:nowrap}
 .rvn-hl i{width:7px;height:7px;border-radius:50%;background:var(--fill-3);flex:0 0 auto}
