@@ -100,7 +100,7 @@ function updateWaNavBadge(){
   if(!b) return;
   // What's waiting, until it's answered or done: everyone's for admins and approvers, your own otherwise.
   const n = waHidden() ? 0 : waCanManage() ? waTasks.filter(t => t.status === 'open').length : waOpenForMe().length;
-  b.textContent = n; b.style.display = n ? 'flex' : 'none';
+  b.textContent = n; b.style.display = n ? '' : 'none';   // the stylesheet lays out the count circle
 }
 function waDays(t){ return Math.max(0, daysBetween(dayStart(new Date(t.first_seen)), dayStart(rNow()))); }
 // Business days since it came in, today included: Monday's message on Tuesday is 1 (answer it today),

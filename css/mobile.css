@@ -258,3 +258,8 @@ body.mac.mobile { overflow: hidden; background: var(--ios-bg, #F2F2F7); -webkit-
 .seg-moving > .pill-under { color: var(--label) !important; }
 .seg-moving > .pill-under .c { color: var(--label-2) !important; }
 .set-tabs.seg-moving > .pill-under, .set-tabs.seg-moving > .pill-under svg { color: var(--label-2) !important; }
+/* Count circles: the number sits in the middle (the line is trimmed to the digits and padded evenly). */
+@supports (text-box: trim-both cap alphabetic) {
+  .tabbar .bdg { display: block; box-sizing: border-box; height: 18px; padding-block: calc((18px - 1cap) / 2) 0; text-align: center; line-height: 1; text-box: trim-both cap alphabetic; }
+  .ir .bdgn { display: inline-block; box-sizing: border-box; height: 20px; padding-block: calc((20px - 1cap) / 2) 0; text-align: center; line-height: 1; text-box: trim-both cap alphabetic; }
+}

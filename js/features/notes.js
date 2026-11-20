@@ -295,5 +295,5 @@ function updateNotesBadge(){
   if(!badge) return;
   const open = notes.filter(n=>n.status!=='done').length;
   badge.textContent = open;
-  badge.style.display = open ? 'inline-flex' : 'none';
+  badge.style.display = open ? '' : 'none';   // the stylesheet lays out the count circle
 }

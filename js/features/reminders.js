@@ -38,7 +38,7 @@ function updateRemindersNavBadge(){
   if(!badge) return;
   const dueCount = clientReminders.filter(r=>r.askedBy===currentUser?.id && reminderDisplayStatus(r)==='due').length;
   badge.textContent = dueCount;
-  badge.style.display = dueCount ? 'flex' : 'none';
+  badge.style.display = dueCount ? '' : 'none';   // the stylesheet lays out the count circle
 }
 
 // Grouped lists, most urgent first — like Apple's Reminders: due

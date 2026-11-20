@@ -2609,3 +2609,9 @@ a.mi{text-decoration:none;color:inherit}
 .ty-rest{margin-left:-8px}
 /* a member's own to-dos on This Week read a step darker */
 .wb-s.is-yours{color:var(--label);font-weight:500}
+/* Count circles: the number sits in the middle. Where the browser can, the line is trimmed to the
+   digits (cap height to baseline) and padded evenly to 20 px, so the digits themselves are centered
+   rather than the font's taller line, in any font. Elsewhere the flex centering above stays. */
+@supports (text-box: trim-both cap alphabetic){
+  .app-win .side .src-i .n{display:inline-block;box-sizing:border-box;height:20px;padding-block:calc((20px - 1cap) / 2) 0;text-align:center;text-box:trim-both cap alphabetic}
+}

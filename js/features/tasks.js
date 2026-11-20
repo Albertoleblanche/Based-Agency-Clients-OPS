@@ -51,7 +51,7 @@ function updateTasksNavBadge(){
   if(!badge || !currentUser) return;
   const open = tasks.filter(t=> t.status!=='done' && !t.cancelledAt && t.assigneeId===currentUser.id).length;
   badge.textContent = open;
-  badge.style.display = open ? 'inline-flex' : 'none';
+  badge.style.display = open ? '' : 'none';   // the stylesheet lays out the count circle
 }
 
 function renderTasks(){

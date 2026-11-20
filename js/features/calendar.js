@@ -65,7 +65,7 @@ function updateCalendarNavBadge(){
     return start >= weekStart && start < weekEnd;
   }).length;
   badge.textContent = count > 99 ? '99+' : count;
-  badge.style.display = count ? 'inline-flex' : 'none';
+  badge.style.display = count ? '' : 'none';   // the stylesheet lays out the count circle
 }
 
 let calendarViewMode = 'month'; // 'month' | 'week'

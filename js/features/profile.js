@@ -135,7 +135,7 @@ function updateEmailRequestBadges(count){
   [navBadge, subtabBadge].forEach(b=>{
     if(!b) return;
     b.textContent = count;
-    b.style.display = count ? 'flex' : 'none';
+    b.style.display = count ? (b === navBadge ? '' : 'flex') : 'none';   // the sidebar's circle is laid out by the stylesheet
   });
 }
 
