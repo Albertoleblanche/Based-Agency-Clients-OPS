@@ -2086,11 +2086,30 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 /* Nov 18: room to breathe. Taller rows with a hairline between them, more space around each group,
    and the client's name without a logo. */
 /* Review: how it will look in the group */
-.wn-chat{margin-top:22px;padding:18px 18px 20px;border-radius:14px;background:var(--fill);display:flex;flex-direction:column;align-items:flex-end}
-.wn-b{position:relative;max-width:560px;padding:10px 12px 18px;border-radius:12px 12px 4px 12px;background:color-mix(in srgb,var(--green) 22%,var(--window));font-size:14px;line-height:1.5;color:var(--label);overflow-wrap:anywhere}
-.wn-b p{margin:0 0 10px}.wn-b p:last-of-type{margin:0}
-.wn-b b{font-weight:650}
-.wn-b time{position:absolute;right:10px;bottom:5px;font-size:10.5px;color:var(--label-3)}
+/* The WhatsApp preview is WhatsApp's own chat (Nov 20): its chat colour, the group's name on a slim bar,
+   a day chip, and the message as an outgoing bubble at WhatsApp's width with its tail, the time and
+   (once sent) the blue ticks tucked into the last line. The text keeps its real line breaks. */
+.wn-chat{--wa-bg:#EFEAE2;--wa-bar:#F0F2F5;--wa-out:#D9FDD3;--wa-ink:#111B21;--wa-sub:#667781;--wa-chip:#FFFFFF;--wa-tick:#53BDEB;
+  margin-top:22px;border-radius:12px;overflow:hidden;background:var(--wa-bg);box-shadow:0 0 0 .5px var(--sep-strong)}
+.mac[data-theme="dark"] .wn-chat{--wa-bg:#0B141A;--wa-bar:#202C33;--wa-out:#005C4B;--wa-ink:#E9EDEF;--wa-sub:rgba(233,237,239,.6);--wa-chip:#182229}
+.wn-hd{display:flex;flex-direction:column;gap:1px;padding:9px 16px 10px;background:var(--wa-bar);box-shadow:0 .5px 0 rgba(0,0,0,.08)}
+.wn-hd b{font-size:14.5px;font-weight:600;color:var(--wa-ink);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wn-hd span{font-size:12.5px;color:var(--wa-sub);line-height:1.3}
+.wn-sc{display:flex;flex-direction:column;align-items:flex-end;gap:12px;padding:14px 22px 20px 9%}
+.wn-day{align-self:center;padding:5px 12px 6px;border-radius:8px;background:var(--wa-chip);box-shadow:0 1px .5px rgba(11,20,26,.13);font-size:12.5px;font-weight:500;color:var(--wa-sub)}
+.wn-b{position:relative;max-width:min(470px,100%);padding:7px 8px 7px 10px;border-radius:7.5px 0 7.5px 7.5px;background:var(--wa-out);box-shadow:0 1px .5px rgba(11,20,26,.13);
+  color:var(--wa-ink);font-size:14.2px;line-height:19px;overflow-wrap:anywhere}
+.wn-b::after{content:"";position:absolute;top:0;right:-8px;width:8px;height:13px;background:var(--wa-out);clip-path:polygon(0 0,100% 0,0 100%)}
+.wn-txt{white-space:pre-wrap}
+.wn-txt b{font-weight:600}
+.wn-txt code{font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace}
+/* the time sits in the last line's corner, as in WhatsApp: a blank the time's width ends the text,
+   so a short last line keeps it beside the words and a full one pushes it onto a line of its own */
+.wn-sp{display:inline-block;width:62px;height:1px}
+.is-sent .wn-sp{width:82px}
+.wn-meta{position:absolute;right:8px;bottom:5px;display:inline-flex;align-items:center;gap:3px;font-size:11px;line-height:15px;color:var(--wa-sub);white-space:nowrap}
+.wn-meta time{font-variant-numeric:tabular-nums}
+.wn-tk{width:16px;height:11px;fill:var(--wa-tick)}
 .wn-cap{margin:10px 0 0;font-size:12px;color:var(--label-3)}
 .mac .wn-pop{height:26px;gap:5px;font-size:13px;max-width:230px}
 .wn-pop svg{width:12px;height:12px;color:var(--label-3)}

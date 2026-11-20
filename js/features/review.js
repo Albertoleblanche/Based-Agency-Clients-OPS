@@ -178,7 +178,7 @@ function reviewReadHtml(x, list){
   const head = `<div class="rvn-hd">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}</b><span class="s">${toWords}</span><span class="s">Drafted by ${mine ? 'you' : escapeHtml(d.author)}${drafted}</span></div></div>`;
   // WhatsApp: as it will look in the group
   const body = editing ? `<textarea spellcheck="true" class="rvn-edit" id="draft-${c.id}" aria-label="Draft">${escapeHtml(d.draft || '')}</textarea>`
-    : wa ? `${waBubbleHtml(d.draft, d.draftSentAt ? new Date(d.draftSentAt) : null)}<p class="wn-cap">As it will look in the group. Bold, line breaks and bullets copy as WhatsApp formatting.</p>`
+    : wa ? `${waBubbleHtml(d.draft, d.draftSentAt ? new Date(d.draftSentAt) : null, { group: (winGroupFor(c) || {}).name || c.name })}<p class="wn-cap">${d.draftSentAt ? 'As it was sent in the group.' : 'As it will look in the group. Copying keeps the bold, line breaks and bullets.'}</p>`
     : `<div class="rvn-body">${draftBodyHtml(d.draft)}</div>`;
   // Before you send.
   const row = (it, kind) => `<div class="rvn-i${kind ? ' is-' + kind : ''}" title="${escapeHtml(it.text + ' · ' + (it.service || c.service || '') + ' · ' + fmtShortDate(new Date(it.date)))}">${icon(kind === 'out' ? 'minus-circle' : kind === 'new' ? 'circle-plus' : 'check-circle')}<span class="rvn-it">${escapeHtml(it.text)}</span><time>${escapeHtml(fmtShortDate(new Date(it.date)))}</time></div>`;

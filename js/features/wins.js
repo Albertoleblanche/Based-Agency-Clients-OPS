@@ -100,11 +100,23 @@ function waText(draft){
   return String(draft || '').replace(/\r/g, '').split('\n')
     .map(l => l.replace(/^\s*[-*•]\s+/, '• ').replace(/\*\*(.+?)\*\*/g, '*$1*').replace(/__(.+?)__/g, '_$1_')).join('\n').trim();
 }
-// How it will look in the group.
-function waBubbleHtml(draft, at){
-  const fmt = l => escapeHtml(l).replace(/\*([^*\n]+)\*/g, '<b>$1</b>').replace(/(^|\s)_([^_\n]+)_(?=\s|$)/g, '$1<i>$2</i>');
-  const body = waText(draft).split(/\n{2,}/).map(b => `<p>${b.split('\n').map(fmt).join('<br>')}</p>`).join('');
-  return `<div class="wn-chat"><div class="wn-b">${body}<time>${escapeHtml(fmtTime(at || rNow()))}</time></div></div>`;
+// How it will look in the group: WhatsApp's own chat, with the group's name on top, a day chip, and
+// your message as an outgoing bubble at WhatsApp's width. The text keeps its real line breaks (a blank
+// line is a blank line there too) and WhatsApp's *bold*, _italic_, ~strike~ and ```code```. Sent ones
+// get the blue ticks.
+function waBubbleHtml(draft, at, opts){
+  const o = opts || {}, sent = !!at, when = at || rNow();
+  const fmt = t => escapeHtml(t)
+    .replace(/```([^`]+)```/g, '<code>$1</code>')
+    .replace(/(^|[\s(“"'])\*([^*\n]+)\*(?=$|[\s).,!?:;”"'])/gm, '$1<b>$2</b>')
+    .replace(/(^|[\s(“"'])_([^_\n]+)_(?=$|[\s).,!?:;”"'])/gm, '$1<i>$2</i>')
+    .replace(/(^|[\s(“"'])~([^~\n]+)~(?=$|[\s).,!?:;”"'])/gm, '$1<s>$2</s>');
+  const d0 = dayStart(when), k = daysBetween(d0, dayStart(rNow()));
+  const chip = k === 0 ? 'Today' : k === 1 ? 'Yesterday' : when.toLocaleDateString('en-US', { weekday: k < 7 ? 'long' : undefined, month: k < 7 ? undefined : 'short', day: k < 7 ? undefined : 'numeric' });
+  const ticks = `<svg class="wn-tk" viewBox="0 0 16 11" aria-hidden="true"><path d="M11.07.65 4.98 7.15 2.53 4.62 1.47 5.65l3.53 3.64L12.1 1.68z"/><path d="M15.07.65 8.98 7.15l-.83-.86-1.05 1.03 1.9 1.97 7.1-7.61z"/></svg>`;
+  const head = o.group ? `<div class="wn-hd"><b>${escapeHtml(o.group)}</b><span>WhatsApp group</span></div>` : '';
+  return `<div class="wn-chat${sent ? ' is-sent' : ''}">${head}<div class="wn-sc"><span class="wn-day">${escapeHtml(chip)}</span>`
+    + `<div class="wn-b"><span class="wn-txt">${fmt(waText(draft))}</span><span class="wn-sp" aria-hidden="true"></span><span class="wn-meta"><time>${escapeHtml(fmtTime(when))}</time>${sent ? ticks : ''}</span></div></div></div>`;
 }
 function copyToClipboard(text){
   if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
