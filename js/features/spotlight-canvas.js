@@ -15,7 +15,7 @@ function spotDraftAction(c){
 }
 function getCommandPaletteIndex(query){
   const q = spotNorm(query).trim();
-  const navLabel = k => (settings.navLabels && settings.navLabels[k]) || (VIEW_TITLES[k] || [k])[0];
+  const navLabel = k => typeof viewTitle === 'function' ? viewTitle(k) : ((settings.navLabels && settings.navLabels[k]) || (VIEW_TITLES[k] || [k])[0]);
   const screens = [...document.querySelectorAll('.nav-item[data-view]')].filter(n => getComputedStyle(n).display !== 'none')
     .map(n => n.dataset.view).filter((v, i, a) => a.indexOf(v) === i && (VIEW_TITLES[v] || v === 'overview'))
     .map(k => { const n = document.querySelector(`.nav-item[data-view="${k}"]`); return { group: 'Go to', svg: n?.querySelector('svg')?.outerHTML || '', title: n?.querySelector('.nav-label')?.textContent.trim() || navLabel(k), kbd: typeof shortcutLabelForView === 'function' ? shortcutLabelForView(k) : '', run: () => switchView(k) }; });

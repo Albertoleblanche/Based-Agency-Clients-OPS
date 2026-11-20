@@ -599,7 +599,7 @@ async function waUpdate(id, patch, okMsg, okSub){
   if(okMsg) showToast('success', okMsg, okSub || '');
   return true;
 }
-function waRedrawToday(){ if(typeof currentViewName !== 'undefined' && currentViewName === 'overview' && typeof renderToday === 'function') renderToday(); }
+function waRedrawToday(){ if(typeof currentViewName !== 'undefined' && currentViewName === 'overview' && typeof renderDashboard === 'function') renderDashboard(); }
 // The task made from an item, if it's still there and not cancelled.
 function waLinkedTask(t){ return t && t.task_id != null && typeof tasks !== 'undefined' ? tasks.find(x => String(x.id) === String(t.task_id) && !x.cancelledAt) || null : null; }
 // Done here is done everywhere: the task made from it is finished too (when it's yours or you
@@ -628,7 +628,7 @@ async function waReopen(id){
   showToast('success', 'Reopened', also ? 'Its task is back in To Do.' : '');
   return ok;
 }
-// From another screen (Today, a task): the WhatsApp page with this item open.
+// From another screen (the Dashboard, a task): the WhatsApp page with this item open.
 function waOpenItem(id){
   switchView('whatsapp');
   setTimeout(() => { window._waSel = id; renderWhatsapp(); waLoadChat(id); }, 0);

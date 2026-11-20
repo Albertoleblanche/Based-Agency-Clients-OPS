@@ -21,7 +21,7 @@ async function loadMyTasks(){
     color:t.color||null, sprintId:t.sprint_id||null
   }));
   tasksDataLoaded = true;
-  if(typeof renderToday === 'function') renderToday();
+  if(typeof renderDashboard === 'function') renderDashboard();
 }
 
 const TASK_PRIORITY_META = {
@@ -529,7 +529,7 @@ async function moveTaskToStatus(taskId, newStatus){
   closeAppModal();
   closeKanbanMenus();
   if(wasDone && typeof renderCalendar === 'function') renderCalendar();
-  if(typeof currentViewName !== 'undefined' && currentViewName === 'overview' && typeof renderToday === 'function') renderToday();
+  if(typeof currentViewName !== 'undefined' && currentViewName === 'overview' && typeof renderDashboard === 'function') renderDashboard();
   const stageLabel = KANBAN_STAGES.find(s=>s.key===newStatus)?.label || newStatus;
   if(error){ showToast('error','Save failed', error.message); return; }
   showToast('success','Task moved', `Moved to ${stageLabel}.${waOpened ? ' Its WhatsApp item is open again.' : ''}`);
@@ -644,7 +644,7 @@ async function finishTask(taskId, notes, link, opts){
   renderTasks();
   updateTasksNavBadge();
   if(typeof renderCalendar === 'function') renderCalendar();            // done there too
-  if(typeof currentViewName !== 'undefined' && currentViewName === 'overview' && typeof renderToday === 'function') renderToday();
+  if(typeof currentViewName !== 'undefined' && currentViewName === 'overview' && typeof renderDashboard === 'function') renderDashboard();
   if(!opts.quiet) showToast('success','Marked complete', `${t.assignerId===currentUser.id ? 'Nice work!' : `${teamProfiles.find(p=>p.id===t.assignerId)?.name||'They'} will be notified.`}${t.clientId ? ' Logged to Past Improvements.' : ''}${timeNote}${waClosed ? ' The WhatsApp item is done too.' : ''}`);
 
   if(t.assignerId !== currentUser.id){

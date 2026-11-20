@@ -101,6 +101,8 @@ function applyRoleVisibility(){
   if(settingsNotifTab){
     settingsNotifTab.style.display = 'flex';
   }
+  // Tab names can depend on the role (a member's All Clients is "Clients")
+  if(typeof applyNavLabels === 'function' && typeof settings !== 'undefined') applyNavLabels();
 }
 
 function populateReportMemberFilter(){
@@ -130,6 +132,16 @@ const VIEW_TITLES = {
   settings: ['Settings', 'Workspace, client fields, AI, integrations and notifications'],
   profile: ['My Profile', 'How the team sees you'],
 };
+
+// A tab's name: what an admin renamed it to, or its usual name. Members see All Clients as just
+// "Clients" (it lists the clients they work on), and the overview route is the Dashboard.
+function viewTitle(name){
+  const custom = typeof settings !== 'undefined' && settings.navLabels && settings.navLabels[name];
+  if(custom) return custom;
+  if(name === 'overview') return 'Dashboard';
+  if(name === 'clients' && typeof canApprove === 'function' && typeof currentUser !== 'undefined' && currentUser && !canApprove()) return 'Clients';
+  return (VIEW_TITLES[name] || [name])[0];
+}
 
 const CMDK_PAGE_ICONS = {
   teamqueue: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2" /> <path d="M17 3h2a2 2 0 0 1 2 2v2" /> <path d="M21 17v2a2 2 0 0 1-2 2h-2" /> <path d="M7 21H5a2 2 0 0 1-2-2v-2" /> <circle cx="12" cy="12" r="1" /> <path d="M18.944 12.33a1 1 0 0 0 0-.66 7.5 7.5 0 0 0-13.888 0 1 1 0 0 0 0 .66 7.5 7.5 0 0 0 13.888 0" /></svg>',
@@ -175,7 +187,7 @@ function closeCommandPalette(){
 function getCommandPaletteIndex(query){
   const q = query.trim().toLowerCase();
   const pages = Object.keys(VIEW_TITLES).map(key=>({ type:'page', key, title:VIEW_TITLES[key][0], icon:CMDK_PAGE_ICONS[key]||CMDK_PAGE_ICONS.settings }));
-  pages.unshift({ type:'page', key:'overview', title:'Overview', icon:CMDK_PAGE_ICONS.overview });
+  pages.unshift({ type:'page', key:'overview', title:viewTitle('overview'), icon:CMDK_PAGE_ICONS.overview });
 
   if(!q) return { pages: pages.slice(0,6), clients: [] };
 
@@ -309,8 +321,8 @@ function updateDocumentTitle(name){
   if(name === 'clientdetail'){
     const c = clients.find(x => x.id === currentDetailClientId);
     screen = c ? c.name : 'Client';
-  } else if(VIEW_TITLES[name]){
-    screen = (settings.navLabels && settings.navLabels[name]) || VIEW_TITLES[name][0];
+  } else if(VIEW_TITLES[name] || name === 'overview'){
+    screen = viewTitle(name);
   }
   document.title = screen ? `${screen} — ${appName}` : `${appName} — ${settings.appDescription || 'Client Update Workflow'}`;
 }
@@ -357,18 +369,10 @@ function closePanelOnLeave(view){
 }
 
 async function switchView(name){
-  if(name === 'claude' || name === 'focusreports') name = 'overview'; // the Assistant and the weekly report were removed; old links land on Today
+  if(name === 'claude' || name === 'focusreports') name = 'overview'; // the Assistant and the weekly report were removed; old links land on the Dashboard
   const leaving = currentViewName;
-  // Back to Today from the week (a click on Today in the sidebar): the other days fold into Today first.
-  const ev = window.event, wb = document.querySelector('#view-approve.active .wb');
-  if(leaving === 'approve' && name === 'overview' && ev && ev.type === 'click' && wb && wb.querySelector('.wd') && !switchView._folding
-     && !(typeof wkReducedMotion === 'function' && wkReducedMotion())){
-    switchView._folding = true; if(typeof wkSet === 'function') wkSet(toDateStr(rNow())); wb.classList.add('is-outro');
-    setTimeout(() => { switchView._folding = false; wb.classList.remove('is-outro'); switchView('overview'); }, 300);
-    return;
-  }
   closeMobileNav();
-  // This Week lives in the Today tab now (a Today / This Week switch in the toolbar), so Today stays lit on it.
+  // This Week (the week board) opens from the Dashboard's toolbar, so the Dashboard stays lit on it.
   const navName = name === 'approve' ? 'overview' : name;
   document.querySelectorAll('.nav-item').forEach(n=>{ const on = n.dataset.view===navName; n.classList.toggle('active', on); n.classList.toggle('on', on); if(on) n.setAttribute('aria-current','page'); else n.removeAttribute('aria-current'); });
   if(typeof setToolbarActions === 'function') setToolbarActions(name);
@@ -397,7 +401,7 @@ async function switchView(name){
     // Falls back to the hardcoded default when no custom name is set —
     // the subtitle always stays the default, since Sidebar Tab Names only
     // lets admins rename the tab itself, not write a custom description.
-    if(titleEl) titleEl.textContent = (settings.navLabels && settings.navLabels[name]) || meta[0];
+    if(titleEl) titleEl.textContent = viewTitle(name);
     if(subEl) subEl.textContent = meta[1];
   }
   // Shown immediately, before the data load starts — the check inside

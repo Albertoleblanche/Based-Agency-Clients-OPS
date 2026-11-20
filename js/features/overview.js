@@ -246,7 +246,7 @@ function renderKpis(){
   renderOverviewMiniCalendar();
   renderOverviewActiveQueue();
   renderGreeting();
-  if(typeof renderToday === 'function') renderToday();
+  if(typeof renderDashboard === 'function') renderDashboard();
 }
 
 function renderOverviewActiveQueue(){
@@ -482,6 +482,6 @@ function renderGreeting(){
   const titleEl = document.getElementById('topbarTitle');
   const subEl = document.getElementById('topbarSub');
   if(!titleEl) return;
-  titleEl.textContent = (settings.navLabels && settings.navLabels.overview) || 'Today';
+  titleEl.textContent = typeof viewTitle === 'function' ? viewTitle('overview') : 'Dashboard';
   if(subEl) subEl.textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 }

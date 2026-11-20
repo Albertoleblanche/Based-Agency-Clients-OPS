@@ -40,6 +40,7 @@
 <!-- App styles, in cascade order (later files override earlier ones). -->
 <link rel="stylesheet" href="css/mac.css">
 <link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/dashboard.css">
 </head>
 <body class="mac" data-theme="light">
 
@@ -83,15 +84,14 @@
 <div class="win app-win" id="appRoot" style="display:none;">
   <nav class="side" id="appSidebar" aria-label="Sidebar">
     <div class="side-head">
-      <a class="side-brand" href="#overview" onclick="switchView('overview');return false;" aria-label="Today">
+      <a class="side-brand" href="#overview" onclick="switchView('overview');return false;" aria-label="Dashboard">
         <span class="brand-mark" aria-hidden="true">BA</span>
         <span class="brand-text"><span class="brand-name">Based Agency</span><span class="brand-sub">CLIENT UPDATE WORKFLOW</span></span>
       </a>
     </div>
     <div class="src">
-      <a class="src-i nav-item" data-view="overview" href="#overview" onclick="switchView('overview');return false;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4" /> <path d="M12 2v2" /> <path d="M12 20v2" /> <path d="m4.93 4.93 1.41 1.41" /> <path d="m17.66 17.66 1.41 1.41" /> <path d="M2 12h2" /> <path d="M20 12h2" /> <path d="m6.34 17.66-1.41 1.41" /> <path d="m19.07 4.93-1.41 1.41" /></svg><span class="nav-label">Today</span></a>
+      <a class="src-i nav-item" data-view="overview" href="#overview" onclick="switchView('overview');return false;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1" /> <rect width="7" height="5" x="14" y="3" rx="1" /> <rect width="7" height="9" x="14" y="12" rx="1" /> <rect width="7" height="5" x="3" y="16" rx="1" /></svg><span class="nav-label">Dashboard</span></a>
       <a class="src-i nav-item" data-view="teamqueue" href="#teamqueue" onclick="switchView('teamqueue');return false;" id="teamQueueNavItem" style="display:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2" /> <path d="M17 3h2a2 2 0 0 1 2 2v2" /> <path d="M21 17v2a2 2 0 0 1-2 2h-2" /> <path d="M7 21H5a2 2 0 0 1-2-2v-2" /> <circle cx="12" cy="12" r="1" /> <path d="M18.944 12.33a1 1 0 0 0 0-.66 7.5 7.5 0 0 0-13.888 0 1 1 0 0 0 0 .66 7.5 7.5 0 0 0 13.888 0" /></svg><span class="nav-label">Review</span><span class="n hot nav-badge" id="navTeamPendingBadge" style="display:none">0</span></a>
-      <div class="src-sep" role="separator"></div>
       <a class="src-i nav-item" data-view="clients" href="#clients" onclick="switchView('clients');return false;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 12h.01" /> <path d="M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" /> <path d="M22 13a18.15 18.15 0 0 1-20 0" /> <rect width="20" height="14" x="2" y="6" rx="2" /></svg><span class="nav-label">All Clients</span><span class="n nav-badge" id="navClientsBadge" style="display:none">0</span></a>
       <a class="src-i nav-item" data-view="health" href="#health" onclick="switchView('health');return false;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></svg><span class="nav-label">Health</span><span class="n nav-badge" id="navHealthBadge" style="display:none">0</span></a>
       <div class="src-sep" role="separator"></div>
@@ -150,9 +150,9 @@
     <div class="views">
 
 
-    <!-- OVERVIEW -->
+    <!-- DASHBOARD (the overview route) -->
     <div class="view active" id="view-overview">
-      <div class="content" id="todayRoot"></div>
+      <div class="content" id="dashRoot"></div>
     </div>
 
     <!-- CLIENTS -->
@@ -1176,6 +1176,7 @@
 <script src="js/features/wins.js"></script>
 <script src="js/features/overview.js"></script>
 <script src="js/features/today.js"></script>
+<script src="js/features/dashboard.js"></script>
 <script src="js/features/improvements-history.js"></script>
 <script src="js/features/custom-fields.js"></script>
 <script src="js/features/client-form.js"></script>

@@ -70,7 +70,7 @@ Use a Harvest administrator's token: it can read the whole setup and log time fo
 Every active Harvest client is in Radar (step 2). Each read links a Harvest client to the Radar
 client with the same name (ignoring endings like "LLC"), or adds it marked **Needs setup** and
 tells admins and approvers (one note for a batch of four or more). It waits at the top of All
-Clients, out of This Week, Health, Today and the reminders, until an approver picks its owner,
+Clients, out of This Week, Health, the Dashboard and the reminders, until an approver picks its owner,
 service and how it gets its weekly win (its group or an email) and presses Finish Setup. Time
 can be logged for it meanwhile. **Same as…** moves the link to a client Radar already has under
 another name, with anything logged on the added one; **Not a Radar Client** sends it to Trash

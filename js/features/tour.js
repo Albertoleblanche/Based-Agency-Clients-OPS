@@ -3,7 +3,7 @@
 
 const tourSteps = [
   { title: 'Welcome to Based Radar', body: 'A one-minute look at where everything lives. Skip anytime; the tour stays in the menu under your name.', icon: 'compass' },
-  { view: 'overview', title: 'Today', body: 'What needs you today: client updates due or overdue, health changes, tasks due and the calendar.' },
+  { view: 'overview', title: 'Dashboard', body: 'Your day at a glance: what needs you now, your tasks, client health, the calendar, follow-ups, WhatsApp and notes.' },
   { view: 'approve', title: 'This Week', body: 'Every client gets one update a week, sent by an approver the day it’s ready. Overdue ones come first, then the ones due today.' },
   { view: 'teamqueue', title: 'Review', body: 'Drafts waiting for an approver. Read them, edit, and send.' },
   { view: 'clients', title: 'All Clients', body: 'Every client with its service, owner, hours and health. Open one to see its whole history.' },
@@ -25,7 +25,8 @@ function tourNavItem(view){ return document.querySelector(`#appSidebar .nav-item
 function tourVisible(el){ return !!el && getComputedStyle(el).display !== 'none' && el.offsetParent !== null; }
 
 async function startTour(){
-  activeTourSteps = tourSteps.filter(s => !s.view || tourVisible(tourNavItem(s.view)));
+  activeTourSteps = tourSteps.filter(s => !s.view || tourVisible(tourNavItem(s.view)))
+    .map(s => s.view && typeof viewTitle === 'function' ? Object.assign({}, s, { title: viewTitle(s.view) }) : s);
   tourIndex = 0;
   const card = document.getElementById('tourCard');
   card.style.display = 'block';

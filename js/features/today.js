@@ -1,7 +1,6 @@
-// Today: your day, not a list of clients (canvas "Today — new design").
-// The date and how much of today is done, your meetings on a strip, the one thing to do next,
-// the rest as a list, who you're waiting on, and what you finished. Schedule and your week on
-// the side. Company-wide numbers live on Health and Focus Reports, not here.
+// What's yours today, worked out once (todayModel): the one thing to do now, the rest in the app's
+// order, what waits on others, and what's done. The Dashboard's "Today's focus" draws it, and the
+// week board (This Week) uses it for today's column. The Today tab itself was removed (Nov 19).
 
 const CHEV = () => icon('caret-right', { cls: 'go', weight: 'bold' });
 function todayPlural(n, one, many){ return `${n} ${n === 1 ? one : (many || one + 's')}`; }
@@ -176,18 +175,6 @@ function todayModel(){
 // ---- The Today tab holds the whole week: › steps to the next day and shows what's due then;
 // Whole Week stretches it into the week board (This Week). ----
 function todayMonday(now){ now = now || rNow(); return dayStart(addDays(now, -((now.getDay() + 6) % 7))); }
-// The day Today shows: null for today, or another day of this week ('YYYY-MM-DD').
-function todaySelectedDay(){
-  const d = window._todayDay, now = rNow(), mon = todayMonday(now);
-  if(!d || d === toDateStr(now)) return null;
-  const t = new Date(d + 'T12:00:00');
-  return t >= mon && t < addDays(mon, 7) ? d : null;
-}
-function todayGoDay(ds){
-  window._todayDay = ds && ds !== toDateStr(rNow()) ? ds : null;
-  window._todayRest = null;
-  if(currentViewName !== 'overview') switchView('overview'); else renderToday();
-}
 // The days Today can step through: Monday to Friday of this week (and today, on a weekend).
 function todayWeekDays(now){
   now = now || rNow(); const mon = todayMonday(now);
@@ -337,128 +324,6 @@ function todayDayModel(ds){
   return { items, others, done };
 }
 
-function renderToday(){
-  const root = document.getElementById('todayRoot');
-  if(!root || typeof clients === 'undefined') return;
-  const { me, approver, now, todayStr, list, ws, waiting, lead, items, next, rest, others, done } = todayModel();
-  const selDay = todaySelectedDay(), dayStr = selDay || todayStr, dayDate = new Date(dayStr + 'T12:00:00'), dayName = DAY_NAMES[dayDate.getDay()];
-  // › steps to the next day of this week; ‹ comes back once you've stepped ahead.
-  const wdays = todayWeekDays(now), wi = wdays.indexOf(dayStr);
-  const nextDay = wi >= 0 && wi < wdays.length - 1 ? wdays[wi + 1] : null, prevDay = selDay && wi > 0 && dayStr > todayStr ? wdays[wi - 1] : null;
-  // ---- header: the date and the done ring ----
-  const open = (lead ? 1 : 0) + items.length, total = open + done.length;
-  const C = 2 * Math.PI * 22, frac = total ? done.length / total : 0;
-  const ring = total ? `<div class="ty-prog"><svg class="ty-ring" viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="22" class="bg"/><circle cx="26" cy="26" r="22" class="fg" stroke-dasharray="${(C * frac).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 26 26)"/></svg>
-<div><b>${done.length} of ${total} done</b><span>${open ? `${open} left today${lead ? ' · the first one is waiting on you' : ''}` : 'Nothing left for today'}</span></div></div>` : '';
-
-  // ---- today's meetings: the strip, and the schedule on the side ----
-  const evs = (typeof calendarEvents !== 'undefined' ? calendarEvents : []).filter(e => !e.allDay && e.startAt && toDateStr(new Date(e.startAt)) === dayStr)
-    .sort((a, b) => new Date(a.startAt) - new Date(b.startAt));
-  const hourOf = d => d.getHours() + d.getMinutes() / 60;
-  let h0 = 8, h1 = 19;
-  evs.forEach(e => { const s = hourOf(new Date(e.startAt)), en = hourOf(new Date(e.endAt || e.startAt)); h0 = Math.min(h0, Math.floor(s)); h1 = Math.max(h1, Math.ceil(en)); });
-  const span = h1 - h0, X = h => ((h - h0) / span * 100).toFixed(2);
-  const nowH = hourOf(now);
-  const blocks = evs.map((e, i) => {
-    const s = new Date(e.startAt), en = new Date(e.endAt || s.getTime() + 30 * 60000), past = en <= now;
-    const left = X(hourOf(s)), w = Math.max(0.6, (hourOf(en) - hourOf(s)) / span * 100), end = +left + w;
-    // the label sits after the block and stops before the next one (or the end of the strip)
-    const nx = evs[i + 1] ? +X(hourOf(new Date(evs[i + 1].startAt))) : 100, room = nx - end;
-    const label = room > 3 ? `<span class="ty-ml${past ? ' past' : ''}" style="left:calc(${end.toFixed(2)}% + 7px);max-width:calc(${room.toFixed(2)}% - 14px)">${escapeHtml(e.title)}</span>` : '';
-    return `<span class="ty-m${past ? ' past' : ''}" style="left:${left}%;width:${w.toFixed(2)}%" title="${escapeHtml(e.title)} · ${fmtTime(s)}" onclick="openEventDetailModal('${e.id}')"></span>${label}`;
-  }).join('');
-  const ticks = [];
-  for(let h = h0; h <= h1; h += 2) ticks.push(`<span class="ty-tk" style="left:${X(h)}%">${(h + 11) % 12 + 1}</span>`);
-  const strip = `<div class="ty-day"><div class="ty-track">${blocks}${!selDay && nowH >= h0 && nowH <= h1 ? `<span class="ty-now" style="left:${X(nowH)}%"></span>` : ''}${evs.length ? '' : `<span class="ty-none">No meetings ${selDay ? dayName : 'today'}</span>`}</div><div class="ty-ticks">${ticks.join('')}</div></div>`;
-  let nowShown = !!selDay;
-  const nowLine = `<div class="ty-nowl"><span>${fmtTime(now)}</span><i></i></div>`;
-  const nextEv = selDay ? null : evs.find(e => new Date(e.startAt) > now);
-  const allDay = (typeof calendarEvents !== 'undefined' ? calendarEvents : []).filter(e => e.allDay && !e.relatedTaskId && e.startAt && toDateStr(new Date(e.startAt)) === dayStr);
-  const evTaskDone = e => !!e.relatedTaskId && (typeof tasks !== 'undefined' ? tasks : []).some(t => String(t.id) === String(e.relatedTaskId) && t.status === 'done');
-  const allDayRows = allDay.map(e => `<div class="ty-ev" onclick="openEventDetailModal('${e.id}')"><span class="tm">All day</span><div class="tx"><b>${escapeHtml(e.title)}</b><span>${escapeHtml((e.description || '').split('\n')[0] || (CALENDAR_TYPE_META[e.eventType] || CALENDAR_TYPE_META.other).label)}</span></div></div>`).join('');
-  const sched = allDayRows + evs.map(e => {
-    const s = new Date(e.startAt), past = new Date(e.endAt || e.startAt) <= now;
-    let pre = ''; if(!nowShown && s > now){ nowShown = true; pre = nowLine; }
-    const link = (e.description || '').match(/https?:\/\/(meet\.google\.com|[a-z0-9.-]*zoom\.us|teams\.microsoft\.com)\/\S+/i);
-    const isNext = e === nextEv, mins = Math.round((s - now) / 60000);
-    const sub = isNext ? `In ${hmText(mins)}${(e.description || '').split('\n')[0] ? ' · ' + escapeHtml((e.description || '').split('\n')[0]) : ''}` : escapeHtml((e.description || '').split('\n')[0]);
-    const join = isNext && link ? `<a class="btn sm" href="${safeUrl(link[0])}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Join</a>` : '';
-    return `${pre}<div class="ty-ev${past ? ' past' : ''}${isNext ? ' next' : ''}${evTaskDone(e) ? ' done' : ''}" onclick="openEventDetailModal('${e.id}')"><span class="tm">${fmtTime(s).replace(/\s?[AP]M$/i, '')}</span><div class="tx"><b>${escapeHtml(e.title)}</b><span>${sub}</span></div>${join}</div>`;
-  }).join('') + (evs.length && !nowShown ? nowLine : '');
-
-  // ---- your week ----
-  const monday = dayStart(addDays(now, -((now.getDay() + 6) % 7)));
-  const sentByMe = list.reduce((n, c) => n + (c.drafts || []).filter(d => d.draftSentAt && new Date(d.draftSentAt) >= monday && (d.draftSentBy === me || (!d.draftSentBy && d.author === me))).length, 0);
-  const impsByMe = list.reduce((n, c) => n + (c.improvements || []).filter(i => i.author === me && new Date(i.date) >= monday).length, 0);
-  const weekMin = (typeof myOwnTimeEntries === 'function' ? myOwnTimeEntries() : []).filter(e => new Date(e.date + 'T12:00:00') >= monday).reduce((s, e) => s + (e.minutes || 0), 0) + (typeof runningMinutes === 'function' ? runningMinutes() : 0);
-  const target = typeof weeklyHoursTarget === 'function' ? weeklyHoursTarget() : 40;
-  const owned = ws.filter(w => clientOwner(w.c) === me);
-  const onTime = owned.filter(w => w.state !== 'late').length;
-
-  // ---- waiting on others ----
-  let waitLine = '';
-  if(others.length){
-    const names = others.map(w => shortClientName(w.c.name));
-    const people = [...new Set(others.map(w => w.holder && w.holder !== 'approvers' ? firstName(w.holder) : null).filter(Boolean))];
-    const nothing = others.every(w => w.done === 0);
-    const what = others.every(w => w.holder === 'approvers') ? `${joinNames(names)} ${names.length === 1 ? 'is' : 'are'} waiting on review.`
-      : `${joinNames(names.length > 3 ? names.slice(0, 3).concat(`${names.length - 3} more`) : names)} ${nothing ? `haven’t had work logged this week` : `${names.length === 1 ? 'is' : 'are'} waiting on ${joinNames(people)}`}.`;
-    const act = people.length ? `<a class="x-lnk" href="#" onclick="remindHolders([${others.filter(w => w.holder && w.holder !== 'approvers').map(w => `'${w.c.id}'`).join(',')}]);return false;">Remind ${escapeHtml(joinNames(people))}</a>` : '';
-    waitLine = `<div class="ty-wait">${icon('clock')}<span><b>Waiting on others:</b> ${escapeHtml(what)}</span>${act}</div>`;
-  }
-
-  // ---- the page ----
-  // Every row is something you do, written that way, so nothing needs working out:
-  // a circle where one click finishes it, the step's name where it needs you to open it.
-  const whenHtml = x => x.when ? `<span class="ty-when${x.late ? ' late' : ''}">${escapeHtml(x.when)}</span>` : '';
-  const itemRow = x => `<div class="ty-i" onclick="${x.go}">${x.tick
-      ? `<button class="ty-cb" role="checkbox" aria-checked="false" aria-label="${escapeHtml(x.tickLabel || 'Done')}: ${escapeHtml(x.title)}" onclick="event.stopPropagation();${x.tick}"></button>`
-      : '<span class="ty-cb-sp" aria-hidden="true"></span>'}<div class="tx"><b>${escapeHtml(x.title)}</b><span>${x.sub}${x.flag ? ' · High priority' : ''}</span></div>${whenHtml(x)}${x.step ? `<button class="btn sm ty-step" onclick="event.stopPropagation();${x.go}">${escapeHtml(x.step)}</button>` : ''}</div>`;
-  const doneRow = x => `<div class="ty-i is-done"><span class="ty-cb on">${icon('check', { weight: 'bold' })}</span><div class="tx"><b>${escapeHtml(x.title)}</b><span>${escapeHtml(x.sub)} · ${fmtTime(x.t)}</span></div></div>`;
-  const leadHtml = lead ? `<div class="ty-up"><span class="ty-lbl">Now</span><div class="ty-up-row">${lead.c ? monoHtml(lead.c, 'lg') : `<span class="ty-up-ic">${icon(lead.ic)}</span>`}
-<div class="tx"><b>${escapeHtml(lead.title)}</b><span>${lead.subHtml || escapeHtml(lead.sub)}</span></div><button class="btn btn-p ty-go" onclick="${lead.go}">${lead.ic && !lead.item ? icon(lead.ic) : ''}${escapeHtml(lead.label)}</button></div></div>`
-    : !activeClients().length ? emptyNoClients('Today shows what needs you: updates due, tasks, follow-ups and meetings.', { title: 'Start with your first client', link: 'Add a Task', onLink: 'openNewTaskModal()', cls: 'ty-es' })
-    : items.length ? '' : `<div class="ty-clear">${icon('check-circle')}<div><b>You’re all caught up</b><span>${escapeHtml(nextDueText(ws.filter(w => myClientsFilter(w.c))) || 'Nothing is waiting on you right now.')}</span></div><a class="x-lnk" href="#" onclick="switchView('plan');return false;">Plan Ahead</a></div>`;
-  // The rest, as one line of counts with their tab's icon: "5 tasks (1 late) · 3 WhatsApp requests".
-  // A count opens its rows right here, each with its circle or step, so you act without leaving Today.
-  const restOpen = rest.some(x => x.src === window._todayRest) ? window._todayRest : null;
-  const restLine = rest.length ? `<div class="ty-sec"><b>Also today</b></div><div class="ty-rest">${TODAY_SRC_ORDER.map(k => {
-    const xs = rest.filter(x => x.src === k); if(!xs.length) return '';
-    const [one, many, , ic] = TODAY_SRC[k], late = xs.filter(x => x.late && x.src !== 'health').length;
-    return `<button class="ty-rk${restOpen === k ? ' on' : ''}" aria-expanded="${restOpen === k}" data-grow="today-rest" onclick="todayToggleRest('${k}')">${icon(ic)}${xs.length} ${xs.length === 1 ? one : many}${late ? `<em>(${late} late)</em>` : ''}</button>`;
-  }).join('')}</div><div class="ty-rest-l" data-grow-key="today-rest">${restOpen ? rest.filter(x => x.src === restOpen).map(itemRow).join('') + `<a class="x-lnk ty-rest-go" href="#" onclick="${TODAY_SRC[restOpen][2]};return false;">Open ${TODAY_SRC[restOpen][4]}</a>` : ''}</div>` : '';
-  // Another day of this week: what's due that day, what's with someone else, and (for a day gone by) what got done.
-  let dayMain = '';
-  if(selDay){
-    const dm = todayDayModel(selDay), past = selDay < todayStr;
-    const ppl = [...new Set(dm.others.map(e => e.whoFull === 'approvers' ? 'an approver' : e.whoFull ? firstName(e.whoFull) : 'no owner yet'))];
-    const wait = dm.others.length ? `<div class="ty-wait">${icon('clock')}<span><b>With someone else:</b> ${escapeHtml(joinNames(dm.others.map(e => shortClientName(e.c.name)).slice(0, 4).concat(dm.others.length > 4 ? [`${dm.others.length - 4} more`] : [])))} (${escapeHtml(joinNames(ppl))}).</span></div>` : '';
-    dayMain = `${dm.items.length ? `<div class="ty-sec"><b>${past ? `Still open from ${dayName}` : `Due ${dayName}`}</b><span>${dm.items.length}</span></div>${dm.items.map(itemRow).join('')}`
-      : `<div class="ty-clear">${icon('check-circle')}<div><b>${past ? `Nothing left from ${dayName}` : `Nothing due ${dayName}`}</b><span>${past ? 'Everything due that day is done.' : 'Nothing of yours is due that day yet.'}</span></div></div>`}
-${wait}
-${dm.done.length ? `<div class="ty-sec"><b>Done ${dayName}</b><span>${dm.done.length}</span></div>${dm.done.slice(0, 5).map(x => `<div class="ty-i is-done"><span class="ty-cb on">${icon('check', { weight: 'bold' })}</span><div class="tx"><b>${escapeHtml(x.title)}</b><span>${escapeHtml(x.sub)}</span></div></div>`).join('')}` : ''}`;
-  }
-  root.innerHTML = `<div class="ty">
-<header class="ty-hd"><div class="ty-date">${selDay ? `<a class="ty-rel is-link" href="#overview" onclick="todayGoDay(null);return false;">Back to Today</a>` : '<span class="ty-rel">Today</span>'}
-<div class="ty-dayrow"><span class="ty-dow">${dayName}</span>${prevDay ? `<button class="ty-step-d" aria-label="${DAY_NAMES[new Date(prevDay + 'T12:00:00').getDay()]}" title="${DAY_NAMES[new Date(prevDay + 'T12:00:00').getDay()]}" onclick="todayGoDay('${prevDay}')">${icon('chevron-left')}</button>` : ''}${nextDay ? `<button class="ty-step-d" aria-label="${DAY_NAMES[new Date(nextDay + 'T12:00:00').getDay()]}" title="${DAY_NAMES[new Date(nextDay + 'T12:00:00').getDay()]}" onclick="todayGoDay('${nextDay}')">${icon('chevron-right')}</button>` : ''}</div>
-<span class="ty-dm">${dayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</span></div>
-<div class="ty-hr"><button class="btn" onclick="wkEnterWeek()">${icon('calendar-days')}Whole Week</button>${selDay ? '' : ring}</div></header>
-${strip}
-<div class="ty-cols"><section class="ty-main">${selDay ? dayMain : `${leadHtml}
-${next.length ? `<div class="ty-sec"><b>Next</b></div>${next.map(itemRow).join('')}` : ''}${restLine}
-${waitLine}
-${done.length ? `<div class="ty-sec"><b>Done today</b><span>${done.length}</span></div>${done.slice(0, 3).map(doneRow).join('')}` : ''}`}
-</section>
-<aside class="ty-side">
-<div class="ty-sec"><b>Schedule</b><a class="x-lnk" href="#calendar" onclick="switchView('calendar');return false;">Calendar</a></div>${sched || `<p class="ty-empty">No meetings ${selDay ? dayName : 'today'}.</p>`}
-<div class="ty-sec"><b>Your week</b></div>
-<div class="ty-st"><span>Updates you sent</span><b>${sentByMe}</b></div>
-<div class="ty-st"><span>Improvements you logged</span><b>${impsByMe}</b></div>
-<div class="ty-st"><span>Hours logged</span><b>${hmText(weekMin)} <small>of ${target}</small></b></div><div class="ty-bar"><i style="width:${Math.min(100, weekMin / 60 / target * 100).toFixed(1)}%"></i></div>
-${owned.length ? `<div class="ty-st"><span>Your clients on time</span><b>${onTime} of ${owned.length}</b></div>` : ''}
-</aside></div></div>`;
-  if(currentViewName === 'overview') setToolbar('Today', selDay ? `What’s due ${dayName}` : 'What you need to do today');
-}
 // How many rows Today lists under Now; everything after is counted, not listed.
 const TODAY_NEXT = 3;
 // What the counts line calls each kind of row, and the tab it opens.
@@ -466,22 +331,19 @@ const TODAY_SRC = { task: ['task', 'tasks', "switchView('tasks')", 'list-todo', 
   follow: ['follow-up', 'follow-ups', "switchView('reminders')", 'bell-ring', 'Reminders'], review: ['review', 'reviews', "switchView('tasks')", 'tray', 'Tasks'],
   update: ['update', 'updates', "switchView('approve')", 'send', 'This Week'], health: ['client at risk', 'clients at risk', "switchView('health')", 'activity', 'Health'],
   note: ['note', 'notes', "switchView('notes')", 'sticky-note', 'Notes'] };
-// Open a count's rows under the line (or close them); one kind at a time.
-function todayToggleRest(k){ window._todayRest = window._todayRest === k ? null : k; renderToday(); }
-const TODAY_SRC_ORDER = ['task', 'wa', 'follow', 'review', 'update', 'health', 'note'];
 function todayDaysSince(ds, todayStr){ return ds ? Math.max(0, Math.round((new Date(todayStr + 'T12:00:00') - new Date(ds + 'T12:00:00')) / 864e5)) : 0; }
 // "Yesterday", or the date for anything older.
 function todayDayWord(ds, now){ return ds === toDateStr(addDays(now || rNow(), -1)) ? 'Yesterday' : fmtShortDate(new Date(ds + 'T12:00:00')); }
 // "Due yesterday", "Due Nov 12"
 function todayDueWord(ds, now){ const w = todayDayWord(ds, now); return 'Due ' + (w === 'Yesterday' ? 'yesterday' : w); }
 // One click from Today: the client answered, or you're done with the note.
-async function todayFollowAnswered(id){ await markReminderStatus(id, 'answered'); if(currentViewName === 'overview') renderToday(); }
+async function todayFollowAnswered(id){ await markReminderStatus(id, 'answered'); if(typeof renderDashboard === 'function') renderDashboard(); }
 async function todayNoteDone(id){
   const { error } = await supabaseClient.from('notes').update({ status: 'done' }).eq('id', id).eq('user_id', currentUser.id);
   if(error){ showToast('error', 'Note not marked done', error.message); return; }
   if(typeof loadMyNotes === 'function') await loadMyNotes();
   if(typeof renderNotes === 'function') renderNotes();
-  if(currentViewName === 'overview') renderToday();
+  if(typeof renderDashboard === 'function') renderDashboard();
   showToast('success', 'Done with the note', '');
 }
 function todayWaOn(){ return typeof waTasks !== 'undefined' && typeof waLinkedTask === 'function' && !(typeof waHidden === 'function' && waHidden()); }
@@ -514,11 +376,6 @@ function todayFromElsewhere(todayStr, now){
       out.push({ src: 'note', age: todayDaysSince(n.followUpDate, todayStr), c, title: `Come back to your note: ${n.title || 'Untitled'}`, sub: c ? escapeHtml(c.name) : 'Your note', late: n.followUpDate < todayStr, when: since(n.followUpDate), go: `openNoteSheet('${n.id}')`, tick: `todayNoteDone('${n.id}')` });
     });
   return out;
-}
-// "Next up: Oakridge Flooring, due tomorrow."
-function nextDueText(ws){
-  const n = ws.filter(w => w.sent).sort((a, b) => a.daysLeft - b.daysLeft)[0];
-  return n ? `Next up: ${n.c.name}, ${n.dueText.toLowerCase()}.` : '';
 }
 
 // Older helpers other screens still call.

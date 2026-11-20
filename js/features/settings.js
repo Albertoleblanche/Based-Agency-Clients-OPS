@@ -205,7 +205,7 @@ function applyAppBranding(){
 // duplicating that as a second editable field here would just be
 // confusing about which one actually takes effect.
 const NAV_LABEL_DEFAULTS = {
-  overview: 'Today', clients: 'All Clients', health: 'Health', approve: 'This Week', teamqueue: 'Review',
+  overview: 'Dashboard', clients: 'All Clients', health: 'Health', approve: 'This Week', teamqueue: 'Review',
   notes: 'Notes', tasks: 'Tasks', reminders: 'Reminders', calendar: 'Calendar',
   time: 'Time', team: 'Team', trash: 'Recently Deleted', settings: 'Settings',
 };
@@ -221,7 +221,8 @@ function applyNavLabels(){
   Object.keys(NAV_LABEL_DEFAULTS).forEach(view=>{
     const navItem = document.querySelector(`.nav-item[data-view="${view}"]`);
     if(!navItem) return;
-    const label = (labels[view] || NAV_LABEL_DEFAULTS[view]).trim() || NAV_LABEL_DEFAULTS[view];
+    const usual = typeof viewTitle === 'function' && !labels[view] ? viewTitle(view) : NAV_LABEL_DEFAULTS[view];
+    const label = (labels[view] || usual).trim() || usual;
     const labelSpan = navItem.querySelector('.nav-label');
     if(labelSpan) labelSpan.textContent = label;
     navItem.setAttribute('data-tooltip', label);

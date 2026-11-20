@@ -19,7 +19,7 @@ An internal tool built around one ritual, the weekly client update, rather than 
 Used all day at a desk alongside Google Ads, Meta, Slack, Harvest and email. Peaks: drafting and approving client updates during the week, sending in batches. Clients are residential contractors and home-services businesses (remodelers, roofers, plumbers, flooring, electricians).
 
 ## Capabilities and Constraints
-- Screens today: Today, This Week, Review, Focus Reports, All Clients (+ client page), Health, Tasks, Reminders, Notes, Calendar, Time (Harvest sync, hour budgets, payroll), Team, Recently Deleted, Settings. Plus the iPhone app (mobile.html).
+- Screens today: Dashboard (approvers: six cards; members: the bento with Today’s focus), This Week, Review, Focus Reports, All Clients (+ client page), Health, Tasks, Reminders, Notes, Calendar, Time (Harvest sync, hour budgets, payroll), Team, Recently Deleted, Settings. Plus the iPhone app (mobile.html).
 - Weekly updates: every client gets one a week, on no fixed day. It's due 7 days after the last one; an approver checks every update and sends it the day it's ready. Nothing is sent automatically.
 - Draft states per client and author: no draft yet → draft ready (pending, then "ready to notify") → approved → sent → archived. Needs re-review when new work lands on an approved draft.
 - Client fields: service, status, importance 1–10, risk 1–5, monthly hour budget, custom fields.

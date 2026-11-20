@@ -16,7 +16,7 @@ function renderClientPage(){
   const c = clients.find(x => x.id === currentDetailClientId);
   const top = document.getElementById('cdTop');
   if(!top || !c) return;
-  setToolbar(c.name, 'All Clients');
+  setToolbar(c.name, typeof viewTitle === 'function' ? viewTitle('clients') : 'All Clients');
   const h = clientHealth(c), w = weekView(clientWeek(c)), owner = clientOwner(c), next = nextStepTask(c);
   const myNotes = (typeof notes !== 'undefined' ? notes : []).filter(n => n.clientId === c.id);
   const start = c.startDate ? new Date(c.startDate + 'T12:00:00') : null;

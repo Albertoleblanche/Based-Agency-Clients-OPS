@@ -1,0 +1,188 @@
+/* Dashboard (canvas "Dashboard", Nov 19): the first screen. Approvers get six outlined cards;
+   team members get the bento with Today's focus. The layout follows the width of the screen:
+   two columns when narrow, the canvas layout on a laptop, and one row at one height on a wide screen. */
+#dashRoot.content{padding:0;container-type:inline-size}
+.db{padding:22px 30px 30px;max-width:1320px}
+.db-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.db-card{display:flex;flex-direction:column;min-width:0;padding:16px 18px 14px;border:1px solid var(--sep);border-radius:14px;background:transparent;transition:border-color 160ms ease}
+.db-card:hover{border-color:var(--sep-strong)}
+.db-h{display:flex;align-items:center;gap:8px;margin:0 0 12px}
+.db-h > svg{width:16px;height:16px;color:var(--label-2);flex:0 0 auto}
+.db-h b{font-size:14px;font-weight:650;letter-spacing:-.005em}
+.db-h .n{font-size:13px;font-weight:600;color:var(--label-3);font-variant-numeric:tabular-nums}
+.db-h .x-lnk{margin-left:auto;font-size:12.5px;color:var(--label-2)}
+.db-h .x-lnk:hover{color:var(--label)}
+.db-sum{margin:-6px 0 8px;font-size:12.5px;color:var(--label-2)}
+.db-sub{margin:14px 0 4px;font-size:12px;font-weight:650;color:var(--label-2)}
+.db-l{list-style:none;margin:0;padding:0}
+.db-r{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-top:.5px solid var(--sep)}
+.db-l > li:first-child .db-r, .db-l > .db-r:first-child{border-top:0}
+.db-tx{display:flex;flex-direction:column;min-width:0;flex:1 1 auto;gap:2px}
+.db-tx b{font-size:13.5px;font-weight:600;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.db-tx .s{font-size:12px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mac .db-more{display:inline-block;align-self:flex-start;margin-top:auto;padding-top:8px;font-size:12.5px;font-weight:500;color:var(--blue)}
+.mac .db-more:hover{text-decoration:underline}
+/* health */
+.db-score{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.db-score b{font-size:34px;font-weight:700;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums}
+.db-score span{font-size:14px;color:var(--label-2)}
+.db-score em{font-style:normal;font-size:12.5px;color:var(--label-3);margin-left:auto}
+.db-bar{margin-top:14px}
+.db-key{margin-top:8px}
+.db-dot{width:7px;height:7px;border-radius:50%;margin-top:6px;flex:0 0 auto}
+.db-dot.r{background:var(--red)} .db-dot.y{background:var(--yellow)}
+.db-hc{padding:8px 0}
+/* tasks */
+.db-tk{display:grid;grid-template-rows:1fr;transition:grid-template-rows 260ms cubic-bezier(.23,1,.32,1) 520ms,opacity 200ms ease 520ms}
+.db-tki{min-height:0;overflow:hidden}
+.db-tk:first-child .db-r{border-top:0}
+.db-tk.is-done .db-tx b{color:var(--label-3);text-decoration:line-through;text-decoration-color:var(--label-3)}
+.db-tk.is-gone{grid-template-rows:0fr;opacity:0}
+.db-cb{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin-top:1px;padding:0;border:0;border-radius:50%;background:none;box-shadow:inset 0 0 0 1.5px var(--label-3);flex:0 0 auto;cursor:default;transition:background-color 160ms ease,box-shadow 160ms ease,transform 100ms ease-out}
+.db-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
+.db-cb:active{transform:scale(.92)}
+.mac .db-cb{color:transparent}
+.db-cb svg{width:11px;height:11px;stroke-width:2.4}
+.mac .db-tk.is-done .db-cb{background:var(--green);box-shadow:none;color:#fff}
+.db-flag{color:var(--label-2);margin-top:2px}
+.db-flag svg{width:13px;height:13px}
+.db-ic{display:inline-flex;margin-top:1px;color:var(--label-2)}
+.db-ic svg{width:16px;height:16px}
+.db-none{display:flex;align-items:center;gap:8px;margin:8px 0 0;font-size:13px;color:var(--label-2);animation:dbIn 240ms cubic-bezier(.23,1,.32,1)}
+.db-none svg{width:16px;height:16px;color:var(--green)}
+@keyframes dbIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+/* calendar */
+.db-day{display:flex;align-items:baseline;gap:8px;margin:0 0 4px;font-size:12px;color:var(--label-2)}
+.db-day b{font-size:12px;font-weight:650;color:var(--label)}
+.db-day span{margin-left:auto}
+.db-agenda + .db-day{margin-top:12px}
+.db-ev{display:grid;grid-template-columns:62px 3px minmax(0,1fr);gap:10px;align-items:stretch;padding:5px 0}
+.db-ev time{font-size:12px;color:var(--label-2);font-variant-numeric:tabular-nums;padding-top:1px;white-space:nowrap}
+.db-evb{border-radius:2px;background:var(--blue)}
+.db-evb.green{background:var(--green)} .db-evb.purple{background:var(--purple)} .db-evb.red{background:var(--red)}
+.db-ev.is-past{opacity:.45}
+.db-now{display:grid;grid-template-columns:62px minmax(0,1fr);gap:10px;align-items:center;height:16px}
+.db-now time{font-size:11px;font-weight:650;color:var(--red);font-variant-numeric:tabular-nums}
+.db-now i{position:relative;height:0;border-top:1.5px solid var(--red)}
+.db-now i::before{content:"";position:absolute;left:-4px;top:-4.75px;width:8px;height:8px;border-radius:50%;background:var(--red)}
+/* reminders */
+.db-q{white-space:normal!important;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+/* whatsapp */
+.db-wt{display:flex;align-items:baseline;gap:8px;min-width:0}
+.db-wt b{flex:1 1 auto;min-width:0}
+.db-wt time{flex:0 0 auto;font-size:12px;color:var(--label-3)}
+.db-wq{font-size:13px;line-height:1.35;color:var(--label);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.db-you{font-weight:600;color:var(--label)}
+/* notes */
+.db-sn{font-size:12.5px;line-height:1.4;color:var(--label-2);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;margin-top:2px}
+.db-prog{display:inline-flex;align-items:center;gap:8px;margin-top:6px;font-size:11.5px;color:var(--label-2)}
+.db-pb{width:56px;height:4px;border-radius:2px;background:var(--fill-2);overflow:hidden}
+.db-pb i{display:block;height:100%;border-radius:2px;background:var(--label-2)}
+@container (max-width: 1060px){ .db-grid{grid-template-columns:repeat(2,minmax(0,1fr))} }
+.db-dot.g{background:var(--green)}
+.db-hok{padding:6px 0}
+.db-row1{flex-direction:row;align-items:baseline;gap:10px}
+.db-row1 b{flex:1 1 auto;min-width:0}
+.db-row1 .s{flex:0 0 auto}
+/* a wide screen (2560 px): all six cards in one row, one height. Each shows what fits and links to the rest */
+@container (min-width: 1800px){
+  .db{max-width:none;padding:28px 36px 32px}
+  .db-grid{gap:18px;grid-template-columns:repeat(6,minmax(0,1fr));align-items:stretch}
+  .db-card{padding:20px 22px 18px;overflow:hidden}
+  .db-score b{font-size:40px}
+}
+@media (prefers-reduced-motion: reduce){ .db-tk,.db-cb{transition:none} .db-none{animation:none} }
+
+/* ---- the member bento ---- */
+.bn-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:auto auto;gap:14px;
+  grid-template-areas:"focus focus focus focus focus focus mid mid mid cal cal cal" "rem rem rem rem wa wa wa wa notes notes notes notes"}
+/* the middle column: Tasks over a small Health box; Tasks takes the rest of the row's height */
+.bn-mid{grid-area:mid;display:flex;flex-direction:column;gap:14px;min-height:0;min-width:0}
+.bn-mid .db-tasks{flex:1 1 auto}
+.bn-mid .db-health{flex:0 0 auto}
+.bn-hsm .db-h{margin-bottom:8px}
+.bn-grid .db-health.bn-hsm .db-score b{font-size:22px;letter-spacing:-.01em}
+.bn-hsm .db-score em{margin-left:auto;width:auto}
+.bn-hsm .db-bar{margin-top:10px}
+.bn-hw{margin:auto 0 0;padding-top:8px;font-size:12px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bn-focus{grid-area:focus} .bn-grid .db-cal{grid-area:cal} .bn-grid .db-wa{grid-area:wa}
+.bn-grid .db-rem{grid-area:rem} .bn-grid .db-notes{grid-area:notes}
+/* the small boxes say less */
+.bn-grid .db-health .db-score b{font-size:30px}
+.bn-grid .db-health:not(.bn-hsm) .db-score em{margin-left:0;width:100%}
+.bn-grid .db-health .db-sub{margin-top:10px}
+/* Today's focus */
+.bn-focus{padding:18px 22px 16px}
+.bn-hi h2{margin:2px 0 0;font-size:24px;font-weight:700;letter-spacing:-.02em;line-height:1.15}
+.bn-hi p{margin:6px 0 0;font-size:13.5px;color:var(--label-2)}
+.bn-lbl{margin:0 0 8px;font-size:12px;font-weight:650;color:var(--label-2)}
+.bn-now{margin-top:18px;padding-top:16px;border-top:.5px solid var(--sep)}
+.bn-nowi{display:flex;align-items:flex-start;gap:14px;animation:bnIn 320ms cubic-bezier(.23,1,.32,1)}
+.bn-nowi.is-done .bn-nt b{color:var(--label-3);text-decoration:line-through;text-decoration-color:var(--label-3)}
+.bn-nowi.is-done{opacity:.6;transition:opacity 200ms ease}
+@keyframes bnIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.bn-ic{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:11px;background:var(--fill-2);color:var(--label-2);flex:0 0 auto}
+.bn-ic svg{width:20px;height:20px}
+.bn-ic.green{background:var(--green-soft);color:var(--green)} .bn-ic.blue{background:var(--blue-soft);color:var(--blue)}
+.bn-nt{display:flex;flex-direction:column;min-width:0;flex:1 1 auto;gap:3px}
+.bn-nt > b{display:flex;align-items:center;gap:8px;font-size:18px;font-weight:650;letter-spacing:-.012em;line-height:1.3}
+.bn-nt > b .db-flag{margin-top:0}
+.bn-nt .s{font-size:13px;color:var(--label-2)}
+.bn-note{display:flex;align-items:center;gap:6px;margin:6px 0 0;font-size:12.5px;color:var(--label);animation:dbIn 220ms cubic-bezier(.23,1,.32,1)}
+.bn-note svg{width:14px;height:14px;color:var(--green)}
+.bn-acts{display:flex;gap:8px;margin-top:12px}
+.bn-acts .btn{height:30px;padding:0 13px;font-size:13px}
+.bn-clear{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--label-2);animation:bnIn 320ms cubic-bezier(.23,1,.32,1)}
+.bn-clear svg{width:22px;height:22px;color:var(--green);flex:0 0 auto}
+.bn-clear b{color:var(--label);font-weight:600}
+.bn-next{margin-top:18px;padding-top:14px;border-top:.5px solid var(--sep)}
+.bn-wa{color:var(--label-2)}
+.bn-wa svg{width:16px;height:16px}
+.bn-open{font-size:12.5px;color:var(--label-2);margin-top:1px}
+.bn-rx{display:grid;grid-template-rows:0fr;transition:grid-template-rows 300ms cubic-bezier(.23,1,.32,1)}
+.bn-rx.open{grid-template-rows:1fr}
+.bn-rxi{min-height:0;overflow:hidden}
+.bn-rest .db-tk:first-child .db-r{border-top:.5px solid var(--sep)}
+.mac .bn-tg{border:0;background:none;padding:6px 0 0;cursor:default}
+.bn-done{display:flex;align-items:center;gap:10px;margin-top:auto;padding-top:14px;font-size:12.5px;color:var(--label-2)}
+.bn-seg{display:inline-flex;gap:3px}
+.bn-seg i{width:18px;height:6px;border-radius:3px;background:var(--fill-2);transition:background-color 240ms ease}
+.bn-seg i.on{background:var(--green)}
+.bn-dw{white-space:nowrap}
+.bn-last{margin-left:auto;color:var(--label-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+@container (max-width: 1060px){ .bn-grid{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:auto;grid-template-areas:"focus focus" "mid cal" "rem wa" "notes notes"} }
+/* a wide screen (2560 px): the bottom row moves up to the right, so every card sits in one row at one height */
+@container (min-width: 1800px){
+  .bn-grid{gap:18px;grid-template-columns:minmax(0,2fr) repeat(4,minmax(0,1fr));grid-template-rows:auto;align-items:stretch;grid-template-areas:"focus mid cal pair notes"}
+  .bn-mid{gap:18px}
+  .bn-mid .db-tasks{flex:1 1 auto} .bn-mid .db-health{flex:0 0 auto}
+  .bn-pair{grid-area:pair;display:flex;flex-direction:column;gap:18px;min-width:0}
+  .bn-pair .db-card{flex:1 1 auto}
+  .bn-cols{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);column-gap:36px;align-items:start}
+  .bn-cols .bn-next{margin-top:18px;padding-top:16px}
+  .bn-focus{padding:22px 28px 20px}
+  .bn-hi h2{font-size:28px}
+  .bn-nt > b{font-size:20px}
+}
+@media (prefers-reduced-motion: reduce){ .bn-nowi,.bn-clear,.bn-note{animation:none} .bn-rx{transition:none} }
+
+/* rows open what they show */
+.db-go{cursor:default;transition:opacity 120ms ease}
+.db-go:active{opacity:.6}
+.db-card{min-height:0}
+/* without WhatsApp: five cards */
+.db-grid.no-wa{grid-template-columns:repeat(6,minmax(0,1fr))}
+.db-grid.no-wa > .db-card{grid-column:span 2}
+.db-grid.no-wa > .db-rem, .db-grid.no-wa > .db-notes{grid-column:span 3}
+.bn-grid.no-wa{grid-template-areas:"focus focus focus focus focus focus mid mid mid cal cal cal" "rem rem rem rem rem rem notes notes notes notes notes notes"}
+@container (max-width: 1060px){
+  .db-grid.no-wa{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .db-grid.no-wa > .db-card, .db-grid.no-wa > .db-rem, .db-grid.no-wa > .db-notes{grid-column:auto}
+  .bn-grid.no-wa{grid-template-areas:"focus focus" "mid cal" "rem notes"}
+}
+@container (min-width: 1800px){
+  .db-grid.no-wa{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .db-grid.no-wa > .db-card, .db-grid.no-wa > .db-rem, .db-grid.no-wa > .db-notes{grid-column:auto}
+  .bn-grid.no-wa{grid-template-areas:"focus mid cal pair notes"}
+}
+@media (prefers-reduced-motion: reduce){ .db-go{transition:none} }
