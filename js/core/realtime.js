@@ -189,6 +189,7 @@ async function fullRefresh(showFeedback){
     typeof loadWaTasks === 'function' ? loadWaTasks() : null,
   ]);
   renderAll();
+  fullRefresh._at = Date.now();   // when everything was last loaded (a screen switch skips a fresh one)
   updateTasksNavBadge();
   await checkForNewNotificationToasts();
   const syncEl = document.getElementById('sidebarSyncTime');

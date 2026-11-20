@@ -369,7 +369,7 @@ function closePanelOnLeave(view){
 }
 
 // The screens that can draw straight away from what's already loaded (the switch fades to them).
-const VIEW_QUICK_DRAW = { overview: 'renderDashboard', clients: 'renderClientsTable', health: 'renderHealth', tasks: 'renderTasks', reminders: 'renderReminders', notes: 'renderNotes', plan: 'renderPlan', teamqueue: 'renderTeamQueue', calendar: 'renderCalendar' };
+const VIEW_QUICK_DRAW = { overview: 'renderDashboard', clients: 'renderClientsTable', health: 'renderHealth', tasks: 'renderTasks', reminders: 'renderReminders', notes: 'renderNotes', plan: 'renderPlan', teamqueue: 'renderTeamQueue', calendar: 'renderCalendar', time: 'renderTimeView', trash: 'renderTrash' };
 async function switchView(name){
   if(name === 'claude' || name === 'focusreports') name = 'overview'; // the Assistant and the weekly report were removed; old links land on the Dashboard
   const leaving = currentViewName;
@@ -438,17 +438,25 @@ async function switchView(name){
     const draw = VIEW_QUICK_DRAW[name]; if(draw && typeof window[draw] === 'function'){ try{ window[draw](); }catch(e){ console.error(e); } }
   };
   if(fade && document.startViewTransition){
-    // the names that let only the page and its title cross-fade are on just for the switch
+    // Only the page takes part (the sidebar and toolbar stay live, so the highlight and the title
+    // change at once); the name that lets it fade is on just for the switch.
     const my = switchView._vt = (switchView._vt || 0) + 1;
     document.documentElement.classList.add('vt-page');
     const vt = document.startViewTransition(swap);
     vt.finished.finally(() => { if(switchView._vt === my) document.documentElement.classList.remove('vt-page'); });
-    await vt.updateCallbackDone.catch(() => {});
+    // the refresh below waits for the fade, so nothing competes with it for frames
+    await vt.finished.catch(() => {});
+    if(switchView._vt !== my) return;   // another tab was clicked during the fade: that switch refreshes
   } else {
     swap();
-    if(fade) viewEl.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: 'cubic-bezier(.23,1,.32,1)' });
+    if(fade) viewEl.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 180, easing: 'cubic-bezier(.23,1,.32,1)' });
   }
-  await fullRefresh();
+  // Live updates keep the data current, so a switch only reloads everything when the last full
+  // load is more than 30 seconds old, and does it quietly (no entrance animations on the redraw).
+  if(!fullRefresh._at || Date.now() - fullRefresh._at > 30000){
+    document.body.classList.add('silent-refresh');
+    try{ await fullRefresh(); } finally { setTimeout(() => document.body.classList.remove('silent-refresh'), 200); }
+  }
   if(name==='trash') renderTrash();
   if(name==='payroll') renderPayroll();
   if(name==='task-archive'){ populateTaskArchiveFilters(); renderTaskArchive(); }

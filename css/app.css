@@ -2784,19 +2784,20 @@ a.mi{text-decoration:none;color:inherit}
 }
 
 /* ---- Changing screens (Nov 20) ----
-   A quick cross-fade of the page and the toolbar's title; the sidebar's highlight and the toolbar's
-   buttons just change, like a Mac app's. The names are on only for the switch (html.vt-page), and the
-   fade never takes the pointer: a click on the next tab during it starts the next switch at once. */
+   Only the page moves: the sidebar's highlight, the title and the toolbar change at once and stay
+   live (the window isn't captured), and the old page goes out quickly before the new one comes in, so
+   two screens are never seen on top of each other. Opacity only: it happens all day. The fade never
+   takes the pointer: a click on the next tab during it starts the next switch at once. */
+html.vt-page{view-transition-name:none}
 html.vt-page .main > .views{view-transition-name:vt-views}
-html.vt-page .tb-t{view-transition-name:vt-title}
 ::view-transition{pointer-events:none}
-::view-transition-old(root),::view-transition-new(root),::view-transition-group(root){animation:none}
-::view-transition-group(vt-views),::view-transition-group(vt-title){animation-duration:0s}
-::view-transition-old(vt-views),::view-transition-old(vt-title){animation-duration:120ms;animation-timing-function:cubic-bezier(.23,1,.32,1)}
-::view-transition-new(vt-views),::view-transition-new(vt-title){animation-duration:180ms;animation-timing-function:cubic-bezier(.23,1,.32,1)}
+::view-transition-group(vt-views){animation:none}
+::view-transition-image-pair(vt-views){isolation:auto}
+::view-transition-old(vt-views){animation:vt-out 90ms cubic-bezier(.23,1,.32,1) both;mix-blend-mode:normal}
+::view-transition-new(vt-views){animation:vt-in 190ms cubic-bezier(.23,1,.32,1) 50ms both;mix-blend-mode:normal}
+@keyframes vt-out{to{opacity:0}}
+@keyframes vt-in{from{opacity:0}}
 @media (prefers-reduced-motion: reduce){ ::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none !important} }
-/* the title keeps its own width while it fades (a longer or shorter title isn't stretched) */
-::view-transition-old(vt-title),::view-transition-new(vt-title){height:100%;width:auto}
 
 /* ---- The sidebar's foot and counts (Nov 20) ----
    The bell sits where Settings was, beside your name (Settings is in your menu now), and its panel
@@ -2821,3 +2822,7 @@ body > .notif-panel{position:fixed;top:auto;right:auto;z-index:1000}
 @supports (text-box: trim-both cap alphabetic){
   .app-win .side .src-i :is(#navTasksBadge,#navWhatsappBadge){display:inline-block;box-sizing:border-box;padding-block:calc((20px - 1cap) / 2) 0;text-align:center;text-box:trim-both cap alphabetic}
 }
+/* the sidebar's selection moves at once, like a Mac sidebar's (it used to fade, so the old row
+   stayed lit while the page was already changing); only the press still eases */
+.mac[data-theme] .app-win .side .src-i{transition:transform 160ms cubic-bezier(.23,1,.32,1)}
+.mac[data-theme] .app-win .side .src-i:active{transition:transform 100ms ease-out}
