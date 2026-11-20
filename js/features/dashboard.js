@@ -24,10 +24,12 @@ function dbTitle(view){ return typeof viewTitle === 'function' ? viewTitle(view)
 // fewest rows it keeps; soft: rows it keeps before giving up an optional part (data-opt).
 function dbCard(cls, view, title, count, body, o){
   o = o || {};
-  const go = o.link === false ? '' : `<a class="x-lnk" href="#${view}" onclick="switchView('${view}');return false;">Open ${escapeHtml(dbTitle(view))}</a>`;
+  const head = `${dbNavIcon(view)}<b>${escapeHtml(title)}</b>${count !== '' && count != null ? `<span class="n">${count}</span>` : ''}`;
   const more = o.total != null ? `<a class="db-more" href="#${view}" data-view="${view}" onclick="switchView('${view}');return false;" hidden></a>` : '';
   const data = o.total != null ? ` data-total="${o.total}" data-min="${o.min ?? 1}"${o.soft ? ` data-soft="${o.soft}"` : ''}` : '';
-  return `<section class="db-card ${cls}" aria-label="${escapeHtml(title)}"${data}><header class="db-h">${dbNavIcon(view)}<b>${escapeHtml(title)}</b>${count !== '' && count != null ? `<span class="n">${count}</span>` : ''}${go}</header>${body}${more}</section>`;
+  const h = o.link === false ? `<header class="db-h">${head}</header>`
+    : `<header class="db-h"><a class="db-hl" href="#${view}" onclick="switchView('${view}');return false;" aria-label="Open ${escapeHtml(dbTitle(view))}">${head}${icon('chevron-right')}</a></header>`;
+  return `<section class="db-card ${cls}" aria-label="${escapeHtml(title)}"${data}>${h}${body}${more}</section>`;
 }
 function dbNone(text){ return `<p class="db-none">${icon('circle-check')}${escapeHtml(text)}</p>`; }
 function dbPlural(n, one, many){ return `${n} ${n === 1 ? one : (many || one + 's')}`; }
@@ -105,8 +107,8 @@ function dbMyTasks(){
 // Mark Done first, as on Tasks, so it doesn't fold until that's confirmed and the card draws again.)
 function dbTick(btn, run){
   const row = btn.closest('.db-tk'); btn.setAttribute('aria-checked', 'true');
-  if(row){ row.classList.add('is-done'); setTimeout(() => row.classList.add('is-gone'), 380); }
-  setTimeout(run, row ? 700 : 0);
+  if(row){ row.classList.add('is-done'); setTimeout(() => row.classList.add('is-gone'), 320); }
+  setTimeout(run, row ? 560 : 0);
 }
 function dbTaskRow(t){
   const today = toDateStr(rNow()), c = t.clientId && clients.find(x => x.id === t.clientId), late = t.dueDate && t.dueDate < today;
@@ -247,10 +249,12 @@ function dbFocusCard(nextN){
     const tone = wa ? 'green' : x && x.src === 'task' ? '' : 'blue';
     const sub = L.subHtml || escapeHtml(L.sub || '');
     const second = x && x.src === 'task' ? `<button class="btn" type="button" onclick="${x.go}">Open Task</button>` : '';
-    nowHtml = `<div class="bn-nowi"><span class="bn-ic ${tone}">${icon(ic)}</span><div class="bn-nt"><b>${escapeHtml(L.title)}${x && x.flag ? `<span class="db-flag" title="High priority">${icon('flag')}</span>` : ''}</b><span class="s">${sub}</span>
+    const nowKey = (x && x.id) || L.title, arrive = window._dbNowKey !== undefined && window._dbNowKey !== nowKey; window._dbNowKey = nowKey;
+    nowHtml = `<div class="bn-nowi${arrive ? ' bn-in' : ''}"><span class="bn-ic ${tone}">${icon(ic)}</span><div class="bn-nt"><b>${escapeHtml(L.title)}${x && x.flag ? `<span class="db-flag" title="High priority">${icon('flag')}</span>` : ''}</b><span class="s">${sub}</span>
 <div class="bn-acts"><button class="btn btn-p" type="button" onclick="${L.go}">${x && x.src === 'task' ? icon('check') : wa ? icon('copy') : ''}${escapeHtml(L.label || 'Open')}</button>${second}</div></div></div>`;
   } else {
-    nowHtml = `<div class="bn-clear">${icon('circle-check')}<span><b>You’re clear for today.</b> ${evText ? `${escapeHtml(evText)} is next.` : 'Nothing else is due today.'}</span></div>`;
+    const arrive = window._dbNowKey !== undefined && window._dbNowKey !== ''; window._dbNowKey = '';
+    nowHtml = `<div class="bn-clear${arrive ? ' bn-in' : ''}">${icon('circle-check')}<span><b>You’re clear for today.</b> ${evText ? `${escapeHtml(evText)} is next.` : 'Nothing else is due today.'}</span></div>`;
   }
   const row = x => {
     const tick = x.src === 'task' ? x.tick : `dbTick(this,()=>{${x.tick}})`;
