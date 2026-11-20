@@ -16,9 +16,17 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/mac.css">
+<link rel="stylesheet" href="css/signin.css">
 <link rel="stylesheet" href="css/mobile.css">
 <!-- The iPhone app. Same backend and the same data code as the desktop (js/core, week-health,
      drafting, sheets-canvas); only the screens are its own (js/mobile/app.js). -->
+<script>
+  // A password-reset (or invite) link lands with #…type=recovery, or #error_code=… once it has expired.
+  // Supabase reads the address and clears it as it starts, so note it first (index.html does the same).
+  try{ const h = location.hash || '';
+    if(/(^|[#&])type=(recovery|invite)(&|$)/.test(h)) sessionStorage.setItem('bda_recovery', '1');
+    if(/(^|[#&])error_(code|description)=/.test(h)) sessionStorage.setItem('bda_link_error', '1'); }catch(e){}
+</script>
 <script src="vendor/supabase-2.119.0.js"></script>
 </head>
 <body class="mac mobile" data-theme="light">
@@ -35,6 +43,7 @@
 <script src="js/core/drafting.js"></script>
 <script src="js/core/session.js"></script>
 <script src="js/ui/icons.js"></script>
+<script src="js/ui/signin.js"></script>
 <script src="js/ui/motion.js"></script>
 <script src="js/features/week-health.js"></script>
 <script src="js/features/wins.js"></script>

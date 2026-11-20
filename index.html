@@ -15,6 +15,15 @@
   // interface, unless the person has explicitly chosen to stay on
   // desktop. Runs before anything else loads, so a phone visitor never
   // even fetches the desktop-only scripts below.
+  // A password-reset (or invite) link lands here with #…type=recovery (or #error_code=… once it has expired).
+  // Supabase reads the address and clears it as it starts, so note it first.
+  (function(){
+    try{
+      const h = location.hash || '';
+      if(/(^|[#&])type=(recovery|invite)(&|$)/.test(h)) sessionStorage.setItem('bda_recovery', '1');
+      if(/(^|[#&])error_(code|description)=/.test(h)) sessionStorage.setItem('bda_link_error', '1');
+    }catch(e){}
+  })();
   (function(){
     try{
       if(localStorage.getItem('bda_force_desktop') === '1') return;
@@ -42,6 +51,7 @@
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/dashboard.css">
 <link rel="stylesheet" href="css/skeleton.css">
+<link rel="stylesheet" href="css/signin.css">
 </head>
 <body class="mac" data-theme="light">
 
@@ -57,29 +67,56 @@
   })();
 </script>
 
-<div class="signin-desk" id="loginOverlay">
-  <div class="signin" id="loginFormCard" role="dialog" aria-label="Sign in to Based Radar">
-    <div class="signin-b">
-      <span class="logo brand-mark" aria-hidden="true">BA</span>
-      <h1>Based Radar</h1>
-      <p>Sign in with your work email to continue.</p>
-      <div id="loginError" class="signin-err" style="display:none;"></div>
-      <div class="signin-f">
-        <label for="loginEmail">Email</label><input id="loginEmail" class="tf" type="email" placeholder="you@basedagency.com" autocomplete="username">
-        <label for="loginPassword">Password</label><input id="loginPassword" class="tf" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter') handleLogin()">
+<!-- Sign in and opening (css/signin.css, js/ui/signin.js). The logo sits in a few still rings; one panel
+     swaps between signing in, a reset link, the link sent and a new password; signing in, a greeting and a
+     thin line take its place while the workspace loads, then the app comes in under it. -->
+<div class="si" id="loginOverlay" data-st="boot">
+  <div class="si-stage">
+    <div class="si-mark"><div class="rd" aria-hidden="true" style="--R:672px"><span class="rd-ring" style="--d:192px;--o:1.00"></span><span class="rd-ring" style="--d:384px;--o:0.87"></span><span class="rd-ring" style="--d:576px;--o:0.74"></span><span class="rd-ring" style="--d:768px;--o:0.61"></span><span class="rd-ring" style="--d:960px;--o:0.48"></span><span class="rd-ring" style="--d:1152px;--o:0.35"></span><span class="rd-ring" style="--d:1344px;--o:0.22"></span></div><span class="si-logo brand-mark" aria-hidden="true">BA</span></div>
+    <h1 class="si-h" id="siHeading">Based Radar</h1>
+    <p class="si-sub" id="siSub" aria-live="polite"></p>
+    <div class="si-slot">
+      <div class="si-panel is-out" id="siPanel" inert>
+        <form class="si-f" data-pane="form" novalidate onsubmit="handleLogin();return false;" aria-label="Sign in">
+          <label class="si-lab" for="loginEmail">Email</label>
+          <input class="si-in" id="loginEmail" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="you@basedagency.com">
+          <div class="si-lab"><label for="loginPassword">Password</label><button class="si-link" type="button" onclick="siShow('forgot')">Forgot password?</button></div>
+          <div class="si-pw"><input class="si-in" id="loginPassword" type="password" autocomplete="current-password"><button class="si-eye" type="button" aria-label="Show password" aria-pressed="false" onclick="siToggleEye(this)" data-ic="eye"></button></div>
+          <p class="si-err" id="loginError" role="alert" hidden></p>
+          <button class="btn btn-p si-go" id="loginBtn" type="submit">Sign In</button>
+        </form>
+        <form class="si-f" data-pane="forgot" novalidate onsubmit="siSendLink();return false;" aria-label="Reset your password" hidden>
+          <p class="si-p">Enter your work email and we’ll send a link to set a new password.</p>
+          <label class="si-lab" for="siResetEmail">Email</label>
+          <input class="si-in" id="siResetEmail" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="you@basedagency.com">
+          <p class="si-err" id="siResetErr" role="alert" hidden></p>
+          <button class="btn btn-p si-go" id="siResetBtn" type="submit">Send Link</button>
+          <button class="si-back" type="button" onclick="siShow('form')"><span data-ic="arrow-left"></span>Back to Sign In</button>
+        </form>
+        <div class="si-f" data-pane="sent" hidden>
+          <span class="si-ok" data-ic="mail-check"></span>
+          <p class="si-p">A link to set a new password is on its way to <b id="siSentTo"></b>. It works for an hour.</p>
+          <button class="btn si-go" type="button" onclick="siShow('form')">Back to Sign In</button>
+        </div>
+        <form class="si-f" data-pane="newpw" novalidate onsubmit="siSaveNewPassword();return false;" aria-label="Set a new password" hidden>
+          <p class="si-p">Choose a new password for <b id="siNewFor"></b>. Use at least 8 characters.</p>
+          <label class="si-lab" for="siNewPw">New password</label>
+          <div class="si-pw"><input class="si-in" id="siNewPw" type="password" autocomplete="new-password"><button class="si-eye" type="button" aria-label="Show password" aria-pressed="false" onclick="siToggleEye(this)" data-ic="eye"></button></div>
+          <label class="si-lab" for="siNewPw2">Confirm new password</label>
+          <input class="si-in" id="siNewPw2" type="password" autocomplete="new-password">
+          <p class="si-err" id="siNewErr" role="alert" hidden></p>
+          <button class="btn btn-p si-go" id="siNewBtn" type="submit">Save Password</button>
+          <button class="si-back" type="button" onclick="siLeaveRecovery()"><span data-ic="arrow-left"></span>Back to Sign In</button>
+        </form>
       </div>
-      <button class="btn btn-p" id="loginBtn" onclick="handleLogin()">Sign In</button>
-      <button class="btn btn-q" style="margin-top:10px" onclick="showToast('info','Forgot your password?','Ask your admin to reset it from Team.')">Forgot password?</button>
+      <div class="si-open" id="siOpen" role="status" aria-label="Opening your workspace" hidden>
+        <span class="si-bar" aria-hidden="true"><i></i></span>
+        <span class="si-steps"><span id="siStep1"><i data-ic="check"></i>Clients</span><span id="siStep2"><i data-ic="check"></i>Your day</span><span id="siStep3"><i data-ic="check"></i>Messages</span></span>
+      </div>
     </div>
+    <p class="si-note is-out" id="siNote">New to the team? An admin adds you from Team.</p>
   </div>
-  <div class="signin" id="loginLoadingCard" style="display:none;">
-    <div class="signin-b" style="padding-bottom:8px">
-      <span class="logo brand-mark" aria-hidden="true">BA</span>
-      <h1>Opening Based Radar…</h1>
-      <p>Loading your workspace.</p>
-      <div class="app-loading-spinner" aria-hidden="true"></div>
-    </div>
-  </div>
+  <p class="si-foot">Based Agency · Client updates, health and the week’s work, in one place</p>
 </div>
 
 <div class="win app-win" id="appRoot" style="display:none;">
@@ -1164,6 +1201,7 @@
 <script src="js/core/desktop-app.js"></script>
 <script src="js/ui/icons.js"></script>
 <script src="js/ui/skeleton.js"></script>
+<script src="js/ui/signin.js"></script>
 <script src="js/ui/motion.js"></script>
 <script src="js/ui/shell.js"></script>
 <script src="js/ui/pickers.js"></script>

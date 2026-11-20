@@ -57,12 +57,6 @@ body.sidebar-collapsed .app-win .side { display: none; }
 .timerpill { border: 0; cursor: default; }
 .timerpill b { font-weight: 500; }
 
-/* ---------- sign-in window ---------- */
-.signin-desk { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 40px; background: var(--desk); }
-.signin { padding: 22px 12px 28px; }
-.signin-err { width: 100%; margin: -8px 0 12px; padding: 8px 10px; border-radius: 8px; background: var(--red-soft); color: var(--red); font-size: 13px; text-align: left; }
-.signin-b .btn-q { width: 100%; justify-content: center; }
-.app-loading-spinner { width: 22px; height: 22px; margin: 4px auto 0; border-radius: 50%; border: 2px solid var(--fill-3); border-top-color: var(--label-2); animation: spin 800ms linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ---------- sheets: every modal opens as a sheet from the toolbar ---------- */
@@ -600,7 +594,6 @@ body.mac :is(input[type="text"], input:not([type]), input[type="email"], input[t
 .side-brand .brand-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
 .side-brand .brand-name { font-size: 14px; font-weight: 600; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .side-brand .brand-sub { font-size: 10px; font-weight: 600; letter-spacing: .06em; color: var(--label-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.signin-b .logo.brand-mark { font-size: 22px; }
 .mac .side.collapsed .side-brand .brand-text { display: none; }
 
 /* ---- glanceable: tags, chips, stat tiles ---- */

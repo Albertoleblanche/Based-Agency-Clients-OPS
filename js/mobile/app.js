@@ -66,38 +66,103 @@ function mAlertDone(ok){
 }
 
 // ---- sign in and loading -------------------------------------------------------------------
-function mRenderLogin(err){
-  $m('mApp').className = 'phone app';
-  $m('mApp').innerHTML = `<div class="stage"><div class="iscroll"><div class="ilogin">
-<span class="logo brand-mark" aria-hidden="true">BA</span>
-<h1>${mEsc(settings.appName || 'Based Radar')}</h1>
-<p>Sign in with your work email</p>
-<form onsubmit="mSignIn();return false;">
-<div class="ig">
-<div class="ir"><label class="ilab" for="mlEmail">Email</label><input id="mlEmail" class="itf" type="email" autocomplete="username" autocapitalize="none" placeholder="you@basedagency.com"></div>
-<div class="ir"><label class="ilab" for="mlPass">Password</label><input id="mlPass" class="itf" type="password" autocomplete="current-password" placeholder="Required"></div>
-</div>
-${err ? `<p class="err">${mEsc(err)}</p>` : ''}
-<button class="ibtn p" id="mlBtn" type="submit" style="margin-top:24px">Sign In</button>
-</form>
-<button class="ibtn" style="margin-top:8px;color:var(--label-2);font-weight:400" onclick="mForgot()">Forgot password?</button>
+// The calm sign-in (Nov 20): the logo in a few still rings, grouped fields, one orange button. Forgot
+// password, the sent link and a new password (after a reset link) swap in place; signing in, the
+// greeting and a thin line show while the workspace loads, then the app fades in. Shared pieces
+// (messages, the eye, the reset-link flag) are js/ui/signin.js; the look is css/signin.css + mobile.css.
+const M_SI_TEXT = { boot: ['Based Radar', ''], form: ['Based Radar', 'Sign in with your work email'], forgot: ['Reset your password', 'Based Radar'],
+  sent: ['Check your email', 'Based Radar'], newpw: ['Set a new password', 'Based Radar'], opening: [null, 'Opening your workspace'] };
+function mRings(){
+  const step = 96 * .62, rings = 6;
+  let h = ''; for(let k = 1; k <= rings; k++) h += `<span class="rd-ring" style="--d:${Math.round(2 * step * k)}px;--o:${Math.max(.18, 1 - .13 * (k - 1)).toFixed(2)}"></span>`;
+  return `<div class="rd" aria-hidden="true" style="--R:${Math.round(rings * step)}px">${h}</div>`;
+}
+function mLoginShell(){
+  if($m('msiRoot')) return;
+  $m('mApp').className = 'phone app is-signin';
+  $m('mApp').innerHTML = `<div class="stage"><div class="iscroll"><div class="msi" id="msiRoot" data-st="boot">
+<div class="si-mark">${mRings()}<span class="si-logo brand-mark" aria-hidden="true">BA</span></div>
+<h1 class="si-h" id="msiHead">Based Radar</h1><p class="si-sub" id="msiSub" aria-live="polite"></p>
+<div class="msi-body" id="msiBody"></div>
+<p class="msi-note is-out" id="msiNote">New to the team? An admin adds you from Team.</p>
 </div></div></div>`;
 }
+function mEyeBtn(){ return `<button class="si-eye" type="button" aria-label="Show password" aria-pressed="false" onclick="siToggleEye(this)">${icon('eye')}</button>`; }
+function mLogin(st, o){
+  o = o || {};
+  mLoginShell();
+  const root = $m('msiRoot'), body = $m('msiBody'), email = mEsc(o.email != null ? o.email : ($m('mlEmail')?.value || $m('mlResetEmail')?.value || '').trim());
+  root.dataset.st = st;
+  const [h, sub] = M_SI_TEXT[st] || M_SI_TEXT.form;
+  siText($m('msiHead'), o.heading || h || $m('msiHead').textContent);
+  siText($m('msiSub'), o.sub != null ? o.sub : sub);
+  $m('msiNote').classList.toggle('is-out', st !== 'form');
+  const err = o.err ? `<p class="msi-err" role="alert">${mEsc(o.err)}</p>` : '';
+  const html = {
+    form: `<form class="msi-f" onsubmit="mSignIn();return false;" novalidate aria-label="Sign in">
+<div class="ig msi-ig"><div class="ir"><label class="ilab" for="mlEmail">Email</label><input id="mlEmail" class="itf${o.bad === 'email' ? ' bad' : ''}" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="you@basedagency.com" value="${email}"></div>
+<div class="ir"><label class="ilab" for="mlPass">Password</label><input id="mlPass" class="itf${o.bad === 'pass' ? ' bad' : ''}" type="password" autocomplete="current-password" placeholder="Required">${mEyeBtn()}</div></div>
+${err}<button class="ibtn p msi-go" id="mlBtn" type="submit">Sign In</button></form>
+<button class="msi-link" type="button" onclick="mLogin('forgot')">Forgot password?</button>`,
+    forgot: `<form class="msi-f" onsubmit="mSendLink();return false;" novalidate aria-label="Reset your password">
+<p class="msi-p">Enter your work email and we’ll send a link to set a new password.</p>
+<div class="ig msi-ig"><div class="ir"><label class="ilab" for="mlResetEmail">Email</label><input id="mlResetEmail" class="itf" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="you@basedagency.com" value="${email}"></div></div>
+${err}<button class="ibtn p msi-go" id="mlResetBtn" type="submit">Send Link</button></form>
+<button class="msi-link" type="button" onclick="mLogin('form')">Back to Sign In</button>`,
+    sent: `<div class="msi-f msi-sent"><span class="si-ok">${icon('mail-check')}</span>
+<p class="msi-p">A link to set a new password is on its way to <b>${email}</b>. It works for an hour.</p>
+<button class="ibtn msi-go msi-sec" type="button" onclick="mLogin('form')">Back to Sign In</button></div>`,
+    newpw: `<form class="msi-f" onsubmit="mSaveNewPassword();return false;" novalidate aria-label="Set a new password">
+<p class="msi-p">Choose a new password for <b>${mEsc(o.account || '')}</b>. Use at least 8 characters.</p>
+<div class="ig msi-ig"><div class="ir"><label class="ilab" for="mlNewPw">New</label><input id="mlNewPw" class="itf" type="password" autocomplete="new-password" placeholder="At least 8 characters">${mEyeBtn()}</div>
+<div class="ir"><label class="ilab" for="mlNewPw2">Confirm</label><input id="mlNewPw2" class="itf" type="password" autocomplete="new-password" placeholder="Again"></div></div>
+${err}<button class="ibtn p msi-go" id="mlNewBtn" type="submit">Save Password</button></form>
+<button class="msi-link" type="button" onclick="mLeaveRecovery()">Back to Sign In</button>`,
+    opening: `<div class="si-open"><span class="si-bar" aria-hidden="true"><i></i></span></div>`,
+    boot: '',
+  }[st];
+  if(body.dataset.st !== st || o.err || st === 'form'){
+    body.dataset.st = st; body.innerHTML = html || '';
+    if(body.firstElementChild && st !== 'boot') body.firstElementChild.classList.add('si-swap');
+  }
+}
+function mLoginBusy(id, label){ const b = $m(id); if(!b) return; b.disabled = true; b.innerHTML = `<span class="si-spin" aria-hidden="true"></span>${mEsc(label)}`; }
+// kept for older call sites: the form with a message
+function mRenderLogin(err){ mLogin('form', { err }); }
 async function mSignIn(){
   const email = $m('mlEmail').value.trim(), password = $m('mlPass').value;
-  if(!email || !password){ mRenderLogin('Enter your email and password.'); return; }
-  const btn = $m('mlBtn'); btn.disabled = true; btn.textContent = 'Signing In…';
-  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-  if(error){ mRenderLogin('That email and password don’t match.'); $m('mlEmail').value = email; return; }
+  if(!siLooksLikeEmail(email)){ mLogin('form', { email, err: email ? 'That doesn’t look like an email address.' : 'Enter your work email.', bad: 'email' }); return; }
+  if(!password){ mLogin('form', { email, err: 'Enter your password.', bad: 'pass' }); return; }
+  mLoginBusy('mlBtn', 'Signing In…');
+  let error = null;
+  try{ ({ error } = await supabaseClient.auth.signInWithPassword({ email, password })); }catch(e){ error = e; }
+  if(error){ mLogin('form', { email, err: siAuthMessage(error, 'signin'), bad: 'pass' }); return; }
   mBoot();
 }
-async function mForgot(){
-  const email = $m('mlEmail')?.value.trim();
-  if(!email){ showToast('info', 'Enter your email first', 'Then tap Forgot password? again.'); return; }
-  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/' });
-  error ? showToast('error', 'Couldn’t send the link', error.message) : showToast('success', 'Check your email', 'A link to set a new password is on its way.');
+async function mSendLink(){
+  const email = $m('mlResetEmail').value.trim();
+  if(!siLooksLikeEmail(email)){ mLogin('forgot', { email, err: 'Enter your work email.' }); return; }
+  mLoginBusy('mlResetBtn', 'Sending…');
+  let error = null;
+  try{ ({ error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/' })); }catch(e){ error = e; }
+  if(error){ mLogin('forgot', { email, err: siAuthMessage(error, 'reset') }); return; }
+  mLogin('sent', { email });
 }
-async function mSignOut(){ await supabaseClient.auth.signOut(); location.reload(); }
+async function mSaveNewPassword(){
+  const pw = $m('mlNewPw').value, pw2 = $m('mlNewPw2').value, account = currentUser?.email || '';
+  if(pw.length < 8){ mLogin('newpw', { account, err: 'Use at least 8 characters.' }); return; }
+  if(pw !== pw2){ mLogin('newpw', { account, err: 'The two passwords don’t match.' }); return; }
+  mLoginBusy('mlNewBtn', 'Saving…');
+  let error = null;
+  try{ ({ error } = await supabaseClient.auth.updateUser({ password: pw })); }catch(e){ error = e; }
+  if(error){ mLogin('newpw', { account, err: siAuthMessage(error, 'new') }); return; }
+  siSetRecovering(false);
+  mBoot({ sub: 'Password saved · Opening your workspace' });
+}
+async function mLeaveRecovery(){ siSetRecovering(false); try{ await supabaseClient.auth.signOut(); }catch(e){} mLogin('form', { email: '' }); }
+// kept for older call sites
+function mForgot(){ mLogin('forgot'); }
+async function mSignOut(){ try{ localStorage.removeItem('bda_first_name'); }catch(e){} await supabaseClient.auth.signOut(); location.reload(); }
 
 async function mLoadAll(){
   const uid = currentUser.id;
@@ -132,16 +197,39 @@ async function mLoadAll(){
   await Promise.all([loadUpdateHistory(), loadHealthHandled(), loadTaskDueTimes(), typeof hvTimeLoad === 'function' ? hvTimeLoad() : null]);
 }
 
-async function mBoot(){
+async function mBoot(o){
+  o = o || {};
+  mLoginShell();   // the logo straight away, while the saved session is read
   const { data: { session } } = await supabaseClient.auth.getSession();
-  if(!session){ mRenderLogin(); return; }
+  const linkError = siTakeLinkError();
+  if(linkError && /error/.test(location.hash)) history.replaceState(null, '', location.pathname);
+  if(!session){
+    siSetRecovering(false);
+    linkError ? mLogin('forgot', { err: 'That link has expired or was already used. Enter your email for a new one.' }) : mLogin('form');
+    return;
+  }
   currentUser = session.user;
+  if(siRecovering()){ mLogin('newpw', { account: session.user.email || '' }); return; }   // from a reset link: a new password first
+  // the opening: a greeting (the name as soon as it's known) and a thin line while everything loads
+  const t0 = Date.now();
+  let first = ''; try{ first = localStorage.getItem('bda_first_name') || ''; }catch(e){}
+  mLogin('opening', { heading: siHello() + (first ? ', ' + first : ''), sub: o.sub });
+  supabaseClient.from('team_profiles').select('name').eq('id', currentUser.id).limit(1).then(({ data }) => {
+    const n = data && data[0] && String(data[0].name || '').split(' ')[0];
+    if(n && $m('msiRoot')?.dataset.st === 'opening') siText($m('msiHead'), siHello() + ', ' + n);
+  }, () => {});
   try{ await mLoadAll(); }catch(e){ console.error(e); }
-  if(!myProfile){ mRenderLogin('This account isn’t on the team yet. Ask an admin to add you.'); return; }
+  if(!myProfile){ mLogin('form', { err: 'This account isn’t on the team yet. Ask an admin to add you.' }); return; }
+  try{ localStorage.setItem('bda_first_name', String(myProfile.name || '').split(' ')[0]); }catch(e){}
+  if($m('msiRoot')) siText($m('msiHead'), siHello() + ', ' + String(myProfile.name || '').split(' ')[0]);
+  // let the greeting land, then fade the sign-in out and the app in
+  const wait = 520 - (Date.now() - t0); if(wait > 0) await new Promise(r => setTimeout(r, wait));
+  if($m('msiRoot')){ $m('msiRoot').classList.add('is-out'); await new Promise(r => setTimeout(r, 200)); }
   mApplyTheme();
   try{ const raw = localStorage.getItem('bda_timer_state'); if(raw) timerState = JSON.parse(raw); }catch(e){}
   document.title = settings.appName || 'Based Radar';
   mRenderShell();
+  const stg = $m('mStage'); if(stg){ stg.classList.add('m-in'); stg.addEventListener('animationend', () => stg.classList.remove('m-in'), { once: true }); }
   mSwitchTab(mTabFromHash() || 'today');
   if(location.hash) mOpenFromHash(location.hash);
   window.addEventListener('hashchange', () => mOpenFromHash(location.hash));
