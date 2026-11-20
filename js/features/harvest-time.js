@@ -70,14 +70,15 @@ function hvProjectTasks(projectId, keepId, all){
     .filter(t => t && (all || t.id === Number(keepId) || typeof waTaskAllowed !== 'function' || waTaskAllowed(t.name)))
     .sort((a, b) => (hvOwnTask(b) - hvOwnTask(a)) || (b.billable - a.billable) || a.name.localeCompare(b.name));
 }
-// A project of a client you were given a task for, outside your areas: every one of its tasks is open to you
-// (otherwise a Paid Ads project would show a Web member no tasks at all).
+// A client outside your areas that's yours anyway (you were given a task for it, or you've worked on
+// it lately): every one of its projects' tasks is open to you (otherwise a Paid Ads project would
+// show a Web member no tasks at all).
 function hvProjectAssigned(projectId){
-  if(typeof waAssignedTo !== 'function' || typeof waMine !== 'function') return false;
+  if(typeof waYours !== 'function' || typeof waInMyAreas !== 'function') return false;
   const p = hvTime.projects.find(x => Number(x.harvest_id) === Number(projectId)); if(!p) return false;
   const hc = hvTime.clients.find(x => Number(x.harvest_id) === Number(p.client_harvest_id));
   const c = hc && clients.find(x => String(x.id) === String(hc.radar_client_id || ''));
-  return !!c && !waMine(c) && waAssignedTo(c);
+  return !!c && waMyAreas().length > 0 && !waInMyAreas(c) && !waOwnsClient(c) && waWorkedOnRecently(c);
 }
 // a task in your own areas comes first (Web Design before Reporting for someone who does Web)
 function hvOwnTask(t){

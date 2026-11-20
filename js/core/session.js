@@ -2,43 +2,81 @@
 // (myProfile, isAdmin, canApprove…), profile loading, button loading states.
 
 /* ---------- Theme ---------- */
+// Appearance is 'auto' (follows the computer), 'light', 'dark', or 'night': dark from night to
+// morning, light through the day. 'night' is 7 PM to 7 AM; other hours are kept as
+// 'night:20:00-06:30'. myProfile.theme follows you to other devices; localStorage is this device's
+// guess for the first paint, before you're signed in.
+const NIGHT_HOURS = ['19:00', '07:00'];
+function themePrefNow(){
+  try{ return (myProfile && myProfile.theme != null) ? myProfile.theme : (localStorage.getItem('bda_theme') || 'auto'); }catch(e){ return 'auto'; }
+}
+function nightHours(pref){
+  const m = /^night(?::(\d{2}:\d{2})-(\d{2}:\d{2}))?$/.exec(pref || '');
+  return m ? [m[1] || NIGHT_HOURS[0], m[2] || NIGHT_HOURS[1]] : null;
+}
+function nightPref(from, to){ return from === NIGHT_HOURS[0] && to === NIGHT_HOURS[1] ? 'night' : `night:${from}-${to}`; }
+const hhmmToMin = v => { const [h, m] = String(v).split(':').map(Number); return h * 60 + (m || 0); };
+function isNightNow(pref, now){
+  const r = nightHours(pref); if(!r) return false;
+  now = now || new Date();
+  const t = now.getHours() * 60 + now.getMinutes(), a = hhmmToMin(r[0]), b = hhmmToMin(r[1]);
+  return a === b ? false : a > b ? (t >= a || t < b) : (t >= a && t < b);
+}
+function resolvedTheme(pref){
+  if(pref === 'dark' || pref === 'light') return pref;
+  if(nightHours(pref)) return isNightNow(pref) ? 'dark' : 'light';
+  return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+// Puts the right appearance on now and, for Night, sets a timer for the next change (in the
+// evening it eases to dark while you work, in the morning back to light).
+function applyTheme(fade){
+  const pref = themePrefNow(), want = resolvedTheme(pref);
+  if(document.body.dataset.theme !== want){
+    if(fade){ document.body.classList.add('theme-switching'); clearTimeout(applyTheme._f); applyTheme._f = setTimeout(() => document.body.classList.remove('theme-switching'), 260); }
+    document.body.dataset.theme = want;
+  }
+  if(typeof syncDarkModeToggleUI === 'function') syncDarkModeToggleUI();
+  if(typeof onThemeApplied === 'function') onThemeApplied(want);
+  clearTimeout(applyTheme._t);
+  const r = nightHours(pref);
+  if(r){
+    const now = new Date(), t = now.getHours() * 60 + now.getMinutes();
+    const mins = Math.min(...r.map(x => ((hhmmToMin(x) - t + 1440) % 1440) || 1440));
+    applyTheme._t = setTimeout(() => applyTheme(true), mins * 60000 - now.getSeconds() * 1000 - now.getMilliseconds() + 400);
+  }
+}
+// A computer that slept through the change catches up when you come back to it.
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible' && nightHours(themePrefNow())) applyTheme(true); });
 async function initTheme(){
   try{
-    // myProfile.theme is the real, per-account source of truth — only
-    // fall back to the localStorage guess if this account has never set
-    // a preference at all (myProfile.theme is null/undefined).
-    const saved = myProfile && myProfile.theme != null ? myProfile.theme : localStorage.getItem('bda_theme');
-    // Nobody has picked a theme yet → follow the system appearance (like a
-    // Mac app) instead of defaulting to light.
-    const systemDark = !!(window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
-    const pref = saved || (systemDark ? 'dark' : 'light');
-    if(pref === 'dark') document.body.dataset.theme = 'dark';
-    else document.body.dataset.theme = 'light';
-    // Keep localStorage in sync so this device's early FOUC-prevention
-    // script (which runs before login, with no access to Supabase) has
-    // an accurate guess to paint with on the next load — but only for a
-    // real choice; an unset preference keeps following the system.
-    if(saved) localStorage.setItem('bda_theme', pref === 'dark' ? 'dark' : 'light');
-    else localStorage.removeItem('bda_theme');
+    applyTheme(false);
+    // Keep this device's first-paint guess in step with the real choice; an unset one keeps
+    // following the system.
+    const pref = themePrefNow();
+    if(pref && pref !== 'auto') localStorage.setItem('bda_theme', pref); else localStorage.removeItem('bda_theme');
     watchSystemTheme();
   }catch(e){ document.body.dataset.theme = 'light'; }
 }
 
-// While nobody has picked a theme, follow the system live — e.g. when
-// macOS switches to dark at sunset with Appearance set to "Auto".
+// While Appearance is Auto, follow the system live — e.g. when macOS switches to dark at sunset
+// with its own Appearance set to "Auto".
 function watchSystemTheme(){
   if(watchSystemTheme._on || !window.matchMedia) return;
   watchSystemTheme._on = true;
   const mq = matchMedia('(prefers-color-scheme: dark)');
-  const follow = () => {
-    const chosen = (myProfile && myProfile.theme != null) || localStorage.getItem('bda_theme');
-    if(chosen) return;
-    if(mq.matches) document.body.dataset.theme = 'dark';
-    else document.body.dataset.theme = 'light';
-    if(typeof syncDarkModeToggleUI === 'function') syncDarkModeToggleUI();
-  };
+  const follow = () => { if(themePrefNow() === 'auto') applyTheme(true); };
   if(mq.addEventListener) mq.addEventListener('change', follow);
   else if(mq.addListener) mq.addListener(follow);
+}
+// Saves an appearance choice: this device at once, your account for your other devices.
+async function saveThemePref(pref){
+  const v = pref === 'auto' ? null : pref;
+  if(myProfile) myProfile.theme = v;
+  try{ v ? localStorage.setItem('bda_theme', v) : localStorage.removeItem('bda_theme'); }catch(e){}
+  applyTheme(true);
+  if(!currentUser) return;
+  const { error } = await supabaseClient.from('team_profiles').update({ theme: v }).eq('id', currentUser.id);
+  if(error){ console.error('theme save', error); showToast('info', 'Saved on this computer', 'Your other devices keep the appearance they had.'); }
 }
 
 function toggleSidebar(){
@@ -163,24 +201,8 @@ function switchToMobileVersion(){
 }
 
 async function toggleDarkMode(){
-  // Page-wide color fade only for the moment of switching (see .theme-switching CSS).
-  document.body.classList.add('theme-switching');
-  clearTimeout(toggleDarkMode._t);
-  toggleDarkMode._t = setTimeout(()=> document.body.classList.remove('theme-switching'), 260);
-  const isDark = document.body.dataset.theme === 'dark';
-  const newTheme = isDark ? 'light' : 'dark';
-  if(isDark){ document.body.dataset.theme = 'light'; }
-  else { document.body.dataset.theme = 'dark'; }
-  try{ localStorage.setItem('bda_theme', newTheme); }catch(e){}
-  syncDarkModeToggleUI();
-  if(currentUser){
-    if(myProfile) myProfile.theme = newTheme;
-    const { error } = await supabaseClient.from('team_profiles').update({ theme: newTheme }).eq('id', currentUser.id);
-    if(error){
-      console.error('toggleDarkMode save error:', error);
-      showToast('error','Preference not saved','This won\'t follow you to other devices — ask your admin to check the theme column exists on team_profiles.');
-    }
-  }
+  // the switch in your menu: a plain Light or Dark (Auto and Night to Morning are in Settings)
+  await saveThemePref(document.body.dataset.theme === 'dark' ? 'light' : 'dark');
 }
 
 // Syncs the toggle switch's own visual .on state to match whatever the
@@ -229,7 +251,9 @@ function renderWhoAmI(){
   if(nameEl && roleEl){
     if(myProfile){
       nameEl.textContent = myProfile.name;
-      roleEl.textContent = roleDisplayLabel(myProfile.role);
+      // what you do (Account Manager, PPC Specialist), not your access level; the access level
+      // only shows if no job title has been set
+      roleEl.textContent = (myProfile.title || '').trim() || roleDisplayLabel(myProfile.role);
     } else {
       nameEl.textContent = '—'; roleEl.textContent = '';
     }

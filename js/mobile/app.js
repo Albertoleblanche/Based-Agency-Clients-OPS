@@ -239,12 +239,9 @@ async function mBoot(o){
   if(navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', e => { if(e.data && e.data.type === 'open-url') mOpenFromHash(new URL(e.data.url, location.origin).hash); });
 }
 async function mRefresh(){ try{ await mLoadAll(); }catch(e){ return; } mRenderTab(); mRenderBadges(); mStack.forEach(s => s.refresh && s.refresh()); }
-function mApplyTheme(){
-  const pref = (myProfile && myProfile.theme) || localStorage.getItem('bda_theme') || 'auto';
-  const dark = pref === 'dark' || (pref !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
-  document.body.dataset.theme = dark ? 'dark' : 'light';
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#000000' : '#F2F2F7');
-}
+function mApplyTheme(){ applyTheme(false); }
+// the status bar follows the appearance, also when Night to Morning changes it on its own
+function onThemeApplied(t){ document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t === 'dark' ? '#000000' : '#F2F2F7'); }
 
 // ---- the shell: tabs, + menu, pushed screens, sheets ----------------------------------------
 const M_TABS = [['today', 'Today', 'house'], ['tasks', 'Tasks', 'check-square'], ['plus'], ['review', 'Review', 'tray'], ['more', 'More', 'dots-three-circle']];
@@ -899,21 +896,19 @@ function mOpenDeleted(){
 async function mRestore(table, id){ const { error } = await supabaseClient.from(table).update({ deleted_at: null }).eq('id', id); if(error){ showToast('error', 'Couldn’t restore it', error.message); return; } await mRefresh(); mPop(); mOpenDeleted(); showToast('success', 'Restored', ''); }
 function mOpenSettings(){
   mPush('Settings', () => {
-    const pref = (myProfile && myProfile.theme) || 'auto';
+    const full = (myProfile && myProfile.theme) || 'auto', pref = nightHours(full) ? 'night' : full;
     const opt = (k, t) => `<button class="ir" onclick="mSetTheme('${k}')"><div class="tx"><span class="t n">${t}</span></div><div class="r">${pref === k ? `<span class="pk">${icon('check', { weight: 'bold' })}</span>` : ''}</div></button>`;
     return `<h1 class="big">Settings</h1>
-${mIsh('Appearance')}<div class="ig">${opt('auto', 'Automatic')}${opt('light', 'Light')}${opt('dark', 'Dark')}</div>
-<p class="ifoot">Automatic follows your iPhone.</p>
+${mIsh('Appearance')}<div class="ig">${opt('auto', 'Automatic')}${opt('light', 'Light')}${opt('dark', 'Dark')}${opt('night', 'Night to Morning')}</div>
+<p class="ifoot">${pref === 'night' ? `Dark from ${fmtTime(atTime(new Date(), nightHours(full)[0]))} to ${fmtTime(atTime(new Date(), nightHours(full)[1]))}. Change the hours in Settings on the desktop.` : 'Automatic follows your iPhone.'}</p>
 ${mIsh('Notifications')}<div class="ig">${mIr('', 'Push notifications', '', `<span class="ios-sw${'Notification' in window && Notification.permission === 'granted' ? ' on' : ''}" role="switch" aria-checked="${'Notification' in window && Notification.permission === 'granted'}"></span>`, 'mEnablePush()', { n: true, noChev: true })}</div>
 <p class="ifoot">Choose which notifications you get in Settings on the desktop.</p>
 <div class="ig" style="margin-top:28px">${mIr('', '<span style="color:var(--red)">Sign Out</span>', '', '', 'mSignOut()', { n: true, noChev: true })}</div>`;
   });
 }
 async function mSetTheme(k){
-  if(myProfile) myProfile.theme = k === 'auto' ? null : k;
-  try{ k === 'auto' ? localStorage.removeItem('bda_theme') : localStorage.setItem('bda_theme', k); }catch(e){}
-  mApplyTheme(); mTop()?.refresh();
-  await supabaseClient.from('team_profiles').update({ theme: k === 'auto' ? null : k }).eq('id', currentUser.id);
+  if(k === 'night' && nightHours((myProfile && myProfile.theme) || '')) k = myProfile.theme;   // keeps the hours set on the desktop
+  const p = saveThemePref(k); mTop()?.refresh(); await p;
 }
 const M_VAPID = 'BMKfTiTGaN-T9TYO-m6a1oAbIypXcS_FsPZ0ie1uIopU9wJQfOmrX7JvT_yReo8OkReAqlT-1PA8kL1m6sqII6s';
 async function mEnablePush(){
@@ -1336,7 +1331,7 @@ async function mSaveEvent(){
 
 // ---- start -----------------------------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
-  try{ const t = localStorage.getItem('bda_theme'); const dark = t === 'dark' || (t !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches); document.body.dataset.theme = dark ? 'dark' : 'light'; }catch(e){}
+  try{ document.body.dataset.theme = resolvedTheme(localStorage.getItem('bda_theme') || 'auto'); }catch(e){}
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { if(myProfile) mApplyTheme(); });
   mBoot();
 });

@@ -161,8 +161,10 @@ async function setClientOwner(clientId, name){
 function renderClientsTable(){
   const root = document.getElementById('clientsRoot');
   if(!root || typeof clients === 'undefined') return;
-  const acAll = activeClients(), hasAreas = waMyAreas().length > 0, mineOn = hasAreas && clientsMine;
-  const ac = mineOn ? acAll.filter(waMine) : acAll;
+  // My clients: your scope of work and what you've worked on lately (work-areas.js). The switch
+  // shows when that's some of the clients, not none or all of them.
+  const acAll = activeClients(), yours = acAll.filter(waYours), hasAreas = yours.length > 0 && yours.length < acAll.length, mineOn = hasAreas && clientsMine;
+  const ac = mineOn ? yours : acAll;
   const rowOf = c => ({ c, h: clientHealth(c), w: weekView(clientWeek(c)), owner: clientOwner(c) });
   const rows = ac.map(rowOf);
   // added from Harvest, waiting for an approver to finish their info (client-setup.js)
@@ -202,7 +204,6 @@ ${clientImportanceCell(c)}</div>`;
   const suMatch = canApprove() && typeof openMatchClientsSheet === 'function' && ac.some(c => !hvLinkOf(c)) ? `<span class="cl-g-act"><button class="x-lnk" onclick="openMatchClientsSheet()">Match to Existing Clients</button>${infoTip(CL_TIPS.match, 'What does Match to Existing Clients do?')}</span>` : '';
   const suGroup = suShown.length ? `<div class="cl-g" role="presentation"><b>Needs setup</b><span>${suShown.length}</span>${suMatch}</div>${suShown.map(clientSetupRowHtml).join('')}` : '';
   const body = shown.length || suShown.length ? suGroup + group('Needs attention', sNeeds) + group('On track', sOk)
-    : mineOn && !ac.length && acAll.length ? `<div class="cl-empty">None of the clients are in your areas yet (${escapeHtml(waWords(waMyAreas()))}).<a class="x-lnk" href="#" onclick="setClientsMine('all');return false;">Show All Clients</a></div>`
     : ac.length || su.length ? `<div class="cl-empty">No clients match.<a class="x-lnk" href="#" onclick="clearClientsCanvasFilters();return false;">Clear Filters</a></div>`
     : emptyNoClients('Every client lives here: who owns it, its health, this week’s update and hours this month.');
   const seg = [['all', 'All', rows.length + su.length], ['attention', 'Needs attention', needs.length], ['behind', 'Not sent yet', notSent.length]]

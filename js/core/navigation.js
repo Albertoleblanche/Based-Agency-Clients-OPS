@@ -368,65 +368,86 @@ function closePanelOnLeave(view){
   if(typeof window[redraw] === 'function') window[redraw]();
 }
 
+// The screens that can draw straight away from what's already loaded (the switch fades to them).
+const VIEW_QUICK_DRAW = { overview: 'renderDashboard', clients: 'renderClientsTable', health: 'renderHealth', tasks: 'renderTasks', reminders: 'renderReminders', notes: 'renderNotes', plan: 'renderPlan', teamqueue: 'renderTeamQueue', calendar: 'renderCalendar' };
 async function switchView(name){
   if(name === 'claude' || name === 'focusreports') name = 'overview'; // the Assistant and the weekly report were removed; old links land on the Dashboard
   const leaving = currentViewName;
-  closeMobileNav();
-  // This Week (the week board) opens from the Dashboard's toolbar, so the Dashboard stays lit on it.
-  const navName = name === 'approve' ? 'overview' : name;
-  document.querySelectorAll('.nav-item').forEach(n=>{ const on = n.dataset.view===navName; n.classList.toggle('active', on); n.classList.toggle('on', on); if(on) n.setAttribute('aria-current','page'); else n.removeAttribute('aria-current'); });
-  if(typeof setToolbarActions === 'function') setToolbarActions(name);
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  const viewEl = document.getElementById('view-'+name);
-  viewEl.classList.add('active');
-  // You change screens all day, so the new one doesn't slide: from a click it fades in briefly, and
-  // from the keyboard (⌘1–9, the back and forward keys) it's simply there.
-  if(switchView._last !== name && window._lastInput !== 'key' && !(name === 'approve' && window._wkIntro)) viewEl.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 140, easing: 'cubic-bezier(.23,1,.32,1)' });
-  switchView._last = name;
-  syncAddressToView(name);
-  if(leaving && leaving !== name) closePanelOnLeave(leaving);
-  // The floating "open the Assistant" button is redundant (and visually
-  // odd sitting on top of the tab's own dark background) while you're
-  // already looking at the Assistant tab itself — hidden here rather than
-  // in applyRoleVisibility(), since that only re-runs on permission
-  // changes, not on every navigation.
-  const claudeFloatBtn = document.getElementById('claudeFloatBtn');
-  if(claudeFloatBtn) claudeFloatBtn.style.display = 'none';
-  // Overview and Client Detail aren't in this lookup — their titles are
-  // dynamic (greeting text, client name) and get set by renderGreeting()
-  // and renderClientDetail() respectively, moments later in this same flow.
-  const meta = VIEW_TITLES[name];
-  if(meta){
-    const titleEl = document.getElementById('topbarTitle');
-    const subEl = document.getElementById('topbarSub');
-    // Falls back to the hardcoded default when no custom name is set —
-    // the subtitle always stays the default, since Sidebar Tab Names only
-    // lets admins rename the tab itself, not write a custom description.
-    if(titleEl) titleEl.textContent = viewTitle(name);
-    if(subEl) subEl.textContent = meta[1];
+  // You change screens all day, so the move is a quick cross-fade of the page and its title (the
+  // sidebar and toolbar buttons just change, like a Mac app's). The new screen is drawn before the
+  // fade, so nothing jumps once it's in. From the keyboard (⌘1–9, back and forward) it's simply there.
+  const fade = leaving && leaving !== name && switchView._last !== name && window._lastInput !== 'key' && !(name === 'approve' && window._wkIntro)
+    && typeof motionOK === 'function' && motionOK() && document.visibilityState === 'visible';
+  let viewEl;
+  const swap = () => {
+    closeMobileNav();
+    // This Week (the week board) opens from the Dashboard's toolbar, so the Dashboard stays lit on it.
+    const navName = name === 'approve' ? 'overview' : name;
+    document.querySelectorAll('.nav-item').forEach(n=>{ const on = n.dataset.view===navName; n.classList.toggle('active', on); n.classList.toggle('on', on); if(on) n.setAttribute('aria-current','page'); else n.removeAttribute('aria-current'); });
+    if(typeof setToolbarActions === 'function') setToolbarActions(name);
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    viewEl = document.getElementById('view-'+name);
+    viewEl.classList.add('active');
+    switchView._last = name;
+    syncAddressToView(name);
+    if(leaving && leaving !== name) closePanelOnLeave(leaving);
+    // The floating "open the Assistant" button is redundant (and visually
+    // odd sitting on top of the tab's own dark background) while you're
+    // already looking at the Assistant tab itself — hidden here rather than
+    // in applyRoleVisibility(), since that only re-runs on permission
+    // changes, not on every navigation.
+    const claudeFloatBtn = document.getElementById('claudeFloatBtn');
+    if(claudeFloatBtn) claudeFloatBtn.style.display = 'none';
+    // Overview and Client Detail aren't in this lookup — their titles are
+    // dynamic (greeting text, client name) and get set by renderGreeting()
+    // and renderClientDetail() respectively, moments later in this same flow.
+    const meta = VIEW_TITLES[name];
+    if(meta){
+      const titleEl = document.getElementById('topbarTitle');
+      const subEl = document.getElementById('topbarSub');
+      // Falls back to the hardcoded default when no custom name is set —
+      // the subtitle always stays the default, since Sidebar Tab Names only
+      // lets admins rename the tab itself, not write a custom description.
+      if(titleEl) titleEl.textContent = viewTitle(name);
+      if(subEl) subEl.textContent = meta[1];
+    }
+    // The Dashboard's title is its greeting: set it now, not after the data load (it said the last tab's name meanwhile)
+    if(name === 'overview' && typeof renderGreeting === 'function') renderGreeting();
+    // Shown immediately, before the data load starts — the check inside
+    // renderTimesheetDay/Week() alone isn't enough, since those only run
+    // AFTER fullRefresh() below has already finished, by which point the
+    // real data is already there and there's nothing left to show a loading
+    // state for.
+    if(name==='time' && !timeEntriesDataLoaded){
+      const tb = document.getElementById('timesheetBody');
+      if(tb) tb.innerHTML = loadingStateHtml('Loading timesheet…');
+    }
+    // Profile doesn't actually need fullRefresh() at all — myProfile is
+    // already loaded from login (fullRefresh()'s chain never touches it;
+    // that's a separate loadMyProfile() call), and its own sub-panels
+    // (Google Calendar, push, email) each do their own independent fetch.
+    // Called here, ahead of 7 unrelated network requests, instead of after
+    // them — there was never a reason for this page specifically to wait.
+    if(name==='profile'){ renderProfilePage(); }
+    if(name==='settings' && typeof renderSettingsView === 'function'){ renderSettingsView(); if(settingsTab === 'integrations') loadIntegrationStatuses(); if(settingsTab === 'ai' && isAdmin()) loadAiProviderConnectionStatus(); if(settingsTab === 'whatsapp' && typeof waStartPoll === 'function') waStartPoll(); }
+    // WhatsApp shows what it has straight away and loads its own tables, instead of waiting for
+    // everything else below to load first.
+    if(name==='whatsapp' && typeof openWhatsappView === 'function') openWhatsappView();
+    // Drawn now from what's loaded, so the page and the toolbar's line under the title are right
+    // from the first frame; the refresh below only changes what's actually new.
+    const draw = VIEW_QUICK_DRAW[name]; if(draw && typeof window[draw] === 'function'){ try{ window[draw](); }catch(e){ console.error(e); } }
+  };
+  if(fade && document.startViewTransition){
+    // the names that let only the page and its title cross-fade are on just for the switch
+    const my = switchView._vt = (switchView._vt || 0) + 1;
+    document.documentElement.classList.add('vt-page');
+    const vt = document.startViewTransition(swap);
+    vt.finished.finally(() => { if(switchView._vt === my) document.documentElement.classList.remove('vt-page'); });
+    await vt.updateCallbackDone.catch(() => {});
+  } else {
+    swap();
+    if(fade) viewEl.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: 'cubic-bezier(.23,1,.32,1)' });
   }
-  // The Dashboard's title is its greeting: set it now, not after the data load (it said the last tab's name meanwhile)
-  if(name === 'overview' && typeof renderGreeting === 'function') renderGreeting();
-  // Shown immediately, before the data load starts — the check inside
-  // renderTimesheetDay/Week() alone isn't enough, since those only run
-  // AFTER fullRefresh() below has already finished, by which point the
-  // real data is already there and there's nothing left to show a loading
-  // state for.
-  if(name==='time' && !timeEntriesDataLoaded){
-    const tb = document.getElementById('timesheetBody');
-    if(tb) tb.innerHTML = loadingStateHtml('Loading timesheet…');
-  }
-  // Profile doesn't actually need fullRefresh() at all — myProfile is
-  // already loaded from login (fullRefresh()'s chain never touches it;
-  // that's a separate loadMyProfile() call), and its own sub-panels
-  // (Google Calendar, push, email) each do their own independent fetch.
-  // Called here, ahead of 7 unrelated network requests, instead of after
-  // them — there was never a reason for this page specifically to wait.
-  if(name==='profile'){ renderProfilePage(); }
-  if(name==='settings' && typeof renderSettingsView === 'function'){ renderSettingsView(); if(settingsTab === 'integrations') loadIntegrationStatuses(); if(settingsTab === 'ai' && isAdmin()) loadAiProviderConnectionStatus(); if(settingsTab === 'whatsapp' && typeof waStartPoll === 'function') waStartPoll(); }
-  // WhatsApp shows what it has straight away and loads its own tables, instead of waiting for
-  // everything else below to load first.
-  if(name==='whatsapp' && typeof openWhatsappView === 'function') openWhatsappView();
   await fullRefresh();
   if(name==='trash') renderTrash();
   if(name==='payroll') renderPayroll();

@@ -27,7 +27,9 @@ function enterIn(el, from){
 function hidePop(el){
   if(!el || el.style.display === 'none' || el.dataset.leaving) return;
   el.dataset.leaving = '1';
-  animateThen(el, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-4px) scale(.98)' }], 140, EASE_IN, () => {
+  // a popover that opened upward (data-from="below") goes back down into what opened it
+  const back = el.dataset.from === 'below' ? 'translateY(4px) scale(.98)' : 'translateY(-4px) scale(.98)';
+  animateThen(el, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: back }], 140, EASE_OUT, () => {
     el.style.display = 'none'; delete el.dataset.leaving;
     el.getAnimations?.().forEach(a => a.cancel());
   });

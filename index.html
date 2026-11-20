@@ -60,9 +60,13 @@
   // the wrong theme while the rest of the app's JS is still loading.
   (function(){
     try{
-      const saved = localStorage.getItem('bda_theme');
-      // No saved choice yet → follow the system appearance, like a Mac app.
-      document.body.dataset.theme = (saved === 'dark' || (!saved && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches)) ? 'dark' : 'light';
+      const saved = localStorage.getItem('bda_theme') || '';
+      // No saved choice yet → follow the system appearance, like a Mac app. Night to Morning
+      // ('night', or 'night:20:00-06:30') is dark between those hours.
+      const m = /^night(?::(\d\d):(\d\d)-(\d\d):(\d\d))?$/.exec(saved);
+      let dark = saved === 'dark' || (saved !== 'light' && !m && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+      if(m){ const a = m[1] ? m[1] * 60 + +m[2] : 1140, b = m[3] ? m[3] * 60 + +m[4] : 420, d = new Date(), t = d.getHours() * 60 + d.getMinutes(); dark = a > b ? (t >= a || t < b) : (t >= a && t < b); }
+      document.body.dataset.theme = dark ? 'dark' : 'light';
     }catch(e){}
   })();
 </script>
@@ -151,9 +155,16 @@
         <span class="av a1" id="topbarAvatarPlaceholder" style="width:28px;height:28px;font-size:11px"></span>
         <span class="who"><b id="sidebarProfileName">—</b><span id="sidebarProfileRole"></span></span>
       </button>
-      <a class="ib nav-item" data-view="settings" href="#settings" onclick="switchView('settings');return false;" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /> <circle cx="12" cy="12" r="3" /></svg></a>
+      <div class="notif-bell-wrap">
+        <button class="ib notif-bell-btn" onclick="toggleNotifPanel()" aria-label="Notifications" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.268 21a2 2 0 0 0 3.464 0" /> <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" /></svg><span class="notif-badge" id="notifBadge" style="display:none;"></span></button>
+        <div class="menu notif-panel" id="notifPanel" role="dialog" aria-label="Notifications" style="display:none;">
+          <div class="notif-panel-head"><b>Notifications</b><span><button class="btn-q btn sm" onclick="markAllNotificationsRead()">Mark all read</button><button class="btn-q btn sm" onclick="clearAllNotifications()">Clear</button></span></div>
+          <div id="notifPanelList"></div>
+        </div>
+      </div>
       <div class="menu side-menu" id="sidebarProfileMenu" role="menu" style="display:none;">
         <button class="mi" role="menuitem" onclick="closeSidebarProfileMenu(); switchView('profile');"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /> <circle cx="12" cy="7" r="4" /></svg><span>My Profile</span></button>
+        <button class="mi" role="menuitem" onclick="closeSidebarProfileMenu(); switchView('settings');"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /> <circle cx="12" cy="12" r="3" /></svg><span>Settings</span><span class="kbd">⌘,</span></button>
         <button class="mi" role="menuitem" onclick="closeSidebarProfileMenu(); startTour();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" /></svg><span>Take a tour</span></button>
         <button class="mi" role="menuitem" onclick="closeSidebarProfileMenu(); openShortcutsSheet();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 8h.01" /> <path d="M12 12h.01" /> <path d="M14 8h.01" /> <path d="M16 12h.01" /> <path d="M18 8h.01" /> <path d="M6 8h.01" /> <path d="M7 16h10" /> <path d="M8 12h.01" /> <rect width="20" height="16" x="2" y="4" rx="2" /></svg><span>Keyboard shortcuts</span><span class="kbd">?</span></button>
         <button class="mi" role="menuitem" id="installAppMenuItem" style="display:none;" onclick="closeSidebarProfileMenu(); installDesktopApp();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 13V7" /> <path d="m15 10-3 3-3-3" /> <rect width="20" height="14" x="2" y="3" rx="2" /> <path d="M12 17v4" /> <path d="M8 21h8" /></svg><span>Install as desktop app</span></button>
@@ -172,13 +183,6 @@
       <div class="tb-t"><b class="page-title" id="topbarTitle">Today</b><span class="page-sub" id="topbarSub"></span></div>
       <div class="tb-actions" id="tbActions"></div>
       <button class="timerpill" id="tbTimer" style="display:none;" onclick="switchView('time')" title="Running timer"><i></i><b id="tbTimerTime">0:00:00</b><span id="tbTimerClient"></span></button>
-      <div class="notif-bell-wrap" style="position:relative;">
-        <button class="ib notif-bell-btn" onclick="toggleNotifPanel()" aria-label="Notifications" title="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.268 21a2 2 0 0 0 3.464 0" /> <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" /></svg><span class="notif-badge" id="notifBadge" style="display:none;"></span></button>
-        <div class="menu notif-panel" id="notifPanel" style="display:none;">
-          <div class="notif-panel-head"><b>Notifications</b><span><button class="btn-q btn sm" onclick="markAllNotificationsRead()">Mark all read</button><button class="btn-q btn sm" onclick="clearAllNotifications()">Clear</button></span></div>
-          <div id="notifPanelList"></div>
-        </div>
-      </div>
       <button class="search tb-search" onclick="openCommandPalette()" aria-label="Search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" /></svg><span>Search</span><span class="kbd">⌘K</span></button>
       <div class="new-wrap" style="position:relative;">
         <button class="btn btn-p" id="tbNewBtn" onclick="toggleNewMenu()" aria-haspopup="menu" title="New (⌘N)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /> <path d="M12 5v14" /></svg>New</button>

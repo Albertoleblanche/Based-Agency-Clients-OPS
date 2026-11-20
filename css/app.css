@@ -2782,3 +2782,36 @@ a.mi{text-decoration:none;color:inherit}
   .cb.rem:not(.done):not(.closed):not(:disabled):hover{box-shadow:inset 0 0 0 1.5px var(--green)}
   .mac .rmp .rmp-q:hover:not(:focus){background:var(--fill)}
 }
+
+/* ---- Changing screens (Nov 20) ----
+   A quick cross-fade of the page and the toolbar's title; the sidebar's highlight and the toolbar's
+   buttons just change, like a Mac app's. The names are on only for the switch (html.vt-page), and the
+   fade never takes the pointer: a click on the next tab during it starts the next switch at once. */
+html.vt-page .main > .views{view-transition-name:vt-views}
+html.vt-page .tb-t{view-transition-name:vt-title}
+::view-transition{pointer-events:none}
+::view-transition-old(root),::view-transition-new(root),::view-transition-group(root){animation:none}
+::view-transition-group(vt-views),::view-transition-group(vt-title){animation-duration:0s}
+::view-transition-old(vt-views),::view-transition-old(vt-title){animation-duration:120ms;animation-timing-function:cubic-bezier(.23,1,.32,1)}
+::view-transition-new(vt-views),::view-transition-new(vt-title){animation-duration:180ms;animation-timing-function:cubic-bezier(.23,1,.32,1)}
+@media (prefers-reduced-motion: reduce){ ::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none !important} }
+/* the title keeps its own width while it fades (a longer or shorter title isn't stretched) */
+::view-transition-old(vt-title),::view-transition-new(vt-title){height:100%;width:auto}
+
+/* ---- The sidebar's foot and counts (Nov 20) ----
+   The bell sits where Settings was, beside your name (Settings is in your menu now), and its panel
+   opens upward from it. A count in the sidebar is a dot: something's there, the screen says how much.
+   Red for Health, blue for what's waiting on you (Review, Team), grey for the rest. The number stays
+   in the page for screen readers. */
+.side-foot .notif-bell-wrap{margin-left:auto;position:relative;flex:0 0 auto;display:flex}
+.side-foot .notif-bell-btn{width:30px;height:28px;border-radius:7px;color:var(--label-2)}
+.mac[data-theme="light"] .app-win .side .side-foot .notif-bell-btn{color:#000}
+.mac .side-foot .notif-badge{top:5px;right:7px;width:7px;height:7px;box-shadow:0 0 0 2px #fff}
+.mac[data-theme="dark"] .side-foot .notif-badge{box-shadow:0 0 0 2px #000}
+body > .notif-panel{position:fixed;top:auto;right:auto;z-index:1000}
+.app-win .side .src-i .n{min-width:0;width:7px;height:7px;padding:0;margin-right:5px;border-radius:50%;font-size:0;line-height:0;color:transparent;background:var(--label-3);overflow:hidden;flex:0 0 auto}
+#navTeamPendingBadge,#navTeamBadge,.mac[data-theme="dark"] #navTeamPendingBadge,.mac[data-theme="dark"] #navTeamBadge{background:var(--blue) !important;color:transparent !important}
+#navHealthBadge,.mac[data-theme="dark"] #navHealthBadge{background:var(--red) !important;color:transparent !important}
+/* Appearance: Night to Morning's tile is the day going down into night */
+.appear > div{width:76px;text-align:center;line-height:1.25}
+.appear i.ap-night{background:linear-gradient(180deg,#FFFFFF 0%,#E4E5EA 34%,#3A3A40 62%,#1E1E20 100%)}

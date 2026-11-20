@@ -150,18 +150,39 @@ function updateNotifBadge(){
   }
 }
 
+// The bell sits at the foot of the sidebar, beside your name, so its panel opens upward from it
+// (floating over the page, like your menu) and goes back down into it when it closes.
 function toggleNotifPanel(){
   const panel = document.getElementById('notifPanel');
   if(!panel) return;
-  const opening = panel.style.display !== 'block';
-  if(opening){ panel.style.display = 'block'; renderNotifPanel(); } else hidePop(panel);
+  const opening = panel.style.display !== 'block' || panel.dataset.leaving;
+  if(!opening){ hidePop(panel); return; }
+  if(typeof closeSidebarProfileMenu === 'function') closeSidebarProfileMenu();
+  const btn = document.querySelector('.notif-bell-btn');
+  if(panel.parentElement !== document.body) document.body.appendChild(panel);
+  panel.getAnimations?.().forEach(a => a.cancel()); delete panel.dataset.leaving;
+  panel.dataset.from = 'below';
+  panel.style.display = 'block';
+  renderNotifPanel();
+  if(btn){
+    const r = btn.getBoundingClientRect(), w = panel.offsetWidth;
+    panel.style.left = Math.round(Math.max(8, Math.min(r.left - 6, window.innerWidth - w - 8))) + 'px';
+    panel.style.bottom = Math.round(window.innerHeight - r.top + 6) + 'px';
+    panel.style.transformOrigin = `${Math.round(r.left + r.width / 2 - parseFloat(panel.style.left))}px 100%`;
+  }
+  if(typeof motionOK === 'function' && motionOK()) panel.animate?.([{ opacity: 0, transform: 'translateY(4px) scale(.98)' }, { opacity: 1, transform: 'none' }], { duration: 180, easing: EASE_OUT });
 }
 
 document.addEventListener('click', (e)=>{
-  const wrap = document.querySelector('.notif-bell-wrap');
+  const btn = document.querySelector('.notif-bell-btn');
   const panel = document.getElementById('notifPanel');
-  if(panel && panel.style.display==='block' && wrap && !wrap.contains(e.target)) hidePop(panel);
+  if(panel && panel.style.display==='block' && !panel.dataset.leaving && !(btn && btn.contains(e.target)) && !panel.contains(e.target)) hidePop(panel);
 });
+document.addEventListener('keydown', (e)=>{
+  const panel = document.getElementById('notifPanel');
+  if(e.key === 'Escape' && panel && panel.style.display === 'block' && !panel.dataset.leaving){ e.stopPropagation(); hidePop(panel); document.querySelector('.notif-bell-btn')?.focus(); }
+}, true);
+window.addEventListener('resize', () => { const p = document.getElementById('notifPanel'); if(p && p.style.display === 'block') hidePop(p); });
 
 function renderNotifPanel(){
   const el = document.getElementById('notifPanelList');

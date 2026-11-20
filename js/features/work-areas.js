@@ -3,7 +3,10 @@
 // Ads, Web, SEO and Content; Website projects are Web; Legacy Retainer is every area), set in
 // Settings → Areas and filled in from the agency's SOPs. A person's areas are set there too.
 // Empty means every area: nothing changes for someone until an approver picks their areas.
-//   Your clients: a client with a project in one of your areas, or one you own.
+//   Your clients (All Clients → My clients): the ones in your scope of work and the ones you've
+//   worked on lately. Scope: one of its projects is in your areas, or you own it. Lately: your time
+//   or an improvement on it in the last 30 days, or a task given to you (open, or done in the last
+//   two weeks). Harvest's project lists don't count: there everyone is often on every project.
 //   Members can't log time or improvements on other clients, and a project's Task list only offers
 //   tasks in their areas (plus the shared ones: onboarding, strategy, calls, reporting).
 //   Admins and approvers work on every client; their areas only set what All Clients shows first.
@@ -60,13 +63,36 @@ function waClientAreas(c){
   return WORK_AREAS.map(a => a[0]).filter(k => out.has(k));
 }
 function waOwnsClient(c){ const o = c && c.customFieldValues && c.customFieldValues.owner; return !!o && typeof myName === 'function' && o === myName(); }
-// One of your clients: in your areas, or you own it. Everyone's, for someone with no areas set.
-function waMine(c){
-  const mine = waMyAreas();
-  if(!mine.length || waOwnsClient(c)) return true;
+function waInMyAreas(c){
+  const mine = waMyAreas(); if(!mine.length) return false;
   const ca = waClientAreas(c);
   return !ca || ca.some(k => mine.includes(k));
 }
+// The clients you've worked on lately, as a set of ids (worked out once per change in the data).
+const WA_RECENT_DAYS = 30;
+function waRecentIds(){
+  if(typeof currentUser === 'undefined' || !currentUser) return new Set();
+  const te = typeof timeEntries !== 'undefined' && Array.isArray(timeEntries) ? timeEntries : [];
+  const cl = typeof clients !== 'undefined' && Array.isArray(clients) ? clients : [];
+  const tk = typeof tasks !== 'undefined' && Array.isArray(tasks) ? tasks : [];
+  const since = toDateStr(addDays(rNow(), -WA_RECENT_DAYS)), me = currentUser.id, my = typeof myName === 'function' ? myName() : '';
+  const key = [me, since, te.length, tk.length, cl.length, cl.reduce((n, c) => n + ((c.improvements || []).length), 0)].join('|');
+  if(waRecentIds._key === key) return waRecentIds._ids;
+  const ids = new Set();
+  te.forEach(e => { if(e.userId === me && e.clientId && String(e.date || '') >= since) ids.add(e.clientId); });
+  cl.forEach(c => { if(my && (c.improvements || []).some(i => i.author === my && String(i.date || '').slice(0, 10) >= since)) ids.add(c.id); });
+  cl.forEach(c => { if(waAssignedTo(c)) ids.add(c.id); });
+  waRecentIds._key = key; waRecentIds._ids = ids;
+  return ids;
+}
+function waWorkedOnRecently(c){ return !!c && waRecentIds().has(c.id); }
+// In your scope of work: it's in your areas, or you own it.
+function waInScope(c){ return waOwnsClient(c) || waInMyAreas(c); }
+// One of your clients (All Clients → My clients, and yours to log time and improvements on): your
+// scope of work and what you've worked on lately. Someone whose areas haven't been set yet works on
+// every client: nothing changes for them until an approver picks their areas.
+function waYours(c){ return !waMyAreas().length || waInScope(c) || waWorkedOnRecently(c); }
+function waMine(c){ return waYours(c); }
 // A task someone assigned you makes its client yours to work on, even outside your areas: while it's
 // open, and for two weeks after you finish it, so its time can still be logged and fixed.
 function waAssignedTo(c){

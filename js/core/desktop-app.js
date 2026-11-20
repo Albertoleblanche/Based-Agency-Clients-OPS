@@ -157,10 +157,11 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     item.click();
   } else if(e.key === ',' && !e.shiftKey){
-    const settingsItem = document.querySelector('#appSidebar .nav-item[data-view="settings"]');
-    if(!isShown(settingsItem) || appModalOpen) return;
+    // Settings lives in your menu (under your name) now; ⌘, still opens it.
+    if(appModalOpen) return;
     e.preventDefault();
-    settingsItem.click();
+    if(typeof closeSidebarProfileMenu === 'function') closeSidebarProfileMenu();
+    switchView('settings');
   } else if(e.key === '\\'){
     e.preventDefault();
     toggleSidebar();

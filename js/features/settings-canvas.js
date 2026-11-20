@@ -113,7 +113,7 @@ function setGeneral(){
   const canWs = canApprove();
   const brand = settings.brandColor || '#C64C19';
   const logo = settings.appIcon ? `<img src="${esc(settings.appIcon)}" alt="" class="logo" style="object-fit:cover">` : `<span class="logo brand-mark">BA</span>`;
-  const pref = myProfile && myProfile.theme != null ? myProfile.theme : (localStorage.getItem('bda_theme') || 'auto');
+  const full = themePrefNow(), night = nightHours(full), pref = night ? 'night' : full;
   const thumb = (bg, side) => `<i style="background:linear-gradient(90deg,${side} 0 30%,${bg} 30% 100%)"></i>`;
   const ap = (k, t, i) => `<div role="radio" tabindex="0" aria-checked="${pref === k}" class="${pref === k ? 'on' : ''}" onclick="setThemePref('${k}')" onkeydown="if(event.key==='Enter'||event.key===' ')setThemePref('${k}')">${i}${t}</div>`;
   return `${canWs ? `<div class="set-h">Workspace</div>
@@ -129,7 +129,8 @@ ${fr('Names in the sidebar', 'Rename screens for everyone, and the line under th
 </div>
 <div class="set-h">Appearance</div>
 <div class="form-grp">
-${fr('Theme', 'Auto follows your computer', `<div class="appear" role="radiogroup" aria-label="Theme">${ap('auto', 'Auto', '<i style="background:linear-gradient(90deg,#F4F4F7 0 15%,#FFFFFF 15% 50%,#262629 50% 65%,#1E1E20 65%)"></i>')}${ap('light', 'Light', thumb('#FFFFFF', '#F4F4F7'))}${ap('dark', 'Dark', thumb('#1E1E20', '#262629'))}</div>`)}
+${fr('Theme', themeSubLine(pref), `<div class="appear" role="radiogroup" aria-label="Theme">${ap('auto', 'Auto', '<i style="background:linear-gradient(90deg,#F4F4F7 0 15%,#FFFFFF 15% 50%,#262629 50% 65%,#1E1E20 65%)"></i>')}${ap('light', 'Light', thumb('#FFFFFF', '#F4F4F7'))}${ap('dark', 'Dark', thumb('#1E1E20', '#262629'))}${ap('night', 'Night to Morning', '<i class="ap-night" aria-hidden="true"></i>')}</div>`)}
+${night ? fr('Dark from', 'Light the rest of the day', `${sheetPop('nightFrom', 'Dark from', nightTimeOpts(night[0]), night[0], `setNightHours(this.value, null)`)}<span class="t-2" style="font-size:13px">to</span>${sheetPop('nightTo', 'Light from', nightTimeOpts(night[1]), night[1], `setNightHours(null, this.value)`)}`) : ''}
 ${fr('Show the timer in the sidebar', 'A running timer always shows', swHtml(toolbarTimerPref(), 'Show the timer in the sidebar', 'toggleToolbarTimerPref()'))}
 </div>`;
 }
@@ -143,20 +144,25 @@ async function saveYourName(v){
 }
 function toolbarTimerPref(){ try{ return localStorage.getItem('bda_tb_timer') !== 'off'; }catch(e){ return true; } }
 function toggleToolbarTimerPref(){ try{ localStorage.setItem('bda_tb_timer', toolbarTimerPref() ? 'off' : 'on'); }catch(e){} if(typeof renderSideTimer === 'function') renderSideTimer(); renderSettingsView(); }
+// the line under Theme (the hours for Night to Morning are in the row under it)
+function themeSubLine(pref){
+  const n = nightHours(pref);
+  if(n) return 'Dark at night, light through the day';
+  return pref === 'light' ? 'Always light' : pref === 'dark' ? 'Always dark' : 'Auto follows your computer';
+}
+function nightTimeOpts(v){ return sheetTimeOpts(v, 30); }
 async function setThemePref(pref){
-  document.body.classList.add('theme-switching'); setTimeout(() => document.body.classList.remove('theme-switching'), 260);
-  if(pref === 'auto'){
-    try{ localStorage.removeItem('bda_theme'); }catch(e){}
-    if(myProfile) myProfile.theme = null;
-    document.body.dataset.theme = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  } else {
-    try{ localStorage.setItem('bda_theme', pref); }catch(e){}
-    if(myProfile) myProfile.theme = pref;
-    document.body.dataset.theme = pref;
-  }
-  if(typeof syncDarkModeToggleUI === 'function') syncDarkModeToggleUI();
+  // Night keeps the hours you set before, if you had
+  if(pref === 'night' && nightHours(themePrefNow())) pref = themePrefNow();
+  await saveThemePref(pref);
   renderSettingsView();
-  if(currentUser) await supabaseClient.from('team_profiles').update({ theme: pref === 'auto' ? null : pref }).eq('id', currentUser.id);
+}
+async function setNightHours(from, to){
+  const cur = nightHours(themePrefNow()) || NIGHT_HOURS.slice();
+  const f = from || cur[0], t = to || cur[1];
+  if(f === t){ showToast('info', 'Pick two different times', 'Dark starts at one time and ends at another.'); renderSettingsView(); return; }
+  await saveThemePref(nightPref(f, t));
+  renderSettingsView();
 }
 function openSidebarNamesSheet(){
   const labels = settings.navLabels || {};
