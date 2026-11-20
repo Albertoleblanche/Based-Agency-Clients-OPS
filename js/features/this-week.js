@@ -294,7 +294,7 @@ async function sendDraftForReview(id, author){
   if(!ok){ showToast('error', 'Couldn’t send for review', 'Try again in a moment.'); return; }
   const approvers = teamProfiles.filter(p => (p.role === 'admin' || p.role === 'approver') && p.id !== currentUser?.id);
   for(const a of approvers) await sendNotification(a.id, 'draft_ready', `${c.name}: draft ready for review`, `${author}'s weekly update is ready.`, 'teamqueue', c.id);
-  showToast('success', 'Sent for review', `${c.name} is in Review.`);
+  showToast('success', 'Sent for review', `Approvers get a notification. You’ll get one when it’s ${typeof winViaWhatsapp === 'function' && winViaWhatsapp(c) ? 'approved' : 'sent'}.`);
   renderAll();
 }
 

@@ -70,12 +70,12 @@ function renderTeamQueue(){
       : tier ? tierTag(tier) : h.level !== 'g' ? tagHtml(h.level === 'r' ? 'red' : 'yellow', healthWord(h.level)) : '';
     // Approved: who sends it (WhatsApp wins go back to whoever wrote them; copying one claims it)
     const line = reviewTab === 'approved' ? escapeHtml(reviewSendWords(x.c, x.d))
-      : `${escapeHtml(firstName(x.d.author))} · <span class="rvn-due ${kind}">${escapeHtml(due)}</span>`;
+      : `${x.d.author === myName() ? '' : escapeHtml(firstName(x.d.author)) + ' · '}<span class="rvn-due ${kind}">${escapeHtml(due)}</span>`;
     return `<a class="rvn-r${on ? ' is-sel' : ''}" href="#teamqueue" onclick="selectReview('${x.c.id}',${jsArg(x.d.author)});return false;"${on ? ' aria-current="true"' : ''}>${unread}${monoHtml(x.c, 'sm')}
 <div class="tx"><b>${escapeHtml(x.c.name)}</b><span class="s wn-rs">${chGlyph(x.c)}<span>${line}</span></span></div>
 <div class="rvn-rr">${reviewTab === 'approved' ? '' : when ? `<time>${escapeHtml(when)}</time>` : ''}${flag}</div></a>`;
   }).join('') || `<div class="rvn-empty"><b>${reviewTab === 'waiting' ? 'Nothing waiting' : reviewTab === 'approved' ? 'Nothing approved and unsent' : 'Nothing sent this week'}</b>${reviewTab === 'waiting' ? 'Drafts show up here when they’re sent for review.' : ''}</div>`;
-  const sortNote = reviewTab === 'waiting' ? `Oldest first${dueN ? ` · ${lateN ? `${lateN} late` + (dueN > lateN ? `, ${dueN - lateN} due today` : '') : `${dueN} due today`}` : ''}`
+  const sortNote = reviewTab === 'waiting' && !canApprove() ? 'Yours · oldest first' : reviewTab === 'waiting' ? `Oldest first${dueN ? ` · ${lateN ? `${lateN} late` + (dueN > lateN ? `, ${dueN - lateN} due today` : '') : `${dueN} due today`}` : ''}`
     : reviewTab === 'approved' ? (list.some(x => winViaWhatsapp(x.c)) ? 'Not sent yet · whoever copies a win sends it' : 'Approved, not sent yet') : 'Sent this week · newest first';
   const prevRead = root.querySelector('.rvn-mail')?.scrollTop || 0, prevKey = root.dataset.sel || '';
   root.innerHTML = `<div class="rvn">
@@ -89,9 +89,26 @@ ${list.length > 1 ? `<p class="rvn-keys"><span><kbd>J</kbd><kbd>K</kbd> next and
 </div>`;
   root.dataset.sel = sel ? key(sel) : '';
   if(sel && prevKey === key(sel)){ const m = root.querySelector('.rvn-mail'); if(m) m.scrollTop = prevRead; }
-  if(currentViewName === 'teamqueue') setToolbar(null, `${items.waiting.length} win${items.waiting.length === 1 ? '' : 's'} waiting${dueN ? ` · ${lateN ? lateN + ' late' : dueN + ' due today'}` : ''}`);
+  if(currentViewName === 'teamqueue') setToolbar(null, canApprove()
+    ? `${items.waiting.length} win${items.waiting.length === 1 ? '' : 's'} waiting${dueN ? ` · ${lateN ? lateN + ' late' : dueN + ' due today'}` : ''}`
+    : reviewMemberSub(items));
   const badge = document.getElementById('navTeamPendingBadge');
-  if(badge){ badge.textContent = items.waiting.length; badge.style.display = items.waiting.length ? '' : 'none'; }
+  if(badge){ const n = reviewBadgeCount(items); badge.textContent = n; badge.style.display = n ? '' : 'none'; }
+}
+// The sidebar count is what's on you. An approver: drafts waiting for a yes. Anyone else: their
+// approved WhatsApp updates still to send, the one thing in Review a member acts on.
+function reviewToSend(items){
+  const me = myName();
+  return (items || reviewItems()).approved.filter(x => x.d.author === me && winViaWhatsapp(x.c) && (st => st.k !== 'copied' || st.by === me)(winSendState(x.d)));
+}
+function reviewBadgeCount(items){
+  items = items || reviewItems();
+  return canApprove() ? items.waiting.length : reviewToSend(items).length;
+}
+// A member's subtitle: "1 to send on WhatsApp · 2 waiting for an approver"
+function reviewMemberSub(items){
+  const me = myName(), send = reviewToSend(items).length, waiting = items.waiting.filter(x => x.d.author === me && x.d.readyToNotify).length;
+  return [send ? `${send} to send on WhatsApp` : '', waiting ? `${waiting} waiting for an approver` : ''].filter(Boolean).join(' · ') || 'Your updates, once they’re sent for review';
 }
 // "Maya copied it 2:22 PM" · "Bruno sends it, not copied yet" · "Email · you send it"
 function reviewSendWords(c, d){
@@ -200,7 +217,7 @@ ${dl.internal.length ? `<div class="rvn-rs rvn-s2"><b>Left out</b><span>${dl.int
     ? `<button class="btn btn-p rvn-main" onclick="sendApprovedDraft(${A})">${icon('paper-plane-tilt')}Send Now</button>`
     : `<button class="btn btn-p rvn-main" onclick="approveAndSendOwnDraft(${A})" title="Approve and send now (⌘↩)">${icon('paper-plane-tilt')}Approve &amp; Send</button>`}`;
   else if(mine && !d.readyToNotify && tab === 'waiting') foot = `<span class="rvn-ft-note">${env}Goes to ${escapeHtml(c.email)} once it’s approved</span><span class="rvn-sp"></span><button class="btn btn-p rvn-main" onclick="sendDraftForReview(${A})">${icon('paper-plane-tilt')}Send for Review</button>`;
-  else foot = `<span class="rvn-ft-note">${icon('clock')}${tab === 'approved' ? 'Approved. An approver sends it.' : 'Waiting for an approver'}</span><span class="rvn-sp"></span>`;
+  else foot = `<span class="rvn-ft-note">${icon('clock')}${tab === 'approved' ? 'Approved. An approver sends it, and you’ll get a notification.' : 'Waiting for an approver. You’ll get a notification when it’s sent.'}</span><span class="rvn-sp"></span>`;
   return `<div class="rvn-top">${top}</div>
 <div class="rvn-mail"><div class="rvn-cols"><div class="rvn-doc">${head}
 ${wa && !editing ? '' : `<h2 class="rvn-subj">Your weekly update${tab === 'sent' ? '' : ' — ' + escapeHtml(updateRangeLabel(c))}</h2>`}
@@ -244,7 +261,7 @@ function reviewWaFootHtml(c, d, tab, A){
       + `<button class="btn btn-p rvn-main" onclick="approveAndCopyWin(${A})" title="Approve, and copy it formatted for WhatsApp (⌘↩)">${icon('copy')}Approve &amp; Copy</button>`;
     if(mine && !d.readyToNotify) return note(wa, 'Goes in their WhatsApp group once it’s approved. You send it.')
       + `<button class="btn btn-p rvn-main" onclick="sendDraftForReview(${A})">${icon('paper-plane-tilt')}Send for Review</button>`;
-    return note(icon('clock'), 'Waiting for an approver');
+    return note(icon('clock'), 'Waiting for an approver. You’ll get a notification when it’s approved, then you send it.');
   }
   // approved, not sent
   const st = winSendState(d);
@@ -310,6 +327,10 @@ document.addEventListener('keydown', e => {
 // Nothing selected because there's nothing in this tab: say what comes here, and where it starts.
 function reviewEmptyHtml(items){
   if(!activeClients().length) return emptyNoClients('Updates written for clients come here to be read and approved before they go out.');
+  if(reviewTab === 'waiting' && !canApprove()) return emptyState({ icon: 'inbox', tone: 'ok', title: 'Nothing waiting',
+    text: 'Your client updates show here once they’re written. Send one for review and an approver gets a notification; you get one when it’s approved or sent.',
+    action: 'Open This Week', onAction: "switchView('approve')",
+    link: items.approved.length ? `${items.approved.length} approved, not sent` : '', onLink: "setReviewTab('approved')" });
   if(reviewTab === 'waiting') return emptyState({ icon: 'inbox', tone: 'ok', title: 'Nothing to review',
     text: 'When a teammate sends a client update for review, it opens here so you can read it, edit it and approve it.',
     action: 'Open This Week', onAction: "switchView('approve')",

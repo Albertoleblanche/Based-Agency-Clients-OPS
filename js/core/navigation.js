@@ -20,10 +20,9 @@ function applyRoleVisibility(){
   if(editClientDetailBtn) editClientDetailBtn.style.display = canApprove() ? 'inline-flex' : 'none';
   const teamQueueNavItem = document.getElementById('teamQueueNavItem');
   if(teamQueueNavItem){
-    teamQueueNavItem.style.display = hasPermission('view_team_queue') ? 'flex' : 'none';
-    // If a non-approver somehow ends up on Team Queue (e.g. lost approver
-    // status mid-session), fall back to their own personal queue.
-    if(!hasPermission('view_team_queue') && document.getElementById('view-teamqueue')?.classList.contains('active')){ switchView('approve'); }
+    // Everyone has Review: approvers read, edit and send what's sent to them; a member sees
+    // their own drafts there (reviewItems() keeps it to theirs), locked once sent for review.
+    teamQueueNavItem.style.display = 'flex';
   }
   const approveQueueNavItem = document.getElementById('approveQueueNavItem');
   if(approveQueueNavItem){

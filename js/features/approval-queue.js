@@ -1128,6 +1128,9 @@ async function recordDraftSent(id, author){
   if(!c) return;
   const at = new Date().toISOString();
   await saveDraftFor(id, author, { draftSentAt: at, draftSentBy: myName() || 'Someone', sentVia: 'email' });
+  // the writer hears it went out
+  const writer = author !== myName() ? teamProfiles.find(p => p.name === author) : null;
+  if(writer && typeof sendNotification === 'function') await sendNotification(writer.id, 'draft_sent', `${c.name}: your update was sent`, `${myName() || 'An approver'} sent it to ${c.email || 'the client'}.`, 'teamqueue', c.id);
   // Kept apart from the draft row, which the next week's draft overwrites: the on-time
   // history in This Week and Health reads from here.
   if(typeof recordUpdateSent === 'function') await recordUpdateSent(id, at);
@@ -1283,7 +1286,7 @@ function queueDraftTextarea(id){
   return document.querySelector('.view.active ' + sel) || document.getElementById('draft-' + id);
 }
 
-async function approveDraft(id, author){
+async function approveDraft(id, author, opts){
   if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can approve drafts.'); return false; }
   const ta = queueDraftTextarea(id);
   { const c0 = clients.find(x=>x.id===id); if(c0 && blockIfWorkDeleted(c0, getDraftFor(c0, author))) return false; }
@@ -1324,11 +1327,17 @@ async function approveDraft(id, author){
   refreshClientDetailActivityIfOpen(id);
 
   // Notify whoever's actual logged work was included in what just got
-  // approved.
+  // approved. The writer hears separately, below.
+  const writer = author !== myName() ? teamProfiles.find(p => p.name === author) : null;
   for(const authorProfile of includedAuthorProfiles){
-    // A WhatsApp win's writer hears from approveWin() instead: it's theirs to send now.
-    if(authorProfile.name === author && typeof winViaWhatsapp === 'function' && winViaWhatsapp(c)) continue;
+    if(writer && authorProfile.id === writer.id) continue;
     await sendNotification(authorProfile.id, 'draft_approved', 'Your submission was approved', `${myName()||'An approver'} approved ${author}'s draft for ${c.name}, which included your logged work.`, 'approve');
+  }
+  // The writer: a WhatsApp win is theirs to send now (approveWin() tells them); an email update
+  // goes out from an approver, so they hear when it's sent (Approve & Send), or now if it's
+  // only approved.
+  if(writer && !(typeof winViaWhatsapp === 'function' && winViaWhatsapp(c)) && !(opts && opts.quietWriter)){
+    await sendNotification(writer.id, 'draft_approved', `${c.name}: your update is approved`, `${myName() || 'An approver'} approved it. An approver sends it to the client.`, 'teamqueue', c.id);
   }
 
   showToast('success','Draft approved', `${author}'s update for ${c.name} was approved.`);
@@ -1348,7 +1357,7 @@ async function approveAndSendOwnDraft(id, author){
   // Someone else's WhatsApp win goes back to them to send once it's approved.
   const c0 = clients.find(x=>x.id===id);
   if(c0 && typeof winViaWhatsapp === 'function' && winViaWhatsapp(c0) && author !== myName()) return approveWin(id, author);
-  if((await approveDraft(id, author)) === false) return;
+  if((await approveDraft(id, author, { quietWriter: true })) === false) return;
   await sendApprovedDraft(id, author);
 }
 

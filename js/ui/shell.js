@@ -70,12 +70,12 @@ document.addEventListener('keydown', e => {
 // Jump to a client on a screen (defined fully by each screen; safe defaults here).
 function openWeekClient(id){ window._weekSel = id; switchView('approve'); if(typeof renderThisWeek === 'function') renderThisWeek(); }
 function openHealthClient(id){ window._healthSel = id; switchView('health'); if(typeof renderHealth === 'function') renderHealth(); }
-// Opens a draft in Review on the tab it's on. A draft that isn't in Review yet (still being
-// written, or someone else's that hasn't been sent for review) opens on This Week instead.
+// Opens a draft in Review on the tab it's on. A draft that isn't in Review for you (someone
+// else's you can't see, or one not sent for review yet) opens on This Week instead.
 function openReviewDraft(clientId, author){
   const c = clients.find(x => x.id === clientId), d = (c && c.drafts || []).find(x => x.author === author);
   const listed = typeof reviewItems === 'function' && Object.values(reviewItems()).some(l => l.some(x => x.c.id === clientId && x.d.author === author));
-  if(!listed || (typeof hasPermission === 'function' && !hasPermission('view_team_queue'))){ openWeekClient(clientId); return; }
+  if(!listed){ openWeekClient(clientId); return; }
   if(typeof reviewTab !== 'undefined' && d) reviewTab = d.draftSentAt ? 'sent' : d.draftStatus === 'approved' ? 'approved' : 'waiting';
   window._reviewSel = { clientId, author }; window._reviewEditing = null;
   switchView('teamqueue');

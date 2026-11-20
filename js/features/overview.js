@@ -176,7 +176,8 @@ function renderKpis(){
       if(d.draftStatus!=='pending') return false;
       return d.readyToNotify===true;
     };
-    teamPendingBadge.textContent = teamProfiles.reduce((total, member) => {
+    if(typeof reviewBadgeCount === 'function'){ const n = reviewBadgeCount(); teamPendingBadge.textContent = n; teamPendingBadge.style.display = n ? '' : 'none'; }
+    else teamPendingBadge.textContent = teamProfiles.reduce((total, member) => {
       const count = aec.filter(c => queueCardEligible(getDraftFor(c, member.name), c.improvements.filter(i=>i.author===member.name)) && readyForReview(c, member.name)).length;
       return total + count;
     }, 0);

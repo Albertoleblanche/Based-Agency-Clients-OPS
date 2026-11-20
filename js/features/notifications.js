@@ -28,7 +28,9 @@ const NOTIFICATION_TYPE_META = {
   task_cancelled:          { label:'A task assigned to you is cancelled', section:'Tasks' },
   task_edited:             { label:'A task assigned to you changes', section:'Tasks' },
   draft_ready:             { label:'A draft is ready for your approval', section:'Client Work', visibleTo:'approver' },
-  draft_approved:          { label:'Your submitted work is approved', section:'Client Work' },
+  draft_approved:          { label:'Your update or submitted work is approved', section:'Client Work' },
+  win_approved:            { label:'Your WhatsApp update is approved, for you to send', section:'Client Work' },
+  draft_sent:              { label:'Your update is sent to the client', section:'Client Work' },
   draft_skipped:           { label:'Your submitted draft is skipped', section:'Client Work' },
   email_sent:              { label:'A client email is sent', section:'Client Work', visibleTo:'approver' },
   reminder_follow_up_due:  { label:'A client follow-up you own comes due', section:'Client Work' },
@@ -216,6 +218,12 @@ async function handleNotifClick(id){
     if(clients.some(c=>c.id===n.target_id && !c.deletedAt)) openClientInspectorFor(n.target_id);
     else switchView('clients');
     return;
+  }
+  // an update in Review: open it there (yours first if you wrote one for that client)
+  if(n.target_view==='teamqueue' && n.target_id && typeof reviewItems === 'function' && typeof openReviewDraft === 'function'){
+    const me = myName(), all = Object.values(reviewItems()).flat().filter(x => x.c.id === n.target_id);
+    const x = (!canApprove() && all.find(y => y.d.author === me)) || all[0];
+    if(x){ hidePop(document.getElementById('notifPanel')); openReviewDraft(x.c.id, x.d.author); return; }
   }
   if(n.target_view){
     hidePop(document.getElementById('notifPanel'));

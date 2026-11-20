@@ -86,7 +86,7 @@ function activateCommandPaletteItem(i){
 }
 
 // ---- The bell: notifications as a menu of rows ------------------------------------------------
-const NOTIF_ICON = { draft_ready: 'envelope-open', draft_approved: 'check-circle', draft_sent: 'paper-plane-tilt', task_assigned: 'list-checks', task_edited: 'list-checks',
+const NOTIF_ICON = { draft_ready: 'envelope-open', draft_approved: 'check-circle', win_approved: 'message-circle', draft_sent: 'paper-plane-tilt', task_assigned: 'list-checks', task_edited: 'list-checks',
   task_completed: 'check-circle', event_invited: 'calendar-blank', event_updated: 'calendar-blank', event_cancelled: 'calendar-blank', event_rsvp: 'calendar-blank',
   reminder_due: 'bell-ring', health: 'heartbeat', mention: 'note-pencil' };
 function notifWhen(iso){
