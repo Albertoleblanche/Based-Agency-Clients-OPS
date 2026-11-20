@@ -713,7 +713,7 @@ function mOpenClients(mode){
     const list = activeClients().map(c => ({ c, h: clientHealth(c) })).sort((a, b) => mode === 'health' ? ({ r: 0, y: 1, g: 2 }[a.h.level] - { r: 0, y: 1, g: 2 }[b.h.level]) || a.c.name.localeCompare(b.c.name) : a.c.name.localeCompare(b.c.name));
     const vis = list.filter(x => !q || x.c.name.toLowerCase().includes(q));
     // added from Harvest, waiting for an approver to finish their info (on a computer)
-    const su = mode === 'health' ? [] : setupClients().filter(c => !q || c.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name));
+    const su = mode === 'health' || !canApprove() ? [] : setupClients().filter(c => !q || c.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name));
     return `<h1 class="big">${mode === 'health' ? 'Health' : 'Clients'}</h1><p class="big-sub">${list.filter(x => x.h.level === 'r').length} at risk · ${list.filter(x => x.h.level === 'y').length} to watch</p>
 <div class="isearch">${icon('magnifying-glass')}<input placeholder="Search" value="${mEsc(q)}" oninput="mClientsQ(this.value)" aria-label="Search clients"></div>
 ${su.length ? `${mIsh('Needs setup')}<div class="ig">${su.map(c => mIr(monoHtml(c), mEsc(c.name), 'Added from Harvest', '', `mOpenClient('${c.id}')`)).join('')}</div>${mIsh('Clients')}` : ''}

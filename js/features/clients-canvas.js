@@ -150,7 +150,8 @@ function renderClientsTable(){
   const rowOf = c => ({ c, h: clientHealth(c), w: weekView(clientWeek(c)), owner: clientOwner(c) });
   const rows = ac.map(rowOf);
   // added from Harvest, waiting for an approver to finish their info (client-setup.js)
-  const su = setupClients(), suOwner = c => (c.customFieldValues || {}).owner || '';
+  // Needs setup is an approver's job: members don't see those clients here until they're set up
+  const su = canApprove() ? setupClients() : [], suOwner = c => (c.customFieldValues || {}).owner || '';
   const services = [...new Set(ac.concat(su).flatMap(serviceParts))].sort((a, b) => a.localeCompare(b));
   if(clientFilters.service !== 'all' && !services.includes(clientFilters.service)) clientFilters.service = 'all'; // a project that's gone
   const suShown = clientsSeg !== 'all' ? [] : su.filter(c => (clientFilters.service === 'all' || serviceHas(c, clientFilters.service)) && (clientsOwnerFilter === 'all' || suOwner(c) === clientsOwnerFilter)
@@ -165,7 +166,7 @@ function renderClientsTable(){
   shown.sort(clientSort.field === 'name' && clientSort.explicit ? (a, b) => dir * a.c.name.localeCompare(b.c.name)
     : (a, b) => rank[a.h.level] - rank[b.h.level] || b.h.signals.filter(s => s.l === 'r').length - a.h.signals.filter(s => s.l === 'r').length || (b.c.importance || 0) - (a.c.importance || 0) || a.c.name.localeCompare(b.c.name));
   const owners = [...new Set(rows.map(r => r.owner).concat(su.map(suOwner)).filter(Boolean))].sort();
-  if(inspectedClientId && !acAll.some(c => c.id === inspectedClientId) && !su.some(c => c.id === inspectedClientId)) inspectedClientId = null;
+  if(inspectedClientId && !acAll.some(c => c.id === inspectedClientId) && !setupClients().some(c => c.id === inspectedClientId)) inspectedClientId = null;
   const row = ({ c, h, w, owner }) => {
     const sel = c.id === inspectedClientId, reason = h.level === 'g' ? '' : tableSignal(h, c);
     const [wk, wkCls, wkSub] = clientWeekCell(w), hp = h.hp, over = hp.budget && hp.used > hp.budget;
@@ -193,7 +194,8 @@ function renderClientsTable(){
   const sortIc = icon('caret-down', { weight: 'bold' });
   // a client outside your areas, opened from search or elsewhere, still opens
   const sel = inspectedClientId ? (rows.find(r => r.c.id === inspectedClientId) || (acAll.find(c => c.id === inspectedClientId) ? rowOf(acAll.find(c => c.id === inspectedClientId)) : null)) : null;
-  const suSel = !sel && inspectedClientId ? su.find(c => c.id === inspectedClientId) : null;
+  // one opened from search or elsewhere still opens, for a member as "Waiting for an approver"
+  const suSel = !sel && inspectedClientId ? setupClients().find(c => c.id === inspectedClientId) : null;
   const prev = root.querySelector('.sp-page')?.scrollTop || 0;
   root.innerHTML = `<div class="spw"><div class="sp-page"><div class="cl">
 <div class="cl-bar0"><div class="seg" role="tablist" aria-label="Show">${seg}</div><span class="cl-sp"></span>
