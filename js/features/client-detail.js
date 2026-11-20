@@ -94,7 +94,7 @@ function renderClientDetailSkeleton(){
   metricsEl.innerHTML = Array.from({ length: 4 }).map(skeletonCard).join('');
   ['cdImprovements','cdDraftStatus','cdTimeEntries','cdNotes'].forEach(id=>{
     const el = document.getElementById(id);
-    if(el) el.innerHTML = `<div class="empty"><span class="spinner"></span>Loading…</div>`;
+    if(el) el.innerHTML = `${loadingStateHtml('Loading…')}`;
   });
 }
 
@@ -392,7 +392,7 @@ async function logClientActivity(clientId, actionType, description){
 async function loadClientActivityHistory(clientId){
   const el = document.getElementById('cdActivityHistory');
   if(!el) return;
-  el.innerHTML = `<div class="empty"><span class="spinner"></span>Loading…</div>`;
+  el.innerHTML = `${loadingStateHtml('Loading…')}`;
   const { data, error } = await supabaseClient
     .from('activity_log').select('*').eq('client_id', clientId).order('created_at', { ascending:false }).limit(200);
   if(error){ el.innerHTML = `<div class="empty">Could not load activity history.</div>`; return; }

@@ -77,7 +77,7 @@ function renderNotes(){
   if(!root.querySelector(':scope > .n1-wrap')) root.innerHTML = '<div class="n1-wrap"><div class="n1-page" id="notesGallery"></div><div id="noteSheetHost"></div></div>';
   const gal = document.getElementById('notesGallery');
   if(currentViewName === 'notes') setToolbar(null, `Private to you · ${notes.length} note${notes.length === 1 ? '' : 's'}`);
-  if(typeof notesDataLoaded !== 'undefined' && !notesDataLoaded){ gal.innerHTML = '<div class="n1"><p class="t-2" style="font-size:13px">Loading notes…</p></div>'; return; }
+  if(typeof notesDataLoaded !== 'undefined' && !notesDataLoaded){ gal.innerHTML = skeletonHtml('notes', 'Loading notes…'); return; }
   const used = [...new Set(notes.map(n => n.clientId))].map(id => clients.find(c => c.id === id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
   if(notesClient !== 'all' && !used.some(c => c.id === notesClient)) notesClient = 'all';
   const cur = used.find(c => c.id === notesClient);

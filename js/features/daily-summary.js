@@ -28,7 +28,7 @@ function resetDailySummaryToToday(){
 async function loadDailySummary(){
   const el = document.getElementById('dailySummaryList');
   if(!el) return;
-  el.innerHTML = `<div class="panel"><div class="empty"><span class="spinner"></span>Loading…</div></div>`;
+  el.innerHTML = `<div class="panel">${loadingStateHtml('Loading…')}</div>`;
   renderDailySummaryDateLabel();
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();

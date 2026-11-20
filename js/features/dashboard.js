@@ -256,6 +256,9 @@ function renderDashboard(){
   if(!root || typeof clients === 'undefined' || typeof currentUser === 'undefined' || !currentUser) return;
   const wide = dbIsWide(), role = canApprove() ? 'approver' : 'member', N = DB_N[role][wide ? 'wide' : 'normal'], wa = dbWaOn();
   root._dbWide = wide;
+  if((typeof tasksDataLoaded !== 'undefined' && !tasksDataLoaded) || (typeof calendarDataLoaded !== 'undefined' && !calendarDataLoaded)){
+    root.innerHTML = skeletonHtml('dashboard', 'Loading your dashboard…'); dbWatchWidth(root); return;
+  }
   let html;
   try{
     if(role === 'approver'){

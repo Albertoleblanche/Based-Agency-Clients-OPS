@@ -142,7 +142,7 @@ function updateEmailRequestBadges(count){
 async function renderPendingEmailRequests(){
   const el = document.getElementById('pendingEmailRequestsList');
   if(!el) return;
-  el.innerHTML = `<div class="empty"><span class="spinner"></span>Loading…</div>`;
+  el.innerHTML = `${loadingStateHtml('Loading…')}`;
   const { data, error } = await supabaseClient.from('email_change_requests').select('*').eq('status','pending').order('created_at',{ascending:true});
   if(error){ el.innerHTML = `<div class="empty">Could not load requests.</div>`; return; } // badges left untouched — a network error here doesn't mean the real count changed
   updateEmailRequestBadges(data ? data.length : 0);

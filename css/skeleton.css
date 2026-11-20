@@ -1,0 +1,65 @@
+/* Loading inside a screen (canvas "Loading", Nov 20): each screen's own shape in soft placeholders
+   that shine together. They fade in after a moment, so a quick load never flashes them. */
+.sk{--sk-a:var(--fill);--sk-b:var(--fill-2);display:block;flex:0 0 auto;border-radius:6px;background:linear-gradient(100deg, var(--sk-a) 38%, var(--sk-b) 50%, var(--sk-a) 62%) var(--sk-a);
+  background-size:220% 100%;background-attachment:fixed;animation:skShine 1.8s cubic-bezier(.45,.05,.55,.95) infinite}
+@keyframes skShine{from{background-position:130% 0}to{background-position:-30% 0}}
+.sk.t{height:12px} .sk.s{height:10px;opacity:.85} .sk.c{border-radius:50%} .sk.b{height:28px;border-radius:7px}
+.skw{animation:skIn 280ms ease 320ms both}
+@keyframes skIn{from{opacity:0}to{opacity:1}}
+.sk-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.sk-fl{flex:1 1 auto}
+.sk-row{display:flex;flex-direction:column;gap:7px;padding:11px 0;border-top:.5px solid var(--sep)}
+.sk-row:first-of-type{border-top:0}
+.sk-rows{padding:6px 0}
+/* a page's title and the line under it, with its controls on the right */
+.sk-ph{display:flex;align-items:flex-end;gap:16px;margin-bottom:26px}
+.sk-ph-t{display:flex;flex-direction:column;gap:10px}
+.sk-ph-r{display:flex;gap:8px;margin-left:auto}
+/* dashboard */
+.sk-dashboard{padding:22px 30px 30px;max-width:1320px}
+.sk-dg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.sk-dc{border:1px solid var(--sep);border-radius:14px;padding:16px 18px 14px;min-height:300px}
+.sk-dc.lo{min-height:250px}
+.sk-dc-h{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+@container (max-width: 1060px){ .sk-dg{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@container (min-width: 1800px){ .sk-dashboard{max-width:none;padding:28px 36px 32px} .sk-dg{grid-template-columns:repeat(6,minmax(0,1fr));gap:18px} }
+/* tasks: the columns */
+.sk-cols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.sk-col{display:flex;flex-direction:column;gap:10px;min-width:0}
+.sk-col-h{display:flex;align-items:center;gap:8px;height:22px;margin-bottom:2px}
+.sk-card{display:flex;flex-direction:column;gap:9px;padding:13px 13px 12px;border-radius:12px;background:var(--fill)}
+.sk-card .sk{--sk-a:var(--fill-2);--sk-b:var(--fill-3)}
+.sk-card-f{display:flex;align-items:center;gap:8px;margin-top:4px}
+/* notes: the jot bar and the gallery */
+.sk-notes{padding:28px 40px 36px}
+.sk-jot{display:flex;align-items:center;gap:12px}
+.sk-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:22px;margin-top:28px}
+.sk-tile{display:flex;flex-direction:column;gap:10px;height:226px;padding:18px;border-radius:14px;background:var(--fill)}
+.sk-tile .sk{--sk-a:var(--fill-2);--sk-b:var(--fill-3)}
+/* calendar: a week */
+.sk-calendar{height:100%;padding:12px 18px 0;overflow:hidden}
+.sk-days{display:grid;grid-template-columns:56px repeat(7,minmax(0,1fr));padding:6px 0 12px;border-bottom:.5px solid var(--sep)}
+.sk-days > span{display:flex;justify-content:flex-start;padding-left:8px}
+.sk-grid{position:relative;display:grid;grid-template-columns:56px repeat(7,minmax(0,1fr));height:640px}
+.sk-hr{position:absolute;left:56px;right:0;border-top:.5px solid var(--sep)}
+.sk-ht{position:absolute;left:8px}
+.sk-cc{position:relative;border-left:.5px solid var(--sep)}
+.sk-ev{position:absolute;left:6px;right:8px}
+/* time: the day's rows and the side */
+.sk-tmh{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+.sk-tr{display:grid;grid-template-columns:90px minmax(0,1fr) 44px;gap:16px;align-items:center;padding:14px 0;border-top:.5px solid var(--sep)}
+.sk-tr:first-child{border-top:0}
+.sk-tr-m{display:flex;flex-direction:column;gap:7px;min-width:0}
+.sk-li{display:flex;align-items:center;gap:10px;padding:8px 0}
+.sk-li.col{flex-direction:column;align-items:stretch;gap:8px}
+/* whatsapp: grouped requests and who has what */
+.sk-wcols{display:grid;grid-template-columns:minmax(0,1fr) 300px;column-gap:56px}
+.sk-wr{display:grid;grid-template-columns:18px minmax(0,1fr) 44px;gap:14px;align-items:center;padding:12px 0;border-top:.5px solid var(--sep)}
+.sk-wg .sk-wr:first-of-type{border-top:0}
+@media (max-width:1100px){ .sk-wcols{grid-template-columns:minmax(0,1fr)} .sk-wcols > aside{display:none} }
+/* a chat: the messages it read */
+.sk-chat{display:flex;flex-direction:column;gap:12px;padding:6px 0}
+.sk-bub{display:flex;flex-direction:column;gap:7px;width:76%;padding:12px 14px;border-radius:14px;background:var(--fill)}
+.sk-bub.me{align-self:flex-end;width:54%;background:var(--fill-2)}
+.sk-bub .sk{--sk-a:var(--fill-2);--sk-b:var(--fill-3)}
+@media (prefers-reduced-motion: reduce){ .sk{animation:none;background:var(--sk-a)} .skw{animation:none} }

@@ -186,6 +186,7 @@ function tsDayRows(k, list, withGaps){
 function renderTimesheet(){
   const root = document.getElementById('timeRoot-timesheet');
   if(!root) return;
+  if(typeof timeEntriesDataLoaded !== 'undefined' && !timeEntriesDataLoaded){ root.innerHTML = skeletonHtml('time', 'Loading your time…'); return; }
   const now = rNow(), today = toDateStr(now);
   if(!tsAnchor || tsAnchor > today) tsAnchor = today;
   if(timeTab === 'timesheet') timeTitle(now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }));

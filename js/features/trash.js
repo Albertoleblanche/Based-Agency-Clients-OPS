@@ -26,7 +26,7 @@ async function renderTrash(){
   }
 
   if(notesEl){
-    notesEl.innerHTML = `<div class="empty" style="padding:14px 0;"><span class="spinner"></span>Loading…</div>`;
+    notesEl.innerHTML = `${loadingStateHtml('Loading…')}`;
     const trashedNotes = await loadMyTrashedNotes();
     notesEl.innerHTML = trashedNotes.length ? trashBulkBarHtml('notes') + trashedNotes.map(n=>{
       const c = clients.find(x=>x.id===n.clientId);
@@ -35,7 +35,7 @@ async function renderTrash(){
   }
 
   if(timeEl){
-    timeEl.innerHTML = `<div class="empty" style="padding:14px 0;"><span class="spinner"></span>Loading…</div>`;
+    timeEl.innerHTML = `${loadingStateHtml('Loading…')}`;
     const trashedTime = await loadMyTrashedTimeEntries();
     timeEl.innerHTML = trashedTime.length ? trashBulkBarHtml('time') + trashedTime.map(e=>{
       const c = clients.find(x=>x.id===e.clientId);

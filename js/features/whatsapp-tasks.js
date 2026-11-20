@@ -268,7 +268,7 @@ function renderWhatsapp(){
   const root = document.getElementById('whatsappRoot');
   if(!root || !currentUser) return;
   if(currentViewName === 'whatsapp') setToolbar(null, 'Client chats');
-  if(!waLoaded){ root.innerHTML = `<div class="spw"><div class="sp-page"><div class="wa">${loadingStateHtml('Loading WhatsApp…')}</div></div></div>`; return; }
+  if(!waLoaded){ root.innerHTML = `<div class="spw"><div class="sp-page"><div class="wa">${skeletonHtml('whatsapp', 'Loading WhatsApp…')}</div></div></div>`; return; }
   try{ waDraw(root); }
   catch(e){
     console.error('WhatsApp screen', e);
@@ -491,7 +491,7 @@ function waReadPanelHtml(){
   const head = `<div class="sp-bar"><button class="ib" aria-label="Close" title="Close (Esc)" onclick="closeWaPanel()">${icon('x')}</button></div>
 <div class="tkp-h"><h3>What it read</h3></div>
 <p class="wap-rd-p">The messages from the last 7 days in the ${reading.length} group${reading.length === 1 ? '' : 's'} it reads. At each check the agent goes through the new ones and lists what a client is still waiting on.</p>`;
-  if(waRead === 'loading' || !waRead) return `<aside class="sp wap" aria-label="What it read">${head}${loadingStateHtml('Loading…')}</aside>`;
+  if(waRead === 'loading' || !waRead) return `<aside class="sp wap" aria-label="What it read">${head}${skeletonHtml('chat', 'Loading the messages…')}</aside>`;
   if(waRead.error) return `<aside class="sp wap" aria-label="What it read">${head}${emptyState({ compact: true, icon: 'refresh-cw', title: 'Couldn’t load the messages', text: waRead.error, action: 'Try Again', onAction: 'waShowRead()' })}</aside>`;
   const open = waTasks.filter(t => t.status === 'open');
   const rows = reading.map(g => ({ g, s: waRead.groups.get(g.jid) || { n: 0 }, items: open.filter(t => t.group_jid === g.jid).length }))

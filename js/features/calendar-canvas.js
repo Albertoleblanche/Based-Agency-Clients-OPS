@@ -112,6 +112,7 @@ function renderCalendar(){
   if(typeof updateCalendarNavBadge === 'function') updateCalendarNavBadge();
   if(typeof closeEventPreview === 'function') closeEventPreview(true);
   if(!root) return;
+  if(typeof calendarDataLoaded !== 'undefined' && !calendarDataLoaded){ root.classList.remove('is-month'); root.innerHTML = skeletonHtml('calendar', 'Loading the calendar…'); return; }
   const a = new Date(calendarAnchorDate), today = toDateStr(new Date()), now = new Date();
   root.classList.toggle('is-month', calendarViewMode === 'month');
   if(calendarViewMode === 'month'){

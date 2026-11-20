@@ -59,6 +59,7 @@ function tkListRowHtml(t){
 function renderTasks(){
   const root = document.getElementById('tasksRoot');
   if(!root || !currentUser) return;
+  if(typeof tasksDataLoaded !== 'undefined' && !tasksDataLoaded){ root.innerHTML = `<div class="spw"><div class="sp-page"><div class="tk">${skeletonHtml('tasks', 'Loading tasks…')}</div></div></div>`; return; }
   const me = currentUser.id, today = toDateStr(new Date());
   let vis = tasks.filter(t => !t.cancelledAt && (t.assignerId === me || t.assigneeId === me) && !(t.status === 'done' && ((t.assignerId === me && t.hiddenByAssigner) || (t.assigneeId === me && t.hiddenByAssignee))));
   // Approvers and admins switch between Everyone (every task they're part of) and Mine. A team

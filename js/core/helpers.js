@@ -30,7 +30,10 @@ function emptyStateHtml(iconSvg, title, sub, actionHtml){
 // actually arrived — distinct from the real empty state, so someone who
 // clicks into Tasks/Notes/Calendar right after signing in sees "loading"
 // rather than what looks like a genuinely empty board.
+// A screen's loading state: soft placeholders (js/ui/skeleton.js) that fade in after a moment;
+// a screen with its own shape passes it to skeletonHtml() itself.
 function loadingStateHtml(label){
+  if(typeof skeletonHtml === 'function') return skeletonHtml('rows', label || 'Loading…');
   return `<div class="empty-rich"><span class="spinner" style="width:16px;height:16px;border-width:2.5px;"></span><div class="empty-rich-sub" style="margin-top:10px;">${escapeHtml(label)||'Loading…'}</div></div>`;
 }
 

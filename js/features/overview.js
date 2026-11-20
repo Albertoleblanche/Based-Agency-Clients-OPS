@@ -380,7 +380,7 @@ function renderOverviewMyNotes(){
 async function renderOverviewDailySummary(){
   const el = document.getElementById('overviewDailySummary');
   if(!el) return;
-  el.innerHTML = `<div class="empty" style="padding:10px 0;"><span class="spinner"></span>Loading…</div>`;
+  el.innerHTML = `${loadingStateHtml('Loading…')}`;
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
     const dateStr = toDateStr(new Date());

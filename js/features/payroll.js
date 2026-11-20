@@ -242,7 +242,7 @@ async function markPayrollPeriodPaid(){
 async function renderPayrollHistory(){
   const el = document.getElementById('payrollHistoryList');
   if(!el) return;
-  el.innerHTML = `<div class="empty"><span class="spinner"></span>Loading…</div>`;
+  el.innerHTML = `${loadingStateHtml('Loading…')}`;
   const { data, error } = await supabaseClient.from('payroll_periods').select('*').order('period_start', { ascending:false }).limit(26);
   if(error){ el.innerHTML = `<div class="empty">Could not load payroll history.</div>`; return; }
   if(!data || !data.length){ el.innerHTML = `<div class="empty">No periods marked as paid yet.</div>`; return; }
