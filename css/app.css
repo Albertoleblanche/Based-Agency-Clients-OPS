@@ -25,7 +25,7 @@ body.sidebar-collapsed .app-win .side { display: none; }
 
 /* sidebar footer: the account button opens the account menu */
 .side-me { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; padding: 4px; margin: -4px; border: 0; border-radius: 8px; background: transparent; text-align: left; cursor: default; }
-.side-me:hover { background: var(--fill); }
+.side-me:active { background: var(--fill-2); }
 .side-me .who { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
 .side-me .who b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .side-me .who span { font-size: 12px; color: var(--label-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -545,12 +545,6 @@ body.mac :is(button:disabled, [aria-disabled="true"], .cb:disabled) { cursor: de
 body.mac :is(input[type="text"], input:not([type]), input[type="email"], input[type="search"], input[type="number"], input[type="password"], input[type="url"], input[type="tel"], textarea) { cursor: text !important; }
 /* The toolbar sits on its own line above the content. */
 .mac #appTopbar { border-bottom: .5px solid var(--sep-strong); }
-/* Sidebar icons lift and tip a little on hover, and press in on click. */
-@media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .side .src-i svg { transition: transform 280ms cubic-bezier(.34, 1.56, .64, 1), color 150ms ease; }
-  .side .src-i:hover svg { transform: translateY(-1.5px) scale(1.14) rotate(-7deg); color: var(--label); }
-  .side .src-i:active svg { transform: scale(.9); transition-duration: 90ms; }
-}
 /* Buttons press in. */
 @media (prefers-reduced-motion: no-preference) {
   .mac :is(.btn, .ib, .set-tab, .seg > button) { transition: transform 140ms cubic-bezier(.23, 1, .32, 1), background-color 150ms ease, box-shadow 150ms ease; }
@@ -587,7 +581,7 @@ body.mac :is(input[type="text"], input:not([type]), input[type="email"], input[t
 
 /* The Based logo, back at the top of the sidebar (a workspace logo from Settings replaces it). */
 .side-brand { display: flex; align-items: center; gap: 10px; margin: 0 10px 10px; padding: 6px 6px; border-radius: 9px; text-decoration: none; color: var(--label); }
-.side-brand:hover { background: var(--fill); }
+.side-brand:active { background: var(--fill-2); }
 .brand-mark { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; overflow: hidden; color: #fff; font-weight: 700; letter-spacing: -.01em;
   background: linear-gradient(180deg, #EF7B44 0%, #D4511B 100%); box-shadow: inset 0 .5px 0 rgba(255,255,255,.35), 0 1px 2px rgba(0,0,0,.18); }
 .side-brand .brand-mark { width: 30px; height: 30px; border-radius: 8px; font-size: 13px; }
@@ -669,10 +663,8 @@ body.mac :is(input[type="text"], input:not([type]), input[type="email"], input[t
 .app-win .side .src-i .n { min-width: 22px; height: 20px; padding: 0 7px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; font-size: 12.5px; font-weight: 600; background: var(--fill-2); color: var(--label); }
 #navTeamPendingBadge, #navTeamBadge { background: var(--blue-soft) !important; color: var(--blue) !important; }
 #navHealthBadge { background: var(--red-soft) !important; color: var(--red) !important; }
-#navTasksBadge, #navRemindersBadge { background: var(--yellow-soft) !important; color: var(--yellow) !important; }
 .mac[data-theme="dark"] #navTeamPendingBadge, .mac[data-theme="dark"] #navTeamBadge { background: rgba(100,168,255,.2) !important; }
 .mac[data-theme="dark"] #navHealthBadge { background: rgba(255,107,97,.2) !important; }
-.mac[data-theme="dark"] #navTasksBadge, .mac[data-theme="dark"] #navRemindersBadge { background: rgba(255,214,10,.18) !important; }
 #navClientsBadge { display: none !important; }
 
 /* ---- the sidebar, a size down (Nov 18): the logo sits in a row as tall as the toolbar, with the
@@ -696,8 +688,8 @@ body.mac :is(input[type="text"], input:not([type]), input[type="email"], input[t
 /* hide / show: the sidebar slides out and the page widens with it, instead of snapping. Only when
    you toggle it (side-anim), so a page that opens collapsed doesn't animate. */
 body.sidebar-collapsed .app-win .side { display: flex; margin-left: -200px; visibility: hidden; }
-body.side-anim .app-win .side { transition: margin-left 320ms cubic-bezier(.32,.72,0,1), visibility 0s linear 0s; }
-body.side-anim.sidebar-collapsed .app-win .side { transition: margin-left 320ms cubic-bezier(.32,.72,0,1), visibility 0s linear 320ms; }
+body.side-anim .app-win .side { transition: margin-left 280ms cubic-bezier(.32,.72,0,1), visibility 0s linear 0s; }
+body.side-anim.sidebar-collapsed .app-win .side { transition: margin-left 220ms cubic-bezier(.32,.72,0,1), visibility 0s linear 220ms; }
 @media (prefers-reduced-motion: reduce) { body.side-anim .app-win .side, body.side-anim.sidebar-collapsed .app-win .side { transition: none; } }
 /* installed as a desktop app: the row is title bar too, and the logo clears the Mac's window buttons */
 @media (display-mode: window-controls-overlay) {
@@ -719,9 +711,8 @@ body.sidebar-collapsed .app-win .side { margin-left: -220px; }
 .app-win .side .src { margin-top: 10px; gap: 2px; }
 .mac[data-theme] .app-win .side .src-i { height: 36px; gap: 11px; padding: 0 10px; border-radius: 7px; font-size: 14px; font-weight: 500; color: var(--sb-text); transition: background-color .12s ease, color .12s ease; }
 .mac[data-theme] .app-win .side .src-i svg { width: 17px; height: 17px; color: var(--sb-text); }
-.mac[data-theme] .app-win .side .src-i:hover { background: var(--sb-hover); color: var(--sb-strong); }
 .mac[data-theme] .app-win .side .src-i.on { background: var(--sb-on); color: var(--sb-strong); }
-.mac[data-theme] .app-win .side .src-i:is(:hover, .on) svg { color: var(--sb-strong); }
+.mac[data-theme] .app-win .side .src-i.on svg { color: var(--sb-strong); }
 .app-win .side .src-i .n { margin-left: auto; }
 .src-sep { flex: 0 0 auto; height: 1px; margin: 9px 2px; background: var(--sb-line, var(--sep)); }
 
@@ -740,7 +731,7 @@ body.sidebar-collapsed .app-win .side { margin-left: -220px; }
 .stm-ic svg{width:11px;height:11px}
 .stm.is-idle{background:transparent;box-shadow:inset 0 0 0 .5px var(--sep-strong)}
 .stm-b{border:0;padding:0;background:transparent;width:26px;height:26px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;color:var(--label-2);flex:0 0 auto;cursor:pointer}
-.stm-b:hover,.stm-main:hover{background:var(--fill-3)}
+.stm-b:active,.stm-main:active{background:var(--fill-3)}
 .stm-b svg{width:13px;height:13px}
 .stm .stm-stop{color:var(--red)}
 
@@ -1416,12 +1407,13 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .rvn-lh{padding:0 14px}
 .rvn-sort{margin:16px 18px 6px;font-size:12px;color:var(--label-3)}
 .rvn-rows{flex:1 1 auto;min-height:0;overflow:auto}
-.rvn-r{position:relative;display:flex;align-items:center;gap:10px;padding:13px 18px 13px 28px;color:inherit;text-decoration:none;cursor:default}
-.rvn-r:hover{background:var(--fill)}
+.rvn-r{position:relative;display:flex;align-items:center;gap:10px;margin:0 8px;padding:13px 10px 13px 20px;border-radius:10px;color:inherit;text-decoration:none;cursor:default;transition:background-color 120ms ease}
 .rvn-r.is-sel{background:var(--select)}
-.rvn-r + .rvn-r::before{content:"";position:absolute;top:0;left:28px;right:18px;height:.5px;background:var(--sep)}
-.rvn-r.is-sel::before,.rvn-r.is-sel + .rvn-r::before,.rvn-r:hover::before,.rvn-r:hover + .rvn-r::before{opacity:0}
-.rvn-dot{position:absolute;left:14px;top:50%;width:7px;height:7px;margin-top:-3.5px;border-radius:50%;background:var(--blue)}
+.rvn-r:active{background:var(--fill-2);transition:none}
+.rvn-r:focus-visible{outline:none;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--blue) 55%,transparent)}
+.rvn-r + .rvn-r::before{content:"";position:absolute;top:0;left:20px;right:10px;height:.5px;background:var(--sep)}
+.rvn-r.is-sel::before,.rvn-r.is-sel + .rvn-r::before,.rvn-r:active::before,.rvn-r:active + .rvn-r::before{opacity:0}
+.rvn-dot{position:absolute;left:7px;top:50%;width:7px;height:7px;margin-top:-3.5px;border-radius:50%;background:var(--blue)}
 .rvn-r .tx{display:flex;flex-direction:column;min-width:0;flex:1 1 auto}
 .rvn-r .tx b{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rvn-r .tx .s{margin-top:2px;font-size:12.5px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1445,7 +1437,7 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .rvn-sp{flex:1 1 auto}
 .rvn-top .btn{height:30px;padding:0 12px}
 .mac .rvn-q{background:transparent;box-shadow:none;color:var(--label-2)}
-.mac .rvn-q:hover{background:var(--fill);color:var(--label)}
+.mac .rvn-q:active{background:var(--fill-2);color:var(--label)}
 .rvn-editing{display:inline-flex;align-items:center;gap:7px;margin-left:10px;font-size:13px;font-weight:600;color:var(--label)}
 .rvn-editing svg{width:15px;height:15px;color:var(--label-2)}
 .rvn-mail{flex:1 1 auto;min-height:0;overflow:auto}
@@ -1483,7 +1475,7 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .rvn-i.is-out .rvn-it{color:var(--label-2)}
 .rvn-rnote{margin:10px 0 0;font-size:12px;line-height:1.45;color:var(--label-3)}
 .rvn-i.is-new > svg{color:var(--blue)}
-.rvn-note{font-size:11.5px;font-weight:600;color:var(--yellow);white-space:nowrap}
+.rvn-note{font-size:11.5px;font-weight:600;color:var(--blue);white-space:nowrap}
 .rvn-note.is-red{color:var(--red)}
 .rvn-rail .btn.rvn-sm{height:28px;padding:0 11px;margin-top:10px;font-size:12.5px}
 .rvn-warn{display:flex;gap:10px;margin:0 0 22px;padding:12px 14px;border-radius:10px;background:var(--fill)}
@@ -2656,3 +2648,24 @@ a.mi{text-decoration:none;color:inherit}
 .tr-pick:focus-visible{outline:none;box-shadow:inset 0 0 0 2px var(--accent)}
 .tr-pick .ck{margin-right:2px}
 .tr-pick .ck.on{background:var(--label-2)}
+
+/* ---- the sidebar and Review, the Apple pass (Nov 20) ----
+   The sidebar stays still: no icons that lift and tip, a row that fills the moment you press it, a
+   focus ring for the keyboard, and hover only with a mouse. Counts are quiet grey; only Health (red)
+   and Team (blue, someone waiting on you) keep a colour. Review's rows are inset and rounded like a
+   Mac list, and health reads as a dot and a word, as on Health and the Dashboard. */
+.mac[data-theme] .app-win .side .src-i:active { background: var(--sb-on); color: var(--sb-strong); transition: none; }
+.mac[data-theme] .app-win .side .src-i:focus-visible { outline: none; box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--blue) 55%, transparent); }
+.rvn-hl{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;color:var(--label);white-space:nowrap}
+.rvn-hl i{width:7px;height:7px;border-radius:50%;background:var(--fill-3);flex:0 0 auto}
+.rvn-hl.r i{background:#FF3B30} .rvn-hl.y i{background:var(--yellow-fill,#F2B300)} .rvn-hl.g i{background:#34C759}
+.mac[data-theme="dark"] .rvn-hl.r i{background:#FF453A} .mac[data-theme="dark"] .rvn-hl.y i{background:var(--yellow-fill,#FFD60A)} .mac[data-theme="dark"] .rvn-hl.g i{background:#30D158}
+@media (hover:hover) and (pointer:fine){
+  .mac[data-theme] .app-win .side .src-i:hover { background: var(--sb-hover); color: var(--sb-strong); }
+  .mac[data-theme] .app-win .side .src-i:hover svg { color: var(--sb-strong); }
+  .side-me:hover, .side-brand:hover { background: var(--fill); }
+  .stm-b:hover, .stm-main:hover { background: var(--fill-3); }
+  .rvn-r:not(.is-sel):hover { background: var(--fill); }
+  .rvn-r:hover::before, .rvn-r:hover + .rvn-r::before { opacity: 0; }
+  .mac .rvn-q:hover { background: var(--fill); color: var(--label); }
+}

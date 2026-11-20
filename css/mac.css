@@ -97,7 +97,7 @@
 .src-i svg{width:17px;height:17px;color:var(--label-2);flex:0 0 auto}
 .src-i .n{margin-left:auto;font-size:13px;color:var(--label-2)}
 .src-i .n.hot{color:var(--label);font-weight:600}
-.src-i:hover{background:var(--fill)}
+@media (hover:hover) and (pointer:fine){.src-i:hover{background:var(--fill)}}
 .src-i.on{background:var(--select)}
 .src-i.on svg{color:var(--label)}
 .src-i.on .n{color:var(--label)}

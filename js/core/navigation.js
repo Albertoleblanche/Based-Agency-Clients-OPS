@@ -379,8 +379,9 @@ async function switchView(name){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   const viewEl = document.getElementById('view-'+name);
   viewEl.classList.add('active');
-  // The new screen fades in; it only moves too when nothing in it is pinned to the window.
-  if(typeof enterIn === 'function' && switchView._last !== name && !(name === 'approve' && window._wkIntro)){ const pinned = viewEl.querySelector('.client-insp:not([hidden])'); pinned ? viewEl.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' }) : enterIn(viewEl, 'translateY(8px)'); }
+  // You change screens all day, so the new one doesn't slide: from a click it fades in briefly, and
+  // from the keyboard (⌘1–9, the back and forward keys) it's simply there.
+  if(switchView._last !== name && window._lastInput !== 'key' && !(name === 'approve' && window._wkIntro)) viewEl.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 140, easing: 'cubic-bezier(.23,1,.32,1)' });
   switchView._last = name;
   syncAddressToView(name);
   if(leaving && leaving !== name) closePanelOnLeave(leaving);

@@ -4,6 +4,9 @@
 
 const EASE_OUT = 'cubic-bezier(.23,1,.32,1)';
 const EASE_IN = 'cubic-bezier(.4,0,1,1)';
+// How you got somewhere: the keyboard gets no animation (switchView reads this).
+document.addEventListener('keydown', e => { if(!e.repeat && (e.metaKey || e.ctrlKey || e.altKey || !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || ''))) window._lastInput = 'key'; }, true);
+document.addEventListener('pointerdown', () => { window._lastInput = 'pointer'; }, true);
 function motionOK(){ try{ return !matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return true; } }
 
 // Play keyframes on an element, then call done (right away when motion is off).

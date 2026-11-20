@@ -67,7 +67,7 @@ function renderTeamQueue(){
     const dl = reviewTab === 'sent' ? null : draftDelta(x.c, x.d), tier = winTier(x.d);
     const flag = dl && dl.gone ? `<span class="rvn-note is-red">${dl.allGone ? 'Work deleted' : `${dl.gone} deleted`}</span>`
       : dl && dl.added.length ? `<span class="rvn-note">${dl.added.length} new since draft</span>`
-      : tier ? tierTag(tier) : h.level !== 'g' ? tagHtml(h.level === 'r' ? 'red' : 'yellow', healthWord(h.level)) : '';
+      : tier ? tierTag(tier) : h.level !== 'g' ? `<span class="rvn-hl ${h.level}"><i></i>${escapeHtml(healthWord(h.level))}</span>` : '';
     // Approved: who sends it (WhatsApp wins go back to whoever wrote them; copying one claims it)
     const line = reviewTab === 'approved' ? escapeHtml(reviewSendWords(x.c, x.d))
       : `${x.d.author === myName() ? '' : escapeHtml(firstName(x.d.author)) + ' · '}<span class="rvn-due ${kind}">${escapeHtml(due)}</span>`;
@@ -182,7 +182,7 @@ function reviewReadHtml(x, list){
     : `<div class="rvn-body">${draftBodyHtml(d.draft)}</div>`;
   // Before you send.
   const row = (it, kind) => `<div class="rvn-i${kind ? ' is-' + kind : ''}" title="${escapeHtml(it.text + ' · ' + (it.service || c.service || '') + ' · ' + fmtShortDate(new Date(it.date)))}">${icon(kind === 'out' ? 'minus-circle' : kind === 'new' ? 'circle-plus' : 'check-circle')}<span class="rvn-it">${escapeHtml(it.text)}</span><time>${escapeHtml(fmtShortDate(new Date(it.date)))}</time></div>`;
-  const htag = tagHtml(h.level === 'r' ? 'red' : h.level === 'y' ? 'yellow' : 'green', healthWord(h.level));
+  const htag = `<span class="rvn-hl ${h.level}"><i></i>${escapeHtml(healthWord(h.level))}</span>`;
   const dueTxt = w.due ? w.due.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) : '';
   const rewriteBtn = rework ? `<button class="btn rvn-sm" onclick="generateDraft(${A})">${icon('sparkle')}Rewrite to Include</button>` : '';
   const goneNote = dl.gone ? `<div class="rvn-warn"><div><b>${dl.allGone ? 'The work this email was written from was deleted' : `${dl.gone} improvement${dl.gone === 1 ? '' : 's'} in this email ${dl.gone === 1 ? 'was' : 'were'} deleted`}</b><span>${rework ? (dl.allGone ? 'Rewrite it from what’s logged now.' : 'Rewrite it from what’s logged now, or edit it by hand.') : 'An approver can rewrite it from what’s logged now.'}</span>${rework ? `<button class="btn rvn-sm" onclick="generateDraft(${A})">${icon('sparkle')}Rewrite</button>` : ''}</div></div>` : '';
