@@ -405,6 +405,8 @@ async function switchView(name){
     if(titleEl) titleEl.textContent = viewTitle(name);
     if(subEl) subEl.textContent = meta[1];
   }
+  // The Dashboard's title is its greeting: set it now, not after the data load (it said the last tab's name meanwhile)
+  if(name === 'overview' && typeof renderGreeting === 'function') renderGreeting();
   // Shown immediately, before the data load starts — the check inside
   // renderTimesheetDay/Week() alone isn't enough, since those only run
   // AFTER fullRefresh() below has already finished, by which point the

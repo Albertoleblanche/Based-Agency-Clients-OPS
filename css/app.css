@@ -2745,3 +2745,10 @@ a.mi{text-decoration:none;color:inherit}
 .wap-sep::before,.wap-sep::after{content:"";flex:1 1 auto;height:.5px;background:color-mix(in srgb,var(--blue) 40%,transparent)}
 .wap-gap{align-self:center;font-size:11.5px;color:var(--label-3)}
 .wap-facts .is-new{color:var(--blue)}
+/* the chat in a WhatsApp item: a box of its own height that scrolls inside. Its scroll bar shows only
+   while the pointer is over it, like a Mac's overlay scroll bars, and scrolling stops at its ends
+   instead of running on into the panel. */
+.wap-chat{position:relative;max-height:340px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:transparent transparent;outline:none}
+.wap-chat:hover,.wap-chat:focus-visible{scrollbar-color:var(--label-3) transparent}
+.wap-chat:focus-visible{box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--blue) 45%,transparent)}
+@media (hover:none){ .wap-chat{scrollbar-color:auto} }

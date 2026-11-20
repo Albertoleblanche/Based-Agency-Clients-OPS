@@ -21,6 +21,7 @@ let waQuietAll = false;        // Quiet clients: show them all
 let waCheckAt = null;          // when Check Now was pressed in this tab (ISO)
 let waCheckTimer = null;
 const waChat = {};             // item id -> its messages ([] when there are none) · 'loading' · 'none' (the database can't say)
+const waChatTop = {};          // item id -> where its chat is scrolled to, while it stays open
 let waClientLast = null;       // leads: group jid -> when the client last wrote there (last 14 days); null = not known
 
 const WA_OWNERS = [['albert', 'Albert'], ['stan', 'Stan'], ['eric', 'Eric'], ['charlie', 'Charlie'], ['dan', 'Dan'], ['joey', 'Joey']];
@@ -282,7 +283,7 @@ function waRedraw(){
 
 // ---- the screen ------------------------------------------------------------------------------
 function setWa(k, v){ if(k === 'tab') waTab = v; if(k === 'who') waWho = v; window._waSel = null; renderWhatsapp(); }
-function selectWa(id){ window._waSel = window._waSel === id ? null : id; renderWhatsapp(); if(window._waSel) waLoadChat(id); }
+function selectWa(id){ window._waSel = window._waSel === id ? null : id; delete waChatTop[id]; renderWhatsapp(); if(window._waSel) waLoadChat(id); }
 function closeWaPanel(){ window._waSel = null; renderWhatsapp(); }
 function renderWhatsappTasks(){ renderWhatsapp(); }   // the old name, still called by realtime
 // Never a blank screen: before the first load a spinner, and if drawing fails, what happened and Try Again.
@@ -365,6 +366,7 @@ ${lead ? `<label class="pop pop-sel"><span class="pl">${escapeHtml(curWho[1])}</
 <div class="wa-body"><div class="wa-main">${list}</div>${side}</div>
 </div></div>${sel ? waPanelHtml(sel) : reading ? waReadPanelHtml() : ''}</div>`;
   const sp = root.querySelector('.sp-page'); if(sp) sp.scrollTop = prev;
+  waChatScroll();
 }
 function waRowHtml(t, sel, who){
   const closed = t.status !== 'open', can = waCanEdit(t), lead = waCanManage();
@@ -568,8 +570,19 @@ async function waLoadChat(id){
   if(window._waSel === id && currentViewName === 'whatsapp'){
     const box = document.getElementById('waChatBox');
     if(box) box.outerHTML = waChatHtml(waTasks.find(x => x.id === id));
-    document.querySelector('#waChatBox .wap-sep, #waChatBox .wap-m:last-child')?.scrollIntoView?.({ block: 'nearest' });
+    waChatScroll();
   }
+}
+// The chat scrolls inside a box of its own. It opens on the line where the item was marked done when
+// the client wrote again, otherwise on the outlined request (or the newest message); read again
+// (after a check), it stays where you'd scrolled to.
+function waChatScroll(){
+  const chat = document.querySelector('#waChatBox .wap-chat'), id = window._waSel;
+  if(!chat || !id) return;
+  if(waChatTop[id] != null){ chat.scrollTop = waChatTop[id]; return; }
+  const at = chat.querySelector('.wap-sep') || chat.querySelector('.wap-m.hit') || chat.lastElementChild;
+  chat.scrollTop = at ? Math.max(0, at.offsetTop - 12) : 0;
+  if(Array.isArray(waChat[id])) waChatTop[id] = chat.scrollTop;   // placed once the real chat is in
 }
 // After a check (or anything new from the connector): read the open item's chat again.
 function waRefreshChat(){
@@ -582,7 +595,7 @@ function waChatHtml(t){
   if(Array.isArray(m) && m.length){
     const day = d => { const k = daysBetween(dayStart(new Date(d)), dayStart(rNow())); return k === 0 ? fmtTime(new Date(d)) : `${new Date(d).toLocaleDateString('en-US', { weekday: k < 7 ? 'short' : undefined, month: k < 7 ? undefined : 'short', day: k < 7 ? undefined : 'numeric' })} ${fmtTime(new Date(d))}`; };
     return `<div id="waChatBox"><div class="sp-sec"><b>In the group</b><span>${m.some(x => x.is_source) ? 'the request is outlined' : ''}</span></div>
-<div class="wap-chat">${(() => {
+<div class="wap-chat" tabindex="0" aria-label="Messages in the group" onscroll="waChatTop['${t.id}'] = this.scrollTop">${(() => {
       const at = waClosedAt(t), word = t.status === 'answered' ? 'Answered in the group' : t.status === 'dismissed' ? 'Marked not a task' : 'Marked done';
       let sep = !at;
       return m.map(x => {

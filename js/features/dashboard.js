@@ -347,6 +347,10 @@ function dbFit(root){
 function renderDashboard(){
   const root = dbRoot();
   if(!root || typeof clients === 'undefined' || typeof currentUser === 'undefined' || !currentUser) return;
+  // Hidden behind another tab, it measures as nothing: it would pick the narrow layout and couldn't
+  // fit a card. So it waits, and draws the moment it shows again, before that first frame paints.
+  if(!root.clientWidth){ root._dbStale = true; dbWatchSize(root); return; }
+  root._dbStale = false;
   const mode = dbMode(), role = canApprove() ? 'approver' : 'member', N = mode === 'narrow' ? DB_FEW : DB_CAP, wa = dbWaOn(), wide = mode === 'wide';
   if((typeof tasksDataLoaded !== 'undefined' && !tasksDataLoaded) || (typeof calendarDataLoaded !== 'undefined' && !calendarDataLoaded)){
     root.innerHTML = skeletonHtml('dashboard', 'Loading your dashboard…'); dbWatchSize(root); return;
@@ -370,13 +374,19 @@ function renderDashboard(){
   dbWatchSize(root);
 }
 // When the window changes size, the cards fit again (and a wide screen gets its table).
+// Shown again after something changed (or the window changed size) while another tab was up: it
+// draws at once, inside the observer, so the first frame is already right.
 function dbWatchSize(root){
   if(root._dbRo || typeof ResizeObserver === 'undefined') return;
-  let w = root.clientWidth, h = root.clientHeight;
+  let w = root.clientWidth, h = root.clientHeight, hidden = !w;
   root._dbRo = new ResizeObserver(() => {
-    if(!root.clientWidth || (root.clientWidth === w && root.clientHeight === h)) return;
+    if(!root.clientWidth){ hidden = true; return; }
+    const back = hidden; hidden = false;
+    if(!root._dbStale && root.clientWidth === w && root.clientHeight === h) return;
     w = root.clientWidth; h = root.clientHeight;
-    clearTimeout(root._dbT); root._dbT = setTimeout(() => { if(root.offsetParent) renderDashboard(); }, 120);
+    clearTimeout(root._dbT);
+    if(back || root._dbStale) renderDashboard();
+    else root._dbT = setTimeout(() => { if(root.offsetParent) renderDashboard(); }, 120);
   });
   root._dbRo.observe(root);
 }
