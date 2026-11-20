@@ -354,7 +354,7 @@ async function openScreenFromAddress(hash){
 
 // Leaving a screen closes its right-hand panel, so the screen is back to its list when you return.
 // It redraws once the screen is hidden, so nothing animates out of sight or on the way back.
-const PANEL_STATE = { approve: ['_weekSel', '_weekDraftEdit'], health: ['_healthSel'], tasks: ['_taskSel'], plan: ['_planSel', '_planAddStep', '_planAddRem'], whatsapp: ['_waSel'] };
+const PANEL_STATE = { approve: ['_weekSel', '_weekDraftEdit'], health: ['_healthSel'], tasks: ['_taskSel'], reminders: ['_remSel'], plan: ['_planSel', '_planAddStep', '_planAddRem'], whatsapp: ['_waSel'] };
 function closePanelOnLeave(view){
   if(view === 'clients'){
     if(typeof inspectedClientId === 'undefined' || !inspectedClientId) return;
@@ -364,7 +364,7 @@ function closePanelOnLeave(view){
   const keys = PANEL_STATE[view];
   if(!keys || !keys.some(k => window[k])) return;
   keys.forEach(k => { window[k] = null; });
-  const redraw = { approve: 'renderThisWeek', health: 'renderHealth', tasks: 'renderTasks', plan: 'renderPlan', whatsapp: 'renderWhatsapp' }[view];
+  const redraw = { approve: 'renderThisWeek', health: 'renderHealth', tasks: 'renderTasks', reminders: 'renderReminders', plan: 'renderPlan', whatsapp: 'renderWhatsapp' }[view];
   if(typeof window[redraw] === 'function') window[redraw]();
 }
 

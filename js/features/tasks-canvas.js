@@ -20,8 +20,9 @@ window.openTaskDetailModal = (sheet => function(id){
 })(window.openTaskDetailModal);
 
 const tkWho = id => id === currentUser?.id ? 'You' : firstName((teamProfiles.find(p => p.id === id) || {}).name || 'Someone');
-function tkLogo(c){ return c ? monoHtml(c, 'sm') : ''; }
-// When it's due, in words: "Due yesterday", "Today, 2:00 PM", "Fri, Nov 20", "Waiting on your review".
+// When it's due, in words: "Due yesterday", "6 days late", "Today, 2:00 PM", "Fri, Nov 20",
+// "Waiting on your review". Past days are counted, never named: "Due Wednesday" read as the
+// coming Wednesday when it meant the last one.
 function tkDue(t){
   if(t.status === 'in_review' && t.assignerId === currentUser?.id) return ['Waiting on your review', 'is-you'];
   if(!t.dueDate) return ['', ''];
@@ -29,7 +30,7 @@ function tkDue(t){
   const hhmm = typeof taskDueTimes !== 'undefined' ? taskDueTimes[t.id] : '', tm = hhmm ? ', ' + fmtTime(atTime(d, hhmm)) : '';
   if(t.dueDate < today){
     const n = daysBetween(dayStart(d), dayStart(new Date()));
-    return [n === 1 ? 'Due yesterday' : n < 7 ? `Due ${DAY_NAMES[d.getDay()]}` : `Due ${fmtShortDate(d)}`, 'is-late'];
+    return [n === 1 ? 'Due yesterday' : `${n} days late`, 'is-late'];
   }
   if(t.dueDate === today) return ['Today' + tm, 'is-soon'];
   if(t.dueDate === toDateStr(addDays(new Date(), 1))) return ['Tomorrow' + tm, ''];
@@ -46,7 +47,7 @@ function tkCardHtml(t){
   const flag = t.priority === 'high' ? `<span class="tk-flag" title="High priority">${icon('flag')}</span>` : '';
   return `<article class="tk-c${t.color ? ' has-c c-' + t.color : ''}${window._taskSel === t.id ? ' is-sel' : ''}" role="button" tabindex="0" aria-label="${escapeHtml(t.title)}" onclick="selectTask('${t.id}')" onkeydown="if((event.key==='Enter'||event.key===' ')&&event.target===this){event.preventDefault();selectTask('${t.id}')}">
 <div class="tk-ct">${tkCb(t)}<b>${escapeHtml(t.title)}</b>${flag}</div>
-${c ? `<div class="tk-cm">${tkLogo(c)}<span class="tk-cl">${escapeHtml(c.name)}</span></div>` : ''}
+${c ? `<div class="tk-cm"><span class="tk-cl">${escapeHtml(c.name)}</span></div>` : ''}
 <div class="tk-cf"><span class="tk-due ${kind}">${escapeHtml(due)}</span><span class="tk-who">${escapeHtml(tkWho(t.assigneeId))}</span></div></article>`;
 }
 function tkListRowHtml(t){
@@ -225,9 +226,9 @@ function taskPanelHtml(t){
 <div class="sp-bar"><button class="ib" aria-label="Close" onclick="closeTaskPanel()">${icon('x')}</button><span class="tkp-bar">${amAssigner && !done ? `<a class="x-lnk" href="#" onclick="openEditTaskModal('${t.id}');return false;">Edit</a>` : ''}${more.length ? `<button class="ib" aria-label="More" title="More" onclick="tkMore(event, '${t.id}')">${icon('dots-three')}</button><template id="tkMoreItems">${more.join('')}</template>` : ''}</span></div>
 <div class="tkp-h">${tkCb(t, 'lg')}<h3>${escapeHtml(t.title)}${t.priority === 'high' && !done ? `<span class="tk-flag" title="High priority">${icon('flag')}</span>` : ''}</h3></div>
 <div class="tkp-meta">
-${c ? `<span class="tkp-k">Client</span><span class="tkp-v"><a href="#" onclick="openClientDetail('${c.id}');return false;">${tkLogo(c)}${escapeHtml(c.name)}</a></span>` : ''}
+${c ? `<span class="tkp-k">Client</span><span class="tkp-v"><a href="#" onclick="openClientDetail('${c.id}');return false;">${escapeHtml(c.name)}</a></span>` : ''}
 <span class="tkp-k">Assigned to</span><span class="tkp-v">${assigned}</span>
-<span class="tkp-k">Due</span><span class="tkp-v${late ? ' tkp-late' : ''}">${escapeHtml(dueTxt)}${linked ? `<em>on your calendar</em>` : ''}</span>
+<span class="tkp-k">Due</span><span class="tkp-v${late ? ' tkp-late' : ''}">${escapeHtml(dueTxt)}${late && t.dueDate < toDateStr(addDays(new Date(), -1)) ? `<em>${escapeHtml(tkDue({ ...t, status: 'todo' })[0])}</em>` : ''}${linked ? `<em>on your calendar</em>` : ''}</span>
 <span class="tkp-k">Status</span><span class="tkp-v">${status}</span>
 ${amAssigner ? `<span class="tkp-k">Color</span><span class="tkp-v">${colorSwatchesHtml('tkpColor', t.color, 'setTaskColor', { small: true })}</span>` : t.color ? `<span class="tkp-k">Color</span><span class="tkp-v"><i class="cc-dot c-${t.color}" aria-hidden="true"></i>${itemColorName(t.color)}</span>` : ''}
 ${sp ? `<span class="tkp-k">Sprint</span><span class="tkp-v"><a href="#" onclick="openPlanSprint('${sp.id}');return false;"><i class="cc-dot${sp.color ? ' c-' + sp.color : ''}" aria-hidden="true"></i>${escapeHtml(sp.title)}</a></span>` : ''}

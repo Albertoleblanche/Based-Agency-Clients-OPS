@@ -298,7 +298,7 @@ async function sendDraftForReview(id, author){
   renderAll();
 }
 
-// Escape closes whichever right-hand panel is open (This Week, Health, Focus Reports, Tasks).
+// Escape closes whichever right-hand panel is open (This Week, Health, Focus Reports, Tasks, Reminders).
 document.addEventListener('keydown', e => {
   if(e.key !== 'Escape' || document.getElementById('appModalOverlay') || document.querySelector('.sheet-overlay, .modal-overlay')) return;
   const v = typeof currentViewName !== 'undefined' ? currentViewName : '';
@@ -306,4 +306,5 @@ document.addEventListener('keydown', e => {
   else if(v === 'approve' && window._weekSel){ closeWeekPanel(); }
   else if(v === 'health' && window._healthSel && typeof closeHealthPanel === 'function'){ closeHealthPanel(); }
   else if(v === 'tasks' && window._taskSel && typeof closeTaskPanel === 'function'){ closeTaskPanel(); }
+  else if(v === 'reminders' && window._remSel && typeof closeRemPanel === 'function'){ closeRemPanel(); }
 });

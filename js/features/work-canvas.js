@@ -22,20 +22,25 @@ function remRowHtml(r, primary){
   const c = clients.find(x => x.id === r.clientId), who = (teamProfiles.find(p => p.id === r.askedBy) || {}).name || 'Someone';
   const asked = r.askedDate ? fmtShortDate(remDay(r.askedDate)) : '';
   const open = r.status === 'waiting', due = open && reminderDisplayStatus(r) === 'due';
-  let right, cb, act = '<span class="rmi-sp"></span>';
+  let right, act = '<span class="rmi-sp"></span>';
   if(open){
     const [when, late] = remWhen(r);
     right = `<span class="rmi-when${late ? ' is-late' : ''}">${when}</span><span class="rmi-d">${r.askedDate ? 'waiting ' + remWaited(r.askedDate) : ''}</span>`;
-    cb = `<button class="cb rem" role="checkbox" aria-checked="false" aria-label="Mark answered" title="Mark answered" onclick="event.stopPropagation();checkOff(this, () => markReminderStatus('${r.id}','answered'))"></button>`;
     if(due) act = `<button class="btn${primary ? ' btn-p' : ''}" onclick="event.stopPropagation();nudgeReminder('${r.id}')">${icon('paper-plane-tilt')}Nudge</button>`;
   } else {
     const at = r.resolvedAt ? fmtShortDate(new Date(r.resolvedAt)) : '';
-    right = `<span class="rmi-when">${r.status === 'answered' ? 'Answered' : 'Closed'} ${at}</span><span class="rmi-d">${r.askedDate && r.resolvedAt ? 'in ' + remWaited(r.askedDate, r.resolvedAt) : ''}</span>`;
-    cb = `<span class="cb rem${r.status === 'answered' ? ' done' : ' closed'}" role="img" aria-label="${r.status === 'answered' ? 'Answered' : 'Closed'}">${r.status === 'answered' ? icon('check', { weight: 'bold' }) : icon('x', { weight: 'bold' })}</span>`;
+    right = `<span class="rmi-when">${r.status === 'answered' ? 'Answered' : 'Closed'} ${at}</span><span class="rmi-d">${r.askedDate && r.resolvedAt ? 'after ' + remWaited(r.askedDate, r.resolvedAt) : ''}</span>`;
   }
-  return `<div class="rmi-r${open ? '' : ' is-done'}" role="button" tabindex="0" onclick="openReminderDetailModal('${r.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)openReminderDetailModal('${r.id}')">${cb}${c ? monoHtml(c, 'sm') : ''}
+  return `<div class="rmi-r${open ? '' : ' is-done'}${window._remSel === r.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectReminder('${r.id}')" onkeydown="if((event.key==='Enter'||event.key===' ')&&event.target===this){event.preventDefault();selectReminder('${r.id}')}">${remCb(r)}
 <div class="tx"><b>${escapeHtml(r.question)}</b><span class="s">${escapeHtml(c ? c.name : '')} · ${escapeHtml(firstName(who))} asked ${escapeHtml(asked)}</span></div>
 <div class="rmi-w">${right}</div>${act}</div>`;
+}
+// The circle: ticks a question answered (with the same little check as everywhere else), or shows
+// how it ended.
+function remCb(r, cls){
+  const k = cls ? ' ' + cls : '';
+  if(r.status === 'waiting') return `<button class="cb rem${k}" role="checkbox" aria-checked="false" aria-label="Mark answered" onclick="event.stopPropagation();checkOff(this, () => markReminderStatus('${r.id}','answered'))"></button>`;
+  return `<span class="cb rem${r.status === 'answered' ? ' done' : ' closed'}${k}" role="img" aria-label="${r.status === 'answered' ? 'Answered' : 'Closed'}">${r.status === 'answered' ? icon('check', { weight: 'bold' }) : icon('x', { weight: 'bold' })}</span>`;
 }
 function renderReminders(){
   const root = document.getElementById('remindersRoot');
@@ -66,13 +71,118 @@ function renderReminders(){
   const curC = usedClients.find(c => c.id === remClient), curW = askers.find(p => p.id === remWho);
   const all = base.filter(r => (remClient === 'all' || r.clientId === remClient) && (remWho === 'all' || r.askedBy === remWho));
   const n = k => all.filter(r => r.status === k).length;
-  root.innerHTML = `<div class="rmi">
+  const sel = window._remSel && clientReminders.find(r => r.id === window._remSel);
+  if(window._remSel && !sel) window._remSel = null;
+  const prev = root.querySelector('.sp-page')?.scrollTop || 0, prevSp = root.querySelector('.sp:not(.sp-leaving)')?.scrollTop || 0;
+  root.innerHTML = `<div class="spw"><div class="sp-page"><div class="rmi">
 <div class="rmi-hd"><div><h2>${due.length ? `${due.length} follow-up${due.length === 1 ? ' is' : 's are'} due` : 'No follow-ups are due'}</h2><p>${everyone ? 'Questions your team asked clients, and when to chase them.' : 'Questions you asked clients, and when to chase them.'}</p></div>
 <div class="rmi-f"><div class="seg" role="tablist" aria-label="Show">${[['open', 'Waiting', n('waiting')], ['answered', 'Answered', n('answered')], ['closed', 'Closed', n('closed')]].map(([k, t, c]) => `<button class="${remTab === k ? 'on' : ''}" role="tab" aria-selected="${remTab === k}" onclick="setRem('tab','${k}')">${t} <span class="c">${c}</span></button>`).join('')}</div>
 <label class="pop pop-sel"><span class="pl">Client: ${escapeHtml(curC ? curC.name : 'All')}</span>${icon('caret-down')}<select aria-label="Client" onchange="setRem('client',this.value)"><option value="all">All</option>${usedClients.map(c => `<option value="${c.id}"${c === curC ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></label>
 ${everyone ? `<label class="pop pop-sel"><span class="pl">${escapeHtml(curW ? curW.name : 'Everyone')}</span>${icon('caret-down')}<select aria-label="Asked by" onchange="setRem('who',this.value)"><option value="all">Everyone</option>${askers.map(p => `<option value="${p.id}"${p === curW ? ' selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}</select></label>` : ''}</div></div>
-${main}</div>`;
+${main}</div></div>${sel ? remPanelHtml(sel) : ''}</div>`;
+  const sp = root.querySelector('.sp-page'); if(sp) sp.scrollTop = prev;
+  const pn = root.querySelector('.sp:not(.sp-leaving)'); if(pn){ pn.scrollTop = prevSp; pn._st = prevSp; }
   if(currentViewName === 'reminders') setToolbar(null, 'Client follow-ups');
+}
+
+// ---- the panel: a follow-up on the right, like a task -----------------------------------------
+// The question edits in place (it saves when you leave the field), the follow-up day is a pop of
+// nearby days, and the one orange button is what to do next: Nudge when it's due, otherwise
+// Mark Answered for when the client gets back to you.
+function selectReminder(id){ window._remSel = window._remSel === id ? null : id; renderReminders(); }
+function closeRemPanel(){ window._remSel = null; renderReminders(); }
+const remSessionActivity = {};
+function remPanelHtml(r){
+  const c = clients.find(x => x.id === r.clientId), owner = teamProfiles.find(p => p.id === r.askedBy);
+  const display = reminderDisplayStatus(r), open = r.status === 'waiting', due = display === 'due';
+  const ownerName = r.askedBy === currentUser?.id ? 'You' : (owner ? owner.name : 'Someone no longer on the team');
+  const asked = r.askedDate ? remDay(r.askedDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '';
+  const resolvedAt = r.resolvedAt ? fmtShortDate(new Date(r.resolvedAt)) : '';
+  const linked = (typeof calendarEvents !== 'undefined' ? calendarEvents : []).find(e => e.relatedReminderId === r.id);
+  const late = open && remWhen(r)[1];
+  const status = due ? `<span class="rmp-st is-due">Due</span>`
+    : open ? `Waiting on the client`
+    : `<span class="rmp-st${r.status === 'answered' ? ' is-ok' : ''}">${r.status === 'answered' ? 'Answered' : 'Closed'}${resolvedAt ? ' ' + resolvedAt : ''}</span>`;
+  const follow = open ? `<span class="tkp-k">Follow up</span><span class="tkp-v rmp-fu${late ? ' tkp-late' : ''}">${sheetDateField('remFollowUp', r.followUpDate || '', { from: 0, to: 30, min: toDateStr(new Date()), none: r.followUpDate ? '' : 'No date', after: 'remSetFollowUp' })}</span>` : '';
+  const waited = r.askedDate ? remWaited(r.askedDate, open ? null : r.resolvedAt) : '';
+  const acts = open
+    ? `<div class="tkp-acts"><button class="btn${due ? ' btn-p' : ''}" onclick="nudgeReminder('${r.id}')">${icon('paper-plane-tilt')}Nudge</button><button class="btn${due ? '' : ' btn-p'}" onclick="markReminderStatus('${r.id}','answered')">${icon('check')}Mark Answered</button></div>`
+    : `<div class="tkp-acts"><button class="btn" onclick="markReminderStatus('${r.id}','waiting')">${icon('rotate-ccw')}Reopen</button></div>`;
+  const ev = [];
+  if(r.askedDate) ev.push({ at: r.askedDate + 'T12:00:00', html: `<b>${escapeHtml(r.askedBy === currentUser?.id ? 'You' : firstName(owner ? owner.name : 'Someone'))}</b> asked ${escapeHtml(c ? c.name : 'the client')}` });
+  (remSessionActivity[r.id] || []).forEach(x => ev.push(x));
+  if(!open && r.resolvedAt) ev.push({ at: r.resolvedAt, html: r.status === 'answered' ? `Marked answered${waited ? `, after ${waited}` : ''}` : 'Closed without an answer' });
+  ev.sort((a, b) => new Date(b.at) - new Date(a.at));
+  const day = at => { const d = new Date(at), k = daysBetween(dayStart(d), dayStart(new Date())); return k === 0 ? 'Today' : k === 1 ? 'Yesterday' : fmtShortDate(d); };
+  const more = [];
+  if(open && !linked && r.followUpDate) more.push(`<button class="mi" onclick="remAddToCalendar('${r.id}')">${icon('calendar-plus')}Add to Calendar</button>`);
+  if(open) more.push(`<button class="mi" onclick="createTaskFromReminder('${r.id}')">${icon('list-checks')}Make a Task…</button>`);
+  if(c) more.push(`<button class="mi" onclick="openNoteModal(null, '${r.clientId}', 'idea')">${icon('notepad')}Start a Note…</button>`);
+  if(open) more.push(`<button class="mi" onclick="markReminderStatus('${r.id}','closed')">${icon('x-circle')}Close Without an Answer</button>`);
+  more.push(`<div class="msep"></div><button class="mi danger" onclick="deleteReminder('${r.id}')">${icon('trash')}Delete…</button>`);
+  return `<aside class="sp tkp rmp" aria-label="${escapeHtml(r.question)}">
+<div class="sp-bar"><button class="ib" aria-label="Close" onclick="closeRemPanel()">${icon('x')}</button><span class="tkp-bar"><button class="ib" aria-label="More" onclick="remMore(event)">${icon('dots-three')}</button><template id="remMoreItems">${more.join('')}</template></span></div>
+<div class="tkp-h">${remCb(r, 'lg')}<textarea class="rmp-q" id="remQ" rows="1" spellcheck="true" aria-label="Question" maxlength="1000" onkeydown="remQKey(event)" onblur="remSaveQuestion('${r.id}')">${escapeHtml(r.question)}</textarea></div>
+<div class="tkp-meta">
+${c ? `<span class="tkp-k">Client</span><span class="tkp-v"><a href="#" onclick="openClientDetail('${c.id}');return false;">${escapeHtml(c.name)}</a></span>` : ''}
+<span class="tkp-k">Asked by</span><span class="tkp-v">${escapeHtml(ownerName)}</span>
+<span class="tkp-k">Asked</span><span class="tkp-v">${escapeHtml(asked || '—')}${open && waited ? `<em>waiting ${waited}</em>` : ''}</span>
+${follow}
+<span class="tkp-k">Status</span><span class="tkp-v">${status}</span>
+${linked ? `<span class="tkp-k">Calendar</span><span class="tkp-v">On your calendar</span>` : ''}
+</div>
+${acts}
+<div class="sp-sec"><b>Activity</b></div>${ev.map(e => `<div class="tkp-a"><span class="tkp-ad">${day(e.at)}</span><span>${e.html}</span></div>`).join('')}
+</aside>`;
+}
+function remMore(e){
+  e.stopPropagation();
+  const had = document.getElementById('remMenu'); had?.remove(); if(had) return;
+  const tpl = document.getElementById('remMoreItems'); if(!tpl) return;
+  const m = document.createElement('div');
+  m.className = 'menu'; m.id = 'remMenu'; m.style.position = 'fixed';
+  const r = e.currentTarget.getBoundingClientRect();
+  m.style.top = (r.bottom + 4) + 'px'; m.style.right = (window.innerWidth - r.right) + 'px';
+  m.innerHTML = tpl.innerHTML;
+  document.body.appendChild(m);
+  setTimeout(() => document.addEventListener('click', () => m.remove(), { once: true }), 0);
+}
+// Esc with a panel's … menu open closes the menu only, not the panel behind it (Tasks too).
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Escape') return;
+  const m = document.getElementById('remMenu') || document.getElementById('tkMenu');
+  if(m){ e.stopPropagation(); m.remove(); }
+}, true);
+// Return saves, Esc puts the question back; both leave the field and keep the panel open.
+function remQKey(e){
+  const el = e.target;
+  if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); el.blur(); }
+  else if(e.key === 'Escape'){ e.stopPropagation(); const r = clientReminders.find(x => x.id === window._remSel); if(r) el.value = r.question; el.blur(); }
+}
+async function remSaveQuestion(id){
+  const el = document.getElementById('remQ'), r = clientReminders.find(x => x.id === id);
+  if(!el || !r) return;
+  const q = el.value.replace(/\s+/g, ' ').trim();
+  if(!q){ el.value = r.question; return; }
+  if(q === r.question) return;
+  const before = r.question; r.question = q; renderReminders();
+  const { error } = await supabaseClient.from('client_reminders').update({ question: q }).eq('id', id);
+  if(error){ r.question = before; renderReminders(); showToast('error', 'Question not saved', error.message); }
+}
+async function remSetFollowUp(v){
+  const r = clientReminders.find(x => x.id === window._remSel);
+  if(!r || !v || v === r.followUpDate) return;
+  if(v < toDateStr(new Date())){ showToast('error', 'Pick today or later', 'A follow-up can’t be in the past.'); renderReminders(); return; }
+  const before = r.followUpDate; r.followUpDate = v; renderReminders();
+  const { error } = await supabaseClient.from('client_reminders').update({ follow_up_date: v }).eq('id', r.id);
+  if(error){ r.followUpDate = before; renderReminders(); showToast('error', 'Follow-up not moved', error.message); return; }
+  const ev = (typeof calendarEvents !== 'undefined' ? calendarEvents : []).find(e => e.relatedReminderId === r.id);
+  if(ev) await supabaseClient.from('calendar_events').update({ start_at: `${v}T00:00:00`, end_at: `${v}T23:59:59` }).eq('id', ev.id);
+}
+async function remAddToCalendar(id){
+  await addReminderToCalendar(id);
+  if(typeof loadCalendarEvents === 'function') await loadCalendarEvents();
+  renderReminders();
 }
 // Nudge: open a short follow-up email to the client and move the next follow-up three days out.
 async function nudgeReminder(id){
@@ -88,6 +198,7 @@ async function nudgeReminder(id){
     try{ await navigator.clipboard.writeText(body); }catch(e){}
   }
   const next = toDateStr(addDays(new Date(), 3));
+  (remSessionActivity[id] = remSessionActivity[id] || []).push({ at: new Date().toISOString(), html: `<b>You</b> nudged ${escapeHtml(c ? c.name : 'them')}` });
   const { error } = await supabaseClient.from('client_reminders').update({ follow_up_date: next }).eq('id', id);
   if(error){ showToast('error', 'Follow-up date not moved', error.message); return; }
   await loadClientReminders();

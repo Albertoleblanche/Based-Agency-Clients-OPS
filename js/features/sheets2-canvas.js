@@ -67,7 +67,7 @@ function openReminderDetailModal(id){
 <h3>Client Follow-up</h3>
 <div class="f">
 <label class="top" for="reminderEditQuestion">Question</label><textarea id="reminderEditQuestion" class="tf" spellcheck="true">${escapeHtml(r.question)}</textarea>
-<label>Asked by</label><div style="font-size:14px">${owner ? sheetWho(owner.name) : '—'}${asked ? `<span class="t-2"> · ${asked}</span>` : ''}</div>
+<label>Asked by</label><div style="font-size:14px">${owner ? escapeHtml(owner.name) : '—'}${asked ? `<span class="t-2"> · ${asked}</span>` : ''}</div>
 <label for="reminderEditFollowUp">Follow up</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sheetDateField('reminderEditFollowUp', r.followUpDate || '', { from: 0, to: 30, min: toDateStr(new Date()), disabled: resolved })}</div>
 </div>
 <div class="sheet-a"><button class="btn danger" style="margin-right:auto" onclick="closeAppModal();deleteReminder('${r.id}')">Delete</button>${resolved
