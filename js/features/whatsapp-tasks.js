@@ -21,6 +21,7 @@ let waQuietAll = false;        // Quiet clients: show them all
 let waCheckAt = null;          // when Check Now was pressed in this tab (ISO)
 let waCheckTimer = null;
 const waChat = {};             // item id -> its messages ([] when there are none) · 'loading' · 'none' (the database can't say)
+let waClientLast = null;       // leads: group jid -> when the client last wrote there (last 14 days); null = not known
 
 const WA_OWNERS = [['albert', 'Albert'], ['stan', 'Stan'], ['eric', 'Eric'], ['charlie', 'Charlie'], ['dan', 'Dan'], ['joey', 'Joey']];
 const WA_KIND = { request: 'Request', question: 'Question', promise: 'We promised', issue: 'Problem' };
@@ -51,13 +52,14 @@ function loadWaTasks(){
 // anyone else, so asking for them up front costs nothing.
 async function waLoadNow(){
   const safe = q => Promise.resolve(q).catch(e => ({ error: { message: e?.message || String(e) } }));
-  const [acc, tk, r, s, g, lc] = await Promise.all([
+  const [acc, tk, r, s, g, lc, cl] = await Promise.all([
     safe(supabaseClient.rpc('wa_access')),
     safe(supabaseClient.from('wa_tasks').select('*').order('first_seen', { ascending: true })),
     safe(supabaseClient.from('wa_runs').select('*').order('started_at', { ascending: false }).limit(20)),
     safe(supabaseClient.from('wa_settings').select('*').eq('id', 1).maybeSingle()),
     safe(supabaseClient.from('wa_groups').select('*').order('name', { ascending: true })),
     safe(supabaseClient.rpc('wa_last_contact')),
+    safe(supabaseClient.from('wa_messages').select('group_jid,ts').eq('from_team', false).gte('ts', new Date(Date.now() - 14 * 86400000).toISOString()).order('ts', { ascending: false }).limit(3000)),
   ]);
   waAccessLevel = !acc.error && ['manage', 'own', 'none'].includes(acc.data) ? acc.data : null;
   waLoadError = null;
@@ -70,7 +72,10 @@ async function waLoadNow(){
   }
   waTasks = tk.data || []; waReady = true;
   updateWaNav();
-  if(waCanManage()){ waRuns = r.data || []; waSettings = s.data || null; waGroups = g.data || []; waContact = lc.error ? null : (lc.data || []); }
+  if(waCanManage()){
+    waRuns = r.data || []; waSettings = s.data || null; waGroups = g.data || []; waContact = lc.error ? null : (lc.data || []);
+    if(!cl.error){ waClientLast = new Map(); (cl.data || []).forEach(m => { if(!waClientLast.has(m.group_jid)) waClientLast.set(m.group_jid, m.ts); }); }
+  }
   waLoaded = true;
   updateWaNavBadge();
   waStartRealtime();
@@ -83,11 +88,25 @@ function waStartRealtime(){
   waRealtimeStarted = true;
   supabaseClient.channel('wa-tasks').on('postgres_changes', { event: '*', schema: 'public', table: 'wa_tasks' }, async () => {
     await loadWaTasks();
-    if(currentViewName === 'whatsapp') renderWhatsapp();
+    if(currentViewName === 'whatsapp'){ renderWhatsapp(); waRefreshChat(); }
   }).subscribe();
 }
 
 // ---- small helpers ---------------------------------------------------------------------------
+// A done item the client wrote on afterwards: the newest closed item in its group (not "not a task"),
+// with no open item there, and a client message after it was closed. Leads only (they can read the
+// messages); the agent reopens it by itself when the message asks for more (connector).
+function waClosedAt(t){ return t.status === 'open' ? null : (t.answered_at || t.updated_at || null); }
+function waWroteAgain(t){
+  if(!waClientLast || t.status === 'open' || t.status === 'dismissed') return null;
+  const last = waClientLast.get(t.group_jid), at = waClosedAt(t);
+  if(!last || !at || new Date(last) <= new Date(at)) return null;
+  if(waTasks.some(x => x.group_jid === t.group_jid && x.status === 'open')) return null;
+  const newest = waTasks.filter(x => x.group_jid === t.group_jid && x.status !== 'open' && x.status !== 'dismissed')
+    .sort((a, b) => new Date(waClosedAt(b)) - new Date(waClosedAt(a)))[0];
+  if(newest && newest.id !== t.id) return null;
+  return new Date(last) >= new Date(Date.now() - 14 * 86400000) ? last : null;
+}
 function waOwnerName(t){
   const p = t.owner_user_id && (teamProfiles || []).find(x => x.id === t.owner_user_id);
   if(p) return firstName(p.name);
@@ -147,6 +166,8 @@ function waAt(iso){
   const d = new Date(iso), k = daysBetween(dayStart(rNow()), dayStart(d));
   return k === 0 ? fmtTime(d) : k === -1 ? `yesterday at ${fmtTime(d)}` : k === 1 ? `tomorrow at ${fmtTime(d)}` : `${fmtShortDate(d)} at ${fmtTime(d)}`;
 }
+// "today", "yesterday" or "Nov 10" (only the words go lower case, never a month)
+function waWhenLower(iso){ const w = claudeWhen(iso); return /^(Today|Yesterday)/.test(w) ? w[0].toLowerCase() + w.slice(1) : w; }
 function waWhen(iso){ const d = new Date(iso); return `${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}, ${fmtTime(d)}`; }
 function waHm(hhmm){ const [h, m] = String(hhmm).split(':').map(Number); return `${(h % 12) || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; }
 function waWeekStart(){ const d = dayStart(rNow()); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; }
@@ -248,6 +269,7 @@ async function waCheckNow(){
       const r = waLastRun();
       if(r && r.id !== before) showToast('success', 'Checked', r.tasks_new ? `Found ${r.tasks_new} new.` : 'Nothing new.');
       waCheckAt = null;
+      waRefreshChat();
     }
     waRedraw();
   }, 5000);
@@ -306,6 +328,8 @@ function waDraw(root){
   const h2 = waTab === 'done' ? (done.length ? `${done.length} done this week` : 'Nothing done this week yet')
     : open.length ? `${open.length} waiting on ${whoName}` : `Nothing waiting on ${whoName}`;
   const subBits = [];
+  const againN = waTab === 'open' ? waTasks.filter(t => pick(t) && waWroteAgain(t)).length : 0;
+  if(againN) subBits.push(`<span class="t-blue">${againN === 1 ? 'A client' : againN + ' clients'} wrote again after done</span>`);
   if(waTab === 'open' && open.length){
     if(late.length) subBits.push(`<span class="t-red">${late.length} waiting over 1 business day</span>`);
     const due = open.filter(waDueToday).length, today = open.filter(t => waDays(t) === 0).length;
@@ -327,8 +351,10 @@ ${lead ? `<label class="pop pop-sel"><span class="pl">${escapeHtml(curWho[1])}</
   // Waiting: the client who has waited longest first; done: the most recent first.
   const byClient = items => { const m = new Map(); items.forEach(t => { const k = waClientLabel(t); if(!m.has(k)) m.set(k, []); m.get(k).push(t); }); return [...m.entries()]; };
   const groupHtml = ([name, ts]) => `<section class="wa-g" aria-label="${escapeHtml(name)}"><div class="wa-gh"><b>${escapeHtml(name)}</b>${ts.length > 1 ? `<span class="n">${ts.length}</span>` : ''}</div>${ts.map(t => waRowHtml(t, sel, who)).join('')}</section>`;
+  const again = waTab === 'open' ? waTasks.filter(t => pick(t) && waWroteAgain(t)) : [];
+  const againHtml = again.length ? `<section class="wa-g wa-again" aria-label="Written to again"><div class="wa-gh"><b>The client wrote again</b><span class="n">${again.length}</span></div><p class="wa-again-p">Marked done, then the client wrote in the group. Open it to read what they said.</p>${again.map(t => waRowHtml(t, sel, who)).join('')}</section>` : '';
   let list;
-  if(waTab === 'open' && open.length) list = `<p class="wa-sort">By client, longest wait first</p>${byClient(open).map(groupHtml).join('')}`;
+  if(waTab === 'open' && (open.length || again.length)) list = `${againHtml}${open.length ? `<p class="wa-sort">By client, longest wait first</p>${byClient(open).map(groupHtml).join('')}` : ''}`;
   else if(waTab === 'done' && done.length) list = `<p class="wa-sort">By client, most recent first</p>${byClient(done).map(groupHtml).join('')}`;
   else list = waEmptyHtml(who, open, done);
 
@@ -349,9 +375,10 @@ function waRowHtml(t, sel, who){
   const quote = t.source_excerpt ? `<span class="wa-x">“${escapeHtml(t.source_excerpt)}”</span>` : '';
   let right;
   if(closed){
-    const word = t.status === 'dismissed' ? 'Not a task' : t.status === 'answered' ? 'Answered in the group' : 'Done';
-    const when = t.answered_at || t.updated_at;
-    right = `<span class="rmi-when">${word}</span><span class="rmi-d">${when ? escapeHtml(new Date(when).toLocaleDateString('en-US', { weekday: 'short' })) : ''}</span>`;
+    const again = waWroteAgain(t);
+    const word = again ? 'Client wrote again' : t.status === 'dismissed' ? 'Not a task' : t.status === 'answered' ? 'Answered in the group' : 'Done';
+    const when = again || t.answered_at || t.updated_at;
+    right = `<span class="rmi-when${again ? ' is-new' : ''}">${word}</span><span class="rmi-d">${when ? escapeHtml(again ? waAt(when) : new Date(when).toLocaleDateString('en-US', { weekday: 'short' })) : ''}</span>`;
   } else {
     const showWho = lead && who !== 'mine';
     const due = t.due_date ? `Due ${t.due_date === toDateStr(rNow()) ? 'today' : fmtShortDate(new Date(t.due_date + 'T12:00:00'))}` : '';
@@ -508,26 +535,62 @@ function waReadPanelHtml(){
 }
 
 // ---- one item, in the panel --------------------------------------------------------------------
+// The messages around the request, then everything after it up to the newest, so a follow-up shows.
+// Fetched every time the item opens and after each check; what was there stays on screen meanwhile.
+// The database function gives the request's part to anyone who can see the item; leads also read
+// the group directly for the rest (the function only had the first few after it before
+// addendum-whatsapp-followups.sql).
 async function waLoadChat(id){
-  if(waChat[id] && waChat[id] !== 'loading') return;
-  waChat[id] = 'loading';
-  let out = 'none';
+  const t = waTasks.find(x => x.id === id);
+  if(!t || waChat[id] === 'loading' || waChat['_busy_' + id]) return;
+  const had = waChat[id];
+  if(!Array.isArray(had)) waChat[id] = 'loading';
+  waChat['_busy_' + id] = true;
+  let out = Array.isArray(had) ? had : 'none';
   try{
     const { data, error } = await supabaseClient.rpc('wa_task_messages', { p_task: id });
-    if(!error && Array.isArray(data)) out = data;
+    if(!error && Array.isArray(data)) out = data.slice();
+    if(waCanManage() && t.group_jid){
+      const list = Array.isArray(out) ? out : [];
+      const after = list.length ? list[list.length - 1].sent_at : new Date(new Date(t.first_seen).getTime() - 86400000).toISOString();
+      const r = await supabaseClient.from('wa_messages').select('wa_msg_id,sender,from_team,text,ts').eq('group_jid', t.group_jid)
+        .gt('ts', after).order('ts', { ascending: false }).limit(40);
+      if(!r.error && r.data && r.data.length){
+        const seen = new Set(list.map(m => m.wa_msg_id)), src = t.source_msg_ids || [];
+        const more = r.data.slice().reverse().filter(m => !seen.has(m.wa_msg_id))
+          .map(m => ({ wa_msg_id: m.wa_msg_id, sender: m.sender, from_team: m.from_team, body: m.text, sent_at: m.ts, is_source: src.includes(m.wa_msg_id) }));
+        out = list.concat(r.data.length >= 40 && list.length ? [{ gap: true }] : [], more);
+      }
+    }
   }catch(e){}
+  delete waChat['_busy_' + id];
   waChat[id] = out;
   if(window._waSel === id && currentViewName === 'whatsapp'){
     const box = document.getElementById('waChatBox');
-    if(box) box.outerHTML = waChatHtml(waTasks.find(t => t.id === id));
+    if(box) box.outerHTML = waChatHtml(waTasks.find(x => x.id === id));
+    document.querySelector('#waChatBox .wap-sep, #waChatBox .wap-m:last-child')?.scrollIntoView?.({ block: 'nearest' });
   }
+}
+// After a check (or anything new from the connector): read the open item's chat again.
+function waRefreshChat(){
+  Object.keys(waChat).forEach(k => { if(!k.startsWith('_busy_') && waChat[k] !== 'loading' && k !== window._waSel) delete waChat[k]; });
+  const id = window._waSel;
+  if(id && id !== 'read' && currentViewName === 'whatsapp') waLoadChat(id);
 }
 function waChatHtml(t){
   const m = waChat[t.id];
   if(Array.isArray(m) && m.length){
     const day = d => { const k = daysBetween(dayStart(new Date(d)), dayStart(rNow())); return k === 0 ? fmtTime(new Date(d)) : `${new Date(d).toLocaleDateString('en-US', { weekday: k < 7 ? 'short' : undefined, month: k < 7 ? undefined : 'short', day: k < 7 ? undefined : 'numeric' })} ${fmtTime(new Date(d))}`; };
     return `<div id="waChatBox"><div class="sp-sec"><b>In the group</b><span>${m.some(x => x.is_source) ? 'the request is outlined' : ''}</span></div>
-<div class="wap-chat">${m.map(x => `<div class="wap-m${x.from_team ? ' us' : ''}${x.is_source ? ' hit' : ''}"><span class="who">${escapeHtml(x.sender || (x.from_team ? 'Based Agency' : 'Client'))}<time>${escapeHtml(day(x.sent_at))}</time></span><p>${escapeHtml(x.body || '')}</p></div>`).join('')}</div></div>`;
+<div class="wap-chat">${(() => {
+      const at = waClosedAt(t), word = t.status === 'answered' ? 'Answered in the group' : t.status === 'dismissed' ? 'Marked not a task' : 'Marked done';
+      let sep = !at;
+      return m.map(x => {
+        if(x.gap) return '<div class="wap-gap">Earlier messages</div>';
+        const line = !sep && new Date(x.sent_at) > new Date(at) ? (sep = true, `<div class="wap-sep"><span>${escapeHtml(word)} ${escapeHtml(day(at))}</span></div>`) : '';
+        return `${line}<div class="wap-m${x.from_team ? ' us' : ''}${x.is_source ? ' hit' : ''}"><span class="who">${escapeHtml(x.sender || (x.from_team ? 'Based Agency' : 'Client'))}<time>${escapeHtml(day(x.sent_at))}</time></span><p>${escapeHtml(x.body || '')}</p></div>`;
+      }).join('');
+    })()}</div></div>`;
   }
   if(m === 'loading' && !t.source_excerpt) return `<div id="waChatBox"><div class="sp-sec"><b>In the group</b><span>loading…</span></div></div>`;
   return `<div id="waChatBox">${t.source_excerpt ? `<div class="sp-sec"><b>What the client said</b>${m === 'loading' ? '<span>loading the chat…</span>' : ''}</div><blockquote class="wa-q">${escapeHtml(t.source_excerpt)}</blockquote>` : ''}</div>`;
@@ -550,10 +613,12 @@ function waPanelHtml(t){
     facts.push(`<b class="${waLate(t) ? 'is-red' : d === 0 ? 'is-new' : ''}">${escapeHtml(word)}</b>`);
     acts = can ? `${taskBtn}<button class="btn" onclick="waDismiss('${t.id}')">Not a Task</button><button class="btn btn-p" onclick="waMarkDone('${t.id}')">${icon('check')}Mark Done</button>` : '';
   } else {
-    const word = t.status === 'dismissed' ? 'Not a task' : t.status === 'answered' && t.answered_at ? `Answered in the group ${claudeWhen(t.answered_at).toLowerCase()}`
-      : `${t.status === 'answered' ? 'Answered in the group' : 'Done'}${t.updated_at ? ' ' + claudeWhen(t.updated_at).toLowerCase() : ''}`;
+    const word = t.status === 'dismissed' ? 'Not a task' : t.status === 'answered' && t.answered_at ? `Answered in the group ${waWhenLower(t.answered_at)}`
+      : `${t.status === 'answered' ? 'Answered in the group' : 'Done'}${t.updated_at ? ' ' + waWhenLower(t.updated_at) : ''}`;
     facts.push(`<b class="${t.status === 'dismissed' ? '' : 'is-ok'}">${escapeHtml(word)}</b>`);
-    acts = can ? `${t.task_id ? taskBtn : ''}<button class="btn" onclick="waReopen('${t.id}')">Reopen</button>` : '';
+    const again = waWroteAgain(t);
+    if(again) facts.push(`<b class="is-new">The client wrote again ${escapeHtml(waAt(again))}</b>`);
+    acts = can ? `${t.task_id ? taskBtn : ''}<button class="btn${again ? ' btn-p' : ''}" onclick="waReopen('${t.id}')">Reopen</button>` : '';
   }
   const sum = t.detail || `First seen ${waWhen(t.first_seen)}.`;
   const owner = can && !closed

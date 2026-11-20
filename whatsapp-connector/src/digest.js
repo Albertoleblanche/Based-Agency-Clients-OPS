@@ -16,11 +16,11 @@ export async function runDigest({ dry = false, notify = true } = {}){
   const profiles = await loadProfiles();
   const groups = check(await db().from('wa_groups').select('jid,name').eq('active', true), 'load groups');
 
-  let seen = 0, created = 0, resolved = 0, failures = 0;
+  let seen = 0, created = 0, resolved = 0, reopened = 0, failures = 0;
   for(const g of groups){
     const r = await analyzeGroup(g, since);
-    seen += r.seen; created += r.created; resolved += r.resolved; if(r.failed) failures++;
-    if(r.created || r.resolved) console.log(`  ${g.name}: +${r.created} new, ${r.resolved} resolved`);
+    seen += r.seen; created += r.created; resolved += r.resolved; reopened += r.reopened || 0; if(r.failed) failures++;
+    if(r.created || r.resolved || r.reopened) console.log(`  ${g.name}: +${r.created} new, ${r.reopened || 0} reopened (the client followed up), ${r.resolved} resolved`);
   }
 
   // Link owners to Radar users (done here so newly added teammates are picked up).
@@ -77,9 +77,9 @@ export async function runDigest({ dry = false, notify = true } = {}){
 
   if(notify) await db().from('wa_tasks').update({ last_reminded_at: new Date().toISOString() }).eq('status', 'open');
   await logRun({ kind: 'digest', started_at: startedAt, finished_at: new Date().toISOString(), ok: failures === 0 || failures < groups.length,
-    connection: 'open', messages_seen: seen, tasks_new: created, tasks_closed: resolved,
-    note: `${groups.length} groups, ${open.length} open, ${sent} Slack messages${failures ? `, ${failures} groups failed` : ''}${notify ? '' : ', Check Now from Radar'}${dry ? ' (dry run)' : ''}` });
-  console.log(`Digest done: ${groups.length} groups, +${created} new, ${resolved} answered, ${open.length} open, ${sent} Slack DMs.`);
+    connection: 'open', messages_seen: seen, tasks_new: created + reopened, tasks_closed: resolved,
+    note: `${groups.length} groups, ${open.length} open${reopened ? `, ${reopened} reopened (the client followed up)` : ''}, ${sent} Slack messages${failures ? `, ${failures} groups failed` : ''}${notify ? '' : ', Check Now from Radar'}${dry ? ' (dry run)' : ''}` });
+  console.log(`Digest done: ${groups.length} groups, +${created} new, ${reopened} reopened, ${resolved} answered, ${open.length} open, ${sent} Slack DMs.`);
 }
 
 export async function alertAdmins(text){

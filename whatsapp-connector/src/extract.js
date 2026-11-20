@@ -47,9 +47,12 @@ Do NOT create tasks for thanks, greetings, FYIs, things clearly finished, or que
 
 You are also given the currently OPEN tasks for this group. For each, decide if the chat now shows it was handled (resolve it) — otherwise leave it alone and do not create a duplicate.
 
+You are also given RECENTLY CLOSED tasks (the team marked them done, or the chat showed them answered), each with when it was closed. If the client's messages AFTER that time follow up on one of them — they ask for more on it, say it isn't fixed or isn't right, or send something the agency now has to act on (files, details, an approval it was waiting for) — REOPEN it with a one-sentence reason instead of creating a new task. Do not reopen for thanks, likes, "looks good", or anything that only confirms it is fine. Never both reopen a task and create a new one for the same thing.
+
 Reply with ONLY JSON:
 {"new_tasks":[{"title":"short imperative, max 120 chars","detail":"1-2 sentences of context","kind":"request|question|promise|issue","owner":"${ROLE_KEYS.join('|')}","priority":"low|normal|high","due_date":"YYYY-MM-DD or null","msg_ids":[message numbers],"excerpt":"short client quote"}],
- "resolve":[{"task_id":"id of an open task","reason":"why"}]}
+ "resolve":[{"task_id":"id of an open task","reason":"why"}],
+ "reopen":[{"task_id":"id of a recently closed task","reason":"what the client now needs, 1 sentence","msg_ids":[message numbers],"excerpt":"short client quote"}]}
 Use priority high only for urgent wording, site down, money, or an angry client. Return empty arrays when nothing applies.`;
 
 export async function analyzeGroup(group, since){
@@ -57,22 +60,27 @@ export async function analyzeGroup(group, since){
   // The newest 150 of the last few days (asking for the oldest would miss what's new in a busy group).
   const msgs = check(await db().from('wa_messages').select('id,wa_msg_id,sender,from_team,text,ts,created_at')
     .eq('group_jid', group.jid).gte('ts', cutoff).order('ts', { ascending: false }).limit(150), 'load messages').reverse();
-  if(!msgs.length) return { created: 0, resolved: 0, seen: 0 };
+  if(!msgs.length) return { created: 0, resolved: 0, reopened: 0, seen: 0 };
   // New to the agent = stored since the last check, whenever it was sent (history that arrives
   // late, or a phone that was offline, still gets read).
   const fresh = since ? msgs.filter(m => (m.created_at || m.ts) > since).length : msgs.length;
   const openTasks = check(await db().from('wa_tasks').select('id,title,kind,owner_key,status')
     .eq('group_jid', group.jid).eq('status', 'open'), 'load open tasks');
-  if(!fresh && !openTasks.length) return { created: 0, resolved: 0, seen: 0 };
-  if(!fresh) return { created: 0, resolved: 0, seen: 0 }; // nothing new to judge
+  if(!fresh) return { created: 0, resolved: 0, reopened: 0, seen: 0 }; // nothing new to judge
+  // Closed in the last two weeks (marked done in Radar, or answered): a client's follow-up on one
+  // reopens it rather than being skipped as an update, or turning into a duplicate.
+  const closedTasks = check(await db().from('wa_tasks').select('id,title,kind,owner_key,status,answered_at,updated_at,source_msg_ids,source_excerpt')
+    .eq('group_jid', group.jid).in('status', ['done', 'answered']).gte('updated_at', new Date(Date.now() - 14 * 86400000).toISOString())
+    .order('updated_at', { ascending: false }).limit(8), 'load closed tasks');
 
   const corrections = await recentCorrections();
   const lines = msgs.map((m, i) => `#${i + 1} [${m.from_team ? 'TEAM' : 'CLIENT'}] ${m.ts.slice(0, 16).replace('T', ' ')} ${m.sender || '?'}: ${m.text.replace(/\s+/g, ' ').slice(0, 600)}`);
-  const user = `Client group: ${group.name}\nToday: ${new Date().toISOString().slice(0, 10)}\n\nOPEN TASKS:\n${openTasks.length ? openTasks.map(t => `- id=${t.id} [${t.kind}] ${t.title} (owner ${t.owner_key})`).join('\n') : '(none)'}\n\nCHAT (oldest first):\n${lines.join('\n')}`;
+  const closedAt = t => (t.answered_at || t.updated_at || '').slice(0, 16).replace('T', ' ');
+  const user = `Client group: ${group.name}\nToday: ${new Date().toISOString().slice(0, 10)}\n\nOPEN TASKS:\n${openTasks.length ? openTasks.map(t => `- id=${t.id} [${t.kind}] ${t.title} (owner ${t.owner_key})`).join('\n') : '(none)'}\n\nRECENTLY CLOSED TASKS:\n${closedTasks.length ? closedTasks.map(t => `- id=${t.id} [${t.kind}] ${t.title} (${t.status === 'answered' ? 'answered in the chat' : 'marked done'} ${closedAt(t)})`).join('\n') : '(none)'}\n\nCHAT (oldest first):\n${lines.join('\n')}`;
 
   let out;
   try { out = parseJson(await claude(SYSTEM(corrections), user)); }
-  catch(e){ console.error(`  extraction failed for ${group.name}: ${e.message}`); return { created: 0, resolved: 0, seen: fresh, failed: true }; }
+  catch(e){ console.error(`  extraction failed for ${group.name}: ${e.message}`); return { created: 0, resolved: 0, reopened: 0, seen: fresh, failed: true }; }
 
   const now = new Date().toISOString();
   let created = 0, resolved = 0;
@@ -82,7 +90,23 @@ export async function analyzeGroup(group, since){
     const { error } = await db().from('wa_tasks').update({ status: 'answered', answered_at: now, updated_at: now }).eq('id', r.task_id);
     if(!error) resolved++;
   }
-  const existingTitles = new Set(openTasks.map(t => t.title.toLowerCase()));
+  // A follow-up on a closed task: back to open, with what the client now needs and their message outlined.
+  let reopened = 0;
+  const closedById = new Map(closedTasks.map(t => [t.id, t]));
+  const reopenedTitles = [];
+  for(const r of out.reopen || []){
+    const t = closedById.get(r.task_id);
+    if(!t) continue;
+    const ids = (r.msg_ids || []).map(n => msgs[Number(n) - 1]?.wa_msg_id).filter(Boolean);
+    const { error } = await db().from('wa_tasks').update({
+      status: 'open', answered_at: null, updated_at: now, last_seen: now,
+      detail: r.reason ? `The client followed up: ${String(r.reason).slice(0, 400)}` : 'The client followed up after it was closed.',
+      source_msg_ids: [...new Set([...(t.source_msg_ids || []), ...ids])],
+      source_excerpt: r.excerpt ? String(r.excerpt).slice(0, 400) : t.source_excerpt,
+    }).eq('id', t.id);
+    if(error) console.error('  reopen failed:', error.message); else { reopened++; reopenedTitles.push(t.title.toLowerCase()); }
+  }
+  const existingTitles = new Set([...openTasks.map(t => t.title.toLowerCase()), ...reopenedTitles]);
   for(const t of out.new_tasks || []){
     if(!t?.title || existingTitles.has(String(t.title).toLowerCase())) continue;
     const owner = ROLE_KEYS.includes(t.owner) ? t.owner : 'eric';
@@ -100,5 +124,5 @@ export async function analyzeGroup(group, since){
   }
   // Still-open tasks in an active chat stay fresh.
   await db().from('wa_tasks').update({ last_seen: now }).eq('group_jid', group.jid).eq('status', 'open');
-  return { created, resolved, seen: fresh };
+  return { created, resolved, reopened, seen: fresh };
 }

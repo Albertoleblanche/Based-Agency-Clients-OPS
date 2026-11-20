@@ -280,8 +280,8 @@ create policy "update own or all wa_tasks" on public.wa_tasks
 --     PC sees it within 30 seconds, reads the groups right away (no Slack messages) and
 --     clears it.
 --   * task_id: the Radar task an item became (Make a Task).
---   * wa_task_messages(item): the messages around what the client asked, for the item
---     panel. Leads (or the testers) see any item's; everyone else only their own items'.
+--   * wa_task_messages(item): the messages around what the client asked, and the newest 30
+--     after it (a follow-up always shows), for the item panel. Leads (or the testers) see any item's; everyone else only their own items'.
 -- ============================================================================
 alter table public.wa_tasks add column if not exists task_id text;
 revoke update on public.wa_tasks from authenticated;
@@ -309,12 +309,15 @@ language sql stable security definer set search_path = public as $$
   ), picked as (
     (select m.* from public.wa_messages m join t on m.group_jid = t.group_jid, src
        where m.ts < src.a order by m.ts desc limit 2)
-    union all
+    union
     (select m.* from public.wa_messages m join t on m.group_jid = t.group_jid, src
        where m.ts between src.a and src.b order by m.ts limit 12)
-    union all
+    union
     (select m.* from public.wa_messages m join t on m.group_jid = t.group_jid, src
        where m.ts > src.b order by m.ts limit 6)
+    union
+    (select m.* from public.wa_messages m join t on m.group_jid = t.group_jid, src
+       where m.ts > src.b order by m.ts desc limit 30)
   )
   select p.wa_msg_id, p.sender, p.from_team, p.text, p.ts, p.wa_msg_id = any(t.source_msg_ids)
   from picked p cross join t

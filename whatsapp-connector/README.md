@@ -73,6 +73,16 @@ Roles live in `src/roles.js`. When someone changes the assignee on an item in Ra
 sees that correction on its next run and uses it as an example — that's how it learns.
 Pressing **Not a Task** also tells it the item wasn't real.
 
+## When a client writes again after an item is done
+
+At each check the agent also sees the group's items closed in the last two weeks (marked done in
+Radar, or answered in the chat). If the client follows up on one of them (asks for more, says it
+isn't fixed, or sends what the team was waiting for), it **reopens that item** with what they now
+need, instead of skipping the message as an update or making a duplicate. Thanks and "looks good"
+don't reopen anything. In Radar, a done item the client wrote on since shows at the top of
+Waiting under "The client wrote again", and its chat runs up to the newest message, with a line
+where it was marked done.
+
 ## If WhatsApp logs out
 
 WhatsApp can drop linked devices. The connector writes an error to Radar (a red dot on the
