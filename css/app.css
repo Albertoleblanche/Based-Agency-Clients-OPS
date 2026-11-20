@@ -2608,3 +2608,17 @@ a.mi{text-decoration:none;color:inherit}
 @supports (text-box: trim-both cap alphabetic){
   .app-win .side .src-i .n{display:inline-block;box-sizing:border-box;height:20px;padding-block:calc((20px - 1cap) / 2) 0;text-align:center;text-box:trim-both cap alphabetic}
 }
+/* Recently Deleted: Select ticks several at once (Nov 20) */
+.tr-top{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.mac .tr-sel-btn{gap:6px}
+#trashRoot.tr-selecting{display:flex;flex-direction:column;padding-bottom:0}
+#trashRoot.tr-selecting > .tr-list{flex:1 0 auto;padding-bottom:24px}
+.tr-bulk{position:sticky;bottom:0;margin:0 -32px;padding:12px 32px}
+.mac .tr-bulk .btn.danger{gap:6px}
+.tr-bulk .btn.danger svg{width:14px;height:14px}
+.tr-bulk .btn:disabled{opacity:.45}
+.tr-pick{cursor:default;transition:background-color 120ms ease}
+.tr-pick:hover{background:var(--fill)}
+.tr-pick:focus-visible{outline:none;box-shadow:inset 0 0 0 2px var(--accent)}
+.tr-pick .ck{margin-right:2px}
+.tr-pick .ck.on{background:var(--label-2)}
