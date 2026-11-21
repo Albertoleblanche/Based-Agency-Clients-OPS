@@ -16,9 +16,10 @@ function isoWeek(d){ const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), 
 function calColor(e){
   if(e.kind === 'due') return 'red';
   if(e.kind === 'sent') return 'green';
-  if(e.isTaskMarker) return 'gray';
+  if(e.isTaskMarker || e._task || e.eventType === 'task') return 'teal';   // tasks
   if(e.eventType === 'deadline') return 'red';
   if(e.eventType === 'meeting') return e.clientId ? 'blue' : 'purple';
+  if(e.eventType === 'reminder') return 'yellow';                         // reminders
   return 'gray';
 }
 // Updates due, updates sent, tasks and all-day events sit in the row under the day names;
@@ -99,12 +100,12 @@ function calTimedHtml(items, colW){
 function calTopChip(e){
   const c = calColor(e), tip = escapeHtml((e.sub ? `${e.title}: ${e.sub}` : e.title) + (e._done ? ' · done' : ''));
   const lead = e.isTaskMarker || e._task ? `<span class="ad-ck" aria-hidden="true">${e._done ? icon('check', { weight: 'bold' }) : ''}</span>` : e.kind === 'sent' ? icon('check') : '';
-  return `<button class="ad ${e.isTaskMarker ? 'is-task' : c}${e.kind ? ' ' + e.kind : ''}${e._task ? ' has-task' : ''}${e._done ? ' done' : ''}" data-id="${e.id}" onclick="calOpen('${e.id}',this)" ondblclick="event.stopPropagation()" title="${tip}">${lead}<span class="t">${escapeHtml(e.title)}</span></button>`;
+  return `<button class="ad ${e.isTaskMarker ? 'is-task ' : ''}${c}${e.kind ? ' ' + e.kind : ''}${e._task ? ' has-task' : ''}${e._done ? ' done' : ''}" data-id="${e.id}" onclick="calOpen('${e.id}',this)" ondblclick="event.stopPropagation()" title="${tip}">${lead}<span class="t">${escapeHtml(e.title)}</span></button>`;
 }
 function calMonthChip(e){
   const c = calColor(e), timed = !calTopRow(e) || e.kind === 'sent';
   const tip = escapeHtml(e.sub ? `${e.title}: ${e.sub}` : e.title);
-  return `<button class="mc ${e.isTaskMarker ? 'is-task' : c}${e.kind ? ' ' + e.kind : ''}${e._done ? ' done' : ''}" data-id="${e.id}" onclick="calOpen('${e.id}',this)" ondblclick="event.stopPropagation()" title="${tip}${e._done ? ' · done' : ''}">${e._done ? `<span class="dot ck" aria-hidden="true">${icon('check', { weight: 'bold' })}</span>` : '<span class="dot" aria-hidden="true"></span>'}<span class="t">${escapeHtml(e.title)}</span>${timed && !e.kind ? `<i>${calShortTime(new Date(e.startAt))}</i>` : ''}</button>`;
+  return `<button class="mc ${e.isTaskMarker ? 'is-task ' : ''}${c}${e.kind ? ' ' + e.kind : ''}${e._done ? ' done' : ''}" data-id="${e.id}" onclick="calOpen('${e.id}',this)" ondblclick="event.stopPropagation()" title="${tip}${e._done ? ' · done' : ''}">${e._done ? `<span class="dot ck" aria-hidden="true">${icon('check', { weight: 'bold' })}</span>` : '<span class="dot" aria-hidden="true"></span>'}<span class="t">${escapeHtml(e.title)}</span>${timed && !e.kind ? `<i>${calShortTime(new Date(e.startAt))}</i>` : ''}</button>`;
 }
 function calSortDay(list){ return list.sort((a, b) => (a._done ? 1 : 0) - (b._done ? 1 : 0) || (calTopRow(a) ? calTopRank(a) : 1.5) - (calTopRow(b) ? calTopRank(b) : 1.5) || new Date(a.startAt) - new Date(b.startAt)); }
 function renderCalendar(){

@@ -187,6 +187,11 @@ button.cb:hover { box-shadow: inset 0 0 0 1.5px var(--label-2); }
 .ad.blue { background: var(--blue-soft); color: var(--blue); box-shadow: inset 3px 0 0 var(--blue); }
 .ad.purple { background: var(--purple-soft); color: var(--purple); box-shadow: inset 3px 0 0 var(--purple); }
 .ad.gray:not(.is-task) { background: var(--fill-2); box-shadow: inset 3px 0 0 var(--label-3); }
+/* tasks in teal (their circle too), reminders in amber */
+.ad.teal, .ad.yellow { font-weight: 600; padding-left: 9px; }
+.ad.teal { background: var(--teal-soft); color: var(--teal); box-shadow: inset 3px 0 0 var(--teal); }
+.ad.yellow { background: var(--yellow-soft); color: var(--yellow); box-shadow: inset 3px 0 0 var(--yellow); }
+.ad.is-task.teal .ad-ck { box-shadow: inset 0 0 0 1.25px var(--teal); }
 .ad.green { color: var(--label-2); }
 .ad.green svg { width: 13px; height: 13px; flex: 0 0 auto; color: var(--green); }
 .ad.red:hover { background: color-mix(in srgb, var(--red) 22%, var(--window)); }
@@ -209,7 +214,9 @@ button.cb:hover { box-shadow: inset 0 0 0 1.5px var(--label-2); }
 .mc { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; height: 20px; flex: 0 0 auto; padding: 0 5px; border: 0; border-radius: 5px; background: transparent; font: inherit; font-size: 12px; color: var(--label); text-align: left; cursor: default; }
 .mc .dot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; background: var(--label-3); }
 .mc.blue .dot { background: var(--blue); } .mc.purple .dot { background: var(--purple); } .mc.red .dot { background: var(--red); } .mc.green .dot { background: var(--green); }
+.mc.teal .dot { background: var(--teal); } .mc.yellow .dot { background: var(--yellow); }
 .mc.is-task .dot { background: transparent; box-shadow: inset 0 0 0 1.25px var(--label-3); }
+.mc.is-task.teal .dot { box-shadow: inset 0 0 0 1.5px var(--teal); }
 .mc .t { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .mc i { flex: 0 0 auto; font-style: normal; font-size: 11px; color: var(--label-3); }
 .mc.due { background: var(--red-soft); color: var(--red); font-weight: 600; }
