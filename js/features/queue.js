@@ -88,7 +88,7 @@ function renderMyQueue(){
     const due = sentAt ? `Sent ${relDayLower(sentAt)}` : quDueShort(x.w);
     const kind = sentAt || x.w.sent ? '' : x.w.late ? 'is-late' : x.w.daysLeft === 0 ? 'is-soon' : '';
     const n = sentAt ? fmtTime(sentAt) : x.mine.length ? todayPlural(x.mine.length, 'logged', 'logged') : 'Draft only';
-    return `<a class="rvn-r qu-r${on ? ' is-sel' : ''}" href="#queue" onclick="selectQueueClient('${x.c.id}');return false;"${on ? ' aria-current="true"' : ''}>${monoHtml(x.c, 'sm')}
+    return `<a class="rvn-r qu-r${on ? ' is-sel' : ''}" href="#queue" onclick="selectQueueClient('${x.c.id}');return false;"${on ? ' aria-current="true"' : ''}>
 <div class="tx"><b>${escapeHtml(x.c.name)}</b><span class="s"><span class="rvn-due ${kind}">${escapeHtml(due)}</span> · ${n}</span></div>
 <div class="rvn-rr"><span class="qu-tag ${cls}">${word}</span></div></a>`;
   }).join('') || `<div class="rvn-empty"><b>${{ todo: 'Nothing to do', review: 'Nothing in review', sent: 'Nothing sent this week' }[queueTab]}</b>${{ todo: 'Clients show up here once you log work for them.', review: 'Drafts you send for review wait here until they go out.', sent: 'Your updates show here once they’re sent.' }[queueTab]}</div>`;
@@ -184,10 +184,10 @@ function queueReadHtml(x, list, split){
 ${x.mine.map(itemRow).join('') || '<p class="qu-none">Nothing of yours logged since the last update.</p>'}
 <div class="qu-new"><textarea spellcheck="true" id="quNew" rows="1" placeholder="Log more for ${escapeHtml(shortClientName(c.name))}…" aria-label="Log more work for ${escapeHtml(c.name)}" oninput="quGrow(this)" onkeydown="quNewKey(event,'${c.id}')"></textarea>
 <div class="qu-nf"><label class="qu-fl" for="quDate">Date</label>${sheetDateField('quDate', form.date, { past: true, from: -13, to: 0, max: toDateStr(new Date()) })}
-<label class="qu-fl" for="quTime">Time spent</label><input id="quTime" class="tf qu-time" placeholder="0:30" autocomplete="off" aria-label="Time spent" value="${escapeHtml(form.time)}" oninput="quTimeChanged('${c.id}')" onkeydown="quNewKey(event,'${c.id}')">
+<label class="qu-fl" for="quTime">Time spent</label><input id="quTime" class="tf qu-time" placeholder="0:30" autocomplete="off" aria-label="Time spent" value="${escapeHtml(form.time)}" aria-required="true" oninput="this.classList.remove('is-need');quTimeChanged('${c.id}')" onkeydown="quNewKey(event,'${c.id}')">
 <span class="rvn-sp"></span><button class="btn" onclick="quLog('${c.id}')">${icon('plus')}Log</button></div>
 <input type="hidden" id="quClient" value="${c.id}"><div class="f qu-pf" id="quPick"></div></div>
-<p class="qu-hint">New work goes in the email; switch Email off to keep it internal. Time goes on your timesheet${typeof hvTimeOn === 'function' && hvTimeOn() ? ' and in Harvest' : ''}. <kbd>↩</kbd> logs it.</p></section>`;
+<p class="qu-hint">The time spent is required and goes on your timesheet${typeof hvTimeOn === 'function' && hvTimeOn() ? ' and in Harvest' : ''}. New work goes in the email; switch Email off to keep it internal. <kbd>↩</kbd> logs it.</p></section>`;
   // Your draft, once there is one: as the client will read it.
   let draft = '';
   if(d){
@@ -352,8 +352,10 @@ async function quLog(clientId){
   if(typeof isClientPaused === 'function' && isClientPaused(clientId)){ showPausedClientWarning(clientId); return; }
   const c = clients.find(x => x.id === clientId);
   if(!c) return;
+  // the time spent is required: every item logged here goes on the timesheet
   const timeRaw = (g('quTime')?.value || '').trim(), minutes = timeRaw ? parseSpent(timeRaw) : 0;
-  if(timeRaw && !minutes){ showToast('error', 'Check the time', 'Try 0:30, 45m or 1h 30m.'); g('quTime')?.focus(); return; }
+  if(!timeRaw){ showToast('error', 'Add the time spent', 'How long did it take? Try 0:30, 45m or 1h 30m.'); g('quTime')?.focus(); g('quTime')?.classList.add('is-need'); return; }
+  if(!minutes){ showToast('error', 'Check the time', 'Try 0:30, 45m or 1h 30m.'); g('quTime')?.focus(); g('quTime')?.classList.add('is-need'); return; }
   const pick = minutes && g('quPick')?.innerHTML && typeof hvPickValue === 'function' ? hvPickValue('qu', clientId) : { ok: true, projectId: null, taskId: null };
   if(!pick.ok){ showToast('error', 'Almost there', pick.msg); return; }
   if(minutes > 960 && !(await confirmDialog(`That’s ${hmLong(minutes)} for one improvement. Log it anyway?`, { confirmLabel: 'Log It', cancelLabel: 'Fix It' }))) return;

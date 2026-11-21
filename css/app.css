@@ -1512,6 +1512,7 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .qu-fl{font-size:12.5px;color:var(--label-2)}
 .qu-fl + .pop,.qu-fl + input{margin-right:8px}
 .mac .qu-time{width:84px;height:30px}
+.mac .qu-time.is-need{box-shadow:0 0 0 1px var(--red),0 0 0 4px var(--red-soft)}
 .qu-nf .btn{height:32px;padding:0 14px;flex:0 0 auto}
 .qu-pf{margin-top:2px;grid-template-columns:84px minmax(0,1fr)}
 .qu-pf > label:not(.pop){font-size:12.5px;text-align:left}
@@ -1524,6 +1525,10 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .qu .rvn-body{margin-top:12px}
 .qu .mac .rvn-edit,.mac .qu .rvn-edit{min-height:260px}
 .qu-r .tx .s{display:block}
+.rvn-r .tx .s{font-size:12px}
+.rvn-r .rvn-due.is-late,.rvn-r .rvn-due.is-soon{font-weight:400}
+.qu .rvn-lh .seg{display:flex;width:100%}
+.qu .rvn-lh .seg button{flex:1 1 0;justify-content:center}
 .rvn-ft{display:flex;align-items:center;gap:8px;padding:14px 24px 16px 36px;border-top:.5px solid var(--sep);flex:0 0 auto}
 .rvn-ft-note{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--label-2);min-width:0}
 .rvn-ft-note svg{width:14px;height:14px;color:var(--label-3);flex:0 0 auto}
@@ -2880,11 +2885,11 @@ body > .notif-panel{position:fixed;top:auto;right:auto;z-index:1000}
 /* Appearance: Night to Morning's tile is the day going down into night */
 .appear > div{width:76px;text-align:center;line-height:1.25}
 .appear i.ap-night{background:linear-gradient(180deg,#FFFFFF 0%,#E4E5EA 34%,#3A3A40 62%,#1E1E20 100%)}
-/* Tasks and WhatsApp keep their number (how many are on you is worth reading at a glance); every
-   other count stays a dot. The same grey pill as before the dots. */
-.app-win .side .src-i :is(#navTasksBadge,#navWhatsappBadge){display:inline-flex;align-items:center;justify-content:center;min-width:20px;width:auto;height:20px;padding:0 6px;margin-right:0;border-radius:999px;font-size:11.5px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;color:var(--label);background:var(--fill-2);overflow:visible}
+/* Tasks, WhatsApp and the Queue keep their number (how many are on you is worth reading at a
+   glance); every other count stays a dot. The same grey pill as before the dots. */
+.app-win .side .src-i :is(#navTasksBadge,#navWhatsappBadge,#navQueueBadge){display:inline-flex;align-items:center;justify-content:center;min-width:20px;width:auto;height:20px;padding:0 6px;margin-right:0;border-radius:999px;font-size:11.5px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;color:var(--label);background:var(--fill-2);overflow:visible}
 @supports (text-box: trim-both cap alphabetic){
-  .app-win .side .src-i :is(#navTasksBadge,#navWhatsappBadge){display:inline-block;box-sizing:border-box;padding-block:calc((20px - 1cap) / 2) 0;text-align:center;text-box:trim-both cap alphabetic}
+  .app-win .side .src-i :is(#navTasksBadge,#navWhatsappBadge,#navQueueBadge){display:inline-block;box-sizing:border-box;padding-block:calc((20px - 1cap) / 2) 0;text-align:center;text-box:trim-both cap alphabetic}
 }
 /* the sidebar's selection moves at once, like a Mac sidebar's (it used to fade, so the old row
    stayed lit while the page was already changing); only the press still eases */

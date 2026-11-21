@@ -40,7 +40,7 @@ html.ui-w .mac[data-theme] .app-win .side{
 html.ui-w .mac[data-theme] .app-win .side .src-i{height:36px;border-radius:12px;font-size:13.5px;font-weight:400;transition:transform 160ms var(--uw-ease),background-color 120ms ease,color 120ms ease}
 html.ui-w .mac[data-theme] .app-win .side .src-i.on{background:var(--sb-on);color:var(--sb-strong);box-shadow:var(--uw-shadow),var(--uw-hi)}
 html.ui-w .mac[data-theme] .app-win .side .src-i:active{transform:scale(.97);transition-duration:100ms}
-html.ui-w .mac .app-win .side .src-i .n{font-family:var(--mono);font-weight:500;font-size:11px;background:var(--fill-2);color:var(--label-2)}
+html.ui-w .mac .app-win .side .src-i :is(#navTasksBadge,#navWhatsappBadge,#navQueueBadge){font-family:var(--mono);font-weight:500;font-size:11px;background:var(--fill-2);color:var(--label-2)}
 html.ui-w .mac .side-foot{border-top-color:var(--sep)}
 html.ui-w .mac .side-brand .brand-mark{border-radius:9px}
 html.ui-w .mac .stm{border-radius:16px;background:var(--grp);box-shadow:0 0 0 1px var(--sep)}
@@ -70,6 +70,9 @@ html.ui-w .mac .seg button,html.ui-w .mac .seg a{height:28px;border-radius:999px
 html.ui-w .mac .seg .on{background:var(--seg-on);color:var(--label);box-shadow:none}
 html.ui-w .mac .seg button:active{transform:scale(.96)}
 html.ui-w .mac .pop{height:32px;border-radius:999px;padding:0 10px 0 13px;background:var(--grp);box-shadow:0 0 0 1px var(--sep);font-size:13px}
+html.ui-w .mac .pop-wrap{height:32px;border-radius:999px;padding-left:13px;background:var(--grp);box-shadow:0 0 0 1px var(--sep);font-size:13px;color:var(--label-2)}
+html.ui-w .mac .pop-wrap select.pop{height:32px;padding:0 26px 0 5px;border-radius:999px;background-color:transparent;box-shadow:none;font-size:13px;color:var(--label)}
+html.ui-w .cl-find{height:32px;border-radius:999px;padding:0 13px;background:var(--grp);box-shadow:0 0 0 1px var(--sep)}
 html.ui-w .mac .tf{border-radius:12px;height:36px;border:0;box-shadow:0 0 0 1px var(--sep-strong);background:var(--field)}
 html.ui-w .mac textarea.tf{height:auto;min-height:84px;border-radius:14px}
 html.ui-w .mac .tf:focus,html.ui-w .mac .tf.focus{box-shadow:0 0 0 1px var(--label-3),0 0 0 4px var(--fill-2)}
@@ -467,8 +470,8 @@ html.ui-w .rvn-sort{font-family:var(--mono);font-size:10.5px;font-weight:500;let
 html.ui-w .rvn-r{border-radius:16px}
 html.ui-w .rvn-r.is-sel{background:var(--card)}
 html.ui-w .rvn-r .tx b{font-weight:500}
-html.ui-w .rvn-due.is-late{color:var(--uw-risk);font-weight:500}
-html.ui-w .rvn-due.is-soon{font-weight:500}
+html.ui-w .rvn-due.is-late{color:var(--uw-risk);font-weight:400}
+html.ui-w .rvn-due.is-soon{font-weight:400;color:var(--label)}
 html.ui-w .rvn-keys kbd{font-family:var(--mono);font-weight:500;border-radius:6px}
 html.ui-w .rvn-top{border-bottom-color:var(--sep);padding:0 18px 0 16px;height:58px}
 html.ui-w .rvn-nav span{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
@@ -766,6 +769,7 @@ html.ui-w .mac :is(.qu-edt,.qu-new textarea){border-radius:16px;background:var(-
 html.ui-w .mac .qu-new textarea{min-height:40px}
 html.ui-w .qu-fl{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--label-3)}
 html.ui-w .mac .qu-time{border-radius:999px;height:32px;text-align:center}
+html.ui-w .mac .qu-time.is-need{box-shadow:0 0 0 1px var(--uw-risk)}
 html.ui-w .qu-nf .btn{height:34px}
 html.ui-w .qu-pf > label:not(.pop){font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--label-3)}
 html.ui-w .mac :is(.qu-edt,.qu-new textarea):focus-visible{box-shadow:0 0 0 1px var(--label-3)}
@@ -813,15 +817,18 @@ html.ui-w .n1-card .n1-sheet{top:auto}
 /* ---- the sidebar flush with the window's edges (no card, no outside margin); a minimal toggle ---- */
 html.ui-w .mac[data-theme] .app-win .side{margin:0;height:100%;flex-basis:224px;width:224px;padding:0 12px 10px;border-radius:0;background:var(--grp);box-shadow:1px 0 0 var(--sep);--sb-on:var(--uw-c2);--sb-hover:var(--uw-c2)}
 html.ui-w body.sidebar-collapsed .app-win .side{margin-left:-225px}
-html.ui-w .mac .app-win .side .side-head{margin:0 -10px;padding:14px 16px 4px}
-html.ui-w .mac .side-brand .brand-mark{width:30px;height:30px;border-radius:10px;font-size:11.5px}
+html.ui-w .mac .app-win .side .side-head{margin:0 -12px;padding:18px 18px 16px}
+html.ui-w .mac .side-brand{gap:10px}
+html.ui-w .mac .side-brand .brand-mark{width:24px;height:24px;border-radius:7px;font-size:9.5px}
 html.ui-w .mac .side-brand .brand-name{font-size:13.5px;font-weight:500}
 html.ui-w .mac .side-brand .brand-sub{font-family:var(--mono);font-size:9px;font-weight:500;letter-spacing:.08em;color:var(--label-3)}
-html.ui-w .mac .app-win .side .src{margin-top:12px}
+html.ui-w .mac .app-win .side .src{margin-top:14px}
 html.ui-w .mac .app-win .side .src-sep{height:0;margin:7px 0;background:transparent}
 html.ui-w .mac[data-theme] .app-win .side .src-i.on{box-shadow:none}
-html.ui-w .mac .side-foot{border-top:0;margin-top:4px;padding:8px 6px 2px}
-html.ui-w .mac .side-me :is(.av,.av-img){display:none!important}
+html.ui-w .mac .side-foot{border-top:0;margin-top:14px;padding:12px 6px 6px}
+html.ui-w .mac .side-me{gap:11px}
+html.ui-w .mac .side-me .av-img{width:30px;height:30px;border-radius:50%;object-fit:cover;flex:0 0 auto}
+html.ui-w .mac .side-me .av{width:30px!important;height:30px!important;border-radius:50%;flex:0 0 auto}
 html.ui-w .mac .side-me .who b{font-size:13.5px;font-weight:500}
 html.ui-w .mac .stm{background:var(--uw-c2);box-shadow:none}
 html.ui-w .ic-classic{display:none}
