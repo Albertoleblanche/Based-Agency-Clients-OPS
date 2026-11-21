@@ -7,8 +7,8 @@ function spotDraftAction(c){
   const w = clientWeek(c), me = myName();
   if(w.sent) return null;
   if(w.draft) return { icon: 'envelope-open', title: `Open this week’s draft for ${c.name}`, run: () => canApprove() ? openReviewDraft(c.id, w.draft.author) : (window._weekSel = c.id, switchView('approve')) };
-  if(w.logged.length){
-    const author = w.logged.find(i => i.author === me) ? me : (canApprove() ? (w.owner || w.logged[0].author) : me);
+  if(w.forEmail.length){
+    const author = w.forEmail.find(i => i.author === me) ? me : (canApprove() ? (w.owner || w.forEmail[0].author) : me);
     return { icon: 'note-pencil', title: `Start this week’s draft for ${c.name}`, run: () => generateDraft(c.id, author) };
   }
   return { icon: 'note-pencil', title: `Log an improvement for ${c.name}`, run: () => openQueueLogImprovementModal(c.id) };

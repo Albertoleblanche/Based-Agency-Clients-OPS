@@ -22,7 +22,7 @@ function uwSteps(w){
   if(w.sent) done = 4;
   else if(w.done >= 3) done = 3;                    // approved, ready to send
   else if(w.done === 2 || written) done = 2;        // in review, or a draft waiting to go for review
-  else if(w.logged && w.logged.length) done = 1;    // work logged, no draft yet
+  else if(w.forEmail && w.forEmail.length) done = 1;    // work for the email logged, no draft yet
   else done = 0;
   const names = ['Logged', 'Draft', 'Review', 'Sent'];
   return `<div class="uw-stp" aria-label="${uwEsc(done >= 4 ? 'Sent' : names[done] + ' is next')}">${names.map((n, i) =>

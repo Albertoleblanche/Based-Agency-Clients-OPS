@@ -43,7 +43,7 @@ ${callout}`;
   document.querySelectorAll('#cdRoot .cd-tab').forEach(t => { t.hidden = t.dataset.tab !== cdTab; });
 
   // ---- Overview
-  const stepTxt = [w.sent ? 'Logged' : `${w.logged.length} improvement${w.logged.length === 1 ? '' : 's'}`,
+  const stepTxt = [w.sent ? 'Logged' : `${w.forEmail.length} improvement${w.forEmail.length === 1 ? '' : 's'}`,
     w.sent || w.done > 1 ? 'Sent for review' : w.draft && w.done === 1 ? 'Waiting on ' + firstName(w.draft.author) : 'Draft not written',
     w.sent || w.done > 2 ? 'Approved' : 'By an approver', w.sent ? `Sent ${relDayLower(w.last)}` : w.dueText];
   const stepper = STEP_NAMES.map((n, k) => {
@@ -106,9 +106,9 @@ function cpUwGridHtml(c, x){
   const head = (ic, title, right, count) => `<div class="uw-wh"><span class="uw-ic">${icon(ic)}</span><span class="uw-wt">${title}</span>${count ? `<span class="uw-cnt">${count}</span>` : ''}${right ? `<span class="uw-sp"></span>${right}` : ''}</div>`;
   // this week's update: where it stands, the four steps, what to do
   const names = ['LOGGED', 'DRAFT', 'REVIEW', 'SENT'];
-  const done = w.sent ? 4 : w.done >= 3 ? 3 : (w.done === 2 || w.draft) ? 2 : (w.logged && w.logged.length) ? 1 : 0;
+  const done = w.sent ? 4 : w.done >= 3 ? 3 : (w.done === 2 || w.draft) ? 2 : (w.forEmail && w.forEmail.length) ? 1 : 0;
   const state = w.sent ? `Sent ${relDayLower(w.last)}` : clientStageWord(w);
-  const detail = w.sent ? (w.note || '') : `${w.logged.length} improvement${w.logged.length === 1 ? '' : 's'} logged · ${w.dueText.replace(/^Due /, 'due ')}`;
+  const detail = w.sent ? (w.note || '') : `${w.forEmail.length ? `${w.forEmail.length} improvement${w.forEmail.length === 1 ? '' : 's'} for the email` : w.logged.length ? 'Only internal work logged' : 'Nothing logged yet'} · ${w.dueText.replace(/^Due /, 'due ')}`;
   const act = w.sent ? '' : `<div class="uw-fa cp-fa">${w.draft ? `<button class="uw-wb" onclick="openReviewDraft('${c.id}',${jsArg(w.draft.author)})">Open draft${icon('arrow-right')}</button>` : `<button class="uw-wb" onclick="openWeekClient('${c.id}')">Open in This Week${icon('arrow-right')}</button>`}${holder && holder !== myName() ? `<button class="uw-pill cp-pl" onclick="remindHolder('${c.id}')">Remind ${escapeHtml(firstName(holder))}</button>` : ''}</div>`;
   const update = `<section class="uw-w uw-s6 cp-up">${head('activity', 'This week’s update', `<span class="cp-due${w.late ? ' is-late' : ''}">${escapeHtml(w.sent ? 'Sent' : w.dueText)}</span>`)}
 <div class="uw-fn"><div class="uw-mono">${done >= 4 ? 'DONE · SENT' : 'NOW · ' + names[done]}</div><h3>${escapeHtml(state)}</h3><p>${escapeHtml(detail)}</p></div>

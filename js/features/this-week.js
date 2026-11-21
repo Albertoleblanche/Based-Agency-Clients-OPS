@@ -42,7 +42,7 @@ function weekTodo(w){
     return { b: 'wait', k: 'w-draft', what: `${firstName(d.author)} hasn’t sent the draft for review`, act: remind };
   }
   const mine = !holder || holder === me;
-  if(w.logged.length) return mine ? { b: 'now', k: 'write', what: 'Write this week’s draft', act: [`generateDraft('${c.id}',${jsArg(me)})`, 'Write Draft'] }
+  if(w.forEmail.length) return mine ? { b: 'now', k: 'write', what: 'Write this week’s draft', act: [`generateDraft('${c.id}',${jsArg(me)})`, 'Write Draft'] }
     : { b: 'wait', k: 'w-write', what: `${who} hasn’t written the draft`, act: remind };
   return mine ? { b: 'now', k: 'log', what: 'Log this week’s work', act: [`openQueueLogImprovementModal('${c.id}')`, 'Log Improvement'] }
     : { b: 'wait', k: 'w-log', what: `${who} hasn’t logged this week’s work`, act: remind };
@@ -72,7 +72,7 @@ function wbEntry(c, monday, today){
   const sentNow = !!w0.last && new Date(w0.last) >= monday;
   // Sent last week but inside its 7 days: this week's update is the next one.
   const w = sentNow ? w0 : w0.sent ? Object.assign({}, w0, w0.next || {}, { sent: false, state: 'due' }) : w0;
-  const step = sentNow ? 'sent' : w.done >= 3 ? 'approved' : w.done === 2 ? 'review' : w.draft ? 'draft' : w.logged.length ? 'logged' : 'none';
+  const step = sentNow ? 'sent' : w.done >= 3 ? 'approved' : w.done === 2 ? 'review' : w.draft ? 'draft' : w.forEmail.length ? 'logged' : 'none';
   const at = dayStart(new Date(sentNow ? w0.last : w.due));
   const lateDays = sentNow ? 0 : Math.round((today - at) / 864e5);
   // Who has it: the owner until there's a draft, then its writer; approvers while it's in review
@@ -216,7 +216,8 @@ function weekPanelHtml(w){
     else if(w.done === 2){ title = `${d.author === me ? 'Your' : firstName(d.author) + '’s'} draft is waiting for ${approver ? 'you' : 'review'}`; sub = `Sent for review ${escapeHtml(relDayLower(d.draftPendingSince || rNow()))}${d.draftPendingSince ? ' at ' + fmtTime(new Date(d.draftPendingSince)) : ''}`; }
     else if(d && draftHasNoWork(c, d)){ title = `Nothing left in ${d.author === me ? 'your' : firstName(d.author) + '’s'} draft`; sub = 'Everything it was written from was deleted. Rewrite it from what’s logged now, or log the work first.'; }
     else if(d){ title = `${d.author === me ? 'Your' : firstName(d.author) + '’s'} draft is written, not sent for review yet`; sub = lastTxt; }
-    else if(w.logged.length){ title = `${todayPlural(w.logged.length, 'improvement')} logged, no draft yet`; sub = lastTxt; }
+    else if(w.forEmail.length){ title = `${todayPlural(w.forEmail.length, 'improvement')} logged, no draft yet`; sub = lastTxt; }
+    else if(w.logged.length){ title = 'Only internal work logged'; sub = `Nothing is marked for the email yet. ${lastTxt}`; }
     else { title = 'Nothing logged yet'; sub = `${holder ? escapeHtml(firstName(holder)) + ' owns this client. ' : ''}${lastTxt}`; }
     // Edit: in Review for whoever has Review (Edit and Rewrite live there); otherwise right here, for
     // the writer, until they send it for review.
@@ -234,7 +235,7 @@ function weekPanelHtml(w){
   }
   // Progress: the four steps
   const stepSub = [
-    w.sent || w.done > 0 ? todayPlural(w.sent ? (w.logged.length || 0) : w.logged.length, 'item') : 'Nothing yet',
+    w.sent || w.done > 0 ? todayPlural(w.sent ? (w.logged.length || 0) : w.forEmail.length, 'item') : 'Nothing yet',
     w.sent || w.done > 1 ? (d && d.draftPendingSince ? whenShort(d.draftPendingSince) : 'Done') : d ? 'Not yet' : 'No draft',
     w.sent || w.done > 2 ? 'Done' : w.done === 2 ? (approver ? 'Waiting on you' : 'Waiting on review') : '',
     w.sent ? relDay(w.last) : w.late ? lateWords(w) : w.dueText];
@@ -243,7 +244,7 @@ function weekPanelHtml(w){
     const cls = k < cur ? 'd' : k === cur ? 'w' : '';
     return `<div class="sp-st ${cls}"><span class="dot">${k < cur ? icon('check', { weight: 'bold' }) : ''}</span><b>${k === 1 ? 'Sent for review' : n}</b><span${k === 3 && w.late && !w.sent ? ' class="t-red"' : ''}>${escapeHtml(stepSub[k])}</span></div>`;
   }).join('');
-  const nowWords = [w.logged.length ? 'log this week’s work' : 'nothing logged yet', d ? 'draft not sent for review' : 'no draft yet',
+  const nowWords = [w.logged.length ? 'nothing for the email yet' : 'nothing logged yet', d ? 'draft not sent for review' : 'no draft yet',
     approver ? 'waiting on you' : 'waiting on review', 'ready to send'][Math.min(cur, 3)];
   const progSum = w.sent ? `All done ·&nbsp;sent ${escapeHtml(relDayLower(w.last))}` : `Step ${cur + 1} of 4 ·&nbsp;<span class="sp-blue">${escapeHtml(nowWords)}</span>`;
   // Improvements: what's in the draft, what came after it, everything else logged for this update

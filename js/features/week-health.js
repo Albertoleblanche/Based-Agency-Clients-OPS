@@ -214,7 +214,10 @@ function clientWeek(c){
     if(t > since) return true;
     return !!last && i.includeInEmail !== false && t > addDays(since, -14);
   });
-  const w = { c, owner, holder: owner, logged, since, last, due, daysLeft, dueText: dueText(daysLeft, due),
+  // what can go in the email: work marked internal ("Include in email" off) is logged, but there's
+  // nothing to write a draft from until something here is meant for the client
+  const forEmail = logged.filter(i => i.includeInEmail !== false);
+  const w = { c, owner, holder: owner, logged, forEmail, since, last, due, daysLeft, dueText: dueText(daysLeft, due),
     done: 0, behind: null, sent: false, late: false, state: 'due', draft: null };
   const approved = drafts.find(d => d.draftStatus === 'approved' && !d.draftSentAt);
   const inReview = drafts.find(d => d.draftStatus === 'pending' && d.readyToNotify && !draftHasNoWork(c, d, logged));
@@ -222,7 +225,8 @@ function clientWeek(c){
   if(approved) Object.assign(w, { done: 3, draft: approved, holder: 'approvers', note: 'Approved · ready to send' });
   else if(inReview) Object.assign(w, { done: 2, draft: inReview, holder: 'approvers', note: `In Review since ${whenShort(inReview.draftPendingSince || now)}` });
   else if(written) Object.assign(w, { done: 1, draft: written, holder: written.author, note: `Draft waiting on ${firstName(written.author)} since ${whenShort(written.draftPendingSince || now)}` });
-  else if(logged.length) Object.assign(w, { done: 1, note: `${logged.length} improvement${logged.length === 1 ? '' : 's'} logged · no draft yet` });
+  else if(forEmail.length) Object.assign(w, { done: 1, note: `${forEmail.length} improvement${forEmail.length === 1 ? '' : 's'} logged · no draft yet` });
+  else if(logged.length) w.note = `${logged.length} logged, all internal · nothing for the email yet`;
   else {
     const lastLog = (c.improvements || []).map(i => new Date(i.date)).filter(d => d <= now).sort((a, b) => b - a)[0];
     w.note = lastLog ? `Nothing logged since ${fmtShortDate(lastLog)}` : 'Nothing logged yet';
@@ -370,7 +374,7 @@ function stageTag(w){
   if(w.done >= 3) return tagHtml('purple', 'Approved');
   if(w.done === 2) return tagHtml('blue', 'In Review');
   if(d) return tagHtml('gray', 'Draft');
-  if(w.done === 1) return tagHtml('gray', `${w.logged.length} logged`);
+  if(w.done === 1) return tagHtml('gray', `${w.forEmail.length} logged`);
   return tagHtml('gray', 'Nothing logged');
 }
 // Each health signal as an icon and a few words: "Over budget" · "2/4 late" · "8d quiet".

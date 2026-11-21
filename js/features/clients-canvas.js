@@ -128,7 +128,8 @@ function clientStageWord(w){
   if(w.done >= 3) return 'Approved';
   if(w.done === 2) return 'In review';
   if(w.draft) return 'Draft written';
-  if(w.logged.length) return `${w.logged.length} logged, no draft`;
+  if(w.forEmail.length) return `${w.forEmail.length} logged, no draft`;
+  if(w.logged.length) return 'Only internal work';
   return 'Nothing logged';
 }
 function clientWeekCell(w){
@@ -284,7 +285,7 @@ function clientPanelHtml({ c, h, w, owner }){
   const hp = h.hp, ots = onTimeSummary(h.seq), lateNow = w.late && !w.sent;
   const weekB = w.sent ? 'Sent' : lateNow ? lateWords(w) : w.dueText;
   const weekS = w.sent ? relDay(w.last) : w.done >= 3 ? 'Approved, not sent yet' : w.done === 2 ? (approver ? 'Waiting for you' : 'Waiting for review')
-    : w.draft ? 'Not sent for review' : w.logged.length ? 'Not written yet' : 'Nothing logged yet';
+    : w.draft ? 'Not sent for review' : w.forEmail.length ? 'Not written yet' : w.logged.length ? 'Only internal work logged' : 'Nothing logged yet';
   const hoursB = hp.budget ? `<span${hp.used > hp.budget ? ' class="t-red"' : ''}>${Math.round(hp.used)}</span> / ${hp.budget} h` : `${Math.round(hp.used)} h`;
   const hoursS = hp.budget ? `<span class="s${hp.projected > hp.budget ? ' t-red' : ''}">On pace for ${Math.round(hp.projected)} h</span>` : '<span class="s">No monthly budget</span>';
   const nums = `<div class="cl-m">

@@ -66,7 +66,7 @@ function todayRowAction(w){
   if(holder && holder !== me) return [`remindHolder('${c.id}')`, 'Remind ' + firstName(holder)];
   if(d && draftHasNoWork(c, d)) return w.logged.some(i => i.author === me && i.includeInEmail !== false) ? [`generateDraft('${c.id}',${jsArg(me)})`, 'Rewrite Draft'] : [`openQueueLogImprovementModal('${c.id}')`, 'Log Improvement'];
   if(d) return [`sendDraftForReview('${c.id}',${jsArg(d.author)})`, 'Send for Review'];
-  if(w.logged.length) return [`generateDraft('${c.id}',${jsArg(me)})`, 'Write Draft'];
+  if(w.forEmail.length) return [`generateDraft('${c.id}',${jsArg(me)})`, 'Write Draft'];
   return [`openQueueLogImprovementModal('${c.id}')`, 'Log Improvement'];
 }
 // An approved WhatsApp win is sent by whoever copies it: its writer, unless someone else already did.
@@ -84,7 +84,7 @@ function todayUpdateTitle(w){
   if(w.done >= 3) return `Send ${n}’s approved update`;
   if(w.done === 2) return `Review ${n}’s draft`;
   if(w.draft) return `Send ${n}’s draft for review`;
-  if(w.logged.length) return `Write ${n}’s update`;
+  if(w.forEmail.length) return `Write ${n}’s update`;
   return `Log this week’s work for ${n}`;
 }
 function hmText(min){ min = Math.round(min); const h = Math.floor(min / 60), m = min % 60; return h ? `${h} h${m ? ' ' + m + ' m' : ''}` : `${m} m`; }
