@@ -242,3 +242,109 @@ html.ui-w .uw-e span{font-size:12px;color:var(--label-2);white-space:nowrap;over
   html.ui-w .uw-foot:hover{color:var(--label)}
 }
 @media (prefers-reduced-motion:reduce){html.ui-w .uwd *{transition-duration:0s!important}}
+
+/* ================= Tasks, Health and Reminders (the canvas tabs, same layouts) ================= */
+/* the page head: a big thin title with its sentence beside it, the filters on the right */
+html.ui-w :is(.tk,.rmi,.hx){padding:6px 26px 30px 22px}
+html.ui-w :is(.tk-hd,.rmi-hd){align-items:center}
+html.ui-w :is(.tk-hd,.rmi-hd,.hx-top) > div:first-child{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 16px;min-width:0}
+html.ui-w :is(.tk-hd h2,.rmi-hd h2,.hx-h){font-size:30px;font-weight:400;letter-spacing:-.03em;line-height:1.15}
+html.ui-w :is(.tk-hd p,.rmi-hd p,.hx-s){margin:0;font-size:13.5px;color:var(--label-2)}
+html.ui-w :is(.tk-hd p b,.hx-s b){color:var(--uw-risk);font-weight:400}
+html.ui-w .hx-top{flex-direction:column;align-items:flex-start;gap:16px}
+html.ui-w .hx-s{max-width:none}
+html.ui-w :is(.tk-f,.rmi-f) .seg button .c,html.ui-w .tk-f .seg button span{font-family:var(--mono);font-size:11.5px}
+
+/* a group as a card: its title, a mono count, then the rows */
+html.ui-w :is(.hx-g,#remindersRoot .rmi-g){background:var(--grp);border-radius:28px;padding:16px 30px 14px;box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
+html.ui-w :is(.hx-gh,.rmi-sec){align-items:center;min-height:36px}
+html.ui-w :is(.hx-gh b,.rmi-sec b){font-size:15px;font-weight:500;letter-spacing:-.01em}
+html.ui-w :is(.hx-gn,.rmi-sec > span){font-family:var(--mono);font-size:12px;font-weight:500;color:var(--label-3)}
+html.ui-w .rmi-sec.is-due :is(b,span){color:var(--uw-risk)}
+
+/* ---- Tasks ---- */
+html.ui-w .tk-board{margin-top:22px;column-gap:16px}
+html.ui-w .tk-ch{height:36px;padding:0 0 0 10px;margin-bottom:12px}
+html.ui-w .tk-ch b{font-size:14px;font-weight:500}
+html.ui-w .tk-ch span{font-family:var(--mono);font-size:12px;font-weight:500}
+html.ui-w :is(.tk-ch,.tk-ls) .ib{width:32px;height:32px;border-radius:50%;box-shadow:0 0 0 1px var(--sep);color:var(--label-2)}
+html.ui-w .tk-c{gap:8px;padding:16px 18px;border-radius:22px;background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi);transition:background-color 120ms ease,box-shadow 120ms ease,transform 160ms var(--uw-ease)}
+html.ui-w .tk-c.is-sel{background:var(--card);box-shadow:0 0 0 1px var(--sep-strong),var(--uw-shadow)}
+html.ui-w .tk-ct b{font-size:13.5px;font-weight:500}
+html.ui-w .tk-cb{box-shadow:inset 0 0 0 1.5px var(--sep-strong);transition:box-shadow 120ms ease,transform 160ms var(--uw-ease)}
+html.ui-w .tk-cb:active{transform:scale(.88)}
+html.ui-w .tk-cb.on{background:var(--label);color:var(--window)}
+html.ui-w .tk-flag{color:var(--uw-watch)}
+html.ui-w .tk-due{font-size:12px}
+html.ui-w .tk-due.is-late{color:var(--uw-risk);font-weight:500}
+html.ui-w .tk-due.is-soon{font-weight:500}
+html.ui-w .tk-due.is-you{color:var(--label);font-weight:500}
+html.ui-w .tk-who{font-weight:400}
+html.ui-w .tk-done{border-left:1px solid var(--sep);padding-left:24px}
+html.ui-w .tk-d .tx b{font-weight:400}
+html.ui-w .tk-ls b{font-size:15px;font-weight:500}
+html.ui-w .tk-ls span{font-family:var(--mono);font-size:12px;font-weight:500}
+html.ui-w .tk-lr{border-radius:14px}
+html.ui-w .tk-lr .tx b{font-weight:500}
+html.ui-w .tk-lr.is-sel{background:var(--card)}
+
+/* ---- Health ---- */
+html.ui-w .mac[data-theme] #healthRoot{--hx-r:var(--uw-risk);--hx-y:var(--uw-watch);--hx-g:var(--uw-good);--hx-q:var(--uw-c3)}
+html.ui-w .hx-grid{margin-top:20px;display:flex;flex-direction:column;gap:14px}
+html.ui-w .hx-g{margin:0}
+html.ui-w .hx-gh{box-shadow:none;padding:0 0 8px;gap:8px}
+html.ui-w .hx-gw{margin-left:auto;font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--label-3)}
+html.ui-w .hx-gl{flex:1 1 auto;min-width:0;margin-left:4px;font-size:13px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:opacity 150ms ease-out}
+html.ui-w .hx-g:has(.hx-x.open) .hx-gl{opacity:0}
+html.ui-w .hx-g.is-ok{padding-top:14px;padding-bottom:14px}
+html.ui-w .hx-g.is-ok .hx-gh{padding:0}
+html.ui-w .hx-g.is-ok .hx-gh::before{content:'';flex:0 0 auto;width:8px;height:8px;margin:0 6px 0 4px;border-radius:50%;background:var(--uw-good);box-shadow:0 0 0 4px var(--uw-goodbg)}
+html.ui-w .hx-g.is-ok .hx-x.open{margin-top:8px}
+html.ui-w .hx-gh .lnk{margin-left:auto;flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 11px 0 12px;border-radius:999px;background:var(--uw-c2);box-shadow:0 0 0 1px var(--sep);color:var(--label-2);font-size:12.5px;font-weight:500;cursor:default;transition:transform 160ms var(--uw-ease),color 120ms ease}
+html.ui-w .hx-gh .lnk::after{content:'';width:5px;height:5px;margin:0 2px 1px 0;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg)}
+html.ui-w .hx-gh .lnk:active{transform:scale(.96);transition-duration:100ms}
+html.ui-w .hx-row.on .tl-s.now::before{background:transparent}
+html.ui-w .hx-row{min-height:62px;border-radius:14px}
+html.ui-w .hx-row.on{background:var(--card)}
+html.ui-w .hx-row:active:not(:has(:is(button,a,select,label,[role=button]):active)){background:var(--card)}
+html.ui-w .hx-nm b{font-weight:500}
+html.ui-w .hx-st{font-size:12.5px;font-weight:400}
+html.ui-w .hx-done{color:var(--uw-good);font-weight:500}
+html.ui-w .tl-s i{width:5px;height:5px;border-radius:99px}
+html.ui-w .tl-s i:is(.y,.r){width:6px}
+html.ui-w .tl-s i.y{height:15px}
+html.ui-w .tl-s i.r{height:22px}
+html.ui-w .tl-s.now::before{left:2px;right:2px;border-radius:99px;background:transparent;box-shadow:inset 0 0 0 1.5px var(--sep-strong)}
+
+/* ---- Reminders (and the shared WhatsApp head) ---- */
+html.ui-w #remindersRoot .rmi-g{margin-top:14px}
+html.ui-w #remindersRoot .rmi-hd + .rmi-g{margin-top:22px}
+html.ui-w #remindersRoot .rmi-g > .rmi-sec:first-child{margin:0 0 4px}
+html.ui-w .rmi-r{border-radius:14px}
+html.ui-w .rmi-r .tx b{font-weight:500}
+html.ui-w .rmi-r.is-sel{background:var(--card)}
+html.ui-w .rmi-when{font-weight:400}
+html.ui-w .rmi-when.is-late{color:var(--uw-risk)}
+html.ui-w .rmi-r .cb.closed{background:var(--uw-c2)}
+
+/* ---- the panel on the right: a card floating over the page ---- */
+html.ui-w .sp{top:10px;right:18px;bottom:18px;max-width:calc(100% - 36px);border-left:0;border-radius:28px;background:var(--grp);padding:14px 26px 28px;box-shadow:0 0 0 1px var(--sep),0 30px 70px -24px rgba(0,0,0,.6),var(--uw-hi)}
+html.ui-w .mac[data-theme="light"] .sp{box-shadow:0 0 0 1px var(--sep),0 24px 60px -20px rgba(0,0,0,.2)}
+html.ui-w .sp-bar{margin:0 -6px 10px}
+html.ui-w .sp-bar .ib{width:32px;height:32px;border-radius:50%;box-shadow:0 0 0 1px var(--sep)}
+html.ui-w :is(.sp-head .tx b,.sp-status > b){font-weight:500}
+html.ui-w .tkp-h h3{font-size:22px;font-weight:400;letter-spacing:-.02em;line-height:1.25}
+html.ui-w .tkp-h h3 .tk-flag{margin-top:6px}
+html.ui-w .tkp-meta{border-color:var(--sep)}
+html.ui-w .tkp-late{color:var(--uw-risk);font-weight:400}
+html.ui-w :is(.tkp-acts,.sp-acts) .btn{height:38px;border-radius:999px}
+html.ui-w .tkp-a b{font-weight:500}
+html.ui-w .tkp-ad{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase}
+
+@media (hover:hover) and (pointer:fine){
+  html.ui-w .tk-c:not(.is-sel):hover{background:var(--card)}
+  html.ui-w .tk-c:hover .tk-cb{box-shadow:inset 0 0 0 1.5px var(--label-3)}
+  html.ui-w :is(.hx-row,.rmi-r,.tk-lr):not(.on):not(.is-sel):hover{background:var(--card)}
+  html.ui-w .hx-row:hover .tl-s.now::before{background:transparent}
+  html.ui-w .hx-gh .lnk:hover{color:var(--label);box-shadow:0 0 0 1px var(--sep-strong)}
+}

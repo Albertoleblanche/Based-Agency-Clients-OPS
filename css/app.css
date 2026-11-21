@@ -1189,6 +1189,7 @@ a.ty-rel:hover{opacity:.8}
 .rmi-f .pop > svg{width:12px;height:12px;color:var(--label-3)}
 .rmi-sec{display:flex;align-items:baseline;gap:8px;margin:34px 0 6px}
 .rmi-hd + .rmi-sec{margin-top:30px}
+.rmi-hd + .rmi-g > .rmi-sec:first-child{margin-top:30px}
 .rmi-sec b{font-size:15px;font-weight:650;letter-spacing:-.01em}
 .rmi-sec span{font-size:13px;font-weight:600;color:var(--label-3)}
 .rmi-sec.is-due b,.rmi-sec.is-due span{color:var(--red)}

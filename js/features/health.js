@@ -86,6 +86,8 @@ function renderHealth(){
   const G = { new: by('new'), long: by('long'), fix: by('fix'), ok: by('ok') };
   const sel = window._healthSel ? all.find(x => x.c.id === window._healthSel) : null;
   const reminded = window._hlReminded || (window._hlReminded = {});
+  // the new look (beta): plain buttons on the rows, counts and the healthy names in the group heads
+  const uw = typeof uiStyleOn === 'function' && uiStyleOn();
 
   // ---- a row: who, 12 weeks, how it is now, why, the one action ----
   let primaryUsed = false;
@@ -104,7 +106,7 @@ function renderHealth(){
       if(s && s.key === 'quiet' && owner && owner !== me) act = reminded[c.id] ? `<span class="hx-done">${icon('check')}Reminded</span>`
         : `<button class="btn sm" onclick="event.stopPropagation();healthRemind('${c.id}')">Remind ${escapeHtml(firstName(owner))}</button>`;
       else if(s && s.key === 'quiet' && !everyone) act = `<button class="btn sm" onclick="event.stopPropagation();openQueueLogImprovementModal('${c.id}')">Log Improvement</button>`;
-      else { act = `<button class="btn sm${primaryUsed ? '' : ' btn-p'}" onclick="event.stopPropagation();planNextStep('${c.id}')">Plan Next Step</button>`; primaryUsed = true; }
+      else { act = `<button class="btn sm${primaryUsed || uw ? '' : ' btn-p'}" onclick="event.stopPropagation();planNextStep('${c.id}')">Plan Next Step</button>`; primaryUsed = true; }
     }
     const st = x.lv === 'g' ? '' : `<span class="hx-st ${x.lv}"><i></i>${x.lv === 'h' ? 'Settling' : HL_WORD[x.lv]}</span>`;
     return `<div class="hx-row${sel && sel.c.id === c.id ? ' on' : ''}" role="button" tabindex="0" data-h="${x.hist.map(k => k || '.').join('')}" onclick="selectHealthClient('${c.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectHealthClient('${c.id}')}">
@@ -112,7 +114,11 @@ function renderHealth(){
 ${healthTrailHtml(x.hist)}<span class="hx-stc">${st}<span class="hx-st then"><i></i></span></span><span class="hx-why">${escapeHtml(why)}</span><span class="hx-act">${act}</span></div>`;
   };
   const info = (title, text) => `<span class="hx-i" tabindex="0" role="button" aria-label="About ${title}">${icon('info')}<span class="hx-tip" role="tooltip">${text}</span></span>`;
-  const group = (k, title, text, extra) => G[k].length ? `<section class="hx-g"><div class="hx-gh"><b>${title}</b>${info(title, text)}${extra || ''}</div>${k === 'ok' ? `<div class="hx-x${window._hlOk ? ' open' : ''}"><div class="hx-xi">${G[k].map(row).join('')}</div></div>` : G[k].map(row).join('')}</section>` : '';
+  const names = list => { const n = list.map(x => x.c.name), k = n.length > 3 ? 3 : n.length - 1;
+    return n.length < 2 ? n.join('') : `${n.slice(0, k).join(', ')} and ${n.length > 3 ? n.length - 3 + ' more' : n[k]}`; };
+  const uwCount = k => uw ? `<span class="hx-gn">${G[k].length}</span>` : '';
+  const uwTail = k => !uw ? '' : k === 'ok' ? `<span class="hx-gl">${escapeHtml(names(G.ok))}</span>` : '<span class="hx-gw">Last 12 weeks</span>';
+  const group = (k, title, text, extra) => G[k].length ? `<section class="hx-g${uw ? ' is-' + k : ''}"><div class="hx-gh"><b>${title}</b>${uwCount(k)}${info(title, text)}${uwTail(k)}${extra || ''}</div>${k === 'ok' ? `<div class="hx-x${window._hlOk ? ' open' : ''}"><div class="hx-xi">${G[k].map(row).join('')}</div></div>` : G[k].map(row).join('')}</section>` : '';
   const needN = G.new.length + G.long.length + G.fix.filter(x => x.lv === 'r' || x.lv === 'y').length;
   const okOnly = !G.new.length && !G.long.length && !G.fix.length;
   if(okOnly && window._hlOk === undefined) window._hlOk = true;
@@ -123,7 +129,8 @@ ${healthTrailHtml(x.hist)}<span class="hx-stc">${st}<span class="hx-st then"><i>
   const who = everyone && !own ? `${needN} client${needN === 1 ? '' : 's'}` : `${needN} of ${own || 'your'} clients`;
   const headline = !all.length ? '' : needN ? `${who} need${needN === 1 ? 's' : ''} care${G.new.length ? `, ${G.new.length === needN ? (needN === 1 ? 'new' : needN === 2 ? 'both' : 'all') : G.new.length + ' of them'} new this week` : ''}`
     : everyone && !own ? 'Every client is healthy' : `All of ${own || 'your'} clients are healthy`;
-  const subline = [G.new.length ? `${G.new.length === 1 ? 'One' : G.new.length} slipped this week${G.new.every(x => x.hist.slice(0, 11).filter(Boolean).every(k => k === 'g')) ? ' after a quiet quarter' : ''}.` : '',
+  const slipped = G.new.length ? `${G.new.length === 1 ? 'One' : G.new.length} slipped this week${G.new.every(x => x.hist.slice(0, 11).filter(Boolean).every(k => k === 'g')) ? ' after a quiet quarter' : ''}.` : '';
+  const subline = [slipped,
     longest ? `${longest.c.name} has needed care for ${longest.streak} weeks, with no plan yet.` : '',
     !needN && all.length ? 'Nothing needs care right now.' : ''].filter(Boolean).join(' ');
   const seg = owners.length > 1 ? `<div class="seg" role="tablist" aria-label="Whose clients">${[['', 'Everyone'], ...owners.map(o => [o, firstName(o)])].map(([o, t]) =>
@@ -135,7 +142,7 @@ ${healthTrailHtml(x.hist)}<span class="hx-stc">${st}<span class="hx-st then"><i>
 ${group('fix', 'Being fixed', 'A plan is underway, or it was handled and is settling')}${group('ok', 'Healthy', 'Nothing needs care right now', `<button class="lnk" onclick="hlToggleOk(this)">${window._hlOk ? 'Hide' : 'Show ' + G.ok.length}</button>`)}</div>`;
 
   root.innerHTML = `<div class="spw"><div class="sp-page"><div class="hx">
-<div class="hx-top"><div><h1 class="hx-h">${escapeHtml(headline)}</h1>${subline ? `<p class="hx-s">${escapeHtml(subline)}</p>` : ''}</div>${seg}</div>
+<div class="hx-top"><div><h1 class="hx-h">${escapeHtml(headline)}</h1>${subline ? `<p class="hx-s">${uw && slipped ? `<b>${escapeHtml(slipped)}</b>${escapeHtml(subline.slice(slipped.length))}` : escapeHtml(subline)}</p>` : ''}</div>${seg}</div>
 ${body}</div></div>${sel ? healthPanelHtml(sel.c, sel.h) : ''}</div>`;
   root._hlWeeks = weeks;
   hlBindScrub(root);
