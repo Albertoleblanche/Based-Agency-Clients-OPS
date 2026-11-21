@@ -137,7 +137,9 @@ function uwCalendarCard(cap){
     const c = e.clientId && clients.find(x => x.id === e.clientId);
     const sub = c ? c.name : (e.endAt && !e.allDay ? 'Until ' + fmtTime(new Date(e.endAt)) : (e.description || '').split('\n')[0]);
     const past = !e.allDay && new Date(e.endAt || e.startAt) <= now;
-    return `<a class="uw-ce${past ? ' is-past' : ''}" href="#" onclick="openEventDetailModal('${e.id}');return false;"><span class="uw-t">${e.allDay ? 'ALL DAY' : uwEsc(fmtTime(new Date(e.startAt)).toUpperCase())}</span><span class="uw-e"><b>${uwEsc(e.title || 'Untitled')}</b>${sub ? `<span>${uwEsc(sub)}</span>` : ''}</span></a>`;
+    // the calendar's colours: client meetings blue, internal purple, deadlines red, tasks teal, reminders amber
+    const tone = typeof calColor === 'function' ? calColor(e) : 'gray';
+    return `<a class="uw-ce ${tone}${past ? ' is-past' : ''}" href="#" onclick="openEventDetailModal('${e.id}');return false;"><span class="uw-t">${e.allDay ? 'ALL DAY' : uwEsc(fmtTime(new Date(e.startAt)).toUpperCase())}</span><span class="uw-e"><b>${uwEsc(e.title || 'Untitled')}</b>${sub ? `<span>${uwEsc(sub)}</span>` : ''}</span></a>`;
   };
   const tod = evs.filter(x => x.ds === todayStr).map(x => x.e);
   let room = cap, html = `<div class="uw-dl"><span class="uw-mono">TODAY</span>${tod.length ? `<span class="uw-mono">${tod.length} EVENT${tod.length === 1 ? '' : 'S'}</span>` : '<span class="uw-cnone">No meetings</span>'}</div>`;

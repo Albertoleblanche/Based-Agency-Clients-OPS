@@ -64,6 +64,7 @@
 .db-ev time{font-size:12px;color:var(--label-2);font-variant-numeric:tabular-nums;padding-top:1px;white-space:nowrap}
 .db-evb{border-radius:2px;background:var(--blue)}
 .db-evb.green{background:var(--green)} .db-evb.purple{background:var(--purple)} .db-evb.red{background:var(--red)}
+.db-evb.teal{background:var(--teal)} .db-evb.yellow{background:var(--yellow-fill)} .db-evb.gray{background:var(--label-3)}
 .db-ev.is-past{opacity:.45}
 .db-now{display:grid;grid-template-columns:62px minmax(0,1fr);gap:10px;align-items:center;height:16px}
 .db-now time{font-size:11px;font-weight:650;color:var(--red);font-variant-numeric:tabular-nums}
