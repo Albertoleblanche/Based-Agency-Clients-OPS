@@ -17,6 +17,89 @@ Run new `.sql` files once in Supabase → SQL Editor. The current one:
 - `addendum-team-activity-log.sql` — moves the Overview activity log into its own
   table. Safe to run more than once; the app keeps working on the old storage until
   it's run, then switches over by itself.
+- `addendum-improvement-details.sql` — adds a service and screenshots to each logged
+  improvement. Until it's run, Log Improvement works as before and hides Screenshots.
+- `addendum-colors-and-plan.sql` — colors on tasks and notes, and the Plan tab's
+  sprints and weekly hours (private to each person). Until it's run, tasks and notes
+  save without a color and Plan shows what's coming up but can't save sprints.
+- `schema-whatsapp-tasks.sql` — the WhatsApp tables (client groups, the open items the
+  connector finds, its runs and settings). Until it's run, the WhatsApp screen says it isn't
+  set up. The connector itself runs on the office PC: see `whatsapp-connector/README.md`.
+- `addendum-whatsapp-test-mode.sql` — puts WhatsApp in test mode for one person (put your
+  sign-in email in it first): only they see it in Radar and get its Slack messages. Its last
+  line turns test mode off.
+- `addendum-whatsapp-check-now.sql` — Check Now, Make a Task (an item links to the task it
+  became) and the chat around each item in its panel. Until it's run, those three say so when
+  used and the rest of WhatsApp works as before. (Also at the end of `schema-whatsapp-tasks.sql`.)
+- `addendum-weekly-wins.sql` (run after `schema-whatsapp-tasks.sql`) — weekly wins: a tier on
+  each win, WhatsApp copy and send with one sender per win (copying claims it; anyone else is
+  warned first), and Radar marking a win sent when it shows up in the client's group. Until
+  it's run, wins have no tier and copying isn't shared with the team; the rest works.
+  It also adds `wa_last_contact()` for Quiet clients on the WhatsApp screen.
+- `addendum-harvest-sync.sql` — Radar reads Harvest's setup: clients, projects, tasks (billable
+  or not), who is assigned where, and the team, matched to Radar people by email. Read only;
+  no rates or costs are kept. Until it's run, Settings → Harvest says so and the rest works.
+- `addendum-harvest-clients.sql` — run after the one above. Radar's client list follows
+  Harvest's: each Harvest client stays linked to its Radar client through renames and
+  archives. Until it's run, Radar reads Harvest as before and adds no clients.
+- `addendum-harvest-time.sql` — time entries keep the Harvest project and task they were logged
+  to. Until it's run, Log Time asks for a service as before.
+- `addendum-harvest-time-read.sql` — time logged in Harvest is read into Radar (source, Harvest
+  person, invoiced lock). Until it's run, Radar sends time to Harvest and reads none back.
+- `addendum-user-delete.sql` — Team → Delete permanently works: every table that points at a
+  person gets a rule. Their profile, notifications and settings go with them; time,
+  improvements, tasks and history stay, without their name. Until it's run, Supabase may stop
+  the delete with "Database error deleting user". Safe to run more than once.
+
+## Weekly wins
+
+Every client gets a win each week on its own win day (Monday to Friday), set in the client's
+panel on All Clients with how it's sent (WhatsApp, email or both) and its WhatsApp group.
+Radar never posts to WhatsApp: an approved WhatsApp win goes back to whoever wrote it, they
+copy it, paste it in the group, and it counts as sent. A client with no win day keeps the old
+rule: due 7 days after its last update.
+
+## Harvest
+
+Harvest owns the setup; Radar mirrors it (step 1 of the Harvest plan). The server reads what
+changed whenever someone opens Radar (at most every 10 minutes), everything each night in the
+daily cron, and on Sync Now in Settings → Harvest, where admins and approvers see the
+connection, what was read, each client's projects and tasks, and the team matched by email.
+Use a Harvest administrator's token: it can read the whole setup and log time for everyone.
+
+Every active Harvest client is in Radar (step 2). Each read links a Harvest client to the Radar
+client with the same name (ignoring endings like "LLC"), or adds it marked **Needs setup** and
+tells admins and approvers (one note for a batch of four or more). It waits at the top of All
+Clients, out of This Week, Health, the Dashboard and the reminders, until an approver picks its owner,
+service and how it gets its weekly win (its group or an email) and presses Finish Setup. Time
+can be logged for it meanwhile. **Same as…** moves the link to a client Radar already has under
+another name, with anything logged on the added one; **Not a Radar Client** sends it to Trash
+and Harvest won't add it again. A rename in Harvest carries over while Radar still uses the old
+name; a client archived in Harvest is mentioned to approvers once, and one still waiting for
+setup just leaves.
+
+Time is logged as in Harvest (step 3): Add Time, Start Timer, Edit Time and Log Improvement (once
+a time is typed) ask for Client → Project → Task, with the client's projects you're on in Harvest
+and each task's Billable or Non-billable. Entries go to Harvest as the person who logged them
+(matched by email); someone not in Harvest, or a client that isn't, keeps the time in Radar.
+Older entries without a project still go through the client and service mappings saved before step 5.
+
+Time logged in Harvest shows in Radar (step 4): from the first of last month on, what changed
+whenever someone opens Radar and everything each night, the same entry in both. It shows From
+Harvest on the Time screen; invoiced ones are read only; a full read with an administrator's token
+removes what was deleted in Harvest. People only in Harvest count by name. A client's monthly hours
+follow its Harvest projects' monthly hour budgets.
+
+Clients start in Harvest (step 5): with Harvest connected, New Client explains it and opens Harvest's
+clients page, and Sync Now brings a new one in under Needs setup. The old client→project and
+service→task mapping lists are gone; Settings → Harvest lists time that didn't reach Harvest, each
+one opening to pick its project and task.
+
+Harvest is the source of truth for what clients buy: on every read, a linked client's service
+becomes its active Harvest projects ("MDF - Tier 3 · Website Hosting and Maintenance"). All Clients
+filters by project, Reports groups hours by project, and Finish Setup, Edit Client and Log
+Improvement stop asking for a service. Clients that aren't in Harvest keep the service picked in
+Radar. Email and WhatsApp drafts get the project names as context only, never to quote to the client.
 
 ---
 

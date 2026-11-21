@@ -434,7 +434,7 @@ function renderQueue(){
   updateNotifyBtnState();
   if(!slackChannelsLoaded) loadSlackClientChannels().then(renderQueue);
   if(!ac.length){ el.innerHTML = `<div class="panel">${emptyStateHtml(
-    '<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M117.25,157.92a60,60,0,1,0-66.5,0A95.83,95.83,0,0,0,3.53,195.63a8,8,0,1,0,13.4,8.74,80,80,0,0,1,134.14,0,8,8,0,0,0,13.4-8.74A95.83,95.83,0,0,0,117.25,157.92ZM40,108a44,44,0,1,1,44,44A44.05,44.05,0,0,1,40,108Zm210.14,98.7a8,8,0,0,1-11.07-2.33A79.83,79.83,0,0,0,172,168a8,8,0,0,1,0-16,44,44,0,1,0-16.34-84.87,8,8,0,1,1-5.94-14.85,60,60,0,0,1,55.53,105.64,95.83,95.83,0,0,1,47.22,37.71A8,8,0,0,1,250.14,206.7Z"/></svg>',
+    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 21a8 8 0 0 0-16 0" /> <circle cx="10" cy="8" r="5" /> <path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3" /></svg>',
     'No clients yet',
     'Add a client to start tracking their drafts and improvements.',
     '<button class="btn btn-brand" onclick="switchView(\'clients\')">Go to Clients</button>'
@@ -448,7 +448,7 @@ function renderQueue(){
     const sub = dateFilterMode!=='all' ? "Nothing from you in this range — try All time, or check Team Queue to see everyone's."
       : filtered ? 'None of your clients are at this stage right now.' : 'Log an improvement for a client to see it show up here.';
     el.innerHTML = `<div class="panel">${emptyStateHtml(
-      '<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/></svg>',
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" /></svg>',
       title, sub
     )}</div>`;
     return;
@@ -533,7 +533,7 @@ function renderTeamQueue(){
   if(actionsRow) actionsRow.style.display = canApprove() ? 'flex' : 'none';
   if(!slackChannelsLoaded) loadSlackClientChannels().then(renderTeamQueue);
   if(!ac.length){ el.innerHTML = `<div class="panel">${emptyStateHtml(
-    '<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M117.25,157.92a60,60,0,1,0-66.5,0A95.83,95.83,0,0,0,3.53,195.63a8,8,0,1,0,13.4,8.74,80,80,0,0,1,134.14,0,8,8,0,0,0,13.4-8.74A95.83,95.83,0,0,0,117.25,157.92ZM40,108a44,44,0,1,1,44,44A44.05,44.05,0,0,1,40,108Zm210.14,98.7a8,8,0,0,1-11.07-2.33A79.83,79.83,0,0,0,172,168a8,8,0,0,1,0-16,44,44,0,1,0-16.34-84.87,8,8,0,1,1-5.94-14.85,60,60,0,0,1,55.53,105.64,95.83,95.83,0,0,1,47.22,37.71A8,8,0,0,1,250.14,206.7Z"/></svg>',
+    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 21a8 8 0 0 0-16 0" /> <circle cx="10" cy="8" r="5" /> <path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3" /></svg>',
     'No clients yet',
     'Add a client to start tracking their drafts and improvements.',
     '<button class="btn btn-brand" onclick="switchView(\'clients\')">Go to Clients</button>'
@@ -553,7 +553,7 @@ function renderTeamQueue(){
     const title = teamDateFilterMode!=='all' ? 'No improvements in this range' : 'No clients match this filter';
     const sub = teamDateFilterMode!=='all' ? 'Try a wider date range, or switch back to All time.' : 'Try a different filter, or clear it to see everyone.';
     el.innerHTML = `<div class="panel">${emptyStateHtml(
-      '<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/></svg>',
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" /></svg>',
       title, sub
     )}</div>`;
     return;
@@ -620,12 +620,12 @@ function notifyForMember(memberId){
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Choose which ${isSelf ? 'drafts' : `of ${escapeHtml(member.name)}'s drafts`} to ${isSelf ? 'send for approval' : 'notify about'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
-      <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">${pending.length} draft${pending.length!==1?'s':''} ready — uncheck any you'd rather hold back for now.</p>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">${pending.length} draft${pending.length!==1?'s':''} ready — uncheck any you'd rather hold back for now.</p>
       <div style="display:flex;flex-direction:column;gap:2px;max-height:340px;overflow-y:auto;">
         ${pending.map(c=>`
           <label style="display:flex;align-items:flex-start;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border);cursor:pointer;">
             <input type="checkbox" class="notify-select-checkbox" value="${c.id}" checked style="margin-top:3px;flex:none;">
-            <span style="flex:1;font-size:13px;color:var(--ink);">${escapeHtml(c.name)}<br><span style="font-size:11px;color:var(--muted-lt);">danger ${c.danger}/5, importance ${c.importance}/10</span></span>
+            <span style="flex:1;font-size:14px;color:var(--ink);">${escapeHtml(c.name)}<br><span style="font-size:12px;color:var(--muted-lt);">danger ${c.danger}/5, importance ${c.importance}/10</span></span>
           </label>
         `).join('')}
       </div>
@@ -699,21 +699,21 @@ function queueCardHtml(c, scopeAuthor, showAuthor, selected, view){
       <div class="avatar-circle" style="background:${avatarColorForName(c.name)};color:#fff;border:2px solid var(--card);box-shadow:none;">${escapeHtml(c.name.trim().charAt(0).toUpperCase())}</div>
       <div style="flex:1;min-width:0;">
         <div class="q-name">${escapeHtml(c.name)}</div>
-        <div class="q-service-caption" style="margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${showAuthor && scopeAuthor ? `<span class="q-author">${escapeHtml(scopeAuthor)}</span> · ` : ''}${escapeHtml(c.service)} · <span class="rating-pill" style="background:${status.bg};color:${status.color};text-transform:capitalize;font-size:10px;padding:2px 8px;">${escapeHtml(status.label)}</span></div>
+        <div class="q-service-caption" style="margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${showAuthor && scopeAuthor ? `<span class="q-author">${escapeHtml(scopeAuthor)}</span> · ` : ''}${escapeHtml(c.service)} · <span class="rating-pill" style="background:${status.bg};color:${status.color};text-transform:capitalize;font-size:10.5px;padding:2px 8px;">${escapeHtml(status.label)}</span></div>
       </div>
       <div class="kanban-card-menu-wrap">
         <span class="kanban-card-menu-btn" onclick="toggleKanbanCardMenu('q-${c.id}')">⋯</span>
         <div class="kanban-card-menu" id="kanbanMenu-q-${c.id}" style="display:none;">
-          <div class="kanban-card-menu-item" onclick="closeKanbanMenus();openQueueLogImprovementModal('${c.id}')"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M224,48V208a16,16,0,0,1-16,16H136a8,8,0,0,1,0-16h72V48H48v96a8,8,0,0,1-16,0V48A16,16,0,0,1,48,32H208A16,16,0,0,1,224,48ZM125.66,154.34a8,8,0,0,0-11.32,0L64,204.69,45.66,186.34a8,8,0,0,0-11.32,11.32l24,24a8,8,0,0,0,11.32,0l56-56A8,8,0,0,0,125.66,154.34Z"/></svg>Log / edit improvements</div>
-          <div class="kanban-card-menu-item" onclick="closeKanbanMenus();openNoteModal(null, '${c.id}')"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M213.66,82.34l-56-56A8,8,0,0,0,152,24H56A16,16,0,0,0,40,40V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V88A8,8,0,0,0,213.66,82.34ZM160,51.31,188.69,80H160ZM200,216H56V40h88V88a8,8,0,0,0,8,8h48V216Zm-32-80a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,168,136Zm0,32a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,168,168Z"/></svg>Add note</div>
-          <div class="kanban-card-menu-item" onclick="closeKanbanMenus();openTimerModal('${c.id}')"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z"/></svg>Track time</div>
+          <div class="kanban-card-menu-item" onclick="closeKanbanMenus();openQueueLogImprovementModal('${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5h8" /> <path d="M13 12h8" /> <path d="M13 19h8" /> <path d="m3 17 2 2 4-4" /> <rect x="3" y="4" width="6" height="6" rx="1" /></svg>Log / edit improvements</div>
+          <div class="kanban-card-menu-item" onclick="closeKanbanMenus();openNoteModal(null, '${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></svg>Add note</div>
+          <div class="kanban-card-menu-item" onclick="closeKanbanMenus();openTimerModal('${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>Track time</div>
         </div>
       </div>
     </div>
     <div class="q-pill-row">
       ${dangerPillCompact(c.danger)}
       <span class="rating-pill rating-pill-ink">Importance ${c.importance}/10</span>
-      ${clientReminders.some(r=>r.clientId===c.id && reminderDisplayStatus(r)==='due') ? `<span class="rating-pill" style="background:#3A63C918;color:#3A63C9;" title="A client question is overdue for a follow-up"><svg width="10" height="10" viewBox="0 0 256 256" style="margin-right:3px;vertical-align:-1px;" fill="currentColor"><path d="M225.29,165.93C216.61,151,212,129.57,212,104a84,84,0,0,0-168,0c0,25.58-4.59,47-13.27,61.93A20.08,20.08,0,0,0,30.66,186,19.77,19.77,0,0,0,48,196H84.18a44,44,0,0,0,87.64,0H208a19.77,19.77,0,0,0,17.31-10A20.08,20.08,0,0,0,225.29,165.93ZM128,212a20,20,0,0,1-19.6-16h39.2A20,20,0,0,1,128,212ZM54.66,172C63.51,154,68,131.14,68,104a60,60,0,0,1,120,0c0,27.13,4.48,50,13.33,68Z"/></svg>Follow-up due</span>` : ''}
+      ${clientReminders.some(r=>r.clientId===c.id && reminderDisplayStatus(r)==='due') ? `<span class="rating-pill" style="background:#3A63C918;color:#3A63C9;" title="A client question is overdue for a follow-up"><svg width="10" height="10" style="margin-right:3px;vertical-align:-1px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0" /> <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" /></svg>Follow-up due</span>` : ''}
     </div>
     ${queueActivityBadgeHtml(c, scopeAuthor)}
     <div class="q-card-actions">
@@ -732,26 +732,26 @@ function queueCardHtml(c, scopeAuthor, showAuthor, selected, view){
         // replaces them here rather than sitting alongside them.
         if(d.draftStatus==='approved' && d.draftSentAt){
           if(!canApprove()) return `
-      <button class="btn btn-brand" onclick="openQueueCardModal('${c.id}',${jsArg(scopeAuthor||'')})"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M247.31,124.76c-.35-.79-8.82-19.58-27.65-38.41C194.57,61.26,162.88,48,128,48S61.43,61.26,36.34,86.35C17.51,105.18,9,124,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208s66.57-13.26,91.66-38.34c18.83-18.83,27.3-37.61,27.65-38.4A8,8,0,0,0,247.31,124.76ZM128,192c-30.78,0-57.67-11.19-79.93-33.25A133.47,133.47,0,0,1,25,128,133.33,133.33,0,0,1,48.07,97.25C70.33,75.19,97.22,64,128,64s57.67,11.19,79.93,33.25A133.46,133.46,0,0,1,231.05,128C223.84,141.46,192.43,192,128,192Zm0-112a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z"/></svg>Details</button>
+      <button class="btn btn-brand" onclick="openQueueCardModal('${c.id}',${jsArg(scopeAuthor||'')})"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /> <circle cx="12" cy="12" r="3" /></svg>Details</button>
       `;
           return `
-      <button class="btn btn-outline" onclick="archiveSentDraft('${c.id}',${jsArg(scopeAuthor||'')})"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M224,48H32A16,16,0,0,0,16,64V88a16,16,0,0,0,16,16v88a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V104a16,16,0,0,0,16-16V64A16,16,0,0,0,224,48ZM208,192H48V104H208ZM224,88H32V64H224V88ZM96,136a8,8,0,0,1,8-8h48a8,8,0,0,1,0,16H104A8,8,0,0,1,96,136Z"/></svg>Archive</button>
-      <button class="btn btn-outline" onclick="openQueueCardModal('${c.id}',${jsArg(scopeAuthor||'')})"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M247.31,124.76c-.35-.79-8.82-19.58-27.65-38.41C194.57,61.26,162.88,48,128,48S61.43,61.26,36.34,86.35C17.51,105.18,9,124,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208s66.57-13.26,91.66-38.34c18.83-18.83,27.3-37.61,27.65-38.4A8,8,0,0,0,247.31,124.76ZM128,192c-30.78,0-57.67-11.19-79.93-33.25A133.47,133.47,0,0,1,25,128,133.33,133.33,0,0,1,48.07,97.25C70.33,75.19,97.22,64,128,64s57.67,11.19,79.93,33.25A133.46,133.46,0,0,1,231.05,128C223.84,141.46,192.43,192,128,192Zm0-112a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z"/></svg>Details</button>
+      <button class="btn btn-outline" onclick="archiveSentDraft('${c.id}',${jsArg(scopeAuthor||'')})"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="5" x="2" y="3" rx="1" /> <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" /> <path d="M10 12h4" /></svg>Archive</button>
+      <button class="btn btn-outline" onclick="openQueueCardModal('${c.id}',${jsArg(scopeAuthor||'')})"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /> <circle cx="12" cy="12" r="3" /></svg>Details</button>
       `;
         }
         if(d.draftStatus==='approved' || canSkipApproval){
           if(!canApprove()) return `
-      <button class="btn btn-brand" onclick="openQueueCardModal('${c.id}',${jsArg(scopeAuthor||'')})"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M247.31,124.76c-.35-.79-8.82-19.58-27.65-38.41C194.57,61.26,162.88,48,128,48S61.43,61.26,36.34,86.35C17.51,105.18,9,124,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208s66.57-13.26,91.66-38.34c18.83-18.83,27.3-37.61,27.65-38.4A8,8,0,0,0,247.31,124.76ZM128,192c-30.78,0-57.67-11.19-79.93-33.25A133.47,133.47,0,0,1,25,128,133.33,133.33,0,0,1,48.07,97.25C70.33,75.19,97.22,64,128,64s57.67,11.19,79.93,33.25A133.46,133.46,0,0,1,231.05,128C223.84,141.46,192.43,192,128,192Zm0-112a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z"/></svg>Details</button>
+      <button class="btn btn-brand" onclick="openQueueCardModal('${c.id}',${jsArg(scopeAuthor||'')})"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /> <circle cx="12" cy="12" r="3" /></svg>Details</button>
       `;
           return `
-      <button class="btn btn-brand" onclick="${canSkipApproval ? `approveAndSendOwnDraft('${c.id}',${jsArg(scopeAuthor||'')})` : `sendApprovedDraft('${c.id}',${jsArg(scopeAuthor||'')})`}"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M227.32,28.68a16,16,0,0,0-15.66-4.08l-.15,0L19.57,82.84a16,16,0,0,0-2.49,29.8L102,154l41.3,84.87A15.86,15.86,0,0,0,157.74,248q.69,0,1.38-.06a15.88,15.88,0,0,0,14-11.51l58.2-191.94c0-.05,0-.1,0-.15A16,16,0,0,0,227.32,28.68ZM157.83,231.85l-.05.14,0-.07-40.06-82.3,48-48a8,8,0,0,0-11.31-11.31l-48,48L24.08,98.25l-.07,0,.14,0L216,40Z"/></svg>Send</button>
-      ${slackClientChannels[c.id] ? `<button class="btn btn-outline" onclick="openSendToSlackConfirm('${c.id}',${jsArg(scopeAuthor||'')})" title="Post this update to ${escapeHtml(slackClientChannels[c.id].channelName||'their Slack channel')}"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M152,96H104a8,8,0,0,0-8,8v48a8,8,0,0,0,8,8h48a8,8,0,0,0,8-8V104A8,8,0,0,0,152,96Zm-8,48H112V112h32Zm88,0H216V112h16a8,8,0,0,0,0-16H216V56a16,16,0,0,0-16-16H160V24a8,8,0,0,0-16,0V40H112V24a8,8,0,0,0-16,0V40H56A16,16,0,0,0,40,56V96H24a8,8,0,0,0,0,16H40v32H24a8,8,0,0,0,0,16H40v40a16,16,0,0,0,16,16H96v16a8,8,0,0,0,16,0V216h32v16a8,8,0,0,0,16,0V216h40a16,16,0,0,0,16-16V160h16a8,8,0,0,0,0-16Zm-32,56H56V56H200v95.87s0,.09,0,.13,0,.09,0,.13V200Z"/></svg>Slack</button>` : ''}
-      <button class="btn btn-outline" onclick="openQueueCardModal('${c.id}',${jsArg(scopeAuthor||'')})"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M247.31,124.76c-.35-.79-8.82-19.58-27.65-38.41C194.57,61.26,162.88,48,128,48S61.43,61.26,36.34,86.35C17.51,105.18,9,124,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208s66.57-13.26,91.66-38.34c18.83-18.83,27.3-37.61,27.65-38.4A8,8,0,0,0,247.31,124.76ZM128,192c-30.78,0-57.67-11.19-79.93-33.25A133.47,133.47,0,0,1,25,128,133.33,133.33,0,0,1,48.07,97.25C70.33,75.19,97.22,64,128,64s57.67,11.19,79.93,33.25A133.46,133.46,0,0,1,231.05,128C223.84,141.46,192.43,192,128,192Zm0-112a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z"/></svg>Details</button>
+      <button class="btn btn-brand" onclick="${canSkipApproval ? `approveAndSendOwnDraft('${c.id}',${jsArg(scopeAuthor||'')})` : `sendApprovedDraft('${c.id}',${jsArg(scopeAuthor||'')})`}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /> <path d="m21.854 2.147-10.94 10.939" /></svg>Send</button>
+      ${slackClientChannels[c.id] ? `<button class="btn btn-outline" onclick="openSendToSlackConfirm('${c.id}',${jsArg(scopeAuthor||'')})" title="Post this update to ${escapeHtml(slackClientChannels[c.id].channelName||'their Slack channel')}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v2" /> <path d="M12 2v2" /> <path d="M17 20v2" /> <path d="M17 2v2" /> <path d="M2 12h2" /> <path d="M2 17h2" /> <path d="M2 7h2" /> <path d="M20 12h2" /> <path d="M20 17h2" /> <path d="M20 7h2" /> <path d="M7 20v2" /> <path d="M7 2v2" /> <rect x="4" y="4" width="16" height="16" rx="2" /> <rect x="8" y="8" width="8" height="8" rx="1" /></svg>Slack</button>` : ''}
+      <button class="btn btn-outline" onclick="openQueueCardModal('${c.id}',${jsArg(scopeAuthor||'')})"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /> <circle cx="12" cy="12" r="3" /></svg>Details</button>
       `;
         }
         return `
-      <button class="btn btn-brand" onclick="openQueueCardModal('${c.id}',${jsArg(scopeAuthor||'')})"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M247.31,124.76c-.35-.79-8.82-19.58-27.65-38.41C194.57,61.26,162.88,48,128,48S61.43,61.26,36.34,86.35C17.51,105.18,9,124,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208s66.57-13.26,91.66-38.34c18.83-18.83,27.3-37.61,27.65-38.4A8,8,0,0,0,247.31,124.76ZM128,192c-30.78,0-57.67-11.19-79.93-33.25A133.47,133.47,0,0,1,25,128,133.33,133.33,0,0,1,48.07,97.25C70.33,75.19,97.22,64,128,64s57.67,11.19,79.93,33.25A133.46,133.46,0,0,1,231.05,128C223.84,141.46,192.43,192,128,192Zm0-112a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z"/></svg>Details</button>
-      <button class="btn btn-outline" onclick="openQueueLogImprovementModal('${c.id}')"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"/></svg>Log now</button>
+      <button class="btn btn-brand" onclick="openQueueCardModal('${c.id}',${jsArg(scopeAuthor||'')})"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /> <circle cx="12" cy="12" r="3" /></svg>Details</button>
+      <button class="btn btn-outline" onclick="openQueueLogImprovementModal('${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /> <path d="M12 5v14" /></svg>Log now</button>
       `;
       })()}
     </div>
@@ -830,7 +830,7 @@ function queueDetailHtml(c, author){
   return `
     <div class="modal-head">
       <div>
-        <div class="q-name">${escapeHtml(c.name)} <span style="font-weight:400;color:var(--muted-lt);font-size:13px;">— ${escapeHtml(author)}</span></div>
+        <div class="q-name">${escapeHtml(c.name)} <span style="font-weight:400;color:var(--muted-lt);font-size:14px;">— ${escapeHtml(author)}</span></div>
         <div class="q-service-caption">${escapeHtml(c.service)} · ${riskCaptionHtml(c.danger)}</div>
         <div class="q-ratings" style="margin-top:12px;">
           ${dotRating('Importance', c.importance, 'ink', 10)}
@@ -842,21 +842,21 @@ function queueDetailHtml(c, author){
     <div class="modal-body">
       <span class="q-status-label" style="color:${status.color};">${escapeHtml(status.label)}</span>
       <div class="q-bulk">
-        ${shownImprovements.length ? `<div class="q-bulk-title">Logged ${activeDateFilterLabel()} (${shownImprovements.length}) — ${shownImprovements.filter(i=>i.includeInEmail!==false).length} included in email</div><div class="q-bulk-list"><ul>${shownImprovements.map(i=>`<li style="${i.includeInEmail===false?'opacity:.55;':''}">${i.includeInEmail===false ? '<span style="color:var(--muted-lt);font-size:10px;">[not in email]</span> ' : ''}${escapeHtml(i.text)} — <span style="color:var(--muted-lt);">${escapeHtml(i.author)}</span></li>`).join('')}</ul></div>` : `<i>No improvements logged by ${escapeHtml(author)} ${activeDateFilterLabel()} — nothing to send.</i>`}
+        ${shownImprovements.length ? `<div class="q-bulk-title">Logged ${activeDateFilterLabel()} (${shownImprovements.length}) — ${shownImprovements.filter(i=>i.includeInEmail!==false).length} included in email</div><div class="q-bulk-list"><ul>${shownImprovements.map(i=>`<li style="${i.includeInEmail===false?'opacity:.55;':''}">${i.includeInEmail===false ? '<span style="color:var(--muted-lt);font-size:10.5px;">[not in email]</span> ' : ''}${escapeHtml(i.text)} — <span style="color:var(--muted-lt);">${escapeHtml(i.author)}</span></li>`).join('')}</ul></div>` : `<i>No improvements logged by ${escapeHtml(author)} ${activeDateFilterLabel()} — nothing to send.</i>`}
       </div>
       ${d.draft ? `<textarea spellcheck="true" class="draft" id="draft-${c.id}" ${d.draftStatus==='approved' && !canApprove() ? 'disabled' : ''}>${escapeHtml(d.draft)}</textarea>` : ''}
       ${d.draft && !c.email ? `<span class="warn-text">No client email on file — add one in Clients</span>` : ''}
     </div>
     <div class="modal-actions">
       ${d.draftStatus==='approved' && d.draftSentAt ? `
-      <span style="font-size:13px;color:var(--muted-lt);">✓ Sent on ${new Date(d.draftSentAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} — nothing left to do here. New work logged by ${escapeHtml(author)} for ${escapeHtml(c.name)} will start a fresh draft cycle on its own.</span>
+      <span style="font-size:14px;color:var(--muted-lt);">✓ Sent on ${new Date(d.draftSentAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} — nothing left to do here. New work logged by ${escapeHtml(author)} for ${escapeHtml(c.name)} will start a fresh draft cycle on its own.</span>
       ` : `
-      ${c.improvements.some(i=>i.author===author) && !(d.draftStatus==='approved' && !canApprove()) && canGenerateOrRegenerateDraft(c, author) ? `<button class="btn btn-dark" id="gen-${c.id}" onclick="generateDraft('${c.id}',${jsArg(author)})" title="${d.draft?'Regenerate':'Generate'} with AI"><svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor"><path d="M208,144a15.78,15.78,0,0,1-10.42,14.94L146,178l-19,51.62a15.92,15.92,0,0,1-29.88,0L78,178l-51.62-19a15.92,15.92,0,0,1,0-29.88L78,110l19-51.62a15.92,15.92,0,0,1,29.88,0L146,110l51.62,19A15.78,15.78,0,0,1,208,144ZM152,48h16V64a8,8,0,0,0,16,0V48h16a8,8,0,0,0,0-16H184V16a8,8,0,0,0-16,0V32H152a8,8,0,0,0,0,16Zm88,32h-8V72a8,8,0,0,0-16,0v8h-8a8,8,0,0,0,0,16h8v8a8,8,0,0,0,16,0V96h8a8,8,0,0,0,0-16Z"/></svg>${d.draft?'Regenerate':'Generate'}</button>` : ''}
-      ${d.draft && canApprove() ? (author===myName() ? `<button class="btn btn-brand" onclick="approveAndSendOwnDraft('${c.id}',${jsArg(author)})" ${d.draftStatus==='approved'?'disabled':''}><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M227.32,28.68a16,16,0,0,0-15.66-4.08l-.15,0L19.57,82.84a16,16,0,0,0-2.49,29.8L102,154l41.3,84.87A15.86,15.86,0,0,0,157.74,248q.69,0,1.38-.06a15.88,15.88,0,0,0,14-11.51l58.2-191.94c0-.05,0-.1,0-.15A16,16,0,0,0,227.32,28.68ZM157.83,231.85l-.05.14,0-.07-40.06-82.3,48-48a8,8,0,0,0-11.31-11.31l-48,48L24.08,98.25l-.07,0,.14,0L216,40Z"/></svg>Send</button>
+      ${c.improvements.some(i=>i.author===author) && !(d.draftStatus==='approved' && !canApprove()) && canGenerateOrRegenerateDraft(c, author) ? `<button class="btn btn-dark" id="gen-${c.id}" onclick="generateDraft('${c.id}',${jsArg(author)})" title="${d.draft?'Regenerate':'Generate'} with AI"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" /> <path d="M20 2v4" /> <path d="M22 4h-4" /> <circle cx="4" cy="20" r="2" /></svg>${d.draft?'Regenerate':'Generate'}</button>` : ''}
+      ${d.draft && canApprove() ? (author===myName() ? `<button class="btn btn-brand" onclick="approveAndSendOwnDraft('${c.id}',${jsArg(author)})" ${d.draftStatus==='approved'?'disabled':''}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /> <path d="m21.854 2.147-10.94 10.939" /></svg>Send</button>
       <button class="btn btn-outline" onclick="skipDraft('${c.id}',${jsArg(author)})" title="Excludes these improvements from future drafts too — they won't reappear next week">Skip &amp; exclude</button>` : `<button class="btn btn-brand" onclick="approveDraft('${c.id}',${jsArg(author)})" ${d.draftStatus==='approved'?'disabled':''}>Approve</button>
       <button class="btn btn-outline" onclick="skipDraft('${c.id}',${jsArg(author)})" title="Excludes these improvements from future drafts too — they won't reappear next week">Skip &amp; exclude</button>`) : ''}
       ${d.draft && !canApprove() && d.draftStatus!=='approved' ? `<span class="warn-text" style="color:var(--muted-lt);">Only admins and approvers can approve or skip drafts.</span>` : ''}
-      ${d.draftStatus==='approved' && !canApprove() ? `<span style="font-size:13px;color:var(--muted-lt);">✓ ${escapeHtml(author)}'s update was approved.</span>` : ''}
+      ${d.draftStatus==='approved' && !canApprove() ? `<span style="font-size:14px;color:var(--muted-lt);">✓ ${escapeHtml(author)}'s update was approved.</span>` : ''}
       `}
     </div>`;
 }
@@ -929,6 +929,30 @@ function openQueueCardModal(id, author){
 }
 
 
+// After writing or rewriting a draft: show it in Review, where it can be read, edited and sent on
+// (the old card sheet only if Review can't show it).
+function openDraftAfterWriting(id, author){
+  // written from the Queue: it shows there, under your work
+  if(currentViewName === 'queue' && typeof renderMyQueue === 'function'){ closeAppModal(); window._queueSel = id; renderMyQueue(); return; }
+  if(typeof openReviewDraft === 'function' && typeof reviewItems === 'function'){
+    closeAppModal();
+    if(hasPermission('view_team_queue') && Object.values(reviewItems()).some(l => l.some(x => x.c.id === id && x.d.author === author))){ openReviewDraft(id, author); return; }
+    // No Review: open the client on This Week with the draft showing in full.
+    if(typeof openWeekClient === 'function'){ window._weekDraftFull = id; openWeekClient(id); return; }
+  }
+  openQueueCardModal(id, author);
+}
+// Every improvement a draft was written from has been deleted: nothing left to send.
+function draftWorkAllDeleted(c, d){
+  const ids = d.draftImprovementIds || [];
+  return ids.length > 0 && !ids.some(id => (c.improvements || []).some(i => i.id === id));
+}
+function blockIfWorkDeleted(c, d){
+  if(!draftWorkAllDeleted(c, d) && !draftHasNoWork(c, d)) return false;
+  showToast('error', 'Nothing left in this draft', `Everything ${d.author}'s draft for ${c.name} was written from has been deleted. Rewrite or discard it first.`);
+  return true;
+}
+
 async function generateDraft(id, author){
   await loadAll();
   const c = clients.find(x=>x.id===id);
@@ -968,12 +992,12 @@ async function generateDraft(id, author){
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Select improvements to include</span><span class="toast-close" onclick="${modalOpenForThis ? `openQueueCardModal('${id}',${jsArg(author)})` : 'closeAppModal()'}">✕</span></div>
     <div class="modal-body">
-      <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">Everything checked below will go into ${escapeHtml(author)}'s draft for ${escapeHtml(c.name)}. Uncheck anything you'd rather hold back for a later one.</p>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Everything checked below will go into ${escapeHtml(author)}'s draft for ${escapeHtml(c.name)}. Uncheck anything you'd rather hold back for a later one.</p>
       <div style="display:flex;flex-direction:column;gap:2px;max-height:340px;overflow-y:auto;">
         ${eligibleImprovements.map(i=>`
           <label style="display:flex;align-items:flex-start;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border);cursor:pointer;">
             <input type="checkbox" class="draft-select-checkbox" value="${i.id}" ${i.author===author?'checked':''} style="margin-top:3px;flex:none;">
-            <span style="flex:1;font-size:13px;color:var(--ink);">${escapeHtml(i.text)}<br><span style="font-size:11px;color:var(--muted-lt);">${escapeHtml(i.author||'')} — ${i.date ? new Date(i.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : 'no date'}</span></span>
+            <span style="flex:1;font-size:14px;color:var(--ink);">${escapeHtml(i.text)}<br><span style="font-size:12px;color:var(--muted-lt);">${escapeHtml(i.author||'')} — ${i.date ? new Date(i.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : 'no date'}</span></span>
           </label>
         `).join('')}
       </div>
@@ -993,40 +1017,7 @@ async function confirmGenerateDraftSelection(id, author){
   const includedImprovements = c.improvements.filter(i => checkedIds.includes(i.id));
   const btn = clickedBtn();
   setBtnLoading(btn, 'Generating…');
-  const bullets = includedImprovements.map(i=>'- '+i.text).join('\n');
-  const customStructure = ((myProfile && myProfile.email_instructions) || '').trim();
-  const contentRules = `Content rules that apply no matter what — never overridden by anything above:
-- Describe every improvement as a specific, measurable deliverable — a concrete action taken, a number, a metric, or a defined output. Never state it as a vague, broad claim (e.g. never say "improved performance," "made things better," "optimized the account" with nothing concrete attached).
-- If a logged improvement itself is vague or lacks a concrete detail, do not invent specifics to make it sound more impressive — describe only what was actually logged, worded as precisely as the source allows, and keep it modest rather than embellished.
-- Never say anything that could make the agency look bad: no admitting mistakes, no exposing internal problems, no hedging language that implies something isn't working, no comparisons that read as excuses. State what was done factually and confidently without overstating results.
-- No subject line, no meta-commentary about the email itself — output only the email body.`;
-
-  const prompt = customStructure
-    ? `Write a weekly client update email for a home-services/construction client from their marketing agency (${settings.appName || 'Based Agency'}).
-
-The agency has specified an exact structure below. Follow it precisely and completely — every element it describes (greeting, paragraph order, sign-off, length, tone) — and do NOT fall back to any generic or default email structure, even partially:
-
---- REQUIRED STRUCTURE ---
-${customStructure}
---- END REQUIRED STRUCTURE ---
-
-Client: ${c.name}
-Service: ${c.service}
-Scope notes: ${c.sow || 'n/a'}
-Improvements made this week:
-${bullets}
-
-${contentRules}`
-    : `Write a short, warm, professional weekly update email to a home-services/construction client from their marketing agency (${settings.appName || 'Based Agency'}).
-Client: ${c.name}
-Service: ${c.service}
-Scope notes: ${c.sow || 'n/a'}
-Improvements made this week:
-${bullets}
-
-Structure: 2-4 short paragraphs max, no fluff or filler compliments, plain language, no subject line, no signature block, sound like a competent account manager not a sales email. End by noting nothing is needed from them unless something explicitly requires their input.
-
-${contentRules}`;
+  const prompt = buildUpdatePrompt(c, includedImprovements);
   try{
     const response = await fetch("/api/generate-draft", {
       method:"POST", headers: await apiAuthHeaders(),
@@ -1056,7 +1047,8 @@ ${contentRules}`;
     // this specific content — Team Queue shouldn't surface it to
     // approvers as awaiting review until the owning member explicitly
     // clicks Ready to Notify again.
-    fields.readyToNotify = false;
+    // An approver rewriting a draft that's in Review keeps it there: they're the one reviewing it.
+    fields.readyToNotify = !!(d.readyToNotify && canApprove() && !stayedApproved);
     // Exactly what's in this draft cycle, from the picker's selection —
     // not re-derived from a date range. Read back by approveDraft() to
     // know precisely which rows to flip include_in_email off for.
@@ -1076,7 +1068,7 @@ ${contentRules}`;
     renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
     logClientActivity(id, 'draft_generated', `AI ${stayedApproved?'re-worded':'generated'} ${author}'s draft from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''} (of ${c.improvements.filter(i=>i.author===author).length} logged by them)${stayedApproved?' — approval carried over':''}.`);
     refreshClientDetailActivityIfOpen(id);
-    openQueueCardModal(id, author);
+    openDraftAfterWriting(id, author);
     showToast('success','Draft generated', stayedApproved ? `${author}'s draft for ${c.name} was re-worded — still approved, no need to re-approve.` : `AI wrote ${author}'s update for ${c.name}.`);
     // No automatic notification here at all — the only way admins/
     // approvers get notified is the explicit "Ready to Notify" button,
@@ -1096,7 +1088,7 @@ ${contentRules}`;
       readyToNotify: false, draftImprovementIds: checkedIds,
     });
     renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
-    openQueueCardModal(id, author);
+    openDraftAfterWriting(id, author);
     showToast('error', saved ? 'AI generation failed' : 'AI generation failed, and the fallback state failed to save too', saved ? 'Write the draft manually below, or try again.' : 'Try refreshing before writing a draft manually — this client\'s saved state may be stale.');
   }
 }
@@ -1108,7 +1100,10 @@ async function sendApprovedDraft(id, author){
   const c = clients.find(x=>x.id===id);
   if(!c) return;
   const d = getDraftFor(c, author);
-  if(!c.email){ showToast('error','No email on file', `Add an email for ${c.name} in Clients to send.`); return; }
+  if(blockIfWorkDeleted(c, d)) return;
+  // WhatsApp clients: Radar never posts there. Copy it for the group instead.
+  if(typeof winViaWhatsapp === 'function' && winViaWhatsapp(c)) return copyWinForWhatsapp(id, author);
+  if(!c.email){ askForClientEmail(c); return; }
   // Already sent this exact draft once — require an explicit
   // confirmation naming who sent it and when, rather than silently
   // allowing (or silently blocking) a second send. A genuinely new draft
@@ -1133,7 +1128,14 @@ async function sendApprovedDraft(id, author){
 async function recordDraftSent(id, author){
   const c = clients.find(x=>x.id===id);
   if(!c) return;
-  await saveDraftFor(id, author, { draftSentAt: new Date().toISOString(), draftSentBy: myName() || 'Someone' });
+  const at = new Date().toISOString();
+  await saveDraftFor(id, author, { draftSentAt: at, draftSentBy: myName() || 'Someone', sentVia: 'email' });
+  // the writer hears it went out
+  const writer = author !== myName() ? teamProfiles.find(p => p.name === author) : null;
+  if(writer && typeof sendNotification === 'function') await sendNotification(writer.id, 'draft_sent', `${c.name}: your update was sent`, `${myName() || 'An approver'} sent it to ${c.email || 'the client'}.`, 'teamqueue', c.id);
+  // Kept apart from the draft row, which the next week's draft overwrites: the on-time
+  // history in This Week and Health reads from here.
+  if(typeof recordUpdateSent === 'function') await recordUpdateSent(id, at);
 }
 
 // Archives a sent draft off the board. Clears the sent draft's text —
@@ -1179,30 +1181,21 @@ let _groupSendAuthors = [];
 // sending each person's update to that client separately. Only surfaces
 // clients where this actually applies — one approved draft doesn't need
 // grouping, the regular per-card Send button already covers that case.
-function openGroupAndSendModal(){
+function openCombineDraftsModal(){
   const eligibleClients = activeClients().filter(c => {
     const approvedNotSent = (c.drafts||[]).filter(d => d.draftStatus==='approved' && !d.draftSentAt);
     return approvedNotSent.length >= 2;
   }).sort((a,b)=>a.name.localeCompare(b.name));
-  if(!eligibleClients.length){ showToast('info','Nothing to group', 'No client currently has approved, unsent drafts from more than one team member.'); return; }
-
-  openAppModal(`
-    <div class="modal-head"><span class="panel-title">Group &amp; Send</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
-    <div class="modal-body">
-      <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">These clients have approved, unsent drafts from more than one team member. Pick one to combine into a single send.</p>
-      <div style="display:flex;flex-direction:column;gap:2px;max-height:360px;overflow-y:auto;">
-        ${eligibleClients.map(c=>{
-          const count = (c.drafts||[]).filter(d => d.draftStatus==='approved' && !d.draftSentAt).length;
-          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 4px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="openGroupSendDraftPicker('${c.id}')">
-            <span style="font-size:13px;color:var(--ink);font-weight:600;">${escapeHtml(c.name)}</span>
-            <span style="font-size:11.5px;color:var(--muted-lt);">${count} drafts ready</span>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
-    </div>`, 480);
+  if(!eligibleClients.length){ showToast('info','Nothing to combine', 'No client has approved, unsent drafts from more than one person.'); return; }
+  openAppModal(`<h3>Combine Drafts</h3>
+<p style="margin:-8px 0 14px;font-size:14px;color:var(--label-2);line-height:1.5">These clients have approved drafts from more than one person. Pick one to send as a single email.</p>
+<div class="grp" style="box-shadow:0 0 0 .5px var(--sep-strong);max-height:360px;overflow:auto">
+${eligibleClients.map(c=>{
+  const count = (c.drafts||[]).filter(d => d.draftStatus==='approved' && !d.draftSentAt).length;
+  return `<a class="row" href="#" onclick="openGroupSendDraftPicker('${c.id}');return false;">${monoHtml(c)}<div class="tx"><span class="t">${escapeHtml(c.name)}</span><span class="s">${count} approved drafts</span></div><div class="r">${icon('caret-right', { weight: 'bold' })}</div></a>`;
+}).join('')}
+</div>
+<div class="sheet-a"><button class="btn" onclick="openGroupAndSendModal()">Back</button><button class="btn" onclick="closeAppModal()">Cancel</button></div>`, 520);
 }
 
 function openGroupSendDraftPicker(clientId){
@@ -1212,25 +1205,14 @@ function openGroupSendDraftPicker(clientId){
   // screen — another approver could have sent one of these in the
   // meantime, or the underlying draft could have changed.
   const approvedNotSent = (c.drafts||[]).filter(d => d.draftStatus==='approved' && !d.draftSentAt);
-  if(approvedNotSent.length < 2){ showToast('info','Nothing to group', `${c.name} no longer has drafts from more than one team member ready.`); closeAppModal(); return; }
+  if(approvedNotSent.length < 2){ showToast('info','Nothing to combine', `${c.name} no longer has approved drafts from more than one person.`); closeAppModal(); return; }
 
-  openAppModal(`
-    <div class="modal-head"><span class="panel-title">Combine drafts for ${escapeHtml(c.name)}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
-    <div class="modal-body">
-      <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">Uncheck any you'd rather send separately. At least two are needed to combine.</p>
-      <div style="display:flex;flex-direction:column;gap:2px;max-height:320px;overflow-y:auto;">
-        ${approvedNotSent.map(d=>`
-          <label style="display:flex;align-items:flex-start;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border);cursor:pointer;">
-            <input type="checkbox" class="group-send-draft-checkbox" value="${escapeHtml(d.author)}" checked style="margin-top:3px;flex:none;">
-            <span style="flex:1;font-size:13px;color:var(--ink);">${escapeHtml(d.author)}</span>
-          </label>
-        `).join('')}
-      </div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-outline" onclick="openGroupAndSendModal()">Back</button>
-      <button class="btn btn-brand" onclick="confirmGroupSendSelection('${clientId}')">Continue</button>
-    </div>`, 480);
+  openAppModal(`<h3>Combine Drafts for ${escapeHtml(c.name)}</h3>
+<p style="margin:-8px 0 14px;font-size:14px;color:var(--label-2);line-height:1.5">Uncheck any you’d rather send on their own. It takes two to combine.</p>
+<div class="grp" style="box-shadow:0 0 0 .5px var(--sep-strong);max-height:320px;overflow:auto">
+${approvedNotSent.map(d=>`<label class="row" style="cursor:default"><input type="checkbox" class="group-send-draft-checkbox ck-native" value="${escapeHtml(d.author)}" checked>${avHtml(d.author)}<div class="tx"><span class="t">${escapeHtml(d.author)}</span><span class="s">${escapeHtml((d.draft||'').replace(/\s+/g,' ').slice(0,90))}${(d.draft||'').length>90?'…':''}</span></div></label>`).join('')}
+</div>
+<div class="sheet-a"><button class="btn" onclick="openCombineDraftsModal()">Back</button><button class="btn btn-p" onclick="confirmGroupSendSelection('${clientId}')">Continue</button></div>`, 520);
 }
 
 // Combines the selected authors' approved draft text into one starting
@@ -1242,7 +1224,7 @@ function confirmGroupSendSelection(clientId){
   if(checkedAuthors.length < 2){ showToast('error','Pick at least two', "Select at least two team members' drafts to combine — one alone doesn't need grouping."); return; }
   const c = clients.find(x=>x.id===clientId);
   if(!c) return;
-  if(!c.email){ showToast('error','No email on file', `Add an email for ${c.name} in Clients to send.`); return; }
+  if(!c.email){ askForClientEmail(c); return; }
 
   _groupSendClientId = clientId;
   _groupSendAuthors = checkedAuthors;
@@ -1306,9 +1288,10 @@ function queueDraftTextarea(id){
   return document.querySelector('.view.active ' + sel) || document.getElementById('draft-' + id);
 }
 
-async function approveDraft(id, author){
-  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can approve drafts.'); return; }
+async function approveDraft(id, author, opts){
+  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can approve drafts.'); return false; }
   const ta = queueDraftTextarea(id);
+  { const c0 = clients.find(x=>x.id===id); if(c0 && blockIfWorkDeleted(c0, getDraftFor(c0, author))) return false; }
   setBtnLoading(clickedBtn(), 'Approving…');
 
   await loadAll();
@@ -1319,6 +1302,8 @@ async function approveDraft(id, author){
   const modalOpenForThis = modalCard && modalCard.dataset.clientId === id && modalCard.dataset.author === author;
   const fields = { draftStatus: 'approved' };
   if(ta) fields.draft = ta.value;
+  // who approved it and when (This Week: "Approved by Albert 20 min ago"); nobody has copied it yet
+  if(typeof winsDbReady === 'function' && winsDbReady()) Object.assign(fields, { approvedBy: myName() || '', approvedAt: new Date().toISOString(), waCopiedBy: '', waCopiedAt: null });
   // Captured before draftImprovementIds gets cleared below —
   // getIncludedAuthorProfiles() needs it.
   const includedAuthorProfiles = getIncludedAuthorProfiles(c, d);
@@ -1339,14 +1324,22 @@ async function approveDraft(id, author){
   if(ok) await persistLog();
   renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
   if(modalOpenForThis) openQueueCardModal(id, author);
-  if(!ok){ showToast('error','Save failed','Approval may not have synced — refresh and check.'); return; }
+  if(!ok){ showToast('error','Save failed','Approval may not have synced — refresh and check.'); return false; }
   logClientActivity(id, 'draft_approved', `${myName()||'Someone'} approved ${author}'s draft.`);
   refreshClientDetailActivityIfOpen(id);
 
   // Notify whoever's actual logged work was included in what just got
-  // approved.
+  // approved. The writer hears separately, below.
+  const writer = author !== myName() ? teamProfiles.find(p => p.name === author) : null;
   for(const authorProfile of includedAuthorProfiles){
+    if(writer && authorProfile.id === writer.id) continue;
     await sendNotification(authorProfile.id, 'draft_approved', 'Your submission was approved', `${myName()||'An approver'} approved ${author}'s draft for ${c.name}, which included your logged work.`, 'approve');
+  }
+  // The writer: a WhatsApp win is theirs to send now (approveWin() tells them); an email update
+  // goes out from an approver, so they hear when it's sent (Approve & Send), or now if it's
+  // only approved.
+  if(writer && !(typeof winViaWhatsapp === 'function' && winViaWhatsapp(c)) && !(opts && opts.quietWriter)){
+    await sendNotification(writer.id, 'draft_approved', `${c.name}: your update is approved`, `${myName() || 'An approver'} approved it. An approver sends it to the client.`, 'teamqueue', c.id);
   }
 
   showToast('success','Draft approved', `${author}'s update for ${c.name} was approved.`);
@@ -1363,7 +1356,10 @@ async function approveDraft(id, author){
 // anyway since every improvement in your own draft is authored by you,
 // and that loop already excludes yourself).
 async function approveAndSendOwnDraft(id, author){
-  await approveDraft(id, author);
+  // Someone else's WhatsApp win goes back to them to send once it's approved.
+  const c0 = clients.find(x=>x.id===id);
+  if(c0 && typeof winViaWhatsapp === 'function' && winViaWhatsapp(c0) && author !== myName()) return approveWin(id, author);
+  if((await approveDraft(id, author, { quietWriter: true })) === false) return;
   await sendApprovedDraft(id, author);
 }
 
@@ -1380,6 +1376,7 @@ async function skipDraft(id, author){
   // notification loop at the end of this function.
   const includedAuthorProfiles = getIncludedAuthorProfiles(c, d);
   const includedIds = d.draftImprovementIds || [];
+  const nothingLeft = draftWorkAllDeleted(c, d); // discarding a draft whose work was all deleted
   // Same treatment as approveDraft(): flipping include_in_email off for
   // exactly the improvements that were part of THIS draft is what keeps
   // them from silently reappearing in a future draft. Previously this was
@@ -1403,7 +1400,7 @@ async function skipDraft(id, author){
   renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
   if(ok){ logClientActivity(id, 'draft_skipped', `${myName()||'Someone'} skipped ${author}'s update.`); refreshClientDetailActivityIfOpen(id); }
   if(modalOpenForThis) openQueueCardModal(id, author);
-  ok ? showToast('info','Skipped', `${author}'s update for ${c.name} won't be sent — those improvements are now excluded from future drafts too.`) : showToast('error','Save failed','Could not save — try again.');
+  ok ? (nothingLeft ? showToast('info','Draft discarded', `${author}'s draft for ${c.name} was discarded.`) : showToast('info','Skipped', `${author}'s update for ${c.name} won't be sent — those improvements are now excluded from future drafts too.`)) : showToast('error','Save failed','Could not save — try again.');
   if(ok){
     for(const authorProfile of includedAuthorProfiles){
       sendNotification(authorProfile.id, 'draft_skipped', 'Draft skipped', `${myName()||'An approver'} skipped ${author}'s draft for ${c.name}, which included your logged work — no email was sent.`, 'approve');

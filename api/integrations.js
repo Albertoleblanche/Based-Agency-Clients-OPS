@@ -11,8 +11,17 @@
 // GET  /api/integrations?provider=harvest  → Harvest status check
 // POST /api/integrations  body: { provider: 'google', action: 'sync' | 'disconnect' }
 // POST /api/integrations  body: { provider: 'harvest', action: 'connect' | 'disconnect'
-//        | 'get-projects' | 'save-client-mapping' | 'save-service-mapping'
-//        | 'sync-entry' | 'delete-entry' | 'sync-now' }
+//        | 'sync-entry' | 'delete-entry' | 'sync-now' | 'sync-setup' | 'link-client' | 'link-clients' }
+//   (the old client→project and service→task mapping lists are gone, step 5: time is logged by
+//   project and task; old entries without one still go through the mappings already saved)
+//   sync-setup: reads Harvest's clients, projects, tasks, assignments and people into Radar.
+//   Anyone signed in may ask (the app does when it opens); it runs at most every 10 minutes
+//   unless an admin or approver forces it (Sync Now, a full read). It also keeps Radar's client
+//   list in step with Harvest's (step 2): see syncHarvestClients in lib/harvest-sync.js.
+//   link-client (admins and approvers): { clientId, targetId } — a client added from Harvest is
+//   one Radar already has; the link and anything logged on it move to that client.
+//   link-clients (admins and approvers): { links: [{ clientId, targetId }] } — the same for several
+//   at once (Match Harvest Clients); one result each.
 // POST /api/integrations  body: { provider: 'push', action: 'send',
 //        targetUserId, title, body, url }
 //
@@ -23,8 +32,11 @@
 const { createClient } = require('@supabase/supabase-js');
 const { syncGoogleCalendarForUser } = require('../lib/google-calendar-sync');
 const {
+  syncHarvestSetup,
+  syncHarvestTime,
+  linkHarvestClient,
   validateHarvestCredentials,
-  fetchHarvestProjectsAndTasks,
+  harvestFetch,
   syncTimeEntryToHarvest,
   deleteTimeEntryFromHarvest,
 } = require('../lib/harvest-sync');
@@ -117,16 +129,41 @@ module.exports = async function handler(req, res) {
     const isAdmin = profile?.role === 'admin';
 
     if (req.method === 'GET') {
-      const { data: connection } = await admin.from('harvest_connection').select('account_id, connected_at, last_synced_at').eq('id', 1).maybeSingle();
-      const { count: clientMappingCount } = await admin.from('harvest_client_mappings').select('*', { count: 'exact', head: true });
-      const { count: serviceMappingCount } = await admin.from('harvest_service_mappings').select('*', { count: 'exact', head: true });
+      // select('*') so this still answers before addendum-harvest-sync.sql adds its columns;
+      // the token itself never leaves the server
+      const { data: connection } = await admin.from('harvest_connection').select('*').eq('id', 1).maybeSingle();
+      // the account's web address, for Open Harvest (New Client, step 5)
+      let companyUrl = null;
+      if (connection && connection.personal_access_token) { try { companyUrl = (await harvestFetch(connection, '/company')).base_uri || null; } catch (e) {} }
+      const countOf = async (table, active) => {
+        let q = admin.from(table).select('*', { count: 'exact', head: true });
+        if (active) q = q.eq('is_active', true);
+        const { count, error } = await q;
+        return error ? null : (count || 0);
+      };
+      const [clients, projects, tasks, people] = await Promise.all([
+        countOf('harvest_clients', true), countOf('harvest_projects', true), countOf('harvest_tasks', true), countOf('harvest_users', true),
+      ]);
+      // step 2 needs addendum-harvest-clients.sql
+      const { error: linkColErr } = clients === null ? { error: true } : await admin.from('harvest_clients').select('name_at_link').limit(1);
       res.status(200).json({
         connected: !!connection,
         accountId: connection?.account_id || null,
         connectedAt: connection?.connected_at || null,
         lastSyncedAt: connection?.last_synced_at || null,
-        clientMappingCount: clientMappingCount || 0,
-        serviceMappingCount: serviceMappingCount || 0,
+        companyUrl,
+        setup: {
+          ready: clients !== null,                       // false until addendum-harvest-sync.sql is run
+          clientsReady: !linkColErr,                     // false until addendum-harvest-clients.sql is run
+          timeReady: !!connection && 'time_synced_at' in connection, // false until addendum-harvest-time-read.sql is run
+          timeSyncedAt: connection?.time_synced_at || null,
+          syncedAt: connection?.setup_synced_at || null,
+          fullAt: connection?.setup_full_at || null,
+          error: connection?.setup_sync_error || null,
+          tokenUser: connection?.token_user_name || null,
+          tokenRoles: connection?.token_user_roles || null,
+          counts: { clients, projects, tasks, people },
+        },
       });
       return;
     }
@@ -135,11 +172,7 @@ module.exports = async function handler(req, res) {
     const { action } = req.body || {};
 
     const isApprover = isAdmin || profile?.role === 'approver';
-    if (action === 'get-projects' && !isApprover) {
-      res.status(403).json({ error: 'Only admins and approvers can view Harvest mappings.' });
-      return;
-    }
-    const adminActions = ['connect', 'disconnect', 'save-client-mapping', 'save-service-mapping', 'sync-now'];
+    const adminActions = ['connect', 'disconnect', 'sync-now'];
     if (adminActions.includes(action) && !isAdmin) {
       res.status(403).json({ error: 'Only admins can manage the Harvest connection.' });
       return;
@@ -170,42 +203,50 @@ module.exports = async function handler(req, res) {
     }
 
     const { data: connection } = await admin.from('harvest_connection').select('*').eq('id', 1).maybeSingle();
+
+    if (action === 'sync-setup') {
+      if (!profile) { res.status(403).json({ error: 'Only team members can sync Harvest.' }); return; }
+      if (!connection) { res.status(200).json({ skipped: 'not-connected' }); return; }
+      const force = !!(req.body || {}).force && isApprover;
+      if (!('setup_synced_at' in connection)) { res.status(200).json({ skipped: 'needs-sql' }); return; }
+      const last = connection.setup_synced_at ? new Date(connection.setup_synced_at).getTime() : 0;
+      if (!force && Date.now() - last < 10 * 60000) { res.status(200).json({ skipped: 'recent', syncedAt: connection.setup_synced_at }); return; }
+      const result = await syncHarvestSetup(admin, connection, { full: force });
+      // step 4: time logged in Harvest (needs addendum-harvest-time-read.sql)
+      try { result.time = await syncHarvestTime(admin, connection, { full: force }); }
+      catch (e) { result.time = { error: e.status === 403 ? 'This token isn\'t allowed to read time entries.' : e.message }; }
+      res.status(200).json(result);
+      return;
+    }
+
+    // Match Harvest Clients: link several at once (the app sends up to 15 per request)
+    if (action === 'link-clients') {
+      if (!isApprover) { res.status(403).json({ error: 'Only admins and approvers link clients.' }); return; }
+      const links = Array.isArray((req.body || {}).links) ? req.body.links.slice(0, 30) : [];
+      if (!links.length) { res.status(400).json({ error: 'Pick the clients to link.' }); return; }
+      const results = [];
+      for (const l of links) {
+        const clientId = l && l.clientId ? String(l.clientId) : '', targetId = l && l.targetId ? String(l.targetId) : '';
+        if (!clientId || !targetId || clientId === targetId) { results.push({ clientId, error: 'Pick the client it’s the same as.' }); continue; }
+        try {
+          const r = await linkHarvestClient(admin, clientId, targetId);
+          results.push(r.error ? { clientId, targetId, error: r.error } : { clientId, targetId, ok: true });
+        } catch (e) { results.push({ clientId, targetId, error: e.message }); }
+      }
+      res.status(200).json({ results });
+      return;
+    }
+    if (action === 'link-client') {
+      if (!isApprover) { res.status(403).json({ error: 'Only admins and approvers link clients.' }); return; }
+      const { clientId, targetId } = req.body || {};
+      if (!clientId || !targetId || clientId === targetId) { res.status(400).json({ error: 'Pick the client it’s the same as.' }); return; }
+      const r = await linkHarvestClient(admin, String(clientId), String(targetId));
+      res.status(r.status).json(r.error ? { error: r.error } : r);
+      return;
+    }
+
     if (!connection && action !== 'sync-entry' && action !== 'delete-entry') {
       res.status(400).json({ error: 'Harvest is not connected yet.' });
-      return;
-    }
-
-    if (action === 'get-projects') {
-      const data = await fetchHarvestProjectsAndTasks(connection);
-      res.status(200).json(data);
-      return;
-    }
-
-    if (action === 'save-client-mapping') {
-      const { clientId, harvestProjectId, harvestProjectName } = req.body;
-      if (!clientId || !harvestProjectId) { res.status(400).json({ error: 'clientId and harvestProjectId are required.' }); return; }
-      const { error } = await admin.from('harvest_client_mappings').upsert({
-        client_id: clientId, harvest_project_id: String(harvestProjectId), harvest_project_name: harvestProjectName || null,
-        updated_at: new Date().toISOString(), updated_by: userId,
-      });
-      if (error) { res.status(500).json({ error: error.message }); return; }
-      await admin.from('time_entries').update({ harvest_sync_status: 'pending', harvest_sync_error: null })
-        .eq('client_id', clientId).eq('harvest_sync_status', 'unmapped');
-      res.status(200).json({ success: true });
-      return;
-    }
-
-    if (action === 'save-service-mapping') {
-      const { service, harvestTaskId, harvestTaskName } = req.body;
-      if (!service || !harvestTaskId) { res.status(400).json({ error: 'service and harvestTaskId are required.' }); return; }
-      const { error } = await admin.from('harvest_service_mappings').upsert({
-        service, harvest_task_id: String(harvestTaskId), harvest_task_name: harvestTaskName || null,
-        updated_at: new Date().toISOString(), updated_by: userId,
-      });
-      if (error) { res.status(500).json({ error: error.message }); return; }
-      await admin.from('time_entries').update({ harvest_sync_status: 'pending', harvest_sync_error: null })
-        .eq('service', service).eq('harvest_sync_status', 'unmapped');
-      res.status(200).json({ success: true });
       return;
     }
 
@@ -220,6 +261,8 @@ module.exports = async function handler(req, res) {
         return;
       }
       const result = await syncTimeEntryToHarvest(admin, connection, entry);
+      // a read from Harvest may have brought this entry in already, before its id was saved here
+      if (result.harvestEntryId) await admin.from('time_entries').delete().eq('harvest_entry_id', result.harvestEntryId).eq('source', 'harvest').neq('id', timeEntryId);
       await admin.from('time_entries').update({
         harvest_sync_status: result.status,
         harvest_entry_id: result.harvestEntryId || entry.harvest_entry_id || null,
@@ -242,6 +285,7 @@ module.exports = async function handler(req, res) {
         .in('harvest_sync_status', ['pending', 'failed']).is('deleted_at', null).limit(200);
       for (const entry of (pending || [])) {
         const result = await syncTimeEntryToHarvest(admin, connection, entry);
+        if (result.harvestEntryId) await admin.from('time_entries').delete().eq('harvest_entry_id', result.harvestEntryId).eq('source', 'harvest').neq('id', entry.id);
         await admin.from('time_entries').update({
           harvest_sync_status: result.status,
           harvest_entry_id: result.harvestEntryId || entry.harvest_entry_id || null,

@@ -245,7 +245,7 @@ async function previewWednesdayEmail(){
     if(!data.wouldSend){
       openAppModal(`
         <div class="modal-head"><span class="panel-title">Wednesday email preview</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
-        <div class="modal-body"><p style="font-size:13px;color:var(--muted);line-height:1.5;">${escapeHtml(data.reason)}</p></div>
+        <div class="modal-body"><p style="font-size:14px;color:var(--muted);line-height:1.5;">${escapeHtml(data.reason)}</p></div>
         <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 460);
       return;
     }
@@ -253,10 +253,10 @@ async function previewWednesdayEmail(){
     openAppModal(`
       <div class="modal-head"><span class="panel-title">This is what Wednesday's automation will send</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
       <div class="modal-body">
-        <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 12px;">Preview only — nothing has been sent. This is exactly what the automated job will send when it runs.</p>
+        <p style="font-size:12.5px;color:var(--muted-lt);margin:0 0 12px;">Preview only — nothing has been sent. This is exactly what the automated job will send when it runs.</p>
         <div class="settings-field"><label>To</label><input value="${escapeHtml(data.to)}" readonly></div>
         <div class="settings-field"><label>Subject</label><input value="${escapeHtml(data.subject)}" readonly></div>
-        <div class="settings-field"><label>Body</label><textarea readonly style="min-height:150px;width:100%;font-family:var(--font);font-size:13px;padding:10px;border-radius:6px;border:1px solid var(--border);">${escapeHtml(data.body)}</textarea></div>
+        <div class="settings-field"><label>Body</label><textarea readonly style="min-height:150px;width:100%;font-family:var(--font);font-size:14px;padding:10px;border-radius:6px;border:1px solid var(--border);">${escapeHtml(data.body)}</textarea></div>
       </div>
       <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 500);
   }catch(e){
@@ -265,43 +265,3 @@ async function previewWednesdayEmail(){
   }
 }
 
-// Unlike previewWednesdayEmail() above, this one is NOT free to run — it
-// has to actually perform the real website checks and pattern-detection
-// call to show what they'd currently find, so it costs real AI API money
-// every single click. Confirmed explicitly before running for that
-// reason; the email preview above needs no such confirmation since it's
-// just reading data already sitting in the database.
-async function previewProactiveInsights(){
-  if(!(await confirmDialog('This actually runs the real website checks and pattern detection — it costs real API calls, the same as a real run. Continue?', {confirmLabel:'Run preview'}))) return;
-  const btn = clickedBtn();
-  setBtnLoading(btn, 'Checking…');
-  try{
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    const response = await fetch('/api/preview-wednesday-notify?action=proactive', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-      body: JSON.stringify({ action: 'proactive' }),
-    });
-    const data = await response.json();
-    restoreBtn(btn);
-    if(!response.ok){ showToast('error','Preview failed', data.error || 'Unknown error'); return; }
-
-    if(!data.ran){
-      openAppModal(`
-        <div class="modal-head"><span class="panel-title">Weekly focus report preview</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
-        <div class="modal-body"><p style="font-size:13px;color:var(--muted);line-height:1.5;">${escapeHtml(data.reason)}</p></div>
-        <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 460);
-      return;
-    }
-
-    const checkedNames = (data.websiteChecksCandidates||[]).map(c=>c.name).join(', ') || 'none (no client has a website on file yet)';
-
-    openWeeklyFocusReportShell();
-    weeklyFocusReportStepsState = buildWeeklyFocusReportSteps(data, `Preview only — nobody was notified, nothing was saved. Checked: ${checkedNames}.`);
-    weeklyFocusReportStepIndex = 0;
-    renderWeeklyFocusReportStep();
-  }catch(e){
-    restoreBtn(btn);
-    showToast('error','Could not load preview', String(e));
-  }
-}

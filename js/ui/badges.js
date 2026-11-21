@@ -187,11 +187,11 @@ function renderServiceBreakdownDonut(entries){
   const svcColor = (i)=> SERVICE_DONUT_COLORS[i % SERVICE_DONUT_COLORS.length];
 
   wrap.innerHTML = `
-    <div style="font-size:11.5px;color:var(--muted-lt);margin-bottom:14px;">${formatMinutes(totalMinutes)} total</div>
+    <div style="font-size:12.5px;color:var(--muted-lt);margin-bottom:14px;">${formatMinutes(totalMinutes)} total</div>
     ${sorted.map(([svc,mins],i)=>{
       const pct = Math.round((mins/totalMinutes)*100);
       return `<div class="report-bar-row">
-        <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:12.5px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:13.5px;">
           <span style="font-weight:600;color:var(--ink);">${escapeHtml(svc)}</span>
           <span style="color:var(--muted-lt);">${formatMinutes(mins)} · ${pct}%</span>
         </div>

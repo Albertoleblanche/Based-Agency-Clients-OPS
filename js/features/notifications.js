@@ -20,19 +20,24 @@ let notifications = [];
 // mute toggle for those to someone who could never receive them is just
 // confusing clutter, not a real preference.
 const NOTIFICATION_TYPE_META = {
+  update_behind:           { label:'A client update you hold is overdue', section:'Weekly Updates' },
+  draft_written:           { label:'A draft is written for you to check', section:'Weekly Updates' },
+  monday_summary:          { label:'The Monday summary', section:'Weekly Updates', visibleTo:'approver' },
   task_assigned:           { label:'A task is assigned to you', section:'Tasks' },
   task_completed:          { label:'A task you assigned is completed', section:'Tasks' },
   task_cancelled:          { label:'A task assigned to you is cancelled', section:'Tasks' },
   task_edited:             { label:'A task assigned to you changes', section:'Tasks' },
   draft_ready:             { label:'A draft is ready for your approval', section:'Client Work', visibleTo:'approver' },
-  draft_approved:          { label:'Your submitted work is approved', section:'Client Work' },
+  draft_approved:          { label:'Your update or submitted work is approved', section:'Client Work' },
+  win_approved:            { label:'Your WhatsApp update is approved, for you to send', section:'Client Work' },
+  draft_sent:              { label:'Your update is sent to the client', section:'Client Work' },
   draft_skipped:           { label:'Your submitted draft is skipped', section:'Client Work' },
   email_sent:              { label:'A client email is sent', section:'Client Work', visibleTo:'approver' },
   reminder_follow_up_due:  { label:'A client follow-up you own comes due', section:'Client Work' },
   reminder_escalated:      { label:'A client follow-up has gone unanswered for a week', section:'Client Work', visibleTo:'approver' },
-  weekly_focus_report:     { label:'The weekly focus report is ready', section:'Client Work' },
   client_danger_maxed:     { label:'A client\'s danger score hits 5/5', section:'Client Work' },
   client_danger_decreased: { label:'A client\'s danger score goes down', section:'Client Work' },
+  harvest_client:          { label:'A client is added from Harvest or archived there', section:'Client Work', visibleTo:'approver' },
   event_rsvp:              { label:'Someone RSVPs or requests a change to your event', section:'Calendar' },
   event_invited:           { label:"You're invited to a calendar event", section:'Calendar' },
   event_updated:           { label:'A calendar event you\'re on changes', section:'Calendar' },
@@ -48,13 +53,18 @@ const NOTIFICATION_TYPE_META = {
 // can't trigger a toast or sit in their bell either, since it was never
 // stored in the first place.
 async function sendNotification(userId, type, title, body, targetView, targetId, alreadyToasted){
+  // Muting a type mutes it everywhere; "app:", "push:" or "slack:" before it mutes one place
+  // only (Settings → Notifications).
   const recipient = teamProfiles.find(p=>p.id===userId);
-  if(recipient && (recipient.muted_notification_types||[]).includes(type)) return;
-  const row = { user_id:userId, type, title, body, target_view:targetView, read:!!alreadyToasted };
-  if(targetId) row.target_id = targetId;
-  await supabaseClient.from('notifications').insert(row);
-  sendPushNotification(userId, title, body, notificationUrl(targetView, targetId));
-  sendSlackNotification(userId, type, title, body);
+  const muted = (recipient && recipient.muted_notification_types) || [];
+  if(muted.includes(type)) return;
+  if(!muted.includes('app:'+type)){
+    const row = { user_id:userId, type, title, body, target_view:targetView, read:!!alreadyToasted };
+    if(targetId) row.target_id = targetId;
+    await supabaseClient.from('notifications').insert(row);
+  }
+  if(!muted.includes('push:'+type)) sendPushNotification(userId, title, body, notificationUrl(targetView, targetId));
+  if(!muted.includes('slack:'+type)) sendSlackNotification(userId, type, title, body);
 }
 
 // Best-effort Slack DM alongside the in-app notification above — same
@@ -120,63 +130,59 @@ async function loadNotifications(){
   if(!currentUser){ notifications = []; return; }
   const { data, error } = await supabaseClient.from('notifications').select('*').eq('user_id', currentUser.id).order('created_at', { ascending:false }).limit(50);
   if(error){ console.error('loadNotifications error', error); notifications = []; return; }
-  notifications = data || [];
+  notifications = (data || []).filter(n => n.type !== 'weekly_focus_report');   // the weekly report was removed
   updateNotifBadge();
 }
 
+// A dot on the bell, no number: red when something's urgent, yellow when something waits on you,
+// blue for news (notifSeverity in helpers.js). The count is in the button's label.
 function updateNotifBadge(){
   const badge = document.getElementById('notifBadge');
   if(!badge) return;
-  const unread = notifications.filter(n=>!n.read).length;
-  badge.textContent = unread > 9 ? '9+' : unread;
-  badge.style.display = unread ? 'flex' : 'none';
-}
-
-function toggleNotifPanel(){
-  const panel = document.getElementById('notifPanel');
-  if(!panel) return;
-  const opening = panel.style.display !== 'block';
-  panel.style.display = opening ? 'block' : 'none';
-  if(opening) renderNotifPanel();
-}
-
-document.addEventListener('click', (e)=>{
-  const wrap = document.querySelector('.notif-bell-wrap');
-  const panel = document.getElementById('notifPanel');
-  if(panel && panel.style.display==='block' && wrap && !wrap.contains(e.target)) panel.style.display='none';
-});
-
-// Harvest's own Widget iframe, replacing the earlier Button approach —
-// full document isolation means nothing on this page can interfere with
-// or accidentally reset the timer mid-run, which is the class of problem
-// the Button kept running into. src is set only once on first open, not
-// on every toggle, since a running timer's actual state lives on
-// Harvest's own server regardless of what this page does locally.
-function toggleHarvestTimerPanel(){
-  const panel = document.getElementById('harvestTimerPanel');
-  if(!panel) return;
-  const opening = panel.style.display !== 'block';
-  panel.style.display = opening ? 'block' : 'none';
-  if(opening){
-    const iframe = document.getElementById('harvestTimerIframe');
-    if(iframe && !iframe.src){
-      const params = new URLSearchParams({
-        app_name: 'Based Agency',
-        closable: 'false',
-        permalink: window.location.origin + '/',
-        external_item_id: 'global',
-        external_item_name: 'Time Entry',
-      });
-      iframe.src = `https://platform.harvestapp.com/platform/timer?${params.toString()}`;
-    }
+  const unread = notifications.filter(n=>!n.read).length, sev = notifTopSeverity(notifications);
+  badge.textContent = '';
+  badge.className = 'notif-badge' + (sev ? ' is-' + sev : '');
+  badge.style.display = unread ? 'block' : 'none';
+  const btn = badge.closest('button');
+  if(btn){
+    const label = unread ? `Notifications: ${unread} unread${sev === 'red' ? ', something urgent' : sev === 'yellow' ? ', something waiting on you' : ''}` : 'Notifications';
+    btn.setAttribute('aria-label', label); btn.title = label;
   }
 }
 
+// The bell sits at the foot of the sidebar, beside your name, so its panel opens upward from it
+// (floating over the page, like your menu) and goes back down into it when it closes.
+function toggleNotifPanel(){
+  const panel = document.getElementById('notifPanel');
+  if(!panel) return;
+  const opening = panel.style.display !== 'block' || panel.dataset.leaving;
+  if(!opening){ hidePop(panel); return; }
+  if(typeof closeSidebarProfileMenu === 'function') closeSidebarProfileMenu();
+  const btn = document.querySelector('.notif-bell-btn');
+  if(panel.parentElement !== document.body) document.body.appendChild(panel);
+  panel.getAnimations?.().forEach(a => a.cancel()); delete panel.dataset.leaving;
+  panel.dataset.from = 'below';
+  panel.style.display = 'block';
+  renderNotifPanel();
+  if(btn){
+    const r = btn.getBoundingClientRect(), w = panel.offsetWidth;
+    panel.style.left = Math.round(Math.max(8, Math.min(r.left - 6, window.innerWidth - w - 8))) + 'px';
+    panel.style.bottom = Math.round(window.innerHeight - r.top + 6) + 'px';
+    panel.style.transformOrigin = `${Math.round(r.left + r.width / 2 - parseFloat(panel.style.left))}px 100%`;
+  }
+  if(typeof motionOK === 'function' && motionOK()) panel.animate?.([{ opacity: 0, transform: 'translateY(4px) scale(.98)' }, { opacity: 1, transform: 'none' }], { duration: 180, easing: EASE_OUT });
+}
+
 document.addEventListener('click', (e)=>{
-  const wrap = document.getElementById('harvestTimerBellWrap');
-  const panel = document.getElementById('harvestTimerPanel');
-  if(panel && panel.style.display==='block' && wrap && !wrap.contains(e.target)) panel.style.display='none';
+  const btn = document.querySelector('.notif-bell-btn');
+  const panel = document.getElementById('notifPanel');
+  if(panel && panel.style.display==='block' && !panel.dataset.leaving && !(btn && btn.contains(e.target)) && !panel.contains(e.target)) hidePop(panel);
 });
+document.addEventListener('keydown', (e)=>{
+  const panel = document.getElementById('notifPanel');
+  if(e.key === 'Escape' && panel && panel.style.display === 'block' && !panel.dataset.leaving){ e.stopPropagation(); hidePop(panel); document.querySelector('.notif-bell-btn')?.focus(); }
+}, true);
+window.addEventListener('resize', () => { const p = document.getElementById('notifPanel'); if(p && p.style.display === 'block') hidePop(p); });
 
 function renderNotifPanel(){
   const el = document.getElementById('notifPanelList');
@@ -191,7 +197,7 @@ function renderNotifPanel(){
         <div class="notif-row-time">${new Date(n.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</div>
       </div>
       <button class="notif-row-delete" onclick="event.stopPropagation();deleteNotification('${n.id}')" title="Delete">
-        <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/></svg>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6" /> <path d="M14 11v6" /> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /> <path d="M3 6h18" /> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
       </button>
     </div>`).join('');
 }
@@ -224,17 +230,25 @@ async function handleNotifClick(id){
     renderNotifPanel();
   }
   if(n.target_view==='client-detail' && n.target_id){
-    document.getElementById('notifPanel').style.display = 'none';
+    hidePop(document.getElementById('notifPanel'));
     openClientDetail(n.target_id);
     return;
   }
-  if(n.target_view==='weekly-focus-report'){
-    document.getElementById('notifPanel').style.display = 'none';
-    openWeeklyFocusReportModal(n.target_id);
+  if(n.target_view==='clients' && n.target_id){
+    hidePop(document.getElementById('notifPanel'));
+    if(clients.some(c=>c.id===n.target_id && !c.deletedAt)) openClientInspectorFor(n.target_id);
+    else switchView('clients');
     return;
   }
+  // an update in Review: open it there (yours first if you wrote one for that client)
+  if(n.target_view==='teamqueue' && n.target_id && typeof reviewItems === 'function' && typeof openReviewDraft === 'function'){
+    const me = myName(), all = Object.values(reviewItems()).flat().filter(x => x.c.id === n.target_id);
+    const x = (!canApprove() && all.find(y => y.d.author === me)) || all[0];
+    if(x){ hidePop(document.getElementById('notifPanel')); openReviewDraft(x.c.id, x.d.author); return; }
+  }
   if(n.target_view){
-    document.getElementById('notifPanel').style.display = 'none';
+    hidePop(document.getElementById('notifPanel'));
+    if(n.target_view==='plan' && n.target_id) window._planSel = n.target_id;
     switchView(n.target_view);
     if(n.target_view==='approve' && n.target_id && clients.find(c=>c.id===n.target_id)){
       openQueueCardModal(n.target_id);

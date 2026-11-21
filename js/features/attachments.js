@@ -54,7 +54,7 @@ async function removeAttachmentFromRecord(recordType, recordId, path){
 async function renderAttachmentsInModal(recordType, recordId){
   const el = document.getElementById('attachmentsList');
   if(!el) return;
-  el.innerHTML = `<div class="empty" style="padding:10px 0;"><span class="spinner"></span>Loading…</div>`;
+  el.innerHTML = `${loadingStateHtml('Loading…')}`;
   const record = recordType==='note' ? notes.find(n=>n.id===recordId) : tasks.find(t=>t.id===recordId);
   const attachments = record?.attachments || [];
   if(!attachments.length){ el.innerHTML = `<div class="empty" style="padding:10px 0;">No files attached yet.</div>`; return; }

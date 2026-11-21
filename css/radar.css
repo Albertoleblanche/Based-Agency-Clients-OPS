@@ -154,7 +154,6 @@ body.sidebar-collapsed .nav-badge{min-width:15px;height:15px;padding:0 4px;backg
 .today .t-num{font-variant-numeric:tabular-nums;color:var(--muted);}
 .today .t-bar{height:5px;border-radius:3px;background:var(--fill-2);overflow:hidden;}
 .today .t-bar i{display:block;height:100%;background:var(--muted-lt);border-radius:3px;}
-#weeklyFocusReportBanner{box-shadow:0 0 0 .5px var(--grp-line);border:0;border-radius:12px;}
 
 /* ---------- sign in: a small app window ---------- */
 .login-overlay{background:var(--side-bg);}

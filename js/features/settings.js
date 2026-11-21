@@ -14,7 +14,7 @@ function onIconFileSelected(e){
       <div class="modal-head"><span class="panel-title">Crop your icon</span><span class="toast-close" onclick="closeCropModal()">✕</span></div>
       <div class="modal-body">
         <div style="max-height:360px;overflow:hidden;background:#000;"><img id="cropImage" src="${evt.target.result}" style="max-width:100%;display:block;"></div>
-        <p style="font-size:11.5px;color:var(--muted-lt);margin:0;">Drag to reposition, scroll or pinch to zoom.</p>
+        <p style="font-size:12.5px;color:var(--muted-lt);margin:0;">Drag to reposition, scroll or pinch to zoom.</p>
       </div>
       <div class="modal-actions">
         <button class="btn btn-brand" onclick="saveAppIcon()">Save icon</button>
@@ -195,7 +195,7 @@ function applyAppBranding(){
   if(colorLabel) colorLabel.textContent = brandColor.toUpperCase();
   if(settings.brandColor) applyBrandColor(settings.brandColor);
 
-  if(tourSteps[0]) tourSteps[0].title = `Welcome to ${name} 👋`;
+
 }
 
 // Default labels match each tab's original hardcoded text exactly — the
@@ -205,10 +205,9 @@ function applyAppBranding(){
 // duplicating that as a second editable field here would just be
 // confusing about which one actually takes effect.
 const NAV_LABEL_DEFAULTS = {
-  overview: 'Today', focusreports: 'Focus Reports', clients: 'All Clients', approve: 'Review', teamqueue: 'Team Queue',
+  overview: 'Dashboard', clients: 'All Clients', health: 'Health', approve: 'This Week', queue: 'Queue', teamqueue: 'Review',
   notes: 'Notes', tasks: 'Tasks', reminders: 'Reminders', calendar: 'Calendar',
   time: 'Time', team: 'Team', trash: 'Recently Deleted', settings: 'Settings',
-  aivisibility: 'AI Visibility',
 };
 
 // Updates both the visible expanded-sidebar label AND the collapsed-
@@ -222,7 +221,8 @@ function applyNavLabels(){
   Object.keys(NAV_LABEL_DEFAULTS).forEach(view=>{
     const navItem = document.querySelector(`.nav-item[data-view="${view}"]`);
     if(!navItem) return;
-    const label = (labels[view] || NAV_LABEL_DEFAULTS[view]).trim() || NAV_LABEL_DEFAULTS[view];
+    const usual = typeof viewTitle === 'function' && !labels[view] ? viewTitle(view) : NAV_LABEL_DEFAULTS[view];
+    const label = (labels[view] || usual).trim() || usual;
     const labelSpan = navItem.querySelector('.nav-label');
     if(labelSpan) labelSpan.textContent = label;
     navItem.setAttribute('data-tooltip', label);
@@ -319,7 +319,7 @@ function renderNotificationPrefs(){
         const isOn = !muted.includes(type);
         return `
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);">
-          <span style="font-size:13px;color:var(--ink);">${escapeHtml(meta.label)}</span>
+          <span style="font-size:14px;color:var(--ink);">${escapeHtml(meta.label)}</span>
           <button class="theme-toggle-switch ${isOn?'on':''}" onclick="toggleNotificationMute('${type}', ${isOn})"></button>
         </div>`;
       }).join('')}
@@ -342,7 +342,7 @@ async function saveAiProvider(provider){
   if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
   settings.aiProvider = provider;
   const ok = await persistSettings();
-  ok ? showToast('success','Saved', provider==='openai' ? 'The Assistant now uses ChatGPT.' : 'The Assistant now uses Claude.') : showToast('error','Save failed','Could not save — try again.');
+  ok ? showToast('success','Saved', provider==='openai' ? 'Weekly insights now use ChatGPT.' : 'Weekly insights now use Claude.') : showToast('error','Save failed','Could not save — try again.');
 }
 
 function renderAiProviderChoice(){
@@ -398,41 +398,6 @@ function renderAiProviderChoice(){
     const el = document.getElementById(elId);
     if(el && document.activeElement !== el){ el.value = sig[sigFieldMap[elId]] || ''; el.disabled = !isAdmin(); }
   });
-  // Undefined means enabled — this feature predates the toggle, so an
-  // existing deployment that's never touched this setting keeps working
-  // exactly as before rather than silently going quiet.
-  const proactiveToggle = document.getElementById('proactiveInsightsToggle');
-  if(proactiveToggle){
-    const enabled = settings.proactiveInsightsEnabled !== false;
-    proactiveToggle.classList.toggle('on', enabled);
-    proactiveToggle.disabled = !isAdmin();
-  }
-  const daySelect = document.getElementById('proactiveInsightsDaySelect');
-  if(daySelect){
-    // Undefined means Wednesday (3) — matches the cron's own fallback, so
-    // an existing deployment that's never touched this shows the day it's
-    // actually already running on, not a misleading blank/default.
-    daySelect.value = String(settings.proactiveInsightsDayOfWeek ?? 3);
-    daySelect.disabled = !isAdmin();
-  }
-}
-
-async function saveProactiveInsightsDay(value){
-  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
-  settings.proactiveInsightsDayOfWeek = parseInt(value);
-  const ok = await persistSettings();
-  const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][settings.proactiveInsightsDayOfWeek];
-  ok ? showToast('success','Saved', `Weekly focus reports will now go out on ${dayName}s.`) : showToast('error','Save failed','Could not save — try again.');
-}
-
-async function toggleProactiveInsightsEnabled(){
-  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
-  const currentlyEnabled = settings.proactiveInsightsEnabled !== false;
-  settings.proactiveInsightsEnabled = !currentlyEnabled;
-  const ok = await persistSettings();
-  if(!ok){ settings.proactiveInsightsEnabled = currentlyEnabled; showToast('error','Save failed','Could not save — try again.'); return; }
-  renderAiProviderChoice();
-  showToast('success', settings.proactiveInsightsEnabled ? 'Enabled' : 'Disabled', settings.proactiveInsightsEnabled ? 'The weekly focus report is back on.' : 'The weekly focus report is paused until re-enabled.');
 }
 
 // Lets a redeployment-free response to a provider deprecating/renaming a
@@ -502,11 +467,11 @@ function openAiProviderConnectModal(provider){
   // format (see lib/ai-client.js's callOpenAI for why).
   const baseUrlField = provider==='openai' ? `
       <div class="settings-field"><label>Base URL <span style="font-weight:400;color:var(--muted-lt);">(optional)</span></label><input type="text" id="aiProviderBaseUrlInput" placeholder="https://api.openai.com/v1" style="width:100%;" autocomplete="off"></div>
-      <p style="font-size:11px;color:var(--muted-lt);margin:-4px 0 12px;line-height:1.5;">Leave blank for OpenAI itself. Set this to point at any other OpenAI-compatible endpoint instead — Azure OpenAI, Mistral, Groq, OpenRouter, a self-hosted model, etc. Note: web search (used for website checks) only works against OpenAI itself, not a custom endpoint.</p>` : '';
+      <p style="font-size:12px;color:var(--muted-lt);margin:-4px 0 12px;line-height:1.5;">Leave blank for OpenAI itself. Set this to point at any other OpenAI-compatible endpoint instead — Azure OpenAI, Mistral, Groq, OpenRouter, a self-hosted model, etc. Note: web search (used for website checks) only works against OpenAI itself, not a custom endpoint.</p>` : '';
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Connect ${escapeHtml(label)}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
-      <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;line-height:1.6;">Paste an API key from your ${escapeHtml(label)} account. It's tested against the real provider before saving, and won't be shown again after this — not even to you.</p>
+      <p style="font-size:13.5px;color:var(--muted);margin:0 0 12px;line-height:1.6;">Paste an API key from your ${escapeHtml(label)} account. It's tested against the real provider before saving, and won't be shown again after this — not even to you.</p>
       <div class="settings-field"><label>API key</label><input type="password" id="aiProviderKeyInput" placeholder="${keyHint}" style="width:100%;" autocomplete="off"></div>
       ${baseUrlField}
       <p style="margin:10px 0 0;"><span class="row-link" onclick="closeAppModal();disconnectAiProvider('${provider}')">Disconnect instead</span></p>
@@ -536,7 +501,7 @@ async function submitAiProviderConnect(provider){
 async function disconnectAiProvider(provider){
   if(!isAdmin()){ showToast('error','Not allowed','Only admins can disconnect a provider.'); return; }
   const label = provider==='claude' ? 'Claude' : 'ChatGPT';
-  if(!(await confirmDialog(`Disconnect ${label}? The Assistant won't be able to use it until reconnected (or until a Vercel environment variable is set instead).`, {confirmLabel:'Disconnect', destructive:true}))) return;
+  if(!(await confirmDialog(`Disconnect ${label}? Weekly insights won't be able to use it until reconnected (or until a Vercel environment variable is set instead).`, {confirmLabel:'Disconnect', destructive:true}))) return;
   try{
     await adminActionCall('disconnect-ai-provider', { provider });
     showToast('success','Disconnected', `${label} disconnected.`);
@@ -644,7 +609,7 @@ function applyAssistantName(){
   const navItem = document.getElementById('claudeNavItem');
   if(navItem) navItem.setAttribute('data-tooltip', name);
   const tabInput = document.getElementById('claudeTabInput');
-  if(tabInput) tabInput.placeholder = `Ask ${name} about a client, or paste a link to review…`;
+  if(tabInput) tabInput.placeholder = `Ask about your clients, drafts or time…`;
   const floatInput = document.getElementById('claudeFloatInput');
   if(floatInput) floatInput.placeholder = `Ask ${name} anything…`;
 }

@@ -133,7 +133,7 @@ document.addEventListener('contextmenu', (e) => {
 // ⌘/Ctrl+\ shows or hides the sidebar, ⌘/Ctrl+/ lists the shortcuts.
 // ⌘/Ctrl+K (search) lives with the command palette in navigation.js.
 function visibleNavItems(){
-  return [...document.querySelectorAll('.sidebar .nav-item[data-view]')].filter(isShown);
+  return [...document.querySelectorAll('#appSidebar .src .nav-item[data-view]')].filter(isShown);
 }
 
 function shortcutLabelForView(view){
@@ -157,10 +157,11 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     item.click();
   } else if(e.key === ',' && !e.shiftKey){
-    const settingsItem = document.querySelector('.sidebar .nav-item[data-view="settings"]');
-    if(!isShown(settingsItem) || appModalOpen) return;
+    // Settings lives in your menu (under your name) now; ⌘, still opens it.
+    if(appModalOpen) return;
     e.preventDefault();
-    settingsItem.click();
+    if(typeof closeSidebarProfileMenu === 'function') closeSidebarProfileMenu();
+    switchView('settings');
   } else if(e.key === '\\'){
     e.preventDefault();
     toggleSidebar();
@@ -171,29 +172,19 @@ document.addEventListener('keydown', (e) => {
 });
 
 function openShortcutsSheet(){
-  // "Ctrl+K" → [Ctrl][K]; "⌘K" → [⌘][K]; "Esc" → [Esc]
+  // "Ctrl+K" → Ctrl K; "⌘K" → ⌘ K — each key its own little cap.
   const keys = (combo) => {
     const parts = combo.startsWith('Ctrl+') ? ['Ctrl', combo.slice(5)] : combo.startsWith('⌘') ? ['⌘', combo.slice(1)] : [combo];
     return parts.map(part => `<kbd class="kbd">${escapeHtml(part)}</kbd>`).join('');
   };
-  const navRows = visibleNavItems().slice(0, 9).map((n, i) => {
-    const label = n.querySelector('.nav-label')?.textContent || n.dataset.tooltip || n.dataset.view;
-    return [label, MOD_LABEL + (i + 1)];
-  });
-  const rows = [
-    ['Search clients and pages', MOD_LABEL + 'K'],
-    ...navRows,
-    ['Settings', MOD_LABEL + ','],
-    ['Show or hide the sidebar', MOD_LABEL + '\\'],
-    ['Keyboard shortcuts', MOD_LABEL + '/'],
-    ['Close a window or menu', 'Esc'],
+  const navRows = visibleNavItems().slice(0, 9).map((n, i) => [n.querySelector('.nav-label')?.textContent.trim() || n.dataset.view, MOD_LABEL + (i + 1)]);
+  const groups = [
+    ['Anywhere', [['Search clients, tasks and screens', MOD_LABEL + 'K'], ['Log an improvement', MOD_LABEL + 'N'], ['Show or hide the sidebar', MOD_LABEL + '\\'], ['These shortcuts', MOD_LABEL + '/'], ['Close a sheet or menu', 'Esc']]],
+    ['Go to', [...navRows, ['Settings', MOD_LABEL + ',']]],
   ];
-  openAppModal(`
-    <div class="modal-head"><span class="panel-title">Keyboard shortcuts</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
-    <div class="modal-body shortcut-list">
-      ${rows.map(([label, combo]) => `<div class="shortcut-row"><span>${escapeHtml(label)}</span><span class="shortcut-keys">${keys(combo)}</span></div>`).join('')}
-    </div>
-    <div class="modal-actions"><button class="btn btn-brand" onclick="closeAppModal()">Done</button></div>`, 420);
+  openAppModal(`<h3>Keyboard Shortcuts</h3>
+${groups.map(([g, rows]) => `<div class="kb-g"><div class="kb-h">${g}</div><div class="grp">${rows.map(([label, combo]) => `<div class="row sm"><div class="tx"><span class="t" style="font-weight:400">${escapeHtml(label)}</span></div><div class="r kb-keys">${keys(combo)}</div></div>`).join('')}</div></div>`).join('')}
+<div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal()">Done</button></div>`, 440);
 }
 
 // ---- Start-up ---------------------------------------------------------------

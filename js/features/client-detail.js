@@ -14,8 +14,8 @@ function openSendToSlackConfirm(clientId, author){
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Send ${escapeHtml(author)}'s update to ${escapeHtml(c.name)}'s Slack channel?</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
-      <p style="font-size:11.5px;color:var(--muted-lt);margin:0 0 12px;">Posts to ${escapeHtml(mapping.channelName || mapping.channelId)} — review before sending, this posts immediately once confirmed.</p>
-      <textarea spellcheck="true" id="slackClientMessageText" style="width:100%;min-height:220px;font-family:var(--font);font-size:12px;padding:10px;border-radius:8px;border:1px solid var(--border);white-space:pre-wrap;">${escapeHtml(d.draft)}</textarea>
+      <p style="font-size:12.5px;color:var(--muted-lt);margin:0 0 12px;">Posts to ${escapeHtml(mapping.channelName || mapping.channelId)} — review before sending, this posts immediately once confirmed.</p>
+      <textarea spellcheck="true" id="slackClientMessageText" style="width:100%;min-height:220px;font-family:var(--font);font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);white-space:pre-wrap;">${escapeHtml(d.draft)}</textarea>
     </div>
     <div class="modal-actions">
       <button class="btn btn-brand" id="sendSlackClientBtn" onclick="confirmSendToSlack('${clientId}')">Send to Slack</button>
@@ -94,7 +94,7 @@ function renderClientDetailSkeleton(){
   metricsEl.innerHTML = Array.from({ length: 4 }).map(skeletonCard).join('');
   ['cdImprovements','cdDraftStatus','cdTimeEntries','cdNotes'].forEach(id=>{
     const el = document.getElementById(id);
-    if(el) el.innerHTML = `<div class="empty"><span class="spinner"></span>Loading…</div>`;
+    if(el) el.innerHTML = `${loadingStateHtml('Loading…')}`;
   });
 }
 
@@ -141,12 +141,12 @@ function renderClientDetail(){
     // them), which is exactly the big dead gap in the screenshot. Flex-wrap
     // has no such artifact — compact fields sit side by side and wrap
     // naturally, full-width ones just break to their own line.
-    const serviceHtml = `<div class="info-grid-item"><label class="info-grid-label">Service</label><div class="info-grid-value">${c.service ? escapeHtml(c.service) : '<span style="color:var(--muted-lt);">—</span>'}</div></div>`;
+    const serviceHtml = `<div class="info-grid-item"><label class="info-grid-label">${typeof serviceFromHarvest === 'function' && serviceFromHarvest(c) ? 'Projects' : 'Service'}</label><div class="info-grid-value">${c.service ? escapeHtml(c.service) : '<span style="color:var(--muted-lt);">—</span>'}</div></div>`;
     const sowHtml = `<div class="info-grid-item info-grid-full"><label class="info-grid-label">SOW / Scope Notes</label><div class="info-grid-value" style="white-space:pre-wrap;">${c.sow ? escapeHtml(c.sow) : '<span style="color:var(--muted-lt);">—</span>'}</div></div>`;
     // Website gets its own real button (not a plain link like custom
     // URL-type fields below) — shown only when the client actually has
     // one set, since not every client does.
-    const websiteHtml = hasWebsite ? `<div class="info-grid-item"><label class="info-grid-label">Website</label><div class="info-grid-value"><a href="${safeUrl(c.website.startsWith('http')?c.website:'https://'+c.website)}" target="_blank" rel="noopener" class="btn btn-outline" style="display:inline-flex;padding:7px 14px;min-height:auto;font-size:12px;text-decoration:none;">View website ↗</a></div></div>` : '';
+    const websiteHtml = hasWebsite ? `<div class="info-grid-item"><label class="info-grid-label">Website</label><div class="info-grid-value"><a href="${safeUrl(c.website.startsWith('http')?c.website:'https://'+c.website)}" target="_blank" rel="noopener" class="btn btn-outline" style="display:inline-flex;padding:7px 14px;min-height:auto;font-size:13px;text-decoration:none;">View website ↗</a></div></div>` : '';
     const fieldsHtml = fields.map(f=>{
       const val = values[f.id];
       return `<div class="info-grid-item"><label class="info-grid-label">${escapeHtml(f.label)}</label><div class="info-grid-value">${val ? (f.type==='url' ? `<a href="${val.startsWith('http')?val:'https://'+val}" target="_blank" style="color:var(--brand-dark);">${escapeHtml(val)}</a>` : escapeHtml(val)) : '<span style="color:var(--muted-lt);">—</span>'}</div></div>`;
@@ -176,7 +176,7 @@ function renderClientDetail(){
       const days = lastSent ? Math.floor((Date.now() - lastSent) / 86400000) : null;
       const bits = [lastSent ? (days === 0 ? 'Update sent today.' : `No update in ${days} day${days===1?'':'s'}.`) : 'No update sent yet.'];
       if(budget && budget.tier === 'over') bits.push(`Over this month’s hours (${(budget.usedMinutes/60).toFixed(1)} of ${(budget.budgetMinutes/60).toFixed(1)}).`);
-      riskEl.innerHTML = `<div class="cd-risk" role="note"><svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M236.8,188.09,149.35,36.22a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM120,104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm8,88a12,12,0,1,1,12-12A12,12,0,0,1,128,192Z"/></svg><div><b>Risk ${c.danger} of 5.</b> ${escapeHtml(bits.join(' '))}</div></div>`;
+      riskEl.innerHTML = `<div class="cd-risk" role="note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></svg><div><b>Risk ${c.danger} of 5.</b> ${escapeHtml(bits.join(' '))}</div></div>`;
     } else riskEl.innerHTML = '';
   }
 
@@ -201,7 +201,7 @@ function renderClientDetail(){
           <div class="ts-entry-title">${escapeHtml(imp.author)||'Team member'}</div>
           <div class="ts-entry-desc">${escapeHtml(imp.text)}</div>
         </div>
-        <div class="ts-entry-right"><div class="ts-entry-duration" style="font-size:10.5px;color:var(--muted-lt);">${imp.date ? new Date(imp.date).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : ''}</div></div>
+        <div class="ts-entry-right"><div class="ts-entry-duration" style="font-size:11px;color:var(--muted-lt);">${imp.date ? new Date(imp.date).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : ''}</div></div>
       </div>`).join('')
     : `<div class="empty">No improvements logged yet.</div>`;
 
@@ -212,7 +212,7 @@ function renderClientDetail(){
   document.getElementById('cdDraftStatus').innerHTML = (activeDrafts.length ? activeDrafts.map(d => {
     const status = statusMeta(c, d.author);
     return `<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border);">
-      <p style="font-size:13px;margin:0 0 6px;"><b>${escapeHtml(d.author)}</b> — Status: <b style="color:${status.color};">${escapeHtml(status.label)}</b></p>
+      <p style="font-size:14px;margin:0 0 6px;"><b>${escapeHtml(d.author)}</b> — Status: <b style="color:${status.color};">${escapeHtml(status.label)}</b></p>
       <div class="ts-entry-desc" style="white-space:pre-wrap;line-height:1.5;">${escapeHtml(d.draft)}</div>
     </div>`;
   }).join('') : `<div class="empty">No draft generated yet.</div>`)
@@ -240,11 +240,11 @@ function renderClientDetail(){
           <div class="note-meta">${new Date(n.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
           <span class="pill ${noteStatus.cls}">${escapeHtml(noteStatus.label)}</span>
         </div>
-        <div style="font-weight:700;font-size:13px;color:var(--ink);margin-bottom:3px;">${escapeHtml(n.title || 'Untitled note')}</div>
+        <div style="font-weight:700;font-size:14px;color:var(--ink);margin-bottom:3px;">${escapeHtml(n.title || 'Untitled note')}</div>
         <div class="note-text">${escapeHtml(n.text)}</div>
         ${n.link ? `<a href="${safeUrl(normalizeUrl(n.link))}" target="_blank" rel="noopener" class="note-link" onclick="event.stopPropagation();">🔗 ${truncateLinkDisplay(n.link, 40)}</a>` : ''}
         <div class="note-actions">
-          ${n.status!=='done' ? `<button class="btn btn-brand" style="padding:7px 12px;font-size:11.5px;" onclick="logNoteNow('${n.id}')">Log it now</button>` : ''}
+          ${n.status!=='done' ? `<button class="btn btn-brand" style="padding:7px 12px;font-size:12.5px;" onclick="logNoteNow('${n.id}')">Log it now</button>` : ''}
           <span class="row-link" onclick="openNoteModal('${n.id}')">Edit</span>
         </div>
       </div>`;
@@ -268,7 +268,7 @@ function renderClientDetail(){
           </div>
           <div class="note-text">${escapeHtml(r.question)}</div>
           <div class="note-actions">
-            <span style="font-size:11px;color:var(--muted-lt);">Follow-up: ${reminderFollowUpLabel(r.followUpDate)}</span>
+            <span style="font-size:12px;color:var(--muted-lt);">Follow-up: ${reminderFollowUpLabel(r.followUpDate)}</span>
             <span class="row-link" onclick="markReminderStatus('${r.id}','answered')">Mark answered</span>
           </div>
         </div>`;
@@ -392,7 +392,7 @@ async function logClientActivity(clientId, actionType, description){
 async function loadClientActivityHistory(clientId){
   const el = document.getElementById('cdActivityHistory');
   if(!el) return;
-  el.innerHTML = `<div class="empty"><span class="spinner"></span>Loading…</div>`;
+  el.innerHTML = `${loadingStateHtml('Loading…')}`;
   const { data, error } = await supabaseClient
     .from('activity_log').select('*').eq('client_id', clientId).order('created_at', { ascending:false }).limit(200);
   if(error){ el.innerHTML = `<div class="empty">Could not load activity history.</div>`; return; }

@@ -38,12 +38,12 @@ async function loadPushStatus(){
   if(!el) return;
 
   if(!('serviceWorker' in navigator) || !('PushManager' in window)){
-    el.innerHTML = `<p style="font-size:12.5px;color:var(--muted);line-height:1.5;">Push notifications aren't supported in this browser. On iPhone, this only works if the app has been added to the Home Screen first — Safari alone can't receive push notifications.</p>`;
+    el.innerHTML = `<p style="font-size:13.5px;color:var(--muted);line-height:1.5;">Push notifications aren't supported in this browser. On iPhone, this only works if the app has been added to the Home Screen first — Safari alone can't receive push notifications.</p>`;
     return;
   }
 
   if(Notification.permission === 'denied'){
-    el.innerHTML = `<p style="font-size:12.5px;color:var(--muted);line-height:1.5;">Notifications are blocked for this site. This can only be undone from your browser's own site settings, not from a button here — look for a lock or site-info icon in the address bar.</p>`;
+    el.innerHTML = `<p style="font-size:13.5px;color:var(--muted);line-height:1.5;">Notifications are blocked for this site. This can only be undone from your browser's own site settings, not from a button here — look for a lock or site-info icon in the address bar.</p>`;
     return;
   }
 
@@ -65,15 +65,15 @@ async function loadPushStatus(){
     }
     if(sub && myRow){
       el.innerHTML = `
-        <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 12px;">Push notifications are on for this device.</p>
+        <p style="font-size:13.5px;color:var(--muted);line-height:1.5;margin:0 0 12px;">Push notifications are on for this device.</p>
         <button class="btn btn-outline" onclick="disablePushNotifications()">Turn off on this device</button>`;
     } else {
       el.innerHTML = `
-        <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 12px;">Get notified on this device even when the app isn't open — approvals, reminders, and more.</p>
+        <p style="font-size:13.5px;color:var(--muted);line-height:1.5;margin:0 0 12px;">Get notified on this device even when the app isn't open — approvals, reminders, and more.</p>
         <button class="btn btn-brand" onclick="enablePushNotifications()">Enable Push Notifications</button>`;
     }
   }catch(e){
-    el.innerHTML = `<p style="font-size:12.5px;color:var(--red);line-height:1.5;">Couldn't check push status: ${escapeHtml(String(e.message||e))}</p>`;
+    el.innerHTML = `<p style="font-size:13.5px;color:var(--red);line-height:1.5;">Couldn't check push status: ${escapeHtml(String(e.message||e))}</p>`;
   }
 }
 
@@ -132,17 +132,17 @@ async function loadGoogleCalendarStatus(){
   if(!data){ el.innerHTML = `<div class="empty">Could not check status — try again.</div>`; return; }
 
   if(!data.googleConfigured){
-    el.innerHTML = `<p style="font-size:12.5px;color:var(--muted);line-height:1.5;">Google Calendar sync isn't configured for this deployment yet — an admin needs to set up a Google Cloud project and add the credentials. See the README for the exact steps.</p>`;
+    el.innerHTML = `<p style="font-size:13.5px;color:var(--muted);line-height:1.5;">Google Calendar sync isn't configured for this deployment yet — an admin needs to set up a Google Cloud project and add the credentials. See the README for the exact steps.</p>`;
     return;
   }
   if(data.connected){
     el.innerHTML = `
-      <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 12px;">Connected as <b>${escapeHtml(data.email)||'your Google account'}</b>${data.lastSyncedAt ? ` · Last synced ${new Date(data.lastSyncedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}` : ' · Not synced yet'}</p>
+      <p style="font-size:13.5px;color:var(--muted);line-height:1.5;margin:0 0 12px;">Connected as <b>${escapeHtml(data.email)||'your Google account'}</b>${data.lastSyncedAt ? ` · Last synced ${new Date(data.lastSyncedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}` : ' · Not synced yet'}</p>
       <button class="btn btn-brand" onclick="syncGoogleCalendar()">Sync now</button>
       <button class="btn btn-outline" onclick="disconnectGoogleCalendar()">Disconnect</button>`;
   } else {
     el.innerHTML = `
-      <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 12px;">Connect your Google Calendar to pull your meetings into the shared team calendar automatically.</p>
+      <p style="font-size:13.5px;color:var(--muted);line-height:1.5;margin:0 0 12px;">Connect your Google Calendar to pull your meetings into the shared team calendar automatically.</p>
       <button class="btn btn-brand" onclick="connectGoogleCalendar()">Connect Google Calendar</button>`;
   }
 }
@@ -164,7 +164,7 @@ async function renderCalendarGoogleSyncWidget(){
   const lastSynced = data.lastSyncedAt
     ? new Date(data.lastSyncedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})
     : 'Not synced yet';
-  el.innerHTML = `<span>Google Calendar · Last synced ${lastSynced}</span><button class="btn btn-outline" style="padding:6px 12px;font-size:11.5px;" onclick="syncGoogleCalendarFromTab()">Sync now</button>`;
+  el.innerHTML = `<span>Google Calendar · Last synced ${lastSynced}</span><button class="btn btn-outline" style="padding:6px 12px;font-size:12.5px;" onclick="syncGoogleCalendarFromTab()">Sync now</button>`;
 }
 
 // Same underlying sync as the Profile page button — it already reloads

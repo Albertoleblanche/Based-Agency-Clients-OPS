@@ -34,7 +34,7 @@ function getAllImprovementsFlat(){
   activeClients().forEach(c=>{
     (c.improvements||[]).forEach(imp=>{
       if(restrictToSelf && imp.author !== me) return;
-      list.push({ id:imp.id, clientId:c.id, clientName:c.name, author:imp.author||'Team member', text:imp.text, date:imp.date, includeInEmail: imp.includeInEmail!==false, source: imp.source||'manual' });
+      list.push({ id:imp.id, clientId:c.id, clientName:c.name, author:imp.author||'Team member', text:imp.text, date:imp.date, includeInEmail: imp.includeInEmail!==false, source: imp.source||'manual', service: imp.service||'', attachments: imp.attachments||[] });
     });
   });
   return list.sort((a,b)=> new Date(b.date||0) - new Date(a.date||0));
@@ -233,7 +233,7 @@ function renderImprovementsHistory(){
             <div class="ts-entry-info">
               <div class="ts-entry-title">
                 <span class="ts-entry-service">${escapeHtml(imp.author)}</span>
-                <span style="color:var(--muted-lt);font-size:10.5px;margin-left:8px;">${imp.date ? new Date(imp.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : ''}</span>
+                <span style="color:var(--muted-lt);font-size:11px;margin-left:8px;">${imp.date ? new Date(imp.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : ''}</span>
                 ${imp.source!=='manual' ? `<span class="pill pill-status" style="margin-left:6px;">${IMPROVEMENT_SOURCE_LABEL[imp.source]||imp.source}</span>` : ''}
               </div>
               <div class="ts-entry-desc">${escapeHtml(imp.text)}</div>

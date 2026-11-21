@@ -166,8 +166,8 @@ document.addEventListener('click', (e)=>{
   if(popover && popover.style.display==='block' && wrap && !wrap.contains(e.target)) popover.style.display = 'none';
 });
 
-const SORT_ICON_UP = '<svg width="9" height="9" viewBox="0 0 256 256" fill="currentColor"><path d="M216.49,168.49a12,12,0,0,1-17,0L128,97,56.49,168.49a12,12,0,0,1-17-17l80-80a12,12,0,0,1,17,0l80,80A12,12,0,0,1,216.49,168.49Z"/></svg>';
-const SORT_ICON_DOWN = '<svg width="9" height="9" viewBox="0 0 256 256" fill="currentColor"><path d="M216.49,104.49l-80,80a12,12,0,0,1-17,0l-80-80a12,12,0,0,1,17-17L128,159l71.51-71.52a12,12,0,0,1,17,17Z"/></svg>';
+const SORT_ICON_UP = '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6" /></svg>';
+const SORT_ICON_DOWN = '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>';
 
 function updateSortArrows(){
   ['name','importance','danger'].forEach(f=>{
@@ -249,7 +249,7 @@ function renderClientsTable(){
   const ac = activeClients();
   if(!ac.length){
     tbody.innerHTML = `<tr><td colspan="7">${emptyStateHtml(
-      '<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M117.25,157.92a60,60,0,1,0-66.5,0A95.83,95.83,0,0,0,3.53,195.63a8,8,0,1,0,13.4,8.74,80,80,0,0,1,134.14,0,8,8,0,0,0,13.4-8.74A95.83,95.83,0,0,0,117.25,157.92ZM40,108a44,44,0,1,1,44,44A44.05,44.05,0,0,1,40,108Zm210.14,98.7a8,8,0,0,1-11.07-2.33A79.83,79.83,0,0,0,172,168a8,8,0,0,1,0-16,44,44,0,1,0-16.34-84.87,8,8,0,1,1-5.94-14.85,60,60,0,0,1,55.53,105.64,95.83,95.83,0,0,1,47.22,37.71A8,8,0,0,1,250.14,206.7Z"/></svg>',
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 21a8 8 0 0 0-16 0" /> <circle cx="10" cy="8" r="5" /> <path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3" /></svg>',
       'No clients yet',
       canApprove() ? 'This is where your whole roster lives — add your first client to start tracking their work.' : 'This is where your whole roster lives — ask an admin or approver to add the first client.',
       canApprove() ? '<button class="btn btn-brand" onclick="openAddClientForm()">+ Add client</button>' : ''
@@ -332,7 +332,15 @@ function selectClientRow(id){
   renderClientInspector();
 }
 
-function closeClientInspector(){
+function closeClientInspector(now){
+  // Slides back out to the right edge it came from.
+  const el = document.getElementById('clientInspector');
+  if(!now && el && !el.hidden && typeof animateThen === 'function' && motionOK()){
+    if(el.dataset.leaving) return;
+    el.dataset.leaving = '1';
+    animateThen(el, [{ transform: 'none' }, { transform: 'translateX(100%)' }], 220, 'cubic-bezier(.32,.72,0,1)', () => { closeClientInspector(true); delete el.dataset.leaving; el.getAnimations?.().forEach(a => a.cancel()); });
+    return;
+  }
   inspectedClientId = null;
   document.querySelectorAll('#clientsTbody tr.client-row.sel').forEach(tr=>{ tr.classList.remove('sel'); tr.setAttribute('aria-selected','false'); });
   renderClientInspector();
@@ -342,7 +350,7 @@ function renderClientInspector(){
   const el = document.getElementById('clientInspector');
   const wrap = document.getElementById('clientsSplit');
   if(!el) return;
-  const c = inspectedClientId ? activeClients().find(x=>x.id===inspectedClientId) : null;
+  const c = inspectedClientId ? liveClients().find(x=>x.id===inspectedClientId) : null;
   if(!c){ el.hidden = true; el.innerHTML = ''; wrap?.classList.remove('has-insp'); return; }
 
   // Keep anything typed into the log field across redraws.
@@ -360,7 +368,7 @@ function renderClientInspector(){
     const days = last ? Math.floor((Date.now() - last) / 86400000) : null;
     const why = [last ? (days === 0 ? 'Update sent today.' : `No update in ${days} day${days===1?'':'s'}.`) : 'No update sent yet.'];
     if(budget && budget.tier === 'over') why.push('Over this month’s hours.');
-    riskHtml = `<div class="cd-risk ci-risk" role="note"><svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M236.8,188.09,149.35,36.22a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM120,104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm8,88a12,12,0,1,1,12-12A12,12,0,0,1,128,192Z"/></svg><div><b>Risk ${c.danger} of 5.</b> ${escapeHtml(why.join(' '))}</div></div>`;
+    riskHtml = `<div class="cd-risk ci-risk" role="note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></svg><div><b>Risk ${c.danger} of 5.</b> ${escapeHtml(why.join(' '))}</div></div>`;
   }
   const action = (label, fn, extra) => `<button type="button" class="ci-act${extra ? ' ' + extra : ''}" onclick="${fn}">${label}</button>`;
 
@@ -369,7 +377,7 @@ function renderClientInspector(){
   el.innerHTML = `
     <div class="ci-top">
       <span class="cd-mono" aria-hidden="true">${escapeHtml(todayInitials(c.name))}</span>
-      <button type="button" class="ci-close" onclick="closeClientInspector()" aria-label="Close panel" title="Close (Esc)"><svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg></button>
+      <button type="button" class="ci-close" onclick="closeClientInspector()" aria-label="Close panel" title="Close (Esc)"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></svg></button>
     </div>
     <h2 class="ci-name">${escapeHtml(c.name)}</h2>
     <p class="ci-sub">${escapeHtml(c.service||'')}${escapeHtml(since)}</p>
@@ -411,14 +419,15 @@ document.addEventListener('keydown', function(e){
   if(!document.getElementById('view-clients')?.classList.contains('active')) return;
   if(e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
   if(document.querySelector('#appModalOverlay[style*="flex"], .cmdk-overlay[style*="flex"]')) return;
-  const rows = [...document.querySelectorAll('#clientsTbody tr.client-row')];
+  const rows = [...document.querySelectorAll('#clientsTbody .client-row')];
   if(!rows.length) return;
   const idx = rows.findIndex(r => r.dataset.id === inspectedClientId);
   if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){
     e.preventDefault();
     const next = e.key === 'ArrowDown' ? Math.min(rows.length - 1, idx + 1) : Math.max(0, idx < 0 ? 0 : idx - 1);
-    selectClientRow(rows[next].dataset.id);
-    rows[next].focus({ preventScroll: false });
+    const id = rows[next].dataset.id;
+    selectClientRow(id);
+    document.querySelector(`#clientsTbody .client-row[data-id="${CSS.escape(id)}"]`)?.focus({ preventScroll: false });
   } else if(e.key === 'Enter' && inspectedClientId){
     e.preventDefault(); openClientDetail(inspectedClientId);
   } else if(e.key === 'Escape' && inspectedClientId){
@@ -470,8 +479,10 @@ async function deleteClient(id){
   const stillThere = clients.find(x=>x.id===id);
   if(!stillThere){ showToast('info','Already gone', `${c.name} was already removed.`); renderAll(); return; }
   const deletedAt = new Date().toISOString();
-  const ok = await updateClientRow(id, { deletedAt });
-  if(ok) stillThere.deletedAt = deletedAt;
+  // one added from Harvest and never set up stays out: Harvest won't add it again
+  const cfv = clientInSetup(stillThere) ? Object.assign({}, stillThere.customFieldValues, { harvestSetup: 'skipped' }) : null;
+  const ok = await updateClientRow(id, cfv ? { deletedAt, customFieldValues: cfv } : { deletedAt });
+  if(ok){ stillThere.deletedAt = deletedAt; if(cfv) stillThere.customFieldValues = cfv; }
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Moved client <b>${escapeHtml(c.name)}</b> to Trash.`});
   if(ok) await persistLog();
   renderAll();
@@ -512,8 +523,10 @@ async function restoreClient(id){
   await loadAll();
   const c = clients.find(x=>x.id===id);
   if(!c) return;
-  const ok = await updateClientRow(id, { deletedAt: null });
-  if(ok) delete c.deletedAt;
+  // one added from Harvest and left out comes back to finish its setup
+  const cfv = c.customFieldValues && c.customFieldValues.harvestSetup === 'skipped' ? Object.assign({}, c.customFieldValues, { harvestSetup: 'needed' }) : null;
+  const ok = await updateClientRow(id, cfv ? { deletedAt: null, customFieldValues: cfv } : { deletedAt: null });
+  if(ok){ delete c.deletedAt; if(cfv) c.customFieldValues = cfv; }
   renderAll();
   renderTrash();
   ok ? showToast('success','Client restored', `${c.name} is back on the roster.`) : showToast('error','Restore failed','Could not save — try again.');

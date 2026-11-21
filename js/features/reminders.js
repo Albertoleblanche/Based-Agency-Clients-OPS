@@ -26,10 +26,10 @@ function reminderDisplayStatus(r){
 }
 
 const REMINDER_STATUS_META = {
-  waiting:  { label:'Waiting on Client', icon:'<svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z"/></svg>', color:'#A65B05' },
-  due:      { label:'Follow-up Due',     icon:'<svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M221.8,175.94C216.25,166.38,208,139.33,208,104a80,80,0,1,0-160,0c0,35.34-8.26,62.38-13.81,71.94A16,16,0,0,0,48,200H88.81a40,40,0,0,0,78.38,0H208a16,16,0,0,0,13.8-24.06ZM128,216a24,24,0,0,1-22.62-16h45.24A24,24,0,0,1,128,216ZM48,184c7.7-13.24,16-43.92,16-80a64,64,0,1,1,128,0c0,36.05,8.28,66.73,16,80Z"/></svg>', color:'#3A63C9' },
-  answered: { label:'Answered',          icon:'<svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg>', color:'#117F3A' },
-  closed:   { label:'Closed',            icon:'<svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M224,48H32A16,16,0,0,0,16,64V88a16,16,0,0,0,16,16v88a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V104a16,16,0,0,0,16-16V64A16,16,0,0,0,224,48ZM208,192H48V104H208ZM224,88H32V64H224V88ZM96,136a8,8,0,0,1,8-8h48a8,8,0,0,1,0,16H104A8,8,0,0,1,96,136Z"/></svg>', color:'#696F78' },
+  waiting:  { label:'Waiting on Client', icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>', color:'#A65B05' },
+  due:      { label:'Follow-up Due',     icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0" /> <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" /></svg>', color:'#3A63C9' },
+  answered: { label:'Answered',          icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="m16 9-5.5 5.5L8 12" /></svg>', color:'#117F3A' },
+  closed:   { label:'Closed',            icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="5" x="2" y="3" rx="1" /> <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" /> <path d="M10 12h4" /></svg>', color:'#696F78' },
 };
 
 
@@ -38,7 +38,7 @@ function updateRemindersNavBadge(){
   if(!badge) return;
   const dueCount = clientReminders.filter(r=>r.askedBy===currentUser?.id && reminderDisplayStatus(r)==='due').length;
   badge.textContent = dueCount;
-  badge.style.display = dueCount ? 'flex' : 'none';
+  badge.style.display = dueCount ? '' : 'none';   // the stylesheet lays out the count circle
 }
 
 // Grouped lists, most urgent first — like Apple's Reminders: due
@@ -75,7 +75,7 @@ function reminderRowHtml(r){
   const asked = r.askedDate ? new Date(r.askedDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
   const when = resolved ? (display==='answered' ? 'Answered' : 'Closed') : `Follow up ${reminderFollowUpLabel(r.followUpDate)}`;
   const circle = resolved
-    ? `<span class="rem-cb done" aria-hidden="true"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M232.49,80.49l-128,128a12,12,0,0,1-17,0l-56-56a12,12,0,1,1,17-17L96,183,215.51,63.51a12,12,0,0,1,17,17Z"/></svg></span>`
+    ? `<span class="rem-cb done" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg></span>`
     : `<button type="button" class="rem-cb" title="Mark answered" aria-label="Mark answered" onclick="event.stopPropagation();markReminderStatus('${r.id}','answered')"></button>`;
   return `<div class="rem-row${resolved ? ' done' : ''}" role="button" tabindex="0" onclick="openReminderDetailModal('${r.id}')">
     ${circle}
@@ -94,13 +94,13 @@ function reminderCardMenuHtml(r){
   if(display!=='closed') moveOptions.push(['closed','Close']);
   if(display==='answered' || display==='closed') moveOptions.push(['waiting','Reopen']);
   const moveHtml = moveOptions.map(([status,label])=>
-    `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();markReminderStatus('${r.id}','${status}')"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M221.66,133.66l-72,72a8,8,0,0,1-11.32-11.32L196.69,136H40a8,8,0,0,1,0-16H196.69L138.34,61.66a8,8,0,0,1,11.32-11.32l72,72A8,8,0,0,1,221.66,133.66Z"/></svg>${escapeHtml(label)}</div>`
+    `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();markReminderStatus('${r.id}','${status}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg>${escapeHtml(label)}</div>`
   ).join('');
   return moveHtml
     + `<div class="kanban-card-menu-divider"></div>`
-    + `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();openNoteModal(null, '${r.clientId}', 'idea')"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M229.66,58.34l-32-32a8,8,0,0,0-11.32,0l-96,96A8,8,0,0,0,88,128v32a8,8,0,0,0,8,8h32a8,8,0,0,0,5.66-2.34l96-96A8,8,0,0,0,229.66,58.34ZM124.69,152H104V131.31l64-64L188.69,88ZM200,76.69,179.31,56,192,43.31,212.69,64ZM224,128v80a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V48A16,16,0,0,1,48,32h80a8,8,0,0,1,0,16H48V208H208V128a8,8,0,0,1,16,0Z"/></svg>Start a note</div>`
-    + (display==='due' ? `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();createTaskFromReminder('${r.id}')"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M224,48V208a16,16,0,0,1-16,16H136a8,8,0,0,1,0-16h72V48H48v96a8,8,0,0,1-16,0V48A16,16,0,0,1,48,32H208A16,16,0,0,1,224,48ZM125.66,154.34a8,8,0,0,0-11.32,0L64,204.69,45.66,186.34a8,8,0,0,0-11.32,11.32l24,24a8,8,0,0,0,11.32,0l56-56A8,8,0,0,0,125.66,154.34Z"/></svg>+ Task: chase this down</div>` : '')
-    + `<div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();deleteReminder('${r.id}')"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/></svg>Delete</div>`;
+    + `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();openNoteModal(null, '${r.clientId}', 'idea')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /> <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" /></svg>Start a note</div>`
+    + (display==='due' ? `<div class="kanban-card-menu-item" onclick="event.stopPropagation();closeKanbanMenus();createTaskFromReminder('${r.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5h8" /> <path d="M13 12h8" /> <path d="M13 19h8" /> <path d="m3 17 2 2 4-4" /> <rect x="3" y="4" width="6" height="6" rx="1" /></svg>+ Task: chase this down</div>` : '')
+    + `<div class="kanban-card-menu-item danger" onclick="event.stopPropagation();closeKanbanMenus();deleteReminder('${r.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6" /> <path d="M14 11v6" /> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /> <path d="M3 6h18" /> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>Delete</div>`;
 }
 
 // Turns a stale reminder into an assigned task — pre-fills the client and
@@ -144,7 +144,7 @@ function openNewReminderModal(presetClientId){
         <div style="grid-column:1/-1;"><label>Question / request</label><textarea spellcheck="true" id="reminderQuestion" placeholder="e.g. Can you send us the latest project photos?" rows="3" style="resize:vertical;min-height:64px;font-family:inherit;"></textarea></div>
         <div style="position:relative;"><label>Follow-up date</label>${datePickerFieldHtml('reminderFollowUpDate', { value: toDateStr(defaultFollowUp), minDate: toDateStr(new Date()) })}</div>
       </div>
-      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink);cursor:pointer;margin-top:2px;"><input type="checkbox" id="reminderAddToCalendarInput" checked> Add to calendar</label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink);cursor:pointer;margin-top:2px;"><input type="checkbox" id="reminderAddToCalendarInput" checked> Add to calendar</label>
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeAppModal()">Cancel</button>
@@ -198,9 +198,9 @@ function openReminderDetailModal(id){
         <span class="rating-pill" style="background:${meta.color}18;color:${meta.color};">${meta.icon} ${escapeHtml(meta.label)}</span>
         ${c ? `<span class="row-link" onclick="closeAppModal();openClientDetail('${c.id}');">${escapeHtml(c.name)}</span>` : ''}
       </div>
-      <div class="settings-field"><label>Question / request</label><textarea spellcheck="true" id="reminderEditQuestion" rows="3" style="width:100%;resize:vertical;min-height:64px;font-family:inherit;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);">${escapeHtml(r.question)}</textarea></div>
+      <div class="settings-field"><label>Question / request</label><textarea spellcheck="true" id="reminderEditQuestion" rows="3" style="width:100%;resize:vertical;min-height:64px;font-family:inherit;font-size:14px;padding:10px;border-radius:8px;border:1px solid var(--border);">${escapeHtml(r.question)}</textarea></div>
       <div class="form-grid">
-        <div><label>Asked by</label><div style="font-size:13px;padding:9px 0;">${owner ? escapeHtml(owner.name) : '—'} · ${new Date(r.askedDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div></div>
+        <div><label>Asked by</label><div style="font-size:14px;padding:9px 0;">${owner ? escapeHtml(owner.name) : '—'} · ${new Date(r.askedDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div></div>
         <div style="position:relative;"><label>Follow-up date</label>${datePickerFieldHtml('reminderEditFollowUp', { value: r.followUpDate||'', minDate: toDateStr(new Date()), disabled: isResolved })}</div>
       </div>
     </div>

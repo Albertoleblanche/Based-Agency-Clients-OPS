@@ -30,10 +30,25 @@ function emptyStateHtml(iconSvg, title, sub, actionHtml){
 // actually arrived — distinct from the real empty state, so someone who
 // clicks into Tasks/Notes/Calendar right after signing in sees "loading"
 // rather than what looks like a genuinely empty board.
+// A screen's loading state: soft placeholders (js/ui/skeleton.js) that fade in after a moment;
+// a screen with its own shape passes it to skeletonHtml() itself.
 function loadingStateHtml(label){
+  if(typeof skeletonHtml === 'function') return skeletonHtml('rows', label || 'Loading…');
   return `<div class="empty-rich"><span class="spinner" style="width:16px;height:16px;border-width:2.5px;"></span><div class="empty-rich-sub" style="margin-top:10px;">${escapeHtml(label)||'Loading…'}</div></div>`;
 }
 
+// Only Based Agency addresses sign in, get an account or become someone's sign-in email (Nov 20).
+// The server checks the same (api/admin-user-actions.js, addendum-email-domain.sql).
+const TEAM_EMAIL_DOMAIN = 'based-agency.com';
+function isTeamEmail(v){ const e = String(v || '').trim().toLowerCase(); return /^[^\s@]+@[^\s@]+$/.test(e) && e.endsWith('@' + TEAM_EMAIL_DOMAIN); }
+// What to say about an address that isn't one: empty, not an email, or another domain.
+function teamEmailProblem(v, whose){
+  const e = String(v || '').trim();
+  if(!e) return whose === 'their' ? 'Enter their work email.' : 'Enter your work email.';
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return 'That doesn’t look like an email address.';
+  if(!isTeamEmail(e)) return whose === 'their' ? `Use their @${TEAM_EMAIL_DOMAIN} email.` : whose === 'new' ? `Use an @${TEAM_EMAIL_DOMAIN} email.` : `Use your @${TEAM_EMAIL_DOMAIN} email.`;
+  return '';
+}
 function escapeHtml(str){
   if(str===null || str===undefined) return '';
   return String(str)
@@ -131,4 +146,17 @@ function getWeekStart(d){
   date.setDate(date.getDate()-diff);
   date.setHours(0,0,0,0);
   return date;
+}
+
+// How urgent an unread notification is, for the dot on the bell (and each unread row): red when
+// something is late or at risk, yellow when it's waiting on you, blue for news.
+const NOTIF_RED = ['update_behind', 'reminder_escalated', 'client_danger_maxed'];
+const NOTIF_YELLOW = ['draft_ready', 'win_approved', 'draft_written', 'task_assigned', 'reminder_follow_up_due', 'harvest_client', 'email_change_requested', 'event_invited', 'event_rsvp'];
+function notifSeverity(n){
+  const t = String((n && n.type) || '');
+  return NOTIF_RED.includes(t) || t.includes('denied') ? 'red' : NOTIF_YELLOW.includes(t) ? 'yellow' : 'blue';
+}
+function notifTopSeverity(list){
+  const s = (list || []).filter(n => !n.read).map(notifSeverity);
+  return s.includes('red') ? 'red' : s.includes('yellow') ? 'yellow' : s.length ? 'blue' : '';
 }

@@ -11,32 +11,28 @@
 //      unchanged from before. (This file is still named
 //      cron-wednesday-notify.js because of this, even though it's no
 //      longer a weekly invocation.)
-//   2. Proactive insights from the Assistant — now genuinely admin
-//      day-configurable via settings.proactiveInsightsDayOfWeek (0=Sunday
-//      ... 6=Saturday, default 3=Wednesday), checked below. See
-//      lib/proactive-insights.js for the actual logic (website
-//      spot-checks, cross-client pattern detection, and the real computed
-//      metrics that make up the weekly focus report). That file is shared
-//      with api/preview-wednesday-notify.js's 'proactive' action, an
-//      admin-only on-demand preview — kept in one place so the preview
-//      can never silently drift from what this real run actually does.
+//   2. The weekly-update automations from Settings -> Updates (automatic
+//      drafts, reminders for overdue updates and the Monday summary) — see
+//      lib/update-automations.js. None of them ever emails a client:
+//      approvers send every update themselves.
 //
-// Both responsibilities run every invocation (after their own day-check
+// All of them run every invocation (after their own day-check
 // passes), independently, in their own try/catch — one failing (say, the
 // email send) shouldn't block the other.
 //
 // clients/client_improvements are real tables now (see
 // schema-clients-migration.sql), not part of the app_storage JSON blob —
-// only the activity log (`log`) still lives there. Client mutations
-// (lastProactiveCheckAt) are written with a targeted per-row UPDATE the
-// moment they happen inside runProactiveInsights, not batched into one
-// end-of-run blob rewrite the way the old app-data.clients array was.
+// only the activity log (`log`) still lives there.
+//
+// The weekly focus report (proactive insights) was removed on Nov 19, 2026 along with its tab;
+// its table, weekly_focus_reports, is left as it was.
 
 const { createClient } = require('@supabase/supabase-js');
 const { sendPushToUser, pushUrlFor } = require('../lib/push-notify');
-const { clientRowFromDb, improvementRowFromDb, runProactiveInsights } = require('../lib/proactive-insights');
+const { clientRowFromDb, improvementRowFromDb } = require('../lib/client-rows');
+const { runUpdateAutomations } = require('../lib/update-automations');
 
-const EMAIL_DIGEST_DAY_OF_WEEK = 3; // Wednesday, hardcoded — not admin-configurable, unlike proactive insights
+const EMAIL_DIGEST_DAY_OF_WEEK = 3; // Wednesday, hardcoded — not admin-configurable
 
 async function runEmailDigest(admin, clients, log, settings, resendKey) {
   if (!resendKey) return { skipped: true, reason: 'Missing RESEND_API_KEY' };
@@ -112,6 +108,7 @@ module.exports = async function handler(req, res) {
   }
 
   const admin = createClient(supabaseUrl, serviceKey);
+  const started = Date.now();
 
   try {
     const [
@@ -136,7 +133,7 @@ module.exports = async function handler(req, res) {
     const settings = settingsRow ? JSON.parse(settingsRow.value) : {};
     const log = appData.log || [];
 
-    const clients = (clientsData || []).map(clientRowFromDb);
+    const clients = (clientsData || []).filter(r => !(r.custom_field_values && r.custom_field_values.harvestSetup === 'needed')).map(clientRowFromDb);
     const improvementsByClient = {};
     (impData || []).forEach(r => {
       (improvementsByClient[r.client_id] = improvementsByClient[r.client_id] || []).push(improvementRowFromDb(r));
@@ -148,7 +145,15 @@ module.exports = async function handler(req, res) {
     // it" consistent with when the function actually runs, rather than
     // drifting by timezone.
     const todayDow = new Date().getUTCDay();
-    const result = { emailDigest: null, proactiveInsights: null };
+    const result = { weeklyUpdates: null, emailDigest: null };
+
+    // The weekly-update automations (Settings -> Updates): reminders for overdue updates,
+    // the Monday summary and automatic drafts. See lib/update-automations.js.
+    try {
+      result.weeklyUpdates = await runUpdateAutomations(admin, settings, { started });
+    } catch (e) {
+      result.weeklyUpdates = { error: String(e) };
+    }
 
     if (todayDow === EMAIL_DIGEST_DAY_OF_WEEK) {
       try {
@@ -160,25 +165,6 @@ module.exports = async function handler(req, res) {
       result.emailDigest = { skipped: true, reason: 'Not Wednesday — this part of the automation only runs on Wednesdays.' };
     }
 
-    // undefined means Wednesday (3) — this setting is new, so an existing
-    // deployment that's never touched it keeps running on the same day it
-    // always did rather than silently going quiet or jumping to Sunday.
-    const proactiveDayOfWeek = settings.proactiveInsightsDayOfWeek ?? 3;
-    if (settings.proactiveInsightsEnabled === false) {
-      result.proactiveInsights = { skipped: true, reason: 'Disabled in Settings -> AI & Email.' };
-    } else if (todayDow !== proactiveDayOfWeek) {
-      result.proactiveInsights = { skipped: true, reason: `Not the configured day (day ${proactiveDayOfWeek}) — nothing to do today.` };
-    } else {
-      try {
-        result.proactiveInsights = await runProactiveInsights(admin, clients, log, settings);
-      } catch (e) {
-        result.proactiveInsights = { error: String(e) };
-      }
-    }
-
-    // Only `log` needs writing back here — client changes
-    // (lastProactiveCheckAt) already wrote themselves via targeted
-    // per-row updates inside runProactiveInsights.
     if (log.length > 60) log.length = 60;
     await admin.from('app_storage').upsert(
       { key: 'app-data', value: JSON.stringify({ ...appData, log }) },
