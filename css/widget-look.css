@@ -699,8 +699,8 @@ html.ui-w .tm-flat .row .r{margin-left:0;gap:8px}
 @media (hover:hover) and (pointer:fine){html.ui-w .tm-pf [role=radio][aria-checked=false]:hover{background:var(--uw-c2)}}
 html.ui-w #view-calendar.active:not(:has(> .cal-up)){grid-template-columns:minmax(0,1fr)}
 
-/* ---- All Clients, the canvas columns: client, service, owner, health, hours, this week ---- */
-html.ui-w .cl-table.is-uw :is(.cl-head,.cl-r){grid-template-columns:minmax(170px,1.5fr) minmax(100px,1fr) minmax(70px,.7fr) minmax(170px,1.6fr) minmax(120px,1fr) minmax(130px,1.2fr)}
+/* ---- All Clients, the canvas columns: client, service, owner, health, this week, importance ---- */
+html.ui-w .cl-table.is-uw :is(.cl-head,.cl-r){grid-template-columns:minmax(170px,1.5fr) minmax(100px,1fr) minmax(70px,.7fr) minmax(170px,1.6fr) minmax(130px,1.2fr) minmax(104px,.75fr)}
 html.ui-w .cl-th{display:flex;align-items:center;gap:10px;min-height:34px;padding:16px 22px 6px}
 html.ui-w .cl-thi{width:34px;height:34px;border-radius:11px;background:var(--uw-c2);display:grid;place-items:center;color:var(--label)}
 html.ui-w .cl-thi svg{width:16px;height:16px}
@@ -708,12 +708,12 @@ html.ui-w .cl-th b{font-size:14px;font-weight:500}
 html.ui-w .cl-thn{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--label-3)}
 html.ui-w .cl-table.is-uw .cl-head{border-radius:0;padding:0 28px}
 html.ui-w .cl-sv{font-size:13px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-html.ui-w .cl-table.is-uw .cl-hrs{display:flex;flex-direction:column;align-items:stretch;justify-self:stretch;text-align:left;gap:6px;min-width:0;padding-right:18px}
-html.ui-w .cl-hrs > span{font-family:var(--mono);font-size:11.5px;font-weight:500;color:var(--label-2)}
-html.ui-w .cl-hrs > span.is-over{color:var(--uw-risk)}
-html.ui-w .cl-hrs i{display:block;height:4px;border-radius:99px;background:var(--uw-c3);overflow:hidden}
-html.ui-w .cl-hrs i em{display:block;height:100%;border-radius:99px;background:var(--label)}
-html.ui-w .cl-hrs i em.is-over{background:var(--uw-risk)}
+html.ui-w .imp-m{display:inline-flex;align-items:flex-end;gap:2px;height:12px;margin-right:9px;flex:0 0 auto}
+html.ui-w .imp-m i{display:block;width:3px;border-radius:1px;background:var(--uw-c3)}
+html.ui-w .imp-m i:nth-child(1){height:5px} html.ui-w .imp-m i:nth-child(2){height:8.5px} html.ui-w .imp-m i:nth-child(3){height:12px}
+html.ui-w :is(.imp-m.lo i:nth-child(1),.imp-m.md i:nth-child(-n+2),.imp-m.hi i){background:var(--label)}
+html.ui-w .imp-w{font-size:13px;color:var(--label-2)}
+html.ui-w .imp-m.hi + .imp-w{color:var(--label);font-weight:500}
 html.ui-w .mac[data-theme] #clientsRoot{--cl-r:var(--uw-risk);--cl-y:var(--uw-watch)}
 html.ui-w .cl-h{font-weight:400}
 html.ui-w .cl-wk{font-weight:400}
@@ -749,10 +749,30 @@ html.ui-w .pl-side .pl-sec:first-child{margin-top:0}
 html.ui-w .pl-ghost{border-radius:16px}
 html.ui-w .cl-head button{text-transform:inherit;letter-spacing:inherit;font-family:inherit}
 @container (max-width:960px){
-  html.ui-w .cl-table.is-uw :is(.cl-head,.cl-r){grid-template-columns:minmax(150px,1.5fr) minmax(64px,.6fr) minmax(150px,1.6fr) minmax(100px,1fr) minmax(120px,1.2fr)}
+  html.ui-w .cl-table.is-uw :is(.cl-head,.cl-r){grid-template-columns:minmax(150px,1.5fr) minmax(64px,.6fr) minmax(150px,1.6fr) minmax(120px,1.2fr) minmax(92px,.75fr)}
   html.ui-w .cl-table.is-uw .cl-head > :nth-child(2),html.ui-w .cl-table.is-uw .cl-r > .cl-sv{display:none}
-  html.ui-w .cl-table.is-uw .cl-head > :nth-child(5){display:inline-flex}
 }
+
+/* ---- Queue: Review's three cards, with your work, the switches and Log More ---- */
+html.ui-w .qu-tag{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--label-3)}
+html.ui-w .qu-tag.is-go{color:var(--label)}
+html.ui-w .qu-tag.is-red{color:var(--uw-risk)}
+html.ui-w .qu-sec{margin-top:34px}
+html.ui-w .qu-sh{border-bottom-color:var(--sep);padding-bottom:12px}
+html.ui-w .qu-sh b{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--label-3)}
+html.ui-w .qu-sh .c,html.ui-w .qu-shs{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--label-3)}
+html.ui-w .qu-i{padding:13px 0;border-bottom-color:var(--sep)}
+html.ui-w .qu-tx{font-size:14.5px}
+html.ui-w .qu-m{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase}
+html.ui-w .qu-em{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase}
+html.ui-w .qu-i .ib.act{border-radius:50%}
+html.ui-w .mac :is(.qu-edt,.qu-new textarea){border-radius:16px;background:var(--uw-c2);padding:10px 14px}
+html.ui-w .mac .qu-new textarea{min-height:40px}
+html.ui-w .mac :is(.qu-edt,.qu-new textarea):focus-visible{box-shadow:0 0 0 1px var(--label-3)}
+html.ui-w .qu-new .btn{height:40px}
+html.ui-w .qu-hint kbd{font-family:var(--mono);font-weight:500;border-radius:6px}
+html.ui-w .qu-dn.is-red{color:var(--uw-risk)}
+html.ui-w .qu-subj{margin-top:18px;font-size:22px;font-weight:400;letter-spacing:-.022em}
 
 /* ---- Review as on the canvas: the list, the letter and Before you send as three cards ---- */
 html.ui-w .rvn-list{flex-basis:290px}

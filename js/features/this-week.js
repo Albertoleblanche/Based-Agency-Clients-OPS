@@ -155,7 +155,7 @@ function weekSegHtml(){
     .map(([k, t, c]) => `<button class="${weekFilter === k ? 'on' : ''}" role="tab" aria-selected="${weekFilter === k}" onclick="setWeekFilter('${k}')">${t} <span class="c">${c}</span></button>`).join('')}</div>`;
 }
 // Keep the old name working: everything that redraws "the queue" redraws This Week now.
-function renderQueue(){ renderThisWeek(); }
+function renderQueue(){ renderThisWeek(); if(typeof renderMyQueue === 'function') renderMyQueue(); }
 
 // The panel: where this client's update is and its one main action, then the draft. Everything
 // else folds into rows (Improvements, Progress, Last 8 weeks) whose summaries say enough to leave

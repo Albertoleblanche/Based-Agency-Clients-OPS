@@ -932,6 +932,8 @@ function openQueueCardModal(id, author){
 // After writing or rewriting a draft: show it in Review, where it can be read, edited and sent on
 // (the old card sheet only if Review can't show it).
 function openDraftAfterWriting(id, author){
+  // written from the Queue: it shows there, under your work
+  if(currentViewName === 'queue' && typeof renderMyQueue === 'function'){ closeAppModal(); window._queueSel = id; renderMyQueue(); return; }
   if(typeof openReviewDraft === 'function' && typeof reviewItems === 'function'){
     closeAppModal();
     if(hasPermission('view_team_queue') && Object.values(reviewItems()).some(l => l.some(x => x.c.id === id && x.d.author === author))){ openReviewDraft(id, author); return; }
