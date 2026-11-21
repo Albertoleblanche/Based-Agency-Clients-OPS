@@ -99,7 +99,7 @@ function renderThisWeek(){
   const sentN = base.filter(e => e.step === 'sent').length, lateN = base.filter(e => e.late && e.step !== 'sent').length, tot = Math.max(1, base.length);
   const counts = WB_STEPS.slice().reverse().map(([k, t, tone]) => [k, t, tone, base.filter(e => e.step === k && (k === 'sent' || !e.late)).length]).filter(x => x[3])
     .concat(lateN ? [['late', 'Late', 'red', lateN]] : []);
-  const summary = `<div class="wb-sum"><div class="wb-big"><b>${sentN} of ${base.length}</b><span>updates sent this week</span></div>
+  const summary = `<div class="wb-sum"><div class="wb-big"><b>${sentN}${typeof uiStyleOn === 'function' && uiStyleOn() ? `<small>of ${base.length}</small>` : ` of ${base.length}`}</b><span>updates sent this week</span></div>
 <div class="wb-bar" role="img" aria-label="${counts.map(x => `${x[1]}: ${x[3]}`).join(', ')}">${counts.map(([k, , tone, n]) => `<i class="${tone}" style="width:${(n / tot * 100).toFixed(2)}%"></i>`).join('')}</div>
 <div class="wb-key">${counts.map(([k, t, tone, n]) => `<span${k === 'late' ? ' class="is-late"' : ''}><i class="wb-dot ${tone}"></i>${t} <b>${n}</b></span>`).join('')}</div></div>`;
 

@@ -422,3 +422,102 @@ html.ui-w .tr-g .row .r{gap:8px}
 html.ui-w .tr-g .row .r .btn svg{width:13px;height:13px}
 html.ui-w .tr-g .row .r .ib{width:32px;height:32px;border-radius:50%;box-shadow:0 0 0 1px var(--sep)}
 html.ui-w .tr-g .row .ic svg{width:15px;height:15px}
+
+/* ---- This Week: the count and Who has the rest as cards, the days in one card ---- */
+html.ui-w #weekRoot .wb{padding:6px 26px 22px 22px}
+html.ui-w .wb-top{gap:14px;align-items:stretch}
+html.ui-w :is(.wb-hl,.wb-who){background:var(--grp);border-radius:28px;padding:20px 24px 20px;box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
+html.ui-w .wb-who{flex:0 1 460px}
+html.ui-w .wb-big{gap:12px}
+html.ui-w .wb-big b{font-size:60px;font-weight:300;letter-spacing:-.05em;line-height:.95}
+html.ui-w .wb-big b small{margin-left:5px;font-size:24px;font-weight:300;letter-spacing:-.02em;color:var(--label-2)}
+html.ui-w .wb-big span{font-size:13.5px}
+html.ui-w .wb-bar{gap:4px;height:10px;margin-top:18px;background:transparent;border-radius:0;overflow:visible}
+html.ui-w .wb-bar i{border-radius:99px}
+html.ui-w .wb-key{gap:6px 14px;margin-top:12px;font-size:12px}
+html.ui-w .wb-key b{font-family:var(--mono);font-weight:500}
+html.ui-w :is(.wb-dot,.wb-bar i).green{background:var(--uw-good)}
+html.ui-w :is(.wb-dot,.wb-bar i).yellow{background:var(--uw-watch)}
+html.ui-w :is(.wb-dot,.wb-bar i).red{background:var(--uw-risk)}
+html.ui-w .wb-key .is-late,html.ui-w .wb-key .is-late b{color:var(--uw-risk)}
+html.ui-w .wb-who-h{margin:0 0 8px;font-size:14px;font-weight:500;color:var(--label)}
+html.ui-w .wb-who-l li{padding:8px 0}
+html.ui-w .wb-who-l :is(b,.c){font-weight:500}
+html.ui-w .wb-who-l .c{font-family:var(--mono);font-size:12.5px}
+html.ui-w .wb-who-l em{color:var(--uw-risk)}
+html.ui-w .mac .wb-who-tg{color:var(--label-2)}
+html.ui-w .wd{margin:14px 0 0;padding:0 8px;border:0;border-radius:28px;background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi);overflow:hidden}
+html.ui-w .wd-c{padding:20px 18px}
+html.ui-w .wd-c:first-child{padding-left:16px}
+html.ui-w .wd-c:last-child{padding-right:16px}
+html.ui-w .wd-c.is-today::before{left:12px;right:12px;height:2px;background:var(--label)}
+html.ui-w .wd-rel{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--label-3)}
+html.ui-w .wd-c.is-today .wd-rel{color:var(--label)}
+html.ui-w .wd-dow{font-weight:400;letter-spacing:-.03em}
+html.ui-w .wd-dm{font-size:13.5px}
+html.ui-w .wd-strip .ty-track{border-radius:99px;background:var(--uw-c2)}
+html.ui-w .wd-strip .ty-m{border-radius:99px}
+html.ui-w .wd-b .ty-i .tx b{font-weight:500}
+
+/* ---- Review: the list and the update as cards ---- */
+html.ui-w .rvn{gap:14px;padding:6px 26px 22px 22px}
+html.ui-w :is(.rvn-list,.rvn-read){background:var(--grp);border-radius:28px;box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi);overflow:hidden}
+html.ui-w .rvn-list{flex-basis:300px;border-right:0}
+html.ui-w .rvn-sort{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase}
+html.ui-w .rvn-r{border-radius:16px}
+html.ui-w .rvn-r.is-sel{background:var(--card)}
+html.ui-w .rvn-r .mono{display:none}
+html.ui-w .rvn-r .tx b{font-weight:500}
+html.ui-w .rvn-due.is-late{color:var(--uw-risk);font-weight:500}
+html.ui-w .rvn-due.is-soon{font-weight:500}
+html.ui-w .rvn-keys kbd{font-family:var(--mono);font-weight:500;border-radius:6px}
+html.ui-w .rvn-top{border-bottom-color:var(--sep);padding:0 18px 0 16px;height:58px}
+html.ui-w .rvn-nav span{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+html.ui-w .rvn-nav .ib{width:32px;height:32px;border-radius:50%;box-shadow:0 0 0 1px var(--sep)}
+html.ui-w .rvn-cols{grid-template-columns:minmax(0,1fr) 300px;column-gap:30px}
+html.ui-w .rvn-hd .tx b{font-weight:500}
+html.ui-w .rvn-subj{font-size:24px;font-weight:400;letter-spacing:-.025em}
+html.ui-w .rvn-rail{padding-left:28px;border-left:1px solid var(--sep)}
+html.ui-w .rvn-rs b{font-weight:500}
+html.ui-w .rvn-rs span{font-family:var(--mono);font-size:12px;font-weight:500}
+html.ui-w .rvn-i time{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase}
+html.ui-w .rvn-i > svg{color:var(--uw-good)}
+html.ui-w .rvn-ft{border-top-color:var(--sep);padding:14px 18px 16px 30px}
+html.ui-w .rvn-ft .btn{height:38px}
+html.ui-w .rvn-hl.r i{background:var(--uw-risk)} html.ui-w .rvn-hl.y i{background:var(--uw-watch)} html.ui-w .rvn-hl.g i{background:var(--uw-good)}
+html.ui-w .rvn-warn{border-radius:16px;background:var(--uw-c2)}
+
+/* ---- Notes: tiles as cards, names without badges ---- */
+html.ui-w .n1{padding:6px 26px 30px 22px}
+html.ui-w .n1-grid{gap:14px;margin-top:20px}
+html.ui-w .n1-t{border-radius:28px;background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
+html.ui-w .n1-t.has-c{box-shadow:inset 3px 0 0 var(--cc),0 0 0 1px var(--sep),var(--uw-shadow)}
+html.ui-w .n1-tc .mono{display:none}
+html.ui-w .n1-tc time{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase}
+html.ui-w .n1-t h3{font-size:16px;font-weight:500}
+html.ui-w .nt-st{font-weight:400}
+html.ui-w .nt-st.prog i{background:#5AA7FF}
+html.ui-w .nt-st.done i{background:var(--uw-good)}
+html.ui-w .nt-fu.is-late,html.ui-w .nt-fu.is-late svg{color:var(--uw-risk)}
+
+/* ---- Reports: thin pill bars, today white; Daily Summary: names without badges ---- */
+html.ui-w #timeRoot-reports{padding:6px 26px 30px 22px}
+html.ui-w #reportChartPanel{border-radius:28px;background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
+html.ui-w #reportChartPanel .dur{font-size:50px!important;font-weight:300!important;letter-spacing:-.045em!important;line-height:1}
+html.ui-w .chart{gap:8px;border-bottom:0}
+html.ui-w .chart i{max-width:14px;min-height:6px;border-radius:99px;background:var(--uw-c3)}
+html.ui-w .chart i.cur{background:var(--label)}
+html.ui-w .chart-x{gap:8px}
+html.ui-w .chart-x span{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--label-3)}
+html.ui-w #reportTableGrp{border-radius:28px}
+html.ui-w .mtx .cell-c .mono{display:none}
+html.ui-w .mtx td.num,html.ui-w .mtx tfoot td{font-family:var(--mono);font-size:12.5px;font-weight:500}
+html.ui-w #timeRoot-dailysummary{padding:6px 26px 30px 22px}
+html.ui-w .ds-day{font-weight:400}
+html.ui-w #timeRoot-dailysummary .og{border-radius:28px;overflow:hidden}
+html.ui-w #timeRoot-dailysummary .og-h > .av{display:none}
+html.ui-w #timeRoot-dailysummary .og-h{padding:16px 22px 10px}
+html.ui-w #timeRoot-dailysummary .og-h .tx b{font-weight:500}
+html.ui-w #timeRoot-dailysummary .og .og-i{padding-left:22px!important;padding-right:22px}
+html.ui-w #timeRoot-dailysummary .og .og-i::before{left:22px;right:22px}
+html.ui-w #timeRoot-dailysummary .og-i .dur{font-family:var(--mono);font-size:12.5px;font-weight:500;color:var(--label)}
