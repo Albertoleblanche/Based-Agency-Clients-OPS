@@ -99,8 +99,14 @@ function renderSettingsView(){
   const draw = { general: setGeneral, updates: setUpdates, clients: setClients, connections: setConnections, notifications: setNotifications,
     harvest: typeof setHarvest === 'function' ? setHarvest : setConnections, whatsapp: typeof setWhatsapp === 'function' ? setWhatsapp : setConnections, ai: setAi }[settingsTab];
   const head = sub ? `<div class="set-sub"><button class="set-back" onclick="switchSettingsTab('connections')">${icon('caret-left', { weight: 'bold' })}Connections</button><h2>${sub[0]}</h2></div>` : '';
-  root.innerHTML = `<div class="set-tb"><div class="set-tabs" role="toolbar" aria-label="Settings sections">${tabs.map(([k, t]) => `<button class="set-tab${k === tab ? ' on' : ''}" ${k === tab ? 'aria-current="page"' : ''} onclick="switchSettingsTab('${k}')">${t}</button>`).join('')}<span class="set-ink" aria-hidden="true"></span></div></div>
-<div class="set-body set-${settingsTab}">${head}${draw()}<p class="set-foot">Changes save as you make them.</p></div>`;
+  // the new look (beta): the sections as a menu in a card on the left, with icons and My Profile at the end
+  const uw = typeof uiStyleOn === 'function' && uiStyleOn();
+  const cur = tabs.find(t => t[0] === tab);
+  const menuHead = uw ? `<div class="set-mh">${icon('sliders-horizontal')}<b>Settings</b></div>` : '';
+  const menuEnd = uw ? `<button class="set-tab" onclick="switchView('profile')">${icon('user')}My Profile</button>` : '';
+  const pageHead = uw && cur && !sub ? `<h2 class="set-pt">${cur[1]}</h2>` : '';
+  root.innerHTML = `<div class="set-tb">${menuHead}<div class="set-tabs" role="toolbar" aria-label="Settings sections">${tabs.map(([k, t, ic]) => `<button class="set-tab${k === tab ? ' on' : ''}" ${k === tab ? 'aria-current="page"' : ''} onclick="switchSettingsTab('${k}')">${uw ? icon(ic) : ''}${t}</button>`).join('')}${menuEnd}<span class="set-ink" aria-hidden="true"></span></div></div>
+<div class="set-body set-${settingsTab}">${pageHead}${head}${draw()}<p class="set-foot">Changes save as you make them.</p></div>`;
   placeSetInk();
   if(keep){ const el = document.getElementById(keep); if(el && el.tagName !== 'BUTTON') el.focus(); }
   if(settingsTab === 'ai' || settingsTab === 'connections') applyAiConn();

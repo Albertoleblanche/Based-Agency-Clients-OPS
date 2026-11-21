@@ -4,8 +4,9 @@
    Shared by the iPhone (mobile.html); its own layout is in mobile.css. */
 
 /* the rings, centered on the logo */
-.rd{position:absolute;left:50%;top:50%;width:0;height:0;pointer-events:none;z-index:0}
-.rd::before{content:"";position:absolute;left:calc(var(--R) * -1);top:calc(var(--R) * -1);width:calc(var(--R) * 2);height:calc(var(--R) * 2);border-radius:50%;
+/* scoped to the logo: .rd is also the radio dot everywhere else (Team's roles) */
+.si-mark > .rd{position:absolute;left:50%;top:50%;width:0;height:0;pointer-events:none;z-index:0}
+.si-mark > .rd::before{content:"";position:absolute;left:calc(var(--R) * -1);top:calc(var(--R) * -1);width:calc(var(--R) * 2);height:calc(var(--R) * 2);border-radius:50%;
   background:radial-gradient(circle, color-mix(in srgb, var(--label) 3%, transparent) 0, transparent 70%)}
 .rd-ring{position:absolute;left:0;top:0;width:var(--d);height:var(--d);margin:calc(var(--d) / -2) 0 0 calc(var(--d) / -2);border-radius:50%;border:1px solid var(--sep);opacity:var(--o)}
 

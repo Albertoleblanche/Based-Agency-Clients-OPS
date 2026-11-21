@@ -61,6 +61,7 @@ ${admin ? '' : '<p class="t-2" style="font-size:13px;margin:12px 4px 0">Only adm
     body = emailRequests.length ? `<div class="grp">${emailRequests.map(emailReqRow).join('')}</div>` : '<div class="empty">No email changes waiting.</div>';
   }
   const sel = people.find(p => p.id === teamSelId);
+  if(teamTab === 'members' && typeof uiStyleOn === 'function' && uiStyleOn()){ root.innerHTML = teamUwHtml(people, sel, admin); return; }
   root.innerHTML = `<div class="tbl-wrap"><div class="content" style="overflow:visible">${tabs}${body}</div></div>${teamTab === 'members' && sel ? teamInspHtml(sel) : ''}`;
 }
 
@@ -73,6 +74,25 @@ async function removeTitle(v){ await removeFieldOption('title', v); drawTeam(); 
 
 const ROLE_INFO = [['member', 'Member', 'Logs improvements and time. Can’t approve drafts.'], ['approver', 'Approver', 'Everything a member can do, plus approve, skip and send drafts.'], ['admin', 'Admin', 'Full access, including the team, roles, payroll and settings.']];
 function teamInspHtml(m){
+  const { admin, self, titleCtl, roles, canRole, extras, slack, rate, owns, fu, acts, danger } = teamParts(m);
+  return `<aside class="insp" aria-label="${escapeHtml(m.name)}">
+<div style="display:flex;align-items:center;gap:12px">${avHtml(m.name, 'style="width:48px;height:48px;font-size:17px"')}
+<div style="min-width:0"><div style="font-size:18px;font-weight:600;letter-spacing:-.01em">${escapeHtml(m.name)}</div><div class="t-2" style="font-size:13px;overflow:hidden;text-overflow:ellipsis">${escapeHtml(m.email || '')}</div></div></div>
+${acts ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px">${acts}</div>` : ''}
+<div class="set-h" style="margin:22px 0 6px">Job title</div>${titleCtl}
+<div class="set-h" style="margin:22px 0 2px">Permissions</div><div ${canRole ? 'role="radiogroup" aria-label="Permissions"' : ''}>${roles}</div>
+${self && admin ? '<p class="t-2" style="font-size:13px;margin:2px 0 0">You can’t change your own role.</p>' : ''}
+${extras ? `<div class="set-h" style="margin:18px 0 4px">Also allowed</div>${extras}` : ''}
+<div class="set-h" style="margin:18px 0 4px">Details</div>
+<div class="kv" style="align-items:center"><span>Slack</span>${slack}</div>
+${admin ? `<div class="kv"><span>Hourly rate</span><b style="font-weight:500">${rate ? money(rate) : 'None'}</b></div>` : ''}
+<div class="kv"><span>Owns</span><b style="font-weight:500">${owns} client${owns === 1 ? '' : 's'}</b></div>
+<div class="kv"><span>Open follow-ups</span><b style="font-weight:500">${fu}</b></div>
+${m.phone ? `<div class="kv"><span>Phone</span><b style="font-weight:500">${escapeHtml(m.phone)}</b></div>` : ''}
+${danger}
+</aside>`;
+}
+function teamParts(m){
   const admin = isAdmin(), self = m.id === currentUser?.id, extra = m.extra_permissions || [];
   const titleCtl = admin
     ? `<label class="pop pop-sel"><span>${escapeHtml(m.title || 'No title')}</span>${icon('caret-up-down', { weight: 'bold' })}<select aria-label="Job title" onchange="changeTeamTitle('${m.id}', this.value)"><option value="">No title</option>${(settings.teamTitleOptions || []).map(o => `<option ${m.title === o ? 'selected' : ''}>${escapeHtml(o)}</option>`).join('')}</select></label>`
@@ -102,22 +122,58 @@ function teamInspHtml(m){
 <button class="btn btn-q" style="padding:0" onclick="adminResetPassword('${m.id}', ${jsArg(m.name)})">Reset Password…</button>
 <button class="btn btn-q" style="padding:0" onclick="toggleUserAccess('${m.id}', ${jsArg(m.name)}, ${!m.access_revoked})">${m.access_revoked ? 'Restore Access…' : 'Revoke Access…'}</button>
 <button class="btn danger" onclick="confirmDeleteUser('${m.id}', ${jsArg(m.name)})">Remove from Team…</button></div>` : '';
-  return `<aside class="insp" aria-label="${escapeHtml(m.name)}">
-<div style="display:flex;align-items:center;gap:12px">${avHtml(m.name, 'style="width:48px;height:48px;font-size:17px"')}
-<div style="min-width:0"><div style="font-size:18px;font-weight:600;letter-spacing:-.01em">${escapeHtml(m.name)}</div><div class="t-2" style="font-size:13px;overflow:hidden;text-overflow:ellipsis">${escapeHtml(m.email || '')}</div></div></div>
-${acts ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px">${acts}</div>` : ''}
-<div class="set-h" style="margin:22px 0 6px">Job title</div>${titleCtl}
-<div class="set-h" style="margin:22px 0 2px">Permissions</div><div ${canRole ? 'role="radiogroup" aria-label="Permissions"' : ''}>${roles}</div>
-${self && admin ? '<p class="t-2" style="font-size:13px;margin:2px 0 0">You can’t change your own role.</p>' : ''}
-${extras ? `<div class="set-h" style="margin:18px 0 4px">Also allowed</div>${extras}` : ''}
-<div class="set-h" style="margin:18px 0 4px">Details</div>
+  return { admin, self, titleCtl, roles, canRole, extras, slack, rate, owns, fu, acts, danger };
+}
+
+// ---- the new look (beta): People in a card on the left, the person in a big Profile card ----
+const TEAM_ROLE_WORD = { member: 'Member', approver: 'Approver', admin: 'Admin' };
+function teamUwHtml(people, sel, admin){
+  const rows = people.map(m => {
+    const on = sel && m.id === sel.id, owns = teamOwns(m), self = m.id === currentUser?.id;
+    return `<button class="tm-r${on ? ' on' : ''}${m.access_revoked ? ' off' : ''}" ${on ? 'aria-current="true"' : ''} onclick="selectTeamMember('${m.id}')"><span class="tm-n"><b>${escapeHtml(m.name)}${self ? ' (you)' : ''}</b><span>${escapeHtml(m.title || TEAM_ROLE_WORD[m.role] || roleDisplayLabel(m.role))}${m.access_revoked ? ' · access revoked' : ''}</span></span><span class="tm-o">${owns ? `${owns} client${owns === 1 ? '' : 's'}` : '—'}</span></button>`;
+  }).join('');
+  const nT = (settings.teamTitleOptions || []).length;
+  const links = admin ? `<span class="tm-links"><button class="uw-pill" onclick="switchTeamTab('titles')">Job titles${nT ? ` <span class="tm-pc">${nT}</span>` : ''}${icon('chevron-right')}</button></span>` : '';
+  const people_ = `<section class="tm-card"><div class="tm-h"><span class="tm-ic">${icon('users-three')}</span><b>People</b><span class="tm-c">${people.length}</span>${links}</div>
+<div class="tm-l">${rows || '<p class="tm-none">No one on the team yet.</p>'}</div>
+${admin ? `<button class="tm-add" onclick="openAddMemberSheet()">${icon('plus')}Add someone</button>` : '<p class="tm-none">Only admins can add people or change roles.</p>'}</section>`;
+  const waiting = admin && emailRequests.length ? `<section class="tm-card"><div class="tm-h"><b>Waiting for you</b><span class="tm-c">${emailRequests.length}</span></div><div class="grp tm-flat">${emailRequests.map(emailReqRow).join('')}</div></section>` : '';
+  return `<div class="tm-uw"><div class="tm-side">${people_}${waiting}</div>${sel ? teamProfileHtml(sel) : ''}</div>`;
+}
+function teamProfileHtml(m){
+  const { admin, self, titleCtl, roles, canRole, extras, slack, rate, owns, fu, acts, danger } = teamParts(m);
+  const role = TEAM_ROLE_WORD[m.role] || roleDisplayLabel(m.role), info = (ROLE_INFO.find(r => r[0] === m.role) || [])[2] || '';
+  // hours this week, day by day (admins see everyone's; everyone sees their own)
+  let hours = '';
+  if(admin || self){
+    const wk0 = getWeekStart(rNow()), today = toDateStr(rNow());
+    const days = Array.from({ length: 7 }, (_, i) => { const d = addDays(wk0, i), k = toDateStr(d); return { d, k, m: timeEntries.filter(e => e.userId === m.id && e.date === k).reduce((s, e) => s + e.minutes, 0) }; })
+      .filter((x, i) => i < 5 || x.m > 0);
+    const tot = days.reduce((s, x) => s + x.m, 0), h = Math.floor(tot / 60), mm = tot % 60;
+    hours = `<div class="tm-hrs"><div class="tm-big">${h}<small>h${mm ? ` ${String(mm).padStart(2, '0')}m` : ''}</small></div><span class="uw-mono">THIS WEEK</span></div>`;
+    const bars = days.map(x => `<div class="tm-b${x.k === today ? ' now' : ''}${x.k > today ? ' fut' : ''}" title="${x.d.toLocaleDateString('en-US', { weekday: 'long' })}: ${hmLong(x.m)}"><i style="height:${Math.max(Math.min(x.m / 480, 1), .04) * 100}%"></i><span>${x.d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()}</span></div>`).join('');
+    hours += `<div class="tm-wk" role="img" aria-label="Hours by day this week">${bars}</div>`;
+  }
+  const mine = activeClients().filter(c => clientOwner(c) === m.name).sort((a, b) => a.name.localeCompare(b.name));
+  const lv = c => { const l = clientHealth(c).level; return l === 'r' ? 'r' : l === 'y' ? 'am' : 'g'; };
+  const chips = mine.length ? `<div class="tm-sec"><span class="uw-mono">CLIENTS</span><span class="uw-mono">${mine.length}</span></div><div class="tm-chips">${mine.map(c => `<button class="tm-chip" onclick="openClientDetail('${c.id}')"><i class="${lv(c)}"></i>${escapeHtml(c.name)}</button>`).join('')}</div>` : '';
+  return `<section class="tm-card tm-pf" aria-label="${escapeHtml(m.name)}">
+<div class="tm-h"><span class="tm-ic">${icon('user')}</span><b>Profile</b>${acts ? `<span class="tm-acts">${acts}</span>` : ''}</div>
+<div class="tm-top"><div class="tm-who"><h2>${escapeHtml(m.name)}${self ? ' <span>(you)</span>' : ''}</h2><p>${escapeHtml(role)}${m.title ? ' · ' + escapeHtml(m.title) : ''}${info ? ' · ' + escapeHtml(info.replace(/\.$/, '').replace(/^./, x => x.toLowerCase())) : ''}</p><p class="tm-mail">${escapeHtml(m.email || '')}</p></div>${hours ? `<div class="tm-hcol">${hours}</div>` : ''}</div>
+${chips}
+<div class="tm-cols">
+<div><div class="tm-sec"><span class="uw-mono">PERMISSIONS</span></div><div ${canRole ? 'role="radiogroup" aria-label="Permissions"' : ''}>${roles}</div>
+${self && admin ? '<p class="tm-none">You can’t change your own role.</p>' : ''}
+${extras ? `<div class="tm-sec"><span class="uw-mono">ALSO ALLOWED</span></div>${extras}` : ''}</div>
+<div><div class="tm-sec"><span class="uw-mono">DETAILS</span></div>
+<div class="kv" style="align-items:center"><span>Job title</span>${titleCtl}</div>
 <div class="kv" style="align-items:center"><span>Slack</span>${slack}</div>
 ${admin ? `<div class="kv"><span>Hourly rate</span><b style="font-weight:500">${rate ? money(rate) : 'None'}</b></div>` : ''}
 <div class="kv"><span>Owns</span><b style="font-weight:500">${owns} client${owns === 1 ? '' : 's'}</b></div>
 <div class="kv"><span>Open follow-ups</span><b style="font-weight:500">${fu}</b></div>
 ${m.phone ? `<div class="kv"><span>Phone</span><b style="font-weight:500">${escapeHtml(m.phone)}</b></div>` : ''}
-${danger}
-</aside>`;
+${danger}</div>
+</div></section>`;
 }
 // The old pop-up for a person now just selects them here.
 function openTeamMemberDetail(id){ teamSelId = id; teamTab = 'members'; if(currentViewName !== 'team') switchView('team'); else drawTeam(); }

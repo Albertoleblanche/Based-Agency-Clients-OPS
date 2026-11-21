@@ -113,6 +113,10 @@ function renderCalendar(){
   if(typeof closeEventPreview === 'function') closeEventPreview(true);
   if(!root) return;
   if(typeof calendarDataLoaded !== 'undefined' && !calendarDataLoaded){ root.classList.remove('is-month'); root.innerHTML = skeletonHtml('calendar', 'Loading the calendar…'); return; }
+  // the new look (beta) opens on the month the first time, with Coming up beside the grid
+  const uw = typeof uiStyleOn === 'function' && uiStyleOn();
+  try{ if(uw && !localStorage.getItem('bda_uw_cal')){ localStorage.setItem('bda_uw_cal', '1'); calendarViewMode = 'month'; localStorage.setItem('bda_cal_mode', 'month'); if(currentViewName === 'calendar') setToolbarActions('calendar'); } }catch(e){}
+  calUpcomingRender(uw && calendarViewMode !== 'week');   // the week needs the full width
   const a = new Date(calendarAnchorDate), today = toDateStr(new Date()), now = new Date();
   root.classList.toggle('is-month', calendarViewMode === 'month');
   if(calendarViewMode === 'month'){
@@ -158,6 +162,40 @@ function renderCalendar(){
   root.querySelectorAll('.cal-all, .cal-all-l').forEach(el => el.style.top = hd.offsetHeight + 'px');
   calScrollToMorning(root, keepScroll);
   if(currentViewName === 'calendar') setToolbar(from.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }), isDay ? from.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : `Week ${isoWeek(from)}`);
+}
+
+// ---- Coming up (the new look): today and the next days, what's on each, in a card beside the grid ----
+function calUpcomingRender(on){
+  const view = document.getElementById('view-calendar');
+  let el = document.getElementById('calUpcoming');
+  if(!on){ if(el) el.remove(); return; }
+  if(!view) return;
+  if(!el){ el = document.createElement('aside'); el.id = 'calUpcoming'; el.className = 'cal-up'; el.setAttribute('aria-label', 'Coming up'); view.appendChild(el); }
+  const t0 = dayStart(rNow()), days = 8, items = calItems(t0, addDays(t0, days));
+  const when = e => {
+    if(e.kind === 'due') return 'Due';
+    if(e.kind === 'sent') return 'Sent';
+    if(e.isTaskMarker || e._task) return 'Task';
+    if(e.allDay) return 'All day';
+    return fmtTime(new Date(e.startAt));
+  };
+  const sub = e => {
+    if(e.kind === 'due' || e.kind === 'sent') return e.sub || '';
+    const c = e.clientId && typeof clients !== 'undefined' ? clients.find(x => String(x.id) === String(e.clientId)) : null;
+    if(!e.allDay && !calTopRow(e) && e.endAt) return `Until ${fmtTime(new Date(e.endAt))}${c ? ' · ' + c.name : ''}`;
+    return c ? c.name : calPlace(e) || '';
+  };
+  let shown = 0;
+  const groups = Array.from({ length: days }, (_, i) => {
+    const d = addDays(t0, i), k = toDateStr(d), list = calSortDay(items.filter(e => toDateStr(new Date(e.startAt)) === k));
+    if(!list.length && i > 0) return '';
+    const name = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-US', { weekday: 'long' });
+    const rows = list.slice(0, Math.max(0, 12 - shown)); shown += rows.length;
+    if(i > 0 && !rows.length) return '';
+    return `<div class="cu-d"><span>${name}</span><span>${list.length ? `${list.length} ${list.length === 1 ? 'thing' : 'things'}` : 'Nothing yet'}</span></div>`
+      + rows.map(e => `<button class="cu-r${e._done ? ' done' : ''} ${calColor(e)}" onclick="calOpen('${e.id}',this)"><span class="cu-t">${escapeHtml(when(e))}</span><span class="cu-x"><b>${escapeHtml(e.title)}</b>${sub(e) ? `<span>${escapeHtml(sub(e))}</span>` : ''}</span></button>`).join('');
+  }).join('');
+  el.innerHTML = `<div class="cu-h"><span class="cu-ic">${icon('calendar-blank')}</span><b>Coming up</b><span class="cu-n">Next ${days - 1} days</span></div><div class="cu-l">${groups}</div>`;
 }
 
 // Open on the working day (8 AM at the top). The view is hidden when it first renders,
