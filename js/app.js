@@ -104,6 +104,7 @@ function showLoginScreen(){
   document.getElementById('appRoot').classList.remove('si-app-in');
   teardownRealtimeSubscriptions();
   currentUser = null; myProfile = null;
+  if(typeof applyUiStyle === 'function') applyUiStyle();
   siIdle(document.getElementById('loginBtn'));
   document.getElementById('loginPassword').value = '';
   siHidePasswords();
@@ -143,6 +144,7 @@ async function showApp(session, o){
     }
     siGreet(myProfile.name);
     await initTheme();
+    applyUiStyle();
     await loadAll();
     siStep(1);
     // Everything below only fills its own list, so it loads in parallel

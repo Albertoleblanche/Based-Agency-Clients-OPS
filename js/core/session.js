@@ -79,6 +79,34 @@ async function saveThemePref(pref){
   if(error){ console.error('theme save', error); showToast('info', 'Saved on this computer', 'Your other devices keep the appearance they had.'); }
 }
 
+/* ---------- New look (beta) ---------- */
+// The widget look (rounded cards, big thin numbers, Geist), offered to one person at a time from the
+// database: team_profiles.ui_style is null (not offered: no switch, no look), 'off' or 'widgets'.
+// Everyone else keeps the app as it is. This device remembers it for the first paint, like the theme.
+function uiStyleOffered(){ return !!myProfile && myProfile.ui_style != null; }
+function uiStyleOn(){ return uiStyleOffered() && myProfile.ui_style === 'widgets'; }
+function loadUiFont(){
+  if(document.getElementById('uiwFont')) return;
+  const l = document.createElement('link');
+  l.id = 'uiwFont'; l.rel = 'stylesheet';
+  l.href = 'https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500;600&display=swap';
+  document.head.appendChild(l);
+}
+function applyUiStyle(){
+  const on = uiStyleOn();
+  document.documentElement.classList.toggle('ui-w', on);
+  if(on) loadUiFont();
+  try{ on ? localStorage.setItem('bda_ui_style', 'widgets') : localStorage.removeItem('bda_ui_style'); }catch(e){}
+}
+async function saveUiStyle(on){
+  if(!uiStyleOffered() || !currentUser) return;
+  const v = on ? 'widgets' : 'off';
+  myProfile.ui_style = v;
+  applyUiStyle();
+  const { error } = await supabaseClient.from('team_profiles').update({ ui_style: v }).eq('id', currentUser.id);
+  if(error){ console.error('ui_style save', error); showToast('info', 'Saved on this computer', 'Your other devices keep the look they had.'); }
+}
+
 function toggleSidebar(){
   document.body.classList.add('side-anim');   // slide it, only when toggled (not on load)
   const collapsed = document.body.classList.toggle('sidebar-collapsed');

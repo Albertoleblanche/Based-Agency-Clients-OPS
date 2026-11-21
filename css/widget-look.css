@@ -1,0 +1,111 @@
+/* The new look (beta): the widget style from the canvas (rows "Every tab in the widget style").
+   Only on when <html> has .ui-w, which js/core/session.js sets for whoever has it turned on
+   (team_profiles.ui_style = 'widgets'). Everyone else never matches a rule in this file.
+   Near-black ground, rounded cards, big thin numbers, small mono labels, pill buttons, Geist.
+   Orange stays on the one main button (New). */
+
+/* ---------- tokens ---------- */
+html.ui-w .mac{
+  --font:'Geist',-apple-system,BlinkMacSystemFont,"SF Pro Text",Inter,system-ui,sans-serif;
+  --mono:'Geist Mono',ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --uw-r-card:22px; --uw-r-ctl:999px; --uw-ease:cubic-bezier(.23,1,.32,1);
+  letter-spacing:0;
+}
+html.ui-w .mac[data-theme="dark"]{
+  --desk:#050506; --window:#0B0B0C; --side:#0B0B0C; --side-solid:#0B0B0C;
+  --grp:#141416; --col:#0B0B0C; --card:#1C1C1F; --menu:rgba(24,24,27,.96); --field:#141416;
+  --label:#F4F4F5; --label-2:#9C9CA4; --label-3:#606068;
+  --sep:rgba(255,255,255,.065); --sep-strong:rgba(255,255,255,.14);
+  --fill:rgba(255,255,255,.05); --fill-2:rgba(255,255,255,.08); --fill-3:rgba(255,255,255,.13);
+  --select:#1C1C1F; --seg-on:#2A2A2F;
+  --uw-hi:inset 0 1px 0 rgba(255,255,255,.035); --uw-shadow:none;
+}
+html.ui-w .mac[data-theme="light"]{
+  --desk:#E2E2E6; --window:#EDEDEF; --side:#EDEDEF; --side-solid:#EDEDEF;
+  --grp:#FFFFFF; --col:#EDEDEF; --card:#FFFFFF; --menu:rgba(255,255,255,.97); --field:#FFFFFF;
+  --label:#121214; --label-2:#67676F; --label-3:#A2A2A9;
+  --sep:rgba(0,0,0,.065); --sep-strong:rgba(0,0,0,.14);
+  --fill:rgba(0,0,0,.04); --fill-2:rgba(0,0,0,.065); --fill-3:rgba(0,0,0,.1);
+  --select:#FFFFFF; --seg-on:#FFFFFF;
+  --uw-hi:none; --uw-shadow:0 1px 2px rgba(0,0,0,.04),0 10px 28px -14px rgba(0,0,0,.1);
+}
+html.ui-w body.mac{background:var(--window)}
+html.ui-w .mac .win.app-win{background:var(--window)}
+
+/* ---------- sidebar: names on the ground, a soft filled pill for the page you're on ---------- */
+html.ui-w .mac[data-theme] .app-win .side{
+  --sb-text:var(--label-2); --sb-strong:var(--label); --sb-hover:var(--fill); --sb-on:var(--select); --sb-line:var(--sep);
+  background:var(--window); border-right:0; -webkit-backdrop-filter:none; backdrop-filter:none; padding-left:14px; padding-right:12px;
+}
+html.ui-w .mac[data-theme] .app-win .side .src-i{height:36px;border-radius:12px;font-size:13.5px;font-weight:400;transition:transform 160ms var(--uw-ease),background-color 120ms ease,color 120ms ease}
+html.ui-w .mac[data-theme] .app-win .side .src-i.on{background:var(--sb-on);color:var(--sb-strong);box-shadow:var(--uw-shadow),var(--uw-hi)}
+html.ui-w .mac[data-theme] .app-win .side .src-i:active{transform:scale(.97);transition-duration:100ms}
+html.ui-w .mac .app-win .side .src-i .n{font-family:var(--mono);font-weight:500;font-size:11px;background:var(--fill-2);color:var(--label-2)}
+html.ui-w .mac .side-foot{border-top-color:var(--sep)}
+html.ui-w .mac .side-brand .brand-mark{border-radius:9px}
+html.ui-w .mac .stm{border-radius:16px;background:var(--grp);box-shadow:0 0 0 1px var(--sep)}
+
+/* ---------- top bar: no line under it, pill search, pill buttons ---------- */
+html.ui-w .mac #appTopbar{border-bottom:0;min-height:60px;padding-top:10px;padding-bottom:6px;background:var(--window)}
+html.ui-w .mac .tb-t b{font-size:15px;font-weight:600;letter-spacing:-.01em}
+html.ui-w .mac .tb-grp{border-radius:999px;background:var(--grp);box-shadow:0 0 0 1px var(--sep);padding:2px}
+html.ui-w .mac .tb-grp .ib{border-radius:999px;width:32px;height:30px}
+html.ui-w .mac .ib{border-radius:11px}
+html.ui-w .mac .search{height:36px;border-radius:999px;background:var(--grp);box-shadow:0 0 0 1px var(--sep);padding:0 10px 0 13px;font-size:13px;color:var(--label-3)}
+html.ui-w .mac .kbd{font-family:var(--mono);background:transparent;color:var(--label-3);font-size:11px;letter-spacing:.02em}
+html.ui-w .mac .timerpill{border-radius:999px;height:32px;background:var(--grp);box-shadow:0 0 0 1px var(--sep)}
+
+/* ---------- buttons and controls: pills, a press on everything ---------- */
+html.ui-w .mac .btn{height:32px;padding:0 14px;border-radius:999px;background:var(--grp);box-shadow:0 0 0 1px var(--sep);font-size:13px;transition:transform 160ms var(--uw-ease),background-color 120ms ease,filter 120ms ease}
+html.ui-w .mac .btn:active{transform:scale(.96);transition-duration:100ms}
+html.ui-w .mac .btn-lg{height:38px;padding:0 18px}
+/* the main button on a screen is white (ink on the ground); orange is kept for New in the top bar */
+html.ui-w .mac .btn-p{background:var(--label);color:var(--window);box-shadow:none}
+html.ui-w .mac .btn-p:hover{background:var(--label);filter:brightness(.92)}
+html.ui-w .mac #tbNewBtn.btn-p,html.ui-w .mac .si-go.btn-p{background:linear-gradient(180deg,#E8652C,#C64C19);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 8px 20px -10px rgba(230,90,30,.7)}
+html.ui-w .mac #tbNewBtn.btn-p:hover{filter:brightness(1.06)}
+html.ui-w .mac .btn-q{background:transparent;box-shadow:none}
+html.ui-w .mac .seg{border-radius:999px;padding:3px;background:var(--grp);box-shadow:0 0 0 1px var(--sep)}
+html.ui-w .mac .seg button,html.ui-w .mac .seg a{height:28px;border-radius:999px;padding:0 13px;font-size:13px;color:var(--label-2);transition:transform 160ms var(--uw-ease),color 120ms ease}
+html.ui-w .mac .seg .on{background:var(--seg-on);color:var(--label);box-shadow:none}
+html.ui-w .mac .seg button:active{transform:scale(.96)}
+html.ui-w .mac .pop{height:32px;border-radius:999px;padding:0 10px 0 13px;background:var(--grp);box-shadow:0 0 0 1px var(--sep);font-size:13px}
+html.ui-w .mac .tf{border-radius:12px;height:36px;border:0;box-shadow:0 0 0 1px var(--sep-strong);background:var(--field)}
+html.ui-w .mac textarea.tf{height:auto;min-height:84px;border-radius:14px}
+html.ui-w .mac .tf:focus,html.ui-w .mac .tf.focus{box-shadow:0 0 0 1px var(--label-3),0 0 0 4px var(--fill-2)}
+html.ui-w .mac .tag{border-radius:999px}
+
+/* ---------- type: big thin page titles, mono labels ---------- */
+html.ui-w .mac .lt{font-size:30px;font-weight:400;letter-spacing:-.03em;line-height:1.12}
+html.ui-w .mac .lt-sub{font-size:13.5px}
+html.ui-w .mac .h2 h2{font-size:15px;font-weight:500;letter-spacing:-.005em}
+html.ui-w .mac .src-h,html.ui-w .mac .set-h{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--label-3)}
+
+/* ---------- cards: one radius, a hairline, no card inside a card ---------- */
+html.ui-w .mac .grp{border-radius:var(--uw-r-card);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow);background:var(--grp)}
+html.ui-w .mac .grp .grp{box-shadow:none;border-radius:16px;background:transparent}
+html.ui-w .mac .row{min-height:54px;padding:10px 16px}
+html.ui-w .mac .row:hover{background:var(--fill)}
+html.ui-w .mac .form-grp{border-radius:var(--uw-r-card);background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow)}
+html.ui-w .mac .kpi{border-radius:var(--uw-r-card)}
+
+/* ---------- menus, sheets and pop-ups ---------- */
+html.ui-w .mac .menu{border-radius:16px;padding:6px;box-shadow:0 0 0 1px var(--sep-strong),0 24px 60px -20px rgba(0,0,0,.6)}
+html.ui-w .mac .menu .mi{border-radius:10px;height:32px;font-size:13.5px}
+html.ui-w .mac .menu .mh,html.ui-w .mac .menu .mhd{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--label-3)}
+html.ui-w .mac .modal-card{border-radius:26px;box-shadow:0 0 0 1px var(--sep-strong),0 40px 100px -30px rgba(0,0,0,.7)}
+html.ui-w .mac[data-theme="dark"] .modal-card{background:#141416}
+
+/* ---------- small things ---------- */
+html.ui-w .mac .cb{box-shadow:inset 0 0 0 1.5px var(--sep-strong)}
+html.ui-w .mac .sw.on{background:#5FD39A}
+html.ui-w .mac[data-theme="light"] .sw.on{background:#1E9A60}
+html.ui-w .mac ::selection{background:var(--fill-3)}
+@media (hover:hover) and (pointer:fine){
+  html.ui-w .mac .btn:not(.btn-p):hover{background:var(--fill-2)}
+  html.ui-w .mac .seg button:not(.on):hover{color:var(--label)}
+  html.ui-w .mac .search:hover{box-shadow:0 0 0 1px var(--sep-strong)}
+}
+@media (prefers-reduced-motion:reduce){
+  html.ui-w .mac :is(.btn,.seg button,.src-i){transition-duration:0s}
+}
