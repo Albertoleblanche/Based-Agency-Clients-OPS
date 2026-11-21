@@ -708,12 +708,8 @@ html.ui-w .cl-th b{font-size:14px;font-weight:500}
 html.ui-w .cl-thn{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--label-3)}
 html.ui-w .cl-table.is-uw .cl-head{border-radius:0;padding:0 28px}
 html.ui-w .cl-sv{font-size:13px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-html.ui-w .imp-m{display:inline-flex;align-items:flex-end;gap:2px;height:12px;margin-right:9px;flex:0 0 auto}
-html.ui-w .imp-m i{display:block;width:3px;border-radius:1px;background:var(--uw-c3)}
-html.ui-w .imp-m i:nth-child(1){height:5px} html.ui-w .imp-m i:nth-child(2){height:8.5px} html.ui-w .imp-m i:nth-child(3){height:12px}
-html.ui-w :is(.imp-m.lo i:nth-child(1),.imp-m.md i:nth-child(-n+2),.imp-m.hi i){background:var(--label)}
-html.ui-w .imp-w{font-size:13px;color:var(--label-2)}
-html.ui-w .imp-m.hi + .imp-w{color:var(--label);font-weight:500}
+html.ui-w .imp-p{height:24px;padding:0 11px;border-radius:999px;font-weight:500}
+html.ui-w .imp-p.lo{background:var(--uw-c2)}
 html.ui-w .mac[data-theme] #clientsRoot{--cl-r:var(--uw-risk);--cl-y:var(--uw-watch)}
 html.ui-w .cl-h{font-weight:400}
 html.ui-w .cl-wk{font-weight:400}

@@ -120,8 +120,6 @@ function clientImportanceCell(c){
   const n = Math.max(0, Math.min(10, Math.round(Number(c.importance) || 0)));
   if(!n) return '<span class="cl-imp" role="cell" aria-label="Importance not set"><span class="t-3">—</span></span>';
   const [word, k] = n >= 8 ? ['High', 'hi'] : n >= 4 ? ['Medium', 'md'] : ['Low', 'lo'];
-  // the new look (beta): a three-step meter in ink beside the word, no coloured pill
-  if(typeof uiStyleOn === 'function' && uiStyleOn()) return `<span class="cl-imp" role="cell" aria-label="Importance ${n} of 10, ${word.toLowerCase()}" title="Importance ${n} of 10"><span class="imp-m ${k}" aria-hidden="true"><i></i><i></i><i></i></span><span class="imp-w">${word}</span></span>`;
   return `<span class="cl-imp" role="cell" aria-label="Importance ${n} of 10, ${word.toLowerCase()}"><span class="imp-p ${k}">${word}</span></span>`;
 }
 
