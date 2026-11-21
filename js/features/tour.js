@@ -5,7 +5,7 @@ const tourSteps = [
   { title: 'Welcome to Based Radar', body: 'A one-minute look at where everything lives. Skip anytime; the tour stays in the menu under your name.', icon: 'compass' },
   { view: 'overview', title: 'Dashboard', body: 'Your day at a glance: what needs you now, your tasks, client health, the calendar, follow-ups, WhatsApp and notes.' },
   { view: 'approve', title: 'This Week', body: 'Every client gets one update a week, sent by an approver the day it’s ready. Overdue ones come first, then the ones due today.' },
-  { view: 'queue', title: 'Queue', body: 'Your logged work, client by client. Switch items between the email and internal, log more, and write the draft.' },
+  { view: 'queue', title: 'Queue', body: 'Your logged work, client by client. Switch items between the email and internal, log more with its date and time, write the draft and follow it until it’s sent.' },
   { view: 'teamqueue', title: 'Review', body: 'Drafts waiting for an approver. Read them, edit, and send.' },
   { view: 'clients', title: 'All Clients', body: 'Every client with its service, owner, health and importance. Open one to see its whole history.' },
   { view: 'health', title: 'Health', body: 'Clients at risk or worth watching, the signals behind it, and the next step.' },

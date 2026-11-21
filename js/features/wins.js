@@ -230,7 +230,7 @@ async function approveWin(clientId, author){
   const c = clients.find(x => x.id === clientId); if(!c) return;
   if((await approveDraft(clientId, author)) === false) return;
   const p = author !== myName() ? profileByName(author) : null;
-  if(p && typeof sendNotification === 'function') await sendNotification(p.id, 'win_approved', `${c.name}: your update is approved`, 'It’s yours to send: copy it in Review and paste it in the WhatsApp group.', 'teamqueue', c.id);
+  if(p && typeof sendNotification === 'function') await sendNotification(p.id, 'win_approved', `${c.name}: your update is approved`, 'It’s yours to send: copy it from your Queue and paste it in the WhatsApp group.', 'teamqueue', c.id);
 }
 // Your own WhatsApp win: approve it and copy it in one go.
 async function approveAndCopyWin(clientId, author){

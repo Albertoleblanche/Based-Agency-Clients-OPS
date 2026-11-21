@@ -764,8 +764,11 @@ html.ui-w .qu-em{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;t
 html.ui-w .qu-i .ib.act{border-radius:50%}
 html.ui-w .mac :is(.qu-edt,.qu-new textarea){border-radius:16px;background:var(--uw-c2);padding:10px 14px}
 html.ui-w .mac .qu-new textarea{min-height:40px}
+html.ui-w .qu-fl{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--label-3)}
+html.ui-w .mac .qu-time{border-radius:999px;height:32px;text-align:center}
+html.ui-w .qu-nf .btn{height:34px}
+html.ui-w .qu-pf > label:not(.pop){font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--label-3)}
 html.ui-w .mac :is(.qu-edt,.qu-new textarea):focus-visible{box-shadow:0 0 0 1px var(--label-3)}
-html.ui-w .qu-new .btn{height:40px}
 html.ui-w .qu-hint kbd{font-family:var(--mono);font-weight:500;border-radius:6px}
 html.ui-w .qu-dn.is-red{color:var(--uw-risk)}
 html.ui-w .qu-subj{margin-top:18px;font-size:22px;font-weight:400;letter-spacing:-.022em}
@@ -807,9 +810,9 @@ html.ui-w .n1-sh{padding:16px 18px 0}
 html.ui-w .n1-card .n1-sheet{width:100%;height:min(560px,calc(100vh - 120px))}
 html.ui-w .n1-card .n1-sheet{top:auto}
 
-/* ---- the sidebar as a card, like everything else; a minimal toggle ---- */
-html.ui-w .mac[data-theme] .app-win .side{margin:10px 0 10px 10px;height:calc(100% - 20px);flex-basis:224px;width:224px;padding:0 10px 10px;border-radius:28px;background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi);--sb-on:var(--uw-c2);--sb-hover:var(--uw-c2)}
-html.ui-w body.sidebar-collapsed .app-win .side{margin-left:-240px}
+/* ---- the sidebar flush with the window's edges (no card, no outside margin); a minimal toggle ---- */
+html.ui-w .mac[data-theme] .app-win .side{margin:0;height:100%;flex-basis:224px;width:224px;padding:0 12px 10px;border-radius:0;background:var(--grp);box-shadow:1px 0 0 var(--sep);--sb-on:var(--uw-c2);--sb-hover:var(--uw-c2)}
+html.ui-w body.sidebar-collapsed .app-win .side{margin-left:-225px}
 html.ui-w .mac .app-win .side .side-head{margin:0 -10px;padding:14px 16px 4px}
 html.ui-w .mac .side-brand .brand-mark{width:30px;height:30px;border-radius:10px;font-size:11.5px}
 html.ui-w .mac .side-brand .brand-name{font-size:13.5px;font-weight:500}

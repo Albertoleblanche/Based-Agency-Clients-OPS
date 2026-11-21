@@ -20,9 +20,9 @@ function applyRoleVisibility(){
   if(editClientDetailBtn) editClientDetailBtn.style.display = canApprove() ? 'inline-flex' : 'none';
   const teamQueueNavItem = document.getElementById('teamQueueNavItem');
   if(teamQueueNavItem){
-    // Everyone has Review: approvers read, edit and send what's sent to them; a member sees
-    // their own drafts there (reviewItems() keeps it to theirs), locked once sent for review.
-    teamQueueNavItem.style.display = 'flex';
+    // Review is for approvers (and anyone who sees everyone's drafts). A member's own drafts,
+    // in review, approved and sent, are in their Queue instead (queue.js).
+    teamQueueNavItem.style.display = typeof queueHasReview === 'function' && queueHasReview() ? 'none' : 'flex';
   }
   const approveQueueNavItem = document.getElementById('approveQueueNavItem');
   if(approveQueueNavItem){
@@ -151,7 +151,7 @@ const CMDK_PAGE_ICONS = {
   overview: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1" /> <rect width="7" height="7" x="14" y="3" rx="1" /> <rect width="7" height="7" x="14" y="14" rx="1" /> <rect width="7" height="7" x="3" y="14" rx="1" /></svg>',
   clients: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12h.01" /> <path d="M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" /> <path d="M22 13a18.15 18.15 0 0 1-20 0" /> <rect width="20" height="14" x="2" y="6" rx="2" /></svg>',
   improvements: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /></svg>',
-  approve: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="m16 9-5.5 5.5L8 12" /></svg>',
+  approve: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" /> <path d="M16 2v4" /> <path d="M3 10h18" /> <path d="M8 2v4" /> <path d="M17 14h-6" /> <path d="M13 18H7" /> <path d="M7 14h.01" /> <path d="M17 18h.01" /></svg>',
   notes: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /> <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" /></svg>',
   tasks: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5h8" /> <path d="M13 12h8" /> <path d="M13 19h8" /> <path d="m3 17 2 2 4-4" /> <rect x="3" y="4" width="6" height="6" rx="1" /></svg>',
   reminders: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0" /> <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" /></svg>',
@@ -294,6 +294,7 @@ function parseRouteHash(hash){
   if(!raw) return null;
   const client = raw.match(/^client\/(.+)$/);
   if(client){ try{ return { view:'clientdetail', clientId: decodeURIComponent(client[1]) }; }catch(e){ return null; } }
+  if(raw === 'teamqueue' && typeof queueHasReview === 'function' && queueHasReview()) return { view: 'queue' };
   return { view: raw };
 }
 // Only screens this person can actually reach from the sidebar (or from a
@@ -374,6 +375,7 @@ function closePanelOnLeave(view){
 const VIEW_QUICK_DRAW = { overview: 'renderDashboard', clients: 'renderClientsTable', health: 'renderHealth', tasks: 'renderTasks', reminders: 'renderReminders', notes: 'renderNotes', plan: 'renderPlan', teamqueue: 'renderTeamQueue', queue: 'renderMyQueue', calendar: 'renderCalendar', time: 'renderTimeView', trash: 'renderTrash' };
 async function switchView(name){
   if(name === 'claude' || name === 'focusreports') name = 'overview'; // the Assistant and the weekly report were removed; old links land on the Dashboard
+  if(name === 'teamqueue' && typeof queueHasReview === 'function' && queueHasReview()) name = 'queue'; // a member's Review is in their Queue
   const leaving = currentViewName;
   // You change screens all day, so the move is a quick cross-fade of the page and its title (the
   // sidebar and toolbar buttons just change, like a Mac app's). The new screen is drawn before the
@@ -383,8 +385,8 @@ async function switchView(name){
   let viewEl;
   const swap = () => {
     closeMobileNav();
-    // This Week (the week board) opens from the Dashboard's toolbar, so the Dashboard stays lit on it.
-    const navName = name === 'approve' ? 'overview' : name;
+    // This Week has its own place in the sidebar now (it also opens from the Dashboard's toolbar).
+    const navName = name;
     document.querySelectorAll('.nav-item').forEach(n=>{ const on = n.dataset.view===navName; n.classList.toggle('active', on); n.classList.toggle('on', on); if(on) n.setAttribute('aria-current','page'); else n.removeAttribute('aria-current'); });
     if(typeof setToolbarActions === 'function') setToolbarActions(name);
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
