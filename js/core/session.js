@@ -103,6 +103,7 @@ async function saveUiStyle(on){
   const v = on ? 'widgets' : 'off';
   myProfile.ui_style = v;
   applyUiStyle();
+  if(typeof renderDashboard === 'function') renderDashboard();   // the Dashboard has its own layout in each look
   const { error } = await supabaseClient.from('team_profiles').update({ ui_style: v }).eq('id', currentUser.id);
   if(error){ console.error('ui_style save', error); showToast('info', 'Saved on this computer', 'Your other devices keep the look they had.'); }
 }
