@@ -245,7 +245,7 @@ html.ui-w .uw-e span{font-size:12px;color:var(--label-2);white-space:nowrap;over
 
 /* ================= Tasks, Health and Reminders (the canvas tabs, same layouts) ================= */
 /* the page head: a big thin title with its sentence beside it, the filters on the right */
-html.ui-w :is(.tk,.rmi,.hx){padding:6px 26px 30px 22px}
+html.ui-w :is(.tk,.rmi,.hx,.wa,.tmi){padding:6px 26px 30px 22px}
 html.ui-w :is(.tk-hd,.rmi-hd){align-items:center}
 html.ui-w :is(.tk-hd,.rmi-hd,.hx-top) > div:first-child{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 16px;min-width:0}
 html.ui-w :is(.tk-hd h2,.rmi-hd h2,.hx-h){font-size:30px;font-weight:400;letter-spacing:-.03em;line-height:1.15}
@@ -348,3 +348,77 @@ html.ui-w .tkp-ad{font-family:var(--mono);font-size:10.5px;font-weight:500;lette
   html.ui-w .hx-row:hover .tl-s.now::before{background:transparent}
   html.ui-w .hx-gh .lnk:hover{color:var(--label);box-shadow:0 0 0 1px var(--sep-strong)}
 }
+
+/* ---- WhatsApp: the list as one card, each part of the side as its own ---- */
+html.ui-w :is(.wa-main,.wa-card){background:var(--grp);border-radius:28px;box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
+html.ui-w .wa-body{margin-top:22px;column-gap:14px;grid-template-columns:minmax(0,1fr) 320px}
+html.ui-w .wa-main{padding:10px 26px 18px}
+html.ui-w .wa-main:empty,html.ui-w .wa-main:has(> .es:only-child){background:transparent;box-shadow:none}
+html.ui-w .wa-side{display:flex;flex-direction:column;gap:14px}
+html.ui-w .wa-card{padding:16px 22px 18px}
+html.ui-w :is(.wa-main,.wa-side,.wa-card) > .rmi-sec:first-child{margin-top:0}
+html.ui-w .wa-card .rmi-sec{margin:0 0 6px}
+html.ui-w .wa-sort{margin:10px 0 2px;font-size:12.5px;color:var(--label-3)}
+html.ui-w .wa-gh{padding:16px 0 6px;border-bottom:0}
+html.ui-w .wa-gh b{font-size:13.5px;font-weight:500}
+html.ui-w .wa-gh .n{font-family:var(--mono);font-size:12px;font-weight:500}
+html.ui-w .wa-k{font-weight:400}
+html.ui-w .wa-k.k-issue{color:var(--uw-risk)}
+html.ui-w .wa-r.is-sel{background:var(--card)}
+html.ui-w :is(.wa-pp,.wa-qc){height:36px;border-radius:12px}
+html.ui-w .wa-pp b{font-family:var(--mono);font-weight:500;font-size:12.5px}
+html.ui-w .wa-pp em{color:var(--uw-risk)}
+html.ui-w .wa-pp.on{background:var(--card)}
+html.ui-w .wa-st b{font-weight:500}
+html.ui-w .wa-lock{margin-top:14px}
+html.ui-w .wa-steps,html.ui-w .wa-chk{min-width:0}
+
+/* ---- Time: the day in a card, the side column as cards, the day's total big ---- */
+html.ui-w .tmi-cols{grid-template-columns:minmax(0,1fr) 340px;column-gap:14px;align-items:start;margin-top:0}
+html.ui-w .tmi-cols > section{background:var(--grp);border-radius:28px;padding:14px 26px 22px;box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
+html.ui-w .tmi-cols > aside > .tmi-body{display:flex;flex-direction:column;gap:14px}
+html.ui-w .tmi-card{background:var(--grp);border-radius:28px;padding:18px 22px 20px;box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
+html.ui-w .tmi-hd{margin-bottom:2px}
+html.ui-w .tmi-nav b{font-size:20px;font-weight:400;letter-spacing:-.02em}
+html.ui-w .tmi-tot b{font-family:var(--mono);font-size:14px;font-weight:500}
+html.ui-w .tmi-sec{border-bottom-color:var(--sep)}
+html.ui-w .tmi-sec b{font-weight:500}
+html.ui-w .tmi-sec span{font-family:var(--mono);font-weight:500;font-size:12.5px}
+html.ui-w .tmi-rng{font-family:var(--mono);font-size:11.5px;letter-spacing:.02em}
+html.ui-w .tmi-r .tx b{font-weight:500}
+html.ui-w .tmi-dur{font-family:var(--mono);font-size:13px;font-weight:500}
+html.ui-w .tmx-sec{border-bottom:0;padding-bottom:6px;align-items:center;min-height:30px}
+html.ui-w .tmx-sec b{font-size:14px;font-weight:500}
+html.ui-w .tmx-sec .x-lnk{display:inline-flex;align-items:center;height:30px;padding:0 12px;border-radius:999px;background:var(--uw-c2);box-shadow:0 0 0 1px var(--sep);color:var(--label-2);font-size:12.5px;font-weight:500;text-decoration:none}
+html.ui-w .tmi-s2{margin-top:0}
+html.ui-w .tmi-big{margin:12px 0 14px;font-size:60px;font-weight:300;letter-spacing:-.05em;line-height:.95;font-variant-numeric:tabular-nums}
+html.ui-w .tmi-big small{margin-left:4px;font-size:24px;font-weight:300;letter-spacing:-.02em;color:var(--label-2)}
+html.ui-w .tm1-by{padding:8px 0}
+html.ui-w .tm1-by + .tm1-by{border-top:1px solid var(--sep)}
+html.ui-w .tm1-by .mono{display:none}
+html.ui-w :is(.tm1-by,.tmx-bud) b{font-family:var(--mono);font-size:12.5px;font-weight:500}
+html.ui-w .tmx-bud b.over{color:var(--uw-risk)}
+html.ui-w .tmx-bud i{height:4px;border-radius:99px;background:var(--uw-c3)}
+html.ui-w .tmx-bud i em{border-radius:99px;background:var(--label)}
+html.ui-w .tmx-bud i em.over{background:var(--uw-risk)}
+html.ui-w .tmi-add{border-radius:999px}
+
+/* ---- Recently Deleted: a title, then each kind as a card ---- */
+html.ui-w #trashRoot{padding:6px 26px 30px 22px}
+html.ui-w .tr-top{align-items:center;gap:8px 10px}
+html.ui-w .tr-hd{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 16px;min-width:0}
+html.ui-w .tr-hd h2{margin:0;font-size:30px;font-weight:400;letter-spacing:-.03em;line-height:1.15}
+html.ui-w .tr-hd p{margin:0;font-size:13.5px;color:var(--label-2)}
+html.ui-w .tr-list{margin-top:22px;display:flex;flex-direction:column;gap:14px}
+html.ui-w .tr-g{background:var(--grp);border-radius:28px;padding:16px 22px 12px;box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
+html.ui-w .tr-g > .h2{margin:0 0 4px;align-items:center;min-height:32px}
+html.ui-w .tr-g > .h2 h2{font-size:15px;font-weight:500}
+html.ui-w .tr-g > .h2 .c{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--label-3)}
+html.ui-w .tr-g > .grp{background:transparent;box-shadow:none;border-radius:0;margin:0 -10px}
+html.ui-w .tr-g .row{min-height:52px;padding:8px 10px;border-radius:14px}
+html.ui-w .tr-g .row .ic{width:30px;height:30px;border-radius:10px;background:var(--uw-c2);display:grid;place-items:center;color:var(--label-2)}
+html.ui-w .tr-g .row .tx .t{font-weight:500}
+html.ui-w .tr-g .row .r{gap:8px}
+html.ui-w .tr-g .row .r .btn svg{width:13px;height:13px}
+html.ui-w .tr-g .row .r .ib{width:32px;height:32px;border-radius:50%;box-shadow:0 0 0 1px var(--sep)}
+html.ui-w .tr-g .row .ic svg{width:15px;height:15px}

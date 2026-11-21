@@ -428,12 +428,14 @@ function waSideHtml(who, conn){
   const lock = testers.length
     ? `<p class="wa-lock">${icon('lock-simple')}<span>Test mode: ${onlyMe ? 'only you see this and get' : `only the ${testers.length} testers see this and get`} its Slack messages. <a href="#" onclick="openSettingsTab('whatsapp');return false;">WhatsApp settings</a></span></p>`
     : `<p class="wa-lock">${icon('settings')}<span><a href="#" onclick="openSettingsTab('whatsapp');return false;">WhatsApp settings</a></span></p>`;
+  // the new look (beta) draws each part of the side as its own card
+  const card = h => h && typeof uiStyleOn === 'function' && uiStyleOn() ? `<div class="wa-card">${h}</div>` : h;
   return `<aside class="wa-side">
-${open.length ? `<div class="rmi-sec"><b>Who has what</b></div><div class="wa-ppl">${people}</div>` : ''}
-${waQuietHtml()}
-<div class="rmi-sec"><b>Checks</b></div>
+${card(open.length ? `<div class="rmi-sec"><b>Who has what</b></div><div class="wa-ppl">${people}</div>` : '')}
+${card(waQuietHtml())}
+${card(`<div class="rmi-sec"><b>Checks</b></div>
 <div class="wa-chk"><div class="wa-st">${st}</div><p>${escapeHtml(txt)}</p>${act}</div>
-${lock}</aside>`;
+${lock}`)}</aside>`;
 }
 // ---- Quiet clients -----------------------------------------------------------------------------
 // Clients whose group Radar reads where nobody from the team has written, and no update or win went

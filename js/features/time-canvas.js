@@ -59,7 +59,10 @@ function clockText(){
 function tickTimesheetClock(){
   const r = document.getElementById('tsRunDur'); if(r) r.textContent = hmm(runningMinutes());
   const t = document.getElementById('tsTotal'); if(t && t.dataset.base != null) t.textContent = hmm(+t.dataset.base + runningMinutes());
+  const g = document.getElementById('tsBig'); if(g && g.dataset.base != null) g.innerHTML = tsBigHtml(+g.dataset.base + (g.dataset.run ? runningMinutes() : 0));
 }
+// the new look (beta): the day's total as a big number, 4h 30m
+function tsBigHtml(m){ m = Math.round(m); const h = Math.floor(m / 60), r = m % 60; return h ? `${h}<small>h ${String(r).padStart(2, '0')}m</small>` : `${r}<small>m</small>`; }
 function startTimerInterval(){ if(timerIntervalId) clearInterval(timerIntervalId); timerIntervalId = setInterval(updateTimerDisplay, 1000); updateTimerDisplay(); }
 
 async function pauseTimer(){
@@ -197,6 +200,8 @@ function renderTimesheet(){
   const runToday = timerState.running && today >= fk && today <= tk ? runningMinutes() : 0;
   const totalMin = inP.reduce((s, e) => s + e.minutes, 0);
   const isCur = today >= fk && today <= tk;
+  const uw = typeof uiStyleOn === 'function' && uiStyleOn();   // the new look (beta): the side column as cards, the day's total big
+  const card = h => uw ? `<div class="tmi-card">${h}</div>` : h;
   const fmtLong = d => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   const label = tsView === 'day' ? (tsAnchor === today ? 'Today, ' + fmtLong(tsD(tsAnchor)) : tsAnchor === toDateStr(addDays(now, -1)) ? 'Yesterday, ' + fmtLong(tsD(tsAnchor)) : fmtLong(tsD(tsAnchor)))
     : tsView === 'week' ? (() => { const hasWkend = inP.some(e => tsD(e.date).getDay() % 6 === 0), end = hasWkend ? to : addDays(from, 4);
@@ -225,7 +230,8 @@ function renderTimesheet(){
     (byDay[tsAnchor] || []).forEach(e => { byC[e.clientId] = (byC[e.clientId] || 0) + e.minutes; });
     if(tsAnchor === today && timerState.running) byC[timerState.clientId] = (byC[timerState.clientId] || 0) + runningMinutes();
     const by = Object.entries(byC).sort((a, b) => b[1] - a[1]).map(([id, m]) => { const c = clients.find(x => x.id === id); return `<div class="tm1-by">${tsClientMono(c)}<span class="tm1-bn">${escapeHtml(c ? c.name : 'Client removed')}</span><b>${hmm(m)}</b></div>`; }).join('');
-    side = `<div class="tmx-sec"><b>${tsAnchor === today ? 'Today' : tsD(tsAnchor).toLocaleDateString('en-US', { weekday: 'long' })} by client</b></div>${by || '<p class="tmi-none">Nothing yet.</p>'}${monthSec}`;
+    const big = uw && by ? `<div class="tmi-big" id="tsBig" data-base="${totalMin}"${tsAnchor === today && timerState.running ? ' data-run="1"' : ''}>${tsBigHtml(totalMin + (tsAnchor === today ? runToday : 0))}</div>` : '';
+    side = card(`<div class="tmx-sec"><b>${tsAnchor === today ? 'Today' : tsD(tsAnchor).toLocaleDateString('en-US', { weekday: 'long' })} by client</b></div>${big}${by || '<p class="tmi-none">Nothing yet.</p>'}`) + card(monthSec);
   } else if(tsView === 'week'){
     const ks = Object.keys(byDay); if(isCur && !ks.includes(today)) ks.push(today);
     ks.sort().reverse();
@@ -235,7 +241,7 @@ function renderTimesheet(){
     const week = Array.from({ length: 7 }, (_, i) => { const d = addDays(from, i), k = toDateStr(d); return { d, k, m: (byDay[k] || []).reduce((s, e) => s + e.minutes, 0) + (k === today ? runningMinutes() : 0) }; })
       .filter((x, i) => i < 5 || x.m > 0);
     const bars = week.map(x => `<button class="tmi-wb${x.k === today ? ' on' : ''}" onclick="tsOpenDay('${x.k}')" aria-label="${fmtLong(x.d)}, ${hmLong(x.m)}"><span class="tmi-wv">${x.m ? hmm(x.m) : ''}</span><i style="height:${Math.max(Math.min(x.m / 60 / 8, 1), .02) * 100}%"></i><span>${x.d.toLocaleDateString('en-US', { weekday: 'short' })}</span></button>`).join('');
-    side = `<div class="tmx-sec"><b>${isCur ? 'This week' : 'That week'}</b><span>${hmm(totalMin + runToday)} of ${weeklyHoursTarget()} h</span></div><div class="tmi-week">${bars}</div>${monthSec}`;
+    side = card(`<div class="tmx-sec"><b>${isCur ? 'This week' : 'That week'}</b><span>${hmm(totalMin + runToday)} of ${weeklyHoursTarget()} h</span></div><div class="tmi-week">${bars}</div>`) + card(monthSec);
   } else {
     const g0 = tsMonday(from), weeks = Math.ceil((daysBetween(g0, to) + 1) / 7);
     let cells = '';
@@ -256,8 +262,8 @@ function renderTimesheet(){
     const upto = isCur ? rNow() : new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59);
     const rowsC = activeClients().map(c => ({ c, u: monthHours(c, upto), b: c.monthlyHourBudget || 0 })).filter(x => x.u > 0 || (isCur && x.b > 0))
       .sort((a, b) => (b.b ? b.u / b.b : 0) - (a.b ? a.u / a.b : 0) || b.u - a.u).slice(0, 8);
-    side = `<div class="tmx-sec"><b>By client ${isCur ? 'this month' : 'that month'}</b><span>vs budget</span></div>${rowsC.map(({ c, u, b }) =>
-      `<div class="tmx-bud"><span>${escapeHtml(c.name)}</span><b class="${b && u > b ? 'over' : ''}">${b ? `${Math.round(u)} / ${b} h` : `${Math.round(u)} h`}</b>${b ? `<i><em class="${u > b ? 'over' : ''}" style="width:${Math.min(u / b, 1) * 100}%"></em></i>` : ''}</div>`).join('') || '<p class="tmi-none">No time this month.</p>'}`;
+    side = card(`<div class="tmx-sec"><b>By client ${isCur ? 'this month' : 'that month'}</b><span>vs budget</span></div>${rowsC.map(({ c, u, b }) =>
+      `<div class="tmx-bud"><span>${escapeHtml(c.name)}</span><b class="${b && u > b ? 'over' : ''}">${b ? `${Math.round(u)} / ${b} h` : `${Math.round(u)} h`}</b>${b ? `<i><em class="${u > b ? 'over' : ''}" style="width:${Math.min(u / b, 1) * 100}%"></em></i>` : ''}</div>`).join('') || '<p class="tmi-none">No time this month.</p>'}`);
   }
   root.innerHTML = `<div class="tmi"><div class="tmi-cols"><section aria-label="Time">${head}<div class="tmi-body">${main}</div></section><aside><div class="tmi-body">${side}</div></aside></div></div>`;
 }

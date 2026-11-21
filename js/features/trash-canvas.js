@@ -135,7 +135,7 @@ function trashRow(ic, title, sub, restore, del, k){
 <span class="ck${on ? ' on' : ''}" aria-hidden="true">${on ? icon('check', { weight: 'bold' }) : ''}</span><span class="ic">${icon(ic)}</span><div class="tx"><span class="t">${escapeHtml(title)}</span><span class="s">${sub}</span></div></div>`;
   }
   return `<div class="row"><span class="ic">${icon(ic)}</span><div class="tx"><span class="t">${escapeHtml(title)}</span><span class="s">${sub}</span></div>
-<div class="r"><button class="btn sm" onclick="${restore}">Restore</button><button class="ib" aria-label="Delete for good" title="Delete for good" onclick="${del}">${icon('trash')}</button></div></div>`;
+<div class="r"><button class="btn sm" onclick="${restore}">${typeof uiStyleOn === 'function' && uiStyleOn() ? icon('rotate-ccw') : ''}Restore</button><button class="ib" aria-label="Delete for good" title="Delete for good" onclick="${del}">${icon('trash')}</button></div></div>`;
 }
 function drawTrash(){
   const root = document.getElementById('trashRoot');
@@ -148,10 +148,11 @@ function drawTrash(){
   const tabs = [['all', 'All', total], ...(canClients ? [['clients', 'Clients', cl.length]] : []), ['notes', 'Notes', nt.length], ['time', 'Time Entries', tm.length]];
   if(!tabs.some(([k]) => k === trashTab)) trashTab = 'all';
   if(trSel && !total) trSel = null;
-  const pick = total && !trSel ? `<span class="cl-sp"></span><button class="btn tr-sel-btn" onclick="trSelStart()">${icon('list-checks')}Select</button>` : '';
-  const seg = `<div class="tr-top"><div class="seg" role="tablist" aria-label="Type">${tabs.map(([k, t, n]) => `<button class="${trashTab === k ? 'on' : ''}" role="tab" aria-selected="${trashTab === k}" onclick="switchTrashTab('${k}')">${t}${n ? ` <span class="c">${n}</span>` : ''}</button>`).join('')}</div>${pick}</div>`;
+  const uw = typeof uiStyleOn === 'function' && uiStyleOn();   // the new look (beta): a title, and each kind as a card
+  const pick = total && !trSel ? `${uw ? '' : '<span class="cl-sp"></span>'}<button class="btn tr-sel-btn" onclick="trSelStart()">${icon('list-checks')}Select</button>` : '';
+  const seg = `<div class="tr-top">${uw ? `<div class="tr-hd"><h2>${total ? `${total} item${total === 1 ? '' : 's'}` : 'Nothing deleted'}</h2><p>Restore puts it back exactly where it was.</p></div><span class="cl-sp"></span>` : ''}<div class="seg" role="tablist" aria-label="Type">${tabs.map(([k, t, n]) => `<button class="${trashTab === k ? 'on' : ''}" role="tab" aria-selected="${trashTab === k}" onclick="switchTrashTab('${k}')">${t}${n ? ` <span class="c">${n}</span>` : ''}</button>`).join('')}</div>${pick}</div>`;
   const head = (type, title, extra) => {
-    return `<div class="h2"><h2>${title}<span class="c">${counts[type]}</span></h2>${extra || ''}</div>`;
+    return `${uw ? '<section class="tr-g">' : ''}<div class="h2"><h2>${title}<span class="c">${counts[type]}</span></h2>${extra || ''}</div>`;
   };
   const show = t => trashTab === 'all' || trashTab === t;
   let html = '';
@@ -160,19 +161,19 @@ function drawTrash(){
       const imps = (c.improvements || []).length, te = timeEntries.filter(e => e.clientId === c.id).length;
       const extra = [imps ? `${imps} improvement${imps === 1 ? '' : 's'}` : '', te ? `${te} time entr${te === 1 ? 'y' : 'ies'}` : ''].filter(Boolean).join(' and ');
       return trashRow('buildings', c.name, `Deleted ${trashDay(c.deletedAt)}${extra ? ` · with its ${extra}` : ''}`, `restoreClient('${c.id}')`, `permanentlyDeleteClient('${c.id}')`, 'clients:' + c.id);
-    }).join('') || '<div class="row"><span class="t-2" style="font-size:14px">No deleted clients.</span></div>'}</div>`;
+    }).join('') || '<div class="row"><span class="t-2" style="font-size:14px">No deleted clients.</span></div>'}</div>${uw ? '</section>' : ''}`;
   }
   if(show('notes') && (nt.length || trashTab === 'notes')){
     html += head('notes', 'Notes', `<span class="t-2" style="font-size:13px;display:inline-flex;align-items:center;gap:4px"><span class="ic sm">${icon('lock-simple')}</span>Only you can see your deleted notes</span>`) + `<div class="grp">${nt.map(n => {
       const c = clients.find(x => x.id === n.clientId);
       return trashRow('notepad', n.title || 'Untitled note', `${escapeHtml(c ? c.name : 'No client')} · deleted ${trashDay(n.deletedAt)}`, `restoreNote('${n.id}')`, `permanentlyDeleteNote('${n.id}')`, 'notes:' + n.id);
-    }).join('') || '<div class="row"><span class="t-2" style="font-size:14px">No deleted notes.</span></div>'}</div>`;
+    }).join('') || '<div class="row"><span class="t-2" style="font-size:14px">No deleted notes.</span></div>'}</div>${uw ? '</section>' : ''}`;
   }
   if(show('time') && (tm.length || trashTab === 'time')){
     html += head('time', 'Time entries') + `<div class="grp">${tm.map(e => {
       const c = clients.find(x => x.id === e.clientId);
       return trashRow('timer', `${e.description || e.service || 'Time'} · ${hmm(e.minutes)}`, `${escapeHtml(c ? c.name : 'Client removed')} · deleted ${trashDay(e.deletedAt)}`, `restoreTimeEntry('${e.id}')`, `permanentlyDeleteTimeEntry('${e.id}')`, 'time:' + e.id);
-    }).join('') || '<div class="row"><span class="t-2" style="font-size:14px">No deleted time entries.</span></div>'}</div>`;
+    }).join('') || '<div class="row"><span class="t-2" style="font-size:14px">No deleted time entries.</span></div>'}</div>${uw ? '</section>' : ''}`;
   }
   if(!html) html = emptyState({ icon: 'trash', title: 'Nothing deleted', text: 'Clients, notes and time entries you delete wait here, so you can bring them back.' });
   root.classList.toggle('tr-selecting', !!trSel);
