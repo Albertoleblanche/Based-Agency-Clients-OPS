@@ -320,59 +320,23 @@ async function saveEditImprovement(clientId, idx){
   ok ? showToast('success','Improvement updated','Changes saved.') : showToast('error','Save failed','Could not save — try again.');
 }
 
+// Both go to Recently Deleted, with the time logged with the work (see trashWork in data.js).
 async function deleteAllImprovements(clientId){
   await loadAll();
   const c = clients.find(x=>x.id===clientId);
   if(!c || !c.improvements.length){ showToast('info','Nothing to delete','No logged improvements for this client.'); return; }
-  const count = c.improvements.length;
-  if(!(await confirmDialog(`Delete all ${count} logged improvement${count!==1?'s':''} for ${c.name}? This can't be undone.`, {confirmLabel:'Delete all', destructive:true}))) return;
-  // .select() after .delete() to confirm rows were actually affected —
-  // same reasoning as deleteImprovementRow() above: an RLS policy that
-  // silently blocks some or all of these rows would otherwise report
-  // success (no error) while deleting nothing, or fewer than expected.
-  const { data: deletedRows, error: delErr } = await supabaseClient.from('client_improvements').delete().eq('client_id', clientId).select();
-  const actuallyDeletedCount = deletedRows ? deletedRows.length : 0;
-  const okDel = !delErr && actuallyDeletedCount === count;
-  if(delErr) console.error('deleteAllImprovements failed', clientId, delErr);
-  else if(actuallyDeletedCount !== count) console.error(`deleteAllImprovements: expected to delete ${count} rows, only ${actuallyDeletedCount} were actually deleted (likely blocked by RLS for the rest)`, clientId);
-  if(okDel){ c.improvements = []; clientImprovements = clientImprovements.filter(i=>i.clientId!==clientId); }
-  // Every author's draft for this client is now stale, not just one
-  // person's — they all just lost their source improvements at once.
-  const invalidatedAuthors = (c.drafts||[]).filter(d => d.draftStatus !== 'none').map(d => d.author);
-  invalidatedAuthors.forEach(author => invalidateStaleDraft(c, author));
-  if(okDel) await Promise.all(invalidatedAuthors.map(author => saveDraftFor(clientId, author, { draftStatus:'none', draft:'' })));
-  const ok = okDel;
-  renderClientsTable(); renderKpis(); renderQueue(); renderTeamQueue(); renderImprovementsHistory();
-  if(ok){
-    logClientActivity(clientId, 'improvement_deleted', `${myName()||'Someone'} deleted all ${count} logged improvements.`);
-    refreshClientDetailActivityIfOpen(clientId);
-  }
-  ok ? showToast('success','Deleted', `Cleared ${count} logged improvement${count!==1?'s':''} for ${c.name}.`) : showToast('error','Delete failed','Could not save — try again.');
+  const r = await deleteWorkAsk(c.improvements.map(i => i.id));
+  if(r && r.ok) refreshClientDetailActivityIfOpen(clientId);
+  renderAll();
 }
 
 async function deleteImprovement(clientId, idx){
-  if(!(await confirmDialog('Delete this logged improvement? This can\'t be undone.', {confirmLabel:'Delete', destructive:true}))) return;
-  await loadAll();
   const c = clients.find(x=>x.id===clientId);
-  if(!c || !c.improvements[idx]){ showToast('info','Already gone','This entry was already removed.'); renderAll(); return; }
-  const deletedText = c.improvements[idx].text;
-  const impId = c.improvements[idx].id;
-  const ok = await deleteImprovementRow(impId);
-  if(ok) c.improvements.splice(idx, 1);
-  // Missing renderTeamQueue() here was the actual bug behind "deleted
-  // improvements keep showing on the Approval Queue" — the underlying
-  // data (c.improvements) was already correctly updated above, but the
-  // Team Queue's rendered HTML was never refreshed to reflect it, so a
-  // stale card just sat there until something else happened to trigger a
-  // re-render. Also adding renderImprovementsHistory() for the same
-  // reason, in case that page is what's currently on screen.
-  renderClientsTable(); renderKpis(); renderQueue(); renderTeamQueue(); renderImprovementsHistory();
-  if(ok){
-    const truncate = (s)=> s && s.length>80 ? s.slice(0,80)+'…' : (s||'—');
-    logClientActivity(clientId, 'improvement_deleted', `${myName()||'Someone'} deleted an improvement — "${truncate(deletedText)}"`);
-    refreshClientDetailActivityIfOpen(clientId);
-  }
-  ok ? showToast('success','Improvement deleted','Removed from the log.') : showToast('error','Delete failed','Could not save — try again.');
+  const imp = c && c.improvements[idx];
+  if(!imp){ showToast('info','Already gone','This entry was already removed.'); renderAll(); return; }
+  const r = await deleteWorkAsk([imp.id]);
+  if(r && r.ok) refreshClientDetailActivityIfOpen(clientId);
+  renderAll();
 }
 
 /* ---------- Per-client audit trail (unbounded, unlike the 60-entry global log) ---------- */

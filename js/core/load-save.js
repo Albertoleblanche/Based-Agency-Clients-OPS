@@ -58,7 +58,7 @@ async function loadAll(){
   if(impRes.error) console.error('loadAll: client_improvements fetch failed', impRes.error);
   if(draftsRes.error) console.error('loadAll: client_drafts fetch failed', draftsRes.error);
   clients = (clientsRes.data || []).map(clientRowFromDb);
-  clientImprovements = (impRes.data || []).map(improvementRowFromDb);
+  setLoadedWork(impRes.data);   // deleted work is kept apart, for Recently Deleted
   clientDrafts = (draftsRes.data || []).map(draftRowFromDb);
   if(typeof winsAfterLoad === 'function') winsAfterLoad(draftsRes.data, winGroupsRes);
   clients.forEach(c => {

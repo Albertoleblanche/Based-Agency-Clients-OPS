@@ -120,7 +120,7 @@ module.exports = async function handler(req, res) {
       admin.from('app_storage').select('value').eq('key', 'app-data').maybeSingle(),
       admin.from('app_storage').select('value').eq('key', 'settings').maybeSingle(),
       admin.from('clients').select('*'),
-      admin.from('client_improvements').select('id, client_id, author, text, date'),
+      admin.from('client_improvements').select('*'),   // deleted work (addendum-deleted-work.sql) is left out below
     ]);
     if (appDataErr || settingsErr || clientsErr || impErr) {
       res.status(500).json({ error: (appDataErr || settingsErr || clientsErr || impErr).message });
@@ -135,7 +135,7 @@ module.exports = async function handler(req, res) {
 
     const clients = (clientsData || []).filter(r => !(r.custom_field_values && r.custom_field_values.harvestSetup === 'needed')).map(clientRowFromDb);
     const improvementsByClient = {};
-    (impData || []).forEach(r => {
+    (impData || []).filter(r => !r.deleted_at).forEach(r => {
       (improvementsByClient[r.client_id] = improvementsByClient[r.client_id] || []).push(improvementRowFromDb(r));
     });
     clients.forEach(c => { c.improvements = improvementsByClient[c.id] || []; });

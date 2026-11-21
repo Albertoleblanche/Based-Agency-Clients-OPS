@@ -181,7 +181,7 @@ async function mLoadAll(){
   try{ settings = s ? (typeof s === 'string' ? JSON.parse(s) : s) : {}; }catch(e){ settings = {}; }
   settings.serviceOptions = (settings.serviceOptions && settings.serviceOptions.length) ? settings.serviceOptions : ['Google Ads (PPC)', 'Meta Ads', 'SEO / Local Search', 'AI Domination Framework', 'Full Framework'];
   clients = (cr.data || []).map(clientRowFromDb);
-  clientImprovements = (ir.data || []).map(improvementRowFromDb);
+  setLoadedWork(ir.data);
   clientDrafts = (dr.data || []).map(draftRowFromDb);
   if(typeof winsAfterLoad === 'function') winsAfterLoad(dr.data, wg);
   clients.forEach(c => { c.improvements = clientImprovements.filter(i => i.clientId === c.id); c.drafts = clientDrafts.filter(d => d.clientId === c.id); });
@@ -191,7 +191,7 @@ async function mLoadAll(){
   clientReminders = (rr.data || []).map(r => ({ id: r.id, clientId: r.client_id, question: r.question, askedBy: r.asked_by, askedDate: r.asked_date, followUpDate: r.follow_up_date, status: r.status }));
   notes = (nr.data || []).map(n => ({ id: n.id, clientId: n.client_id, title: n.title, text: n.text, status: n.status, link: n.link, followUpDate: n.follow_up_date, updatedAt: n.updated_at }));
   timeEntries = (er.data || []).map(e => ({ id: e.id, userId: e.user_id, clientId: e.client_id, date: e.entry_date, minutes: e.minutes, description: e.description || '', service: e.service || '', logged: !!e.logged,
-    createdAt: e.created_at, harvestProjectId: e.harvest_project_id || null, harvestTaskId: e.harvest_task_id || null, source: e.source || '', harvestLocked: !!e.harvest_locked }));
+    createdAt: e.created_at, harvestProjectId: e.harvest_project_id || null, harvestTaskId: e.harvest_task_id || null, source: e.source || '', harvestLocked: !!e.harvest_locked, improvementId: e.improvement_id || null }));
   notifications = nf.data || [];
   teamProfiles = pr.data || [];
   myProfile = teamProfiles.find(p => p.id === uid) || myProfile;
@@ -888,12 +888,28 @@ function mOpenDeleted(){
   mPush('Recently Deleted', () => `<h1 class="big">Recently Deleted</h1><p class="big-sub">Loading…</p>`);
   Promise.all([supabaseClient.from('notes').select('*').eq('user_id', currentUser.id).not('deleted_at', 'is', null), supabaseClient.from('time_entries').select('*').eq('user_id', currentUser.id).not('deleted_at', 'is', null)]).then(([n, e]) => {
     const top = mTop(); if(!top || top.title !== 'Recently Deleted') return;
-    const rows = [...(n.data || []).map(x => mIr(`<span class="gl">${icon('notepad')}</span>`, mEsc(x.title || 'Untitled note'), 'Note', `<button onclick="mRestore('notes','${x.id}')" style="color:var(--label);font-size:15px">Restore</button>`, null, { n: true })),
-      ...(e.data || []).map(x => mIr(`<span class="gl">${icon('timer')}</span>`, mEsc(clients.find(c => c.id === x.client_id)?.name || 'Time'), `${Math.floor(x.minutes / 60)}:${String(x.minutes % 60).padStart(2, '0')} · ${fmtShortDate(new Date(x.entry_date + 'T12:00:00'))}`, `<button onclick="mRestore('time_entries','${x.id}')" style="color:var(--label);font-size:15px">Restore</button>`, null, { n: true }))];
-    top.el.querySelector('.ipbody').innerHTML = `<h1 class="big">Recently Deleted</h1><p class="big-sub">Notes and time you deleted</p><div class="ig" style="margin-top:16px">${rows.join('') || '<div class="ir"><span class="t n" style="color:var(--label-2)">Nothing here</span></div>'}</div>`;
+    // deleted work (yours, or work you deleted) comes back with the time logged with it, so that time isn't listed on its own
+    const wk = typeof myDeletedWork === 'function' ? myDeletedWork() : [], wIds = new Set(wk.map(w => w.id));
+    const tOf = id => (e.data || []).filter(x => x.improvement_id === id).reduce((m, x) => m + (x.minutes || 0), 0);
+    const rows = [...wk.map(w => { const m = tOf(w.id); return mIr(`<span class="gl">${icon('square-pen')}</span>`, mEsc(w.text || 'Work'), `${mEsc(clients.find(c => c.id === w.clientId)?.name || 'Work')}${m ? ` · ${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')} of time` : ''}`, `<button onclick="mRestoreWork('${w.id}')" style="color:var(--label);font-size:15px">Restore</button>`, null, { n: true }); }),
+      ...(n.data || []).map(x => mIr(`<span class="gl">${icon('notepad')}</span>`, mEsc(x.title || 'Untitled note'), 'Note', `<button onclick="mRestore('notes','${x.id}')" style="color:var(--label);font-size:15px">Restore</button>`, null, { n: true })),
+      ...(e.data || []).filter(x => !x.improvement_id || !wIds.has(x.improvement_id)).map(x => mIr(`<span class="gl">${icon('timer')}</span>`, mEsc(clients.find(c => c.id === x.client_id)?.name || 'Time'), `${Math.floor(x.minutes / 60)}:${String(x.minutes % 60).padStart(2, '0')} · ${fmtShortDate(new Date(x.entry_date + 'T12:00:00'))}`, `<button onclick="mRestore('time_entries','${x.id}')" style="color:var(--label);font-size:15px">Restore</button>`, null, { n: true }))];
+    top.el.querySelector('.ipbody').innerHTML = `<h1 class="big">Recently Deleted</h1><p class="big-sub">Work, notes and time you deleted</p><div class="ig" style="margin-top:16px">${rows.join('') || '<div class="ir"><span class="t n" style="color:var(--label-2)">Nothing here</span></div>'}</div>`;
   });
 }
-async function mRestore(table, id){ const { error } = await supabaseClient.from(table).update({ deleted_at: null }).eq('id', id); if(error){ showToast('error', 'Couldn’t restore it', error.message); return; } await mRefresh(); mPop(); mOpenDeleted(); showToast('success', 'Restored', ''); }
+// Time comes back on the timesheet and is made again in Harvest (deleting it took it out of there)
+async function mRestore(table, id){
+  const back = table === 'time_entries' ? { deleted_at: null, harvest_entry_id: null, harvest_sync_status: 'pending', harvest_sync_error: null } : { deleted_at: null };
+  const { error } = await supabaseClient.from(table).update(back).eq('id', id);
+  if(error){ showToast('error', 'Couldn’t restore it', error.message); return; }
+  if(table === 'time_entries') mSyncToHarvest(id);
+  await mRefresh(); mPop(); mOpenDeleted(); showToast('success', 'Restored', '');
+}
+async function mRestoreWork(id){
+  const r = await restoreWork([id]);
+  if(!r.ok){ showToast('error', 'Couldn’t restore it', 'Try again in a moment.'); return; }
+  await mRefresh(); mPop(); mOpenDeleted(); showToast('success', 'Restored', 'The work, with its time.');
+}
 function mOpenSettings(){
   mPush('Settings', () => {
     const full = (myProfile && myProfile.theme) || 'auto', pref = nightHours(full) ? 'night' : full;
@@ -1066,8 +1082,8 @@ async function mSaveLog(){
   if(!imp){ if(btn) btn.disabled = false; showToast('error', 'Couldn’t save it', 'Try again in a moment.'); return; }
   if(include && c){ const d = (c.drafts || []).find(x => x.author === author); if(d && d.draftStatus !== 'none') await saveDraftFor(L.clientId, author, { draftStatus: 'none', draft: '' }); }
   if(minutes){
-    if(L.useTimer && timerState.running && timerState.clientId === L.clientId){ timerState.service = pick.projectId ? pick.service : service; timerState.projectId = pick.projectId; timerState.taskId = pick.taskId; timerState.description = text; await mStopTimer(true, true); }
-    else await mAddTime({ clientId: L.clientId, service: pick.projectId ? pick.service : service, dateStr: L.date, minutes, description: text, logged: true, projectId: pick.projectId, taskId: pick.taskId });
+    if(L.useTimer && timerState.running && timerState.clientId === L.clientId){ timerState.service = pick.projectId ? pick.service : service; timerState.projectId = pick.projectId; timerState.taskId = pick.taskId; timerState.description = text; await mStopTimer(true, true, imp.id); }
+    else await mAddTime({ clientId: L.clientId, service: pick.projectId ? pick.service : service, dateStr: L.date, minutes, description: text, logged: true, projectId: pick.projectId, taskId: pick.taskId, improvementId: imp.id });
   }
   mLog(L.clientId, 'improvement_logged', `${author} logged an improvement: "${text.slice(0, 80)}"`, `Logged an improvement for <b>${escapeHtml(c ? c.name : '')}</b>.`);
   mCloseSheet(true);
@@ -1076,7 +1092,13 @@ async function mSaveLog(){
 }
 // One entry per client, project, task and day (or client, service and day before Harvest), like
 // the desktop timesheet. It goes to Harvest straight away, as the desktop does.
-async function mAddTime({ clientId, service, dateStr, minutes, description, logged, projectId, taskId }){
+async function mAddTime({ clientId, service, dateStr, minutes, description, logged, projectId, taskId, improvementId }){
+  // logged with a piece of work: its own entry, linked to it, as on the desktop (deleting either deletes both)
+  if(improvementId){
+    const { data, error } = await supabaseClient.from('time_entries').insert({ user_id: currentUser.id, client_id: clientId, entry_date: dateStr, minutes, description, service: service || '', logged: true,
+      improvement_id: improvementId, ...(projectId ? { harvest_project_id: projectId, harvest_task_id: taskId || null } : {}) }).select('id').single();
+    if(!error || !workColumnMissing(error, 'improvement_id')){ if(data && data.id) mSyncToHarvest(data.id); return data ? data.id : null; }
+  }
   let q = supabaseClient.from('time_entries').select('id, minutes, description').eq('user_id', currentUser.id).eq('client_id', clientId).eq('entry_date', dateStr).is('deleted_at', null);
   q = projectId ? (taskId ? q.eq('harvest_project_id', projectId).eq('harvest_task_id', taskId) : q.eq('harvest_project_id', projectId).is('harvest_task_id', null)) : q.eq('service', service || '');
   const { data: rows } = await q.limit(1), ex = rows && rows[0];
@@ -1184,13 +1206,13 @@ async function mSaveTime(){
   mCloseSheet(true); await mRefresh();
   showToast('success', 'Time added', `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')} for ${mClientName(T.clientId)}`);
 }
-async function mStopTimer(quiet, logged){
+async function mStopTimer(quiet, logged, improvementId){
   if(!timerState.running) return;
   const t = timerState, minutes = Math.max(1, Math.round((Date.now() - t.startedAt) / 60000));
   timerState = { running: false, startedAt: null, clientId: '', service: '', description: '', resumeEntryId: null };
   try{ localStorage.setItem('bda_timer_state', JSON.stringify(timerState)); }catch(e){}
   clearInterval(mTimerTick);
-  const id = await mAddTime({ clientId: t.clientId, service: t.service, dateStr: toDateStr(new Date()), minutes, description: t.description, logged, projectId: t.projectId || null, taskId: t.taskId || null });
+  const id = await mAddTime({ clientId: t.clientId, service: t.service, dateStr: toDateStr(new Date()), minutes, description: t.description, logged, projectId: t.projectId || null, taskId: t.taskId || null, improvementId: improvementId || null });
   if(!quiet){ await mRefresh(); showToast(id ? 'success' : 'error', id ? 'Time saved' : 'Couldn’t save the time', id ? `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')} for ${mClientName(t.clientId)}` : 'Add it on the desktop Timesheet.'); }
 }
 

@@ -90,7 +90,8 @@ let improvementExtrasReady = null; // null: not known yet
 function improvementRowFromDb(r){
   if(r && Object.prototype.hasOwnProperty.call(r, 'service')) improvementExtrasReady = true;
   return { id: r.id, clientId: r.client_id, author: r.author || '', text: r.text, date: r.date, includeInEmail: r.include_in_email, source: r.source,
-    service: r.service || '', attachments: Array.isArray(r.attachments) ? r.attachments : [] };
+    service: r.service || '', attachments: Array.isArray(r.attachments) ? r.attachments : [],
+    ...(r.deleted_at ? { deletedAt: r.deleted_at, deletedBy: r.deleted_by || null } : {}) };   // deleted work (data.js)
 }
 function isMissingColumnError(e){ return !!e && (e.code === '42703' || e.code === 'PGRST204' || /column/i.test(e.message || '') && /(does not exist|could not find)/i.test(e.message || '')); }
 async function insertImprovementFull(clientId, f){
@@ -273,10 +274,10 @@ async function saveQueueLogImprovement(another){
     if(useTimer && timerState.running && timerState.clientId === clientId){
       if(!timerState.service){ timerState.service = service; saveTimerState(); }
       if(pick.projectId){ timerState.projectId = pick.projectId; timerState.taskId = pick.taskId; timerState.service = pick.service; saveTimerState(); }
-      const id = await stopAndSaveTimer({ quiet: true });
+      const id = await stopAndSaveTimer({ quiet: true, improvementId: imp.id });
       if(id) await supabaseClient.from('time_entries').update({ logged: true }).eq('id', id); else timeOk = false;
     } else {
-      const r = await mergeOrInsertTimeEntry({ clientId, service: pick.projectId ? pick.service : service, dateStr, minutes, description: text, projectId: pick.projectId, taskId: pick.taskId });
+      const r = await mergeOrInsertTimeEntry({ clientId, service: pick.projectId ? pick.service : service, dateStr, minutes, description: text, projectId: pick.projectId, taskId: pick.taskId, improvementId: imp.id });
       if(r.error) timeOk = false;
       else {
         if(!r.merged && r.entryId) await supabaseClient.from('time_entries').update({ logged: true }).eq('id', r.entryId);

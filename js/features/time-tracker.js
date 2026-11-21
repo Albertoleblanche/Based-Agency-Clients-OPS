@@ -31,7 +31,7 @@ let timesheetAnchor = new Date();
 async function loadTimeEntries(){
   const { data, error } = await selectAll(() => supabaseClient.from('time_entries').select('*').is('deleted_at', null).order('entry_date', { ascending:false }).order('id'));
   if(error){ console.error('loadTimeEntries error', error); timeEntries = []; timeEntriesDataLoaded = true; return; }
-  timeEntries = (data||[]).map(e=>({ id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes, description:e.description||'', service:e.service||'', createdAt:e.created_at, logged:!!e.logged, harvestStatus:e.harvest_sync_status||'', harvestId:e.harvest_entry_id||null, harvestError:e.harvest_sync_error||'', harvestProjectId:e.harvest_project_id||null, harvestTaskId:e.harvest_task_id||null, source:e.source||'', harvestUserId:e.harvest_user_id||null, harvestLocked:!!e.harvest_locked }));
+  timeEntries = (data||[]).map(e=>({ id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes, description:e.description||'', service:e.service||'', createdAt:e.created_at, logged:!!e.logged, harvestStatus:e.harvest_sync_status||'', harvestId:e.harvest_entry_id||null, harvestError:e.harvest_sync_error||'', harvestProjectId:e.harvest_project_id||null, harvestTaskId:e.harvest_task_id||null, source:e.source||'', harvestUserId:e.harvest_user_id||null, harvestLocked:!!e.harvest_locked, improvementId:e.improvement_id||null }));
   timeEntriesDataLoaded = true;
   if(typeof renderDashboard === 'function') renderDashboard();
 }
@@ -57,7 +57,9 @@ async function logTimeEntryAsImprovement(entryId){
   renderQueue();
   renderKpis();
 
-  const { error } = await supabaseClient.from('time_entries').update({ logged: true }).eq('id', entryId);
+  // linked to the work it became, so deleting either one deletes both (addendum-deleted-work.sql)
+  let { error } = await supabaseClient.from('time_entries').update({ logged: true, improvement_id: imp.id }).eq('id', entryId);
+  if(error && workColumnMissing(error, 'improvement_id')) ({ error } = await supabaseClient.from('time_entries').update({ logged: true }).eq('id', entryId));
   await loadTimeEntries();
   renderTimesheet(); renderReports();
   error
@@ -69,15 +71,26 @@ async function loadMyTrashedTimeEntries(){
   if(!currentUser) return [];
   const { data, error } = await supabaseClient.from('time_entries').select('*').eq('user_id', currentUser.id).not('deleted_at', 'is', null).order('deleted_at', { ascending:false });
   if(error){ console.error('loadMyTrashedTimeEntries error', error); return []; }
-  return (data||[]).map(e=>({ id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes, description:e.description||'', service:e.service||'', deletedAt:e.deleted_at }));
+  return (data||[]).map(e=>({ id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes, description:e.description||'', service:e.service||'', deletedAt:e.deleted_at, improvementId:e.improvement_id||null }));
 }
 
+// Back on the timesheet, and made again in Harvest (deleting it took it out of there). Time logged
+// with a piece of work comes back with that work.
 async function restoreTimeEntry(id){
-  const { error } = await supabaseClient.from('time_entries').update({ deleted_at: null }).eq('id', id);
+  const e = (typeof trashData !== 'undefined' ? trashData.time : []).find(x => x.id === id);
+  if(e && e.improvementId && deletedWork.some(w => w.id === e.improvementId)) return trRestoreWork(e.improvementId);
+  const ok = await restoreTimeRows([id]);
   await loadTimeEntries();
   renderTimesheet(); renderReports();
   await renderTrash();
-  error ? showToast('error','Restore failed', error.message) : showToast('success','Entry restored','Back on the timesheet.');
+  ok ? showToast('success','Entry restored', `Back on the timesheet${typeof hvTimeOn === 'function' && hvTimeOn() ? ' and in Harvest' : ''}.`) : showToast('error','Restore failed','Try again in a moment.');
+}
+async function restoreTimeRows(ids){
+  if(!ids.length) return true;
+  const { data, error } = await supabaseClient.from('time_entries').update({ deleted_at: null, harvest_entry_id: null, harvest_sync_status: 'pending', harvest_sync_error: null }).in('id', ids).select('id');
+  if(error){ console.error('restoreTimeRows', error); return false; }
+  (data || []).forEach(r => syncEntryToHarvestBackground(r.id));
+  return true;
 }
 
 async function permanentlyDeleteTimeEntry(id){
@@ -305,7 +318,17 @@ function toggleTimer(){
 // could plausibly be created in quick succession (e.g. a timer running
 // while also logging a manual entry) and a stale read would silently
 // lose one of them.
-async function mergeOrInsertTimeEntry({ clientId, service, dateStr, minutes, description, projectId, taskId }){
+async function mergeOrInsertTimeEntry({ clientId, service, dateStr, minutes, description, projectId, taskId, improvementId }){
+  // Time logged with a piece of work is its own entry, linked to it (time_entries.improvement_id), so
+  // deleting either one deletes both; it's never merged into other time. Before
+  // addendum-deleted-work.sql there's nothing to link it with, and it merges as before.
+  if(improvementId){
+    const { data, error } = await supabaseClient.from('time_entries').insert({
+      user_id: currentUser.id, client_id: clientId, entry_date: dateStr, minutes, description, service, logged: true, improvement_id: improvementId,
+      ...(projectId ? { harvest_project_id: projectId, harvest_task_id: taskId || null } : {})
+    }).select('id').single();
+    if(!error || !workColumnMissing(error, 'improvement_id')) return { error, merged: false, entryId: data?.id || null, linked: !error };
+  }
   // logged by project and task (step 3 of the Harvest plan): one entry per client, project, task and day
   let q = supabaseClient.from('time_entries').select('id, minutes, description')
     .eq('user_id', currentUser.id).eq('client_id', clientId).eq('entry_date', dateStr).is('deleted_at', null);
@@ -391,8 +414,9 @@ async function stopAndSaveTimer(opts){
       if(newRow){ savedId = newRow.id; syncEntryToHarvestBackground(newRow.id); }
     }
   } else {
+    // stopped to log a piece of work (Log Improvement's timer): the time is that work's own entry
     const mergeResult = await mergeOrInsertTimeEntry({
-      clientId, service, dateStr: toDateStr(new Date()), minutes, description, projectId, taskId
+      clientId, service, dateStr: toDateStr(new Date()), minutes, description, projectId, taskId, improvementId: opts.improvementId || null
     });
     error = mergeResult.error; mergedIntoExisting = mergeResult.merged; savedId = mergeResult.entryId || null;
     if(!error) syncEntryToHarvestBackground(mergeResult.entryId);
@@ -821,6 +845,14 @@ async function saveTimeEntryEdit(id){
 }
 
 async function deleteTimeEntry(id){
+  // logged with a piece of work: both go, together (see trashWork in data.js)
+  const linked = timeEntries.find(e => e.id === id);
+  const work = linked && linked.improvementId ? clientImprovements.find(i => i.id === linked.improvementId) : null;
+  if(work){
+    const r = await deleteWorkAsk([work.id], { fromTime: true });
+    if(r && r.ok){ renderTimesheet(); renderReports(); if(typeof renderAll === 'function') renderAll(); }
+    return;
+  }
   if(!(await confirmDialog('Move this time entry to Recently Deleted? You can restore it from there.', {confirmLabel:'Move to Trash'}))) return;
   const { data: entry } = await supabaseClient.from('time_entries').select('harvest_entry_id').eq('id', id).maybeSingle();
   const { error } = await supabaseClient.from('time_entries').update({ deleted_at: new Date().toISOString() }).eq('id', id);

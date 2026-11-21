@@ -604,11 +604,12 @@ async function finishTask(taskId, notes, link, opts){
   // are internal and have no client attached, which is fine, they just
   // don't create an improvement entry. Only logs once, the first time it
   // reaches Completed — moving it back out and in again doesn't double-log.
+  let doneImp = null;   // the work this logged, for the time below to go with
   if(!wasAlreadyDone && t.clientId){
     await loadAll();
     const c = clients.find(x=>x.id===t.clientId);
     if(c){
-      await insertImprovementRow(t.clientId, {
+      doneImp = await insertImprovementRow(t.clientId, {
         author: myName()||'Team member',
         text: t.description ? `${t.title} — ${t.description}` : t.title,
         includeInEmail: false,
@@ -628,7 +629,8 @@ async function finishTask(taskId, notes, link, opts){
   let timeNote = '';
   if(opts.time){
     const { clientId, minutes, pick } = opts.time;
-    const r = await mergeOrInsertTimeEntry({ clientId, service: pick.service || '', dateStr: doneDate, minutes, description: t.title, projectId: pick.projectId || null, taskId: pick.taskId || null });
+    const r = await mergeOrInsertTimeEntry({ clientId, service: pick.service || '', dateStr: doneDate, minutes, description: t.title, projectId: pick.projectId || null, taskId: pick.taskId || null,
+      improvementId: doneImp && doneImp.clientId === clientId ? doneImp.id : null });
     if(r.error) showToast('error', 'The time wasn’t saved', `${r.error.message} Add it in Time.`);
     else {
       timeNote = ` ${formatMinutes(minutes)} logged in Time${doneDate === today ? '' : ' on ' + fmtShortDate(new Date(doneDate + 'T12:00:00'))}.`;

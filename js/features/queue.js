@@ -22,8 +22,11 @@ function quEntry(c, me){
   const w = clientWeek(c), d = getDraftFor(c, me);
   const mine = w.logged.filter(i => i.author === me).sort((a, b) => new Date(b.date) - new Date(a.date));
   const email = mine.filter(i => i.includeInEmail !== false);
-  const live = !!d.draft && !d.draftSentAt && (d.draftStatus === 'pending' || d.draftStatus === 'approved');
-  if(!mine.length && !live) return null;
+  // a draft written only from work since deleted isn't shown: write a new one from what's logged now
+  const live = !!d.draft && !d.draftSentAt && (d.draftStatus === 'pending' || d.draftStatus === 'approved') && !draftHasNoWork(c, d);
+  // nothing of yours logged for this update: nothing to send, so it isn't in your queue (a draft
+  // whose work was all deleted waits out of sight, and comes back with the work if it's restored)
+  if(!mine.length) return null;
   const st = live ? (d.draftStatus === 'approved' ? 'approved' : draftHasNoWork(c, d) ? 'empty' : d.readyToNotify ? 'review' : 'written')
     : email.length ? 'write' : 'internal';
   return { c, w, d: live ? d : null, mine, email, st, tab: st === 'review' || st === 'approved' ? 'review' : 'todo' };
@@ -167,7 +170,8 @@ function queueReadHtml(x, list, split){
   const form = { date: kf && kf.date && kf.date <= today ? kf.date : today, time: kf ? kf.time || '' : '' };
   const out = x.mine.length - x.email.length;
   const meta = it => {
-    const bits = [fmtShortDate(new Date(it.date))];
+    const bits = [fmtShortDate(new Date(it.date))], mins = typeof workMinutes === 'function' ? workMinutes([it.id]) : 0;
+    if(mins) bits.push(hmm(mins));   // the time logged with it (deleting the work deletes that too)
     if(it.includeInEmail === false) bits.push('Internal');
     else if(d && !d.draftSentAt) bits.push(inDraft.has(it.id) ? 'In your draft' : 'Not in your draft yet');
     if(it.source && it.source !== 'manual') bits.push({ note: 'From a note', time: 'From your timesheet', whatsapp: 'From WhatsApp' }[it.source] || '');
@@ -317,18 +321,15 @@ async function quSaveEdit(clientId, impId){
   showToast('success', 'Saved', '');
 }
 
+// Delete: the work and the time logged with it go to Recently Deleted (see trashWork in data.js).
 async function quDeleteImp(clientId, impId){
   const { c, imp } = quFind(clientId, impId);
   if(!c || !imp) return;
-  const d = getDraftFor(c, myName()), used = (d.draftImprovementIds || []).includes(impId) && !d.draftSentAt && !!d.draft;
-  const short = imp.text.length > 80 ? imp.text.slice(0, 80) + '…' : imp.text;
-  if(!(await confirmDialog(`Delete “${short}”?${used ? ' It’s in your draft, so the draft will need a rewrite.' : ''} This can’t be undone.`, { confirmLabel: 'Delete', destructive: true }))) return;
-  const ok = await deleteImprovementRow(impId);
-  if(!ok){ showToast('error', 'Couldn’t delete it', 'Try again in a moment.'); return; }
-  if(typeof logClientActivity === 'function') logClientActivity(clientId, 'improvement_deleted', `${myName() || 'Someone'} deleted an improvement — "${short}"`);
+  const r = await deleteWorkAsk([impId]);
+  if(!r || !r.ok) return;
   if(window._quEditImp === impId) window._quEditImp = null;
   quRefreshAll(clientId);
-  showToast('success', 'Deleted', `Removed from ${c.name}’s log.`);
+  if(typeof renderTimesheet === 'function') renderTimesheet();
 }
 
 // Log More: right here, for this client. A draft you already wrote stays; the work shows as
@@ -371,7 +372,7 @@ async function quLog(clientId){
   // the time, on your timesheet for that day (and to Harvest for a Harvest client)
   let timeOk = true;
   if(minutes){
-    const r = await mergeOrInsertTimeEntry({ clientId, service: pick.projectId ? pick.service : service, dateStr, minutes, description: text, projectId: pick.projectId, taskId: pick.taskId });
+    const r = await mergeOrInsertTimeEntry({ clientId, service: pick.projectId ? pick.service : service, dateStr, minutes, description: text, projectId: pick.projectId, taskId: pick.taskId, improvementId: imp.id });
     if(r.error) timeOk = false;
     else {
       if(!r.merged && r.entryId) await supabaseClient.from('time_entries').update({ logged: true }).eq('id', r.entryId);

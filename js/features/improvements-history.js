@@ -111,48 +111,13 @@ function getFilteredImprovements(){
 async function deleteAllFilteredImprovements(){
   const filtered = getFilteredImprovements();
   if(!filtered.length){ showToast('info','Nothing to delete','No improvements match the current filters.'); return; }
-
-  const search = document.getElementById('improvementsSearch')?.value;
-  const clientFilter = document.getElementById('improvementsClientFilter')?.value;
-  const inclFilter = document.getElementById('improvementsInclFilter')?.value;
-  const fromVal = document.getElementById('improvementsFromDate')?.value;
-  const toVal = document.getElementById('improvementsToDate')?.value;
-  const isFiltered = search || (clientFilter && clientFilter!=='all') || (inclFilter && inclFilter!=='all') || fromVal || toVal;
-  const scopeText = isFiltered
-    ? `${filtered.length} filtered improvement${filtered.length!==1?'s':''}`
-    : `ALL ${filtered.length} improvement${filtered.length!==1?'s':''} across every client`;
-  if(!(await confirmDialog(`Delete ${scopeText}? This can't be undone.`, {confirmLabel:'Delete', destructive:true}))) return;
-
-  await loadAll();
-  // Real ids now (client_improvements.id) — no more index-shift juggling,
-  // each row is deleted independently by its own stable id.
-  const results = await Promise.all(filtered.map(imp => deleteImprovementRow(imp.id)));
-  const removedCount = results.filter(Boolean).length;
-  // Groups by (client, author) pair, not just client — a bulk delete like
-  // this can span multiple people's work across multiple clients at once,
-  // and only the specific authors whose improvements were actually
-  // removed should have their own draft invalidated.
-  const touchedPairs = new Map(); // clientId -> Set of authors
-  filtered.forEach(imp => {
-    if(!touchedPairs.has(imp.clientId)) touchedPairs.set(imp.clientId, new Set());
-    touchedPairs.get(imp.clientId).add(imp.author);
-  });
-  const invalidationSaves = [];
-  touchedPairs.forEach((authors, clientId) => {
-    const c = clients.find(x=>x.id===clientId);
-    if(!c) return;
-    authors.forEach(author => {
-      const invalidated = invalidateStaleDraft(c, author);
-      if(invalidated) invalidationSaves.push(saveDraftFor(clientId, author, { draftStatus:'none', draft:'' }));
-    });
-  });
-  await Promise.all(invalidationSaves);
-
-  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Deleted ${removedCount} logged improvement${removedCount!==1?'s':''}${isFiltered?' (filtered)':' (all)'}.`});
-  const ok = await persistLog();
-  renderImprovementsHistory();
-  renderClientsTable(); renderKpis(); renderQueue(); renderLog();
-  ok ? showToast('success','Deleted', `Removed ${removedCount} improvement${removedCount!==1?'s':''}.`) : showToast('error','Delete failed','Could not save — try again.');
+  // to Recently Deleted, with the time logged with them; drafts and people as in trashWork (data.js)
+  const r = await deleteWorkAsk(filtered.map(imp => imp.id));
+  if(!r || !r.ok) return;
+  const n = r.moved.length;
+  log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Deleted ${n} logged improvement${n!==1?'s':''}.`});
+  await persistLog();
+  renderAll();
 }
 
 function renderImprovementsHistory(){

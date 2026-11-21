@@ -210,7 +210,8 @@ async function saveDraftFor(clientId, author, fields){
   return true;
 }
 function improvementRowFromDb(r){
-  return { id:r.id, clientId:r.client_id, author:r.author||'', text:r.text, date:r.date, includeInEmail:r.include_in_email, source:r.source };
+  return { id:r.id, clientId:r.client_id, author:r.author||'', text:r.text, date:r.date, includeInEmail:r.include_in_email, source:r.source,
+    ...(r.deleted_at ? { deletedAt: r.deleted_at, deletedBy: r.deleted_by || null } : {}) };
 }
 
 // Real per-row update — replaces the old "mutate the roster array, then
@@ -242,40 +243,219 @@ async function insertImprovementRow(clientId, {author, text, includeInEmail=true
   return entry;
 }
 
-// Real per-id delete — replaces splice-by-array-index (which needed a
-// descending sort to avoid shifting indices mid-batch-delete, since the old
-// JSON array entries had no stable id of their own).
-async function deleteImprovementRow(id){
-  // .select() after .delete() specifically to get back the row(s) that
-  // were actually deleted — checking only `error` isn't enough here.
-  // When an RLS policy silently blocks a delete, PostgREST doesn't return
-  // an error at all: the request succeeds having affected zero rows. That
-  // combination (no error, but nothing deleted) was going undetected here,
-  // reporting success and removing the item locally while the row stayed
-  // in the database — invisible until whatever fetched it fresh again
-  // (a reload, the Team Queue) brought it right back.
-  const clientId = (clientImprovements.find(i=>i.id===id) || {}).clientId;
-  const { data, error } = await supabaseClient.from('client_improvements').delete().eq('id', id).select();
-  if(error){ console.error('deleteImprovementRow failed', id, error); return false; }
-  if(!data || !data.length){ console.error('deleteImprovementRow: delete affected 0 rows (likely blocked by RLS)', id); return false; }
-  clientImprovements = clientImprovements.filter(i=>i.id!==id);
-  clients.forEach(c=>{ if(c.improvements) c.improvements = c.improvements.filter(i=>i.id!==id); });
-  if(clientId) await returnEmptyDraftsToWriter(clientId);
-  return true;
+// ---- Deleted work (Nov 21) ----------------------------------------------------------------------
+// Deleting work moves it to Recently Deleted (client_improvements.deleted_at), and the time logged
+// with it goes too (time_entries.improvement_id): off the timesheet, and out of Harvest at once.
+// Deleting that time does the same in reverse. Restore brings both back and makes the time again in
+// Harvest; Delete for Good removes both (nothing left to do in Harvest). Deleted work is gone from
+// everything else. The people involved hear about it: a draft in review or approved that used the
+// work goes back to its writer (they and the approvers are told), and someone else's work tells its
+// owner. Work already in a sent update stays as sent. See addendum-deleted-work.sql; until it's run,
+// deleting work removes it for good, as before.
+let deletedWork = [];   // deleted work, kept for Recently Deleted
+function setLoadedWork(rows){
+  const all = (rows || []).map(improvementRowFromDb);
+  clientImprovements = all.filter(i => !i.deletedAt);
+  deletedWork = all.filter(i => i.deletedAt).sort((a, b) => new Date(b.deletedAt) - new Date(a.deletedAt));
 }
-// A draft in review whose work has all been deleted goes back to whoever wrote it, to rewrite:
-// approvers never get an empty draft.
-async function returnEmptyDraftsToWriter(clientId){
-  const c = clients.find(x=>x.id===clientId);
-  if(!c || typeof draftHasNoWork !== 'function') return;
-  const me = typeof myName === 'function' ? myName() : '';
-  for(const d of (c.drafts||[]).filter(x => x.draftStatus==='pending' && x.readyToNotify && draftHasNoWork(c, x))){
-    if(!(await saveDraftFor(clientId, d.author, { readyToNotify: false }))) continue;
-    if(d.author === me){ if(typeof showToast === 'function') showToast('info', 'Your draft came back from Review', `Everything your ${c.name} draft was written from is deleted. Rewrite it from what’s logged now.`); continue; }
-    const p = (typeof teamProfiles !== 'undefined' ? teamProfiles : []).find(x => x.name === d.author);
-    if(p && typeof sendNotification === 'function') sendNotification(p.id, 'draft_returned', `${c.name}: your draft came back to you`, 'Everything it was written from was deleted. Rewrite it from what’s logged now.', 'approve', c.id);
+// What this person sees in Recently Deleted: their own work, and work they deleted.
+function myDeletedWork(){
+  const me = typeof myName === 'function' ? myName() : '', uid = typeof currentUser !== 'undefined' && currentUser ? currentUser.id : null;
+  return deletedWork.filter(i => i.author === me || (uid && i.deletedBy === uid));
+}
+function workColumnMissing(error, col){
+  const m = String((error && (error.message || error.details)) || '');
+  return !!error && (error.code === 'PGRST204' || error.code === '42703') && (!col || m.includes(col));
+}
+function workCut(s, n){ s = String(s || ''); n = n || 80; return s.length > n ? s.slice(0, n) + '…' : s; }
+function workHm(min){ min = Math.max(0, Math.round(min || 0)); return `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`; }
+function workProfile(name){ return (typeof teamProfiles !== 'undefined' ? teamProfiles : []).find(p => p.name === name && !p.access_revoked) || null; }
+// The time on your timesheet logged with this work (only your own time is loaded here)
+function workMinutes(ids){
+  const set = new Set(ids);
+  return (typeof timeEntries !== 'undefined' ? timeEntries : []).filter(e => e.improvementId && set.has(e.improvementId)).reduce((n, e) => n + (e.minutes || 0), 0);
+}
+// Drafts that used this work, as they are now: kind is written, review, approved or sent
+function workDraftEffects(items){
+  const out = [];
+  (typeof clients !== 'undefined' ? clients : []).forEach(c => {
+    const mine = items.filter(i => i.clientId === c.id);
+    if(!mine.length) return;
+    (c.drafts || []).forEach(d => {
+      if(!d.draft) return;
+      const ids = d.draftImprovementIds || [];
+      const hit = ids.length ? mine.some(i => ids.includes(i.id))
+        : !d.draftSentAt && mine.some(i => i.author === d.author && i.includeInEmail !== false);
+      if(!hit) return;
+      const kind = d.draftSentAt ? 'sent' : d.draftStatus === 'approved' ? 'approved'
+        : d.draftStatus === 'pending' ? (d.readyToNotify ? 'review' : 'written') : null;
+      if(kind) out.push({ c, d, kind });
+    });
+  });
+  return out;
+}
+// The question before deleting: what goes, and what happens because of it. From the Timesheet
+// (opts.fromTime), it starts from the time.
+function workDeleteQuestion(items, opts){
+  opts = opts || {};
+  const me = typeof myName === 'function' ? myName() : '', n = items.length, it = n === 1 ? 'it' : 'them';
+  const mins = workMinutes(items.map(i => i.id)), others = [...new Set(items.filter(i => i.author !== me).map(i => i.author))];
+  const harvest = typeof hvTimeOn === 'function' && hvTimeOn() ? ' and out of Harvest' : '';
+  const head = opts.fromTime
+    ? `Delete this time and the work it was logged with, “${workCut(items[0].text)}”?`
+    : `Delete ${n === 1 ? `“${workCut(items[0].text)}”` : `${n} work items`}?`;
+  const notes = [];
+  if(opts.fromTime) notes.push(`Both come off your timesheet${harvest}, and out of the client’s log.`);
+  else if(mins) notes.push(`The ${workHm(mins)} logged with ${it} comes off your timesheet${harvest} too.`);
+  else if(others.length) notes.push(`Any time logged with ${it} goes too.`);
+  const fx = workDraftEffects(items), back = fx.filter(e => e.kind === 'review' || e.kind === 'approved'), sent = fx.filter(e => e.kind === 'sent');
+  if(back.length > 2) notes.push(`${back.length} drafts in review or approved used ${it}, so they go back to their writers to rewrite, and they’re told.`);
+  else back.forEach(({ d, kind }) => {
+    const yours = d.author === me;
+    notes.push(`${n === 1 ? 'It’s' : 'Some of it is'} in ${yours ? 'your' : `${firstName(d.author)}’s`} draft ${kind === 'review' ? 'in review' : 'that’s approved'}, so the draft goes back to ${yours ? 'you' : firstName(d.author)} to rewrite${yours ? '' : ', and they’re told'}.`);
+  });
+  if(fx.some(e => e.kind === 'written' && e.d.author === me) && !back.some(e => e.d.author === me)) notes.push(`${n === 1 ? 'It’s' : 'Some of it is'} in your draft, so the draft will need a rewrite.`);
+  if(sent.length === 1) notes.push(`${n === 1 ? 'It was' : 'Some of it was'} in ${sent[0].d.author === me ? 'your' : `${firstName(sent[0].d.author)}’s`} update sent ${fmtShortDate(new Date(sent[0].d.draftSentAt))}; that email stays as sent.`);
+  else if(sent.length) notes.push('Some of it was in updates already sent; those emails stay as sent.');
+  if(others.length) notes.push(others.length > 3 ? 'Whoever logged it will be told.' : `${others.map(firstName).join(' and ')} will be told.`);
+  notes.push(`You can restore ${opts.fromTime ? 'both' : it} from Recently Deleted.`);
+  return `${head} ${notes.join(' ')}`;
+}
+// The time logged with the work moves with it. The server moves it (it may be someone else's) and
+// keeps Harvest in step; if it can't be reached, your own time is moved from here.
+async function workTimeMove(mode, ids){
+  if(!ids.length) return;
+  let done = false;
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if(session){
+      const res = await fetch('/api/integrations', { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'harvest', action: 'work-time', mode, improvementIds: ids }) });
+      const j = await res.json().catch(() => ({}));
+      done = res.ok && typeof j.moved === 'number';
+    }
+  }catch(e){ console.error('workTimeMove', mode, e); }
+  if(!done && typeof currentUser !== 'undefined' && currentUser){
+    const t = () => supabaseClient.from('time_entries'), uid = currentUser.id;
+    if(mode === 'trash'){
+      const { data } = await t().update({ deleted_at: new Date().toISOString() }).in('improvement_id', ids).eq('user_id', uid).is('deleted_at', null).select('id, harvest_entry_id');
+      (data || []).filter(e => e.harvest_entry_id).forEach(e => workHarvest({ action: 'delete-entry', harvestEntryId: e.harvest_entry_id }));
+    } else if(mode === 'restore'){
+      const { data } = await t().update({ deleted_at: null, harvest_entry_id: null, harvest_sync_status: 'pending', harvest_sync_error: null })
+        .in('improvement_id', ids).eq('user_id', uid).not('deleted_at', 'is', null).select('id');
+      (data || []).forEach(e => workHarvest({ action: 'sync-entry', timeEntryId: e.id }));
+    } else await t().delete().in('improvement_id', ids).eq('user_id', uid).not('deleted_at', 'is', null);
   }
+  if(typeof loadTimeEntries === 'function') await loadTimeEntries();
 }
+function workHarvest(body){
+  supabaseClient.auth.getSession().then(({ data: { session } }) => session && fetch('/api/integrations', { method: 'POST',
+    headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ provider: 'harvest', ...body }) }).catch(() => {}));
+}
+// Moves the work to Recently Deleted. Returns { ok, moved, soft }.
+async function trashWork(ids){
+  const items = [...new Set(ids)].map(id => clientImprovements.find(i => i.id === id)).filter(Boolean);
+  if(!items.length) return { ok: false, moved: [] };
+  const effects = workDraftEffects(items);   // before: the drafts as they are now
+  const now = new Date().toISOString(), uid = currentUser ? currentUser.id : null, idList = items.map(i => i.id);
+  let soft = true;
+  // .select() so a change blocked by a policy (no error, nothing changed) isn't taken for success
+  let { data, error } = await supabaseClient.from('client_improvements').update({ deleted_at: now, deleted_by: uid }).in('id', idList).select('id');
+  if(error && workColumnMissing(error)){
+    soft = false;   // before addendum-deleted-work.sql: deleted for good, as before
+    ({ data, error } = await supabaseClient.from('client_improvements').delete().in('id', idList).select('id'));
+  }
+  if(error){ console.error('trashWork failed', idList, error); return { ok: false, moved: [] }; }
+  const gone = new Set((data || []).map(r => r.id));
+  if(!gone.size){ console.error('trashWork: nothing changed (likely blocked by RLS)', idList); return { ok: false, moved: [] }; }
+  const moved = items.filter(i => gone.has(i.id));
+  clientImprovements = clientImprovements.filter(i => !gone.has(i.id));
+  clients.forEach(c => { if(c.improvements) c.improvements = c.improvements.filter(i => !gone.has(i.id)); });
+  if(soft){
+    moved.forEach(i => { i.deletedAt = now; i.deletedBy = uid; });
+    deletedWork = [...moved, ...deletedWork];
+    await workTimeMove('trash', [...gone]);
+  }
+  await workAfterDelete(effects, moved, soft);
+  return { ok: true, moved, soft };
+}
+// A draft in review or approved that used the work goes back to its writer; they and the approvers
+// are told. Someone else's work tells its owner (once, with the draft news if they wrote it).
+async function workAfterDelete(effects, moved, soft){
+  const me = typeof myName === 'function' ? myName() : '', who = me || 'Someone', uid = currentUser ? currentUser.id : null;
+  const tell = typeof sendNotification === 'function' ? sendNotification : null;
+  const approvers = (typeof teamProfiles !== 'undefined' ? teamProfiles : []).filter(p => (p.role === 'admin' || p.role === 'approver') && p.id !== uid && !p.access_revoked);
+  const told = new Set();
+  const where = soft ? 'It’s in your Recently Deleted if you need it back.' : '';
+  for(const { c, d, kind } of effects){
+    if(kind !== 'review' && kind !== 'approved') continue;
+    if(!(await saveDraftFor(c.id, d.author, kind === 'approved' ? { draftStatus: 'pending', readyToNotify: false } : { readyToNotify: false }))) continue;
+    const theirs = moved.some(i => i.clientId === c.id && i.author === d.author);
+    if(d.author === me){ if(typeof showToast === 'function') showToast('info', 'Your draft came back from Review', `You deleted work it was written from. Rewrite your ${c.name} draft from what’s logged now.`); }
+    else {
+      const p = workProfile(d.author);
+      if(p && tell){ told.add(c.id + '|' + d.author);
+        tell(p.id, 'draft_returned', `${c.name}: your draft came back to you`, `${who} deleted ${theirs ? 'your work' : 'work'} it was written from. ${theirs && where ? where + ' ' : ''}Rewrite it from what’s logged now.`, 'queue', c.id); }
+    }
+    if(tell) approvers.filter(p => p.name !== d.author).forEach(p => tell(p.id, 'draft_returned', `${c.name}: ${firstName(d.author)}’s draft went back to them`,
+      `${who} deleted work it was written from, so it’s out of Review until it’s rewritten.`, 'approve', c.id));
+  }
+  if(!tell) return;
+  const groups = new Map();
+  moved.filter(i => i.author && i.author !== me).forEach(i => { const k = i.clientId + '|' + i.author; if(!told.has(k)) groups.set(k, [...(groups.get(k) || []), i]); });
+  groups.forEach(list => {
+    const p = workProfile(list[0].author), c = clients.find(x => x.id === list[0].clientId);
+    if(!p) return;
+    tell(p.id, 'work_deleted', `${who} deleted ${list.length === 1 ? 'your work' : `${list.length} of your work items`} for ${c ? c.name : 'a client'}`,
+      `${list.length === 1 ? `“${workCut(list[0].text)}”, with the time logged with it. ` : 'With the time logged with them. '}${where}`, soft ? 'trash' : 'queue', null);
+  });
+}
+// Asks, deletes, says what happened. Returns trashWork's result, or null when they said no.
+async function deleteWorkAsk(ids, opts){
+  opts = opts || {};
+  const items = [...new Set(ids)].map(id => clientImprovements.find(i => i.id === id)).filter(Boolean);
+  if(!items.length){ showToast('info', 'Already gone', 'That work was already deleted.'); return null; }
+  if(!(await confirmDialog(workDeleteQuestion(items, opts), { confirmLabel: 'Delete', destructive: true }))) return null;
+  const mins = workMinutes(items.map(i => i.id));
+  const r = await trashWork(items.map(i => i.id));
+  if(!r.ok){ showToast('error', 'Couldn’t delete it', 'Try again in a moment.'); return r; }
+  const n = r.moved.length;
+  if(typeof logClientActivity === 'function') r.moved.forEach(i => logClientActivity(i.clientId, 'improvement_deleted', `${myName() || 'Someone'} deleted an improvement — "${workCut(i.text)}"`));
+  showToast('success', r.soft ? 'Moved to Recently Deleted' : 'Deleted', r.soft
+    ? `${n === 1 ? 'The work' : `${n} work items`}${mins ? `, with ${n === 1 ? 'its' : 'their'} ${workHm(mins)} of time` : ''}. You can restore ${n === 1 && !mins ? 'it' : 'them'} anytime.` : 'Removed from the log.');
+  return r;
+}
+// Brings deleted work back, with its time (made again in Harvest).
+async function restoreWork(ids){
+  const items = [...new Set(ids)].map(id => deletedWork.find(i => i.id === id)).filter(Boolean);
+  if(!items.length) return { ok: false, restored: [] };
+  const { data, error } = await supabaseClient.from('client_improvements').update({ deleted_at: null, deleted_by: null }).in('id', items.map(i => i.id)).select('id');
+  if(error || !data || !data.length){ console.error('restoreWork failed', error); return { ok: false, restored: [] }; }
+  const back = new Set(data.map(r => r.id)), restored = items.filter(i => back.has(i.id));
+  deletedWork = deletedWork.filter(i => !back.has(i.id));
+  const byDate = (a, b) => new Date(a.date) - new Date(b.date) || String(a.id).localeCompare(String(b.id));
+  restored.forEach(i => {
+    i.deletedAt = null; i.deletedBy = null; clientImprovements.push(i);
+    const c = clients.find(x => x.id === i.clientId); if(c){ c.improvements = [...(c.improvements || []), i].sort(byDate); }
+  });
+  clientImprovements.sort(byDate);
+  await workTimeMove('restore', [...back]);
+  return { ok: true, restored };
+}
+// Delete for Good: the work and its time, both gone (the time already left Harvest).
+async function deleteWorkForGood(ids){
+  ids = [...new Set(ids)].filter(id => deletedWork.some(i => i.id === id));
+  if(!ids.length) return false;
+  await workTimeMove('forever', ids);
+  const { data, error } = await supabaseClient.from('client_improvements').delete().in('id', ids).select('id');
+  if(error){ console.error('deleteWorkForGood failed', error); return false; }
+  const gone = new Set((data || []).map(r => r.id));
+  deletedWork = deletedWork.filter(i => !gone.has(i.id));
+  return gone.size > 0;
+}
+// One improvement, by id. Kept for older callers: deleting is moving to Recently Deleted now.
+async function deleteImprovementRow(id){ return (await trashWork([id])).ok; }
 
 // Shared (team-wide) storage — backed by Supabase, replaces window.storage.
 async function safeGet(key){

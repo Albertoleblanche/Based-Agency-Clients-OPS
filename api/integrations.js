@@ -11,7 +11,10 @@
 // GET  /api/integrations?provider=harvest  → Harvest status check
 // POST /api/integrations  body: { provider: 'google', action: 'sync' | 'disconnect' }
 // POST /api/integrations  body: { provider: 'harvest', action: 'connect' | 'disconnect'
-//        | 'sync-entry' | 'delete-entry' | 'sync-now' | 'sync-setup' | 'link-client' | 'link-clients' }
+//        | 'sync-entry' | 'delete-entry' | 'sync-now' | 'sync-setup' | 'link-client' | 'link-clients'
+//        | 'work-time' }
+//   work-time: { mode: 'trash' | 'restore' | 'forever', improvementIds } — the time logged with
+//   deleted (or restored) work moves with it, and Harvest is kept in step (see the handler).
 //   (the old client→project and service→task mapping lists are gone, step 5: time is logged by
 //   project and task; old entries without one still go through the mappings already saved)
 //   sync-setup: reads Harvest's clients, projects, tasks, assignments and people into Radar.
@@ -242,6 +245,54 @@ module.exports = async function handler(req, res) {
       if (!clientId || !targetId || clientId === targetId) { res.status(400).json({ error: 'Pick the client it’s the same as.' }); return; }
       const r = await linkHarvestClient(admin, String(clientId), String(targetId));
       res.status(r.status).json(r.error ? { error: r.error } : r);
+      return;
+    }
+
+    // Work and the time logged with it (time_entries.improvement_id) go to Recently Deleted together
+    // and come back together (addendum-deleted-work.sql). The browser moves the work first; this moves
+    // its time, which may be someone else's (an approver deleting a member's work), so it happens here,
+    // past the time_entries policies. Only time whose work is already where it's going is moved, so
+    // nothing else can be moved this way. Harvest is kept in step: the entry is deleted there now, and
+    // made again on restore. 'forever' deletes the time and then the work (its writer, whoever deleted
+    // it, or an approver).
+    if (action === 'work-time') {
+      if (!profile) { res.status(403).json({ error: 'Only team members can do this.' }); return; }
+      const mode = String((req.body || {}).mode || '');
+      const ids = [...new Set(((req.body || {}).improvementIds || []).map(String))].slice(0, 500);
+      if (!['trash', 'restore', 'forever'].includes(mode)) { res.status(400).json({ error: 'Unknown mode.' }); return; }
+      if (!ids.length) { res.status(200).json({ moved: 0 }); return; }
+      const { data: imps, error: iErr } = await admin.from('client_improvements').select('*').in('id', ids);
+      if (iErr) { res.status(500).json({ error: iErr.message }); return; }
+      let workIds = (imps || []).filter(i => (mode === 'restore' ? !i.deleted_at : !!i.deleted_at)).map(i => String(i.id));
+      if (mode === 'forever') {
+        const { data: me } = await admin.from('team_profiles').select('name').eq('id', userId).maybeSingle();
+        workIds = (imps || []).filter(i => i.deleted_at && (isApprover || (me && i.author === me.name) || i.deleted_by === userId)).map(i => String(i.id));
+      }
+      if (!workIds.length) { res.status(200).json({ moved: 0 }); return; }
+      let q = admin.from('time_entries').select('*').in('improvement_id', workIds);
+      q = mode === 'trash' ? q.is('deleted_at', null) : q.not('deleted_at', 'is', null);
+      const { data: entries, error: tErr } = await q;
+      if (tErr) {
+        // before addendum-deleted-work.sql there's no link: nothing to move
+        if (/improvement_id/.test(tErr.message || '')) { res.status(200).json({ moved: 0 }); return; }
+        res.status(500).json({ error: tErr.message }); return;
+      }
+      const list = entries || [], eIds = list.map(e => e.id);
+      if (mode === 'trash') {
+        if (eIds.length) await admin.from('time_entries').update({ deleted_at: new Date().toISOString() }).in('id', eIds);
+        if (connection) for (const e of list) if (e.harvest_entry_id) await deleteTimeEntryFromHarvest(connection, e.harvest_entry_id);
+      } else if (mode === 'restore') {
+        if (eIds.length) await admin.from('time_entries').update({ deleted_at: null, harvest_entry_id: null, harvest_sync_error: null,
+          harvest_sync_status: connection ? 'pending' : 'not_configured' }).in('id', eIds);
+        if (connection) for (const e of list) {
+          const result = await syncTimeEntryToHarvest(admin, connection, { ...e, deleted_at: null, harvest_entry_id: null });
+          if (result.harvestEntryId) await admin.from('time_entries').delete().eq('harvest_entry_id', result.harvestEntryId).eq('source', 'harvest').neq('id', e.id);
+          await admin.from('time_entries').update({ harvest_sync_status: result.status, harvest_entry_id: result.harvestEntryId || null, harvest_sync_error: result.error || null }).eq('id', e.id);
+        }
+      } else {
+        if (eIds.length) await admin.from('time_entries').delete().in('id', eIds);
+      }
+      res.status(200).json({ moved: eIds.length, entries: eIds });
       return;
     }
 

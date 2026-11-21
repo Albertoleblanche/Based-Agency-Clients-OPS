@@ -1,5 +1,7 @@
-// Recently Deleted, as on the canvas: one page with a section per kind (clients, your notes,
-// your time entries), Restore beside each item and a bin to delete it for good.
+// Recently Deleted, as on the canvas: one page with a section per kind (clients, work, your notes,
+// your time entries), Restore beside each item and a bin to delete it for good. Work (Nov 21) is
+// your own deleted work and work you deleted, each with the time logged with it: that time shows
+// on its work, not under Time, and comes back with it (made again in Harvest).
 // Select (Nov 20) ticks several at once, then Restore them or Delete them for Good together.
 // One at a time uses the functions in clients.js, notes.js and time-tracker.js.
 
@@ -14,6 +16,25 @@ async function renderTrash(){
   trashData = { notes: notesList || [], time: timeList || [] };
   selectedTrashIds = { clients: new Set(), notes: new Set(), time: new Set() };
   drawTrash();
+}
+// Work in Recently Deleted, and the time of yours that goes with each
+function trWork(){ return typeof myDeletedWork === 'function' ? myDeletedWork() : []; }
+function trWorkTime(id){ return trashData.time.filter(e => e.improvementId === id); }
+function trLooseTime(){ const ids = new Set(trWork().map(w => w.id)); return trashData.time.filter(e => !e.improvementId || !ids.has(e.improvementId)); }
+async function trRestoreWork(id){
+  const w = deletedWork.find(i => i.id === id); if(!w) return;
+  const mins = trWorkTime(id).reduce((n, e) => n + (e.minutes || 0), 0);
+  const r = await restoreWork([id]);
+  renderAll();
+  r.ok ? showToast('success', 'Restored', `“${workCut(w.text, 60)}” is back in ${(clients.find(c => c.id === w.clientId) || {}).name || 'the client'}’s log${mins ? `, with its ${workHm(mins)} of time${typeof hvTimeOn === 'function' && hvTimeOn() ? ' (in Harvest again too)' : ''}` : ''}.`)
+    : showToast('error', 'Couldn’t restore it', 'Try again in a moment.');
+}
+async function trDeleteWorkForGood(id){
+  const w = deletedWork.find(i => i.id === id); if(!w) return;
+  if(!(await confirmDialog(`Delete “${workCut(w.text, 60)}” for good, with the time logged with it? This can’t be undone.`, { confirmLabel: 'Delete for Good', destructive: true }))) return;
+  const ok = await deleteWorkForGood([id]);
+  await renderTrash();
+  ok ? showToast('success', 'Deleted for good', 'The work and its time are gone.') : showToast('error', 'Couldn’t delete it', 'Try again in a moment.');
 }
 
 // ---- several at once ------------------------------------------------------------------------
@@ -33,13 +54,13 @@ function trSetAll(on){
   drawTrash();
 }
 function trPicked(){
-  const by = { clients: [], notes: [], time: [] };
+  const by = { clients: [], work: [], notes: [], time: [] };
   (trSel ? [...trSel] : []).forEach(k => { const i = k.indexOf(':'); by[k.slice(0, i)]?.push(k.slice(i + 1)); });
   return by;
 }
-// "2 clients, 3 notes and 1 time entry"
+// "2 clients, 1 work item, 3 notes and 1 time entry"
 function trWords(by){
-  const p = [[by.clients.length, 'client', 'clients'], [by.notes.length, 'note', 'notes'], [by.time.length, 'time entry', 'time entries']]
+  const p = [[by.clients.length, 'client', 'clients'], [(by.work || []).length, 'work item', 'work items'], [by.notes.length, 'note', 'notes'], [by.time.length, 'time entry', 'time entries']]
     .filter(([n]) => n).map(([n, one, many]) => `${n} ${n === 1 ? one : many}`);
   return p.length > 1 ? p.slice(0, -1).join(', ') + ' and ' + p[p.length - 1] : (p[0] || '');
 }
@@ -66,6 +87,10 @@ async function trBulkRestore(){
     }));
     if(res.some(ok => !ok)) fails.push('clients');
   }
+  if(by.work.length){
+    const r = await restoreWork(by.work);
+    if(!r.ok || r.restored.length < by.work.length) fails.push('work');
+  }
   if(by.notes.length){
     const { error } = await supabaseClient.from('notes').update({ deleted_at: null }).in('id', by.notes).eq('user_id', currentUser.id);
     if(error) fails.push('notes');
@@ -74,23 +99,24 @@ async function trBulkRestore(){
     if(typeof renderNotes === 'function') renderNotes();
   }
   if(by.time.length){
-    const { error } = await supabaseClient.from('time_entries').update({ deleted_at: null }).in('id', by.time);
-    if(error) fails.push('time entries');
+    if(!(await restoreTimeRows(by.time))) fails.push('time entries');   // and made again in Harvest
     await loadTimeEntries();
     if(typeof renderTimesheet === 'function') renderTimesheet();
     if(typeof renderReports === 'function') renderReports();
   }
   trSel = null;
-  if(by.clients.length) renderAll();
+  if(by.clients.length || by.work.length) renderAll();
   await renderTrash();
+  const n = by.clients.length + by.work.length + by.notes.length + by.time.length;
   fails.length ? showToast('error', 'Some didn’t restore', `The ${fails.join(' and ')} couldn’t be restored. Try again.`)
-    : showToast('success', 'Restored', `${trWords(by)} ${by.clients.length + by.notes.length + by.time.length === 1 ? 'is' : 'are'} back.`);
+    : showToast('success', 'Restored', `${trWords(by)} ${n === 1 ? 'is' : 'are'} back.`);
 }
 async function trBulkDelete(){
   const by = trPicked(), words = trWords(by);
   if(!words) return;
   if(by.clients.length && !hasPermission('delete_clients')){ showToast('error', 'Not allowed', 'You don’t have permission to delete clients for good.'); return; }
-  const also = by.clients.length ? ` The client${by.clients.length === 1 ? '’s' : 's’'} improvements and notes go with ${by.clients.length === 1 ? 'it' : 'them'}.` : '';
+  const also = (by.clients.length ? ` The client${by.clients.length === 1 ? '’s' : 's’'} improvements and notes go with ${by.clients.length === 1 ? 'it' : 'them'}.` : '')
+    + (by.work.length ? ` The time logged with the work goes too.` : '');
   if(!(await confirmDialog(`Delete ${words} for good? This can’t be undone.${also}`, { confirmLabel: 'Delete for Good', destructive: true }))) return;
   const fails = [];
   if(by.clients.length){
@@ -112,6 +138,7 @@ async function trBulkDelete(){
       if(typeof loadCalendarEvents === 'function'){ await loadCalendarEvents(); if(typeof renderCalendar === 'function') renderCalendar(); }
     }
   }
+  if(by.work.length && !(await deleteWorkForGood(by.work))) fails.push('work');
   if(by.time.length){
     const { error } = await supabaseClient.from('time_entries').delete().in('id', by.time);
     if(error) fails.push('time entries');
@@ -119,8 +146,9 @@ async function trBulkDelete(){
   trSel = null;
   if(by.clients.length) renderAll();
   await renderTrash();
+  const n = by.clients.length + by.work.length + by.notes.length + by.time.length;
   fails.length ? showToast('error', 'Some weren’t deleted', `The ${fails.join(' and ')} couldn’t be deleted. Try again.`)
-    : showToast('success', 'Deleted for good', `${trWords(by)} ${by.clients.length + by.notes.length + by.time.length === 1 ? 'is' : 'are'} gone.`);
+    : showToast('success', 'Deleted for good', `${trWords(by)} ${n === 1 ? 'is' : 'are'} gone.`);
 }
 document.addEventListener('keydown', e => {
   if(e.key !== 'Escape' || !trSel || !document.getElementById('view-trash')?.classList.contains('active')) return;
@@ -142,10 +170,10 @@ function drawTrash(){
   if(!root) return;
   const canClients = hasPermission('delete_clients');
   const cl = canClients ? clients.filter(c => c.deletedAt).sort((a, b) => new Date(b.deletedAt) - new Date(a.deletedAt)) : [];
-  const nt = trashData.notes, tm = trashData.time;
-  const counts = { clients: cl.length, notes: nt.length, time: tm.length };
-  const total = cl.length + nt.length + tm.length;
-  const tabs = [['all', 'All', total], ...(canClients ? [['clients', 'Clients', cl.length]] : []), ['notes', 'Notes', nt.length], ['time', 'Time Entries', tm.length]];
+  const wk = trWork(), nt = trashData.notes, tm = trLooseTime();
+  const counts = { clients: cl.length, work: wk.length, notes: nt.length, time: tm.length };
+  const total = cl.length + wk.length + nt.length + tm.length;
+  const tabs = [['all', 'All', total], ...(canClients ? [['clients', 'Clients', cl.length]] : []), ['work', 'Work', wk.length], ['notes', 'Notes', nt.length], ['time', 'Time Entries', tm.length]];
   if(!tabs.some(([k]) => k === trashTab)) trashTab = 'all';
   if(trSel && !total) trSel = null;
   const uw = typeof uiStyleOn === 'function' && uiStyleOn();   // the new look (beta): a title, and each kind as a card
@@ -163,6 +191,16 @@ function drawTrash(){
       return trashRow('buildings', c.name, `Deleted ${trashDay(c.deletedAt)}${extra ? ` · with its ${extra}` : ''}`, `restoreClient('${c.id}')`, `permanentlyDeleteClient('${c.id}')`, 'clients:' + c.id);
     }).join('') || '<div class="row"><span class="t-2" style="font-size:14px">No deleted clients.</span></div>'}</div>${uw ? '</section>' : ''}`;
   }
+  if(show('work') && (wk.length || trashTab === 'work')){
+    const uid = currentUser ? currentUser.id : null;
+    html += head('work', 'Work') + `<div class="grp">${wk.map(w => {
+      const c = clients.find(x => x.id === w.clientId), mins = trWorkTime(w.id).reduce((n, e) => n + (e.minutes || 0), 0);
+      const by = w.deletedBy && w.deletedBy !== uid ? (teamProfiles.find(p => p.id === w.deletedBy) || {}).name : '';
+      const whose = w.author && w.author !== myName() ? ` · ${escapeHtml(firstName(w.author))}’s` : '';
+      return trashRow('square-pen', w.text || 'Work', `${escapeHtml(c ? c.name : 'Client removed')}${whose}${mins ? ` · ${hmm(mins)} of time` : ''} · deleted ${trashDay(w.deletedAt)}${by ? ` by ${escapeHtml(firstName(by))}` : ''}`,
+        `trRestoreWork('${w.id}')`, `trDeleteWorkForGood('${w.id}')`, 'work:' + w.id);
+    }).join('') || '<div class="row"><span class="t-2" style="font-size:14px">No deleted work.</span></div>'}</div>${uw ? '</section>' : ''}`;
+  }
   if(show('notes') && (nt.length || trashTab === 'notes')){
     html += head('notes', 'Notes', `<span class="t-2" style="font-size:13px;display:inline-flex;align-items:center;gap:4px"><span class="ic sm">${icon('lock-simple')}</span>Only you can see your deleted notes</span>`) + `<div class="grp">${nt.map(n => {
       const c = clients.find(x => x.id === n.clientId);
@@ -175,7 +213,7 @@ function drawTrash(){
       return trashRow('timer', `${e.description || e.service || 'Time'} · ${hmm(e.minutes)}`, `${escapeHtml(c ? c.name : 'Client removed')} · deleted ${trashDay(e.deletedAt)}`, `restoreTimeEntry('${e.id}')`, `permanentlyDeleteTimeEntry('${e.id}')`, 'time:' + e.id);
     }).join('') || '<div class="row"><span class="t-2" style="font-size:14px">No deleted time entries.</span></div>'}</div>${uw ? '</section>' : ''}`;
   }
-  if(!html) html = emptyState({ icon: 'trash', title: 'Nothing deleted', text: 'Clients, notes and time entries you delete wait here, so you can bring them back.' });
+  if(!html) html = emptyState({ icon: 'trash', title: 'Nothing deleted', text: 'Clients, work, notes and time you delete wait here, so you can bring them back.' });
   root.classList.toggle('tr-selecting', !!trSel);
   root.innerHTML = `${seg}<div class="tr-list">${html}</div>${trBulkBarHtml()}`;
   // switching tabs while selecting keeps only what still shows, so nothing hidden is restored or deleted

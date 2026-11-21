@@ -32,6 +32,8 @@ const NOTIFICATION_TYPE_META = {
   win_approved:            { label:'Your WhatsApp update is approved, for you to send', section:'Client Work' },
   draft_sent:              { label:'Your update is sent to the client', section:'Client Work' },
   draft_skipped:           { label:'Your submitted draft is skipped', section:'Client Work' },
+  draft_returned:          { label:'A draft goes back to its writer because work in it was deleted', section:'Client Work' },
+  work_deleted:            { label:'Someone deletes your logged work and its time', section:'Client Work' },
   email_sent:              { label:'A client email is sent', section:'Client Work', visibleTo:'approver' },
   reminder_follow_up_due:  { label:'A client follow-up you own comes due', section:'Client Work' },
   reminder_escalated:      { label:'A client follow-up has gone unanswered for a week', section:'Client Work', visibleTo:'approver' },
