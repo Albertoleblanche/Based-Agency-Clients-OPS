@@ -28,6 +28,13 @@ function renderClientPage(){
 <div class="tx"><b>${healthWord(h.level)} since ${relDay(h.since || rNow()).toLowerCase() === 'today' ? 'today' : relDay(h.since || rNow())}${next ? '' : ' — no next step yet'}</b><span>${escapeHtml(h.signals.map(s => s.title.charAt(0).toUpperCase() + s.title.slice(1)).join(' · '))}</span></div>
 <button class="btn" onclick="openHealthClient('${c.id}')">See Why</button>${next ? `<button class="btn" onclick="openTaskDetailModal('${next.id}')">Open Next Step</button>` : `<button class="btn btn-p" onclick="planNextStep('${c.id}')">${icon('plus')}Plan Next Step</button>`}</div>`;
   }
+  // the new look (beta): the canvas layout, a grid of cards
+  const uw = typeof uiStyleOn === 'function' && uiStyleOn();
+  document.getElementById('cdRoot')?.classList.toggle('is-uw', !!uw);
+  if(uw){
+    top.innerHTML = `<header class="cp-hd"><div><h1>${escapeHtml(c.name)}</h1><div class="cp-sub">${h.level !== 'g' ? `<span class="uw-delta bad"><i></i>${escapeHtml(healthWord(h.level))} since ${relDay(h.since || rNow()).toLowerCase() === 'today' ? 'today' : escapeHtml(relDay(h.since || rNow()))}</span>` : '<span class="uw-delta"><i></i>Healthy</span>'}<span>${escapeHtml([c.service, owner ? firstName(owner) + ' owns it' : '', c.status !== 'Active' ? c.status : '', start ? 'client since ' + start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : ''].filter(Boolean).join(' · '))}</span></div></div>
+<div class="seg" role="tablist" aria-label="Client sections">${tabs}</div></header>`;
+  } else
   top.innerHTML = `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:16px">
 <span class="mono ${clientColor(c)}" style="width:56px;height:56px;border-radius:14px;font-size:19px" aria-hidden="true">${escapeHtml(clientMono(c))}</span>
 <div style="min-width:0"><h1 class="lt">${escapeHtml(c.name)}</h1><p class="lt-sub" style="margin-top:4px">${escapeHtml([c.service, c.status !== 'Active' ? c.status : '', start ? 'client since ' + start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : ''].filter(Boolean).join(' · '))}</p></div>
@@ -54,6 +61,10 @@ ${callout}`;
   const seq = h.seq, ots = onTimeSummary(seq);
   const kv = (k, v) => `<div class="kv"><span>${k}</span><b style="font-weight:500">${v}</b></div>`;
   const cf = (settings.customFields || []).filter(f => (c.customFieldValues || {})[f.id]).map(f => kv(escapeHtml(f.label || f.name || 'Field'), escapeHtml(String(c.customFieldValues[f.id])))).join('');
+  if(uw){
+    document.getElementById('cdOverviewMain').innerHTML = cpUwGridHtml(c, { h, w, owner, next, imps, impStatus, seq, ots, sentAt, holder });
+    document.getElementById('cdOverviewSide').innerHTML = '';
+  } else {
   document.getElementById('cdOverviewMain').innerHTML = `
 <div class="h2"><h2>This week’s update</h2><span class="${w.late ? 't-red' : 't-2'}" style="font-size:13px">${escapeHtml(w.sent ? w.note : w.upcoming ? `${w.dueText} · last sent ${fmtShortDate(w.last)}` : w.dueText)}</span></div>
 <div class="panel" style="padding:18px 18px 16px"><div class="stepper">${stepper}</div>${weekBtns}</div>
@@ -72,6 +83,7 @@ ${c.website ? `<div class="kv"><span>Website</span><a href="${safeUrl(c.website.
 ${c.email ? `<div class="kv"><span>Contact</span><a href="mailto:${escapeHtml(c.email)}" style="font-weight:500">${escapeHtml(c.email)}</a></div>` : ''}
 ${cf}</section>
 ${c.sow ? `<section class="panel"><h3>Scope</h3><p style="margin:0;font-size:14px;line-height:1.55">${escapeHtml(c.sow)}</p></section>` : ''}`;
+  }
 
   // ---- other tabs
   document.getElementById('cdImpTab').innerHTML = `<div class="h2"><h2>Improvements<span class="c">${imps.length}</span></h2>${waCanWork(c) ? `<a href="#" onclick="openQueueLogImprovementModal('${c.id}');return false;">Log Improvement</a>` : ''}</div>
@@ -85,4 +97,50 @@ ${c.sow ? `<section class="panel"><h3>Scope</h3><p style="margin:0;font-size:14p
 <div class="grp">${rems.map(r => `<a class="row sm" href="#" onclick="openReminderDetailModal('${r.id}');return false;"><div class="tx"><span class="t" style="font-weight:400">${escapeHtml(r.question)}</span><span class="s">Asked ${fmtShortDate(new Date(r.askedDate + 'T12:00:00'))}${r.followUpDate ? ' · follow up ' + fmtShortDate(new Date(r.followUpDate + 'T12:00:00')) : ''}</span></div><div class="r">${reminderDisplayStatus(r) === 'due' ? '<span class="t-red">Follow-up due</span>' : 'Waiting'}</div></a>`).join('') || '<div class="row sm"><span class="s t-2">Nothing waiting on the client.</span></div>'}</div>
 <div class="h2"><h2>My notes<span class="c">${myNotes.length}</span></h2><a href="#" onclick="openNoteModalFromDetail();return false;">New Note</a></div>
 <div class="grp">${myNotes.map(n => `<a class="row sm" href="#" onclick="openNoteModal('${n.id}');return false;"><div class="tx"><span class="t" style="font-weight:400">${escapeHtml(n.title || (n.text || '').slice(0, 60))}</span><span class="s">${fmtShortDate(new Date(n.updatedAt || n.createdAt))} · only you can see this</span></div><div class="r">${escapeHtml(({ idea: 'Idea', planned: 'Planned', done: 'Done' })[n.status] || '')}</div></a>`).join('') || '<div class="row sm"><span class="s t-2">No notes yet.</span></div>'}</div>`;
+}
+
+// ---- the client page in the new look (beta): the canvas board ClientPage ----
+function cpUwGridHtml(c, x){
+  const { h, w, owner, next, imps, impStatus, seq, ots, sentAt, holder } = x;
+  const pill = (label, js) => `<button class="uw-pill" type="button" onclick="${js}">${escapeHtml(label)}${icon('chevron-right')}</button>`;
+  const head = (ic, title, right, count) => `<div class="uw-wh"><span class="uw-ic">${icon(ic)}</span><span class="uw-wt">${title}</span>${count ? `<span class="uw-cnt">${count}</span>` : ''}${right ? `<span class="uw-sp"></span>${right}` : ''}</div>`;
+  // this week's update: where it stands, the four steps, what to do
+  const names = ['LOGGED', 'DRAFT', 'REVIEW', 'SENT'];
+  const done = w.sent ? 4 : w.done >= 3 ? 3 : (w.done === 2 || w.draft) ? 2 : (w.logged && w.logged.length) ? 1 : 0;
+  const state = w.sent ? `Sent ${relDayLower(w.last)}` : clientStageWord(w);
+  const detail = w.sent ? (w.note || '') : `${w.logged.length} improvement${w.logged.length === 1 ? '' : 's'} logged · ${w.dueText.replace(/^Due /, 'due ')}`;
+  const act = w.sent ? '' : `<div class="uw-fa cp-fa">${w.draft ? `<button class="uw-wb" onclick="openReviewDraft('${c.id}',${jsArg(w.draft.author)})">Open draft${icon('arrow-right')}</button>` : `<button class="uw-wb" onclick="openWeekClient('${c.id}')">Open in This Week${icon('arrow-right')}</button>`}${holder && holder !== myName() ? `<button class="uw-pill cp-pl" onclick="remindHolder('${c.id}')">Remind ${escapeHtml(firstName(holder))}</button>` : ''}</div>`;
+  const update = `<section class="uw-w uw-s6 cp-up">${head('activity', 'This week’s update', `<span class="cp-due${w.late ? ' is-late' : ''}">${escapeHtml(w.sent ? 'Sent' : w.dueText)}</span>`)}
+<div class="uw-fn"><div class="uw-mono">${done >= 4 ? 'DONE · SENT' : 'NOW · ' + names[done]}</div><h3>${escapeHtml(state)}</h3><p>${escapeHtml(detail)}</p></div>
+${uwSteps(w)}${act}
+<div class="cp-ot">${histDotsHtml(seq)}<span>${ots.total ? `On time ${ots.onTime} of ${ots.total}` : 'No updates yet'}</span><b>${sentAt ? 'Last sent ' + escapeHtml(fmtShortDate(sentAt)) : 'None sent yet'}</b></div></section>`;
+  // health: the word, why in a line, the last 12 weeks, the one thing to do
+  const trail = typeof healthTrailHtml === 'function' && typeof healthTrail === 'function' ? healthTrailHtml(healthTrail(c, h, healthWeeks()), 'cp-tl') : '';
+  const hBtn = h.level === 'g' ? '' : next ? `<button class="uw-wb cp-wide" onclick="openTaskDetailModal('${next.id}')">Open next step</button>` : `<button class="uw-wb cp-wide" onclick="planNextStep('${c.id}')">${icon('plus')}Plan next step</button>`;
+  const hSub = h.level === 'g' ? 'Nothing needs care right now' : `${h.signals.length} reason${h.signals.length === 1 ? '' : 's'} · ${next ? 'next: ' + next.title : 'no next step yet'}`;
+  const health = `<section class="uw-w uw-s3 cp-h">${head('heart-pulse', 'Health', h.level === 'g' ? '' : pill('See why', `openHealthClient('${c.id}')`))}
+<div class="cp-hb"><div class="cp-word ${h.level}"><i></i>${escapeHtml(healthWord(h.level))}</div><div class="uw-bigsub">${escapeHtml(hSub)}</div></div>
+${trail}${hBtn ? `<div class="cp-hact">${hBtn}</div>` : ''}</section>`;
+  // hours this month against the budget, and where it's heading
+  const hp = h.hp || {}, used = Math.round(hp.used || 0), bud = hp.budget || 0, over = bud && used > bud;
+  const end = new Date(rNow().getFullYear(), rNow().getMonth() + 1, 0);
+  const hours = `<section class="uw-w uw-s3 cp-hr">${head('clock', 'Hours this month', pill('Time', `setCdTab('time')`))}
+<div class="cp-hb"><div class="uw-big md${over ? ' uw-risk' : ''}">${used}<small>${bud ? `/ ${bud} h` : 'h'}</small></div><div class="uw-bigsub">${bud ? `on pace for ${Math.round(hp.projected || 0)} by ${escapeHtml(fmtShortDate(end))}` : 'No monthly budget set'}</div></div>
+${bud ? `<div class="cp-pacew"><div class="cp-pace"><i class="${over || (hp.projected > bud) ? 'is-over' : ''}" style="width:${Math.min(used / bud, 1) * 100}%"></i><em style="left:${Math.min((hp.day || 0) / (hp.dim || 30), 1) * 100}%"></em></div><div class="cp-paces"><span>${escapeHtml(fmtShortDate(new Date(end.getFullYear(), end.getMonth(), 1)))}</span><span>today</span><span>${escapeHtml(fmtShortDate(end))}</span></div></div>` : ''}</section>`;
+  // why it's at risk (or what's fine)
+  const sigs = h.signals.map(sg => `<div class="cp-sig"><span class="cp-si ${sg.l}">${icon(sg.icon)}</span><span class="cp-st"><b>${escapeHtml(sg.title)}</b><span>${escapeHtml(sg.text)}</span></span><span class="cp-since">${escapeHtml((relDay(sg.since).toLowerCase() === 'today' ? 'today' : relDay(sg.since)).toUpperCase())}</span></div>`).join('');
+  const why = `<section class="uw-w uw-s4 cp-why">${head('flag', h.level === 'r' ? 'Why it’s at risk' : h.level === 'y' ? 'Why it’s on Watch' : 'Signals', canApprove() ? pill('Adjust', `openSettingsTab('updates')`) : '', h.signals.length || '')}
+<div class="cp-l">${sigs || `<p class="uw-none">${icon('check-circle')}Nothing is slipping.</p>`}</div></section>`;
+  // the latest improvements
+  const impRows = imps.slice(0, 5).map(i => `<div class="cp-imp"><span class="uw-mono">${escapeHtml(fmtShortDate(new Date(i.date)).toUpperCase())}</span><span class="cp-it"><b>${escapeHtml(i.text)}</b><span>${escapeHtml([c.service, i.author ? firstName(i.author) : ''].filter(Boolean).join(' · '))}</span></span><em>${escapeHtml(impStatus(i))}</em></div>`).join('');
+  const improvements = `<section class="uw-w uw-s5 cp-imps">${head('circle-check', 'Improvements', waCanWork(c) ? pill('Log', `openQueueLogImprovementModal('${c.id}')`) : '', imps.length || '')}
+<div class="cp-l">${impRows || '<p class="uw-none">Nothing logged yet.</p>'}</div>
+${imps.length > 5 ? `<a class="uw-foot" href="#" onclick="setCdTab('improvements');return false;">All ${imps.length} improvements${icon('chevron-right')}</a>` : ''}</section>`;
+  // details
+  const kv = (k, v) => v ? `<div><span>${k}</span><b>${v}</b></div>` : '';
+  const ch = typeof winChannel === 'function' ? ({ whatsapp: 'WhatsApp', email: 'Email', both: 'Email and WhatsApp' })[winChannel(c)] : '';
+  const site = c.website ? `<a href="${safeUrl(c.website.startsWith('http') ? c.website : 'https://' + c.website)}" target="_blank" rel="noopener">${escapeHtml(c.website.replace(/^https?:\/\//, '').replace(/\/$/, ''))}</a>` : '';
+  const details = `<section class="uw-w uw-s3 cp-det">${head('building-2', 'Details', canApprove() ? pill('Edit', `openEditClientFormFromDetail()`) : '')}
+<div class="cp-kv">${kv('Owner', owner ? escapeHtml(owner) : '—')}${kv('Importance', `${c.importance || 0} of 10`)}${kv('Risk flag', `${c.danger || 0} of 5`)}${kv('Monthly budget', c.monthlyHourBudget ? `${c.monthlyHourBudget} h` : '—')}${kv('Website', site)}${kv('Contact', c.email ? `<a href="mailto:${escapeHtml(c.email)}">${escapeHtml(c.email)}</a>` : '')}${kv('Sends by', ch)}${c.status !== 'Active' ? kv('Status', escapeHtml(c.status || '—')) : ''}</div></section>`;
+  return `<div class="cp-pg">${update}${health}${hours}${why}${improvements}${details}</div>`;
 }
