@@ -521,3 +521,55 @@ html.ui-w #timeRoot-dailysummary .og-h .tx b{font-weight:500}
 html.ui-w #timeRoot-dailysummary .og .og-i{padding-left:22px!important;padding-right:22px}
 html.ui-w #timeRoot-dailysummary .og .og-i::before{left:22px;right:22px}
 html.ui-w #timeRoot-dailysummary .og-i .dur{font-family:var(--mono);font-size:12.5px;font-weight:500;color:var(--label)}
+
+/* ---- All Clients: the table in one card, mono column heads and group labels ---- */
+html.ui-w .cl-bar0{padding:6px 26px 14px 22px}
+html.ui-w .cl-table{margin:0 26px 0 22px;padding:2px 0 12px;border-radius:28px;background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
+html.ui-w .cl-head{height:42px;border-radius:28px 28px 0 0;background:var(--grp);font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--label-3)}
+html.ui-w .cl-head .is-sort{color:var(--label-2)}
+html.ui-w .cl-g{padding-top:18px}
+html.ui-w .cl-g::after{display:none}
+html.ui-w .cl-g b,html.ui-w .cl-g > span:not(.cl-g-act){font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--label-3)}
+html.ui-w .cl-r{border-radius:14px}
+html.ui-w .cl-r.is-sel{background:var(--card)}
+html.ui-w .cl-r b{font-weight:500}
+
+/* ---- Team and the inspectors: a card beside the list ---- */
+html.ui-w #teamRoot .grp .row > .av{display:none}
+html.ui-w #teamRoot .mhead{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--label-3)}
+html.ui-w .insp:not(.insp-over){align-self:stretch;height:auto;margin:10px 18px 18px 0;border-left:0;border-radius:28px;background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
+html.ui-w .insp-over{top:10px;right:18px;bottom:18px;border-radius:28px;background:var(--grp);box-shadow:0 0 0 1px var(--sep),0 30px 70px -24px rgba(0,0,0,.6)}
+html.ui-w .insp .t-2,html.ui-w .insp .mono-l{font-size:12.5px}
+
+/* ---- Calendar: the grid as a card, today in ink instead of orange ---- */
+html.ui-w .cal-legend{padding:4px 26px 12px 22px;border:0}
+html.ui-w .cal-wrap{margin:0 26px 22px 22px;border-radius:28px;background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
+html.ui-w .cal-hd{background:var(--grp);border-bottom-color:var(--sep)}
+html.ui-w .cal-hd b{font-weight:400}
+html.ui-w .cal-hd.today{color:var(--label)}
+html.ui-w .cal-hd.today b{background:var(--label);color:var(--window);font-weight:500}
+html.ui-w .cal-hd.today[role="button"]:hover b{background:var(--label)}
+html.ui-w .ev{border-radius:10px}
+html.ui-w .ev b{font-weight:500}
+
+/* ---- Plan: the same head as the other tabs, the side column as a card ---- */
+html.ui-w .pln{padding:6px 26px 30px 22px}
+html.ui-w .pl-hd{align-items:center}
+html.ui-w .pl-hd > div:first-child{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 16px;min-width:0}
+html.ui-w .pl-hd h2{font-size:30px;font-weight:400;letter-spacing:-.03em;line-height:1.15}
+html.ui-w .pl-hd p{margin:0}
+html.ui-w .pl-hd p b{font-weight:500}
+html.ui-w .pl-setup{border-radius:16px;background:var(--uw-c2);padding:12px 16px}
+html.ui-w .pl-setup svg{color:var(--uw-watch)}
+html.ui-w .pl-sec b{font-weight:500}
+html.ui-w .pl-sec .n{font-family:var(--mono);font-weight:500}
+html.ui-w .pl-b{border-radius:16px}
+html.ui-w .pl-b b{font-weight:500}
+html.ui-w .pl-side{padding:18px 22px 20px;border-radius:28px;background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
+
+/* ---- Settings: the section labels in mono ---- */
+html.ui-w .set-tab{font-weight:400}
+html.ui-w .set-tab.on{font-weight:500}
+html.ui-w .cl-head > *{text-transform:inherit;letter-spacing:inherit}
+html.ui-w #teamRoot .mhead{letter-spacing:.05em}
+html.ui-w #teamRoot .mhead span{white-space:nowrap}
