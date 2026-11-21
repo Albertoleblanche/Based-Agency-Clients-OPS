@@ -93,9 +93,19 @@ html.ui-w .mac .form-grp{border-radius:var(--uw-r-card);background:var(--grp);bo
 html.ui-w .mac .kpi{border-radius:var(--uw-r-card)}
 
 /* ---------- menus, sheets and pop-ups ---------- */
-html.ui-w .mac .menu{border-radius:16px;padding:6px;box-shadow:0 0 0 1px var(--sep-strong),0 24px 60px -20px rgba(0,0,0,.6)}
-html.ui-w .mac .menu .mi{border-radius:10px;height:32px;font-size:13.5px}
-html.ui-w .mac .menu .mh,html.ui-w .mac .menu .mhd{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--label-3)}
+/* Menus: a frosted card, roomy rows, groups set apart, keys in mono; pressing a row gives a little */
+html.ui-w .mac .menu{min-width:236px;border-radius:18px;padding:6px;background:color-mix(in srgb,var(--grp) 94%,transparent);-webkit-backdrop-filter:blur(28px) saturate(1.5);backdrop-filter:blur(28px) saturate(1.5);box-shadow:0 0 0 1px var(--sep-strong),0 2px 6px rgba(0,0,0,.14),0 28px 64px -24px rgba(0,0,0,.6)}
+html.ui-w .mac[data-theme="light"] .menu{box-shadow:0 0 0 1px var(--sep),0 2px 6px rgba(0,0,0,.06),0 24px 56px -24px rgba(0,0,0,.22)}
+html.ui-w .mac .menu .mi{height:34px;padding:0 10px;gap:12px;border-radius:12px;font-size:13.5px;font-weight:400;transition:background-color 120ms ease,transform 160ms var(--uw-ease)}
+html.ui-w .mac .menu .mi svg{width:16px;height:16px;color:var(--label-2)}
+html.ui-w .mac .menu .mi:not(.theme-row):active{transform:scale(.985);transition-duration:100ms}
+@media (hover:hover) and (pointer:fine){html.ui-w .mac .menu .mi:hover,html.ui-w .mac .menu .mi.on{background:var(--uw-c2)}}
+html.ui-w .mac .menu .mi .kbd{margin-left:auto;padding:2px 6px;border-radius:6px;background:var(--uw-c2);font-family:var(--mono);font-size:10.5px;font-weight:500;color:var(--label-3)}
+html.ui-w .mac .menu .msep{height:1px;margin:5px 10px;background:var(--sep)}
+html.ui-w .mac .menu .mh,html.ui-w .mac .menu .mhd{padding:9px 10px 6px;font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--label-3)}
+html.ui-w .mac .menu .mi.danger,html.ui-w .mac .menu .mi.danger svg{color:var(--uw-risk)}
+html.ui-w .mac .menu .msync{padding:8px 10px 5px;font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--label-3)}
+html.ui-w .mac .side-menu .mi{height:36px}
 html.ui-w .mac .modal-card{border-radius:26px;box-shadow:0 0 0 1px var(--sep-strong),0 40px 100px -30px rgba(0,0,0,.7)}
 html.ui-w .mac[data-theme="dark"] .modal-card{background:#141416}
 
@@ -117,7 +127,13 @@ html.ui-w .mac ::selection{background:var(--fill-3)}
 html.ui-w .mac{--uw-good:#5FD39A;--uw-watch:#F2C35B;--uw-risk:#FF6B57;--uw-goodbg:rgba(95,211,154,.12);--uw-watchbg:rgba(242,195,91,.13);--uw-riskbg:rgba(255,107,87,.13);--uw-c2:var(--card);--uw-c3:#27272B}
 html.ui-w .mac[data-theme="light"]{--uw-good:#1E9A60;--uw-watch:#C2850C;--uw-risk:#DF4A33;--uw-goodbg:rgba(30,154,96,.10);--uw-watchbg:rgba(194,133,12,.12);--uw-riskbg:rgba(223,74,51,.10);--uw-c2:#F3F3F5;--uw-c3:#E6E6EA}
 html.ui-w #dashRoot.content{overflow:auto}
-html.ui-w .uwd{min-height:100%;display:flex;flex-direction:column;gap:14px;padding:4px 26px 22px 18px;color:var(--label)}
+/* every tab sits the same distance from the sidebar as the Dashboard's cards */
+html.ui-w{--uw-gl:18px}
+html.ui-w .uwd{min-height:100%;display:flex;flex-direction:column;gap:14px;padding:4px 26px 22px var(--uw-gl);color:var(--label)}
+/* the plain pages (Past Improvements, Finished Tasks, My Profile) on the same gutter */
+html.ui-w .view > .content{padding:6px 26px 30px var(--uw-gl)}
+html.ui-w #profileRoot.settings-pane{padding:6px 26px 30px var(--uw-gl)!important}
+html.ui-w #profileRoot .set-body{padding-left:0;padding-right:0}
 html.ui-w .uwd *{box-sizing:border-box}
 html.ui-w .uw-hd{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:2px 4px 0}
 html.ui-w .uw-hd h1{margin:0;font-size:30px;font-weight:400;letter-spacing:-.03em;line-height:1.1}
@@ -248,7 +264,7 @@ html.ui-w .uw-e span{font-size:12px;color:var(--label-2);white-space:nowrap;over
 
 /* ================= Tasks, Health and Reminders (the canvas tabs, same layouts) ================= */
 /* the page head: a big thin title with its sentence beside it, the filters on the right */
-html.ui-w :is(.tk,.rmi,.hx,.wa,.tmi){padding:6px 26px 30px 22px}
+html.ui-w :is(.tk,.rmi,.hx,.wa,.tmi){padding:6px 26px 30px var(--uw-gl)}
 html.ui-w :is(.tk-hd,.rmi-hd){align-items:center}
 html.ui-w :is(.tk-hd,.rmi-hd,.hx-top) > div:first-child{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 16px;min-width:0}
 html.ui-w :is(.tk-hd h2,.rmi-hd h2,.hx-h){font-size:30px;font-weight:400;letter-spacing:-.03em;line-height:1.15}
@@ -407,7 +423,7 @@ html.ui-w .tmx-bud i em.over{background:var(--uw-risk)}
 html.ui-w .tmi-add{border-radius:999px}
 
 /* ---- Recently Deleted: a title, then each kind as a card ---- */
-html.ui-w #trashRoot{padding:6px 26px 30px 22px}
+html.ui-w #trashRoot{padding:6px 26px 30px var(--uw-gl)}
 html.ui-w .tr-top{align-items:center;gap:8px 10px}
 html.ui-w .tr-hd{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 16px;min-width:0}
 html.ui-w .tr-hd h2{margin:0;font-size:30px;font-weight:400;letter-spacing:-.03em;line-height:1.15}
@@ -427,7 +443,7 @@ html.ui-w .tr-g .row .r .ib{width:32px;height:32px;border-radius:50%;box-shadow:
 html.ui-w .tr-g .row .ic svg{width:15px;height:15px}
 
 /* ---- This Week: the count and Who has the rest as cards, the days in one card ---- */
-html.ui-w #weekRoot .wb{padding:6px 26px 22px 22px}
+html.ui-w #weekRoot .wb{padding:6px 26px 22px var(--uw-gl)}
 html.ui-w .wb-top{gap:14px;align-items:stretch}
 html.ui-w :is(.wb-hl,.wb-who){background:var(--grp);border-radius:28px;padding:20px 24px 20px;box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
 html.ui-w .wb-who{flex:0 1 460px}
@@ -463,7 +479,7 @@ html.ui-w .wd-strip .ty-m{border-radius:99px}
 html.ui-w .wd-b .ty-i .tx b{font-weight:500}
 
 /* ---- Review: the list and the update as cards ---- */
-html.ui-w .rvn{gap:14px;padding:6px 26px 22px 22px}
+html.ui-w .rvn{gap:14px;padding:6px 26px 22px var(--uw-gl)}
 html.ui-w :is(.rvn-list,.rvn-read){background:var(--grp);border-radius:28px;box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi);overflow:hidden}
 html.ui-w .rvn-list{flex-basis:300px;border-right:0}
 html.ui-w .rvn-sort{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase}
@@ -490,7 +506,7 @@ html.ui-w .rvn-hl.r i{background:var(--uw-risk)} html.ui-w .rvn-hl.y i{backgroun
 html.ui-w .rvn-warn{border-radius:16px;background:var(--uw-c2)}
 
 /* ---- Notes: tiles as cards, names without badges ---- */
-html.ui-w .n1{padding:6px 26px 30px 22px}
+html.ui-w .n1{padding:6px 26px 30px var(--uw-gl)}
 html.ui-w .n1-grid{gap:14px;margin-top:20px}
 html.ui-w .n1-t{border-radius:28px;background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
 html.ui-w .n1-t.has-c{box-shadow:inset 3px 0 0 var(--cc),0 0 0 1px var(--sep),var(--uw-shadow)}
@@ -503,7 +519,7 @@ html.ui-w .nt-st.done i{background:var(--uw-good)}
 html.ui-w .nt-fu.is-late,html.ui-w .nt-fu.is-late svg{color:var(--uw-risk)}
 
 /* ---- Reports: thin pill bars, today white; Daily Summary: names without badges ---- */
-html.ui-w #timeRoot-reports{padding:6px 26px 30px 22px}
+html.ui-w #timeRoot-reports{padding:6px 26px 30px var(--uw-gl)}
 html.ui-w #reportChartPanel{border-radius:28px;background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
 html.ui-w #reportChartPanel .dur{font-size:50px!important;font-weight:300!important;letter-spacing:-.045em!important;line-height:1}
 html.ui-w .chart{gap:8px;border-bottom:0}
@@ -514,7 +530,7 @@ html.ui-w .chart-x span{font-family:var(--mono);font-size:10.5px;letter-spacing:
 html.ui-w #reportTableGrp{border-radius:28px}
 html.ui-w .mtx .cell-c .mono{display:none}
 html.ui-w .mtx td.num,html.ui-w .mtx tfoot td{font-family:var(--mono);font-size:12.5px;font-weight:500}
-html.ui-w #timeRoot-dailysummary{padding:6px 26px 30px 22px}
+html.ui-w #timeRoot-dailysummary{padding:6px 26px 30px var(--uw-gl)}
 html.ui-w .ds-day{font-weight:400}
 html.ui-w #timeRoot-dailysummary .og{border-radius:28px;overflow:hidden}
 html.ui-w #timeRoot-dailysummary .og-h > .av{display:none}
@@ -525,7 +541,7 @@ html.ui-w #timeRoot-dailysummary .og .og-i::before{left:22px;right:22px}
 html.ui-w #timeRoot-dailysummary .og-i .dur{font-family:var(--mono);font-size:12.5px;font-weight:500;color:var(--label)}
 
 /* ---- All Clients: the table in one card, mono column heads and group labels ---- */
-html.ui-w .cl-bar0{padding:6px 26px 14px 22px}
+html.ui-w .cl-bar0{padding:6px 26px 14px var(--uw-gl)}
 html.ui-w .cl-table{margin:0 26px 0 22px;padding:2px 0 12px;border-radius:28px;background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
 html.ui-w .cl-head{height:42px;border-radius:28px 28px 0 0;background:var(--grp);font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--label-3)}
 html.ui-w .cl-head .is-sort{color:var(--label-2)}
@@ -544,7 +560,7 @@ html.ui-w .insp-over{top:10px;right:18px;bottom:18px;border-radius:28px;backgrou
 html.ui-w .insp .t-2,html.ui-w .insp .mono-l{font-size:12.5px}
 
 /* ---- Calendar: the grid as a card, today in ink instead of orange ---- */
-html.ui-w .cal-legend{padding:4px 26px 12px 22px;border:0}
+html.ui-w .cal-legend{padding:4px 26px 12px var(--uw-gl);border:0}
 html.ui-w .cal-wrap{margin:0 26px 22px 22px;border-radius:28px;background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
 html.ui-w .cal-hd{background:var(--grp);border-bottom-color:var(--sep)}
 html.ui-w .cal-hd b{font-weight:400}
@@ -555,7 +571,7 @@ html.ui-w .ev{border-radius:10px}
 html.ui-w .ev b{font-weight:500}
 
 /* ---- Plan: the same head as the other tabs, the side column as a card ---- */
-html.ui-w .pln{padding:6px 26px 30px 22px}
+html.ui-w .pln{padding:6px 26px 30px var(--uw-gl)}
 html.ui-w .pl-hd{align-items:center}
 html.ui-w .pl-hd > div:first-child{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 16px;min-width:0}
 html.ui-w .pl-hd h2{font-size:30px;font-weight:400;letter-spacing:-.03em;line-height:1.15}
@@ -577,7 +593,7 @@ html.ui-w #teamRoot .mhead{letter-spacing:.05em}
 html.ui-w #teamRoot .mhead span{white-space:nowrap}
 
 /* ---- Settings: the sections as a menu in a card on the left, the open one on the right ---- */
-html.ui-w #settingsRoot.settings-pane{display:grid;grid-template-columns:250px minmax(0,1fr);column-gap:14px;align-items:start;padding:6px 26px 26px 22px!important}
+html.ui-w #settingsRoot.settings-pane{display:grid;grid-template-columns:250px minmax(0,1fr);column-gap:14px;align-items:start;padding:6px 26px 26px var(--uw-gl)!important}
 html.ui-w .settings-pane .set-tb{position:sticky;top:6px;padding:14px 12px 12px;border:0;border-radius:28px;background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
 html.ui-w .set-mh{display:flex;align-items:center;gap:10px;padding:2px 6px 12px}
 html.ui-w .set-mh svg{width:34px;height:34px;padding:9px;border-radius:11px;background:var(--uw-c2);color:var(--label)}
@@ -594,7 +610,7 @@ html.ui-w .set-pt{margin:0 4px 22px;font-size:30px;font-weight:400;letter-spacin
 @media (hover:hover) and (pointer:fine){html.ui-w .mac button.set-tab:hover:not(.on){background:var(--uw-c2);color:var(--label)}}
 
 /* ---- Calendar: the grid card with Coming up beside it ---- */
-html.ui-w #view-calendar.active{display:grid;grid-template-columns:minmax(0,1fr) 330px;grid-template-rows:auto minmax(0,1fr);column-gap:14px;padding:0 26px 22px 22px}
+html.ui-w #view-calendar.active{display:grid;grid-template-columns:minmax(0,1fr) 330px;grid-template-rows:auto minmax(0,1fr);column-gap:14px;padding:0 26px 22px var(--uw-gl)}
 html.ui-w #view-calendar > .cal-legend{grid-column:1;grid-row:1;padding:4px 4px 12px}
 html.ui-w #view-calendar > .cal-wrap{grid-column:1;grid-row:2;margin:0}
 html.ui-w #view-calendar > .cal-up{grid-column:2;grid-row:1 / 3;min-height:0;display:flex;flex-direction:column;margin-top:4px;padding:18px 20px 12px;border-radius:28px;background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
@@ -614,6 +630,8 @@ html.ui-w .cu-r.blue .cu-x{border-left-color:#5AA7FF}
 html.ui-w .cu-r.purple .cu-x{border-left-color:#B98CFF}
 html.ui-w .cu-r.red .cu-x{border-left-color:var(--uw-risk)}
 html.ui-w .cu-r.green .cu-x{border-left-color:var(--uw-good)}
+html.ui-w .cu-r.teal .cu-x{border-left-color:var(--teal)}
+html.ui-w .cu-r.yellow .cu-x{border-left-color:var(--yellow)}
 html.ui-w .cu-x b{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 html.ui-w .cu-x span{font-size:12px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 html.ui-w .cu-r.done .cu-x b{color:var(--label-3);text-decoration:line-through}
@@ -629,7 +647,7 @@ html.ui-w .ad{border-radius:8px}
 @media (hover:hover) and (pointer:fine){html.ui-w .cu-r:hover{background:var(--uw-c2)}}
 
 /* ---- Team: People in a card on the left, the person in a big Profile card ---- */
-html.ui-w #teamRoot > .tm-uw{flex:1 1 auto;min-height:0;overflow:auto;display:grid;grid-template-columns:330px minmax(0,1fr);gap:14px;align-items:start;padding:6px 26px 26px 22px}
+html.ui-w #teamRoot > .tm-uw{flex:1 1 auto;min-height:0;overflow:auto;display:grid;grid-template-columns:330px minmax(0,1fr);gap:14px;align-items:start;padding:6px 26px 26px var(--uw-gl)}
 html.ui-w .tm-side{position:sticky;top:0;display:flex;flex-direction:column;gap:14px;min-width:0}
 html.ui-w .tm-card{min-width:0;padding:16px 14px 12px;border-radius:28px;background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
 html.ui-w .tm-h{display:flex;align-items:center;gap:10px;min-height:34px;padding:0 6px 10px}
@@ -840,7 +858,7 @@ html.ui-w :hover{scrollbar-color:var(--sep-strong) transparent}
 html.ui-w .mac[data-theme="light"] :hover{scrollbar-color:rgba(0,0,0,.18) transparent}
 
 /* ---- the client page as on the canvas (ClientPage): a head, then a grid of cards ---- */
-html.ui-w #cdRoot.is-uw{padding:6px 26px 26px 22px;container-type:inline-size}
+html.ui-w #cdRoot.is-uw{padding:6px 26px 26px var(--uw-gl);container-type:inline-size}
 html.ui-w #cdRoot.is-uw .cd-tab[data-tab="overview"] .cols{display:block;margin:0}
 html.ui-w #cdRoot.is-uw .cd-tab[data-tab="overview"] .col-side{display:none}
 html.ui-w .cp-hd{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;padding:2px 4px 0;margin-bottom:18px}

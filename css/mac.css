@@ -146,10 +146,16 @@
 .tf::placeholder{color:var(--label-2)}
 .tf.focus{border-color:var(--label-3);box-shadow:0 0 0 3px var(--fill-2)}
 textarea.tf{height:72px;padding:7px 9px;resize:none;line-height:1.4}
-.sw{position:relative;display:inline-block;width:38px;height:22px;border-radius:11px;background:var(--fill-3);flex:0 0 auto}
-.sw::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+/* Switches slide: the knob travels (transform, so it stays smooth) and the track's colour
+   follows; pressing stretches the knob a little toward where it's going, like a Mac switch. */
+.sw{position:relative;display:inline-block;width:38px;height:22px;border-radius:11px;background:var(--fill-3);flex:0 0 auto;transition:background-color 200ms ease}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:9px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform 260ms cubic-bezier(.32,.72,0,1),width 160ms cubic-bezier(.23,1,.32,1)}
 .sw.on{background:var(--green)}
-.sw.on::after{left:18px}
+.sw.on::after{transform:translateX(16px)}
+.sw:not(:disabled):active::after{width:22px}
+.sw.on:not(:disabled):active::after{transform:translateX(12px)}
+.sw.sw-snap,.sw.sw-snap::after{transition:none!important}
+@media (prefers-reduced-motion:reduce){.sw,.sw::after{transition-duration:1ms!important}}
 .cb{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--label-3);flex:0 0 auto;color:#fff}
 .cb.done{background:var(--label-2);box-shadow:none}
 .cb svg{width:11px;height:11px}

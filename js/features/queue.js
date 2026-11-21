@@ -259,10 +259,10 @@ function queueStep(dir){
 function openQueueClient(id){ window._queueSel = id; quResetEdits(); if(currentViewName !== 'queue') switchView('queue'); else renderMyQueue(); }
 
 // Everything that shows logged work is drawn again after a change here.
-function quRefreshAll(clientId){
+function quRefreshAll(clientId, o){
   if(typeof renderClientsTable === 'function') renderClientsTable();
   if(typeof renderKpis === 'function') renderKpis();
-  renderQueue();
+  if(o && o.keepQueue){ if(typeof renderThisWeek === 'function') renderThisWeek(); } else renderQueue();
   if(typeof renderTeamQueue === 'function') renderTeamQueue();
   if(typeof renderImprovementsHistory === 'function') renderImprovementsHistory();
   if(clientId && typeof refreshClientDetailActivityIfOpen === 'function') refreshClientDetailActivityIfOpen(clientId);
@@ -287,7 +287,7 @@ async function quToggleEmail(clientId, impId){
     return;
   }
   const ci = (typeof clientImprovements !== 'undefined' ? clientImprovements : []).find(i => i.id === impId); if(ci) ci.includeInEmail = next;
-  quRefreshAll();
+  quRefreshAll(null, { keepQueue: true });   // the Queue already shows it; drawing it again would cut the slide short
 }
 
 function quStartEdit(impId){

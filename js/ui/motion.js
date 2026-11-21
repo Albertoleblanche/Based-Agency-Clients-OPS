@@ -35,6 +35,54 @@ function hidePop(el){
   });
 }
 
+// ---- menus leave the way they came -----------------------------------------------------------
+// Menus made on the fly are simply removed when they close; a copy stays in their place for a
+// moment and fades and shrinks out, so no menu ever vanishes in one frame.
+(function(){
+  if(typeof MutationObserver === 'undefined' || !document.body) return;
+  new MutationObserver(list => {
+    if(!motionOK()) return;
+    for(const m of list) for(const n of m.removedNodes){
+      if(!(n instanceof HTMLElement) || !n.classList.contains('menu') || n.dataset.ghost || n.style.display === 'none' || n.hidden) continue;
+      const parent = m.target;
+      if(!parent || !parent.isConnected) continue;
+      const c = n.cloneNode(true);
+      c.dataset.ghost = '1'; c.removeAttribute('id'); c.setAttribute('aria-hidden', 'true'); c.inert = true;
+      c.querySelectorAll('[id]').forEach(x => x.removeAttribute('id'));
+      c.style.pointerEvents = 'none'; c.style.transition = 'none';
+      parent.insertBefore(c, m.nextSibling && m.nextSibling.parentNode === parent ? m.nextSibling : null);
+      const up = n.classList.contains('side-menu') || n.classList.contains('notif-panel') || n.dataset.from === 'below';
+      animateThen(c, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: `translateY(${up ? 4 : -4}px) scale(.97)` }], 130, EASE_OUT, () => c.remove());
+    }
+  }).observe(document.body, { childList: true, subtree: true });
+})();
+
+// ---- switches slide, even the ones that are drawn again after you click them ------------------
+// A switch that flips in place slides by itself (CSS). Most screens draw their switch again once
+// the change is saved, so the new one would just appear in its new state: this finds it (by id,
+// or by its label) and plays the slide from the old state.
+document.addEventListener('click', e => {
+  const sw = e.target.closest && e.target.closest('.sw[role="switch"]');
+  if(!sw || sw.disabled || !motionOK()) return;
+  const was = sw.classList.contains('on'), id = sw.id, label = sw.getAttribute('aria-label');
+  let tries = 0;
+  const check = () => {
+    if(sw.isConnected){
+      if(sw.classList.contains('on') !== was) return;      // flipped in place: CSS slides it
+      if(++tries < 120) requestAnimationFrame(check);       // not redrawn yet (still saving)
+      return;
+    }
+    const next = (id && document.getElementById(id)) || (label && [...document.querySelectorAll('.sw[role="switch"]')].find(x => x.getAttribute('aria-label') === label));
+    if(!next){ if(++tries < 120) requestAnimationFrame(check); return; }
+    const now = next.classList.contains('on');
+    if(now === was || next.dataset.swSlid) return;
+    next.dataset.swSlid = '1';
+    next.classList.add('sw-snap'); next.classList.toggle('on', was); void next.offsetWidth;
+    next.classList.remove('sw-snap'); next.classList.toggle('on', now);
+  };
+  requestAnimationFrame(check);
+}, true);
+
 // ---- the selected tab slides to the one you clicked -------------------------------------------
 // Segmented controls are redrawn on click, so this remembers where the selection was, waits for
 // the redraw, and slides a pill from the old spot to the new one behind the labels.

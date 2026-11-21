@@ -48,8 +48,14 @@ function toggleNewMenu(){
   const m = document.getElementById('newMenu');
   if(!m) return;
   if(m.style.display === 'block'){ closeNewMenu(); return; }
-  m.innerHTML = '<div class="mh">New</div>' + newMenuItems().map(([label, ic, fn, kbd, note]) =>
-    `<button class="mi" role="menuitem" onclick="closeNewMenu(); ${fn}">${icon(ic)}<span>${label}</span>${kbd ? `<span class="kbd">${kbd}</span>` : ''}${note ? `<span class="mi-note">${note}</span>` : ''}</button>`).join('');
+  // grouped: what you did, what's next, the calendar, time, and (approvers) a client
+  const GROUP = { 'Log Improvement': 0, Task: 1, Sprint: 1, Reminder: 1, Note: 1, Event: 2, 'Start Timer': 3, 'Time Worked': 3, Client: 4 };
+  let last = null;
+  m.innerHTML = '<div class="mh">New</div>' + newMenuItems().map(([label, ic, fn, kbd, note]) => {
+    const g = GROUP[label] ?? 9, sep = last !== null && g !== last ? '<div class="msep" role="separator"></div>' : '';
+    last = g;
+    return `${sep}<button class="mi" role="menuitem" onclick="closeNewMenu(); ${fn}">${icon(ic)}<span>${label}</span>${kbd ? `<span class="kbd">${kbd}</span>` : ''}${note ? `<span class="mi-note">${note}</span>` : ''}</button>`;
+  }).join('');
   m.style.display = 'block';
 }
 function closeNewMenu(){ const m = document.getElementById('newMenu'); if(m && m.style.display === 'block') typeof hidePop === 'function' ? hidePop(m) : (m.style.display = 'none'); }

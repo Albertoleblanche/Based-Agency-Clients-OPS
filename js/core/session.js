@@ -216,12 +216,13 @@ function toggleSidebarProfileMenu(){
   const foot = trigger.closest('.side-foot') || trigger, r = foot.getBoundingClientRect();
   menu.style.left = Math.max(8, Math.round(r.left)) + 'px';
   menu.style.bottom = Math.round(window.innerHeight - r.top + 6) + 'px';
+  menu.dataset.from = 'below';   // it opens upward from your name, and closes back down into it
   menu.style.display = 'block';
   trigger.classList.add('open');
 }
 function closeSidebarProfileMenu(){
   const menu = document.getElementById('sidebarProfileMenu');
-  if(menu) menu.style.display = 'none';
+  if(menu && menu.style.display !== 'none') typeof hidePop === 'function' ? hidePop(menu) : (menu.style.display = 'none');
   document.querySelector('.sidebar-profile-trigger')?.classList.remove('open');
 }
 function switchToMobileVersion(){

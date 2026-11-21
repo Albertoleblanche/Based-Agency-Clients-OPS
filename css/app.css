@@ -6,6 +6,8 @@
 html, body { height: 100%; margin: 0; }
 body.mac { background: var(--window); overflow: hidden; }
 body.mac.theme-switching, body.mac.theme-switching * { transition: background-color 220ms ease, color 220ms ease, border-color 220ms ease !important; }
+/* the Dark mode switch still slides while the colours change */
+body.mac.theme-switching .sw::after { transition: transform 260ms cubic-bezier(.32,.72,0,1), width 160ms cubic-bezier(.23,1,.32,1) !important; }
 
 /* ---------- window ---------- */
 .win.app-win { max-width: none; width: 100vw; height: 100vh; height: 100dvh; margin: 0; border-radius: 0; box-shadow: none; flex-wrap: nowrap; }
@@ -423,6 +425,15 @@ label.well { display: inline-block; }
 button.ck, button.rd { border: 0; padding: 0; font: inherit; cursor: default; }
 button.set-tab { font-size: 12px; }
 .menu[hidden] { display: none !important; }
+/* Menus open with a short scale and fade from the side they hang from (CSS @starting-style, so
+   every menu does it, however it's shown), and close the same way (motion.js). */
+@media (prefers-reduced-motion: no-preference){
+  .menu { transform-origin: top left; transition: opacity 150ms cubic-bezier(.23,1,.32,1), transform 190ms cubic-bezier(.23,1,.32,1); }
+  @starting-style { .menu { opacity: 0; transform: translateY(-4px) scale(.97); } }
+  .new-menu { transform-origin: top right; }
+  .side-menu, .notif-panel { transform-origin: bottom left; }
+  @starting-style { .side-menu, .notif-panel { opacity: 0; transform: translateY(4px) scale(.97); } }
+}
 /* filter bars shared by history screens */
 .search-f { position: relative; display: inline-flex; align-items: center; }
 .search-f svg { position: absolute; left: 8px; width: 14px; height: 14px; color: var(--label-2); pointer-events: none; }
