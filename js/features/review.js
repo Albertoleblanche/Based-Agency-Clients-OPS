@@ -21,11 +21,12 @@ function reviewItems(){
 }
 
 function draftBodyHtml(text){
+  const em = t => escapeHtml(t).replace(/\*\*([^*\n]+?)\*\*/g, '<b>$1</b>');   // **bold** reads as bold
   const blocks = String(text || '').replace(/\r/g, '').split(/\n{2,}/);
   return blocks.map(b => {
     const lines = b.split('\n').filter(l => l.trim());
-    if(lines.length && lines.every(l => /^\s*([-•*]|\d+\.)\s+/.test(l))) return '<ul>' + lines.map(l => `<li>${escapeHtml(l.replace(/^\s*([-•*]|\d+\.)\s+/, ''))}</li>`).join('') + '</ul>';
-    return `<p>${lines.map(l => escapeHtml(l)).join('<br>')}</p>`;
+    if(lines.length && lines.every(l => /^\s*([-•*]|\d+\.)\s+/.test(l))) return '<ul>' + lines.map(l => `<li>${em(l.replace(/^\s*([-•*]|\d+\.)\s+/, ''))}</li>`).join('') + '</ul>';
+    return `<p>${lines.map(l => em(l)).join('<br>')}</p>`;
   }).join('');
 }
 
@@ -85,7 +86,12 @@ function renderTeamQueue(){
 <div class="rvn-rows">${rows}</div>
 ${list.length > 1 ? `<p class="rvn-keys"><span><kbd>J</kbd><kbd>K</kbd> next and previous</span>${canApprove() && reviewTab === 'waiting' ? '<span><kbd>⌘</kbd><kbd>↩</kbd> approve &amp; send</span>' : ''}</p>` : ''}
 </section>
-<section class="rvn-read" aria-label="Selected draft">${sel ? reviewReadHtml(sel, list) : `<div class="rvn-none">${reviewEmptyHtml(items)}</div>`}</section>
+${(() => {
+  // the new look (beta): the letter and "Before you send" are two cards, as on the canvas
+  const uw = typeof uiStyleOn === 'function' && uiStyleOn(), parts = sel ? reviewReadHtml(sel, list, uw) : null;
+  if(uw && parts) return `<section class="rvn-read" aria-label="Selected draft">${parts.main}</section><section class="rvn-railc">${parts.rail}</section>`;
+  return `<section class="rvn-read" aria-label="Selected draft">${sel ? parts : `<div class="rvn-none">${reviewEmptyHtml(items)}</div>`}</section>`;
+})()}
 </div>`;
   root.dataset.sel = sel ? key(sel) : '';
   if(sel && prevKey === key(sel)){ const m = root.querySelector('.rvn-mail'); if(m) m.scrollTop = prevRead; }
@@ -157,7 +163,7 @@ function canReworkDraft(c, d){
   return d.author === myName() && !d.readyToNotify;
 }
 
-function reviewReadHtml(x, list){
+function reviewReadHtml(x, list, split){
   const c = x.c, d = x.d, h = clientHealth(c), w = clientWeek(c), seq = weekHistory(c), ots = onTimeSummary(seq);
   const k = c.id + '|' + d.author, editing = window._reviewEditing === k;
   const i = list.indexOf(x), approver = canApprove(), mine = d.author === myName();
@@ -174,11 +180,10 @@ function reviewReadHtml(x, list){
   const to = clientContact(c), ch = winChannel(c), wa = ch === 'whatsapp';
   const drafted = tab === 'approved' && d.approvedBy ? ` · approved by ${d.approvedBy === myName() ? 'you' : escapeHtml(firstName(d.approvedBy))}${d.approvedAt ? ' at ' + escapeHtml(fmtTime(new Date(d.approvedAt))) : ''}`
     : d.draftPendingSince ? ` · ${fmtWait(d.draftPendingSince)} ago` : '';
-  const toWords = wa ? 'To their WhatsApp group' : `${to || c.email ? `To ${escapeHtml(to || c.email)}` : 'By email'}${ch === 'both' ? ' and their WhatsApp group' : ''}`;
+  const toWords = wa ? `To the ${escapeHtml((winGroupFor(c) || {}).name || c.name)} group on WhatsApp` : `${to || c.email ? `To ${escapeHtml(to || c.email)}` : 'By email'}${ch === 'both' ? ' and their WhatsApp group' : ''}`;
   const head = `<div class="rvn-hd">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}</b><span class="s">${toWords}</span><span class="s">Drafted by ${mine ? 'you' : escapeHtml(d.author)}${drafted}</span></div></div>`;
-  // WhatsApp: as it will look in the group
+  // WhatsApp or email, it reads as the same letter
   const body = editing ? `<textarea spellcheck="true" class="rvn-edit" id="draft-${c.id}" aria-label="Draft">${escapeHtml(d.draft || '')}</textarea>`
-    : wa ? `${waBubbleHtml(d.draft, d.draftSentAt ? new Date(d.draftSentAt) : null, { group: (winGroupFor(c) || {}).name || c.name })}<p class="wn-cap">${d.draftSentAt ? 'As it was sent in the group.' : 'As it will look in the group. Copying keeps the bold, line breaks and bullets.'}</p>`
     : `<div class="rvn-body">${draftBodyHtml(d.draft)}</div>`;
   // Before you send.
   const row = (it, kind) => `<div class="rvn-i${kind ? ' is-' + kind : ''}" title="${escapeHtml(it.text + ' · ' + (it.service || c.service || '') + ' · ' + fmtShortDate(new Date(it.date)))}">${icon(kind === 'out' ? 'minus-circle' : kind === 'new' ? 'circle-plus' : 'check-circle')}<span class="rvn-it">${escapeHtml(it.text)}</span><time>${escapeHtml(fmtShortDate(new Date(it.date)))}</time></div>`;
@@ -218,10 +223,14 @@ ${dl.internal.length ? `<div class="rvn-rs rvn-s2"><b>Left out</b><span>${dl.int
     : `<button class="btn btn-p rvn-main" onclick="approveAndSendOwnDraft(${A})" title="Approve and send now (⌘↩)">${icon('paper-plane-tilt')}Approve &amp; Send</button>`}`;
   else if(mine && !d.readyToNotify && tab === 'waiting') foot = `<span class="rvn-ft-note">${env}Goes to ${escapeHtml(c.email)} once it’s approved</span><span class="rvn-sp"></span><button class="btn btn-p rvn-main" onclick="sendDraftForReview(${A})">${icon('paper-plane-tilt')}Send for Review</button>`;
   else foot = `<span class="rvn-ft-note">${icon('clock')}${tab === 'approved' ? 'Approved. An approver sends it, and you’ll get a notification.' : 'Waiting for an approver. You’ll get a notification when it’s sent.'}</span><span class="rvn-sp"></span>`;
+  const doc = `<div class="rvn-doc">${head}
+<h2 class="rvn-subj">Your weekly update${tab === 'sent' ? '' : ' — ' + escapeHtml(updateRangeLabel(c))}</h2>
+${body}</div>`;
+  if(split) return { main: `<div class="rvn-top">${top}</div>
+<div class="rvn-mail"><div class="rvn-cols is-one">${doc}</div></div>
+<div class="rvn-ft">${foot}</div>`, rail };
   return `<div class="rvn-top">${top}</div>
-<div class="rvn-mail"><div class="rvn-cols"><div class="rvn-doc">${head}
-${wa && !editing ? '' : `<h2 class="rvn-subj">Your weekly update${tab === 'sent' ? '' : ' — ' + escapeHtml(updateRangeLabel(c))}</h2>`}
-${body}</div>${rail}</div></div>
+<div class="rvn-mail"><div class="rvn-cols">${doc}${rail}</div></div>
 <div class="rvn-ft">${foot}</div>`;
 }
 // The win's rows in the rail: its tier, how the client gets it, the group, and who sends it.

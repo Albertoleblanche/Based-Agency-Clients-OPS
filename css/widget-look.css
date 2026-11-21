@@ -22,7 +22,7 @@ html.ui-w .mac[data-theme="dark"]{
 }
 html.ui-w .mac[data-theme="light"]{
   --desk:#E2E2E6; --window:#EDEDEF; --side:#EDEDEF; --side-solid:#EDEDEF;
-  --grp:#FFFFFF; --col:#EDEDEF; --card:#FFFFFF; --menu:rgba(255,255,255,.97); --field:#FFFFFF;
+  --grp:#FFFFFF; --col:#EDEDEF; --card:#F1F1F3; --menu:rgba(255,255,255,.97); --field:#FFFFFF;
   --label:#121214; --label-2:#67676F; --label-3:#A2A2A9;
   --sep:rgba(0,0,0,.065); --sep-strong:rgba(0,0,0,.14);
   --fill:rgba(0,0,0,.04); --fill-2:rgba(0,0,0,.065); --fill-3:rgba(0,0,0,.1);
@@ -466,7 +466,6 @@ html.ui-w .rvn-list{flex-basis:300px;border-right:0}
 html.ui-w .rvn-sort{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase}
 html.ui-w .rvn-r{border-radius:16px}
 html.ui-w .rvn-r.is-sel{background:var(--card)}
-html.ui-w .rvn-r .mono{display:none}
 html.ui-w .rvn-r .tx b{font-weight:500}
 html.ui-w .rvn-due.is-late{color:var(--uw-risk);font-weight:500}
 html.ui-w .rvn-due.is-soon{font-weight:500}
@@ -477,7 +476,7 @@ html.ui-w .rvn-nav .ib{width:32px;height:32px;border-radius:50%;box-shadow:0 0 0
 html.ui-w .rvn-cols{grid-template-columns:minmax(0,1fr) 300px;column-gap:30px}
 html.ui-w .rvn-hd .tx b{font-weight:500}
 html.ui-w .rvn-subj{font-size:24px;font-weight:400;letter-spacing:-.025em}
-html.ui-w .rvn-rail{padding-left:28px;border-left:1px solid var(--sep)}
+html.ui-w .rvn-cols:not(.is-one) .rvn-rail{padding-left:28px;border-left:1px solid var(--sep)}
 html.ui-w .rvn-rs b{font-weight:500}
 html.ui-w .rvn-rs span{font-family:var(--mono);font-size:12px;font-weight:500}
 html.ui-w .rvn-i time{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase}
@@ -699,3 +698,117 @@ html.ui-w .tm-flat .row .tx{flex:1 1 100%;min-width:0}
 html.ui-w .tm-flat .row .r{margin-left:0;gap:8px}
 @media (hover:hover) and (pointer:fine){html.ui-w .tm-pf [role=radio][aria-checked=false]:hover{background:var(--uw-c2)}}
 html.ui-w #view-calendar.active:not(:has(> .cal-up)){grid-template-columns:minmax(0,1fr)}
+
+/* ---- All Clients, the canvas columns: client, service, owner, health, hours, this week ---- */
+html.ui-w .cl-table.is-uw :is(.cl-head,.cl-r){grid-template-columns:minmax(170px,1.5fr) minmax(100px,1fr) minmax(70px,.7fr) minmax(170px,1.6fr) minmax(120px,1fr) minmax(130px,1.2fr)}
+html.ui-w .cl-th{display:flex;align-items:center;gap:10px;min-height:34px;padding:16px 22px 6px}
+html.ui-w .cl-thi{width:34px;height:34px;border-radius:11px;background:var(--uw-c2);display:grid;place-items:center;color:var(--label)}
+html.ui-w .cl-thi svg{width:16px;height:16px}
+html.ui-w .cl-th b{font-size:14px;font-weight:500}
+html.ui-w .cl-thn{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--label-3)}
+html.ui-w .cl-table.is-uw .cl-head{border-radius:0;padding:0 28px}
+html.ui-w .cl-sv{font-size:13px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.ui-w .cl-table.is-uw .cl-hrs{display:flex;flex-direction:column;align-items:stretch;justify-self:stretch;text-align:left;gap:6px;min-width:0;padding-right:18px}
+html.ui-w .cl-hrs > span{font-family:var(--mono);font-size:11.5px;font-weight:500;color:var(--label-2)}
+html.ui-w .cl-hrs > span.is-over{color:var(--uw-risk)}
+html.ui-w .cl-hrs i{display:block;height:4px;border-radius:99px;background:var(--uw-c3);overflow:hidden}
+html.ui-w .cl-hrs i em{display:block;height:100%;border-radius:99px;background:var(--label)}
+html.ui-w .cl-hrs i em.is-over{background:var(--uw-risk)}
+html.ui-w .mac[data-theme] #clientsRoot{--cl-r:var(--uw-risk);--cl-y:var(--uw-watch)}
+html.ui-w .cl-h{font-weight:400}
+html.ui-w .cl-wk{font-weight:400}
+html.ui-w .cl-wk.is-late{color:var(--uw-risk);font-weight:500}
+
+/* ---- Plan: the next weeks in a card, Coming up in a card, the side column beside them ---- */
+html.ui-w .pl-body{grid-template-columns:minmax(0,1fr) 320px;column-gap:14px;margin-top:20px}
+html.ui-w .pl-main{display:flex;flex-direction:column;gap:14px}
+html.ui-w :is(.pl-tl,.pl-ah){padding:16px 22px 18px;border-radius:28px;background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
+html.ui-w .pl-ah{margin-top:0}
+html.ui-w .pl-tlh{display:flex;align-items:center;gap:10px;min-height:34px;margin-bottom:14px}
+html.ui-w .pl-tlh .pl-tli{width:34px;height:34px;border-radius:11px;background:var(--uw-c2);display:grid;place-items:center;color:var(--label)}
+html.ui-w .pl-tlh .pl-tli svg{width:16px;height:16px}
+html.ui-w .pl-tlh b{font-size:14px;font-weight:500}
+html.ui-w .pl-tlh .uw-pill{margin-left:auto}
+html.ui-w .pl-tlh .pl-tlc{margin-left:auto;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 12px;border-radius:999px;background:var(--uw-c2);box-shadow:0 0 0 1px var(--sep);font-size:12.5px;color:var(--label-2)}
+html.ui-w .pl-tlh .pl-tlc i{width:7px;height:7px;border-radius:50%;background:var(--uw-good)}
+html.ui-w .pl-wk b{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--label-3)}
+html.ui-w .pl-wk.is-now b{color:var(--label)}
+html.ui-w .pl-wk span{font-family:var(--mono);font-size:11px}
+html.ui-w .pl-wk i{height:4px;border-radius:99px;background:var(--uw-c3)}
+html.ui-w .pl-wk i em{border-radius:99px;background:var(--label)}
+html.ui-w .pl-wk i em.is-over{background:var(--uw-risk)}
+html.ui-w .pl-days{border-bottom-color:var(--sep)}
+html.ui-w .pl-days > span{font-family:var(--mono);font-size:9.5px}
+html.ui-w .pl-days > span.is-today{color:var(--window)}
+html.ui-w .pl-days > span.is-today::before{background:var(--label)}
+html.ui-w .pl-ah-h h3{font-size:14px;font-weight:500}
+html.ui-w .pl-ah-r{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--label-3)}
+html.ui-w .pl-gh b{font-size:13.5px}
+html.ui-w .pl-sec{margin-top:18px}
+html.ui-w .pl-side .pl-sec:first-child{margin-top:0}
+html.ui-w .pl-ghost{border-radius:16px}
+html.ui-w .cl-head button{text-transform:inherit;letter-spacing:inherit;font-family:inherit}
+@container (max-width:960px){
+  html.ui-w .cl-table.is-uw :is(.cl-head,.cl-r){grid-template-columns:minmax(150px,1.5fr) minmax(64px,.6fr) minmax(150px,1.6fr) minmax(100px,1fr) minmax(120px,1.2fr)}
+  html.ui-w .cl-table.is-uw .cl-head > :nth-child(2),html.ui-w .cl-table.is-uw .cl-r > .cl-sv{display:none}
+  html.ui-w .cl-table.is-uw .cl-head > :nth-child(5){display:inline-flex}
+}
+
+/* ---- Review as on the canvas: the list, the letter and Before you send as three cards ---- */
+html.ui-w .rvn-list{flex-basis:290px}
+html.ui-w .rvn-railc{flex:0 0 300px;min-width:0;overflow:auto;padding:20px 22px;border-radius:28px;background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
+html.ui-w .rvn-cols.is-one{grid-template-columns:minmax(0,1fr);padding:26px 30px 30px}
+html.ui-w .rvn-railc .rvn-rail{padding:0;border:0}
+html.ui-w .rvn-railc .rvn-rs{border-bottom:0;padding-bottom:6px}
+html.ui-w .rvn-railc .rvn-rs.rvn-s2{margin-top:18px;padding-top:14px;border-top:1px solid var(--sep)}
+html.ui-w .rvn-railc .rvn-rs.rvn-s2 b{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--label-3)}
+html.ui-w .rvn-railc .rvn-kv{border-top:1px solid var(--sep)}
+html.ui-w .rvn-railc .rvn-rs + .rvn-kv{border-top:0}
+html.ui-w .rvn-r .mono{width:30px;height:30px;border-radius:10px;font-size:10.5px;font-family:var(--mono);font-weight:500;background:var(--uw-c2)!important;color:var(--label-2)!important}
+html.ui-w .rvn-hd .mono.lg{border-radius:14px;font-family:var(--mono);font-weight:500;background:var(--uw-c2)!important;color:var(--label-2)!important}
+html.ui-w .rvn-body{font-size:14.5px;line-height:1.65}
+html.ui-w .rvn-body b{font-weight:600}
+html.ui-w .rvn-ft-note{color:var(--label-2)}
+
+/* ---- the colour you pick for a note or a task shows on its card ---- */
+html.ui-w :is(.n1-t,.tk-c){position:relative}
+html.ui-w :is(.n1-t,.tk-c).has-c{background:color-mix(in srgb,var(--cc) 7%,var(--grp))}
+html.ui-w :is(.n1-t,.tk-c).has-c::before{content:'';position:absolute;left:0;top:20px;bottom:20px;width:3px;border-radius:0 3px 3px 0;background:var(--cc)}
+html.ui-w .n1-t.has-c,html.ui-w .tk-c.has-c{box-shadow:0 0 0 1px color-mix(in srgb,var(--cc) 22%,var(--sep)),var(--uw-shadow),var(--uw-hi)}
+html.ui-w .n1-t.has-c .n1-cl,html.ui-w .tk-c.has-c .tk-cl{color:var(--cc)}
+html.ui-w .tk-c.has-c.is-sel{background:color-mix(in srgb,var(--cc) 12%,var(--card))}
+@media (hover:hover) and (pointer:fine){html.ui-w :is(.n1-t,.tk-c).has-c:not(.is-sel):hover{background:color-mix(in srgb,var(--cc) 11%,var(--grp))}}
+html.ui-w .mac{--red:var(--uw-risk)}
+
+/* ---- the note sheet: smaller, a card like the rest ---- */
+html.ui-w .n1-sheet{top:56px;bottom:auto;width:680px;height:min(560px,calc(100% - 112px));border-radius:28px;background:var(--grp)}
+html.ui-w .n1-sheet.is-new{height:min(440px,calc(100% - 112px))}
+html.ui-w .n1-sheet.has-c{box-shadow:inset 3px 0 0 var(--cc),0 0 0 1px var(--sep),0 30px 90px rgba(0,0,0,.5)}
+html.ui-w .n1-doc{padding:24px 40px 22px}
+html.ui-w .mac .n1-h2,html.ui-w .mac .n1-h2:focus{font-size:24px;font-weight:500;letter-spacing:-.02em}
+html.ui-w .n1-body{margin-top:18px;font-size:14.5px;line-height:1.65}
+html.ui-w .n1-sh{padding:16px 18px 0}
+html.ui-w .n1-card .n1-sheet{width:100%;height:min(560px,calc(100vh - 120px))}
+html.ui-w .n1-card .n1-sheet{top:auto}
+
+/* ---- the sidebar as a card, like everything else; a minimal toggle ---- */
+html.ui-w .mac[data-theme] .app-win .side{margin:10px 0 10px 10px;height:calc(100% - 20px);flex-basis:224px;width:224px;padding:0 10px 10px;border-radius:28px;background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi);--sb-on:var(--uw-c2);--sb-hover:var(--uw-c2)}
+html.ui-w body.sidebar-collapsed .app-win .side{margin-left:-240px}
+html.ui-w .mac .app-win .side .side-head{margin:0 -10px;padding:14px 16px 4px}
+html.ui-w .mac .side-brand .brand-mark{width:30px;height:30px;border-radius:10px;font-size:11.5px}
+html.ui-w .mac .side-brand .brand-name{font-size:13.5px;font-weight:500}
+html.ui-w .mac .side-brand .brand-sub{font-family:var(--mono);font-size:9px;font-weight:500;letter-spacing:.08em;color:var(--label-3)}
+html.ui-w .mac .app-win .side .src{margin-top:12px}
+html.ui-w .mac .app-win .side .src-sep{height:0;margin:7px 0;background:transparent}
+html.ui-w .mac[data-theme] .app-win .side .src-i.on{box-shadow:none}
+html.ui-w .mac .side-foot{border-top:0;margin-top:4px;padding:8px 6px 2px}
+html.ui-w .mac .side-me :is(.av,.av-img){display:none!important}
+html.ui-w .mac .side-me .who b{font-size:13.5px;font-weight:500}
+html.ui-w .mac .stm{background:var(--uw-c2);box-shadow:none}
+html.ui-w .ic-classic{display:none}
+html.ui-w .ic-uw{display:block}
+
+/* ---- scrollbars: hidden until you're over what scrolls ---- */
+html.ui-w,html.ui-w *{scrollbar-width:thin;scrollbar-color:transparent transparent}
+html.ui-w :hover{scrollbar-color:var(--sep-strong) transparent}
+html.ui-w .mac[data-theme="light"] :hover{scrollbar-color:rgba(0,0,0,.18) transparent}

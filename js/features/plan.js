@@ -247,7 +247,9 @@ function renderPlan(){
   const head = `<div class="pl-hd"><div><h2>Your next ${weeks === 6 ? '6 weeks' : '3 months'}</h2><p>${sub}</p></div>
 <div class="pl-f"><div class="seg" role="tablist" aria-label="Range"><button class="${weeks === 6 ? 'on' : ''}" role="tab" aria-selected="${weeks === 6}" onclick="setPlanRange(6)">6 Weeks</button><button class="${weeks === 13 ? 'on' : ''}" role="tab" aria-selected="${weeks === 13}" onclick="setPlanRange(13)">3 Months</button></div>
 ${used.length ? `<label class="pop pop-sel"><span class="pl">Client: ${escapeHtml(curC ? curC.name : 'All')}</span>${icon('caret-down')}<select aria-label="Client" onchange="setPlanClient(this.value)"><option value="all">All</option>${used.map(c => `<option value="${c.id}"${c === curC ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></label>` : ''}</div></div>`;
-  const timeline = `<section class="pl-tl${weeks > 6 ? ' is-long' : ''}" aria-label="The next ${weeks} weeks" style="--cols:${cols}">
+  // the new look (beta): the timeline is a card with its own head, like the canvas
+  const uwHead = typeof uiStyleOn === 'function' && uiStyleOn() ? `<div class="pl-tlh"><span class="pl-tli">${icon('plan')}</span><b>Next ${weeks === 6 ? 'six weeks' : '3 months'}</b><span class="pl-tlc"><i></i>${planWeeklyHours} h a week for planned work</span></div>` : '';
+  const timeline = `<section class="pl-tl${weeks > 6 ? ' is-long' : ''}" aria-label="The next ${weeks} weeks" style="--cols:${cols}">${uwHead}
 <div class="pl-wks" style="grid-template-columns:repeat(${weeks},minmax(0,1fr))">${wkHtml}</div>
 <div class="pl-days" aria-hidden="true">${days}</div>
 <div class="pl-lanes" style="--wk:${weeks}">${offHtml}<span class="pl-now" aria-hidden="true" style="left:${nowLeft.toFixed(2)}%"></span>${bars}${ghost}</div>
