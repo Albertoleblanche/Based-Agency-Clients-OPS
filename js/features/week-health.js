@@ -1,7 +1,8 @@
 // The two things Based Radar watches for the team:
-//   1. The weekly update — every client gets one a week, on no fixed day: an approver checks it
-//      and sends it the day it's ready. A client is due 7 days after its last update and
-//      overdue after that. Each client's update is Sent, Due or Overdue.
+//   1. The weekly update — every client gets one a week: an approver checks it and sends it the
+//      day it's ready. A client is due on its win day, else 7 days after its last update (never
+//      on a weekend), and overdue after that; one that never had one is due once, then late.
+//      Each client's update is Sent, Due or Overdue; a client set to "No weekly update" has none.
 //   2. Client health — Watch and At risk, worked out every time data changes from what the
 //      app already knows: updates sent, hours against budget, work logged, overdue tasks and
 //      the owner's own risk flag. Thresholds live in Settings → Updates.
@@ -64,7 +65,8 @@ function updateCycle(now){
 function relDayLower(d){ const r = relDay(d); return r === 'Today' ? 'today' : r; }
 // A time today, else the day: "2:15 PM" · "Monday" · "Nov 12".
 function whenShort(d){ return daysBetween(d, rNow()) <= 0 ? fmtTime(new Date(d)) : relDay(d); }
-// When a client's next update is due: 7 days after its last one (today, if it never had one).
+// When a client's next update is due: its win day each week, else 7 days after its last one (a
+// weekend moves to the Friday before). One that never had one is due once, then late (below).
 function clientDue(c, now){
   now = now || rNow();
   const last = lastSentAt(c);
@@ -76,12 +78,25 @@ function clientDue(c, now){
     const done = !!last && last >= monday, due = done ? addDays(thisDue, 7) : thisDue;
     return { last, due, daysLeft: daysBetween(now, due), done };
   }
-  // Never had one: due a week after the client started (today, if the start date isn't known).
-  const start = c.startDate ? new Date(c.startDate + 'T00:00:00') : null;
-  const due = last ? dayStart(addDays(last, UPDATE_EVERY_DAYS)) : (start && start < now ? addDays(start, UPDATE_EVERY_DAYS) : dayStart(now));
+  // Never had one: due a week after the client started (its start date, else when it was added), and
+  // never before Radar's first Friday. It used to be "due today" every day until one went out (Nov 22).
+  let due;
+  if(last) due = dayStart(addDays(last, UPDATE_EVERY_DAYS));
+  else {
+    const from = clientStartedAt(c), first = new Date(FIRST_UPDATES_DUE + 'T00:00:00');
+    due = from ? dayStart(addDays(from, UPDATE_EVERY_DAYS)) : first;
+    if(due < first) due = first;
+  }
+  due = weekdayDue(due);
   const daysLeft = daysBetween(now, due);
   return { last, due, daysLeft, done: !!last && daysLeft > 0 };
 }
+// Radar started counting weekly updates the week of Monday Nov 23, 2026. A client that hasn't had one
+// through Radar is first due that Friday (or a week after it started, if that's later): due once,
+// then late. Before this it showed "Due today" every day until its first update went out.
+const FIRST_UPDATES_DUE = '2026-11-27';
+// Nothing is due on a weekend: an update that would fall on a Saturday or Sunday is due the Friday before.
+function weekdayDue(d){ const k = d.getDay(); return k === 6 ? addDays(d, -1) : k === 0 ? addDays(d, -2) : d; }
 function dueText(daysLeft, due){
   if(daysLeft < -59) return 'Months overdue';
   if(daysLeft < -13) return `${Math.floor(-daysLeft / 7)} weeks overdue`;
@@ -247,6 +262,8 @@ function logSuggestions(limit){
 
 // ---- this week's update for one client ------------------------------------------------------
 const STEP_NAMES = ['Logged', 'Ready for review', 'Approved', 'Sent'];
+// Work is logged for this update, all of it internal: what to do about it, said the same everywhere.
+const INTERNAL_ONLY_NOTE = 'Nothing for the email yet: log work or switch an item to Email';
 function clientWeek(c){
   const now = rNow(), drafts = c.drafts || [], owner = clientOwner(c);
   const { last, due, daysLeft, done: doneThisWeek } = clientDue(c, now);
@@ -282,11 +299,13 @@ function clientWeek(c){
   else if(inReview) Object.assign(w, { done: 2, draft: inReview, holder: 'approvers', note: `In Review since ${whenShort(inReview.draftPendingSince || now)}` });
   else if(written) Object.assign(w, { done: 1, draft: written, holder: written.author, note: `Draft waiting on ${firstName(written.author)} since ${whenShort(written.draftPendingSince || now)}` });
   else if(forEmail.length) Object.assign(w, { done: 1, note: `${forEmail.length} improvement${forEmail.length === 1 ? '' : 's'} logged · no draft yet` });
-  else if(logged.length) w.note = `${logged.length} logged, all internal · nothing for the email yet`;
+  else if(logged.length) w.note = INTERNAL_ONLY_NOTE;
   else {
     const lastLog = (c.improvements || []).map(i => new Date(i.date)).filter(d => d <= now).sort((a, b) => b - a)[0];
     w.note = lastLog ? `Nothing logged since ${fmtShortDate(lastLog)}` : 'Nothing logged yet';
   }
+  // Set to "No weekly update" (the agency itself, an internal client): nothing is ever due.
+  if(!getsUpdates(c)) return Object.assign(w, { off: true, state: 'off', holder: '', daysLeft: 9999, dueText: 'No weekly update', note: 'No weekly update · work and hours are still logged' });
   // Sent in the last 7 days: done for this week. The next update's progress is kept in w.next.
   if(doneThisWeek){
     const sentDraft = drafts.filter(d => d.draftSentAt).sort((a, b) => new Date(b.draftSentAt) - new Date(a.draftSentAt))[0] || null;
@@ -313,6 +332,7 @@ function draftHasNoWork(c, d, logged){
 function weekView(w){ return w.sent && w.next && w.daysLeft <= 2 ? Object.assign({}, w, w.next, { sent: false, behind: null, upcoming: true }) : w; }
 function needsUpdate(w){ return w.state === 'due' || w.state === 'late'; }
 function stepsHtml(w){
+  if(w.off) return '';
   if(w.sent) return '<span class="steps sent" role="img" aria-label="Sent"><i></i><i></i><i></i><i></i></span>';
   if(w.upcoming){ let o = ''; for(let k = 0; k < 4; k++) o += k < w.done ? '<i class="d"></i>' : '<i></i>'; return `<span class="steps" role="img" aria-label="${w.dueText}: ${w.done ? STEP_NAMES[w.done - 1].toLowerCase() : 'not started'}">${o}</span>`; }
   let out = '';
@@ -366,6 +386,9 @@ function clientHealth(c){
   const last = lastSentAt(c);
   const noUpd = last ? daysBetween(last, now) : null;
   const w = clientWeek(c);
+  // No weekly update (the agency itself, an internal client): Health doesn't watch it, so it never
+  // shows Watch or At risk anywhere. Its hours still show in its panel.
+  if(!getsUpdates(c)) return { level: 'g', rawLevel: 'g', quiet: false, signals: [], since: null, short: null, hp: hoursPace(c), seq: weekHistory(c), off: true };
   if(noUpd != null){
     const l = lvl(noUpd, T.noUpdateDays);
     if(l) sig.push({ l, key: 'noupdate', icon: 'mail', title: 'Updates keep slipping', since: addDays(last, T.noUpdateDays[0]),
@@ -429,6 +452,7 @@ function overdueShort(w){
   return d < 14 ? `${d}d overdue` : d < 60 ? `${Math.floor(d / 7)} weeks overdue` : 'Months overdue';
 }
 function dueTag(w){
+  if(w.off) return tagHtml('gray', 'No weekly update');
   if(w.sent) return tagHtml('green', 'Sent ' + shortDay(w.last), 'check');
   if(w.late) return tagHtml('red', overdueShort(w));
   if(w.state === 'due') return tagHtml('yellow', 'Due today', 'clock');
@@ -438,12 +462,13 @@ function dueTag(w){
 function nextDueTag(w){ return w.sent ? tagHtml('gray', w.daysLeft === 1 ? 'Due tomorrow' : 'Due ' + (w.daysLeft < 7 ? DAY_NAMES[w.due.getDay()].slice(0, 3) : fmtShortDate(w.due)), 'clock') : dueTag(w); }
 // Where the update is: one word, colored by stage.
 function stageTag(w){
-  if(w.sent) return '';
+  if(w.sent || w.off) return '';
   const d = w.draft;
   if(w.done >= 3) return tagHtml('purple', 'Approved');
   if(w.done === 2) return tagHtml('blue', 'In Review');
   if(d) return tagHtml('gray', 'Draft');
   if(w.done === 1) return tagHtml('gray', `${w.forEmail.length} logged`);
+  if(w.logged.length) return tagHtml('gray', 'Only internal');   // logged, nothing for the email yet
   return tagHtml('gray', 'Nothing logged');
 }
 // Each health signal as an icon and a few words: "Over budget" · "2/4 late" · "8d quiet".

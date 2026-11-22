@@ -837,7 +837,7 @@ ${mIsh('Needs setup')}<div class="ig"><div class="ir"><span class="t n" style="w
     const steps = STEP_NAMES.map((n, k) => mIr(`<span class="gl" style="color:${w.sent || k < w.done ? 'var(--green)' : w.behind === k ? (w.late ? 'var(--red)' : 'var(--yellow)') : 'var(--label-3)'}">${icon(w.sent || k < w.done ? 'check-circle' : w.behind === k ? 'warning' : 'circle')}</span>`, n, '', k === 3 ? (w.sent ? mEsc(relDay(w.last)) : `<span class="${w.late ? 't-red' : ''}">${mEsc(w.dueText)}</span>`) : '', null, { n: true })).join('');
     return `<div class="idetail" style="display:flex;gap:12px;align-items:center;margin-top:4px">${monoHtml(c, 'lg')}<div style="min-width:0"><h1 style="font-size:24px;font-weight:700;letter-spacing:-.02em;margin:0">${mEsc(c.name)}</h1><div class="ikv">${mEsc([c.service, w.owner].filter(Boolean).join(' · '))}</div></div></div>
 ${h.level !== 'g' ? `<div class="tags iwrap" style="margin:14px 16px 0">${healthTag(h.level)}${signalChips(h, 4)}</div>` : ''}
-${mIsh('This week’s update')}<div class="ig">${steps}</div>
+${mIsh('This week’s update')}${w.off ? `<div class="ig">${mIr('', 'No weekly update', '', '', null, { n: true })}</div><p class="ifoot">It isn’t on This Week, Today or Health. Work and hours are still logged here.</p>` : `<div class="ig">${steps}</div>`}
 ${waCanWork(c) ? `<div style="margin:12px 16px 0"><button class="ibtn s" onclick="mOpenLog('${c.id}')">${icon('plus')}Log Improvement</button></div>` : `<p class="ifoot" style="margin-top:12px">${mEsc(waOutsideWords(c))}</p>`}
 ${mIsh('Logged')}<div class="ig">${imps.map(i => mIr('', mEsc(i.text), `${mEsc(i.author)} · ${fmtShortDate(new Date(i.date))}${i.includeInEmail === false ? ' · internal' : ''}`, '', null, { n: true })).join('') || '<div class="ir"><span class="t n" style="color:var(--label-2)">Nothing logged yet</span></div>'}</div>`;
   });
@@ -849,7 +849,7 @@ function mOpenCalendar(){
       const d = addDays(t0, k), ds = toDateStr(d);
       const evs = calendarEvents.filter(e => toDateStr(new Date(e.startAt)) === ds && (!e.attendeeIds.length || e.attendeeIds.includes(currentUser.id) || e.createdBy === currentUser.id));
       const ts = mVisibleTasks().filter(t => t.status !== 'done' && t.dueDate === ds && t.assigneeId === currentUser.id);
-      const dueHere = activeClients().filter(c => { const due = clientDue(c).due; return toDateStr(due < t0 ? t0 : due) === ds; });
+      const dueHere = attentionEligibleClients().filter(c => { const due = clientDue(c).due; return toDateStr(due < t0 ? t0 : due) === ds; });
       const send = dueHere.length ? [mIr(`<span class="gl" style="color:var(--red)">${icon('paper-plane-tilt')}</span>`, `${dueHere.length} update${dueHere.length === 1 ? '' : 's'} due`, mEsc(dueHere.slice(0, 3).map(c => c.name).join(', ') + (dueHere.length > 3 ? '…' : '')), '', k === 0 ? 'mOpenWeek()' : null, { n: true })] : [];
       const rows = [...send, ...evs.map(e => mIr(`<span class="gl">${icon('calendar-blank')}</span>`, mEsc(e.title), mEsc(clients.find(c => c.id === e.clientId)?.name || e.location || ''), e.allDay ? 'All day' : fmtTime(new Date(e.startAt)), null, { n: true })), ...ts.map(mTaskRow)];
       if(rows.length) days.push(`${mIsh(k === 0 ? 'Today' : k === 1 ? 'Tomorrow' : d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }))}<div class="ig">${rows.join('')}</div>`);
@@ -1059,12 +1059,18 @@ ${svcRow}
 ${mRowPick('Date', dateLabel, 'mLogPick(\'date\')', true)}
 <div class="ir"><label class="ilab" for="mLogTime">Time spent</label><input class="tm" id="mLogTime" inputmode="decimal" placeholder="0:30" oninput="mKeep('mLogTime',this.value);mLog_.useTimer=false" onchange="mLogTimeSet()">${timerState.running ? `<button class="link" onclick="mLogUseTimer()">Use timer</button>` : ''}</div>
 ${hvTimeOn() && L.hasTime ? mHvRows(L, 'mLogPick') : ''}</div>${hvTimeOn() && L.hasTime && mHvBill(L) ? `<p class="ifoot">Time spent is ${mHvBill(L).toLowerCase()}.</p>` : ''}
-<div class="ig flat" style="margin-top:20px"><div class="ir"><span class="ilab">Include in the client email</span>${mSw('mLogInclude', true, 'Include in the client email')}</div></div>
-<p class="ifoot">Turn off for internal work the client doesn’t need to hear about.</p>`;
+<div class="ig flat" style="margin-top:20px"><div class="ir"><span class="ilab">Include in the client email</span>${mSw('mLogInclude', mLogIncOn(), 'Include in the client email')}</div></div>
+<p class="ifoot">${lc && !getsUpdates(lc) ? `${mEsc(lc.name)} gets no weekly update, so its work stays internal.` : 'Turn off for internal work the client doesn’t need to hear about.'}</p>`;
 }
+// "Include in the client email" starts on, or off for a client with no weekly update (Nov 22). Once
+// you flip it, it stays as you set it while you change the other rows.
+function mLogIncDefault(){ const c = clients.find(x => x.id === mLog_.clientId); return !c || getsUpdates(c); }
+function mLogIncOn(){ return mLog_.inc != null ? mLog_.inc : mLogIncDefault(); }
 function mLogPick(what){
   const keepInc = mIsOn('mLogInclude');
-  const back = () => { const t = mSheetVal('mLogText'), tm = mSheetVal('mLogTime'); $m('mSheet').querySelector('.sheet-scroll').innerHTML = mLogBody(); $m('mLogText').value = t; $m('mLogTime').value = tm; if(!keepInc){ $m('mLogInclude').classList.remove('on'); } };
+  // flipped by hand: keep it; else follow the client (picking another client may change the default)
+  mLog_.inc = keepInc !== mLogIncDefault() ? keepInc : null;
+  const back = () => { const t = mSheetVal('mLogText'), tm = mSheetVal('mLogTime'); $m('mSheet').querySelector('.sheet-scroll').innerHTML = mLogBody(); $m('mLogText').value = t; $m('mLogTime').value = tm; };
   mKeep('mLogText', mSheetVal('mLogText')); mKeep('mLogTime', mSheetVal('mLogTime'));
   if(what === 'client') mPickClient(mLog_.clientId, v => { mLog_.clientId = v; const c = clients.find(x => x.id === v); if(c && c.service) mLog_.service = c.service; mHvClient(mLog_); back(); }, null, true);
   if(what === 'service') mPick('Service', [...new Set([mLog_.service, ...(settings.serviceOptions || [])].filter(Boolean))].map(s => [s, s]), mLog_.service, v => { mLog_.service = v; back(); });
@@ -1077,7 +1083,8 @@ function mLogTimeSet(){
   if(!hvTimeOn() || has === !!mLog_.hasTime) return;
   mLog_.hasTime = has;
   const keepInc = mIsOn('mLogInclude'), t = mSheetVal('mLogText'), tm = mSheetVal('mLogTime');
-  $m('mSheet').querySelector('.sheet-scroll').innerHTML = mLogBody(); $m('mLogText').value = t; $m('mLogTime').value = tm; if(!keepInc) $m('mLogInclude').classList.remove('on');
+  mLog_.inc = keepInc !== mLogIncDefault() ? keepInc : null;
+  $m('mSheet').querySelector('.sheet-scroll').innerHTML = mLogBody(); $m('mLogText').value = t; $m('mLogTime').value = tm;
 }
 function mLogUseTimer(){
   const m = Math.max(1, Math.round((Date.now() - timerState.startedAt) / 60000));

@@ -52,7 +52,11 @@ function showPausedClientWarning(clientId){
 // pending-approval badges) — not at the many other activeClients() call
 // sites like client-picker dropdowns or duplicate-name checks, where a
 // paused client still needs to be findable.
-function attentionEligibleClients(){ return activeClients().filter(c=>c.status!=='Paused'); }
+// Clients set to "No weekly update" (the agency itself, an internal client) are left out too: no
+// update is ever due, so they stay off Today, This Week, the Queue, Review and Health (Nov 22).
+// Their work is still logged and their hours tracked; they're still in All Clients.
+function getsUpdates(c){ return !(c && c.customFieldValues && c.customFieldValues.weeklyUpdate === 'off'); }
+function attentionEligibleClients(){ return activeClients().filter(c=>c.status!=='Paused' && getsUpdates(c)); }
 let log = [];
 let notes = [];
 let notesDataLoaded = false;

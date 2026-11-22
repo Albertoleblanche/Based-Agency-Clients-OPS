@@ -286,7 +286,7 @@ ${oNames.length ? `<div class="rvn-rs rvn-s2"><b>Other parts</b><span>${oNames.l
   else if(x.st === 'write') foot = `<span class="rvn-ft-note">${icon('sparkle')}Written from the ${todayPlural(x.email.length, 'item')} with Email on</span><span class="rvn-sp"></span><button class="btn btn-p rvn-main" onclick="generateDraft(${A})">${icon('sparkle')}Write Draft</button>`;
   else if(x.st === 'next') foot = `<span class="rvn-ft-note">${icon('clock')}You can write it once the update ${x.held && x.held.draftStatus === 'approved' ? 'that’s approved' : 'in review'} is sent.</span><span class="rvn-sp"></span><button class="btn btn-p rvn-main" disabled title="Once the update in review is sent">${icon('sparkle')}Write Draft</button>`;
   else if(x.st === 'missed') foot = `<span class="rvn-ft-note">Add the work that never went out to the next update, or leave it out.</span><span class="rvn-sp"></span>`;
-  else if(x.st === 'internal') foot = `<span class="rvn-ft-note">Nothing is marked for the email yet. Switch Email on for an item, or log more.</span><span class="rvn-sp"></span><button class="btn btn-p rvn-main" disabled title="Switch Email on for something first">${icon('sparkle')}Write Draft</button>`;
+  else if(x.st === 'internal') foot = `<span class="rvn-ft-note">${INTERNAL_ONLY_NOTE}.</span><span class="rvn-sp"></span><button class="btn btn-p rvn-main" disabled title="Switch Email on for something first">${icon('sparkle')}Write Draft</button>`;
   else if(x.st === 'empty') foot = x.email.length
     ? `<span class="rvn-ft-note">Rewrite it from what’s logged now to send it.</span><span class="rvn-sp"></span><button class="btn btn-p rvn-main" onclick="generateDraft(${A})">${icon('sparkle')}Rewrite Draft</button>`
     : `<span class="rvn-ft-note">Log this week’s work, then rewrite it to send it.</span><span class="rvn-sp"></span>`;
@@ -330,6 +330,12 @@ function queueStep(dir){
 }
 // Open a client in the queue (from elsewhere in the app).
 // tab: which of the client's lines to open, when it has one in each (In review and its Next update)
+// Only internal work of yours logged for a client (Nov 22): open it in the Queue with that work
+// showing, to switch an item to Email. It stays there until you move on, like one you just switched.
+function openQueueInternal(id){
+  quResetEdits(); window._quKeep = id; window._queueSel = id; queueTab = 'todo';
+  if(currentViewName !== 'queue') switchView('queue'); else renderMyQueue();
+}
 function openQueueClient(id, tab){
   window._queueSel = id; quResetEdits();
   if(tab && queueTabs().includes(tab) && queueItems()[tab].some(x => x.c.id === id)) queueTab = tab;

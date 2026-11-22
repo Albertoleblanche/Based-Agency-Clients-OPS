@@ -39,7 +39,7 @@ function clBulkMenu(e){
   const r = e.currentTarget.getBoundingClientRect();
   m.style.top = (r.bottom + 4) + 'px'; m.style.right = (window.innerWidth - r.right) + 'px';
   const canMatch = typeof openMatchClientsSheet === 'function' && setupClients().length;
-  m.innerHTML = `<button class="mi" role="menuitem" onclick="clBulkStart()">${icon('list-checks')}<span><b>Edit Several Clients…</b><small>Tick clients, then set their status, importance, risk or hours a month at once.</small></span></button>`
+  m.innerHTML = `<button class="mi" role="menuitem" onclick="clBulkStart()">${icon('list-checks')}<span><b>Edit Several Clients…</b><small>Tick clients, then set their owner, status, importance, risk, hours or weekly update at once.</small></span></button>`
     + (canMatch ? `<button class="mi" role="menuitem" onclick="openMatchClientsSheet()">${icon('git-merge')}<span><b>Match to Existing Clients…</b><small>Clients added from Harvest that you already have under another name: merge them into yours.</small></span></button>` : '');
   document.body.appendChild(m);
   setTimeout(() => document.addEventListener('click', () => m.remove(), { once: true }), 0);
@@ -53,6 +53,16 @@ function clBulkStart(){
   document.querySelectorAll('#clientsTbody .cl-ck').forEach(ck => ck.animate?.([{ opacity: 0, transform: 'scale(.8)' }, { opacity: 1, transform: 'none' }], { duration: 180, easing: 'cubic-bezier(.23,1,.32,1)' }));
 }
 function clBulkEnd(){ clBulk = null; renderClientsTable(); }
+// Bulk Edit with these clients ticked and the sheet open: This Week's "Set Owners" for the clients
+// with no owner yet (Nov 22). The list shows every client so each ticked one is in view.
+function clBulkEditClients(ids){
+  if(!canApprove() || !ids || !ids.length) return;
+  clientsSeg = 'all'; clientsOwnerFilter = 'all'; clientsMine = false; clientFilters.search = '';
+  if(currentViewName !== 'clients') switchView('clients');
+  clBulk = new Set(ids.filter(id => clients.some(c => c.id === id))); inspectedClientId = null; renderClientsTable();
+  openClientsBulkSheet();
+  setTimeout(() => document.getElementById('bkOwner')?.focus(), 40);
+}
 function clBulkToggle(id){
   if(!clBulk) return;
   if(clBulk.has(id)) clBulk.delete(id); else clBulk.add(id);
@@ -85,13 +95,16 @@ function openClientsBulkSheet(){
   const picked = clients.filter(c => clBulk.has(c.id)), n = picked.length;
   const names = picked.slice(0, 3).map(c => c.name).join(', ') + (n > 3 ? ` and ${n - 3} more` : '');
   const keep = [['', 'Keep as is']];
+  const people = (typeof teamProfiles !== 'undefined' ? teamProfiles : []).filter(p => p.name && !p.access_revoked).map(p => p.name).sort();
   openAppModal(`<h3>Edit ${n} Client${n === 1 ? '' : 's'}</h3>
 <p class="t-2 bk-sub">${escapeHtml(names)}. Only what you change here changes; everything else stays as each client has it.</p>
 <div class="f bk-f">
+<label for="bkOwner">Owner</label><div>${sheetPop('bkOwner', 'Owner', keep.concat([['@auto', 'Automatic']], people.map(p => [p, p])), '')}</div>
 <label for="bkStatus">Status</label><div>${sheetPop('bkStatus', 'Status', keep.concat((settings.statusOptions || []).map(s => [s, s])), '')}</div>
 <label for="bkImportance">Importance${infoTip('How much this client matters to the agency, from 1 to 10. At 8 or more, a client on Watch counts as At risk, and it comes first when two updates are due the same day.', 'What does Importance do?')}</label><div>${sheetPop('bkImportance', 'Importance', keep.concat(Array.from({ length: 10 }, (_, i) => [String(i + 1), `${i + 1} of 10`])), '')}</div>
 <label for="bkDanger">Risk${infoTip('Your read on how likely the client is to leave, from 1 (low) to 5 (high). At 3 Health puts the client on Watch; at 4 or 5, At risk, flagged by its owner.', 'What does Risk do?')}</label><div>${sheetPop('bkDanger', 'Risk', keep.concat([['1', '1 · Low'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5 · High']]), '')}</div>
 <label for="bkHours">Hours a month</label><div class="bk-h"><input type="number" id="bkHours" class="tf" min="0" step="0.5" placeholder="Keep as is"><span class="t-2">0 removes it</span></div>
+<label for="bkWeekly">Weekly update${infoTip('No weekly update is for the agency itself or an internal client: nothing is ever due, so it stays off This Week, Today, the Queue and Health. Work and hours are still logged.', 'What does Weekly update do?')}</label><div>${sheetPop('bkWeekly', 'Weekly update', keep.concat([['on', 'Every week'], ['off', 'No weekly update']]), '')}</div>
 </div>
 <div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" id="bkSave" onclick="saveClientsBulk()">Save to ${n} Client${n === 1 ? '' : 's'}</button></div>`, 520);
 }
@@ -104,12 +117,22 @@ async function saveClientsBulk(){
   if(v('bkDanger')){ fields.danger = Number(v('bkDanger')); words.push(`risk to ${fields.danger}`); }
   const hrs = v('bkHours').trim();
   if(hrs !== ''){ const h = Math.max(0, Number(hrs) || 0); fields.monthlyHourBudget = h || null; words.push(h ? `hours a month to ${h}` : 'no monthly hours'); }
+  // owner and weekly update live in each client's own custom values, so they're merged per client
+  const cf = {};
+  if(v('bkOwner')){ cf.owner = v('bkOwner') === '@auto' ? null : v('bkOwner'); words.unshift(cf.owner ? `owner to ${cf.owner}` : 'owner to automatic'); }
+  if(v('bkWeekly')){ cf.weeklyUpdate = v('bkWeekly') === 'off' ? 'off' : null; words.push(cf.weeklyUpdate ? 'no weekly update' : 'a weekly update'); }
   if(!words.length){ showToast('info', 'Nothing to change yet', 'Pick a new value for at least one field.'); return; }
   const btn = document.getElementById('bkSave'); if(btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
   const picked = clients.filter(c => clBulk.has(c.id));
   const results = await Promise.all(picked.map(async c => {
-    const ok = await updateClientRow(c.id, fields);
-    if(ok){ Object.assign(c, fields); if(typeof logClientActivity === 'function') logClientActivity(c.id, 'client_updated', `${myName() || 'Someone'} set ${words.join(', ')}${picked.length > 1 ? ` for ${picked.length} clients at once` : ''}.`); }
+    const mine = Object.assign({}, fields);
+    if(Object.keys(cf).length){
+      const cfv = Object.assign({}, c.customFieldValues || {});
+      Object.entries(cf).forEach(([k, x]) => { if(x == null) delete cfv[k]; else cfv[k] = x; });
+      mine.customFieldValues = cfv;
+    }
+    const ok = await updateClientRow(c.id, mine);
+    if(ok){ Object.assign(c, mine); if(typeof logClientActivity === 'function') logClientActivity(c.id, 'client_updated', `${myName() || 'Someone'} set ${words.join(', ')}${picked.length > 1 ? ` for ${picked.length} clients at once` : ''}.`); }
     return ok;
   }));
   const done = results.filter(Boolean).length, failed = results.length - done;
@@ -133,6 +156,7 @@ function clientImportanceCell(c){
 
 // Where this week's update stands, in a word or two.
 function clientStageWord(w){
+  if(w.off) return 'No weekly update';
   if(w.done >= 3) return 'Approved';
   if(w.done === 2) return 'In review';
   if(w.draft) return 'Draft written';
@@ -141,6 +165,7 @@ function clientStageWord(w){
   return 'Nothing logged';
 }
 function clientWeekCell(w){
+  if(w.off) return ['No weekly update', 'is-none', 'Internal'];
   if(w.sent){ const d = relDay(w.last); return [`Sent ${d === 'Today' ? 'today' : d}`, 'is-sent', w.dueText.replace(/^Due /, 'Next due ')]; }
   if(w.late) return [lateWords(w), 'is-late', clientStageWord(w)];
   return [clientStageWord(w), w.done === 0 && !w.logged.length ? 'is-none' : '', w.dueText];
@@ -184,9 +209,10 @@ function renderClientsTable(){
   const suShown = clientsSeg !== 'all' ? [] : su.filter(c => (clientFilters.service === 'all' || serviceHas(c, clientFilters.service)) && (clientsOwnerFilter === 'all' || suOwner(c) === clientsOwnerFilter)
     && (!clientFilters.search || c.name.toLowerCase().includes(clientFilters.search) || (c.email || '').toLowerCase().includes(clientFilters.search)))
     .sort((a, b) => String((b.customFieldValues || {}).harvestAdded || '').localeCompare(String((a.customFieldValues || {}).harvestAdded || '')) || a.name.localeCompare(b.name));
-  // needs attention: what Health counts (a paused client isn't on Health, so it isn't here either)
-  const needsCare = r => r.h.level !== 'g' && r.c.status !== 'Paused';
-  const needs = rows.filter(needsCare), notSent = rows.filter(r => !r.w.sent);
+  // needs attention: what Health counts (a paused client, or one with no weekly update, isn't on
+  // Health, so it isn't here either); not sent leaves out the clients that get no update
+  const needsCare = r => r.h.level !== 'g' && r.c.status !== 'Paused' && !r.w.off;
+  const needs = rows.filter(needsCare), notSent = rows.filter(r => !r.w.sent && !r.w.off);
   let shown = clientsSeg === 'attention' ? needs : clientsSeg === 'behind' ? notSent : rows;
   shown = shown.filter(r => (clientFilters.service === 'all' || serviceHas(r.c, clientFilters.service)) && (clientsOwnerFilter === 'all' || r.owner === clientsOwnerFilter)
     && (!clientFilters.search || r.c.name.toLowerCase().includes(clientFilters.search) || (r.c.email || '').toLowerCase().includes(clientFilters.search)));
@@ -207,13 +233,13 @@ function renderClientsTable(){
 <span class="cl-c" role="cell">${clBulkCk(c)}<span class="cl-tx"><b>${escapeHtml(c.name)}</b></span></span>
 <span class="cl-sv" role="cell">${escapeHtml(c.service || '—')}</span>
 <span class="cl-o" role="cell">${owner ? escapeHtml(firstName(owner)) : '<span class="t-3">—</span>'}</span>
-<span class="cl-hc" role="cell"><span class="cl-h ${h.level}"><i></i>${healthWord(h.level)}</span>${reason ? `<span class="cl-s">${escapeHtml(reason)}</span>` : ''}</span>
+<span class="cl-hc" role="cell">${h.off ? '<span class="t-3" title="Health doesn’t watch a client with no weekly update">—</span>' : `<span class="cl-h ${h.level}"><i></i>${healthWord(h.level)}</span>${reason ? `<span class="cl-s">${escapeHtml(reason)}</span>` : ''}`}</span>
 <span class="cl-w" role="cell"><span class="cl-wk ${wkCls}">${escapeHtml(wk)}</span><span class="cl-s">${escapeHtml(wkSub)}</span></span>
 ${clientImportanceCell(c)}</div>`;
     return `<div class="cl-r client-row${sel ? ' is-sel' : ''}${picked ? ' is-picked' : ''}" data-id="${c.id}" role="row" tabindex="0" aria-selected="${clBulk ? picked : sel}" onclick="${clBulk ? `clBulkToggle('${c.id}')` : `clientRowClick(event,'${c.id}')`}" ${clBulk ? `onkeydown="clBulkKey(event,'${c.id}')"` : `ondblclick="openClientDetail('${c.id}')"`}>
 <span class="cl-c" role="cell">${clBulkCk(c)}<span class="cl-tx"><b>${escapeHtml(c.name)}</b><span class="cl-s">${escapeHtml(c.service || '—')}</span></span></span>
 <span class="cl-o" role="cell">${owner ? escapeHtml(owner) : '<span class="t-3">—</span>'}</span>
-<span class="cl-hc" role="cell"><span class="cl-h ${h.level}"><i></i>${healthWord(h.level)}</span>${reason ? `<span class="cl-s">${escapeHtml(reason)}</span>` : ''}</span>
+<span class="cl-hc" role="cell">${h.off ? '<span class="t-3" title="Health doesn’t watch a client with no weekly update">—</span>' : `<span class="cl-h ${h.level}"><i></i>${healthWord(h.level)}</span>${reason ? `<span class="cl-s">${escapeHtml(reason)}</span>` : ''}`}</span>
 <span class="cl-w" role="cell"><span class="cl-wk ${wkCls}">${escapeHtml(wk)}</span><span class="cl-s">${escapeHtml(wkSub)}</span></span>
 <span class="cl-l" role="cell">${histDotsHtml(h.seq)}</span>
 ${clientImportanceCell(c)}</div>`;
@@ -280,6 +306,9 @@ function clientPanelHtml({ c, h, w, owner }){
     else if(h.quiet){ title = 'Handled, waiting for the numbers to settle'; sub = ''; }
     else { title = why || 'No next step yet'; sub = `Plan a next step and it becomes a task for ${escapeHtml(firstName(owner) || 'the owner')}.`;
       acts = `<button class="btn" onclick="markHealthHandled(${A})" title="You’ve dealt with it: the warning goes quiet for ${healthThresholds().quietDays} days, unless it gets worse">Mark Handled</button><button class="btn btn-p" onclick="planNextStep(${A})">${icon('plus')}Plan Next Step</button>`; }
+  } else if(w.off){
+    eyebrow = `<span class="sp-eb">${icon('minus-circle', { weight: 'bold' })}Not watched by Health</span>`;
+    title = 'No weekly update'; sub = 'Work and hours are still logged here. Pick how it’s sent under Weekly win to turn it back on.';
   } else if(w.sent){
     eyebrow = `<span class="sp-eb ok">${icon('check', { weight: 'bold' })}Healthy</span>`;
     title = 'This week’s update is out'; sub = `Sent ${escapeHtml(relDayLower(w.last))}. Next one ${escapeHtml(w.dueText.replace(/^Due /, 'due '))}.`;
@@ -291,15 +320,16 @@ function clientPanelHtml({ c, h, w, owner }){
   }
   // three numbers: this week's update (opens it in This Week), hours this month, on time
   const hp = h.hp, ots = onTimeSummary(h.seq), lateNow = w.late && !w.sent;
-  const weekB = w.sent ? 'Sent' : lateNow ? lateWords(w) : w.dueText;
-  const weekS = w.sent ? relDay(w.last) : w.done >= 3 ? 'Approved, not sent yet' : w.done === 2 ? (approver ? 'Waiting for you' : 'Waiting for review')
+  const weekB = w.off ? 'Off' : w.sent ? 'Sent' : lateNow ? lateWords(w) : w.dueText;
+  const weekS = w.off ? 'No weekly update' : w.sent ? relDay(w.last) : w.done >= 3 ? 'Approved, not sent yet' : w.done === 2 ? (approver ? 'Waiting for you' : 'Waiting for review')
     : w.draft ? 'Not sent for review' : w.forEmail.length ? 'Not written yet' : w.logged.length ? 'Only internal work logged' : 'Nothing logged yet';
   const hoursB = hp.budget ? `<span${hp.used > hp.budget ? ' class="t-red"' : ''}>${Math.round(hp.used)}</span> / ${hp.budget} h` : `${Math.round(hp.used)} h`;
   const hoursS = hp.budget ? `<span class="s${hp.projected > hp.budget ? ' t-red' : ''}">On pace for ${Math.round(hp.projected)} h</span>` : '<span class="s">No monthly budget</span>';
   const nums = `<div class="cl-m">
-<button class="cl-mc" onclick="openWeekClient(${A})" title="Open in This Week"><span class="k">This week’s win</span><b${lateNow ? ' class="t-red"' : ''}>${escapeHtml(weekB)}</b><span class="s">${escapeHtml(weekS)}</span></button>
+${w.off ? `<div class="cl-mc"><span class="k">This week’s win</span><b>${escapeHtml(weekB)}</b><span class="s">${escapeHtml(weekS)}</span></div>`
+  : `<button class="cl-mc" onclick="openWeekClient(${A})" title="Open in This Week"><span class="k">This week’s win</span><b${lateNow ? ' class="t-red"' : ''}>${escapeHtml(weekB)}</b><span class="s">${escapeHtml(weekS)}</span></button>`}
 <div class="cl-mc"><span class="k">Hours</span><b>${hoursB}</b>${hoursS}</div>
-<div class="cl-mc"><span class="k">Updates on time</span><b>${ots.total ? `${ots.onTime} of ${ots.total}` : '—'}</b><span class="s">${ots.total ? histDotsHtml(h.seq) : 'No updates yet'}</span></div>
+<div class="cl-mc"><span class="k">Updates on time</span><b>${!w.off && ots.total ? `${ots.onTime} of ${ots.total}` : '—'}</b><span class="s">${w.off ? 'Not counted' : ots.total ? histDotsHtml(h.seq) : 'No updates yet'}</span></div>
 </div>`;
   // details
   const [how, why2] = ownerReason(c);
@@ -342,15 +372,18 @@ function clientFoldHtml(k, title, summary, body){
 }
 // "WhatsApp · Thursdays" on the Weekly win row
 function clientWinSummary(c){
+  if(!getsUpdates(c)) return 'No weekly update';
   const ch = winChannel(c), d = winDay(c);
   return `${ch !== 'email' ? `<span class="wn-sic">${icon('message-circle')}</span>` : ''}${escapeHtml(winChannelWords(c))} · ${d ? escapeHtml(WIN_DAY_NAMES[d]) + 's' : 'no set day'}`;
 }
 // How the client gets its win: email, its WhatsApp group or both, which group, and the day.
 function clientWinHtml(c){
-  const approver = canApprove(), ch = winChannel(c), g = winGroupFor(c), d = winDay(c), A = `'${c.id}'`;
+  const approver = canApprove(), off = !getsUpdates(c), ch = off ? 'none' : winChannel(c), g = winGroupFor(c), d = winDay(c), A = `'${c.id}'`;
   const kv = (k, v) => `<div class="cl-kv"><span>${k}</span><span>${v}</span></div>`;
-  const seg = approver ? `<span class="seg wn-seg" role="radiogroup" aria-label="Sends by">${[['whatsapp', 'WhatsApp', 'message-circle'], ['email', 'Email', ''], ['both', 'Both', '']]
-    .map(([k, t, ic]) => `<button class="${ch === k ? 'on' : ''}" role="radio" aria-checked="${ch === k}" onclick="setWinChannel(${A},'${k}')">${ic ? icon(ic) : ''}${t}</button>`).join('')}</span>` : escapeHtml(winChannelWords(c));
+  // None: no weekly update (the agency itself, an internal client), Nov 22
+  const seg = approver ? `<span class="seg wn-seg" role="radiogroup" aria-label="Sends by">${[['whatsapp', 'WhatsApp', 'message-circle'], ['email', 'Email', ''], ['both', 'Both', ''], ['none', 'None', '']]
+    .map(([k, t, ic]) => `<button class="${ch === k ? 'on' : ''}" role="radio" aria-checked="${ch === k}" onclick="${k === 'none' ? `setWeeklyUpdate(${A},false)` : `setWinChannel(${A},'${k}')`}"${k === 'none' ? ' title="No weekly update: for the agency itself or an internal client"' : ''}>${ic ? icon(ic) : ''}${t}</button>`).join('')}</span>` : escapeHtml(winChannelWords(c));
+  if(off) return `<div class="cl-kvs wn-kvs">${kv('Sends by', seg)}</div><p class="wn-note">${icon('minus-circle')}No weekly update. It stays off This Week, Today, the Queue and Health; work and hours are still logged here.</p>`;
   const group = ch === 'email' ? '' : kv('Group', approver
     ? `<button class="pop wn-pop" onclick="winGroupMenu(event,${A})" title="${g ? escapeHtml(g.name) : ''}">${g ? `<span>${escapeHtml(g.name)}</span>` : '<span class="t-3">Pick the group</span>'}${icon('caret-down', { weight: 'bold' })}</button>`
     : g ? escapeHtml(g.name) : '<span class="t-3">Not linked yet</span>');

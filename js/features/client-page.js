@@ -32,7 +32,7 @@ function renderClientPage(){
   const uw = typeof uiStyleOn === 'function' && uiStyleOn();
   document.getElementById('cdRoot')?.classList.toggle('is-uw', !!uw);
   if(uw){
-    top.innerHTML = `<header class="cp-hd"><div><h1>${escapeHtml(c.name)}</h1><div class="cp-sub">${h.level !== 'g' ? `<span class="uw-delta bad"><i></i>${escapeHtml(healthWord(h.level))} since ${relDay(h.since || rNow()).toLowerCase() === 'today' ? 'today' : escapeHtml(relDay(h.since || rNow()))}</span>` : '<span class="uw-delta"><i></i>Healthy</span>'}<span>${escapeHtml([c.service, owner ? firstName(owner) + ' owns it' : '', c.status !== 'Active' ? c.status : '', start ? 'client since ' + start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : ''].filter(Boolean).join(' · '))}</span></div></div>
+    top.innerHTML = `<header class="cp-hd"><div><h1>${escapeHtml(c.name)}</h1><div class="cp-sub">${h.level !== 'g' ? `<span class="uw-delta bad"><i></i>${escapeHtml(healthWord(h.level))} since ${relDay(h.since || rNow()).toLowerCase() === 'today' ? 'today' : escapeHtml(relDay(h.since || rNow()))}</span>` : h.off ? '<span class="uw-delta n"><i></i>No weekly update</span>' : '<span class="uw-delta"><i></i>Healthy</span>'}<span>${escapeHtml([c.service, owner ? firstName(owner) + ' owns it' : '', c.status !== 'Active' ? c.status : '', start ? 'client since ' + start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : ''].filter(Boolean).join(' · '))}</span></div></div>
 <div class="seg" role="tablist" aria-label="Client sections">${tabs}</div></header>`;
   } else
   top.innerHTML = `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:16px">
@@ -55,7 +55,7 @@ ${callout}`;
   const weekBtns = w.sent ? '' : `<div style="display:flex;gap:8px;margin-top:16px">${w.draft ? `<button class="btn" onclick="openReviewDraft('${c.id}',${jsArg(w.draft.author)})">${icon('envelope-open')}Open Draft</button>` : `<button class="btn" onclick="openWeekClient('${c.id}')">${icon('layers')}Open in This Week</button>`}${holder && holder !== myName() ? `<button class="btn" onclick="remindHolder('${c.id}')">Remind ${escapeHtml(firstName(holder))}</button>` : ''}</div>`;
   const imps = (c.improvements || []).slice().sort((a, b) => new Date(b.date) - new Date(a.date));
   const sentAt = lastSentAt(c);
-  const impStatus = i => i.includeInEmail === false ? 'Internal' : (w.draft && (w.draft.draftImprovementIds || []).includes(i.id) ? 'In this week’s draft' : (sentAt && new Date(i.date) <= sentAt ? 'In the ' + fmtShortDate(sentAt) + ' update' : 'Not sent yet'));
+  const impStatus = i => i.includeInEmail === false ? 'Internal' : w.off ? 'Logged' : (w.draft && (w.draft.draftImprovementIds || []).includes(i.id) ? 'In this week’s draft' : (sentAt && new Date(i.date) <= sentAt ? 'In the ' + fmtShortDate(sentAt) + ' update' : 'Not sent yet'));
   const impRows = (list) => list.map(i => `<div class="row sm"><span style="width:52px;flex:0 0 auto;font-size:13px;color:var(--label-2)">${fmtShortDate(new Date(i.date))}</span>
 <div class="tx"><span class="t" style="font-weight:400">${escapeHtml(i.text)}</span><span class="s">${escapeHtml([c.service, i.author].filter(Boolean).join(' · '))}</span></div><div class="r">${impStatus(i)}</div></div>`).join('');
   const seq = h.seq, ots = onTimeSummary(seq);
@@ -66,15 +66,16 @@ ${callout}`;
     document.getElementById('cdOverviewSide').innerHTML = '';
   } else {
   document.getElementById('cdOverviewMain').innerHTML = `
-<div class="h2"><h2>This week’s update</h2><span class="${w.late ? 't-red' : 't-2'}" style="font-size:13px">${escapeHtml(w.sent ? w.note : w.upcoming ? `${w.dueText} · last sent ${fmtShortDate(w.last)}` : w.dueText)}</span></div>
-<div class="panel" style="padding:18px 18px 16px"><div class="stepper">${stepper}</div>${weekBtns}</div>
+<div class="h2"><h2>This week’s update</h2><span class="${w.late ? 't-red' : 't-2'}" style="font-size:13px">${escapeHtml(w.off ? 'Off' : w.sent ? w.note : w.upcoming ? `${w.dueText} · last sent ${fmtShortDate(w.last)}` : w.dueText)}</span></div>
+${w.off ? `<div class="panel" style="padding:18px"><b>No weekly update</b><p class="t-2" style="margin:4px 0 0">It stays off This Week, Today, the Queue and Health. Work and hours are still logged here.</p></div>`
+  : `<div class="panel" style="padding:18px 18px 16px"><div class="stepper">${stepper}</div>${weekBtns}</div>`}
 ${h.signals.length ? `<div class="h2"><h2>${h.level === 'r' ? 'Why it’s at risk' : 'Why it’s on Watch'}<span class="c">${h.signals.length}</span></h2><a href="#settings" onclick="openSettingsTab('updates');return false;">Adjust signals</a></div><div class="grp">${signalRowsHtml(h)}</div>` : ''}
 <div class="h2"><h2>Improvements<span class="c">${imps.length}</span></h2>${waCanWork(c) ? `<a href="#" onclick="openQueueLogImprovementModal('${c.id}');return false;">Log Improvement</a>` : ''}</div>
 <div class="grp">${impRows(imps.slice(0, 6)) || '<div class="row sm"><span class="s t-2" style="font-size:13px">Nothing logged yet.</span></div>'}</div>
 ${imps.length > 6 ? `<p style="margin:8px 2px 0"><a class="btn btn-q sm" href="#" onclick="setCdTab('improvements');return false;">All ${imps.length} improvements</a></p>` : ''}`;
   document.getElementById('cdOverviewSide').innerHTML = `
 <section class="panel"><h3>Hours this month<span>${h.hp.budget ? `<b class="${h.hp.used > h.hp.budget ? 't-red' : ''}" style="font-weight:600">${Math.round(h.hp.used)}</b> of ${h.hp.budget}` : Math.round(h.hp.used) + ' h'}</span></h3>${h.hp.budget ? paceChartHtml(c, 300, 140) : '<p class="t-2" style="font-size:13px;margin:0">No monthly budget set.</p>'}</section>
-<section class="panel"><h3>Weekly updates<span>${ots.total ? `On time ${ots.onTime} of ${ots.total}` : ''}</span></h3><div style="display:flex;align-items:center;justify-content:space-between;font-size:13px">${histDotsHtml(seq)}<span class="t-2">${sentAt ? 'Last sent ' + fmtShortDate(sentAt) : 'None sent yet'}</span></div></section>
+${w.off ? `<section class="panel"><h3>Weekly updates<span>Off</span></h3><div class="t-2" style="font-size:13px">No weekly update${sentAt ? ' · last sent ' + fmtShortDate(sentAt) : ''}</div></section>` : `<section class="panel"><h3>Weekly updates<span>${ots.total ? `On time ${ots.onTime} of ${ots.total}` : ''}</span></h3><div style="display:flex;align-items:center;justify-content:space-between;font-size:13px">${histDotsHtml(seq)}<span class="t-2">${sentAt ? 'Last sent ' + fmtShortDate(sentAt) : 'None sent yet'}</span></div></section>`}
 <section class="panel"><h3>Details${canApprove() ? `<span><a href="#" onclick="openEditClientFormFromDetail();return false;" style="color:var(--label);font-weight:500">Edit</a></span>` : ''}</h3>
 ${kv('Status', escapeHtml(c.status || '—'))}${kv('Importance', `${c.importance || 0} of 10`)}${kv('Risk flag', `${c.danger || 0} of 5`)}
 ${kv('Monthly budget', c.monthlyHourBudget ? `${c.monthlyHourBudget} hours` : '—')}
@@ -109,19 +110,23 @@ function cpUwGridHtml(c, x){
   const names = ['LOGGED', 'DRAFT', 'REVIEW', 'SENT'];
   const done = w.sent ? 4 : w.done >= 3 ? 3 : (w.done === 2 || w.draft) ? 2 : (w.forEmail && w.forEmail.length) ? 1 : 0;
   const state = w.sent ? `Sent ${relDayLower(w.last)}` : clientStageWord(w);
-  const detail = w.sent ? (w.note || '') : `${w.forEmail.length ? `${w.forEmail.length} improvement${w.forEmail.length === 1 ? '' : 's'} for the email` : w.logged.length ? 'Only internal work logged' : 'Nothing logged yet'} · ${w.dueText.replace(/^Due /, 'due ')}`;
+  const detail = w.sent ? (w.note || '') : `${w.forEmail.length ? `${w.forEmail.length} improvement${w.forEmail.length === 1 ? '' : 's'} for the email` : w.logged.length ? INTERNAL_ONLY_NOTE : 'Nothing logged yet'} · ${w.dueText.replace(/^Due /, 'due ')}`;
   const act = w.sent ? '' : `<div class="uw-fa cp-fa">${w.draft ? `<button class="uw-wb" onclick="openReviewDraft('${c.id}',${jsArg(w.draft.author)})">Open draft${icon('arrow-right')}</button>` : `<button class="uw-wb" onclick="openWeekClient('${c.id}')">Open in This Week${icon('arrow-right')}</button>`}${holder && holder !== myName() ? `<button class="uw-pill cp-pl" onclick="remindHolder('${c.id}')">Remind ${escapeHtml(firstName(holder))}</button>` : ''}</div>`;
-  const update = `<section class="uw-w uw-s6 cp-up">${head('activity', 'This week’s update', `<span class="cp-due${w.late ? ' is-late' : ''}">${escapeHtml(w.sent ? 'Sent' : w.dueText)}</span>`)}
+  // set to "No weekly update" (the agency itself, an internal client): nothing is due (Nov 22)
+  const update = w.off ? `<section class="uw-w uw-s6 cp-up">${head('activity', 'This week’s update', '<span class="cp-due">Off</span>')}
+<div class="uw-fn"><div class="uw-mono">NO WEEKLY UPDATE</div><h3>No weekly update</h3><p>It stays off This Week, Today, the Queue and Health. Work and hours are still logged here.</p></div>
+${canApprove() ? `<div class="uw-fa cp-fa"><button class="uw-wb" onclick="setWeeklyUpdate('${c.id}',true)">Turn the weekly update on${icon('arrow-right')}</button></div>` : ''}</section>`
+  : `<section class="uw-w uw-s6 cp-up">${head('activity', 'This week’s update', `<span class="cp-due${w.late ? ' is-late' : ''}">${escapeHtml(w.sent ? 'Sent' : w.dueText)}</span>`)}
 <div class="uw-fn"><div class="uw-mono">${done >= 4 ? 'DONE · SENT' : 'NOW · ' + names[done]}</div><h3>${escapeHtml(state)}</h3><p>${escapeHtml(detail)}</p></div>
 ${uwSteps(w)}${act}
 <div class="cp-ot">${histDotsHtml(seq)}<span>${ots.total ? `On time ${ots.onTime} of ${ots.total}` : 'No updates yet'}</span><b>${sentAt ? 'Last sent ' + escapeHtml(fmtShortDate(sentAt)) : 'None sent yet'}</b></div></section>`;
   // health: the word, why in a line, the last 12 weeks, the one thing to do
   const trail = typeof healthTrailHtml === 'function' && typeof healthTrail === 'function' ? healthTrailHtml(healthTrail(c, h, healthWeeks()), 'cp-tl') : '';
   const hBtn = h.level === 'g' ? '' : next ? `<button class="uw-wb cp-wide" onclick="openTaskDetailModal('${next.id}')">Open next step</button>` : `<button class="uw-wb cp-wide" onclick="planNextStep('${c.id}')">${icon('plus')}Plan next step</button>`;
-  const hSub = h.level === 'g' ? 'Nothing needs care right now' : `${h.signals.length} reason${h.signals.length === 1 ? '' : 's'} · ${next ? 'next: ' + next.title : 'no next step yet'}`;
+  const hSub = h.off ? 'It gets no weekly update' : h.level === 'g' ? 'Nothing needs care right now' : `${h.signals.length} reason${h.signals.length === 1 ? '' : 's'} · ${next ? 'next: ' + next.title : 'no next step yet'}`;
   const health = `<section class="uw-w uw-s3 cp-h">${head('heart-pulse', 'Health', h.level === 'g' ? '' : pill('See why', `openHealthClient('${c.id}')`))}
-<div class="cp-hb"><div class="cp-word ${h.level}"><i></i>${escapeHtml(healthWord(h.level))}</div><div class="uw-bigsub">${escapeHtml(hSub)}</div></div>
-${trail}${hBtn ? `<div class="cp-hact">${hBtn}</div>` : ''}</section>`;
+<div class="cp-hb"><div class="cp-word ${h.off ? 'n' : h.level}"><i></i>${escapeHtml(h.off ? 'Not watched' : healthWord(h.level))}</div><div class="uw-bigsub">${escapeHtml(hSub)}</div></div>
+${h.off ? '' : trail}${hBtn ? `<div class="cp-hact">${hBtn}</div>` : ''}</section>`;
   // hours this month against the budget, and where it's heading
   const hp = h.hp || {}, used = Math.round(hp.used || 0), bud = hp.budget || 0, over = bud && used > bud;
   const end = new Date(rNow().getFullYear(), rNow().getMonth() + 1, 0);

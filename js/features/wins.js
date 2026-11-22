@@ -48,7 +48,7 @@ function winChannel(c){
 }
 // WhatsApp-only clients go through copy and paste; email and "both" go out by email (WhatsApp extra).
 function winViaWhatsapp(c){ return winChannel(c) === 'whatsapp'; }
-function winChannelWords(c){ return { whatsapp: 'WhatsApp', email: 'Email', both: 'WhatsApp and email' }[winChannel(c)]; }
+function winChannelWords(c){ return getsUpdates(c) ? { whatsapp: 'WhatsApp', email: 'Email', both: 'WhatsApp and email' }[winChannel(c)] : 'No weekly update'; }
 function chGlyph(c){
   const ch = winChannel(c), wa = ch !== 'email';
   return `<span class="wn-ch" title="${ch === 'both' ? 'WhatsApp and email' : wa ? 'WhatsApp group' : 'Email'}">${icon(wa ? 'message-circle' : 'envelope-simple')}</span>`;
@@ -62,7 +62,29 @@ async function setWinSetting(clientId, key, value){
   c.customFieldValues = cfv; winsRerender();
   if(!(await updateClientRow(clientId, { customFieldValues: cfv }))){ c.customFieldValues = prev; winsRerender(); showToast('error', 'Couldn’t save', 'Try again in a moment.'); }
 }
-function setWinChannel(clientId, v){ return setWinSetting(clientId, 'winChannel', v); }
+function setWinChannel(clientId, v){
+  const c = clients.find(x => x.id === clientId);
+  // picking how it's sent turns a client set to "No weekly update" back on
+  if(c && !getsUpdates(c)) return setWeeklyUpdate(clientId, true, { channel: v });
+  return setWinSetting(clientId, 'winChannel', v);
+}
+// "No weekly update" (Nov 22): for the agency itself or an internal client. No update is ever due, so
+// it leaves Today, This Week, the Queue, Review and Health (attentionEligibleClients), and the
+// morning automations skip it. Its work is still logged and its hours tracked.
+async function setWeeklyUpdate(clientId, on, o){
+  const c = clients.find(x => x.id === clientId); if(!c) return;
+  if(!canApprove()){ showToast('error', 'Not allowed', 'Only admins and approvers change how a client gets its win.'); return; }
+  if(getsUpdates(c) === !!on && !(o && o.channel)) return;
+  const cfv = Object.assign({}, c.customFieldValues || {}), prev = c.customFieldValues;
+  if(on) delete cfv.weeklyUpdate; else cfv.weeklyUpdate = 'off';
+  if(on && o && o.channel) cfv.winChannel = o.channel;
+  const redraw = () => typeof renderAll === 'function' ? renderAll() : winsRerender();
+  c.customFieldValues = cfv; redraw();
+  if(!(await updateClientRow(clientId, { customFieldValues: cfv }))){ c.customFieldValues = prev; redraw(); showToast('error', 'Couldn’t save', 'Try again in a moment.'); return; }
+  if(typeof logClientActivity === 'function') logClientActivity(clientId, 'client_updated', `${myName() || 'Someone'} ${on ? 'turned the weekly update back on' : 'set the client to no weekly update'}.`);
+  if(!(o && o.quiet)) showToast('success', on ? `${c.name} gets a weekly update again` : `${c.name}: no weekly update`,
+    on ? 'It’s back on This Week, Today and the Queue.' : 'It’s off This Week, Today, the Queue and Health. Work and hours are still logged.');
+}
 function setWinDay(clientId, v){ return setWinSetting(clientId, 'winDay', v ? Number(v) : ''); }
 // Link a WhatsApp group to the client (and unlink any other group from it).
 async function setWinGroup(clientId, jid){
@@ -277,8 +299,10 @@ function winTierMenu(e, clientId, author){
 function winChannelMenu(e, clientId){
   const c = clients.find(x => x.id === clientId); if(!c) return;
   const ch = winChannel(c);
+  const off = !getsUpdates(c);
   winMenu(e, [['whatsapp', 'WhatsApp', 'message-circle'], ['email', 'Email', 'envelope-simple'], ['both', 'Both', 'layers']]
-    .map(([k, t, ic]) => ({ on: ch === k, fn: `setWinChannel('${clientId}','${k}')`, html: `${icon(ic)}${t}` })), 'ch' + clientId);
+    .map(([k, t, ic]) => ({ on: !off && ch === k, fn: `setWinChannel('${clientId}','${k}')`, html: `${icon(ic)}${t}` }))
+    .concat(['-', { on: off, fn: `setWeeklyUpdate('${clientId}',false)`, html: `${icon('minus-circle')}No weekly update <span class="wn-mt">the agency, internal</span>` }]), 'ch' + clientId);
 }
 function winGroupMenu(e, clientId){
   const c = clients.find(x => x.id === clientId); if(!c) return;

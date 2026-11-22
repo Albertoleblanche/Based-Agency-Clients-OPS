@@ -210,7 +210,7 @@ function openQueueLogImprovementModal(presetClientId){
 <label for="liDate">Date</label><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${sheetDateField('liDate', toDateStr(new Date()), { past: true, from: -13, to: 0, max: toDateStr(new Date()) })}</div>
 <label for="liTime">Time spent</label><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><input id="liTime" class="tf" style="width:80px" placeholder="0:30" autocomplete="off" oninput="logSheet.useTimer=false;liTimeChanged()">${timerLink}</div>
 <div id="liPick" class="hvp"></div>
-<span></span><div style="display:flex;align-items:flex-start;gap:10px;font-size:14px">${sheetSw('liInclude', true, 'Include in the client email')}<div><div>Include in the client email</div><div class="t-2" style="font-size:13px">Turn off for internal work the client doesn’t need to hear about</div></div></div>
+<span></span><div style="display:flex;align-items:flex-start;gap:10px;font-size:14px">${sheetSw('liInclude', !c || getsUpdates(c), 'Include in the client email', 'logSheet.incTouched=true')}<div><div>Include in the client email</div><div class="t-2" id="liIncHint" style="font-size:13px">${liIncHint(c)}</div></div></div>
 ${improvementExtrasReady === false ? '' : `<label>Screenshots</label><div class="fchips" id="liFiles"></div>`}
 <label>Logged by</label><div style="font-size:14px">${sheetWho(me)}</div>
 </div>
@@ -229,9 +229,14 @@ function liTimeChanged(force){
   const d = fromTimer ? { projectId: timerState.projectId, taskId: timerState.taskId } : hvDefaultPick(cid);
   wrap.innerHTML = hvPickRowsHtml('li', cid, d.projectId, d.taskId);
 }
+// A client with no weekly update (Nov 22): its work starts internal, and the hint says why.
+function liIncHint(c){ return c && !getsUpdates(c) ? `${escapeHtml(c.name)} gets no weekly update, so its work stays internal` : 'Turn off for internal work the client doesn’t need to hear about'; }
 function liClientChanged(){
   liTimeChanged(true);
   const c = clients.find(x => x.id === document.getElementById('liClient')?.value);
+  const sw = document.getElementById('liInclude'), hint = document.getElementById('liIncHint');
+  if(sw && !logSheet.incTouched){ const on = !c || getsUpdates(c); sw.classList.toggle('on', on); sw.setAttribute('aria-checked', on); }
+  if(hint) hint.innerHTML = liIncHint(c);
   document.querySelectorAll('.li-sgr').forEach(b => b.classList.toggle('on', !!c && b.dataset.id === c.id));
   const wrap = document.getElementById('liSvc');
   if(!c || !wrap || (logSheet.serviceTouched && !serviceFromHarvest(c) && document.getElementById('liService'))) return;

@@ -206,7 +206,7 @@ function setUpdates(){
   if(!can) return `<div class="set-h">Your drafts</div><div class="form-grp">${yours}</div>`;
   return `<div class="set-h">Weekly updates</div>
 <div class="form-grp">
-${fr('Every client, once a week', 'Due 7 days after its last update. An approver checks each one and sends it the day it’s ready; nothing goes out by itself.', '<span class="t-2 nowrap">Every 7 days</span>')}
+${fr('Every client, once a week', 'Due on its win day, else 7 days after its last update; a weekend moves to the Friday before. An approver checks each one and sends it the day it’s ready; nothing goes out by itself. Clients set to No weekly update (the agency itself, an internal client) are skipped.', '<span class="t-2 nowrap">Every week</span>')}
 ${signature}
 ${yours}
 </div>

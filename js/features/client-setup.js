@@ -31,8 +31,9 @@ function hvProjectsOf(c){
 // What's left before a client can finish setup. The win needs its WhatsApp group, an email to
 // send to, or both, depending on how it gets it.
 function clientSetupSteps(c){
-  const cfv = c.customFieldValues || {}, ch = winChannel(c);
-  const needEmail = ch !== 'whatsapp' && !c.email, needGroup = ch !== 'email' && !winGroupFor(c);
+  const cfv = c.customFieldValues || {}, ch = winChannel(c), on = getsUpdates(c);
+  // a client with no weekly update (the agency itself, an internal client) needs no group or email
+  const needEmail = on && ch !== 'whatsapp' && !c.email, needGroup = on && ch !== 'email' && !winGroupFor(c);
   return [
     { k: 'owner', ok: !!cfv.owner, word: 'owner' },
     // a client in Harvest buys its Harvest projects, so there's no service to pick
@@ -83,7 +84,7 @@ ${typeof clientImportanceCell === 'function' ? clientImportanceCell(c) : ''}</di
 function clientSetupPanelHtml(c){
   const A = `'${c.id}'`, approver = canApprove(), cfv = c.customFieldValues || {};
   const steps = clientSetupSteps(c), left = steps.filter(s => !s.ok), ok = k => steps.find(s => s.k === k).ok;
-  const ch = winChannel(c), g = winGroupFor(c), d = winDay(c);
+  const off = !getsUpdates(c), ch = off ? 'none' : winChannel(c), g = winGroupFor(c), d = winDay(c);
   const ps = hvProjectsOf(c), hc = hvLinkOf(c);
   const mark = on => `<span class="su-m${on ? ' ok' : ''}" aria-label="${on ? 'Done' : 'To do'}">${on ? icon('check', { weight: 'bold' }) : ''}</span>`;
   const row = (k, label, val, done, note) => `<div class="su-r${done == null ? ' is-opt' : ''}">${done == null ? '<span class="su-m none"></span>' : mark(done)}<span class="su-k">${label}</span><div class="su-v">${val}${note ? `<span class="su-n">${note}</span>` : ''}</div></div>`;
@@ -102,16 +103,17 @@ function clientSetupPanelHtml(c){
         ps.length ? `In Harvest: ${ps.map(p => escapeHtml(p.name)).join(' · ')}` : ''));
 
   // the weekly win: how it's sent, then the group and/or the email it needs
-  const seg = approver ? `<span class="seg wn-seg" role="radiogroup" aria-label="Sends by">${[['whatsapp', 'WhatsApp'], ['email', 'Email'], ['both', 'Both']]
-    .map(([k, t]) => `<button class="${ch === k ? 'on' : ''}" role="radio" aria-checked="${ch === k}" onclick="setWinChannel(${A},'${k}')">${t}</button>`).join('')}</span>` : escapeHtml(winChannelWords(c));
-  rows += row('win', 'Weekly win', seg, null);
-  if(ch !== 'email') rows += row('group', 'Group', approver
+  // None: no weekly update, for the agency itself or an internal client (Nov 22)
+  const seg = approver ? `<span class="seg wn-seg" role="radiogroup" aria-label="Sends by">${[['whatsapp', 'WhatsApp'], ['email', 'Email'], ['both', 'Both'], ['none', 'None']]
+    .map(([k, t]) => `<button class="${ch === k ? 'on' : ''}" role="radio" aria-checked="${ch === k}" onclick="${k === 'none' ? `setWeeklyUpdate(${A},false,{quiet:true})` : `setWinChannel(${A},'${k}')`}"${k === 'none' ? ' title="No weekly update: for the agency itself or an internal client"' : ''}>${t}</button>`).join('')}</span>` : escapeHtml(winChannelWords(c));
+  rows += row('win', 'Weekly win', seg, null, off ? 'No weekly update: it won’t be on This Week, Today, the Queue or Health.' : '');
+  if(ch !== 'email' && !off) rows += row('group', 'Group', approver
     ? `<button class="pop wn-pop" onclick="winGroupMenu(event,${A})">${g ? `<span>${escapeHtml(g.name)}</span>` : '<span class="t-3">Pick the group</span>'}${icon('caret-down', { weight: 'bold' })}</button>`
     : g ? escapeHtml(g.name) : '<span class="t-3">Not linked yet</span>', !!g);
-  if(ch !== 'whatsapp') rows += row('email', 'Email', approver
+  if(ch !== 'whatsapp' && !off) rows += row('email', 'Email', approver
     ? `<input class="tf su-in" id="suEmail" type="email" value="${escapeHtml(c.email || '')}" placeholder="contact@client.com" onchange="setClientSetupField(${A}, 'email', this.value)" aria-label="Email">`
     : c.email ? escapeHtml(c.email) : '<span class="t-3">Not set</span>', !!c.email, approver ? 'Separate addresses with commas.' : '');
-  rows += row('day', 'Win day', approver
+  if(!off) rows += row('day', 'Win day', approver
     ? `<button class="pop wn-pop" onclick="winDayMenu(event,${A})">${d ? WIN_DAY_NAMES[d] : '<span class="t-3">Every 7 days</span>'}${icon('caret-down', { weight: 'bold' })}</button>`
     : d ? WIN_DAY_NAMES[d] : 'Every 7 days', null);
   // hours: from Harvest's monthly budget when it has one
@@ -126,7 +128,8 @@ function clientSetupPanelHtml(c){
   const same = guess ? `<div class="su-same"><span>Already in Radar as <b>${escapeHtml(guess.name)}</b>?</span><button class="btn" onclick="hvLinkClient(${A}, '${guess.id}')">Link Them</button></div>` : '';
 
   const title = approver ? `Finish ${c.name}’s setup` : 'Waiting for an approver';
-  const sub = approver ? (left.length ? `${clientSetupLeftWords(c)}. Then it joins This Week, Health and the reminders.` : 'All set. It joins This Week, Health and the reminders.')
+  const sub = approver ? (off ? (left.length ? `${clientSetupLeftWords(c)}. It gets no weekly update, so it joins All Clients only.` : 'All set. It gets no weekly update, so it joins All Clients only.')
+    : left.length ? `${clientSetupLeftWords(c)}. Then it joins This Week, Health and the reminders.` : 'All set. It joins This Week, Health and the reminders.')
     : 'An approver finishes its info, then it joins This Week and Health.';
   const acts = approver ? `<div class="sp-acts su-acts"><button class="btn" onclick="clientNotRadar(${A})">Not a Radar Client</button><button class="btn btn-p" onclick="finishClientSetup(${A})"${left.length ? ' disabled' : ''}>Finish Setup</button></div>` : '';
   const meta = [hc && winNorm(hc.name) !== winNorm(c.name) ? `${hc.name} in Harvest` : '', serviceFromHarvest(c) ? '' : c.service].filter(Boolean).map(escapeHtml).join(' · ');

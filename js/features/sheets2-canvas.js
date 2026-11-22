@@ -407,6 +407,12 @@ function customFieldInputHtml(field, value){
   const type = { text: 'text', url: 'url', email: 'email', phone: 'tel', number: 'number' }[field.type] || 'text';
   return label + `<input type="${type}" id="${id}" class="tf" value="${escapeHtml(val)}">`;
 }
+// Everyone on the team, for the Owner picker (plus a removed owner it still has, so it isn't lost).
+function clientFormPeople(c){
+  const names = (typeof teamProfiles !== 'undefined' ? teamProfiles : []).filter(p => p.name && !p.access_revoked).map(p => p.name);
+  const cur = c && c.customFieldValues && c.customFieldValues.owner;
+  return [...new Set(names.concat(cur ? [cur] : []))].sort((a, b) => a.localeCompare(b));
+}
 function clientFormHtml(title, submitLabel, customValues, c){
   const opt = list => (list || []).map(o => [o, o]);
   // a client in Harvest buys its Harvest projects: shown here, changed there (harvest-time.js)
@@ -422,6 +428,8 @@ function clientFormHtml(title, submitLabel, customValues, c){
 <label class="top" for="ncEmail">Email</label><div><input id="ncEmail" class="tf" placeholder="contact@client.com, billing@client.com"><div class="t-2" style="font-size:13px;margin-top:5px">Separate addresses with commas. Updates go to everyone listed.</div></div>
 ${service}
 <label for="ncStatus">Status</label><div>${sheetPop('ncStatus', 'Status', opt(settings.statusOptions), (settings.statusOptions || [])[0] || '')}</div>
+<label for="ncOwner">Owner</label><div style="display:flex;gap:10px;align-items:center"><span style="flex:none">${sheetPop('ncOwner', 'Owner', [['', 'Automatic']].concat(clientFormPeople(c).map(p => [p, p])), (customValues || {}).owner || '')}</span><span class="t-2" style="font-size:13px">Automatic: who logs the most work</span></div>
+<label for="ncWeekly">Weekly update</label><div style="display:flex;gap:10px;align-items:center"><span style="flex:none">${sheetPop('ncWeekly', 'Weekly update', [['on', 'Every week'], ['off', 'No weekly update']], (customValues || {}).weeklyUpdate === 'off' ? 'off' : 'on')}</span><span class="t-2" style="font-size:13px">Off for the agency or an internal client</span></div>
 <label for="ncImportance">Importance</label><div style="display:flex;gap:10px;align-items:center">${sheetPop('ncImportance', 'Importance', Array.from({ length: 10 }, (_, i) => [String(i + 1), `${i + 1} of 10`]), '5')}<span class="t-2" style="font-size:13px">How much this client matters to the agency</span></div>
 <label for="ncDanger">Risk</label><div><div style="display:flex;gap:10px;align-items:center">${sheetPop('ncDanger', 'Risk', [['1', '1 · Low'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5 · High']], '1')}<span class="t-2" style="font-size:13px">Your read on how likely they are to leave</span></div><div id="ncDangerNudge" class="t-2" style="display:none;font-size:13px;margin-top:5px"></div></div>
 <label for="ncBudget">Hours a month</label><div style="display:flex;gap:10px;align-items:center"><input type="number" id="ncBudget" class="tf" style="width:90px" min="0" step="0.5" placeholder="20"><span class="t-2" style="font-size:13px">Leave empty if there’s no budget</span></div>

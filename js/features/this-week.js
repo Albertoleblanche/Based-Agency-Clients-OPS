@@ -44,6 +44,9 @@ function weekTodo(w){
   const mine = !holder || holder === me;
   if(w.forEmail.length) return mine ? { b: 'now', k: 'write', what: 'Write this week’s draft', act: [`generateDraft('${c.id}',${jsArg(me)})`, 'Write Draft'] }
     : { b: 'wait', k: 'w-write', what: `${who} hasn’t written the draft`, act: remind };
+  // only internal work logged: nothing for the email yet (Nov 22)
+  if(w.logged.length) return mine ? { b: 'now', k: 'log', what: 'Nothing for the email yet', act: internalOnlyAct(w) }
+    : { b: 'wait', k: 'w-log', what: `Nothing for the email yet: ${who} logged only internal work`, act: remind };
   return mine ? { b: 'now', k: 'log', what: 'Log this week’s work', act: [`openQueueLogImprovementModal('${c.id}')`, 'Log Improvement'] }
     : { b: 'wait', k: 'w-log', what: `${who} hasn’t logged this week’s work`, act: remind };
 }
@@ -82,7 +85,9 @@ function wbEntry(c, monday, today){
     : wa ? (winSendState(w.draft).k === 'copied' ? winSendState(w.draft).by : w.draft.author)
     : step === 'draft' ? w.draft.author : (w.holder && w.holder !== 'approvers' ? w.holder : w.owner) || '';
   if(whoFull && whoFull !== 'approvers' && whoFull !== me && (typeof teamProfiles !== 'undefined' && teamProfiles.length) && !profileByName(whoFull)) whoFull = '';
-  return { c, w, step, empty: step === 'draft' && draftHasNoWork(c, w.draft), at, lateDays: Math.max(0, lateDays), late: lateDays > 0, col: sentNow || at >= monday ? at.getDay() : 'late',
+  return { c, w, step, empty: step === 'draft' && draftHasNoWork(c, w.draft), at, lateDays: Math.max(0, lateDays), late: lateDays > 0,
+    // the day of this week it's due; one due in a later week isn't on this week's days at all (Nov 22)
+    col: sentNow || (at >= monday && at < addDays(monday, 7)) ? at.getDay() : at < monday ? 'late' : 'later',
     whoFull, who: !whoFull ? 'No owner' : whoFull === me ? 'You' : whoFull === 'approvers' ? 'An approver' : firstName(whoFull), mine: w0.owner === me || w.holder === me || whoFull === me };
 }
 function renderThisWeek(){
@@ -109,7 +114,7 @@ function renderThisWeek(){
   const rows = Object.entries(byWho).sort((a, b) => (b[0] === me) - (a[0] === me) || b[1].length - a[1].length).map(([full, es]) => {
     const late = es.filter(e => e.late).length, name = !full ? 'No owner yet' : full === me ? 'You' : full === 'approvers' ? 'Approvers' : full;
     const steps = WB_STEPS.filter(([k]) => es.some(e => e.step === k)).map(([k, t]) => `${es.filter(e => e.step === k).length} ${t.toLowerCase()}`).join(', ');
-    const remind = !full ? (canApprove() ? `<a class="x-lnk" href="#" onclick="switchView('clients');return false;">Set an Owner</a>` : '')
+    const remind = !full ? (canApprove() ? `<a class="x-lnk" href="#" onclick="clBulkEditClients([${es.map(e => `'${e.c.id}'`).join(',')}]);return false;">Set Owner${es.length === 1 ? '' : 's'}</a>` : '')
       : full !== me && full !== 'approvers' && profileByName(full) ? `<a class="x-lnk" href="#" onclick="remindHolders([${es.map(e => `'${e.c.id}'`).join(',')}]);return false;">Remind</a>` : '';
     return `<li><b>${escapeHtml(name)}</b><span class="c">${es.length}</span><span class="s">${late ? `<em>${late} late</em> · ` : ''}${escapeHtml(steps)}</span>${remind}</li>`;
   });
@@ -217,7 +222,7 @@ function weekPanelHtml(w){
     else if(d && draftHasNoWork(c, d)){ title = `Nothing left in ${d.author === me ? 'your' : firstName(d.author) + '’s'} draft`; sub = 'Everything it was written from was deleted. Rewrite it from what’s logged now, or log the work first.'; }
     else if(d){ title = `${d.author === me ? 'Your' : firstName(d.author) + '’s'} draft is written, not sent for review yet`; sub = lastTxt; }
     else if(w.forEmail.length){ title = `${todayPlural(w.forEmail.length, 'improvement')} logged, no draft yet`; sub = lastTxt; }
-    else if(w.logged.length){ title = 'Only internal work logged'; sub = `Nothing is marked for the email yet. ${lastTxt}`; }
+    else if(w.logged.length){ title = 'Nothing for the email yet'; sub = `Only internal work is logged: log work or switch an item to Email. ${lastTxt}`; }
     else { title = 'Nothing logged yet'; sub = `${holder ? escapeHtml(firstName(holder)) + ' owns this client. ' : ''}${lastTxt}`; }
     // Edit: in Review for whoever has Review (Edit and Rewrite live there); otherwise right here, for
     // the writer, until they send it for review.
@@ -231,7 +236,9 @@ function weekPanelHtml(w){
     const waOther = winViaWhatsapp(c) && d && d.author !== me;
     const main = w.done === 2 && approver ? `<button class="btn btn-p" onclick="approveAndSendOwnDraft('${c.id}',${jsArg(d.author)})">${winViaWhatsapp(c) ? (waOther ? `${icon('check')}Approve` : `${icon('copy')}Approve &amp; Copy`) : `${icon('paper-plane-tilt')}Approve &amp; Send`}</button>`
       : t && t.act ? `<button class="btn btn-p" onclick="${t.act[0]}">${escapeHtml(t.act[1])}</button>` : '';
-    acts = !editing && (edit || main) ? `<div class="sp-acts">${edit}${main}</div>` : '';
+    // only internal work: switch an item to Email (the main button), or log work for the email
+    const alt = t && t.act && t.act[1] === 'Switch to Email' ? `<button class="btn" onclick="openQueueLogImprovementModal('${c.id}')">${icon('plus')}Log Improvement</button>` : '';
+    acts = !editing && (edit || main) ? `<div class="sp-acts">${edit}${alt}${main}</div>` : '';
   }
   // Progress: the four steps
   const stepSub = [

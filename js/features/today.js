@@ -67,7 +67,13 @@ function todayRowAction(w){
   if(d && draftHasNoWork(c, d)) return w.logged.some(i => i.author === me && i.includeInEmail !== false) ? [`generateDraft('${c.id}',${jsArg(me)})`, 'Rewrite Draft'] : [`openQueueLogImprovementModal('${c.id}')`, 'Log Improvement'];
   if(d) return [`sendDraftForReview('${c.id}',${jsArg(d.author)})`, 'Send for Review'];
   if(w.forEmail.length) return [`generateDraft('${c.id}',${jsArg(me)})`, 'Write Draft'];
-  return [`openQueueLogImprovementModal('${c.id}')`, 'Log Improvement'];
+  return internalOnlyAct(w) || [`openQueueLogImprovementModal('${c.id}')`, 'Log Improvement'];
+}
+// Only internal work logged (Nov 22): if some of it is yours, open it in the Queue to switch an item
+// to Email; otherwise log work for the email. Null when it isn't internal-only.
+function internalOnlyAct(w){
+  if(w.forEmail.length || !w.logged.length) return null;
+  return w.logged.some(i => i.author === myName()) ? [`openQueueInternal('${w.c.id}')`, 'Switch to Email'] : [`openQueueLogImprovementModal('${w.c.id}')`, 'Log Improvement'];
 }
 // An approved WhatsApp win is sent by whoever copies it: its writer, unless someone else already did.
 function todayWaSender(w){
@@ -85,8 +91,12 @@ function todayUpdateTitle(w){
   if(w.done === 2) return `Review ${n}’s draft`;
   if(w.draft) return `Send ${n}’s draft for review`;
   if(w.forEmail.length) return `Write ${n}’s update`;
+  if(w.logged.length) return `Nothing for ${n}’s email yet`;
   return `Log this week’s work for ${n}`;
 }
+// The line under an update row: the note, except internal-only work, which says what to do (the
+// title already says there's nothing for the email).
+function todayUpdateNote(w){ return !w.forEmail.length && w.logged.length && !w.draft && w.done < 2 ? 'Log work or switch an item to Email' : (w.note || ''); }
 function hmText(min){ min = Math.round(min); const h = Math.floor(min / 60), m = min % 60; return h ? `${h} h${m ? ' ' + m + ' m' : ''}` : `${m} m`; }
 
 // Everything Today shows, worked out once: the lead, what else is yours, what's waiting on others,
@@ -114,7 +124,7 @@ function todayModel(){
   } else {
     const w = behind.find(x => todayWaSender(x) ? todayWaSender(x) === me || approver : !x.holder || x.holder === me || x.holder === 'approvers' && approver);
     if(w){ used.add(w.c.id); const [go, label] = todayRowAction(w);
-      lead = { c: w.c, title: todayUpdateTitle(w), sub: `${w.late ? overdueShort(w) : 'Due today'} · ${w.note || ''}`, go, label }; }
+      lead = { c: w.c, title: todayUpdateTitle(w), sub: `${w.late ? overdueShort(w) : 'Due today'} · ${todayUpdateNote(w)}`, go, label }; }
   }
 
   // ---- Also today: everything else that waits on you; Waiting on others: what doesn't ----
@@ -126,7 +136,8 @@ function todayModel(){
     if(wa ? wa !== me && !approver : holder && holder !== me){ others.push(w); return; }
     if(!wa && w.holder === 'approvers' && !approver){ others.push(w); return; }
     const [go, step] = todayRowAction(w);
-    items.push({ src: 'update', age: w.late ? -w.daysLeft : 0, c: w.c, title: todayUpdateTitle(w), sub: `${escapeHtml(w.c.name)}${w.note ? ' · ' + escapeHtml(w.note) : ''}`, late: !!w.late, when: w.late ? overdueShort(w) : '', step, go });
+    const note = todayUpdateNote(w);
+    items.push({ src: 'update', age: w.late ? -w.daysLeft : 0, c: w.c, title: todayUpdateTitle(w), sub: `${escapeHtml(w.c.name)}${note ? ' · ' + escapeHtml(note) : ''}`, late: !!w.late, when: w.late ? overdueShort(w) : '', step, go });
   });
   list.filter(c => myClientsFilter(c) && !used.has(c.id) && clientHealth(c).level === 'r' && !nextStepTask(c)).forEach(c => {
     used.add(c.id);
@@ -229,6 +240,7 @@ function wkRowIcon(x){
   if(/^Review /.test(x.title)) return 'scan-eye';
   if(/Write|Rewrite/.test(s)) return 'pen-line';
   if(s === 'Log Improvement') return 'circle-plus';
+  if(s === 'Switch to Email') return 'mail';
   if(/^Remind/.test(s)) return 'bell';
   return 'send';
 }
@@ -302,8 +314,8 @@ function todayDayModel(ds){
     if(e.step === 'sent'){ done.push({ t: new Date(e.w.last), title: `Sent ${shortClientName(c.name)}’s update`, sub: c.name }); return; }
     const mine = e.whoFull === me || (approver && e.whoFull === 'approvers') || (!e.whoFull && myClientsFilter(c));
     if(!mine){ others.push(e); return; }
-    const [go, step] = todayRowAction(e.w);
-    items.push({ src: 'update', c, title: todayUpdateTitle(e.w), sub: escapeHtml(c.name), step, go, at: '' });
+    const [go, step] = todayRowAction(e.w), note = !e.w.forEmail.length && e.w.logged.length && !e.w.draft ? todayUpdateNote(e.w) : '';
+    items.push({ src: 'update', c, title: todayUpdateTitle(e.w), sub: escapeHtml(c.name) + (note ? ' · ' + escapeHtml(note) : ''), step, go, at: '' });
   });
   (typeof tasks !== 'undefined' ? tasks : []).filter(t => t.assigneeId === currentUser?.id && !t.cancelledAt && t.dueDate === ds).forEach(t => {
     const c = clients.find(x => x.id === t.clientId);

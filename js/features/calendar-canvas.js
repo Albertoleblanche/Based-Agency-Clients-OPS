@@ -40,7 +40,8 @@ function calItems(from, to){
   getTaskCalendarMarkers().filter(t => !onCal.has(String(t.taskId))).forEach(t => { const d = new Date(t.startAt); if(d >= from && d < to) out.push(Object.assign(t, { _done: t.taskStatus === 'done' })); });
   // Client updates due, on the day each is due (anything overdue shows today).
   const today = dayStart(rNow()), dueByDay = {};
-  activeClients().forEach(c => { const { due } = clientDue(c); const d = due < today ? today : due; if(d >= dayStart(from) && d < to){ const k = toDateStr(d); (dueByDay[k] = dueByDay[k] || []).push(c.name); } });
+  // due updates: the clients This Week shows (not paused, and getting a weekly update)
+  attentionEligibleClients().forEach(c => { const { due } = clientDue(c); const d = due < today ? today : due; if(d >= dayStart(from) && d < to){ const k = toDateStr(d); (dueByDay[k] = dueByDay[k] || []).push(c.name); } });
   Object.entries(dueByDay).forEach(([k, names]) => {
     const at = atTime(new Date(k + 'T12:00:00'), '00:00');
     out.push({ id: 'due-' + k, kind: 'due', title: `${names.length} update${names.length === 1 ? '' : 's'} due`, sub: names.join(', '), startAt: at.toISOString(), endAt: at.toISOString() });

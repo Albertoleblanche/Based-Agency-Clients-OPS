@@ -162,6 +162,8 @@ html.ui-w .uw-delta{display:inline-flex;align-items:center;gap:5px;font-family:v
 html.ui-w .uw-delta svg{width:12px;height:12px}
 html.ui-w .uw-delta i{width:6px;height:6px;border-radius:50%;background:currentColor}
 html.ui-w .uw-delta.bad{color:var(--uw-risk);background:var(--uw-riskbg)}
+html.ui-w .uw-delta.n{color:var(--label-2);background:var(--fill-2)}
+html.ui-w .uw-delta.n i{background:transparent;box-shadow:inset 0 0 0 1.5px currentColor}
 html.ui-w .uw-none{display:flex;align-items:center;gap:8px;margin:14px 0 0;font-size:13px;color:var(--label-2)}
 html.ui-w .uw-none svg{width:15px;height:15px;color:var(--uw-good)}
 /* Today's focus */
@@ -885,6 +887,9 @@ html.ui-w .cp-word{display:flex;align-items:center;gap:12px;font-size:34px;font-
 html.ui-w .cp-word i{width:12px;height:12px;border-radius:50%;background:var(--uw-good);box-shadow:0 0 0 6px var(--uw-goodbg)}
 html.ui-w .cp-word.r i{background:var(--uw-risk);box-shadow:0 0 0 6px var(--uw-riskbg)}
 html.ui-w .cp-word.y i{background:var(--uw-watch);box-shadow:0 0 0 6px var(--uw-watchbg)}
+/* not watched (a client with no weekly update): a hollow grey dot, nothing to read as good or bad */
+html.ui-w .cp-word.n{color:var(--label-2)}
+html.ui-w .cp-word.n i{background:transparent;box-shadow:inset 0 0 0 2px var(--label-3)}
 html.ui-w .cp-h .uw-bigsub,html.ui-w .cp-hr .uw-bigsub{margin-top:12px}
 html.ui-w .cp-h .tl{margin-top:auto;padding-top:18px}
 html.ui-w .cp-h{--hx-r:var(--uw-risk);--hx-y:var(--uw-watch);--hx-g:var(--uw-good);--hx-q:var(--uw-c3)}

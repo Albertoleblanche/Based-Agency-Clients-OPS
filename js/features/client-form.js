@@ -300,13 +300,18 @@ async function saveClientForm(){
     sow:document.getElementById('ncSow').value.trim(),
     startDate: document.getElementById('ncStartDate').value || null,
   };
-  // What's set outside this form stays: the owner and weekly win chosen in the client panel, and
-  // a client's Harvest setup. Only the custom fields below change here.
+  // What's set outside this form stays: how the weekly win is sent (client panel) and a client's
+  // Harvest setup. Only the fields below change here.
   const customFieldValues = editingClientId ? Object.assign({}, (clients.find(x=>x.id===editingClientId) || {}).customFieldValues || {}) : {};
   (settings.customFields||[]).forEach(f=>{
     const el = document.getElementById('ncCustom_'+f.id);
     if(el) customFieldValues[f.id] = el.value.trim();
   });
+  // owner (empty: automatic) and the weekly update (Nov 22: "No weekly update" for internal clients)
+  const ownerEl = document.getElementById('ncOwner');
+  if(ownerEl){ if(ownerEl.value) customFieldValues.owner = ownerEl.value; else delete customFieldValues.owner; }
+  const weeklyEl = document.getElementById('ncWeekly');
+  if(weeklyEl){ if(weeklyEl.value === 'off') customFieldValues.weeklyUpdate = 'off'; else delete customFieldValues.weeklyUpdate; }
   // the main contact: who wins and updates greet by name
   const contactEl = document.getElementById('ncContact');
   if(contactEl){ const v = contactEl.value.trim().replace(/\s+/g, ' ').slice(0, 80); if(v) customFieldValues.contact = v; else delete customFieldValues.contact; }
