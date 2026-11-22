@@ -126,9 +126,12 @@ ${healthTrailHtml(x.hist)}<span class="hx-stc">${st}<span class="hx-st then"><i>
   // ---- the headline: how many need care and how many of them are new; the longest-running one ----
   const longest = G.long.slice().sort((a, b) => b.streak - a.streak)[0];
   const own = window._hlOwner ? firstName(window._hlOwner) + '’s' : '';
-  const who = everyone && !own ? `${needN} client${needN === 1 ? '' : 's'}` : `${needN} of ${own || 'your'} clients`;
+  // "your clients" when Show is on My clients (the same clients All Clients shows, myClientsOn)
+  const scoped = myClientsOn();
+  const who = !scoped && !own ? `${needN} client${needN === 1 ? '' : 's'}` : `${needN} of ${own || 'your'} clients`;
   const headline = !all.length ? '' : needN ? `${who} need${needN === 1 ? 's' : ''} care${G.new.length ? `, ${G.new.length === needN ? (needN === 1 ? 'new' : needN === 2 ? 'both' : 'all') : G.new.length + ' of them'} new this week` : ''}`
-    : everyone && !own ? 'Every client is healthy' : `All of ${own || 'your'} clients are healthy`;
+    : !scoped && !own ? 'Every client is healthy' : `All of ${own || 'your'} clients are healthy`;
+  const show = myClientsSplit().has ? `<label class="pop-wrap">Show: <select class="pop" onchange="setClientsMine(this.value)"><option value="mine"${scoped ? ' selected' : ''}>My clients</option><option value="all"${scoped ? '' : ' selected'}>All clients</option></select></label>` : '';
   const slipped = G.new.length ? `${G.new.length === 1 ? 'One' : G.new.length} slipped this week${G.new.every(x => x.hist.slice(0, 11).filter(Boolean).every(k => k === 'g')) ? ' after a quiet quarter' : ''}.` : '';
   const subline = [slipped,
     longest ? `${longest.c.name} has needed care for ${longest.streak} weeks, with no plan yet.` : '',
@@ -142,11 +145,11 @@ ${healthTrailHtml(x.hist)}<span class="hx-stc">${st}<span class="hx-st then"><i>
 ${group('fix', 'Being fixed', 'A plan is underway, or it was handled and is settling')}${group('ok', 'Healthy', 'Nothing needs care right now', `<button class="lnk" onclick="hlToggleOk(this)">${window._hlOk ? 'Hide' : 'Show ' + G.ok.length}</button>`)}</div>`;
 
   root.innerHTML = `<div class="spw"><div class="sp-page"><div class="hx">
-<div class="hx-top"><div><h1 class="hx-h">${escapeHtml(headline)}</h1>${subline ? `<p class="hx-s">${uw && slipped ? `<b>${escapeHtml(slipped)}</b>${escapeHtml(subline.slice(slipped.length))}` : escapeHtml(subline)}</p>` : ''}</div>${seg}</div>
+<div class="hx-top"><div><h1 class="hx-h">${escapeHtml(headline)}</h1>${subline ? `<p class="hx-s">${uw && slipped ? `<b>${escapeHtml(slipped)}</b>${escapeHtml(subline.slice(slipped.length))}` : escapeHtml(subline)}</p>` : ''}</div><div class="hx-ctl">${show}${seg}</div></div>
 ${body}</div></div>${sel ? healthPanelHtml(sel.c, sel.h) : ''}</div>`;
   root._hlWeeks = weeks;
   hlBindScrub(root);
-  if(currentViewName === 'health') setToolbar('Health', everyone ? 'How clients are doing, and who is fixing what' : 'How your clients are doing');
+  if(currentViewName === 'health') setToolbar('Health', !scoped ? 'How clients are doing, and who is fixing what' : 'How your clients are doing');
 }
 
 function healthRemind(id){

@@ -956,6 +956,7 @@ a.ty-rel:hover{opacity:.8}
 .mac[data-theme="dark"] #healthRoot{--hx-r:#FF453A;--hx-y:var(--yellow-fill,#FFD60A);--hx-g:#30D158;--hx-q:rgba(255,255,255,.2)}
 .hx{padding:28px 36px 48px;width:100%}
 .hx-top{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.hx-ctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .hx-h{margin:0;font-size:26px;font-weight:700;letter-spacing:-.022em;line-height:1.15}
 .hx-s{margin:7px 0 0;font-size:14px;line-height:1.45;color:var(--label-2);max-width:700px}
 .hx-none{margin:24px 0;font-size:13.5px;color:var(--label-2)}

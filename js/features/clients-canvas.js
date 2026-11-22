@@ -6,7 +6,15 @@
 let clientsSeg = 'all', clientsOwnerFilter = 'all', clientsMine = true;
 function setClientsSeg(k){ clientsSeg = k; renderClientsTable(); }
 // Someone with areas of work opens on their clients (work-areas.js); All clients shows the rest.
-function setClientsMine(v){ clientsMine = v === 'mine'; renderClientsTable(); }
+// Show: My clients / All clients. One switch for All Clients, Health, the Dashboard's health card and
+// the Health badge (myClientsOn, week-health.js), so they always count the same clients.
+function setClientsMine(v){
+  clientsMine = v === 'mine';
+  renderClientsTable();
+  if(typeof renderHealth === 'function') renderHealth();
+  if(typeof renderDashboard === 'function' && currentViewName === 'dashboard') renderDashboard();
+  if(typeof updateShellBadges === 'function') updateShellBadges();
+}
 function setClientsOwner(v){ clientsOwnerFilter = v; renderClientsTable(); }
 function setClientsService(v){ clientFilters.service = v; renderClientsTable(); }
 function setClientsFind(v){
@@ -164,7 +172,7 @@ function renderClientsTable(){
   if(!root || typeof clients === 'undefined') return;
   // My clients: your scope of work and what you've worked on lately (work-areas.js). The switch
   // shows when that's some of the clients, not none or all of them.
-  const acAll = activeClients(), yours = acAll.filter(waYours), hasAreas = yours.length > 0 && yours.length < acAll.length, mineOn = hasAreas && clientsMine;
+  const acAll = activeClients(), { yours, has: hasAreas } = myClientsSplit(), mineOn = hasAreas && clientsMine;
   const ac = mineOn ? yours : acAll;
   const rowOf = c => ({ c, h: clientHealth(c), w: weekView(clientWeek(c)), owner: clientOwner(c) });
   const rows = ac.map(rowOf);
@@ -176,7 +184,9 @@ function renderClientsTable(){
   const suShown = clientsSeg !== 'all' ? [] : su.filter(c => (clientFilters.service === 'all' || serviceHas(c, clientFilters.service)) && (clientsOwnerFilter === 'all' || suOwner(c) === clientsOwnerFilter)
     && (!clientFilters.search || c.name.toLowerCase().includes(clientFilters.search) || (c.email || '').toLowerCase().includes(clientFilters.search)))
     .sort((a, b) => String((b.customFieldValues || {}).harvestAdded || '').localeCompare(String((a.customFieldValues || {}).harvestAdded || '')) || a.name.localeCompare(b.name));
-  const needs = rows.filter(r => r.h.level !== 'g'), notSent = rows.filter(r => !r.w.sent);
+  // needs attention: what Health counts (a paused client isn't on Health, so it isn't here either)
+  const needsCare = r => r.h.level !== 'g' && r.c.status !== 'Paused';
+  const needs = rows.filter(needsCare), notSent = rows.filter(r => !r.w.sent);
   let shown = clientsSeg === 'attention' ? needs : clientsSeg === 'behind' ? notSent : rows;
   shown = shown.filter(r => (clientFilters.service === 'all' || serviceHas(r.c, clientFilters.service)) && (clientsOwnerFilter === 'all' || r.owner === clientsOwnerFilter)
     && (!clientFilters.search || r.c.name.toLowerCase().includes(clientFilters.search) || (r.c.email || '').toLowerCase().includes(clientFilters.search)));
@@ -208,7 +218,7 @@ ${clientImportanceCell(c)}</div>`;
 <span class="cl-l" role="cell">${histDotsHtml(h.seq)}</span>
 ${clientImportanceCell(c)}</div>`;
   };
-  const sNeeds = shown.filter(r => r.h.level !== 'g'), sOk = shown.filter(r => r.h.level === 'g');
+  const sNeeds = shown.filter(needsCare), sOk = shown.filter(r => !needsCare(r));
   const group = (title, list) => list.length ? `<div class="cl-g" role="presentation"><b>${title}</b><span>${uw ? '· ' : ''}${list.length}</span></div>${list.map(row).join('')}` : '';
   // approvers match them all to Radar's clients in one sheet (client-setup.js)
   const suMatch = canApprove() && typeof openMatchClientsSheet === 'function' && ac.some(c => !hvLinkOf(c)) ? `<span class="cl-g-act"><button class="x-lnk" onclick="openMatchClientsSheet()">Match to Existing Clients</button>${infoTip(CL_TIPS.match, 'What does Match to Existing Clients do?')}</span>` : '';

@@ -314,9 +314,18 @@ function stepsHtml(w){
 function dueOrder(a, b){ return a.daysLeft - b.daysLeft || (b.c.importance || 0) - (a.c.importance || 0); }
 // Approvers and admins see every client; a team member sees the clients they own.
 function seesEveryone(){ return typeof canApprove === 'function' && canApprove(); }
+// "My clients" is one thing everywhere (Nov 21): your scope of work and what you've worked on lately
+// (waYours, work-areas.js), picked with the Show switch on All Clients and on Health. Health, the
+// Dashboard's health card and the Health badge count the same clients All Clients shows, so their
+// numbers always agree. The switch only exists when that's some of the clients, not none or all.
+function myClientsSplit(){
+  const ac = activeClients(), yours = typeof waYours === 'function' ? ac.filter(waYours) : ac;
+  return { yours, has: yours.length > 0 && yours.length < ac.length };
+}
+function myClientsOn(){ return myClientsSplit().has && (typeof clientsMine === 'undefined' || clientsMine); }
 function healthScopeClients(){
   const all = attentionEligibleClients();
-  return seesEveryone() ? all : all.filter(c => clientOwner(c) === myName());
+  return myClientsOn() ? all.filter(waYours) : all;
 }
 function weekSummary(list){
   const ws = list.map(clientWeek);
