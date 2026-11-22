@@ -350,10 +350,12 @@ function renderReports(){
   });
   const rows = Object.entries(grouped).sort((a, b) => b[1] - a[1]);
   const grp = document.getElementById('reportTableGrp');
+  if(groupIc) rtCard();   // new look: the header and the table share one card
   if(!rows.length){ grp.innerHTML = emptyState({ compact: true, icon: 'timer', title: `No time logged ${rangeWord}`, text: `Hours show here by client, ${sw.one} or teammate once time is tracked.`, action: 'Open Timesheet', onAction: "switchTimeTab('timesheet')", link: range !== 'all' ? 'Show All Time' : '', onLink: "setReportRangeAll()" }); return; }
   const shown = reportShowAll ? rows : rows.slice(0, 9), rest = rows.slice(shown.length);
   const restMin = rest.reduce((s, [, m]) => s + m, 0);
   const withBudget = reportTab === 'clients' && range === 'month';
+  if(typeof uiStyleOn === 'function' && uiStyleOn()){ rtRender({ grp, rows, shown, rest, restMin, withBudget, total, rangeWord, sw }); return; }
   let head, body;
   if(reportTab === 'clients'){
     const allOn = rows.every(([id]) => !reportExcluded.has(id));
@@ -457,6 +459,53 @@ function rcMount(){
     if(rcResizeObs) rcResizeObs.disconnect();
     rcResizeObs = new ResizeObserver(() => rcPlace(false)); rcResizeObs.observe(plot);
   }
+}
+
+// ---- By client / service / teammate, new look (Nov 22) -----------------------------------------
+// In the chart's style, one card with its header: each row's hours big with the unit dimmed (and
+// the budget under them), a thick rounded bar with a dot at its end, and the percent. Over budget
+// is red, nearly there amber; the bar under the pointer gets the chart's stripes. Unticked clients
+// fade. Teammates are names, no avatars.
+function rtSplit(min){ const m = hrs(min).match(/^(\d+)(\.\d)?h$/); return m ? [m[1], (m[2] || '') + 'h'] : [hrs(min), '']; }
+function rtNum(a, b){ return `<span class="rt-v">${a}<span>${b}</span></span>`; }
+function rtCard(){
+  const h = document.getElementById('reportGroupH'), grp = document.getElementById('reportTableGrp');
+  if(!h || !grp || document.getElementById('reportTableCard')) return;
+  const card = document.createElement('section'); card.id = 'reportTableCard'; card.className = 'rt-card';
+  h.before(card); card.append(h, grp);
+}
+function rtRender(o){
+  const { grp, rows, shown, rest, restMin, withBudget, total, rangeWord, sw } = o;
+  rtCard();
+  const cl = reportTab === 'clients', bars = cl && withBudget ? 'Used of budget' : 'Share';
+  const allOn = rows.every(([id]) => !reportExcluded.has(id));
+  const head = `${cl ? `<th class="rt-ckc">${ckHtml(allOn, 'Select all', 'toggleReportAll()')}</th>` : ''}<th>${cl ? 'Client' : reportTab === 'services' ? sw.col : 'Teammate'}</th><th class="num">Hours</th><th class="rt-barc">${bars}</th><th class="num rt-p"></th>`;
+  const bar = (pct, cls) => pct == null ? '<span class="rt-none">No budget</span>' : `<div class="rt-bar ${cls}"><i style="width:${(Math.min(pct, 1) * 100).toFixed(1)}%"></i></div>`;
+  const pctHtml = pct => pct == null ? '' : rtNum(Math.round(pct * 100), '%');
+  const body = shown.map(([k, m]) => {
+    const [a, u] = rtSplit(m);
+    if(cl){
+      const c = clients.find(x => x.id === k), on = !reportExcluded.has(k);
+      const b = c?.monthlyHourBudget || 0, pct = withBudget ? (b ? m / 60 / b : null) : m / total;
+      const tone = withBudget && pct != null ? (pct > 1 ? 'is-over' : pct >= .9 ? 'is-warn' : '') : '';
+      return `<tr data-rid="${k}" class="rt-r ${tone}${on ? '' : ' is-off'}"><td class="rt-ckc">${ckHtml(on, 'Include ' + (c?.name || 'client'), `toggleReportRow('${k}')`)}</td>
+<td class="rt-n"><button class="cell-c link-row" onclick="openClientReportDetail('${k}')">${escapeHtml(c?.name || 'Client removed')}</button></td>
+<td class="num rt-h">${rtNum(a, u)}${withBudget ? `<span class="rt-of">${b ? `of ${b}h` : 'no budget'}</span>` : ''}</td>
+<td class="rt-barc">${bar(pct, tone)}</td><td class="num rt-p">${pctHtml(pct)}</td></tr>`;
+    }
+    const p = reportTab === 'teammates' ? teamProfiles.find(x => x.id === k) : null;
+    const hvName = reportTab === 'teammates' && !p && String(k).startsWith('hv:') && typeof hvPersonName === 'function' ? hvPersonName(String(k).slice(3)) : '';
+    const name = reportTab === 'teammates' ? `${escapeHtml(p?.name || hvName || 'Former teammate')}${hvName ? ' <span class="rt-tag">Harvest only</span>' : ''}` : escapeHtml(k);
+    return `<tr class="rt-r"><td class="rt-n">${name}</td><td class="num rt-h">${rtNum(a, u)}</td><td class="rt-barc">${bar(m / total, '')}</td><td class="num rt-p">${pctHtml(m / total)}</td></tr>`;
+  }).join('');
+  const lead = cl ? 2 : 1, after = 2;
+  const word = n => cl ? (n === 1 ? 'client' : 'clients') : reportTab === 'services' ? (n === 1 ? sw.one : sw.many) : (n === 1 ? 'teammate' : 'teammates');
+  const [ra, ru] = rtSplit(restMin), [ta, tu] = rtSplit(total);
+  const restRow = reportShowAll && rows.length > 9 ? `<tr class="rt-more"><td colspan="${lead}"><button class="link-row" data-grow="report-rows" onclick="reportShowAll=false;renderReports()">Show fewer</button></td><td colspan="${after + 1}"></td></tr>`
+    : rest.length ? `<tr class="rt-more"><td colspan="${lead}"><button class="link-row" data-grow="report-rows" onclick="reportShowAll=true;renderReports()">${rest.length} more ${word(rest.length)}</button></td><td class="num rt-h">${rtNum(ra, ru)}</td><td colspan="${after}"></td></tr>` : '';
+  grp.setAttribute('data-grow-key', 'report-rows'); grp.setAttribute('data-grow-rows', 'tbody > tr');
+  grp.innerHTML = `<table class="mtx rt" aria-label="Hours ${escapeHtml(rangeWord)}"><thead><tr>${head}</tr></thead><tbody>${body}${restRow}</tbody>
+<tfoot><tr><td colspan="${lead}">Total</td><td class="num rt-h">${rtNum(ta, tu)}</td><td colspan="${after}"></td></tr></tfoot></table>`;
 }
 
 // ================================================================ Daily Summary
