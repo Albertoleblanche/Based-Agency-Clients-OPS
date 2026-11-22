@@ -157,10 +157,27 @@ function draftDelta(c, d){
 }
 // Who may rewrite or edit a draft from Review: approvers while it waits; the writer until they
 // send it for review.
+// Sending a draft for review doesn't lock its writer out (Nov 21): they can still edit and rewrite
+// it. In review it stays in review with the new words; approved by someone else, it goes back to
+// Review and the approvers are told (writerDraftFields). Approvers can rework any draft still waiting.
+// Nobody reworks a sent one, or a WhatsApp win someone already copied to paste.
 function canReworkDraft(c, d){
-  if(d.draftSentAt || d.draftStatus === 'approved') return false;
-  if(canApprove()) return true;
-  return d.author === myName() && !d.readyToNotify;
+  if(!d || d.draftSentAt) return false;
+  const mine = d.author === myName();
+  if(d.draftStatus === 'approved') return mine && !d.waCopiedBy;
+  return canApprove() || mine;
+}
+// The fields a writer's change adds: an approved draft they can't approve themselves goes back to Review.
+function writerDraftFields(c, d){
+  if(!d || d.draftStatus !== 'approved' || canApprove()) return {};
+  return { draftStatus: 'pending', readyToNotify: true, draftPendingSince: new Date().toISOString() };
+}
+// ...and once saved, the approvers hear that what they approved changed.
+async function tellApproversDraftChanged(c, d){
+  if(!d || canApprove() || typeof sendNotification !== 'function') return;
+  const me = myName(), uid = currentUser ? currentUser.id : null;
+  const approvers = (teamProfiles || []).filter(p => (p.role === 'admin' || p.role === 'approver') && p.id !== uid && !p.access_revoked);
+  for(const p of approvers) await sendNotification(p.id, 'draft_ready', `${c.name}: ${firstName(me)} changed an approved draft`, 'It’s back in Review for another look.', 'approve', c.id);
 }
 
 function reviewReadHtml(x, list, split){

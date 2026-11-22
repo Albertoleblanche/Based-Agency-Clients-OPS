@@ -8,7 +8,15 @@ function sheetPop(id, label, options, value, onchange, opts){
   opts = opts || {};
   const cur = options.find(o => String(o[0]) === String(value));
   const ph = opts.placeholder && !cur ? `<option value="" selected disabled hidden>${escapeHtml(opts.placeholder)}</option>` : '';
-  return `<label class="pop pop-sel${opts.disabled ? ' off' : ''}"${opts.style ? ` style="${opts.style}"` : ''}>${opts.lead || ''}<span class="pl">${escapeHtml(cur ? cur[1] : (opts.placeholder || ''))}</span>${icon('caret-up-down', { weight: 'bold' })}<select id="${id}" aria-label="${escapeHtml(label)}" onchange="syncPopSel(this)${onchange ? ';' + onchange : ''}"${opts.disabled ? ' disabled' : ''}>${ph}${options.map(([v, t]) => `<option value="${escapeHtml(v)}"${String(v) === String(value) ? ' selected' : ''}>${escapeHtml(t)}</option>`).join('')}</select></label>`;
+  return `<label class="pop pop-sel${opts.disabled ? ' off' : ''}"${opts.style ? ` style="${opts.style}"` : ''}>${opts.lead || ''}<span class="pl">${escapeHtml(cur ? cur[1] : (opts.placeholder || ''))}</span>${icon('caret-up-down', { weight: 'bold' })}<select id="${id}" aria-label="${escapeHtml(label)}" onchange="syncPopSel(this)${onchange ? ';' + onchange : ''}"${opts.disabled ? ' disabled' : ''}>${ph}${sheetPopOptions(options, value, opts.top)}</select></label>`;
+}
+// opts.top: ids listed first under "Suggested", then everything under its own heading
+function sheetPopOptions(options, value, top){
+  const one = ([v, t]) => `<option value="${escapeHtml(v)}"${String(v) === String(value) ? ' selected' : ''}>${escapeHtml(t)}</option>`;
+  const first = (top || []).map(id => options.find(o => String(o[0]) === String(id))).filter(Boolean);
+  if(!first.length) return options.map(one).join('');
+  const rest = options.filter(o => !first.includes(o));
+  return `<optgroup label="Suggested">${first.map(one).join('')}</optgroup><optgroup label="${escapeHtml(top.label || 'All')}">${rest.map(one).join('')}</optgroup>`;
 }
 function sheetSw(id, on, label, extra){ return `<button type="button" class="sw${on ? ' on' : ''}" id="${id}" role="switch" aria-checked="${!!on}" aria-label="${escapeHtml(label)}" onclick="sheetToggle(this)${extra ? ';' + extra : ''}"></button>`; }
 function sheetToggle(el){ const on = !el.classList.contains('on'); el.classList.toggle('on', on); el.setAttribute('aria-checked', on); return on; }
@@ -169,6 +177,12 @@ function liServiceRowHtml(c){
   const services = logSheetServices(c);
   return `<label for="liService">Service</label><div>${sheetPop('liService', 'Service', services.map(s => [s, s]), (c && c.service) || services[0] || '', 'logSheet.serviceTouched=true')}</div>`;
 }
+// A suggestion under the Client picker: choose it, as if picked from the list
+function liPickSuggested(id){
+  const sel = document.getElementById('liClient'); if(!sel) return;
+  sel.value = id; syncPopSel(sel); liClientChanged();
+  document.getElementById('liText')?.focus();
+}
 function openQueueLogImprovementModal(presetClientId){
   logSheet = { files: [], useTimer: false, serviceTouched: false };
   const me = myName() || 'Team member';
@@ -180,10 +194,16 @@ function openQueueLogImprovementModal(presetClientId){
   let cid = (typeof presetClientId === 'string' && presetClientId) || fromView || (timerState.running ? timerState.clientId : '') || '';
   if(cid && !list.some(x => x.id === cid)) cid = '';
   const c = list.find(x => x.id === cid);
+  // Worth logging for (logSuggestions, week-health.js): first in the picker, and, when no client is
+  // chosen yet, the top three under it with why
+  const sug = typeof logSuggestions === 'function' ? logSuggestions(5).filter(x => list.some(l => l.id === x.c.id)) : [];
+  const sugTop = Object.assign(sug.map(x => x.c.id), { label: 'All clients' });
+  const sugRows = !cid && sug.length ? `<div class="li-sg" role="group" aria-label="Worth logging for"><span class="li-sgh">Worth logging for</span>${sug.slice(0, 3).map(x =>
+    `<button type="button" class="li-sgr" data-id="${x.c.id}" onclick="liPickSuggested('${x.c.id}')"><b>${escapeHtml(x.c.name)}</b><span${/overdue/.test(x.why) ? ' class="is-late"' : ''}>${escapeHtml(x.why)}</span></button>`).join('')}</div>` : '';
   const timerLink = timerState.running ? `<button type="button" class="btn btn-q" id="liTimerBtn" style="padding:0 4px" onclick="liUseTimer()">Use the running timer (${hmm((Date.now() - timerState.startedAt) / 60000)})</button>` : '';
   openAppModal(`<h3>Log Improvement</h3>
 <div class="f">
-<label for="liClient">Client</label><div>${sheetPop('liClient', 'Client', list.map(x => [x.id, x.name]), cid, 'liClientChanged()', { placeholder: 'Choose a client' })}</div>
+<label for="liClient"${sugRows ? ' class="top"' : ''}>Client</label><div>${sheetPop('liClient', 'Client', list.map(x => [x.id, x.name]), cid, 'liClientChanged()', { placeholder: 'Choose a client', top: sugTop })}${sugRows}</div>
 <label class="top" for="liText">What did you do?</label><textarea id="liText" class="tf" style="height:84px" spellcheck="true" placeholder="What changed, with the number or result if there is one"></textarea>
 <div id="liSvc" class="hvp">${liServiceRowHtml(c)}</div>
 <label for="liDate">Date</label><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${sheetDateField('liDate', toDateStr(new Date()), { past: true, from: -13, to: 0, max: toDateStr(new Date()) })}</div>
@@ -211,6 +231,7 @@ function liTimeChanged(force){
 function liClientChanged(){
   liTimeChanged(true);
   const c = clients.find(x => x.id === document.getElementById('liClient')?.value);
+  document.querySelectorAll('.li-sgr').forEach(b => b.classList.toggle('on', !!c && b.dataset.id === c.id));
   const wrap = document.getElementById('liSvc');
   if(!c || !wrap || (logSheet.serviceTouched && !serviceFromHarvest(c) && document.getElementById('liService'))) return;
   wrap.innerHTML = liServiceRowHtml(c);

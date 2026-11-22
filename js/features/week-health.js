@@ -198,6 +198,52 @@ function weekStripHtml(c){
   }).join('')}</div>`;
 }
 
+// When a client started with us: its start date, else when it was added to Radar.
+function clientStartedAt(c){
+  if(c && c.startDate){ const d = new Date(String(c.startDate).slice(0, 10) + 'T12:00:00'); if(!isNaN(d)) return d; }
+  if(c && c.createdAt){ const d = new Date(c.createdAt); if(!isNaN(d)) return d; }
+  return null;
+}
+
+// ---- What to log for next ----------------------------------------------------------------------
+// The clients worth logging work for now, best first, each with why: time you tracked for a client
+// without logging the work; your clients whose update is due (or nearly) with nothing logged; and
+// your clients with nothing logged for a while. Clients already in your Queue aren't repeated.
+// Used by the Queue (under its list) and the Log Improvement sheets (desktop and iPhone).
+function logSuggestions(limit){
+  const me = typeof myName === 'function' ? myName() : '', uid = typeof currentUser !== 'undefined' && currentUser ? currentUser.id : null;
+  if(!me || !uid) return [];
+  const T = healthThresholds(), now = rNow();
+  const entries = (typeof timeEntries !== 'undefined' ? timeEntries : []).filter(e => e.userId === uid && !e.deletedAt && !e.improvementId && !e.logged && e.clientId);
+  const canWork = c => typeof waCanWork !== 'function' || waCanWork(c);
+  const out = [];
+  attentionEligibleClients().filter(canWork).forEach(c => {
+    const w = clientWeek(c), mine = w.logged.filter(i => i.author === me);
+    const d = typeof getDraftFor === 'function' ? getDraftFor(c, me) : null;
+    const inQueue = mine.length || (d && d.draft && !d.draftSentAt && (d.draftStatus === 'pending' || d.draftStatus === 'approved') && !draftHasNoWork(c, d));
+    if(inQueue) return;
+    const from = toDateStr(w.since), mins = entries.filter(e => e.clientId === c.id && e.date >= from).reduce((n, e) => n + (e.minutes || 0), 0);
+    const owner = clientOwner(c) === me, open = !w.sent && !w.logged.length;
+    let score = 0; const why = [];
+    if(mins){ score += 300 + Math.min(mins, 600) / 10; why.push(`${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')} tracked, no work logged`); }
+    if(owner && open && w.daysLeft <= 2){
+      score += 200 - w.daysLeft * 10;
+      const when = w.late ? `${w.daysLeft === -1 ? '1 day' : `${-w.daysLeft} days`} overdue` : w.daysLeft === 0 ? 'Due today' : w.daysLeft === 1 ? 'Due tomorrow' : `Due ${DAY_NAMES[w.due.getDay()]}`;
+      why.push(mins ? when : `${when}, nothing logged`);
+    }
+    if(owner && !why.length){
+      const lastLog = (c.improvements || []).map(i => new Date(i.date)).filter(x => x <= now).sort((a, b) => b - a)[0];
+      const q = lastLog || clientStartedAt(c), n = q ? daysBetween(q, now) : 0;
+      if(q && n >= T.nothingLoggedDays[0]){ score += 100 + Math.min(n, 60); why.push(lastLog ? `Nothing logged in ${n} days` : 'Nothing logged yet'); }
+    }
+    if(!score) return;
+    if(why.length > 1) why[1] = why[1].toLowerCase();
+    out.push({ c, score, why: why.join(' · '), mins });
+  });
+  out.sort((a, b) => b.score - a.score || (b.c.importance || 0) - (a.c.importance || 0) || a.c.name.localeCompare(b.c.name));
+  return limit ? out.slice(0, limit) : out;
+}
+
 // ---- this week's update for one client ------------------------------------------------------
 const STEP_NAMES = ['Logged', 'Ready for review', 'Approved', 'Sent'];
 function clientWeek(c){
@@ -326,10 +372,14 @@ function clientHealth(c){
     else if(hp.day >= 15 && hp.used < hp.expected * T.underUsedPct / 100) sig.push({ l: 'y', key: 'under', icon: 'clock', title: 'Hours under-used', since: new Date(now.getFullYear(), now.getMonth(), 16),
       text: `${Math.round(hp.used)} of ${hp.budget} hours used with the month half gone.` });
   }
+  // Nothing logged: counted from the last work logged, or, for a client with none ever, from when
+  // it started (its start date, else when it was added). It used to skip those clients entirely.
   const lastLog = (c.improvements || []).map(i => new Date(i.date)).filter(d => d <= now).sort((a, b) => b - a)[0];
-  if(lastLog){
-    const n = daysBetween(lastLog, now), l = lvl(n, T.nothingLoggedDays);
-    if(l) sig.push({ l, key: 'quiet', icon: 'square-pen', title: 'Nothing logged', since: addDays(lastLog, T.nothingLoggedDays[0]), text: `Nothing logged in ${n} days.` });
+  const quietFrom = lastLog || clientStartedAt(c);
+  if(quietFrom && quietFrom <= now){
+    const n = daysBetween(quietFrom, now), l = lvl(n, T.nothingLoggedDays);
+    if(l) sig.push({ l, key: 'quiet', icon: 'square-pen', title: 'Nothing logged', since: addDays(quietFrom, T.nothingLoggedDays[0]),
+      text: lastLog ? `Nothing logged in ${n} days.` : `Nothing logged since it started, ${n} days ago.` });
   }
   const openAt = t => (t.status !== 'done' || (t.completedAt && new Date(t.completedAt) > now)) && (!t.cancelledAt || new Date(t.cancelledAt) > now) && (!t.createdAt || new Date(t.createdAt) <= now);
   const overdue = (typeof tasks !== 'undefined' ? tasks : []).filter(t => t.clientId === c.id && openAt(t) && t.dueDate && dayStart(new Date(t.dueDate + 'T12:00:00')) < dayStart(now));

@@ -189,10 +189,13 @@ function startWeekDraftEdit(clientId, author){
 function cancelWeekDraftEdit(){ window._weekDraftEdit = null; renderThisWeek(); }
 async function saveWeekDraftEdit(clientId, author){
   const ta = document.getElementById('draft-' + clientId); if(!ta) return;
-  const ok = await saveDraftFor(clientId, author, { draft: ta.value });
+  const c = clients.find(x => x.id === clientId), d = c ? getDraftFor(c, author) : null;
+  const extra = author === myName() ? writerDraftFields(c, d) : {}, back = !!extra.draftStatus;   // see quSaveDraftEdit
+  const ok = await saveDraftFor(clientId, author, { draft: ta.value, ...extra });
   if(!ok){ showToast('error', 'Couldn’t save the draft', 'Try again in a moment.'); return; }
+  if(back) await tellApproversDraftChanged(c, d);
   window._weekDraftEdit = null; window._weekDraftFull = clientId;
-  renderThisWeek(); showToast('success', 'Draft saved', '');
+  renderThisWeek(); showToast('success', 'Draft saved', back ? 'It was already approved, so it’s back in Review for another look.' : '');
 }
 function weekPanelHtml(w){
   const c = w.c, me = myName(), d = w.draft, approver = canApprove();

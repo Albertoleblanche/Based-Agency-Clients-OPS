@@ -139,7 +139,7 @@ function clientRowFromDb(r){
     id:r.id, name:r.name, email:r.email||'', website:r.website||'', service:r.service, status:r.status,
     importance:r.importance, danger:r.danger, monthlyHourBudget:r.monthly_hour_budget||0, sow:r.sow||'',
     lastProactiveCheckAt:r.last_proactive_check_at, customFieldValues:r.custom_field_values||{},
-    deletedAt:r.deleted_at||undefined, startDate:r.start_date||'',
+    deletedAt:r.deleted_at||undefined, startDate:r.start_date||'', createdAt:r.created_at||null,
     improvements:[], // hydrated separately from clientImprovements
     drafts:[], // hydrated separately from clientDrafts — one entry per author who has ever had a draft for this client (see draftRowFromDb / getDraftFor)
   };

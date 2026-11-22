@@ -1438,6 +1438,24 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .rvn-rr time{font-size:12px;color:var(--label-3)}
 .rvn-empty{padding:24px 28px;display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--label-2)}
 .rvn-empty b{color:var(--label);font-weight:600}
+/* Log Improvement: Worth logging for, under the Client picker */
+.li-sg{display:flex;flex-direction:column;margin-top:8px}
+.li-sgh{font-size:11.5px;color:var(--label-3);margin:0 0 2px 2px}
+.li-sgr{display:flex;align-items:baseline;gap:8px;min-width:0;padding:6px 8px;margin:0 -6px;border:0;border-radius:8px;background:none;color:inherit;font:inherit;text-align:left;cursor:default;transition:background-color 120ms ease,transform 120ms ease}
+.li-sgr b{font-size:13px;font-weight:600;white-space:nowrap}
+.li-sgr span{font-size:12px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.li-sgr span.is-late{color:var(--red)}
+.li-sgr.on{background:var(--select)}
+.li-sgr:active{transform:scale(.98);background:var(--fill-2)}
+.li-sgr:focus-visible{outline:none;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--blue) 55%,transparent)}
+@media (hover:hover) and (pointer:fine){.li-sgr:hover:not(.on){background:var(--fill)}}
+/* Queue: Worth logging for (logSuggestions), under To do */
+.qu-sgh{margin-top:22px}
+.qu-sgr .tx .s.is-late{color:var(--red)}
+.qu-sgp{flex:0 0 auto;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;color:var(--label-2);background:var(--fill);transition:background-color 120ms ease,transform 120ms ease}
+.qu-sgp svg{width:13px;height:13px}
+.qu-sgr:active .qu-sgp{transform:scale(.92)}
+@media (hover:hover) and (pointer:fine){.qu-sgr:hover .qu-sgp{background:var(--fill-2);color:var(--label)}}
 .rvn-keys{margin:auto 18px 0;padding-top:14px;font-size:11.5px;color:var(--label-3);display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap}
 .rvn-keys span{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
 .rvn-keys kbd{font:600 10.5px/1 -apple-system,system-ui,sans-serif;padding:3px 5px;border-radius:4px;background:var(--fill-2);color:var(--label-2)}

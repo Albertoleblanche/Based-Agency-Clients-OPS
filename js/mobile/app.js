@@ -1010,7 +1010,13 @@ function mRowPick(label, valueText, onclick, set){ return `<button class="ir" on
 function mSw(id, on, label){ return `<button class="ios-sw${on ? ' on' : ''}" id="${id}" role="switch" aria-checked="${!!on}" aria-label="${mEsc(label)}" onclick="this.classList.toggle('on');this.setAttribute('aria-checked',this.classList.contains('on'))"></button>`; }
 function mIsOn(id){ return !!$m(id)?.classList.contains('on'); }
 function mClientName(id){ return clients.find(c => c.id === id)?.name || ''; }
-function mPickClient(cur, cb, none){ mPick('Client', [...(none ? [['', none]] : []), ...waWorkable(liveClients(), cur).slice().sort((a, b) => a.name.localeCompare(b.name)).map(c => [c.id, c.name, c.service || ''])], cur, cb); }
+// suggest: worth logging for first, with why (logSuggestions, week-health.js); the rest A to Z
+function mPickClient(cur, cb, none, suggest){
+  const all = waWorkable(liveClients(), cur).slice().sort((a, b) => a.name.localeCompare(b.name));
+  const sug = suggest && typeof logSuggestions === 'function' ? logSuggestions(4).filter(x => all.includes(x.c)) : [];
+  const first = new Set(sug.map(x => x.c.id));
+  mPick('Client', [...(none ? [['', none]] : []), ...sug.map(x => [x.c.id, x.c.name, x.why]), ...all.filter(c => !first.has(c.id)).map(c => [c.id, c.name, c.service || ''])], cur, cb);
+}
 function mDayPick(title, cur, from, to, none, cb){ const opts = sheetDayOptions(from, to); if(from < 0) opts.reverse(); mPick(title, [...(none ? [['', none]] : []), ...opts], cur, cb); }
 
 let mLog_ = {};
@@ -1043,7 +1049,7 @@ function mLogPick(what){
   const keepInc = mIsOn('mLogInclude');
   const back = () => { const t = mSheetVal('mLogText'), tm = mSheetVal('mLogTime'); $m('mSheet').querySelector('.sheet-scroll').innerHTML = mLogBody(); $m('mLogText').value = t; $m('mLogTime').value = tm; if(!keepInc){ $m('mLogInclude').classList.remove('on'); } };
   mKeep('mLogText', mSheetVal('mLogText')); mKeep('mLogTime', mSheetVal('mLogTime'));
-  if(what === 'client') mPickClient(mLog_.clientId, v => { mLog_.clientId = v; const c = clients.find(x => x.id === v); if(c && c.service) mLog_.service = c.service; mHvClient(mLog_); back(); });
+  if(what === 'client') mPickClient(mLog_.clientId, v => { mLog_.clientId = v; const c = clients.find(x => x.id === v); if(c && c.service) mLog_.service = c.service; mHvClient(mLog_); back(); }, null, true);
   if(what === 'service') mPick('Service', [...new Set([mLog_.service, ...(settings.serviceOptions || [])].filter(Boolean))].map(s => [s, s]), mLog_.service, v => { mLog_.service = v; back(); });
   if(what === 'date') mDayPick('Date', mLog_.date, -13, 0, null, v => { mLog_.date = v; back(); });
   if(what === 'project' || what === 'task') mHvPick(mLog_, what, back);
@@ -1158,7 +1164,7 @@ function mOpenTimerSheet(){
 function mTimerPick(what){
   mKeep('mTimerDesc', mSheetVal('mTimerDesc'));
   const back = () => { const v = mSheetVal('mTimerDesc'); $m('mSheet').querySelector('.sheet-scroll').innerHTML = window.mTimerBody(); $m('mTimerDesc').value = v; };
-  if(what === 'client') mPickClient(mLog_.clientId, v => { mLog_.clientId = v; const c = clients.find(x => x.id === v); if(c && c.service) mLog_.service = c.service; mHvClient(mLog_); back(); });
+  if(what === 'client') mPickClient(mLog_.clientId, v => { mLog_.clientId = v; const c = clients.find(x => x.id === v); if(c && c.service) mLog_.service = c.service; mHvClient(mLog_); back(); }, null, true);
   else if(what === 'project' || what === 'task') mHvPick(mLog_, what, back);
   else mPick('Service', settings.serviceOptions.map(s => [s, s]), mLog_.service, v => { mLog_.service = v; back(); });
 }

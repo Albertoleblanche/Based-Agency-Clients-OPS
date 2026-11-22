@@ -95,6 +95,12 @@ function renderMyQueue(){
 <div class="tx"><b>${escapeHtml(x.c.name)}</b><span class="s"><span class="rvn-due ${kind}">${escapeHtml(due)}</span> · ${n}</span></div>
 <div class="rvn-rr"><span class="qu-tag ${cls}">${word}</span></div></a>`;
   }).join('') || `<div class="rvn-empty"><b>${{ todo: 'Nothing to do', review: 'Nothing in review', sent: 'Nothing sent this week' }[queueTab]}</b>${{ todo: 'Clients show up here once you log work for them.', review: 'Drafts you send for review wait here until they go out.', sent: 'Your updates show here once they’re sent.' }[queueTab]}</div>`;
+  // Worth logging for: clients you tracked time for, or yours that are due, with nothing logged
+  // (logSuggestions in week-health.js). Under To do, after the clients already here.
+  const sugg = queueTab === 'todo' && typeof logSuggestions === 'function' ? logSuggestions(4) : [];
+  const suggHtml = sugg.length ? `<p class="rvn-sort qu-sgh">Worth logging for</p>${sugg.map(x => `<a class="rvn-r qu-r qu-sgr" href="#queue" onclick="openQueueLogImprovementModal('${x.c.id}');return false;" title="Log work for ${escapeHtml(x.c.name)}">
+<div class="tx"><b>${escapeHtml(x.c.name)}</b><span class="s${/overdue/.test(x.why) ? ' is-late' : ''}">${escapeHtml(x.why)}</span></div><span class="qu-sgp" aria-hidden="true">${icon('plus')}</span></a>`).join('')}` : '';
+  window._quSugg = sugg;
   const lateN = list.filter(x => x.w.late).length, toSend = list.filter(quWaToSend).length;
   const sortNote = queueTab === 'todo' ? `Due first${lateN ? ` · ${lateN} late` : ''}` : queueTab === 'sent' ? 'Sent this week · newest first'
     : toSend ? `${toSend} yours to send on WhatsApp` : 'Waiting on an approver';
@@ -107,7 +113,7 @@ function renderMyQueue(){
 <section class="rvn-list" aria-label="Your clients">
 <div class="rvn-lh"><div class="seg" role="tablist" aria-label="Queue">${tabs}</div></div>
 <p class="rvn-sort">${sortNote}</p>
-<div class="rvn-rows">${rows}</div>
+<div class="rvn-rows">${rows}${suggHtml}</div>
 ${list.length > 1 ? '<p class="rvn-keys"><span><kbd>J</kbd><kbd>K</kbd> next and previous</span></p>' : ''}
 </section>
 ${read}
@@ -144,9 +150,10 @@ function queueEmptyHtml(items){
   if(queueTab === 'review') return emptyState({ icon: 'queue', tone: 'ok', title: 'Nothing in review',
     text: 'When you send a draft for review it waits here until an approver sends it.',
     link: items.todo.length ? `${items.todo.length} to do` : '', onLink: "setQueueTab('todo')" });
+  const top = (window._quSugg || [])[0];
   return emptyState({ icon: 'queue', tone: 'ok', title: 'Nothing logged since the last updates',
-    text: 'Log what you did for a client and it shows up here, ready to become this week’s update.',
-    action: 'Log Improvement', onAction: 'openQueueLogImprovementModal()',
+    text: top ? `Log what you did for a client and it shows up here. ${top.c.name} is first: ${top.why.toLowerCase()}.` : 'Log what you did for a client and it shows up here, ready to become this week’s update.',
+    action: top ? `Log for ${shortClientName(top.c.name)}` : 'Log Improvement', onAction: top ? `openQueueLogImprovementModal('${top.c.id}')` : 'openQueueLogImprovementModal()',
     link: items.review.length ? `${items.review.length} in review` : '', onLink: "setQueueTab('review')" });
 }
 
@@ -318,7 +325,9 @@ async function quSaveEdit(clientId, impId){
   const cut = s => s.length > 60 ? s.slice(0, 60) + '…' : s;
   if(typeof logClientActivity === 'function') logClientActivity(clientId, 'improvement_edited', `${myName() || 'Someone'} changed an improvement — "${cut(old)}" → "${cut(text)}"`);
   quRefreshAll(clientId);
-  showToast('success', 'Saved', '');
+  // the draft was written from the old words: say so, whatever step it's at
+  const d = getDraftFor(c, myName()), inIt = d && d.draft && !d.draftSentAt && (d.draftImprovementIds || []).includes(impId);
+  showToast('success', 'Saved', inIt ? `Your draft${d.readyToNotify ? ' in Review' : d.draftStatus === 'approved' ? ', already approved,' : ''} still has the old wording. Rewrite it to include the change.` : '');
 }
 
 // Delete: the work and the time logged with it go to Recently Deleted (see trashWork in data.js).
@@ -397,11 +406,17 @@ function quStartDraftEdit(clientId){
   const ta = document.getElementById('qu-draft-' + clientId); if(ta){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
 }
 function quCancelDraftEdit(){ window._quDraftEdit = null; renderMyQueue(); }
+// Saving your draft after you sent it: in Review it stays there with the new words; approved (by
+// someone else) it goes back to Review and the approvers are told (writerDraftFields, review.js).
 async function quSaveDraftEdit(clientId){
   const ta = document.getElementById('qu-draft-' + clientId); if(!ta) return;
-  const ok = await saveDraftFor(clientId, myName(), { draft: ta.value });
+  const c = clients.find(x => x.id === clientId), d = c ? getDraftFor(c, myName()) : null;
+  const extra = writerDraftFields(c, d), back = !!extra.draftStatus, inReview = !!(d && d.readyToNotify);
+  const ok = await saveDraftFor(clientId, myName(), { draft: ta.value, ...extra });
   if(!ok){ showToast('error', 'Couldn’t save the draft', 'Try again in a moment.'); return; }
-  window._quDraftEdit = null; quRefreshAll(clientId); showToast('success', 'Draft saved', '');
+  if(back) await tellApproversDraftChanged(c, d);
+  window._quDraftEdit = null; quRefreshAll(clientId);
+  showToast('success', 'Draft saved', back ? 'It was already approved, so it’s back in Review for another look.' : inReview ? 'Still in Review, with your changes.' : '');
 }
 
 // J / K move through the list (not while typing); Escape leaves editing.

@@ -1025,14 +1025,17 @@ async function confirmGenerateDraftSelection(id, author){
     });
     const data = await response.json();
     const text = (data.text || '').trim();
-    const stayedApproved = d.draftStatus === 'approved';
+    // an approved draft rewritten by its writer, who can't approve it, goes back to Review
+    const backToReview = d.draftStatus === 'approved' && !canApprove();
+    const stayedApproved = d.draftStatus === 'approved' && !backToReview;
     const fields = { draft: text || 'Could not generate a draft — try again.' };
     // Regenerating an already-approved draft doesn't require re-approval —
     // what was actually approved is the underlying included improvements,
     // which haven't changed, not this specific AI wording of them. A
     // fresh (never-approved) draft still becomes pending as before.
     if(!stayedApproved){
-      fields.draftStatus = 'pending'; fields.draftPendingSince = new Date().toISOString();
+      // still in (or back to) Review: it keeps its place there
+      fields.draftStatus = 'pending'; fields.draftPendingSince = d.readyToNotify && d.draftPendingSince && !backToReview ? d.draftPendingSince : new Date().toISOString();
       // A genuinely new cycle means different underlying content — the
       // "already sent" record from whatever was sent before no longer
       // applies to this draft. Deliberately NOT cleared in the
@@ -1047,8 +1050,9 @@ async function confirmGenerateDraftSelection(id, author){
     // this specific content — Team Queue shouldn't surface it to
     // approvers as awaiting review until the owning member explicitly
     // clicks Ready to Notify again.
-    // An approver rewriting a draft that's in Review keeps it there: they're the one reviewing it.
-    fields.readyToNotify = !!(d.readyToNotify && canApprove() && !stayedApproved);
+    // A draft in Review stays there when it's rewritten, by an approver or by its writer (Nov 21);
+    // an approved one its writer rewrote goes back there.
+    fields.readyToNotify = backToReview || !!(d.readyToNotify && !stayedApproved);
     // Exactly what's in this draft cycle, from the picker's selection —
     // not re-derived from a date range. Read back by approveDraft() to
     // know precisely which rows to flip include_in_email off for.
@@ -1064,12 +1068,14 @@ async function confirmGenerateDraftSelection(id, author){
       showToast('error','Draft generated, but not saved', 'The AI wrote it, but saving to the database failed — check that all schema migrations have been run, then try again.');
       return;
     }
+    if(backToReview && typeof tellApproversDraftChanged === 'function') await tellApproversDraftChanged(c, d);
     await persistLog();
     renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
     logClientActivity(id, 'draft_generated', `AI ${stayedApproved?'re-worded':'generated'} ${author}'s draft from ${includedImprovements.length} included improvement${includedImprovements.length!==1?'s':''} (of ${c.improvements.filter(i=>i.author===author).length} logged by them)${stayedApproved?' — approval carried over':''}.`);
     refreshClientDetailActivityIfOpen(id);
     openDraftAfterWriting(id, author);
-    showToast('success','Draft generated', stayedApproved ? `${author}'s draft for ${c.name} was re-worded — still approved, no need to re-approve.` : `AI wrote ${author}'s update for ${c.name}.`);
+    showToast('success','Draft generated', stayedApproved ? `${author}'s draft for ${c.name} was re-worded — still approved, no need to re-approve.`
+      : backToReview ? 'It was already approved, so it’s back in Review for another look.' : fields.readyToNotify ? `Still in Review, with the new words.` : `AI wrote ${author}'s update for ${c.name}.`);
     // No automatic notification here at all — the only way admins/
     // approvers get notified is the explicit "Ready to Notify" button,
     // which is also what makes a pending draft actually visible in Team
@@ -1247,14 +1253,10 @@ async function recordGroupSendComplete(){
 
 function canGenerateOrRegenerateDraft(c, author){
   const d = getDraftFor(c, author);
-  // Locked for the original contributor once they've told an approver
-  // it's ready — regenerating out from under someone who's actively
-  // reviewing it would silently change what they're looking at.
-  // Approvers/admins keep full control regardless, since they're the
-  // ones with authority over what happens next.
-  if(d.draftStatus==='pending' && d.readyToNotify===true && !canApprove()) return false;
-  // Each person can always work on their own draft (subject to the lock
-  // above) — draft state is now genuinely per-author, so "is this my own
+  // Sending it for review no longer locks its writer out (Nov 21): rewriting keeps it in Review with
+  // the new words (see confirmGenerateDraftSelection). A sent one is done.
+  if(d.draftSentAt) return false;
+  // Each person can always work on their own draft — draft state is genuinely per-author, so "is this my own
   // draft" replaces the old "did I contribute to the shared draft"
   // question entirely. Anyone else's draft is admin/approver territory,
   // matching their oversight role across the whole team.
