@@ -281,6 +281,7 @@ function startEditImprovement(clientId, idx){
   const c = clients.find(x=>x.id===clientId);
   if(!c || !c.improvements[idx]) return;
   const imp = c.improvements[idx];
+  if(workLockedToast(imp)) return;   // in an update in review or approved (data.js)
   const row = document.getElementById(`imp-row-${clientId}-${idx}`);
   if(!row) return;
   row.innerHTML = `

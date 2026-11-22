@@ -226,6 +226,7 @@ async function toggleImprovementIncludeInEmail(clientId, impId, checked){
   const c = clients.find(x=>x.id===clientId);
   const imp = c && c.improvements.find(i=>i.id===impId);
   if(!imp) return;
+  if(workLockedToast(imp)){ renderImprovementsHistory(); return; }   // in an update in review or approved
   // .select() after .update() to confirm a row was actually affected —
   // same reasoning as the delete functions fixed earlier on this exact
   // table: an RLS policy that silently blocks the update reports success

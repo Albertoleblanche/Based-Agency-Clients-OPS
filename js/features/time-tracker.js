@@ -849,6 +849,7 @@ async function deleteTimeEntry(id){
   const linked = timeEntries.find(e => e.id === id);
   const work = linked && linked.improvementId ? clientImprovements.find(i => i.id === linked.improvementId) : null;
   if(work){
+    if(workLockedToast(work)) return;   // its work is in an update in review or approved
     const r = await deleteWorkAsk([work.id], { fromTime: true });
     if(r && r.ok){ renderTimesheet(); renderReports(); if(typeof renderAll === 'function') renderAll(); }
     return;

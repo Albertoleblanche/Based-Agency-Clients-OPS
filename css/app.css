@@ -1449,6 +1449,14 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .li-sgr:active{transform:scale(.98);background:var(--fill-2)}
 .li-sgr:focus-visible{outline:none;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--blue) 55%,transparent)}
 @media (hover:hover) and (pointer:fine){.li-sgr:hover:not(.on){background:var(--fill)}}
+/* Queue: sent for review or approved, nothing here changes */
+.qu-i.is-lock .qu-t{padding-right:0}
+.qu-lockn{display:flex;align-items:flex-start;gap:8px;margin:14px 0 0;font-size:13px;line-height:1.45;color:var(--label-2)}
+.qu-lockn svg{flex:0 0 auto;width:14px;height:14px;margin-top:2px;color:var(--label-3)}
+.ib.act.is-lock{cursor:default;color:var(--label-3)}
+.ib.act.is-lock svg{width:14px;height:14px}
+.ck[aria-disabled="true"]{opacity:.55;cursor:default}
+.qu-nextn{margin:0 0 6px;font-size:13px;line-height:1.45;color:var(--label-2)}
 /* Queue: Worth logging for (logSuggestions), under To do */
 .qu-sgh{margin-top:22px}
 .qu-sgr .tx .s.is-late{color:var(--red)}

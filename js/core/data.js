@@ -411,12 +411,31 @@ async function workAfterDelete(effects, moved, soft){
       `${list.length === 1 ? `“${workCut(list[0].text)}”, with the time logged with it. ` : 'With the time logged with them. '}${where}`, soft ? 'trash' : 'queue', null);
   });
 }
+// Work in an update that's sent for review or approved, and not sent yet, is locked until it's sent
+// (Nov 21): what went for approval is what goes out. Edit, delete and the email switch say why
+// instead, everywhere (Queue, client page, Past Improvements, the Timesheet).
+function workLockedBy(imp){
+  if(!imp) return null;
+  const c = (typeof clients !== 'undefined' ? clients : []).find(x => x.id === imp.clientId);
+  return ((c && c.drafts) || []).find(d => d.draft && !d.draftSentAt && (d.draftStatus === 'approved' || (d.draftStatus === 'pending' && d.readyToNotify))
+    && (d.draftImprovementIds || []).includes(imp.id)) || null;
+}
+function workLockedWords(d){
+  const me = typeof myName === 'function' ? myName() : '';
+  return `It’s in ${d.author === me ? 'your' : `${firstName(d.author)}’s`} update ${d.draftStatus === 'approved' ? 'that’s approved' : 'in review'}, so it can’t change until that’s sent.`;
+}
+function workLockedToast(imp){ const d = workLockedBy(imp); if(d) showToast('info', 'Locked until it’s sent', workLockedWords(d)); return !!d; }
+
 // Asks, deletes, says what happened. Returns trashWork's result, or null when they said no.
 async function deleteWorkAsk(ids, opts){
   opts = opts || {};
-  const items = [...new Set(ids)].map(id => clientImprovements.find(i => i.id === id)).filter(Boolean);
-  if(!items.length){ showToast('info', 'Already gone', 'That work was already deleted.'); return null; }
-  if(!(await confirmDialog(workDeleteQuestion(items, opts), { confirmLabel: 'Delete', destructive: true }))) return null;
+  const all = [...new Set(ids)].map(id => clientImprovements.find(i => i.id === id)).filter(Boolean);
+  if(!all.length){ showToast('info', 'Already gone', 'That work was already deleted.'); return null; }
+  // work in an update that's in review or approved stays put
+  const items = all.filter(i => !workLockedBy(i)), kept = all.length - items.length;
+  if(!items.length){ workLockedToast(all[0]); return null; }
+  const q = workDeleteQuestion(items, opts) + (kept ? ` ${kept === 1 ? '1 item stays' : `${kept} items stay`}: ${kept === 1 ? 'it’s' : 'they’re'} in an update in review or approved, and can’t change until it’s sent.` : '');
+  if(!(await confirmDialog(q, { confirmLabel: 'Delete', destructive: true }))) return null;
   const mins = workMinutes(items.map(i => i.id));
   const r = await trashWork(items.map(i => i.id));
   if(!r.ok){ showToast('error', 'Couldn’t delete it', 'Try again in a moment.'); return r; }
