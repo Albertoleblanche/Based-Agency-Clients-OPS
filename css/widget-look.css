@@ -587,6 +587,27 @@ html.ui-w .mac[data-theme="light"] .rc-b i::before{background:#1C1C1F}
 @media (hover:hover) and (pointer:fine){html.ui-w .mac[data-theme="light"] .rc-b:not(.on):hover i{filter:brightness(.96)}}
 html.ui-w .mac[data-theme="light"] .rc-b.on i{background:repeating-linear-gradient(135deg,rgba(0,0,0,.09) 0 7px,rgba(0,0,0,.015) 7px 16px),#F6F6F8;box-shadow:inset 0 0 0 1px rgba(0,0,0,.05)}
 html.ui-w .mac[data-theme="light"] .rc-tip{box-shadow:0 10px 22px -12px rgba(0,0,0,.35),0 0 0 1px rgba(0,0,0,.04)}
+/* ---- the Dashboard's Hours card (under Tasks), Nov 22: the Reports chart, smaller ---- */
+html.ui-w .uw-stk > .uw-hrs{flex:1}
+html.ui-w .uw-hrs .uw-hsum{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:14px 0 0}
+html.ui-w .uw-hrs .rc-big{margin:0;font-size:52px}
+html.ui-w .uw-hrs .rc-k{display:inline;font-size:13px;color:var(--label-3)}
+html.ui-w .uw-hrs .rc-plot{flex:1;display:flex;flex-direction:column;justify-content:flex-end;margin-top:4px;min-height:0}
+/* the bars grow with the card when the row is tall, so no gap opens under the total */
+html.ui-w .uw-hrs .rc-plot.rc-sm .rc-bars{flex:1 1 auto;height:auto;min-height:120px;grid-template-rows:minmax(0,1fr)}
+/* compact: the total beside the title (as a count, a little larger), shorter bars */
+html.ui-w .uw-hrs.is-compact .uw-cnt{font-family:inherit;font-size:16px;font-weight:400;color:var(--label);letter-spacing:-.01em;text-transform:none}
+html.ui-w .uw-hrs.is-compact .uw-cnt .d{color:var(--label-3)}
+html.ui-w .uw-hrs.is-compact .rc-plot.rc-sm .rc-bars{min-height:92px;padding-top:44px}
+html.ui-w .uw-hrs.is-compact .rc-plot.rc-sm .rc-x{margin-top:6px}
+html.ui-w .rc-plot.rc-sm .rc-bars{height:168px;padding-top:52px;column-gap:10px}
+html.ui-w .rc-plot.rc-sm .rc-b i{max-width:64px;border-radius:12px}
+html.ui-w .rc-plot.rc-sm .rc-x{column-gap:10px;margin-top:10px}
+html.ui-w .rc-plot.rc-sm .rc-x span{font-size:12px}
+html.ui-w .rc-plot.rc-sm .rc-tip{padding:7px 11px;border-radius:11px}
+html.ui-w .rc-plot.rc-sm .rc-tip b,html.ui-w .rc-plot.rc-sm .rc-tip span{font-size:16px}
+html.ui-w .rc-plot.rc-sm .rc-tip em{font-size:12px;margin-left:7px}
+
 /* ---- the table under it, Nov 22: one card with its header; hours big with the unit dimmed, the
    budget under them, a thick rounded bar with a dot at its end, the percent; stripes under the pointer */
 html.ui-w .rt-card{margin-top:22px;padding:22px 24px 8px;border-radius:var(--uw-r-sec);background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}

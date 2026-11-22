@@ -3,7 +3,7 @@
 // dashboard.js's cards. Same data as dashboard.js: todayModel() for Today's focus, dbHealthModel()
 // for Health and Needs care, dbMyTasks(), the calendar, reminders and WhatsApp lists.
 //   Hello line · Today's focus (6) · Health (3) · WhatsApp over Reminders (3)
-//   Needs care (5) · Tasks (4) · Calendar (3)
+//   Needs care (5) · Tasks over Hours (4) · Calendar (3)
 // Loaded after dashboard.js.
 
 function uwOn(){ return document.documentElement.classList.contains('ui-w'); }
@@ -127,6 +127,38 @@ function uwTasksCard(n){
   return `<section class="uw-w uw-s4" aria-label="Tasks">${uwHead('tasks', dbNavIcon('tasks'), dbTitle('tasks'), `<span class="uw-sp">${uwPill('All tasks', "switchView('tasks')")}</span>`, ts.length || '')}${body}</section>`;
 }
 
+// ---- Hours: yours this week, day by day, in the Reports chart's style (Nov 22) ----
+// The total big with its trailing part dimmed, last week beside it, and Monday to Friday as wide
+// rounded bars (a weekend day shows once it has time). Today is striped with the lime pill; the
+// pill follows the pointer and the arrow keys. Bars are out of an 8-hour day, so a short day looks short.
+function uwHoursModel(){
+  const me = currentUser?.id, now = rNow(), today = toDateStr(now), wk0 = getWeekStart(now);
+  const mine = (typeof timeEntries !== 'undefined' ? timeEntries : []).filter(e => e.userId === me);
+  const sum = (from, to) => mine.filter(e => e.date >= from && e.date <= to).reduce((n, e) => n + (e.minutes || 0), 0);
+  const days = Array.from({ length: 7 }, (_, i) => { const d = addDays(wk0, i), ds = toDateStr(d); return { d, ds, m: sum(ds, ds) }; })
+    .filter((x, i) => i < 5 || x.m > 0 || x.ds === today);
+  const total = days.reduce((n, x) => n + x.m, 0);
+  const last = sum(toDateStr(addDays(wk0, -7)), toDateStr(addDays(wk0, -1)));
+  return { days, total, last, today };
+}
+function uwHoursCard(compact){
+  const { days, total, last, today } = uwHoursModel();
+  const max = Math.max(480, ...days.map(x => x.m));
+  const ti = days.findIndex(x => x.ds === today), lastWith = days.map(x => x.m > 0).lastIndexOf(true);
+  const def = ti >= 0 && days[ti].m ? ti : lastWith >= 0 ? lastWith : Math.max(ti, 0);
+  const bars = days.map(x => ({ m: x.m, h: x.m / max * 100, now: x.ds === today,
+    x: x.ds === today ? 'Today' : x.d.toLocaleDateString('en-US', { weekday: 'short' }),
+    long: x.ds === today ? 'Today' : x.d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) }));
+  const [a, rest] = rcSplit(total);
+  const lw = last ? `last week ${hrs(last)}` : '';
+  const go = "switchView('time');switchTimeTab('reports')";
+  // compact (a short window): the total sits beside the title, as the other cards' counts do
+  const head = uwHead('time', dbNavIcon('time'), 'Hours', `<span class="uw-sp">${uwPill('Reports', go)}</span>`, compact ? `${a}<span class="d">${rest} this week</span>` : '');
+  return `<section class="uw-w uw-hrs${compact ? ' is-compact' : ''}" aria-label="Hours">${head}
+${compact ? '' : `<div class="uw-hsum"><div class="rc-big" aria-label="${hrs(total)} this week">${a}<span>${rest}</span></div><span class="rc-k">this week${lw ? ` · ${uwEsc(lw)}` : ''}</span></div>`}
+${rcPlotHtml('uwh', bars, def, { cls: 'rc-sm', aria: 'Your hours by day this week. Use the left and right arrow keys to read each day.' })}</section>`;
+}
+
 // ---- Calendar: today, then the next days that have something ----
 function uwCalendarCard(cap){
   const now = rNow(), todayStr = toDateStr(now), end = toDateStr(addDays(now, 6));
@@ -153,6 +185,19 @@ function uwCalendarCard(cap){
   return `<section class="uw-w uw-s3" aria-label="Calendar">${uwHead('calendar', dbNavIcon('calendar'), dbTitle('calendar'), `<span class="uw-sp">${uwPill('Full calendar', "switchView('calendar')")}</span>`)}${html}</section>`;
 }
 
+// The page fits the window without scrolling (wide layout). Tasks over Hours give way in steps
+// until it does: the Hours card goes compact, then Tasks lists two tasks, then one (its "N more"
+// link has the rest). The narrow layout scrolls anyway, so it keeps everything.
+function uwFitTasksHours(root){
+  const stk = root.querySelector('.uw-stk.uw-s4'); if(!stk) return;
+  if(getComputedStyle(stk).gridColumnStart !== 'span 4') return;
+  const fits = () => root.scrollHeight <= root.clientHeight + 1;
+  for(const [n, compact] of [[3, true], [2, true], [1, true]]){
+    if(fits()) return;
+    stk.innerHTML = uwTasksCard(n) + uwHoursCard(compact);
+  }
+}
+
 // ---- the page ----
 function uwRenderDashboard(root){
   let html;
@@ -163,11 +208,13 @@ function uwRenderDashboard(root){
     const sum = [f.overdue ? `<span class="uw-delta bad"><i></i>${f.overdue} overdue</span>` : '', f.open ? `${dbPlural(f.open, 'thing')} left today` : 'Nothing left today'].filter(Boolean).join('');
     html = `<div class="uwd"><header class="uw-hd"><h1>${hello}${name ? ', ' + uwEsc(name) : ''}</h1><div class="uw-fsub">${sum}</div></header>
 <div class="uw-gr">${uwFocusCard(f)}${uwHealthCard(m)}<div class="uw-stk uw-s3">${wa ? uwWhatsappSmall() : uwNotesSmall()}${uwRemindersSmall()}</div>
-${uwCareCard(m, 3)}${uwTasksCard(4)}${uwCalendarCard(5)}</div></div>`;
+${uwCareCard(m, 3)}<div class="uw-stk uw-s4">${uwTasksCard(3)}${uwHoursCard()}</div>${uwCalendarCard(5)}</div></div>`;
   } catch(e){
     console.error('Dashboard (new look)', e);
     html = `<div class="uwd">${emptyState({ icon: 'refresh-cw', title: 'The dashboard couldn’t be shown', text: String(e && e.message || e), action: 'Try Again', onAction: 'renderDashboard()' })}</div>`;
   }
   root.innerHTML = html;
+  uwFitTasksHours(root);
+  if(typeof rcMount === 'function' && root.querySelector('.rc-plot[data-rc="uwh"]')) rcMount('uwh');
   if(currentViewName === 'overview' && typeof renderGreeting === 'function') renderGreeting();
 }
