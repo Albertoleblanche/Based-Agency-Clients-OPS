@@ -165,6 +165,30 @@ async function loadTaskComments(id){
   taskComments[id] = data || [];
   if(window._taskSel === id) renderTasks();
 }
+// "Ask Eric" under a date you can't change: drafts the comment in the box below, ready to finish
+// with the date you need and post (the post notifies them). With no comment box, a short sheet.
+function askTaskDateMove(id){
+  const t = tasks.find(x => x.id === id); if(!taskCanAskDate(t)) return;
+  const box = document.getElementById('tkpCmt'), text = taskDateAskText(t);
+  if(box){
+    box.value = text; box.focus(); box.setSelectionRange(text.length, text.length);
+    box.closest('form')?.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    return;
+  }
+  const name = escapeHtml(firstName(taskAssignerFor(t).name));
+  openAppModal(`<h3>Ask ${name}</h3><p class="t-2" style="margin:0 0 12px">${name} gets it in their notifications.</p>
+<textarea id="tkAskText" class="tf" rows="3" spellcheck="true" aria-label="Message">${escapeHtml(text)}</textarea>
+<div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" id="tkAskSend" onclick="sendTaskDateAskSheet('${id}')">Send</button></div>`, 440);
+  setTimeout(() => { const el = document.getElementById('tkAskText'); if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 40);
+}
+async function sendTaskDateAskSheet(id){
+  const t = tasks.find(x => x.id === id), btn = document.getElementById('tkAskSend'); if(!t) return;
+  if(btn){ btn.disabled = true; btn.textContent = 'Sending…'; }
+  const ok = await sendTaskDateAsk(t, document.getElementById('tkAskText')?.value);
+  if(!ok){ if(btn){ btn.disabled = false; btn.textContent = 'Send'; } showToast('info', 'Write a message first', ''); return; }
+  closeAppModal(); renderTasks();
+  showToast('success', `Asked ${firstName(taskAssignerFor(t).name)}`, 'They’ll see it in their notifications.');
+}
 async function postTaskComment(id){
   const el = document.getElementById('tkpCmt'), body = (el?.value || '').trim();
   if(!body) return;
@@ -229,6 +253,7 @@ function taskPanelHtml(t){
 ${c ? `<span class="tkp-k">Client</span><span class="tkp-v"><a href="#" onclick="openClientDetail('${c.id}');return false;">${escapeHtml(c.name)}</a></span>` : ''}
 <span class="tkp-k">Assigned to</span><span class="tkp-v">${assigned}</span>
 <span class="tkp-k">Due</span><span class="tkp-v${late ? ' tkp-late' : ''}">${escapeHtml(dueTxt)}${late && t.dueDate < toDateStr(addDays(new Date(), -1)) ? `<em>${escapeHtml(tkDue({ ...t, status: 'todo' })[0])}</em>` : ''}${linked ? `<em>on your calendar</em>` : ''}</span>
+${taskCanAskDate(t) ? `<span class="tkp-k" aria-hidden="true"></span><span class="tkp-ask">Only ${escapeHtml(firstName(assigner.name))} can change the date.<a class="x-lnk" href="#" onclick="askTaskDateMove('${t.id}');return false;">Ask ${escapeHtml(firstName(assigner.name))}</a></span>` : ''}
 <span class="tkp-k">Status</span><span class="tkp-v">${status}</span>
 ${amAssigner ? `<span class="tkp-k">Color</span><span class="tkp-v">${colorSwatchesHtml('tkpColor', t.color, 'setTaskColor', { small: true })}</span>` : t.color ? `<span class="tkp-k">Color</span><span class="tkp-v"><i class="cc-dot c-${t.color}" aria-hidden="true"></i>${itemColorName(t.color)}</span>` : ''}
 ${sp ? `<span class="tkp-k">Sprint</span><span class="tkp-v"><a href="#" onclick="openPlanSprint('${sp.id}');return false;"><i class="cc-dot${sp.color ? ' c-' + sp.color : ''}" aria-hidden="true"></i>${escapeHtml(sp.title)}</a></span>` : ''}

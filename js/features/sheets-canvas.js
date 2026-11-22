@@ -457,6 +457,24 @@ function warnNoColorColumn(title){
 }
 
 // ---- New Task / Edit Task -------------------------------------------------------------------
+// Only the person who assigned a task can change it, its date included (Nov 22). The person it's
+// assigned to asks them instead, here and on the iPhone: a comment on the task, so it's on record,
+// and a notification. Without the comments table (addendum-task-comments.sql) it's just the notification.
+function taskAssignerFor(t){ const p = teamProfiles.find(x => x.id === t.assignerId); return p && !p.access_revoked ? p : null; }
+function taskCanAskDate(t){ return !!t && t.assigneeId === currentUser.id && t.assignerId !== currentUser.id && t.status !== 'done' && !t.cancelledAt && !!taskAssignerFor(t); }
+function taskDateAskText(t){
+  const who = taskAssignerFor(t), d = t.dueDate ? new Date(t.dueDate + 'T12:00:00') : null;
+  return `${who ? firstName(who.name) + ', can' : 'Can'} you move the due date? ${d ? `It’s set for ${fmtDay(d)}, ${fmtShortDate(d)}.` : 'It has no date yet.'} New date: `;
+}
+async function sendTaskDateAsk(t, body){
+  body = String(body || '').trim(); const who = taskAssignerFor(t);
+  if(!body || !who) return false;
+  const { data, error } = await supabaseClient.from('task_comments').insert({ task_id: t.id, user_id: currentUser.id, body }).select().single();
+  if(!error && typeof taskComments !== 'undefined') (taskComments[t.id] = taskComments[t.id] || []).push(data || { user_id: currentUser.id, body, created_at: new Date().toISOString() });
+  const notify = typeof sendNotification === 'function' ? sendNotification : mNotify;
+  await notify(who.id, 'task_comment', `${myName() || 'Someone'} asks to move “${t.title}”`, body.length > 140 ? body.slice(0, 140) + '…' : body, 'tasks', t.id);
+  return true;
+}
 let taskDueTimes = {};
 async function loadTaskDueTimes(){
   const raw = await safeGet('task-due-times');

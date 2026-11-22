@@ -1398,6 +1398,11 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .mac .tkp-v .pop{height:28px;gap:6px;font-size:13.5px;color:var(--label)}
 .tkp-v .pop > svg{width:12px;height:12px;color:var(--label-3)}
 .tkp-late{color:var(--red);font-weight:600}
+/* under a date only the person who assigned the task can change: who to ask, and the link to do it */
+.tkp-ask{display:inline-flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px;margin-top:-6px;font-size:12.5px;color:var(--label-3)}
+.tkp-ask .x-lnk{font-size:12.5px;color:var(--blue)}
+.tkp-ask .x-lnk:hover{text-decoration:underline;text-underline-offset:2px}
+.tkp-ask .x-lnk:active{opacity:.6}
 .tkp-st{display:inline-flex;align-items:center;gap:6px;color:var(--green);font-weight:500}
 .tkp-st svg{width:15px;height:15px}
 .tkp-acts{display:flex;gap:8px;margin-top:16px}

@@ -574,10 +574,27 @@ ${t.dueDate ? mIr('', 'Due', '', mTaskDue(t), null, { n: true }) : ''}
 ${c ? mIr('', 'Client', '', mEsc(c.name), `mOpenClient('${c.id}')`, { n: true }) : ''}
 ${t.link ? mIr('', 'Link', '', mEsc(truncateLinkDisplay(t.link, 26)), `window.open(${jsArg(normalizeUrl(t.link))},'_blank')`, { n: true }) : ''}
 </div>
+${taskCanAskDate(t) ? `<p class="ifoot">Only ${mEsc(firstName(from.name))} can change the date.</p>` : ''}
 ${t.status !== 'done' && mine ? `<div style="margin:24px 16px 0;display:flex;flex-direction:column;gap:10px">
 ${t.status !== 'in_progress' ? `<button class="ibtn s" onclick="mMoveTask('${t.id}','in_progress')">Start Working on It</button>` : ''}
+${taskCanAskDate(t) ? `<button class="ibtn s" onclick="mAskTaskDate('${t.id}')">Ask ${mEsc(firstName(from.name))} to Move the Date</button>` : ''}
 <button class="ibtn p" onclick="mCompleteTask('${t.id}');mPop()">${icon('check', { weight: 'bold' })}Mark Done</button></div>` : ''}`;
   });
+}
+// Ask the person who assigned it to move the date (only they can change it): a short message,
+// already drafted, sent as a comment on the task and a notification (Nov 22).
+function mAskTaskDate(id){
+  const t = tasks.find(x => x.id === id); if(!taskCanAskDate(t)) return;
+  const name = firstName(taskAssignerFor(t).name);
+  mOpenSheet(`Ask ${name}`, `<div class="ig flat" style="margin-top:20px"><div class="ir" style="align-items:flex-start"><textarea class="iarea" id="mAskText" spellcheck="true" aria-label="Message">${mEsc(taskDateAskText(t))}</textarea></div></div>
+<p class="ifoot">${mEsc(name)} gets it in their notifications. Add the date you need.</p>`, { done: `mSendTaskAsk('${id}')`, doneLabel: 'Send' });
+  setTimeout(() => { const el = $m('mAskText'); if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 420);
+}
+async function mSendTaskAsk(id){
+  const t = tasks.find(x => x.id === id); if(!t) return;
+  const ok = await sendTaskDateAsk(t, $m('mAskText')?.value);
+  if(!ok){ showToast('info', 'Write a message first', ''); return; }
+  mCloseSheet(true); showToast('success', `Asked ${firstName(taskAssignerFor(t).name)}`, 'They’ll see it in their notifications.');
 }
 async function mMoveTask(id, status){
   const { error } = await supabaseClient.from('tasks').update({ status }).eq('id', id);
