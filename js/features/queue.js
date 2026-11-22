@@ -18,32 +18,57 @@ function setQueueTab(t){ queueTab = t; window._queueSel = null; quResetEdits(); 
 function quResetEdits(){ window._quEditImp = null; window._quDraftEdit = null; }
 
 // One client in your queue: what you logged, what of it goes in the email, your draft and its step.
-// A client's lines in your Queue. Usually one: the work you've logged since its last update, with
-// your draft. Once that draft is sent for review (or approved) it's locked, in the In review tab
-// with exactly the work it was written from; anything you log for the client after that is a
-// second line, the Next update, in To do, where you can edit it and add to it. It becomes the
-// update after this one is sent (or joins this one again if it comes back to you).
-function quEntries(c, me){
+// A client's lines in your Queue. One update per client, with everyone's work in it (Nov 21): its
+// writer (pickWriter, week-health.js) writes it from their work and everyone else's (x.team); anyone
+// else's work for it is a "theirs" line, showing where it goes. Once the draft is sent for review
+// (or approved) it's locked, in the In review tab with exactly the work it was written from;
+// anything logged for the client after that is a second line, the Next update, in To do, where it
+// can be edited and added to. It becomes the update after this one is sent (or joins this one again
+// if it comes back to its writer).
+function quEntriesBase(c, me){
   const w = clientWeek(c), d = getDraftFor(c, me);
-  const mine = w.logged.filter(i => i.author === me).sort((a, b) => new Date(b.date) - new Date(a.date));
+  const all = w.logged.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
   const emailOf = list => list.filter(i => i.includeInEmail !== false);
+  const split = list => ({ mine: list.filter(i => i.author === me), team: list.filter(i => i.author !== me) });
+  const isLocked = x => !!x && !!x.draft && !x.draftSentAt && (x.draftStatus === 'approved' || (x.draftStatus === 'pending' && x.readyToNotify));
+  const inDraft = x => { const ids = x.draftImprovementIds || [], since = x.draftPendingSince ? new Date(x.draftPendingSince) : null;
+    return i => ids.length ? ids.includes(i.id) : !since || new Date(i.date) <= since; };
   // a draft written only from work since deleted isn't shown: write a new one from what's logged now
   const live = !!d.draft && !d.draftSentAt && (d.draftStatus === 'pending' || d.draftStatus === 'approved') && !draftHasNoWork(c, d);
-  const locked = live && (d.draftStatus === 'approved' || d.readyToNotify);
-  if(locked){
-    const ids = d.draftImprovementIds || [], since = d.draftPendingSince ? new Date(d.draftPendingSince) : null;
-    const inIt = i => ids.length ? ids.includes(i.id) : !since || new Date(i.date) <= since;
-    const sent = mine.filter(inIt), after = mine.filter(i => !inIt(i)), out = [];
-    out.push({ c, w, d, mine: sent, email: emailOf(sent), st: d.draftStatus === 'approved' ? 'approved' : 'review', tab: 'review' });
-    if(after.length) out.push({ c, w, d: null, held: d, mine: after, email: emailOf(after), st: 'next', tab: 'todo' });
+  const writer = pickWriter(c, w.logged);
+  if(!live && writer && writer !== me){
+    // someone else writes it: your work goes in their update
+    const mineAll = all.filter(i => i.author === me);
+    if(!mineAll.length) return [];
+    const wd = getDraftFor(c, writer), lk = isLocked(wd), inIt = lk ? inDraft(wd) : () => false;
+    const sent = mineAll.filter(inIt), after = mineAll.filter(i => !inIt(i)), out = [];
+    if(sent.length) out.push({ c, w, d: null, writer, wd, mine: sent, team: [], email: emailOf(sent), st: 'theirs', tab: 'review' });
+    if(after.length) out.push({ c, w, d: null, writer, wd: lk ? null : wd, mine: after, team: [], email: emailOf(after), st: 'theirs', tab: 'todo' });
     return out;
   }
-  // nothing of yours logged for this update: nothing to send, so it isn't in your queue (a draft
-  // whose work was all deleted waits out of sight, and comes back with the work if it's restored)
-  if(!mine.length) return [];
-  const email = emailOf(mine);
+  if(live && isLocked(d)){
+    const inIt = inDraft(d), sent = all.filter(inIt), after = all.filter(i => !inIt(i)), out = [];
+    out.push({ c, w, d, ...split(sent), email: emailOf(sent), st: d.draftStatus === 'approved' ? 'approved' : 'review', tab: 'review' });
+    if(after.length) out.push({ c, w, d: null, held: d, ...split(after), email: emailOf(after), st: 'next', tab: 'todo' });
+    return out;
+  }
+  // nothing logged for this update: nothing to send, so it isn't in your queue (a draft whose work
+  // was all deleted waits out of sight, and comes back with the work if it's restored)
+  if(!all.length) return [];
+  const email = emailOf(all);
   const st = live ? (draftHasNoWork(c, d) ? 'empty' : 'written') : email.length ? 'write' : 'internal';
-  return [{ c, w, d: live ? d : null, mine, email, st, tab: 'todo' }];
+  return [{ c, w, d: live ? d : null, ...split(all), email, st, tab: 'todo' }];
+}
+// ...plus your work that never went out (w.missed, week-health.js): on your To do line for the
+// client, or a line of its own, to add to the next update or leave out.
+function quEntries(c, me){
+  const out = quEntriesBase(c, me), w = out[0] ? out[0].w : clientWeek(c);
+  const missed = (w.missed || []).filter(i => i.author === me).sort((a, b) => new Date(b.date) - new Date(a.date));
+  if(!missed.length) return out;
+  const todo = out.find(x => x.tab === 'todo');
+  if(todo) todo.missed = missed;
+  else out.push({ c, w, d: null, mine: [], team: [], email: [], missed, st: 'missed', tab: 'todo' });
+  return out;
 }
 function quEntry(c, me){ return quEntries(c, me)[0] || null; }
 function queueItems(){
@@ -58,8 +83,8 @@ function queueItems(){
     out.sent.sort((a, b) => new Date(b.d.draftSentAt) - new Date(a.d.draftSentAt));
   }
   // Next updates wait behind everything you can act on now
-  const rank = { empty: 0, written: 1, write: 2, internal: 3, next: 4, review: 5, approved: 6 };
-  const order = (a, b) => (a.st === 'next') - (b.st === 'next') || a.w.daysLeft - b.w.daysLeft || rank[a.st] - rank[b.st] || (b.c.importance || 0) - (a.c.importance || 0) || a.c.name.localeCompare(b.c.name);
+  const rank = { empty: 0, written: 1, write: 2, missed: 3, internal: 4, next: 5, theirs: 6, review: 7, approved: 8 };
+  const order = (a, b) => quLater(a) - quLater(b) || a.w.daysLeft - b.w.daysLeft || rank[a.st] - rank[b.st] || (b.c.importance || 0) - (a.c.importance || 0) || a.c.name.localeCompare(b.c.name);
   out.todo.sort(order); out.review.sort(order);
   return out;
 }
@@ -68,12 +93,13 @@ function quWaToSend(x){
   if(x.st !== 'approved' || typeof winViaWhatsapp !== 'function' || !winViaWhatsapp(x.c)) return false;
   const st = winSendState(x.d); return st.k !== 'copied' || st.by === myName();
 }
-function queueBadgeCount(items){ items = items || queueItems(); return items.todo.filter(x => x.st !== 'internal' && x.st !== 'next').length + items.review.filter(quWaToSend).length; }
+function quLater(x){ return x.st === 'next' || x.st === 'theirs'; }
+function queueBadgeCount(items){ items = items || queueItems(); return items.todo.filter(x => !['internal', 'next', 'theirs'].includes(x.st)).length + items.review.filter(quWaToSend).length; }
 // Each step: its words in the rail, and the short tag on its row in the list.
 const QU_STATE = {
   write: ['Ready to write', 'is-go', 'Write'], written: ['Draft written', '', 'Draft'], empty: ['Work deleted', 'is-red', 'Rewrite'],
   internal: ['Only internal', 'is-out', 'Internal'], review: ['In review', '', 'In review'], approved: ['Approved', '', 'Approved'],
-  next: ['Next update', 'is-out', 'Next'],
+  next: ['Next update', 'is-out', 'Next'], missed: ['Never went out', 'is-red', 'Missed'], theirs: ['In someone else’s update', 'is-out', 'Shared'],
   send: ['Approved, yours to send', 'is-go', 'Send'], sent: ['Sent', 'is-out', 'Sent'],
 };
 // An approved WhatsApp win you still have to send reads as Send.
@@ -101,14 +127,18 @@ function renderMyQueue(){
   else if(window._queueSel !== sel.c.id){ quResetEdits(); window._queueSel = sel.c.id; }
   const TAB_WORDS = { todo: 'To do', review: 'In review', sent: 'Sent' };
   const tabs = tabsOn.map(k => [k, TAB_WORDS[k]]).map(([k, t]) =>
-    `<button class="${queueTab === k ? 'on' : ''}" role="tab" aria-selected="${queueTab === k}" onclick="setQueueTab('${k}')">${t} <span class="c">${items[k].length}</span></button>`).join('');
-  const rows = list.map(x => {
-    const on = x === sel, [, cls, word] = QU_STATE[quStateOf(x)];
+    `<button class="${queueTab === k ? 'on' : ''}" role="tab" aria-selected="${queueTab === k}" onclick="setQueueTab('${k}')">${t} <span class="c">${k === 'todo' ? items.todo.filter(x => !quLater(x)).length : items[k].length}</span></button>`).join('');
+  // Next updates and work in someone else's update wait under "Later", out of the To do count
+  const firstLater = queueTab === 'todo' ? list.findIndex(quLater) : -1;
+  const rows = list.map((x, ix) => {
+    const on = x === sel, [, cls, word0] = QU_STATE[quStateOf(x)];
+    const word = x.st === 'theirs' ? (x.tab === 'review' ? 'In review' : `${firstName(x.writer)}’s`) : word0;
     const sentAt = x.st === 'sent' ? new Date(x.d.draftSentAt) : null;
-    const due = sentAt ? `Sent ${relDayLower(sentAt)}` : x.st === 'next' ? 'After the one in review' : quDueShort(x.w);
-    const kind = sentAt || x.w.sent || x.st === 'next' ? '' : x.w.late ? 'is-late' : x.w.daysLeft === 0 ? 'is-soon' : '';
-    const n = sentAt ? fmtTime(sentAt) : x.mine.length ? todayPlural(x.mine.length, 'logged', 'logged') : 'Draft only';
-    return `<a class="rvn-r qu-r${on ? ' is-sel' : ''}" href="#queue" onclick="selectQueueClient('${x.c.id}');return false;"${on ? ' aria-current="true"' : ''}>
+    const due = sentAt ? `Sent ${relDayLower(sentAt)}` : x.st === 'missed' ? `${todayPlural(x.missed.length, 'item')} never went out` : x.st === 'next' ? 'After the one in review' : x.st === 'theirs' ? `In ${firstName(x.writer)}’s update` : quDueShort(x.w);
+    const kind = sentAt || x.w.sent || x.st === 'next' || x.st === 'theirs' ? '' : x.w.late ? 'is-late' : x.w.daysLeft === 0 ? 'is-soon' : '';
+    const k = x.mine.length + (x.team || []).length;
+    const n = sentAt ? fmtTime(sentAt) : x.st === 'missed' ? 'nothing new' : k ? todayPlural(k, 'logged', 'logged') : 'Draft only';
+    return `${ix === firstLater && ix > 0 ? '<p class="rvn-sort qu-sgh">Later</p>' : ''}<a class="rvn-r qu-r${on ? ' is-sel' : ''}" href="#queue" onclick="selectQueueClient('${x.c.id}');return false;"${on ? ' aria-current="true"' : ''}>
 <div class="tx"><b>${escapeHtml(x.c.name)}</b><span class="s"><span class="rvn-due ${kind}">${escapeHtml(due)}</span> · ${n}</span></div>
 <div class="rvn-rr"><span class="qu-tag ${cls}">${word}</span></div></a>`;
   }).join('') || `<div class="rvn-empty"><b>${{ todo: 'Nothing to do', review: 'Nothing in review', sent: 'Nothing sent this week' }[queueTab]}</b>${{ todo: 'Clients show up here once you log work for them.', review: 'Drafts you send for review wait here until they go out.', sent: 'Your updates show here once they’re sent.' }[queueTab]}</div>`;
@@ -119,7 +149,7 @@ function renderMyQueue(){
 <div class="tx"><b>${escapeHtml(x.c.name)}</b><span class="s${/overdue/.test(x.why) ? ' is-late' : ''}">${escapeHtml(x.why)}</span></div><span class="qu-sgp" aria-hidden="true">${icon('plus')}</span></a>`).join('')}` : '';
   window._quSugg = sugg;
   const lateN = list.filter(x => x.w.late).length, toSend = list.filter(quWaToSend).length;
-  const sortNote = queueTab === 'todo' ? `Due first${lateN ? ` · ${lateN} late` : ''}` : queueTab === 'sent' ? 'Sent this week · newest first'
+  const sortNote = firstLater === 0 ? 'Later: in another update' : queueTab === 'todo' ? `Due first${lateN ? ` · ${lateN} late` : ''}` : queueTab === 'sent' ? 'Sent this week · newest first'
     : toSend ? `${toSend} yours to send on WhatsApp` : 'Waiting on an approver';
   const prevScroll = root.querySelector('.rvn-mail')?.scrollTop || 0, prevKey = root.dataset.sel || '';
   const keep = quKeepComposer(root);
@@ -139,7 +169,7 @@ ${read}
   if(sel && prevKey === sel.c.id){ const m = root.querySelector('.rvn-mail'); if(m) m.scrollTop = prevScroll; }
   quRestoreComposer(root, keep);
   if(currentViewName === 'queue'){
-    const todo = items.todo.filter(x => x.st !== 'next').length, rev = items.review.length;   // next updates aren't to do yet
+    const todo = items.todo.filter(x => !quLater(x)).length, rev = items.review.length;   // next updates and work in someone else's aren't to do yet
     setToolbar(null, todo || rev ? [todo ? `${todo} to do` : '', rev ? `${rev} in review` : ''].filter(Boolean).join(' · ') : 'Your logged work, client by client');
   }
 }
@@ -179,8 +209,10 @@ function queueReadHtml(x, list, split){
   const h = clientHealth(c), editingDraft = d && window._quDraftEdit === c.id;
   // Sent for review (or approved): it's out of your hands, so nothing here changes it any more, the
   // draft or the work in it, and Log More is gone. An approver can still edit it in Review.
-  const locked = x.st === 'review' || x.st === 'approved';
+  const locked = x.st === 'review' || x.st === 'approved' || (x.st === 'theirs' && x.tab === 'review');
   const rework = d && !locked ? canReworkDraft(c, d) : false;
+  // someone else writes this update (x.writer): your work goes in theirs
+  const wf = x.writer ? firstName(x.writer) : '', theirIds = x.st === 'theirs' && x.wd ? new Set(x.wd.draftImprovementIds || []) : null;
   const dl = d ? draftDelta(c, d) : null, inDraft = new Set(dl ? dl.inc.map(it => it.id) : []);
   // Top: move through the list; the draft's Edit and Rewrite while you can still change it.
   const nav = `<div class="rvn-nav"><button class="ib" aria-label="Previous client" title="Previous (K)" onclick="queueStep(-1)"${i <= 0 ? ' disabled' : ''}>${icon('chevron-up')}</button><button class="ib" aria-label="Next client" title="Next (J)" onclick="queueStep(1)"${i >= list.length - 1 ? ' disabled' : ''}>${icon('chevron-down')}</button><span>${i + 1} of ${list.length}</span></div>`;
@@ -189,20 +221,21 @@ function queueReadHtml(x, list, split){
     : `${nav}<span class="rvn-sp"></span>${d && rework ? `<button class="btn rvn-q" onclick="quStartDraftEdit('${c.id}')">${icon('pencil-simple')}Edit</button><button class="btn rvn-q" onclick="generateDraft(${A})">${icon('sparkle')}Rewrite</button>` : ''}<button class="btn rvn-q" onclick="openClientDetail('${c.id}')">${icon('external-link')}Open Client</button>`;
   // The client, and where its update stands.
   const sentAt = x.st === 'sent' ? new Date(d.draftSentAt) : null;
-  const due = sentAt ? `Sent ${relDayLower(sentAt)} at ${fmtTime(sentAt)}` : x.st === 'next' ? `Next update · after the one ${x.held && x.held.draftStatus === 'approved' ? 'approved' : 'in review'} is sent`
+  const due = sentAt ? `Sent ${relDayLower(sentAt)} at ${fmtTime(sentAt)}` : x.st === 'theirs' ? `Goes in ${wf}’s update${locked ? ', in review' : ''} · ${w.dueText.replace(/^Due /, 'due ')}` : x.st === 'next' ? `Next update · after the one ${x.held && x.held.draftStatus === 'approved' ? 'approved' : 'in review'} is sent`
     : w.sent ? `Last update sent ${relDayLower(w.last)} · next ${w.dueText.replace(/^Due /, 'due ')}` : w.dueText;
   const head = `<div class="rvn-hd">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}</b><span class="s"><span class="${!sentAt && !w.sent && w.late && x.st !== 'next' ? 't-red' : ''}">${escapeHtml(due)}</span></span><span class="s">${escapeHtml([c.service, w.owner ? (w.owner === me ? 'Yours' : 'Owner ' + firstName(w.owner)) : ''].filter(Boolean).join(' · '))}</span></div></div>`;
   // Your work: each item with its email switch, Edit and Delete; Log More under it, with the date
   // (today unless you pick another) and the time spent, kept while you move around the page.
   const today = toDateStr(new Date()), kf = window._quForm && window._quForm.id === c.id ? window._quForm : null;
   const form = { date: kf && kf.date && kf.date <= today ? kf.date : today, time: kf ? kf.time || '' : '' };
-  const out = x.mine.length - x.email.length;
+  const myEmail = x.mine.filter(i => i.includeInEmail !== false).length, out = x.mine.length - myEmail;
   const meta = it => {
     const bits = [fmtShortDate(new Date(it.date))], mins = typeof workMinutes === 'function' ? workMinutes([it.id]) : 0;
     if(mins) bits.push(hmm(mins));   // the time logged with it (deleting the work deletes that too)
-    if(locked) bits.push(inDraft.has(it.id) ? 'In this update' : it.includeInEmail === false ? 'Internal' : 'Next update');
+    if(locked) bits.push(x.st === 'theirs' ? `In ${wf}’s update` : inDraft.has(it.id) ? 'In this update' : it.includeInEmail === false ? 'Internal' : 'Next update');
     else if(it.includeInEmail === false) bits.push('Internal');
-    else if(d && !d.draftSentAt) bits.push(inDraft.has(it.id) ? 'In your draft' : 'Not in your draft yet');
+    else if(theirIds) bits.push(theirIds.has(it.id) ? `In ${wf}’s draft` : `Not in ${wf}’s draft yet`);
+    else if(d && !d.draftSentAt) bits.push(inDraft.has(it.id) ? (dl.edited.includes(it) ? 'Edited since your draft' : 'In your draft') : 'Not in your draft yet');
     if(it.source && it.source !== 'manual') bits.push({ note: 'From a note', time: 'From your timesheet', whatsapp: 'From WhatsApp' }[it.source] || '');
     return bits.filter(Boolean).join(' · ');
   };
@@ -220,15 +253,22 @@ function queueReadHtml(x, list, split){
 <span class="rvn-sp"></span><button class="btn" onclick="quLog('${c.id}')">${icon('plus')}Log</button></div>
 <input type="hidden" id="quClient" value="${c.id}"><div class="f qu-pf" id="quPick"></div></div>
 <p class="qu-hint">The time spent is required and goes on your timesheet${typeof hvTimeOn === 'function' && hvTimeOn() ? ' and in Harvest' : ''}. New work goes in the email; switch Email off to keep it internal. <kbd>↩</kbd> logs it.</p>`;
-  const work = `<section class="qu-sec" aria-label="Your work"><div class="qu-sh"><b>Your work</b><span class="c">${x.mine.length}</span>${x.mine.length ? `<span class="qu-shs">${x.email.length} for the email${out ? ` · ${out} internal` : ''}</span>` : ''}</div>
+  const work = `<section class="qu-sec qu-mine" aria-label="Your work"><div class="qu-sh"><b>Your work</b><span class="c">${x.mine.length}</span>${x.mine.length ? `<span class="qu-shs">${myEmail} for the email${out ? ` · ${out} internal` : ''}</span>` : ''}</div>
 ${x.st === 'next' ? `<p class="qu-nextn">Logged after you sent ${escapeHtml(shortClientName(c.name))}’s update for review, so it goes in the next one. <a class="fix-lnk" href="#" onclick="openQueueClient('${c.id}','review');return false;">See the one ${x.held && x.held.draftStatus === 'approved' ? 'approved' : 'in review'}</a></p>` : ''}
+${x.st === 'theirs' && !locked ? `<p class="qu-nextn">${escapeHtml(wf)} writes ${escapeHtml(shortClientName(c.name))}’s update, with your work in it: one update per client.</p>` : ''}
 ${x.mine.map(itemRow).join('') || '<p class="qu-none">Nothing of yours logged since the last update.</p>'}
-${locked ? quLockedNote(c, x.st) : quComposer}</section>`;
+${locked ? (x.st === 'theirs' ? quTheirsLockedNote(c, x) : quLockedNote(c, x.st)) : quComposer}</section>
+${(x.team || []).length ? `<section class="qu-sec qu-team" aria-label="Everyone else’s work"><div class="qu-sh"><b>Everyone else’s work</b><span class="c">${x.team.length}</span><span class="qu-shs">it goes in your update too</span></div>
+${x.team.map(it => `<div class="qu-i is-lock${it.includeInEmail === false ? ' is-out' : ''}"><div class="qu-t"><span class="qu-tx">${escapeHtml(it.text)}</span><span class="qu-m">${escapeHtml([firstName(it.author), meta(it)].join(' · '))}</span></div></div>`).join('')}</section>` : ''}
+${(x.missed || []).length ? `<section class="qu-sec qu-missed" aria-label="Never went out"><div class="qu-sh"><b>Never went out</b><span class="c">${x.missed.length}</span><span class="qu-shs">logged for the email, never sent</span></div>
+<p class="qu-nextn">Logged more than two weeks before ${escapeHtml(shortClientName(c.name))}’s last update and never in one. Add it to the next update, or leave it out.</p>
+${x.missed.map(it => `<div class="qu-i"><div class="qu-t"><span class="qu-tx">${escapeHtml(it.text)}</span><span class="qu-m">${escapeHtml(fmtShortDate(new Date(it.date)))}</span></div><button class="btn sm" onclick="quCarry('${c.id}','${it.id}')">Add to Next Update</button><button class="btn sm" onclick="quLeaveOut('${c.id}','${it.id}')">Leave Out</button></div>`).join('')}</section>` : ''}`;
   // Your draft, once there is one: as the client will read it.
   let draft = '';
   if(d){
     const stWords = { written: 'Written, not sent for review yet', empty: 'Nothing left in it', review: `In review since ${whenShort(d.draftPendingSince || rNow())}`, approved: 'Approved', sent: `Sent ${relDayLower(sentAt || rNow())}` }[x.st] || '';
     const note = sentAt ? '' : dl.gone ? `<p class="qu-dn is-red">${dl.allGone ? 'Everything this draft was written from was deleted.' : `${todayPlural(dl.gone, 'item')} in it ${dl.gone === 1 ? 'was' : 'were'} deleted.`}${rework ? ` <a class="fix-lnk" href="#" onclick="generateDraft(${A});return false;">Rewrite it from what’s logged now</a>` : ''}</p>`
+      : dl.edited.length ? `<p class="qu-dn">${dl.edited.length === 1 ? '1 item in it was' : `${dl.edited.length} items in it were`} edited after it was written.${rework ? ` <a class="fix-lnk" href="#" onclick="generateDraft(${A});return false;">Rewrite it to match</a>` : ''}</p>`
       : dl.added.length ? `<p class="qu-dn">${dl.added.length === 1 ? '1 item was' : `${dl.added.length} items were`} logged after it.${rework ? ` <a class="fix-lnk" href="#" onclick="generateDraft(${A});return false;">Rewrite to include ${dl.added.length === 1 ? 'it' : 'them'}</a>` : ' They go in the next update.'}</p>` : '';
     const body = editingDraft ? `<textarea spellcheck="true" class="rvn-edit" id="qu-draft-${c.id}" aria-label="Draft">${escapeHtml(d.draft || '')}</textarea>` : `<div class="rvn-body">${draftBodyHtml(d.draft)}</div>`;
     draft = `<section class="qu-sec" aria-label="Your draft"><div class="qu-sh"><b>${sentAt ? 'Your update' : 'Your draft'}</b><span class="qu-shs">${escapeHtml(stWords)}</span></div>${note}
@@ -242,12 +282,12 @@ ${locked ? quLockedNote(c, x.st) : quComposer}</section>`;
 <div class="rvn-rs"><b>This update</b></div>
 ${x.st === 'next' ? `<div class="rvn-kv"><span>Due</span><span>A week after the one in review is sent</span></div>`
   : `<div class="rvn-kv"><span>${w.sent ? 'Next due' : 'Due'}</span><span${!w.sent && w.late ? ' class="t-red"' : ''}>${escapeHtml(w.late && !w.sent ? w.dueText : w.due ? w.due.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) : '—')}</span></div>`}
-<div class="rvn-kv"><span>Your step</span><span>${escapeHtml(QU_STATE[quStateOf(x)][0])}</span></div>
+<div class="rvn-kv"><span>Your step</span><span>${escapeHtml(x.st === 'theirs' ? `In ${wf}’s update` : QU_STATE[quStateOf(x)][0])}</span></div>
 <div class="rvn-kv"><span>Last update</span><span>${w.last ? escapeHtml(fmtShortDate(w.last)) : 'None yet'}</span></div>
 ${sentAt ? '' : (n => `<div class="rvn-kv"><span>Your time</span><span>${n ? escapeHtml(hmLong(n)) : 'None'} since ${escapeHtml(fmtShortDate(w.since))}</span></div>`)(quMyMinutes(c, w))}
 <div class="rvn-kv"><span>Sends by</span><span>${{ whatsapp: 'WhatsApp', both: 'Email and WhatsApp' }[ch] || 'Email'}</span></div>
 <div class="rvn-kv"><span>Health</span><span><span class="rvn-hl ${h.level}"><i></i>${escapeHtml(healthWord(h.level))}</span></span></div>
-${others.length ? `<div class="rvn-rs rvn-s2"><b>Others’ work</b><span>${others.length}</span></div>${Object.entries(byOther).map(([n, k]) => `<div class="rvn-kv"><span>${escapeHtml(n)}</span><span>${todayPlural(k, 'item')}</span></div>`).join('')}<p class="rvn-rnote">Each person writes their own draft from their own work.</p>` : ''}
+${others.length ? `<div class="rvn-rs rvn-s2"><b>Others’ work</b><span>${others.length}</span></div>${Object.entries(byOther).map(([n, k]) => `<div class="rvn-kv"><span>${escapeHtml(n)}</span><span>${todayPlural(k, 'item')}</span></div>`).join('')}<p class="rvn-rnote">${x.st === 'theirs' ? `${escapeHtml(wf)} writes this update, with everyone’s work in it.` : 'One update per client: their work goes in yours.'}</p>` : ''}
 <p class="rvn-rnote">Only work with Email on goes in the draft. Internal work stays in the log and in Past Improvements.</p>
 </aside>`;
   // The main step, under it all.
@@ -256,6 +296,9 @@ ${others.length ? `<div class="rvn-rs rvn-s2"><b>Others’ work</b><span>${other
   if(editingDraft) foot = `<span class="rvn-ft-note">Save first, then send</span><span class="rvn-sp"></span><button class="btn btn-p rvn-main" disabled>${icon('paper-plane-tilt')}Send for Review</button>`;
   else if(x.st === 'write') foot = `<span class="rvn-ft-note">${icon('sparkle')}Written from the ${todayPlural(x.email.length, 'item')} with Email on</span><span class="rvn-sp"></span><button class="btn btn-p rvn-main" onclick="generateDraft(${A})">${icon('sparkle')}Write Draft</button>`;
   else if(x.st === 'next') foot = `<span class="rvn-ft-note">${icon('clock')}You can write it once the update ${x.held && x.held.draftStatus === 'approved' ? 'that’s approved' : 'in review'} is sent.</span><span class="rvn-sp"></span><button class="btn btn-p rvn-main" disabled title="Once the update in review is sent">${icon('sparkle')}Write Draft</button>`;
+  else if(x.st === 'missed') foot = `<span class="rvn-ft-note">Add the work that never went out to the next update, or leave it out.</span><span class="rvn-sp"></span>`;
+  else if(x.st === 'theirs') foot = locked ? `<span class="rvn-ft-note">${icon('clock')}In ${escapeHtml(wf)}’s update, waiting for an approver.</span><span class="rvn-sp"></span>`
+    : `<span class="rvn-ft-note">${escapeHtml(wf)} writes ${escapeHtml(shortClientName(c.name))}’s update, with your work in it.</span><span class="rvn-sp"></span>${x.wd && x.wd.draft && !x.wd.draftSentAt ? '' : `<button class="btn" onclick="remindHolder('${c.id}')">${icon('bell')}Remind ${escapeHtml(wf)}</button>`}`;
   else if(x.st === 'internal') foot = `<span class="rvn-ft-note">Nothing is marked for the email yet. Switch Email on for an item, or log more.</span><span class="rvn-sp"></span><button class="btn btn-p rvn-main" disabled title="Switch Email on for something first">${icon('sparkle')}Write Draft</button>`;
   else if(x.st === 'empty') foot = x.email.length
     ? `<span class="rvn-ft-note">Rewrite it from what’s logged now to send it.</span><span class="rvn-sp"></span><button class="btn btn-p rvn-main" onclick="generateDraft(${A})">${icon('sparkle')}Rewrite Draft</button>`
@@ -278,6 +321,10 @@ ${others.length ? `<div class="rvn-rs rvn-s2"><b>Others’ work</b><span>${other
 <div class="rvn-ft">${foot}</div>`;
 }
 
+// Your work, in someone else's update that's in review: locked, and where new work goes.
+function quTheirsLockedNote(c, x){
+  return `<p class="qu-lockn">${icon('lock')}<span>It’s in ${escapeHtml(firstName(x.writer))}’s update, ${x.wd && x.wd.draftStatus === 'approved' ? 'approved' : 'in review'}, so it can’t change until it’s sent. Work you log for ${escapeHtml(shortClientName(c.name))} from here on goes in the next one. <a class="fix-lnk" href="#" onclick="openQueueLogImprovementModal('${c.id}');return false;">Log work for the next one</a></span></p>`;
+}
 // Sent for review or approved: why nothing in the panel can change, and where new work goes.
 function quLockedNote(c, st){
   return `<p class="qu-lockn">${icon('lock')}<span>${st === 'approved' ? 'Approved' : 'Sent for review'}, so this update can’t change now${st === 'review' ? ' (an approver can still edit it in Review)' : ''}. Work you log for ${escapeHtml(shortClientName(c.name))} from here on goes in the next one. <a class="fix-lnk" href="#" onclick="openQueueLogImprovementModal('${c.id}');return false;">Log work for the next one</a></span></p>`;
@@ -353,7 +400,7 @@ async function quSaveEdit(clientId, impId){
   if(!text){ showToast('error', 'Nothing to save', 'Write what you did, or delete the item instead.'); return; }
   if(text === imp.text){ quCancelEdit(); return; }
   const old = imp.text;
-  const { data, error } = await supabaseClient.from('client_improvements').update({ text }).eq('id', impId).select();
+  const { data, error } = await saveWorkText(impId, { text });   // with when (data.js)
   if(error || !(data && data.length)){ console.error('quSaveEdit failed', impId, error || 'no row changed'); showToast('error', 'Couldn’t save that', 'Try again in a moment.'); return; }
   imp.text = text;
   const ci = (typeof clientImprovements !== 'undefined' ? clientImprovements : []).find(i => i.id === impId); if(ci) ci.text = text;
@@ -363,7 +410,25 @@ async function quSaveEdit(clientId, impId){
   quRefreshAll(clientId);
   // the draft (not sent for review yet) was written from the old words: say so
   const d = getDraftFor(c, myName()), inIt = d && d.draft && !d.draftSentAt && (d.draftImprovementIds || []).includes(impId);
-  showToast('success', 'Saved', inIt ? 'Your draft still has the old wording. Rewrite it to include the change.' : '');
+  showToast('success', 'Saved', inIt ? 'Your draft still has the old wording: it says so until you rewrite it.' : '');
+}
+
+// Work that never went out: add it to the next update (carry_over, addendum-flow-gaps.sql), or leave
+// it out (out of the email, as internal work).
+async function quCarry(clientId, impId){
+  const { imp } = quFind(clientId, impId); if(!imp) return;
+  const { data, error } = await supabaseClient.from('client_improvements').update({ carry_over: true }).eq('id', impId).select('id');
+  if(error && workColumnMissing(error, 'carry_over')){ showToast('error', 'Needs a database update', 'Run addendum-flow-gaps.sql in Supabase, then try again.'); return; }
+  if(error || !(data && data.length)){ showToast('error', 'Couldn’t add it', 'Try again in a moment.'); return; }
+  imp.carryOver = true; const ci = clientImprovements.find(i => i.id === impId); if(ci) ci.carryOver = true;
+  quRefreshAll(clientId); showToast('success', 'Added to the next update', '');
+}
+async function quLeaveOut(clientId, impId){
+  const { imp } = quFind(clientId, impId); if(!imp) return;
+  const { data, error } = await supabaseClient.from('client_improvements').update({ include_in_email: false }).eq('id', impId).select('id');
+  if(error || !(data && data.length)){ showToast('error', 'Couldn’t save that', 'Try again in a moment.'); return; }
+  imp.includeInEmail = false; const ci = clientImprovements.find(i => i.id === impId); if(ci) ci.includeInEmail = false;
+  quRefreshAll(clientId); showToast('success', 'Left out', 'It stays in the log, out of the email.');
 }
 
 // Delete: the work and the time logged with it go to Recently Deleted (see trashWork in data.js).
@@ -404,6 +469,7 @@ async function quLog(clientId){
   if(!minutes){ showToast('error', 'Check the time', 'Try 0:30, 45m or 1h 30m.'); g('quTime')?.focus(); g('quTime')?.classList.add('is-need'); return; }
   const pick = minutes && g('quPick')?.innerHTML && typeof hvPickValue === 'function' ? hvPickValue('qu', clientId) : { ok: true, projectId: null, taskId: null };
   if(!pick.ok){ showToast('error', 'Almost there', pick.msg); return; }
+  if(!(await okToLogDuplicate(clientId, text))) return;   // logged already? (data.js)
   if(minutes > 960 && !(await confirmDialog(`That’s ${hmLong(minutes)} for one improvement. Log it anyway?`, { confirmLabel: 'Log It', cancelLabel: 'Fix It' }))) return;
   const today = toDateStr(new Date()), dateStr = g('quDate')?.value || today;
   const when = dateStr === today ? new Date() : new Date(dateStr + 'T12:00:00');

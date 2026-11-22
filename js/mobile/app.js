@@ -55,7 +55,7 @@ function confirmDialog(message, opts){
   let el = $m('mAlert');
   if(!el){ el = document.createElement('div'); el.id = 'mAlert'; el.className = 'ialert'; document.body.appendChild(el); }
   el.innerHTML = `<div class="ialert-box" role="alertdialog" aria-modal="true" aria-labelledby="mAlertT"><div class="ialert-tx"><b id="mAlertT">${mEsc(opts.title || message)}</b>${opts.title ? `<span>${mEsc(message)}</span>` : ''}</div>
-<div class="ialert-btns"><button onclick="mAlertDone(false)">Cancel</button><button id="mAlertOk" class="${opts.danger ? 'danger' : 'ok'}" onclick="mAlertDone(true)">${mEsc(opts.confirmLabel || 'OK')}</button></div></div>`;
+<div class="ialert-btns"><button onclick="mAlertDone(false)">${mEsc(opts.cancelLabel || 'Cancel')}</button><button id="mAlertOk" class="${opts.danger ? 'danger' : 'ok'}" onclick="mAlertDone(true)">${mEsc(opts.confirmLabel || 'OK')}</button></div></div>`;
   requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('in')));
   if(mAlertResolve) mAlertResolve(false);
   return new Promise(res => { mAlertResolve = res; });
@@ -761,6 +761,7 @@ async function mSendDraft(clientId, author){
   const at = new Date().toISOString();
   await saveDraftFor(clientId, author, { draftSentAt: at, draftSentBy: myName() });
   await recordUpdateSent(clientId, at);
+  await tellContributorsSent(c, getDraftFor(c, author), 'email');
   mLog(clientId, 'email_sent', `${myName()} sent the weekly update to ${c.email}.`, `Sent ${escapeHtml(author)}'s update to <b>${escapeHtml(c.name)}</b>.`);
   await mRefresh(); showToast('success', 'Sent', `${c.name}’s update is on its way.`);
   if(mStack.length) mPop();
@@ -1079,6 +1080,7 @@ async function mSaveLog(){
   if(raw && !minutes){ showToast('error', 'Check the time', 'Try 0:30, 45m or 1h 30m.'); return; }
   const pick = minutes && hvTimeOn() ? mHvValue(L) : { ok: true, projectId: null, taskId: null };
   if(!pick.ok){ showToast('error', 'Almost there', pick.msg); return; }
+  if(!(await okToLogDuplicate(L.clientId, text))) return;   // logged already? (data.js)
   const include = mIsOn('mLogInclude'), author = myName() || 'Team member';
   const btn = $m('mSheetDone'); if(btn) btn.disabled = true;
   const when = L.date === toDateStr(new Date()) ? new Date() : new Date(L.date + 'T12:00:00');
@@ -1086,7 +1088,7 @@ async function mSaveLog(){
   const service = c && serviceFromHarvest(c) ? (pick.projectId ? pick.service : improvementServiceFor(c)) : L.service;
   const imp = await insertImprovementFull(L.clientId, { author, text, includeInEmail: include, source: 'manual', date: when.toISOString(), service });
   if(!imp){ if(btn) btn.disabled = false; showToast('error', 'Couldn’t save it', 'Try again in a moment.'); return; }
-  if(include && c){ const d = (c.drafts || []).find(x => x.author === author); if(d && d.draftStatus !== 'none') await saveDraftFor(L.clientId, author, { draftStatus: 'none', draft: '' }); }
+  // new work never wipes a draft (as on desktop): it shows as new since the draft, or goes in the next update
   if(minutes){
     if(L.useTimer && timerState.running && timerState.clientId === L.clientId){ timerState.service = pick.projectId ? pick.service : service; timerState.projectId = pick.projectId; timerState.taskId = pick.taskId; timerState.description = text; await mStopTimer(true, true, imp.id); }
     else await mAddTime({ clientId: L.clientId, service: pick.projectId ? pick.service : service, dateStr: L.date, minutes, description: text, logged: true, projectId: pick.projectId, taskId: pick.taskId, improvementId: imp.id });

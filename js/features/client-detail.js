@@ -306,7 +306,8 @@ async function saveEditImprovement(clientId, idx){
   if(!c || !c.improvements[idx]){ showToast('error','Entry not found','This may have changed elsewhere — refreshing.'); renderAll(); return; }
   const oldText = c.improvements[idx].text;
   const impId = c.improvements[idx].id;
-  const { error } = await supabaseClient.from('client_improvements').update({ text, author }).eq('id', impId);
+  if(workLockedToast(c.improvements[idx])){ renderAll(); return; }   // in an update in review or approved
+  const { error } = oldText !== text ? await saveWorkText(impId, { text, author }) : await supabaseClient.from('client_improvements').update({ author }).eq('id', impId);
   const ok = !error;
   if(ok){ c.improvements[idx].text = text; c.improvements[idx].author = author; }
   renderClientsTable(); renderKpis(); renderQueue();

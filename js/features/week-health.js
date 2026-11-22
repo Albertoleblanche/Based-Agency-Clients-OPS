@@ -198,6 +198,23 @@ function weekStripHtml(c){
   }).join('')}</div>`;
 }
 
+// One update per client, with everyone's work in it (Nov 21). Its writer: whoever's draft is under
+// way, else the client's owner (clientOwner falls back to whoever logs for it most). Everyone else's
+// work goes in that update; the morning auto-draft picks the same way (lib/update-automations.js).
+function pickWriter(c, logged){
+  const owner = clientOwner(c);
+  // only people still on the team, as clientOwner
+  const ps = typeof teamProfiles !== 'undefined' ? teamProfiles : [], onTeam = n => !!n && (!ps.length || ps.some(p => p.name === n));
+  const live = (c.drafts || []).filter(d => onTeam(d.author) && d.draft && !d.draftSentAt && (d.draftStatus === 'pending' || d.draftStatus === 'approved') && !draftHasNoWork(c, d, logged));
+  if(live.length) return (live.find(d => d.author === owner) || live.slice().sort((a, b) => new Date(a.draftPendingSince || 0) - new Date(b.draftPendingSince || 0))[0]).author;
+  if(owner) return owner;
+  const first = (logged || []).filter(i => i.includeInEmail !== false && onTeam(i.author)).sort((a, b) => new Date(a.date) - new Date(b.date))[0];
+  return first ? first.author : '';
+}
+function updateWriter(c){ return pickWriter(c, clientWeek(c).logged); }
+// Your work for a client goes in someone else's update: the authors besides its writer.
+function workGoesTo(c){ const w = updateWriter(c); return w && w !== myName() ? w : ''; }
+
 // When a client started with us: its start date, else when it was added to Radar.
 function clientStartedAt(c){
   if(c && c.startDate){ const d = new Date(String(c.startDate).slice(0, 10) + 'T12:00:00'); if(!isNaN(d)) return d; }
@@ -254,16 +271,25 @@ function clientWeek(c){
   // the email that was logged before it but didn't make it in (logged after that draft was
   // written, for example). Sent work is marked out of the email when it's approved, so it never
   // comes back; the carry-over only looks two weeks back.
+  // Also (Nov 21): work logged since then with an earlier date (back-dated), and older work someone
+  // chose to add to the next update (carryOver, from "Never went out" in the Queue).
   const logged = (c.improvements || []).filter(i => {
     const t = new Date(i.date);
     if(t > now) return false;
     if(t > since) return true;
+    if(i.createdAt && new Date(i.createdAt) > since) return true;
+    if(i.carryOver && i.includeInEmail !== false) return true;
     return !!last && i.includeInEmail !== false && t > addDays(since, -14);
   });
+  // Work meant for the email that never went out: before the two-week carry-over, never sent (sending
+  // switches it out of the email), from the last four months. Shown in the Queue, to add or leave out.
+  const missed = !last ? [] : (c.improvements || []).filter(i => i.includeInEmail !== false && !i.carryOver && !logged.includes(i)
+    && new Date(i.date) <= addDays(since, -14) && new Date(i.date) > addDays(since, -120)
+    && !(c.drafts || []).some(d => d.draftSentAt && (d.draftImprovementIds || []).includes(i.id)));
   // what can go in the email: work marked internal ("Include in email" off) is logged, but there's
   // nothing to write a draft from until something here is meant for the client
   const forEmail = logged.filter(i => i.includeInEmail !== false);
-  const w = { c, owner, holder: owner, logged, forEmail, since, last, due, daysLeft, dueText: dueText(daysLeft, due),
+  const w = { c, owner, holder: owner || pickWriter(c, logged), logged, forEmail, missed, since, last, due, daysLeft, dueText: dueText(daysLeft, due),
     done: 0, behind: null, sent: false, late: false, state: 'due', draft: null };
   const approved = drafts.find(d => d.draftStatus === 'approved' && !d.draftSentAt);
   const inReview = drafts.find(d => d.draftStatus === 'pending' && d.readyToNotify && !draftHasNoWork(c, d, logged));

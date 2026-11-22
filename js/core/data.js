@@ -211,7 +211,8 @@ async function saveDraftFor(clientId, author, fields){
 }
 function improvementRowFromDb(r){
   return { id:r.id, clientId:r.client_id, author:r.author||'', text:r.text, date:r.date, includeInEmail:r.include_in_email, source:r.source,
-    ...(r.deleted_at ? { deletedAt: r.deleted_at, deletedBy: r.deleted_by || null } : {}) };
+    ...(r.deleted_at ? { deletedAt: r.deleted_at, deletedBy: r.deleted_by || null } : {}),
+    createdAt: r.created_at || null, editedAt: r.edited_at || null, carryOver: !!r.carry_over };
 }
 
 // Real per-row update — replaces the old "mutate the roster array, then
@@ -426,6 +427,52 @@ function workLockedWords(d){
 }
 function workLockedToast(imp){ const d = workLockedBy(imp); if(d) showToast('info', 'Locked until it’s sent', workLockedWords(d)); return !!d; }
 
+// One update per client (Nov 21): when it goes out, everyone whose work was in it hears, not just its
+// writer. Desktop: in the app, by push and on Slack; the iPhone: in the app.
+async function tellContributorsSent(c, d, via){
+  if(!c || !d) return;
+  const ids = new Set(d.draftImprovementIds || []), me = typeof myName === 'function' ? myName() : '';
+  const names = [...new Set((c.improvements || []).filter(i => ids.has(i.id)).map(i => i.author))]
+    .filter(n => n && n !== d.author && n !== me);
+  for(const n of names){
+    const p = workProfile(n); if(!p) continue;
+    const title = `${c.name}: your work went out`, body = `It was in ${firstName(d.author)}’s update${via === 'whatsapp' ? ', in the WhatsApp group' : ''}.`;
+    if(typeof sendNotification === 'function') await sendNotification(p.id, 'draft_sent', title, body, 'queue', c.id);
+    else await supabaseClient.from('notifications').insert({ user_id: p.id, type: 'draft_sent', title, body, target_view: 'queue', target_id: c.id, read: false });
+  }
+}
+
+// The same work logged twice (Nov 21): before logging, a near match for the client from the last 30
+// days (same words, or nearly: 85% of the words shared, four or more of them) is shown, to log it
+// anyway or not. Returns true to go ahead.
+function workWords(t){ return String(t || '').toLowerCase().replace(/[^a-z0-9\u00c0-\u024f#%$ ]+/g, ' ').split(/\s+/).filter(Boolean); }
+function workDuplicateOf(clientId, text){
+  const a = workWords(text); if(!a.length) return null;
+  const A = new Set(a), since = addDays(new Date(), -30);
+  return (typeof clientImprovements !== 'undefined' ? clientImprovements : []).filter(i => i.clientId === clientId && new Date(i.date) >= since).find(i => {
+    const b = workWords(i.text); if(b.join(' ') === a.join(' ')) return true;
+    const B = new Set(b); if(A.size < 4 || B.size < 4) return false;
+    let n = 0; A.forEach(x => { if(B.has(x)) n++; });
+    return n / (A.size + B.size - n) >= 0.85;
+  }) || null;
+}
+async function okToLogDuplicate(clientId, text){
+  const dup = workDuplicateOf(clientId, text); if(!dup) return true;
+  const c = clients.find(x => x.id === clientId), me = typeof myName === 'function' ? myName() : '';
+  const who = dup.author === me ? 'You' : firstName(dup.author);
+  return await confirmDialog(`${who} already logged this for ${c ? c.name : 'this client'} on ${fmtShortDate(new Date(dup.date))}: “${workCut(dup.text, 90)}”.`, { title: 'Log it again?', confirmLabel: 'Log It Again', cancelLabel: 'Don’t Log' });
+}
+
+// Saving changed words for a piece of work, with when (edited_at, addendum-flow-gaps.sql), so a draft
+// written before the change can say so. Before that SQL, just the words. Returns { data, error }.
+async function saveWorkText(impId, fields){
+  const at = new Date().toISOString();
+  let r = await supabaseClient.from('client_improvements').update({ ...fields, edited_at: at }).eq('id', impId).select();
+  if(r.error && workColumnMissing(r.error, 'edited_at')) r = await supabaseClient.from('client_improvements').update(fields).eq('id', impId).select();
+  else if(!r.error){ const i = clientImprovements.find(x => x.id === impId); if(i) i.editedAt = at; }
+  return r;
+}
+
 // Asks, deletes, says what happened. Returns trashWork's result, or null when they said no.
 async function deleteWorkAsk(ids, opts){
   opts = opts || {};
@@ -441,9 +488,18 @@ async function deleteWorkAsk(ids, opts){
   if(!r.ok){ showToast('error', 'Couldn’t delete it', 'Try again in a moment.'); return r; }
   const n = r.moved.length;
   if(typeof logClientActivity === 'function') r.moved.forEach(i => logClientActivity(i.clientId, 'improvement_deleted', `${myName() || 'Someone'} deleted an improvement — "${workCut(i.text)}"`));
+  const back = r.moved.map(i => i.id);
   showToast('success', r.soft ? 'Moved to Recently Deleted' : 'Deleted', r.soft
-    ? `${n === 1 ? 'The work' : `${n} work items`}${mins ? `, with ${n === 1 ? 'its' : 'their'} ${workHm(mins)} of time` : ''}. You can restore ${n === 1 && !mins ? 'it' : 'them'} anytime.` : 'Removed from the log.');
+    ? `${n === 1 ? `“${workCut(r.moved[0].text, 48)}”` : `${n} work items`}${mins ? `, with ${n === 1 ? 'its' : 'their'} ${workHm(mins)} of time` : ''}.` : 'Removed from the log.',
+    r.soft ? { action: 'Undo', onAction: () => undoTrashWork(back) } : null);
   return r;
+}
+// Undo, from the toast after a delete: the work and its time come back (the time made again in Harvest).
+async function undoTrashWork(ids){
+  const r = await restoreWork(ids);
+  if(typeof renderAll === 'function') renderAll();
+  r.ok ? showToast('success', 'Restored', r.restored.length === 1 ? 'The work is back, with its time.' : `${r.restored.length} work items are back, with their time.`)
+    : showToast('error', 'Couldn’t undo it', 'Restore it from Recently Deleted.');
 }
 // Brings deleted work back, with its time (made again in Harvest).
 async function restoreWork(ids){

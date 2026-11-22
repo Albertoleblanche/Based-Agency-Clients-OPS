@@ -221,6 +221,7 @@ async function markWinSent(clientId, author){
   if(!ok){ showToast('error', 'Couldn’t mark it sent', 'Try again in a moment.'); return; }
   Object.assign(d, { draftSentAt: at, draftSentBy: by, sentVia: d.sentVia || 'whatsapp' });
   if(typeof recordUpdateSent === 'function') await recordUpdateSent(clientId, at);
+  if(typeof tellContributorsSent === 'function') await tellContributorsSent(c, d, 'whatsapp');
   typeof logClientActivity === 'function' && logClientActivity(clientId, 'draft_sent', `${by || 'Someone'} sent ${author}'s win in the WhatsApp group.`);
   winsRerender();
   showToast('success', 'Marked as sent', `${c.name} got this week’s win.`);

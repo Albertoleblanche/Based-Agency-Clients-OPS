@@ -48,6 +48,7 @@ async function logTimeEntryAsImprovement(entryId){
   await loadAll();
   const c = clients.find(x=>x.id===entry.clientId);
   if(!c){ showToast('error','Client not found','This client may have been removed.'); return; }
+  if(!(await okToLogDuplicate(entry.clientId, entry.description.trim()))) return;   // logged already? (data.js)
   const imp = await insertImprovementRow(entry.clientId, { author: myName()||'Team member', text: entry.description.trim(), includeInEmail: false, source: 'time' });
   if(!imp){ showToast('error','Save failed','Could not save — try again.'); return; }
   const invalidated = invalidateStaleDraft(c, myName()||'Team member');

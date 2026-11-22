@@ -977,7 +977,15 @@ async function generateDraft(id, author){
   // accident.
   const allEligible = c.improvements.filter(i => i.includeInEmail !== false)
     .sort((a,b) => new Date(a.date||0) - new Date(b.date||0)); // oldest first — easy to miss otherwise
-  const eligibleImprovements = canApprove() ? allEligible : allEligible.filter(i => i.author === author);
+  // One update per client, with everyone's work (Nov 21): its writer writes it from all of this
+  // update's work, checked; anyone else's work goes in the writer's update instead of a second draft.
+  const writer = typeof updateWriter === 'function' ? updateWriter(c) : author;
+  if(writer && writer !== author && !(d.draft && !d.draftSentAt && d.draftStatus !== 'none')){
+    showToast('info', `${firstName(writer)} writes this update`, `One update per client: ${author === myName() ? 'your' : `${firstName(author)}’s`} work goes in ${firstName(writer)}’s, with everyone else’s.`);
+    return;
+  }
+  const thisUpdate = new Set(clientWeek(c).forEmail.map(i => i.id));
+  const eligibleImprovements = allEligible;
   if(!eligibleImprovements.length){
     showToast('error','Nothing to include', c.improvements.some(i=>i.author===author)
       ? `${author} has logged items for ${c.name}, but none are marked "Include in email" yet — review them in Past Improvements.`
@@ -990,11 +998,11 @@ async function generateDraft(id, author){
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Select improvements to include</span><span class="toast-close" onclick="${modalOpenForThis ? `openQueueCardModal('${id}',${jsArg(author)})` : 'closeAppModal()'}">✕</span></div>
     <div class="modal-body">
-      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Everything checked below will go into ${escapeHtml(author)}'s draft for ${escapeHtml(c.name)}. Uncheck anything you'd rather hold back for a later one.</p>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Everything checked below goes into ${escapeHtml(c.name)}’s update: everyone’s work since the last one. Uncheck anything you’d rather hold back for a later one.</p>
       <div style="display:flex;flex-direction:column;gap:2px;max-height:340px;overflow-y:auto;">
         ${eligibleImprovements.map(i=>`
           <label style="display:flex;align-items:flex-start;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border);cursor:pointer;">
-            <input type="checkbox" class="draft-select-checkbox" value="${i.id}" ${i.author===author?'checked':''} style="margin-top:3px;flex:none;">
+            <input type="checkbox" class="draft-select-checkbox" value="${i.id}" ${thisUpdate.has(i.id)?'checked':''} style="margin-top:3px;flex:none;">
             <span style="flex:1;font-size:14px;color:var(--ink);">${escapeHtml(i.text)}<br><span style="font-size:12px;color:var(--muted-lt);">${escapeHtml(i.author||'')} — ${i.date ? new Date(i.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : 'no date'}</span></span>
           </label>
         `).join('')}
@@ -1131,6 +1139,7 @@ async function recordDraftSent(id, author){
   // the writer hears it went out
   const writer = author !== myName() ? teamProfiles.find(p => p.name === author) : null;
   if(writer && typeof sendNotification === 'function') await sendNotification(writer.id, 'draft_sent', `${c.name}: your update was sent`, `${myName() || 'An approver'} sent it to ${c.email || 'the client'}.`, 'teamqueue', c.id);
+  if(typeof tellContributorsSent === 'function') await tellContributorsSent(c, getDraftFor(c, author), 'email');
   // Kept apart from the draft row, which the next week's draft overwrites: the on-time
   // history in This Week and Health reads from here.
   if(typeof recordUpdateSent === 'function') await recordUpdateSent(id, at);

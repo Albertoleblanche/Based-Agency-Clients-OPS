@@ -156,6 +156,15 @@ document.addEventListener('keydown', e => {
   trSelEnd();
 });
 function trashDay(d){ return d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''; }
+// Work, notes and time are deleted for good 30 days after they're deleted (lib/trash-purge.js)
+const TRASH_KEEP_DAYS = 30;
+function trashLeft(d){
+  if(!d) return '';
+  // counted in calendar days: deleted yesterday, 29 days left
+  const day = t => { const x = new Date(t); x.setHours(0, 0, 0, 0); return x.getTime(); };
+  const n = Math.max(0, TRASH_KEEP_DAYS - Math.round((day(Date.now()) - day(d)) / 86400000));
+  return n === 0 ? ' · goes for good soon' : n === 1 ? ' · 1 day left' : ` · ${n} days left`;
+}
 function trashRow(ic, title, sub, restore, del, k){
   if(trSel){   // selecting: the whole row ticks
     const on = trSel.has(k);
@@ -197,23 +206,23 @@ function drawTrash(){
       const c = clients.find(x => x.id === w.clientId), mins = trWorkTime(w.id).reduce((n, e) => n + (e.minutes || 0), 0);
       const by = w.deletedBy && w.deletedBy !== uid ? (teamProfiles.find(p => p.id === w.deletedBy) || {}).name : '';
       const whose = w.author && w.author !== myName() ? ` · ${escapeHtml(firstName(w.author))}’s` : '';
-      return trashRow('square-pen', w.text || 'Work', `${escapeHtml(c ? c.name : 'Client removed')}${whose}${mins ? ` · ${hmm(mins)} of time` : ''} · deleted ${trashDay(w.deletedAt)}${by ? ` by ${escapeHtml(firstName(by))}` : ''}`,
+      return trashRow('square-pen', w.text || 'Work', `${escapeHtml(c ? c.name : 'Client removed')}${whose}${mins ? ` · ${hmm(mins)} of time` : ''} · deleted ${trashDay(w.deletedAt)}${by ? ` by ${escapeHtml(firstName(by))}` : ''}${trashLeft(w.deletedAt)}`,
         `trRestoreWork('${w.id}')`, `trDeleteWorkForGood('${w.id}')`, 'work:' + w.id);
     }).join('') || '<div class="row"><span class="t-2" style="font-size:14px">No deleted work.</span></div>'}</div>${uw ? '</section>' : ''}`;
   }
   if(show('notes') && (nt.length || trashTab === 'notes')){
     html += head('notes', 'Notes', `<span class="t-2" style="font-size:13px;display:inline-flex;align-items:center;gap:4px"><span class="ic sm">${icon('lock-simple')}</span>Only you can see your deleted notes</span>`) + `<div class="grp">${nt.map(n => {
       const c = clients.find(x => x.id === n.clientId);
-      return trashRow('notepad', n.title || 'Untitled note', `${escapeHtml(c ? c.name : 'No client')} · deleted ${trashDay(n.deletedAt)}`, `restoreNote('${n.id}')`, `permanentlyDeleteNote('${n.id}')`, 'notes:' + n.id);
+      return trashRow('notepad', n.title || 'Untitled note', `${escapeHtml(c ? c.name : 'No client')} · deleted ${trashDay(n.deletedAt)}${trashLeft(n.deletedAt)}`, `restoreNote('${n.id}')`, `permanentlyDeleteNote('${n.id}')`, 'notes:' + n.id);
     }).join('') || '<div class="row"><span class="t-2" style="font-size:14px">No deleted notes.</span></div>'}</div>${uw ? '</section>' : ''}`;
   }
   if(show('time') && (tm.length || trashTab === 'time')){
     html += head('time', 'Time entries') + `<div class="grp">${tm.map(e => {
       const c = clients.find(x => x.id === e.clientId);
-      return trashRow('timer', `${e.description || e.service || 'Time'} · ${hmm(e.minutes)}`, `${escapeHtml(c ? c.name : 'Client removed')} · deleted ${trashDay(e.deletedAt)}`, `restoreTimeEntry('${e.id}')`, `permanentlyDeleteTimeEntry('${e.id}')`, 'time:' + e.id);
+      return trashRow('timer', `${e.description || e.service || 'Time'} · ${hmm(e.minutes)}`, `${escapeHtml(c ? c.name : 'Client removed')} · deleted ${trashDay(e.deletedAt)}${trashLeft(e.deletedAt)}`, `restoreTimeEntry('${e.id}')`, `permanentlyDeleteTimeEntry('${e.id}')`, 'time:' + e.id);
     }).join('') || '<div class="row"><span class="t-2" style="font-size:14px">No deleted time entries.</span></div>'}</div>${uw ? '</section>' : ''}`;
   }
-  if(!html) html = emptyState({ icon: 'trash', title: 'Nothing deleted', text: 'Clients, work, notes and time you delete wait here, so you can bring them back.' });
+  if(!html) html = emptyState({ icon: 'trash', title: 'Nothing deleted', text: 'Clients, work, notes and time you delete wait here, so you can bring them back. Work, notes and time go for good after 30 days.' });
   root.classList.toggle('tr-selecting', !!trSel);
   root.innerHTML = `${seg}<div class="tr-list">${html}</div>${trBulkBarHtml()}`;
   // switching tabs while selecting keeps only what still shows, so nothing hidden is restored or deleted

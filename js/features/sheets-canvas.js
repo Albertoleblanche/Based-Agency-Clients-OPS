@@ -99,7 +99,8 @@ function improvementRowFromDb(r){
   if(r && Object.prototype.hasOwnProperty.call(r, 'service')) improvementExtrasReady = true;
   return { id: r.id, clientId: r.client_id, author: r.author || '', text: r.text, date: r.date, includeInEmail: r.include_in_email, source: r.source,
     service: r.service || '', attachments: Array.isArray(r.attachments) ? r.attachments : [],
-    ...(r.deleted_at ? { deletedAt: r.deleted_at, deletedBy: r.deleted_by || null } : {}) };   // deleted work (data.js)
+    ...(r.deleted_at ? { deletedAt: r.deleted_at, deletedBy: r.deleted_by || null } : {}),   // deleted work (data.js)
+    createdAt: r.created_at || null, editedAt: r.edited_at || null, carryOver: !!r.carry_over };   // addendum-flow-gaps.sql
 }
 function isMissingColumnError(e){ return !!e && (e.code === '42703' || e.code === 'PGRST204' || /column/i.test(e.message || '') && /(does not exist|could not find)/i.test(e.message || '')); }
 async function insertImprovementFull(clientId, f){
@@ -272,6 +273,7 @@ async function saveQueueLogImprovement(another){
   const pick = minutes && g('liPick') && g('liPick').innerHTML && typeof hvPickValue === 'function' ? hvPickValue('li', clientId) : { ok: true, projectId: null, taskId: null };
   if(!pick.ok){ showToast('error', 'Almost there', pick.msg); return; }
   if(minutes > 960 && !(await confirmDialog(`That’s ${hmLong(minutes)} for one improvement. Log it anyway?`, { confirmLabel: 'Log It', cancelLabel: 'Fix It' }))) return;
+  if(!(await okToLogDuplicate(clientId, text))) return;   // logged already? (data.js)
   const picked = g('liService')?.value || '';
   const dateStr = g('liDate')?.value || toDateStr(new Date());
   const include = sheetIsOn('liInclude');

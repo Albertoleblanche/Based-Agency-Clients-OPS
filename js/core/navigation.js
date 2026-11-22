@@ -129,7 +129,7 @@ const VIEW_TITLES = {
   calendar: ['Calendar', "The whole team's calendar in one place — meetings, deadlines, and reminders"],
   time: ['Time', 'Your timesheet, reports and payroll'],
   team: ['Team', "Everyone on the team, and what they do here"],
-  trash: ['Recently Deleted', 'Restore anything here, or delete it for good'],
+  trash: ['Recently Deleted', 'Work, notes and time go for good after 30 days; clients stay until you delete them'],
   settings: ['Settings', 'Workspace, client fields, AI, integrations and notifications'],
   profile: ['My Profile', 'How the team sees you'],
 };

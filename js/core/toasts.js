@@ -77,7 +77,8 @@ function toastIconHtml(type){
   return typeof icon === 'function' ? icon(name) : '';
 }
 
-function showToast(type, title, detail){
+// opts.action / opts.onAction: one button beside the close (Undo after a delete); it stays a little longer.
+function showToast(type, title, detail, opts){
   const stack = document.getElementById('toastStack');
   const el = document.createElement('div');
   el.className = 'toast ' + type;
@@ -88,7 +89,7 @@ function showToast(type, title, detail){
     cancel: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M4.929 4.929 19.07 19.071" /></svg>',
   };
   const ic = toastIconHtml(type);
-  el.innerHTML = `<span class="toast-icon">${ic}</span><span class="toast-text"><b class="toast-t">${escapeHtml(title)}</b>${detail?escapeHtml(detail):''}</span><span class="toast-close" onclick="dismissToastEl(this.parentElement)">✕</span><span class="toast-progress"></span>`;
+  el.innerHTML = `<span class="toast-icon">${ic}</span><span class="toast-text"><b class="toast-t">${escapeHtml(title)}</b>${detail?escapeHtml(detail):''}</span>${opts && opts.action ? `<button type="button" class="toast-act">${escapeHtml(opts.action)}</button>` : ''}<span class="toast-close" onclick="dismissToastEl(this.parentElement)">✕</span><span class="toast-progress"></span>`;
   // Starting state for the entrance transition — appended off-screen and
   // invisible, then restackToasts() (called one paint frame later) sets
   // the real target position, which the CSS transition animates into.
@@ -99,6 +100,8 @@ function showToast(type, title, detail){
   el.style.transform = 'scale(.94)';
   stack.appendChild(el);
   requestAnimationFrame(()=> requestAnimationFrame(restackToasts));
+  const act = el.querySelector('.toast-act');
+  if(act) act.addEventListener('click', e => { e.stopPropagation(); act.disabled = true; dismissToastEl(el); try{ opts.onAction(); }catch(err){ console.error('toast action', err); } });
 
   // Hover pauses both the visible progress bar and the actual dismiss
   // timer together — reading a toast shouldn't cost you the chance to
@@ -107,7 +110,7 @@ function showToast(type, title, detail){
   // Exposed on the element itself (not just private to this closure) so
   // the stack-wide hover-to-expand handler can pause/resume every toast
   // in the stack, not just whichever one the cursor happens to be over.
-  const duration = 4200;
+  const duration = opts && opts.action ? 7000 : 4200;
   let remaining = duration;
   let lastStart = Date.now();
   let dismissTimer = setTimeout(()=>dismissToastEl(el), duration);

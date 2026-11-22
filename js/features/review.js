@@ -67,6 +67,7 @@ function renderTeamQueue(){
     const when = reviewTab === 'sent' ? (x.at ? fmtTime(new Date(x.at)) : '') : x.at ? fmtWait(x.at) : '';
     const dl = reviewTab === 'sent' ? null : draftDelta(x.c, x.d), tier = winTier(x.d);
     const flag = dl && dl.gone ? `<span class="rvn-note is-red">${dl.allGone ? 'Work deleted' : `${dl.gone} deleted`}</span>`
+      : dl && dl.edited.length ? `<span class="rvn-note">${dl.edited.length} edited</span>`
       : dl && dl.added.length ? `<span class="rvn-note">${dl.added.length} new since draft</span>`
       : tier ? tierTag(tier) : h.level !== 'g' ? `<span class="rvn-hl ${h.level}"><i></i>${escapeHtml(healthWord(h.level))}</span>` : '';
     // Approved: who sends it (WhatsApp wins go back to whoever wrote them; copying one claims it)
@@ -145,15 +146,22 @@ function reviewStep(dir){
 //   added   this person's work for the email that isn't in it (logged after it was written, or held
 //           back); it goes in a rewrite, or into the next update if this one is sent as is
 //   internal  work this update covers that stays out of client emails
+// One update per client (Nov 21): added and internal work count everyone's, not only the writer's
+// (but not work already in someone else's live draft). edited: work in it changed after it was
+// written (edited_at, addendum-flow-gaps.sql).
 function draftDelta(c, d){
   const imps = c.improvements || [], ids = d.draftImprovementIds || [], w = clientWeek(c);
   const byId = new Map(imps.map(i => [i.id, i]));
   const inc = ids.length ? ids.map(id => byId.get(id)).filter(Boolean) : w.logged.filter(i => i.author === d.author && i.includeInEmail !== false);
   const gone = ids.length - (ids.length ? inc.length : 0), inSet = new Set(inc.map(i => i.id));
-  const added = ids.length && !d.draftSentAt ? w.logged.filter(i => i.author === d.author && i.includeInEmail !== false && !inSet.has(i.id)) : [];
-  const internal = d.draftSentAt ? [] : w.logged.filter(i => i.author === d.author && i.includeInEmail === false && !inSet.has(i.id));
+  const elsewhere = new Set((c.drafts || []).filter(x => x !== d && x.draft && !x.draftSentAt && x.draftStatus !== 'none').flatMap(x => x.draftImprovementIds || []));
+  const free = i => !inSet.has(i.id) && !elsewhere.has(i.id);
+  const added = ids.length && !d.draftSentAt ? w.logged.filter(i => i.includeInEmail !== false && free(i)) : [];
+  const internal = d.draftSentAt ? [] : w.logged.filter(i => i.includeInEmail === false && free(i));
+  const written = d.draftPendingSince ? new Date(d.draftPendingSince) : null;
+  const edited = d.draftSentAt || !written ? [] : inc.filter(i => i.editedAt && new Date(i.editedAt) > written);
   const byDate = (a, b) => new Date(a.date) - new Date(b.date);
-  return { inc: inc.sort(byDate), gone, allGone: ids.length > 0 && !inc.length, added: added.sort(byDate), internal: internal.sort(byDate) };
+  return { inc: inc.sort(byDate), gone, allGone: ids.length > 0 && !inc.length, added: added.sort(byDate), internal: internal.sort(byDate), edited: edited.sort(byDate) };
 }
 // Who may rewrite or edit a draft from Review: approvers while it waits; the writer until they
 // send it for review.
@@ -192,7 +200,7 @@ function reviewReadHtml(x, list, split){
   const rewriteBtn = rework ? `<button class="btn rvn-sm" onclick="generateDraft(${A})">${icon('sparkle')}Rewrite to Include</button>` : '';
   const goneNote = dl.gone ? `<div class="rvn-warn"><div><b>${dl.allGone ? 'The work this email was written from was deleted' : `${dl.gone} improvement${dl.gone === 1 ? '' : 's'} in this email ${dl.gone === 1 ? 'was' : 'were'} deleted`}</b><span>${rework ? (dl.allGone ? 'Rewrite it from what’s logged now.' : 'Rewrite it from what’s logged now, or edit it by hand.') : 'An approver can rewrite it from what’s logged now.'}</span>${rework ? `<button class="btn rvn-sm" onclick="generateDraft(${A})">${icon('sparkle')}Rewrite</button>` : ''}</div></div>` : '';
   const rail = `<aside class="rvn-rail" aria-label="${tab === 'sent' ? 'About this update' : 'Before you send'}">
-${goneNote}<div class="rvn-rs"><b>${tab === 'sent' ? 'About this update' : 'Before you send'}</b></div>
+${goneNote}${!dl.gone && dl.edited.length ? `<div class="rvn-warn"><div><b>${dl.edited.length === 1 ? 'An improvement in this email was' : `${dl.edited.length} improvements in this email were`} edited after it was written</b><span>${escapeHtml(dl.edited.map(i => `“${i.text.length > 70 ? i.text.slice(0, 70) + '…' : i.text}”`).join(', '))}. ${rework ? 'Rewrite it so it matches, or edit it by hand.' : 'Check the email still says the same.'}</span></div></div>` : ''}<div class="rvn-rs"><b>${tab === 'sent' ? 'About this update' : 'Before you send'}</b></div>
 ${reviewWinRowsHtml(c, d, tab)}
 <div class="rvn-kv"><span>Health</span><span>${htag}</span></div>
 ${tab !== 'sent' && dueTxt ? `<div class="rvn-kv"><span>Due</span><span${w.late ? ' class="t-red"' : ''}>${escapeHtml(w.late ? w.dueText : dueTxt)}</span></div>` : ''}

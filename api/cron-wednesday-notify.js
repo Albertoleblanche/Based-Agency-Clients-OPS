@@ -31,6 +31,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { sendPushToUser, pushUrlFor } = require('../lib/push-notify');
 const { clientRowFromDb, improvementRowFromDb } = require('../lib/client-rows');
 const { runUpdateAutomations } = require('../lib/update-automations');
+const { purgeRecentlyDeleted } = require('../lib/trash-purge');
 
 const EMAIL_DIGEST_DAY_OF_WEEK = 3; // Wednesday, hardcoded — not admin-configurable
 
@@ -153,6 +154,13 @@ module.exports = async function handler(req, res) {
       result.weeklyUpdates = await runUpdateAutomations(admin, settings, { started });
     } catch (e) {
       result.weeklyUpdates = { error: String(e) };
+    }
+
+    // Recently Deleted keeps work, notes and time for 30 days (lib/trash-purge.js)
+    try {
+      result.recentlyDeleted = await purgeRecentlyDeleted(admin);
+    } catch (e) {
+      result.recentlyDeleted = { error: String(e) };
     }
 
     if (todayDow === EMAIL_DIGEST_DAY_OF_WEEK) {
