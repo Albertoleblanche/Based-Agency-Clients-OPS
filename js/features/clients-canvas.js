@@ -223,7 +223,7 @@ function renderClientsTable(){
     : (a, b) => rank[a.h.level] - rank[b.h.level] || b.h.signals.filter(s => s.l === 'r').length - a.h.signals.filter(s => s.l === 'r').length || (b.c.importance || 0) - (a.c.importance || 0) || a.c.name.localeCompare(b.c.name));
   const owners = [...new Set(rows.map(r => r.owner).concat(su.map(suOwner)).filter(Boolean))].sort();
   if(inspectedClientId && !acAll.some(c => c.id === inspectedClientId) && !setupClients().some(c => c.id === inspectedClientId)) inspectedClientId = null;
-  // the new look (beta) uses the canvas columns: client, service, owner, health, this week, importance
+  // the new look uses the canvas columns: client, service, owner, health, this week, importance
   const uw = typeof uiStyleOn === 'function' && uiStyleOn();
   const row = ({ c, h, w, owner }) => {
     const sel = c.id === inspectedClientId, reason = h.level === 'g' ? '' : tableSignal(h, c);

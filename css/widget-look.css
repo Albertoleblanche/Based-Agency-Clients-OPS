@@ -1,4 +1,4 @@
-/* The new look (beta): the widget style from the canvas (rows "Every tab in the widget style").
+/* The new look: the widget style from the canvas (rows "Every tab in the widget style").
    Only on when <html> has .ui-w, which js/core/session.js sets for whoever has it turned on
    (team_profiles.ui_style = 'widgets'). Everyone else never matches a rule in this file.
    Near-black ground, rounded cards, big thin numbers, small mono labels, pill buttons, Geist.

@@ -185,7 +185,7 @@ function drawTrash(){
   const tabs = [['all', 'All', total], ...(canClients ? [['clients', 'Clients', cl.length]] : []), ['work', 'Work', wk.length], ['notes', 'Notes', nt.length], ['time', 'Time Entries', tm.length]];
   if(!tabs.some(([k]) => k === trashTab)) trashTab = 'all';
   if(trSel && !total) trSel = null;
-  const uw = typeof uiStyleOn === 'function' && uiStyleOn();   // the new look (beta): a title, and each kind as a card
+  const uw = typeof uiStyleOn === 'function' && uiStyleOn();   // the new look: a title, and each kind as a card
   const pick = total && !trSel ? `${uw ? '' : '<span class="cl-sp"></span>'}<button class="btn tr-sel-btn" onclick="trSelStart()">${icon('list-checks')}Select</button>` : '';
   const seg = `<div class="tr-top">${uw ? `<div class="tr-hd"><h2>${total ? `${total} item${total === 1 ? '' : 's'}` : 'Nothing deleted'}</h2><p>Restore puts it back exactly where it was.</p></div><span class="cl-sp"></span>` : ''}<div class="seg" role="tablist" aria-label="Type">${tabs.map(([k, t, n]) => `<button class="${trashTab === k ? 'on' : ''}" role="tab" aria-selected="${trashTab === k}" onclick="switchTrashTab('${k}')">${t}${n ? ` <span class="c">${n}</span>` : ''}</button>`).join('')}</div>${pick}</div>`;
   const head = (type, title, extra) => {

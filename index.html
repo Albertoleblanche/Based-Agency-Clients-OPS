@@ -68,7 +68,7 @@
       let dark = saved === 'dark' || (saved !== 'light' && !m && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
       if(m){ const a = m[1] ? m[1] * 60 + +m[2] : 1140, b = m[3] ? m[3] * 60 + +m[4] : 420, d = new Date(), t = d.getHours() * 60 + d.getMinutes(); dark = a > b ? (t >= a || t < b) : (t >= a && t < b); }
       document.body.dataset.theme = dark ? 'dark' : 'light';
-      // The new look (beta), if this device last had it on (js/core/session.js keeps it right once you're signed in)
+      // The new look, if this device last had it on (js/core/session.js keeps it right once you're signed in)
       if(localStorage.getItem('bda_ui_style') === 'widgets'){
         document.documentElement.classList.add('ui-w');
         const l = document.createElement('link'); l.id = 'uiwFont'; l.rel = 'stylesheet';

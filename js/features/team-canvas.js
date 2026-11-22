@@ -129,7 +129,7 @@ function teamParts(m){
   return { admin, self, full, titleCtl, roles: full ? roles : '', canRole, extras, slack: full ? slack : '', rate, owns, fu: full ? fu : null, acts, danger };
 }
 
-// ---- the new look (beta): People in a card on the left, the person in a big Profile card ----
+// ---- the new look: People in a card on the left, the person in a big Profile card ----
 const TEAM_ROLE_WORD = { member: 'Member', approver: 'Approver', admin: 'Admin' };
 function teamUwHtml(people, sel, admin){
   const rows = people.map(m => {

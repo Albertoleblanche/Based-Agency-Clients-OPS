@@ -56,7 +56,7 @@ function renderReminders(){
   const open = rs.filter(r => r.status === 'waiting'), answered = rs.filter(r => r.status === 'answered').sort(byDone), closed = rs.filter(r => r.status === 'closed').sort(byDone);
   const due = open.filter(r => reminderDisplayStatus(r) === 'due').sort(byFu), waiting = open.filter(r => reminderDisplayStatus(r) !== 'due').sort(byFu);
   const weekAgo = addDays(rNow(), -7), recent = answered.filter(r => r.resolvedAt && new Date(r.resolvedAt) >= weekAgo);
-  // each group in its own block, so the new look (beta) can draw it as a card; no white button on the rows there
+  // each group in its own block, so the new look can draw it as a card; no white button on the rows there
   const uw = typeof uiStyleOn === 'function' && uiStyleOn();
   const sec = (t, list, cls) => list.length ? `<section class="rmi-g"><div class="rmi-sec${cls ? ' ' + cls : ''}"><b>${t}</b><span>${list.length}</span></div>${list.map((r, i) => remRowHtml(r, !uw && cls === 'is-due' && i === 0)).join('')}</section>` : '';
   let main;

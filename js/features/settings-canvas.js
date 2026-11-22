@@ -99,7 +99,7 @@ function renderSettingsView(){
   const draw = { general: setGeneral, updates: setUpdates, clients: setClients, connections: setConnections, notifications: setNotifications,
     harvest: typeof setHarvest === 'function' ? setHarvest : setConnections, whatsapp: typeof setWhatsapp === 'function' ? setWhatsapp : setConnections, ai: setAi }[settingsTab];
   const head = sub ? `<div class="set-sub"><button class="set-back" onclick="switchSettingsTab('connections')">${icon('caret-left', { weight: 'bold' })}Connections</button><h2>${sub[0]}</h2></div>` : '';
-  // the new look (beta): the sections as a menu in a card on the left, with icons and My Profile at the end
+  // the new look: the sections as a menu in a card on the left, with icons and My Profile at the end
   const uw = typeof uiStyleOn === 'function' && uiStyleOn();
   const cur = tabs.find(t => t[0] === tab);
   const menuHead = uw ? `<div class="set-mh">${icon('sliders-horizontal')}<b>Settings</b></div>` : '';
@@ -138,7 +138,7 @@ ${fr('Names in the sidebar', 'Rename screens for everyone, and the line under th
 ${fr('Theme', themeSubLine(pref), `<div class="appear" role="radiogroup" aria-label="Theme">${ap('auto', 'Auto', '<i style="background:linear-gradient(90deg,#F4F4F7 0 15%,#FFFFFF 15% 50%,#262629 50% 65%,#1E1E20 65%)"></i>')}${ap('light', 'Light', thumb('#FFFFFF', '#F4F4F7'))}${ap('dark', 'Dark', thumb('#1E1E20', '#262629'))}${ap('night', 'Night to Morning', '<i class="ap-night" aria-hidden="true"></i>')}</div>`)}
 ${night ? fr('Dark from', 'Light the rest of the day', `${sheetPop('nightFrom', 'Dark from', nightTimeOpts(night[0]), night[0], `setNightHours(this.value, null)`)}<span class="t-2" style="font-size:13px">to</span>${sheetPop('nightTo', 'Light from', nightTimeOpts(night[1]), night[1], `setNightHours(null, this.value)`)}`) : ''}
 ${fr('Show the timer in the sidebar', 'A running timer always shows', swHtml(toolbarTimerPref(), 'Show the timer in the sidebar', 'toggleToolbarTimerPref()'))}
-${typeof uiStyleOffered === 'function' && uiStyleOffered() ? fr('New look (beta)', 'Rounded cards, big numbers and the Geist font. Only you see it', swHtml(uiStyleOn(), 'New look', 'toggleUiStyle()')) : ''}
+${typeof uiStyleOffered === 'function' && uiStyleOffered() ? fr('New look', 'Rounded cards, big numbers and the Geist font. Off brings back the classic look', swHtml(uiStyleOn(), 'New look', 'toggleUiStyle()')) : ''}
 </div>`;
 }
 async function saveWorkspaceName(v){ await changeSettings(s => { s.appName = v.trim(); }); if(typeof applyAppBranding === 'function') applyAppBranding(); }

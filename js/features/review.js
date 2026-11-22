@@ -120,7 +120,7 @@ function renderTeamQueue(){
 ${list.length > 1 ? `<p class="rvn-keys"><span><kbd>J</kbd><kbd>K</kbd> next and previous</span>${canApprove() && reviewTab === 'waiting' ? '<span><kbd>⌘</kbd><kbd>↩</kbd> approve &amp; send</span>' : ''}</p>` : ''}
 </section>
 ${(() => {
-  // the new look (beta): the letter and "Before you send" are two cards, as on the canvas
+  // the new look: the letter and "Before you send" are two cards, as on the canvas
   const uw = typeof uiStyleOn === 'function' && uiStyleOn(), parts = sel ? (sel.group ? reviewPartsHtml(sel, list, uw) : reviewReadHtml(sel, list, uw)) : null;
   if(uw && parts) return `<section class="rvn-read" aria-label="Selected draft">${parts.main}</section><section class="rvn-railc">${parts.rail}</section>`;
   return `<section class="rvn-read" aria-label="Selected draft">${sel ? parts : `<div class="rvn-none">${reviewEmptyHtml(items)}</div>`}</section>`;

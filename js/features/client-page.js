@@ -28,7 +28,7 @@ function renderClientPage(){
 <div class="tx"><b>${healthWord(h.level)} since ${relDay(h.since || rNow()).toLowerCase() === 'today' ? 'today' : relDay(h.since || rNow())}${next ? '' : ' — no next step yet'}</b><span>${escapeHtml(h.signals.map(s => s.title.charAt(0).toUpperCase() + s.title.slice(1)).join(' · '))}</span></div>
 <button class="btn" onclick="openHealthClient('${c.id}')">See Why</button>${next ? `<button class="btn" onclick="openTaskDetailModal('${next.id}')">Open Next Step</button>` : `<button class="btn btn-p" onclick="planNextStep('${c.id}')">${icon('plus')}Plan Next Step</button>`}</div>`;
   }
-  // the new look (beta): the canvas layout, a grid of cards
+  // the new look: the canvas layout, a grid of cards
   const uw = typeof uiStyleOn === 'function' && uiStyleOn();
   document.getElementById('cdRoot')?.classList.toggle('is-uw', !!uw);
   if(uw){
@@ -101,7 +101,7 @@ ${c.sow ? `<section class="panel"><h3>Scope</h3><p style="margin:0;font-size:14p
 <div class="grp">${myNotes.map(n => `<a class="row sm" href="#" onclick="openNoteModal('${n.id}');return false;"><div class="tx"><span class="t" style="font-weight:400">${escapeHtml(n.title || (n.text || '').slice(0, 60))}</span><span class="s">${fmtShortDate(new Date(n.updatedAt || n.createdAt))} · only you can see this</span></div><div class="r">${escapeHtml(({ idea: 'Idea', planned: 'Planned', done: 'Done' })[n.status] || '')}</div></a>`).join('') || '<div class="row sm"><span class="s t-2">No notes yet.</span></div>'}</div>`;
 }
 
-// ---- the client page in the new look (beta): the canvas board ClientPage ----
+// ---- the client page in the new look: the canvas board ClientPage ----
 function cpUwGridHtml(c, x){
   const { h, w, owner, next, imps, impStatus, seq, ots, sentAt, holder } = x;
   const pill = (label, js) => `<button class="uw-pill" type="button" onclick="${js}">${escapeHtml(label)}${icon('chevron-right')}</button>`;

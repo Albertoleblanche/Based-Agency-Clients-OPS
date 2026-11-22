@@ -86,7 +86,7 @@ function renderHealth(){
   const G = { new: by('new'), long: by('long'), fix: by('fix'), ok: by('ok') };
   const sel = window._healthSel ? all.find(x => x.c.id === window._healthSel) : null;
   const reminded = window._hlReminded || (window._hlReminded = {});
-  // the new look (beta): plain buttons on the rows, counts and the healthy names in the group heads
+  // the new look: plain buttons on the rows, counts and the healthy names in the group heads
   const uw = typeof uiStyleOn === 'function' && uiStyleOn();
 
   // ---- a row: who, 12 weeks, how it is now, why, the one action ----

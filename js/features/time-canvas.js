@@ -61,7 +61,7 @@ function tickTimesheetClock(){
   const t = document.getElementById('tsTotal'); if(t && t.dataset.base != null) t.textContent = hmm(+t.dataset.base + runningMinutes());
   const g = document.getElementById('tsBig'); if(g && g.dataset.base != null) g.innerHTML = tsBigHtml(+g.dataset.base + (g.dataset.run ? runningMinutes() : 0));
 }
-// the new look (beta): the day's total as a big number, 4h 30m
+// the new look: the day's total as a big number, 4h 30m
 function tsBigHtml(m){ m = Math.round(m); const h = Math.floor(m / 60), r = m % 60; return h ? `${h}<small>h ${String(r).padStart(2, '0')}m</small>` : `${r}<small>m</small>`; }
 function startTimerInterval(){ if(timerIntervalId) clearInterval(timerIntervalId); timerIntervalId = setInterval(updateTimerDisplay, 1000); updateTimerDisplay(); }
 
@@ -200,7 +200,7 @@ function renderTimesheet(){
   const runToday = timerState.running && today >= fk && today <= tk ? runningMinutes() : 0;
   const totalMin = inP.reduce((s, e) => s + e.minutes, 0);
   const isCur = today >= fk && today <= tk;
-  const uw = typeof uiStyleOn === 'function' && uiStyleOn();   // the new look (beta): the side column as cards, the day's total big
+  const uw = typeof uiStyleOn === 'function' && uiStyleOn();   // the new look: the side column as cards, the day's total big
   const card = h => uw ? `<div class="tmi-card">${h}</div>` : h;
   const fmtLong = d => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   const label = tsView === 'day' ? (tsAnchor === today ? 'Today, ' + fmtLong(tsD(tsAnchor)) : tsAnchor === toDateStr(addDays(now, -1)) ? 'Yesterday, ' + fmtLong(tsD(tsAnchor)) : fmtLong(tsD(tsAnchor)))

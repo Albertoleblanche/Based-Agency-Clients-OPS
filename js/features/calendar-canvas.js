@@ -115,7 +115,7 @@ function renderCalendar(){
   if(typeof closeEventPreview === 'function') closeEventPreview(true);
   if(!root) return;
   if(typeof calendarDataLoaded !== 'undefined' && !calendarDataLoaded){ root.classList.remove('is-month'); root.innerHTML = skeletonHtml('calendar', 'Loading the calendar…'); return; }
-  // the new look (beta) opens on the month the first time, with Coming up beside the grid
+  // the new look opens on the month the first time, with Coming up beside the grid
   const uw = typeof uiStyleOn === 'function' && uiStyleOn();
   try{ if(uw && !localStorage.getItem('bda_uw_cal')){ localStorage.setItem('bda_uw_cal', '1'); calendarViewMode = 'month'; localStorage.setItem('bda_cal_mode', 'month'); if(currentViewName === 'calendar') setToolbarActions('calendar'); } }catch(e){}
   calUpcomingRender(uw && calendarViewMode !== 'week');   // the week needs the full width

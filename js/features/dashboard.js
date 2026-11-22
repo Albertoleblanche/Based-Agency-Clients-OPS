@@ -355,7 +355,7 @@ function renderDashboard(){
   if((typeof tasksDataLoaded !== 'undefined' && !tasksDataLoaded) || (typeof calendarDataLoaded !== 'undefined' && !calendarDataLoaded)){
     root.innerHTML = skeletonHtml('dashboard', 'Loading your dashboard…'); dbWatchSize(root); return;
   }
-  // the new look (beta) has its own dashboard (dashboard-widgets.js)
+  // the new look has its own dashboard (dashboard-widgets.js)
   if(typeof uwOn === 'function' && uwOn()){ uwRenderDashboard(root); dbWatchSize(root); return; }
   let html;
   try{

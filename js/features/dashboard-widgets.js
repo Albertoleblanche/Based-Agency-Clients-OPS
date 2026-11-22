@@ -64,7 +64,7 @@ function uwHealthCard(m){
   const cells = [].concat(Array(m.g).fill('g'), Array(m.y).fill('am'), Array(m.r).fill('r'));
   const dash = cells.map(c => `<i class="${c}"></i>`).join('');
   return `<section class="uw-w uw-s3 uw-hc" aria-label="Health">${uwHead('health', dbNavIcon('health'), 'Health', `<span class="uw-sp">${uwPill('Details', go)}</span>`)}
-<div class="uw-hb"><div class="uw-big">${pct}<small>%</small></div><div class="uw-bigsub">healthy, ${m.g} of ${m.tot} clients</div></div>
+<div class="uw-hb"><div class="uw-big">${pct}<small>%</small></div><div class="uw-bigsub">healthy, ${m.g} of ${m.tot}${typeof canApprove === 'function' && !canApprove() ? ' of your clients' : ' clients'}</div></div>
 <div class="uw-dash${cells.length > 28 ? ' is-many' : ''}" role="img" aria-label="At risk ${m.r}, To watch ${m.y}, Healthy ${m.g}">${dash}</div>
 <div class="uw-lg"><div><b>${m.r}</b><span><i class="r"></i>At risk</span></div><div><b>${m.y}</b><span><i class="am"></i>To watch</span></div><div><b>${m.g}</b><span><i class="g"></i>Healthy</span></div></div></section>`;
 }

@@ -79,12 +79,12 @@ async function saveThemePref(pref){
   if(error){ console.error('theme save', error); showToast('info', 'Saved on this computer', 'Your other devices keep the appearance they had.'); }
 }
 
-/* ---------- New look (beta) ---------- */
-// The widget look (rounded cards, big thin numbers, Geist), offered to one person at a time from the
-// database: team_profiles.ui_style is null (not offered: no switch, no look), 'off' or 'widgets'.
-// Everyone else keeps the app as it is. This device remembers it for the first paint, like the theme.
-function uiStyleOffered(){ return !!myProfile && myProfile.ui_style != null; }
-function uiStyleOn(){ return uiStyleOffered() && myProfile.ui_style === 'widgets'; }
+/* ---------- New look ---------- */
+// The widget look (rounded cards, big thin numbers, Geist) is everyone's look. team_profiles.ui_style
+// keeps one person's choice from Settings → Appearance: null or 'widgets' is the new look, 'off' the
+// classic one. This device remembers it for the first paint, like the theme.
+function uiStyleOffered(){ return !!myProfile; }
+function uiStyleOn(){ return uiStyleOffered() && myProfile.ui_style !== 'off'; }
 function loadUiFont(){
   if(document.getElementById('uiwFont')) return;
   const l = document.createElement('link');
