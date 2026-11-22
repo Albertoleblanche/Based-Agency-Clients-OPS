@@ -1,5 +1,5 @@
-// Queue: your own logged work, client by client, laid out like Review. The list is every client
-// you've logged something for since its last update (or whose draft of yours isn't sent yet);
+// Queue: your work for client emails, client by client, laid out like Review. The list is every
+// client with work for its email since its last update (or whose draft of yours isn't sent yet);
 // the right side is that work, where you switch each item between the email and internal, edit
 // or delete it, log more, and write, edit or send the draft. Only work marked for the email goes
 // in a draft, so Write Draft is there only once something is.
@@ -15,7 +15,7 @@ function queueTabs(){ return queueHasReview() ? ['todo', 'review', 'sent'] : ['t
 
 let queueTab = 'todo';
 function setQueueTab(t){ queueTab = t; window._queueSel = null; quResetEdits(); renderMyQueue(); }
-function quResetEdits(){ window._quEditImp = null; window._quDraftEdit = null; }
+function quResetEdits(){ window._quEditImp = null; window._quDraftEdit = null; window._quKeep = null; }
 
 // One client in your queue: what you logged, what of it goes in the email, your draft and its step.
 // A client's lines in your Queue. One update per client, with everyone's work in it (Nov 21): its
@@ -25,6 +25,8 @@ function quResetEdits(){ window._quEditImp = null; window._quDraftEdit = null; }
 // anything logged for the client after that is a second line, the Next update, in To do, where it
 // can be edited and added to. It becomes the update after this one is sent (or joins this one again
 // if it comes back to its writer).
+// The Queue is for what goes in client emails (Nov 22): a client is here only when there's work for
+// the email (or a draft, a review or a send). Internal-only work stays in the client's log.
 function quEntriesBase(c, me){
   const w = clientWeek(c), d = getDraftFor(c, me);
   const all = w.logged.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -39,24 +41,28 @@ function quEntriesBase(c, me){
   if(!live && writer && writer !== me){
     // someone else writes it: your work goes in their update
     const mineAll = all.filter(i => i.author === me);
-    if(!mineAll.length) return [];
+    if(!emailOf(mineAll).length) return [];
     const wd = getDraftFor(c, writer), lk = isLocked(wd), inIt = lk ? inDraft(wd) : () => false;
     const sent = mineAll.filter(inIt), after = mineAll.filter(i => !inIt(i)), out = [];
-    if(sent.length) out.push({ c, w, d: null, writer, wd, mine: sent, team: [], email: emailOf(sent), st: 'theirs', tab: 'review' });
-    if(after.length) out.push({ c, w, d: null, writer, wd: lk ? null : wd, mine: after, team: [], email: emailOf(after), st: 'theirs', tab: 'todo' });
+    if(emailOf(sent).length) out.push({ c, w, d: null, writer, wd, mine: sent, team: [], email: emailOf(sent), st: 'theirs', tab: 'review' });
+    if(emailOf(after).length) out.push({ c, w, d: null, writer, wd: lk ? null : wd, mine: after, team: [], email: emailOf(after), st: 'theirs', tab: 'todo' });
     return out;
   }
   if(live && isLocked(d)){
     const inIt = inDraft(d), sent = all.filter(inIt), after = all.filter(i => !inIt(i)), out = [];
     out.push({ c, w, d, ...split(sent), email: emailOf(sent), st: d.draftStatus === 'approved' ? 'approved' : 'review', tab: 'review' });
-    if(after.length) out.push({ c, w, d: null, held: d, ...split(after), email: emailOf(after), st: 'next', tab: 'todo' });
+    if(emailOf(after).length) out.push({ c, w, d: null, held: d, ...split(after), email: emailOf(after), st: 'next', tab: 'todo' });
     return out;
   }
   // nothing logged for this update: nothing to send, so it isn't in your queue (a draft whose work
   // was all deleted waits out of sight, and comes back with the work if it's restored)
-  if(!all.length) return [];
   const email = emailOf(all);
-  const st = live ? (draftHasNoWork(c, d) ? 'empty' : 'written') : email.length ? 'write' : 'internal';
+  if(!live && !email.length){
+    // nothing for the email: internal work isn't sent, so the client isn't here. One you just switched
+    // to internal stays while it's open (to switch it back), and goes when you move on.
+    return window._quKeep === c.id && all.length ? [{ c, w, d: null, ...split(all), email, st: 'internal', tab: 'todo' }] : [];
+  }
+  const st = live ? (draftHasNoWork(c, d) ? 'empty' : 'written') : 'write';
   return [{ c, w, d: live ? d : null, ...split(all), email, st, tab: 'todo' }];
 }
 // ...plus your work that never went out (w.missed, week-health.js): on your To do line for the
@@ -141,7 +147,7 @@ function renderMyQueue(){
     return `${ix === firstLater && ix > 0 ? '<p class="rvn-sort qu-sgh">Later</p>' : ''}<a class="rvn-r qu-r${on ? ' is-sel' : ''}" href="#queue" onclick="selectQueueClient('${x.c.id}');return false;"${on ? ' aria-current="true"' : ''}>
 <div class="tx"><b>${escapeHtml(x.c.name)}</b><span class="s"><span class="rvn-due ${kind}">${escapeHtml(due)}</span> · ${n}</span></div>
 <div class="rvn-rr"><span class="qu-tag ${cls}">${word}</span></div></a>`;
-  }).join('') || `<div class="rvn-empty"><b>${{ todo: 'Nothing to do', review: 'Nothing in review', sent: 'Nothing sent this week' }[queueTab]}</b>${{ todo: 'Clients show up here once you log work for them.', review: 'Drafts you send for review wait here until they go out.', sent: 'Your updates show here once they’re sent.' }[queueTab]}</div>`;
+  }).join('') || `<div class="rvn-empty"><b>${{ todo: 'Nothing to do', review: 'Nothing in review', sent: 'Nothing sent this week' }[queueTab]}</b>${{ todo: 'Clients show up here once you log work for their email.', review: 'Drafts you send for review wait here until they go out.', sent: 'Your updates show here once they’re sent.' }[queueTab]}</div>`;
   // Worth logging for: clients you tracked time for, or yours that are due, with nothing logged
   // (logSuggestions in week-health.js). Under To do, after the clients already here.
   const sugg = queueTab === 'todo' && typeof logSuggestions === 'function' ? logSuggestions(4) : [];
@@ -170,7 +176,7 @@ ${read}
   quRestoreComposer(root, keep);
   if(currentViewName === 'queue'){
     const todo = items.todo.filter(x => !quLater(x)).length, rev = items.review.length;   // next updates and work in someone else's aren't to do yet
-    setToolbar(null, todo || rev ? [todo ? `${todo} to do` : '', rev ? `${rev} in review` : ''].filter(Boolean).join(' · ') : 'Your logged work, client by client');
+    setToolbar(null, todo || rev ? [todo ? `${todo} to do` : '', rev ? `${rev} in review` : ''].filter(Boolean).join(' · ') : 'Work for client emails, client by client');
   }
 }
 // What you were typing in Log More (and where the cursor was) survives a redraw.
@@ -198,8 +204,8 @@ function queueEmptyHtml(items){
     text: 'When you send a draft for review it waits here until an approver sends it.',
     link: items.todo.length ? `${items.todo.length} to do` : '', onLink: "setQueueTab('todo')" });
   const top = (window._quSugg || [])[0];
-  return emptyState({ icon: 'queue', tone: 'ok', title: 'Nothing logged since the last updates',
-    text: top ? `Log what you did for a client and it shows up here. ${top.c.name} is first: ${top.why.toLowerCase()}.` : 'Log what you did for a client and it shows up here, ready to become this week’s update.',
+  return emptyState({ icon: 'queue', tone: 'ok', title: 'Nothing for client emails yet',
+    text: top ? `Log what you did for a client, with Email on, and it shows up here. ${top.c.name} is first: ${top.why.toLowerCase()}.` : 'Log what you did for a client, with Email on, and it shows up here, ready to become its next update. Internal work stays in the client’s log.',
     action: top ? `Log for ${shortClientName(top.c.name)}` : 'Log Improvement', onAction: top ? `openQueueLogImprovementModal('${top.c.id}')` : 'openQueueLogImprovementModal()',
     link: items.review.length ? `${items.review.length} in review` : '', onLink: "setQueueTab('review')" });
 }
@@ -371,6 +377,7 @@ async function quToggleEmail(clientId, impId){
   const { c, imp } = quFind(clientId, impId);
   if(!c || !imp) return;
   const next = imp.includeInEmail === false;
+  window._quKeep = clientId;   // stays in view even if nothing's left for the email
   imp.includeInEmail = next; renderMyQueue();   // the switch moves at once; it moves back if the save fails
   const { data, error } = await supabaseClient.from('client_improvements').update({ include_in_email: next }).eq('id', impId).select();
   const ok = !error && !!(data && data.length);

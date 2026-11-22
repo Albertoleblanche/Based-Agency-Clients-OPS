@@ -12,7 +12,7 @@ function reviewItems(){
     if(!all && d.author !== me) return;
     if(d.draftSentAt){ if(new Date(d.draftSentAt) >= cyc.weekStart) out.sent.push({ c, d, at: d.draftSentAt }); }
     else if(d.draftStatus === 'approved') out.approved.push({ c, d, at: d.draftPendingSince });
-    else if(d.draftStatus === 'pending' && d.draft && (d.author === me || (d.readyToNotify && !draftHasNoWork(c, d)))) out.waiting.push({ c, d, at: d.draftPendingSince });
+    else if(d.draftStatus === 'pending' && d.draft && (d.author === me || d.readyToNotify) && !draftHasNoWork(c, d)) out.waiting.push({ c, d, at: d.draftPendingSince });
   }));
   out.waiting.sort((a, b) => new Date(a.at || 0) - new Date(b.at || 0));
   out.approved.sort((a, b) => new Date(a.at || 0) - new Date(b.at || 0));

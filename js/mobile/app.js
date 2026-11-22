@@ -470,7 +470,7 @@ ${groups.filter(g => g[1].length).map(([t, list, cls]) => mIsh(t, null, cls) + `
 }
 // A due client opens its draft when one is waiting, otherwise the client.
 function mBehindTap(w){
-  const d = (w.c.drafts || []).find(x => x.draftStatus === 'pending' && x.draft && (canApprove() || x.author === myName()));
+  const d = (w.c.drafts || []).find(x => x.draftStatus === 'pending' && x.draft && (canApprove() || x.author === myName()) && !draftHasNoWork(w.c, x));
   return d ? `mOpenDraft('${w.c.id}',${jsArg(d.author)})` : `mOpenClient('${w.c.id}')`;
 }
 // Health in a phone-sized phrase: "Over budget, updates late".
@@ -593,7 +593,7 @@ function mReviewItems(allClients){
     if(!approver && d.author !== me) return;
     if(d.draftSentAt){ if(new Date(d.draftSentAt) >= cyc.weekStart) out.sent.push({ c, d, at: d.draftSentAt }); }
     else if(d.draftStatus === 'approved') out.approved.push({ c, d, at: d.draftPendingSince });
-    else if(d.draftStatus === 'pending' && d.draft && (d.author === me || (d.readyToNotify && !draftHasNoWork(c, d)))) out.waiting.push({ c, d, at: d.draftPendingSince });
+    else if(d.draftStatus === 'pending' && d.draft && (d.author === me || d.readyToNotify) && !draftHasNoWork(c, d)) out.waiting.push({ c, d, at: d.draftPendingSince });
   }));
   out.waiting.sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0));
   out.sent.sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0));

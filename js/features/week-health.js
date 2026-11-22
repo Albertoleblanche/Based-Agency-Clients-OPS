@@ -235,18 +235,19 @@ function logSuggestions(limit){
   const canWork = c => typeof waCanWork !== 'function' || waCanWork(c);
   const out = [];
   attentionEligibleClients().filter(canWork).forEach(c => {
-    const w = clientWeek(c), mine = w.logged.filter(i => i.author === me);
+    // in your Queue already: work of yours for the email, an update of yours to write, or a draft
+    const w = clientWeek(c), mine = w.forEmail.filter(i => i.author === me), writing = w.forEmail.length && pickWriter(c, w.logged) === me;
     const d = typeof getDraftFor === 'function' ? getDraftFor(c, me) : null;
-    const inQueue = mine.length || (d && d.draft && !d.draftSentAt && (d.draftStatus === 'pending' || d.draftStatus === 'approved') && !draftHasNoWork(c, d));
+    const inQueue = mine.length || writing || (d && d.draft && !d.draftSentAt && (d.draftStatus === 'pending' || d.draftStatus === 'approved') && !draftHasNoWork(c, d));
     if(inQueue) return;
     const from = toDateStr(w.since), mins = entries.filter(e => e.clientId === c.id && e.date >= from).reduce((n, e) => n + (e.minutes || 0), 0);
-    const owner = clientOwner(c) === me, open = !w.sent && !w.logged.length;
+    const owner = clientOwner(c) === me, open = !w.sent && !w.forEmail.length;
     let score = 0; const why = [];
     if(mins){ score += 300 + Math.min(mins, 600) / 10; why.push(`${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')} tracked, no work logged`); }
     if(owner && open && w.daysLeft <= 2){
       score += 200 - w.daysLeft * 10;
       const when = w.late ? `${w.daysLeft === -1 ? '1 day' : `${-w.daysLeft} days`} overdue` : w.daysLeft === 0 ? 'Due today' : w.daysLeft === 1 ? 'Due tomorrow' : `Due ${DAY_NAMES[w.due.getDay()]}`;
-      why.push(mins ? when : `${when}, nothing logged`);
+      why.push(mins ? when : `${when}, ${w.logged.length ? 'only internal work logged' : 'nothing logged'}`);
     }
     if(owner && !why.length){
       const lastLog = (c.improvements || []).map(i => new Date(i.date)).filter(x => x <= now).sort((a, b) => b - a)[0];

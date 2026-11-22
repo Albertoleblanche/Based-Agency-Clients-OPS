@@ -10,7 +10,7 @@ function todayPlural(n, one, many){ return `${n} ${n === 1 ? one : (many || one 
 function todayWaitingDrafts(){
   const me = myName(), approver = canApprove(), out = [];
   attentionEligibleClients().forEach(c => (c.drafts || []).forEach(d => {
-    if(d.draftStatus !== 'pending') return;
+    if(d.draftStatus !== 'pending' || d.draftSentAt || draftHasNoWork(c, d)) return;   // a draft with nothing behind it isn't waiting on anyone
     const mine = d.author === me;
     if(approver ? (mine || d.readyToNotify === true) : mine){
       const count = (d.draftImprovementIds || []).length || c.improvements.filter(i => i.author === d.author).length;
