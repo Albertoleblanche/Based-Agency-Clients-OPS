@@ -74,26 +74,30 @@ async function removeTitle(v){ await removeFieldOption('title', v); drawTeam(); 
 
 const ROLE_INFO = [['member', 'Member', 'Logs improvements and time. Can’t approve drafts.'], ['approver', 'Approver', 'Everything a member can do, plus approve, skip and send drafts.'], ['admin', 'Admin', 'Full access, including the team, roles, payroll and settings.']];
 function teamInspHtml(m){
-  const { admin, self, titleCtl, roles, canRole, extras, slack, rate, owns, fu, acts, danger } = teamParts(m);
+  const { admin, self, full, titleCtl, roles, canRole, extras, slack, rate, owns, fu, acts, danger } = teamParts(m);
   return `<aside class="insp" aria-label="${escapeHtml(m.name)}">
 <div style="display:flex;align-items:center;gap:12px">${avHtml(m.name, 'style="width:48px;height:48px;font-size:17px"')}
 <div style="min-width:0"><div style="font-size:18px;font-weight:600;letter-spacing:-.01em">${escapeHtml(m.name)}</div><div class="t-2" style="font-size:13px;overflow:hidden;text-overflow:ellipsis">${escapeHtml(m.email || '')}</div></div></div>
 ${acts ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px">${acts}</div>` : ''}
 <div class="set-h" style="margin:22px 0 6px">Job title</div>${titleCtl}
-<div class="set-h" style="margin:22px 0 2px">Permissions</div><div ${canRole ? 'role="radiogroup" aria-label="Permissions"' : ''}>${roles}</div>
+${full ? `<div class="set-h" style="margin:22px 0 2px">Permissions</div><div ${canRole ? 'role="radiogroup" aria-label="Permissions"' : ''}>${roles}</div>` : `<div class="set-h" style="margin:22px 0 6px">Role</div><span style="font-size:14px">${escapeHtml(TEAM_ROLE_WORD[m.role] || roleDisplayLabel(m.role))}</span>`}
 ${self && admin ? '<p class="t-2" style="font-size:13px;margin:2px 0 0">You can’t change your own role.</p>' : ''}
 ${extras ? `<div class="set-h" style="margin:18px 0 4px">Also allowed</div>${extras}` : ''}
 <div class="set-h" style="margin:18px 0 4px">Details</div>
-<div class="kv" style="align-items:center"><span>Slack</span>${slack}</div>
+${full ? `<div class="kv" style="align-items:center"><span>Slack</span>${slack}</div>` : ''}
 ${admin ? `<div class="kv"><span>Hourly rate</span><b style="font-weight:500">${rate ? money(rate) : 'None'}</b></div>` : ''}
 <div class="kv"><span>Owns</span><b style="font-weight:500">${owns} client${owns === 1 ? '' : 's'}</b></div>
-<div class="kv"><span>Open follow-ups</span><b style="font-weight:500">${fu}</b></div>
+${full ? `<div class="kv"><span>Open follow-ups</span><b style="font-weight:500">${fu}</b></div>` : ''}
 ${m.phone ? `<div class="kv"><span>Phone</span><b style="font-weight:500">${escapeHtml(m.phone)}</b></div>` : ''}
 ${danger}
 </aside>`;
 }
+// What you see of a person (Nov 22): admins see everything; on your own profile you see your role,
+// hours, follow-ups and Slack. Anyone else's profile, for someone who isn't an admin, is a directory
+// card: name, role, title, email, phone and the clients they own. Their permissions, Slack link,
+// follow-ups, hours and the health of their clients stay private to admins.
 function teamParts(m){
-  const admin = isAdmin(), self = m.id === currentUser?.id, extra = m.extra_permissions || [];
+  const admin = isAdmin(), self = m.id === currentUser?.id, extra = m.extra_permissions || [], full = admin || self;
   const titleCtl = admin
     ? `<label class="pop pop-sel"><span>${escapeHtml(m.title || 'No title')}</span>${icon('caret-up-down', { weight: 'bold' })}<select aria-label="Job title" onchange="changeTeamTitle('${m.id}', this.value)"><option value="">No title</option>${(settings.teamTitleOptions || []).map(o => `<option ${m.title === o ? 'selected' : ''}>${escapeHtml(o)}</option>`).join('')}</select></label>`
     : `<span style="font-size:14px">${escapeHtml(m.title || 'No title')}</span>`;
@@ -122,7 +126,7 @@ function teamParts(m){
 <button class="btn btn-q" style="padding:0" onclick="adminResetPassword('${m.id}', ${jsArg(m.name)})">Reset Password…</button>
 <button class="btn btn-q" style="padding:0" onclick="toggleUserAccess('${m.id}', ${jsArg(m.name)}, ${!m.access_revoked})">${m.access_revoked ? 'Restore Access…' : 'Revoke Access…'}</button>
 <button class="btn danger" onclick="confirmDeleteUser('${m.id}', ${jsArg(m.name)})">Remove from Team…</button></div>` : '';
-  return { admin, self, titleCtl, roles, canRole, extras, slack, rate, owns, fu, acts, danger };
+  return { admin, self, full, titleCtl, roles: full ? roles : '', canRole, extras, slack: full ? slack : '', rate, owns, fu: full ? fu : null, acts, danger };
 }
 
 // ---- the new look (beta): People in a card on the left, the person in a big Profile card ----
@@ -141,8 +145,8 @@ ${admin ? `<button class="tm-add" onclick="openAddMemberSheet()">${icon('plus')}
   return `<div class="tm-uw"><div class="tm-side">${people_}${waiting}</div>${sel ? teamProfileHtml(sel) : ''}</div>`;
 }
 function teamProfileHtml(m){
-  const { admin, self, titleCtl, roles, canRole, extras, slack, rate, owns, fu, acts, danger } = teamParts(m);
-  const role = TEAM_ROLE_WORD[m.role] || roleDisplayLabel(m.role), info = (ROLE_INFO.find(r => r[0] === m.role) || [])[2] || '';
+  const { admin, self, full, titleCtl, roles, canRole, extras, slack, rate, owns, fu, acts, danger } = teamParts(m);
+  const role = TEAM_ROLE_WORD[m.role] || roleDisplayLabel(m.role), info = full ? (ROLE_INFO.find(r => r[0] === m.role) || [])[2] || '' : '';
   // hours this week, day by day (admins see everyone's; everyone sees their own)
   let hours = '';
   if(admin || self){
@@ -155,22 +159,23 @@ function teamProfileHtml(m){
     hours += `<div class="tm-wk" role="img" aria-label="Hours by day this week">${bars}</div>`;
   }
   const mine = activeClients().filter(c => clientOwner(c) === m.name).sort((a, b) => a.name.localeCompare(b.name));
+  // the health of someone else's clients is for admins (and you, on your own profile)
   const lv = c => { const l = clientHealth(c).level; return l === 'r' ? 'r' : l === 'y' ? 'am' : 'g'; };
-  const chips = mine.length ? `<div class="tm-sec"><span class="uw-mono">CLIENTS</span><span class="uw-mono">${mine.length}</span></div><div class="tm-chips">${mine.map(c => `<button class="tm-chip" onclick="openClientDetail('${c.id}')"><i class="${lv(c)}"></i>${escapeHtml(c.name)}</button>`).join('')}</div>` : '';
+  const chips = mine.length ? `<div class="tm-sec"><span class="uw-mono">CLIENTS</span><span class="uw-mono">${mine.length}</span></div><div class="tm-chips">${mine.map(c => `<button class="tm-chip" onclick="openClientDetail('${c.id}')">${full ? `<i class="${lv(c)}"></i>` : ''}${escapeHtml(c.name)}</button>`).join('')}</div>` : '';
   return `<section class="tm-card tm-pf" aria-label="${escapeHtml(m.name)}">
 <div class="tm-h"><span class="tm-ic">${icon('user')}</span><b>Profile</b>${acts ? `<span class="tm-acts">${acts}</span>` : ''}</div>
 <div class="tm-top"><div class="tm-who"><h2>${escapeHtml(m.name)}${self ? ' <span>(you)</span>' : ''}</h2><p>${escapeHtml(role)}${m.title ? ' · ' + escapeHtml(m.title) : ''}${info ? ' · ' + escapeHtml(info.replace(/\.$/, '').replace(/^./, x => x.toLowerCase())) : ''}</p><p class="tm-mail">${escapeHtml(m.email || '')}</p></div>${hours ? `<div class="tm-hcol">${hours}</div>` : ''}</div>
 ${chips}
-<div class="tm-cols">
-<div><div class="tm-sec"><span class="uw-mono">PERMISSIONS</span></div><div ${canRole ? 'role="radiogroup" aria-label="Permissions"' : ''}>${roles}</div>
+<div class="tm-cols${full ? '' : ' is-dir'}">
+${full ? `<div><div class="tm-sec"><span class="uw-mono">PERMISSIONS</span></div><div ${canRole ? 'role="radiogroup" aria-label="Permissions"' : ''}>${roles}</div>
 ${self && admin ? '<p class="tm-none">You can’t change your own role.</p>' : ''}
-${extras ? `<div class="tm-sec"><span class="uw-mono">ALSO ALLOWED</span></div>${extras}` : ''}</div>
+${extras ? `<div class="tm-sec"><span class="uw-mono">ALSO ALLOWED</span></div>${extras}` : ''}</div>` : ''}
 <div><div class="tm-sec"><span class="uw-mono">DETAILS</span></div>
 <div class="kv" style="align-items:center"><span>Job title</span>${titleCtl}</div>
-<div class="kv" style="align-items:center"><span>Slack</span>${slack}</div>
+${full ? `<div class="kv" style="align-items:center"><span>Slack</span>${slack}</div>` : ''}
 ${admin ? `<div class="kv"><span>Hourly rate</span><b style="font-weight:500">${rate ? money(rate) : 'None'}</b></div>` : ''}
 <div class="kv"><span>Owns</span><b style="font-weight:500">${owns} client${owns === 1 ? '' : 's'}</b></div>
-<div class="kv"><span>Open follow-ups</span><b style="font-weight:500">${fu}</b></div>
+${full ? `<div class="kv"><span>Open follow-ups</span><b style="font-weight:500">${fu}</b></div>` : ''}
 ${m.phone ? `<div class="kv"><span>Phone</span><b style="font-weight:500">${escapeHtml(m.phone)}</b></div>` : ''}
 ${danger}</div>
 </div></section>`;

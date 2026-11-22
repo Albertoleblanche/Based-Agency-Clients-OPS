@@ -709,6 +709,9 @@ html.ui-w .tm-chip:active{transform:scale(.96)}
 html.ui-w .tm-chip i{width:7px;height:7px;border-radius:50%}
 html.ui-w .tm-chip i.g{background:var(--uw-good)} html.ui-w .tm-chip i.am{background:var(--uw-watch)} html.ui-w .tm-chip i.r{background:var(--uw-risk)}
 html.ui-w .tm-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:40px}
+/* a teammate's directory card (not an admin): just the details, as wide as one column */
+html.ui-w .tm-cols.is-dir{grid-template-columns:minmax(0,1fr);max-width:calc(50% - 20px)}
+@media (max-width:1100px){html.ui-w .tm-cols.is-dir{max-width:none}}
 html.ui-w .tm-cols .kv{padding:10px 0;border-top:1px solid var(--sep)}
 html.ui-w .tm-cols .tm-sec + .kv{border-top:0}
 html.ui-w .tm-cols .rd + div > div:first-child{font-weight:500}
