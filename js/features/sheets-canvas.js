@@ -330,34 +330,38 @@ async function saveQueueLogImprovement(another){
   } else closeAppModal();
 }
 
-// ---- Group & Send: each client's logged work becomes one draft --------------------------------
-// Each client's work since its last update. Clients due within 2 days are picked to start with.
+// ---- Group & Send: each person's part of each client's update, written at once --------------------
+// Each client's work since its last update, one part per person who logged it (Nov 22): a member
+// writes their own parts; an approver writes everyone's. The parts go to Review, and a client's
+// approved parts go out as one email. Clients due within 2 days are picked to start with.
 let gsList = [], gsPick = new Set();
 function gsCandidates(){
-  const me = myName(), mineOnly = !canApprove();
-  const out = [];
+  const me = myName(), mineOnly = !canApprove(), out = [];
+  const onTeam = n => teamProfiles.some(p => p.name === n && !p.access_revoked);
+  const byDate = (a, b) => new Date(a.date) - new Date(b.date), s = n => n === 1 ? '' : 's';
   weekVisibleClients().forEach(c => {
     const drafts = c.drafts || [], w = clientWeek(c);
-    if(drafts.some(d => (d.draftStatus === 'approved' && !d.draftSentAt) || (d.draftStatus === 'pending' && d.readyToNotify))) return; // in Review or approved
-    let imps = w.logged.slice();
-    if(mineOnly) imps = imps.filter(i => i.author === me);
-    const inEmail = imps.filter(i => i.includeInEmail !== false);
+    const inEmail = w.logged.filter(i => i.includeInEmail !== false && (mineOnly ? i.author === me : onTeam(i.author)));
     if(!inEmail.length) return;
-    const written = drafts.find(d => d.draftStatus === 'pending' && (!mineOnly || d.author === me));
-    const writer = mineOnly ? me : (written ? written.author : (clientOwner(c) || inEmail[0].author || me));
-    let redraft = 0;
-    if(written){ const have = new Set(written.draftImprovementIds || []); redraft = inEmail.filter(i => !have.has(i.id)).length; if(!redraft) return; }
-    if(!canGenerateOrRegenerateDraft(c, writer)) return;
-    const s = n => n === 1 ? '' : 's';
-    const by = writer === me ? 'you write it' : `${writer} writes it`;
-    const sub = redraft ? `Redraft with the ${redraft} new improvement${s(redraft)} · ${writer === me ? 'you' : writer}`
-      : `${imps.length} improvement${s(imps.length)}${inEmail.length !== imps.length ? ` · ${inEmail.length} in the email` : ''} · ${by}`;
-    out.push({ c, writer, items: inEmail.slice().sort((a, b) => new Date(a.date) - new Date(b.date)), sub: `${w.dueText} · ${sub}`, daysLeft: w.daysLeft });
+    const byAuthor = {}; inEmail.forEach(i => (byAuthor[i.author] = byAuthor[i.author] || []).push(i));
+    const parts = [];
+    Object.entries(byAuthor).forEach(([author, items]) => {
+      const d = drafts.find(x => x.author === author);
+      if(d && !d.draftSentAt && (d.draftStatus === 'approved' || (d.draftStatus === 'pending' && d.readyToNotify))) return;   // in Review or approved
+      let redraft = 0;
+      if(d && d.draft && !d.draftSentAt && d.draftStatus === 'pending'){ const have = new Set(d.draftImprovementIds || []); redraft = items.filter(i => !have.has(i.id)).length; if(!redraft) return; }
+      if(!canGenerateOrRegenerateDraft(c, author)) return;
+      parts.push({ writer: author, items: items.sort(byDate), redraft });
+    });
+    if(!parts.length) return;
+    const who = p => p.writer === me ? 'you' : firstName(p.writer), p0 = parts[0];
+    const sub = parts.length > 1 ? `${parts.length} parts: ${joinNames(parts.map(who))}`
+      : p0.redraft ? `Redraft with the ${p0.redraft} new improvement${s(p0.redraft)} · ${who(p0)}`
+      : `${p0.items.length} improvement${s(p0.items.length)} · ${p0.writer === me ? 'your part' : firstName(p0.writer) + '’s part'}`;
+    out.push({ c, parts, sub: `${w.dueText} · ${sub}`, daysLeft: w.daysLeft });
   });
   return out.sort((a, b) => a.daysLeft - b.daysLeft || a.c.name.localeCompare(b.c.name));
 }
-// Clients with approved drafts from more than one person: offered as "Combine Them…".
-function gsCombinable(){ return activeClients().filter(c => (c.drafts || []).filter(d => d.draftStatus === 'approved' && !d.draftSentAt).length >= 2); }
 function openGroupAndSendModal(){
   gsList = gsCandidates();
   gsPick = new Set(gsList.filter(x => x.daysLeft <= 2).map(x => x.c.id));
@@ -367,15 +371,13 @@ function gsToggle(id){ gsPick.has(id) ? gsPick.delete(id) : gsPick.add(id); gsRe
 function gsRender(keep){
   const rows = gsList.map(x => `<div class="row" style="cursor:default" onclick="gsToggle('${x.c.id}')">${sheetCk(gsPick.has(x.c.id), 'Include ' + x.c.name, `event.stopPropagation();gsToggle('${x.c.id}')`)}${monoHtml(x.c)}<div class="tx"><span class="t">${escapeHtml(x.c.name)}</span><span class="s">${escapeHtml(x.sub)}</span></div></div>`).join('')
     || `<div class="row"><div class="tx"><span class="t">Nothing to group</span><span class="s">Every client with work logged since its last update already has a draft.</span></div></div>`;
-  const comb = gsCombinable();
-  const combLine = comb.length && canApprove() ? `<p class="t-2" style="margin:12px 0 0;font-size:13px;line-height:1.45">${escapeHtml(comb[0].name)}${comb.length > 1 ? ` and ${comb.length - 1} more have` : ' has'} approved drafts from more than one person. <button class="link-btn" onclick="openCombineDraftsModal()">Combine Them…</button></p>` : '';
-  const n = gsPick.size;
+  const n = gsList.filter(x => gsPick.has(x.c.id)).reduce((k, x) => k + x.parts.length, 0);   // one draft per part
   const html = `<h3>Group &amp; Send</h3>
-<p style="margin:-8px 0 14px;font-size:14px;color:var(--label-2);line-height:1.5">Each client’s improvements become one email draft. Drafts go to Review first, so nothing reaches a client until an approver sends it.</p>
+<p style="margin:-8px 0 14px;font-size:14px;color:var(--label-2);line-height:1.5">Each person’s improvements become their part of the client’s update. Parts go to Review first, and a client’s parts go out together, as one email, once an approver sends them.</p>
 <div class="grp gs-list" style="box-shadow:0 0 0 .5px var(--sep-strong)">${rows}</div>
 <div class="form-grp" style="margin-top:14px">
 <div class="fr"><div class="l"><b>Write the drafts with AI</b><span>Uses your email structure and signature from Settings</span></div>${sheetSw('gsAI', gsAIOn(), 'Write the drafts with AI', 'gsSaveAI()')}</div>
-</div>${combLine}
+</div>
 <div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" id="gsGo" onclick="createGroupDrafts()"${n ? '' : ' disabled'}>Create ${n ? n + ' ' : ''}Draft${n === 1 ? '' : 's'}</button></div>`;
   const card = document.querySelector('#appModalOverlay .modal-card');
   if(keep && card && card.dataset.sheet === 'gs'){ const st = card.querySelector('.gs-list')?.scrollTop || 0; card.innerHTML = html; const l = card.querySelector('.gs-list'); if(l) l.scrollTop = st; return; }
@@ -391,8 +393,9 @@ async function createGroupDrafts(){
   const btn = document.getElementById('gsGo');
   if(btn) btn.disabled = true;
   let ok = 0, fail = 0, aiMissed = 0;
-  for(const [k, x] of picks.entries()){
-    if(btn) btn.textContent = `Writing ${k + 1} of ${picks.length}…`;
+  const jobs = picks.flatMap(x => x.parts.map(p => ({ c: x.c, writer: p.writer, items: p.items })));
+  for(const [k, x] of jobs.entries()){
+    if(btn) btn.textContent = `Writing ${k + 1} of ${jobs.length}…`;
     let text = '';
     if(useAI){
       try{
@@ -405,7 +408,7 @@ async function createGroupDrafts(){
     if(!text) text = plainUpdateDraft(x.c, x.items);
     const saved = await saveDraftFor(x.c.id, x.writer, { draft: text, draftStatus: 'pending', draftPendingSince: new Date().toISOString(),
       draftSentAt: null, draftSentBy: '', readyToNotify: true, draftImprovementIds: x.items.map(i => i.id) });
-    if(saved){ ok++; logClientActivity(x.c.id, 'draft_generated', `${useAI && text ? 'AI wrote' : 'Started'} ${x.writer}'s draft from ${x.items.length} improvement${x.items.length === 1 ? '' : 's'} with Group & Send, and sent it to Review.`); }
+    if(saved){ ok++; logClientActivity(x.c.id, 'draft_generated', `${useAI && text ? 'AI wrote' : 'Started'} ${x.writer}'s part from ${x.items.length} improvement${x.items.length === 1 ? '' : 's'} with Group & Send, and sent it to Review.`); }
     else fail++;
   }
   if(ok){

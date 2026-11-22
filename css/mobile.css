@@ -101,6 +101,7 @@ body.mac.mobile { overflow: hidden; background: var(--ios-bg, #F2F2F7); -webkit-
 /* draft screen */
 .idraft { padding: 6px 16px 24px; }
 .idraft .mono.lg { width: 40px; height: 40px; border-radius: 10px; font-size: 14px; }
+.idraft-parts { margin: 10px 0 0; font-size: 14px; line-height: 1.4; color: var(--label-2); }
 .idraft h2 { font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; margin: 16px 0 12px; }
 .idraft .body { font-size: 16px; line-height: 1.5; }
 .idraft .body p { margin: 0 0 10px; }

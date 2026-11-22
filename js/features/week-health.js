@@ -198,23 +198,6 @@ function weekStripHtml(c){
   }).join('')}</div>`;
 }
 
-// One update per client, with everyone's work in it (Nov 21). Its writer: whoever's draft is under
-// way, else the client's owner (clientOwner falls back to whoever logs for it most). Everyone else's
-// work goes in that update; the morning auto-draft picks the same way (lib/update-automations.js).
-function pickWriter(c, logged){
-  const owner = clientOwner(c);
-  // only people still on the team, as clientOwner
-  const ps = typeof teamProfiles !== 'undefined' ? teamProfiles : [], onTeam = n => !!n && (!ps.length || ps.some(p => p.name === n));
-  const live = (c.drafts || []).filter(d => onTeam(d.author) && d.draft && !d.draftSentAt && (d.draftStatus === 'pending' || d.draftStatus === 'approved') && !draftHasNoWork(c, d, logged));
-  if(live.length) return (live.find(d => d.author === owner) || live.slice().sort((a, b) => new Date(a.draftPendingSince || 0) - new Date(b.draftPendingSince || 0))[0]).author;
-  if(owner) return owner;
-  const first = (logged || []).filter(i => i.includeInEmail !== false && onTeam(i.author)).sort((a, b) => new Date(a.date) - new Date(b.date))[0];
-  return first ? first.author : '';
-}
-function updateWriter(c){ return pickWriter(c, clientWeek(c).logged); }
-// Your work for a client goes in someone else's update: the authors besides its writer.
-function workGoesTo(c){ const w = updateWriter(c); return w && w !== myName() ? w : ''; }
-
 // When a client started with us: its start date, else when it was added to Radar.
 function clientStartedAt(c){
   if(c && c.startDate){ const d = new Date(String(c.startDate).slice(0, 10) + 'T12:00:00'); if(!isNaN(d)) return d; }
@@ -235,10 +218,10 @@ function logSuggestions(limit){
   const canWork = c => typeof waCanWork !== 'function' || waCanWork(c);
   const out = [];
   attentionEligibleClients().filter(canWork).forEach(c => {
-    // in your Queue already: work of yours for the email, an update of yours to write, or a draft
-    const w = clientWeek(c), mine = w.forEmail.filter(i => i.author === me), writing = w.forEmail.length && pickWriter(c, w.logged) === me;
+    // in your Queue already: work of yours for the email, or a part of yours not sent yet
+    const w = clientWeek(c), mine = w.forEmail.filter(i => i.author === me);
     const d = typeof getDraftFor === 'function' ? getDraftFor(c, me) : null;
-    const inQueue = mine.length || writing || (d && d.draft && !d.draftSentAt && (d.draftStatus === 'pending' || d.draftStatus === 'approved') && !draftHasNoWork(c, d));
+    const inQueue = mine.length || (d && d.draft && !d.draftSentAt && (d.draftStatus === 'pending' || d.draftStatus === 'approved') && !draftHasNoWork(c, d));
     if(inQueue) return;
     const from = toDateStr(w.since), mins = entries.filter(e => e.clientId === c.id && e.date >= from).reduce((n, e) => n + (e.minutes || 0), 0);
     const owner = clientOwner(c) === me, open = !w.sent && !w.forEmail.length;
@@ -290,7 +273,7 @@ function clientWeek(c){
   // what can go in the email: work marked internal ("Include in email" off) is logged, but there's
   // nothing to write a draft from until something here is meant for the client
   const forEmail = logged.filter(i => i.includeInEmail !== false);
-  const w = { c, owner, holder: owner || pickWriter(c, logged), logged, forEmail, missed, since, last, due, daysLeft, dueText: dueText(daysLeft, due),
+  const w = { c, owner, holder: owner, logged, forEmail, missed, since, last, due, daysLeft, dueText: dueText(daysLeft, due),
     done: 0, behind: null, sent: false, late: false, state: 'due', draft: null };
   const approved = drafts.find(d => d.draftStatus === 'approved' && !d.draftSentAt);
   const inReview = drafts.find(d => d.draftStatus === 'pending' && d.readyToNotify && !draftHasNoWork(c, d, logged));

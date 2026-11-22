@@ -672,7 +672,7 @@ function mOpenDraft(clientId, author){
     }
     return `<div class="idraft">
 <div style="display:flex;gap:12px;align-items:center">${monoHtml(c, 'lg')}<div style="min-width:0"><div style="font-size:17px;font-weight:600">${mEsc(c.name)}</div><div style="font-size:14px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${wa ? 'To their WhatsApp group' : `To ${mEsc(contact || 'no email on file')}`} · by ${mEsc(d.author)}</div></div></div>
-<div style="margin-top:12px">${mDot(status[0], status[1])}</div>
+<div style="margin-top:12px">${mDot(status[0], status[1])}</div>${!d.draftSentAt && typeof hasParts === 'function' && hasParts(c) ? `<p class="idraft-parts">${mEsc(mPartsWords(c, d.author))}</p>` : ''}
 <h2>Your weekly update — ${mEsc(updateRangeLabel(c))}</h2>
 ${editing ? `<textarea id="mDraftEdit" spellcheck="true">${mEsc(d.draft || '')}</textarea>` : `<div class="body">${mDraftBody(d.draft)}</div>`}
 </div>${bar && !editing ? `<div class="ibar">${bar}</div>` : ''}`;
@@ -693,6 +693,13 @@ ${editing ? `<textarea id="mDraftEdit" spellcheck="true">${mEsc(d.draft || '')}<
   setRight();
   entry.el.querySelector('.ipbody').addEventListener('input', () => {});
 }
+// "Goes out with Charlie’s part (in review), as one email."
+function mPartsWords(c, author){
+  const others = clientParts(c).filter(p => p.author !== author), me = myName();
+  const st = { writing: 'still being written', review: 'in review', approved: 'approved' };
+  const join = a => a.length <= 1 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+  return `Goes out with ${join(others.map(p => `${p.author === me ? 'your' : firstName(p.author) + '’s'} part (${st[p.state]})`))}, as one email.`;
+}
 // The draft as the client will read it: each line a paragraph, runs of "- " lines a list.
 function mDraftBody(text){
   const out = []; let list = null;
@@ -710,7 +717,7 @@ async function mApproveDraft(clientId, author, stay, quiet){
   const { c, d } = mDraftFor(clientId, author); if(!d) return;
   const edited = $m('mDraftEdit')?.value;
   const ids = d.draftImprovementIds || [];
-  const ok = await saveDraftFor(clientId, author, { draftStatus: 'approved', draftImprovementIds: [], ...(edited != null ? { draft: edited } : {}),
+  const ok = await saveDraftFor(clientId, author, { draftStatus: 'approved', ...(edited != null ? { draft: edited } : {}),
     ...(typeof winsDbReady === 'function' && winsDbReady() ? { approvedBy: myName() || '', approvedAt: new Date().toISOString(), waCopiedBy: '', waCopiedAt: null } : {}) });
   if(!ok){ showToast('error', 'Couldn’t approve', 'Try again in a moment.'); return; }
   if(ids.length) await supabaseClient.from('client_improvements').update({ include_in_email: false }).in('id', ids);
@@ -747,22 +754,31 @@ async function mWinCopy(clientId, author){ await copyWinForWhatsapp(clientId, au
 async function mWinSent(clientId, author){ await markWinSent(clientId, author); await mRefresh(); }
 async function mApproveAndSend(clientId, author){ await mApproveDraft(clientId, author, true, true); await mSendDraft(clientId, author); }
 // The email goes out from the app, with the agency's signature, the same as on the desktop.
+// A client's update in parts (update-parts.js): every approved part goes, as one email.
 async function mSendDraft(clientId, author){
   const { c, d } = mDraftFor(clientId, author); if(!d) return;
   if(typeof winViaWhatsapp === 'function' && winViaWhatsapp(c)) return mWinCopy(clientId, author);
   if(!c.email){ showToast('info', `Add ${c.name}’s email first`, 'Add it in Edit Client on your computer, then send it.'); return; }
-  if(!(await confirmDialog(`It goes to ${c.email}, with your signature.`, { title: `Send ${c.name}’s update now?`, confirmLabel: 'Send' }))) return;
+  const me = myName(), ap = approvedParts(c), ds = ap.length ? ap.map(p => p.d) : [d], authors = ds.map(x => x.author);
+  const join = a => a.length <= 1 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+  const left = clientParts(c).filter(p => p.state === 'review' && !authors.includes(p.author)).map(p => firstName(p.author));
+  const more = (authors.length > 1 ? ` ${partNames(authors, me).replace(/^./, x => x.toUpperCase())} go as one email.` : '') + (left.length ? ` ${join(left)}’s part${left.length === 1 ? ' is' : 's are'} still waiting for review and ${left.length === 1 ? 'goes' : 'go'} next time.` : '');
+  if(!(await confirmDialog(`It goes to ${c.email}, with your signature.${more}`, { title: `Send ${c.name}’s update now?`, confirmLabel: 'Send' }))) return;
   const subject = `Your weekly update from ${settings.appName || 'Based Agency'}`;
   try{
-    const r = await fetch('/api/send-email', { method: 'POST', headers: await apiAuthHeaders(), body: JSON.stringify({ to: c.email, subject, body: d.draft || '', includeSignature: true }) });
+    const r = await fetch('/api/send-email', { method: 'POST', headers: await apiAuthHeaders(), body: JSON.stringify({ to: c.email, subject, body: combineParts(ds), includeSignature: true }) });
     const data = await r.json().catch(() => ({}));
     if(!r.ok){ showToast('error', 'Send failed', data.error || 'The email didn’t go out.'); return; }
   }catch(e){ showToast('error', 'Send failed', 'Check your connection and try again.'); return; }
   const at = new Date().toISOString();
-  await saveDraftFor(clientId, author, { draftSentAt: at, draftSentBy: myName() });
+  for(const a of authors) await saveDraftFor(clientId, a, { draftSentAt: at, draftSentBy: me, sentVia: 'email' });
   await recordUpdateSent(clientId, at);
-  await tellContributorsSent(c, getDraftFor(c, author), 'email');
-  mLog(clientId, 'email_sent', `${myName()} sent the weekly update to ${c.email}.`, `Sent ${escapeHtml(author)}'s update to <b>${escapeHtml(c.name)}</b>.`);
+  for(const a of authors){
+    await tellContributorsSent(c, getDraftFor(c, a), 'email');
+    const p = a !== me ? teamProfiles.find(x => x.name === a) : null, rest = authors.filter(x => x !== a);
+    if(p) mNotify(p.id, 'draft_sent', `${c.name}: your update was sent`, `${me || 'An approver'} sent it to ${c.email}${rest.length ? `, with ${partNames(rest, a)}, in one email` : ''}.`, 'teamqueue', c.id);
+  }
+  mLog(clientId, 'email_sent', `${me} sent the weekly update to ${c.email}${authors.length > 1 ? `, from ${join(authors)} in one email` : ''}.`, `Sent ${escapeHtml(join(authors))}'s update to <b>${escapeHtml(c.name)}</b>.`);
   await mRefresh(); showToast('success', 'Sent', `${c.name}’s update is on its way.`);
   if(mStack.length) mPop();
 }

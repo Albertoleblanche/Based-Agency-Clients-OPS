@@ -977,15 +977,10 @@ async function generateDraft(id, author){
   // accident.
   const allEligible = c.improvements.filter(i => i.includeInEmail !== false)
     .sort((a,b) => new Date(a.date||0) - new Date(b.date||0)); // oldest first — easy to miss otherwise
-  // One update per client, with everyone's work (Nov 21): its writer writes it from all of this
-  // update's work, checked; anyone else's work goes in the writer's update instead of a second draft.
-  const writer = typeof updateWriter === 'function' ? updateWriter(c) : author;
-  if(writer && writer !== author && !(d.draft && !d.draftSentAt && d.draftStatus !== 'none')){
-    showToast('info', `${firstName(writer)} writes this update`, `One update per client: ${author === myName() ? 'your' : `${firstName(author)}’s`} work goes in ${firstName(writer)}’s, with everyone else’s.`);
-    return;
-  }
-  const thisUpdate = new Set(clientWeek(c).forEmail.map(i => i.id));
-  const eligibleImprovements = allEligible;
+  // A part of the client's update (Nov 22): each person writes theirs from their own work; the parts
+  // go to the client as one email. Checked: this author's work for this update.
+  const thisUpdate = new Set(clientWeek(c).forEmail.filter(i => i.author === author).map(i => i.id));
+  const eligibleImprovements = canApprove() ? allEligible : allEligible.filter(i => i.author === author);
   if(!eligibleImprovements.length){
     showToast('error','Nothing to include', c.improvements.some(i=>i.author===author)
       ? `${author} has logged items for ${c.name}, but none are marked "Include in email" yet — review them in Past Improvements.`
@@ -998,7 +993,7 @@ async function generateDraft(id, author){
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Select improvements to include</span><span class="toast-close" onclick="${modalOpenForThis ? `openQueueCardModal('${id}',${jsArg(author)})` : 'closeAppModal()'}">✕</span></div>
     <div class="modal-body">
-      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Everything checked below goes into ${escapeHtml(c.name)}’s update: everyone’s work since the last one. Uncheck anything you’d rather hold back for a later one.</p>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Everything checked below goes into ${author === myName() ? 'your' : escapeHtml(author) + '’s'} part of ${escapeHtml(c.name)}’s update. Anyone else who worked on it writes their own part, and the parts go to the client as one email. Uncheck anything you’d rather hold back for a later one.</p>
       <div style="display:flex;flex-direction:column;gap:2px;max-height:340px;overflow-y:auto;">
         ${eligibleImprovements.map(i=>`
           <label style="display:flex;align-items:flex-start;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border);cursor:pointer;">
@@ -1110,6 +1105,8 @@ async function sendApprovedDraft(id, author){
   // WhatsApp clients: Radar never posts there. Copy it for the group instead.
   if(typeof winViaWhatsapp === 'function' && winViaWhatsapp(c)) return copyWinForWhatsapp(id, author);
   if(!c.email){ askForClientEmail(c); return; }
+  // A client's update in parts (update-parts.js): sending sends every approved part, as one email
+  if(!d.draftSentAt && typeof approvedParts === 'function' && approvedParts(c).length > 1) return sendClientParts(id);
   // Already sent this exact draft once — require an explicit
   // confirmation naming who sent it and when, rather than silently
   // allowing (or silently blocking) a second send. A genuinely new draft
@@ -1180,76 +1177,60 @@ async function archiveSentDraft(clientId, author){
   else showToast('error','Archive failed','Could not archive — try again.');
 }
 
-let _groupSendClientId = null;
-let _groupSendAuthors = [];
-
-// "Group & Send" combines approved, unsent drafts from DIFFERENT team
-// members for the SAME client into one email, instead of an approver
-// sending each person's update to that client separately. Only surfaces
-// clients where this actually applies — one approved draft doesn't need
-// grouping, the regular per-card Send button already covers that case.
-function openCombineDraftsModal(){
-  const eligibleClients = activeClients().filter(c => {
-    const approvedNotSent = (c.drafts||[]).filter(d => d.draftStatus==='approved' && !d.draftSentAt);
-    return approvedNotSent.length >= 2;
-  }).sort((a,b)=>a.name.localeCompare(b.name));
-  if(!eligibleClients.length){ showToast('info','Nothing to combine', 'No client has approved, unsent drafts from more than one person.'); return; }
-  openAppModal(`<h3>Combine Drafts</h3>
-<p style="margin:-8px 0 14px;font-size:14px;color:var(--label-2);line-height:1.5">These clients have approved drafts from more than one person. Pick one to send as a single email.</p>
-<div class="grp" style="box-shadow:0 0 0 .5px var(--sep-strong);max-height:360px;overflow:auto">
-${eligibleClients.map(c=>{
-  const count = (c.drafts||[]).filter(d => d.draftStatus==='approved' && !d.draftSentAt).length;
-  return `<a class="row" href="#" onclick="openGroupSendDraftPicker('${c.id}');return false;">${monoHtml(c)}<div class="tx"><span class="t">${escapeHtml(c.name)}</span><span class="s">${count} approved drafts</span></div><div class="r">${icon('caret-right', { weight: 'bold' })}</div></a>`;
-}).join('')}
-</div>
-<div class="sheet-a"><button class="btn" onclick="openGroupAndSendModal()">Back</button><button class="btn" onclick="closeAppModal()">Cancel</button></div>`, 520);
+// ---- A client's update in parts (Nov 22, update-parts.js) ------------------------------------------
+// Each person's part is approved on its own; sending sends every approved part as one email.
+async function approvePart(clientId, author){
+  await approveDraft(clientId, author, { quietToast: true });
+  const c = clients.find(x => x.id === clientId), left = c ? clientParts(c).filter(p => p.state === 'review').length : 0;
+  showToast('success', `${author === myName() ? 'Your' : firstName(author) + '’s'} part is approved`, left ? `${left} more to read before it goes out.` : 'Send it when you’re ready: the parts go as one email.');
 }
-
-function openGroupSendDraftPicker(clientId){
-  const c = clients.find(x=>x.id===clientId);
-  if(!c) return;
-  // Re-checked fresh rather than trusting the count from the previous
-  // screen — another approver could have sent one of these in the
-  // meantime, or the underlying draft could have changed.
-  const approvedNotSent = (c.drafts||[]).filter(d => d.draftStatus==='approved' && !d.draftSentAt);
-  if(approvedNotSent.length < 2){ showToast('info','Nothing to combine', `${c.name} no longer has approved drafts from more than one person.`); closeAppModal(); return; }
-
-  openAppModal(`<h3>Combine Drafts for ${escapeHtml(c.name)}</h3>
-<p style="margin:-8px 0 14px;font-size:14px;color:var(--label-2);line-height:1.5">Uncheck any you’d rather send on their own. It takes two to combine.</p>
-<div class="grp" style="box-shadow:0 0 0 .5px var(--sep-strong);max-height:320px;overflow:auto">
-${approvedNotSent.map(d=>`<label class="row" style="cursor:default"><input type="checkbox" class="group-send-draft-checkbox ck-native" value="${escapeHtml(d.author)}" checked>${avHtml(d.author)}<div class="tx"><span class="t">${escapeHtml(d.author)}</span><span class="s">${escapeHtml((d.draft||'').replace(/\s+/g,' ').slice(0,90))}${(d.draft||'').length>90?'…':''}</span></div></label>`).join('')}
-</div>
-<div class="sheet-a"><button class="btn" onclick="openCombineDraftsModal()">Back</button><button class="btn btn-p" onclick="confirmGroupSendSelection('${clientId}')">Continue</button></div>`, 520);
+// "Approve All, Send Later"
+async function approveAllParts(clientId){
+  const c = clients.find(x => x.id === clientId); if(!c) return;
+  const me = myName(), list = clientParts(c).filter(p => p.state === 'review' || (p.state === 'writing' && p.author === me));
+  for(const p of list) if((await approveDraft(clientId, p.author, { quietToast: true, quietWriter: false })) === false) return;
+  showToast('success', 'Approved', `${partNames(list.map(p => p.author), me)} ${list.length === 1 ? 'is' : 'are'} approved. Send ${list.length === 1 ? 'it' : 'them'} from Approved when you’re ready.`);
 }
-
-// Combines the selected authors' approved draft text into one starting
-// body — a reasonable draft the approver can still edit in the send modal
-// before it actually goes out, not an attempt at seamlessly merging
-// separate greetings/sign-offs into one message on its own.
-function confirmGroupSendSelection(clientId){
-  const checkedAuthors = [...document.querySelectorAll('.group-send-draft-checkbox:checked')].map(el=>el.value);
-  if(checkedAuthors.length < 2){ showToast('error','Pick at least two', "Select at least two team members' drafts to combine — one alone doesn't need grouping."); return; }
-  const c = clients.find(x=>x.id===clientId);
-  if(!c) return;
+// The main button on a client's parts: approve what's waiting, then send them all as one email.
+async function approveAndSendParts(clientId){
+  const c0 = clients.find(x => x.id === clientId); if(!c0) return;
+  if(!c0.email){ askForClientEmail(c0); return; }
+  const me = myName(), list = clientParts(c0).filter(p => p.state === 'review' || (p.state === 'writing' && p.author === me));
+  for(const p of list) if((await approveDraft(clientId, p.author, { quietToast: true, quietWriter: true })) === false) return;
+  await sendClientParts(clientId, { asked: true });
+}
+// Sends every approved part of a client's update as one email (the Send Email sheet, to look over
+// and change before it goes). A part still waiting for review isn't in it: it goes next time.
+async function sendClientParts(clientId, opts){
+  const c = clients.find(x => x.id === clientId); if(!c) return;
+  if(typeof winViaWhatsapp === 'function' && winViaWhatsapp(c)){ const p0 = approvedParts(c)[0]; if(p0) return copyWinForWhatsapp(clientId, p0.author); return; }
   if(!c.email){ askForClientEmail(c); return; }
-
-  _groupSendClientId = clientId;
-  _groupSendAuthors = checkedAuthors;
-  const combinedBody = checkedAuthors.map(author => getDraftFor(c, author).draft || '').filter(Boolean).join('\n\n---\n\n');
-  showSendEmailConfirm(c.email, `Your weekly update from ${settings.appName || 'Based Agency'}`, combinedBody, () => recordGroupSendComplete(), true);
+  const parts = approvedParts(c), me = myName();
+  if(!parts.length){ showToast('info', 'Nothing approved yet', 'Approve a part first.'); return; }
+  const left = clientParts(c).filter(p => p.state === 'review');
+  if(left.length && !(opts && opts.asked)){
+    const n = left.length, who = joinNames(left.map(p => firstName(p.author)));
+    if(!(await confirmDialog(`${who}’s part${n === 1 ? ' is' : 's are'} still waiting for review. Send without ${n === 1 ? 'it' : 'them'}? ${n === 1 ? 'It goes' : 'They go'} in the next update.`, { confirmLabel: 'Send Without It', cancelLabel: 'Wait' }))) return;
+  }
+  const authors = parts.map(p => p.author);
+  showSendEmailConfirm(c.email, `Your weekly update from ${settings.appName || 'Based Agency'}`, combineParts(parts.map(p => p.d)), () => recordPartsSent(clientId, authors), true);
 }
-
-// Marks every included draft sent, in parallel — mirrors recordDraftSent()
-// but for the whole selected group at once, since a combined send needs
-// every one of them stamped, not just the one client/author pair
-// recordDraftSent() alone would handle.
-async function recordGroupSendComplete(){
-  const clientId = _groupSendClientId;
-  const authors = _groupSendAuthors;
-  if(!clientId || !authors.length) return;
-  await Promise.all(authors.map(author => recordDraftSent(clientId, author)));
-  renderTeamQueue();
-  showToast('success','Sent', `Combined update sent, covering ${authors.length} team members' work.`);
+// Once the email has actually gone: every part in it is marked sent at the same moment (one send in
+// the on-time history), each writer hears it went out, with whose parts it went with.
+async function recordPartsSent(clientId, authors){
+  const c = clients.find(x => x.id === clientId); if(!c) return;
+  const at = new Date().toISOString(), me = myName();
+  for(const a of authors) await saveDraftFor(clientId, a, { draftSentAt: at, draftSentBy: me || 'Someone', sentVia: 'email' });
+  for(const a of authors){
+    if(a === me) continue;
+    const p = teamProfiles.find(x => x.name === a); if(!p) continue;
+    const rest = authors.filter(x => x !== a);
+    await sendNotification(p.id, 'draft_sent', `${c.name}: your update was sent`, `${me || 'An approver'} sent it to ${c.email || 'the client'}${rest.length ? `, with ${partNames(rest, a)}, in one email` : ''}.`, 'teamqueue', c.id);
+  }
+  for(const a of authors) if(typeof tellContributorsSent === 'function') await tellContributorsSent(c, getDraftFor(c, a), 'email');
+  if(typeof recordUpdateSent === 'function') await recordUpdateSent(clientId, at);
+  if(typeof logClientActivity === 'function') logClientActivity(clientId, 'email_sent', `${me || 'Someone'} sent the weekly update to ${c.email}, from ${joinNames(authors)}${authors.length === 1 ? '' : ' in one email'}.`);
+  renderAll();
 }
 
 function canGenerateOrRegenerateDraft(c, author){
@@ -1311,8 +1292,8 @@ async function approveDraft(id, author, opts){
   if(ta) fields.draft = ta.value;
   // who approved it and when (This Week: "Approved by Albert 20 min ago"); nobody has copied it yet
   if(typeof winsDbReady === 'function' && winsDbReady()) Object.assign(fields, { approvedBy: myName() || '', approvedAt: new Date().toISOString(), waCopiedBy: '', waCopiedAt: null });
-  // Captured before draftImprovementIds gets cleared below —
-  // getIncludedAuthorProfiles() needs it.
+  // The work it was written from stays listed on it once approved (Nov 22): Review shows each
+  // approved part's work, and that work stays locked until the update goes out (workLockedBy).
   const includedAuthorProfiles = getIncludedAuthorProfiles(c, d);
   const includedIds = d.draftImprovementIds || [];
   log.unshift({t:nowTime(), tag:'you', userId:currentUser?.id, text:`Approved ${escapeHtml(author)}'s draft for <b>${escapeHtml(c.name)}</b>.`});
@@ -1323,7 +1304,6 @@ async function approveDraft(id, author, opts){
   if(includedIds.length){
     c.improvements.forEach(i => { if(includedIds.includes(i.id)) i.includeInEmail = false; });
   }
-  fields.draftImprovementIds = [];
   const ok = await saveDraftFor(id, author, fields);
   if(ok && includedIds.length){
     await supabaseClient.from('client_improvements').update({ include_in_email: false }).in('id', includedIds);
@@ -1349,7 +1329,7 @@ async function approveDraft(id, author, opts){
     await sendNotification(writer.id, 'draft_approved', `${c.name}: your update is approved`, `${myName() || 'An approver'} approved it. An approver sends it to the client.`, 'teamqueue', c.id);
   }
 
-  showToast('success','Draft approved', `${author}'s update for ${c.name} was approved.`);
+  if(!(opts && opts.quietToast)) showToast('success','Draft approved', `${author}'s update for ${c.name} was approved.`);
 }
 
 // Admins/approvers don't need to approve their own work — that's a

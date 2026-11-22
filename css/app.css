@@ -1528,6 +1528,36 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .rvn-warn b{font-size:13px;font-weight:600;color:var(--label)}
 .rvn-warn span{font-size:12.5px;line-height:1.45;color:var(--label-2)}
 .rvn-warn .btn.rvn-sm{margin-top:7px}
+/* ---- Review: a client's update in parts, one email (review.js, Nov 22) ----
+   Each part sits in the letter under a quiet line in the margin's voice: who wrote it, where it
+   stands, and its own Approve / Edit / Rewrite. Parts are told apart by that line and a hairline,
+   not by boxes, so the letter still reads as one email. */
+.rvp-mail{margin-top:6px}
+.rvp{padding:14px 0 0}
+.rvp + .rvp{border-top:.5px solid var(--sep)}
+.rvp-h{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;min-height:28px;margin:0 0 4px;font-size:12px;line-height:1.3;color:var(--label-2)}
+.rvp-h b{font-size:12.5px;font-weight:650;color:var(--label);letter-spacing:-.003em}
+.rvp-st{display:inline-flex;align-items:center;gap:4px;font-weight:500;white-space:nowrap}
+.rvp-st svg{width:12px;height:12px}
+.rvp-st.is-approved,.rvp-st.is-sent{color:var(--green)}
+.rvp-st.is-review{color:var(--blue)}
+.rvp-st.is-writing{color:var(--label-3)}
+.rvp-n{font-weight:600;color:var(--blue);white-space:nowrap}
+.rvp-n.is-red{color:var(--red)}
+.rvp-h .rvp-tier{height:22px}
+.rvp-h .btn.rvp-b{height:26px;padding:0 10px;font-size:12.5px;gap:5px}
+.rvp-h .btn.rvp-b svg{width:13px;height:13px}
+.rvp-body{margin-top:8px}
+.rvp-body p:last-child{margin-bottom:12px}
+.rvp.is-dim .rvp-body{opacity:.45}
+.rvp.is-later{padding-bottom:12px}
+.rvp.is-later .rvp-h{margin:0}
+.rvp-close{margin-top:2px;padding-top:14px;border-top:.5px solid var(--sep)}
+.mac .rvp-edit{min-height:180px;margin-top:8px}
+.rvp-hint{margin:8px 0 12px;font-size:12px;line-height:1.45;color:var(--label-3)}
+.rvn-note.is-quiet{color:var(--label-3);font-weight:500}
+@media (hover:hover) and (pointer:fine){ .rvp-h .btn.rvp-b{transition:background-color 150ms ease-out,transform 120ms ease-out} }
+.rvp-h .btn.rvp-b:active{transform:scale(.97)}
 /* ---- Queue: your logged work, client by client, in Review's layout (queue.js) ---- */
 .qu-tag{font-size:11.5px;font-weight:600;color:var(--label-2);white-space:nowrap}
 .qu-tag.is-go{color:var(--blue)}
