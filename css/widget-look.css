@@ -537,6 +537,60 @@ html.ui-w .chart i.cur{background:var(--label)}
 html.ui-w .chart-x{gap:8px}
 html.ui-w .chart-x span{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--label-3)}
 html.ui-w #reportTableGrp{border-radius:var(--uw-r-sec)}
+
+/* ---- Reports, Nov 22: the sales-widget style. A round icon and title, the total big with its
+   trailing part dimmed, wide rounded bars with a dot on top, one bar striped with a lime pill ---- */
+html.ui-w #reportChartPanel{padding:22px 24px 18px}
+html.ui-w .rc-h,html.ui-w #reportGroupH{display:flex;align-items:center;gap:14px}
+html.ui-w .rc-ic{flex:none;display:grid;place-items:center;width:44px;height:44px;border-radius:50%;box-shadow:inset 0 0 0 1px var(--sep);color:var(--label)}
+html.ui-w .rc-ic svg{width:19px;height:19px}
+html.ui-w .rc-h h3,html.ui-w #reportGroupH h2{margin:0;font-size:21px;font-weight:400;letter-spacing:-.012em;color:var(--label)}
+html.ui-w .rc-acts,html.ui-w #reportGroupH .seg{margin-left:auto}
+html.ui-w .rc-acts .seg,html.ui-w #reportGroupH .seg{height:44px;padding:4px;border-radius:99px;background:var(--uw-c3);box-shadow:none}
+html.ui-w .rc-acts .seg button,html.ui-w #reportGroupH .seg button{height:36px;padding:0 17px;border-radius:99px;color:var(--label-2)}
+html.ui-w .mac[data-theme="dark"] .rc-acts .seg button.on,html.ui-w .mac[data-theme="dark"] #reportGroupH .seg button.on{background:rgba(255,255,255,.11);color:var(--label);box-shadow:none}
+html.ui-w .mac[data-theme="light"] .rc-acts .seg button.on,html.ui-w .mac[data-theme="light"] #reportGroupH .seg button.on{background:#fff;color:var(--label);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+html.ui-w #reportGroupH{margin:30px 2px 14px}
+html.ui-w .rc-sum{margin:26px 0 4px 2px}
+html.ui-w .rc-k{display:block;font-size:13.5px;color:var(--label-2)}
+html.ui-w .rc-big{margin-top:6px;font-size:72px;font-weight:300;letter-spacing:-.045em;line-height:1;color:var(--label);font-variant-numeric:tabular-nums}
+html.ui-w .rc-big span{color:var(--label-3)}
+/* the plot: room above the bars for the pill */
+html.ui-w .rc-plot{position:relative;margin-top:6px;border-radius:12px;outline:0}
+html.ui-w .rc-plot:focus-visible{box-shadow:0 0 0 2px var(--focus, #5AA7FF)}
+html.ui-w .rc-bars,html.ui-w .rc-x{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));column-gap:clamp(4px,.8vw,12px)}
+html.ui-w .rc-bars{height:250px;padding-top:64px;box-sizing:border-box}
+html.ui-w .rc-b{position:relative;height:100%;display:flex;align-items:flex-end;justify-content:center;cursor:default}
+html.ui-w .rc-b i{position:relative;display:block;width:100%;max-width:76px;border-radius:14px;
+  background:linear-gradient(180deg,#36363A 0%,#2B2B2F 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.06);transition:background-color 140ms ease,filter 140ms ease}
+html.ui-w .rc-b i::before{content:'';position:absolute;top:-4px;left:50%;width:9px;height:9px;margin-left:-4.5px;border-radius:50%;background:#fff;box-shadow:0 0 0 3px var(--grp);transition:opacity 140ms ease,transform 180ms var(--uw-ease)}
+html.ui-w .rc-b.is-0 i{height:8px!important;opacity:.55}
+html.ui-w .rc-b.is-0 i::before{display:none}
+@media (hover:hover) and (pointer:fine){html.ui-w .rc-b:not(.on):hover i{filter:brightness(1.18)}}
+html.ui-w .rc-b.on i{background:repeating-linear-gradient(135deg,rgba(255,255,255,.12) 0 7px,rgba(255,255,255,.02) 7px 16px),#1F1F22;box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
+html.ui-w .rc-b.on i::before{opacity:0;transform:scale(.6)}
+html.ui-w .rc-x{margin-top:12px}
+html.ui-w .rc-x span{min-width:0;font-size:12.5px;color:var(--label-3);text-align:center;white-space:nowrap;overflow:visible}
+html.ui-w .rc-x span.now{color:var(--label-2)}
+/* the pill: lime, the hours dark with their trailing part dimmed, the day or week after them */
+html.ui-w .rc-tip{position:absolute;left:0;top:0;z-index:2;display:inline-flex;align-items:baseline;gap:0;padding:9px 14px;border-radius:13px;white-space:nowrap;pointer-events:none;
+  background:#E9F98B;color:#151515;box-shadow:0 10px 24px -10px rgba(0,0,0,.55);transition:transform 240ms var(--uw-ease)}
+html.ui-w .rc-tip.no-anim{transition:none}
+html.ui-w .rc-tip b{font-size:18px;font-weight:500;letter-spacing:-.02em}
+html.ui-w .rc-tip span{font-size:18px;font-weight:400;color:rgba(21,21,21,.48);letter-spacing:-.02em}
+html.ui-w .rc-tip em{margin-left:9px;font-style:normal;font-size:12.5px;color:rgba(21,21,21,.55)}
+html.ui-w .rc-tip::after{content:'';position:absolute;left:var(--ax,50%);bottom:-4px;width:9px;height:9px;margin-left:-4.5px;background:inherit;border-radius:2px;transform:rotate(45deg)}
+@media (prefers-reduced-motion:reduce){html.ui-w .rc-tip{transition:none}html.ui-w .rc-b i,html.ui-w .rc-b i::before{transition:none}}
+/* light: pale bars, a dark dot, faint stripes; the pill stays lime */
+html.ui-w .mac[data-theme="light"] .rc-b i{background:linear-gradient(180deg,#EEEEF1 0%,#E6E6EA 100%);box-shadow:inset 0 1px 0 #fff}
+html.ui-w .mac[data-theme="light"] .rc-b i::before{background:#1C1C1F}
+@media (hover:hover) and (pointer:fine){html.ui-w .mac[data-theme="light"] .rc-b:not(.on):hover i{filter:brightness(.96)}}
+html.ui-w .mac[data-theme="light"] .rc-b.on i{background:repeating-linear-gradient(135deg,rgba(0,0,0,.09) 0 7px,rgba(0,0,0,.015) 7px 16px),#F6F6F8;box-shadow:inset 0 0 0 1px rgba(0,0,0,.05)}
+html.ui-w .mac[data-theme="light"] .rc-tip{box-shadow:0 10px 22px -12px rgba(0,0,0,.35),0 0 0 1px rgba(0,0,0,.04)}
+/* the filter bar and the table's share bars, rounder to match */
+html.ui-w #timeRoot-reports .rp-bar .pop,html.ui-w #timeRoot-reports .rp-bar .btn{height:40px;border-radius:99px;padding:0 18px}
+html.ui-w #reportTableGrp .bar{height:8px;border-radius:99px;background:var(--uw-c3)}
+html.ui-w #reportTableGrp .bar i{border-radius:99px}
 html.ui-w .mtx .cell-c .mono{display:none}
 html.ui-w .mtx td.num,html.ui-w .mtx tfoot td{font-family:var(--mono);font-size:12.5px;font-weight:500}
 html.ui-w #timeRoot-dailysummary{padding:6px 26px 30px var(--uw-gl)}

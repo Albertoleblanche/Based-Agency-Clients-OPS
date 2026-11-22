@@ -327,7 +327,10 @@ function renderReports(){
   const busyLabel = busiest ? (g === 'day' ? busiest.sortDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : g === 'week' ? 'week of ' + busiest.label : busiest.sortDate.toLocaleDateString('en-US', { month: 'long' })) : '';
   const rangeWord = { week: 'this week', month: 'this month', all: 'all time', custom: 'in this range' }[range];
   const gseg = `<div class="seg" role="tablist" aria-label="Granularity">${['day', 'week', 'month'].map(k => `<button class="${g === k ? 'on' : ''}" role="tab" aria-selected="${g === k}" onclick="setReportChartGranularity('${k}')">${k[0].toUpperCase() + k.slice(1)}</button>`).join('')}</div>`;
-  document.getElementById('reportChartPanel').innerHTML = `<h3>Hours over time<span>${gseg}</span></h3>
+  if(typeof uiStyleOn === 'function' && uiStyleOn()){
+    document.getElementById('reportChartPanel').innerHTML = rcChartHtml({ buckets, g, curKey, total, busiest, busyWord, busyLabel, rangeWord, gseg });
+    rcMount();
+  } else document.getElementById('reportChartPanel').innerHTML = `<h3>Hours over time<span>${gseg}</span></h3>
 <div style="display:flex;flex-wrap:wrap;gap:4px 28px;align-items:baseline;margin:2px 0 14px"><div><b style="font-size:22px;font-weight:600;letter-spacing:-.02em" class="dur">${hrs(total)}</b> <span class="t-2" style="font-size:13px">${rangeWord}</span></div>${busiest ? `<div class="t-2" style="font-size:13px">Busiest ${busyWord}: ${busyLabel} · ${hrs(busiest.minutes)}</div>` : ''}</div>
 <div class="chart" style="gap:6px">${bars}</div><div class="chart-x" style="gap:6px">${xs}</div>`;
 
@@ -337,7 +340,8 @@ function renderReports(){
   const sw = hvP ? { tab: 'Projects', one: 'project', many: 'projects', col: 'Project', none: 'No project' } : { tab: 'Services', one: 'service', many: 'services', col: 'Service', none: 'No service set' };
   const tabs = [['clients', 'Clients'], ['services', sw.tab], ['teammates', 'Teammates']].filter(([k]) => k !== 'teammates' || isAdmin());
   if(!tabs.some(([k]) => k === reportTab)) reportTab = 'clients';
-  document.getElementById('reportGroupH').innerHTML = `<h2>By ${{ clients: 'client', services: sw.one, teammates: 'teammate' }[reportTab]}</h2><div class="seg" role="tablist" aria-label="Group by">${tabs.map(([k, t]) => `<button class="${reportTab === k ? 'on' : ''}" role="tab" aria-selected="${reportTab === k}" onclick="switchReportTab('${k}')">${t}</button>`).join('')}</div>`;
+  const groupIc = typeof uiStyleOn === 'function' && uiStyleOn() ? `<span class="rc-ic" aria-hidden="true">${icon({ clients: 'briefcase', services: 'layers', teammates: 'users' }[reportTab])}</span>` : '';
+  document.getElementById('reportGroupH').innerHTML = `${groupIc}<h2>By ${{ clients: 'client', services: sw.one, teammates: 'teammate' }[reportTab]}</h2><div class="seg" role="tablist" aria-label="Group by">${tabs.map(([k, t]) => `<button class="${reportTab === k ? 'on' : ''}" role="tab" aria-selected="${reportTab === k}" onclick="switchReportTab('${k}')">${t}</button>`).join('')}</div>`;
   const grouped = {};
   relevant.forEach(e => {
     const c = clients.find(x => x.id === e.clientId);
@@ -378,6 +382,81 @@ ${withBudget ? `<td class="num t-2">${b ? b + 'h' : '—'}</td>` : ''}
   grp.setAttribute('data-grow-key', 'report-rows'); grp.setAttribute('data-grow-rows', 'tbody > tr');
   grp.innerHTML = `<table class="mtx" aria-label="Hours ${rangeWord}"><thead><tr>${head}</tr></thead><tbody>${body}${restRow}</tbody>
 <tfoot><tr>${reportTab === 'clients' ? '<td></td>' : ''}<td>Total</td><td class="num">${hrs(total)}</td><td colspan="${cols - (reportTab === 'clients' ? 3 : 2)}"></td></tr></tfoot></table>`;
+}
+
+// ---- Hours over time, new look (Nov 22) --------------------------------------------------------
+// A card in the style of a sales widget: a round icon and the title, the total big with its
+// trailing part dimmed, wide rounded bars with a dot on top, and one bar picked: striped, with a
+// lime pill above it giving its hours. The pill follows the pointer (and the arrow keys when the
+// chart has focus) and rests on the busiest day, week or month, marked "busiest".
+function rcSplit(min){
+  const h = (min || 0) / 60, r = h >= 100 || Number.isInteger(+h.toFixed(1)) ? String(Math.round(h)) : h.toFixed(1);
+  const [a, b] = r.split('.');
+  return [Number(a).toLocaleString('en-US'), (b ? '.' + b : '') + 'h'];
+}
+function rcLongLabel(b, g){
+  return g === 'day' ? b.sortDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    : g === 'week' ? 'Week of ' + b.label : b.sortDate.toLocaleDateString('en-US', { month: 'long', year: b.sortDate.getFullYear() === rNow().getFullYear() ? undefined : 'numeric' });
+}
+let rcState = null;
+function rcChartHtml(o){
+  const { buckets, g, curKey, total, busiest, busyWord, busyLabel, rangeWord, gseg } = o;
+  const max = Math.max(1, ...buckets.map(b => b.minutes));
+  const cur = buckets.findIndex(b => b.key === curKey), busy = busiest ? buckets.indexOf(busiest) : -1;
+  const def = busy >= 0 ? busy : cur >= 0 ? cur : buckets.length - 1;
+  rcState = { bars: buckets.map((b, i) => ({ v: rcSplit(b.minutes), l: rcLongLabel(b, g) + (i === busy ? ' · busiest' : ''), m: b.minutes })), def, on: def };
+  // labels: every 7th day (and today), or about a dozen for weeks and months
+  const step = g === 'day' ? 7 : Math.max(1, Math.ceil(buckets.length / 12));
+  const lab = (b, i) => b.key === curKey && g === 'day' ? 'Today' : (g === 'day' ? i % 7 === 0 : i % step === 0 || b.key === curKey) ? b.label : '';
+  const bars = buckets.map((b, i) => `<div class="rc-b${b.minutes ? '' : ' is-0'}${i === def ? ' on' : ''}" data-i="${i}" onmouseenter="rcPick(${i})" onclick="rcPick(${i})"><i style="height:${b.minutes ? Math.max(b.minutes / max * 100, 6).toFixed(1) : 0}%"></i></div>`).join('');
+  const xs = buckets.map((b, i) => `<span${b.key === curKey ? ' class="now"' : ''}>${lab(b, i)}</span>`).join('');
+  const [a, rest] = rcSplit(total);
+  const unit = { day: 'day', week: 'week', month: 'month' }[g];
+  return `<div class="rc-h"><span class="rc-ic" aria-hidden="true">${icon('chart-column')}</span><h3>Hours over time</h3><span class="rc-acts">${gseg}</span></div>
+<div class="rc-sum"><span class="rc-k">logged ${escapeHtml(rangeWord)}</span><div class="rc-big" aria-label="${hrs(total)} logged ${escapeHtml(rangeWord)}">${a}<span>${rest}</span></div></div>
+<div class="rc-plot" tabindex="0" role="group" aria-label="Hours by ${unit}${busiest ? `; busiest ${busyWord} ${escapeHtml(busyLabel)}, ${hrs(busiest.minutes)}` : ''}. Use the left and right arrow keys to read each ${unit}." onkeydown="rcKey(event)" onmouseleave="rcPick(rcState && rcState.def)">
+<div class="rc-tip" id="rcTip" aria-live="polite"></div>
+<div class="rc-bars" style="--n:${buckets.length}">${bars}</div>
+<div class="rc-x" style="--n:${buckets.length}">${xs}</div></div>`;
+}
+// The pill moves with transform (interruptible); the first placement doesn't animate.
+function rcPlace(animate){
+  const tip = document.getElementById('rcTip'); if(!tip || !rcState) return;
+  const plot = tip.parentElement, col = plot.querySelector(`.rc-b[data-i="${rcState.on}"]`); if(!col) return;
+  const bar = col.firstElementChild, pr = plot.getBoundingClientRect(), cr = col.getBoundingClientRect(), br = bar.getBoundingClientRect();
+  const x = cr.left - pr.left + cr.width / 2, top = (rcState.bars[rcState.on].m ? br.top : cr.bottom) - pr.top;
+  const half = tip.offsetWidth / 2, cx = Math.min(Math.max(x, half), pr.width - half);
+  tip.classList.toggle('no-anim', !animate);
+  tip.style.transform = `translate(${cx - half}px, ${Math.max(top - tip.offsetHeight - 12, 0)}px)`;
+  tip.style.setProperty('--ax', `${x - (cx - half)}px`);
+}
+function rcFill(){
+  const tip = document.getElementById('rcTip'), b = rcState && rcState.bars[rcState.on]; if(!tip || !b) return;
+  tip.innerHTML = `<b>${b.v[0]}</b><span>${b.v[1]}</span><em>${escapeHtml(b.l)}</em>`;
+}
+function rcPick(i){
+  if(!rcState || i == null || !rcState.bars[i] || i === rcState.on) return;
+  const plot = document.querySelector('#reportChartPanel .rc-plot'); if(!plot) return;
+  plot.querySelector('.rc-b.on')?.classList.remove('on');
+  plot.querySelector(`.rc-b[data-i="${i}"]`)?.classList.add('on');
+  rcState.on = i; rcFill(); rcPlace(true);
+}
+function rcKey(e){
+  if(!rcState) return;
+  const n = rcState.bars.length, k = { ArrowLeft: -1, ArrowRight: 1 }[e.key];
+  if(k){ e.preventDefault(); rcPick(Math.min(n - 1, Math.max(0, rcState.on + k))); }
+  else if(e.key === 'Home'){ e.preventDefault(); rcPick(0); }
+  else if(e.key === 'End'){ e.preventDefault(); rcPick(n - 1); }
+}
+let rcResizeObs = null;
+function rcMount(){
+  rcFill();
+  requestAnimationFrame(() => rcPlace(false));
+  const plot = document.querySelector('#reportChartPanel .rc-plot');
+  if(plot && typeof ResizeObserver === 'function'){
+    if(rcResizeObs) rcResizeObs.disconnect();
+    rcResizeObs = new ResizeObserver(() => rcPlace(false)); rcResizeObs.observe(plot);
+  }
 }
 
 // ================================================================ Daily Summary
