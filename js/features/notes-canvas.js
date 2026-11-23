@@ -119,10 +119,18 @@ function renderNotes(){
 ${mts === null ? skeletonHtml('notes', 'Loading meetings…') : list.length ? `<div class="n1-grid">${list.map(meetingTileHtml).join('')}</div>`
   : granolaMtChecking && !cur ? skeletonHtml('notes', 'Checking Granola…')
   : emptyState({ icon: 'sticky-note', tone: 'blue', title: cur ? `No meetings for ${escapeHtml(cur.name)}` : 'No meetings yet', text: 'Meetings shared to Granola’s team space show here once Radar has read them.', html: true })}
-<p class="n1-foot nt-lock">${appLogo('granola', 'xs')}Shared to Granola’s team space: everyone on the team sees these</p>
+<p class="n1-foot nt-lock">${appLogo('granola', 'xs')}${meetingCanAssign() ? 'From Granola. Admins and approvers see every meeting; everyone else, the meetings they were in.' : 'From Granola: the meetings you were in.'}</p>
 </div>`;
     return;
   }
+  // All, with meetings: two sections, Granola Meetings (the latest few) and Personal (Nov 23)
+  const MT_IN_ALL = 6;
+  const sections = notesScope === 'all' && mtMine.length ? (() => {
+    const few = mtMine.slice(0, MT_IN_ALL), ns = mine.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    return `<section class="n1-sec" aria-label="Granola Meetings"><div class="n1-sh"><h2>${appLogo('granola', 'xs')}Granola Meetings<span class="c">${mtMine.length}</span></h2>${mtMine.length > few.length ? `<button type="button" class="x-lnk" onclick="setNotesFilter('scope','meetings')">See All ${mtMine.length}</button>` : ''}</div><div class="n1-grid">${few.map(meetingTileHtml).join('')}</div></section>
+<section class="n1-sec" aria-label="Personal"><div class="n1-sh"><h2>${icon('lock-simple')}Personal<span class="c">${ns.length}</span></h2><span class="n1-sh-r">Only you can see these</span></div>${ns.length ? `<div class="n1-grid">${ns.map(noteTileHtml).join('')}</div>`
+  : `<p class="n1-none">No personal notes${cur ? ` for ${escapeHtml(cur.name)}` : ''} yet. <button type="button" class="x-lnk" onclick="openNoteSheet('new')">Jot one down</button></p>`}</section>`;
+  })() : '';
   const empty = !notes.length ? ['No notes yet', 'Ideas and plans for a client, just for you. When you do one, mark it done or log it as an improvement.']
     : notesScope === 'open' ? ['Nothing open', cur ? `Every note for ${escapeHtml(cur.name)} is done.` : 'Every note is done.']
     : ['Nothing done yet', 'Notes you finish, or log as an improvement, show up here.'];
@@ -132,7 +140,7 @@ ${mts === null ? skeletonHtml('notes', 'Loading meetings…') : list.length ? `<
 <label class="pop pop-sel n1-pop"><span class="pl">${escapeHtml(cur ? cur.name : 'All clients')}</span>${icon('caret-down')}<select aria-label="Client" onchange="setNotesFilter('client',this.value)"><option value="all">All clients</option>${used.map(c => `<option value="${c.id}"${c === cur ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></label>
 <div class="seg" role="tablist" aria-label="Show">${seg}</div>
 </div>
-${allItems && allItems.length ? `<div class="n1-grid">${allItems.map(x => x.html()).join('')}</div>` : shown.length ? `<div class="n1-grid">${shown.map(noteTileHtml).join('')}</div>` : emptyState({ icon: !notes.length ? 'sticky-note' : notesScope === 'open' ? 'check-circle' : 'sticky-note', tone: !notes.length ? 'blue' : notesScope === 'open' ? 'ok' : '', title: empty[0], text: empty[1], html: true,
+${sections ? sections : allItems && allItems.length ? `<div class="n1-grid">${allItems.map(x => x.html()).join('')}</div>` : shown.length ? `<div class="n1-grid">${shown.map(noteTileHtml).join('')}</div>` : emptyState({ icon: !notes.length ? 'sticky-note' : notesScope === 'open' ? 'check-circle' : 'sticky-note', tone: !notes.length ? 'blue' : notesScope === 'open' ? 'ok' : '', title: empty[0], text: empty[1], html: true,
     action: !notes.length || notesScope === 'open' ? 'New Note' : '', actionIcon: 'plus', onAction: "openNoteSheet('new')" })}
 <p class="n1-foot nt-lock">${icon('lock-simple')}Only you can see your notes${allItems && mtMine.length ? '. Meetings from Granola are shared with the team.' : ''}</p>
 </div>`;

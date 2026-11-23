@@ -802,8 +802,8 @@ async function loadGranolaMeetings(){
   granolaMeetings = (data || []).map(r => {
     let m = {}; try{ m = JSON.parse(r.value) || {}; }catch(e){}
     return { id: r.key.slice('granola-note:'.length), title: m.title || 'A meeting', summary: m.summary || '', url: m.url || null, at: m.meetingAt || m.at || r.updated_at,
-      clientId: m.clientId || null, people: m.people || [], owner: m.owner || null, items: m.items || 0, state: m.state };
-  }).filter(m => m.summary && m.state !== 'same' && new Date(m.at).getTime() > since && meetingCanSee(m))   // the people who were there; admins and approvers see all
+      clientId: m.clientId || null, people: m.people || [], owner: m.owner || null, items: m.items || 0, state: m.state, pulled: m.pulled || null };
+  }).filter(m => m.summary && m.state !== 'same' && m.state !== 'removed' && new Date(m.at).getTime() > since && meetingCanSee(m))   // the people who were there; admins and approvers see all
     .sort((a, b) => String(b.at).localeCompare(String(a.at)));
   return granolaMeetings;
 }
@@ -854,29 +854,94 @@ function meetingSubWords(m){
   const c = m.clientId ? clients.find(x => String(x.id) === String(m.clientId)) : null;
   return [meetingWhenWords(m), c ? c.name : '', m.owner ? `notes by ${String(m.owner).split(' ')[0]}` : ''].filter(Boolean);
 }
-// The notes, with the way back to Granola (desktop: a sheet; iPhone: its sheet). Each point can
-// become a task (below).
+// ---- A meeting's sheet (Nov 23) -------------------------------------------------------------------
+// The notes, with the way back to Granola (desktop: a sheet; iPhone: its sheet). Any point can become a
+// task; the AI button pulls the tasks out of the notes, grouped, so nobody has to read the whole thing;
+// Remove from Radar takes the meeting out for everyone, for good (Restore brings it back).
+let meetingView = {};    // meeting id → 'notes' | 'tasks'
+let meetingPulls = {};   // meeting id → { groups, at } | { loading: true } | { error }
 function openMeetingNotes(id){
   const m = (granolaMeetings || []).find(x => x.id === id); if(!m) return;
+  if(m.pulled && m.pulled.groups && !meetingPulls[m.id]) meetingPulls[m.id] = { groups: m.pulled.groups, at: m.pulled.at };
   const sub = meetingSubWords(m).join(' · ');
-  const can = meetingCanAssign(), mine = meetingWasMine(m);
-  const hint = can || mine ? `<p class="mtn-tasks">${appLogo('granola', 'xs')}<span>${can ? 'Any point can be a task for someone on the team.' : 'Any point can be one of your tasks.'} Points already added say who has them.</span></p>` : '';
   if(typeof mOpenSheet === 'function'){
-    mOpenSheet(m.title, `<div class="mtn"><p class="mtn-sub">${escapeHtml(sub)}</p>${hint}<div class="mtn-body" id="mtnBody">${meetingBodyHtml(m)}</div>${m.url ? `<a class="ibtn mtn-open" href="${safeUrl(m.url)}" target="_blank" rel="noopener">Open in Granola</a>` : ''}</div>`, { cancel: 'Close' });
+    mOpenSheet(m.title, `<div class="mtn"><p class="mtn-sub">${escapeHtml(sub)}</p><div id="mtnTop">${meetingTopHtml(m)}</div><div class="mtn-body" id="mtnBody" data-mt="${m.id}">${meetingMainHtml(m)}</div>${m.url ? `<a class="ibtn mtn-open" href="${safeUrl(m.url)}" target="_blank" rel="noopener">Open in Granola</a>` : ''}<button type="button" class="mtn-rm" onclick="meetingRemove('${m.id}')">Remove from Radar</button></div>`, { cancel: 'Close' });
   } else {
-    openAppModal(`<h3 class="ap-h">${appLogo('granola', 'sm')}${escapeHtml(m.title)}</h3><p class="t-2 mtn-sub">${escapeHtml(sub)}</p>${hint}
-<div class="mtn-body" id="mtnBody">${meetingBodyHtml(m)}</div>
-<div class="sheet-a">${m.url ? `<a class="btn" href="${safeUrl(m.url)}" target="_blank" rel="noopener">Open in Granola</a>` : ''}<button class="btn btn-p" id="mtnDone" onclick="closeAppModal()">Done</button></div>`, 680);
+    openAppModal(`<h3 class="ap-h">${appLogo('granola', 'sm')}${escapeHtml(m.title)}</h3><p class="t-2 mtn-sub">${escapeHtml(sub)}</p><div id="mtnTop">${meetingTopHtml(m)}</div>
+<div class="mtn-body" id="mtnBody" data-mt="${m.id}">${meetingMainHtml(m)}</div>
+<div class="sheet-a"><button type="button" class="btn mtn-rm" onclick="meetingRemove('${m.id}')">Remove from Radar</button><span class="sgp-gap"></span>${m.url ? `<a class="btn" href="${safeUrl(m.url)}" target="_blank" rel="noopener">Open in Granola</a>` : ''}<button class="btn btn-p" id="mtnDone" onclick="closeAppModal()">Done</button></div>`, 680);
     // focus starts on Done, not on the first link inside the notes
     setTimeout(() => document.getElementById('mtnDone')?.focus({ preventScroll: true }), 30);   // after the sheet's own first focus
   }
   // who each point is already suggested to
   loadMeetingSuggestions(m).then(() => meetingRedraw(m)).catch(() => {});
 }
+function meetingTopHtml(m){
+  const tasksView = meetingView[m.id] === 'tasks', can = meetingCanAssign(), mine = meetingWasMine(m);
+  const words = tasksView ? (can ? 'Everyone’s tasks in this meeting, pulled out by AI and grouped.' : 'Your tasks in this meeting, pulled out by AI and grouped.')
+    : can ? 'Any point can be a task for someone on the team.' : mine ? 'Any point can be one of your tasks.' : '';
+  const label = tasksView ? 'Show the Notes' : can ? 'Pull the Tasks' : 'Pull My Tasks';
+  return `<div class="mtn-bar"><p class="mtn-tasks">${tasksView ? icon('sparkle') : appLogo('granola', 'xs')}<span>${words}</span></p>`
+    + `<button type="button" class="btn sm mtn-ai${tasksView ? '' : ' is-ai'}" onclick="meetingToggleView('${m.id}')">${icon(tasksView ? 'file-pdf' : 'sparkle')}<span>${label}</span></button></div>`;
+}
+function meetingMainHtml(m){ return meetingView[m.id] === 'tasks' ? meetingTasksHtml(m) : meetingBodyHtml(m); }
+function meetingBodyHtml(m){
+  return meetingNotesHtml(m.summary, { point: (i, text) => text ? mtSideHtml(m, mtSpec(m, 'p' + i)) : '' });
+}
+// Draws the sheet again, if it's still this meeting's
+function meetingRedraw(m){
+  const b = document.getElementById('mtnBody'); if(!b || b.dataset.mt !== m.id) return;
+  const t = document.getElementById('mtnTop'); if(t) t.innerHTML = meetingTopHtml(m);
+  b.innerHTML = meetingMainHtml(m);
+}
+// The AI button: pulls the tasks (once; the answer is kept until the notes change), and back to the notes
+async function meetingToggleView(id, again){
+  const m = (granolaMeetings || []).find(x => x.id === id); if(!m) return;
+  if(!again && meetingView[id] === 'tasks'){ meetingView[id] = 'notes'; meetingRedraw(m); return; }
+  meetingView[id] = 'tasks';
+  const have = meetingPulls[id];
+  if(!again && have && (have.groups || have.loading)){ meetingRedraw(m); return; }
+  meetingPulls[id] = { loading: true }; meetingRedraw(m);
+  try{
+    const r = await granolaApi('meeting-tasks', { note: id, again: !!again });
+    meetingPulls[id] = { groups: r.groups || [], at: r.at };
+    m.pulled = { groups: r.groups || [], at: r.at };
+  }catch(e){ meetingPulls[id] = { error: e.message || 'The AI didn’t answer. Try again in a moment.' }; }
+  meetingRedraw(m);
+}
+// The pulled tasks this person sees (everyone's for admins and approvers; theirs for anyone else)
+function meetingItems(m){
+  const p = meetingPulls[m.id]; if(!p || !p.groups) return [];
+  const can = meetingCanAssign();
+  return p.groups.map((g, gi) => ({ label: g.label, clientId: g.clientId || null,
+    items: g.items.map((it, ii) => ({ ...it, key: `a${gi}.${ii}` })).filter(it => can || it.whoId === currentUser.id) })).filter(g => g.items.length);
+}
+function meetingTasksHtml(m){
+  const p = meetingPulls[m.id], can = meetingCanAssign();
+  if(!p || p.loading) return `<div class="mtk-load" aria-live="polite"><p>${icon('sparkle')}Reading the notes…</p><i></i><i></i><i></i></div>`;
+  if(p.error) return `<div class="mtk-empty"><p>${escapeHtml(p.error)}</p><button type="button" class="btn sm" onclick="meetingToggleView('${m.id}', true)">Try Again</button></div>`;
+  const groups = meetingItems(m), shown = groups.reduce((n, g) => n + g.items.length, 0);
+  const others = (p.groups || []).reduce((n, g) => n + g.items.length, 0) - shown;
+  const again = `<button type="button" class="x-lnk" onclick="meetingToggleView('${m.id}', true)">Pull Again</button>`;
+  if(!shown) return `<div class="mtk-empty"><p>${can ? 'No tasks for the team in these notes.' : 'Nothing in these notes is for you.'}${others ? ` ${others === 1 ? 'One is' : `${others} are`} for others in the meeting.` : ''}</p>${again}</div>`;
+  const open = groups.flatMap(g => g.items).map(it => mtSpec(m, it.key)).filter(sp => sp && !mtSpecTasks(m, sp).length && (can ? sp.whoId : true));
+  const all = open.length >= 2 ? `<button type="button" class="btn sm mtk-all" onclick="meetingAll('${m.id}', this)">${can ? `Assign All ${open.length}` : `Add All ${open.length}`}</button>` : '';
+  const today = toDateStr(new Date());
+  const row = it => {
+    const sp = mtSpec(m, it.key);
+    const due = it.due && it.due >= today ? `due ${fmtDay(new Date(it.due + 'T12:00:00'))}, ${fmtShortDate(new Date(it.due + 'T12:00:00'))}` : '';
+    const meta = [can ? (it.whoId ? `for ${mtName(it.whoId)}` : 'nobody named') : '', due, it.why || ''].filter(Boolean);
+    return `<div class="mtk-r" data-k="${it.key}"><div class="mtk-x"><b>${escapeHtml(it.title)}</b>${meta.length ? `<span>${escapeHtml(meta.join(' · '))}</span>` : ''}</div><div class="mtp-r">${mtSideHtml(m, sp)}</div></div>`;
+  };
+  return `<div class="mtk-h"><span>${shown} task${shown === 1 ? '' : 's'}${can ? '' : ' for you'} · ${groups.length} group${groups.length === 1 ? '' : 's'}</span>${all}</div>`
+    + groups.map(g => `<section class="mtk-g"><h4>${escapeHtml(g.label)}<span class="n">${g.items.length}</span></h4>${g.items.map(row).join('')}</section>`).join('')
+    + `<p class="mtk-foot">${icon('sparkle')}<span>Pulled from the notes by AI${!can && others ? ` · ${others} more for others in the meeting` : ''} · ${again}</span></p>`;
+}
+
 // ---- From the notes to tasks (Nov 23) ------------------------------------------------------------
-// Any point in a meeting's notes can become a task. Someone who was there adds it to their own tasks;
-// admins and approvers give it to anyone (to start with, the person the point names). A point that
-// is already a task says who has it and who added it, so nobody adds it twice, and the matching
+// A point in the notes, or a task the AI pulled out, can become a task. Someone who was there adds it
+// to their own tasks; admins and approvers give it to anyone (to start with, the person it names). One
+// that is already a task says who has it and who added it, so nobody adds it twice, and the matching
 // suggestion in that person's Tasks goes away.
 function meetingCanAssign(){ return typeof canApprove === 'function' && canApprove(); }
 function meetingCanSee(m){ return meetingCanAssign() || meetingWasMine(m); }
@@ -926,13 +991,31 @@ function mtQuoteIn(q, text){
   return Q.length >= 2 && Q.filter(w => T.has(w)).length >= Q.length * 0.8;
 }
 const mtPointOf = t => { const x = String((t && t.description) || '').match(/In the notes: “([^”]*)”/); return x ? x[1] : ''; };
-// The tasks a point already became: made from the point here, or the same work added from the
-// meeting's suggestion (same meeting link, nearly the same title).
-function meetingPointTasks(m, text){
-  const quote = `In the notes: “${text}”`, title = meetingPointTitle(text);
+// What can become a task: 'p3' (the 4th point in the notes) or 'a0.1' (the AI's 1st group, 2nd task).
+// A pulled task is tied to the point it came from, so a task made from either shows on both.
+function mtSpec(m, key){
+  if(!m || !key) return null;
+  if(key[0] === 'p'){
+    const text = meetingPoints(m)[+key.slice(1)]; if(!text) return null;
+    const who = meetingPointWho(text);
+    return { key, text, title: meetingPointTitle(text), whoId: who ? who.id : null, due: '', why: '', clientId: m.clientId || null };
+  }
+  const [gi, ii] = key.slice(1).split('.').map(Number);
+  const g = ((meetingPulls[m.id] || {}).groups || [])[gi], it = g && g.items[ii]; if(!it) return null;
+  return { key, text: mtMatchPoint(m, it) || mdPlain(it.point) || it.title, title: it.title, whoId: it.whoId || null, due: it.due || '', why: it.why || '',
+    clientId: g.clientId || m.clientId || null };
+}
+function mtMatchPoint(m, it){
+  const pts = meetingPoints(m), q = mdPlain(it.point || '');
+  return (q && pts.find(t => t === q)) || (q && pts.find(t => mtQuoteIn(q, t) && mtQuoteIn(t, q))) || pts.find(t => mtSame(it.title, meetingPointTitle(t))) || null;
+}
+// The tasks it already became: made from it here, or the same work added from the meeting's
+// suggestion (same meeting link, nearly the same title)
+function mtSpecTasks(m, sp){
+  const quote = `In the notes: “${sp.text}”`;
   return (tasks || []).filter(t => !t.cancelledAt && (
     (t.description || '').includes(quote) && (!m.url || t.link === m.url || (t.description || '').includes(m.url))
-    || (m.url && t.link === m.url && mtSame(title, t.title))));
+    || (m.url && t.link === m.url && mtSame(sp.title, t.title))));
 }
 // A meeting's suggestions (each person's own; admins and approvers see everyone's)
 let meetingSgs = {};
@@ -941,34 +1024,28 @@ async function loadMeetingSuggestions(m){
   meetingSgs[m.id] = error ? [] : (data || []).map(suggestionFromDb);
   return meetingSgs[m.id];
 }
-function meetingPointSuggestions(m, text){
-  const title = meetingPointTitle(text);
+function mtSpecSuggestions(m, sp){
   return (meetingSgs[m.id] || []).filter(s => s.status === 'pending' && (meetingCanAssign() || s.assigneeId === currentUser.id)
-    && (mtSame(title, s.title) || (s.quote && mtQuoteIn(s.quote, text))));
+    && (mtSame(sp.title, s.title) || (s.quote && mtQuoteIn(s.quote, sp.text))));
 }
 const mtName = id => { const p = teamProfiles.find(x => x.id === id); return p ? (id === currentUser.id ? 'you' : mtFirst(p)) : 'someone'; };
 function mtList(names){ const u = [...new Set(names)]; return u.length < 3 ? u.join(' and ') : `${u.slice(0, -1).join(', ')} and ${u[u.length - 1]}`; }
-// What a point shows on its right: who has it, else the way to add it
-function meetingPointSide(m, i, text){
-  const done = meetingPointTasks(m, text);
+// What it shows on its right: who has it, else the way to add it
+function mtSideHtml(m, sp){
+  if(!sp) return '';
+  const done = mtSpecTasks(m, sp);
   if(done.length){
     const t = done[0], by = done.filter(x => x.assignerId && x.assignerId !== x.assigneeId).map(x => mtName(x.assignerId));
     const mine = done.some(x => x.assigneeId === currentUser.id);
     const who = mine && done.length === 1 ? `In your tasks${by.length ? `, from ${mtList(by)}` : ''}` : `Added for ${mtList(done.map(x => mtName(x.assigneeId)))}${by.length ? ` by ${mtList(by)}` : ''}`;
     return `<button type="button" class="mtp-ok" onclick="meetingOpenTask('${t.id}')" title="Open the task">${icon('check', { weight: 'bold' })}<span>${escapeHtml(who)}</span></button>`;
   }
-  const sg = meetingPointSuggestions(m, text);
+  const sg = mtSpecSuggestions(m, sp);
   const note = sg.length ? `<span class="mtp-sg" title="Suggested from the notes; it’s waiting in their Tasks">Suggested to ${escapeHtml(mtList(sg.map(s => mtName(s.assigneeId))))}</span>` : '';
-  // (iPhone shows the + alone, as a round button; the words stay for VoiceOver)
-  if(meetingCanAssign()) return `${note}<button type="button" class="btn sm mtp-go" aria-label="Assign this point" onclick="meetingAssignPoint('${m.id}', ${i})">${icon('plus', { weight: 'bold' })}<span>Assign…</span></button>`;
-  if(meetingWasMine(m)) return `${note}<button type="button" class="btn sm mtp-go" aria-label="Add this point to my tasks" onclick="meetingAddPoint('${m.id}', ${i}, this)">${icon('plus', { weight: 'bold' })}<span>Add to My Tasks</span></button>`;
+  // (iPhone shows the + alone, as a round button)
+  if(meetingCanAssign()) return `${note}<button type="button" class="btn sm mtp-go" aria-label="Assign “${escapeHtml(sp.title)}”" onclick="meetingAssign('${m.id}', '${sp.key}')">${icon('plus', { weight: 'bold' })}<span>Assign…</span></button>`;
+  if(meetingWasMine(m)) return `${note}<button type="button" class="btn sm mtp-go" aria-label="Add “${escapeHtml(sp.title)}” to my tasks" onclick="meetingAdd('${m.id}', '${sp.key}', this)">${icon('plus', { weight: 'bold' })}<span>Add to My Tasks</span></button>`;
   return note;
-}
-function meetingBodyHtml(m){
-  return meetingNotesHtml(m.summary, { point: (i, text) => text ? meetingPointSide(m, i, text) : '' });
-}
-function meetingRedraw(m){
-  const b = document.getElementById('mtnBody'); if(b) b.innerHTML = meetingBodyHtml(m);
 }
 // A task just made, known here before the next load of everyone's tasks
 function mtKnow(t){
@@ -981,51 +1058,119 @@ function meetingOpenTask(id){
   closeAppModal(); openTaskDetailModal(id);
 }
 // The pending suggestions this task stands for: settled, so they leave that person's Tasks
-async function meetingSettle(m, text, task){
-  const sgs = meetingPointSuggestions(m, text).filter(s => s.assigneeId === task.assignee_id);
+async function meetingSettle(m, sp, task){
+  const sgs = mtSpecSuggestions(m, sp).filter(s => s.assigneeId === task.assignee_id);
   for(const s of sgs){
     const { error } = await supabaseClient.from('task_suggestions').update({ status: 'added', task_id: task.id, decided_at: new Date().toISOString() }).eq('id', s.id);
     if(!error){ s.status = 'added'; if(taskSuggestions) taskSuggestions = taskSuggestions.filter(x => x.id !== s.id); }
   }
 }
-// Someone who was there: the point is theirs, as it is
-async function meetingAddPoint(id, i, btn){
-  const m = (granolaMeetings || []).find(x => x.id === id); if(!m) return;
-  const text = meetingPoints(m)[i]; if(!text) return;
-  if(meetingPointTasks(m, text).length){ meetingRedraw(m); return; }
-  const lab = btn && btn.querySelector('span');
-  if(btn){ btn.disabled = true; if(lab) lab.textContent = 'Adding…'; }
-  const res = await insertTaskRow({ title: meetingPointTitle(text), description: meetingPointNotes(m, text), priority: 'medium', status: 'todo',
-    assigner_id: currentUser.id, assignee_id: currentUser.id, client_id: m.clientId || null, link: m.url || null, due_date: null });
-  if(res.error || !res.data){ if(btn){ btn.disabled = false; if(lab) lab.textContent = 'Add to My Tasks'; } showToast('error', 'Not added', (res.error && res.error.message) || 'Try again in a moment.'); return; }
-  mtKnow(res.data);
-  await meetingSettle(m, text, res.data);
+function mtTaskNotes(m, sp){ return (sp.why ? sp.why + '\n\n' : '') + meetingPointNotes(m, sp.text); }
+function mtDue(sp){ return sp.due && sp.due >= toDateStr(new Date()) ? sp.due : ''; }
+function mtInsert(m, sp, assigneeId){
+  return insertTaskRow({ title: sp.title, description: mtTaskNotes(m, sp), priority: 'medium', status: 'todo', assigner_id: currentUser.id, assignee_id: assigneeId,
+    client_id: sp.clientId || null, link: m.url || null, due_date: mtDue(sp) || null });
+}
+function mtNotify(uid, title){
+  if(uid === currentUser.id) return;
+  const words = `${(typeof myName === 'function' && myName()) || 'Someone'}: "${title}"`;
+  if(typeof mNotify === 'function') mNotify(uid, 'task_assigned', 'New task assigned to you', words, 'tasks');
+  else if(typeof sendNotification === 'function') sendNotification(uid, 'task_assigned', 'New task assigned to you', words, 'tasks');
+}
+function mtAfterChange(m){
   meetingRedraw(m);
   if(typeof loadMyTasks === 'function') loadMyTasks().then(() => meetingRedraw(m));
-  showToast('success', 'Added to your tasks', res.data.title);
   if(typeof updateTasksNavBadge === 'function') updateTasksNavBadge();
   if(typeof currentViewName !== 'undefined' && currentViewName === 'tasks' && typeof renderTasks === 'function') renderTasks();
   if(typeof mRenderTab === 'function') mRenderTab();
 }
-// Admins and approvers: New Task, filled in, for the person the point names; back to the notes after
-function meetingAssignPoint(id, i){
-  const m = (granolaMeetings || []).find(x => x.id === id); if(!m) return;
-  const text = meetingPoints(m)[i]; if(!text) return;
-  const who = meetingPointWho(text);
-  const preset = { title: meetingPointTitle(text), description: meetingPointNotes(m, text), clientId: m.clientId || '', link: m.url || '', priority: 'medium' };
+// Someone who was there: it's theirs, as it is
+async function meetingAdd(id, key, btn){
+  const m = (granolaMeetings || []).find(x => x.id === id), sp = mtSpec(m, key); if(!sp) return;
+  if(mtSpecTasks(m, sp).length){ meetingRedraw(m); return; }
+  const lab = btn && btn.querySelector('span');
+  if(btn){ btn.disabled = true; if(lab) lab.textContent = 'Adding…'; }
+  const res = await mtInsert(m, sp, currentUser.id);
+  if(res.error || !res.data){ if(btn){ btn.disabled = false; if(lab) lab.textContent = 'Add to My Tasks'; } showToast('error', 'Not added', (res.error && res.error.message) || 'Try again in a moment.'); return; }
+  mtKnow(res.data);
+  await meetingSettle(m, sp, res.data);
+  mtAfterChange(m);
+  showToast('success', 'Added to your tasks', res.data.title);
+}
+// Admins and approvers: New Task, filled in, for the person it names; back to the sheet after
+function meetingAssign(id, key){
+  const m = (granolaMeetings || []).find(x => x.id === id), sp = mtSpec(m, key); if(!sp) return;
+  const preset = { title: sp.title, description: mtTaskNotes(m, sp), clientId: sp.clientId || '', link: m.url || '', priority: 'medium', due: mtDue(sp) };
   const after = async task => {
     if(!task) return;
     mtKnow(task);
-    await meetingSettle(m, text, task);
-    // iPhone: the task sheet closes after this, so the notes open again once it has
+    await meetingSettle(m, sp, task);
+    // iPhone: the task sheet closes after this, so the meeting opens again once it has
     if(typeof mOpenTaskSheet === 'function') setTimeout(() => openMeetingNotes(m.id), 450); else openMeetingNotes(m.id);
   };
   if(typeof mOpenTaskSheet === 'function'){
     mCloseSheet(true);
-    setTimeout(() => mOpenTaskSheet({ ...preset, due: '', assigneeId: who ? who.id : currentUser.id, afterSave: after }), 320);
+    setTimeout(() => mOpenTaskSheet({ ...preset, assigneeId: sp.whoId || currentUser.id, afterSave: after }), 320);
     return;
   }
-  openNewTaskModal(who ? who.id : currentUser.id, 'todo', { ...preset, afterCreate: after });
+  openNewTaskModal(sp.whoId || currentUser.id, 'todo', { ...preset, afterCreate: after });
+}
+// Add All (yours) / Assign All (each to the person it names): every pulled task not made yet
+async function meetingAll(id, btn){
+  const m = (granolaMeetings || []).find(x => x.id === id); if(!m) return;
+  const can = meetingCanAssign();
+  const open = meetingItems(m).flatMap(g => g.items).map(it => mtSpec(m, it.key)).filter(sp => sp && !mtSpecTasks(m, sp).length && (can ? sp.whoId : true));
+  if(!open.length) return;
+  if(btn){ btn.disabled = true; btn.textContent = can ? 'Assigning…' : 'Adding…'; }
+  const per = {};
+  for(const sp of open){
+    const who = can ? sp.whoId : currentUser.id;
+    const res = await mtInsert(m, sp, who);
+    if(res.error || !res.data) continue;
+    per[who] = (per[who] || 0) + 1;
+    mtKnow(res.data);
+    await meetingSettle(m, sp, res.data);
+    mtNotify(who, res.data.title);
+  }
+  const n = Object.values(per).reduce((a, b) => a + b, 0);
+  mtAfterChange(m);
+  if(!n){ showToast('error', 'Nothing added', 'Try again in a moment.'); return; }
+  if(can) showToast('success', `Assigned ${n} task${n === 1 ? '' : 's'}`, Object.entries(per).map(([uid, k]) => `${uid === currentUser.id ? 'You' : mtName(uid)} ${k}`).join(' · '));
+  else showToast('success', `Added ${n} task${n === 1 ? '' : 's'} to yours`, m.title);
+}
+
+// Remove from Radar: for everyone, and no read of Granola brings it back; tasks made from it stay
+async function meetingRemove(id){
+  const m = (granolaMeetings || []).find(x => x.id === id); if(!m) return;
+  const waiting = (meetingSgs[id] || []).some(s => s.status === 'pending');
+  const ok = await confirmDialog(`It goes for everyone on the team and won’t come back when Granola is read. Tasks already made from it stay${waiting ? '; its waiting suggestions are dismissed' : ''}.`,
+    { title: `Remove “${m.title}” from Radar?`, confirmLabel: 'Remove', destructive: true, danger: true });
+  if(!ok) return;
+  try{ await granolaApi('remove-meeting', { note: id }); }
+  catch(e){ showToast('error', 'Not removed', e.message || 'Try again in a moment.'); return; }
+  if(typeof mCloseSheet === 'function') mCloseSheet(true); else closeAppModal();
+  granolaMeetings = (granolaMeetings || []).filter(x => x.id !== id);
+  if(taskSuggestions) taskSuggestions = taskSuggestions.filter(s => s.sourceId !== id);
+  meetingsChanged();
+  showToast('info', 'Removed from Radar', m.title, { action: 'Undo', onAction: () => meetingRestore(id) });
+}
+async function meetingRestore(id){
+  let r;
+  try{ r = await granolaApi('restore-meeting', { note: id }); }
+  catch(e){ showToast('error', 'Not restored', e.message || 'Try again in a moment.'); return false; }
+  await loadGranolaMeetings();
+  try{ await loadTaskSuggestions(); }catch(e){}
+  meetingsChanged();
+  showToast('success', 'Back in Radar', (r && r.title) || '');
+  return true;
+}
+function meetingsChanged(){
+  const v = typeof currentViewName !== 'undefined' ? currentViewName : '';
+  if(v === 'notes' && typeof renderNotes === 'function') renderNotes();
+  if(v === 'tasks' && typeof renderTasks === 'function') renderTasks();
+  if(typeof updateTasksNavBadge === 'function') updateTasksNavBadge();
+  if(typeof mRenderTab === 'function') mRenderTab();
+  if(typeof mTop === 'function'){ const t = mTop(); if(t && t.refresh) t.refresh(); }
 }
 
 async function insertTaskRow(row){

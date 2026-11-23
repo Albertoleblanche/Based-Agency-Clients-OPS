@@ -528,6 +528,9 @@ html.ui-w .rvn-warn{border-radius:16px;background:var(--uw-c2)}
 /* ---- Notes: tiles as cards, names without badges ---- */
 html.ui-w .n1{padding:6px 26px 30px var(--uw-gl)}
 html.ui-w .n1-grid{gap:14px;margin-top:20px}
+html.ui-w .n1-sec .n1-grid{margin-top:12px}
+html.ui-w .n1-sec{margin-top:22px}
+html.ui-w .n1-sec + .n1-sec{margin-top:34px}
 html.ui-w .n1-t{border-radius:var(--uw-r-sec);background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
 html.ui-w .n1-t.has-c{box-shadow:inset 3px 0 0 var(--cc),0 0 0 1px var(--sep),var(--uw-shadow)}
 html.ui-w .n1-tc .mono{display:none}

@@ -603,22 +603,39 @@ async function addManualEntry(){
   const dateVal = document.getElementById('manualDate').value;
   const totalMinutes = parseDurationInput(document.getElementById('manualDuration').value);
   const description = document.getElementById('manualDesc').value.trim();
+  const asWork = typeof sheetIsOn === 'function' && sheetIsOn('manualWork');   // also log it as work, for Queue (Nov 23)
   if(!clientId){ showToast('error','Pick a client','Select which client this time is for.'); return; }
   if(isClientPaused(clientId)){ showPausedClientWarning(clientId); return; }
   if(!pick.ok){ showToast('error', 'Almost there', pick.msg); return; }
   if(!dateVal){ showToast('error','Pick a date','Choose the date this time was worked.'); return; }
   if(!totalMinutes || totalMinutes<=0){ showToast('error','Enter a duration','Try something like "1h 30m" or "1.5".'); return; }
+  if(asWork && !description){ showToast('error', 'Say what you worked on', 'The notes are what shows in Queue.'); document.getElementById('manualDesc')?.focus(); return; }
   if(totalMinutes > 960 && !(await confirmDialog(`That's ${formatMinutes(totalMinutes)} for a single entry — did you mean minutes instead of hours?`, {confirmLabel:'Log it anyway', cancelLabel:'Let me fix it'}))) return;
+  if(asWork && !(await okToLogDuplicate(clientId, description))) return;   // logged already? (data.js)
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
+  // as work: the improvement first, then the time as its own entry, linked to it (as Queue's Log does)
+  let imp = null;
+  if(asWork){
+    const c0 = clients.find(x => x.id === clientId), today = toDateStr(new Date());
+    const when = dateVal === today ? new Date() : new Date(dateVal + 'T12:00:00');
+    imp = await insertImprovementFull(clientId, { author: myName() || 'Team member', text: description, includeInEmail: true, source: 'time', date: when.toISOString(),
+      service: c0 && typeof serviceFromHarvest === 'function' && serviceFromHarvest(c0) ? (pick.projectId ? service : improvementServiceFor(c0)) : service });
+    if(!imp){ restoreBtn(btn); showToast('error', 'Save failed', 'Couldn’t log it as work. Try again in a moment.'); return; }
+  }
   const { error, merged, entryId } = await mergeOrInsertTimeEntry({
-    clientId, service, dateStr: dateVal, minutes: totalMinutes, description, projectId: pick.projectId, taskId: pick.taskId
+    clientId, service, dateStr: dateVal, minutes: totalMinutes, description, projectId: pick.projectId, taskId: pick.taskId, improvementId: imp ? imp.id : null
   });
   restoreBtn(btn);
   const c = clients.find(x=>x.id===clientId);
-  if(error){ showToast('error','Save failed', error.message); return; }
+  if(error){ showToast('error','Save failed', error.message); if(imp && typeof quRefreshAll === 'function') quRefreshAll(clientId); return; }
+  if(imp && entryId) await supabaseClient.from('time_entries').update({ logged: true }).eq('id', entryId);
   closeAppModal();
-  merged
+  if(imp){
+    if(typeof logClientActivity === 'function') logClientActivity(clientId, 'improvement_logged', `${myName() || 'Team member'} logged an improvement: "${description.length > 80 ? description.slice(0, 80) + '…' : description}"`);
+    if(typeof quRefreshAll === 'function') quRefreshAll(clientId);
+    showToast('success', 'Time added and logged as work', `${formatMinutes(totalMinutes)} for ${c ? c.name : 'the client'}; it’s in Queue.`);
+  } else merged
     ? showToast('success','Time added', `${formatMinutes(totalMinutes)} added to today's existing entry for ${c?c.name:'client'}.`)
     : showToast('success','Time added', `${formatMinutes(totalMinutes)} added for ${c?c.name:'client'}.`);
   syncEntryToHarvestBackground(entryId);

@@ -125,7 +125,7 @@ function granolaSheetInner(){
   ].filter(Boolean);
   return about + `<div class="form-grp"><div class="fr"><div class="l"><b>${icon('check-circle')}Connected</b><span>${lines.join('<br>')}</span></div></div></div>`
     + (admin ? `<div class="gr-acts"><button class="btn" id="granolaRead" onclick="granolaReadNow()">Read Recent Meetings Now</button><button class="btn" onclick="granolaDisconnect()">Disconnect…</button></div>` : '')
-    + (canApprove() ? granolaMeetingsHtml(g.meetings || [], admin) : '');
+    + granolaMeetingsHtml(g.meetings || [], admin);   // each person's own meetings; the server filters (Nov 23)
 }
 // The meetings Radar read lately and what came of each, so a missing task can be traced; an admin
 // can read one again (what it already suggested isn't suggested twice).
@@ -133,6 +133,7 @@ function granolaMeetingWords(m){
   if(m.state === 'waiting') return 'Waiting for Granola to finish the notes';
   if(m.state === 'reading') return 'Reading now…';
   if(m.state === 'same') return 'Another recording of this meeting was read';
+  if(m.state === 'removed') return `Removed from Radar${m.removedBy ? ` by ${String(m.removedBy).split(' ')[0]}` : ''}`;
   if(m.items) return `${m.items} task${m.items === 1 ? '' : 's'} suggested${m.away && m.away.length ? `; some were for people not in Radar (${m.away.join(', ')})` : ''}`;
   return m.why ? m.why.charAt(0).toUpperCase() + m.why.slice(1) : 'Nothing for the team';
 }
@@ -140,8 +141,14 @@ function granolaMeetingsHtml(list, admin){
   if(!list.length) return '';
   const day = t => { const d = new Date(t); return isNaN(d) ? '' : relDay(d); };
   const row = m => `<div class="fr gr-m"><div class="l"><b>${m.url ? `<a href="${safeUrl(m.url)}" target="_blank" rel="noopener">${escapeHtml(m.title)}</a>` : escapeHtml(m.title)}</b><span>${escapeHtml([day(m.meetingAt || m.at), granolaMeetingWords(m)].filter(Boolean).join(' · '))}</span></div>`
-    + (admin ? `<button class="btn sm" onclick="granolaReadAgain(${jsArg(m.id)}, this)">Read Again</button>` : '') + `</div>`;
+    + (m.state === 'removed' ? `<button class="btn sm" onclick="granolaRestore(${jsArg(m.id)}, this)">Restore</button>`
+      : admin ? `<button class="btn sm" onclick="granolaReadAgain(${jsArg(m.id)}, this)">Read Again</button>` : '') + `</div>`;
   return `<div class="sl-h gr-mh">Recent meetings</div><div class="form-grp gr-ml">${list.map(row).join('')}</div>`;
+}
+// A meeting removed from Radar, back (for the people who can see it; the server checks)
+async function granolaRestore(id, btn){
+  setBtnLoading(btn, 'Restoring…');
+  if(await meetingRestore(id)) await loadGranolaState(); else restoreBtn(btn);
 }
 async function granolaReadAgain(id, btn){
   setBtnLoading(btn, 'Reading…');

@@ -1163,13 +1163,14 @@ function mMeetingsHtml(){
   if(granolaMeetings === null) return '';
   if(!granolaMeetings.length) return '';
   const list = granolaMeetings.slice(0, mMtAll ? 60 : 6);
-  return `<div class="ish"><h2 class="ish-lg">${appLogo('granola', 'xs')}From Granola</h2>${granolaMeetings.length > 6 ? `<button onclick="mMtAll=!mMtAll;mTop()?.refresh()">${mMtAll ? 'Fewer' : 'See All'}</button>` : ''}</div>
-<div class="ig">${list.map(m => mIr('', mEsc(m.title), mEsc(meetingSubWords(m).join(' · ')), '', `openMeetingNotes(${mEsc(JSON.stringify(m.id))})`)).join('')}</div><p class="ifoot">Meetings shared to Granola’s team space. Everyone on the team sees these.</p>`;
+  return `<div class="ish"><h2 class="ish-lg">${appLogo('granola', 'xs')}Granola Meetings</h2>${granolaMeetings.length > 6 ? `<button onclick="mMtAll=!mMtAll;mTop()?.refresh()">${mMtAll ? 'Fewer' : 'See All'}</button>` : ''}</div>
+<div class="ig">${list.map(m => mIr('', mEsc(m.title), mEsc(meetingSubWords(m).join(' · ')), '', `openMeetingNotes(${mEsc(JSON.stringify(m.id))})`)).join('')}</div><p class="ifoot">${meetingCanAssign() ? 'Admins and approvers see every meeting; everyone else, the meetings they were in.' : 'The meetings you were in.'}</p>`;
 }
 let mMtAll = false;
 function mOpenNotes(){
-  mPush('Notes', () => `<h1 class="big">Notes</h1><p class="big-sub">Only you can see these</p>
-<div class="ig" style="margin-top:16px">${notes.map(n => { const c = clients.find(x => x.id === n.clientId); return mIr('', mEsc(n.title || 'Untitled note'), mEsc([c ? c.name : '', String(n.text || '').replace(/\s+/g, ' ').slice(0, 60)].filter(Boolean).join(' · ')), '', `mOpenNoteSheet('${n.id}')`, { n: true }); }).join('') || '<div class="ir"><span class="t n" style="color:var(--label-2)">No notes yet</span></div>'}</div>${mMeetingsHtml()}`,
+  // two sections: Granola Meetings, then Personal (Nov 23)
+  mPush('Notes', () => `<h1 class="big">Notes</h1>${mMeetingsHtml()}<div class="ish"><h2 class="ish-lg">${icon('lock-simple')}Personal</h2></div>
+<div class="ig">${notes.map(n => { const c = clients.find(x => x.id === n.clientId); return mIr('', mEsc(n.title || 'Untitled note'), mEsc([c ? c.name : '', String(n.text || '').replace(/\s+/g, ' ').slice(0, 60)].filter(Boolean).join(' · ')), '', `mOpenNoteSheet('${n.id}')`, { n: true }); }).join('') || '<div class="ir"><span class="t n" style="color:var(--label-2)">No notes yet</span></div>'}</div><p class="ifoot">Only you can see these.</p>`,
   { right: `<button aria-label="New note" onclick="mOpenNoteSheet()">${icon('plus')}</button>` });
 }
 function mOpenTime(){
@@ -1501,13 +1502,15 @@ let mTime_ = {};
 function mOpenTimeSheet(presetClientId){
   if(!waPresetOk(presetClientId)) return;
   const c = clients.find(x => x.id === presetClientId);
-  mTime_ = { clientId: presetClientId || '', service: (c && c.service) || (settings.serviceOptions || [])[0] || '', date: toDateStr(new Date()) };
+  mTime_ = { clientId: presetClientId || '', service: (c && c.service) || (settings.serviceOptions || [])[0] || '', date: toDateStr(new Date()), work: false };
   mHvClient(mTime_);
   mKeep('mTimeDur', ''); mKeep('mTimeDesc', '');
   window.mTimeBody = () => `<div class="ig flat" style="margin-top:12px">${mRowPick('Client', mEsc(mClientName(mTime_.clientId) || 'Choose'), "mTimePick('client')", !!mTime_.clientId)}${mHvRows(mTime_, 'mTimePick')}${mRowPick('Date', mTime_.date === toDateStr(new Date()) ? 'Today' : sheetDayLabel(new Date(mTime_.date + 'T12:00:00')), "mTimePick('date')", true)}
 <div class="ir"><label class="ilab" for="mTimeDur">Time worked</label><input class="tm" id="mTimeDur" inputmode="decimal" placeholder="1:30" oninput="mKeep('mTimeDur',this.value)"></div></div>
 <p class="ifoot">${mHvBill(mTime_) ? mHvBill(mTime_) + '. ' : ''}1:30, 45m or 1.5 all work.</p>
-<div class="ig flat" style="margin-top:20px"><div class="ir" style="align-items:flex-start"><textarea class="iarea" id="mTimeDesc" placeholder="What did you work on?" style="min-height:72px" oninput="mKeep('mTimeDesc',this.value)"></textarea></div></div>`;
+<div class="ig flat" style="margin-top:20px"><div class="ir" style="align-items:flex-start"><textarea class="iarea" id="mTimeDesc" placeholder="What did you work on?" style="min-height:72px" oninput="mKeep('mTimeDesc',this.value)"></textarea></div></div>
+<div class="ig flat" style="margin-top:20px"><div class="ir"><span class="ilab">Also Log It as Work</span><button class="ios-sw${mTime_.work ? ' on' : ''}" id="mTimeWork" role="switch" aria-checked="${!!mTime_.work}" aria-label="Also log it as work" onclick="mTime_.work=!mTime_.work;this.classList.toggle('on',mTime_.work);this.setAttribute('aria-checked',mTime_.work)"></button></div></div>
+<p class="ifoot">What you worked on becomes an improvement in Queue, ready for the client update.</p>`;
   mOpenSheet('Add Time', window.mTimeBody(), { done: 'mSaveTime()', doneLabel: 'Add' });
 }
 function mTimePick(what){
@@ -1526,11 +1529,22 @@ async function mSaveTime(){
   const pick = mHvValue(T);
   if(!pick.ok){ showToast('error', 'Almost there', pick.msg); return; }
   if(minutes > 16 * 60 && !(await confirmDialog(`That’s ${Math.floor(minutes / 60)} hours in one entry.`, { title: 'Log it anyway?', confirmLabel: 'Log It' }))) return;
+  if(T.work && !desc){ showToast('error', 'Say what you worked on', 'That’s what shows in Queue.'); $m('mTimeDesc')?.focus(); return; }
+  if(T.work && !(await okToLogDuplicate(T.clientId, desc))) return;   // logged already? (data.js)
   const btn = $m('mSheetDone'); if(btn) btn.disabled = true;
-  const id = await mAddTime({ clientId: T.clientId, service: pick.service, dateStr: T.date, minutes, description: desc, projectId: pick.projectId, taskId: pick.taskId });
+  // as work (Nov 23): the improvement first, then the time as its own entry, linked to it
+  let imp = null;
+  if(T.work){
+    const c = clients.find(x => x.id === T.clientId), when = T.date === toDateStr(new Date()) ? new Date() : new Date(T.date + 'T12:00:00');
+    imp = await insertImprovementFull(T.clientId, { author: myName() || 'Team member', text: desc, includeInEmail: true, source: 'time', date: when.toISOString(),
+      service: c && serviceFromHarvest(c) ? (pick.projectId ? pick.service : improvementServiceFor(c)) : pick.service });
+    if(!imp){ if(btn) btn.disabled = false; showToast('error', 'Couldn’t log it as work', 'Try again in a moment.'); return; }
+  }
+  const id = await mAddTime({ clientId: T.clientId, service: pick.service, dateStr: T.date, minutes, description: desc, projectId: pick.projectId, taskId: pick.taskId, logged: !!imp, improvementId: imp ? imp.id : null });
   if(!id){ if(btn) btn.disabled = false; showToast('error', 'Couldn’t add the time', 'Try again in a moment.'); return; }
+  if(imp) mLog(T.clientId, 'improvement_logged', `${myName() || 'Team member'} logged an improvement: "${desc.slice(0, 80)}"`, `Logged an improvement for <b>${escapeHtml(mClientName(T.clientId))}</b>.`);
   mCloseSheet(true); await mRefresh();
-  showToast('success', 'Time added', `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')} for ${mClientName(T.clientId)}`);
+  showToast('success', imp ? 'Time added and logged as work' : 'Time added', `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')} for ${mClientName(T.clientId)}${imp ? '; it’s in Queue' : ''}`);
 }
 async function mStopTimer(quiet, logged, improvementId){
   if(!timerState.running) return;

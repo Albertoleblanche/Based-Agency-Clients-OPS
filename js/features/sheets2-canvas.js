@@ -307,6 +307,7 @@ ${hvPickBlockHtml('manual', cid, d.projectId, d.taskId)}
 <label for="manualDate">Date</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sheetDateField('manualDate', day, { past: true, from: -30, to: 0, max: today })}</div>
 <label for="manualDuration">Time</label><input id="manualDuration" class="tf" style="width:110px" placeholder="1:30" autocomplete="off"${presetMinutes ? ` value="${hmm(presetMinutes)}"` : ''}>
 <label class="top" for="manualDesc">Notes</label><textarea id="manualDesc" class="tf" spellcheck="true" placeholder="What did you work on?"></textarea>
+<span></span><div class="mw-row">${sheetSw('manualWork', false, 'Also log it as work')}<div><b>Also log it as work</b><span>The notes become an improvement in Queue, ready for the client update.</span></div></div>
 </div>
 <div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="addManualEntry()">Add Time</button></div>`, 520);
 }
