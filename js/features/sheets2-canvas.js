@@ -43,7 +43,7 @@ function sheetFocusPrimary(){ setTimeout(() => document.querySelector('#appModal
 // ---- Reminders ------------------------------------------------------------------------------
 const REMINDER_DOT = { waiting: 'yellow', due: 'red', answered: 'green', closed: 'hollow' };
 function openNewReminderModal(presetClientId){
-  const fu = toDateStr(addDays(new Date(), 3));
+  const fu = toDateStr(typeof remWorkday === 'function' ? remWorkday(addDays(new Date(), 3)) : addDays(new Date(), 3));   // never a weekend
   openAppModal(`<h3>New Reminder</h3>
 <div class="f">
 <label for="reminderClient">Client</label><div>${sheetPop('reminderClient', 'Client', sheetClientOptions(), presetClientId || '', '', { placeholder: 'Choose a client' })}</div>

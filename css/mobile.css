@@ -104,6 +104,22 @@ body.mac.mobile { overflow: hidden; background: var(--ios-bg, #F2F2F7); -webkit-
 .idraft-parts { margin: 10px 0 0; font-size: 14px; line-height: 1.4; color: var(--label-2); }
 .idraft h2 { font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; margin: 16px 0 12px; }
 .idraft .body { font-size: 16px; line-height: 1.5; }
+/* Nudge (Nov 23): the AI's follow-up to a client, from Reminders */
+.inudge-q { margin-top: 4px; font-size: 15px; line-height: 1.4; color: var(--label-2); }
+.inudge .inudge-ch { margin: 14px 0 4px; }
+.inudge .inudge-ch button { height: 30px; padding: 0 16px; font-size: 15px; }
+.inudge .inudge-f { margin: 12px -16px 0; }
+.inudge .inudge-f .itf { font-weight: 600; }
+.inudge .inudge-f textarea.iarea { min-height: 200px; }
+.inudge-n { margin: 10px 0 0; font-size: 14px; line-height: 1.4; color: var(--label-2); }
+.app .inudge-n .inudge-again { border: 0; background: none; padding: 0; font: inherit; font-weight: 500; color: var(--accent); }
+.inudge-w { display: flex; align-items: center; gap: 8px; margin: 22px 0 14px; font-size: 15px; color: var(--label-2); }
+.inudge-w svg { width: 17px; height: 17px; }
+.inudge-sk { display: block; height: 12px; margin: 0 0 12px; border-radius: 6px; background: var(--fill-2); }
+.inudge-sk:nth-of-type(2) { width: 80%; }
+.inudge-sk:nth-of-type(3) { width: 56%; }
+@media (prefers-reduced-motion: no-preference) { .inudge-sk { animation: mskel 1.4s ease-in-out infinite; } }
+@keyframes mskel { 50% { opacity: .5; } }
 .idraft .body p { margin: 0 0 10px; }
 .idraft .body ul { margin: 0 0 10px; padding-left: 20px; }
 .idraft .body li { margin-bottom: 6px; }

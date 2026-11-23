@@ -2,7 +2,7 @@ import cron from 'node-cron';
 import { config } from './config.js';
 import { connect, getStatus, stop, relink, syncActiveGroups, refreshGroups, groupsReady } from './wa.js';
 import { loadSettings, applySettings, heartbeat, clearRelinkFlag, clearCheckFlag } from './settings.js';
-import { runDigest, alertAdmins } from './digest.js';
+import { runDigest, alertAdmins, sendHeldAlerts } from './digest.js';
 
 const args = new Set(process.argv.slice(2));
 const dry = args.has('--dry');
@@ -41,9 +41,14 @@ async function main(){
     for(const t of config.digestTimes){
       const [h, m] = t.split(':').map(Number);
       if(Number.isNaN(h) || Number.isNaN(m)) { console.error(`Bad digest time: ${t}`); continue; }
-      tasks.push(cron.schedule(`${m} ${h} * * *`, () => { if(getStatus() === 'open') safeDigest({ dry }); else console.log('Skipped digest: WhatsApp not connected.'); }, { timezone: config.tz }));
+      // Weekdays only: the team doesn't work weekends. Monday's first check reads everything since
+      // Friday's last one, so nothing is missed.
+      tasks.push(cron.schedule(`${m} ${h} * * 1-5`, async () => {
+        await sendHeldAlerts().catch(e => console.error('Held alert not sent:', e.message));
+        if(getStatus() === 'open') safeDigest({ dry }); else console.log('Skipped digest: WhatsApp not connected.');
+      }, { timezone: config.tz }));
     }
-    console.log(`Digest scheduled daily at ${config.digestTimes.join(', ')} (${config.tz}).`);
+    console.log(`Digest scheduled on weekdays at ${config.digestTimes.join(', ')} (${config.tz}).`);
   };
   applySettings(await loadSettings());
   schedule();

@@ -26,7 +26,7 @@ function remRowHtml(r, primary){
   if(open){
     const [when, late] = remWhen(r);
     right = `<span class="rmi-when${late ? ' is-late' : ''}">${when}</span><span class="rmi-d">${r.askedDate ? 'waiting ' + remWaited(r.askedDate) : ''}</span>`;
-    if(due) act = `<button class="btn${primary ? ' btn-p' : ''}" onclick="event.stopPropagation();nudgeReminder('${r.id}')">${icon('paper-plane-tilt')}Nudge</button>`;
+    if(due) act = `<button class="btn${primary ? ' btn-p' : ''}" onclick="event.stopPropagation();nudgeReminder('${r.id}')">${icon('sparkle')}Nudge</button>`;
   } else {
     const at = r.resolvedAt ? fmtShortDate(new Date(r.resolvedAt)) : '';
     right = `<span class="rmi-when">${r.status === 'answered' ? 'Answered' : 'Closed'} ${at}</span><span class="rmi-d">${r.askedDate && r.resolvedAt ? 'after ' + remWaited(r.askedDate, r.resolvedAt) : ''}</span>`;
@@ -107,8 +107,9 @@ function remPanelHtml(r){
     : `<span class="rmp-st${r.status === 'answered' ? ' is-ok' : ''}">${r.status === 'answered' ? 'Answered' : 'Closed'}${resolvedAt ? ' ' + resolvedAt : ''}</span>`;
   const follow = open ? `<span class="tkp-k">Follow up</span><span class="tkp-v rmp-fu${late ? ' tkp-late' : ''}">${sheetDateField('remFollowUp', r.followUpDate || '', { from: 0, to: 30, min: toDateStr(new Date()), none: r.followUpDate ? '' : 'No date', after: 'remSetFollowUp' })}</span>` : '';
   const waited = r.askedDate ? remWaited(r.askedDate, open ? null : r.resolvedAt) : '';
+  const draft = open ? remDrafts[r.id] : null;
   const acts = open
-    ? `<div class="tkp-acts"><button class="btn${due ? ' btn-p' : ''}" onclick="nudgeReminder('${r.id}')">${icon('paper-plane-tilt')}Nudge</button><button class="btn${due ? '' : ' btn-p'}" onclick="markReminderStatus('${r.id}','answered')">${icon('check')}Mark Answered</button></div>`
+    ? `<div class="tkp-acts">${draft ? '' : `<button class="btn${due ? ' btn-p' : ''}" onclick="nudgeReminder('${r.id}')">${icon('sparkle')}Draft Nudge</button>`}<button class="btn${due || draft ? '' : ' btn-p'}" onclick="markReminderStatus('${r.id}','answered')">${icon('check')}Mark Answered</button></div>`
     : `<div class="tkp-acts"><button class="btn" onclick="markReminderStatus('${r.id}','waiting')">${icon('rotate-ccw')}Reopen</button></div>`;
   const ev = [];
   if(r.askedDate) ev.push({ at: r.askedDate + 'T12:00:00', html: `<b>${escapeHtml(r.askedBy === currentUser?.id ? 'You' : firstName(owner ? owner.name : 'Someone'))}</b> asked ${escapeHtml(c ? c.name : 'the client')}` });
@@ -134,6 +135,7 @@ ${follow}
 ${linked ? `<span class="tkp-k">Calendar</span><span class="tkp-v">On your calendar</span>` : ''}
 </div>
 ${acts}
+${draft ? remDraftHtml(r, c, draft) : ''}
 <div class="sp-sec"><b>Activity</b></div>${ev.map(e => `<div class="tkp-a"><span class="tkp-ad">${day(e.at)}</span><span>${e.html}</span></div>`).join('')}
 </aside>`;
 }
@@ -186,27 +188,92 @@ async function remAddToCalendar(id){
   if(typeof loadCalendarEvents === 'function') await loadCalendarEvents();
   renderReminders();
 }
-// Nudge: open a short follow-up email to the client and move the next follow-up three days out.
-async function nudgeReminder(id){
+// ---- Nudge: the AI writes the follow-up to the client (js/core/followup-prompt.js) --------------
+// Draft Nudge writes it in the panel, as an email or a WhatsApp message (how the client hears from
+// us), to edit before it goes. Open in Mail or Copy counts as nudged: the next follow-up moves three
+// days out (never onto a weekend). Nothing is ever sent to the client by Radar itself.
+const remDrafts = {};   // reminder id -> { ch: 'email' | 'whatsapp', state: 'writing' | 'ready', subject, body, plain, n }
+// The next weekday from a date: the team doesn't work weekends.
+function remWorkday(d){ const k = d.getDay(); return k === 6 ? addDays(d, 2) : k === 0 ? addDays(d, 1) : d; }
+function remNudgeCh(c){ return c && typeof winChannel === 'function' && winChannel(c) === 'whatsapp' ? 'whatsapp' : 'email'; }
+function remNudgeFacts(r, c, ch){
+  const asked = r.askedDate ? remDay(r.askedDate) : null;
+  return { client: c ? c.name : 'the client', contact: typeof clientContact === 'function' ? clientContact(c) : '', ask: r.question,
+    askedOn: asked ? asked.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : '',
+    waitedDays: asked ? Math.max(0, daysBetween(asked, dayStart(new Date()))) : null,
+    sender: firstName(myName() || ''), agency: settings.appName || 'Based Agency', whatsapp: ch === 'whatsapp' };
+}
+// From a row's Nudge, or the panel's Draft Nudge: open the panel on it and write the nudge.
+function nudgeReminder(id){
+  if(window._remSel !== id){ window._remSel = id; }
+  remDraftNudge(id);
+}
+async function remDraftNudge(id, ch){
+  const r = clientReminders.find(x => x.id === id); if(!r) return;
+  const c = clients.find(x => x.id === r.clientId), prev = remDrafts[id];
+  const d = remDrafts[id] = { ch: ch || (prev && prev.ch) || remNudgeCh(c), state: 'writing', subject: '', body: '', plain: false, n: ((prev && prev.n) || 0) + 1 };
+  renderReminders();
+  const o = remNudgeFacts(r, c, d.ch);
+  let out = null;
+  try{
+    const res = await fetch('/api/generate-draft', { method: 'POST', headers: await apiAuthHeaders(), body: JSON.stringify({ prompt: followUpPrompt(o), model: settings.openaiModel }) });
+    const data = await res.json().catch(() => ({}));
+    if(res.ok) out = followUpParse(data.text, o.whatsapp);
+  }catch(e){ console.error('Nudge draft failed', e); }
+  if(remDrafts[id] !== d) return;   // written again, or discarded, while this one was on its way
+  if(!out){ out = followUpPlain(o); d.plain = true; }
+  Object.assign(d, { state: 'ready', subject: out.subject || '', body: out.body || '' });
+  renderReminders();
+  if(d.plain) showToast('info', 'Here’s a simple one', 'The AI didn’t answer, so this is a plain nudge to edit.');
+  setTimeout(() => { const el = document.getElementById('remDrBody'); if(el && window._remSel === id){ el.focus(); el.setSelectionRange(0, 0); el.scrollTop = 0; } }, 40);
+}
+function remDraftEdit(id, k, v){ const d = remDrafts[id]; if(d) d[k] = v; }
+function remDiscardNudge(id){ delete remDrafts[id]; renderReminders(); }
+function remDraftHtml(r, c, d){
+  const email = d.ch === 'email', to = c && c.email ? String(c.email).split(',')[0].trim() : '';
+  const who = (typeof clientContact === 'function' && clientContact(c)) || (c ? c.name : 'the client');
+  const next = remDay(toDateStr(remWorkday(addDays(new Date(), 3)))).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const seg = `<div class="seg rmp-ch" role="tablist" aria-label="Send by">${[['email', 'Email'], ['whatsapp', 'WhatsApp']].map(([k, t]) => `<button class="${d.ch === k ? 'on' : ''}" role="tab" aria-selected="${d.ch === k}" ${d.state === 'writing' ? 'disabled' : ''} onclick="${d.ch === k ? '' : `remDraftNudge('${r.id}','${k}')`}">${t}</button>`).join('')}</div>`;
+  const head = `<div class="sp-sec rmp-dh"><b>Nudge</b>${seg}<span class="rmp-dt"><button class="ib" aria-label="Write again" title="Write again" ${d.state === 'writing' ? 'disabled' : ''} onclick="remDraftNudge('${r.id}')">${icon('arrows-clockwise')}</button><button class="ib" aria-label="Discard the nudge" title="Discard" onclick="remDiscardNudge('${r.id}')">${icon('x')}</button></span></div>`;
+  if(d.state === 'writing') return `${head}<div class="rmp-dr is-writing" aria-live="polite"><p class="rmp-dw">${icon('sparkle')}Writing ${email ? 'an email' : 'a WhatsApp message'} to ${escapeHtml(who)}…</p><i></i><i></i><i></i></div>`;
+  const primary = email && to
+    ? `<button class="btn btn-p" onclick="remSendNudge('${r.id}')">${icon('envelope-simple')}Open in Mail</button><button class="btn" onclick="remCopyNudge('${r.id}')">${icon('copy')}Copy</button>`
+    : `<button class="btn btn-p" onclick="remCopyNudge('${r.id}')">${icon('copy')}${email ? 'Copy' : 'Copy for WhatsApp'}</button>`;
+  const note = email
+    ? (to ? `To ${escapeHtml(to)}. Sending it moves the next follow-up to ${next}.` : `No email on file for ${escapeHtml(c ? c.name : 'this client')}, so copy it into your mail. The next follow-up moves to ${next}.`)
+    : `Paste it in their group. The next follow-up moves to ${next}.`;
+  return `${head}<div class="rmp-dr">
+${email ? `<input class="tf rmp-subj" id="remDrSubj" aria-label="Subject" placeholder="Subject" value="${escapeHtml(d.subject)}" oninput="remDraftEdit('${r.id}','subject',this.value)">` : ''}
+<textarea class="tf rmp-body" id="remDrBody" aria-label="${email ? 'Email' : 'Message'}" spellcheck="true" rows="${email ? 8 : 5}" oninput="remDraftEdit('${r.id}','body',this.value)">${escapeHtml(d.body)}</textarea>
+<div class="rmp-dacts">${primary}</div>
+<p class="rmp-dn">${note}</p></div>`;
+}
+async function remSendNudge(id){
+  const r = clientReminders.find(x => x.id === id), d = remDrafts[id]; if(!r || !d) return;
+  const c = clients.find(x => x.id === r.clientId), to = c && c.email ? String(c.email).split(',')[0].trim() : '';
+  if(!to) return remCopyNudge(id);
+  const a = document.createElement('a');
+  a.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(d.subject || '')}&body=${encodeURIComponent(d.body || '')}`;
+  a.click();
+  await remNudged(id, 'mail');
+}
+async function remCopyNudge(id){
+  const d = remDrafts[id]; if(!d) return;
+  try{ await navigator.clipboard.writeText(d.body || ''); }catch(e){ showToast('error', 'Couldn’t copy', 'Select the text and copy it yourself.'); return; }
+  await remNudged(id, d.ch === 'whatsapp' ? 'whatsapp' : 'copy');
+}
+async function remNudged(id, how){
   const r = clientReminders.find(x => x.id === id); if(!r) return;
   const c = clients.find(x => x.id === r.clientId);
-  const asked = r.askedDate ? remDay(r.askedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : '';
-  const body = `Hi,\n\nJust following up on my question${asked ? ` from ${asked}` : ''}:\n\n${r.question}\n\nThanks,\n${firstName(myName() || '')}`;
-  if(c && c.email){
-    const a = document.createElement('a');
-    a.href = `mailto:${encodeURIComponent(c.email)}?subject=${encodeURIComponent('Following up: ' + r.question)}&body=${encodeURIComponent(body)}`;
-    a.click();
-  } else {
-    try{ await navigator.clipboard.writeText(body); }catch(e){}
-  }
-  const next = toDateStr(addDays(new Date(), 3));
+  const next = toDateStr(remWorkday(addDays(new Date(), 3)));
+  delete remDrafts[id];
   (remSessionActivity[id] = remSessionActivity[id] || []).push({ at: new Date().toISOString(), html: `<b>You</b> nudged ${escapeHtml(c ? c.name : 'them')}` });
   const { error } = await supabaseClient.from('client_reminders').update({ follow_up_date: next }).eq('id', id);
-  if(error){ showToast('error', 'Follow-up date not moved', error.message); return; }
+  if(error){ renderReminders(); showToast('error', 'Follow-up date not moved', error.message); return; }
   await loadClientReminders();
   renderReminders();
   const day = remDay(next).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  showToast('success', c && c.email ? 'Nudge ready in your mail app' : 'Nudge copied', `${c && c.email ? '' : `No email on file for ${c ? c.name : 'this client'}, so the message is on your clipboard. `}Next follow-up ${day}.`);
+  showToast('success', how === 'mail' ? 'Nudge ready in your mail app' : how === 'whatsapp' ? 'Nudge copied for WhatsApp' : 'Nudge copied', `Next follow-up ${day}.`);
   if(c) logClientActivity(r.clientId, 'reminder_nudged', `${myName() || 'Someone'} nudged ${c.name} about "${r.question.length > 80 ? r.question.slice(0, 80) + '…' : r.question}".`);
 }
 

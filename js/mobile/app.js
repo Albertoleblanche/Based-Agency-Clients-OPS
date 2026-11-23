@@ -892,10 +892,93 @@ function mReminderActions(id){
   const r = clientReminders.find(x => x.id === id); if(!r) return;
   const c = clients.find(x => x.id === r.clientId);
   mActions(r.question, [
+    ...(r.status === 'waiting' ? [{ label: 'Draft a Nudge', fn: () => mOpenNudge(id) }] : []),
     { label: 'Mark Answered', fn: async () => { await supabaseClient.from('client_reminders').update({ status: 'answered', resolved_at: new Date().toISOString() }).eq('id', id); await mRefresh(); showToast('success', 'Marked answered', c ? c.name : ''); } },
     { label: 'Make a Task', fn: () => mOpenTaskSheet({ title: c ? `Follow up with ${c.name}` : 'Follow up', clientId: r.clientId, description: r.question }) },
     { label: 'Delete Reminder', danger: true, fn: async () => { await supabaseClient.from('client_reminders').delete().eq('id', id); await mRefresh(); showToast('success', 'Reminder deleted', ''); } },
   ]);
+}
+// Nudge (Nov 23): the AI writes the follow-up to the client (js/core/followup-prompt.js), as on the
+// desktop. Open in Mail or Copy counts as nudged and moves the next follow-up three days out, never
+// onto a weekend. Radar never sends it to the client by itself.
+let mNudge_ = null;   // { id, ch, state, subject, body, plain, n }
+function mWorkday(d){ const k = d.getDay(); return k === 6 ? addDays(d, 2) : k === 0 ? addDays(d, 1) : d; }
+function mOpenNudge(id){
+  const r = clientReminders.find(x => x.id === id); if(!r) return;
+  const c = clients.find(x => x.id === r.clientId);
+  mNudge_ = { id, ch: c && typeof winChannel === 'function' && winChannel(c) === 'whatsapp' ? 'whatsapp' : 'email', state: 'writing', subject: '', body: '', n: 0 };
+  const entry = mPush('Nudge', () => mNudgeBody(), { navTitle: true });
+  mNudge_.entry = entry;
+  mWriteNudge();
+}
+async function mWriteNudge(ch){
+  const n = mNudge_; if(!n) return;
+  const r = clientReminders.find(x => x.id === n.id); if(!r) return;
+  const c = clients.find(x => x.id === r.clientId);
+  if(ch) n.ch = ch;
+  n.state = 'writing'; n.plain = false; const k = ++n.n;
+  n.entry && n.entry.refresh();
+  const asked = r.askedDate ? new Date(r.askedDate + 'T12:00:00') : null;
+  const o = { client: c ? c.name : 'the client', contact: clientContact(c), ask: r.question,
+    askedOn: asked ? asked.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : '',
+    waitedDays: asked ? Math.max(0, daysBetween(dayStart(asked), dayStart(new Date()))) : null,
+    sender: firstName(myName() || ''), agency: (typeof settings !== 'undefined' && settings.appName) || 'Based Agency', whatsapp: n.ch === 'whatsapp' };
+  let out = null;
+  try{
+    const res = await fetch('/api/generate-draft', { method: 'POST', headers: await apiAuthHeaders(), body: JSON.stringify({ prompt: followUpPrompt(o), model: typeof settings !== 'undefined' ? settings.openaiModel : undefined }) });
+    const data = await res.json().catch(() => ({}));
+    if(res.ok) out = followUpParse(data.text, o.whatsapp);
+  }catch(e){}
+  if(mNudge_ !== n || n.n !== k) return;
+  if(!out){ out = followUpPlain(o); n.plain = true; }
+  Object.assign(n, { state: 'ready', subject: out.subject || '', body: out.body || '' });
+  n.entry && n.entry.refresh();
+  if(n.plain) showToast('info', 'Here’s a simple one', 'The AI didn’t answer, so this is a plain nudge to edit.');
+}
+function mNudgeBody(){
+  const n = mNudge_; if(!n) return '';
+  const r = clientReminders.find(x => x.id === n.id), c = r && clients.find(x => x.id === r.clientId);
+  if(!r) return mEmpty('This reminder is gone', '');
+  const email = n.ch === 'email', to = c && c.email ? String(c.email).split(',')[0].trim() : '';
+  const who = clientContact(c) || (c ? c.name : 'the client');
+  const seg = `<div class="seg inudge-ch" role="tablist" aria-label="Send by">${[['email', 'Email'], ['whatsapp', 'WhatsApp']].map(([k, t]) => `<button class="${n.ch === k ? 'on' : ''}" role="tab" aria-selected="${n.ch === k}" ${n.state === 'writing' ? 'disabled' : ''} onclick="${n.ch === k ? '' : `mWriteNudge('${k}')`}">${t}</button>`).join('')}</div>`;
+  const head = `<div class="idraft inudge"><div style="font-size:17px;font-weight:600">${mEsc(c ? c.name : '')}</div><div class="inudge-q">${mEsc(r.question)}</div>${seg}`;
+  if(n.state === 'writing') return `${head}<div class="inudge-w" aria-live="polite">${icon('sparkle')}Writing ${email ? 'an email' : 'a WhatsApp message'} to ${mEsc(who)}…</div><i class="inudge-sk"></i><i class="inudge-sk"></i><i class="inudge-sk"></i></div>`;
+  const next = mWorkday(addDays(new Date(), 3)).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const primary = email && to
+    ? `<button class="ibtn s" style="flex:0 0 108px" onclick="mCopyNudge()">${icon('copy')}Copy</button><button class="ibtn p" onclick="mMailNudge()">${icon('envelope-simple')}Open in Mail</button>`
+    : `<button class="ibtn s" style="flex:0 0 108px" onclick="mWriteNudge()">${icon('arrows-clockwise')}Again</button><button class="ibtn p" onclick="mCopyNudge()">${icon('copy')}${email ? 'Copy' : 'Copy for WhatsApp'}</button>`;
+  return `${head}
+<div class="ig flat inudge-f">${email ? `<div class="ir"><input class="itf" id="mNudgeSubj" aria-label="Subject" placeholder="Subject" value="${mEsc(n.subject)}" oninput="mNudge_ && (mNudge_.subject = this.value)"></div>` : ''}
+<div class="ir" style="align-items:flex-start"><textarea class="iarea" id="mNudgeBody" aria-label="Message" spellcheck="true" oninput="mNudge_ && (mNudge_.body = this.value)">${mEsc(n.body)}</textarea></div></div>
+<p class="inudge-n">${email ? (to ? `To ${mEsc(to)}.` : `No email on file for ${mEsc(c ? c.name : 'this client')}, so copy it into your mail.`) : 'Paste it in their group.'} The next follow-up moves to ${next}.${email && to ? ` <button class="inudge-again" onclick="mWriteNudge()">Write again</button>` : ''}</p>
+</div><div class="ibar">${primary}</div>`;
+}
+async function mMailNudge(){
+  const n = mNudge_; if(!n) return;
+  const r = clientReminders.find(x => x.id === n.id), c = r && clients.find(x => x.id === r.clientId);
+  const to = c && c.email ? String(c.email).split(',')[0].trim() : '';
+  if(!to) return mCopyNudge();
+  const a = document.createElement('a');
+  a.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(n.subject || '')}&body=${encodeURIComponent(n.body || '')}`;
+  a.click();
+  await mNudged('mail');
+}
+async function mCopyNudge(){
+  const n = mNudge_; if(!n) return;
+  try{ await navigator.clipboard.writeText(n.body || ''); }catch(e){ showToast('error', 'Couldn’t copy', 'Select the text and copy it yourself.'); return; }
+  await mNudged(n.ch === 'whatsapp' ? 'whatsapp' : 'copy');
+}
+async function mNudged(how){
+  const n = mNudge_; if(!n) return;
+  const r = clientReminders.find(x => x.id === n.id), c = r && clients.find(x => x.id === r.clientId);
+  const next = mWorkday(addDays(new Date(), 3));
+  mNudge_ = null; mPop();
+  const { error } = await supabaseClient.from('client_reminders').update({ follow_up_date: toDateStr(next) }).eq('id', n.id);
+  if(error){ showToast('error', 'Follow-up date not moved', error.message); return; }
+  await mRefresh();
+  showToast('success', how === 'mail' ? 'Nudge ready in Mail' : how === 'whatsapp' ? 'Nudge copied for WhatsApp' : 'Nudge copied', `Next follow-up ${next.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}.`);
+  if(c && r && typeof logClientActivity === 'function') logClientActivity(r.clientId, 'reminder_nudged', `${myName() || 'Someone'} nudged ${c.name} about "${r.question.length > 80 ? r.question.slice(0, 80) + '…' : r.question}".`);
 }
 function mOpenNotes(){
   mPush('Notes', () => `<h1 class="big">Notes</h1><p class="big-sub">Only you can see these</p>
@@ -1307,7 +1390,7 @@ async function mSaveTask(){
 
 let mRem_ = {};
 function mOpenReminderSheet(){
-  mRem_ = { clientId: '', date: toDateStr(addDays(new Date(), 3)) };
+  mRem_ = { clientId: '', date: toDateStr(mWorkday(addDays(new Date(), 3))) };   // never a weekend
   mKeep('mRemQ', '');
   window.mRemBody = () => `<div class="ig flat" style="margin-top:12px">${mRowPick('Client', mEsc(mClientName(mRem_.clientId) || 'Choose'), "mRemPick('client')", !!mRem_.clientId)}</div>
 <div class="ig flat" style="margin-top:20px"><div class="ir" style="align-items:flex-start"><textarea class="iarea" id="mRemQ" placeholder="What are you waiting to hear back on?" oninput="mKeep('mRemQ',this.value)"></textarea></div></div>

@@ -16,6 +16,17 @@ const { syncGoogleCalendarForUser } = require('../lib/google-calendar-sync');
 const { syncTimeEntryToHarvest, syncHarvestSetup, syncHarvestTime } = require('../lib/harvest-sync');
 const { sendPushToUser, pushUrlFor } = require('../lib/push-notify');
 const { sendSlackDM } = require('../lib/slack-notify');
+const { isTeamWeekend } = require('../lib/workdays');
+
+// Client names for the reminders. Clients are their own table now (schema-clients-migration.sql);
+// the old app_storage list is gone, which made every reminder say "a client".
+async function clientNames(admin, ids) {
+  const names = {};
+  if (!ids.length) return names;
+  const { data } = await admin.from('clients').select('id, name').in('id', [...new Set(ids)]);
+  (data || []).forEach(c => { names[c.id] = c.name; });
+  return names;
+}
 
 async function notifyDueReminders(admin) {
   const today = new Date().toISOString().slice(0, 10);
@@ -32,12 +43,10 @@ async function notifyDueReminders(admin) {
     .is('reminder_notified_at', null);
   if (error || !due || !due.length) return { notified: 0 };
 
-  const { data: appDataRow } = await admin.from('app_storage').select('value').eq('key', 'app-data').maybeSingle();
-  const clients = appDataRow ? (JSON.parse(appDataRow.value).clients || []) : [];
+  const names = await clientNames(admin, due.map(r => r.client_id));
 
   for (const r of due) {
-    const client = clients.find(c => c.id === r.client_id);
-    const clientName = client ? client.name : 'a client';
+    const clientName = names[r.client_id] || 'A client';
     await admin.from('notifications').insert({
       user_id: r.asked_by, type: 'reminder_follow_up_due', title: 'Follow-up needed',
       body: `You haven't received a response from ${clientName} regarding: "${r.question}"`,
@@ -69,12 +78,10 @@ async function notifyEscalatedReminders(admin) {
   const { data: admins } = await admin.from('team_profiles').select('id, role').in('role', ['admin', 'approver']);
   if (!admins || !admins.length) return { escalated: 0 };
 
-  const { data: appDataRow } = await admin.from('app_storage').select('value').eq('key', 'app-data').maybeSingle();
-  const clients = appDataRow ? (JSON.parse(appDataRow.value).clients || []) : [];
+  const names = await clientNames(admin, stale.map(r => r.client_id));
 
   for (const r of stale) {
-    const client = clients.find(c => c.id === r.client_id);
-    const clientName = client ? client.name : 'a client';
+    const clientName = names[r.client_id] || 'A client';
     const recipients = admins.filter(a => a.id !== r.asked_by);
     for (const recipient of recipients) {
       await admin.from('notifications').insert({
@@ -165,12 +172,21 @@ module.exports = async function handler(req, res) {
 
   const admin = createClient(supabaseUrl, serviceKey);
   const result = { calendarSync: null, reminders: null, escalations: null, harvestSync: null, harvestSetup: null, harvestTime: null };
+  // The team doesn't work weekends (lib/workdays.js): the follow-up reminders, and the Harvest
+  // read that tells approvers about new or archived clients, wait for Monday morning. A follow-up
+  // due on Saturday is still waiting then, so Monday's run picks it up.
+  let weekend = false;
+  try { weekend = await isTeamWeekend(admin); } catch (e) {}
+  result.weekend = weekend;
 
-  try { result.reminders = await notifyDueReminders(admin); }
-  catch (e) { result.reminders = { error: String(e) }; }
+  if (weekend) result.reminders = result.escalations = { skipped: 'weekend' };
+  else {
+    try { result.reminders = await notifyDueReminders(admin); }
+    catch (e) { result.reminders = { error: String(e) }; }
 
-  try { result.escalations = await notifyEscalatedReminders(admin); }
-  catch (e) { result.escalations = { error: String(e) }; }
+    try { result.escalations = await notifyEscalatedReminders(admin); }
+    catch (e) { result.escalations = { error: String(e) }; }
+  }
 
   try { result.calendarSync = await syncGoogleCalendarAll(admin); }
   catch (e) { result.calendarSync = { error: String(e) }; }
@@ -184,6 +200,7 @@ module.exports = async function handler(req, res) {
     const { data: connection } = await admin.from('harvest_connection').select('*').eq('id', 1).maybeSingle();
     result.harvestSetup = !connection ? { skipped: 'not-connected' }
       : !('setup_synced_at' in connection) ? { skipped: 'needs-sql' }
+      : weekend ? { skipped: 'weekend' }
       : await syncHarvestSetup(admin, connection, { full: true });
   } catch (e) { result.harvestSetup = { error: String(e) }; }
   // Time logged in Harvest, everything from the first of last month (drops what was deleted there).

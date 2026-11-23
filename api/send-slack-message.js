@@ -327,7 +327,7 @@ module.exports = async function handler(req, res) {
         ).join('\n');
         const personalText = `*Your Daily Summary — ${dateLabel}*\n\n${entryLines}\n\n*Total:* ${formatMinutesServer(person.totalMinutes)}`;
 
-        const result = await sendSlackDM(admin, person.userId, 'daily_summary', personalText, overrideId);
+        const result = await sendSlackDM(admin, person.userId, 'daily_summary', personalText, overrideId, { anyDay: true });   // someone pressed Send
         results.push({ userId: person.userId, name: person.name, ...result });
       }
 

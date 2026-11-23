@@ -2922,6 +2922,35 @@ a.mi{text-decoration:none;color:inherit}
 .rmp-fu .tf{height:28px}
 .rmp .tkp-acts .btn{flex:1 1 0;justify-content:center}
 .rmp .tkp-acts .btn svg{width:14px;height:14px}
+/* Nudge: the AI's follow-up to the client, edited in the panel before it goes (work-canvas.js) */
+.rmp-dh{align-items:center}
+.rmp-dh .rmp-ch{margin-left:6px}
+.rmp-dh .rmp-ch button{height:22px;padding:0 10px;font-size:12.5px}
+.rmp-dt{display:flex;gap:2px;margin-left:auto}
+.rmp-dt .ib{width:26px;height:26px}
+.rmp-dt .ib svg{width:14px;height:14px}
+.rmp-dr{display:flex;flex-direction:column;gap:8px}
+.mac .rmp-dr .tf{width:100%;font-size:14px}
+.mac .rmp-dr .rmp-subj{height:34px;font-weight:600}
+.mac .rmp-dr textarea.rmp-body{min-height:132px;line-height:1.55;resize:vertical;field-sizing:content;max-height:46vh}
+.rmp-dacts{display:flex;gap:8px;margin-top:2px}
+.rmp-dacts .btn{flex:1 1 0;justify-content:center;height:34px}
+.rmp-dacts .btn svg{width:14px;height:14px}
+.rmp-dn{margin:0;font-size:12.5px;line-height:1.45;color:var(--label-2)}
+.rmp-dr.is-writing{gap:9px;padding:4px 0 6px}
+.rmp-dw{display:flex;align-items:center;gap:7px;margin:0 0 2px;font-size:13px;color:var(--label-2)}
+.rmp-dw svg{width:14px;height:14px;color:var(--label-2)}
+.rmp-dr.is-writing i{display:block;height:10px;border-radius:5px;background:var(--fill-2)}
+.rmp-dr.is-writing i:nth-of-type(1){width:92%}
+.rmp-dr.is-writing i:nth-of-type(2){width:78%}
+.rmp-dr.is-writing i:nth-of-type(3){width:54%}
+@media (prefers-reduced-motion:no-preference){
+  .rmp-dr.is-writing i{animation:skel 1.4s ease-in-out infinite}
+  .rmp-dr.is-writing i:nth-of-type(2){animation-delay:.15s}
+  .rmp-dr.is-writing i:nth-of-type(3){animation-delay:.3s}
+  .rmp-dr:not(.is-writing){animation:rmpIn 220ms cubic-bezier(.23,1,.32,1)}
+}
+@keyframes rmpIn{from{opacity:0;transform:translateY(4px)}}
 @media (hover:hover) and (pointer:fine){
   .tk-c:hover{background:var(--fill-2)}
   .tk-c.is-sel:hover{background:var(--select)}

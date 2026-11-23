@@ -36,7 +36,8 @@ After the connector is running once, open Radar → Settings → **WhatsApp** (o
 - **Groups it reads:** switch any group on or off, or Turn All On / Turn All Off (with Find, just the
   groups that match). Groups with "Marketing" in the name are on by default. Only group *names* are
   stored for groups that are off, never their messages.
-- **When it checks:** the daily check times and time zone.
+- **When it checks:** the check times and time zone. It checks on weekdays only (the team doesn't work
+  weekends); Monday's first check reads everything since Friday, and an alert on a weekend waits for Monday.
 - **Who handles what:** edit what each person is responsible for. Blank = the default.
 
 **Weekly wins:** when someone pastes an approved win in a client's group, Radar marks it sent by

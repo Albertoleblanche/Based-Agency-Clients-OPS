@@ -82,7 +82,22 @@ export async function runDigest({ dry = false, notify = true } = {}){
   console.log(`Digest done: ${groups.length} groups, +${created} new, ${reopened} reopened, ${resolved} answered, ${open.length} open, ${sent} Slack DMs.`);
 }
 
+// The team's weekend, in the connector's time zone (Radar's WhatsApp settings).
+export function isWeekend(when = new Date()){
+  const d = new Intl.DateTimeFormat('en-US', { timeZone: config.tz, weekday: 'short' }).format(when);
+  return d === 'Sat' || d === 'Sun';
+}
+// An alert on a Saturday or Sunday waits for Monday's first check (sendHeldAlerts), so nobody is
+// messaged on the weekend. Only the latest of each kind is kept.
+const held = new Map();
+export async function sendHeldAlerts(){
+  if(isWeekend() || !held.size) return;
+  const list = [...held.values()]; held.clear();
+  for(const text of list) await alertAdmins(text);
+}
+
 export async function alertAdmins(text){
+  if(isWeekend()){ held.set(text, text); console.log('Weekend, so this alert goes out Monday morning:', text); return; }
   const profiles = await loadProfiles();
   const testers = config.pilotIds;
   if(testers === null){ console.error('Not sent to Slack (Radar settings not loaded):', text); return; }

@@ -212,8 +212,8 @@ ${yours}
 </div>
 <div class="set-h">Help the team keep up</div>
 <div class="form-grp">
-${auto('autoDraft', 'Write drafts automatically', 'Each morning, for clients due within a day, from the work logged. They still wait for an approver.')}
-${auto('remindBehind', 'Remind whoever has an overdue update', 'The morning after it’s due, in the app and on Slack')}
+${auto('autoDraft', 'Write drafts automatically', 'Each weekday morning, for clients due within a day, from the work logged. They still wait for an approver.')}
+${auto('remindBehind', 'Remind whoever has an overdue update', 'The next weekday morning after it’s due, in the app and on Slack')}
 ${auto('mondaySummary', 'Monday summary for approvers', 'Last week’s updates and any client health changes')}
 </div>
 <div class="set-h mhead"><span>Client health</span><span class="mcol">Watch at</span><span class="mcol">At risk at</span></div>
@@ -580,7 +580,7 @@ function setNotifications(){
     sections.get(s).push([type, meta]);
   });
   const ck = (type, ch, label) => { const on = notifOn(type, ch); return `<span class="mcol"><button class="ck${on ? ' on' : ''}" role="checkbox" aria-checked="${on}" aria-label="${esc(label)}" onclick="toggleNotifChannel('${type}','${ch}')">${on ? icon('check', { weight: 'bold' }) : ''}</button></span>`; };
-  return `<p class="set-note" style="margin:0 4px 4px">Choose where each kind of notification reaches you.</p>` + [...sections.entries()].map(([s, rows]) =>
+  return `<p class="set-note" style="margin:0 4px 4px">Choose where each kind of notification reaches you. Nothing goes to Slack on Saturdays and Sundays; reminders wait for Monday morning.</p>` + [...sections.entries()].map(([s, rows]) =>
     `<div class="mhead nt-h"><span>${esc(s)}</span><span class="mcol">In app</span><span class="mcol">Slack</span><span class="mcol">Push</span></div>
 <div class="form-grp">${rows.map(([type, meta]) => `<div class="fr"><div class="l"><b style="font-weight:400">${esc(meta.label)}</b></div>${ck(type, 'app', meta.label + ' — in app')}${ck(type, 'slack', meta.label + ' — Slack')}${ck(type, 'push', meta.label + ' — push')}</div>`).join('')}</div>`).join('');
 }

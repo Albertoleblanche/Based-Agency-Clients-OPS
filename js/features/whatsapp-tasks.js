@@ -191,8 +191,9 @@ function waZoned(y, m, d, hhmm, tz){
 function waNextCheck(){
   if(!waSettings) return null;
   const tz = waTz(), now = rNow(), p = waTzParts(now, tz), times = waTimes().sort();
-  for(let k = 0; k < 3; k++){
+  for(let k = 0; k < 5; k++){
     const day = new Date(Date.UTC(p.y, p.m - 1, p.d + k, 12));
+    if(day.getUTCDay() === 0 || day.getUTCDay() === 6) continue;   // weekdays only, as the connector
     for(const t of times){ const at = waZoned(day.getUTCFullYear(), day.getUTCMonth() + 1, day.getUTCDate(), t, tz); if(at > now) return at; }
   }
   return null;
@@ -492,7 +493,7 @@ function waSetupHtml(){
   return `<div class="rmi-hd"><div><h2>Link WhatsApp to start</h2><p>Radar reads your client groups at the times you choose and lists what clients are waiting on, here and in Slack.</p></div></div>
 <div class="wa-body"><div class="wa-main"><div class="rmi-sec"><b>${steps.length === 4 ? 'Four' : 'Three'} steps</b><span>${n} of ${steps.length} done</span></div><div class="wa-steps">${rows}</div></div>
 <aside class="wa-side"><div class="rmi-sec"><b>Checks</b></div><div class="wa-chk"><div class="wa-st"><span class="dot ${linked ? 'green' : 'gray'}"></span><b>${linked ? 'Connected' : 'Not linked'}</b><span>${linked ? '' : 'nothing is read yet'}</span></div>
-<p>Once WhatsApp is linked it checks at ${waTimes().map(waHm).join(' and ')}${waSettings ? ` (${escapeHtml(waCity(waTz()))} time)` : ''}, and sends ${waTesters().length ? 'you' : 'each person'} the list in Slack.</p></div>
+<p>Once WhatsApp is linked it checks on weekdays at ${waTimes().map(waHm).join(' and ')}${waSettings ? ` (${escapeHtml(waCity(waTz()))} time)` : ''}, and sends ${waTesters().length ? 'you' : 'each person'} the list in Slack.</p></div>
 <p class="wa-lock">${icon('lock-simple')}<span>Personal chats are never read, and it never sends anything to WhatsApp.</span></p></aside></div>`;
 }
 
@@ -832,7 +833,7 @@ ${emptyState({ compact: true, icon: 'message-circle', tone: 'blue', title: 'Add 
   return sec(`<div class="set-h">Connection</div><div class="form-grp" id="waConnBox">${waConnHtml()}</div>`)
     + sec(waGroupsHtml())
     + sec(`<div class="set-h">When it checks</div>
-<div class="form-grp"><div class="fr"><div class="l"><b>Every day at</b><span>${waTesters().length ? `It reads the groups, then sends ${waTesters().length === 1 && waTesters()[0] === currentUser?.id ? 'you' : 'the testers'} the full list in Slack.` : 'It reads the groups, then sends each person their list in Slack.'}</span></div>
+<div class="form-grp"><div class="fr"><div class="l"><b>Weekdays at</b><span>${waTesters().length ? `It reads the groups, then sends ${waTesters().length === 1 && waTesters()[0] === currentUser?.id ? 'you' : 'the testers'} the full list in Slack.` : 'It reads the groups, then sends each person their list in Slack.'}</span></div>
 <div class="was-times">${timePops}${times.length < 6 ? `<button class="ib" aria-label="Add a time" title="Add a time" onclick="waAddTime()">${icon('plus')}</button>` : ''}</div></div>
 ${fr('Time zone', escapeHtml(tzSub), popSel('Time zone', tzs.map(z => [z, waCity(z)]), s.timezone, 'waSetZone(this.value)'))}</div>`)
     + sec(`<div class="set-h">Who handles what</div>
