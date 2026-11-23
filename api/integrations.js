@@ -31,7 +31,7 @@
 //        targetUserId, title, body, url }
 // GET  /api/integrations?provider=granola → Granola status (anyone on the team)
 // POST /api/integrations  body: { provider: 'granola', action: 'check' } (anyone on the team: Check Granola in
-//   Tasks, at most once a minute) | { action: 'connect' (key) | 'disconnect' | 'read-now' | 'read-again' (note) } (admins) | { action: 'remove-meeting' | 'restore-meeting' | 'meeting-tasks' (note, again) } (people in the meeting, admins, approvers) — tasks from Granola meetings, lib/granola-tasks.js. The webhook Granola calls is
+//   Tasks, at most once a minute) | { action: 'connect' (key) | 'disconnect' | 'read-now' | 'read-again' (note) } (admins) | { action: 'remove-meeting' | 'restore-meeting' | 'meeting-tasks' | 'meeting-recap' (note, again) } (people in the meeting, admins, approvers) — tasks from Granola meetings, lib/granola-tasks.js. The webhook Granola calls is
 //   /hooks/granola, in api/send-slack-message.js (it needs the raw body).
 //
 // Two more things live here, reached by rewrites in vercel.json, before the sign-in check:
@@ -56,7 +56,7 @@ const {
   deleteTimeEntryFromHarvest,
 } = require('../lib/harvest-sync');
 const { sendPushToUser } = require('../lib/push-notify');
-const { connectGranola, disconnectGranola, granolaStatus, granolaCatchUp, granolaReadNow, granolaReadAgain, removeGranolaMeeting, restoreGranolaMeeting, pullMeetingTasks } = require('../lib/granola-tasks');
+const { connectGranola, disconnectGranola, granolaStatus, granolaCatchUp, granolaReadNow, granolaReadAgain, removeGranolaMeeting, restoreGranolaMeeting, pullMeetingTasks, draftMeetingRecap } = require('../lib/granola-tasks');
 const { handleMcp, protectedResourceMetadata } = require('../lib/mcp-server');
 
 module.exports = async function handler(req, res) {
@@ -109,7 +109,7 @@ module.exports = async function handler(req, res) {
       // Check Granola (Tasks, Notes → Meetings): anyone on the team; at most once a minute for everyone together
       if (action === 'check') { res.status(200).json(await granolaReadNow(admin, { budgetMs: 45000, appUrl })); return; }
       // One meeting (Nov 23): the people who were in it, admins and approvers
-      const one = { 'remove-meeting': removeGranolaMeeting, 'restore-meeting': restoreGranolaMeeting, 'meeting-tasks': pullMeetingTasks }[action];
+      const one = { 'remove-meeting': removeGranolaMeeting, 'restore-meeting': restoreGranolaMeeting, 'meeting-tasks': pullMeetingTasks, 'meeting-recap': draftMeetingRecap }[action];
       if (one) {
         const r = await one(admin, (req.body || {}).note, viewer, { again: !!(req.body || {}).again });
         res.status(r.error ? (r.status || 400) : 200).json(r);

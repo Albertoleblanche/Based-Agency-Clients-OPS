@@ -445,6 +445,27 @@ body.mac.mobile { overflow: hidden; background: var(--ios-bg, #F2F2F7); -webkit-
 .mtn-time.is-done svg { width: 14px; height: 14px; color: var(--green); }
 .app .mtn .mtn-rm { display: block; width: 100%; margin-top: 6px; padding: 12px; border: 0; background: none; color: var(--red); font: inherit; font-size: 17px; text-align: center; }
 .app .mtn .mtn-rm:active { opacity: .6; }
+.mtn-btns { display: flex; flex-direction: column; gap: 8px; }
+.rcp-seg { display: flex; margin: 0 0 12px; padding: 2px; border-radius: 9px; background: var(--fill-2); }
+.rcp-seg button { flex: 1; height: 32px; border: 0; border-radius: 7px; background: none; color: var(--label); font: inherit; font-size: 14px; font-weight: 500; }
+.rcp-seg button.on { background: var(--ios-cell, #fff); box-shadow: 0 1px 3px rgba(0,0,0,.12); font-weight: 600; }
+.rcp { display: flex; flex-direction: column; gap: 10px; }
+.rcp-f { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+.rcp-f .k { flex: none; width: 64px; color: var(--label-2); }
+.rcp-f .v { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rcp-in { flex: 1; min-width: 0; height: 40px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--ios-cell, #fff); color: var(--label); font: inherit; font-size: 16px; }
+.rcp-ta { width: 100%; min-height: 260px; padding: 12px; border: 0; border-radius: 12px; background: var(--ios-cell, #fff); color: var(--label); font: inherit; font-size: 16px; line-height: 1.45; box-sizing: border-box; }
+.rcp-ta.rcp-wa { min-height: 150px; }
+.rcp-a { display: flex; flex-direction: column; gap: 8px; }
+.rcp-a .ibtn { display: flex; align-items: center; justify-content: center; gap: 7px; }
+.rcp-a .ibtn svg { width: 17px; height: 17px; }
+.app .rcp-a .ibtn.rcp-go { background: var(--label); color: var(--ios-bg, #fff); }
+.app .mtn-btns .mtn-ai { height: 44px; }
+.mtn-fu { margin: 0 0 14px; padding: 0 0 12px; border-bottom: .5px solid var(--sep); }
+.mtn-fu .k { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--label-2); }
+.mtn-fu .k svg { width: 15px; height: 15px; }
+.mtn-fu-r { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; width: 100%; padding: 7px 0; border: 0; background: none; color: var(--label); font: inherit; font-size: 16px; text-align: left; }
+.mtn-fu-r em { flex: none; font-style: normal; font-size: 13px; color: var(--label-3); }
 .mtk-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 32px; font-size: 14px; color: var(--label-2); }
 .mtk-all { height: 32px; padding: 0 14px; border: 0; border-radius: 16px; background: var(--label); color: var(--ios-bg, #fff); font: inherit; font-size: 14px; font-weight: 600; }
 .mtk-all:disabled { opacity: .5; }

@@ -803,7 +803,7 @@ async function loadGranolaMeetings(){
     let m = {}; try{ m = JSON.parse(r.value) || {}; }catch(e){}
     return { id: r.key.slice('granola-note:'.length), title: m.title || 'A meeting', summary: m.summary || '', url: m.url || null, at: m.meetingAt || m.at || r.updated_at,
       clientId: m.clientId || null, people: m.people || [], owner: m.owner || null, items: m.items || 0, state: m.state, pulled: m.pulled || null,
-      minutes: m.minutes || null, metClientId: m.metClientId || null };
+      minutes: m.minutes || null, metClientId: m.metClientId || null, followUps: m.followUps || [] };
   }).filter(m => m.summary && m.state !== 'same' && m.state !== 'removed' && new Date(m.at).getTime() > since && meetingCanSee(m))   // the people who were there; admins and approvers see all
     .sort((a, b) => String(b.at).localeCompare(String(a.at)));
   return granolaMeetings;
@@ -878,14 +878,17 @@ function openMeetingNotes(id){
   loadMeetingSuggestions(m).then(() => meetingRedraw(m)).catch(() => {});
 }
 function meetingTopHtml(m){
-  const tasksView = meetingView[m.id] === 'tasks', can = meetingCanAssign(), mine = meetingWasMine(m);
-  const words = tasksView ? (can ? 'Everyone’s tasks in this meeting, pulled out by AI and grouped.' : 'Your tasks in this meeting, pulled out by AI and grouped.')
+  const v = meetingView[m.id] || 'notes', can = meetingCanAssign(), mine = meetingWasMine(m);
+  const words = v === 'tasks' ? (can ? 'Everyone’s tasks in this meeting, pulled out by AI and grouped.' : 'Your tasks in this meeting, pulled out by AI and grouped.')
+    : v === 'recap' ? 'A recap for the client, drafted by AI from the notes.'
     : can ? 'Any point can be a task for someone on the team.' : mine ? 'Any point can be one of your tasks.' : '';
-  const label = tasksView ? 'Show the Notes' : can ? 'Pull the Tasks' : 'Pull My Tasks';
-  return `<div class="mtn-bar"><p class="mtn-tasks">${tasksView ? icon('sparkle') : appLogo('granola', 'xs')}<span>${words}</span></p>`
-    + `<button type="button" class="btn sm mtn-ai${tasksView ? '' : ' is-ai'}" onclick="meetingToggleView('${m.id}')">${icon(tasksView ? 'file-pdf' : 'sparkle')}<span>${label}</span></button></div>`;
+  const btn = (cls, ic, label, js) => `<button type="button" class="btn sm mtn-ai${cls}" onclick="${js}">${icon(ic)}<span>${label}</span></button>`;
+  const acts = v !== 'notes' ? btn('', 'file-pdf', 'Show the Notes', `meetingShowNotes('${m.id}')`)
+    : btn(' is-ai', 'sparkle', can ? 'Pull the Tasks' : 'Pull My Tasks', `meetingToggleView('${m.id}')`) + (meetingWithClient(m) ? btn(' is-ai', 'envelope-simple', 'Draft a Recap', `meetingRecap('${m.id}')`) : '');
+  return `<div class="mtn-bar"><p class="mtn-tasks">${v !== 'notes' ? icon('sparkle') : appLogo('granola', 'xs')}<span>${words}</span></p><div class="mtn-btns">${acts}</div></div>`;
 }
-function meetingMainHtml(m){ return meetingView[m.id] === 'tasks' ? meetingTasksHtml(m) : meetingBodyHtml(m); }
+function meetingShowNotes(id){ const m = (granolaMeetings || []).find(x => x.id === id); if(!m) return; meetingView[id] = 'notes'; meetingRedraw(m); }
+function meetingMainHtml(m){ const v = meetingView[m.id]; return v === 'tasks' ? meetingTasksHtml(m) : v === 'recap' ? meetingRecapHtml(m) : meetingFollowUpsHtml(m) + meetingBodyHtml(m); }
 function meetingBodyHtml(m){
   return meetingNotesHtml(m.summary, { point: (i, text) => text ? mtSideHtml(m, mtSpec(m, 'p' + i)) : '' });
 }
@@ -898,7 +901,7 @@ function meetingRedraw(m){
 // The AI button: pulls the tasks (once; the answer is kept until the notes change), and back to the notes
 async function meetingToggleView(id, again){
   const m = (granolaMeetings || []).find(x => x.id === id); if(!m) return;
-  if(!again && meetingView[id] === 'tasks'){ meetingView[id] = 'notes'; meetingRedraw(m); return; }
+  if(!again && meetingView[id] === 'tasks'){ meetingView[id] = 'notes'; meetingRedraw(m); return; }   // (the bar's Show the Notes)
   meetingView[id] = 'tasks';
   const have = meetingPulls[id];
   if(!again && have && (have.groups || have.loading)){ meetingRedraw(m); return; }
@@ -1240,6 +1243,67 @@ function meetingLogTime(id){
   if(typeof mOpenTimeSheet === 'function'){ mCloseSheet(true); setTimeout(() => mOpenTimeSheet(cid, { date: day, minutes, desc: meetingTimeWords(m) }), 320); return; }
   closeAppModal();
   openManualEntryModal(day, minutes, cid, meetingTimeWords(m));
+}
+
+// ---- A recap for the client (Nov 23) -------------------------------------------------------------
+// After a meeting with a client: an email and a WhatsApp message drafted by AI from the notes, to read,
+// change and send yourself (Copy, or Open in Email). Only for a meeting someone from a client was in.
+let meetingRecaps = {};    // meeting id → { subject, email, whatsapp, to, client } | { loading } | { error }
+let meetingRecapCh = {};   // meeting id → 'email' | 'whatsapp'
+function meetingGuests(m){
+  const team = new Set((teamProfiles || []).map(p => String(p.email || '').toLowerCase().split('@')[1]).filter(Boolean));
+  return (m.people || []).filter(e => { const d = String(e).toLowerCase().split('@')[1]; return d && !team.has(d); });
+}
+function meetingWithClient(m){ return !!(m.metClientId || (meetingGuests(m).length && m.clientId)); }
+async function meetingRecap(id, again){
+  const m = (granolaMeetings || []).find(x => x.id === id); if(!m) return;
+  meetingView[id] = 'recap';
+  if(!again && meetingRecaps[id] && !meetingRecaps[id].error){ meetingRedraw(m); return; }
+  meetingRecaps[id] = { loading: true }; meetingRedraw(m);
+  try{ meetingRecaps[id] = await granolaApi('meeting-recap', { note: id, again: !!again }); }
+  catch(e){ meetingRecaps[id] = { error: e.message || 'The AI didn’t answer. Try again in a moment.' }; }
+  meetingRedraw(m);
+}
+function meetingRecapHtml(m){
+  const r = meetingRecaps[m.id], ios = typeof mOpenSheet === 'function';
+  if(!r || r.loading) return `<div class="mtk-load" aria-live="polite"><p>${icon('sparkle')}Writing the recap…</p><i></i><i></i><i></i></div>`;
+  if(r.error) return `<div class="mtk-empty"><p>${escapeHtml(r.error)}</p><button type="button" class="btn sm" onclick="meetingRecap('${m.id}', true)">Try Again</button></div>`;
+  const ch = meetingRecapCh[m.id] || 'email', A = `'${m.id}'`;
+  const seg = `<div class="seg rcp-seg" role="tablist" aria-label="Send by">${[['email', 'Email'], ['whatsapp', 'WhatsApp']].map(([k, t]) => `<button type="button" role="tab" aria-selected="${ch === k}" class="${ch === k ? 'on' : ''}" onclick="meetingRecapCh[${A}]='${k}';meetingRedraw((granolaMeetings||[]).find(x=>x.id===${A}))">${t}</button>`).join('')}</div>`;
+  const keep = f => `oninput="meetingRecaps[${A}].${f}=this.value"`;
+  const body = ch === 'email'
+    ? `<div class="rcp-f"><span class="k">To</span><span class="v">${escapeHtml((r.to || []).join(', ') || 'Add who it’s for in your email app')}</span></div>
+<div class="rcp-f"><label class="k" for="rcpSubj">Subject</label><input id="rcpSubj" class="tf rcp-in" value="${escapeHtml(r.subject || '')}" ${keep('subject')}></div>
+<textarea id="rcpBody" class="tf rcp-ta" spellcheck="true" aria-label="The email" ${keep('email')}>${escapeHtml(r.email || '')}</textarea>
+<div class="rcp-a"><button type="button" class="${ios ? 'ibtn s' : 'btn'}" onclick="meetingRecapCopy(${A})">${icon('copy')}Copy</button><button type="button" class="${ios ? 'ibtn s rcp-go' : 'btn btn-p'}" onclick="meetingRecapMail(${A})">${icon('envelope-simple')}Open in Email</button></div>`
+    : `<textarea id="rcpWa" class="tf rcp-ta rcp-wa" spellcheck="true" aria-label="The WhatsApp message" ${keep('whatsapp')}>${escapeHtml(r.whatsapp || '')}</textarea>
+<div class="rcp-a"><button type="button" class="${ios ? 'ibtn s rcp-go' : 'btn btn-p'}" onclick="meetingRecapCopy(${A})">${icon('copy')}Copy for WhatsApp</button></div>`;
+  return `${seg}<div class="rcp">${body}</div><p class="mtk-foot">${icon('sparkle')}<span>Drafted by AI from the notes for ${escapeHtml(r.client || 'the client')}. Read it over before you send it. · <button type="button" class="x-lnk" onclick="meetingRecap(${A}, true)">Draft Again</button></span></p>`;
+}
+function meetingRecapText(id){
+  const r = meetingRecaps[id] || {}, ch = meetingRecapCh[id] || 'email';
+  return ch === 'email' ? `${r.subject ? `Subject: ${r.subject}\n\n` : ''}${r.email || ''}` : (r.whatsapp || '');
+}
+async function meetingRecapCopy(id){
+  const ch = meetingRecapCh[id] || 'email', text = ch === 'email' ? (meetingRecaps[id] || {}).email || '' : meetingRecapText(id);
+  try{ await navigator.clipboard.writeText(text); showToast('success', 'Copied', ch === 'email' ? 'Paste it into your email.' : 'Paste it into the client’s WhatsApp.'); }
+  catch(e){ showToast('error', 'Couldn’t copy', 'Select the text and copy it.'); }
+}
+function meetingRecapMailUrl(id){
+  const r = meetingRecaps[id] || {};
+  return `mailto:${(r.to || []).map(encodeURIComponent).join(',')}?subject=${encodeURIComponent(r.subject || '')}&body=${encodeURIComponent(r.email || '')}`;
+}
+function meetingRecapMail(id){ window.location.href = meetingRecapMailUrl(id); }
+
+// ---- What the client said they'd do (Nov 23) -----------------------------------------------------
+// Each became a follow-up (Reminders) when the meeting was read; the meeting lists them.
+function meetingFollowUpsHtml(m){
+  const ids = m.followUps || []; if(!ids.length || typeof clientReminders === 'undefined') return '';
+  const rs = ids.map(id => clientReminders.find(r => r.id === id)).filter(Boolean); if(!rs.length) return '';
+  const c = clients.find(x => String(x.id) === String(m.metClientId || m.clientId));
+  const day = d => d ? fmtShortDate(new Date(d + 'T12:00:00')) : '';
+  const open = typeof mOpenSheet === 'function' ? id => `mCloseSheet(true);setTimeout(() => mReminderActions('${id}'), 320)` : id => `closeAppModal();openReminderDetailModal('${id}')`;
+  return `<div class="mtn-fu"><p class="k">${icon('bell')}Waiting on ${escapeHtml(c ? c.name : 'the client')}</p>${rs.map(r => `<button type="button" class="mtn-fu-r" onclick="${open(r.id)}"><span>${escapeHtml(r.question)}</span><em>${r.status === 'answered' ? 'answered' : r.followUpDate ? `follow up ${escapeHtml(day(r.followUpDate))}` : ''}</em></button>`).join('')}</div>`;
 }
 
 async function insertTaskRow(row){
