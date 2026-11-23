@@ -279,7 +279,7 @@ function tkFilesHtml(t, can){
   const files = t.attachments || [];
   if(!files.length && !can) return '';
   const kb = n => !n ? '' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
-  const row = a => `<a class="tkp-file" href="#" data-path="${escapeHtml(a.path)}" data-name="${escapeHtml(a.name)}" target="_blank" rel="noopener" onclick="return tkOpenFile(event, this)">${icon(/\.(png|jpe?g|gif|webp|heic|svg)$/i.test(a.name) ? 'image' : 'file-text')}<span class="nm">${escapeHtml(a.name)}</span><span class="sz">${kb(a.size)}</span>${can ? `<button class="ib" aria-label="Remove ${escapeHtml(a.name)}" title="Remove" onclick="event.preventDefault();event.stopPropagation();tkRemoveFile('${t.id}',${jsArg(a.path)},${jsArg(a.name)})">${icon('x')}</button>` : ''}</a>`;
+  const row = a => { const img = tkIsImg(a.name); return `<a class="tkp-file${img ? ' is-img' : ''}" href="#" data-path="${escapeHtml(a.path)}" data-name="${escapeHtml(a.name)}" target="_blank" rel="noopener" title="${img ? 'Preview' : 'Open'} ${escapeHtml(a.name)}" onclick="return tkOpenFile(event, this)"><span class="tkp-th">${icon(img ? 'image' : 'file-text')}</span><span class="nm">${escapeHtml(a.name)}</span><span class="sz">${kb(a.size)}</span>${can ? `<button class="ib" aria-label="Remove ${escapeHtml(a.name)}" title="Remove" onclick="event.preventDefault();event.stopPropagation();tkRemoveFile('${t.id}',${jsArg(a.path)},${jsArg(a.name)})">${icon('x')}</button>` : ''}</a>`; };
   return `<div class="sp-sec tkp-fh"><b>Files</b>${files.length ? `<span>${files.length}</span>` : ''}${can ? `<label class="x-lnk tkp-fadd">Add Files…<input type="file" multiple hidden onchange="tkAddFiles('${t.id}', this.files);this.value=''"></label>` : ''}</div>
 ${files.length ? `<div class="tkp-files">${files.map(row).join('')}</div>` : `<p class="tkp-fnone">No files yet. Add some, or drop them on this panel.</p>`}`;
 }
@@ -289,16 +289,29 @@ async function tkFillFiles(root){
     const p = a.dataset.path, hit = tkFileUrls[p];
     let url = hit && Date.now() - hit.at < 50 * 60000 ? hit.url : null;
     if(!url){ const { data } = await supabaseClient.storage.from('attachments').createSignedUrl(p, 3600); url = data && data.signedUrl; if(url) tkFileUrls[p] = { url, at: Date.now() }; }
-    if(url && a.isConnected){ a.href = url; a.dataset.ready = '1'; }
+    if(url && a.isConnected){
+      a.href = url; a.dataset.ready = '1';
+      const th = a.querySelector('.tkp-th');
+      if(th && tkIsImg(a.dataset.name) && !th.querySelector('img')){ const im = new Image(); im.alt = ''; im.decoding = 'async'; im.onload = () => im.classList.add('on'); im.onerror = () => im.remove(); im.src = url; th.replaceChildren(im); }
+    }
   }
 }
+// Pictures the browser can show; HEIC and other files open in a new tab instead.
+function tkIsImg(name){ return /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(name || ''); }
+// A picture opens in the viewer, with the task's other pictures a step away; a file opens in a new tab.
 function tkOpenFile(e, a){
-  const img = /\.(png|jpe?g|gif|webp|svg)$/i.test(a.dataset.name || '');
-  if(a.dataset.ready){ if(img && typeof openImageLightbox === 'function'){ e.preventDefault(); openImageLightbox(a.href, a.dataset.name); return false; } return true; }
+  const img = tkIsImg(a.dataset.name);
+  if(a.dataset.ready && !img) return true;
   e.preventDefault();
+  const open = url => {
+    if(!img) return window.open(url, '_blank', 'noopener');
+    const set = [...(a.closest('.tkp-files') || document).querySelectorAll('.tkp-file.is-img[data-ready]')].map(x => ({ url: x === a ? url : x.href, name: x.dataset.name }));
+    openImageLightbox(url, a.dataset.name, set);
+  };
+  if(a.dataset.ready){ open(a.href); return false; }
   supabaseClient.storage.from('attachments').createSignedUrl(a.dataset.path, 3600).then(({ data }) => {
     if(!data || !data.signedUrl) return showToast('error', 'Couldn’t open the file', 'Try again in a moment.');
-    if(img && typeof openImageLightbox === 'function') openImageLightbox(data.signedUrl, a.dataset.name); else window.open(data.signedUrl, '_blank', 'noopener');
+    open(data.signedUrl);
   });
   return false;
 }

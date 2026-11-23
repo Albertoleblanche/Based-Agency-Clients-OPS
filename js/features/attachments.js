@@ -86,27 +86,88 @@ function attachmentItemHtml(a, recordType, recordId){
   </div>`;
 }
 
-function openImageLightbox(url, filename){
-  closeLightbox();
-  const overlay = document.createElement('div');
-  overlay.className = 'lightbox-overlay';
-  overlay.id = 'lightboxOverlay';
-  overlay.onclick = (e)=>{ if(e.target===overlay) closeLightbox(); };
-  overlay.innerHTML = `
-    <div class="lightbox-toolbar">
-      <a href="${safeUrl(url)}" download="${escapeHtml(filename)}" class="btn btn-outline">Download</a>
-      <button class="btn btn-outline" onclick="closeLightbox()">Close ✕</button>
-    </div>
-    <img src="${safeUrl(url)}" class="lightbox-img" id="lightboxImg" onclick="toggleLightboxZoom()" title="Click to zoom">`;
-  document.body.appendChild(overlay);
+// ---- Picture viewer (Nov 23) ------------------------------------------------------------------
+// Opens a picture over the app, Quick Look style. Esc, × or a click beside the picture closes it;
+// ← → (or the side buttons) step through the other pictures in `set` ([{ url, name }]); a picture
+// bigger than the window opens at full size on click, scrolled to where you clicked. Download
+// saves it under its own name (a Supabase signed link gets ?download= so it saves, not opens).
+let qv = null;
+function qvDownloadUrl(url, name){
+  return /\/storage\/v1\/object\/sign\//.test(url) ? url + (url.includes('?') ? '&' : '?') + 'download=' + encodeURIComponent(name || '') : url;
 }
-
-function closeLightbox(){
-  const el = document.getElementById('lightboxOverlay');
-  if(el) el.remove();
+function openImageLightbox(url, filename, set){
+  closeLightbox(true);
+  const list = (set && set.length ? set : [{ url, name: filename }]).filter(x => x && x.url);
+  let at = list.findIndex(x => x.url === url);
+  if(at < 0){ list.unshift({ url, name: filename }); at = 0; }
+  const many = list.length > 1;
+  const el = document.createElement('div');
+  el.className = 'qv'; el.id = 'lightboxOverlay';
+  el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'Picture'); el.tabIndex = -1;
+  el.innerHTML = `<div class="qv-bar"><span class="qv-n"></span>${many ? '<span class="qv-c"></span>' : ''}<a class="qv-b qv-dl" target="_blank" rel="noopener">${icon('download-simple')}Download</a><button type="button" class="qv-b qv-x" aria-label="Close" onclick="closeLightbox()">${icon('x')}</button></div>
+<div class="qv-stage"><img class="qv-img" id="lightboxImg" alt=""><p class="qv-err" hidden>This picture didn’t load. <a target="_blank" rel="noopener">Open it in a new tab</a></p></div>
+${many ? `<button type="button" class="qv-nav prev" aria-label="Previous picture" onclick="qvStep(-1)">${icon('caret-left')}</button><button type="button" class="qv-nav next" aria-label="Next picture" onclick="qvStep(1)">${icon('caret-right')}</button>` : ''}`;
+  el.addEventListener('click', e => { if(e.target === el || e.target.classList.contains('qv-stage') || e.target.classList.contains('qv-bar')) closeLightbox(); });
+  const img = el.querySelector('.qv-img');
+  img.addEventListener('load', () => {
+    el.querySelector('.qv-stage').classList.remove('is-loading');
+    img.classList.add('is-loaded');
+    requestAnimationFrame(() => img.classList.toggle('can-zoom', img.naturalWidth > img.clientWidth + 2 || img.naturalHeight > img.clientHeight + 2));
+  });
+  img.addEventListener('error', () => { el.querySelector('.qv-stage').classList.remove('is-loading'); el.querySelector('.qv-err').hidden = false; img.hidden = true; });
+  img.addEventListener('click', qvZoom);
+  document.body.appendChild(el);
+  qv = { el, list, at, back: document.activeElement };
+  document.addEventListener('keydown', qvKey, true);
+  qvShow();
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('is-in')));
+  el.focus({ preventScroll: true });
 }
-
-function toggleLightboxZoom(){
-  const img = document.getElementById('lightboxImg');
-  if(img) img.classList.toggle('zoomed');
+function qvShow(){
+  if(!qv) return;
+  const { el, list, at } = qv, it = list[at], img = el.querySelector('.qv-img'), stage = el.querySelector('.qv-stage');
+  el.classList.remove('is-full');
+  el.querySelector('.qv-n').textContent = it.name || '';
+  const c = el.querySelector('.qv-c'); if(c) c.textContent = `${at + 1} of ${list.length}`;
+  const dl = el.querySelector('.qv-dl'); dl.href = qvDownloadUrl(it.url, it.name); dl.setAttribute('download', it.name || '');
+  el.querySelector('.qv-err a').href = it.url; el.querySelector('.qv-err').hidden = true;
+  img.hidden = false; img.classList.remove('is-loaded', 'can-zoom'); stage.classList.add('is-loading');
+  img.alt = it.name || ''; img.src = it.url;
 }
+function qvStep(d){
+  if(!qv || qv.list.length < 2) return;
+  qv.at = (qv.at + d + qv.list.length) % qv.list.length;
+  qvShow();
+}
+function qvZoom(e){
+  if(!qv) return;
+  const { el } = qv, img = el.querySelector('.qv-img'), stage = el.querySelector('.qv-stage');
+  if(!img.classList.contains('can-zoom') && !el.classList.contains('is-full')) return;
+  const r = img.getBoundingClientRect(), rx = (e.clientX - r.left) / r.width, ry = (e.clientY - r.top) / r.height;
+  el.classList.toggle('is-full');
+  if(el.classList.contains('is-full')){
+    stage.scrollLeft = rx * img.offsetWidth - stage.clientWidth / 2;
+    stage.scrollTop = ry * img.offsetHeight - stage.clientHeight / 2;
+  }
+}
+function qvKey(e){
+  if(!qv) return;
+  if(e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); closeLightbox(); }
+  else if(e.key === 'ArrowLeft' || e.key === 'ArrowRight'){ e.preventDefault(); e.stopPropagation(); qvStep(e.key === 'ArrowLeft' ? -1 : 1); }
+  else if(e.key === 'Tab'){ // keep focus on the viewer's own buttons
+    const f = [...qv.el.querySelectorAll('a[href], button')].filter(x => !x.closest('[hidden]'));
+    const i = f.indexOf(document.activeElement);
+    if(i < 0 || (e.shiftKey ? i === 0 : i === f.length - 1)){ e.preventDefault(); f[e.shiftKey ? f.length - 1 : 0]?.focus(); }
+  }
+}
+function closeLightbox(now){
+  document.removeEventListener('keydown', qvKey, true);
+  const cur = qv; qv = null;
+  document.querySelectorAll('#lightboxOverlay').forEach(el => {
+    if(now === true || matchMedia('(prefers-reduced-motion: reduce)').matches){ el.remove(); return; }
+    el.id = ''; el.classList.remove('is-in'); el.classList.add('is-out');
+    setTimeout(() => el.remove(), 160);
+  });
+  if(cur && cur.back && cur.back.isConnected && now !== true) cur.back.focus({ preventScroll: true });
+}
+function toggleLightboxZoom(){ const img = document.querySelector('#lightboxOverlay .qv-img'); if(img) img.click(); }

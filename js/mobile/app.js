@@ -186,7 +186,7 @@ async function mLoadAll(){
   if(typeof winsAfterLoad === 'function') winsAfterLoad(dr.data, wg);
   clients.forEach(c => { c.improvements = clientImprovements.filter(i => i.clientId === c.id); c.drafts = clientDrafts.filter(d => d.clientId === c.id); });
   tasks = (tr.data || []).map(t => ({ id: t.id, title: t.title, description: t.description || '', priority: t.priority, status: t.status, assignerId: t.assigner_id, assigneeId: t.assignee_id,
-    clientId: t.client_id, dueDate: t.due_date, link: t.link, createdAt: t.created_at, completedAt: t.completed_at, cancelledAt: t.cancelled_at,
+    clientId: t.client_id, dueDate: t.due_date, link: t.link, attachments: t.attachments || [], createdAt: t.created_at, completedAt: t.completed_at, cancelledAt: t.cancelled_at,
     hiddenByAssigner: t.hidden_by_assigner, hiddenByAssignee: t.hidden_by_assignee }));
   clientReminders = (rr.data || []).map(r => ({ id: r.id, clientId: r.client_id, question: r.question, askedBy: r.asked_by, askedDate: r.asked_date, followUpDate: r.follow_up_date, status: r.status }));
   notes = (nr.data || []).map(n => ({ id: n.id, clientId: n.client_id, title: n.title, text: n.text, status: n.status, link: n.link, followUpDate: n.follow_up_date, updatedAt: n.updated_at }));
@@ -574,11 +574,108 @@ ${t.dueDate ? mIr('', 'Due', '', mTaskDue(t), null, { n: true }) : ''}
 ${c ? mIr('', 'Client', '', mEsc(c.name), `mOpenClient('${c.id}')`, { n: true }) : ''}
 ${t.link ? mIr('', 'Link', '', mEsc(truncateLinkDisplay(t.link, 26)), `window.open(${jsArg(normalizeUrl(t.link))},'_blank')`, { n: true }) : ''}
 </div>
+${mTaskFilesHtml(t)}
 ${taskCanAskDate(t) ? `<p class="ifoot">Only ${mEsc(firstName(from.name))} can change the date.</p>` : ''}
 ${t.status !== 'done' && mine ? `<div style="margin:24px 16px 0;display:flex;flex-direction:column;gap:10px">
 ${t.status !== 'in_progress' ? `<button class="ibtn s" onclick="mMoveTask('${t.id}','in_progress')">Start Working on It</button>` : ''}
 ${taskCanAskDate(t) ? `<button class="ibtn s" onclick="mAskTaskDate('${t.id}')">Ask ${mEsc(firstName(from.name))} to Move the Date</button>` : ''}
 <button class="ibtn p" onclick="mCompleteTask('${t.id}');mPop()">${icon('check', { weight: 'bold' })}Mark Done</button></div>` : ''}`;
+  });
+}
+// Files on a task (Nov 23): each with a preview tile; a picture opens full screen (swipe to the
+// task's other pictures), any other file opens in a new tab. Whoever gave or has the task, and
+// approvers, can add more here; removing is on the desktop.
+const mFileUrls = {};   // path -> { url, at }: signed links last an hour, reused for 50 minutes
+function mIsPic(name){ return /\.(png|jpe?g|gif|webp|avif)$/i.test(name || ''); }
+function mTaskFilesHtml(t){
+  const files = t.attachments || [], can = t.assigneeId === currentUser.id || t.assignerId === currentUser.id || canApprove();
+  if(!files.length && !can) return '';
+  setTimeout(mFillTaskFiles, 0);
+  const row = a => `<a class="ir mtf-row${mIsPic(a.name) ? ' is-pic' : ''}" href="#" target="_blank" rel="noopener" data-path="${mEsc(a.path)}" data-name="${mEsc(a.name)}" onclick="return mOpenTaskFile(event, this)"><span class="mth">${icon(mIsPic(a.name) ? 'image' : 'file-text')}</span><span class="t n">${mEsc(a.name)}</span><span class="r">${a.size ? mFileSize(a.size) : ''}${icon('caret-right', { cls: 'chev', weight: 'bold' })}</span></a>`;
+  return `${mIsh('Files')}<div class="ig mtf-list">${files.map(row).join('')}${can ? `<label class="ir tap mtf-add"><span class="gl">${icon('paperclip')}</span><span class="t n">Add Files</span><input type="file" multiple hidden onchange="mAddTaskFiles('${t.id}', this.files);this.value=''"></label>` : ''}</div>`;
+}
+async function mFileUrl(path){
+  const hit = mFileUrls[path];
+  if(hit && Date.now() - hit.at < 50 * 60000) return hit.url;
+  try{ const { data } = await supabaseClient.storage.from('attachments').createSignedUrl(path, 3600); if(data && data.signedUrl){ mFileUrls[path] = { url: data.signedUrl, at: Date.now() }; return data.signedUrl; } }catch(e){}
+  return null;
+}
+async function mFillTaskFiles(){
+  for(const a of [...document.querySelectorAll('.mtf-row[data-path]:not([data-ready])')]){
+    const url = await mFileUrl(a.dataset.path);
+    if(!url || !a.isConnected) continue;
+    a.href = url; a.dataset.ready = '1';
+    const th = a.querySelector('.mth');
+    if(th && mIsPic(a.dataset.name)){ const im = new Image(); im.alt = ''; im.decoding = 'async'; im.onload = () => im.classList.add('on'); im.onerror = () => im.remove(); im.src = url; th.replaceChildren(im); }
+  }
+}
+function mOpenTaskFile(e, a){
+  const pic = mIsPic(a.dataset.name);
+  if(a.dataset.ready && !pic) return true;   // the real link opens it, so Safari doesn't block it
+  e.preventDefault();
+  if(!a.dataset.ready){ showToast('info', 'Still getting the file', 'Try again in a second.'); mFillTaskFiles(); return false; }
+  const set = [...(a.closest('.mtf-list') || document).querySelectorAll('.mtf-row.is-pic[data-ready]')].map(x => ({ url: x.href, name: x.dataset.name }));
+  mOpenPic(a.href, a.dataset.name, set);
+  return false;
+}
+async function mAddTaskFiles(id, list){
+  const files = [].slice.call(list || []); if(!files.length) return;
+  showToast('info', `Attaching ${files.length === 1 ? files[0].name : files.length + ' files'}…`, '');
+  const r = await uploadTaskFiles(id, files);
+  const { data } = await supabaseClient.from('tasks').select('attachments').eq('id', id).maybeSingle();
+  const t = tasks.find(x => x.id === id); if(t && data) t.attachments = data.attachments || [];
+  mTop()?.refresh();
+  if(r.failed.length) showToast('error', r.added.length ? 'Some files weren’t attached' : 'Not attached', taskFilesError(r.failed));
+  else showToast('success', r.added.length === 1 ? 'File attached' : `${r.added.length} files attached`, r.added.length === 1 ? r.added[0].name : '');
+}
+// Full-screen picture, like Photos: Done closes it, swipe left or right for the task's other
+// pictures, tap a picture bigger than the screen to see it full size (then scroll around it),
+// and the share button opens it in Safari to save or zoom.
+let mPicState = null;
+function mOpenPic(url, name, set){
+  mClosePic(true);
+  const list = (set && set.length ? set : [{ url, name }]); let at = list.findIndex(x => x.url === url); if(at < 0){ list.unshift({ url, name }); at = 0; }
+  const el = document.createElement('div');
+  el.className = 'mqv'; el.id = 'mPicView'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'Picture');
+  el.innerHTML = `<div class="mqv-bar"><button type="button" class="mqv-done" onclick="mClosePic()">Done</button><span class="mqv-n"><b></b><span></span></span><a class="mqv-open" target="_blank" rel="noopener" aria-label="Open in Safari">${icon('export')}</a></div>
+<div class="mqv-stage"><img class="mqv-img" alt=""></div>`;
+  const img = el.querySelector('.mqv-img'), stage = el.querySelector('.mqv-stage');
+  img.addEventListener('load', () => { stage.classList.remove('is-loading'); img.classList.add('is-loaded'); requestAnimationFrame(() => img.classList.toggle('can-zoom', img.naturalWidth > img.clientWidth * 1.15 || img.naturalHeight > img.clientHeight * 1.15)); });
+  img.addEventListener('error', () => { stage.classList.remove('is-loading'); showToast('error', 'Couldn’t show the picture', 'Use the share button to open it.'); });
+  img.addEventListener('click', e => {
+    if(!img.classList.contains('can-zoom') && !el.classList.contains('is-full')) return;
+    const r = img.getBoundingClientRect(), rx = (e.clientX - r.left) / r.width, ry = (e.clientY - r.top) / r.height;
+    el.classList.toggle('is-full');
+    if(el.classList.contains('is-full')){ stage.scrollLeft = rx * img.offsetWidth - stage.clientWidth / 2; stage.scrollTop = ry * img.offsetHeight - stage.clientHeight / 2; }
+  });
+  let sx = 0, sy = 0, st = 0;
+  stage.addEventListener('touchstart', e => { if(e.touches.length === 1){ sx = e.touches[0].clientX; sy = e.touches[0].clientY; st = Date.now(); } }, { passive: true });
+  stage.addEventListener('touchend', e => {
+    if(el.classList.contains('is-full') || !mPicState || mPicState.list.length < 2) return;
+    const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy, v = Math.abs(dx) / Math.max(1, Date.now() - st);
+    if(Math.abs(dx) > Math.abs(dy) * 1.4 && (Math.abs(dx) > 60 || v > 0.4)) mPicStep(dx < 0 ? 1 : -1);
+  }, { passive: true });
+  document.body.appendChild(el);
+  mPicState = { el, list, at };
+  mPicShow();
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('is-in')));
+}
+function mPicShow(){
+  if(!mPicState) return;
+  const { el, list, at } = mPicState, it = list[at], img = el.querySelector('.mqv-img');
+  el.classList.remove('is-full');
+  el.querySelector('.mqv-n b').textContent = it.name || '';
+  el.querySelector('.mqv-n span').textContent = list.length > 1 ? `${at + 1} of ${list.length}` : '';
+  el.querySelector('.mqv-open').href = it.url;
+  img.classList.remove('is-loaded', 'can-zoom'); el.querySelector('.mqv-stage').classList.add('is-loading');
+  img.alt = it.name || ''; img.src = it.url;
+}
+function mPicStep(d){ if(!mPicState) return; mPicState.at = (mPicState.at + d + mPicState.list.length) % mPicState.list.length; mPicShow(); }
+function mClosePic(now){
+  mPicState = null;
+  document.querySelectorAll('#mPicView').forEach(el => {
+    if(now === true || matchMedia('(prefers-reduced-motion: reduce)').matches){ el.remove(); return; }
+    el.id = ''; el.classList.remove('is-in'); setTimeout(() => el.remove(), 200);
   });
 }
 // Ask the person who assigned it to move the date (only they can change it): a short message,

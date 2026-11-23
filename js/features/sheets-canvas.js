@@ -159,8 +159,9 @@ async function openImprovementFiles(clientId, impId){
     catch(e){ return { ...a, url: null }; }
   }));
   const grid = document.getElementById('impFilesGrid'); if(!grid) return;
+  window._impPics = withUrls.filter(a => isImageAttachment(a) && a.url).map(a => ({ url: a.url, name: a.name }));
   grid.innerHTML = withUrls.map(a => isImageAttachment(a) && a.url
-    ? `<button class="att" onclick="openImageLightbox(${jsArg(a.url)}, ${jsArg(a.name)})"><img src="${safeUrl(a.url)}" alt=""><span>${escapeHtml(a.name)}</span></button>`
+    ? `<button class="att" onclick="openImageLightbox(${jsArg(a.url)}, ${jsArg(a.name)}, window._impPics)"><img src="${safeUrl(a.url)}" alt=""><span>${escapeHtml(a.name)}</span></button>`
     : `<a class="att" href="${a.url ? safeUrl(a.url) : '#'}" download="${escapeHtml(a.name)}"><span class="att-f">${icon('file-text')}</span><span>${escapeHtml(a.name)}</span></a>`).join('');
 }
 

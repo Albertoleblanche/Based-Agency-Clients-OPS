@@ -3076,7 +3076,6 @@ body > .notif-panel{position:fixed;top:auto;right:auto;z-index:1000}
 .tkp-fh .tkp-fadd{margin-left:auto;font-size:13px}
 .tkp-files{display:flex;flex-direction:column;gap:2px;margin:0 -8px}
 .tkp-file{display:flex;align-items:center;gap:9px;min-height:34px;padding:0 4px 0 8px;border-radius:8px;color:var(--label);text-decoration:none;font-size:13.5px}
-.tkp-file > svg{width:15px;height:15px;flex:none;color:var(--label-2)}
 .tkp-file .nm{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tkp-file .sz{font-size:12px;color:var(--label-2);white-space:nowrap}
 .tkp-file .ib{width:26px;height:26px;opacity:0;transition:opacity 120ms ease}
@@ -3089,3 +3088,44 @@ body > .notif-panel{position:fixed;top:auto;right:auto;z-index:1000}
   .tkp-file:hover .ib{opacity:1}
 }
 @media (hover:none){ .tkp-file .ib{opacity:1} }
+
+/* ---- Picture viewer (Nov 23): Quick Look style, always dark, over everything ---------------- */
+.qv{position:fixed;inset:0;z-index:6000;display:grid;grid-template-rows:auto minmax(0,1fr);outline:none;background:rgba(10,10,12,.9);-webkit-backdrop-filter:blur(14px) saturate(120%);backdrop-filter:blur(14px) saturate(120%);color:#fff;opacity:0;transition:opacity 180ms cubic-bezier(.23,1,.32,1)}
+.qv.is-in{opacity:1}
+.qv.is-out{opacity:0;transition-duration:140ms;pointer-events:none}
+.qv-bar{display:flex;align-items:center;gap:8px;padding:14px 16px 10px 22px;min-width:0}
+.qv-n{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:550;letter-spacing:-.005em}
+.qv-c{flex:0 0 auto;font-size:13px;color:rgba(255,255,255,.55);font-variant-numeric:tabular-nums}
+.qv-c::before{content:'·';margin-right:8px}
+.qv-dl{margin-left:auto}
+.qv-b{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 12px;border:0;border-radius:8px;background:rgba(255,255,255,.12);color:#fff;font:inherit;font-size:13px;font-weight:500;text-decoration:none;cursor:default;transition:background-color 120ms ease,transform 100ms ease-out}
+.qv-b svg{width:15px;height:15px}
+.qv-x{width:32px;padding:0}
+.qv-b:active,.qv-nav:active{transform:scale(.96)}
+.qv-b:focus-visible,.qv-nav:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.qv-stage{position:relative;display:flex;overflow:auto;min-height:0;padding:6px 72px 36px;overscroll-behavior:contain}
+.qv-img{display:block;margin:auto;max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 0 0 .5px rgba(255,255,255,.08),0 24px 70px -24px rgba(0,0,0,.8);opacity:0;transform:scale(.97);transition:opacity 180ms ease,transform 240ms cubic-bezier(.23,1,.32,1)}
+.qv.is-in .qv-img.is-loaded{opacity:1;transform:none}
+.qv-img.can-zoom{cursor:zoom-in}
+.qv.is-full .qv-stage{padding:0}
+.qv.is-full .qv-img{max-width:none;max-height:none;border-radius:0;cursor:zoom-out;transition:none}
+.qv-stage.is-loading::after{content:'';position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;border:2px solid rgba(255,255,255,.18);border-top-color:rgba(255,255,255,.8);animation:qvSpin 700ms linear infinite}
+@keyframes qvSpin{to{transform:rotate(360deg)}}
+.qv-err{margin:auto;font-size:14px;color:rgba(255,255,255,.7)}
+.qv-err a{color:#fff}
+.qv-nav{position:absolute;top:50%;width:44px;height:44px;margin-top:-22px;border:0;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.12);color:#fff;cursor:default;transition:background-color 120ms ease,transform 100ms ease-out}
+.qv-nav svg{width:18px;height:18px}
+.qv-nav.prev{left:16px}.qv-nav.next{right:16px}
+.qv.is-full .qv-nav{opacity:.0;pointer-events:none}
+@media (hover:hover) and (pointer:fine){ .qv-b:hover,.qv-nav:hover{background:rgba(255,255,255,.2)} }
+@media (prefers-reduced-motion:reduce){ .qv,.qv-img{transition:opacity 120ms ease} .qv-img{transform:none} .qv-stage.is-loading::after{animation:none} }
+@media (prefers-reduced-transparency:reduce){ .qv{background:#0b0b0d;-webkit-backdrop-filter:none;backdrop-filter:none} }
+
+/* Files in the task panel: a small preview tile for each (the picture itself, once it's signed) */
+.tkp-th{width:30px;height:30px;flex:none;border-radius:6px;overflow:hidden;display:grid;place-items:center;background:var(--fill-2);color:var(--label-2);box-shadow:inset 0 0 0 .5px var(--sep)}
+.tkp-th svg{width:15px;height:15px}
+.tkp-th img{width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 160ms ease}
+.tkp-th img.on{opacity:1}
+.tkp-file{min-height:40px}
+.tkp-file.is-img{cursor:zoom-in}
+.tkp-file .ib{cursor:default}
