@@ -317,3 +317,10 @@ body.mac.mobile { overflow: hidden; background: var(--ios-bg, #F2F2F7); -webkit-
   .tabbar .bdg { display: block; box-sizing: border-box; height: 18px; padding-block: calc((18px - 1cap) / 2) 0; text-align: center; line-height: 1; text-box: trim-both cap alphabetic; }
   .ir .bdgn { display: inline-block; box-sizing: border-box; height: 20px; padding-block: calc((20px - 1cap) / 2) 0; text-align: center; line-height: 1; text-box: trim-both cap alphabetic; }
 }
+/* Focus (Nov 23): a purple target beside the name; the toggle on a client's page */
+.fo-mk { display: inline-flex; vertical-align: -1px; margin-left: 6px; color: var(--purple); }
+.fo-mk svg { width: 13px; height: 13px; stroke-width: 2.2; }
+.fo-tg { display: inline-flex; align-items: center; gap: 6px; height: 28px; margin-top: 8px; padding: 0 12px; border-radius: 14px; border: 0; background: var(--fill-2); color: var(--label-2); font: inherit; font-size: 14px; font-weight: 600; }
+.fo-tg svg { width: 15px; height: 15px; stroke-width: 2.2; }
+.fo-tg.on { background: var(--purple-soft); color: var(--purple); }
+.fo-tg:not(.is-ro):active { opacity: .8; }

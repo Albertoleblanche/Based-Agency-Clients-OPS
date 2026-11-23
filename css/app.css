@@ -3013,3 +3013,25 @@ body > .notif-panel{position:fixed;top:auto;right:auto;z-index:1000}
 .toast-act{flex:0 0 auto;align-self:center;margin-left:4px;padding:4px 10px;border:0;border-radius:7px;background:var(--fill-2);color:var(--blue);font:600 13px/1.2 inherit;cursor:default;transition:transform 120ms ease,background-color 120ms ease}
 .toast-act:active{transform:scale(.96)}
 @media (hover:hover) and (pointer:fine){.toast-act:hover{background:var(--fill-3)}}
+
+/* ---- Focus (Nov 23): clients the owner asked the team to give extra attention ----
+   A small purple target beside the name wherever a client is listed, and a Focus toggle by the
+   name in its panel and on its page (approvers; others see it only when it's on). */
+.fo-mk{display:inline-flex;vertical-align:-1px;margin-left:6px;color:var(--purple);flex:none}
+.fo-mk svg{width:12px;height:12px;stroke-width:2.2}
+.fo-tg{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 10px;border-radius:12px;border:0;background:var(--fill-2);color:var(--label-2);
+  font:inherit;font-size:12.5px;font-weight:550;letter-spacing:0;flex:none;cursor:default;vertical-align:middle;
+  transition:background-color 160ms ease,color 160ms ease,transform 120ms ease}
+.fo-tg svg{width:13px;height:13px;stroke-width:2.2}
+.fo-tg.on{background:var(--purple-soft);color:var(--purple)}
+.fo-tg:not(.is-ro):active{transform:scale(.96)}
+.sp-head .fo-tg{margin-left:auto}
+.lt-sub .fo-tg{margin-right:10px}
+.fo-empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:40px 28px;text-align:center}
+.fo-empty svg{width:22px;height:22px;color:var(--purple)}
+.fo-empty b{font-size:14px;color:var(--label);font-weight:600}
+.fo-empty span{max-width:440px;line-height:1.5}
+@media (hover:hover) and (pointer:fine){
+  .fo-tg:not(.is-ro):not(.on):hover{background:var(--fill-3);color:var(--label)}
+  .fo-tg.on:not(.is-ro):hover{background:var(--purple-soft);filter:brightness(1.08)}
+}

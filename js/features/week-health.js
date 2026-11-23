@@ -17,6 +17,21 @@ const DEFAULT_HEALTH_SIGNALS = {
 };
 function updateAutomation(){ return Object.assign({}, DEFAULT_UPDATE_AUTOMATION, (typeof settings !== 'undefined' && settings.updatesAutomation) || {}); }
 function healthThresholds(){ return Object.assign({}, DEFAULT_HEALTH_SIGNALS, (typeof settings !== 'undefined' && settings.healthSignals) || {}); }
+// Focus clients (data.js) are watched closer (Nov 23): "nothing logged" warns a quarter sooner, an
+// update not sent turns At risk halfway sooner, one late update of the last four or one overdue
+// task is already Watch, and hours under 70% of the month's pace are flagged. The over-budget pace
+// and the owner's risk flag stay as they are. The server's Monday summary uses the same rule.
+function focusThresholds(T){
+  const days = ([w, r]) => { const a = Math.max(1, Math.round(w * .75)); return [a, Math.max(a + 1, Math.round(r * .75))]; };
+  const less = ([w, r]) => { const a = Math.max(1, w - 1); return [a, Math.max(a + 1, r - 1)]; };
+  return Object.assign({}, T, {
+    nothingLoggedDays: days(T.nothingLoggedDays),
+    noUpdateDays: [T.noUpdateDays[0], Math.max(T.noUpdateDays[0] + 1, Math.round(T.noUpdateDays[0] + (T.noUpdateDays[1] - T.noUpdateDays[0]) / 2))],
+    lateOfLast4: less(T.lateOfLast4), overdueTasks: less(T.overdueTasks),
+    underUsedPct: Math.min(90, (T.underUsedPct || 50) + 20),
+  });
+}
+function clientThresholds(c){ const T = healthThresholds(); return typeof isFocus === 'function' && isFocus(c) ? focusThresholds(T) : T; }
 
 // ---- time helpers ------------------------------------------------------------------------
 // rNow() is "now" for every rule here. Health's trend re-runs the same rules as of a past day
@@ -250,13 +265,13 @@ function logSuggestions(limit){
     if(owner && !why.length){
       const lastLog = (c.improvements || []).map(i => new Date(i.date)).filter(x => x <= now).sort((a, b) => b - a)[0];
       const q = lastLog || clientStartedAt(c), n = q ? daysBetween(q, now) : 0;
-      if(q && n >= T.nothingLoggedDays[0]){ score += 100 + Math.min(n, 60); why.push(lastLog ? `Nothing logged in ${n} days` : 'Nothing logged yet'); }
+      if(q && n >= clientThresholds(c).nothingLoggedDays[0]){ score += 100 + Math.min(n, 60); why.push(lastLog ? `Nothing logged in ${n} days` : 'Nothing logged yet'); }
     }
     if(!score) return;
     if(why.length > 1) why[1] = why[1].toLowerCase();
     out.push({ c, score, why: why.join(' · '), mins });
   });
-  out.sort((a, b) => b.score - a.score || (b.c.importance || 0) - (a.c.importance || 0) || a.c.name.localeCompare(b.c.name));
+  out.sort((a, b) => focusFirst(a.c, b.c) || b.score - a.score || (b.c.importance || 0) - (a.c.importance || 0) || a.c.name.localeCompare(b.c.name));
   return limit ? out.slice(0, limit) : out;
 }
 
@@ -341,7 +356,8 @@ function stepsHtml(w){
   return `<span class="steps" role="img" aria-label="${label}">${out}</span>`;
 }
 // Overdue first (longest first), then due today; most important clients first within each.
-function dueOrder(a, b){ return a.daysLeft - b.daysLeft || (b.c.importance || 0) - (a.c.importance || 0); }
+// Focus clients first (data.js), then the soonest due, then the most important.
+function dueOrder(a, b){ return focusFirst(a.c, b.c) || a.daysLeft - b.daysLeft || (b.c.importance || 0) - (a.c.importance || 0); }
 // Approvers and admins see every client; a team member sees the clients they own.
 function seesEveryone(){ return typeof canApprove === 'function' && canApprove(); }
 // "My clients" is one thing everywhere (Nov 21): your scope of work and what you've worked on lately
@@ -381,7 +397,7 @@ async function loadHealthHandled(){
   try{ healthHandled = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : {}; }catch(e){ healthHandled = {}; }
 }
 function clientHealth(c){
-  const T = healthThresholds(), now = rNow(), sig = [];
+  const T = clientThresholds(c), now = rNow(), sig = [];
   const lvl = (v, [w, r]) => (v >= r ? 'r' : (v >= w ? 'y' : null));
   const last = lastSentAt(c);
   const noUpd = last ? daysBetween(last, now) : null;

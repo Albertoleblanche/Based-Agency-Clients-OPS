@@ -83,7 +83,7 @@ function uwWhatsappSmall(){
 function uwRemindersSmall(){
   const me = currentUser?.id, today = toDateStr(rNow()), tom = toDateStr(addDays(rNow(), 1));
   const rs = (typeof clientReminders !== 'undefined' ? clientReminders : []).filter(r => r.status === 'waiting' && (canApprove() || r.askedBy === me))
-    .sort((a, b) => (a.followUpDate || '9999').localeCompare(b.followUpDate || '9999'));
+    .sort((a, b) => focusIdFirst(a.clientId, b.clientId) || (a.followUpDate || '9999').localeCompare(b.followUpDate || '9999'));
   const over = rs.filter(r => r.followUpDate && r.followUpDate < today).length;
   const soon = rs.filter(r => r.followUpDate === today || r.followUpDate === tom).length;
   const cells = rs.slice(0, 12).map(r => `<i class="${r.followUpDate && r.followUpDate < today ? 'od' : r.followUpDate === today || r.followUpDate === tom ? 'nx' : ''}"></i>`).join('');
@@ -106,7 +106,7 @@ function uwCareCard(m, n){
     const c = x.c, hp = x.h.hp || {};
     const gl = x.h.level !== lastLvl ? `<div class="uw-gl">${x.h.level === 'r' ? 'AT RISK' : 'TO WATCH'}</div>` : ''; lastLvl = x.h.level;
     const badge = hp.budget ? `<span class="uw-mv${hp.used > hp.budget ? ' bad' : ''}">${Math.round(hp.used)}/${hp.budget} H</span>` : '';
-    return `${gl}<a class="uw-cr" href="#" onclick="dbOpenHealth('${c.id}');return false;"><span class="uw-st ${x.h.level === 'r' ? 'r' : 'am'}"></span><span class="uw-cm"><b>${uwEsc(c.name)}</b><span>${uwEsc(tableSignal(x.h, c) || '')}</span></span>${badge}${icon('chevron-right')}</a>`;
+    return `${gl}<a class="uw-cr" href="#" onclick="dbOpenHealth('${c.id}');return false;"><span class="uw-st ${x.h.level === 'r' ? 'r' : 'am'}"></span><span class="uw-cm"><b>${uwEsc(c.name)}${focusMark(c)}</b><span>${uwEsc(tableSignal(x.h, c) || '')}</span></span>${badge}${icon('chevron-right')}</a>`;
   }).join('');
   const rr = rest.filter(x => x.h.level === 'r').length, ry = rest.length - rr;
   const foot = rest.length ? `<a class="uw-foot" href="#health" onclick="switchView('health');return false;">${[rr ? `${rr} more at risk` : '', ry ? `${ry} to watch` : ''].filter(Boolean).join(', ')}${icon('chevron-right')}</a>` : '';

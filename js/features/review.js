@@ -14,8 +14,8 @@ function reviewItems(){
     else if(d.draftStatus === 'approved') out.approved.push({ c, d, at: d.draftPendingSince });
     else if(d.draftStatus === 'pending' && d.draft && (d.author === me || d.readyToNotify) && !draftHasNoWork(c, d)) out.waiting.push({ c, d, at: d.draftPendingSince });
   }));
-  out.waiting.sort((a, b) => new Date(a.at || 0) - new Date(b.at || 0));
-  out.approved.sort((a, b) => new Date(a.at || 0) - new Date(b.at || 0));
+  out.waiting.sort((a, b) => focusFirst(a.c, b.c) || new Date(a.at || 0) - new Date(b.at || 0));
+  out.approved.sort((a, b) => focusFirst(a.c, b.c) || new Date(a.at || 0) - new Date(b.at || 0));
   out.sent.sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0));
   return out;
 }
@@ -106,7 +106,7 @@ function renderTeamQueue(){
     const line = reviewTab === 'approved' ? escapeHtml(reviewSendWords(x.c, x.d))
       : `${x.d.author === myName() ? '' : escapeHtml(firstName(x.d.author)) + ' · '}<span class="rvn-due ${kind}">${escapeHtml(due)}</span>`;
     return `<a class="rvn-r${on ? ' is-sel' : ''}" href="#teamqueue" onclick="selectReview('${x.c.id}',${jsArg(x.d.author)});return false;"${on ? ' aria-current="true"' : ''}>${unread}${monoHtml(x.c, 'sm')}
-<div class="tx"><b>${escapeHtml(x.c.name)}</b><span class="s wn-rs">${chGlyph(x.c)}<span>${line}</span></span></div>
+<div class="tx"><b>${escapeHtml(x.c.name)}${focusMark(x.c)}</b><span class="s wn-rs">${chGlyph(x.c)}<span>${line}</span></span></div>
 <div class="rvn-rr">${reviewTab === 'approved' ? '' : when ? `<time>${escapeHtml(when)}</time>` : ''}${flag}</div></a>`;
   }).join('') || `<div class="rvn-empty"><b>${reviewTab === 'waiting' ? 'Nothing waiting' : reviewTab === 'approved' ? 'Nothing approved and unsent' : 'Nothing sent this week'}</b>${reviewTab === 'waiting' ? 'Drafts show up here when they’re sent for review.' : ''}</div>`;
   const sortNote = reviewTab === 'waiting' && !canApprove() ? 'Yours · oldest first' : reviewTab === 'waiting' ? `Oldest first${dueN ? ` · ${lateN ? `${lateN} late` + (dueN > lateN ? `, ${dueN - lateN} due today` : '') : `${dueN} due today`}` : ''}`
@@ -220,7 +220,7 @@ function reviewReadHtml(x, list, split){
   const drafted = tab === 'approved' && d.approvedBy ? ` · approved by ${d.approvedBy === myName() ? 'you' : escapeHtml(firstName(d.approvedBy))}${d.approvedAt ? ' at ' + escapeHtml(fmtTime(new Date(d.approvedAt))) : ''}`
     : d.draftPendingSince ? ` · ${fmtWait(d.draftPendingSince)} ago` : '';
   const toWords = wa ? `To the ${escapeHtml((winGroupFor(c) || {}).name || c.name)} group on WhatsApp` : `${to || c.email ? `To ${escapeHtml(to || c.email)}` : 'By email'}${ch === 'both' ? ' and their WhatsApp group' : ''}`;
-  const head = `<div class="rvn-hd">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}</b><span class="s">${toWords}</span><span class="s">Drafted by ${mine ? 'you' : escapeHtml(d.author)}${drafted}</span></div></div>`;
+  const head = `<div class="rvn-hd">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}${focusMark(c)}</b><span class="s">${toWords}</span><span class="s">Drafted by ${mine ? 'you' : escapeHtml(d.author)}${drafted}</span></div></div>`;
   // WhatsApp or email, it reads as the same letter
   const body = editing ? `<textarea spellcheck="true" class="rvn-edit" id="draft-${c.id}" aria-label="Draft">${escapeHtml(d.draft || '')}</textarea>`
     : `<div class="rvn-body">${draftBodyHtml(d.draft)}</div>`;
@@ -295,7 +295,7 @@ function reviewGroupRowHtml(x, on, seen){
     : bad ? `<span class="rvn-note is-red">${bad} deleted</span>`
     : `<span class="rvn-note">${ok === x.parts.length ? (ok === 2 ? 'Both approved' : 'All approved') : `${ok} of ${x.parts.length} approved`}</span>`;
   return `<a class="rvn-r${on ? ' is-sel' : ''}" href="#teamqueue" onclick="selectReview('${c.id}','*');return false;"${on ? ' aria-current="true"' : ''}>${unread}${monoHtml(c, 'sm')}
-<div class="tx"><b>${escapeHtml(c.name)}</b><span class="s wn-rs">${chGlyph(c)}<span>${escapeHtml(names)} · <span class="rvn-due ${kind}">${escapeHtml(due)}</span></span></span></div>
+<div class="tx"><b>${escapeHtml(c.name)}${focusMark(c)}</b><span class="s wn-rs">${chGlyph(c)}<span>${escapeHtml(names)} · <span class="rvn-due ${kind}">${escapeHtml(due)}</span></span></span></div>
 <div class="rvn-rr">${when ? `<time>${escapeHtml(when)}</time>` : ''}${flag}</div></a>`;
 }
 // The email the client gets, with each person's part marked in the margin: who wrote it, where it
@@ -316,7 +316,7 @@ function reviewPartsHtml(x, list, split){
   // The client, as the email's header
   const to = clientContact(c), ch = winChannel(c);
   const oldest = parts.map(p => p.d.draftPendingSince).filter(Boolean).sort()[0];
-  const head = `<div class="rvn-hd">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}</b><span class="s">${to || c.email ? `To ${escapeHtml(to || c.email)}` : 'By email'}${ch === 'both' ? ' and their WhatsApp group' : ''}</span><span class="s">${escapeHtml(capFirst(partNames(parts.map(p => p.author), me)))}, as one email${tab !== 'sent' && oldest ? ` · ${escapeHtml(fmtWait(oldest))} ago` : ''}</span></div></div>`;
+  const head = `<div class="rvn-hd">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}${focusMark(c)}</b><span class="s">${to || c.email ? `To ${escapeHtml(to || c.email)}` : 'By email'}${ch === 'both' ? ' and their WhatsApp group' : ''}</span><span class="s">${escapeHtml(capFirst(partNames(parts.map(p => p.author), me)))}, as one email${tab !== 'sent' && oldest ? ` · ${escapeHtml(fmtWait(oldest))} ago` : ''}</span></div></div>`;
   // The letter, part by part
   const { sections, closer } = partSections(inMail.map(p => p.d));
   const partBlock = p => {

@@ -17,7 +17,7 @@ function todayWaitingDrafts(){
       out.push({ c, d, count });
     }
   }));
-  out.sort((a, b) => new Date(a.d.draftPendingSince || 0) - new Date(b.d.draftPendingSince || 0));
+  out.sort((a, b) => focusFirst(a.c, b.c) || new Date(a.d.draftPendingSince || 0) - new Date(b.d.draftPendingSince || 0));
   return out;
 }
 function myClientsFilter(c){ return canApprove() || clientOwner(c) === myName(); }
@@ -153,7 +153,7 @@ function todayModel(){
   // for your review, WhatsApp requests waiting on you, follow-ups with clients, and notes to revisit.
   todayFromElsewhere(todayStr, now).forEach(x => items.push(x));
   // The app picks the order: late first, then high priority, then what has waited longest, then by time.
-  items.sort((a, b) => (!!b.late - !!a.late) || (!!b.flag - !!a.flag) || ((b.age || 0) - (a.age || 0)) || (a.at || '~').localeCompare(b.at || '~'));
+  items.sort((a, b) => (!!b.late - !!a.late) || itemFocusFirst(a, b) || (!!b.flag - !!a.flag) || ((b.age || 0) - (a.age || 0)) || (a.at || '~').localeCompare(b.at || '~'));
   // Today stays short: Now, the next three, and the rest as counts that open their tabs.
   if(!lead && items.length){
     const x = items[0];
@@ -248,7 +248,7 @@ function wkRow(x){
   const step = x.step || (x.tick ? '' : 'Open');
   return `<div class="ty-i" onclick="if(wkIsOpen(this)){${x.go}}">${x.tick
       ? `<button class="ty-cb" role="checkbox" aria-checked="false" aria-label="${escapeHtml(x.tickLabel || 'Done')}: ${escapeHtml(x.title)}" onclick="event.stopPropagation();if(wkIsOpen(this)){${x.tick}}"></button>`
-      : `<span class="ty-ic" aria-hidden="true">${icon(wkRowIcon(x))}</span>`}<div class="tx"><b>${escapeHtml(x.title)}</b><span>${x.sub || ''}${x.flag ? ' · High priority' : ''}</span></div>${x.when ? `<span class="ty-when${x.late ? ' late' : ''}">${escapeHtml(x.when)}</span>` : ''}${step
+      : `<span class="ty-ic" aria-hidden="true">${icon(wkRowIcon(x))}</span>`}<div class="tx"><b>${escapeHtml(x.title)}${itemFocus(x) ? focusMark(x.c || clients.find(c => c.id === (x.task ? x.task.clientId : x.clientId))) : ''}</b><span>${x.sub || ''}${x.flag ? ' · High priority' : ''}</span></div>${x.when ? `<span class="ty-when${x.late ? ' late' : ''}">${escapeHtml(x.when)}</span>` : ''}${step
       ? `<button class="btn sm ty-step" onclick="event.stopPropagation();${x.go}">${escapeHtml(step)}</button>` : ''}</div>`;
 }
 // Whole Week from Today opens on today and plays the week growing in around it.
@@ -331,7 +331,7 @@ function todayDayModel(ds){
     const c = clients.find(x => x.id === n.clientId);
     items.push({ src: 'note', c, title: `Come back to your note: ${n.title || 'Untitled'}`, sub: c ? escapeHtml(c.name) : 'Your note', go: `openNoteSheet('${n.id}')` });
   });
-  items.sort((a, b) => (!!b.flag - !!a.flag) || (a.at || '~').localeCompare(b.at || '~'));
+  items.sort((a, b) => itemFocusFirst(a, b) || (!!b.flag - !!a.flag) || (a.at || '~').localeCompare(b.at || '~'));
   done.sort((a, b) => b.t - a.t);
   return { items, others, done };
 }

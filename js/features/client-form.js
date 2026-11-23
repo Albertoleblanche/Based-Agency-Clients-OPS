@@ -312,6 +312,12 @@ async function saveClientForm(){
   if(ownerEl){ if(ownerEl.value) customFieldValues.owner = ownerEl.value; else delete customFieldValues.owner; }
   const weeklyEl = document.getElementById('ncWeekly');
   if(weeklyEl){ if(weeklyEl.value === 'off') customFieldValues.weeklyUpdate = 'off'; else delete customFieldValues.weeklyUpdate; }
+  // Focus (Nov 23): when it's switched on, and by whom, is kept until it's switched off
+  const focusEl = document.getElementById('ncFocus');
+  if(focusEl){
+    if(focusEl.value === 'on'){ if(!customFieldValues.focus) Object.assign(customFieldValues, { focus: true, focusAt: new Date().toISOString(), focusBy: myName() || '' }); }
+    else { delete customFieldValues.focus; delete customFieldValues.focusAt; delete customFieldValues.focusBy; }
+  }
   // the main contact: who wins and updates greet by name
   const contactEl = document.getElementById('ncContact');
   if(contactEl){ const v = contactEl.value.trim().replace(/\s+/g, ' ').slice(0, 80); if(v) customFieldValues.contact = v; else delete customFieldValues.contact; }

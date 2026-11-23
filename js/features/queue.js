@@ -74,7 +74,7 @@ function queueItems(){
   }
   // Next updates wait behind everything you can act on now
   const rank = { empty: 0, written: 1, write: 2, missed: 3, internal: 4, next: 5, review: 6, approved: 7 };
-  const order = (a, b) => quLater(a) - quLater(b) || a.w.daysLeft - b.w.daysLeft || rank[a.st] - rank[b.st] || (b.c.importance || 0) - (a.c.importance || 0) || a.c.name.localeCompare(b.c.name);
+  const order = (a, b) => quLater(a) - quLater(b) || focusFirst(a.c, b.c) || a.w.daysLeft - b.w.daysLeft || rank[a.st] - rank[b.st] || (b.c.importance || 0) - (a.c.importance || 0) || a.c.name.localeCompare(b.c.name);
   out.todo.sort(order); out.review.sort(order);
   return out;
 }
@@ -129,14 +129,14 @@ function renderMyQueue(){
     const k = x.mine.length;
     const n = sentAt ? fmtTime(sentAt) : x.st === 'missed' ? 'nothing new' : k ? todayPlural(k, 'logged', 'logged') : 'Draft only';
     return `${ix === firstLater && ix > 0 ? '<p class="rvn-sort qu-sgh">Later</p>' : ''}<a class="rvn-r qu-r${on ? ' is-sel' : ''}" href="#queue" onclick="selectQueueClient('${x.c.id}');return false;"${on ? ' aria-current="true"' : ''}>
-<div class="tx"><b>${escapeHtml(x.c.name)}</b><span class="s"><span class="rvn-due ${kind}">${escapeHtml(due)}</span> · ${n}</span></div>
+<div class="tx"><b>${escapeHtml(x.c.name)}${focusMark(x.c)}</b><span class="s"><span class="rvn-due ${kind}">${escapeHtml(due)}</span> · ${n}</span></div>
 <div class="rvn-rr"><span class="qu-tag ${cls}">${word}</span></div></a>`;
   }).join('') || `<div class="rvn-empty"><b>${{ todo: 'Nothing to do', review: 'Nothing in review', sent: 'Nothing sent this week' }[queueTab]}</b>${{ todo: 'Clients show up here once you log work for their email.', review: 'Drafts you send for review wait here until they go out.', sent: 'Your updates show here once they’re sent.' }[queueTab]}</div>`;
   // Worth logging for: clients you tracked time for, or yours that are due, with nothing logged
   // (logSuggestions in week-health.js). Under To do, after the clients already here.
   const sugg = queueTab === 'todo' && typeof logSuggestions === 'function' ? logSuggestions(4) : [];
   const suggHtml = sugg.length ? `<p class="rvn-sort qu-sgh">Worth logging for</p>${sugg.map(x => `<a class="rvn-r qu-r qu-sgr" href="#queue" onclick="openQueueLogImprovementModal('${x.c.id}');return false;" title="Log work for ${escapeHtml(x.c.name)}">
-<div class="tx"><b>${escapeHtml(x.c.name)}</b><span class="s${/overdue/.test(x.why) ? ' is-late' : ''}">${escapeHtml(x.why)}</span></div><span class="qu-sgp" aria-hidden="true">${icon('plus')}</span></a>`).join('')}` : '';
+<div class="tx"><b>${escapeHtml(x.c.name)}${focusMark(x.c)}</b><span class="s${/overdue/.test(x.why) ? ' is-late' : ''}">${escapeHtml(x.why)}</span></div><span class="qu-sgp" aria-hidden="true">${icon('plus')}</span></a>`).join('')}` : '';
   window._quSugg = sugg;
   const lateN = list.filter(x => x.w.late).length, toSend = list.filter(quWaToSend).length;
   const sortNote = firstLater === 0 ? 'Later: in another update' : queueTab === 'todo' ? `Due first${lateN ? ` · ${lateN} late` : ''}` : queueTab === 'sent' ? 'Sent this week · newest first'
@@ -211,7 +211,7 @@ function queueReadHtml(x, list, split){
   const sentAt = x.st === 'sent' ? new Date(d.draftSentAt) : null;
   const due = sentAt ? `Sent ${relDayLower(sentAt)} at ${fmtTime(sentAt)}` : x.st === 'next' ? `Next update · after the one ${x.held && x.held.draftStatus === 'approved' ? 'approved' : 'in review'} is sent`
     : w.sent ? `Last update sent ${relDayLower(w.last)} · next ${w.dueText.replace(/^Due /, 'due ')}` : w.dueText;
-  const head = `<div class="rvn-hd">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}</b><span class="s"><span class="${!sentAt && !w.sent && w.late && x.st !== 'next' ? 't-red' : ''}">${escapeHtml(due)}</span></span><span class="s">${escapeHtml([c.service, w.owner ? (w.owner === me ? 'Yours' : 'Owner ' + firstName(w.owner)) : ''].filter(Boolean).join(' · '))}</span></div></div>`;
+  const head = `<div class="rvn-hd">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}${focusMark(c)}</b><span class="s"><span class="${!sentAt && !w.sent && w.late && x.st !== 'next' ? 't-red' : ''}">${escapeHtml(due)}</span></span><span class="s">${escapeHtml([c.service, w.owner ? (w.owner === me ? 'Yours' : 'Owner ' + firstName(w.owner)) : ''].filter(Boolean).join(' · '))}</span></div></div>`;
   // Your work: each item with its email switch, Edit and Delete; Log More under it, with the date
   // (today unless you pick another) and the time spent, kept while you move around the page.
   const today = toDateStr(new Date()), kf = window._quForm && window._quForm.id === c.id ? window._quForm : null;

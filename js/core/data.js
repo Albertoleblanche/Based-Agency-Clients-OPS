@@ -25,6 +25,37 @@ function activeClients(){ return clients.filter(c=>!c.deletedAt && !clientInSetu
 function liveClients(){ return clients.filter(c=>!c.deletedAt); }
 // The person at the client that updates and wins greet by name ("Mike", "Mike and Sarah").
 function clientContact(c){ return String((c && ((c.customFieldValues && c.customFieldValues.contact) || c.contactName || c.contact_name)) || '').trim(); }
+// ---- Focus (Nov 23) ----
+// Clients the owner asked the team to give extra attention, on top of Importance. Approvers switch
+// it on a client (its panel, client page, Edit Client, Bulk Edit); then, within every list and
+// group, Focus clients come first, Health watches them closer (week-health.js), and the morning
+// reminders and the Monday summary put them on top (lib/update-automations.js). Kept in the
+// client's custom values: focus (true), focusAt and focusBy.
+function isFocus(c){ return !!(c && c.customFieldValues && c.customFieldValues.focus); }
+function isFocusId(id){ return !!id && typeof clients !== 'undefined' && isFocus(clients.find(c => c.id === id)); }
+function focusFirst(a, b){ return (isFocus(b) ? 1 : 0) - (isFocus(a) ? 1 : 0); }
+function focusIdFirst(a, b){ return (isFocusId(b) ? 1 : 0) - (isFocusId(a) ? 1 : 0); }
+// a row of a mixed list: an update or note (x.c), a task (x.task) or anything with a clientId
+function itemFocus(x){ return !!x && (isFocus(x.c) || !!(x.task && isFocusId(x.task.clientId)) || isFocusId(x.clientId)); }
+function itemFocusFirst(a, b){ return (itemFocus(b) ? 1 : 0) - (itemFocus(a) ? 1 : 0); }
+function focusMark(c){ return isFocus(c) && typeof icon === 'function' ? `<span class="fo-mk" role="img" aria-label="Focus client" title="Focus client">${icon('target')}</span>` : ''; }
+function focusClients(){ return activeClients().filter(isFocus); }
+// Switches Focus on or off for some clients; returns how many saved.
+async function saveClientFocus(ids, on){
+  const list = [].concat(ids).map(id => clients.find(c => c.id === id)).filter(c => c && isFocus(c) !== !!on);
+  const results = await Promise.all(list.map(async c => {
+    const cfv = Object.assign({}, c.customFieldValues || {});
+    if(on) Object.assign(cfv, { focus: true, focusAt: new Date().toISOString(), focusBy: (typeof myName === 'function' && myName()) || '' });
+    else { delete cfv.focus; delete cfv.focusAt; delete cfv.focusBy; }
+    const ok = await updateClientRow(c.id, { customFieldValues: cfv });
+    if(ok){
+      c.customFieldValues = cfv;
+      if(typeof logClientActivity === 'function') logClientActivity(c.id, 'client_updated', `${(typeof myName === 'function' && myName()) || 'Someone'} ${on ? 'added' : 'took'} ${c.name} ${on ? 'to' : 'off'} Focus.`);
+    }
+    return ok;
+  }));
+  return { done: results.filter(Boolean).length, failed: results.filter(x => !x).length };
+}
 function setupClients(){ return clients.filter(c=>!c.deletedAt && clientInSetup(c)); }
 function isClientPaused(clientId){
   const c = clients.find(x=>x.id===clientId);

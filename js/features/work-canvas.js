@@ -32,7 +32,7 @@ function remRowHtml(r, primary){
     right = `<span class="rmi-when">${r.status === 'answered' ? 'Answered' : 'Closed'} ${at}</span><span class="rmi-d">${r.askedDate && r.resolvedAt ? 'after ' + remWaited(r.askedDate, r.resolvedAt) : ''}</span>`;
   }
   return `<div class="rmi-r${open ? '' : ' is-done'}${window._remSel === r.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectReminder('${r.id}')" onkeydown="if((event.key==='Enter'||event.key===' ')&&event.target===this){event.preventDefault();selectReminder('${r.id}')}">${remCb(r)}
-<div class="tx"><b>${escapeHtml(r.question)}</b><span class="s">${escapeHtml(c ? c.name : '')} · ${escapeHtml(firstName(who))} asked ${escapeHtml(asked)}</span></div>
+<div class="tx"><b>${escapeHtml(r.question)}</b><span class="s">${escapeHtml(c ? c.name : '')}${focusMark(c)} · ${escapeHtml(firstName(who))} asked ${escapeHtml(asked)}</span></div>
 <div class="rmi-w">${right}</div>${act}</div>`;
 }
 // The circle: ticks a question answered (with the same little check as everywhere else), or shows
@@ -51,7 +51,7 @@ function renderReminders(){
   let rs = base.slice();
   if(remClient !== 'all') rs = rs.filter(r => r.clientId === remClient);
   if(remWho !== 'all') rs = rs.filter(r => r.askedBy === remWho);
-  const byFu = (a, b) => (a.followUpDate || '9999').localeCompare(b.followUpDate || '9999') || (a.askedDate || '').localeCompare(b.askedDate || '');
+  const byFu = (a, b) => focusIdFirst(a.clientId, b.clientId) || (a.followUpDate || '9999').localeCompare(b.followUpDate || '9999') || (a.askedDate || '').localeCompare(b.askedDate || '');
   const byDone = (a, b) => new Date(b.resolvedAt || 0) - new Date(a.resolvedAt || 0);
   const open = rs.filter(r => r.status === 'waiting'), answered = rs.filter(r => r.status === 'answered').sort(byDone), closed = rs.filter(r => r.status === 'closed').sort(byDone);
   const due = open.filter(r => reminderDisplayStatus(r) === 'due').sort(byFu), waiting = open.filter(r => reminderDisplayStatus(r) !== 'due').sort(byFu);

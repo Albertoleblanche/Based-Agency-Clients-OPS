@@ -47,13 +47,13 @@ function tkCardHtml(t){
   const flag = t.priority === 'high' ? `<span class="tk-flag" title="High priority">${icon('flag')}</span>` : '';
   return `<article class="tk-c${t.color ? ' has-c c-' + t.color : ''}${window._taskSel === t.id ? ' is-sel' : ''}" role="button" tabindex="0" aria-label="${escapeHtml(t.title)}" onclick="selectTask('${t.id}')" onkeydown="if((event.key==='Enter'||event.key===' ')&&event.target===this){event.preventDefault();selectTask('${t.id}')}">
 <div class="tk-ct">${tkCb(t)}<b>${escapeHtml(t.title)}</b>${flag}</div>
-${c ? `<div class="tk-cm"><span class="tk-cl">${escapeHtml(c.name)}</span></div>` : ''}
+${c ? `<div class="tk-cm"><span class="tk-cl">${escapeHtml(c.name)}${focusMark(c)}</span></div>` : ''}
 <div class="tk-cf"><span class="tk-due ${kind}">${escapeHtml(due)}</span><span class="tk-who">${escapeHtml(tkWho(t.assigneeId))}</span></div></article>`;
 }
 function tkListRowHtml(t){
   const c = clients.find(x => x.id === t.clientId), [due, kind] = tkDue(t), done = t.status === 'done';
   return `<div class="tk-lr${done ? ' is-done' : ''}${window._taskSel === t.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectTask('${t.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)selectTask('${t.id}')">${tkCb(t)}
-<div class="tx"><b>${t.color && !done ? `<i class="cc-dot c-${t.color}" aria-hidden="true"></i>` : ''}${escapeHtml(t.title)}${t.priority === 'high' && !done ? `<span class="tk-flag" title="High priority">${icon('flag')}</span>` : ''}</b><span class="s">${c ? escapeHtml(c.name) + ' · ' : ''}${escapeHtml(tkWho(t.assigneeId))}</span></div>
+<div class="tx"><b>${t.color && !done ? `<i class="cc-dot c-${t.color}" aria-hidden="true"></i>` : ''}${escapeHtml(t.title)}${t.priority === 'high' && !done ? `<span class="tk-flag" title="High priority">${icon('flag')}</span>` : ''}</b><span class="s">${c ? escapeHtml(c.name) + focusMark(c) + ' · ' : ''}${escapeHtml(tkWho(t.assigneeId))}</span></div>
 <span class="tk-due ${kind}">${escapeHtml(done && t.completedAt ? 'Done ' + fmtShortDate(new Date(t.completedAt)) : due)}</span></div>`;
 }
 
@@ -74,7 +74,7 @@ function renderTasks(){
   if(tasksClient !== 'all') vis = vis.filter(t => t.clientId === tasksClient);
   const open = vis.filter(t => t.status !== 'done'), overdue = open.filter(t => t.dueDate && t.dueDate < today);
   const review = open.filter(t => t.status === 'in_review' && t.assignerId === me);
-  const order = (a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999') || (a.priority === 'high' ? -1 : 0) - (b.priority === 'high' ? -1 : 0) || new Date(b.createdAt) - new Date(a.createdAt);
+  const order = (a, b) => focusIdFirst(a.clientId, b.clientId) || (a.dueDate || '9999').localeCompare(b.dueDate || '9999') || (a.priority === 'high' ? -1 : 0) - (b.priority === 'high' ? -1 : 0) || new Date(b.createdAt) - new Date(a.createdAt);
   const monday = dayStart(addDays(new Date(), -((new Date().getDay() + 6) % 7)));
   const done = vis.filter(t => t.status === 'done').sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
   const doneWeek = done.filter(t => t.completedAt && new Date(t.completedAt) >= monday);

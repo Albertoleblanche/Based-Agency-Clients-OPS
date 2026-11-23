@@ -380,7 +380,7 @@ function personalQueueClients(filterKey){
   // draft for each client (getDraftFor) — this page has always been
   // personal, and draft state is per-author (see addendum-25.sql).
   const isSentDraft = (c) => { const d = getDraftFor(c, me); return d.draftStatus==='approved' && !!d.draftSentAt; };
-  let list = [...activeClients()].sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
+  let list = [...activeClients()].sort((a,b)=> focusFirst(a,b) || b.danger-a.danger || b.importance-a.importance);
   if(filterKey==='sent') list = list.filter(isSentDraft);
   else {
     list = list.filter(c=>!isSentDraft(c));
@@ -500,7 +500,7 @@ function teamQueueMemberClients(member, filterKey){
     .filter(c => c.importance >= (Number(teamQueueImportanceFilter)||0))
     .filter(c => queueCardEligible(getDraftFor(c, member.name), c.improvements.filter(i => i.author===member.name && improvementInDateRange(i, true))))
     .filter(c => statusMatches(c, member.name) && readyForReview(c, member.name))
-    .sort((a,b)=> b.danger-a.danger || b.importance-a.importance);
+    .sort((a,b)=> focusFirst(a,b) || b.danger-a.danger || b.importance-a.importance);
 }
 
 // Same client can legitimately count under several members (if more than
@@ -545,7 +545,7 @@ function renderTeamQueue(){
     if(teamQueueMemberFilter !== 'all' && member.name !== teamQueueMemberFilter) return;
     teamQueueMemberClients(member, teamQueueFilter).forEach(c => pairs.push({ c, member }));
   });
-  pairs.sort((a,b)=> (b.c.danger - a.c.danger) || (b.c.importance - a.c.importance) || a.c.name.localeCompare(b.c.name) || a.member.name.localeCompare(b.member.name));
+  pairs.sort((a,b)=> focusFirst(a.c, b.c) || (b.c.danger - a.c.danger) || (b.c.importance - a.c.importance) || a.c.name.localeCompare(b.c.name) || a.member.name.localeCompare(b.member.name));
 
   if(!pairs.length){
     const title = teamDateFilterMode!=='all' ? 'No improvements in this range' : 'No clients match this filter';

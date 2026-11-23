@@ -32,12 +32,12 @@ function renderClientPage(){
   const uw = typeof uiStyleOn === 'function' && uiStyleOn();
   document.getElementById('cdRoot')?.classList.toggle('is-uw', !!uw);
   if(uw){
-    top.innerHTML = `<header class="cp-hd"><div><h1>${escapeHtml(c.name)}</h1><div class="cp-sub">${h.level !== 'g' ? `<span class="uw-delta bad"><i></i>${escapeHtml(healthWord(h.level))} since ${relDay(h.since || rNow()).toLowerCase() === 'today' ? 'today' : escapeHtml(relDay(h.since || rNow()))}</span>` : h.off ? '<span class="uw-delta n"><i></i>No weekly update</span>' : '<span class="uw-delta"><i></i>Healthy</span>'}<span>${escapeHtml([c.service, owner ? firstName(owner) + ' owns it' : '', c.status !== 'Active' ? c.status : '', start ? 'client since ' + start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : ''].filter(Boolean).join(' · '))}</span></div></div>
+    top.innerHTML = `<header class="cp-hd"><div><h1>${escapeHtml(c.name)}</h1><div class="cp-sub">${typeof focusToggleHtml === 'function' ? focusToggleHtml(c) : ''}${h.level !== 'g' ? `<span class="uw-delta bad"><i></i>${escapeHtml(healthWord(h.level))} since ${relDay(h.since || rNow()).toLowerCase() === 'today' ? 'today' : escapeHtml(relDay(h.since || rNow()))}</span>` : h.off ? '<span class="uw-delta n"><i></i>No weekly update</span>' : '<span class="uw-delta"><i></i>Healthy</span>'}<span>${escapeHtml([c.service, owner ? firstName(owner) + ' owns it' : '', c.status !== 'Active' ? c.status : '', start ? 'client since ' + start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : ''].filter(Boolean).join(' · '))}</span></div></div>
 <div class="seg" role="tablist" aria-label="Client sections">${tabs}</div></header>`;
   } else
   top.innerHTML = `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:16px">
 <span class="mono ${clientColor(c)}" style="width:56px;height:56px;border-radius:14px;font-size:19px" aria-hidden="true">${escapeHtml(clientMono(c))}</span>
-<div style="min-width:0"><h1 class="lt">${escapeHtml(c.name)}</h1><p class="lt-sub" style="margin-top:4px">${escapeHtml([c.service, c.status !== 'Active' ? c.status : '', start ? 'client since ' + start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : ''].filter(Boolean).join(' · '))}</p></div>
+<div style="min-width:0"><h1 class="lt">${escapeHtml(c.name)}</h1><p class="lt-sub" style="margin-top:4px">${typeof focusToggleHtml === 'function' ? focusToggleHtml(c) : ''}${escapeHtml([c.service, c.status !== 'Active' ? c.status : '', start ? 'client since ' + start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : ''].filter(Boolean).join(' · '))}</p></div>
 <span style="flex:1"></span><div class="seg" role="tablist" aria-label="Client sections">${tabs}</div></div>
 ${callout}`;
   document.querySelectorAll('#cdRoot .cd-tab').forEach(t => { t.hidden = t.dataset.tab !== cdTab; });

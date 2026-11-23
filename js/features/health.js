@@ -82,7 +82,7 @@ function renderHealth(){
     return { c, h, next, hist, group, streak, lv: settling ? 'h' : h.level };
   });
   const order = { r: 0, y: 1, h: 2, g: 3 };
-  const by = k => all.filter(x => x.group === k).sort((a, b) => order[a.lv] - order[b.lv] || (b.c.importance || 0) - (a.c.importance || 0) || a.c.name.localeCompare(b.c.name));
+  const by = k => all.filter(x => x.group === k).sort((a, b) => focusFirst(a.c, b.c) || order[a.lv] - order[b.lv] || (b.c.importance || 0) - (a.c.importance || 0) || a.c.name.localeCompare(b.c.name));
   const G = { new: by('new'), long: by('long'), fix: by('fix'), ok: by('ok') };
   const sel = window._healthSel ? all.find(x => x.c.id === window._healthSel) : null;
   const reminded = window._hlReminded || (window._hlReminded = {});
@@ -110,7 +110,7 @@ function renderHealth(){
     }
     const st = x.lv === 'g' ? '' : `<span class="hx-st ${x.lv}"><i></i>${x.lv === 'h' ? 'Settling' : HL_WORD[x.lv]}</span>`;
     return `<div class="hx-row${sel && sel.c.id === c.id ? ' on' : ''}" role="button" tabindex="0" data-h="${x.hist.map(k => k || '.').join('')}" onclick="selectHealthClient('${c.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectHealthClient('${c.id}')}">
-<div class="hx-nm"><b>${escapeHtml(c.name)}</b><span>${escapeHtml(everyone ? owner || 'No owner' : c.service || '')}</span></div>
+<div class="hx-nm"><b>${escapeHtml(c.name)}${focusMark(c)}</b><span>${escapeHtml(everyone ? owner || 'No owner' : c.service || '')}</span></div>
 ${healthTrailHtml(x.hist)}<span class="hx-stc">${st}<span class="hx-st then"><i></i></span></span><span class="hx-why">${escapeHtml(why)}</span><span class="hx-act">${act}</span></div>`;
   };
   const info = (title, text) => `<span class="hx-i" tabindex="0" role="button" aria-label="About ${title}">${icon('info')}<span class="hx-tip" role="tooltip">${text}</span></span>`;
@@ -234,7 +234,7 @@ function healthPanelHtml(c, h, closeFn){
   const events = healthEvents(c, h).slice(0, 3).map(e => `<div class="hp-ev"><span>${escapeHtml(relDay(e.at))}</span><b>${escapeHtml(e.t)}</b></div>`).join('');
   return `<aside class="sp" aria-label="${escapeHtml(c.name)}, health">
 <div class="sp-bar"><button class="ib" aria-label="Close" onclick="${closeFn || 'closeHealthPanel()'}">${icon('x')}</button><a class="x-lnk" href="#" onclick="openClientDetail('${c.id}');return false;">Open client</a></div>
-<div class="sp-head">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}</b><span>${meta}</span></div></div>
+<div class="sp-head">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}${focusMark(c)}</b><span>${meta}</span></div></div>
 <div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b><span class="sub">${sub}</span>${acts}</div>
 ${h.signals.length ? `<div class="sp-sec"><b>Why</b><span>${todayPlural(h.signals.length, 'signal')}</span></div>${why}` : ''}
 ${trail}

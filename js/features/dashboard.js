@@ -53,7 +53,7 @@ function dbHealthModel(){
   const hs = (typeof healthScopeClients === 'function' ? healthScopeClients() : attentionEligibleClients()).map(c => ({ c, h: clientHealth(c) }));
   const n = l => hs.filter(x => x.h.level === l).length;
   const reds = x => x.h.signals.filter(s => s.l === 'r').length;
-  const list = hs.filter(x => x.h.level === 'r' || x.h.level === 'y').sort((a, b) => (a.h.level === 'r' ? 0 : 1) - (b.h.level === 'r' ? 0 : 1)
+  const list = hs.filter(x => x.h.level === 'r' || x.h.level === 'y').sort((a, b) => focusFirst(a.c, b.c) || (a.h.level === 'r' ? 0 : 1) - (b.h.level === 'r' ? 0 : 1)
     || reds(b) - reds(a) || b.h.signals.length - a.h.signals.length || (b.c.importance || 0) - (a.c.importance || 0) || (b.c.danger || 0) - (a.c.danger || 0));
   return { r: n('r'), y: n('y'), g: n('g'), tot: hs.length, list };
 }
@@ -68,7 +68,7 @@ function dbOpenHealth(id){ window._healthSel = id; switchView('health'); }
 function dbHealthCard(n){
   const m = dbHealthModel();
   if(!m.tot) return dbCard('db-health', 'health', 'Health', '', dbNone('No clients to watch yet.'));
-  const rows = m.list.slice(0, n).map(x => `<li class="db-r db-hc db-go" data-item onclick="dbOpenHealth('${x.c.id}')"><span class="db-dot ${x.h.level}" aria-label="${x.h.level === 'r' ? 'At risk' : 'To watch'}"></span><span class="db-tx"><b>${escapeHtml(x.c.name)}</b><span class="s">${escapeHtml(tableSignal(x.h, x.c) || '')}</span></span></li>`).join('');
+  const rows = m.list.slice(0, n).map(x => `<li class="db-r db-hc db-go" data-item onclick="dbOpenHealth('${x.c.id}')"><span class="db-dot ${x.h.level}" aria-label="${x.h.level === 'r' ? 'At risk' : 'To watch'}"></span><span class="db-tx"><b>${escapeHtml(x.c.name)}${focusMark(x.c)}</b><span class="s">${escapeHtml(tableSignal(x.h, x.c) || '')}</span></span></li>`).join('');
   const body = dbHealthTop(m, canApprove() ? ' clients' : ' of your clients') + (m.list.length
     ? `<p class="db-sub">Needs care</p><ul class="db-l">${rows}</ul>` : dbNone('Every client is healthy.'));
   return dbCard('db-health', 'health', 'Health', '', body, { total: m.list.length });
@@ -88,7 +88,7 @@ function dbClientsTable(n){
     const c = x.c, w = clientWeek(c), hp = x.h.hp || {}, last = lastSentAt(c), owner = clientOwner(c);
     const week = w.sent ? `Sent ${relDayLower(new Date(w.last))}` : w.dueText;
     const hrs = hp.budget ? `<span class="${hp.used > hp.budget ? 't-red' : ''}">${Math.round(hp.used)} / ${hp.budget} h</span>` : (hp.used ? `${Math.round(hp.used)} h` : '<span class="db-mute">—</span>');
-    return `<tr class="db-go" data-item onclick="dbOpenHealth('${c.id}')"><td><span class="db-cl"><span class="db-dot ${x.h.level}" aria-label="${x.h.level === 'r' ? 'At risk' : 'To watch'}"></span><b>${escapeHtml(c.name)}</b></span></td>
+    return `<tr class="db-go" data-item onclick="dbOpenHealth('${c.id}')"><td><span class="db-cl"><span class="db-dot ${x.h.level}" aria-label="${x.h.level === 'r' ? 'At risk' : 'To watch'}"></span><b>${escapeHtml(c.name)}${focusMark(c)}</b></span></td>
 <td class="db-why">${escapeHtml(tableSignal(x.h, c) || '')}</td><td>${owner ? escapeHtml(firstName(owner)) : '<span class="db-mute">No owner</span>'}</td>
 <td><span class="${w.late && !w.sent ? 't-red' : ''}">${escapeHtml(week)}</span></td><td class="num">${hrs}</td><td>${last ? escapeHtml(relDay(new Date(last))) : '<span class="db-mute">No update yet</span>'}</td></tr>`;
   }).join('');
@@ -101,7 +101,7 @@ function dbClientsTable(n){
 // ---- Tasks ----
 function dbMyTasks(){
   return (typeof tasks !== 'undefined' ? tasks : []).filter(t => t.assigneeId === currentUser?.id && t.status !== 'done' && t.status !== 'in_review' && !t.cancelledAt)
-    .sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999') || (a.dueTime || '~').localeCompare(b.dueTime || '~') || ((b.priority === 'high') - (a.priority === 'high')));
+    .sort((a, b) => focusIdFirst(a.clientId, b.clientId) || (a.dueDate || '9999').localeCompare(b.dueDate || '9999') || (a.dueTime || '~').localeCompare(b.dueTime || '~') || ((b.priority === 'high') - (a.priority === 'high')));
 }
 // Ticking a circle strikes the row through, folds it away, then marks it done. (A task's circle opens
 // Mark Done first, as on Tasks, so it doesn't fold until that's confirmed and the card draws again.)
@@ -170,7 +170,7 @@ function dbCalendarCard(cap){
 function dbRemindersCard(n){
   const me = currentUser?.id, today = toDateStr(rNow());
   const rs = (typeof clientReminders !== 'undefined' ? clientReminders : []).filter(r => r.status === 'waiting' && (canApprove() || r.askedBy === me))
-    .sort((a, b) => (a.followUpDate || '9999').localeCompare(b.followUpDate || '9999'));
+    .sort((a, b) => focusIdFirst(a.clientId, b.clientId) || (a.followUpDate || '9999').localeCompare(b.followUpDate || '9999'));
   const over = rs.filter(r => r.followUpDate && r.followUpDate < today).length, due = rs.filter(r => r.followUpDate === today).length;
   const summ = ['Waiting on clients', over ? `<span class="t-red">${over} overdue</span>` : '', due ? `${due} to follow up today` : ''].filter(Boolean).join(' · ');
   const rows = rs.slice(0, n).map(r => {

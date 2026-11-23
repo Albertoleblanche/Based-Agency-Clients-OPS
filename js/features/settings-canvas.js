@@ -229,8 +229,14 @@ ${flagOn ? pair('ownerFlag', 'Owner’s risk flag', flagO, flagO) : ''}
 <div class="form-grp set-gap">
 ${fr('Owners can flag a client’s risk, 1 to 5', 'From the client’s panel. It counts as a signal above.', swHtml(flagOn, 'Owners can flag a client’s risk', 'changeSettings(s => { s.ownerRiskFlag = s.ownerRiskFlag === false; })'))}
 ${fr('Flag important clients sooner', 'Importance 8 or more moves up one level', swHtml(t.importantBump, 'Flag important clients sooner', 'saveSignalToggle(\'importantBump\')', !can))}
+${fr('Focus clients are watched closer', escapeHtml(focusRuleWords(t)), `<a class="set-lnk" href="#" onclick="setClientsSeg('focus');switchView('clients');return false;">${(typeof focusClients === 'function' ? focusClients().length : 0) || 'No'} Focus client${(typeof focusClients === 'function' ? focusClients().length : 0) === 1 ? '' : 's'}</a>`)}
 ${fr('Quiet a handled signal for', 'Comes back sooner if it gets worse', popSel('Quiet a handled signal for', [3, 5, 7, 10, 14].map(v => [v, `${v} days`]), t.quietDays, 'saveSignalValue(\'quietDays\',this.value)', { disabled: !can }))}
 </div>`;
+}
+// What the closer watch on Focus clients means, with today's numbers (week-health.js focusThresholds).
+function focusRuleWords(t){
+  const f = focusThresholds(t);
+  return `Nothing logged: watch at ${f.nothingLoggedDays[0]} days, at risk at ${f.nothingLoggedDays[1]}. No update: at risk at ${f.noUpdateDays[1]} days. ${f.lateOfLast4[0]} late update or ${f.overdueTasks[0]} overdue task is Watch. Hours under ${f.underUsedPct}% of the pace are flagged.`;
 }
 // The daily automations work out "today" in the team's time zone, saved from the browser.
 function teamTimeZone(){ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; }catch(e){ return ''; } }

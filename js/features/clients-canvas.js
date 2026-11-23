@@ -104,6 +104,7 @@ function openClientsBulkSheet(){
 <label for="bkImportance">Importance${infoTip('How much this client matters to the agency, from 1 to 10. At 8 or more, a client on Watch counts as At risk, and it comes first when two updates are due the same day.', 'What does Importance do?')}</label><div>${sheetPop('bkImportance', 'Importance', keep.concat(Array.from({ length: 10 }, (_, i) => [String(i + 1), `${i + 1} of 10`])), '')}</div>
 <label for="bkDanger">Risk${infoTip('Your read on how likely the client is to leave, from 1 (low) to 5 (high). At 3 Health puts the client on Watch; at 4 or 5, At risk, flagged by its owner.', 'What does Risk do?')}</label><div>${sheetPop('bkDanger', 'Risk', keep.concat([['1', '1 · Low'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5 · High']]), '')}</div>
 <label for="bkHours">Hours a month</label><div class="bk-h"><input type="number" id="bkHours" class="tf" min="0" step="0.5" placeholder="Keep as is"><span class="t-2">0 removes it</span></div>
+<label for="bkFocus">Focus${infoTip('For clients the owner asked the team to give extra attention. Focus clients come first in every list, Health watches them closer, and the morning reminders and the Monday summary put them on top.', 'What does Focus do?')}</label><div>${sheetPop('bkFocus', 'Focus', keep.concat([['on', 'Add to Focus'], ['off', 'Take off Focus']]), '')}</div>
 <label for="bkWeekly">Weekly update${infoTip('No weekly update is for the agency itself or an internal client: nothing is ever due, so it stays off This Week, Today, the Queue and Health. Work and hours are still logged.', 'What does Weekly update do?')}</label><div>${sheetPop('bkWeekly', 'Weekly update', keep.concat([['on', 'Every week'], ['off', 'No weekly update']]), '')}</div>
 </div>
 <div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" id="bkSave" onclick="saveClientsBulk()">Save to ${n} Client${n === 1 ? '' : 's'}</button></div>`, 520);
@@ -121,6 +122,7 @@ async function saveClientsBulk(){
   const cf = {};
   if(v('bkOwner')){ cf.owner = v('bkOwner') === '@auto' ? null : v('bkOwner'); words.unshift(cf.owner ? `owner to ${cf.owner}` : 'owner to automatic'); }
   if(v('bkWeekly')){ cf.weeklyUpdate = v('bkWeekly') === 'off' ? 'off' : null; words.push(cf.weeklyUpdate ? 'no weekly update' : 'a weekly update'); }
+  if(v('bkFocus')){ const on = v('bkFocus') === 'on'; Object.assign(cf, on ? { focus: true, focusAt: new Date().toISOString(), focusBy: myName() || '' } : { focus: null, focusAt: null, focusBy: null }); words.push(on ? 'Focus on' : 'Focus off'); }
   if(!words.length){ showToast('info', 'Nothing to change yet', 'Pick a new value for at least one field.'); return; }
   const btn = document.getElementById('bkSave'); if(btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
   const picked = clients.filter(c => clBulk.has(c.id));
@@ -128,7 +130,8 @@ async function saveClientsBulk(){
     const mine = Object.assign({}, fields);
     if(Object.keys(cf).length){
       const cfv = Object.assign({}, c.customFieldValues || {});
-      Object.entries(cf).forEach(([k, x]) => { if(x == null) delete cfv[k]; else cfv[k] = x; });
+      const wasFocus = !!cfv.focus;   // one already on Focus keeps when, and by whom
+      Object.entries(cf).forEach(([k, x]) => { if(x == null) delete cfv[k]; else if(!((k === 'focusAt' || k === 'focusBy') && wasFocus)) cfv[k] = x; });
       mine.customFieldValues = cfv;
     }
     const ok = await updateClientRow(c.id, mine);
@@ -143,6 +146,26 @@ async function saveClientsBulk(){
 }
 
 function closeClientInspector(){ inspectedClientId = null; renderClientsTable(); }
+// ---- Focus (Nov 23): approvers switch it on a client; everyone sees the mark (js/core/data.js) ----
+function focusSinceWords(c){
+  const v = c.customFieldValues || {}, at = v.focusAt ? new Date(v.focusAt) : null;
+  return `Since ${at && !isNaN(at) ? fmtShortDate(at) : 'before Nov 23'}${v.focusBy ? `, by ${firstName(v.focusBy)}` : ''}`;
+}
+function focusToggleHtml(c){
+  const on = isFocus(c);
+  if(!canApprove()) return on ? `<span class="fo-tg on is-ro" title="Focus client: comes first everywhere, and Health watches it closer">${icon('target')}Focus</span>` : '';
+  return `<button class="fo-tg${on ? ' on' : ''}" aria-pressed="${on}" title="${on ? 'Focus client. Click to take it off Focus.' : 'Add to Focus: it comes first in every list, and Health watches it closer'}" onclick="setClientFocus('${c.id}', ${!on})">${icon('target')}Focus</button>`;
+}
+async function setClientFocus(ids, on){
+  if(!canApprove()){ showToast('error', 'Not allowed', 'Only admins and approvers choose the Focus clients.'); return; }
+  ids = [].concat(ids);
+  const one = ids.length === 1 ? clients.find(x => x.id === ids[0]) : null;
+  const r = await saveClientFocus(ids, on);
+  if(r.failed) showToast('error', `${r.failed} client${r.failed === 1 ? '' : 's'} didn’t save`, 'Try again.');
+  else if(r.done) showToast('success', one ? (on ? `${one.name} is a Focus client` : `${one.name} is off Focus`) : `${r.done} client${r.done === 1 ? '' : 's'} ${on ? 'added to' : 'taken off'} Focus`,
+    on ? 'It comes first in every list, and Health watches it closer.' : 'It goes back to the usual order.');
+  renderAll();
+}
 
 // Importance, from 1 to 10, as a word in a coloured pill: High (8 and up, where a client on Watch counts
 // as At risk) is purple, Medium (4 to 7) blue, Low (1 to 3) grey. Not health's colours, and not orange,
@@ -213,14 +236,16 @@ function renderClientsTable(){
   // Health, so it isn't here either); not sent leaves out the clients that get no update
   const needsCare = r => r.h.level !== 'g' && r.c.status !== 'Paused' && !r.w.off;
   const needs = rows.filter(needsCare), notSent = rows.filter(r => !r.w.sent && !r.w.off);
-  let shown = clientsSeg === 'attention' ? needs : clientsSeg === 'behind' ? notSent : rows;
+  const focusRows = rows.filter(r => isFocus(r.c));
+  if(clientsSeg === 'focus' && !focusRows.length && !canApprove()) clientsSeg = 'all';
+  let shown = clientsSeg === 'attention' ? needs : clientsSeg === 'behind' ? notSent : clientsSeg === 'focus' ? focusRows : rows;
   shown = shown.filter(r => (clientFilters.service === 'all' || serviceHas(r.c, clientFilters.service)) && (clientsOwnerFilter === 'all' || r.owner === clientsOwnerFilter)
     && (!clientFilters.search || r.c.name.toLowerCase().includes(clientFilters.search) || (r.c.email || '').toLowerCase().includes(clientFilters.search)));
   const rank = { r: 0, y: 1, g: 2 };
   const dir = clientSort.dir === 'desc' ? -1 : 1;
   shown.sort(clientSort.field === 'name' && clientSort.explicit ? (a, b) => dir * a.c.name.localeCompare(b.c.name)
     : clientSort.field === 'importance' && clientSort.explicit ? (a, b) => dir * ((a.c.importance || 0) - (b.c.importance || 0)) || a.c.name.localeCompare(b.c.name)
-    : (a, b) => rank[a.h.level] - rank[b.h.level] || b.h.signals.filter(s => s.l === 'r').length - a.h.signals.filter(s => s.l === 'r').length || (b.c.importance || 0) - (a.c.importance || 0) || a.c.name.localeCompare(b.c.name));
+    : (a, b) => focusFirst(a.c, b.c) || rank[a.h.level] - rank[b.h.level] || b.h.signals.filter(s => s.l === 'r').length - a.h.signals.filter(s => s.l === 'r').length || (b.c.importance || 0) - (a.c.importance || 0) || a.c.name.localeCompare(b.c.name));
   const owners = [...new Set(rows.map(r => r.owner).concat(su.map(suOwner)).filter(Boolean))].sort();
   if(inspectedClientId && !acAll.some(c => c.id === inspectedClientId) && !setupClients().some(c => c.id === inspectedClientId)) inspectedClientId = null;
   // the new look uses the canvas columns: client, service, owner, health, this week, importance
@@ -230,14 +255,14 @@ function renderClientsTable(){
     const [wk, wkCls, wkSub] = clientWeekCell(w);
     const picked = !!(clBulk && clBulk.has(c.id));
     if(uw) return `<div class="cl-r client-row${sel ? ' is-sel' : ''}${picked ? ' is-picked' : ''}" data-id="${c.id}" role="row" tabindex="0" aria-selected="${clBulk ? picked : sel}" onclick="${clBulk ? `clBulkToggle('${c.id}')` : `clientRowClick(event,'${c.id}')`}" ${clBulk ? `onkeydown="clBulkKey(event,'${c.id}')"` : `ondblclick="openClientDetail('${c.id}')"`}>
-<span class="cl-c" role="cell">${clBulkCk(c)}<span class="cl-tx"><b>${escapeHtml(c.name)}</b></span></span>
+<span class="cl-c" role="cell">${clBulkCk(c)}<span class="cl-tx"><b>${escapeHtml(c.name)}${focusMark(c)}</b></span></span>
 <span class="cl-sv" role="cell">${escapeHtml(c.service || '—')}</span>
 <span class="cl-o" role="cell">${owner ? escapeHtml(firstName(owner)) : '<span class="t-3">—</span>'}</span>
 <span class="cl-hc" role="cell">${h.off ? '<span class="t-3" title="Health doesn’t watch a client with no weekly update">—</span>' : `<span class="cl-h ${h.level}"><i></i>${healthWord(h.level)}</span>${reason ? `<span class="cl-s">${escapeHtml(reason)}</span>` : ''}`}</span>
 <span class="cl-w" role="cell"><span class="cl-wk ${wkCls}">${escapeHtml(wk)}</span><span class="cl-s">${escapeHtml(wkSub)}</span></span>
 ${clientImportanceCell(c)}</div>`;
     return `<div class="cl-r client-row${sel ? ' is-sel' : ''}${picked ? ' is-picked' : ''}" data-id="${c.id}" role="row" tabindex="0" aria-selected="${clBulk ? picked : sel}" onclick="${clBulk ? `clBulkToggle('${c.id}')` : `clientRowClick(event,'${c.id}')`}" ${clBulk ? `onkeydown="clBulkKey(event,'${c.id}')"` : `ondblclick="openClientDetail('${c.id}')"`}>
-<span class="cl-c" role="cell">${clBulkCk(c)}<span class="cl-tx"><b>${escapeHtml(c.name)}</b><span class="cl-s">${escapeHtml(c.service || '—')}</span></span></span>
+<span class="cl-c" role="cell">${clBulkCk(c)}<span class="cl-tx"><b>${escapeHtml(c.name)}${focusMark(c)}</b><span class="cl-s">${escapeHtml(c.service || '—')}</span></span></span>
 <span class="cl-o" role="cell">${owner ? escapeHtml(owner) : '<span class="t-3">—</span>'}</span>
 <span class="cl-hc" role="cell">${h.off ? '<span class="t-3" title="Health doesn’t watch a client with no weekly update">—</span>' : `<span class="cl-h ${h.level}"><i></i>${healthWord(h.level)}</span>${reason ? `<span class="cl-s">${escapeHtml(reason)}</span>` : ''}`}</span>
 <span class="cl-w" role="cell"><span class="cl-wk ${wkCls}">${escapeHtml(wk)}</span><span class="cl-s">${escapeHtml(wkSub)}</span></span>
@@ -250,9 +275,11 @@ ${clientImportanceCell(c)}</div>`;
   const suMatch = canApprove() && typeof openMatchClientsSheet === 'function' && ac.some(c => !hvLinkOf(c)) ? `<span class="cl-g-act"><button class="x-lnk" onclick="openMatchClientsSheet()">Match to Existing Clients</button>${infoTip(CL_TIPS.match, 'What does Match to Existing Clients do?')}</span>` : '';
   const suGroup = suShown.length ? `<div class="cl-g" role="presentation"><b>Needs setup</b><span>${suShown.length}</span>${suMatch}</div>${suShown.map(clientSetupRowHtml).join('')}` : '';
   const body = shown.length || suShown.length ? suGroup + group('Needs attention', sNeeds) + group('On track', sOk)
+    : clientsSeg === 'focus' && !focusRows.length ? `<div class="cl-empty fo-empty">${icon('target')}<b>No Focus clients yet</b><span>When the owner asks the team to give a client extra attention, switch on Focus in its panel or with Bulk Edit. Focus clients come first in every list, and Health watches them closer.</span></div>`
     : ac.length || su.length ? `<div class="cl-empty">No clients match.<a class="x-lnk" href="#" onclick="clearClientsCanvasFilters();return false;">Clear Filters</a></div>`
     : emptyNoClients('Every client lives here: who owns it, its health, this week’s update and how much it matters.');
-  const seg = [['all', 'All', rows.length + su.length], ['attention', 'Needs attention', needs.length], ['behind', 'Not sent yet', notSent.length]]
+  // Focus: the clients the owner asked us to give extra attention (shown once there are any, or to approvers)
+  const seg = [['all', 'All', rows.length + su.length], ...(focusRows.length || canApprove() ? [['focus', 'Focus', focusRows.length]] : []), ['attention', 'Needs attention', needs.length], ['behind', 'Not sent yet', notSent.length]]
     .map(([k, t, n]) => `<button class="${clientsSeg === k ? 'on' : ''}" role="tab" aria-selected="${clientsSeg === k}" onclick="setClientsSeg('${k}')">${t} <span class="c">${n}</span></button>`).join('');
   const sortIc = icon('caret-down', { weight: 'bold' });
   // a client outside your areas, opened from search or elsewhere, still opens
@@ -277,7 +304,7 @@ ${clBulkBarHtml()}</div></div>${sel ? clientPanelHtml(sel) : suSel ? clientSetup
   if(sp && clEl && tbl){ const edge = () => clEl.classList.toggle('is-scrolled', tbl.getBoundingClientRect().top < sp.getBoundingClientRect().top - .5); sp.addEventListener('scroll', edge, { passive: true }); edge(); }
   if(currentViewName === 'clients'){
     const used = rows.reduce((a, r) => a + r.h.hp.used, 0), budget = rows.reduce((a, r) => a + (r.h.hp.budget || 0), 0);
-    setToolbar(null, `${mineOn ? `${ac.length} of your clients` : `${ac.length} client${ac.length === 1 ? '' : 's'}`} · ${needs.length} need attention${su.length ? ` · ${su.length} need setup` : ''}${budget ? ` · ${Math.round(used)} of ${Math.round(budget)} h this month` : ''}`);
+    setToolbar(null, `${mineOn ? `${ac.length} of your clients` : `${ac.length} client${ac.length === 1 ? '' : 's'}`}${focusRows.length ? ` · ${focusRows.length} in Focus` : ''} · ${needs.length} need attention${su.length ? ` · ${su.length} need setup` : ''}${budget ? ` · ${Math.round(used)} of ${Math.round(budget)} h this month` : ''}`);
   }
   const old = document.getElementById('clientInspector'); if(old){ old.hidden = true; old.innerHTML = ''; }
 }
@@ -342,12 +369,13 @@ ${w.off ? `<div class="cl-mc"><span class="k">This week’s win</span><b>${escap
   const kv = (k, v) => v ? `<div class="cl-kv"><span>${k}</span><span>${v}</span></div>` : '';
   const details = kv('Owner', ownerCell) + (why2 ? `<p class="cl-own-note">${escapeHtml(why2)}${approver ? ' Choose someone to make it fixed.' : ''}</p>` : '')
     + kv('Contact', contact) + kv('Website', site) + kv('Monthly hours', hp.budget ? `${hp.budget} h${typeof hvClientBudget === 'function' && hvClientBudget(c.id) ? ' <span class="t-3">· from Harvest</span>' : ''}` : '')
-    + kv('Client since', start ? start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '');
+    + kv('Client since', start ? start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '')
+    + kv('Focus', isFocus(c) ? escapeHtml(focusSinceWords(c)) : '');
   const detSum = [owner || 'No owner yet', hp.budget ? `${hp.budget} h a month` : ''].filter(Boolean).join(' · ');
   return `<aside class="sp cl-p has-foot" aria-label="${escapeHtml(c.name)}">
 <div class="sp-bar"><button class="ib" aria-label="Close" title="Close (Esc)" onclick="closeClientInspector()">${icon('x')}</button><span class="cl-pbar-r">${approver || c.website ? `<button class="ib" aria-label="More" title="More" onclick="clientPanelMore(event, ${A})">${icon('dots-three')}</button>` : ''}<a class="x-lnk" href="#" onclick="openClientDetail(${A});return false;">Open client page</a></span></div>
 <div class="sp-main">
-<div class="sp-head">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}</b><span>${meta}</span></div></div>
+<div class="sp-head">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}</b><span>${meta}</span></div>${focusToggleHtml(c)}</div>
 <div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b>${sub ? `<span class="sub">${sub}</span>` : ''}${acts ? `<div class="sp-acts">${acts}</div>` : ''}</div>
 ${nums}
 <div class="sp-folds cl-folds">
@@ -428,7 +456,7 @@ function clientPanelMore(e, clientId){
   const r = e.currentTarget.getBoundingClientRect();
   m.style.top = (r.bottom + 4) + 'px'; m.style.right = (window.innerWidth - r.right) + 'px';
   m.innerHTML = `${c.website ? `<a class="mi" role="menuitem" href="${safeUrl(c.website.startsWith('http') ? c.website : 'https://' + c.website)}" target="_blank" rel="noopener">${icon('globe')}Open Website</a>` : ''}
-${canApprove() ? `<button class="mi" role="menuitem" onclick="openEditClientForm('${c.id}')">${icon('pencil-simple')}Edit Client…</button><div class="msep"></div><button class="mi danger" role="menuitem" onclick="deleteClient('${c.id}')">${icon('trash')}Delete Client…</button>` : ''}`;
+${canApprove() ? `<button class="mi" role="menuitem" onclick="setClientFocus('${c.id}', ${!isFocus(c)})">${icon('target')}${isFocus(c) ? 'Take Off Focus' : 'Add to Focus'}</button><button class="mi" role="menuitem" onclick="openEditClientForm('${c.id}')">${icon('pencil-simple')}Edit Client…</button><div class="msep"></div><button class="mi danger" role="menuitem" onclick="deleteClient('${c.id}')">${icon('trash')}Delete Client…</button>` : ''}`;
   document.body.appendChild(m);
   setTimeout(() => document.addEventListener('click', () => m.remove(), { once: true }), 0);
 }
