@@ -389,6 +389,7 @@ ${nums}
 <div class="sp-folds cl-folds">
 ${clientFoldHtml('win', 'Weekly win', clientWinSummary(c), clientWinHtml(c))}
 ${clientFoldHtml('det', 'Details', escapeHtml(detSum), `<div class="cl-kvs">${details}</div>`)}
+${typeof clientMeetingsOn === 'function' && clientMeetingsOn(c) ? clientFoldHtml('mt', `${appLogo('granola', 'xs')}Meetings`, escapeHtml(lastMetWords(c) || 'No meeting with them yet'), clientMeetingsHtml(c, 5)) : ''}
 </div>
 ${waOutsideNoteHtml(c)}
 </div>

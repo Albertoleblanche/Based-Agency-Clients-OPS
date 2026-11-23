@@ -802,7 +802,8 @@ async function loadGranolaMeetings(){
   granolaMeetings = (data || []).map(r => {
     let m = {}; try{ m = JSON.parse(r.value) || {}; }catch(e){}
     return { id: r.key.slice('granola-note:'.length), title: m.title || 'A meeting', summary: m.summary || '', url: m.url || null, at: m.meetingAt || m.at || r.updated_at,
-      clientId: m.clientId || null, people: m.people || [], owner: m.owner || null, items: m.items || 0, state: m.state, pulled: m.pulled || null };
+      clientId: m.clientId || null, people: m.people || [], owner: m.owner || null, items: m.items || 0, state: m.state, pulled: m.pulled || null,
+      minutes: m.minutes || null, metClientId: m.metClientId || null };
   }).filter(m => m.summary && m.state !== 'same' && m.state !== 'removed' && new Date(m.at).getTime() > since && meetingCanSee(m))   // the people who were there; admins and approvers see all
     .sort((a, b) => String(b.at).localeCompare(String(a.at)));
   return granolaMeetings;
@@ -865,11 +866,11 @@ function openMeetingNotes(id){
   if(m.pulled && m.pulled.groups && !meetingPulls[m.id]) meetingPulls[m.id] = { groups: m.pulled.groups, at: m.pulled.at };
   const sub = meetingSubWords(m).join(' · ');
   if(typeof mOpenSheet === 'function'){
-    mOpenSheet(m.title, `<div class="mtn"><p class="mtn-sub">${escapeHtml(sub)}</p><div id="mtnTop">${meetingTopHtml(m)}</div><div class="mtn-body" id="mtnBody" data-mt="${m.id}">${meetingMainHtml(m)}</div>${m.url ? `<a class="ibtn mtn-open" href="${safeUrl(m.url)}" target="_blank" rel="noopener">Open in Granola</a>` : ''}<button type="button" class="mtn-rm" onclick="meetingRemove('${m.id}')">Remove from Radar</button></div>`, { cancel: 'Close' });
+    mOpenSheet(m.title, `<div class="mtn"><p class="mtn-sub">${escapeHtml(sub)}</p><div id="mtnTop">${meetingTopHtml(m)}</div><div class="mtn-body" id="mtnBody" data-mt="${m.id}">${meetingMainHtml(m)}</div><div class="mtn-acts">${meetingTimeHtml(m, true)}${m.url ? `<a class="ibtn mtn-open" href="${safeUrl(m.url)}" target="_blank" rel="noopener">Open in Granola</a>` : ''}</div><button type="button" class="mtn-rm" onclick="meetingRemove('${m.id}')">Remove from Radar</button></div>`, { cancel: 'Close' });
   } else {
     openAppModal(`<h3 class="ap-h">${appLogo('granola', 'sm')}${escapeHtml(m.title)}</h3><p class="t-2 mtn-sub">${escapeHtml(sub)}</p><div id="mtnTop">${meetingTopHtml(m)}</div>
 <div class="mtn-body" id="mtnBody" data-mt="${m.id}">${meetingMainHtml(m)}</div>
-<div class="sheet-a"><button type="button" class="btn mtn-rm" onclick="meetingRemove('${m.id}')">Remove from Radar</button><span class="sgp-gap"></span>${m.url ? `<a class="btn" href="${safeUrl(m.url)}" target="_blank" rel="noopener">Open in Granola</a>` : ''}<button class="btn btn-p" id="mtnDone" onclick="closeAppModal()">Done</button></div>`, 680);
+<div class="sheet-a"><button type="button" class="btn mtn-rm" onclick="meetingRemove('${m.id}')">Remove from Radar</button><span class="sgp-gap"></span>${meetingTimeHtml(m)}${m.url ? `<a class="btn" href="${safeUrl(m.url)}" target="_blank" rel="noopener">Open in Granola</a>` : ''}<button class="btn btn-p" id="mtnDone" onclick="closeAppModal()">Done</button></div>`, 680);
     // focus starts on Done, not on the first link inside the notes
     setTimeout(() => document.getElementById('mtnDone')?.focus({ preventScroll: true }), 30);   // after the sheet's own first focus
   }
@@ -1171,6 +1172,74 @@ function meetingsChanged(){
   if(typeof updateTasksNavBadge === 'function') updateTasksNavBadge();
   if(typeof mRenderTab === 'function') mRenderTab();
   if(typeof mTop === 'function'){ const t = mTop(); if(t && t.refresh) t.refresh(); }
+}
+
+// ---- A client's meetings (Nov 23) ---------------------------------------------------------------
+// The meetings Radar read for a client (the ones you can see), and when the team last met them:
+// kept by the server for the whole team (app_storage granola-last-met; only someone from the client's
+// side being there counts), so Health says the same for everyone.
+let granolaLastMet = {};
+async function loadGranolaLastMet(){
+  try{
+    const { data } = await supabaseClient.from('app_storage').select('value').eq('key', 'granola-last-met').maybeSingle();
+    granolaLastMet = data && data.value ? (typeof data.value === 'string' ? JSON.parse(data.value) : data.value) || {} : {};
+  }catch(e){ granolaLastMet = {}; }
+  return granolaLastMet;
+}
+function clientMeetings(c){
+  return (granolaMeetings || []).filter(m => String(m.metClientId || m.clientId || '') === String(c.id));
+}
+function clientLastMet(c){
+  const t = granolaLastMet && granolaLastMet[c.id]; if(!t) return null;
+  const d = new Date(t); return isNaN(d) ? null : d;
+}
+function lastMetWords(c){
+  const d = clientLastMet(c); if(!d) return '';
+  const n = daysBetween(d, rNow());
+  return n <= 0 ? 'Met today' : n === 1 ? 'Met yesterday' : `Last met ${n} days ago`;
+}
+// Granola is in use: show the Meetings parts (once meetings were read, or it's connected)
+function clientMeetingsOn(c){ return !!(clientLastMet(c) || (typeof granolaOn !== 'undefined' && granolaOn) || clientMeetings(c).length); }
+// The client's meetings, as rows that open the notes (desktop and iPhone share the words)
+function clientMeetingRows(c, n){
+  return clientMeetings(c).slice(0, n || 50).map(m => ({ id: m.id, title: m.title, sub: [meetingWhenWords(m), m.owner ? `notes by ${String(m.owner).split(' ')[0]}` : '', meetingWasMine(m) ? 'you were there' : ''].filter(Boolean).join(' · ') }));
+}
+function clientMeetingsHtml(c, n){
+  if(granolaMeetings === null){ loadGranolaMeetings().then(() => { if(typeof clientMeetingsRedraw === 'function') clientMeetingsRedraw(c); }); return `<p class="cm-none">Loading meetings…</p>`; }
+  const rows = clientMeetingRows(c, n), all = clientMeetings(c).length;
+  if(!rows.length) return `<p class="cm-none">${clientLastMet(c) ? 'No meetings with them that you were in.' : 'No meetings read for them yet.'}</p>`;
+  return `<div class="cm-list">${rows.map(r => `<button type="button" class="cm-r" onclick="openMeetingNotes(${jsArg(r.id)})">${appLogo('granola', 'xs')}<span class="tx"><b>${escapeHtml(r.title)}</b><span>${escapeHtml(r.sub)}</span></span>${icon('caret-right', { weight: 'bold' })}</button>`).join('')}</div>`
+    + (all > rows.length ? `<p class="cm-more">${all - rows.length} more in Notes → Meetings</p>` : '');
+}
+// After the meetings load: the open client panel or page draws them
+function clientMeetingsRedraw(c){
+  if(typeof renderClientsTable === 'function' && document.querySelector('.cl-p')) try{ renderClientsTable(); }catch(e){}
+  if(typeof renderClientPage === 'function') try{ renderClientPage(); }catch(e){}
+  if(typeof mTop === 'function'){ const t = mTop(); if(t && t.refresh) t.refresh(); }
+}
+
+// ---- A meeting's time, on your timesheet (Nov 23) -----------------------------------------------
+// Someone who was there logs it in one go: Add Time opens filled in (its client, its day, how long it
+// was booked for, "Meeting: …"); once logged, the sheet says so instead.
+function meetingDay(m){ const d = new Date(m.at); return isNaN(d) ? toDateStr(new Date()) : toDateStr(d); }
+function meetingTimeWords(m){ return `Meeting: ${m.title}`; }
+function meetingTimeLogged(m){
+  const day = meetingDay(m), words = meetingTimeWords(m);
+  return (typeof timeEntries !== 'undefined' ? timeEntries : []).find(e => e.userId === currentUser.id && e.date === day && String(e.description || '').includes(words)) || null;
+}
+function meetingTimeHtml(m, ios){
+  if(!meetingWasMine(m)) return '';
+  const done = meetingTimeLogged(m);
+  if(done) return `<span class="mtn-time is-done" title="On your timesheet">${icon('check', { weight: 'bold' })}${Math.floor(done.minutes / 60)}:${String(done.minutes % 60).padStart(2, '0')} logged</span>`;
+  return `<button type="button" class="${ios ? 'ibtn s' : 'btn'} mtn-time" onclick="meetingLogTime('${m.id}')">${icon('clock')}${ios ? 'Log the Meeting’s Time' : 'Log Time'}</button>`;
+}
+function meetingLogTime(id){
+  const m = (granolaMeetings || []).find(x => x.id === id); if(!m) return;
+  const today = toDateStr(new Date()), day = meetingDay(m) <= today ? meetingDay(m) : today;
+  const cid = m.metClientId || m.clientId || '', minutes = m.minutes || 30;
+  if(typeof mOpenTimeSheet === 'function'){ mCloseSheet(true); setTimeout(() => mOpenTimeSheet(cid, { date: day, minutes, desc: meetingTimeWords(m) }), 320); return; }
+  closeAppModal();
+  openManualEntryModal(day, minutes, cid, meetingTimeWords(m));
 }
 
 async function insertTaskRow(row){

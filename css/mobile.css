@@ -437,6 +437,12 @@ body.mac.mobile { overflow: hidden; background: var(--ios-bg, #F2F2F7); -webkit-
 .mtn-ai svg { width: 17px; height: 17px; }
 .mtn-ai.is-ai svg { color: var(--purple, #af52de); }
 .mtn-ai:active { opacity: .7; }
+.mtn-acts { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+.mtn-acts .mtn-open { margin-top: 0; }
+.mtn-acts .mtn-time { display: flex; align-items: center; justify-content: center; gap: 7px; }
+.mtn-acts .mtn-time svg { width: 17px; height: 17px; }
+.mtn-time.is-done { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; color: var(--label-2); font-size: 15px; }
+.mtn-time.is-done svg { width: 14px; height: 14px; color: var(--green); }
 .app .mtn .mtn-rm { display: block; width: 100%; margin-top: 6px; padding: 12px; border: 0; background: none; color: var(--red); font: inherit; font-size: 17px; text-align: center; }
 .app .mtn .mtn-rm:active { opacity: .6; }
 .mtk-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 32px; font-size: 14px; color: var(--label-2); }

@@ -1020,8 +1020,16 @@ ${mIsh('Needs setup')}<div class="ig"><div class="ir"><span class="t n" style="w
 ${h.level !== 'g' ? `<div class="tags iwrap" style="margin:14px 16px 0">${healthTag(h.level)}${signalChips(h, 4)}</div>` : ''}
 ${mIsh('This week’s update')}${w.off ? `<div class="ig">${mIr('', 'No weekly update', '', '', null, { n: true })}</div><p class="ifoot">It isn’t on This Week, Today or Health. Work and hours are still logged here.</p>` : `<div class="ig">${steps}</div>`}
 ${waCanWork(c) ? `<div style="margin:12px 16px 0"><button class="ibtn s" onclick="mOpenLog('${c.id}')">${icon('plus')}Log Improvement</button></div>` : `<p class="ifoot" style="margin-top:12px">${mEsc(waOutsideWords(c))}</p>`}
-${mIsh('Logged')}<div class="ig">${imps.map(i => mIr('', mEsc(i.text), `${mEsc(i.author)} · ${fmtShortDate(new Date(i.date))}${i.includeInEmail === false ? ' · internal' : ''}`, '', null, { n: true })).join('') || '<div class="ir"><span class="t n" style="color:var(--label-2)">Nothing logged yet</span></div>'}</div>`;
+${mIsh('Logged')}<div class="ig">${imps.map(i => mIr('', mEsc(i.text), `${mEsc(i.author)} · ${fmtShortDate(new Date(i.date))}${i.includeInEmail === false ? ' · internal' : ''}`, '', null, { n: true })).join('') || '<div class="ir"><span class="t n" style="color:var(--label-2)">Nothing logged yet</span></div>'}</div>${mClientMeetingsHtml(c)}`;
   });
+}
+// The client's meetings (Nov 23): when the team last met them, and the meetings you can see
+function mClientMeetingsHtml(c){
+  if(!clientMeetingsOn(c)) return '';
+  if(granolaMeetings === null) loadGranolaMeetings().then(() => mTop()?.refresh());
+  const rows = granolaMeetings ? clientMeetingRows(c, 6) : [];
+  return `<div class="ish"><h2 class="ish-lg">${appLogo('granola', 'xs')}Meetings</h2></div><div class="ig">${rows.map(r => mIr('', mEsc(r.title), mEsc(r.sub), '', `openMeetingNotes(${mEsc(JSON.stringify(r.id))})`)).join('')
+    || `<div class="ir"><span class="t n" style="color:var(--label-2)">${granolaMeetings === null ? 'Loading…' : clientLastMet(c) ? 'No meetings with them that you were in' : 'No meetings read for them yet'}</span></div>`}</div>${clientLastMet(c) ? `<p class="ifoot">${mEsc(lastMetWords(c))}.</p>` : ''}`;
 }
 // Focus (Nov 23): an approver switches it here too; everyone sees it (js/core/data.js)
 function mFocusHtml(c){
@@ -1499,12 +1507,13 @@ function mStartTimer(){
 }
 // Time worked without the timer: client, service, day, how long, what.
 let mTime_ = {};
-function mOpenTimeSheet(presetClientId){
+function mOpenTimeSheet(presetClientId, preset){
   if(!waPresetOk(presetClientId)) return;
+  preset = preset || {};
   const c = clients.find(x => x.id === presetClientId);
-  mTime_ = { clientId: presetClientId || '', service: (c && c.service) || (settings.serviceOptions || [])[0] || '', date: toDateStr(new Date()), work: false };
+  mTime_ = { clientId: presetClientId || '', service: (c && c.service) || (settings.serviceOptions || [])[0] || '', date: preset.date || toDateStr(new Date()), work: false };
   mHvClient(mTime_);
-  mKeep('mTimeDur', ''); mKeep('mTimeDesc', '');
+  mKeep('mTimeDur', preset.minutes ? `${Math.floor(preset.minutes / 60)}:${String(preset.minutes % 60).padStart(2, '0')}` : ''); mKeep('mTimeDesc', preset.desc || '');
   window.mTimeBody = () => `<div class="ig flat" style="margin-top:12px">${mRowPick('Client', mEsc(mClientName(mTime_.clientId) || 'Choose'), "mTimePick('client')", !!mTime_.clientId)}${mHvRows(mTime_, 'mTimePick')}${mRowPick('Date', mTime_.date === toDateStr(new Date()) ? 'Today' : sheetDayLabel(new Date(mTime_.date + 'T12:00:00')), "mTimePick('date')", true)}
 <div class="ir"><label class="ilab" for="mTimeDur">Time worked</label><input class="tm" id="mTimeDur" inputmode="decimal" placeholder="1:30" oninput="mKeep('mTimeDur',this.value)"></div></div>
 <p class="ifoot">${mHvBill(mTime_) ? mHvBill(mTime_) + '. ' : ''}1:30, 45m or 1.5 all work.</p>
@@ -1512,6 +1521,7 @@ function mOpenTimeSheet(presetClientId){
 <div class="ig flat" style="margin-top:20px"><div class="ir"><span class="ilab">Also Log It as Work</span><button class="ios-sw${mTime_.work ? ' on' : ''}" id="mTimeWork" role="switch" aria-checked="${!!mTime_.work}" aria-label="Also log it as work" onclick="mTime_.work=!mTime_.work;this.classList.toggle('on',mTime_.work);this.setAttribute('aria-checked',mTime_.work)"></button></div></div>
 <p class="ifoot">What you worked on becomes an improvement in Queue, ready for the client update.</p>`;
   mOpenSheet('Add Time', window.mTimeBody(), { done: 'mSaveTime()', doneLabel: 'Add' });
+  if(preset.minutes || preset.desc) mRestoreSheetState();   // a meeting's time, filled in (Nov 23)
 }
 function mTimePick(what){
   mKeep('mTimeDur', mSheetVal('mTimeDur')); mKeep('mTimeDesc', mSheetVal('mTimeDesc'));

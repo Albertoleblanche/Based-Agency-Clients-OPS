@@ -393,6 +393,7 @@ function hoursPace(c){
 }
 let healthHandled = {};
 async function loadHealthHandled(){
+  if(typeof loadGranolaLastMet === 'function') await loadGranolaLastMet();   // when the team last met each client (Nov 23)
   const raw = await safeGet('health-handled');
   try{ healthHandled = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : {}; }catch(e){ healthHandled = {}; }
 }
@@ -445,7 +446,14 @@ function clientHealth(c){
   if(lo) sig.push({ l: lo, key: 'tasks', icon: 'list-checks', title: `${overdue.length} tasks overdue`, since: now, text: overdue.map(t => t.title).slice(0, 2).join(' · ') });
   const lf = (typeof settings !== 'undefined' && settings.ownerRiskFlag === false) ? null : lvl(c.danger || 0, T.ownerFlag);
   if(lf) sig.push({ l: lf, key: 'flag', icon: 'flag', title: `Flagged by ${firstName(clientOwner(c)) || 'the owner'}`, since: now, text: `Risk set to ${c.danger} of 5.` });
-  const prio = ['hours', 'noupdate', 'late', 'quiet', 'under', 'tasks', 'flag'];
+  // No meeting lately (Nov 23): only for a client the team meets on Granola (it has a last meeting), and
+  // only Watch: a gap in meetings alone never makes a client At risk
+  const met = typeof clientLastMet === 'function' ? clientLastMet(c) : null;
+  if(met && met <= now){
+    const n = daysBetween(met, now);
+    if(n >= 35) sig.push({ l: 'y', key: 'met', icon: 'users-three', title: 'No meeting lately', since: addDays(met, 35), text: `Last met ${n} days ago.` });
+  }
+  const prio = ['hours', 'noupdate', 'late', 'quiet', 'under', 'tasks', 'flag', 'met'];
   sig.sort((a, b) => (a.l === 'r' ? 0 : 1) - (b.l === 'r' ? 0 : 1) || prio.indexOf(a.key) - prio.indexOf(b.key));
   let level = sig.some(s => s.l === 'r') ? 'r' : (sig.length ? 'y' : 'g');
   if(level === 'y' && T.importantBump && (c.importance || 0) >= 8) level = 'r';
@@ -497,7 +505,8 @@ function signalChips(h, max){
     late: lateM ? `${lateM[1]}/4 late` : 'Late updates',
     quiet: (s.text.match(/(\d+) days/) || [])[1] ? `${s.text.match(/(\d+) days/)[1]}d quiet` : 'Quiet',
     tasks: s.title.replace(' tasks overdue', ' overdue tasks'),
-    flag: 'Owner flag' }[s.key] || s.title);
+    flag: 'Owner flag',
+    met: (s.text.match(/(\d+) days/) || [])[1] ? `${s.text.match(/(\d+) days/)[1]}d since a meeting` : 'No meeting' }[s.key] || s.title);
   return h.signals.slice(0, max || 3).map(s => `<span class="chip c${s.l}" title="${escapeHtml(s.title + ' — ' + s.text)}">${typeof icon === 'function' ? icon(s.icon) : ''}${escapeHtml(word(s))}</span>`).join('');
 }
 function healthWord(l){ return { r: 'At risk', y: 'Watch', g: 'Healthy' }[l]; }
