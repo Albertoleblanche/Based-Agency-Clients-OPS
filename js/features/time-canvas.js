@@ -146,7 +146,9 @@ function tsRowHtml(e, rng){
   const c = clients.find(x => x.id === e.clientId);
   // logged in Harvest (step 4), invoiced there, sent there, or why not (tried again when edited and each night)
   // time that stayed in Radar while its client wasn't linked: once it is, the row says Send to Harvest too
-  const nowLinked = e.harvestStatus === 'unmapped' && !e.harvestId && typeof hvTimeOn === 'function' && hvTimeOn() && hvClientProjects(e.clientId).linked;
+  // (from the first of last month, as Settings → Harvest counts it: older time predates Harvest here)
+  const nowLinked = e.harvestStatus === 'unmapped' && !e.harvestId && typeof hvTimeOn === 'function' && hvTimeOn() && hvClientProjects(e.clientId).linked
+    && e.date >= toDateStr(new Date(rNow().getFullYear(), rNow().getMonth() - 1, 1));
   const sync = e.harvestStatus === 'failed' || (e.harvestStatus === 'unmapped' && e.harvestProjectId) || nowLinked ? `<span class="tmi-sync is-fix" title="${escapeHtml((e.harvestError ? e.harvestError + '. ' : '') + 'Open it and pick its project and task to send it.')}">Send to Harvest</span>`
     : e.harvestLocked ? `<span class="tmi-sync" title="Invoiced in Harvest, so it can’t change here">Invoiced</span>`
     : e.source === 'harvest' ? `<span class="tmi-sync" title="Logged in Harvest">From Harvest</span>`
