@@ -166,11 +166,15 @@ function hvEdits(a, b, max){
 // A word the same but for a typo: a letter off in words of 5 to 8 letters, two in longer ones.
 function hvWordAlike(a, b){ if(a === b) return true; const n = Math.min(a.length, b.length); return n >= 5 && hvEdits(a, b, n >= 9 ? 2 : 1); }
 // 2: the same name but for typos and endings ("PE Developement" / "PE Development LLC");
-// 1: one is the other with more words after ("Online Liquidation" / "Online Liquidation Auction"); 0: not alike.
+// 1: one is the other with more words after ("Online Liquidation" / "Online Liquidation Auction"),
+// or one starts with the other's initials ("ABD Team" / "American Building Development"); 0: not alike.
 function hvNamesAlike(a, b){
   const x = hvNameWords(a), y = hvNameWords(b);
   if(!x.length || !y.length) return 0;
-  if(x.length === y.length) return x.every((w, i) => hvWordAlike(w, y[i])) ? 2 : 0;
+  if(x.length === y.length && x.every((w, i) => hvWordAlike(w, y[i]))) return 2;
+  const initials = (p, q) => q.length >= 3 && /^[a-z]+$/.test(p[0]) && p[0] === q.map(w => w[0]).join('');
+  if(initials(x, y) || initials(y, x)) return 1;
+  if(x.length === y.length) return 0;
   const [sh, lo] = x.length < y.length ? [x, y] : [y, x];
   return sh.join(' ').length >= 6 && sh.every((w, i) => hvWordAlike(w, lo[i])) ? 1 : 0;
 }
@@ -218,6 +222,29 @@ async function hvLinkClientToHarvest(clientId){
   showToast('success', `${c.name} is linked to Harvest`, 'Time logged for it goes to Harvest now. Time logged before this: open it and pick its project and task.');
   return true;
 }
+// Someone who can't link asks those who can: a note to every admin and approver, opening the client.
+// Once per client per day from this device.
+function hvAskedKey(clientId){ return `radar-hv-asked:${clientId}:${toDateStr(new Date())}`; }
+function hvAsked(clientId){ try{ return !!localStorage.getItem(hvAskedKey(clientId)); }catch(e){ return false; } }
+async function hvAskApprovers(clientId, btn){
+  const c = clients.find(x => String(x.id) === String(clientId)), fix = hvHarvestNameFor(clientId);
+  if(!c || hvAsked(clientId)) return false;
+  const who = (typeof teamProfiles !== 'undefined' ? teamProfiles : []).filter(p => !p.access_revoked && (p.role === 'admin' || p.role === 'approver') && p.id !== (myProfile && myProfile.id));
+  if(!who.length){ showToast('info', 'No approver to ask', 'Radar has no admin or approver yet.'); return false; }
+  const title = `${myName() || 'Someone'} asks to link ${c.name} to Harvest`;
+  const body = fix && fix.rc && !clientInSetup(fix.rc) ? `Harvest’s “${fix.hc.name}” is linked to ${fix.rc.name}. Open ${c.name}, then Details → Harvest → Change.`
+    : fix ? `Harvest calls it “${fix.hc.name}”. Open ${c.name}, then Details → Harvest → Link.` : `Time for it stays in Radar. Open ${c.name}, then Details → Harvest → Link.`;
+  if(btn) setBtnLoading(btn, 'Asking…');
+  try{
+    if(typeof sendNotification === 'function') for(const p of who) await sendNotification(p.id, 'harvest_client', title, body, 'clients', c.id);
+    else { const { error } = await supabaseClient.from('notifications').insert(who.map(p => ({ user_id: p.id, type: 'harvest_client', title, body, target_view: 'clients', target_id: c.id, read: false }))); if(error) throw error; }
+  }catch(e){ if(btn) restoreBtn(btn); showToast('error', 'Couldn’t ask', e.message || 'Try again in a moment.'); return false; }
+  try{ localStorage.setItem(hvAskedKey(clientId), '1'); }catch(e){}
+  showToast('success', `Asked ${who.map(p => p.name.split(' ')[0]).join(' and ')}`, 'They’ll link it; your time goes to Harvest after that.');
+  if(btn){ btn.disabled = true; btn.textContent = 'Asked'; }
+  return true;
+}
+
 // The desktop sheets' Link (the rows redraw with the client's projects)
 async function hvLinkFromPick(prefix, clientId){
   if(!(await hvLinkClientToHarvest(clientId))) return;
@@ -225,12 +252,60 @@ async function hvLinkFromPick(prefix, clientId){
   if(wrap){ const d = hvDefaultPick(clientId); wrap.innerHTML = hvPickRowsHtml(prefix, clientId, d.projectId, d.taskId); }
 }
 
+// ---- A client's Harvest link, from its Details (approvers): Link… or Change… ---------------------
+// Every active Harvest client to pick from, the likely ones first; one linked to another client says
+// which, and picking it moves the link here (with the time on its projects).
+function hvLinkedHarvestOf(clientId){ return hvTimeOn() ? (hvTime.clients || []).find(x => String(x.radar_client_id || '') === String(clientId)) || null : null; }
+function hvLinkSheet(clientId){
+  const c = clients.find(x => String(x.id) === String(clientId)); if(!c || !canApprove() || !hvTimeOn()) return;
+  const cur = hvLinkedHarvestOf(clientId);
+  const nameOf = id => { const x = clients.find(y => String(y.id) === String(id)); return x && !x.deletedAt ? x : null; };
+  const list = (hvTime.clients || []).filter(hc => hc.is_active !== false || (cur && hc.harvest_id === cur.harvest_id))
+    .map(hc => ({ hc, k: hvNamesAlike(hc.name, c.name), rc: hc.radar_client_id ? nameOf(hc.radar_client_id) : null }))
+    .sort((a, b) => (b.k - a.k) || a.hc.name.localeCompare(b.hc.name));
+  // linked to another client: "· linked" when that client has its name, "· linked to …" when it doesn't
+  const opt = x => { const elsewhere = x.rc && String(x.rc.id) !== String(c.id) && !clientInSetup(x.rc) ? (hvNamesAlike(x.hc.name, x.rc.name) ? ' · linked' : ` · linked to ${x.rc.name}`) : '';
+    return [String(x.hc.harvest_id), x.hc.name + elsewhere]; };
+  openAppModal(`<h3 class="ap-h">${typeof appLogo === 'function' ? appLogo('harvest', 'sm') : ''}${escapeHtml(c.name)} in Harvest</h3>
+<p class="t-2 hvl-sub">${cur ? `Linked to Harvest’s “${escapeHtml(cur.name)}”. Pick another if that’s the wrong one: time for ${escapeHtml(c.name)} goes to its projects.` : `Not linked, so time for ${escapeHtml(c.name)} stays in Radar. Pick it in Harvest.`}</p>
+<div class="f"><label for="hvlSel">Harvest client</label><div>${sheetPop('hvlSel', 'Harvest client', list.map(opt), cur ? String(cur.harvest_id) : '', "document.getElementById('hvlGo').disabled=!this.value||this.value===this.dataset.cur", { placeholder: 'Choose a Harvest client' })}</div></div>
+<div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" id="hvlGo" disabled onclick="hvLinkSheetSave(${jsArg(clientId)})">${cur ? 'Change' : 'Link'}</button></div>`, 460);
+  const sel = document.getElementById('hvlSel'); if(sel) sel.dataset.cur = cur ? String(cur.harvest_id) : '';
+}
+async function hvLinkSheetSave(clientId){
+  const c = clients.find(x => String(x.id) === String(clientId)), id = Number(document.getElementById('hvlSel')?.value);
+  const hc = (hvTime.clients || []).find(x => Number(x.harvest_id) === id); if(!c || !hc) return;
+  const rc = hc.radar_client_id ? clients.find(x => String(x.id) === String(hc.radar_client_id) && !x.deletedAt) || null : null;
+  const cur = hvLinkedHarvestOf(clientId);
+  const words = (rc && String(rc.id) !== String(c.id) ? hvLinkConfirmWords({ hc, rc }, c) : `${c.name} gets Harvest’s “${hc.name}”: its projects, and the time already logged there.`)
+    + (cur ? ` ${c.name} stops being Harvest’s “${cur.name}”; link that one to its client from there.` : '');
+  if(!(await confirmDialog(words, { title: `Link ${c.name} to “${hc.name}”?`, confirmLabel: cur ? 'Change' : 'Link' }))) return;
+  const btn = document.getElementById('hvlGo'); setBtnLoading(btn, 'Linking…');
+  try{ await hvLinkHarvest(hc.harvest_id, c.id); }catch(e){ restoreBtn(btn); showToast('error', 'Couldn’t link it', e.message); return; }
+  closeAppModal();
+  if(typeof loadAll === 'function') await loadAll();
+  await hvTimeLoad();
+  if(typeof hvLoadLinks === 'function') await hvLoadLinks();
+  if(typeof loadTimeEntries === 'function') await loadTimeEntries();
+  showToast('success', `${c.name} is linked to “${hc.name}”`, 'Time logged for it goes there now. Time logged before: open it and pick its project and task.');
+  if(typeof renderAll === 'function') renderAll();
+}
+// The Details line: which Harvest client, and Link… / Change… for approvers ('' when Harvest is off).
+function hvDetailsHtml(c){
+  if(!hvTimeOn() || !c) return '';
+  const cur = hvLinkedHarvestOf(c.id), fix = !cur && hvHarvestNameFor(c.id);
+  const words = cur ? `“${escapeHtml(cur.name)}”` : fix ? `Not linked <span class="t-3">· Harvest has “${escapeHtml(fix.hc.name)}”</span>` : '<span class="t-3">Not linked</span>';
+  const act = canApprove() ? ` <a class="x-lnk hvl-act" href="#" onclick="hvLinkSheet(${jsArg(c.id)});return false;">${cur ? 'Change…' : 'Link…'}</a>`
+    : !cur && fix && !hvAsked(c.id) ? ` <a class="x-lnk hvl-act" href="#" onclick="hvAskApprovers(${jsArg(c.id)}, this);return false;">Ask an Approver</a>` : '';
+  return `<div class="cl-kv"><span>Harvest</span><span>${words}${act}</span></div>`;
+}
+
 // Why a client has nothing to pick, in words (null when it has projects for you).
 function hvNoPickWords(clientId){
   const { all, mine, linked } = hvClientProjects(clientId);
   if(mine.length) return null;
   if(!linked){
-    const fix = hvHarvestNameFor(clientId), ask = canApprove() ? '' : ' An approver can link them.';
+    const fix = hvHarvestNameFor(clientId), ask = canApprove() ? '' : hvAsked(clientId) ? ' You asked an approver to link them.' : ' An approver can link them.';
     if(fix && fix.rc && !clientInSetup(fix.rc)) return `Harvest’s “${fix.hc.name}” is linked to ${fix.rc.name}, so this time stays in Radar.${ask}`;
     if(fix) return `Harvest calls this client “${fix.hc.name}”, so this time stays in Radar until they’re linked.${ask}`;
   }
@@ -250,8 +325,10 @@ function hvPickRowsHtml(prefix, clientId, projectId, taskId, service){
   if(!clientId) return `<label>Project</label><div class="hvp-none t-3">Pick a client first</div>`;
   const none = hvNoPickWords(clientId);
   if(none){
-    const fix = canApprove() && hvHarvestNameFor(clientId);
-    return `<label>Project</label><div class="hvp-none t-2">${escapeHtml(none)}${fix ? `<button type="button" class="btn sm hvp-link" onclick="hvLinkFromPick('${prefix}', ${jsArg(clientId)})">${fix.rc && !clientInSetup(fix.rc) ? 'Link Here Instead…' : 'Link Them…'}</button>` : ''}</div>`;
+    const fix = hvHarvestNameFor(clientId);
+    const btn = !fix ? '' : canApprove() ? `<button type="button" class="btn sm hvp-link" onclick="hvLinkFromPick('${prefix}', ${jsArg(clientId)})">${fix.rc && !clientInSetup(fix.rc) ? 'Link Here Instead…' : 'Link Them…'}</button>`
+      : hvAsked(clientId) ? '' : `<button type="button" class="btn sm hvp-link" onclick="hvAskApprovers(${jsArg(clientId)}, this)">Ask an Approver</button>`;
+    return `<label>Project</label><div class="hvp-none t-2">${escapeHtml(none)}${btn}</div>`;
   }
   const { mine } = hvClientProjects(clientId);
   const pid = projectId && mine.some(p => Number(p.harvest_id) === Number(projectId)) ? Number(projectId) : null;

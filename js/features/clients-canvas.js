@@ -368,7 +368,7 @@ ${w.off ? `<div class="cl-mc"><span class="k">This week’s win</span><b>${escap
   const site = c.website ? `<a class="cl-link" href="${safeUrl(c.website.startsWith('http') ? c.website : 'https://' + c.website)}" target="_blank" rel="noopener">${escapeHtml(c.website.replace(/^https?:\/\//, '').replace(/\/$/, ''))}</a>` : '';
   const kv = (k, v) => v ? `<div class="cl-kv"><span>${k}</span><span>${v}</span></div>` : '';
   const details = kv('Owner', ownerCell) + (why2 ? `<p class="cl-own-note">${escapeHtml(why2)}${approver ? ' Choose someone to make it fixed.' : ''}</p>` : '')
-    + kv('Contact', contact) + kv('Website', site) + kv('Monthly hours', hp.budget ? `${hp.budget} h${typeof hvClientBudget === 'function' && hvClientBudget(c.id) ? ' <span class="t-3">· from Harvest</span>' : ''}` : '')
+    + kv('Contact', contact) + kv('Website', site) + (typeof hvDetailsHtml === 'function' ? hvDetailsHtml(c) : '') + kv('Monthly hours', hp.budget ? `${hp.budget} h${typeof hvClientBudget === 'function' && hvClientBudget(c.id) ? ' <span class="t-3">· from Harvest</span>' : ''}` : '')
     + kv('Client since', start ? start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '')
     + kv('Focus', isFocus(c) ? escapeHtml(focusSinceWords(c)) : '');
   const detSum = [owner || 'No owner yet', hp.budget ? `${hp.budget} h a month` : ''].filter(Boolean).join(' · ');

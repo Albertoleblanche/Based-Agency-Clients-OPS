@@ -1419,9 +1419,10 @@ function mHvRows(st, pickFn){
   if(!st.clientId) return '';
   const none = hvNoPickWords(st.clientId);
   if(none){
-    const fix = canApprove() && hvHarvestNameFor(st.clientId);
+    const fix = hvHarvestNameFor(st.clientId);
     return `<div class="ir"><span class="ilab">Project</span><span class="t n" style="white-space:normal;text-align:right;color:var(--label-2);font-size:15px">${mEsc(none)}</span></div>`
-      + (fix ? `<button class="ir mhv-link" onclick="${pickFn}('link')"><span class="t">${fix.rc && !clientInSetup(fix.rc) ? 'Link Here Instead…' : 'Link to Harvest…'}</span></button>` : '');
+      + (!fix ? '' : canApprove() ? `<button class="ir mhv-link" onclick="${pickFn}('link')"><span class="t">${fix.rc && !clientInSetup(fix.rc) ? 'Link Here Instead…' : 'Link to Harvest…'}</span></button>`
+        : hvAsked(st.clientId) ? '' : `<button class="ir mhv-link" onclick="hvAskApprovers(${mEsc(JSON.stringify(String(st.clientId)))}, null).then(ok => { if(ok) this.remove(); })"><span class="t">Ask an Approver</span></button>`);
   }
   const { mine } = hvClientProjects(st.clientId);
   const proj = mine.length === 1 ? `<div class="ir"><span class="ilab">Project</span><span class="t n" style="text-align:right">${mEsc(mine[0].name)}</span></div>`
