@@ -2934,7 +2934,9 @@ a.mi{text-decoration:none;color:inherit}
 .mac .rmp-dr .rmp-subj{height:34px;font-weight:600}
 .mac .rmp-dr textarea.rmp-body{min-height:132px;line-height:1.55;resize:vertical;field-sizing:content;max-height:46vh}
 .rmp-dacts{display:flex;gap:8px;margin-top:2px}
-.rmp-dacts .btn{flex:1 1 0;justify-content:center;height:34px}
+.rmp-dacts .btn{flex:0 0 auto;justify-content:center;height:34px;padding:0 12px}
+.rmp-dacts .btn-p{flex:1 1 auto}
+.rmp-dr.is-writing .rmp-dacts{margin-top:8px}
 .rmp-dacts .btn svg{width:14px;height:14px}
 .rmp-dn{margin:0;font-size:12.5px;line-height:1.45;color:var(--label-2)}
 .rmp-dr.is-writing{gap:9px;padding:4px 0 6px}

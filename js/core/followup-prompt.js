@@ -21,8 +21,9 @@ How to write it:
 - Only use facts from the note. Never invent a deadline, a date, a reason, a meeting or a detail.
 - Never say or hint that they're slow or late: no "just checking in", "friendly reminder", "as per my last message", "I haven't heard back", "still waiting", "circling back", "bumping this", and no counting days.
 - Never make the agency look bad: no apologizing, no admitting delays, mistakes or problems on our side, no excuses.
+- No emojis and no markdown.
 ${o.whatsapp
-    ? `- Like a text: two or three short sentences, 15 to 50 words, plain text, at most one emoji, no sign-off.
+    ? `- Like a text: two or three short sentences, 15 to 50 words, plain text, no sign-off.
 - Reply with JSON only, no other text: {"subject": "", "body": "the message"}`
     : `- The body: a greeting line, then two or three short sentences (25 to 80 words), then "Thanks," and ${o.sender ? `"${o.sender}"` : 'no name'} on the next line. No signature block.
 - The subject: under 8 words, says what it's about (like "Austin website launch date"), never "Following up", "Reminder" or "Checking in".
@@ -40,13 +41,18 @@ function followUpPlain(o){
   };
 }
 
+// No emojis in a nudge, even if the AI adds one: they're taken out, with the space they leave.
+function followUpNoEmoji(s){
+  return String(s || '').replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}\uFE0F\u200D\u20E3]/gu, '')
+    .replace(/[ \t]+([.,!?])/g, '$1').replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+$/gm, '').trim();
+}
 // The AI's answer, as { subject, body }; a plain reply becomes the body.
 function followUpParse(text, whatsapp){
   const t = String(text || '').trim();
   if(!t) return null;
   const m = t.match(/\{[\s\S]*\}/);
-  if(m){ try{ const j = JSON.parse(m[0]); if(j && typeof j.body === 'string' && j.body.trim()) return { subject: whatsapp ? '' : String(j.subject || '').trim(), body: j.body.trim() }; }catch(e){} }
-  return { subject: '', body: t.replace(/^```\w*\n?|```$/g, '').trim() };
+  if(m){ try{ const j = JSON.parse(m[0]); if(j && typeof j.body === 'string' && j.body.trim()) return { subject: whatsapp ? '' : followUpNoEmoji(j.subject), body: followUpNoEmoji(j.body) }; }catch(e){} }
+  return { subject: '', body: followUpNoEmoji(t.replace(/^```\w*\n?|```$/g, '')) };
 }
 
-if(typeof module !== 'undefined' && module.exports) module.exports = { followUpPrompt, followUpPlain, followUpParse };
+if(typeof module !== 'undefined' && module.exports) module.exports = { followUpPrompt, followUpPlain, followUpParse, followUpNoEmoji };

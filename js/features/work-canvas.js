@@ -108,8 +108,9 @@ function remPanelHtml(r){
   const follow = open ? `<span class="tkp-k">Follow up</span><span class="tkp-v rmp-fu${late ? ' tkp-late' : ''}">${sheetDateField('remFollowUp', r.followUpDate || '', { from: 0, to: 30, min: toDateStr(new Date()), none: r.followUpDate ? '' : 'No date', after: 'remSetFollowUp' })}</span>` : '';
   const waited = r.askedDate ? remWaited(r.askedDate, open ? null : r.resolvedAt) : '';
   const draft = open ? remDrafts[r.id] : null;
-  const acts = open
-    ? `<div class="tkp-acts">${draft ? '' : `<button class="btn${due ? ' btn-p' : ''}" onclick="nudgeReminder('${r.id}')">${icon('sparkle')}Draft Nudge</button>`}<button class="btn${due || draft ? '' : ' btn-p'}" onclick="markReminderStatus('${r.id}','answered')">${icon('check')}Mark Answered</button></div>`
+  // One row of buttons: under the nudge while there is one (send it, or mark it answered), else here.
+  const acts = draft ? ''
+    : open ? `<div class="tkp-acts"><button class="btn${due ? ' btn-p' : ''}" onclick="nudgeReminder('${r.id}')">${icon('sparkle')}Draft Nudge</button><button class="btn${due ? '' : ' btn-p'}" onclick="markReminderStatus('${r.id}','answered')">${icon('check')}Mark Answered</button></div>`
     : `<div class="tkp-acts"><button class="btn" onclick="markReminderStatus('${r.id}','waiting')">${icon('rotate-ccw')}Reopen</button></div>`;
   const ev = [];
   if(r.askedDate) ev.push({ at: r.askedDate + 'T12:00:00', html: `<b>${escapeHtml(r.askedBy === currentUser?.id ? 'You' : firstName(owner ? owner.name : 'Someone'))}</b> asked ${escapeHtml(c ? c.name : 'the client')}` });
@@ -235,17 +236,20 @@ function remDraftHtml(r, c, d){
   const next = remDay(toDateStr(remWorkday(addDays(new Date(), 3)))).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   const seg = `<div class="seg rmp-ch" role="tablist" aria-label="Send by">${[['email', 'Email'], ['whatsapp', 'WhatsApp']].map(([k, t]) => `<button class="${d.ch === k ? 'on' : ''}" role="tab" aria-selected="${d.ch === k}" ${d.state === 'writing' ? 'disabled' : ''} onclick="${d.ch === k ? '' : `remDraftNudge('${r.id}','${k}')`}">${t}</button>`).join('')}</div>`;
   const head = `<div class="sp-sec rmp-dh"><b>Nudge</b>${seg}<span class="rmp-dt"><button class="ib" aria-label="Write again" title="Write again" ${d.state === 'writing' ? 'disabled' : ''} onclick="remDraftNudge('${r.id}')">${icon('arrows-clockwise')}</button><button class="ib" aria-label="Discard the nudge" title="Discard" onclick="remDiscardNudge('${r.id}')">${icon('x')}</button></span></div>`;
-  if(d.state === 'writing') return `${head}<div class="rmp-dr is-writing" aria-live="polite"><p class="rmp-dw">${icon('sparkle')}Writing ${email ? 'an email' : 'a WhatsApp message'} to ${escapeHtml(who)}…</p><i></i><i></i><i></i></div>`;
+  const writing = d.state === 'writing', off = writing ? ' disabled' : '';
+  const answered = `<button class="btn rmp-ans" onclick="markReminderStatus('${r.id}','answered')">${icon('check')}Mark Answered</button>`;
   const primary = email && to
-    ? `<button class="btn btn-p" onclick="remSendNudge('${r.id}')">${icon('envelope-simple')}Open in Mail</button><button class="btn" onclick="remCopyNudge('${r.id}')">${icon('copy')}Copy</button>`
-    : `<button class="btn btn-p" onclick="remCopyNudge('${r.id}')">${icon('copy')}${email ? 'Copy' : 'Copy for WhatsApp'}</button>`;
+    ? `<button class="btn btn-p" onclick="remSendNudge('${r.id}')"${off}>${icon('envelope-simple')}Open in Mail</button><button class="btn" onclick="remCopyNudge('${r.id}')"${off}>${icon('copy')}Copy</button>`
+    : `<button class="btn btn-p" onclick="remCopyNudge('${r.id}')"${off}>${icon('copy')}${email ? 'Copy' : 'Copy for WhatsApp'}</button>`;
+  if(writing) return `${head}<div class="rmp-dr is-writing" aria-live="polite"><p class="rmp-dw">${icon('sparkle')}Writing ${email ? 'an email' : 'a WhatsApp message'} to ${escapeHtml(who)}…</p><i></i><i></i><i></i>
+<div class="rmp-dacts">${primary}${answered}</div></div>`;
   const note = email
     ? (to ? `To ${escapeHtml(to)}. Sending it moves the next follow-up to ${next}.` : `No email on file for ${escapeHtml(c ? c.name : 'this client')}, so copy it into your mail. The next follow-up moves to ${next}.`)
     : `Paste it in their group. The next follow-up moves to ${next}.`;
   return `${head}<div class="rmp-dr">
 ${email ? `<input class="tf rmp-subj" id="remDrSubj" aria-label="Subject" placeholder="Subject" value="${escapeHtml(d.subject)}" oninput="remDraftEdit('${r.id}','subject',this.value)">` : ''}
 <textarea class="tf rmp-body" id="remDrBody" aria-label="${email ? 'Email' : 'Message'}" spellcheck="true" rows="${email ? 8 : 5}" oninput="remDraftEdit('${r.id}','body',this.value)">${escapeHtml(d.body)}</textarea>
-<div class="rmp-dacts">${primary}</div>
+<div class="rmp-dacts">${primary}${answered}</div>
 <p class="rmp-dn">${note}</p></div>`;
 }
 async function remSendNudge(id){
