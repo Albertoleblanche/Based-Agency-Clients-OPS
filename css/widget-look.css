@@ -41,7 +41,7 @@ html.ui-w .mac[data-theme] .app-win .side .src-i{height:36px;border-radius:12px;
 html.ui-w .mac[data-theme] .app-win .side .src-i.on{background:var(--sb-on);color:var(--sb-strong);box-shadow:var(--uw-shadow),var(--uw-hi)}
 html.ui-w .mac[data-theme] .app-win .side .src-i:active{transform:scale(.97);transition-duration:100ms}
 /* Tasks, WhatsApp and Queue: what's on you, so a solid pill you see at a glance (Nov 23; was grey on grey) */
-html.ui-w .mac .app-win .side .src-i :is(#navTasksBadge,#navWhatsappBadge,#navQueueBadge){font-family:var(--mono);font-weight:600;font-size:11px;background:var(--label);color:var(--grp)}
+html.ui-w .mac .app-win .side .src-i :is(#navTasksBadge,#navWhatsappBadge,#navQueueBadge,#navNotesBadge,#navClientsBadge){font-family:var(--mono);font-weight:600;font-size:11px;background:var(--label);color:var(--grp)}
 html.ui-w .mac .side-foot{border-top-color:var(--sep)}
 html.ui-w .mac .side-brand .brand-mark{border-radius:9px}
 html.ui-w .mac .stm{border-radius:16px;background:var(--grp);box-shadow:0 0 0 1px var(--sep)}
@@ -398,9 +398,14 @@ html.ui-w .wa-card{padding:16px 22px 18px}
 html.ui-w :is(.wa-main,.wa-side,.wa-card) > .rmi-sec:first-child{margin-top:0}
 html.ui-w .wa-card .rmi-sec{margin:0 0 6px}
 html.ui-w .wa-sort{margin:10px 0 2px;font-size:12.5px;color:var(--label-3)}
-html.ui-w .wa-gh{padding:16px 0 6px;border-bottom:0}
-html.ui-w .wa-gh b{font-size:13.5px;font-weight:500}
-html.ui-w .wa-gh .n{font-family:var(--mono);font-size:12px;font-weight:500}
+html.ui-w .wa-gh{padding:14px 0 6px;border-bottom:0}
+html.ui-w .wa-gh b{font-size:14px;font-weight:600}
+html.ui-w .wa-gh .n{font-family:var(--mono);font-size:12px;font-weight:600;background:var(--label);color:var(--grp)}
+/* each client is its own card; the list around them isn't (Nov 23) */
+html.ui-w .wa-main:has(.wa-g){background:transparent;box-shadow:none;padding:0}
+html.ui-w .wa-g{padding:4px 22px 12px;border-radius:var(--uw-r-sec);background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
+html.ui-w .wa-g + .wa-g{margin-top:14px}
+html.ui-w .wa-main:has(.wa-g) > .wa-sort:first-child{margin-top:0}
 html.ui-w .wa-k{font-weight:400}
 html.ui-w .wa-k.k-issue{color:var(--uw-risk)}
 html.ui-w .wa-r.is-sel{background:var(--card)}

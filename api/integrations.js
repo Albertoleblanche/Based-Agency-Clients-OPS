@@ -55,7 +55,7 @@ const {
   syncTimeEntryToHarvest,
   deleteTimeEntryFromHarvest,
 } = require('../lib/harvest-sync');
-const { sendPushToUser } = require('../lib/push-notify');
+const { sendPushToUser, pushUrlFor } = require('../lib/push-notify');
 const { connectGranola, disconnectGranola, granolaStatus, granolaCatchUp, granolaReadNow, granolaReadAgain, removeGranolaMeeting, restoreGranolaMeeting, pullMeetingTasks, draftMeetingRecap } = require('../lib/granola-tasks');
 const { handleMcp, protectedResourceMetadata } = require('../lib/mcp-server');
 
@@ -68,6 +68,22 @@ module.exports = async function handler(req, res) {
     return;
   }
   if (route === 'mcp') { await handleMcp(req, res); return; }
+  // The WhatsApp connector (the office PC) asks for phone pushes for the Radar notifications it just
+  // added (Nov 23). It proves itself with the service key it already holds; Radar holds the push keys.
+  if (route === 'service-push') {
+    const key = String(req.headers['x-radar-service-key'] || ''), want = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '');
+    const same = key.length === want.length && want.length > 20 && require('crypto').timingSafeEqual(Buffer.from(key), Buffer.from(want));
+    if (req.method !== 'POST' || !same) { res.status(401).json({ error: 'Not allowed' }); return; }
+    const admin = createClient(process.env.SUPABASE_URL, want);
+    const pushes = Array.isArray((req.body || {}).pushes) ? req.body.pushes.slice(0, 50) : [];
+    let sent = 0;
+    for (const p of pushes) {
+      if (!p || !p.userId || !p.title) continue;
+      try { const r = await sendPushToUser(admin, String(p.userId), String(p.title).slice(0, 120), String(p.body || '').slice(0, 400), pushUrlFor(String(p.view || ''), null)); sent += r.sent || 0; } catch (e) {}
+    }
+    res.status(200).json({ sent });
+    return;
+  }
 
   const callerToken = (req.headers.authorization || '').replace('Bearer ', '');
   if (!callerToken) {

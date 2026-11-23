@@ -3,6 +3,7 @@
 // sheets-canvas.js for logging) so a client's week reads the same on both.
 
 let tasks = [], clientReminders = [], timeEntries = [], notifications = [], calendarEvents = [];
+let mNotifIds = null;   // the unread notifications already seen (for the chime)
 let timerState = { running: false, startedAt: null, clientId: '', service: '', description: '', resumeEntryId: null };
 let newTaskPresetStatus = 'todo';
 let mTab = 'today', mTaskScope = 'everyone', mTaskClient = 'all', mReviewTab = 'waiting', mReviewClient = 'all', mStack = [], mTimerTick = null;
@@ -196,6 +197,10 @@ async function mLoadAll(){
   if(typeof granolaAutoStart === 'function') granolaAutoStart();      // and they come in by themselves
   timeEntries = (er.data || []).map(e => ({ id: e.id, userId: e.user_id, clientId: e.client_id, date: e.entry_date, minutes: e.minutes, description: e.description || '', service: e.service || '', logged: !!e.logged,
     createdAt: e.created_at, harvestProjectId: e.harvest_project_id || null, harvestTaskId: e.harvest_task_id || null, source: e.source || '', harvestLocked: !!e.harvest_locked, improvementId: e.improvement_id || null }));
+  // something new since the last look: the chime (Nov 23)
+  const unread = (nf.data || []).filter(n => !n.read).map(n => n.id);
+  if(mNotifIds && unread.some(id => !mNotifIds.has(id)) && typeof radarChime === 'function') radarChime();
+  mNotifIds = new Set(unread);
   notifications = nf.data || [];
   teamProfiles = pr.data || [];
   myProfile = teamProfiles.find(p => p.id === uid) || myProfile;
@@ -240,6 +245,12 @@ async function mBoot(o){
   if(location.hash) mOpenFromHash(location.hash);
   window.addEventListener('hashchange', () => mOpenFromHash(location.hash));
   document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') mRefresh(); });
+  // while it's open: a quick look for new notifications each minute, so they show (and chime) (Nov 23)
+  setInterval(async () => {
+    if(document.visibilityState !== 'visible' || !currentUser) return;
+    const { data } = await supabaseClient.from('notifications').select('id').eq('user_id', currentUser.id).eq('read', false).order('created_at', { ascending: false }).limit(30);
+    if(data && mNotifIds && data.some(n => !mNotifIds.has(n.id))) mRefresh();
+  }, 60000);
   if(navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', e => { if(e.data && e.data.type === 'open-url') mOpenFromHash(new URL(e.data.url, location.origin).hash); });
 }
 async function mRefresh(){ try{ await mLoadAll(); }catch(e){ return; } mRenderTab(); mRenderBadges(); mStack.forEach(s => s.refresh && s.refresh()); }
@@ -986,7 +997,7 @@ function mMoreHtml(){
   const g = (ic, t, right, fn) => mIr(`<span class="gl">${icon(ic)}</span>`, t, '', right || '', fn, { n: true });
   return `<h1 class="big" style="margin-top:8px">More</h1>
 <div class="ig" style="margin-top:16px"><button class="ir prof" onclick="mOpenProfile()">${me.avatar_url ? `<img src="${safeUrl(me.avatar_url)}" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover">` : avHtml(me.name || '?')}<div class="tx"><b>${mEsc(me.name || '')}</b><span>${mEsc(roleDisplayLabel(me.role))} · ${mEsc(settings.appName || 'Based Radar')}</span></div>${icon('caret-right', { cls: 'chev', weight: 'bold' })}</button></div>
-<div class="ig" style="margin-top:20px">${g('buildings', 'Clients', String(activeClients().length), "mOpenClients()")}${g('calendar-blank', 'Calendar', '', 'mOpenCalendar()')}${g('bell-ring', 'Reminders', due ? String(due) : '', 'mOpenReminders()')}${g('notepad', 'Notes', '', 'mOpenNotes()')}${g('timer', 'Time', timerState.running ? `<span class="mClk">${mClock()}</span>` : '', 'mOpenTime()')}</div>
+<div class="ig" style="margin-top:20px">${g('buildings', 'Clients', String(activeClients().length), "mOpenClients()")}${g('calendar-blank', 'Calendar', '', 'mOpenCalendar()')}${g('bell-ring', 'Reminders', due ? String(due) : '', 'mOpenReminders()')}${g('notepad', 'Notes', typeof granolaNewN !== 'undefined' && granolaNewN ? `<span class="m-new">${granolaNewN} new</span>` : '', 'mOpenNotes()')}${g('timer', 'Time', timerState.running ? `<span class="mClk">${mClock()}</span>` : '', 'mOpenTime()')}</div>
 <div class="ig" style="margin-top:20px">${g('users-three', 'Team', '', 'mOpenTeam()')}${g('trash', 'Recently Deleted', '', 'mOpenDeleted()')}${g('gear-six', 'Settings', '', 'mOpenSettings()')}</div>
 <div class="ig" style="margin-top:20px">${g('desktop', 'Open the Desktop Version', '', "mOpenDesktop()")}</div>`;
 }
@@ -1176,6 +1187,7 @@ function mMeetingsHtml(){
 }
 let mMtAll = false;
 function mOpenNotes(){
+  if(typeof granolaMarkSeen === 'function') granolaMarkSeen();   // the new meetings are seen
   // two sections: Granola Meetings, then Personal (Nov 23)
   mPush('Notes', () => `<h1 class="big">Notes</h1>${mMeetingsHtml()}<div class="ish"><h2 class="ish-lg">${icon('lock-simple')}Personal</h2></div>
 <div class="ig">${notes.map(n => { const c = clients.find(x => x.id === n.clientId); return mIr('', mEsc(n.title || 'Untitled note'), mEsc([c ? c.name : '', String(n.text || '').replace(/\s+/g, ' ').slice(0, 60)].filter(Boolean).join(' · ')), '', `mOpenNoteSheet('${n.id}')`, { n: true }); }).join('') || '<div class="ir"><span class="t n" style="color:var(--label-2)">No notes yet</span></div>'}</div><p class="ifoot">Only you can see these.</p>`,
@@ -1230,7 +1242,7 @@ function mOpenSettings(){
     return `<h1 class="big">Settings</h1>
 ${mIsh('Appearance')}<div class="ig">${opt('auto', 'Automatic')}${opt('light', 'Light')}${opt('dark', 'Dark')}${opt('night', 'Night to Morning')}</div>
 <p class="ifoot">${pref === 'night' ? `Dark from ${fmtTime(atTime(new Date(), nightHours(full)[0]))} to ${fmtTime(atTime(new Date(), nightHours(full)[1]))}. Change the hours in Settings on the desktop.` : 'Automatic follows your iPhone.'}</p>
-${mIsh('Notifications')}<div class="ig">${mIr('', 'Push notifications', '', `<span class="ios-sw${'Notification' in window && Notification.permission === 'granted' ? ' on' : ''}" role="switch" aria-checked="${'Notification' in window && Notification.permission === 'granted'}"></span>`, 'mEnablePush()', { n: true, noChev: true })}</div>
+${mIsh('Notifications')}<div class="ig">${mIr('', 'Sound in Radar', '', `<span class="ios-sw${radarSoundOn() ? ' on' : ''}" role="switch" aria-checked="${radarSoundOn()}"></span>`, 'setRadarSound(!radarSoundOn());mTop()?.refresh()', { n: true, noChev: true })}${mIr('', 'Push notifications', '', `<span class="ios-sw${'Notification' in window && Notification.permission === 'granted' ? ' on' : ''}" role="switch" aria-checked="${'Notification' in window && Notification.permission === 'granted'}"></span>`, 'mEnablePush()', { n: true, noChev: true })}</div>
 <p class="ifoot">Choose which notifications you get in Settings on the desktop.</p>
 <div class="ig" style="margin-top:28px">${mIr('', '<span style="color:var(--red)">Sign Out</span>', '', '', 'mSignOut()', { n: true, noChev: true })}</div>`;
   });

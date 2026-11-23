@@ -93,7 +93,9 @@ function updateShellBadges(){
   const set = (id, n) => { const el = document.getElementById(id); if(!el) return; el.textContent = n; el.style.display = Number(n) ? '' : 'none'; };
   if(typeof attentionEligibleClients === 'function'){
     const list = attentionEligibleClients();
-    set('navClientsBadge', (canApprove() ? liveClients() : activeClients()).length); // members don't see clients waiting for setup
+    // All Clients: for admins and approvers, the clients waiting for setup (Nov 23); nothing for others
+    set('navClientsBadge', canApprove() && typeof setupClients === 'function' ? setupClients().length : 0);
+    const cb = document.getElementById('navClientsBadge'); if(cb) cb.title = cb.textContent !== '0' ? `${cb.textContent} need${cb.textContent === '1' ? 's' : ''} setup` : '';
     set('navHealthBadge', (typeof healthScopeClients === 'function' ? healthScopeClients() : list).filter(c => clientHealth(c).level !== 'g').length);
   }
   ['navTeamPendingBadge', 'navTasksBadge', 'navRemindersBadge', 'navTeamBadge'].forEach(id => {

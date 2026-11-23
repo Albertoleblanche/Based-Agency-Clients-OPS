@@ -84,6 +84,7 @@ function renderNotes(){
   // (realtime, a save) can't wipe what you're typing.
   if(!root.querySelector(':scope > .n1-wrap')) root.innerHTML = '<div class="n1-wrap"><div class="n1-page" id="notesGallery"></div><div id="noteSheetHost"></div></div>';
   const gal = document.getElementById('notesGallery');
+  if(currentViewName === 'notes' && typeof granolaMarkSeen === 'function') granolaMarkSeen();   // seen: the count on Notes clears
   if(currentViewName === 'notes') setToolbar(null, `Private to you · ${notes.length} note${notes.length === 1 ? '' : 's'}`);
   if(typeof notesDataLoaded !== 'undefined' && !notesDataLoaded){ gal.innerHTML = skeletonHtml('notes', 'Loading notes…'); return; }
   // Meetings shows once Granola is connected (or meetings were read); they load when it's opened
@@ -127,8 +128,8 @@ ${mts === null ? skeletonHtml('notes', 'Loading meetings…') : list.length ? `<
   const MT_IN_ALL = 6;
   const sections = notesScope === 'all' && mtMine.length ? (() => {
     const few = mtMine.slice(0, MT_IN_ALL), ns = mine.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    return `<section class="n1-sec" aria-label="Granola Meetings"><div class="n1-sh"><h2>${appLogo('granola', 'xs')}Granola Meetings<span class="c">${mtMine.length}</span></h2>${mtMine.length > few.length ? `<button type="button" class="x-lnk" onclick="setNotesFilter('scope','meetings')">See All ${mtMine.length}</button>` : ''}</div><div class="n1-grid">${few.map(meetingTileHtml).join('')}</div></section>
-<section class="n1-sec" aria-label="Personal"><div class="n1-sh"><h2>${icon('lock-simple')}Personal<span class="c">${ns.length}</span></h2><span class="n1-sh-r">Only you can see these</span></div>${ns.length ? `<div class="n1-grid">${ns.map(noteTileHtml).join('')}</div>`
+    return `<section class="n1-sec" aria-label="Granola Meetings"><div class="n1-sech"><h2>${appLogo('granola', 'xs')}Granola Meetings<span class="c">${mtMine.length}</span></h2>${mtMine.length > few.length ? `<button type="button" class="x-lnk" onclick="setNotesFilter('scope','meetings')">See All ${mtMine.length}</button>` : ''}</div><div class="n1-grid">${few.map(meetingTileHtml).join('')}</div></section>
+<section class="n1-sec" aria-label="Personal"><div class="n1-sech"><h2>${icon('lock-simple')}Personal<span class="c">${ns.length}</span></h2><span class="n1-sech-r">Only you can see these</span></div>${ns.length ? `<div class="n1-grid">${ns.map(noteTileHtml).join('')}</div>`
   : `<p class="n1-none">No personal notes${cur ? ` for ${escapeHtml(cur.name)}` : ''} yet. <button type="button" class="x-lnk" onclick="openNoteSheet('new')">Jot one down</button></p>`}</section>`;
   })() : '';
   const empty = !notes.length ? ['No notes yet', 'Ideas and plans for a client, just for you. When you do one, mark it done or log it as an improvement.']
@@ -216,7 +217,6 @@ function noteSheetHtml(n){
 ${noteClientPopHtml(s.clientId)}
 ${noteStatusPopHtml(s.status)}
 ${noteFuPopHtml(s.followUp)}
-<span class="n1-cc">${colorSwatchesHtml('nsColor', s.color, 'noteSetColor', { small: true })}</span>
 <span class="n1-sp"></span>
 ${n ? `<button type="button" class="ib" aria-label="More" title="More" onclick="noteMore(event)">${icon('dots-three')}</button>` : ''}<button type="button" class="ib" aria-label="Close" title="Close" onclick="closeNoteSheet()">${icon('x')}</button>
 </header>`;
@@ -230,7 +230,7 @@ ${n ? `<button type="button" class="ib" aria-label="More" title="More" onclick="
 ${head}
 <div class="n1-doc">
 <textarea class="n1-h2" id="nsTitle" rows="1" spellcheck="true" placeholder="Title" aria-label="Title" oninput="noteFit(this);noteDirty()" onkeydown="if(event.key==='Enter'&&!event.isComposing){event.preventDefault();noteFocusBlock(0,'start')}">${escapeHtml(n ? (n.title || '') : '')}</textarea>
-<p class="n1-meta">${meta}</p>
+<div class="n1-metarow"><p class="n1-meta">${meta}</p><span class="n1-cc" title="Color">${colorSwatchesHtml('nsColor', s.color, 'noteSetColor', { small: true })}</span></div>
 <div class="n1-lk" id="nsLink">${noteLinkHtml()}</div>
 <div class="n1-body" id="nsBody">${noteEditorHtml(noteBlocks(n ? n.text : ''))}</div>
 ${tips}

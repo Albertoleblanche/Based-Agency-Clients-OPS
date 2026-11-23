@@ -332,6 +332,8 @@ ${hvPickBlockHtml('editEntry', e.clientId, e.harvestProjectId || hvDefaultPick(e
 <label for="editEntryDate">Date</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sheetDateField('editEntryDate', e.date, { past: true, from: -30, to: 0 })}</div>
 <label for="editEntryDuration">Time</label><input id="editEntryDuration" class="tf" style="width:110px" value="${hmm(e.minutes)}" autocomplete="off">
 <label class="top" for="editEntryDesc">Notes</label><textarea id="editEntryDesc" class="tf" spellcheck="true">${escapeHtml(e.description || '')}</textarea>
+${e.logged || e.improvementId ? `<span></span><div class="mw-row is-done">${icon('check-circle')}<div><b>Logged as work</b><span>It’s an improvement for the client, in Queue and on the client’s page.</span></div></div>`
+  : mine ? `<span></span><div class="mw-row">${sheetSw('editEntryWork', false, 'Also log it as work')}<div><b>Also log it as work</b><span>The notes become an improvement in Queue, ready for the client update.</span></div></div>` : ''}
 </div>
 <div class="sheet-a">${mine ? `<button class="btn danger" style="margin-right:auto" onclick="closeAppModal();deleteTimeEntry('${id}')">Delete</button>` : ''}<button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="saveTimeEntryEdit('${id}')">Save</button></div>`, 520);
 }

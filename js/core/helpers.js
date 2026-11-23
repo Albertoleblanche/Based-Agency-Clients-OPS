@@ -173,3 +173,37 @@ function appLogo(app, size){
 function appLogoPair(a, b, size){ return `<span class="app-pair${size ? ' ' + size : ''}" aria-hidden="true">${appLogo(a)}${appLogo(b)}</span>`; }
 // An app without a logo of its own here (a connected app Radar doesn't know) gets its symbol on a plain tile the same size.
 function appGlyph(name, size){ return `<span class="app-logo is-glyph${size ? ' ' + size : ''}" aria-hidden="true">${icon(name)}</span>`; }
+
+// ---- The notification sound (Nov 23) -------------------------------------------------------------
+// A soft two-note chime when something new comes in, made here (no sound file). On by default, per
+// device (Settings → Notifications → Sound). Browsers only let a page play sound after you've
+// clicked or typed in it, so the first chime waits for that. While the window is in the background
+// the phone or computer's own push alert sounds instead, so this one stays quiet then.
+let radarAudio = null;
+function radarSoundOn(){ try{ return localStorage.getItem('radar-sound') !== '0'; }catch(e){ return true; } }
+function setRadarSound(on){ try{ localStorage.setItem('radar-sound', on ? '1' : '0'); }catch(e){} if(on) radarChime(true); }
+function radarAudioCtx(){
+  if(radarAudio) return radarAudio;
+  const AC = window.AudioContext || window.webkitAudioContext; if(!AC) return null;
+  try{ radarAudio = new AC(); }catch(e){ radarAudio = null; }
+  return radarAudio;
+}
+['pointerdown', 'keydown', 'touchstart'].forEach(ev => window.addEventListener(ev, () => { const c = radarAudioCtx(); if(c && c.state === 'suspended') c.resume().catch(() => {}); }, { passive: true }));
+function radarChime(force){
+  if(!force && !radarSoundOn()) return false;
+  const pushOn = typeof Notification !== 'undefined' && Notification.permission === 'granted';
+  if(!force && document.visibilityState !== 'visible' && pushOn) return false;
+  const c = radarAudioCtx(); if(!c || c.state !== 'running') return false;
+  const t0 = c.currentTime + 0.01;
+  [[880, 0, 0.11], [1318.5, 0.09, 0.22]].forEach(([f, at, len]) => {
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = 'sine'; o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, t0 + at);
+    g.gain.exponentialRampToValueAtTime(0.09, t0 + at + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + len);
+    o.connect(g); g.connect(c.destination);
+    o.start(t0 + at); o.stop(t0 + at + len + 0.02);
+  });
+  window._radarChimes = (window._radarChimes || 0) + 1;
+  return true;
+}

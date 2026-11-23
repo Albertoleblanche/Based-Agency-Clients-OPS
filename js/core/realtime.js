@@ -35,6 +35,8 @@ function setupRealtimeSubscriptions(){
     // app_storage holds several distinct blobs in one table, keyed by
     // `key` — only react to the ones that actually feed rendered state.
     const changedKey = payload?.new?.key ?? payload?.old?.key;
+    // a meeting read from Granola: the count on Notes (Nov 23)
+    if(String(changedKey || '').startsWith('granola-note:')){ if(typeof granolaCountNew === 'function') granolaCountNew().catch(() => {}); return; }
     if(changedKey !== 'app-data' && changedKey !== 'settings') return;
     silentSection(async ()=>{
       await loadAll();

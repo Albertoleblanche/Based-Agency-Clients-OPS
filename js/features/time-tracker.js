@@ -880,20 +880,38 @@ async function saveTimeEntryEdit(id){
   const dateVal = document.getElementById('editEntryDate').value;
   const totalMinutes = parseDurationInput(document.getElementById('editEntryDuration').value);
   const description = document.getElementById('editEntryDesc').value.trim();
+  const asWork = typeof sheetIsOn === 'function' && sheetIsOn('editEntryWork');   // also log it as work, for Queue (Nov 23)
   if(!totalMinutes || totalMinutes<=0){ showToast('error','Enter a duration','Try something like "1h 30m" or "1.5".'); return; }
+  if(asWork && !description){ showToast('error', 'Say what you worked on', 'The notes are what shows in Queue.'); document.getElementById('editEntryDesc')?.focus(); return; }
   if(totalMinutes > 960 && !(await confirmDialog(`That's ${formatMinutes(totalMinutes)} for a single entry — did you mean minutes instead of hours?`, {confirmLabel:'Save it anyway', cancelLabel:'Let me fix it'}))) return;
+  if(asWork && !(await okToLogDuplicate(clientId, description))) return;   // logged already? (data.js)
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
   const { error } = await supabaseClient.from('time_entries').update({
     client_id: clientId, entry_date: dateVal, minutes: totalMinutes, description, service, harvest_sync_status: 'pending',
     ...(typeof hvTimeOn === 'function' && hvTimeOn() ? { harvest_project_id: pick.projectId || null, harvest_task_id: pick.taskId || null } : {})
   }).eq('id', id);
+  // as work: the improvement, and the entry linked to it (as Add Time does)
+  let imp = null;
+  if(!error && asWork){
+    const c0 = clients.find(x => x.id === clientId), today = toDateStr(new Date());
+    imp = await insertImprovementFull(clientId, { author: myName() || 'Team member', text: description, includeInEmail: true, source: 'time',
+      date: (dateVal === today ? new Date() : new Date(dateVal + 'T12:00:00')).toISOString(),
+      service: c0 && typeof serviceFromHarvest === 'function' && serviceFromHarvest(c0) ? (pick.projectId ? service : improvementServiceFor(c0)) : service });
+    if(imp){
+      let r = await supabaseClient.from('time_entries').update({ logged: true, improvement_id: imp.id }).eq('id', id);
+      if(r.error && workColumnMissing(r.error, 'improvement_id')) await supabaseClient.from('time_entries').update({ logged: true }).eq('id', id);
+      if(typeof logClientActivity === 'function') logClientActivity(clientId, 'improvement_logged', `${myName() || 'Team member'} logged an improvement: "${description.length > 80 ? description.slice(0, 80) + '…' : description}"`);
+      if(typeof quRefreshAll === 'function') quRefreshAll(clientId);
+    }
+  }
   restoreBtn(btn);
   closeAppModal();
   await loadTimeEntries();
   renderTimesheet(); renderReports();
   if(error){ showToast('error','Save failed', error.message); return; }
-  showToast('success','Entry updated','Changes saved.');
+  if(asWork && !imp) showToast('info', 'Saved, not logged as work', 'The time is saved, but it couldn’t be logged as work. Try again from the entry.');
+  else showToast('success', imp ? 'Saved and logged as work' : 'Entry updated', imp ? 'It’s in Queue for the client update.' : 'Changes saved.');
   syncEntryToHarvestBackground(id);
 }
 

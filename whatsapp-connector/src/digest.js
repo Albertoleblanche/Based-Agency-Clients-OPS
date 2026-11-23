@@ -17,9 +17,11 @@ export async function runDigest({ dry = false, notify = true } = {}){
   const groups = check(await db().from('wa_groups').select('jid,name').eq('active', true), 'load groups');
 
   let seen = 0, created = 0, resolved = 0, reopened = 0, failures = 0;
+  const fresh = [];
   for(const g of groups){
     const r = await analyzeGroup(g, since);
     seen += r.seen; created += r.created; resolved += r.resolved; reopened += r.reopened || 0; if(r.failed) failures++;
+    fresh.push(...(r.items || []));
     if(r.created || r.resolved || r.reopened) console.log(`  ${g.name}: +${r.created} new, ${r.reopened || 0} reopened (the client followed up), ${r.resolved} resolved`);
   }
 
@@ -28,6 +30,10 @@ export async function runDigest({ dry = false, notify = true } = {}){
     const p = matchProfile(role, profiles);
     if(p) await db().from('wa_tasks').update({ owner_user_id: p.id }).eq('owner_key', role.key).is('owner_user_id', null).eq('status', 'open');
   }
+
+  // Each new or reopened item reaches its owner in Radar too, on every check (Check Now included):
+  // the bell, and a push on their phone (Nov 23)
+  if(!dry) { try { await notifyRadar(fresh, profiles); } catch(e){ console.error('  Radar notifications failed:', e.message); } }
 
   const open = check(await db().from('wa_tasks').select('*').eq('status', 'open').order('first_seen', { ascending: true }), 'load open');
   const label = new Date().toLocaleTimeString('en-US', { timeZone: config.tz, hour: 'numeric', minute: '2-digit' });
@@ -109,4 +115,44 @@ export async function alertAdmins(text){
     const role = ROLES.find(r => r.key === key); const p = role && matchProfile(role, profiles);
     if(p?.slack_user_id) await slackDM(p.slack_user_id, text);
   }
+}
+
+// ---- Radar notifications (Nov 23) -----------------------------------------------------------------
+// One notification per person per check ("2 new WhatsApp requests"), in the bell, and a push through
+// Radar (RADAR_URL; Radar holds the push keys). Muting "A client asks you for something in WhatsApp"
+// in Radar's Settings → Notifications (everywhere, or just in the app or on the phone) is honored.
+// In test mode only the testers hear about it.
+const TYPE = 'whatsapp_request';
+export async function notifyRadar(items, profiles, deps){
+  const DB = (deps && deps.db) || db, get = (deps && deps.fetch) || fetch;
+  if(!items.length || config.pilotIds === null) return;
+  const per = new Map();
+  for(const it of items){
+    const role = ROLES.find(r => r.key === it.owner_key), p = role && matchProfile(role, profiles);
+    if(!p) continue;
+    if(config.pilotIds.length && !config.pilotIds.includes(String(p.id))) continue;
+    if(!per.has(p.id)) per.set(p.id, { p, list: [] });
+    per.get(p.id).list.push(it);
+  }
+  const pushes = [];
+  for(const { p, list } of per.values()){
+    const m = p.muted_notification_types || [];
+    if(m.includes(TYPE)) continue;
+    const again = list.filter(x => x.reopened).length, high = list.some(x => x.high);
+    const title = list.length === 1 ? `${list[0].client} on WhatsApp${list[0].reopened ? ', again' : ''}` : `${list.length} new WhatsApp requests${again ? ` (${again} again)` : ''}`;
+    const body = list.slice(0, 3).map(x => list.length === 1 ? x.title : `${x.client}: ${x.title}`).join(' · ') + (list.length > 3 ? ` · and ${list.length - 3} more` : '') + (high ? ' (high priority)' : '');
+    if(!m.includes('app:' + TYPE)){
+      const { error } = await DB().from('notifications').insert({ user_id: p.id, type: TYPE, title, body, target_view: 'whatsapp', read: false });
+      if(error) console.error('  notification failed:', error.message);
+    }
+    if(!m.includes('push:' + TYPE)) pushes.push({ userId: p.id, title, body, view: 'whatsapp' });
+  }
+  // RADAR_URL may carry a screen (…/#whatsapp, as in .env.example): the push goes to the site itself
+  let origin = ''; try { origin = new URL(config.radarUrl).origin; } catch(e) {}
+  if(!pushes.length || !origin || origin === 'null') return;
+  const res = await get(`${origin}/api/integrations?route=service-push`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-radar-service-key': config.supabaseKey() }, body: JSON.stringify({ pushes }),
+  });
+  if(!res.ok) console.error(`  Radar push failed: ${res.status}`);
+  else { const r = await res.json().catch(() => ({})); console.log(`  Radar: ${per.size} notified, ${r.sent || 0} push${r.sent === 1 ? '' : 'es'} sent`); }
 }

@@ -290,10 +290,12 @@ function renderNotes(){
   board.innerHTML = `<div class="notes-list" role="listbox" aria-label="Notes">${list}</div><section class="notes-pane" aria-label="Selected note">${pane}</section>`;
 }
 
+// Notes in the sidebar counts the Granola meetings read since you last opened Notes (Nov 23)
 function updateNotesBadge(){
   const badge = document.getElementById('navNotesBadge');
   if(!badge) return;
-  const open = notes.filter(n=>n.status!=='done').length;
-  badge.textContent = open;
-  badge.style.display = open ? '' : 'none';   // the stylesheet lays out the count circle
+  const n = typeof granolaNewN !== 'undefined' ? granolaNewN : 0;
+  badge.textContent = n;
+  badge.style.display = n ? '' : 'none';   // the stylesheet lays out the count circle
+  badge.title = n ? `${n} new meeting${n === 1 ? '' : 's'} from Granola` : '';
 }

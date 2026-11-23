@@ -94,6 +94,8 @@ export async function analyzeGroup(group, since){
   let reopened = 0;
   const closedById = new Map(closedTasks.map(t => [t.id, t]));
   const reopenedTitles = [];
+  const items = [];   // what's new for someone, for their Radar notification (Nov 23)
+  const clientName = group.name.replace(/\s*\|.*$/, '').replace(/marketing/i, '').replace(/[-–—:]+\s*$/, '').trim() || group.name;
   for(const r of out.reopen || []){
     const t = closedById.get(r.task_id);
     if(!t) continue;
@@ -104,7 +106,7 @@ export async function analyzeGroup(group, since){
       source_msg_ids: [...new Set([...(t.source_msg_ids || []), ...ids])],
       source_excerpt: r.excerpt ? String(r.excerpt).slice(0, 400) : t.source_excerpt,
     }).eq('id', t.id);
-    if(error) console.error('  reopen failed:', error.message); else { reopened++; reopenedTitles.push(t.title.toLowerCase()); }
+    if(error) console.error('  reopen failed:', error.message); else { reopened++; reopenedTitles.push(t.title.toLowerCase()); items.push({ title: t.title, client: clientName, owner_key: t.owner_key, reopened: true }); }
   }
   const existingTitles = new Set([...openTasks.map(t => t.title.toLowerCase()), ...reopenedTitles]);
   for(const t of out.new_tasks || []){
@@ -113,16 +115,16 @@ export async function analyzeGroup(group, since){
     const ids = (t.msg_ids || []).map(n => msgs[Number(n) - 1]?.wa_msg_id).filter(Boolean);
     const due = /^\d{4}-\d{2}-\d{2}$/.test(t.due_date || '') ? t.due_date : null;
     const { error } = await db().from('wa_tasks').insert({
-      group_jid: group.jid, client: group.name.replace(/\s*\|.*$/, '').replace(/marketing/i, '').replace(/[-–—:]+\s*$/, '').trim() || group.name,
+      group_jid: group.jid, client: clientName,
       title: String(t.title).slice(0, 300), detail: t.detail || null,
       kind: ['request', 'question', 'promise', 'issue'].includes(t.kind) ? t.kind : 'request',
       owner_key: owner, ai_owner_key: owner,
       priority: ['low', 'normal', 'high'].includes(t.priority) ? t.priority : 'normal',
       due_date: due, source_msg_ids: ids, source_excerpt: t.excerpt ? String(t.excerpt).slice(0, 400) : null,
     });
-    if(error) console.error('  task insert failed:', error.message); else created++;
+    if(error) console.error('  task insert failed:', error.message); else { created++; items.push({ title: String(t.title).slice(0, 300), client: clientName, owner_key: owner, high: t.priority === 'high' }); }
   }
   // Still-open tasks in an active chat stay fresh.
   await db().from('wa_tasks').update({ last_seen: now }).eq('group_jid', group.jid).eq('status', 'open');
-  return { created, resolved, reopened, seen: fresh };
+  return { created, resolved, reopened, seen: fresh, items };
 }

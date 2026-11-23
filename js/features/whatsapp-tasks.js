@@ -352,9 +352,11 @@ ${lead ? `<label class="pop pop-sel"><span class="pl">${escapeHtml(curWho[1])}</
   // Grouped under the client's name, so two things split from one message read as one client.
   // Waiting: the client who has waited longest first; done: the most recent first.
   const byClient = items => { const m = new Map(); items.forEach(t => { const k = waClientLabel(t); if(!m.has(k)) m.set(k, []); m.get(k).push(t); }); return [...m.entries()]; };
-  const groupHtml = ([name, ts]) => `<section class="wa-g" aria-label="${escapeHtml(name)}"><div class="wa-gh"><b>${escapeHtml(name)}</b>${ts.length > 1 ? `<span class="n">${ts.length}</span>` : ''}</div>${ts.map(t => waRowHtml(t, sel, who)).join('')}</section>`;
+  // each client its own block: the name, its service under it, and how many (Nov 23)
+  const groupHtml = ([name, ts]) => { const c = waClient(ts[0]), svc = c && c.service ? String(c.service) : '';
+    return `<section class="wa-g" aria-label="${escapeHtml(name)}"><div class="wa-gh"><div class="wa-gt"><b>${escapeHtml(name)}</b>${svc ? `<span class="svc">${escapeHtml(svc)}</span>` : ''}</div><span class="n" aria-label="${ts.length} ${ts.length === 1 ? 'item' : 'items'}">${ts.length}</span></div>${ts.map(t => waRowHtml(t, sel, who)).join('')}</section>`; };
   const again = waTab === 'open' ? waTasks.filter(t => pick(t) && waWroteAgain(t)) : [];
-  const againHtml = again.length ? `<section class="wa-g wa-again" aria-label="Written to again"><div class="wa-gh"><b>The client wrote again</b><span class="n">${again.length}</span></div><p class="wa-again-p">Marked done, then the client wrote in the group. Open it to read what they said.</p>${again.map(t => waRowHtml(t, sel, who)).join('')}</section>` : '';
+  const againHtml = again.length ? `<section class="wa-g wa-again" aria-label="Written to again"><div class="wa-gh"><div class="wa-gt"><b>The client wrote again</b></div><span class="n">${again.length}</span></div><p class="wa-again-p">Marked done, then the client wrote in the group. Open it to read what they said.</p>${again.map(t => waRowHtml(t, sel, who)).join('')}</section>` : '';
   let list;
   if(waTab === 'open' && (open.length || again.length)) list = `${againHtml}${open.length ? `<p class="wa-sort">By client, longest wait first</p>${byClient(open).map(groupHtml).join('')}` : ''}`;
   else if(waTab === 'done' && done.length) list = `<p class="wa-sort">By client, most recent first</p>${byClient(done).map(groupHtml).join('')}`;

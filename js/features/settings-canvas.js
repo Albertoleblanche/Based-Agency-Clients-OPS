@@ -625,7 +625,10 @@ function setNotifications(){
     sections.get(s).push([type, meta]);
   });
   const ck = (type, ch, label) => { const on = notifOn(type, ch); return `<span class="mcol"><button class="ck${on ? ' on' : ''}" role="checkbox" aria-checked="${on}" aria-label="${esc(label)}" onclick="toggleNotifChannel('${type}','${ch}')">${on ? icon('check', { weight: 'bold' }) : ''}</button></span>`; };
-  return `<p class="set-note" style="margin:0 4px 4px">Choose where each kind of notification reaches you. Nothing goes to Slack on Saturdays and Sundays; reminders wait for Monday morning.</p>` + [...sections.entries()].map(([s, rows]) =>
+  // the sound in the app, on this device (Nov 23)
+  const snd = radarSoundOn();
+  const sound = `<div class="form-grp nt-snd"><div class="fr"><div class="l"><b>Sound</b><span>A soft chime in Radar when a notification comes in, on this device.</span></div><button type="button" class="sw${snd ? ' on' : ''}" role="switch" aria-checked="${snd}" aria-label="Sound" onclick="setRadarSound(!radarSoundOn());renderNotificationPrefs()"></button></div></div>`;
+  return sound + `<p class="set-note" style="margin:0 4px 4px">Choose where each kind of notification reaches you. Nothing goes to Slack on Saturdays and Sundays; reminders wait for Monday morning.</p>` + [...sections.entries()].map(([s, rows]) =>
     `<div class="mhead nt-h"><span>${esc(s)}</span><span class="mcol">In app</span><span class="mcol">Slack</span><span class="mcol">Push</span></div>
 <div class="form-grp">${rows.map(([type, meta]) => `<div class="fr"><div class="l"><b style="font-weight:400">${esc(meta.label)}</b></div>${ck(type, 'app', meta.label + ' — in app')}${ck(type, 'slack', meta.label + ' — Slack')}${ck(type, 'push', meta.label + ' — push')}</div>`).join('')}</div>`).join('');
 }

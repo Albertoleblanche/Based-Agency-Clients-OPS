@@ -27,6 +27,7 @@ const NOTIFICATION_TYPE_META = {
   task_completed:          { label:'A task you assigned is completed', section:'Tasks' },
   task_cancelled:          { label:'A task assigned to you is cancelled', section:'Tasks' },
   task_edited:             { label:'A task assigned to you changes', section:'Tasks' },
+  task_suggested:          { label:'A task is suggested from a meeting you were in', section:'Tasks' },
   draft_ready:             { label:'A draft is ready for your approval', section:'Client Work', visibleTo:'approver' },
   draft_approved:          { label:'Your update or submitted work is approved', section:'Client Work' },
   win_approved:            { label:'Your WhatsApp update is approved, for you to send', section:'Client Work' },
@@ -36,6 +37,8 @@ const NOTIFICATION_TYPE_META = {
   work_deleted:            { label:'Someone deletes your logged work and its time', section:'Client Work' },
   email_sent:              { label:'A client email is sent', section:'Client Work', visibleTo:'approver' },
   reminder_follow_up_due:  { label:'A client follow-up you own comes due', section:'Client Work' },
+  whatsapp_request:        { label:'A client asks you for something on WhatsApp', section:'Client Work' },
+  reminder_added:          { label:'A client promises something in a meeting (a follow-up is added)', section:'Client Work' },
   reminder_escalated:      { label:'A client follow-up has gone unanswered for a week', section:'Client Work', visibleTo:'approver' },
   client_danger_maxed:     { label:'A client\'s danger score hits 5/5', section:'Client Work' },
   client_danger_decreased: { label:'A client\'s danger score goes down', section:'Client Work' },
@@ -292,6 +295,7 @@ async function checkForNewNotificationToasts(){
   const { data, error } = await supabaseClient.from('notifications').select('*')
     .eq('user_id', currentUser.id).eq('read', false).gt('created_at', lastChecked).order('created_at', { ascending:true });
   if(!error && data && data.length){
+    if(typeof radarChime === 'function') radarChime();   // one chime for what just came in (Nov 23)
     data.forEach(n=>{
       const type = n.type.includes('denied') ? 'error' : n.type.includes('approved') ? 'success' : 'info';
       showToast(type, n.title, n.body || '');

@@ -714,8 +714,10 @@ let granolaAutoT = null, granolaAutoFirst = null;
 async function granolaAutoTick(){
   if(document.visibilityState !== 'visible') return;
   if(!(await granolaKnown())) return;
+  granolaCountNew().catch(() => {});   // meetings the webhook brought in count too
   let r = null; try{ r = await granolaApi('check'); }catch(e){ return; }
   if(!r || r.recent || r.skipped) return;
+  granolaCountNew().catch(() => {});
   if(typeof tkSgRefresh === 'function') tkSgRefresh(); else { try{ await loadTaskSuggestions(); }catch(e){} }
   if(granolaMeetings !== null){ try{ await loadGranolaMeetings(); }catch(e){} }
   if(typeof currentViewName !== 'undefined' && currentViewName === 'notes' && typeof renderNotes === 'function') renderNotes();
@@ -725,6 +727,7 @@ function granolaAutoStart(){
   if(granolaAutoT) return;
   granolaAutoT = setInterval(granolaAutoTick, 15 * 60000);
   granolaAutoFirst = setTimeout(granolaAutoTick, 20000);
+  setTimeout(() => granolaCountNew().catch(() => {}), 3000);   // the count on Notes, from the start
   // back to Radar after a while away: catch up then, not up to 15 minutes later
   let hiddenAt = 0;
   document.addEventListener('visibilitychange', () => {
@@ -820,6 +823,7 @@ function meetingsRefresh(redraw){
     granolaMtChecking = false;
     await loadGranolaMeetings();
     try{ await loadTaskSuggestions(); }catch(e){}
+    granolaCountNew().catch(() => {});
     redraw();
   });
 }
@@ -1304,6 +1308,31 @@ function meetingFollowUpsHtml(m){
   const day = d => d ? fmtShortDate(new Date(d + 'T12:00:00')) : '';
   const open = typeof mOpenSheet === 'function' ? id => `mCloseSheet(true);setTimeout(() => mReminderActions('${id}'), 320)` : id => `closeAppModal();openReminderDetailModal('${id}')`;
   return `<div class="mtn-fu"><p class="k">${icon('bell')}Waiting on ${escapeHtml(c ? c.name : 'the client')}</p>${rs.map(r => `<button type="button" class="mtn-fu-r" onclick="${open(r.id)}"><span>${escapeHtml(r.question)}</span><em>${r.status === 'answered' ? 'answered' : r.followUpDate ? `follow up ${escapeHtml(day(r.followUpDate))}` : ''}</em></button>`).join('')}</div>`;
+}
+
+// ---- New meetings, counted on Notes (Nov 23) -----------------------------------------------------
+// The Granola meetings Radar read since you last opened Notes (the ones you can see): the count on
+// Notes in the sidebar (and on iPhone, the Notes row). Opening Notes clears it.
+let granolaNewN = 0;
+function granolaSeenKey(){ return `radar-mt-seen-${typeof currentUser !== 'undefined' && currentUser ? currentUser.id : ''}`; }
+function granolaMarkSeen(){
+  try{ localStorage.setItem(granolaSeenKey(), new Date().toISOString()); }catch(e){}
+  if(granolaNewN){ granolaNewN = 0; granolaBadgesChanged(); }
+}
+async function granolaCountNew(){
+  if(typeof currentUser === 'undefined' || !currentUser) return 0;
+  let seen = null; try{ seen = localStorage.getItem(granolaSeenKey()); }catch(e){}
+  if(!seen){ granolaMarkSeen(); return 0; }   // the first time: from now on
+  const { data, error } = await supabaseClient.from('app_storage').select('key, value').like('key', 'granola-note:%').gt('updated_at', seen).limit(80);
+  if(error) return granolaNewN;
+  const n = (data || []).map(r => { let m = {}; try{ m = typeof r.value === 'string' ? JSON.parse(r.value) || {} : r.value || {}; }catch(e){} return m; })
+    .filter(m => m.state === 'done' && m.summary && m.at && m.at > seen && meetingCanSee({ people: m.people || [] })).length;
+  if(n !== granolaNewN){ granolaNewN = n; granolaBadgesChanged(); }
+  return n;
+}
+function granolaBadgesChanged(){
+  if(typeof updateNotesBadge === 'function') updateNotesBadge();
+  if(typeof mRenderTab === 'function' && typeof mTab !== 'undefined' && mTab === 'more') mRenderTab();
 }
 
 async function insertTaskRow(row){
