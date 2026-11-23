@@ -56,15 +56,19 @@ function clientAddedWords(c){
 // shares most of its words ("Brutsky" and "Brutsky Builds", "Hill Country Roofing" and "Hill
 // Country Roofing & Siding").
 function clientSameAsGuesses(c){
-  const words = s => winNorm(s).split(' ').filter(w => w.length > 2 && !['llc', 'inc', 'the', 'and', 'company', 'corp'].includes(w));
-  const mine = words(c.name), key = mine.join(' ');
-  if(!key) return [];
-  return activeClients().filter(x => !hvLinkOf(x)).map(x => {
-    const theirs = words(x.name), k2 = theirs.join(' ');
-    if(!k2) return null;
-    if(k2 === key || (Math.min(k2.length, key.length) >= 4 && (k2.startsWith(key + ' ') || key.startsWith(k2 + ' ')))) return { c: x, s: 2 };
-    const shared = theirs.filter(w => mine.includes(w)).length;
-    return shared && shared / Math.min(theirs.length, mine.length) >= 0.6 ? { c: x, s: shared / Math.max(theirs.length, mine.length) } : null;
+  // Nov 23: short words count ("PE"), a typo still matches ("Developement"), and one shared word isn't
+  // enough when the other name has more ("PE Development" isn't American Building Development).
+  const words = s => winNorm(s).split(' ').filter(w => w && !['llc', 'inc', 'the', 'and', 'company', 'corp', 'co', 'ltd'].includes(w));
+  const mine = words(c.name);
+  if(!mine.length) return [];
+  const alike = (a, b) => typeof hvWordAlike === 'function' ? hvWordAlike(a, b) : a === b;
+  return activeClients().filter(x => x.id !== c.id && !hvLinkOf(x)).map(x => {
+    const theirs = words(x.name);
+    if(!theirs.length) return null;
+    const k = typeof hvNamesAlike === 'function' ? hvNamesAlike(c.name, x.name) : 0;
+    if(k) return { c: x, s: k + 1 };
+    const shared = theirs.filter(w => mine.some(m => alike(m, w))).length;
+    return shared && shared / Math.max(theirs.length, mine.length) >= 0.6 ? { c: x, s: shared / Math.max(theirs.length, mine.length) } : null;
   }).filter(Boolean).sort((a, b) => b.s - a.s).slice(0, 2).map(x => x.c);
 }
 

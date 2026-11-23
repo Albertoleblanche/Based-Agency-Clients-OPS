@@ -147,10 +147,93 @@ function hvDefaultPick(clientId, projectId){
   const ts = pid ? hvProjectTasks(pid) : [];
   return { projectId: pid, taskId: ts.length ? ts[0].id : null };
 }
+// ---- Harvest knows this client under another name (Nov 23) ----------------------------------------
+// Radar links clients to Harvest by name, so "PE Developement" here and "PE Development" there weren't
+// linked, and the time stayed in Radar. Where time is logged, Radar now says which Harvest client it
+// probably is, and an approver links them right there.
+const HV_NAME_SKIP = new Set(['llc', 'inc', 'co', 'corp', 'ltd', 'the', 'and']);
+function hvNameWords(s){ return String(s || '').toLowerCase().replace(/&/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(w => w && !HV_NAME_SKIP.has(w)); }
+function hvEdits(a, b, max){
+  if(Math.abs(a.length - b.length) > max) return false;
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for(let j = 1; j <= b.length; j++) d[0][j] = j;
+  for(let i = 1; i <= a.length; i++) for(let j = 1; j <= b.length; j++){
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    if(i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+  }
+  return d[a.length][b.length] <= max;
+}
+// A word the same but for a typo: a letter off in words of 5 to 8 letters, two in longer ones.
+function hvWordAlike(a, b){ if(a === b) return true; const n = Math.min(a.length, b.length); return n >= 5 && hvEdits(a, b, n >= 9 ? 2 : 1); }
+// 2: the same name but for typos and endings ("PE Developement" / "PE Development LLC");
+// 1: one is the other with more words after ("Online Liquidation" / "Online Liquidation Auction"); 0: not alike.
+function hvNamesAlike(a, b){
+  const x = hvNameWords(a), y = hvNameWords(b);
+  if(!x.length || !y.length) return 0;
+  if(x.length === y.length) return x.every((w, i) => hvWordAlike(w, y[i])) ? 2 : 0;
+  const [sh, lo] = x.length < y.length ? [x, y] : [y, x];
+  return sh.join(' ').length >= 6 && sh.every((w, i) => hvWordAlike(w, lo[i])) ? 1 : 0;
+}
+// The Harvest client this Radar client probably is, when it isn't linked: { hc, rc, k }, where rc is the
+// Radar client that Harvest client is linked to now (a copy Radar added, or one linked by mistake),
+// or null. A Harvest client linked to a client with a name like its own is that client's, not this one's.
+function hvHarvestNameFor(clientId){
+  if(!hvTimeOn() || !clientId || hvClientProjects(clientId).linked) return null;
+  const c = clients.find(x => String(x.id) === String(clientId)); if(!c) return null;
+  let best = null;
+  (hvTime.clients || []).forEach(hc => {
+    if(hc.is_active === false) return;
+    const k = hvNamesAlike(hc.name, c.name); if(!k) return;
+    const rc = hc.radar_client_id ? clients.find(x => String(x.id) === String(hc.radar_client_id)) || null : null;
+    const live = rc && !rc.deletedAt ? rc : null;
+    if(live && !clientInSetup(live) && hvNamesAlike(hc.name, live.name)) return;
+    if(!best || k > best.k) best = { hc, rc: live, k };
+  });
+  return best;
+}
+function hvLinkConfirmWords(fix, c){
+  const h = `Harvest’s “${fix.hc.name}”`;
+  if(fix.rc && clientInSetup(fix.rc)) return `${c.name} gets ${h}: its projects, and the time already logged there. The copy Radar added for it goes.`;
+  if(fix.rc) return `${h} moves from ${fix.rc.name} to ${c.name}, with the time logged on its projects. ${fix.rc.name} stays in Radar, not linked to Harvest.`;
+  return `${c.name} gets ${h}: its projects, and the time already logged there.`;
+}
+async function hvLinkHarvest(harvestId, targetId){
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  const r = await fetch('/api/integrations', { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ provider: 'harvest', action: 'link-harvest', harvestId, targetId }) });
+  let body = {}; try{ body = await r.json(); }catch(e){}
+  if(!r.ok || body.error) throw new Error(body.error || 'Couldn’t link it.');
+  return body;
+}
+// Asks, links, and reloads what depends on it. Returns true when linked.
+async function hvLinkClientToHarvest(clientId){
+  const c = clients.find(x => String(x.id) === String(clientId)), fix = hvHarvestNameFor(clientId);
+  if(!c || !fix || !canApprove()) return false;
+  if(!(await confirmDialog(hvLinkConfirmWords(fix, c), { title: `Link ${c.name} to Harvest?`, confirmLabel: 'Link' }))) return false;
+  try{ await hvLinkHarvest(fix.hc.harvest_id, c.id); }catch(e){ showToast('error', 'Couldn’t link it', e.message); return false; }
+  if(typeof loadAll === 'function' && typeof mLoadAll !== 'function') await loadAll();
+  else if(typeof mLoadAll === 'function') await mLoadAll();
+  await hvTimeLoad();
+  if(typeof loadTimeEntries === 'function') await loadTimeEntries();
+  showToast('success', `${c.name} is linked to Harvest`, 'Time logged for it goes to Harvest now. Time logged before this: open it and pick its project and task.');
+  return true;
+}
+// The desktop sheets' Link (the rows redraw with the client's projects)
+async function hvLinkFromPick(prefix, clientId){
+  if(!(await hvLinkClientToHarvest(clientId))) return;
+  const wrap = document.getElementById(prefix + 'Pick');
+  if(wrap){ const d = hvDefaultPick(clientId); wrap.innerHTML = hvPickRowsHtml(prefix, clientId, d.projectId, d.taskId); }
+}
+
 // Why a client has nothing to pick, in words (null when it has projects for you).
 function hvNoPickWords(clientId){
   const { all, mine, linked } = hvClientProjects(clientId);
   if(mine.length) return null;
+  if(!linked){
+    const fix = hvHarvestNameFor(clientId), ask = canApprove() ? '' : ' An approver can link them.';
+    if(fix && fix.rc && !clientInSetup(fix.rc)) return `Harvest’s “${fix.hc.name}” is linked to ${fix.rc.name}, so this time stays in Radar.${ask}`;
+    if(fix) return `Harvest calls this client “${fix.hc.name}”, so this time stays in Radar until they’re linked.${ask}`;
+  }
   if(!linked || !all.length) return 'Not in Harvest, so this time stays in Radar.';
   if(hvTime.me == null) return 'You aren’t in Harvest yet, so this time stays in Radar.';
   return 'You aren’t on its projects in Harvest, so this time stays in Radar. An admin can add you there.';
@@ -166,7 +249,10 @@ function hvPickRowsHtml(prefix, clientId, projectId, taskId, service){
   }
   if(!clientId) return `<label>Project</label><div class="hvp-none t-3">Pick a client first</div>`;
   const none = hvNoPickWords(clientId);
-  if(none) return `<label>Project</label><div class="hvp-none t-2">${escapeHtml(none)}</div>`;
+  if(none){
+    const fix = canApprove() && hvHarvestNameFor(clientId);
+    return `<label>Project</label><div class="hvp-none t-2">${escapeHtml(none)}${fix ? `<button type="button" class="btn sm hvp-link" onclick="hvLinkFromPick('${prefix}', ${jsArg(clientId)})">${fix.rc && !clientInSetup(fix.rc) ? 'Link Here Instead…' : 'Link Them…'}</button>` : ''}</div>`;
+  }
   const { mine } = hvClientProjects(clientId);
   const pid = projectId && mine.some(p => Number(p.harvest_id) === Number(projectId)) ? Number(projectId) : null;
   const project = mine.length === 1

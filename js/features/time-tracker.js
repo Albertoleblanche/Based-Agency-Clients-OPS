@@ -34,6 +34,7 @@ async function loadTimeEntries(){
   timeEntries = (data||[]).map(e=>({ id:e.id, userId:e.user_id, clientId:e.client_id, date:e.entry_date, minutes:e.minutes, description:e.description||'', service:e.service||'', createdAt:e.created_at, logged:!!e.logged, harvestStatus:e.harvest_sync_status||'', harvestId:e.harvest_entry_id||null, harvestError:e.harvest_sync_error||'', harvestProjectId:e.harvest_project_id||null, harvestTaskId:e.harvest_task_id||null, source:e.source||'', harvestUserId:e.harvest_user_id||null, harvestLocked:!!e.harvest_locked, improvementId:e.improvement_id||null }));
   timeEntriesDataLoaded = true;
   if(typeof renderDashboard === 'function') renderDashboard();
+  hvResendStuck();
 }
 
 // Turns one time entry's description into a real improvement log — a
@@ -362,15 +363,49 @@ async function mergeOrInsertTimeEntry({ clientId, service, dateStr, minutes, des
 // toast here, since a background sync failing isn't something that
 // needs to interrupt someone mid-task — it's visible on the Timesheet
 // row and gets retried by the daily catch-up regardless.
-function syncEntryToHarvestBackground(entryId){
-  if(!entryId) return;
-  supabaseClient.auth.getSession().then(({ data: { session } })=>{
-    fetch('/api/integrations', {
+// Nov 23: it now listens for the answer. Radar didn't answer (offline, a hiccup): one more try a few
+// seconds later; still nothing, and the row says "Send to Harvest" (it used to sit at "pending" unseen
+// until the nightly retry). Harvest's own answer is saved on the row by the server either way.
+function syncEntryToHarvestBackground(entryId, tries){
+  if(!entryId) return Promise.resolve(null);
+  tries = tries || 0;
+  return supabaseClient.auth.getSession().then(({ data: { session } }) => {
+    if(!session) throw new Error('Not signed in.');
+    return fetch('/api/integrations', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ provider: 'harvest', action: 'sync-entry', timeEntryId: entryId }),
-    }).catch(()=>{}); // network failure here is fine — falls to the daily catch-up
+    });
+  }).then(async r => {
+    let body = {}; try{ body = await r.json(); }catch(e){}
+    if(!r.ok && r.status >= 500) throw new Error(body.error || `Radar answered ${r.status}`);
+    hvEntrySent(entryId, r.ok ? body : { status: 'failed', error: body.error || 'Couldn’t send it.' });
+    return body;
+  }).catch(e => {
+    if(tries < 1) return new Promise(res => setTimeout(res, 4000)).then(() => syncEntryToHarvestBackground(entryId, tries + 1));
+    hvEntrySent(entryId, { status: 'failed', error: e.message || 'Couldn’t reach Radar.' });
+    return null;
   });
+}
+// What the send came to, on the row now (the next load reads it from the database anyway).
+function hvEntrySent(entryId, r){
+  const e = (typeof timeEntries !== 'undefined' ? timeEntries : []).find(x => x.id === entryId); if(!e || !r) return;
+  if(r.status) e.harvestStatus = r.status;
+  if(r.harvestEntryId) e.harvestId = r.harvestEntryId;
+  e.harvestError = r.error || '';
+  if(r.status !== 'synced' && typeof renderTimesheet === 'function' && currentViewName === 'time') renderTimesheet();
+}
+// Your time that was never sent (a send that didn't finish): sent again once, a little after Radar
+// opens. Only entries with a project and task; only your own; the last month.
+let hvResent = false;
+function hvResendStuck(){
+  if(hvResent || typeof currentUser === 'undefined' || !currentUser) return;
+  hvResent = true;
+  const from = toDateStr(new Date(Date.now() - 31 * 864e5)), old = Date.now() - 3 * 60000;
+  const stuck = timeEntries.filter(e => e.userId === currentUser.id && e.harvestStatus === 'pending' && !e.harvestId && e.harvestProjectId && e.harvestTaskId
+    && e.date >= from && new Date(e.createdAt || 0).getTime() < old).slice(0, 8);
+  if(!stuck.length) return;
+  setTimeout(async () => { for(const e of stuck) await syncEntryToHarvestBackground(e.id); }, 3000);
 }
 
 async function stopAndSaveTimer(opts){

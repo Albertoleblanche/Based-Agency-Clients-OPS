@@ -11,7 +11,7 @@
 // GET  /api/integrations?provider=harvest  → Harvest status check
 // POST /api/integrations  body: { provider: 'google', action: 'sync' | 'disconnect' }
 // POST /api/integrations  body: { provider: 'harvest', action: 'connect' | 'disconnect'
-//        | 'sync-entry' | 'delete-entry' | 'sync-now' | 'sync-setup' | 'link-client' | 'link-clients'
+//        | 'sync-entry' | 'delete-entry' | 'sync-now' | 'sync-setup' | 'link-client' | 'link-clients' | 'link-harvest'
 //        | 'work-time' }
 //   work-time: { mode: 'trash' | 'restore' | 'forever', improvementIds } — the time logged with
 //   deleted (or restored) work moves with it, and Harvest is kept in step (see the handler).
@@ -25,11 +25,13 @@
 //   one Radar already has; the link and anything logged on it move to that client.
 //   link-clients (admins and approvers): { links: [{ clientId, targetId }] } — the same for several
 //   at once (Match Harvest Clients); one result each.
+//   link-harvest (admins and approvers): { harvestId, targetId } — from where time is logged: Harvest
+//   knows this Radar client under another name; its link moves here (moveHarvestLink).
 // POST /api/integrations  body: { provider: 'push', action: 'send',
 //        targetUserId, title, body, url }
 // GET  /api/integrations?provider=granola → Granola status (anyone on the team)
 // POST /api/integrations  body: { provider: 'granola', action: 'check' } (anyone on the team: Check Granola in
-//   Tasks, at most once a minute) | { action: 'connect' (key) | 'disconnect' | 'read-now' } (admins) — tasks from Granola meetings, lib/granola-tasks.js. The webhook Granola calls is
+//   Tasks, at most once a minute) | { action: 'connect' (key) | 'disconnect' | 'read-now' | 'read-again' (note) } (admins) — tasks from Granola meetings, lib/granola-tasks.js. The webhook Granola calls is
 //   /hooks/granola, in api/send-slack-message.js (it needs the raw body).
 //
 // Two more things live here, reached by rewrites in vercel.json, before the sign-in check:
@@ -47,13 +49,14 @@ const {
   syncHarvestSetup,
   syncHarvestTime,
   linkHarvestClient,
+  moveHarvestLink,
   validateHarvestCredentials,
   harvestFetch,
   syncTimeEntryToHarvest,
   deleteTimeEntryFromHarvest,
 } = require('../lib/harvest-sync');
 const { sendPushToUser } = require('../lib/push-notify');
-const { connectGranola, disconnectGranola, granolaStatus, granolaCatchUp, granolaReadNow } = require('../lib/granola-tasks');
+const { connectGranola, disconnectGranola, granolaStatus, granolaCatchUp, granolaReadNow, granolaReadAgain } = require('../lib/granola-tasks');
 const { handleMcp, protectedResourceMetadata } = require('../lib/mcp-server');
 
 module.exports = async function handler(req, res) {
@@ -114,6 +117,7 @@ module.exports = async function handler(req, res) {
       }
       if (action === 'disconnect') { res.status(200).json(await disconnectGranola(admin)); return; }
       if (action === 'read-now') { res.status(200).json(await granolaCatchUp(admin, { budgetMs: 45000, sinceDays: 7 })); return; }
+      if (action === 'read-again') { res.status(200).json(await granolaReadAgain(admin, (req.body || {}).note)); return; }
       res.status(400).json({ error: `Unknown action: ${action}` });
       return;
     }
@@ -282,6 +286,15 @@ module.exports = async function handler(req, res) {
       res.status(200).json({ results });
       return;
     }
+    // The time form's Link: Harvest knows this client under another name (lib/harvest-sync.js)
+    if (action === 'link-harvest') {
+      if (!isApprover) { res.status(403).json({ error: 'Only admins and approvers link clients.' }); return; }
+      const { harvestId, targetId } = req.body || {};
+      if (!harvestId || !targetId) { res.status(400).json({ error: 'Pick the clients to link.' }); return; }
+      const r = await moveHarvestLink(admin, Number(harvestId), String(targetId));
+      res.status(r.status || 200).json(r.error ? { error: r.error } : r);
+      return;
+    }
     if (action === 'link-client') {
       if (!isApprover) { res.status(403).json({ error: 'Only admins and approvers link clients.' }); return; }
       const { clientId, targetId } = req.body || {};
@@ -354,7 +367,10 @@ module.exports = async function handler(req, res) {
         res.status(200).json({ status: 'not_configured' });
         return;
       }
-      const result = await syncTimeEntryToHarvest(admin, connection, entry);
+      // whatever goes wrong, the entry says so (left "pending", it would wait for the nightly retry unseen)
+      let result;
+      try { result = await syncTimeEntryToHarvest(admin, connection, entry); }
+      catch (e) { result = { status: 'failed', error: e.message || 'Couldn’t reach Harvest.' }; }
       // a read from Harvest may have brought this entry in already, before its id was saved here
       if (result.harvestEntryId) await admin.from('time_entries').delete().eq('harvest_entry_id', result.harvestEntryId).eq('source', 'harvest').neq('id', timeEntryId);
       await admin.from('time_entries').update({

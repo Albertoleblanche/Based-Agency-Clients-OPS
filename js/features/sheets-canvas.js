@@ -699,9 +699,15 @@ async function checkGranolaNow(){
   const mine = (taskSuggestions || []).filter(s => !before.has(s.id)).length;
   if(r.error) return { type: 'error', title: 'Granola didn’t answer', text: r.error, mine };
   if(r.skipped === 'not connected'){ granolaSet(false); return { type: 'info', title: 'Granola isn’t connected', text: 'An admin connects it in Settings → Connections.', mine }; }
-  if(mine) return { type: 'success', title: `${mine} new task${mine === 1 ? '' : 's'} from your meetings`, text: 'Add the ones that are yours to do.', mine };
+  // meetings Granola is still writing, and ones there wasn't time for: they come in by themselves
+  const n = (k, one, many) => k === 1 ? one : many;
+  const later = [r.waiting ? `${r.waiting} ${n(r.waiting, 'meeting is', 'meetings are')} still being written in Granola; Radar reads ${n(r.waiting, 'it', 'them')} once ${n(r.waiting, 'it’s', 'they’re')} done.` : '',
+    r.left ? `${r.left} more to read: check again in a minute.` : ''].filter(Boolean).join(' ');
+  const plus = t => later ? `${t} ${later}` : t;
+  if(mine) return { type: 'success', title: `${mine} new task${mine === 1 ? '' : 's'} from your meetings`, text: plus('Add the ones that are yours to do.'), mine };
   if(r.recent) return { type: 'info', title: 'Granola was just checked', text: 'Nothing new for you. New meetings also come in by themselves.', mine };
-  if(r.read) return { type: 'info', title: `Read ${r.read} meeting${r.read === 1 ? '' : 's'}`, text: 'Nothing in them for you.', mine };
+  if(r.read) return { type: 'info', title: `Read ${r.read} meeting${r.read === 1 ? '' : 's'}`, text: plus('Nothing in them for you.'), mine };
+  if(later) return { type: 'info', title: 'Nothing new for you yet', text: later, mine };
   return { type: 'info', title: 'No new meetings', text: 'Radar reads meetings shared to Granola’s team space; private notes stay private.', mine };
 }
 

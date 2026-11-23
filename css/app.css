@@ -3164,6 +3164,13 @@ html.ui-w .tk-sg{border-radius:var(--uw-r-card);box-shadow:0 0 0 1px var(--sep),
 #granolaKey{flex:1 1 auto;min-width:0;font-family:var(--mono,ui-monospace,monospace);font-size:13px}
 .gr-err{color:var(--red)}
 .gr-acts{display:flex;gap:8px;margin-top:12px}
+.gr-mh{margin-top:22px}
+.gr-m .l b a{color:inherit;text-decoration:none}
+@media (hover:hover) and (pointer:fine){ .gr-m .l b a:hover{text-decoration:underline;text-underline-offset:2px;text-decoration-color:var(--label-3)} }
+.gr-m .btn.sm{flex:none}
+/* Not in Harvest, but Harvest has it under another name: the words, then Link (Nov 23) */
+.hvp-none:has(.hvp-link){display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.hvp-link{flex:none}
 #granolaBox .form-grp .l b svg{width:15px;height:15px;margin-right:6px;vertical-align:-2px;color:var(--green)}
 .ai-url{margin:0 0 14px}
 .ai-steps{display:grid;grid-template-columns:1fr 1fr;gap:16px}

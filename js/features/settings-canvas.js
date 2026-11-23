@@ -98,7 +98,7 @@ function renderSettingsView(){
   const keep = document.activeElement && document.activeElement.id;
   const draw = { general: setGeneral, updates: setUpdates, clients: setClients, connections: setConnections, notifications: setNotifications,
     harvest: typeof setHarvest === 'function' ? setHarvest : setConnections, whatsapp: typeof setWhatsapp === 'function' ? setWhatsapp : setConnections, ai: setAi }[settingsTab];
-  const head = sub ? `<div class="set-sub"><button class="set-back" onclick="switchSettingsTab('connections')">${icon('caret-left', { weight: 'bold' })}Connections</button><h2>${{ harvest: appLogo('harvest', 'xl'), whatsapp: appGlyph('message-circle', 'xl'), ai: appLogoPair('claude', 'chatgpt', 'xl') }[settingsTab] || ''}${sub[0]}</h2></div>` : '';
+  const head = sub ? `<div class="set-sub"><button class="set-back" onclick="switchSettingsTab('connections')">${icon('caret-left', { weight: 'bold' })}Connections</button><h2>${{ harvest: appLogo('harvest', 'xl'), whatsapp: appLogo('whatsapp', 'xl'), ai: appLogoPair('claude', 'chatgpt', 'xl') }[settingsTab] || ''}${sub[0]}</h2></div>` : '';
   // the new look: the sections as a menu in a card on the left, with icons and My Profile at the end
   const uw = typeof uiStyleOn === 'function' && uiStyleOn();
   const cur = tabs.find(t => t[0] === tab);
@@ -506,13 +506,13 @@ ${f('setSignatureAddress', 'address', 'Address', '')}
 // Logos that fill their square (Claude, Granola, Harvest) sit edge to edge; marks on white (ChatGPT,
 // Google, Slack) sit inset on a white tile, as on a home screen. Two apps in one row overlap.
 const APP_LOGOS = { claude: ['Claude', 'fill'], chatgpt: ['ChatGPT', 'mark'], granola: ['Granola', 'fill'],
-  google: ['Google', 'mark'], slack: ['Slack', 'mark'], harvest: ['Harvest', 'fill'] };
+  google: ['Google', 'mark'], slack: ['Slack', 'mark'], harvest: ['Harvest', 'fill'], whatsapp: ['WhatsApp', 'mark'] };
 function appLogo(app, size){
   const a = APP_LOGOS[app]; if(!a) return '';
   return `<span class="app-logo is-${a[1]} lg-${app}${size ? ' ' + size : ''}" aria-hidden="true"><img src="/icons/apps/${app}.png" alt="" width="96" height="96" decoding="async" draggable="false"></span>`;
 }
 function appLogoPair(a, b, size){ return `<span class="app-pair${size ? ' ' + size : ''}" aria-hidden="true">${appLogo(a)}${appLogo(b)}</span>`; }
-// An app without a logo of its own here (WhatsApp) gets its symbol on a plain tile the same size.
+// An app without a logo of its own here (a connected app Radar doesn't know) gets its symbol on a plain tile the same size.
 function appGlyph(name, size){ return `<span class="app-logo is-glyph${size ? ' ' + size : ''}" aria-hidden="true">${icon(name)}</span>`; }
 
 // ---- Connections: the apps Radar works with -----------------------------------------------------
@@ -543,7 +543,7 @@ function setConnections(){
     h && h.connected ? `Clients, projects, tasks and time${h.setup && h.setup.syncedAt && typeof hvWhen === 'function' ? ' · read ' + hvWhen(h.setup.syncedAt) : ''}` : 'Time logged the way Harvest is set up',
     h == null ? st('', 'Checking…') : h.connected ? st('green', 'Connected') : st('hollow', 'Not connected')));
   const wa = typeof waIntegrationRow === 'function' ? waIntegrationRow() : null;
-  if(wa) rows.push(go("switchSettingsTab('whatsapp')", appGlyph('message-circle'), 'WhatsApp', 'Reads client groups and lists what clients are waiting on', wa[3]));
+  if(wa) rows.push(go("switchSettingsTab('whatsapp')", appLogo('whatsapp'), 'WhatsApp', 'Reads client groups and lists what clients are waiting on', wa[3]));
   if(approver) rows.push(go("openIntegrationSheet('slack')", appLogo('slack'), 'Slack', 'Client channels, reminders and daily summaries',
     integ.slackUnlinked == null ? st('', 'Checking…') : integ.slackUnlinked ? st('yellow', `${integ.slackUnlinked} client${integ.slackUnlinked === 1 ? '' : 's'} not linked`) : st('green', 'Connected')));
   if(typeof granolaRowStatus === 'function') rows.push(go('openGranolaSheet()', appLogo('granola'), 'Granola', 'Action items from meetings, suggested as tasks', granolaRowStatus(st)));

@@ -1335,6 +1335,7 @@ function mLogPick(what){
   mLog_.inc = keepInc !== mLogIncDefault() ? keepInc : null;
   const back = () => { const t = mSheetVal('mLogText'), tm = mSheetVal('mLogTime'); $m('mSheet').querySelector('.sheet-scroll').innerHTML = mLogBody(); $m('mLogText').value = t; $m('mLogTime').value = tm; };
   mKeep('mLogText', mSheetVal('mLogText')); mKeep('mLogTime', mSheetVal('mLogTime'));
+  if(what === 'link'){ hvLinkClientToHarvest(mLog_.clientId).then(ok => { if(ok){ mHvClient(mLog_); back(); } }); return; }
   if(what === 'client') mPickClient(mLog_.clientId, v => { mLog_.clientId = v; const c = clients.find(x => x.id === v); if(c && c.service) mLog_.service = c.service; mHvClient(mLog_); back(); }, null, true);
   if(what === 'service') mPick('Service', [...new Set([mLog_.service, ...(settings.serviceOptions || [])].filter(Boolean))].map(s => [s, s]), mLog_.service, v => { mLog_.service = v; back(); });
   if(what === 'date') mDayPick('Date', mLog_.date, -13, 0, null, v => { mLog_.date = v; back(); });
@@ -1417,7 +1418,11 @@ function mHvRows(st, pickFn){
   if(!hvTimeOn()) return mRowPick('Service', mEsc(st.service || 'None'), `${pickFn}('service')`, !!st.service);
   if(!st.clientId) return '';
   const none = hvNoPickWords(st.clientId);
-  if(none) return `<div class="ir"><span class="ilab">Project</span><span class="t n" style="white-space:normal;text-align:right;color:var(--label-2);font-size:15px">${mEsc(none)}</span></div>`;
+  if(none){
+    const fix = canApprove() && hvHarvestNameFor(st.clientId);
+    return `<div class="ir"><span class="ilab">Project</span><span class="t n" style="white-space:normal;text-align:right;color:var(--label-2);font-size:15px">${mEsc(none)}</span></div>`
+      + (fix ? `<button class="ir mhv-link" onclick="${pickFn}('link')"><span class="t">${fix.rc && !clientInSetup(fix.rc) ? 'Link Here Instead…' : 'Link to Harvest…'}</span></button>` : '');
+  }
   const { mine } = hvClientProjects(st.clientId);
   const proj = mine.length === 1 ? `<div class="ir"><span class="ilab">Project</span><span class="t n" style="text-align:right">${mEsc(mine[0].name)}</span></div>`
     : mRowPick('Project', mEsc(hvProjectName(st.projectId) || 'Choose'), `${pickFn}('project')`, !!st.projectId);
@@ -1452,6 +1457,7 @@ function mOpenTimerSheet(){
 function mTimerPick(what){
   mKeep('mTimerDesc', mSheetVal('mTimerDesc'));
   const back = () => { const v = mSheetVal('mTimerDesc'); $m('mSheet').querySelector('.sheet-scroll').innerHTML = window.mTimerBody(); $m('mTimerDesc').value = v; };
+  if(what === 'link'){ hvLinkClientToHarvest(mLog_.clientId).then(ok => { if(ok){ mHvClient(mLog_); back(); } }); return; }
   if(what === 'client') mPickClient(mLog_.clientId, v => { mLog_.clientId = v; const c = clients.find(x => x.id === v); if(c && c.service) mLog_.service = c.service; mHvClient(mLog_); back(); }, null, true);
   else if(what === 'project' || what === 'task') mHvPick(mLog_, what, back);
   else mPick('Service', settings.serviceOptions.map(s => [s, s]), mLog_.service, v => { mLog_.service = v; back(); });
@@ -1482,6 +1488,7 @@ function mOpenTimeSheet(presetClientId){
 function mTimePick(what){
   mKeep('mTimeDur', mSheetVal('mTimeDur')); mKeep('mTimeDesc', mSheetVal('mTimeDesc'));
   const back = () => { $m('mSheet').querySelector('.sheet-scroll').innerHTML = window.mTimeBody(); mRestoreSheetState(); };
+  if(what === 'link'){ hvLinkClientToHarvest(mTime_.clientId).then(ok => { if(ok){ mHvClient(mTime_); back(); } }); return; }
   if(what === 'client') mPickClient(mTime_.clientId, v => { mTime_.clientId = v; const c = clients.find(x => x.id === v); if(c && c.service) mTime_.service = c.service; mHvClient(mTime_); back(); });
   if(what === 'project' || what === 'task') mHvPick(mTime_, what, back);
   if(what === 'service') mPick('Service', [...new Set([mTime_.service, ...(settings.serviceOptions || [])].filter(Boolean))].map(x => [x, x]), mTime_.service, v => { mTime_.service = v; back(); });

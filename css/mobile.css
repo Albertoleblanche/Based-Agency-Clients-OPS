@@ -387,3 +387,5 @@ body.mac.mobile { overflow: hidden; background: var(--ios-bg, #F2F2F7); -webkit-
 .app .mgr.is-busy svg { animation: mgrPulse 900ms ease-in-out infinite alternate; }
 @keyframes mgrPulse { from { opacity: 1; } to { opacity: .3; } }
 @media (prefers-reduced-motion: reduce) { .app .mgr.is-busy svg { animation: none; opacity: .4; } }
+/* Link to Harvest, under a client Harvest knows by another name (Nov 23) */
+.mhv-link .t{color:var(--blue,#0a84ff);font-weight:500}
