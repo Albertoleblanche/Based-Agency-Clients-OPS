@@ -880,11 +880,14 @@ async function saveTimeEntryEdit(id){
   const dateVal = document.getElementById('editEntryDate').value;
   const totalMinutes = parseDurationInput(document.getElementById('editEntryDuration').value);
   const description = document.getElementById('editEntryDesc').value.trim();
-  const asWork = typeof sheetIsOn === 'function' && sheetIsOn('editEntryWork');   // also log it as work, for Queue (Nov 23)
+  const asWork = typeof sheetIsOn === 'function' && sheetIsOn('editEntryWork');   // log it as work, the Queue's Email switch (Nov 23)
+  const e0 = timeEntries.find(x => x.id === id), st = e0 && typeof entryWorkState === 'function' ? entryWorkState(e0) : { w: null, on: false, lock: null };
+  const swShown = !!document.getElementById('editEntryWork');
+  const newWork = swShown && asWork && !st.w && !st.linked, emailFlip = swShown && st.w && !st.lock && asWork !== st.on;
   if(!totalMinutes || totalMinutes<=0){ showToast('error','Enter a duration','Try something like "1h 30m" or "1.5".'); return; }
-  if(asWork && !description){ showToast('error', 'Say what you worked on', 'The notes are what shows in Queue.'); document.getElementById('editEntryDesc')?.focus(); return; }
+  if(newWork && !description){ showToast('error', 'Say what you worked on', 'The notes are what shows in Queue.'); document.getElementById('editEntryDesc')?.focus(); return; }
   if(totalMinutes > 960 && !(await confirmDialog(`That's ${formatMinutes(totalMinutes)} for a single entry — did you mean minutes instead of hours?`, {confirmLabel:'Save it anyway', cancelLabel:'Let me fix it'}))) return;
-  if(asWork && !(await okToLogDuplicate(clientId, description))) return;   // logged already? (data.js)
+  if(newWork && !(await okToLogDuplicate(clientId, description))) return;   // logged already? (data.js)
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
   const { error } = await supabaseClient.from('time_entries').update({
@@ -892,8 +895,24 @@ async function saveTimeEntryEdit(id){
     ...(typeof hvTimeOn === 'function' && hvTimeOn() ? { harvest_project_id: pick.projectId || null, harvest_task_id: pick.taskId || null } : {})
   }).eq('id', id);
   // as work: the improvement, and the entry linked to it (as Add Time does)
-  let imp = null;
-  if(!error && asWork){
+  let imp = null, flipped = null;
+  // already logged: the switch is the Queue's Email switch, and the work's words follow the notes
+  if(!error && st.w && !st.lock){
+    const ch = {};
+    if(emailFlip) ch.include_in_email = asWork;
+    if(description && st.w.text === (e0.description || '').trim() && description !== st.w.text) ch.text = description;
+    if(Object.keys(ch).length){
+      const r = await supabaseClient.from('client_improvements').update(ch).eq('id', st.w.id).select();
+      if(!r.error && r.data && r.data.length){
+        if('include_in_email' in ch){ st.w.includeInEmail = ch.include_in_email; flipped = ch.include_in_email; }
+        if(ch.text) st.w.text = ch.text;
+        const c1 = clients.find(x => x.id === st.w.clientId), ci = c1 && (c1.improvements || []).find(i => i.id === st.w.id);
+        if(ci && ci !== st.w){ if('include_in_email' in ch) ci.includeInEmail = ch.include_in_email; if(ch.text) ci.text = ch.text; }
+        if(typeof quRefreshAll === 'function') quRefreshAll(st.w.clientId);
+      } else if('include_in_email' in ch) flipped = 'failed';
+    }
+  }
+  if(!error && newWork){
     const c0 = clients.find(x => x.id === clientId), today = toDateStr(new Date());
     imp = await insertImprovementFull(clientId, { author: myName() || 'Team member', text: description, includeInEmail: true, source: 'time',
       date: (dateVal === today ? new Date() : new Date(dateVal + 'T12:00:00')).toISOString(),
@@ -910,7 +929,10 @@ async function saveTimeEntryEdit(id){
   await loadTimeEntries();
   renderTimesheet(); renderReports();
   if(error){ showToast('error','Save failed', error.message); return; }
-  if(asWork && !imp) showToast('info', 'Saved, not logged as work', 'The time is saved, but it couldn’t be logged as work. Try again from the entry.');
+  if(newWork && !imp) showToast('info', 'Saved, not logged as work', 'The time is saved, but it couldn’t be logged as work. Try again from the entry.');
+  else if(flipped === 'failed') showToast('info', 'Saved, Queue not changed', 'The time is saved, but the client update didn’t change. Try again in a moment.');
+  else if(flipped === true) showToast('success', 'Saved, and in the client update', 'It’s back in Queue.');
+  else if(flipped === false) showToast('success', 'Saved, and left out of the update', 'It stays on the client’s page, out of Queue’s email.');
   else showToast('success', imp ? 'Saved and logged as work' : 'Entry updated', imp ? 'It’s in Queue for the client update.' : 'Changes saved.');
   syncEntryToHarvestBackground(id);
 }

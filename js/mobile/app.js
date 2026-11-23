@@ -1530,7 +1530,7 @@ function mOpenTimeSheet(presetClientId, preset){
 <div class="ir"><label class="ilab" for="mTimeDur">Time worked</label><input class="tm" id="mTimeDur" inputmode="decimal" placeholder="1:30" oninput="mKeep('mTimeDur',this.value)"></div></div>
 <p class="ifoot">${mHvBill(mTime_) ? mHvBill(mTime_) + '. ' : ''}1:30, 45m or 1.5 all work.</p>
 <div class="ig flat" style="margin-top:20px"><div class="ir" style="align-items:flex-start"><textarea class="iarea" id="mTimeDesc" placeholder="What did you work on?" style="min-height:72px" oninput="mKeep('mTimeDesc',this.value)"></textarea></div></div>
-<div class="ig flat" style="margin-top:20px"><div class="ir"><span class="ilab">Also Log It as Work</span><button class="ios-sw${mTime_.work ? ' on' : ''}" id="mTimeWork" role="switch" aria-checked="${!!mTime_.work}" aria-label="Also log it as work" onclick="mTime_.work=!mTime_.work;this.classList.toggle('on',mTime_.work);this.setAttribute('aria-checked',mTime_.work)"></button></div></div>
+<div class="ig flat" style="margin-top:20px"><div class="ir"><span class="ilab">Log It as Work</span><button class="ios-sw${mTime_.work ? ' on' : ''}" id="mTimeWork" role="switch" aria-checked="${!!mTime_.work}" aria-label="Log it as work" onclick="mTime_.work=!mTime_.work;this.classList.toggle('on',mTime_.work);this.setAttribute('aria-checked',mTime_.work)"></button></div></div>
 <p class="ifoot">What you worked on becomes an improvement in Queue, ready for the client update.</p>`;
   mOpenSheet('Add Time', window.mTimeBody(), { done: 'mSaveTime()', doneLabel: 'Add' });
   if(preset.minutes || preset.desc) mRestoreSheetState();   // a meeting's time, filled in (Nov 23)

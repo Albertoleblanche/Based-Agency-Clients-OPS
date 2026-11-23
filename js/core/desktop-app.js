@@ -56,17 +56,50 @@ function syncThemeColor(){
   if(bg) meta.setAttribute('content', bg);
 }
 
-// ---- Scrollbars that show while scrolling (as on macOS) --------------------
-// css/desktop-app.css hides scrollbar thumbs at rest; a scroller gets
-// .is-scrolling while it moves and for a moment after.
-const _scrollHideTimers = new WeakMap();
+// ---- Scrollbars that fade in and out (Nov 23) ------------------------------------------------
+// In the new look a scroller's scrollbar is hidden until the pointer is over it or it's scrolling,
+// then fades in, and fades out a moment after (css/widget-look.css). The fade animates the
+// scroller's --sb colour from wherever it is, so moving in and out quickly never jumps.
+const _sb = { over: new Set(), anim: new WeakMap(), idle: new WeakMap(), ovf: new WeakMap() };
+function sbOn(){ return document.documentElement.classList.contains('ui-w') && !matchMedia('(hover:none)').matches; }
+function sbScrolls(el){
+  if(!el || el.nodeType !== 1) return false;
+  let o = _sb.ovf.get(el);
+  if(o === undefined){ const cs = getComputedStyle(el); o = /(auto|scroll|overlay)/.test(cs.overflowY + ' ' + cs.overflowX) || el === document.documentElement; _sb.ovf.set(el, o); }
+  return o && (el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1);
+}
+function sbFade(el, show){
+  const cs = getComputedStyle(el), from = cs.getPropertyValue('--sb').trim() || 'rgba(0,0,0,0)';
+  const to = show ? (cs.getPropertyValue('--sb-on').trim() || 'rgba(128,128,128,.4)') : 'rgba(0,0,0,0)';
+  const prev = _sb.anim.get(el);
+  if(prev && prev._show === show) return;
+  if(!el.animate){ return; }
+  const a = el.animate([{ '--sb': from }, { '--sb': to }], { duration: show ? 160 : 420, easing: show ? 'cubic-bezier(.23,1,.32,1)' : 'ease-in-out', fill: 'forwards' });
+  a._show = show;
+  if(prev) prev.cancel();
+  if(!show) a.onfinish = () => { if(_sb.anim.get(el) === a){ a.cancel(); _sb.anim.delete(el); } };
+  _sb.anim.set(el, a);
+}
+function sbHideLater(el, ms){
+  clearTimeout(_sb.idle.get(el));
+  _sb.idle.set(el, setTimeout(() => { _sb.idle.delete(el); if(!_sb.over.has(el)) sbFade(el, false); }, ms));
+}
+document.addEventListener('pointerover', (e) => {
+  if(!sbOn() || e.pointerType === 'touch') return;
+  const now = new Set();
+  for(let el = e.target; el && el.nodeType === 1; el = el.parentElement) if(sbScrolls(el)) now.add(el);
+  now.forEach(el => { if(!_sb.over.has(el)){ clearTimeout(_sb.idle.get(el)); sbFade(el, true); } });
+  _sb.over.forEach(el => { if(!now.has(el) && !_sb.idle.has(el)) sbFade(el, false); });
+  _sb.over = now;
+}, { capture: true, passive: true });
+document.documentElement.addEventListener('pointerleave', () => { _sb.over.forEach(el => { if(!_sb.idle.has(el)) sbFade(el, false); }); _sb.over = new Set(); });
 document.addEventListener('scroll', (e) => {
+  if(!sbOn()) return;
   const el = e.target === document ? document.documentElement : e.target;
-  if(!el || !el.classList) return;
-  el.classList.add('is-scrolling');
-  clearTimeout(_scrollHideTimers.get(el));
-  _scrollHideTimers.set(el, setTimeout(() => el.classList.remove('is-scrolling'), 900));
-}, { capture:true, passive:true });
+  if(!el || el.nodeType !== 1) return;
+  sbFade(el, true);
+  sbHideLater(el, 900);
+}, { capture: true, passive: true });
 
 // ---- Right-click menus -------------------------------------------------------
 // Right-clicking a card or row opens that item's own ⋯ menu at the pointer,

@@ -30,7 +30,7 @@ async function main(){
       if(args.has('--link-only')){ console.log('Linked. You can close this (Ctrl+C) and start it normally with: npm start'); }
     },
     onLogout: async () => {
-      await alertAdmins('⚠️ *Radar WhatsApp connector was logged out.* New client messages are NOT being read. Open the connector on the office PC, delete the `auth` folder and scan the QR code again.');
+      await alertAdmins('*The Radar WhatsApp connector was logged out.* New client messages are not being read. Open the connector on the office PC, delete the `auth` folder and scan the QR code again.');
     },
   });
   if(args.has('--link-only')) return;

@@ -307,10 +307,37 @@ ${hvPickBlockHtml('manual', cid, d.projectId, d.taskId)}
 <label for="manualDate">Date</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sheetDateField('manualDate', day, { past: true, from: -30, to: 0, max: today })}</div>
 <label for="manualDuration">Time</label><input id="manualDuration" class="tf" style="width:110px" placeholder="1:30" autocomplete="off"${presetMinutes ? ` value="${hmm(presetMinutes)}"` : ''}>
 <label class="top" for="manualDesc">Notes</label><textarea id="manualDesc" class="tf" spellcheck="true" placeholder="What did you work on?">${typeof presetNotes === 'string' ? escapeHtml(presetNotes) : ''}</textarea>
-<span></span><div class="mw-row">${sheetSw('manualWork', false, 'Also log it as work')}<div><b>Also log it as work</b><span>The notes become an improvement in Queue, ready for the client update.</span></div></div>
+<span></span><div class="mw-row">${sheetSw('manualWork', false, 'Log it as work')}<div><b>Log it as work</b><span>The notes become an improvement in Queue, ready for the client update.</span></div></div>
 </div>
 <div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="addManualEntry()">Add Time</button></div>`, 520);
 }
+// Edit Time's "Log it as work" is the same switch as the Queue's Email switch (Nov 23): on when the
+// time is logged as work and in the client update, off when it isn't (or the Queue left it out of the
+// email). Turning it on logs the notes as work, or puts work already logged back in the update;
+// turning it off leaves it out of the update, as the Queue does (it stays on the client's page).
+// Work in an update in review or approved is locked, so the row only says where it is.
+function entryWorkState(e){
+  const w = e.improvementId ? (typeof clientImprovements !== 'undefined' ? clientImprovements : []).find(i => i.id === e.improvementId) : null;
+  if(!w) return { w: null, on: false, linked: !!(e.logged || e.improvementId), lock: null };
+  return { w, on: w.includeInEmail !== false, linked: true, lock: typeof workLockedBy === 'function' ? workLockedBy(w) : null };
+}
+function entryWorkHint(st){
+  return st.on ? 'In Queue for the client update. Off leaves it out of the update; it stays on the client’s page.'
+    : st.w ? 'Logged as work, but left out of the client update. On puts it back in Queue.'
+    : 'The notes become an improvement in Queue, ready for the client update.';
+}
+function entryWorkRowHtml(e, mine){
+  const st = entryWorkState(e);
+  if(st.lock) return `<span></span><div class="mw-row is-done">${icon('check-circle')}<div><b>Logged as work</b><span>${escapeHtml(workLockedWords(st.lock))}</span></div></div>`;
+  if(st.linked && !st.w) return `<span></span><div class="mw-row is-done">${icon('check-circle')}<div><b>Logged as work</b><span>It’s an improvement for the client, on the client’s page.</span></div></div>`;
+  if(!mine) return st.w ? `<span></span><div class="mw-row is-done">${icon('check-circle')}<div><b>Logged as work</b><span>${st.on ? 'In Queue for the client update.' : 'Left out of the client update.'}</span></div></div>` : '';
+  return `<span></span><div class="mw-row">${sheetSw('editEntryWork', st.on, 'Log it as work', `entryWorkHintNow(this,'${e.id}')`)}<div><b>Log it as work</b><span id="editEntryWorkHint">${entryWorkHint(st)}</span></div></div>`;
+}
+function entryWorkHintNow(sw, id){
+  const h = document.getElementById('editEntryWorkHint'), e = timeEntries.find(x => x.id === id); if(!h) return;
+  h.textContent = entryWorkHint({ on: sw.classList.contains('on'), w: e ? entryWorkState(e).w : null });
+}
+
 function openTimeEntryModal(id){
   const e = timeEntries.find(x => x.id === id);
   if(!e) return;
@@ -332,8 +359,7 @@ ${hvPickBlockHtml('editEntry', e.clientId, e.harvestProjectId || hvDefaultPick(e
 <label for="editEntryDate">Date</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sheetDateField('editEntryDate', e.date, { past: true, from: -30, to: 0 })}</div>
 <label for="editEntryDuration">Time</label><input id="editEntryDuration" class="tf" style="width:110px" value="${hmm(e.minutes)}" autocomplete="off">
 <label class="top" for="editEntryDesc">Notes</label><textarea id="editEntryDesc" class="tf" spellcheck="true">${escapeHtml(e.description || '')}</textarea>
-${e.logged || e.improvementId ? `<span></span><div class="mw-row is-done">${icon('check-circle')}<div><b>Logged as work</b><span>It’s an improvement for the client, in Queue and on the client’s page.</span></div></div>`
-  : mine ? `<span></span><div class="mw-row">${sheetSw('editEntryWork', false, 'Also log it as work')}<div><b>Also log it as work</b><span>The notes become an improvement in Queue, ready for the client update.</span></div></div>` : ''}
+${entryWorkRowHtml(e, mine)}
 </div>
 <div class="sheet-a">${mine ? `<button class="btn danger" style="margin-right:auto" onclick="closeAppModal();deleteTimeEntry('${id}')">Delete</button>` : ''}<button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="saveTimeEntryEdit('${id}')">Save</button></div>`, 520);
 }

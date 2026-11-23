@@ -61,12 +61,65 @@ function uwHealthCard(m){
   const go = "switchView('health')";
   if(!m.tot) return `<section class="uw-w uw-s3 uw-hc">${uwHead('health', dbNavIcon('health'), 'Health', `<span class="uw-sp">${uwPill('Details', go)}</span>`)}${uwNone('No clients to watch yet.')}</section>`;
   const pct = Math.round(m.g / m.tot * 100);
-  const cells = [].concat(Array(m.g).fill('g'), Array(m.y).fill('am'), Array(m.r).fill('r'));
-  const dash = cells.map(c => `<i class="${c}"></i>`).join('');
+  const cells = [].concat(Array(m.g).fill('g'), Array(m.y).fill('y'), Array(m.r).fill('r'));
+  const dash = `<canvas aria-hidden="true"></canvas>`;   // drawn by uwDashFit, in whole screen pixels
   return `<section class="uw-w uw-s3 uw-hc" aria-label="Health">${uwHead('health', dbNavIcon('health'), 'Health', `<span class="uw-sp">${uwPill('Details', go)}</span>`)}
 <div class="uw-hb"><div class="uw-big">${pct}<small>%</small></div><div class="uw-bigsub">healthy, ${m.g} of ${m.tot}${typeof canApprove === 'function' && !canApprove() ? ' of your clients' : ' clients'}</div></div>
-<div class="uw-dash${cells.length > 28 ? ' is-many' : ''}" role="img" aria-label="At risk ${m.r}, To watch ${m.y}, Healthy ${m.g}">${dash}</div>
+<div class="uw-dash${cells.length > 28 ? ' is-many' : ''}" data-c="${cells.join('')}" role="img" aria-label="At risk ${m.r}, To watch ${m.y}, Healthy ${m.g}">${dash}</div>
 <div class="uw-lg"><div><b>${m.r}</b><span><i class="r"></i>At risk</span></div><div><b>${m.y}</b><span><i class="am"></i>To watch</span></div><div><b>${m.g}</b><span><i class="g"></i>Healthy</span></div></div></section>`;
+}
+
+// The bar per client (Nov 23), drawn on a canvas in whole screen pixels: every line exactly as wide
+// as the others and on a pixel of its own, at 100%, 125% or 150% (Windows laptops), about half of each
+// line's share of the width, never thinner than 2 pixels or wider than 8px. Gaps differ by at most a
+// pixel, so the bar still spans the card. Drawn again when the card changes size or the theme changes.
+let uwDashRO = null, uwDashMO = null;
+function uwDashFit(root){
+  (root || document).querySelectorAll('.uw-dash').forEach(el => {
+    if(typeof ResizeObserver === 'function'){
+      uwDashRO = uwDashRO || new ResizeObserver(es => es.forEach(x => {
+        const d = x.devicePixelContentBoxSize && x.devicePixelContentBoxSize[0];
+        uwDashDraw(x.target.closest('.uw-dash'), d ? d.inlineSize : 0, d ? d.blockSize : 0);
+      }));
+      const cv = el.querySelector('canvas');
+      try { uwDashRO.observe(cv, { box: 'device-pixel-content-box' }); } catch(e){ uwDashRO.observe(cv); }
+    }
+    uwDashDraw(el);
+  });
+  const mac = document.querySelector('.mac');
+  if(mac && !uwDashMO && typeof MutationObserver === 'function'){
+    uwDashMO = new MutationObserver(() => document.querySelectorAll('.uw-dash').forEach(d => uwDashDraw(d)));
+    uwDashMO.observe(mac, { attributes: true, attributeFilter: ['data-theme'] });
+  }
+}
+function uwDashDraw(el, wDev, hDev){
+  const cv = el && el.querySelector('canvas'), cells = el ? String(el.dataset.c || '').split('') : [];
+  if(!cv || !cells.length) return;
+  const dpr = window.devicePixelRatio || 1, r = cv.getBoundingClientRect(), n = cells.length;
+  // the observer's exact screen-pixel size when it agrees with the layout (it can lag a zoom change)
+  const ew = Math.round(r.width * dpr), eh = Math.round(r.height * dpr);
+  const W = wDev && Math.abs(wDev - ew) <= 1 ? wDev : ew, H = hDev && Math.abs(hDev - eh) <= 1 ? hDev : eh;
+  if(!W || !H) return;
+  if(cv.width !== W) cv.width = W;
+  if(cv.height !== H) cv.height = H;
+  const pitch = W / n;
+  let k = Math.round(pitch * .55);
+  k = Math.max(Math.min(2, Math.floor(pitch)), Math.min(k, Math.round(8 * dpr), Math.floor(pitch) - 1));
+  if(k < 1) k = 1;
+  const room = W - n * k, g = n > 1 ? Math.floor(room / (n - 1)) : 0, extra = n > 1 ? room - g * (n - 1) : 0;
+  const cs = getComputedStyle(el), col = { g: cs.getPropertyValue('--uw-good'), y: cs.getPropertyValue('--uw-watch'), r: cs.getPropertyValue('--uw-risk') };
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  let x = n > 1 ? 0 : Math.floor((W - k) / 2);
+  cells.forEach((c, i) => {
+    ctx.fillStyle = (col[c] || '').trim() || '#888';
+    ctx.beginPath();
+    if(ctx.roundRect) ctx.roundRect(x, 0, k, H, k / 2); else ctx.rect(x, 0, k, H);
+    ctx.fill();
+    // the leftover pixels go one to a gap, spread along the bar
+    x += k + g + (Math.floor((i + 1) * extra / (n - 1)) - Math.floor(i * extra / (n - 1)));
+  });
+  el.dataset.k = k;   // the line width in screen pixels (tests read it)
 }
 
 // ---- the two small cards: WhatsApp over Reminders (Notes when WhatsApp is off) ----
@@ -215,6 +268,7 @@ ${uwCareCard(m, 3)}<div class="uw-stk uw-s4">${uwTasksCard(3)}${uwHoursCard()}</
   }
   root.innerHTML = html;
   uwFitTasksHours(root);
+  uwDashFit(root);
   if(typeof rcMount === 'function' && root.querySelector('.rc-plot[data-rc="uwh"]')) rcMount('uwh');
   if(currentViewName === 'overview' && typeof renderGreeting === 'function') renderGreeting();
 }

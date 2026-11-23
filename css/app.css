@@ -2744,7 +2744,7 @@ a.mi{text-decoration:none;color:inherit}
 .wd-b{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;margin:0 -6px;padding:0 6px 4px;overscroll-behavior:contain;opacity:1;visibility:visible;transition:opacity 240ms ease 160ms,visibility 0s linear 0s;
   scrollbar-width:thin;scrollbar-color:transparent transparent}
 /* the scrollbar shows only while you point at the day's rows */
-.wd-b:hover{scrollbar-color:rgba(128,128,128,.45) transparent}
+html:not(.ui-w) .wd-b:hover{scrollbar-color:rgba(128,128,128,.45) transparent}   /* the new look fades it (desktop-app.js) */
 .wd-b::-webkit-scrollbar{width:8px}
 .wd-b::-webkit-scrollbar-track{background:transparent}
 .wd-b::-webkit-scrollbar-thumb{background:transparent;border-radius:4px}
@@ -2902,7 +2902,7 @@ a.mi{text-decoration:none;color:inherit}
    while the pointer is over it, like a Mac's overlay scroll bars, and scrolling stops at its ends
    instead of running on into the panel. */
 .wap-chat{position:relative;max-height:340px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:transparent transparent;outline:none}
-.wap-chat:hover,.wap-chat:focus-visible{scrollbar-color:var(--label-3) transparent}
+html:not(.ui-w) :is(.wap-chat:hover,.wap-chat:focus-visible){scrollbar-color:var(--label-3) transparent}
 .wap-chat:focus-visible{box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--blue) 45%,transparent)}
 @media (hover:none){ .wap-chat{scrollbar-color:auto} }
 

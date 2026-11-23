@@ -4,9 +4,9 @@ import { ROLES, matchProfile } from './roles.js';
 import { analyzeGroup } from './extract.js';
 import { slackDM } from './slack.js';
 
-const ICON = { request: '🛠', question: '❓', promise: '🤝', issue: '🚨' };
+const KIND = { request: 'Request', question: 'Question', promise: 'Promise', issue: 'Issue' };   // words, no emojis (Nov 23)
 const ago = (iso) => { const d = Math.floor((Date.now() - new Date(iso)) / 86400000); return d <= 0 ? 'today' : d === 1 ? '1d' : `${d}d`; };
-const line = (t) => `${ICON[t.kind] || '•'} ${t.priority === 'high' ? '*[HIGH]* ' : ''}*${t.client}* — ${t.title} _(${ago(t.first_seen)})_`;
+const line = (t) => `• ${t.priority === 'high' ? '*High priority:* ' : ''}*${t.client}*: ${t.title} _(${[KIND[t.kind], ago(t.first_seen)].filter(Boolean).join(', ')})_`;
 
 // notify: false for Check Now from Radar — it reads the groups and updates the list, but sends no
 // Slack messages (those go at the set times).
@@ -46,7 +46,7 @@ export async function runDigest({ dry = false, notify = true } = {}){
   const fullView = (key, heading) => {
     const sections = [...ROLES].sort((a, b) => (b.key === key) - (a.key === key)).map(r => ({ r, items: byOwner(r.key) })).filter(s => s.items.length)
       .map(s => `*${s.r.name}* (${s.items.length})\n${s.items.slice(0, 12).map(line).join('\n')}`);
-    return `*${heading}, ${label}*\n${open.length} open · +${created} new · ${resolved} answered since last check\n\n${sections.join('\n\n') || '_Nothing open. 🎉_'}${link}`;
+    return `*${heading}, ${label}*\n${open.length} open · +${created} new · ${resolved} answered since last check\n\n${sections.join('\n\n') || '_Nothing open._'}${link}`;
   };
   const testers = config.pilotIds;
 
@@ -69,7 +69,7 @@ export async function runDigest({ dry = false, notify = true } = {}){
     if(muted(p)) continue;
     const mine = byOwner(role.key);
     if(!mine.length) continue;
-    const text = `*WhatsApp client items for you — ${label}* (${mine.length} open)\n${mine.slice(0, 25).map(line).join('\n')}${mine.length > 25 ? `\n…and ${mine.length - 25} more` : ''}${link}`;
+    const text = `*WhatsApp client items for you, ${label}* (${mine.length} open)\n${mine.slice(0, 25).map(line).join('\n')}${mine.length > 25 ? `\n…and ${mine.length - 25} more` : ''}${link}`;
     if(dry) console.log(`\n[dry] DM → ${role.name}\n${text}`); else if(await slackDM(p.slack_user_id, text)) sent++;
   }
 
@@ -77,7 +77,7 @@ export async function runDigest({ dry = false, notify = true } = {}){
   if(notify && testers && !testers.length) for(const key of config.adminKeys){
     const role = ROLES.find(r => r.key === key); const p = role && matchProfile(role, profiles);
     if(!p?.slack_user_id || muted(p)) continue;
-    const text = fullView(key, 'WhatsApp client items — full team view');
+    const text = fullView(key, 'WhatsApp client items, the full team view');
     if(dry) console.log(`\n[dry] FULL VIEW → ${role.name}\n${text}`); else if(await slackDM(p.slack_user_id, text)) sent++;
   }
 

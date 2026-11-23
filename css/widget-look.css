@@ -193,12 +193,13 @@ html.ui-w .uw-nx:active{opacity:.6}
 html.ui-w .uw-hb{margin-top:24px}
 html.ui-w .uw-hc .uw-big{font-size:60px}
 html.ui-w .uw-hc .uw-big small{font-size:24px;margin-left:4px}
-html.ui-w .uw-dash{display:flex;justify-content:space-between;gap:4px;margin-top:auto;padding-top:18px}
-html.ui-w .uw-dash i{flex:1;max-width:8px;height:30px;border-radius:99px}
-html.ui-w .uw-dash.is-many i{max-width:5px;height:24px}
-html.ui-w :is(.uw-dash,.uw-lg) .g{background:var(--uw-good)}
-html.ui-w :is(.uw-dash,.uw-lg) .am{background:var(--uw-watch)}
-html.ui-w :is(.uw-dash,.uw-lg) .r{background:var(--uw-risk)}
+html.ui-w .uw-dash{display:block;margin-top:auto;padding-top:18px}
+/* the lines are drawn by uwDashFit (dashboard-widgets.js), in whole screen pixels */
+html.ui-w .uw-dash canvas{display:block;width:100%;height:30px}
+html.ui-w .uw-dash.is-many canvas{height:26px}
+html.ui-w .uw-lg .g{background:var(--uw-good)}
+html.ui-w .uw-lg .am{background:var(--uw-watch)}
+html.ui-w .uw-lg .r{background:var(--uw-risk)}
 html.ui-w .uw-lg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--sep)}
 html.ui-w .uw-lg div{display:flex;flex-direction:column;gap:4px}
 html.ui-w .uw-lg b{font-size:22px;font-weight:400;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
@@ -1011,10 +1012,16 @@ html.ui-w .mac .stm{background:var(--uw-c2);box-shadow:none}
 html.ui-w .ic-classic{display:none}
 html.ui-w .ic-uw{display:block}
 
-/* ---- scrollbars: hidden until you're over what scrolls ---- */
-html.ui-w,html.ui-w *{scrollbar-width:thin;scrollbar-color:transparent transparent}
-html.ui-w :hover{scrollbar-color:var(--sep-strong) transparent}
-html.ui-w .mac[data-theme="light"] :hover{scrollbar-color:rgba(0,0,0,.18) transparent}
+/* ---- scrollbars: hidden until you're over what scrolls, or scrolling it; they fade in and out
+   (Nov 23). Each scroller's --sb is animated by js/core/desktop-app.js (sbFade); --sb-on is the
+   colour it fades to. On a touch screen the system's own scrollbars. ---- */
+@property --sb{syntax:'<color>';inherits:false;initial-value:rgba(0,0,0,0)}
+html.ui-w{--sb-on:rgba(128,128,128,.4)}
+html.ui-w .mac[data-theme="dark"]{--sb-on:var(--sep-strong)}
+html.ui-w .mac[data-theme="light"]{--sb-on:rgba(0,0,0,.18)}
+html.ui-w,html.ui-w *{scrollbar-width:thin;scrollbar-color:var(--sb) transparent}
+@media (hover:none){html.ui-w,html.ui-w *{scrollbar-color:auto}}
+@media (prefers-contrast:more){html.ui-w,html.ui-w *{scrollbar-color:var(--label-3) transparent}}
 
 /* ---- the client page as on the canvas (ClientPage): a head, then a grid of cards ---- */
 html.ui-w #cdRoot.is-uw{padding:6px 26px 26px var(--uw-gl);container-type:inline-size}
