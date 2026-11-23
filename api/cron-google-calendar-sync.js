@@ -14,6 +14,8 @@
 const { createClient } = require('@supabase/supabase-js');
 const { syncGoogleCalendarForUser } = require('../lib/google-calendar-sync');
 const { syncTimeEntryToHarvest, syncHarvestSetup, syncHarvestTime } = require('../lib/harvest-sync');
+// Granola meetings a webhook missed (Granola down, Radar down): read with whatever time is left.
+const { granolaCatchUp } = require('../lib/granola-tasks');
 const { sendPushToUser, pushUrlFor } = require('../lib/push-notify');
 const { sendSlackDM } = require('../lib/slack-notify');
 const { isTeamWeekend } = require('../lib/workdays');
@@ -157,6 +159,7 @@ async function syncHarvestCatchUp(admin) {
 }
 
 module.exports = async function handler(req, res) {
+  const started = Date.now();
   const authHeader = req.headers['authorization'] || '';
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     res.status(401).json({ error: 'Unauthorized' });
@@ -208,6 +211,13 @@ module.exports = async function handler(req, res) {
     const { data: connection } = await admin.from('harvest_connection').select('*').eq('id', 1).maybeSingle();
     result.harvestTime = !connection ? { skipped: 'not-connected' } : await syncHarvestTime(admin, connection, { full: true });
   } catch (e) { result.harvestTime = { error: String(e) }; }
+
+  // Granola: action items from meetings, as suggestions (lib/granola-tasks.js). Most arrive by
+  // webhook within minutes; this reads what didn't, in the time this run has left.
+  try {
+    const budgetMs = 52000 - (Date.now() - started);
+    result.granola = budgetMs > 4000 ? await granolaCatchUp(admin, { budgetMs }) : { skipped: 'no time left' };
+  } catch (e) { result.granola = { error: String(e) }; }
 
   res.status(200).json(result);
 };

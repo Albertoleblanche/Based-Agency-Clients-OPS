@@ -603,6 +603,53 @@ function ntReadForm(){
     dueTime: dueDate ? (g('taskTimeInput')?.value || '') : '', clientId: g('taskClientSelect').value || null, link: url ? normalizeUrl(url.replace(/[).,;]+$/, '')) : null,
     color: pickedItemColor('ntColor') };
 }
+// ---- Tasks suggested from meetings (Nov 23) -------------------------------------------------------
+// Granola's meeting notes go through the AI on the server (lib/granola-tasks.js); each action item
+// for someone on the team waits in task_suggestions until that person adds it (it becomes their own
+// task, from them, with the meeting linked) or dismisses it. Shared by the desktop and the iPhone.
+let taskSuggestions = null, taskSuggestionsAt = 0;   // my pending ones; null until loaded
+function suggestionFromDb(r){
+  return { id: r.id, title: r.title, description: r.description || '', clientId: r.client_id || '', dueDate: r.due_date || '', priority: r.priority || 'medium',
+    sourceTitle: r.source_title || 'a meeting', sourceUrl: r.source_url || '', sourceAt: r.source_at || r.created_at, quote: r.quote || '' };
+}
+async function loadTaskSuggestions(){
+  if(typeof currentUser === 'undefined' || !currentUser) return [];
+  taskSuggestionsAt = Date.now();
+  const { data, error } = await supabaseClient.from('task_suggestions').select('*').eq('assignee_id', currentUser.id).eq('status', 'pending')
+    .order('source_at', { ascending: false }).limit(60);
+  taskSuggestions = error ? [] : (data || []).map(suggestionFromDb);   // no table yet (addendum-granola.sql): none
+  return taskSuggestions;
+}
+// "Oakridge weekly · Mon, Nov 23 · Oakridge Flooring · due Fri, Nov 27"
+function suggestionSub(s){
+  const c = s.clientId ? clients.find(x => x.id === s.clientId) : null, when = s.sourceAt ? new Date(s.sourceAt) : null;
+  const due = s.dueDate ? new Date(s.dueDate + 'T12:00:00') : null;
+  return [s.sourceTitle, when ? `${fmtDay(when)}, ${fmtShortDate(when)}` : '', c ? c.name : '', due ? `due ${fmtDay(due)}, ${fmtShortDate(due)}` : ''].filter(Boolean);
+}
+function suggestionNotes(s){
+  const when = s.sourceAt ? new Date(s.sourceAt) : null;
+  return [s.description, `From the meeting “${s.sourceTitle}”${when ? `, ${fmtShortDate(when)}` : ''}${s.sourceUrl ? `: ${s.sourceUrl}` : ''}`].filter(Boolean).join('\n\n');
+}
+async function decideSuggestion(id, status, taskId){
+  const { error } = await supabaseClient.from('task_suggestions').update({ status, task_id: taskId || null, decided_at: status === 'pending' ? null : new Date().toISOString() }).eq('id', id);
+  if(!error && taskSuggestions) taskSuggestions = status === 'pending' ? taskSuggestions : taskSuggestions.filter(x => x.id !== id);
+  return !error;
+}
+// Add as it is: the task is yours, from you, with the meeting's notes as its link.
+async function addSuggestedTask(id){
+  const s = (taskSuggestions || []).find(x => x.id === id); if(!s) return { error: { message: 'Already decided.' } };
+  const res = await insertTaskRow({ title: s.title, description: suggestionNotes(s), priority: s.priority || 'medium', status: 'todo', assigner_id: currentUser.id, assignee_id: currentUser.id,
+    due_date: s.dueDate || null, client_id: s.clientId || null, link: s.sourceUrl || null });
+  if(res.error || !res.data) return { error: res.error || { message: 'Not saved' } };
+  await decideSuggestion(id, 'added', res.data.id);
+  return { task: res.data };
+}
+// The New Task sheet's preset for "Edit…": change anything, and saving adds it.
+function suggestionPreset(s){
+  return { title: s.title, description: suggestionNotes(s), clientId: s.clientId || '', due: s.dueDate || '', priority: s.priority || 'medium', link: s.sourceUrl || '',
+    afterCreate: task => decideSuggestion(s.id, 'added', task && task.id) };
+}
+
 async function insertTaskRow(row){
   let res = await supabaseClient.from('tasks').insert(row).select().single();
   if(res.error && isMissingColumnError(res.error) && ('color' in row || 'sprint_id' in row)){

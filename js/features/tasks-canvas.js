@@ -110,7 +110,8 @@ function renderTasks(){
   const sel = window._taskSel && tasks.find(t => t.id === window._taskSel);
   if(window._taskSel && !sel) window._taskSel = null;
   const prev = root.querySelector('.sp-page')?.scrollTop || 0, prevSp = root.querySelector('.sp:not(.sp-leaving)')?.scrollTop || 0, cmt = document.getElementById('tkpCmt')?.value || '';
-  root.innerHTML = `<div class="spw"><div class="sp-page"><div class="tk">${head}${body}</div></div>${sel ? taskPanelHtml(sel) : ''}</div>`;
+  const sg = typeof tkSuggestHtml === 'function' ? tkSuggestHtml() : '';   // tasks from meetings (granola.js)
+  root.innerHTML = `<div class="spw"><div class="sp-page"><div class="tk">${head}${sg}${body}</div></div>${sel ? taskPanelHtml(sel) : ''}</div>`;
   const sp = root.querySelector('.sp-page'); if(sp) sp.scrollTop = prev;
   const pn = root.querySelector('.sp:not(.sp-leaving)'); if(pn){ pn.scrollTop = prevSp; pn._st = prevSp; }
   const ci = document.getElementById('tkpCmt'); if(ci && cmt) ci.value = cmt;

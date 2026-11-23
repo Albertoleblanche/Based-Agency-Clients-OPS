@@ -27,6 +27,15 @@
 //   at once (Match Harvest Clients); one result each.
 // POST /api/integrations  body: { provider: 'push', action: 'send',
 //        targetUserId, title, body, url }
+// GET  /api/integrations?provider=granola → Granola status (anyone on the team)
+// POST /api/integrations  body: { provider: 'granola', action: 'connect' (key) | 'disconnect' | 'read-now' }
+//   (admins) — tasks from Granola meetings, lib/granola-tasks.js. The webhook Granola calls is
+//   /hooks/granola, in api/send-slack-message.js (it needs the raw body).
+//
+// Two more things live here, reached by rewrites in vercel.json, before the sign-in check:
+//   /mcp → ?route=mcp: Radar's MCP server for ChatGPT and Claude (lib/mcp-server.js). They sign in
+//     with Supabase's OAuth server and send that token; the server checks it itself.
+//   /.well-known/oauth-protected-resource(/mcp) → ?route=oauth-resource: tells them where to sign in.
 //
 // Note: the daily cron catch-up for Harvest lives in
 // cron-google-calendar-sync.js now, not here — this file only handles
@@ -44,8 +53,19 @@ const {
   deleteTimeEntryFromHarvest,
 } = require('../lib/harvest-sync');
 const { sendPushToUser } = require('../lib/push-notify');
+const { connectGranola, disconnectGranola, granolaStatus, granolaCatchUp } = require('../lib/granola-tasks');
+const { handleMcp, protectedResourceMetadata } = require('../lib/mcp-server');
 
 module.exports = async function handler(req, res) {
+  const route = (req.query || {}).route;
+  if (route === 'oauth-resource') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.status(200).json(protectedResourceMetadata(req));
+    return;
+  }
+  if (route === 'mcp') { await handleMcp(req, res); return; }
+
   const callerToken = (req.headers.authorization || '').replace('Bearer ', '');
   if (!callerToken) {
     res.status(401).json({ error: 'Not signed in' });
@@ -70,8 +90,29 @@ module.exports = async function handler(req, res) {
     const userId = userData.user.id;
     const provider = req.method === 'GET' ? req.query.provider : (req.body || {}).provider;
 
-    if (provider !== 'google' && provider !== 'harvest' && provider !== 'push') {
-      res.status(400).json({ error: 'Missing or unknown provider — expected "google", "harvest", or "push".' });
+    if (provider !== 'google' && provider !== 'harvest' && provider !== 'push' && provider !== 'granola') {
+      res.status(400).json({ error: 'Missing or unknown provider — expected "google", "harvest", "push" or "granola".' });
+      return;
+    }
+
+    // ================= GRANOLA =================
+    if (provider === 'granola') {
+      const { data: me } = await admin.from('team_profiles').select('role, access_revoked').eq('id', userId).maybeSingle();
+      if (!me || me.access_revoked) { res.status(403).json({ error: 'Only team members can see this.' }); return; }
+      if (req.method === 'GET') { res.status(200).json(await granolaStatus(admin)); return; }
+      if (me.role !== 'admin') { res.status(403).json({ error: 'Only admins can manage the Granola connection.' }); return; }
+      const { action, key } = req.body || {};
+      const appUrl = (process.env.APP_URL || `https://${req.headers['x-forwarded-host'] || req.headers.host}`).replace(/\/+$/, '');
+      if (action === 'connect') {
+        const r = await connectGranola(admin, { key, appUrl, userId });
+        if (r.error) { res.status(400).json(r); return; }
+        const first = await granolaCatchUp(admin, { budgetMs: 35000 });   // the last few days, now
+        res.status(200).json({ ...r, first });
+        return;
+      }
+      if (action === 'disconnect') { res.status(200).json(await disconnectGranola(admin)); return; }
+      if (action === 'read-now') { res.status(200).json(await granolaCatchUp(admin, { budgetMs: 45000 })); return; }
+      res.status(400).json({ error: `Unknown action: ${action}` });
       return;
     }
 

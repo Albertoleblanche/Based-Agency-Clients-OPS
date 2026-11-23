@@ -41,12 +41,14 @@ function mCb(t){
 }
 
 // ---- toast ---------------------------------------------------------------------------------
-function showToast(type, title, detail){
+function showToast(type, title, detail, opts){
   const el = $m('mToast'); if(!el) return;
   el.className = 'itoast ' + type;
-  el.innerHTML = `${icon(type === 'error' ? 'x' : type === 'success' ? 'check-circle' : 'info')}<div><b>${mEsc(title)}</b>${detail ? `<span>${mEsc(detail)}</span>` : ''}</div>`;
+  const act = opts && opts.action && typeof opts.onAction === 'function';
+  el.innerHTML = `${icon(type === 'error' ? 'x' : type === 'success' ? 'check-circle' : 'info')}<div><b>${mEsc(title)}</b>${detail ? `<span>${mEsc(detail)}</span>` : ''}</div>${act ? `<button class="itoast-act">${mEsc(opts.action)}</button>` : ''}`;
+  if(act) el.querySelector('.itoast-act').onclick = () => { el.classList.remove('in'); opts.onAction(); };   // e.g. Undo
   requestAnimationFrame(() => el.classList.add('in'));
-  clearTimeout(showToast._t); showToast._t = setTimeout(() => el.classList.remove('in'), 3200);
+  clearTimeout(showToast._t); showToast._t = setTimeout(() => el.classList.remove('in'), act ? 5500 : 3200);
 }
 // An iOS alert, not the browser's confirm() (which titles itself with the site's address).
 let mAlertResolve = null;
@@ -190,6 +192,7 @@ async function mLoadAll(){
     hiddenByAssigner: t.hidden_by_assigner, hiddenByAssignee: t.hidden_by_assignee }));
   clientReminders = (rr.data || []).map(r => ({ id: r.id, clientId: r.client_id, question: r.question, askedBy: r.asked_by, askedDate: r.asked_date, followUpDate: r.follow_up_date, status: r.status }));
   notes = (nr.data || []).map(n => ({ id: n.id, clientId: n.client_id, title: n.title, text: n.text, status: n.status, link: n.link, followUpDate: n.follow_up_date, updatedAt: n.updated_at }));
+  try{ await loadTaskSuggestions(); }catch(e){ taskSuggestions = []; }   // tasks from meetings (Granola)
   timeEntries = (er.data || []).map(e => ({ id: e.id, userId: e.user_id, clientId: e.client_id, date: e.entry_date, minutes: e.minutes, description: e.description || '', service: e.service || '', logged: !!e.logged,
     createdAt: e.created_at, harvestProjectId: e.harvest_project_id || null, harvestTaskId: e.harvest_task_id || null, source: e.source || '', harvestLocked: !!e.harvest_locked, improvementId: e.improvement_id || null }));
   notifications = nf.data || [];
@@ -528,13 +531,52 @@ function mTasksHtml(){
     ['Later', vis.filter(t => t.dueDate && t.dueDate > weekEnd)], ['No date', vis.filter(t => !t.dueDate)]];
   const overdue = groups[0][1].length;
   const c = mTaskClient !== 'all' ? clients.find(x => x.id === mTaskClient) : null;
-  const body = groups.filter(g => g[1].length).map(([g, ts, cls]) => `<div class="ish"><h2${cls ? ` class="${cls}"` : ''}>${g}</h2></div><div class="ig">${ts.sort(order).map(mTaskRow).join('')}</div>`).join('')
+  const sg = mSuggestHtml();
+  const body = sg + groups.filter(g => g[1].length).map(([g, ts, cls]) => `<div class="ish"><h2${cls ? ` class="${cls}"` : ''}>${g}</h2></div><div class="ig">${ts.sort(order).map(mTaskRow).join('')}</div>`).join('')
     || `<div style="margin-top:22px">${mEmpty(mTaskScope === 'mine' ? 'Nothing on your list' : 'No open tasks', 'Tap + to add one.')}</div>`;
   return `<div class="inav"><div class="r"><button aria-label="Filter by client" onclick="mPickTaskClient()" style="${c ? 'color:var(--label)' : ''}">${icon('funnel-simple')}</button></div></div>
 <h1 class="big">Tasks</h1><p class="big-sub">${vis.length} open${overdue ? ` · ${overdue} overdue` : ''}${c ? ` · ${mEsc(c.name)}` : ''}</p>
 ${mSeg([['everyone', 'Everyone'], ['mine', 'Mine', mineN], ['byme', 'Assigned by me']], 'mSetTaskScope', mTaskScope)}
 ${body}
 ${mVisibleTasks().some(t => t.status === 'done') ? `<p class="ifoot" style="margin-top:16px"><button onclick="mOpenDoneTasks()" style="color:var(--label-2)">Show finished tasks</button></p>` : ''}`;
+}
+// Tasks suggested from meetings (Nov 23, Granola): Add makes it your task; tapping it opens New Task
+// filled in (adding it from there); × dismisses it, with Undo. Shared logic in sheets-canvas.js.
+let mSgAll = false;
+function mSuggestHtml(){
+  if(typeof taskSuggestions === 'undefined' || !taskSuggestions || mTaskScope === 'byme') return '';
+  const list = taskSuggestions.filter(s => mTaskClient === 'all' || s.clientId === mTaskClient);
+  if(!list.length) return '';
+  const row = s => `<div class="ir msug" data-sg="${s.id}"><button class="tx" onclick="mSgEdit('${s.id}')"><span class="t n">${mEsc(s.title)}</span><span class="s">${mEsc(suggestionSub(s).join(' · '))}</span></button>`
+    + `<button class="msg-add" onclick="mSgAdd('${s.id}')">Add</button><button class="msg-x" aria-label="Dismiss ${mEsc(s.title)}" onclick="mSgDismiss('${s.id}')">${icon('x', { weight: 'bold' })}</button></div>`;
+  return `<div class="ish"><h2>From Your Meetings</h2>${list.length > 4 ? `<button onclick="mSgAll=!mSgAll;mRenderTab()">${mSgAll ? 'Fewer' : 'See All'}</button>` : ''}</div>
+<div class="ig msg-list">${(mSgAll ? list : list.slice(0, 4)).map(row).join('')}</div><p class="ifoot">Found in your Granola notes. Add the ones that are yours to do.</p>`;
+}
+function mSgOut(id, then){
+  const row = document.querySelector(`.msug[data-sg="${id}"]`);
+  if(!row || matchMedia('(prefers-reduced-motion: reduce)').matches){ then(); return; }
+  row.style.height = row.offsetHeight + 'px'; row.offsetHeight; row.classList.add('is-out'); row.style.height = '0px';
+  setTimeout(then, 230);
+}
+async function mSgAdd(id){
+  document.querySelectorAll(`.msug[data-sg="${id}"] button`).forEach(b => { b.disabled = true; });
+  const r = await addSuggestedTask(id);
+  if(r.error){ document.querySelectorAll(`.msug[data-sg="${id}"] button`).forEach(b => { b.disabled = false; }); showToast('error', 'Not added', r.error.message || ''); return; }
+  mSgOut(id, () => mRefresh());
+  showToast('success', 'Added to your tasks', r.task.title);
+}
+function mSgEdit(id){
+  const s = (taskSuggestions || []).find(x => x.id === id); if(!s) return;
+  const p = suggestionPreset(s);
+  mOpenTaskSheet({ title: p.title, description: p.description, clientId: p.clientId, due: p.due, priority: p.priority, link: p.link, afterSave: p.afterCreate });
+}
+async function mSgDismiss(id){
+  const s = (taskSuggestions || []).find(x => x.id === id); if(!s) return;
+  if(!(await decideSuggestion(id, 'dismissed'))){ showToast('error', 'Not dismissed', 'Try again in a moment.'); return; }
+  mSgOut(id, () => mRenderTab());
+  showToast('info', 'Dismissed', s.title, { action: 'Undo', onAction: async () => {
+    if(await decideSuggestion(id, 'pending')){ taskSuggestions = [s, ...(taskSuggestions || []).filter(x => x.id !== id)].sort((a, b) => new Date(b.sourceAt || 0) - new Date(a.sourceAt || 0)); mRenderTab(); }
+  } });
 }
 function mPickTaskClient(){
   const used = [...new Set(tasks.map(t => t.clientId).filter(Boolean))].map(id => clients.find(c => c.id === id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
@@ -1460,7 +1502,7 @@ async function mStopTimer(quiet, logged, improvementId){
 let mTask_ = {};
 function mOpenTaskSheet(preset){
   preset = preset || {};
-  mTask_ = { clientId: preset.clientId || '', assigneeId: currentUser.id, due: '', time: '', priority: 'medium' };
+  mTask_ = { clientId: preset.clientId || '', assigneeId: currentUser.id, due: preset.due || '', time: '', priority: preset.priority || 'medium', afterSave: preset.afterSave || null };
   mKeep('mTaskTitle', preset.title || ''); mKeep('mTaskNotes', preset.description || ''); mKeep('mTaskLink', preset.link || '');
   window._mTaskFiles = [];
   const body = () => {
@@ -1503,6 +1545,7 @@ async function mSaveTask(){
   const files = window._mTaskFiles || [];
   const up = files.length ? await uploadTaskFiles(data.id, files) : { failed: [] };
   if(T.assigneeId !== currentUser.id){ const p = teamProfiles.find(x => x.id === T.assigneeId); mNotify(T.assigneeId, 'task_assigned', 'New task assigned to you', `${myName()}: "${title}"`, 'tasks'); }
+  if(T.afterSave){ try{ await T.afterSave(data); }catch(e){} }   // e.g. a meeting's suggestion it came from
   mCloseSheet(true); await mRefresh();
   if(up.failed.length) showToast('error', 'Task added, files not attached', taskFilesError(up.failed));
   else showToast('success', T.assigneeId === currentUser.id ? 'Task added' : 'Task assigned', title);

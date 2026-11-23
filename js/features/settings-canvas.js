@@ -512,6 +512,8 @@ async function loadIntegrationStatuses(){
     canApprove() ? harvestApiCall(null).catch(() => null) : null,
   ]);
   integ.google = g; integ.harvest = h;
+  if(typeof loadGranolaState === 'function') await loadGranolaState();
+  if(typeof loadAiApps === 'function') await loadAiApps();
   if(isAdmin() && !aiConnCache){ try{ aiConnCache = await adminActionCall('get-ai-connections'); }catch(e){} }
   if(canApprove() && typeof loadSlackClientChannels === 'function'){
     try{ if(!slackChannelsLoaded) await loadSlackClientChannels(); integ.slackUnlinked = activeClients().filter(c => !slackClientChannels[c.id]).length; }catch(e){}
@@ -531,11 +533,15 @@ function setConnections(){
   if(wa) rows.push(go("switchSettingsTab('whatsapp')", 'message-circle', 'WhatsApp', 'Reads client groups and lists what clients are waiting on', wa[3]));
   if(approver) rows.push(go("openIntegrationSheet('slack')", 'hash', 'Slack', 'Client channels, reminders and daily summaries',
     integ.slackUnlinked == null ? st('', 'Checking…') : integ.slackUnlinked ? st('yellow', `${integ.slackUnlinked} client${integ.slackUnlinked === 1 ? '' : 's'} not linked`) : st('green', 'Connected')));
+  if(typeof granolaRowStatus === 'function') rows.push(go('openGranolaSheet()', 'notepad', 'Granola', 'Action items from meetings, suggested as tasks', granolaRowStatus(st)));
   if(isAdmin()){ const w = aiConnWords(); rows.push(go("switchSettingsTab('ai')", 'sparkle', 'AI', 'Claude and ChatGPT: drafts, the Assistant and weekly insights', w == null ? st('', 'Checking…', 'cnAiSt') : w ? st('green', w, 'cnAiSt') : st('hollow', 'Not connected', 'cnAiSt'))); }
   rows.push(go("openIntegrationSheet('sheet')", 'table', 'Google Sheet', settings.sheetCsvUrl ? 'Pulls the client list from a published sheet' : 'Keep a copy of the client list in a sheet',
     settings.sheetCsvUrl ? st('green', 'Connected') : st('hollow', 'Not connected')));
-  const yours = g && g.googleConfigured ? `<div class="set-h">Yours</div><div class="form-grp"><div class="fr"><span class="ic lg">${icon('calendar-blank')}</span><div class="l"><b>Google Calendar</b><span>${g.connected ? `Your meetings in the team calendar${g.lastSyncedAt ? ' · synced ' + claudeWhen(g.lastSyncedAt).toLowerCase() : ''}` : 'Bring your meetings into the team calendar'}</span></div>
-${g.connected ? `${st('green', 'Connected')}<button class="btn" onclick="syncGoogleCalendar().then(loadIntegrationStatuses)">Sync Now</button>` : `<button class="btn" onclick="connectGoogleCalendar()">Connect…</button>`}</div></div>` : '';
+  const gRow = g && g.googleConfigured ? `<div class="fr"><span class="ic lg">${icon('calendar-blank')}</span><div class="l"><b>Google Calendar</b><span>${g.connected ? `Your meetings in the team calendar${g.lastSyncedAt ? ' · synced ' + claudeWhen(g.lastSyncedAt).toLowerCase() : ''}` : 'Bring your meetings into the team calendar'}</span></div>
+${g.connected ? `${st('green', 'Connected')}<button class="btn" onclick="syncGoogleCalendar().then(loadIntegrationStatuses)">Sync Now</button>` : `<button class="btn" onclick="connectGoogleCalendar()">Connect…</button>`}</div>` : '';
+  // ChatGPT and Claude: each person connects their own (ai-apps.js)
+  const aiRow = typeof aiAppsRowStatus === 'function' ? go('openAiAppsSheet()', 'plugs-connected', 'ChatGPT and Claude', 'Use Radar from their apps, as you', aiAppsRowStatus(st)) : '';
+  const yours = gRow || aiRow ? `<div class="set-h">Yours</div><div class="form-grp cn-g">${aiRow}${gRow}</div>` : '';
   const live = (supabaseClient.getChannels ? supabaseClient.getChannels() : []).some(c => c.state === 'joined');
   return `<div class="set-h">Apps</div><div class="form-grp cn-g">${rows.join('')}</div>
 ${yours}

@@ -30,12 +30,17 @@
 // POST body (form, from Slack): command=/task&text=...&user_id=...  (see handleTaskSlashCommand)
 // POST body (JSON, from Slack): Events API — url_verification, and event_callback for messages and
 //   reactions in the channels Radar is in: tasks by themselves (lib/slack-tasks.js, Nov 23).
+// POST /hooks/granola (rewritten to ?source=granola): Granola's webhook when a meeting's notes are
+//   ready — signed like Slack's, so it lives here with the raw body. Radar reads the meeting and
+//   suggests its action items as tasks (lib/granola-tasks.js). Granola wants an answer within 15
+//   seconds; the reading happens after.
 
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 const { sendSlackDM } = require('../lib/slack-notify');
 const { sendPushToUser, pushUrlFor } = require('../lib/push-notify');
 const { parseTaskCommandText, handleSlackEvent } = require('../lib/slack-tasks');
+const { handleGranolaHook } = require('../lib/granola-tasks');
 // Keeps the function running after Slack has its answer (it wants one within 3 seconds; reading a
 // message with the AI can take longer). Without it, the work is done before answering.
 let waitUntil = null;
@@ -180,6 +185,16 @@ module.exports = async function handler(req, res) {
     } catch (e) {
       res.status(500).json({ error: String(e) });
     }
+    return;
+  }
+
+  // ---- Granola: a meeting's notes are ready ----
+  if ((req.query || {}).source === 'granola' || req.headers['webhook-signature']) {
+    const r = await handleGranolaHook(admin, rawBody, req.headers).catch(e => ({ status: 500, body: { error: String(e) } }));
+    const work = r.work ? r.work.catch(e => ({ error: String(e) })) : null;
+    if (work && waitUntil) { waitUntil(work); res.status(r.status).json(r.body); return; }
+    if (work) await work;
+    res.status(r.status).json(r.body);
     return;
   }
 

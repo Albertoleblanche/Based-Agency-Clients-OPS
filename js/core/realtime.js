@@ -122,6 +122,7 @@ function setupRealtimeSubscriptions(){
 
   const onNotificationsChange = debounced('notifications', ()=>{
     loadNotifications().then(()=> checkForNewNotificationToasts());
+    if(typeof tkSgRefresh === 'function') tkSgRefresh();   // a meeting may have suggested tasks
   }, 300);
 
   let realtimeErrorToastShown = false;
