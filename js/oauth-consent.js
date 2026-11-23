@@ -24,6 +24,9 @@
   }
 
   async function start(){
+    // what it needs didn't load (a script blocked or offline): say so plainly, not the script's error
+    let ready = false; try{ ready = !!supabaseClient; }catch(e){}
+    if(!ready) return problem('Couldn’t load this page', 'Reload it. If it still doesn’t open, start connecting again from ChatGPT or Claude.');
     if(!id) return problem('Nothing to connect', 'Open this from ChatGPT or Claude when you connect Radar.');
     if(!supabaseClient.auth.oauth || !supabaseClient.auth.oauth.getAuthorizationDetails) return problem('Can’t connect from here', 'This page needs a newer Radar. Reload it and try again.');
     const { data: { session } } = await supabaseClient.auth.getSession();

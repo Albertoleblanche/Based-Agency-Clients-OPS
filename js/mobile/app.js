@@ -1145,7 +1145,8 @@ async function mNudged(how){
 }
 function mMeetingsHtml(){
   if(typeof granolaMeetings === 'undefined') return '';
-  if(granolaMeetings === null){ loadGranolaMeetings().then(() => mTop()?.refresh()); return ''; }
+  meetingsRefresh(() => mTop()?.refresh());
+  if(granolaMeetings === null) return '';
   if(!granolaMeetings.length) return '';
   const list = granolaMeetings.slice(0, mMtAll ? 60 : 6);
   return `<div class="ish"><h2 class="ish-lg">${appLogo('granola', 'xs')}From Granola</h2>${granolaMeetings.length > 6 ? `<button onclick="mMtAll=!mMtAll;mTop()?.refresh()">${mMtAll ? 'Fewer' : 'See All'}</button>` : ''}</div>

@@ -728,6 +728,21 @@ async function loadGranolaMeetings(){
     .sort((a, b) => String(b.at).localeCompare(String(a.at)));
   return granolaMeetings;
 }
+// Opening Meetings reads Granola too, so it never waits on Tasks' Check Granola: what's there shows at
+// once, and new meetings join it when the read is done (the server reads at most once a minute for
+// the whole team; this asks at most every two minutes).
+let granolaMtCheckedAt = 0, granolaMtChecking = false;
+function meetingsRefresh(redraw){
+  if(granolaMeetings === null) loadGranolaMeetings().then(redraw);
+  if(granolaMtChecking || Date.now() - granolaMtCheckedAt < 120000) return;
+  granolaMtCheckedAt = Date.now(); granolaMtChecking = true;
+  granolaApi('check').catch(() => null).then(async () => {
+    granolaMtChecking = false;
+    await loadGranolaMeetings();
+    try{ await loadTaskSuggestions(); }catch(e){}
+    redraw();
+  });
+}
 function meetingWasMine(m){
   const e = String((typeof myProfile !== 'undefined' && myProfile && myProfile.email) || (typeof currentUser !== 'undefined' && currentUser && currentUser.email) || '').toLowerCase();
   return !!e && (m.people || []).includes(e);

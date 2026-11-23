@@ -91,7 +91,7 @@ function renderNotes(){
   if(typeof granolaWatch === 'function') granolaWatch(() => { if(currentViewName === 'notes') renderNotes(); });
   if(notesScope === 'meetings' && !showMt) notesScope = 'all';
   const mts = notesScope === 'meetings' ? granolaMeetings : null;
-  if(notesScope === 'meetings' && granolaMeetings === null){ loadGranolaMeetings().then(() => { if(currentViewName === 'notes') renderNotes(); }); }
+  if(notesScope === 'meetings') meetingsRefresh(() => { if(currentViewName === 'notes') renderNotes(); });
   const used = [...new Set((notesScope === 'meetings' ? (mts || []) : notes).map(n => n.clientId))].map(id => clients.find(c => c.id === id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
   if(notesClient !== 'all' && !used.some(c => c.id === notesClient)) notesClient = 'all';
   const cur = used.find(c => c.id === notesClient);
@@ -101,7 +101,7 @@ function renderNotes(){
   const seg = [['all', 'All', mine.length], ['open', 'Open', open.length], ['done', 'Done', done.length]].concat(showMt ? [['meetings', 'Meetings', granolaMeetings ? granolaMeetings.length : '']] : [])
     .map(([k, t, n]) => `<button class="${notesScope === k ? 'on' : ''}" role="tab" aria-selected="${notesScope === k}" onclick="setNotesFilter('scope','${k}')">${t}${n !== '' ? ` <span class="c">${n}</span>` : ''}</button>`).join('');
   if(notesScope === 'meetings'){
-    if(currentViewName === 'notes') setToolbar(null, `From Granola’s team space${mts ? ` · ${mts.length} meeting${mts.length === 1 ? '' : 's'}` : ''}`);
+    if(currentViewName === 'notes') setToolbar(null, `From Granola’s team space${mts ? ` · ${mts.length} meeting${mts.length === 1 ? '' : 's'}` : ''}${granolaMtChecking ? ' · checking for new ones…' : ''}`);
     const list = (mts || []).filter(m => !cur || String(m.clientId) === String(cur.id));
     gal.innerHTML = `<div class="n1">
 <div class="n1-top">
@@ -110,6 +110,7 @@ function renderNotes(){
 <div class="seg" role="tablist" aria-label="Show">${seg}</div>
 </div>
 ${mts === null ? skeletonHtml('notes', 'Loading meetings…') : list.length ? `<div class="n1-grid">${list.map(meetingTileHtml).join('')}</div>`
+  : granolaMtChecking && !cur ? skeletonHtml('notes', 'Checking Granola…')
   : emptyState({ icon: 'sticky-note', tone: 'blue', title: cur ? `No meetings for ${escapeHtml(cur.name)}` : 'No meetings yet', text: 'Meetings shared to Granola’s team space show here once Radar has read them.', html: true })}
 <p class="n1-foot nt-lock">${appLogo('granola', 'xs')}Shared to Granola’s team space: everyone on the team sees these</p>
 </div>`;

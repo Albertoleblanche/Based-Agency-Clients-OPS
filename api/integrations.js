@@ -104,10 +104,10 @@ module.exports = async function handler(req, res) {
       if (!me || me.access_revoked) { res.status(403).json({ error: 'Only team members can see this.' }); return; }
       if (req.method === 'GET') { res.status(200).json(await granolaStatus(admin)); return; }
       const { action, key } = req.body || {};
-      // Check Granola (Tasks): anyone on the team; at most once a minute for everyone together
-      if (action === 'check') { res.status(200).json(await granolaReadNow(admin, { budgetMs: 45000 })); return; }
-      if (me.role !== 'admin') { res.status(403).json({ error: 'Only admins can manage the Granola connection.' }); return; }
       const appUrl = (process.env.APP_URL || `https://${req.headers['x-forwarded-host'] || req.headers.host}`).replace(/\/+$/, '');
+      // Check Granola (Tasks, Notes → Meetings): anyone on the team; at most once a minute for everyone together
+      if (action === 'check') { res.status(200).json(await granolaReadNow(admin, { budgetMs: 45000, appUrl })); return; }
+      if (me.role !== 'admin') { res.status(403).json({ error: 'Only admins can manage the Granola connection.' }); return; }
       if (action === 'connect') {
         const r = await connectGranola(admin, { key, appUrl, userId });
         if (r.error) { res.status(400).json(r); return; }
@@ -116,7 +116,7 @@ module.exports = async function handler(req, res) {
         return;
       }
       if (action === 'disconnect') { res.status(200).json(await disconnectGranola(admin)); return; }
-      if (action === 'read-now') { res.status(200).json(await granolaCatchUp(admin, { budgetMs: 45000, sinceDays: 7 })); return; }
+      if (action === 'read-now') { res.status(200).json(await granolaCatchUp(admin, { budgetMs: 45000, sinceDays: 7, appUrl, forceHook: true })); return; }
       if (action === 'read-again') { res.status(200).json(await granolaReadAgain(admin, (req.body || {}).note)); return; }
       res.status(400).json({ error: `Unknown action: ${action}` });
       return;

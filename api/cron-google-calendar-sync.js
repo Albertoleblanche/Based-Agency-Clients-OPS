@@ -216,7 +216,7 @@ module.exports = async function handler(req, res) {
   // webhook within minutes; this reads what didn't, in the time this run has left.
   try {
     const budgetMs = 52000 - (Date.now() - started);
-    result.granola = budgetMs > 4000 ? await granolaCatchUp(admin, { budgetMs }) : { skipped: 'no time left' };
+    result.granola = budgetMs > 4000 ? await granolaCatchUp(admin, { budgetMs, appUrl: (process.env.APP_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '')).replace(/\/+$/, '') }) : { skipped: 'no time left' };
   } catch (e) { result.granola = { error: String(e) }; }
 
   res.status(200).json(result);
