@@ -3266,6 +3266,25 @@ html.ui-w .tk-sg{border-radius:var(--uw-r-card);box-shadow:0 0 0 1px var(--sep),
 .mtn-body li{margin:2px 0}
 .mtn-body p{margin:0 0 8px}
 .mtn-body a{color:var(--blue,#0a84ff)}
+.mtn-tasks > span{min-width:0}
+/* A point in a meeting's notes, and the way to make it a task (Nov 23) */
+.mtn-body li[data-pt]{margin:1px 0}
+.mtp{display:flex;align-items:flex-start;gap:12px;margin:0 -8px;padding:3px 8px;border-radius:8px;transition:background-color 120ms ease}
+.mtp-x{flex:1;min-width:0;padding-top:1px}
+.mtp-r{flex:none;display:flex;align-items:center;gap:8px;min-height:24px}
+.mtp-r:empty{display:none}
+.mtp .mtp-go.btn.sm{height:24px;padding:0 10px;font-size:12.5px}
+.mtp .mtp-go > svg{display:none}
+.mtp-sg{font-size:12px;color:var(--label-3);white-space:nowrap}
+.mtp-ok{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border:0;border-radius:999px;background:var(--fill-2);color:var(--label-2);font:inherit;font-size:12.5px;white-space:nowrap;cursor:pointer;transition:transform 120ms ease,background-color 120ms ease,color 120ms ease}
+.mtp-ok svg{width:12px;height:12px;flex:none;color:var(--green)}
+.mtp-ok:hover{background:var(--fill-3);color:var(--label)}
+.mtp-ok:active{transform:scale(.97)}
+@media (hover:hover) and (pointer:fine){
+  .mtp:hover{background:var(--fill-2)}
+  .mtp .mtp-go{opacity:0;transition:opacity 120ms ease,transform 120ms ease}
+  .mtp:hover .mtp-go,.mtp .mtp-go:focus-visible{opacity:1}
+}
 @media (hover:hover) and (pointer:fine){ .n1-t.mt-t:hover{background:color-mix(in srgb,#B2C248 10%,var(--fill))} }
 
 /* ---- A suggested Granola task, previewed (Nov 23) -------------------------------------------- */

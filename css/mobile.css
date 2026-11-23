@@ -413,6 +413,22 @@ body.mac.mobile { overflow: hidden; background: var(--ios-bg, #F2F2F7); -webkit-
 .mtn-body li { margin: 3px 0; }
 .mtn-body p { margin: 0 0 8px; }
 .mtn-open { display: flex; justify-content: center; margin-top: 18px; text-decoration: none; }
+/* a point in the notes, and the way to make it a task (Nov 23) */
+.mtp { display: flex; align-items: flex-start; gap: 10px; padding: 3px 0; }
+.mtp-x { flex: 1; min-width: 0; }
+.mtp-r { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.mtp-r:empty { display: none; }
+.mtp-go { display: grid; place-items: center; width: 32px; height: 32px; margin: -2px 0; padding: 0; border: 0; border-radius: 16px; background: var(--fill-2); color: var(--label); -webkit-user-select: none; user-select: none; position: relative; }
+.mtp-go::after { content: ''; position: absolute; inset: -6px; }   /* a 44pt target */
+.mtp-go svg { width: 15px; height: 15px; }
+.mtp-go span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.mtp-go:active { opacity: .7; }
+.mtp-go:disabled { opacity: .5; }
+.mtp-sg { font-size: 12px; color: var(--label-3); white-space: nowrap; }
+.mtp-ok { display: inline-flex; align-items: center; gap: 5px; max-width: 46vw; height: 30px; padding: 0 11px; border: 0; border-radius: 15px; background: var(--fill-2); color: var(--label-2); font: inherit; font-size: 13px; }
+.mtp-ok span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mtp-ok svg { width: 13px; height: 13px; flex: none; color: var(--green); }
+.mtp-ok:active { opacity: .7; }
 /* a suggested Granola task, previewed (Nov 23) */
 .msgp { padding: 6px 16px 24px; }
 .msgp .sgp-h { margin: 4px 0 8px; font-size: 22px; font-weight: 600; letter-spacing: -.01em; line-height: 1.25; }

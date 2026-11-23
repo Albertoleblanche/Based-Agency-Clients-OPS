@@ -570,7 +570,7 @@ function mSgPreview(id){
 }
 function mSuggestHtml(){
   if(typeof taskSuggestions === 'undefined' || !taskSuggestions || mTaskScope === 'byme') return '';
-  const list = taskSuggestions.filter(s => mTaskClient === 'all' || s.clientId === mTaskClient);
+  const list = suggestionsOpen(taskSuggestions).filter(s => mTaskClient === 'all' || s.clientId === mTaskClient);
   if(!list.length) return '';
   const row = s => `<div class="ir msug" data-sg="${s.id}"><button class="tx" onclick="mSgPreview('${s.id}')"><span class="t n">${mEsc(s.title)}</span><span class="s">${mEsc(suggestionSub(s).join(' · '))}</span></button>`
     + `<button class="msg-add" onclick="mSgAdd('${s.id}')">Add</button><button class="msg-x" aria-label="Dismiss ${mEsc(s.title)}" onclick="mSgDismiss('${s.id}')">${icon('x', { weight: 'bold' })}</button></div>`;
@@ -1545,7 +1545,7 @@ async function mStopTimer(quiet, logged, improvementId){
 let mTask_ = {};
 function mOpenTaskSheet(preset){
   preset = preset || {};
-  mTask_ = { clientId: preset.clientId || '', assigneeId: currentUser.id, due: preset.due || '', time: '', priority: preset.priority || 'medium', afterSave: preset.afterSave || null };
+  mTask_ = { clientId: preset.clientId || '', assigneeId: preset.assigneeId || currentUser.id, due: preset.due || '', time: '', priority: preset.priority || 'medium', afterSave: preset.afterSave || null };
   mKeep('mTaskTitle', preset.title || ''); mKeep('mTaskNotes', preset.description || ''); mKeep('mTaskLink', preset.link || '');
   window._mTaskFiles = [];
   const body = () => {

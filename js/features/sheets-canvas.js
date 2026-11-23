@@ -610,7 +610,7 @@ function ntReadForm(){
 let taskSuggestions = null, taskSuggestionsAt = 0;   // my pending ones; null until loaded
 function suggestionFromDb(r){
   return { id: r.id, title: r.title, description: r.description || '', clientId: r.client_id || '', dueDate: r.due_date || '', priority: r.priority || 'medium',
-    sourceTitle: r.source_title || 'a meeting', sourceUrl: r.source_url || '', sourceAt: r.source_at || r.created_at, quote: r.quote || '', sourceId: r.source_id || '' };
+    sourceTitle: r.source_title || 'a meeting', sourceUrl: r.source_url || '', sourceAt: r.source_at || r.created_at, quote: r.quote || '', sourceId: r.source_id || '', assigneeId: r.assignee_id || null, status: r.status || 'pending' };
 }
 async function loadTaskSuggestions(){
   if(typeof currentUser === 'undefined' || !currentUser) return [];
@@ -619,6 +619,21 @@ async function loadTaskSuggestions(){
     .order('source_at', { ascending: false }).limit(60);
   taskSuggestions = error ? [] : (data || []).map(suggestionFromDb);   // no table yet (addendum-granola.sql): none
   return taskSuggestions;
+}
+// A suggestion that's already one of that person's tasks (added from the meeting's notes, or given to
+// them by an admin or approver): it isn't shown, and it's settled so it doesn't come back.
+function suggestionTaken(s){
+  if(typeof tasks === 'undefined' || !tasks || !s || !s.sourceUrl) return null;
+  return tasks.find(t => t.assigneeId === s.assigneeId && !t.cancelledAt && t.link === s.sourceUrl
+    && (mtSame(s.title, t.title) || (s.quote && mtPointOf(t) && mtQuoteIn(s.quote, mtPointOf(t))))) || null;
+}
+const sgSettling = new Set();
+function suggestionsOpen(list){
+  return (list || []).filter(s => {
+    const t = suggestionTaken(s); if(!t) return true;
+    if(!sgSettling.has(s.id)){ sgSettling.add(s.id); decideSuggestion(s.id, 'added', t.id); }
+    return false;
+  });
 }
 // "Oakridge weekly · Mon, Nov 23 · Oakridge Flooring · due Fri, Nov 27"
 function suggestionSub(s){
@@ -788,7 +803,7 @@ async function loadGranolaMeetings(){
     let m = {}; try{ m = JSON.parse(r.value) || {}; }catch(e){}
     return { id: r.key.slice('granola-note:'.length), title: m.title || 'A meeting', summary: m.summary || '', url: m.url || null, at: m.meetingAt || m.at || r.updated_at,
       clientId: m.clientId || null, people: m.people || [], owner: m.owner || null, items: m.items || 0, state: m.state };
-  }).filter(m => m.summary && m.state !== 'same' && new Date(m.at).getTime() > since)
+  }).filter(m => m.summary && m.state !== 'same' && new Date(m.at).getTime() > since && meetingCanSee(m))   // the people who were there; admins and approvers see all
     .sort((a, b) => String(b.at).localeCompare(String(a.at)));
   return granolaMeetings;
 }
@@ -812,13 +827,15 @@ function meetingWasMine(m){
   return !!e && (m.people || []).includes(e);
 }
 // Granola's notes are Markdown: headings, bullets (nested by indent), **bold** and links.
-function meetingNotesHtml(md){
+// opts.point(i, text): what point i shows on its right (see "From the notes to tasks")
+function meetingNotesHtml(md, opts){
   const inline = t => escapeHtml(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-  const out = [], open = [];
+  const out = [], open = [], side = opts && opts.point;
+  let n = 0;
   const close = to => { while(open.length > to){ out.push('</ul>'); open.pop(); } };
   String(md || '').replace(/\r/g, '').split('\n').forEach(line => {
     const li = line.match(/^(\s*)[-*]\s+(.*)$/);
-    if(li){ const depth = Math.floor(li[1].replace(/\t/g, '  ').length / 2) + 1; close(depth); while(open.length < depth){ out.push('<ul>'); open.push(1); } out.push(`<li>${inline(li[2])}</li>`); return; }
+    if(li){ const depth = Math.floor(li[1].replace(/\t/g, '  ').length / 2) + 1; close(depth); while(open.length < depth){ out.push('<ul>'); open.push(1); } const i = n++; out.push(side ? `<li data-pt="${i}"><div class="mtp"><span class="mtp-x">${inline(li[2])}</span><span class="mtp-r">${side(i, mdPlain(li[2]))}</span></div></li>` : `<li>${inline(li[2])}</li>`); return; }
     close(0);
     const h = line.match(/^(#{1,4})\s+(.*)$/);
     if(h){ out.push(`<h4>${inline(h[2])}</h4>`); return; }
@@ -837,20 +854,178 @@ function meetingSubWords(m){
   const c = m.clientId ? clients.find(x => String(x.id) === String(m.clientId)) : null;
   return [meetingWhenWords(m), c ? c.name : '', m.owner ? `notes by ${String(m.owner).split(' ')[0]}` : ''].filter(Boolean);
 }
-// The notes, read only, with the way back to Granola (desktop: a sheet; iPhone: its sheet)
+// The notes, with the way back to Granola (desktop: a sheet; iPhone: its sheet). Each point can
+// become a task (below).
 function openMeetingNotes(id){
   const m = (granolaMeetings || []).find(x => x.id === id); if(!m) return;
   const sub = meetingSubWords(m).join(' · ');
-  const tasks = m.items ? `<p class="mtn-tasks">${appLogo('granola', 'xs')}${m.items} task${m.items === 1 ? '' : 's'} suggested from it, in each person’s Tasks.</p>` : '';
+  const can = meetingCanAssign(), mine = meetingWasMine(m);
+  const hint = can || mine ? `<p class="mtn-tasks">${appLogo('granola', 'xs')}<span>${can ? 'Any point can be a task for someone on the team.' : 'Any point can be one of your tasks.'} Points already added say who has them.</span></p>` : '';
   if(typeof mOpenSheet === 'function'){
-    mOpenSheet(m.title, `<div class="mtn"><p class="mtn-sub">${escapeHtml(sub)}</p>${tasks}<div class="mtn-body">${meetingNotesHtml(m.summary)}</div>${m.url ? `<a class="ibtn mtn-open" href="${safeUrl(m.url)}" target="_blank" rel="noopener">Open in Granola</a>` : ''}</div>`, { cancel: 'Close' });
+    mOpenSheet(m.title, `<div class="mtn"><p class="mtn-sub">${escapeHtml(sub)}</p>${hint}<div class="mtn-body" id="mtnBody">${meetingBodyHtml(m)}</div>${m.url ? `<a class="ibtn mtn-open" href="${safeUrl(m.url)}" target="_blank" rel="noopener">Open in Granola</a>` : ''}</div>`, { cancel: 'Close' });
+  } else {
+    openAppModal(`<h3 class="ap-h">${appLogo('granola', 'sm')}${escapeHtml(m.title)}</h3><p class="t-2 mtn-sub">${escapeHtml(sub)}</p>${hint}
+<div class="mtn-body" id="mtnBody">${meetingBodyHtml(m)}</div>
+<div class="sheet-a">${m.url ? `<a class="btn" href="${safeUrl(m.url)}" target="_blank" rel="noopener">Open in Granola</a>` : ''}<button class="btn btn-p" id="mtnDone" onclick="closeAppModal()">Done</button></div>`, 680);
+    // focus starts on Done, not on the first link inside the notes
+    setTimeout(() => document.getElementById('mtnDone')?.focus({ preventScroll: true }), 30);   // after the sheet's own first focus
+  }
+  // who each point is already suggested to
+  loadMeetingSuggestions(m).then(() => meetingRedraw(m)).catch(() => {});
+}
+// ---- From the notes to tasks (Nov 23) ------------------------------------------------------------
+// Any point in a meeting's notes can become a task. Someone who was there adds it to their own tasks;
+// admins and approvers give it to anyone (to start with, the person the point names). A point that
+// is already a task says who has it and who added it, so nobody adds it twice, and the matching
+// suggestion in that person's Tasks goes away.
+function meetingCanAssign(){ return typeof canApprove === 'function' && canApprove(); }
+function meetingCanSee(m){ return meetingCanAssign() || meetingWasMine(m); }
+function mdPlain(t){ return String(t || '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/\s+/g, ' ').trim(); }
+// The points, in the order the notes show them (the same count as the bullets meetingNotesHtml draws)
+function meetingPoints(m){
+  const out = [];
+  String((m && m.summary) || '').replace(/\r/g, '').split('\n').forEach(l => { const li = l.match(/^\s*[-*]\s+(.*)$/); if(li) out.push(mdPlain(li[1])); });
+  return out;
+}
+const mtFirst = p => String(p.name || '').split(' ')[0];
+const mtWord = n => new RegExp(`(^|[^A-Za-z])${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![A-Za-z])`);
+// Who the point is for: "(Charlie)" at the end, "Charlie to…" at the start, or the one teammate it names
+function meetingPointWho(text){
+  const team = (teamProfiles || []).filter(p => !p.access_revoked && mtFirst(p).length > 1);
+  const paren = text.match(/\(([^)]*)\)\s*$/);
+  if(paren){ const p = team.find(p => mtWord(mtFirst(p)).test(paren[1])); if(p) return p; }
+  const lead = text.match(/^([A-Z][A-Za-z]+)\s+(?:to|will|should|needs to|can|is going to)\s/);
+  if(lead){ const p = team.find(p => mtFirst(p) === lead[1]); if(p) return p; }
+  const named = team.filter(p => mtWord(mtFirst(p)).test(text));
+  return named.length === 1 ? named[0] : null;
+}
+// The point as a task's title: no names in brackets at the end, no "Charlie to" in front, no "see the doc"
+function meetingPointTitle(text){
+  const names = (teamProfiles || []).map(mtFirst).filter(Boolean);
+  let t = String(text || '').replace(/\s+[—–-]\s+see\b.*$/i, '');
+  const paren = t.match(/\s*\(([^)]*)\)\s*$/);
+  if(paren && paren[1].split(/,|&|\band\b/).every(w => !w.trim() || names.includes(w.trim()) || /^(?:all|team|everyone)$/i.test(w.trim()))) t = t.slice(0, paren.index);
+  const lead = t.match(/^([A-Z][A-Za-z]+)\s+(?:to|will|should|needs to|is going to)\s+(.*)$/);
+  if(lead && names.includes(lead[1])) t = lead[2].charAt(0).toUpperCase() + lead[2].slice(1);
+  t = t.replace(/[.;:]\s*$/, '').trim();
+  return t.length > 120 ? t.slice(0, 117).trimEnd() + '…' : t;
+}
+function meetingPointNotes(m, text){
+  const d = new Date(m.at);
+  return `From the meeting “${m.title}”${isNaN(d) ? '' : `, ${fmtShortDate(d)}`}${m.url ? `: ${m.url}` : ''}\n\nIn the notes: “${text}”`;
+}
+// The same work in other words: most of the words shared ("Send the report" isn't "Send the invoice")
+function mtSame(a, b){
+  const A = new Set(sgWords(a)), B = new Set(sgWords(b));
+  let n = 0; A.forEach(w => { if(B.has(w)) n++; });
+  return n >= 2 && n / (A.size + B.size - n) >= 0.6;
+}
+// A line someone said, found in a point: nearly all its words are there
+function mtQuoteIn(q, text){
+  const Q = [...new Set(sgWords(q))], T = new Set(sgWords(text));
+  return Q.length >= 2 && Q.filter(w => T.has(w)).length >= Q.length * 0.8;
+}
+const mtPointOf = t => { const x = String((t && t.description) || '').match(/In the notes: “([^”]*)”/); return x ? x[1] : ''; };
+// The tasks a point already became: made from the point here, or the same work added from the
+// meeting's suggestion (same meeting link, nearly the same title).
+function meetingPointTasks(m, text){
+  const quote = `In the notes: “${text}”`, title = meetingPointTitle(text);
+  return (tasks || []).filter(t => !t.cancelledAt && (
+    (t.description || '').includes(quote) && (!m.url || t.link === m.url || (t.description || '').includes(m.url))
+    || (m.url && t.link === m.url && mtSame(title, t.title))));
+}
+// A meeting's suggestions (each person's own; admins and approvers see everyone's)
+let meetingSgs = {};
+async function loadMeetingSuggestions(m){
+  const { data, error } = await supabaseClient.from('task_suggestions').select('*').eq('source_id', m.id).limit(80);
+  meetingSgs[m.id] = error ? [] : (data || []).map(suggestionFromDb);
+  return meetingSgs[m.id];
+}
+function meetingPointSuggestions(m, text){
+  const title = meetingPointTitle(text);
+  return (meetingSgs[m.id] || []).filter(s => s.status === 'pending' && (meetingCanAssign() || s.assigneeId === currentUser.id)
+    && (mtSame(title, s.title) || (s.quote && mtQuoteIn(s.quote, text))));
+}
+const mtName = id => { const p = teamProfiles.find(x => x.id === id); return p ? (id === currentUser.id ? 'you' : mtFirst(p)) : 'someone'; };
+function mtList(names){ const u = [...new Set(names)]; return u.length < 3 ? u.join(' and ') : `${u.slice(0, -1).join(', ')} and ${u[u.length - 1]}`; }
+// What a point shows on its right: who has it, else the way to add it
+function meetingPointSide(m, i, text){
+  const done = meetingPointTasks(m, text);
+  if(done.length){
+    const t = done[0], by = done.filter(x => x.assignerId && x.assignerId !== x.assigneeId).map(x => mtName(x.assignerId));
+    const mine = done.some(x => x.assigneeId === currentUser.id);
+    const who = mine && done.length === 1 ? `In your tasks${by.length ? `, from ${mtList(by)}` : ''}` : `Added for ${mtList(done.map(x => mtName(x.assigneeId)))}${by.length ? ` by ${mtList(by)}` : ''}`;
+    return `<button type="button" class="mtp-ok" onclick="meetingOpenTask('${t.id}')" title="Open the task">${icon('check', { weight: 'bold' })}<span>${escapeHtml(who)}</span></button>`;
+  }
+  const sg = meetingPointSuggestions(m, text);
+  const note = sg.length ? `<span class="mtp-sg" title="Suggested from the notes; it’s waiting in their Tasks">Suggested to ${escapeHtml(mtList(sg.map(s => mtName(s.assigneeId))))}</span>` : '';
+  // (iPhone shows the + alone, as a round button; the words stay for VoiceOver)
+  if(meetingCanAssign()) return `${note}<button type="button" class="btn sm mtp-go" aria-label="Assign this point" onclick="meetingAssignPoint('${m.id}', ${i})">${icon('plus', { weight: 'bold' })}<span>Assign…</span></button>`;
+  if(meetingWasMine(m)) return `${note}<button type="button" class="btn sm mtp-go" aria-label="Add this point to my tasks" onclick="meetingAddPoint('${m.id}', ${i}, this)">${icon('plus', { weight: 'bold' })}<span>Add to My Tasks</span></button>`;
+  return note;
+}
+function meetingBodyHtml(m){
+  return meetingNotesHtml(m.summary, { point: (i, text) => text ? meetingPointSide(m, i, text) : '' });
+}
+function meetingRedraw(m){
+  const b = document.getElementById('mtnBody'); if(b) b.innerHTML = meetingBodyHtml(m);
+}
+// A task just made, known here before the next load of everyone's tasks
+function mtKnow(t){
+  if(typeof tasks === 'undefined' || !tasks || !t || tasks.some(x => x.id === t.id)) return;
+  tasks.unshift({ id: t.id, title: t.title, description: t.description || '', link: t.link || null, assigneeId: t.assignee_id, assignerId: t.assigner_id,
+    clientId: t.client_id || null, status: t.status || 'todo', priority: t.priority, dueDate: t.due_date || null, createdAt: t.created_at, attachments: [] });
+}
+function meetingOpenTask(id){
+  if(typeof mOpenTask === 'function'){ mCloseSheet(true); setTimeout(() => mOpenTask(id), 320); return; }
+  closeAppModal(); openTaskDetailModal(id);
+}
+// The pending suggestions this task stands for: settled, so they leave that person's Tasks
+async function meetingSettle(m, text, task){
+  const sgs = meetingPointSuggestions(m, text).filter(s => s.assigneeId === task.assignee_id);
+  for(const s of sgs){
+    const { error } = await supabaseClient.from('task_suggestions').update({ status: 'added', task_id: task.id, decided_at: new Date().toISOString() }).eq('id', s.id);
+    if(!error){ s.status = 'added'; if(taskSuggestions) taskSuggestions = taskSuggestions.filter(x => x.id !== s.id); }
+  }
+}
+// Someone who was there: the point is theirs, as it is
+async function meetingAddPoint(id, i, btn){
+  const m = (granolaMeetings || []).find(x => x.id === id); if(!m) return;
+  const text = meetingPoints(m)[i]; if(!text) return;
+  if(meetingPointTasks(m, text).length){ meetingRedraw(m); return; }
+  const lab = btn && btn.querySelector('span');
+  if(btn){ btn.disabled = true; if(lab) lab.textContent = 'Adding…'; }
+  const res = await insertTaskRow({ title: meetingPointTitle(text), description: meetingPointNotes(m, text), priority: 'medium', status: 'todo',
+    assigner_id: currentUser.id, assignee_id: currentUser.id, client_id: m.clientId || null, link: m.url || null, due_date: null });
+  if(res.error || !res.data){ if(btn){ btn.disabled = false; if(lab) lab.textContent = 'Add to My Tasks'; } showToast('error', 'Not added', (res.error && res.error.message) || 'Try again in a moment.'); return; }
+  mtKnow(res.data);
+  await meetingSettle(m, text, res.data);
+  meetingRedraw(m);
+  if(typeof loadMyTasks === 'function') loadMyTasks().then(() => meetingRedraw(m));
+  showToast('success', 'Added to your tasks', res.data.title);
+  if(typeof updateTasksNavBadge === 'function') updateTasksNavBadge();
+  if(typeof currentViewName !== 'undefined' && currentViewName === 'tasks' && typeof renderTasks === 'function') renderTasks();
+  if(typeof mRenderTab === 'function') mRenderTab();
+}
+// Admins and approvers: New Task, filled in, for the person the point names; back to the notes after
+function meetingAssignPoint(id, i){
+  const m = (granolaMeetings || []).find(x => x.id === id); if(!m) return;
+  const text = meetingPoints(m)[i]; if(!text) return;
+  const who = meetingPointWho(text);
+  const preset = { title: meetingPointTitle(text), description: meetingPointNotes(m, text), clientId: m.clientId || '', link: m.url || '', priority: 'medium' };
+  const after = async task => {
+    if(!task) return;
+    mtKnow(task);
+    await meetingSettle(m, text, task);
+    // iPhone: the task sheet closes after this, so the notes open again once it has
+    if(typeof mOpenTaskSheet === 'function') setTimeout(() => openMeetingNotes(m.id), 450); else openMeetingNotes(m.id);
+  };
+  if(typeof mOpenTaskSheet === 'function'){
+    mCloseSheet(true);
+    setTimeout(() => mOpenTaskSheet({ ...preset, due: '', assigneeId: who ? who.id : currentUser.id, afterSave: after }), 320);
     return;
   }
-  openAppModal(`<h3 class="ap-h">${appLogo('granola', 'sm')}${escapeHtml(m.title)}</h3><p class="t-2 mtn-sub">${escapeHtml(sub)}</p>${tasks}
-<div class="mtn-body">${meetingNotesHtml(m.summary)}</div>
-<div class="sheet-a">${m.url ? `<a class="btn" href="${safeUrl(m.url)}" target="_blank" rel="noopener">Open in Granola</a>` : ''}<button class="btn btn-p" id="mtnDone" onclick="closeAppModal()">Done</button></div>`, 640);
-  // focus starts on Done, not on the first link inside the notes
-  setTimeout(() => document.getElementById('mtnDone')?.focus({ preventScroll: true }), 30);   // after the sheet's own first focus
+  openNewTaskModal(who ? who.id : currentUser.id, 'todo', { ...preset, afterCreate: after });
 }
 
 async function insertTaskRow(row){

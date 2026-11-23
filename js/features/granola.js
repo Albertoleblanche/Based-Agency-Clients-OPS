@@ -13,7 +13,7 @@ function tkSuggestHtml(){
   if(typeof taskSuggestions === 'undefined') return '';
   if(taskSuggestions === null || Date.now() - taskSuggestionsAt > 60000) tkSgRefresh();
   if(tasksScope === 'byme') return '';
-  const list = (taskSuggestions || []).filter(s => tasksClient === 'all' || s.clientId === tasksClient);
+  const list = suggestionsOpen(taskSuggestions).filter(s => tasksClient === 'all' || s.clientId === tasksClient);
   if(!list.length) return '';
   const shown = tkSgAll ? list : list.slice(0, 4);
   const row = s => {
