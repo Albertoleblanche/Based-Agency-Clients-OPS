@@ -69,10 +69,12 @@ function uwHealthCard(m){
 <div class="uw-lg"><div><b>${m.r}</b><span><i class="r"></i>At risk</span></div><div><b>${m.y}</b><span><i class="am"></i>To watch</span></div><div><b>${m.g}</b><span><i class="g"></i>Healthy</span></div></div></section>`;
 }
 
-// The bar per client (Nov 23), drawn on a canvas in whole screen pixels: every line exactly as wide
-// as the others and on a pixel of its own, at 100%, 125% or 150% (Windows laptops), about half of each
-// line's share of the width, never thinner than 2 pixels or wider than 8px. Gaps differ by at most a
-// pixel, so the bar still spans the card. Drawn again when the card changes size or the theme changes.
+// The Health bar (Nov 23), drawn on a canvas in whole screen pixels: lines 4px wide with clear gaps
+// (6px or more), as many as fit the card and never more than 30, so it reads the same on a laptop as on
+// a wide screen. With more clients than lines, each line is a share of them: the colours keep the
+// proportions, and a group with even one client keeps at least one line. The counts are underneath.
+// Every line is the same width at 100%, 125% and 150%; gaps differ by a pixel at most. Drawn again
+// when the card resizes or the theme changes.
 let uwDashRO = null, uwDashMO = null;
 function uwDashFit(root){
   (root || document).querySelectorAll('.uw-dash').forEach(el => {
@@ -92,6 +94,19 @@ function uwDashFit(root){
     uwDashMO.observe(mac, { attributes: true, attributeFilter: ['data-theme'] });
   }
 }
+// ['g','g','y','r',…] squeezed into `lines` colours, in order, by share (largest remainder), every
+// colour present keeping at least one line.
+function uwDashShares(cells, lines){
+  const n = cells.length; if(lines >= n) return cells.slice();
+  const keys = ['g', 'y', 'r'], cnt = {}; keys.forEach(k => cnt[k] = cells.filter(c => c === k).length);
+  const present = keys.filter(k => cnt[k]);
+  const got = {}; present.forEach(k => got[k] = Math.max(1, Math.floor(cnt[k] * lines / n)));
+  let left = lines - present.reduce((t, k) => t + got[k], 0);
+  const rem = present.map(k => [k, cnt[k] * lines / n - Math.floor(cnt[k] * lines / n)]).sort((a, b) => b[1] - a[1]);
+  for(let i = 0; left > 0 && rem.length; i++, left--) got[rem[i % rem.length][0]]++;
+  while(left < 0){ const big = present.slice().sort((a, b) => got[b] - got[a])[0]; if(got[big] <= 1) break; got[big]--; left++; }
+  return [].concat(...present.map(k => Array(got[k]).fill(k)));
+}
 function uwDashDraw(el, wDev, hDev){
   const cv = el && el.querySelector('canvas'), cells = el ? String(el.dataset.c || '').split('') : [];
   if(!cv || !cells.length) return;
@@ -102,24 +117,23 @@ function uwDashDraw(el, wDev, hDev){
   if(!W || !H) return;
   if(cv.width !== W) cv.width = W;
   if(cv.height !== H) cv.height = H;
-  const pitch = W / n;
-  let k = Math.round(pitch * .55);
-  k = Math.max(Math.min(2, Math.floor(pitch)), Math.min(k, Math.round(8 * dpr), Math.floor(pitch) - 1));
-  if(k < 1) k = 1;
-  const room = W - n * k, g = n > 1 ? Math.floor(room / (n - 1)) : 0, extra = n > 1 ? room - g * (n - 1) : 0;
+  const k = Math.max(2, Math.round(4 * dpr)), gMin = Math.max(2, Math.round(6 * dpr));
+  const lines = Math.max(1, Math.min(n, 30, Math.floor((W + gMin) / (k + gMin))));
+  const cols = uwDashShares(cells, lines);
+  const room = W - lines * k, g = lines > 1 ? Math.floor(room / (lines - 1)) : 0, extra = lines > 1 ? room - g * (lines - 1) : 0;
   const cs = getComputedStyle(el), col = { g: cs.getPropertyValue('--uw-good'), y: cs.getPropertyValue('--uw-watch'), r: cs.getPropertyValue('--uw-risk') };
   const ctx = cv.getContext('2d');
   ctx.clearRect(0, 0, W, H);
-  let x = n > 1 ? 0 : Math.floor((W - k) / 2);
-  cells.forEach((c, i) => {
+  let x = lines > 1 ? 0 : Math.floor((W - k) / 2);
+  cols.forEach((c, i) => {
     ctx.fillStyle = (col[c] || '').trim() || '#888';
     ctx.beginPath();
     if(ctx.roundRect) ctx.roundRect(x, 0, k, H, k / 2); else ctx.rect(x, 0, k, H);
     ctx.fill();
     // the leftover pixels go one to a gap, spread along the bar
-    x += k + g + (Math.floor((i + 1) * extra / (n - 1)) - Math.floor(i * extra / (n - 1)));
+    x += k + g + (Math.floor((i + 1) * extra / (lines - 1)) - Math.floor(i * extra / (lines - 1)));
   });
-  el.dataset.k = k;   // the line width in screen pixels (tests read it)
+  el.dataset.k = k; el.dataset.lines = cols.join('');   // what was drawn (tests read it)
 }
 
 // ---- the two small cards: WhatsApp over Reminders (Notes when WhatsApp is off) ----

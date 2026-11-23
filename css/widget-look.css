@@ -196,7 +196,6 @@ html.ui-w .uw-hc .uw-big small{font-size:24px;margin-left:4px}
 html.ui-w .uw-dash{display:block;margin-top:auto;padding-top:18px}
 /* the lines are drawn by uwDashFit (dashboard-widgets.js), in whole screen pixels */
 html.ui-w .uw-dash canvas{display:block;width:100%;height:30px}
-html.ui-w .uw-dash.is-many canvas{height:26px}
 html.ui-w .uw-lg .g{background:var(--uw-good)}
 html.ui-w .uw-lg .am{background:var(--uw-watch)}
 html.ui-w .uw-lg .r{background:var(--uw-risk)}
