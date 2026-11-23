@@ -610,7 +610,7 @@ function ntReadForm(){
 let taskSuggestions = null, taskSuggestionsAt = 0;   // my pending ones; null until loaded
 function suggestionFromDb(r){
   return { id: r.id, title: r.title, description: r.description || '', clientId: r.client_id || '', dueDate: r.due_date || '', priority: r.priority || 'medium',
-    sourceTitle: r.source_title || 'a meeting', sourceUrl: r.source_url || '', sourceAt: r.source_at || r.created_at, quote: r.quote || '' };
+    sourceTitle: r.source_title || 'a meeting', sourceUrl: r.source_url || '', sourceAt: r.source_at || r.created_at, quote: r.quote || '', sourceId: r.source_id || '' };
 }
 async function loadTaskSuggestions(){
   if(typeof currentUser === 'undefined' || !currentUser) return [];
@@ -690,6 +690,33 @@ function granolaWatch(redraw){
     if(granolaMisses && granolaMisses <= 5 && !granolaRetry) granolaRetry = setTimeout(() => { granolaRetry = null; granolaWatch(redraw); }, granolaWait() + 50);
   });
 }
+// ---- Granola by itself (Nov 23) -----------------------------------------------------------------
+// Nobody has to press anything: a little after Radar opens, and every 15 minutes while it's open and
+// in view, it asks for a read (the server reads at most once a minute for the whole team, and only
+// meetings it hasn't read). New suggestions and meetings then show where you are. Granola's webhook
+// brings each meeting in as soon as its notes are ready; this is the net under it.
+let granolaAutoT = null, granolaAutoFirst = null;
+async function granolaAutoTick(){
+  if(document.visibilityState !== 'visible') return;
+  if(!(await granolaKnown())) return;
+  let r = null; try{ r = await granolaApi('check'); }catch(e){ return; }
+  if(!r || r.recent || r.skipped) return;
+  if(typeof tkSgRefresh === 'function') tkSgRefresh(); else { try{ await loadTaskSuggestions(); }catch(e){} }
+  if(granolaMeetings !== null){ try{ await loadGranolaMeetings(); }catch(e){} }
+  if(typeof currentViewName !== 'undefined' && currentViewName === 'notes' && typeof renderNotes === 'function') renderNotes();
+  if(typeof mRenderTab === 'function'){ if(typeof mTab !== 'undefined' && mTab === 'tasks') mRenderTab(); if(typeof mTop === 'function') mTop()?.refresh(); }
+}
+function granolaAutoStart(){
+  if(granolaAutoT) return;
+  granolaAutoT = setInterval(granolaAutoTick, 15 * 60000);
+  granolaAutoFirst = setTimeout(granolaAutoTick, 20000);
+  // back to Radar after a while away: catch up then, not up to 15 minutes later
+  let hiddenAt = 0;
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'hidden'){ hiddenAt = Date.now(); return; }
+    if(hiddenAt && Date.now() - hiddenAt > 10 * 60000) granolaAutoTick();
+  });
+}
 // What a check found, in words for a toast: { type, title, text, mine }.
 async function checkGranolaNow(){
   const before = new Set((taskSuggestions || []).map(s => s.id));
@@ -709,6 +736,43 @@ async function checkGranolaNow(){
   if(r.read) return { type: 'info', title: `Read ${r.read} meeting${r.read === 1 ? '' : 's'}`, text: plus('Nothing in them for you.'), mine };
   if(later) return { type: 'info', title: 'Nothing new for you yet', text: later, mine };
   return { type: 'info', title: 'No new meetings', text: 'Radar reads meetings shared to Granola’s team space; private notes stay private.', mine };
+}
+
+// ---- A suggested task, previewed (Nov 23) ------------------------------------------------------
+// One line isn't enough to decide: the preview has what it's about, the line it came from, and the
+// part of the meeting's notes around it (the points that share the most words with the task).
+const SG_SKIP = new Set(['the', 'and', 'for', 'with', 'from', 'about', 'into', 'their', 'this', 'that', 'once', 'will', 'to', 'of', 'on', 'in', 'a', 'an', 'is', 'be']);
+function sgWords(t){ return String(t || '').toLowerCase().replace(/\*\*/g, '').replace(/[^a-z0-9]+/g, ' ').split(' ').filter(w => w.length > 2 && !SG_SKIP.has(w)); }
+function suggestionMeeting(s){ return s && s.sourceId ? (granolaMeetings || []).find(m => m.id === s.sourceId) || null : null; }
+// Markdown of the best one or two points (with what's nested under them, under their heading), or ''.
+function suggestionExcerpt(s){
+  const m = suggestionMeeting(s); if(!m || !m.summary) return '';
+  const blocks = []; let head = '', cur = null;
+  m.summary.replace(/\r/g, '').split('\n').forEach(l => {
+    const h = l.match(/^#{1,4}\s+(.*)$/);
+    if(h){ head = h[1].trim(); cur = null; return; }
+    if(/^[-*]\s+/.test(l)){ cur = { head, lines: [l] }; blocks.push(cur); return; }
+    if(cur && l.trim()) cur.lines.push(l);
+  });
+  const want = new Set(sgWords(`${s.title} ${s.quote} ${s.description}`));
+  const scored = blocks.map((b, i) => { const w = new Set(sgWords(b.lines.join(' '))); let n = 0; want.forEach(x => { if(w.has(x)) n++; }); return { b, i, n }; })
+    .filter(x => x.n >= 2).sort((a, b) => b.n - a.n);
+  // the best point, and a second only when it's nearly as close (not one that shares a name)
+  const keep = scored.filter((x, k) => k === 0 || (k === 1 && x.n >= scored[0].n * 0.6)).sort((a, b) => a.i - b.i);
+  let last = null;
+  return keep.map(({ b }) => { const out = (b.head && b.head !== last ? `### ${b.head}\n` : '') + b.lines.join('\n'); last = b.head; return out; }).join('\n');
+}
+// The preview's body (shared by the desktop sheet and the iPhone sheet).
+function suggestionPreviewHtml(s){
+  const sub = suggestionSub(s), meet = s.sourceUrl ? `<a href="${safeUrl(s.sourceUrl)}" target="_blank" rel="noopener">${escapeHtml(sub[0])}</a>` : escapeHtml(sub[0]);
+  const ex = suggestionExcerpt(s);
+  const loading = granolaMeetings === null && s.sourceId;
+  return `<p class="sgp-meta">${appLogo('granola', 'xs')}<span>${meet}${sub.slice(1).map(x => ' · ' + escapeHtml(x)).join('')}</span></p>
+${s.description ? `<div class="sgp-sec"><span class="sgp-k">What it’s about</span><p class="sgp-d">${escapeHtml(s.description)}</p></div>` : ''}
+${s.quote ? `<div class="sgp-sec"><span class="sgp-k">What was said</span><blockquote class="sgp-q">${escapeHtml(s.quote)}</blockquote></div>` : ''}
+${ex ? `<div class="sgp-sec"><span class="sgp-k">In the meeting notes</span><div class="sgp-ex mtn-body">${meetingNotesHtml(ex)}</div></div>`
+  : loading ? `<div class="sgp-sec"><span class="sgp-k">In the meeting notes</span><p class="sgp-d t-3">Loading…</p></div>` : ''}
+${s.sourceUrl ? `<p class="sgp-open"><a class="x-lnk" href="${safeUrl(s.sourceUrl)}" target="_blank" rel="noopener">Open the full notes in Granola</a></p>` : ''}`;
 }
 
 // ---- Granola meetings in Notes (Nov 23) ----------------------------------------------------------
@@ -786,7 +850,7 @@ function openMeetingNotes(id){
 <div class="mtn-body">${meetingNotesHtml(m.summary)}</div>
 <div class="sheet-a">${m.url ? `<a class="btn" href="${safeUrl(m.url)}" target="_blank" rel="noopener">Open in Granola</a>` : ''}<button class="btn btn-p" id="mtnDone" onclick="closeAppModal()">Done</button></div>`, 640);
   // focus starts on Done, not on the first link inside the notes
-  requestAnimationFrame(() => document.getElementById('mtnDone')?.focus({ preventScroll: true }));
+  setTimeout(() => document.getElementById('mtnDone')?.focus({ preventScroll: true }), 30);   // after the sheet's own first focus
 }
 
 async function insertTaskRow(row){

@@ -18,7 +18,7 @@ function tkSuggestHtml(){
   const shown = tkSgAll ? list : list.slice(0, 4);
   const row = s => {
     const sub = suggestionSub(s), meet = s.sourceUrl ? `<a href="${safeUrl(s.sourceUrl)}" target="_blank" rel="noopener" title="Open the notes in Granola">${escapeHtml(sub[0])}</a>` : escapeHtml(sub[0]);
-    return `<div class="tk-sg-r" data-sg="${s.id}"><div class="tx"><b>${escapeHtml(s.title)}</b><span class="s">${meet}${sub.slice(1).map(x => ' · ' + escapeHtml(x)).join('')}</span>${s.quote ? `<span class="q">“${escapeHtml(s.quote)}”</span>` : ''}</div>`
+    return `<div class="tk-sg-r" data-sg="${s.id}"><div class="tx" role="button" tabindex="0" aria-label="Preview “${escapeHtml(s.title)}”" onclick="if(!event.target.closest('a'))tkSgPreview('${s.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();tkSgPreview('${s.id}')}"><b>${escapeHtml(s.title)}</b><span class="s">${meet}${sub.slice(1).map(x => ' · ' + escapeHtml(x)).join('')}</span>${s.quote ? `<span class="q">“${escapeHtml(s.quote)}”</span>` : ''}</div>`
       + `<div class="tk-sg-a"><button class="btn sm" onclick="tkSgAdd('${s.id}')">Add</button><button class="btn sm" onclick="tkSgEdit('${s.id}')">Edit…</button>`
       + `<button class="ib" aria-label="Dismiss “${escapeHtml(s.title)}”" title="Dismiss" onclick="tkSgDismiss('${s.id}')">${icon('x')}</button></div></div>`;
   };
@@ -31,6 +31,15 @@ async function tkSgRefresh(){
   const before = (taskSuggestions || []).map(s => s.id).join();
   try{ await loadTaskSuggestions(); }catch(e){} finally{ tkSgRefresh.busy = false; }
   if((taskSuggestions || []).map(s => s.id).join() !== before && typeof currentViewName !== 'undefined' && currentViewName === 'tasks') renderTasks();
+}
+// The preview (Nov 23): what the task is about before deciding; Add, Edit… or Dismiss from there.
+function tkSgPreview(id){
+  const s = (taskSuggestions || []).find(x => x.id === id); if(!s) return;
+  openAppModal(`<h3 class="sgp-h">${escapeHtml(s.title)}</h3><div class="sgp" id="sgpBody">${suggestionPreviewHtml(s)}</div>
+<div class="sheet-a sgp-a"><button class="btn sgp-x" onclick="closeAppModal();tkSgDismiss('${s.id}')">Dismiss</button><span class="sgp-gap"></span><button class="btn" onclick="closeAppModal();tkSgEdit('${s.id}')">Edit…</button><button class="btn btn-p" id="sgpAdd" onclick="closeAppModal();tkSgAdd('${s.id}')">Add to My Tasks</button></div>`, 560);
+  setTimeout(() => document.getElementById('sgpAdd')?.focus({ preventScroll: true }), 30);   // after the sheet's own first focus
+  // the meeting's notes, for the excerpt, if they aren't here yet
+  if(granolaMeetings === null && s.sourceId) loadGranolaMeetings().then(() => { const b = document.getElementById('sgpBody'); if(b) b.innerHTML = suggestionPreviewHtml(s); });
 }
 // A decided row folds away, then the list redraws without it.
 function tkSgOut(id, then){

@@ -40,7 +40,8 @@ html.ui-w .mac[data-theme] .app-win .side{
 html.ui-w .mac[data-theme] .app-win .side .src-i{height:36px;border-radius:12px;font-size:13.5px;font-weight:400;transition:transform 160ms var(--uw-ease),background-color 120ms ease,color 120ms ease}
 html.ui-w .mac[data-theme] .app-win .side .src-i.on{background:var(--sb-on);color:var(--sb-strong);box-shadow:var(--uw-shadow),var(--uw-hi)}
 html.ui-w .mac[data-theme] .app-win .side .src-i:active{transform:scale(.97);transition-duration:100ms}
-html.ui-w .mac .app-win .side .src-i :is(#navTasksBadge,#navWhatsappBadge,#navQueueBadge){font-family:var(--mono);font-weight:500;font-size:11px;background:var(--fill-2);color:var(--label-2)}
+/* Tasks, WhatsApp and Queue: what's on you, so a solid pill you see at a glance (Nov 23; was grey on grey) */
+html.ui-w .mac .app-win .side .src-i :is(#navTasksBadge,#navWhatsappBadge,#navQueueBadge){font-family:var(--mono);font-weight:600;font-size:11px;background:var(--label);color:var(--grp)}
 html.ui-w .mac .side-foot{border-top-color:var(--sep)}
 html.ui-w .mac .side-brand .brand-mark{border-radius:9px}
 html.ui-w .mac .stm{border-radius:16px;background:var(--grp);box-shadow:0 0 0 1px var(--sep)}
@@ -129,15 +130,16 @@ html.ui-w .mac[data-theme="light"]{--uw-good:#1E9A60;--uw-watch:#C2850C;--uw-ris
 html.ui-w #dashRoot.content{overflow:auto}
 /* every tab sits the same distance from the sidebar as the Dashboard's cards */
 html.ui-w{--uw-gl:18px}
-html.ui-w .uwd{min-height:100%;display:flex;flex-direction:column;gap:14px;padding:4px 26px 22px var(--uw-gl);color:var(--label)}
+html.ui-w .uwd{min-height:100%;display:flex;flex-direction:column;gap:12px;padding:0 26px 22px var(--uw-gl);color:var(--label)}
 /* the plain pages (Past Improvements, Finished Tasks, My Profile) on the same gutter */
 html.ui-w .view > .content{padding:6px 26px 30px var(--uw-gl)}
 html.ui-w #profileRoot.settings-pane{padding:6px 26px 30px var(--uw-gl)!important}
 html.ui-w #profileRoot .set-body{padding-left:0;padding-right:0}
 html.ui-w .uwd *{box-sizing:border-box}
-html.ui-w .uw-hd{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:2px 4px 0}
-html.ui-w .uw-hd h1{margin:0;font-size:30px;font-weight:400;letter-spacing:-.03em;line-height:1.1}
+html.ui-w .uw-hd{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:0 4px}
+html.ui-w .uw-hd h1{margin:0;font-size:30px;font-weight:400;letter-spacing:-.03em;line-height:1.05}
 html.ui-w .uw-fsub{display:flex;align-items:center;gap:10px;font-size:13.5px;color:var(--label-2)}
+@media (max-height:960px){html.ui-w .uwd{gap:10px;padding-bottom:18px}html.ui-w .uw-hd h1{font-size:27px}}   /* short windows: the page still fits with the sub text under the greeting */
 html.ui-w .uw-mono{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.08em;color:var(--label-3)}
 html.ui-w .uw-risk{color:var(--uw-risk)}
 html.ui-w .uw-gr{flex:1;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:auto 1fr;gap:14px;min-height:0}
@@ -275,7 +277,7 @@ html.ui-w .uw-e span{font-size:12px;color:var(--label-2);white-space:nowrap;over
 /* the page head: a big thin title with its sentence beside it, the filters on the right */
 html.ui-w :is(.tk,.rmi,.hx,.wa,.tmi){padding:6px 26px 30px var(--uw-gl)}
 html.ui-w :is(.tk-hd,.rmi-hd){align-items:center}
-html.ui-w :is(.tk-hd,.rmi-hd,.hx-top) > div:first-child{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 16px;min-width:0}
+html.ui-w :is(.tk-hd,.rmi-hd,.hx-top) > div:first-child{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-width:0}   /* the sub text under the title (Nov 23) */
 html.ui-w :is(.tk-hd h2,.rmi-hd h2,.hx-h){font-size:30px;font-weight:400;letter-spacing:-.03em;line-height:1.15}
 html.ui-w :is(.tk-hd p,.rmi-hd p,.hx-s){margin:0;font-size:13.5px;color:var(--label-2)}
 html.ui-w :is(.tk-hd p b,.hx-s b){color:var(--uw-risk);font-weight:400}
@@ -443,7 +445,7 @@ html.ui-w .tmi-add{border-radius:var(--uw-r-ctl)}
 /* ---- Recently Deleted: a title, then each kind as a card ---- */
 html.ui-w #trashRoot{padding:6px 26px 30px var(--uw-gl)}
 html.ui-w .tr-top{align-items:center;gap:8px 10px}
-html.ui-w .tr-hd{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 16px;min-width:0}
+html.ui-w .tr-hd{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-width:0}
 html.ui-w .tr-hd h2{margin:0;font-size:30px;font-weight:400;letter-spacing:-.03em;line-height:1.15}
 html.ui-w .tr-hd p{margin:0;font-size:13.5px;color:var(--label-2)}
 html.ui-w .tr-list{margin-top:22px;display:flex;flex-direction:column;gap:14px}
@@ -531,6 +533,15 @@ html.ui-w .n1-t.has-c{box-shadow:inset 3px 0 0 var(--cc),0 0 0 1px var(--sep),va
 html.ui-w .n1-tc .mono{display:none}
 html.ui-w .n1-tc time{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase}
 html.ui-w .n1-t h3{font-size:16px;font-weight:500}
+/* tiles answer the pointer (the new look's background had covered the hover): a lift of tint and
+   edge, Granola's green on a meeting; a press settles them */
+html.ui-w .n1-t{transition:background-color 160ms ease,box-shadow 160ms ease,transform 160ms var(--uw-ease)}
+@media (hover:hover) and (pointer:fine){
+  html.ui-w .n1-t:not(.has-c):not(.mt-t):hover{background:color-mix(in srgb,var(--label) 4%,var(--grp));box-shadow:0 0 0 1px var(--sep-strong),var(--uw-shadow),var(--uw-hi)}
+  html.ui-w .n1-t.mt-t:hover{background:color-mix(in srgb,#B2C248 8%,var(--grp));box-shadow:0 0 0 1px color-mix(in srgb,#B2C248 40%,var(--sep)),var(--uw-shadow),var(--uw-hi)}
+}
+html.ui-w .n1-t:active:not(:has(:is(button,a,[onclick],[role=button],[role=checkbox]):active)){transform:scale(.99)}
+@media (prefers-reduced-motion:reduce){ html.ui-w .n1-t{transition:background-color 160ms ease,box-shadow 160ms ease} html.ui-w .n1-t:active{transform:none} }
 html.ui-w .nt-st{font-weight:400}
 html.ui-w .nt-st.prog i{background:#5AA7FF}
 html.ui-w .nt-st.done i{background:var(--uw-good)}
@@ -710,7 +721,7 @@ html.ui-w .ev b{font-weight:500}
 /* ---- Plan: the same head as the other tabs, the side column as a card ---- */
 html.ui-w .pln{padding:6px 26px 30px var(--uw-gl)}
 html.ui-w .pl-hd{align-items:center}
-html.ui-w .pl-hd > div:first-child{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 16px;min-width:0}
+html.ui-w .pl-hd > div:first-child{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-width:0}
 html.ui-w .pl-hd h2{font-size:30px;font-weight:400;letter-spacing:-.03em;line-height:1.15}
 html.ui-w .pl-hd p{margin:0}
 html.ui-w .pl-hd p b{font-weight:500}
@@ -1062,3 +1073,6 @@ html.ui-w .cp-pg .uw-wt{white-space:nowrap}
 html.ui-w .mac .cl-bmenu{width:320px}
 html.ui-w .mac .cl-bmenu .mi{height:auto;min-height:34px;align-items:flex-start;padding:9px 10px;white-space:normal}
 html.ui-w .mac .cl-bmenu .mi > svg{margin-top:2px}
+html.ui-w .sgp-h{font-weight:500}
+@media (hover:hover) and (pointer:fine){ html.ui-w .tk-sg-r .tx:hover{background:var(--uw-c2)} }
+html.ui-w .sgp-ex{background:var(--uw-c2);border-radius:12px}

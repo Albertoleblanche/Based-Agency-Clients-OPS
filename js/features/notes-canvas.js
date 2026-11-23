@@ -92,13 +92,20 @@ function renderNotes(){
   if(notesScope === 'meetings' && !showMt) notesScope = 'all';
   const mts = notesScope === 'meetings' ? granolaMeetings : null;
   if(notesScope === 'meetings') meetingsRefresh(() => { if(currentViewName === 'notes') renderNotes(); });
-  const used = [...new Set((notesScope === 'meetings' ? (mts || []) : notes).map(n => n.clientId))].map(id => clients.find(c => c.id === id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
+  // All has the meetings too, beside your notes, newest first (Nov 23); Open and Done are notes only
+  if(showMt && granolaMeetings === null && notesScope !== 'meetings') loadGranolaMeetings().then(() => { if(currentViewName === 'notes') renderNotes(); });
+  const mtAll = showMt && granolaMeetings ? granolaMeetings : [];
+  const used = [...new Set((notesScope === 'meetings' ? (mts || []) : notesScope === 'all' ? notes.concat(mtAll) : notes).map(n => n.clientId))].map(id => clients.find(c => c.id === id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
   if(notesClient !== 'all' && !used.some(c => c.id === notesClient)) notesClient = 'all';
   const cur = used.find(c => c.id === notesClient);
   const mine = cur ? notes.filter(n => n.clientId === cur.id) : notes;
+  const mtMine = cur ? mtAll.filter(m => String(m.clientId) === String(cur.id)) : mtAll;
   const open = mine.filter(n => n.status !== 'done'), done = mine.filter(n => n.status === 'done');
   const shown = (notesScope === 'open' ? open : notesScope === 'done' ? done : mine).slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  const seg = [['all', 'All', mine.length], ['open', 'Open', open.length], ['done', 'Done', done.length]].concat(showMt ? [['meetings', 'Meetings', granolaMeetings ? granolaMeetings.length : '']] : [])
+  const allItems = notesScope === 'all' ? mine.map(n => ({ at: n.createdAt, html: () => noteTileHtml(n) })).concat(mtMine.map(m => ({ at: m.at, html: () => meetingTileHtml(m) })))
+    .sort((a, b) => new Date(b.at) - new Date(a.at)) : null;
+  if(currentViewName === 'notes' && notesScope !== 'meetings' && mtAll.length) setToolbar(null, `${notes.length} note${notes.length === 1 ? '' : 's'}, private to you · ${mtAll.length} meeting${mtAll.length === 1 ? '' : 's'} from Granola`);
+  const seg = [['all', 'All', mine.length + mtMine.length], ['open', 'Open', open.length], ['done', 'Done', done.length]].concat(showMt ? [['meetings', 'Meetings', granolaMeetings ? granolaMeetings.length : '']] : [])
     .map(([k, t, n]) => `<button class="${notesScope === k ? 'on' : ''}" role="tab" aria-selected="${notesScope === k}" onclick="setNotesFilter('scope','${k}')">${t}${n !== '' ? ` <span class="c">${n}</span>` : ''}</button>`).join('');
   if(notesScope === 'meetings'){
     if(currentViewName === 'notes') setToolbar(null, `From Granola’s team space${mts ? ` · ${mts.length} meeting${mts.length === 1 ? '' : 's'}` : ''}${granolaMtChecking ? ' · checking for new ones…' : ''}`);
@@ -125,9 +132,9 @@ ${mts === null ? skeletonHtml('notes', 'Loading meetings…') : list.length ? `<
 <label class="pop pop-sel n1-pop"><span class="pl">${escapeHtml(cur ? cur.name : 'All clients')}</span>${icon('caret-down')}<select aria-label="Client" onchange="setNotesFilter('client',this.value)"><option value="all">All clients</option>${used.map(c => `<option value="${c.id}"${c === cur ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></label>
 <div class="seg" role="tablist" aria-label="Show">${seg}</div>
 </div>
-${shown.length ? `<div class="n1-grid">${shown.map(noteTileHtml).join('')}</div>` : emptyState({ icon: !notes.length ? 'sticky-note' : notesScope === 'open' ? 'check-circle' : 'sticky-note', tone: !notes.length ? 'blue' : notesScope === 'open' ? 'ok' : '', title: empty[0], text: empty[1], html: true,
+${allItems && allItems.length ? `<div class="n1-grid">${allItems.map(x => x.html()).join('')}</div>` : shown.length ? `<div class="n1-grid">${shown.map(noteTileHtml).join('')}</div>` : emptyState({ icon: !notes.length ? 'sticky-note' : notesScope === 'open' ? 'check-circle' : 'sticky-note', tone: !notes.length ? 'blue' : notesScope === 'open' ? 'ok' : '', title: empty[0], text: empty[1], html: true,
     action: !notes.length || notesScope === 'open' ? 'New Note' : '', actionIcon: 'plus', onAction: "openNoteSheet('new')" })}
-<p class="n1-foot nt-lock">${icon('lock-simple')}Only you can see your notes</p>
+<p class="n1-foot nt-lock">${icon('lock-simple')}Only you can see your notes${allItems && mtMine.length ? '. Meetings from Granola are shared with the team.' : ''}</p>
 </div>`;
 }
 

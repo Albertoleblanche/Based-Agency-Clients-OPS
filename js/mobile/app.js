@@ -193,6 +193,7 @@ async function mLoadAll(){
   clientReminders = (rr.data || []).map(r => ({ id: r.id, clientId: r.client_id, question: r.question, askedBy: r.asked_by, askedDate: r.asked_date, followUpDate: r.follow_up_date, status: r.status }));
   notes = (nr.data || []).map(n => ({ id: n.id, clientId: n.client_id, title: n.title, text: n.text, status: n.status, link: n.link, followUpDate: n.follow_up_date, updatedAt: n.updated_at }));
   try{ await loadTaskSuggestions(); }catch(e){ taskSuggestions = []; }   // tasks from meetings (Granola)
+  if(typeof granolaAutoStart === 'function') granolaAutoStart();      // and they come in by themselves
   timeEntries = (er.data || []).map(e => ({ id: e.id, userId: e.user_id, clientId: e.client_id, date: e.entry_date, minutes: e.minutes, description: e.description || '', service: e.service || '', logged: !!e.logged,
     createdAt: e.created_at, harvestProjectId: e.harvest_project_id || null, harvestTaskId: e.harvest_task_id || null, source: e.source || '', harvestLocked: !!e.harvest_locked, improvementId: e.improvement_id || null }));
   notifications = nf.data || [];
@@ -355,8 +356,10 @@ function mEdgeSwipe(el){
 
 // Sheets rise from the bottom; the screen behind shrinks back.
 let mSheetDirty = false;
+let mSheetGen = 0;   // a sheet opened again before the last close finished keeps its content
 function mOpenSheet(title, bodyHtml, opts){
   opts = opts || {};
+  mSheetGen++;
   const sh = $m('mSheet'), scrim = $m('mSheetScrim');
   sh.innerHTML = `<div class="grab" aria-hidden="true"></div>
 <div class="inav"><button class="l" onclick="mCloseSheet()">${opts.cancel || 'Cancel'}</button><span class="ttl2">${mEsc(title)}</span><div class="r">${opts.done ? `<button id="mSheetDone" onclick="${opts.done}"><b>${opts.doneLabel || 'Done'}</b></button>` : ''}</div></div>
@@ -372,7 +375,8 @@ function mCloseSheet(force){
   if(!sh || sh.hidden) return;
   sh.classList.remove('in'); scrim.classList.remove('in');
   $m('mApp').classList.remove('sheeted');
-  setTimeout(() => { sh.hidden = true; scrim.hidden = true; sh.innerHTML = ''; }, 380);
+  const gen = mSheetGen;
+  setTimeout(() => { if(gen !== mSheetGen) return; sh.hidden = true; scrim.hidden = true; sh.innerHTML = ''; }, 380);
 }
 // A list to pick from, as its own sheet (clients, services, dates, people).
 let mPickCb = null;
@@ -382,6 +386,7 @@ function mPick(title, options, cur, cb){
   mPick._prev = prev;
   const rows = options.map(([v, t, s]) => `<button class="ir" onclick="mPicked(${jsArg(v)})"><div class="tx"><span class="t n">${mEsc(t)}</span>${s ? `<span class="s">${mEsc(s)}</span>` : ''}</div><div class="r">${String(v) === String(cur) ? `<span class="pk">${icon('check', { weight: 'bold' })}</span>` : ''}</div></button>`).join('');
   const sh = $m('mSheet');
+  mSheetGen++;
   sh.innerHTML = `<div class="grab" aria-hidden="true"></div><div class="inav"><button class="l" onclick="mPicked(null, true)">Back</button><span class="ttl2">${mEsc(title)}</span></div>
 ${options.length > 8 ? `<div class="isearch">${icon('magnifying-glass')}<input placeholder="Search" oninput="mPickFilter(this.value)" aria-label="Search"></div>` : ''}
 <div class="sheet-scroll"><div class="ig flat ilist-pick" style="margin-top:12px" id="mPickList">${rows}</div></div>`;
@@ -554,11 +559,20 @@ async function mGranolaCheck(){
 // Tasks suggested from meetings (Nov 23, Granola): Add makes it your task; tapping it opens New Task
 // filled in (adding it from there); × dismisses it, with Undo. Shared logic in sheets-canvas.js.
 let mSgAll = false;
+// Tapping a suggestion shows what it's about first (Nov 23); Add, Edit or Dismiss from there.
+function mSgPreview(id){
+  const s = (taskSuggestions || []).find(x => x.id === id); if(!s) return;
+  const body = () => `<div class="sgp msgp"><h3 class="sgp-h">${mEsc(s.title)}</h3>${suggestionPreviewHtml(s)}
+<div class="msgp-a"><button class="ibtn msgp-add" onclick="mCloseSheet(true);mSgAdd('${s.id}')">Add to My Tasks</button>
+<div class="msgp-2"><button class="ibtn s" onclick="mCloseSheet(true);setTimeout(() => mSgEdit('${s.id}'), 320)">Edit</button><button class="ibtn s msgp-x" onclick="mCloseSheet(true);mSgDismiss('${s.id}')">Dismiss</button></div></div></div>`;
+  mOpenSheet('Suggested Task', body(), { cancel: 'Close' });
+  if(granolaMeetings === null && s.sourceId) loadGranolaMeetings().then(() => { const sh = $m('mSheet'); const sc = sh && sh.querySelector('.sheet-scroll'); if(sc && !sh.hidden) sc.innerHTML = body(); });
+}
 function mSuggestHtml(){
   if(typeof taskSuggestions === 'undefined' || !taskSuggestions || mTaskScope === 'byme') return '';
   const list = taskSuggestions.filter(s => mTaskClient === 'all' || s.clientId === mTaskClient);
   if(!list.length) return '';
-  const row = s => `<div class="ir msug" data-sg="${s.id}"><button class="tx" onclick="mSgEdit('${s.id}')"><span class="t n">${mEsc(s.title)}</span><span class="s">${mEsc(suggestionSub(s).join(' · '))}</span></button>`
+  const row = s => `<div class="ir msug" data-sg="${s.id}"><button class="tx" onclick="mSgPreview('${s.id}')"><span class="t n">${mEsc(s.title)}</span><span class="s">${mEsc(suggestionSub(s).join(' · '))}</span></button>`
     + `<button class="msg-add" onclick="mSgAdd('${s.id}')">Add</button><button class="msg-x" aria-label="Dismiss ${mEsc(s.title)}" onclick="mSgDismiss('${s.id}')">${icon('x', { weight: 'bold' })}</button></div>`;
   return `<div class="ish"><h2 class="ish-lg">${appLogo('granola', 'xs')}From Your Granola Meetings</h2>${list.length > 4 ? `<button onclick="mSgAll=!mSgAll;mRenderTab()">${mSgAll ? 'Fewer' : 'See All'}</button>` : ''}</div>
 <div class="ig msg-list">${(mSgAll ? list : list.slice(0, 4)).map(row).join('')}</div><p class="ifoot">Found in your Granola notes. Add the ones that are yours to do.</p>`;

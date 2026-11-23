@@ -102,9 +102,9 @@ module.exports = async function handler(req, res) {
     if (provider === 'granola') {
       const { data: me } = await admin.from('team_profiles').select('role, access_revoked').eq('id', userId).maybeSingle();
       if (!me || me.access_revoked) { res.status(403).json({ error: 'Only team members can see this.' }); return; }
-      if (req.method === 'GET') { res.status(200).json(await granolaStatus(admin)); return; }
-      const { action, key } = req.body || {};
       const appUrl = (process.env.APP_URL || `https://${req.headers['x-forwarded-host'] || req.headers.host}`).replace(/\/+$/, '');
+      if (req.method === 'GET') { res.status(200).json(await granolaStatus(admin, { appUrl })); return; }
+      const { action, key } = req.body || {};
       // Check Granola (Tasks, Notes → Meetings): anyone on the team; at most once a minute for everyone together
       if (action === 'check') { res.status(200).json(await granolaReadNow(admin, { budgetMs: 45000, appUrl })); return; }
       if (me.role !== 'admin') { res.status(403).json({ error: 'Only admins can manage the Granola connection.' }); return; }

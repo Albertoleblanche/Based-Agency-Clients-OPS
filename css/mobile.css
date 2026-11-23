@@ -413,3 +413,21 @@ body.mac.mobile { overflow: hidden; background: var(--ios-bg, #F2F2F7); -webkit-
 .mtn-body li { margin: 3px 0; }
 .mtn-body p { margin: 0 0 8px; }
 .mtn-open { display: flex; justify-content: center; margin-top: 18px; text-decoration: none; }
+/* a suggested Granola task, previewed (Nov 23) */
+.msgp { padding: 6px 16px 24px; }
+.msgp .sgp-h { margin: 4px 0 8px; font-size: 22px; font-weight: 600; letter-spacing: -.01em; line-height: 1.25; }
+.msgp .sgp-meta { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 18px; font-size: 14px; color: var(--label-2); }
+.msgp .sgp-meta .app-logo.xs { width: 18px; height: 18px; border-radius: 5px; margin-top: 1px; }
+.msgp .sgp-meta a { color: inherit; }
+.msgp .sgp-sec { margin: 0 0 16px; }
+.msgp .sgp-k { display: block; margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--label-3); text-transform: uppercase; letter-spacing: .02em; }
+.msgp .sgp-d { margin: 0; font-size: 16px; line-height: 1.45; color: var(--label); }
+.msgp .sgp-q { margin: 0; padding: 2px 0 2px 12px; border-left: 2px solid #B2C248; font-size: 16px; color: var(--label-2); }
+.msgp .sgp-ex { padding: 12px 14px; border-radius: 12px; background: var(--fill, rgba(120,120,128,.12)); font-size: 15px; }
+.msgp .sgp-open { margin: 4px 0 0; font-size: 15px; }
+.msgp .sgp-open a { color: var(--blue, #0a84ff); text-decoration: none; }
+.msgp-a { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+.msgp-a .msgp-add { background: var(--label); color: var(--ios-bg, #fff); }
+.msgp-2 { display: flex; gap: 10px; }
+.msgp-2 .ibtn { flex: 1; }
+.msgp-2 .msgp-x { color: var(--label-2); }

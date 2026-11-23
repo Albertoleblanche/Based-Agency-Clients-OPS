@@ -170,6 +170,7 @@ async function showApp(session, o){
     renderAll();
     siEnterApp();
     updateTasksNavBadge();
+    if(typeof granolaAutoStart === 'function') granolaAutoStart();   // meetings come in by themselves
     applyAppIcon();
     applyAppBranding();
     applyNavLabels();
