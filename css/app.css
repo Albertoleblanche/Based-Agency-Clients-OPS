@@ -3177,3 +3177,9 @@ html.ui-w .tk-sg{border-radius:var(--uw-r-card);box-shadow:0 0 0 1px var(--sep),
 .ai-setup ol{margin:8px 0 10px;padding-left:18px;display:flex;flex-direction:column;gap:4px}
 .ai-setup ol b{color:var(--label);font-weight:550}
 @media (max-width:640px){ .ai-steps{grid-template-columns:1fr} }
+/* Check Granola, in the Tasks header */
+.tk-gr{gap:6px}
+.tk-gr svg{width:15px;height:15px}
+.tk-gr-spin{width:13px;height:13px;border-radius:50%;border:1.5px solid color-mix(in srgb,currentColor 25%,transparent);border-top-color:currentColor;animation:tkGrSpin 700ms linear infinite}
+@keyframes tkGrSpin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){ .tk-gr-spin{animation:none} }

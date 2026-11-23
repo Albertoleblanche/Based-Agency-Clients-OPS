@@ -28,8 +28,8 @@
 // POST /api/integrations  body: { provider: 'push', action: 'send',
 //        targetUserId, title, body, url }
 // GET  /api/integrations?provider=granola → Granola status (anyone on the team)
-// POST /api/integrations  body: { provider: 'granola', action: 'connect' (key) | 'disconnect' | 'read-now' }
-//   (admins) — tasks from Granola meetings, lib/granola-tasks.js. The webhook Granola calls is
+// POST /api/integrations  body: { provider: 'granola', action: 'check' } (anyone on the team: Check Granola in
+//   Tasks, at most once a minute) | { action: 'connect' (key) | 'disconnect' | 'read-now' } (admins) — tasks from Granola meetings, lib/granola-tasks.js. The webhook Granola calls is
 //   /hooks/granola, in api/send-slack-message.js (it needs the raw body).
 //
 // Two more things live here, reached by rewrites in vercel.json, before the sign-in check:
@@ -53,7 +53,7 @@ const {
   deleteTimeEntryFromHarvest,
 } = require('../lib/harvest-sync');
 const { sendPushToUser } = require('../lib/push-notify');
-const { connectGranola, disconnectGranola, granolaStatus, granolaCatchUp } = require('../lib/granola-tasks');
+const { connectGranola, disconnectGranola, granolaStatus, granolaCatchUp, granolaReadNow } = require('../lib/granola-tasks');
 const { handleMcp, protectedResourceMetadata } = require('../lib/mcp-server');
 
 module.exports = async function handler(req, res) {
@@ -100,8 +100,10 @@ module.exports = async function handler(req, res) {
       const { data: me } = await admin.from('team_profiles').select('role, access_revoked').eq('id', userId).maybeSingle();
       if (!me || me.access_revoked) { res.status(403).json({ error: 'Only team members can see this.' }); return; }
       if (req.method === 'GET') { res.status(200).json(await granolaStatus(admin)); return; }
-      if (me.role !== 'admin') { res.status(403).json({ error: 'Only admins can manage the Granola connection.' }); return; }
       const { action, key } = req.body || {};
+      // Check Granola (Tasks): anyone on the team; at most once a minute for everyone together
+      if (action === 'check') { res.status(200).json(await granolaReadNow(admin, { budgetMs: 45000 })); return; }
+      if (me.role !== 'admin') { res.status(403).json({ error: 'Only admins can manage the Granola connection.' }); return; }
       const appUrl = (process.env.APP_URL || `https://${req.headers['x-forwarded-host'] || req.headers.host}`).replace(/\/+$/, '');
       if (action === 'connect') {
         const r = await connectGranola(admin, { key, appUrl, userId });

@@ -534,11 +534,22 @@ function mTasksHtml(){
   const sg = mSuggestHtml();
   const body = sg + groups.filter(g => g[1].length).map(([g, ts, cls]) => `<div class="ish"><h2${cls ? ` class="${cls}"` : ''}>${g}</h2></div><div class="ig">${ts.sort(order).map(mTaskRow).join('')}</div>`).join('')
     || `<div style="margin-top:22px">${mEmpty(mTaskScope === 'mine' ? 'Nothing on your list' : 'No open tasks', 'Tap + to add one.')}</div>`;
-  return `<div class="inav"><div class="r"><button aria-label="Filter by client" onclick="mPickTaskClient()" style="${c ? 'color:var(--label)' : ''}">${icon('funnel-simple')}</button></div></div>
+  if(granolaOn === null && !mTasksHtml.asked){ mTasksHtml.asked = true; granolaKnown().then(on => { if(on && mTab === 'tasks') mRenderTab(); }); }
+  const gr = granolaOn ? `<button aria-label="Check Granola for new tasks" title="Check Granola" class="mgr${mGranolaBusy ? ' is-busy' : ''}" onclick="mGranolaCheck()"${mGranolaBusy ? ' disabled' : ''}>${icon('notepad')}</button>` : '';
+  return `<div class="inav"><div class="r">${gr}<button aria-label="Filter by client" onclick="mPickTaskClient()" style="${c ? 'color:var(--label)' : ''}">${icon('funnel-simple')}</button></div></div>
 <h1 class="big">Tasks</h1><p class="big-sub">${vis.length} open${overdue ? ` · ${overdue} overdue` : ''}${c ? ` · ${mEsc(c.name)}` : ''}</p>
 ${mSeg([['everyone', 'Everyone'], ['mine', 'Mine', mineN], ['byme', 'Assigned by me']], 'mSetTaskScope', mTaskScope)}
 ${body}
 ${mVisibleTasks().some(t => t.status === 'done') ? `<p class="ifoot" style="margin-top:16px"><button onclick="mOpenDoneTasks()" style="color:var(--label-2)">Show finished tasks</button></p>` : ''}`;
+}
+// Check Granola: the notepad in the Tasks bar reads new meetings now (shared with the desktop).
+let mGranolaBusy = false;
+async function mGranolaCheck(){
+  if(mGranolaBusy) return;
+  mGranolaBusy = true; mRenderTab();
+  let r; try{ r = await checkGranolaNow(); } finally { mGranolaBusy = false; }
+  showToast(r.type, r.title, r.text);
+  mRenderTab();
 }
 // Tasks suggested from meetings (Nov 23, Granola): Add makes it your task; tapping it opens New Task
 // filled in (adding it from there); × dismisses it, with Undo. Shared logic in sheets-canvas.js.

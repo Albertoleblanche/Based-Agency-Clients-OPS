@@ -650,6 +650,41 @@ function suggestionPreset(s){
     afterCreate: task => decideSuggestion(s.id, 'added', task && task.id) };
 }
 
+// ---- Check Granola (Tasks, desktop and iPhone) ---------------------------------------------------
+// Meetings come in by themselves (a webhook, and a daily read); this asks for a read now. Anyone on
+// the team can; the server skips it when Granola was read in the last minute.
+let granolaOn = null;   // is Granola connected? null until asked
+async function granolaApi(action, body){
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  const r = await fetch(action ? '/api/integrations' : '/api/integrations?provider=granola', {
+    method: action ? 'POST' : 'GET',
+    headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+    body: action ? JSON.stringify({ provider: 'granola', action, ...(body || {}) }) : undefined,
+  });
+  let data = {}; try{ data = await r.json(); }catch(e){}
+  if(!r.ok) throw new Error(data.error || 'Something went wrong talking to Granola.');
+  return data;
+}
+async function granolaKnown(){
+  if(granolaOn !== null) return granolaOn;
+  try{ granolaOn = !!(await granolaApi(null)).connected; }catch(e){ granolaOn = false; }
+  return granolaOn;
+}
+// What a check found, in words for a toast: { type, title, text, mine }.
+async function checkGranolaNow(){
+  const before = new Set((taskSuggestions || []).map(s => s.id));
+  let r;
+  try{ r = await granolaApi('check'); }catch(e){ return { type: 'error', title: 'Couldn’t check Granola', text: e.message }; }
+  try{ await loadTaskSuggestions(); }catch(e){}
+  const mine = (taskSuggestions || []).filter(s => !before.has(s.id)).length;
+  if(r.error) return { type: 'error', title: 'Granola didn’t answer', text: r.error, mine };
+  if(r.skipped === 'not connected'){ granolaOn = false; return { type: 'info', title: 'Granola isn’t connected', text: 'An admin connects it in Settings → Connections.', mine }; }
+  if(mine) return { type: 'success', title: `${mine} new task${mine === 1 ? '' : 's'} from your meetings`, text: 'Add the ones that are yours to do.', mine };
+  if(r.recent) return { type: 'info', title: 'Granola was just checked', text: 'Nothing new for you. New meetings also come in by themselves.', mine };
+  if(r.read) return { type: 'info', title: `Read ${r.read} meeting${r.read === 1 ? '' : 's'}`, text: 'Nothing in them for you.', mine };
+  return { type: 'info', title: 'No new meetings', text: 'Radar reads meetings shared to Granola’s team space; private notes stay private.', mine };
+}
+
 async function insertTaskRow(row){
   let res = await supabaseClient.from('tasks').insert(row).select().single();
   if(res.error && isMissingColumnError(res.error) && ('color' in row || 'sprint_id' in row)){

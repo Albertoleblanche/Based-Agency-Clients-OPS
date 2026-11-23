@@ -66,21 +66,27 @@ async function tkSgDismiss(id){
   } });
 }
 
+// Check Granola, in the Tasks header: anyone on the team can ask for new meetings to be read now
+// (they also come in by themselves). Shown once Radar knows Granola is connected.
+let tkGranolaBusy = false;
+function tkGranolaBtn(){
+  if(granolaOn === null && !tkGranolaBtn.asked){ tkGranolaBtn.asked = true; granolaKnown().then(on => { if(on && currentViewName === 'tasks') renderTasks(); }); }
+  if(!granolaOn) return '';
+  return `<button class="btn tk-gr" id="tkGranola" onclick="tkGranolaCheck()"${tkGranolaBusy ? ' disabled' : ''} title="Look for new action items in your Granola meetings">${tkGranolaBusy ? '<span class="tk-gr-spin" aria-hidden="true"></span>Checking…' : `${icon('notepad')}Check Granola`}</button>`;
+}
+async function tkGranolaCheck(){
+  if(tkGranolaBusy) return;
+  tkGranolaBusy = true; renderTasks();
+  let r; try{ r = await checkGranolaNow(); } finally { tkGranolaBusy = false; }
+  showToast(r.type, r.title, r.text);
+  renderTasks();
+}
+
 // ---- Settings → Connections → Granola ----------------------------------------------------------
 let granolaState = null;   // what the server says (connected, last read…); null while checking
-async function granolaApi(action, body){
-  const { data: { session } } = await supabaseClient.auth.getSession();
-  const r = await fetch(action ? '/api/integrations' : '/api/integrations?provider=granola', {
-    method: action ? 'POST' : 'GET',
-    headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-    body: action ? JSON.stringify({ provider: 'granola', action, ...(body || {}) }) : undefined,
-  });
-  let data = {}; try{ data = await r.json(); }catch(e){}
-  if(!r.ok) throw new Error(data.error || 'Something went wrong talking to Granola.');
-  return data;
-}
 async function loadGranolaState(){
   try{ granolaState = await granolaApi(null); }catch(e){ granolaState = { connected: false, error: e.message }; }
+  if(!granolaState.error) granolaOn = !!granolaState.connected;   // the Check Granola button in Tasks follows
   const box = document.getElementById('granolaBox'); if(box) box.innerHTML = granolaSheetInner();
   return granolaState;
 }
