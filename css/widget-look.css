@@ -1058,3 +1058,7 @@ html.ui-w .cp-kv b{font-weight:500;min-width:0;white-space:nowrap;overflow:hidde
 html.ui-w .cp-kv a{color:inherit;text-decoration:none}
 html.ui-w #cdRoot.is-uw .cd-tab:not([data-tab="overview"]) .h2{margin-top:4px}
 html.ui-w .cp-pg .uw-wt{white-space:nowrap}
+/* Bulk Edit's menu (Nov 23): each item holds its two lines; the new look's fixed 34px row had them spill into the next */
+html.ui-w .mac .cl-bmenu{width:320px}
+html.ui-w .mac .cl-bmenu .mi{height:auto;min-height:34px;align-items:flex-start;padding:9px 10px;white-space:normal}
+html.ui-w .mac .cl-bmenu .mi > svg{margin-top:2px}

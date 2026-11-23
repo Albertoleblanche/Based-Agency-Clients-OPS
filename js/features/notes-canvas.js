@@ -68,6 +68,14 @@ function noteTileHtml(n){
 <h3>${escapeHtml(title)}</h3><div class="n1-b">${notePreviewHtml(n.text)}</div>
 <div class="n1-tf">${foot}</div></article>`;
 }
+// Notes → Meetings (Nov 23): the meetings from Granola, read only (sheets-canvas.js)
+function meetingTileHtml(m){
+  const c = m.clientId ? clients.find(x => String(x.id) === String(m.clientId)) : null, pts = meetingPreview(m.summary, 4);
+  return `<article class="n1-t mt-t" data-meeting="${m.id}" role="button" tabindex="0" aria-label="${escapeHtml(m.title)}" onclick="openMeetingNotes(${jsArg(m.id)})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openMeetingNotes(${jsArg(m.id)})}">
+<div class="n1-tc">${c ? monoHtml(c, 'sm') : ''}<span class="n1-cl">${escapeHtml(c ? c.name : 'Team meeting')}</span><time>${escapeHtml(meetingWhenWords(m))}</time></div>
+<h3>${escapeHtml(m.title)}</h3><div class="n1-b">${pts.map(t => `<p>${escapeHtml(t)}</p>`).join('')}</div>
+<div class="n1-tf"><span class="nt-fu mt-src">${appLogo('granola', 'xs')}Granola</span>${meetingWasMine(m) ? '<span class="nt-fu">You were there</span>' : ''}${m.items ? `<span class="nt-fu">${icon('check-square')}${m.items} task${m.items === 1 ? '' : 's'}</span>` : ''}</div></article>`;
+}
 function renderNotes(){
   const root = document.getElementById('notesRoot');
   if(typeof updateNotesBadge === 'function') updateNotesBadge();
@@ -78,14 +86,35 @@ function renderNotes(){
   const gal = document.getElementById('notesGallery');
   if(currentViewName === 'notes') setToolbar(null, `Private to you · ${notes.length} note${notes.length === 1 ? '' : 's'}`);
   if(typeof notesDataLoaded !== 'undefined' && !notesDataLoaded){ gal.innerHTML = skeletonHtml('notes', 'Loading notes…'); return; }
-  const used = [...new Set(notes.map(n => n.clientId))].map(id => clients.find(c => c.id === id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
+  // Meetings shows once Granola is connected (or meetings were read); they load when it's opened
+  const showMt = typeof granolaWatch === 'function' && (granolaOn || (granolaMeetings && granolaMeetings.length));
+  if(typeof granolaWatch === 'function') granolaWatch(() => { if(currentViewName === 'notes') renderNotes(); });
+  if(notesScope === 'meetings' && !showMt) notesScope = 'all';
+  const mts = notesScope === 'meetings' ? granolaMeetings : null;
+  if(notesScope === 'meetings' && granolaMeetings === null){ loadGranolaMeetings().then(() => { if(currentViewName === 'notes') renderNotes(); }); }
+  const used = [...new Set((notesScope === 'meetings' ? (mts || []) : notes).map(n => n.clientId))].map(id => clients.find(c => c.id === id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
   if(notesClient !== 'all' && !used.some(c => c.id === notesClient)) notesClient = 'all';
   const cur = used.find(c => c.id === notesClient);
   const mine = cur ? notes.filter(n => n.clientId === cur.id) : notes;
   const open = mine.filter(n => n.status !== 'done'), done = mine.filter(n => n.status === 'done');
   const shown = (notesScope === 'open' ? open : notesScope === 'done' ? done : mine).slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  const seg = [['all', 'All', mine.length], ['open', 'Open', open.length], ['done', 'Done', done.length]]
-    .map(([k, t, n]) => `<button class="${notesScope === k ? 'on' : ''}" role="tab" aria-selected="${notesScope === k}" onclick="setNotesFilter('scope','${k}')">${t} <span class="c">${n}</span></button>`).join('');
+  const seg = [['all', 'All', mine.length], ['open', 'Open', open.length], ['done', 'Done', done.length]].concat(showMt ? [['meetings', 'Meetings', granolaMeetings ? granolaMeetings.length : '']] : [])
+    .map(([k, t, n]) => `<button class="${notesScope === k ? 'on' : ''}" role="tab" aria-selected="${notesScope === k}" onclick="setNotesFilter('scope','${k}')">${t}${n !== '' ? ` <span class="c">${n}</span>` : ''}</button>`).join('');
+  if(notesScope === 'meetings'){
+    if(currentViewName === 'notes') setToolbar(null, `From Granola’s team space${mts ? ` · ${mts.length} meeting${mts.length === 1 ? '' : 's'}` : ''}`);
+    const list = (mts || []).filter(m => !cur || String(m.clientId) === String(cur.id));
+    gal.innerHTML = `<div class="n1">
+<div class="n1-top">
+<button type="button" class="n1-cap" onclick="openNoteSheet('new')">${icon('sticky-note')}<span>Jot something down for a client…</span><span class="kbd">N</span></button>
+<label class="pop pop-sel n1-pop"><span class="pl">${escapeHtml(cur ? cur.name : 'All clients')}</span>${icon('caret-down')}<select aria-label="Client" onchange="setNotesFilter('client',this.value)"><option value="all">All clients</option>${used.map(c => `<option value="${c.id}"${c === cur ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></label>
+<div class="seg" role="tablist" aria-label="Show">${seg}</div>
+</div>
+${mts === null ? skeletonHtml('notes', 'Loading meetings…') : list.length ? `<div class="n1-grid">${list.map(meetingTileHtml).join('')}</div>`
+  : emptyState({ icon: 'sticky-note', tone: 'blue', title: cur ? `No meetings for ${escapeHtml(cur.name)}` : 'No meetings yet', text: 'Meetings shared to Granola’s team space show here once Radar has read them.', html: true })}
+<p class="n1-foot nt-lock">${appLogo('granola', 'xs')}Shared to Granola’s team space: everyone on the team sees these</p>
+</div>`;
+    return;
+  }
   const empty = !notes.length ? ['No notes yet', 'Ideas and plans for a client, just for you. When you do one, mark it done or log it as an improvement.']
     : notesScope === 'open' ? ['Nothing open', cur ? `Every note for ${escapeHtml(cur.name)} is done.` : 'Every note is done.']
     : ['Nothing done yet', 'Notes you finish, or log as an improvement, show up here.'];

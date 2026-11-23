@@ -18,7 +18,7 @@ function itipPop(){
 function itipShow(btn){
   clearTimeout(ITIP.timer);
   if(ITIP.btn && ITIP.btn !== btn) ITIP.btn.setAttribute('aria-expanded', 'false');
-  const el = itipPop(), text = btn.getAttribute('data-tip') || '';
+  const el = itipPop(), text = btn.getAttribute('data-tip') || btn.getAttribute('data-hovertip') || '';
   el.innerHTML = text.split(/\n\s*\n/).map(p => `<p>${escapeHtml(p.trim()).replace(/\n/g, '<br>')}</p>`).join('');
   el.classList.remove('on'); el.style.display = 'block';
   const r = btn.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight, pad = 8;
@@ -38,8 +38,11 @@ function itipHide(){
   ITIP.btn = null; ITIP.pinned = false;
   if(ITIP.el){ ITIP.el.classList.remove('on'); ITIP.el.style.display = 'none'; }
 }
+// [data-hovertip] (Nov 23): the same tip on hover or keyboard focus for something that does its own
+// thing on click (the Focus mark and pill), so a click never pins it.
+const ITIP_SEL = '.itip, [data-hovertip]';
 document.addEventListener('mouseover', e => {
-  const b = e.target.closest && e.target.closest('.itip');
+  const b = e.target.closest && e.target.closest(ITIP_SEL);
   if(!b || b === ITIP.btn || ITIP.pinned) return;
   clearTimeout(ITIP.timer);
   // the first tip waits a moment; the next ones open straight away
@@ -47,13 +50,13 @@ document.addEventListener('mouseover', e => {
   ITIP.timer = setTimeout(() => itipShow(b), quick ? 0 : 280);
 });
 document.addEventListener('mouseout', e => {
-  const b = e.target.closest && e.target.closest('.itip');
+  const b = e.target.closest && e.target.closest(ITIP_SEL);
   if(!b || ITIP.pinned || (e.relatedTarget && b.contains(e.relatedTarget))) return;
   clearTimeout(ITIP.timer);
   if(ITIP.btn === b) itipHide();
 });
-document.addEventListener('focusin', e => { const b = e.target.closest && e.target.closest('.itip'); if(b && b.matches(':focus-visible')) itipShow(b); });
-document.addEventListener('focusout', e => { const b = e.target.closest && e.target.closest('.itip'); if(b && ITIP.btn === b && !ITIP.pinned) itipHide(); });
+document.addEventListener('focusin', e => { const b = e.target.closest && e.target.closest(ITIP_SEL); if(b && b.matches(':focus-visible')) itipShow(b); });
+document.addEventListener('focusout', e => { const b = e.target.closest && e.target.closest(ITIP_SEL); if(b && ITIP.btn === b && !ITIP.pinned) itipHide(); });
 // a click or tap pins it open (and never reaches the row or header it sits in)
 document.addEventListener('click', e => {
   const b = e.target.closest && e.target.closest('.itip');
@@ -63,6 +66,7 @@ document.addEventListener('click', e => {
     return;
   }
   if(ITIP.pinned) itipHide();
+  else if(ITIP.btn && ITIP.btn.hasAttribute('data-hovertip')) itipHide();   // a click on the Focus pill: its tip goes
 }, true);
 document.addEventListener('keydown', e => { if(e.key === 'Escape' && ITIP.btn){ e.stopPropagation(); itipHide(); } }, true); // only the tip closes
 addEventListener('scroll', () => { if(ITIP.btn) itipHide(); }, true);

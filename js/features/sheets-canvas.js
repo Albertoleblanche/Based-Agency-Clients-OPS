@@ -711,6 +711,69 @@ async function checkGranolaNow(){
   return { type: 'info', title: 'No new meetings', text: 'Radar reads meetings shared to Granola’s team space; private notes stay private.', mine };
 }
 
+// ---- Granola meetings in Notes (Nov 23) ----------------------------------------------------------
+// The meetings Radar read from Granola's team space, with their notes, read only: kept by the server
+// with what it read (app_storage, granola-note:<id>), the way everyone on the team sees them in
+// Granola. Another recording of a meeting already there isn't listed twice.
+let granolaMeetings = null;   // null until loaded
+async function loadGranolaMeetings(){
+  const { data, error } = await supabaseClient.from('app_storage').select('key, value, updated_at').like('key', 'granola-note:%').order('updated_at', { ascending: false }).limit(120);
+  if(error){ granolaMeetings = granolaMeetings || []; return granolaMeetings; }
+  const since = Date.now() - 90 * 864e5;
+  granolaMeetings = (data || []).map(r => {
+    let m = {}; try{ m = JSON.parse(r.value) || {}; }catch(e){}
+    return { id: r.key.slice('granola-note:'.length), title: m.title || 'A meeting', summary: m.summary || '', url: m.url || null, at: m.meetingAt || m.at || r.updated_at,
+      clientId: m.clientId || null, people: m.people || [], owner: m.owner || null, items: m.items || 0, state: m.state };
+  }).filter(m => m.summary && m.state !== 'same' && new Date(m.at).getTime() > since)
+    .sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  return granolaMeetings;
+}
+function meetingWasMine(m){
+  const e = String((typeof myProfile !== 'undefined' && myProfile && myProfile.email) || (typeof currentUser !== 'undefined' && currentUser && currentUser.email) || '').toLowerCase();
+  return !!e && (m.people || []).includes(e);
+}
+// Granola's notes are Markdown: headings, bullets (nested by indent), **bold** and links.
+function meetingNotesHtml(md){
+  const inline = t => escapeHtml(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  const out = [], open = [];
+  const close = to => { while(open.length > to){ out.push('</ul>'); open.pop(); } };
+  String(md || '').replace(/\r/g, '').split('\n').forEach(line => {
+    const li = line.match(/^(\s*)[-*]\s+(.*)$/);
+    if(li){ const depth = Math.floor(li[1].replace(/\t/g, '  ').length / 2) + 1; close(depth); while(open.length < depth){ out.push('<ul>'); open.push(1); } out.push(`<li>${inline(li[2])}</li>`); return; }
+    close(0);
+    const h = line.match(/^(#{1,4})\s+(.*)$/);
+    if(h){ out.push(`<h4>${inline(h[2])}</h4>`); return; }
+    if(line.trim()) out.push(`<p>${inline(line.trim())}</p>`);
+  });
+  close(0);
+  return out.join('');
+}
+// The first few points, as plain lines, for a tile or a row.
+function meetingPreview(md, n){
+  return String(md || '').split('\n').map(l => l.trim()).filter(l => /^[-*]\s+/.test(l)).slice(0, n || 3)
+    .map(l => l.replace(/^[-*]\s+/, '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1'));
+}
+function meetingWhenWords(m){ const d = new Date(m.at); return isNaN(d) ? '' : `${relDay(d)} at ${fmtTime(d)}`; }
+function meetingSubWords(m){
+  const c = m.clientId ? clients.find(x => String(x.id) === String(m.clientId)) : null;
+  return [meetingWhenWords(m), c ? c.name : '', m.owner ? `notes by ${String(m.owner).split(' ')[0]}` : ''].filter(Boolean);
+}
+// The notes, read only, with the way back to Granola (desktop: a sheet; iPhone: its sheet)
+function openMeetingNotes(id){
+  const m = (granolaMeetings || []).find(x => x.id === id); if(!m) return;
+  const sub = meetingSubWords(m).join(' · ');
+  const tasks = m.items ? `<p class="mtn-tasks">${appLogo('granola', 'xs')}${m.items} task${m.items === 1 ? '' : 's'} suggested from it, in each person’s Tasks.</p>` : '';
+  if(typeof mOpenSheet === 'function'){
+    mOpenSheet(m.title, `<div class="mtn"><p class="mtn-sub">${escapeHtml(sub)}</p>${tasks}<div class="mtn-body">${meetingNotesHtml(m.summary)}</div>${m.url ? `<a class="ibtn mtn-open" href="${safeUrl(m.url)}" target="_blank" rel="noopener">Open in Granola</a>` : ''}</div>`, { cancel: 'Close' });
+    return;
+  }
+  openAppModal(`<h3 class="ap-h">${appLogo('granola', 'sm')}${escapeHtml(m.title)}</h3><p class="t-2 mtn-sub">${escapeHtml(sub)}</p>${tasks}
+<div class="mtn-body">${meetingNotesHtml(m.summary)}</div>
+<div class="sheet-a">${m.url ? `<a class="btn" href="${safeUrl(m.url)}" target="_blank" rel="noopener">Open in Granola</a>` : ''}<button class="btn btn-p" id="mtnDone" onclick="closeAppModal()">Done</button></div>`, 640);
+  // focus starts on Done, not on the first link inside the notes
+  requestAnimationFrame(() => document.getElementById('mtnDone')?.focus({ preventScroll: true }));
+}
+
 async function insertTaskRow(row){
   let res = await supabaseClient.from('tasks').insert(row).select().single();
   if(res.error && isMissingColumnError(res.error) && ('color' in row || 'sprint_id' in row)){

@@ -502,19 +502,6 @@ ${f('setSignatureAddress', 'address', 'Address', '')}
 <div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal()">Done</button></div>`, 480);
 }
 
-// ---- App logos (Nov 23): each connection shows its own mark ---------------------------------------
-// Logos that fill their square (Claude, Granola, Harvest) sit edge to edge; marks on white (ChatGPT,
-// Google, Slack) sit inset on a white tile, as on a home screen. Two apps in one row overlap.
-const APP_LOGOS = { claude: ['Claude', 'fill'], chatgpt: ['ChatGPT', 'mark'], granola: ['Granola', 'fill'],
-  google: ['Google', 'mark'], slack: ['Slack', 'mark'], harvest: ['Harvest', 'fill'], whatsapp: ['WhatsApp', 'mark'] };
-function appLogo(app, size){
-  const a = APP_LOGOS[app]; if(!a) return '';
-  return `<span class="app-logo is-${a[1]} lg-${app}${size ? ' ' + size : ''}" aria-hidden="true"><img src="/icons/apps/${app}.png" alt="" width="96" height="96" decoding="async" draggable="false"></span>`;
-}
-function appLogoPair(a, b, size){ return `<span class="app-pair${size ? ' ' + size : ''}" aria-hidden="true">${appLogo(a)}${appLogo(b)}</span>`; }
-// An app without a logo of its own here (a connected app Radar doesn't know) gets its symbol on a plain tile the same size.
-function appGlyph(name, size){ return `<span class="app-logo is-glyph${size ? ' ' + size : ''}" aria-hidden="true">${icon(name)}</span>`; }
-
 // ---- Connections: the apps Radar works with -----------------------------------------------------
 // Harvest, WhatsApp and AI open as pages here; Slack and Google Sheet open a sheet; Google Calendar
 // is yours alone and connects in place.

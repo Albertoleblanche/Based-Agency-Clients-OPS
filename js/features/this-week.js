@@ -279,9 +279,9 @@ function weekPanelHtml(w){
   const seq = weekHistory(c), ots = onTimeSummary(seq);
   const wkSum = ots.total ? `${histDotsHtml(seq)}${ots.onTime} of ${ots.total} on time` : 'Starts with the first update';
   return `<aside class="sp sp-wk has-foot" aria-label="${escapeHtml(c.name)}, this week’s update">
-<div class="sp-bar"><button class="ib" aria-label="Close" title="Close (Esc)" onclick="closeWeekPanel()">${icon('x')}</button><a class="x-lnk" href="#" onclick="openClientDetail('${c.id}');return false;">Open client page</a></div>
+<div class="sp-bar"><button class="ib" aria-label="Close" title="Close (Esc)" onclick="closeWeekPanel()">${icon('x')}</button></div>
 <div class="sp-main">
-<div class="sp-head">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}</b><span>${[w.owner, c.service].filter(Boolean).map(escapeHtml).join(' · ')}</span></div></div>
+<div class="sp-head">${monoHtml(c, 'lg')}<div class="tx"><b><a class="sp-nm" href="#" onclick="openClientDetail('${c.id}');return false;" title="Open client page">${escapeHtml(c.name)}${icon('caret-right', { weight: 'bold' })}</a></b><span>${[w.owner, c.service].filter(Boolean).map(escapeHtml).join(' · ')}</span></div></div>
 <div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b><span class="sub">${sub}</span>${acts}</div>
 ${draft}
 <div class="sp-folds">

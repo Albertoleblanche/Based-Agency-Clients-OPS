@@ -152,9 +152,17 @@ function focusSinceWords(c){
   return `Since ${at && !isNaN(at) ? fmtShortDate(at) : 'before Nov 23'}${v.focusBy ? `, by ${firstName(v.focusBy)}` : ''}`;
 }
 function focusToggleHtml(c){
-  const on = isFocus(c);
-  if(!canApprove()) return on ? `<span class="fo-tg on is-ro" title="Focus client: comes first everywhere, and Health watches it closer">${icon('target')}Focus</span>` : '';
-  return `<button class="fo-tg${on ? ' on' : ''}" aria-pressed="${on}" title="${on ? 'Focus client. Click to take it off Focus.' : 'Add to Focus: it comes first in every list, and Health watches it closer'}" onclick="setClientFocus('${c.id}', ${!on})">${icon('target')}Focus</button>`;
+  const on = isFocus(c), tip = escapeHtml(FOCUS_WORDS);
+  if(!canApprove()) return on ? `<span class="fo-tg on is-ro" tabindex="0" data-hovertip="${tip}">${icon('target')}Focus</span>` : '';
+  return `<button class="fo-tg${on ? ' on' : ''}" aria-pressed="${on}" aria-label="${on ? 'Focus client: click to take it off Focus' : 'Add to Focus'}" data-hovertip="${tip}" onclick="setClientFocus('${c.id}', ${!on})">${icon('target')}Focus</button>`;
+}
+// Details → Focus: what it is, on or off, and the switch for admins and approvers.
+function focusDetailsHtml(c){
+  const on = isFocus(c), A = jsArg(c.id);
+  const state = on ? `<b class="fo-on">${icon('target')}On</b><span class="t-3">${escapeHtml(focusSinceWords(c))}</span>` : '<span class="t-3">Off</span>';
+  const sw = canApprove() && typeof swHtml === 'function' ? swHtml(on, 'Focus client', `setClientFocus(${A}, ${!on})`) : '';
+  return `<div class="cl-kv fo-kv"><span>Focus</span><span class="fo-kv-v"><span class="fo-st">${state}</span>${sw}</span></div>
+<p class="cl-own-note fo-note">The owner asked the team to give it extra attention: it comes first in every list, Health watches it more closely, and it leads the morning reminders and the Monday summary.${canApprove() ? '' : ' Admins and approvers choose Focus clients.'}</p>`;
 }
 async function setClientFocus(ids, on){
   if(!canApprove()){ showToast('error', 'Not allowed', 'Only admins and approvers choose the Focus clients.'); return; }
@@ -370,17 +378,17 @@ ${w.off ? `<div class="cl-mc"><span class="k">This week’s win</span><b>${escap
   const details = kv('Owner', ownerCell) + (why2 ? `<p class="cl-own-note">${escapeHtml(why2)}${approver ? ' Choose someone to make it fixed.' : ''}</p>` : '')
     + kv('Contact', contact) + kv('Website', site) + (typeof hvDetailsHtml === 'function' ? hvDetailsHtml(c) : '') + kv('Monthly hours', hp.budget ? `${hp.budget} h${typeof hvClientBudget === 'function' && hvClientBudget(c.id) ? ' <span class="t-3">· from Harvest</span>' : ''}` : '')
     + kv('Client since', start ? start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '')
-    + kv('Focus', isFocus(c) ? escapeHtml(focusSinceWords(c)) : '');
+    + focusDetailsHtml(c);
   const detSum = [owner || 'No owner yet', hp.budget ? `${hp.budget} h a month` : ''].filter(Boolean).join(' · ');
   return `<aside class="sp cl-p has-foot" aria-label="${escapeHtml(c.name)}">
-<div class="sp-bar"><button class="ib" aria-label="Close" title="Close (Esc)" onclick="closeClientInspector()">${icon('x')}</button><span class="cl-pbar-r">${approver || c.website ? `<button class="ib" aria-label="More" title="More" onclick="clientPanelMore(event, ${A})">${icon('dots-three')}</button>` : ''}<a class="x-lnk" href="#" onclick="openClientDetail(${A});return false;">Open client page</a></span></div>
+<div class="sp-bar"><button class="ib" aria-label="Close" title="Close (Esc)" onclick="closeClientInspector()">${icon('x')}</button><span class="cl-pbar-r"><button class="ib" aria-label="More" title="More" onclick="clientPanelMore(event, ${A})">${icon('dots-three')}</button></span></div>
 <div class="sp-main">
-<div class="sp-head">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}</b><span>${meta}</span></div>${focusToggleHtml(c)}</div>
+<div class="sp-head">${monoHtml(c, 'lg')}<div class="tx"><b><a class="sp-nm" href="#" onclick="openClientDetail(${A});return false;" title="Open client page">${escapeHtml(c.name)}${icon('caret-right', { weight: 'bold' })}</a></b><span>${meta}</span></div>${focusToggleHtml(c)}</div>
 <div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b>${sub ? `<span class="sub">${sub}</span>` : ''}${acts ? `<div class="sp-acts">${acts}</div>` : ''}</div>
 ${nums}
 <div class="sp-folds cl-folds">
 ${clientFoldHtml('win', 'Weekly win', clientWinSummary(c), clientWinHtml(c))}
-${clientFoldHtml('det', 'Details', escapeHtml(detSum), `<div class="cl-kvs">${details}</div>${approver ? `<a class="x-lnk cl-edit" href="#" onclick="openEditClientForm(${A});return false;">Edit Client</a>` : ''}`)}
+${clientFoldHtml('det', 'Details', escapeHtml(detSum), `<div class="cl-kvs">${details}</div>`)}
 </div>
 ${waOutsideNoteHtml(c)}
 </div>
@@ -455,7 +463,8 @@ function clientPanelMore(e, clientId){
   m.className = 'menu'; m.id = 'clMenu'; m.setAttribute('role', 'menu'); Object.assign(m.style, { position: 'fixed', zIndex: '1200' });
   const r = e.currentTarget.getBoundingClientRect();
   m.style.top = (r.bottom + 4) + 'px'; m.style.right = (window.innerWidth - r.right) + 'px';
-  m.innerHTML = `${c.website ? `<a class="mi" role="menuitem" href="${safeUrl(c.website.startsWith('http') ? c.website : 'https://' + c.website)}" target="_blank" rel="noopener">${icon('globe')}Open Website</a>` : ''}
+  m.innerHTML = `<button class="mi" role="menuitem" onclick="openClientDetail('${c.id}')">${icon('buildings')}Open Client Page</button>
+${c.website ? `<a class="mi" role="menuitem" href="${safeUrl(c.website.startsWith('http') ? c.website : 'https://' + c.website)}" target="_blank" rel="noopener">${icon('globe')}Open Website</a>` : ''}
 ${canApprove() ? `<button class="mi" role="menuitem" onclick="setClientFocus('${c.id}', ${!isFocus(c)})">${icon('target')}${isFocus(c) ? 'Take Off Focus' : 'Add to Focus'}</button><button class="mi" role="menuitem" onclick="openEditClientForm('${c.id}')">${icon('pencil-simple')}Edit Client…</button><div class="msep"></div><button class="mi danger" role="menuitem" onclick="deleteClient('${c.id}')">${icon('trash')}Delete Client…</button>` : ''}`;
   document.body.appendChild(m);
   setTimeout(() => document.addEventListener('click', () => m.remove(), { once: true }), 0);

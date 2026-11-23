@@ -74,7 +74,9 @@ function focusIdFirst(a, b){ return (isFocusId(b) ? 1 : 0) - (isFocusId(a) ? 1 :
 // a row of a mixed list: an update or note (x.c), a task (x.task) or anything with a clientId
 function itemFocus(x){ return !!x && (isFocus(x.c) || !!(x.task && isFocusId(x.task.clientId)) || isFocusId(x.clientId)); }
 function itemFocusFirst(a, b){ return (itemFocus(b) ? 1 : 0) - (itemFocus(a) ? 1 : 0); }
-function focusMark(c){ return isFocus(c) && typeof icon === 'function' ? `<span class="fo-mk" role="img" aria-label="Focus client" title="Focus client">${icon('target')}</span>` : ''; }
+// What Focus means, in one place: the mark's tooltip, the client's Details and its toggle.
+const FOCUS_WORDS = 'Focus client: the owner asked the team to give it extra attention. It comes first in every list, Health watches it more closely, and it leads the morning reminders and the Monday summary. Admins and approvers choose Focus clients.';
+function focusMark(c){ return isFocus(c) && typeof icon === 'function' ? `<span class="fo-mk" role="img" aria-label="Focus client" data-hovertip="${escapeHtml(FOCUS_WORDS)}">${icon('target')}</span>` : ''; }
 function focusClients(){ return activeClients().filter(isFocus); }
 // Switches Focus on or off for some clients; returns how many saved.
 async function saveClientFocus(ids, on){

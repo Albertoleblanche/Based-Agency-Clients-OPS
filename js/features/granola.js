@@ -1,5 +1,5 @@
 // Granola (Nov 23): tasks from meetings, on the desktop.
-//  • Tasks: "From your meetings" sits above the board or list while you have suggestions waiting.
+//  • Tasks: "From your Granola meetings" sits above the board or list while you have suggestions waiting.
 //    Add makes it your task as it is; Edit… opens New Task filled in (saving adds it); × dismisses,
 //    with Undo. The shared parts (loading, adding, deciding) are in sheets-canvas.js.
 //  • Settings → Connections → Granola: an admin pastes the workspace API key; everyone sees whether
@@ -22,7 +22,7 @@ function tkSuggestHtml(){
       + `<div class="tk-sg-a"><button class="btn sm" onclick="tkSgAdd('${s.id}')">Add</button><button class="btn sm" onclick="tkSgEdit('${s.id}')">Edit…</button>`
       + `<button class="ib" aria-label="Dismiss “${escapeHtml(s.title)}”" title="Dismiss" onclick="tkSgDismiss('${s.id}')">${icon('x')}</button></div></div>`;
   };
-  return `<section class="tk-sg" aria-label="Suggested from your meetings"><div class="tk-sg-h">${icon('sparkle')}<b>From your meetings</b><span class="n">${list.length}</span><span class="w">Found in your Granola notes. Add the ones that are yours to do.</span></div>
+  return `<section class="tk-sg" aria-label="Suggested from your Granola meetings"><div class="tk-sg-h">${appLogo('granola', 'xs')}<b>From your Granola meetings</b><span class="n">${list.length}</span><span class="w">Found in your Granola notes. Add the ones that are yours to do.</span></div>
 ${shown.map(row).join('')}${list.length > 4 ? `<button class="x-lnk tk-sg-more" onclick="tkSgAll=!tkSgAll;renderTasks()">${tkSgAll ? 'Show fewer' : `Show all ${list.length}`}</button>` : ''}</section>`;
 }
 async function tkSgRefresh(){
@@ -72,7 +72,7 @@ let tkGranolaBusy = false;
 function tkGranolaBtn(){
   granolaWatch(() => { if(currentViewName === 'tasks') renderTasks(); });
   if(!granolaOn) return '';
-  return `<button class="btn tk-gr" id="tkGranola" onclick="tkGranolaCheck()"${tkGranolaBusy ? ' disabled' : ''} title="Look for new action items in your Granola meetings">${tkGranolaBusy ? '<span class="tk-gr-spin" aria-hidden="true"></span>Checking…' : `${icon('notepad')}Check Granola`}</button>`;
+  return `<button class="btn tk-gr" id="tkGranola" onclick="tkGranolaCheck()"${tkGranolaBusy ? ' disabled' : ''} title="Look for new action items in your Granola meetings">${tkGranolaBusy ? '<span class="tk-gr-spin" aria-hidden="true"></span>Checking…' : `${appLogo('granola', 'xs')}Check Granola`}</button>`;
 }
 async function tkGranolaCheck(){
   if(tkGranolaBusy) return;

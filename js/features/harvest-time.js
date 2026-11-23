@@ -297,7 +297,7 @@ function hvDetailsHtml(c){
   const words = cur ? `“${escapeHtml(cur.name)}”` : fix ? `Not linked <span class="t-3">· Harvest has “${escapeHtml(fix.hc.name)}”</span>` : '<span class="t-3">Not linked</span>';
   const act = canApprove() ? ` <a class="x-lnk hvl-act" href="#" onclick="hvLinkSheet(${jsArg(c.id)});return false;">${cur ? 'Change…' : 'Link…'}</a>`
     : !cur && fix && !hvAsked(c.id) ? ` <a class="x-lnk hvl-act" href="#" onclick="hvAskApprovers(${jsArg(c.id)}, this);return false;">Ask an Approver</a>` : '';
-  return `<div class="cl-kv"><span>Harvest</span><span>${words}${act}</span></div>`;
+  return `<div class="cl-kv"><span>Harvest</span><span class="hvl-v">${typeof appLogo === 'function' ? appLogo('harvest', 'xs') : ''}<span>${words}${act}</span></span></div>`;
 }
 
 // Why a client has nothing to pick, in words (null when it has projects for you).

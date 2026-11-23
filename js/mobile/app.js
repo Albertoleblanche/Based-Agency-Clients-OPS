@@ -535,7 +535,7 @@ function mTasksHtml(){
   const body = sg + groups.filter(g => g[1].length).map(([g, ts, cls]) => `<div class="ish"><h2${cls ? ` class="${cls}"` : ''}>${g}</h2></div><div class="ig">${ts.sort(order).map(mTaskRow).join('')}</div>`).join('')
     || `<div style="margin-top:22px">${mEmpty(mTaskScope === 'mine' ? 'Nothing on your list' : 'No open tasks', 'Tap + to add one.')}</div>`;
   granolaWatch(() => { if(mTab === 'tasks') mRenderTab(); });
-  const gr = granolaOn ? `<button aria-label="Check Granola for new tasks" title="Check Granola" class="mgr${mGranolaBusy ? ' is-busy' : ''}" onclick="mGranolaCheck()"${mGranolaBusy ? ' disabled' : ''}>${icon('notepad')}</button>` : '';
+  const gr = granolaOn ? `<button aria-label="Check Granola for new tasks" title="Check Granola" class="mgr${mGranolaBusy ? ' is-busy' : ''}" onclick="mGranolaCheck()"${mGranolaBusy ? ' disabled' : ''}>${appLogo('granola', 'sm')}</button>` : '';
   return `<div class="inav"><div class="r">${gr}<button aria-label="Filter by client" onclick="mPickTaskClient()" style="${c ? 'color:var(--label)' : ''}">${icon('funnel-simple')}</button></div></div>
 <h1 class="big">Tasks</h1><p class="big-sub">${vis.length} open${overdue ? ` · ${overdue} overdue` : ''}${c ? ` · ${mEsc(c.name)}` : ''}</p>
 ${mSeg([['everyone', 'Everyone'], ['mine', 'Mine', mineN], ['byme', 'Assigned by me']], 'mSetTaskScope', mTaskScope)}
@@ -560,7 +560,7 @@ function mSuggestHtml(){
   if(!list.length) return '';
   const row = s => `<div class="ir msug" data-sg="${s.id}"><button class="tx" onclick="mSgEdit('${s.id}')"><span class="t n">${mEsc(s.title)}</span><span class="s">${mEsc(suggestionSub(s).join(' · '))}</span></button>`
     + `<button class="msg-add" onclick="mSgAdd('${s.id}')">Add</button><button class="msg-x" aria-label="Dismiss ${mEsc(s.title)}" onclick="mSgDismiss('${s.id}')">${icon('x', { weight: 'bold' })}</button></div>`;
-  return `<div class="ish"><h2>From Your Meetings</h2>${list.length > 4 ? `<button onclick="mSgAll=!mSgAll;mRenderTab()">${mSgAll ? 'Fewer' : 'See All'}</button>` : ''}</div>
+  return `<div class="ish"><h2 class="ish-lg">${appLogo('granola', 'xs')}From Your Granola Meetings</h2>${list.length > 4 ? `<button onclick="mSgAll=!mSgAll;mRenderTab()">${mSgAll ? 'Fewer' : 'See All'}</button>` : ''}</div>
 <div class="ig msg-list">${(mSgAll ? list : list.slice(0, 4)).map(row).join('')}</div><p class="ifoot">Found in your Granola notes. Add the ones that are yours to do.</p>`;
 }
 function mSgOut(id, then){
@@ -1143,9 +1143,18 @@ async function mNudged(how){
   showToast('success', how === 'mail' ? 'Nudge ready in Mail' : how === 'whatsapp' ? 'Nudge copied for WhatsApp' : 'Nudge copied', `Next follow-up ${next.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}.`);
   if(c && r && typeof logClientActivity === 'function') logClientActivity(r.clientId, 'reminder_nudged', `${myName() || 'Someone'} nudged ${c.name} about "${r.question.length > 80 ? r.question.slice(0, 80) + '…' : r.question}".`);
 }
+function mMeetingsHtml(){
+  if(typeof granolaMeetings === 'undefined') return '';
+  if(granolaMeetings === null){ loadGranolaMeetings().then(() => mTop()?.refresh()); return ''; }
+  if(!granolaMeetings.length) return '';
+  const list = granolaMeetings.slice(0, mMtAll ? 60 : 6);
+  return `<div class="ish"><h2 class="ish-lg">${appLogo('granola', 'xs')}From Granola</h2>${granolaMeetings.length > 6 ? `<button onclick="mMtAll=!mMtAll;mTop()?.refresh()">${mMtAll ? 'Fewer' : 'See All'}</button>` : ''}</div>
+<div class="ig">${list.map(m => mIr('', mEsc(m.title), mEsc(meetingSubWords(m).join(' · ')), '', `openMeetingNotes(${mEsc(JSON.stringify(m.id))})`)).join('')}</div><p class="ifoot">Meetings shared to Granola’s team space. Everyone on the team sees these.</p>`;
+}
+let mMtAll = false;
 function mOpenNotes(){
   mPush('Notes', () => `<h1 class="big">Notes</h1><p class="big-sub">Only you can see these</p>
-<div class="ig" style="margin-top:16px">${notes.map(n => { const c = clients.find(x => x.id === n.clientId); return mIr('', mEsc(n.title || 'Untitled note'), mEsc([c ? c.name : '', String(n.text || '').replace(/\s+/g, ' ').slice(0, 60)].filter(Boolean).join(' · ')), '', `mOpenNoteSheet('${n.id}')`, { n: true }); }).join('') || '<div class="ir"><span class="t n" style="color:var(--label-2)">No notes yet</span></div>'}</div>`,
+<div class="ig" style="margin-top:16px">${notes.map(n => { const c = clients.find(x => x.id === n.clientId); return mIr('', mEsc(n.title || 'Untitled note'), mEsc([c ? c.name : '', String(n.text || '').replace(/\s+/g, ' ').slice(0, 60)].filter(Boolean).join(' · ')), '', `mOpenNoteSheet('${n.id}')`, { n: true }); }).join('') || '<div class="ir"><span class="t n" style="color:var(--label-2)">No notes yet</span></div>'}</div>${mMeetingsHtml()}`,
   { right: `<button aria-label="New note" onclick="mOpenNoteSheet()">${icon('plus')}</button>` });
 }
 function mOpenTime(){
