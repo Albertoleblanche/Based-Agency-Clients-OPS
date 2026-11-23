@@ -106,12 +106,12 @@ module.exports = async function handler(req, res) {
       if (action === 'connect') {
         const r = await connectGranola(admin, { key, appUrl, userId });
         if (r.error) { res.status(400).json(r); return; }
-        const first = await granolaCatchUp(admin, { budgetMs: 35000 });   // the last few days, now
+        const first = await granolaCatchUp(admin, { budgetMs: 35000, sinceDays: 7 });   // the last week, now
         res.status(200).json({ ...r, first });
         return;
       }
       if (action === 'disconnect') { res.status(200).json(await disconnectGranola(admin)); return; }
-      if (action === 'read-now') { res.status(200).json(await granolaCatchUp(admin, { budgetMs: 45000 })); return; }
+      if (action === 'read-now') { res.status(200).json(await granolaCatchUp(admin, { budgetMs: 45000, sinceDays: 7 })); return; }
       res.status(400).json({ error: `Unknown action: ${action}` });
       return;
     }
