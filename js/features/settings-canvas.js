@@ -98,7 +98,7 @@ function renderSettingsView(){
   const keep = document.activeElement && document.activeElement.id;
   const draw = { general: setGeneral, updates: setUpdates, clients: setClients, connections: setConnections, notifications: setNotifications,
     harvest: typeof setHarvest === 'function' ? setHarvest : setConnections, whatsapp: typeof setWhatsapp === 'function' ? setWhatsapp : setConnections, ai: setAi }[settingsTab];
-  const head = sub ? `<div class="set-sub"><button class="set-back" onclick="switchSettingsTab('connections')">${icon('caret-left', { weight: 'bold' })}Connections</button><h2>${sub[0]}</h2></div>` : '';
+  const head = sub ? `<div class="set-sub"><button class="set-back" onclick="switchSettingsTab('connections')">${icon('caret-left', { weight: 'bold' })}Connections</button><h2>${{ harvest: appLogo('harvest', 'xl'), whatsapp: appGlyph('message-circle', 'xl'), ai: appLogoPair('claude', 'chatgpt', 'xl') }[settingsTab] || ''}${sub[0]}</h2></div>` : '';
   // the new look: the sections as a menu in a card on the left, with icons and My Profile at the end
   const uw = typeof uiStyleOn === 'function' && uiStyleOn();
   const cur = tabs.find(t => t[0] === tab);
@@ -454,7 +454,7 @@ function cfMenu(e, id, i, n){
 // Drafts are written with ChatGPT; the Assistant uses the one picked here.
 function setAi(){
   const admin = isAdmin(), provider = settings.aiProvider === 'openai' ? 'openai' : 'claude';
-  const conn = p => `<div class="fr"><div class="l"><b>${p === 'claude' ? 'Claude' : 'ChatGPT'}</b><span id="aiConnectionStatus-${p}">Checking…</span></div><input id="${p === 'claude' ? 'setClaudeModel' : 'setOpenaiModel'}" class="tf" style="width:170px" value="${esc(p === 'claude' ? settings.claudeModel || '' : settings.openaiModel || '')}" placeholder="${esc(p === 'claude' ? DEFAULT_CLAUDE_MODEL : DEFAULT_OPENAI_MODEL)}" aria-label="${p === 'claude' ? 'Claude' : 'ChatGPT'} model" onchange="saveAiModel('${p}', this.value)" title="Model"><button class="btn" id="aiConnectionBtn-${p}" onclick="openAiProviderConnectModal('${p}')">Connect…</button></div>`;
+  const conn = p => `<div class="fr">${appLogo(p === 'claude' ? 'claude' : 'chatgpt')}<div class="l"><b>${p === 'claude' ? 'Claude' : 'ChatGPT'}</b><span id="aiConnectionStatus-${p}">Checking…</span></div><input id="${p === 'claude' ? 'setClaudeModel' : 'setOpenaiModel'}" class="tf" style="width:170px" value="${esc(p === 'claude' ? settings.claudeModel || '' : settings.openaiModel || '')}" placeholder="${esc(p === 'claude' ? DEFAULT_CLAUDE_MODEL : DEFAULT_OPENAI_MODEL)}" aria-label="${p === 'claude' ? 'Claude' : 'ChatGPT'} model" onchange="saveAiModel('${p}', this.value)" title="Model"><button class="btn" id="aiConnectionBtn-${p}" onclick="openAiProviderConnectModal('${p}')">Connect…</button></div>`;
   return `<div class="set-h">Accounts</div><div class="form-grp">${conn('claude')}${conn('openai')}</div>
 <p class="set-note">Each account’s key stays on the server. The box is the model it uses. Drafts are written with ChatGPT.</p>
 <div class="set-h">Assistant</div>
@@ -502,6 +502,19 @@ ${f('setSignatureAddress', 'address', 'Address', '')}
 <div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal()">Done</button></div>`, 480);
 }
 
+// ---- App logos (Nov 23): each connection shows its own mark ---------------------------------------
+// Logos that fill their square (Claude, Granola, Harvest) sit edge to edge; marks on white (ChatGPT,
+// Google, Slack) sit inset on a white tile, as on a home screen. Two apps in one row overlap.
+const APP_LOGOS = { claude: ['Claude', 'fill'], chatgpt: ['ChatGPT', 'mark'], granola: ['Granola', 'fill'],
+  google: ['Google', 'mark'], slack: ['Slack', 'mark'], harvest: ['Harvest', 'fill'] };
+function appLogo(app, size){
+  const a = APP_LOGOS[app]; if(!a) return '';
+  return `<span class="app-logo is-${a[1]} lg-${app}${size ? ' ' + size : ''}" aria-hidden="true"><img src="/icons/apps/${app}.png" alt="" width="96" height="96" decoding="async" draggable="false"></span>`;
+}
+function appLogoPair(a, b, size){ return `<span class="app-pair${size ? ' ' + size : ''}" aria-hidden="true">${appLogo(a)}${appLogo(b)}</span>`; }
+// An app without a logo of its own here (WhatsApp) gets its symbol on a plain tile the same size.
+function appGlyph(name, size){ return `<span class="app-logo is-glyph${size ? ' ' + size : ''}" aria-hidden="true">${icon(name)}</span>`; }
+
 // ---- Connections: the apps Radar works with -----------------------------------------------------
 // Harvest, WhatsApp and AI open as pages here; Slack and Google Sheet open a sheet; Google Calendar
 // is yours alone and connects in place.
@@ -524,23 +537,23 @@ async function loadIntegrationStatuses(){
 function setConnections(){
   const st = (color, text, id) => `<span class="st"${id ? ` id="${id}"` : ''}><span class="dot ${color}"></span>${text}</span>`;
   const g = integ.google, h = integ.harvest, approver = canApprove();
-  const go = (js, ic, name, sub, status) => `<button class="fr cn-r" onclick="${js}"><span class="ic lg">${icon(ic)}</span><div class="l"><b>${name}</b><span>${sub}</span></div>${status}${icon('caret-right', { weight: 'bold' })}</button>`;
+  const go = (js, logo, name, sub, status) => `<button class="fr cn-r" onclick="${js}">${logo}<div class="l"><b>${name}</b><span>${sub}</span></div>${status}${icon('caret-right', { weight: 'bold' })}</button>`;
   const rows = [];
-  if(approver) rows.push(go("switchSettingsTab('harvest')", 'timer', 'Harvest',
+  if(approver) rows.push(go("switchSettingsTab('harvest')", appLogo('harvest'), 'Harvest',
     h && h.connected ? `Clients, projects, tasks and time${h.setup && h.setup.syncedAt && typeof hvWhen === 'function' ? ' · read ' + hvWhen(h.setup.syncedAt) : ''}` : 'Time logged the way Harvest is set up',
     h == null ? st('', 'Checking…') : h.connected ? st('green', 'Connected') : st('hollow', 'Not connected')));
   const wa = typeof waIntegrationRow === 'function' ? waIntegrationRow() : null;
-  if(wa) rows.push(go("switchSettingsTab('whatsapp')", 'message-circle', 'WhatsApp', 'Reads client groups and lists what clients are waiting on', wa[3]));
-  if(approver) rows.push(go("openIntegrationSheet('slack')", 'hash', 'Slack', 'Client channels, reminders and daily summaries',
+  if(wa) rows.push(go("switchSettingsTab('whatsapp')", appGlyph('message-circle'), 'WhatsApp', 'Reads client groups and lists what clients are waiting on', wa[3]));
+  if(approver) rows.push(go("openIntegrationSheet('slack')", appLogo('slack'), 'Slack', 'Client channels, reminders and daily summaries',
     integ.slackUnlinked == null ? st('', 'Checking…') : integ.slackUnlinked ? st('yellow', `${integ.slackUnlinked} client${integ.slackUnlinked === 1 ? '' : 's'} not linked`) : st('green', 'Connected')));
-  if(typeof granolaRowStatus === 'function') rows.push(go('openGranolaSheet()', 'notepad', 'Granola', 'Action items from meetings, suggested as tasks', granolaRowStatus(st)));
-  if(isAdmin()){ const w = aiConnWords(); rows.push(go("switchSettingsTab('ai')", 'sparkle', 'AI', 'Claude and ChatGPT: drafts, the Assistant and weekly insights', w == null ? st('', 'Checking…', 'cnAiSt') : w ? st('green', w, 'cnAiSt') : st('hollow', 'Not connected', 'cnAiSt'))); }
-  rows.push(go("openIntegrationSheet('sheet')", 'table', 'Google Sheet', settings.sheetCsvUrl ? 'Pulls the client list from a published sheet' : 'Keep a copy of the client list in a sheet',
+  if(typeof granolaRowStatus === 'function') rows.push(go('openGranolaSheet()', appLogo('granola'), 'Granola', 'Action items from meetings, suggested as tasks', granolaRowStatus(st)));
+  if(isAdmin()){ const w = aiConnWords(); rows.push(go("switchSettingsTab('ai')", appLogoPair('claude', 'chatgpt'), 'AI', 'Claude and ChatGPT: drafts, the Assistant and weekly insights', w == null ? st('', 'Checking…', 'cnAiSt') : w ? st('green', w, 'cnAiSt') : st('hollow', 'Not connected', 'cnAiSt'))); }
+  rows.push(go("openIntegrationSheet('sheet')", appLogo('google'), 'Google Sheet', settings.sheetCsvUrl ? 'Pulls the client list from a published sheet' : 'Keep a copy of the client list in a sheet',
     settings.sheetCsvUrl ? st('green', 'Connected') : st('hollow', 'Not connected')));
-  const gRow = g && g.googleConfigured ? `<div class="fr"><span class="ic lg">${icon('calendar-blank')}</span><div class="l"><b>Google Calendar</b><span>${g.connected ? `Your meetings in the team calendar${g.lastSyncedAt ? ' · synced ' + claudeWhen(g.lastSyncedAt).toLowerCase() : ''}` : 'Bring your meetings into the team calendar'}</span></div>
+  const gRow = g && g.googleConfigured ? `<div class="fr cn-r">${appLogo('google')}<div class="l"><b>Google Calendar</b><span>${g.connected ? `Your meetings in the team calendar${g.lastSyncedAt ? ' · synced ' + claudeWhen(g.lastSyncedAt).toLowerCase() : ''}` : 'Bring your meetings into the team calendar'}</span></div>
 ${g.connected ? `${st('green', 'Connected')}<button class="btn" onclick="syncGoogleCalendar().then(loadIntegrationStatuses)">Sync Now</button>` : `<button class="btn" onclick="connectGoogleCalendar()">Connect…</button>`}</div>` : '';
   // ChatGPT and Claude: each person connects their own (ai-apps.js)
-  const aiRow = typeof aiAppsRowStatus === 'function' ? go('openAiAppsSheet()', 'plugs-connected', 'ChatGPT and Claude', 'Use Radar from their apps, as you', aiAppsRowStatus(st)) : '';
+  const aiRow = typeof aiAppsRowStatus === 'function' ? go('openAiAppsSheet()', appLogoPair('chatgpt', 'claude'), 'ChatGPT and Claude', 'Use Radar from their apps, as you', aiAppsRowStatus(st)) : '';
   const yours = gRow || aiRow ? `<div class="set-h">Yours</div><div class="form-grp cn-g">${aiRow}${gRow}</div>` : '';
   const live = (supabaseClient.getChannels ? supabaseClient.getChannels() : []).some(c => c.state === 'joined');
   return `<div class="set-h">Apps</div><div class="form-grp cn-g">${rows.join('')}</div>
@@ -582,13 +595,13 @@ function openIntegrationSheet(which){
   if(which === 'harvest'){
     switchSettingsTab('harvest'); // everything Harvest lives in its own tab now
   } else if(which === 'slack'){
-    openAppModal(`<h3>Slack</h3>
+    openAppModal(`<h3 class="ap-h">${appLogo('slack', 'sm')}Slack</h3>
 <div id="slackTasksBox">${slackTasksHtml(null)}</div>
 <div class="sl-h">Client channels</div><div id="slackChannelsPanelBody" class="integ-sheet">Loading…</div><div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal();loadIntegrationStatuses()">Done</button></div>`, 620);
     loadSlackChannelsPanel();
     loadSlackTasksState();
   } else {
-    openAppModal(`<h3>Google Sheet</h3>
+    openAppModal(`<h3 class="ap-h">${appLogo('google', 'sm')}Google Sheet</h3>
 <div class="f" style="grid-template-columns:120px minmax(0,1fr)">
 <label for="sheetCsvUrl">Published link</label><input class="tf" id="sheetCsvUrl" value="${esc(settings.sheetCsvUrl || '')}" placeholder="https://docs.google.com/…/pub?output=csv">
 <span></span><p class="t-2" style="font-size:13px;margin:0">In Google Sheets: File → Share → Publish to web → CSV. A normal edit link won’t work.</p>

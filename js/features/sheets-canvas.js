@@ -653,9 +653,16 @@ function suggestionPreset(s){
 // ---- Check Granola (Tasks, desktop and iPhone) ---------------------------------------------------
 // Meetings come in by themselves (a webhook, and a daily read); this asks for a read now. Anyone on
 // the team can; the server skips it when Granola was read in the last minute.
-let granolaOn = null;   // is Granola connected? null until asked
+// Is Granola connected? Remembered on this device so the button is there at once, and asked again at
+// most once a minute. Only a clear answer from Radar changes it: a failed ask (offline, still signing
+// in, a slow server) keeps what was known and asks again soon, backing off: 15s, 30s, 1m, 2m, 4m.
+let granolaOn = (() => { try{ const v = localStorage.getItem('radar-granola-on'); return v === '1' ? true : v === '0' ? false : null; }catch(e){ return null; } })();
+let granolaAskedAt = 0, granolaAsking = null, granolaMisses = 0, granolaRetry = null;
+function granolaSet(on){ granolaOn = !!on; granolaMisses = 0; granolaAskedAt = Date.now(); try{ localStorage.setItem('radar-granola-on', on ? '1' : '0'); }catch(e){} }
+const granolaWait = () => granolaMisses ? Math.min(15000 * 2 ** (granolaMisses - 1), 240000) : 60000;
 async function granolaApi(action, body){
   const { data: { session } } = await supabaseClient.auth.getSession();
+  if(!session) throw new Error('Not signed in yet.');
   const r = await fetch(action ? '/api/integrations' : '/api/integrations?provider=granola', {
     method: action ? 'POST' : 'GET',
     headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
@@ -665,10 +672,23 @@ async function granolaApi(action, body){
   if(!r.ok) throw new Error(data.error || 'Something went wrong talking to Granola.');
   return data;
 }
-async function granolaKnown(){
-  if(granolaOn !== null) return granolaOn;
-  try{ granolaOn = !!(await granolaApi(null)).connected; }catch(e){ granolaOn = false; }
-  return granolaOn;
+function granolaKnown(){
+  if(granolaAsking) return granolaAsking;
+  if(Date.now() - granolaAskedAt < granolaWait()) return Promise.resolve(granolaOn);
+  granolaAskedAt = Date.now();
+  granolaAsking = granolaApi(null)
+    .then(s => { if(s && !s.error){ granolaSet(s.connected); return true; } return false; }, () => false)
+    .then(heard => { granolaAsking = null; if(!heard) granolaMisses++; return granolaOn; });
+  return granolaAsking;
+}
+// Asks (when due) and draws again only if the answer changes whether the button shows. If Radar
+// didn't answer, it asks again by itself a few times, so the button comes back without a reload.
+function granolaWatch(redraw){
+  const was = !!granolaOn;
+  granolaKnown().then(on => {
+    if(!!on !== was){ redraw(); return; }
+    if(granolaMisses && granolaMisses <= 5 && !granolaRetry) granolaRetry = setTimeout(() => { granolaRetry = null; granolaWatch(redraw); }, granolaWait() + 50);
+  });
 }
 // What a check found, in words for a toast: { type, title, text, mine }.
 async function checkGranolaNow(){
@@ -678,7 +698,7 @@ async function checkGranolaNow(){
   try{ await loadTaskSuggestions(); }catch(e){}
   const mine = (taskSuggestions || []).filter(s => !before.has(s.id)).length;
   if(r.error) return { type: 'error', title: 'Granola didn’t answer', text: r.error, mine };
-  if(r.skipped === 'not connected'){ granolaOn = false; return { type: 'info', title: 'Granola isn’t connected', text: 'An admin connects it in Settings → Connections.', mine }; }
+  if(r.skipped === 'not connected'){ granolaSet(false); return { type: 'info', title: 'Granola isn’t connected', text: 'An admin connects it in Settings → Connections.', mine }; }
   if(mine) return { type: 'success', title: `${mine} new task${mine === 1 ? '' : 's'} from your meetings`, text: 'Add the ones that are yours to do.', mine };
   if(r.recent) return { type: 'info', title: 'Granola was just checked', text: 'Nothing new for you. New meetings also come in by themselves.', mine };
   if(r.read) return { type: 'info', title: `Read ${r.read} meeting${r.read === 1 ? '' : 's'}`, text: 'Nothing in them for you.', mine };

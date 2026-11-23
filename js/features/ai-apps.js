@@ -29,6 +29,8 @@ function aiAppsRowStatus(st){
   return n ? st('green', `${n} connected`) : st('hollow', 'Not connected');
 }
 function aiGrantName(g){ const c = g.client || {}; return c.client_name || c.name || g.client_name || 'An app'; }
+// the connected app's own logo when its name says which it is
+function aiGrantLogo(name){ return /claude|anthropic/i.test(name) ? appLogo('claude') : /chatgpt|openai/i.test(name) ? appLogo('chatgpt') : appGlyph('plugs-connected'); }
 function aiGrantId(g){ const c = g.client || {}; return c.client_id || c.id || g.client_id || ''; }
 function aiAppsInner(){
   const s = aiAppsState;
@@ -42,14 +44,14 @@ function aiAppsInner(){
 </ol><button class="btn sm" onclick="loadAiApps()">Check Again</button></div>`
     : `<p class="gr-warn">${icon('warning')}An admin needs to switch this on in Supabase first.</p>`);
   const url = mcpAddress();
-  const grants = (s.grants || []).map(g => `<div class="fr"><span class="ic">${icon('plugs-connected')}</span><div class="l"><b>${escapeHtml(aiGrantName(g))}</b><span>${g.granted_at || g.created_at ? 'Connected ' + escapeHtml(fmtShortDate(new Date(g.granted_at || g.created_at))) : 'Connected'}</span></div><button class="btn sm" onclick="aiAppDisconnect(${jsArg(aiGrantId(g))}, ${jsArg(aiGrantName(g))})">Disconnect…</button></div>`).join('');
+  const grants = (s.grants || []).map(g => `<div class="fr">${aiGrantLogo(aiGrantName(g))}<div class="l"><b>${escapeHtml(aiGrantName(g))}</b><span>${g.granted_at || g.created_at ? 'Connected ' + escapeHtml(fmtShortDate(new Date(g.granted_at || g.created_at))) : 'Connected'}</span></div><button class="btn sm" onclick="aiAppDisconnect(${jsArg(aiGrantId(g))}, ${jsArg(aiGrantName(g))})">Disconnect…</button></div>`).join('');
   return intro + `<div class="sl-url ai-url"><code>${escapeHtml(url)}</code><button type="button" class="btn sm" onclick="copyToClipboard(${jsArg(url)}).then(()=>{this.textContent='Copied';setTimeout(()=>{this.textContent='Copy'},1600)})">Copy</button></div>
-<div class="ai-steps"><div><b>Claude</b><ol><li>In Claude, open <b>Settings → Connectors</b> and choose <b>Add custom connector</b>.</li><li>Name it Radar, paste the address above, and add it.</li><li>Click <b>Connect</b>, sign in to Radar, and allow it.</li></ol></div>
-<div><b>ChatGPT</b><ol><li>In ChatGPT on the web, open <b>Plugins</b> and choose <b>+ → Add custom MCP server</b>. In a company workspace an admin may need to allow it first.</li><li>Paste the address above and choose <b>OAuth</b>.</li><li>Sign in to Radar and allow it. Your ChatGPT plan decides whether it can also make changes or only read.</li></ol></div></div>
+<div class="ai-steps"><div><b>${appLogo('claude', 'xs')}Claude</b><ol><li>In Claude, open <b>Settings → Connectors</b> and choose <b>Add custom connector</b>.</li><li>Name it Radar, paste the address above, and add it.</li><li>Click <b>Connect</b>, sign in to Radar, and allow it.</li></ol></div>
+<div><b>${appLogo('chatgpt', 'xs')}ChatGPT</b><ol><li>In ChatGPT on the web, open <b>Plugins</b> and choose <b>+ → Add custom MCP server</b>. In a company workspace an admin may need to allow it first.</li><li>Paste the address above and choose <b>OAuth</b>.</li><li>Sign in to Radar and allow it. Your ChatGPT plan decides whether it can also make changes or only read.</li></ol></div></div>
 <div class="sl-h">Connected to your account</div>${grants ? `<div class="form-grp">${grants}</div>` : `<p class="t-2 gr-st">Nothing yet. Once you connect ChatGPT or Claude it shows here, and you can disconnect it any time.</p>`}`;
 }
 function openAiAppsSheet(){
-  openAppModal(`<h3>ChatGPT and Claude</h3><div id="aiAppsBox">${aiAppsInner()}</div><div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal();loadIntegrationStatuses()">Done</button></div>`, 600);
+  openAppModal(`<h3 class="ap-h">${appLogoPair('chatgpt', 'claude', 'sm')}ChatGPT and Claude</h3><div id="aiAppsBox">${aiAppsInner()}</div><div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal();loadIntegrationStatuses()">Done</button></div>`, 600);
   loadAiApps();
 }
 async function aiAppDisconnect(clientId, name){

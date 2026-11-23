@@ -70,7 +70,7 @@ async function tkSgDismiss(id){
 // (they also come in by themselves). Shown once Radar knows Granola is connected.
 let tkGranolaBusy = false;
 function tkGranolaBtn(){
-  if(granolaOn === null && !tkGranolaBtn.asked){ tkGranolaBtn.asked = true; granolaKnown().then(on => { if(on && currentViewName === 'tasks') renderTasks(); }); }
+  granolaWatch(() => { if(currentViewName === 'tasks') renderTasks(); });
   if(!granolaOn) return '';
   return `<button class="btn tk-gr" id="tkGranola" onclick="tkGranolaCheck()"${tkGranolaBusy ? ' disabled' : ''} title="Look for new action items in your Granola meetings">${tkGranolaBusy ? '<span class="tk-gr-spin" aria-hidden="true"></span>Checking…' : `${icon('notepad')}Check Granola`}</button>`;
 }
@@ -86,19 +86,20 @@ async function tkGranolaCheck(){
 let granolaState = null;   // what the server says (connected, last read…); null while checking
 async function loadGranolaState(){
   try{ granolaState = await granolaApi(null); }catch(e){ granolaState = { connected: false, error: e.message }; }
-  if(!granolaState.error) granolaOn = !!granolaState.connected;   // the Check Granola button in Tasks follows
+  if(!granolaState.error) granolaSet(granolaState.connected);   // the Check Granola button in Tasks follows
   const box = document.getElementById('granolaBox'); if(box) box.innerHTML = granolaSheetInner();
   return granolaState;
 }
 function granolaRowStatus(st){
   const g = granolaState;
-  return g == null ? st('', 'Checking…') : g.needsSql ? st('yellow', 'Needs setup') : g.connected ? st(g.lastError ? 'yellow' : 'green', g.lastError ? 'Problem' : 'Connected') : st('hollow', 'Not connected');
+  return g == null ? st('', 'Checking…') : g.error ? st('yellow', 'Couldn’t check') : g.needsSql ? st('yellow', 'Needs setup') : g.connected ? st(g.lastError ? 'yellow' : 'green', g.lastError ? 'Problem' : 'Connected') : st('hollow', 'Not connected');
 }
 const granolaWhen = t => { if(!t) return ''; const d = new Date(t); return `${relDay(d).toLowerCase() === 'today' ? 'today' : relDay(d)} at ${fmtTime(d)}`; };
 function granolaSheetInner(){
   const g = granolaState, admin = isAdmin();
   const about = `<p class="t-2 gr-about">When a meeting’s notes are ready in Granola, Radar picks out the action items for people on the team and suggests each one to its person in Tasks, where they add it or dismiss it.</p>`;
   if(g == null) return about + `<p class="t-2 gr-st">Checking…</p>`;
+  if(g.error) return about + `<p class="gr-warn">${icon('warning')}Radar couldn’t check Granola just now. <button class="btn sm" onclick="granolaState=null;document.getElementById('granolaBox').innerHTML=granolaSheetInner();loadGranolaState()">Try Again</button></p>`;
   if(g.needsSql) return about + `<p class="gr-warn">${icon('warning')}Run <code>addendum-granola.sql</code> in Supabase’s SQL Editor first, then come back here.</p>`;
   if(!g.connected){
     return about + (admin ? `<label class="gr-lab" for="granolaKey">Workspace API key</label>
@@ -117,7 +118,7 @@ function granolaSheetInner(){
     + (admin ? `<div class="gr-acts"><button class="btn" id="granolaRead" onclick="granolaReadNow()">Read Recent Meetings Now</button><button class="btn" onclick="granolaDisconnect()">Disconnect…</button></div>` : '');
 }
 function openGranolaSheet(){
-  openAppModal(`<h3>Granola</h3><div id="granolaBox">${granolaSheetInner()}</div><div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal();loadIntegrationStatuses()">Done</button></div>`, 560);
+  openAppModal(`<h3 class="ap-h">${appLogo('granola', 'sm')}Granola</h3><div id="granolaBox">${granolaSheetInner()}</div><div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal();loadIntegrationStatuses()">Done</button></div>`, 560);
   loadGranolaState();
 }
 async function granolaConnect(){
