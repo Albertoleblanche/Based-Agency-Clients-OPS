@@ -542,12 +542,45 @@ ${yours}
 <p class="set-note cn-live">${st(live ? 'green' : 'yellow', live ? 'Live: changes show for everyone as they’re made' : 'Reconnecting… changes show for everyone once it’s back')}</p>
 <p class="t-2 set-note" id="sheetSyncStatus"></p>`;
 }
+// ---- Tasks from Slack (Nov 23, lib/slack-tasks.js) -------------------------------------------------
+// By itself: a message in a channel Radar is in that asks a teammate to do something becomes their
+// task. What Radar last heard from Slack shows here, and the one-time setup in Slack's app settings.
+let slackTasksState = null;
+async function loadSlackTasksState(){
+  try{ const { data } = await supabaseClient.from('app_storage').select('value').eq('key', 'slack-auto-tasks').maybeSingle(); slackTasksState = data && data.value ? JSON.parse(data.value) : {}; }catch(e){ slackTasksState = {}; }
+  const el = document.getElementById('slackTasksBox'); if(el) el.innerHTML = slackTasksHtml(slackTasksState);
+}
+function toggleSlackAutoTasks(){
+  if(!isAdmin()) return;
+  changeSettings(s => { s.slackAutoTasks = s.slackAutoTasks === false; });
+  const el = document.getElementById('slackTasksBox'); if(el) el.innerHTML = slackTasksHtml(slackTasksState);
+}
+function slackTasksHtml(st){
+  const on = settings.slackAutoTasks !== false, ago = t => { const d = new Date(t); return isNaN(d) ? '' : `${relDay(d).toLowerCase() === 'today' ? 'today' : relDay(d)} at ${fmtTime(d)}`; };
+  const heard = st == null ? 'Checking…' : st.lastEventAt
+    ? `Last heard from Slack ${ago(st.lastEventAt)}${st.lastTaskAt ? `. Last task: “${esc(st.lastTaskTitle || '')}”, ${ago(st.lastTaskAt)}` : ''}.`
+    : 'Not hearing from Slack yet: set it up there once (below).';
+  const url = `${location.origin}/api/send-slack-message`;
+  return `<div class="form-grp">${fr('Add tasks from Slack by itself', 'When someone asks a teammate to do something in a channel Radar is in, it becomes their task, links and all. A message to Radar itself is a task for you. Radar answers in the thread; react with :x: to take one back.', swHtml(on, 'Add tasks from Slack by itself', 'toggleSlackAutoTasks()', !isAdmin()))}
+<div class="fr"><div class="l"><span class="t-2" id="slackHeard">${heard}</span></div></div></div>
+<details class="sl-setup"><summary>Set it up in Slack (once)</summary><ol>
+<li>At api.slack.com/apps, open the Radar app. <b>Event Subscriptions</b>: turn it on, and paste this as the Request URL:<span class="sl-url"><code>${esc(url)}</code><button type="button" class="btn sm" onclick="copyToClipboard(${jsArg(url)}).then(()=>{this.textContent='Copied';setTimeout(()=>{this.textContent='Copy'},1600)})">Copy</button></span></li>
+<li>Under <b>Subscribe to bot events</b>, add <code>message.channels</code>, <code>message.groups</code>, <code>message.im</code>, <code>app_mention</code> and <code>reaction_added</code>. Save.</li>
+<li><b>OAuth &amp; Permissions</b>: make sure the bot has <code>channels:history</code>, <code>groups:history</code>, <code>im:history</code>, <code>app_mentions:read</code>, <code>reactions:read</code> and <code>chat:write</code>, then reinstall the app when Slack asks.</li>
+<li>In each channel where work gets asked for, type <code>/invite @Radar</code>.</li>
+<li>For <code>/task</code>: under <b>Slash Commands</b>, edit /task and tick <b>Escape channels, users, and links sent to your app</b>, so people and links come through.</li>
+</ol></details>
+<p class="sl-cmd">By command still works: <code>/task @person what to do due:friday</code>, with any links in it kept on the task.</p>`;
+}
 function openIntegrationSheet(which){
   if(which === 'harvest'){
     switchSettingsTab('harvest'); // everything Harvest lives in its own tab now
   } else if(which === 'slack'){
-    openAppModal(`<h3>Slack channels</h3><p class="t-2" style="font-size:13px;margin:-8px 0 12px">Link each client to its Slack channel so updates and alerts land there.</p><div id="slackChannelsPanelBody" class="integ-sheet">Loading…</div><div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal();loadIntegrationStatuses()">Done</button></div>`, 620);
+    openAppModal(`<h3>Slack</h3>
+<div id="slackTasksBox">${slackTasksHtml(null)}</div>
+<div class="sl-h">Client channels</div><div id="slackChannelsPanelBody" class="integ-sheet">Loading…</div><div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal();loadIntegrationStatuses()">Done</button></div>`, 620);
     loadSlackChannelsPanel();
+    loadSlackTasksState();
   } else {
     openAppModal(`<h3>Google Sheet</h3>
 <div class="f" style="grid-template-columns:120px minmax(0,1fr)">

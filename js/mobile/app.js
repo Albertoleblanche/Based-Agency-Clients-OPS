@@ -1364,10 +1364,12 @@ let mTask_ = {};
 function mOpenTaskSheet(preset){
   preset = preset || {};
   mTask_ = { clientId: preset.clientId || '', assigneeId: currentUser.id, due: '', time: '', priority: 'medium' };
-  mKeep('mTaskTitle', preset.title || ''); mKeep('mTaskNotes', preset.description || '');
+  mKeep('mTaskTitle', preset.title || ''); mKeep('mTaskNotes', preset.description || ''); mKeep('mTaskLink', preset.link || '');
+  window._mTaskFiles = [];
   const body = () => {
     const T = mTask_, who = teamProfiles.find(p => p.id === T.assigneeId);
-    return `<div class="ig flat" style="margin-top:12px"><div class="ir"><input class="itf" id="mTaskTitle" placeholder="Title" oninput="mKeep('mTaskTitle',this.value)"></div><div class="ir" style="align-items:flex-start"><textarea class="iarea" id="mTaskNotes" placeholder="Notes" style="min-height:64px" oninput="mKeep('mTaskNotes',this.value)"></textarea></div></div>
+    return `<div class="ig flat" style="margin-top:12px"><div class="ir"><input class="itf" id="mTaskTitle" placeholder="Title" oninput="mKeep('mTaskTitle',this.value)"></div><div class="ir" style="align-items:flex-start"><textarea class="iarea" id="mTaskNotes" placeholder="Notes" style="min-height:64px" oninput="mKeep('mTaskNotes',this.value)"></textarea></div><div class="ir"><input class="itf" id="mTaskLink" type="url" inputmode="url" autocapitalize="none" autocorrect="off" placeholder="Link" oninput="mKeep('mTaskLink',this.value)"></div></div>
+<div class="ig flat" style="margin-top:20px">${(window._mTaskFiles || []).map((f, i) => { const big = f.size > TASK_FILE_MAX; return `<div class="ir mtf"><span class="gl">${icon(/\.(png|jpe?g|gif|webp|heic|svg)$/i.test(f.name) ? 'image' : 'file-text')}</span><span class="t n">${mEsc(f.name)}</span><span class="r${big ? ' big' : ''}">${big ? 'Over 10 MB' : mFileSize(f.size)}</span><button type="button" class="mtf-rm" aria-label="Remove ${mEsc(f.name)}" onclick="mTaskFileDrop(${i})">Remove</button></div>`; }).join('')}<label class="ir tap mtf-add"><span class="gl">${icon('paperclip')}</span><span class="t n">Add Files</span><input type="file" multiple hidden onchange="mTaskFilesPicked(this.files);this.value=''"></label></div>
 <div class="ig flat" style="margin-top:20px">
 ${mRowPick('Client', mEsc(mClientName(T.clientId) || 'None'), "mTaskPick('client')", !!T.clientId)}
 ${mRowPick('Assignee', mEsc(who ? (who.id === currentUser.id ? 'Me' : who.name) : 'Choose'), "mTaskPick('who')", true)}
@@ -1379,8 +1381,12 @@ ${mRowPick('Priority', { none: 'None', low: 'Low', medium: 'Medium', high: 'High
   mOpenSheet('New Task', body(), { done: 'mSaveTask()', doneLabel: 'Add' });
   mRestoreSheetState();
 }
+function mFileSize(n){ n = n || 0; return n < 1048576 ? Math.max(1, Math.round(n / 1024)) + ' KB' : (n / 1048576).toFixed(1) + ' MB'; }
+function mTaskFilesRedraw(){ mKeep('mTaskTitle', mSheetVal('mTaskTitle')); mKeep('mTaskNotes', mSheetVal('mTaskNotes')); mKeep('mTaskLink', mSheetVal('mTaskLink')); $m('mSheet').querySelector('.sheet-scroll').innerHTML = window.mTaskBody(); mRestoreSheetState(); }
+function mTaskFilesPicked(list){ window._mTaskFiles = (window._mTaskFiles || []).concat([].slice.call(list || [])); mTaskFilesRedraw(); }
+function mTaskFileDrop(i){ window._mTaskFiles.splice(i, 1); mTaskFilesRedraw(); }
 function mTaskPick(what){
-  mKeep('mTaskTitle', mSheetVal('mTaskTitle')); mKeep('mTaskNotes', mSheetVal('mTaskNotes'));
+  mKeep('mTaskTitle', mSheetVal('mTaskTitle')); mKeep('mTaskNotes', mSheetVal('mTaskNotes')); mKeep('mTaskLink', mSheetVal('mTaskLink'));
   const back = () => { $m('mSheet').querySelector('.sheet-scroll').innerHTML = window.mTaskBody(); mRestoreSheetState(); };
   const T = mTask_;
   if(what === 'client') mPickClient(T.clientId, v => { T.clientId = v; back(); }, 'None');
@@ -1392,13 +1398,17 @@ function mTaskPick(what){
 async function mSaveTask(){
   const T = mTask_, title = mSheetVal('mTaskTitle').trim(), notesTxt = mSheetVal('mTaskNotes').trim();
   if(!title){ showToast('error', 'Add a title', ''); $m('mTaskTitle').focus(); return; }
-  const url = (notesTxt.match(/https?:\/\/[^\s<>"]+/i) || [])[0];
+  const linkTxt = mSheetVal('mTaskLink').trim();
+  const url = linkTxt ? (/^https?:\/\//i.test(linkTxt) ? linkTxt : 'https://' + linkTxt) : (notesTxt.match(/https?:\/\/[^\s<>"]+/i) || [])[0];
   const { data, error } = await insertTaskRow({ title, description: notesTxt, priority: T.priority === 'none' ? null : T.priority, assigner_id: currentUser.id, assignee_id: T.assigneeId, client_id: T.clientId || null, due_date: T.due || null, link: url || null, status: 'todo' });
   if(error || !data){ showToast('error', 'Couldn’t add the task', error?.message || ''); return; }
   if(T.time) await setTaskDueTime(data.id, T.time);
+  const files = window._mTaskFiles || [];
+  const up = files.length ? await uploadTaskFiles(data.id, files) : { failed: [] };
   if(T.assigneeId !== currentUser.id){ const p = teamProfiles.find(x => x.id === T.assigneeId); mNotify(T.assigneeId, 'task_assigned', 'New task assigned to you', `${myName()}: "${title}"`, 'tasks'); }
   mCloseSheet(true); await mRefresh();
-  showToast('success', T.assigneeId === currentUser.id ? 'Task added' : 'Task assigned', title);
+  if(up.failed.length) showToast('error', 'Task added, files not attached', taskFilesError(up.failed));
+  else showToast('success', T.assigneeId === currentUser.id ? 'Task added' : 'Task assigned', title);
 }
 
 let mRem_ = {};

@@ -25,6 +25,42 @@ function activeClients(){ return clients.filter(c=>!c.deletedAt && !clientInSetu
 function liveClients(){ return clients.filter(c=>!c.deletedAt); }
 // The person at the client that updates and wins greet by name ("Mike", "Mike and Sarah").
 function clientContact(c){ return String((c && ((c.customFieldValues && c.customFieldValues.contact) || c.contactName || c.contact_name)) || '').trim(); }
+// ---- Files on a task (Nov 23) ----
+// Kept in the private 'attachments' bucket under tasks/<task id>/ and listed in tasks.attachments
+// as { name, path, size, type, uploadedAt }, like notes. 10 MB a file at most.
+const TASK_FILE_MAX = 10 * 1024 * 1024;
+async function uploadTaskFiles(taskId, files){
+  const added = [], failed = [];
+  for(const f of [].slice.call(files || [])){
+    if(f.size > TASK_FILE_MAX){ failed.push({ name: f.name, why: 'over 10 MB' }); continue; }
+    const path = `tasks/${taskId}/${Date.now()}-${String(f.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const { error } = await supabaseClient.storage.from('attachments').upload(path, f, { contentType: f.type || undefined });
+    if(error){ failed.push({ name: f.name, why: error.message }); continue; }
+    added.push({ name: f.name, path, size: f.size, type: f.type || '', uploadedAt: new Date().toISOString() });
+  }
+  if(added.length){
+    const { data: cur } = await supabaseClient.from('tasks').select('attachments').eq('id', taskId).maybeSingle();
+    const { error } = await supabaseClient.from('tasks').update({ attachments: [...((cur && cur.attachments) || []), ...added] }).eq('id', taskId);
+    if(error){
+      try{ await supabaseClient.storage.from('attachments').remove(added.map(a => a.path)); }catch(e){}
+      return { added: [], failed: failed.concat(added.map(a => ({ name: a.name, why: error.message }))) };
+    }
+  }
+  return { added, failed };
+}
+async function removeTaskFiles(taskId, paths){
+  if(!paths || !paths.length) return true;
+  const { data: cur } = await supabaseClient.from('tasks').select('attachments').eq('id', taskId).maybeSingle();
+  const { error } = await supabaseClient.from('tasks').update({ attachments: ((cur && cur.attachments) || []).filter(a => !paths.includes(a.path)) }).eq('id', taskId);
+  if(!error){ try{ await supabaseClient.storage.from('attachments').remove(paths); }catch(e){} }
+  return !error;
+}
+// What a failed upload says: a missing storage rule reads as a plain next step.
+function taskFilesError(failed){
+  const f = failed[0] || {}, rls = /row-level security|policy|not authorized|unauthorized|403/i.test(f.why || '');
+  return rls ? 'Files on tasks need one setup step in Supabase: run addendum-task-files.sql.' : `${failed.map(x => x.name).join(', ')}: ${f.why || 'try again'}.`;
+}
+
 // ---- Focus (Nov 23) ----
 // Clients the owner asked the team to give extra attention, on top of Importance. Approvers switch
 // it on a client (its panel, client page, Edit Client, Bulk Edit); then, within every list and

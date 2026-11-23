@@ -18,6 +18,9 @@
     },
     "api/integrations.js": {
       "maxDuration": 60
+    },
+    "api/send-slack-message.js": {
+      "maxDuration": 30
     }
   }
 }

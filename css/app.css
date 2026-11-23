@@ -2922,7 +2922,10 @@ a.mi{text-decoration:none;color:inherit}
 .rmp-fu .tf{height:28px}
 .rmp .tkp-acts .btn{flex:1 1 0;justify-content:center}
 .rmp .tkp-acts .btn svg{width:14px;height:14px}
-/* Nudge: the AI's follow-up to the client, edited in the panel before it goes (work-canvas.js) */
+/* Nudge: the AI's follow-up to the client, edited in the panel before it goes (work-canvas.js).
+   The buttons and the nudge share one section that eases between shapes (remMorph); while it
+   writes, a subject bar and a box the size of the draft stand in, so nothing below moves. */
+.rmp-nz{display:block}
 .rmp-dh{align-items:center}
 .rmp-dh .rmp-ch{margin-left:6px}
 .rmp-dh .rmp-ch button{height:22px;padding:0 10px;font-size:12.5px}
@@ -2932,27 +2935,31 @@ a.mi{text-decoration:none;color:inherit}
 .rmp-dr{display:flex;flex-direction:column;gap:8px}
 .mac .rmp-dr .tf{width:100%;font-size:14px}
 .mac .rmp-dr .rmp-subj{height:34px;font-weight:600}
-.mac .rmp-dr textarea.rmp-body{min-height:132px;line-height:1.55;resize:vertical;field-sizing:content;max-height:46vh}
+.mac .rmp-dr textarea.rmp-body{line-height:1.55;resize:vertical;field-sizing:content;max-height:46vh}
+.mac .rmp-dr textarea.rmp-body.is-email{min-height:150px}
+.mac .rmp-dr textarea.rmp-body.is-wa{min-height:96px}
+.rmp-sk{box-sizing:border-box;border-radius:8px;background:var(--fill);box-shadow:inset 0 0 0 .5px var(--sep)}
+.rmp-sk i{display:block;height:9px;border-radius:5px;background:var(--fill-2)}
+.rmp-sk-subj{height:34px;display:flex;align-items:center;padding:0 10px}
+.rmp-sk-subj i{width:42%}
+.rmp-sk-body{display:flex;flex-direction:column;gap:9px;padding:9px 10px}
+.rmp-sk-body.is-email{min-height:150px}
+.rmp-sk-body.is-wa{min-height:96px}
+.rmp-sk-body i:nth-of-type(1){width:92%}
+.rmp-sk-body i:nth-of-type(2){width:78%}
+.rmp-sk-body i:nth-of-type(3){width:54%}
+.rmp-dw{display:flex;align-items:center;gap:7px;margin:0 0 3px;font-size:13px;color:var(--label-2)}
+.rmp-dw svg{width:14px;height:14px;color:var(--label-2)}
 .rmp-dacts{display:flex;gap:8px;margin-top:2px}
-.rmp-dacts .btn{flex:0 0 auto;justify-content:center;height:34px;padding:0 12px}
+.rmp-dacts .btn{flex:0 0 auto;justify-content:center;height:34px;padding:0 12px;transition:opacity 160ms ease}
 .rmp-dacts .btn-p{flex:1 1 auto}
-.rmp-dr.is-writing .rmp-dacts{margin-top:8px}
 .rmp-dacts .btn svg{width:14px;height:14px}
 .rmp-dn{margin:0;font-size:12.5px;line-height:1.45;color:var(--label-2)}
-.rmp-dr.is-writing{gap:9px;padding:4px 0 6px}
-.rmp-dw{display:flex;align-items:center;gap:7px;margin:0 0 2px;font-size:13px;color:var(--label-2)}
-.rmp-dw svg{width:14px;height:14px;color:var(--label-2)}
-.rmp-dr.is-writing i{display:block;height:10px;border-radius:5px;background:var(--fill-2)}
-.rmp-dr.is-writing i:nth-of-type(1){width:92%}
-.rmp-dr.is-writing i:nth-of-type(2){width:78%}
-.rmp-dr.is-writing i:nth-of-type(3){width:54%}
 @media (prefers-reduced-motion:no-preference){
-  .rmp-dr.is-writing i{animation:skel 1.4s ease-in-out infinite}
-  .rmp-dr.is-writing i:nth-of-type(2){animation-delay:.15s}
-  .rmp-dr.is-writing i:nth-of-type(3){animation-delay:.3s}
-  .rmp-dr:not(.is-writing){animation:rmpIn 220ms cubic-bezier(.23,1,.32,1)}
+  .rmp-sk i,.rmp-dw svg{animation:skel 1.4s ease-in-out infinite}
+  .rmp-sk-body i:nth-of-type(2){animation-delay:.15s}
+  .rmp-sk-body i:nth-of-type(3){animation-delay:.3s}
 }
-@keyframes rmpIn{from{opacity:0;transform:translateY(4px)}}
 @media (hover:hover) and (pointer:fine){
   .tk-c:hover{background:var(--fill-2)}
   .tk-c.is-sel:hover{background:var(--select)}
@@ -3035,3 +3042,50 @@ body > .notif-panel{position:fixed;top:auto;right:auto;z-index:1000}
   .fo-tg:not(.is-ro):not(.on):hover{background:var(--fill-3);color:var(--label)}
   .fo-tg.on:not(.is-ro):hover{background:var(--purple-soft);filter:brightness(1.08)}
 }
+
+/* Settings → Connections → Slack: setting up tasks from Slack, folded */
+.sl-setup{margin:12px 2px 0;font-size:13px;line-height:1.5;color:var(--label-2)}
+.sl-setup summary{cursor:default;color:var(--label);font-weight:550;list-style:none;display:flex;align-items:center;gap:6px}
+.sl-setup summary::-webkit-details-marker{display:none}
+.sl-setup summary::before{content:'';width:6px;height:6px;border-right:1.5px solid var(--label-2);border-bottom:1.5px solid var(--label-2);transform:rotate(-45deg);transition:transform 180ms cubic-bezier(.23,1,.32,1);margin-right:2px}
+.sl-setup[open] summary::before{transform:rotate(45deg)}
+.sl-setup ol{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.sl-setup code,.sl-cmd code{font-size:12px;padding:1px 5px;border-radius:5px;background:var(--fill-2);color:var(--label);white-space:nowrap}
+.sl-url{display:flex;align-items:center;gap:8px;margin:6px 0 2px;padding:6px 6px 6px 10px;border-radius:8px;background:var(--fill-2)}
+.sl-url code{flex:1 1 auto;min-width:0;padding:0;background:none;overflow:hidden;text-overflow:ellipsis;user-select:all}
+.sl-url .btn{flex:0 0 auto;min-width:64px}
+.sl-cmd{font-size:13px;line-height:1.5;color:var(--label-2);margin:12px 0 0}
+.sl-h{margin:22px 0 6px;font-size:14px;font-weight:600;color:var(--label)}
+.sl-chan-note{font-size:13px;line-height:1.5;color:var(--label-2);margin:0 0 12px}
+
+/* ---- Files on tasks (Nov 23): the New Task sheet's Files row, and the task panel's list ---- */
+.nt-files{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:34px;padding:3px;margin:-3px;border-radius:10px;transition:background-color 160ms ease,box-shadow 160ms ease}
+.nt-files.is-over{background:var(--accent-soft);box-shadow:inset 0 0 0 1.5px var(--accent)}
+.nt-file{display:inline-flex;align-items:center;gap:6px;max-width:100%;height:28px;padding:0 2px 0 9px;border-radius:8px;background:var(--fill-2);font-size:12.5px;color:var(--label)}
+.nt-file svg{width:13px;height:13px;flex:none;color:var(--label-2)}
+.nt-file .nm{min-width:0;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nt-file .sz{color:var(--label-2);font-size:11.5px;white-space:nowrap}
+.nt-file .ib{width:22px;height:22px}
+.nt-file .ib svg{width:11px;height:11px}
+.nt-file.is-big{background:var(--red-soft)}
+.nt-file.is-big .sz{color:var(--red)}
+.nt-add{height:28px;gap:6px}
+.nt-add svg{width:13px;height:13px}
+.nt-hint{font-size:12.5px;color:var(--label-3)}
+.tkp-fh{align-items:baseline}
+.tkp-fh .tkp-fadd{margin-left:auto;font-size:13px}
+.tkp-files{display:flex;flex-direction:column;gap:2px;margin:0 -8px}
+.tkp-file{display:flex;align-items:center;gap:9px;min-height:34px;padding:0 4px 0 8px;border-radius:8px;color:var(--label);text-decoration:none;font-size:13.5px}
+.tkp-file > svg{width:15px;height:15px;flex:none;color:var(--label-2)}
+.tkp-file .nm{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tkp-file .sz{font-size:12px;color:var(--label-2);white-space:nowrap}
+.tkp-file .ib{width:26px;height:26px;opacity:0;transition:opacity 120ms ease}
+.tkp-file .ib svg{width:12px;height:12px}
+.tkp-file:focus-within .ib{opacity:1}
+.tkp-fnone{margin:2px 0 0;font-size:13px;color:var(--label-3)}
+.sp.tkp.is-drop{box-shadow:inset 0 0 0 2px var(--accent),-24px 0 48px rgba(0,0,0,.35)}
+@media (hover:hover) and (pointer:fine){
+  .tkp-file:hover{background:var(--fill)}
+  .tkp-file:hover .ib{opacity:1}
+}
+@media (hover:none){ .tkp-file .ib{opacity:1} }

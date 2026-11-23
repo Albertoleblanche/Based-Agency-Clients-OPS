@@ -499,8 +499,10 @@ function taskFormHtml(editing, presetAssigneeId, presetContext){
   const due = t ? (t.dueDate || '') : (presetContext?.due || '');
   const time = t ? (taskDueTimes[t.id] || '') : '';
   const pri = t ? (t.priority || 'none') : (presetContext?.priority || 'medium');
-  let notes = t ? (t.description || '') : (presetContext?.description || '');
-  if(t && t.link && !notes.includes(t.link)) notes = (notes ? notes + '\n\n' : '') + t.link;
+  const notes = t ? (t.description || '') : (presetContext?.description || '');
+  const link = t ? (t.link || '') : (presetContext?.link || '');
+  // files: the task's own (when editing) and the ones picked here, uploaded when it's saved
+  window._ntFiles = []; window._ntRemove = new Set(); window._ntExisting = t ? (t.attachments || []).slice() : [];
   const title = t ? t.title : (presetContext?.title || '');
   const priSeg = [['none', 'None'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']].map(([v, l]) => `<button type="button" class="${pri === v ? 'on' : ''}" role="radio" aria-checked="${pri === v}" data-v="${v}" onclick="ntPri(this)">${l}</button>`).join('');
   const noteMenu = !t ? `<span style="position:relative;margin-right:auto"><button type="button" class="btn" id="ntFillBtn" onclick="ntToggleNoteMenu()">${icon('sparkle')}Fill from a note</button><div class="menu" id="ntNoteMenu" hidden style="bottom:34px;left:0;width:300px;max-height:260px;overflow:auto"></div></span>` : '';
@@ -512,11 +514,27 @@ function taskFormHtml(editing, presetAssigneeId, presetContext){
 <label for="taskDueInput">Due</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap" id="ntDueRow">${sheetDateField('taskDueInput', due, { none: 'No date', from: 0, to: 20, min: toDateStr(new Date()), after: 'ntSyncDue', label: 'Due date' })}${sheetPop('taskTimeInput', 'Due time', taskTimeOptions(), time, '', { disabled: !due })}</div>
 <label>Priority</label><div><div class="seg" role="radiogroup" aria-label="Priority" id="ntPriority">${priSeg}</div></div>
 <label>Color</label><div>${colorSwatchesHtml('ntColor', t ? t.color : (presetContext?.color || null))}</div>
-<label class="top" for="taskDescInput">Notes</label><textarea id="taskDescInput" class="tf" spellcheck="true" placeholder="Add details, links or a checklist">${escapeHtml(notes)}</textarea>
+<label class="top" for="taskDescInput">Notes</label><textarea id="taskDescInput" class="tf" spellcheck="true" placeholder="Add details or a checklist">${escapeHtml(notes)}</textarea>
+<label for="taskLinkInput">Link</label><input id="taskLinkInput" class="tf" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://… (a doc, a page, a design)" value="${escapeHtml(link)}">
+<label class="top">Files</label><div class="nt-files" id="ntFiles" ondragenter="ntFilesDrag(event,true)" ondragover="ntFilesDrag(event,true)" ondragleave="ntFilesDrag(event,false)" ondrop="ntFilesDrop(event)">${ntFilesInner()}</div>
 ${t ? '' : `<span></span><div style="display:flex;align-items:center;gap:10px;font-size:14px" id="ntCalRow" class="${due ? '' : 'off'}">${sheetSw('ntCal', true, 'Add to my calendar')}Add to my calendar</div>`}
 </div>
 <div class="sheet-a">${noteMenu}<button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="${t ? `saveEditTask('${t.id}')` : 'saveNewTask()'}">${t ? 'Save' : 'Create Task'}</button></div>`;
 }
+// ---- Files on the New Task / Edit Task sheet (Nov 23) ----
+// Picked or dropped here, shown as chips (a × takes one off), uploaded when the task is saved.
+function ntFilesInner(){
+  const kb = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+  const chip = (name, size, rm, big) => `<span class="nt-file${big ? ' is-big' : ''}" title="${escapeHtml(name)}${big ? ' is over 10 MB, so it won’t be attached' : ''}">${icon(/\.(png|jpe?g|gif|webp|heic|svg)$/i.test(name) ? 'image' : 'file-text')}<span class="nm">${escapeHtml(name)}</span><span class="sz">${big ? 'over 10 MB' : kb(size || 0)}</span><button type="button" class="ib" aria-label="Remove ${escapeHtml(name)}" onclick="${rm}">${icon('x')}</button></span>`;
+  const have = (window._ntExisting || []).filter(a => !(window._ntRemove || new Set()).has(a.path)).map(a => chip(a.name, a.size, `ntFileDrop('old',${jsArg(a.path)})`));
+  const add = (window._ntFiles || []).map((f, i) => chip(f.name, f.size, `ntFileDrop('new',${i})`, f.size > TASK_FILE_MAX));
+  return `${have.concat(add).join('')}<label class="btn sm nt-add">${icon('paperclip')}Add Files…<input type="file" multiple hidden onchange="ntFilesPicked(this.files);this.value=''"></label>${have.length || add.length ? '' : '<span class="nt-hint">or drop them here</span>'}`;
+}
+function ntFilesRedraw(){ const el = document.getElementById('ntFiles'); if(el) el.innerHTML = ntFilesInner(); }
+function ntFilesPicked(list){ window._ntFiles = (window._ntFiles || []).concat([].slice.call(list || [])); ntFilesRedraw(); }
+function ntFileDrop(kind, k){ if(kind === 'old') window._ntRemove.add(k); else window._ntFiles.splice(k, 1); ntFilesRedraw(); }
+function ntFilesDrag(e, on){ if(!e.dataTransfer || ![].includes.call(e.dataTransfer.types || [], 'Files')) return; e.preventDefault(); e.currentTarget.classList.toggle('is-over', on); }
+function ntFilesDrop(e){ if(!e.dataTransfer || !e.dataTransfer.files.length) return; e.preventDefault(); e.currentTarget.classList.remove('is-over'); ntFilesPicked(e.dataTransfer.files); }
 function openNewTaskModal(presetAssigneeId, presetStatus, presetContext){
   if(!teamProfiles.length){ showToast('error', 'No team members', 'Add team members in Team before assigning tasks.'); return; }
   newTaskPresetStatus = presetStatus || 'todo';
@@ -578,7 +596,8 @@ function ntReadForm(){
   const title = g('taskTitleInput').value.trim();
   let dueDate = g('taskDueInput').value || null;
   const notesTxt = g('taskDescInput').value.trim();
-  const url = (notesTxt.match(/https?:\/\/[^\s<>"]+|www\.[^\s<>"]+/i) || [])[0];
+  const linkTxt = (g('taskLinkInput')?.value || '').trim();
+  const url = linkTxt || (!g('taskLinkInput') ? (notesTxt.match(/https?:\/\/[^\s<>"]+|www\.[^\s<>"]+/i) || [])[0] : '');
   return { title, assigneeId: g('taskAssigneeSelect').value, priority: ntPriority(), description: notesTxt, dueDate,
     dueTime: dueDate ? (g('taskTimeInput')?.value || '') : '', clientId: g('taskClientSelect').value || null, link: url ? normalizeUrl(url.replace(/[).,;]+$/, '')) : null,
     color: pickedItemColor('ntColor') };
@@ -617,8 +636,10 @@ async function saveNewTask(){
   if(f.color) row.color = f.color;
   const { data, error } = await insertTaskRow(row);
   newTaskPresetStatus = 'todo';
+  if(error || !data){ restoreBtn(btn); showToast('error', 'Save failed', error?.message || 'Try again in a moment.'); return; }
+  let filesFailed = [];
+  if((window._ntFiles || []).length){ setBtnLoading(btn, 'Uploading…'); filesFailed = (await uploadTaskFiles(data.id, window._ntFiles)).failed; }
   restoreBtn(btn);
-  if(error || !data){ showToast('error', 'Save failed', error?.message || 'Try again in a moment.'); return; }
   closeAppModal();
   const afterCreate = window._ntAfterCreate; window._ntAfterCreate = null;
   if(f.dueTime) await setTaskDueTime(data.id, f.dueTime);
@@ -630,7 +651,8 @@ async function saveNewTask(){
   if(afterCreate) await afterCreate(data);
   const assignee = teamProfiles.find(p => p.id === f.assigneeId);
   if(f.assigneeId !== currentUser.id) sendNotification(f.assigneeId, 'task_assigned', 'New task assigned to you', `${myName() || 'Someone'}: "${f.title}"`, 'tasks');
-  if(!calOk) showToast('info', 'Task created', 'It couldn’t be added to your calendar. Try again from the task.');
+  if(filesFailed.length) showToast('error', `Task created, ${filesFailed.length === 1 ? 'a file' : filesFailed.length + ' files'} not attached`, taskFilesError(filesFailed));
+  else if(!calOk) showToast('info', 'Task created', 'It couldn’t be added to your calendar. Try again from the task.');
   else showToast('success', f.assigneeId === currentUser.id ? 'Task created' : 'Task assigned', f.assigneeId === currentUser.id ? (addCal ? 'Added to your tasks and your calendar.' : 'Added to your tasks.') : `${assignee ? firstName(assignee.name) : 'They'} will be notified.`);
 }
 async function saveEditTask(taskId){
@@ -647,9 +669,12 @@ async function saveEditTask(taskId){
   if(error && isMissingColumnError(error) && 'color' in row){ delete row.color; warnNoColorColumn(); ({ error } = await supabaseClient.from('tasks').update(row).eq('id', taskId)); }
   if(error && row.priority == null) ({ error } = await supabaseClient.from('tasks').update({ ...row, priority: 'low' }).eq('id', taskId));
   if(!error && (taskDueTimes[taskId] || '') !== (f.dueTime || '')) await setTaskDueTime(taskId, f.dueTime);
+  let filesFailed = [];
+  if(!error && window._ntRemove && window._ntRemove.size) await removeTaskFiles(taskId, [...window._ntRemove]);
+  if(!error && (window._ntFiles || []).length) filesFailed = (await uploadTaskFiles(taskId, window._ntFiles)).failed;
   closeAppModal();
   await loadMyTasks();
   renderTasks();
-  error ? showToast('error', 'Save failed', error.message) : showToast('success', 'Task updated', 'Changes saved.');
+  error ? showToast('error', 'Save failed', error.message) : filesFailed.length ? showToast('error', 'Saved, but not every file was attached', taskFilesError(filesFailed)) : showToast('success', 'Task updated', 'Changes saved.');
   if(!error && !reassigned && f.assigneeId !== currentUser.id) sendNotification(f.assigneeId, 'task_edited', 'Task updated', `${myName() || 'Someone'} updated "${f.title}".`, 'tasks');
 }

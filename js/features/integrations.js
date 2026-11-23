@@ -54,9 +54,9 @@ function renderSlackChannelsList(){
   const cursorPos = hadFocus ? searchInput.selectionStart : null;
 
   el.innerHTML = `
-    <p style="font-size:13px;color:var(--muted);margin:0 0 14px;line-height:1.6;">
-      Map each client to the Slack channel bridged to their WhatsApp group. Paste the <b>channel ID</b> (found in that channel's own details in Slack, not its name) — the bot needs to already be invited to it.
-      ${!canEdit ? '<br><br><b>Admins only can add or change mappings</b> — you can see what\'s already set up here.' : ''}
+    <p class="sl-chan-note">
+      Link each client to its Slack channel (the one bridged to their WhatsApp group) so updates and alerts land there, and a task asked for in it is for that client. Paste the <b>channel ID</b> from the channel’s own details in Slack, not its name; Radar needs to be invited to the channel.
+      ${!canEdit ? '<br><br><b>Only admins can add or change these</b>; you can see what’s set up.' : ''}
     </p>
     <input type="text" id="slackChannelsSearchInput" placeholder="Search clients…" value="${escapeHtml(slackChannelsSearchQuery)}" oninput="filterSlackChannelsPanel()" style="width:100%;font-size:13.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);margin-bottom:12px;">
     ${pageClients.map(c=>{

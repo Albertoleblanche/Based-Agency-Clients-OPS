@@ -324,3 +324,12 @@ body.mac.mobile { overflow: hidden; background: var(--ios-bg, #F2F2F7); -webkit-
 .fo-tg svg { width: 15px; height: 15px; stroke-width: 2.2; }
 .fo-tg.on { background: var(--purple-soft); color: var(--purple); }
 .fo-tg:not(.is-ro):active { opacity: .8; }
+
+/* New Task: attached files and the Add Files row */
+.app .mtf .t { flex: 1 1 auto; min-width: 0; }
+.app .mtf .r { font-size: 15px; }
+.app .mtf .r.big { color: var(--red); }
+.app .mtf-rm { flex: 0 0 auto; border: 0; background: none; margin: -10px -8px -10px 0; padding: 10px 8px; font: inherit; font-size: 15px; color: var(--red); border-radius: 8px; }
+.app .mtf-rm:active { background: var(--fill); }
+.app .mtf-add { cursor: pointer; }
+.app .mtf-add .t, .app .mtf-add .gl { color: var(--accent); }

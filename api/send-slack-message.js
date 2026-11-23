@@ -6,8 +6,10 @@
 // creates a task IN the app. The first three only ever run after a human
 // has reviewed the exact text and clicked confirm (or fire automatically
 // alongside an in-app notification, same as the push-notification path).
-// The slash command is a direct action someone typed in Slack — nothing
-// here reads or infers intent from ordinary conversation.
+// The slash command is a direct action someone typed in Slack. Since Nov 23
+// Radar can also read the channels it's invited to (Slack's Events API) and
+// turn a request to a teammate into a task by itself (lib/slack-tasks.js);
+// that's switched off in Settings → Connections → Slack.
 //
 // bodyParser is disabled for this whole file (not just the slash-command
 // path) because Slack's request signature has to be computed over the
@@ -26,11 +28,18 @@
 // POST body (JSON):             { action: 'client-message', clientId, text }
 // POST body (JSON):             { action: 'dm', targetUserId, notificationType, text }
 // POST body (form, from Slack): command=/task&text=...&user_id=...  (see handleTaskSlashCommand)
+// POST body (JSON, from Slack): Events API — url_verification, and event_callback for messages and
+//   reactions in the channels Radar is in: tasks by themselves (lib/slack-tasks.js, Nov 23).
 
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 const { sendSlackDM } = require('../lib/slack-notify');
 const { sendPushToUser, pushUrlFor } = require('../lib/push-notify');
+const { parseTaskCommandText, handleSlackEvent } = require('../lib/slack-tasks');
+// Keeps the function running after Slack has its answer (it wants one within 3 seconds; reading a
+// message with the AI can take longer). Without it, the work is done before answering.
+let waitUntil = null;
+try { ({ waitUntil } = require('@vercel/functions')); } catch (e) {}
 
 module.exports.config = { api: { bodyParser: false } };
 
@@ -68,34 +77,8 @@ function verifySlackSignature(rawBody, headers) {
   return { ok: true };
 }
 
-// Supported syntax: /task @person the task title due:2026-08-25
-// due: also accepts "today" and "tomorrow". Anything else after due: is
-// left as-is (rather than guessed at) — deliberately not attempting
-// full natural-language date parsing here, which would add a lot of
-// ambiguity (does "friday" mean this week or next?) for a command meant
-// to be quick and unambiguous to type.
-function parseTaskCommandText(text) {
-  const mentionMatch = text.match(/<@([A-Z0-9]+)(?:\|[^>]*)?>/);
-  const assigneeSlackId = mentionMatch ? mentionMatch[1] : null;
-
-  let dueDate = null;
-  const dueMatch = text.match(/\bdue:(\S+)/i);
-  if (dueMatch) {
-    const raw = dueMatch[1].toLowerCase();
-    const today = new Date();
-    if (raw === 'today') dueDate = today.toISOString().slice(0, 10);
-    else if (raw === 'tomorrow') { today.setDate(today.getDate() + 1); dueDate = today.toISOString().slice(0, 10); }
-    else if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) dueDate = raw;
-  }
-
-  const title = text
-    .replace(/<@[A-Z0-9]+(?:\|[^>]*)?>/g, '')
-    .replace(/\bdue:\S+/i, '')
-    .trim();
-
-  return { assigneeSlackId, dueDate, title };
-}
-
+// The command's text is read by parseTaskCommandText (lib/slack-tasks.js): the person, the title,
+// due:, and the links, which go on the task.
 async function handleTaskSlashCommand(req, res, rawBody, admin) {
   const verification = verifySlackSignature(rawBody, req.headers);
   if (!verification.ok) {
@@ -113,7 +96,7 @@ async function handleTaskSlashCommand(req, res, rawBody, admin) {
     return;
   }
 
-  const { assigneeSlackId, dueDate, title } = parseTaskCommandText(text);
+  const { assigneeSlackId, dueDate, title, link, description } = parseTaskCommandText(text);
   if (!assigneeSlackId) {
     res.status(200).json({
       response_type: 'ephemeral',
@@ -145,10 +128,10 @@ async function handleTaskSlashCommand(req, res, rawBody, admin) {
     return;
   }
 
-  const { data: task, error } = await admin.from('tasks').insert({
-    title, description: null, priority: 'medium', status: 'todo',
-    assigner_id: runnerProfile.id, assignee_id: assigneeProfile.id, due_date: dueDate,
-  }).select().single();
+  const row = { title, description: description || null, priority: 'medium', status: 'todo',
+    assigner_id: runnerProfile.id, assignee_id: assigneeProfile.id, due_date: dueDate, link: link || null };
+  let { data: task, error } = await admin.from('tasks').insert(row).select().single();
+  if (error && /link/.test(error.message || '')) { const { link: _l, ...rest } = row; ({ data: task, error } = await admin.from('tasks').insert(rest).select().single()); }
 
   if (error || !task) {
     res.status(200).json({ response_type: 'ephemeral', text: `Couldn't create the task: ${error?.message || 'unknown error'}` });
@@ -170,7 +153,7 @@ async function handleTaskSlashCommand(req, res, rawBody, admin) {
 
   res.status(200).json({
     response_type: 'ephemeral',
-    text: `Task "${title}" assigned to ${assigneeProfile.name || 'them'}${dueDate ? ` (due ${dueDate})` : ''}.`,
+    text: `Task "${title}" assigned to ${assigneeProfile.name || 'them'}${dueDate ? ` (due ${dueDate})` : ''}${link ? `, with the link ${link}` : ''}.`,
   });
 }
 
@@ -197,6 +180,23 @@ module.exports = async function handler(req, res) {
     } catch (e) {
       res.status(500).json({ error: String(e) });
     }
+    return;
+  }
+
+  // ---- Slack's Events API: the URL check, then messages and reactions (tasks by themselves) ----
+  if (req.headers['x-slack-signature']) {
+    const verification = verifySlackSignature(rawBody, req.headers);
+    if (!verification.ok) { res.status(401).json({ error: verification.reason }); return; }
+    let payload = {};
+    try { payload = JSON.parse(rawBody || '{}'); } catch (e) { res.status(400).json({ error: 'Malformed JSON body' }); return; }
+    if (payload.type === 'url_verification') { res.status(200).json({ challenge: payload.challenge }); return; }
+    // Slack sends an event again when it didn't hear back in time; the first one is already being read.
+    if (req.headers['x-slack-retry-num']) { res.status(200).json({ ok: true, retry: true }); return; }
+    if (payload.type !== 'event_callback') { res.status(200).json({ ok: true }); return; }
+    const work = handleSlackEvent(admin, payload, { appUrl: process.env.APP_URL || `https://${req.headers.host}` }).catch(e => ({ error: String(e) }));
+    if (waitUntil) { waitUntil(work); res.status(200).json({ ok: true }); return; }
+    const result = await work;
+    res.status(200).json({ ok: true, result });
     return;
   }
 

@@ -114,6 +114,7 @@ function renderTasks(){
   const sp = root.querySelector('.sp-page'); if(sp) sp.scrollTop = prev;
   const pn = root.querySelector('.sp:not(.sp-leaving)'); if(pn){ pn.scrollTop = prevSp; pn._st = prevSp; }
   const ci = document.getElementById('tkpCmt'); if(ci && cmt) ci.value = cmt;
+  tkFillFiles(root);
   if(currentViewName === 'tasks') setToolbar(null, `${open.length} open${overdue.length ? ` · ${overdue.length} overdue` : ''}`);
   if(typeof updateTasksNavBadge === 'function') updateTasksNavBadge();
 }
@@ -246,7 +247,8 @@ function taskPanelHtml(t){
   if(amAssignee && !done && !sp && typeof openNewSprintModal === 'function') more.push(`<button class="mi" onclick="openNewSprintModal({ taskId: '${t.id}' })">${icon('route')}Plan a Sprint…</button>`);
   if(amAssigner && !done) more.push(`${more.length ? '<div class="msep"></div>' : ''}<button class="mi danger" onclick="cancelTask('${t.id}')">${icon('x')}Cancel Task…</button>`);
   if(done && hasPermission('delete_tasks')) more.push(`<div class="msep"></div><button class="mi danger" onclick="deleteTaskPermanently('${t.id}')">${icon('trash')}Delete…</button>`);
-  return `<aside class="sp tkp" aria-label="${escapeHtml(t.title)}">
+  const dropOk = amAssigner || amAssignee || canApprove();
+  return `<aside class="sp tkp" aria-label="${escapeHtml(t.title)}"${dropOk ? ` ondragenter="tkFilesDrag(event,true)" ondragover="tkFilesDrag(event,true)" ondragleave="tkFilesDrag(event,false)" ondrop="tkFilesDrop(event,'${t.id}')"` : ''}>
 <div class="sp-bar"><button class="ib" aria-label="Close" onclick="closeTaskPanel()">${icon('x')}</button><span class="tkp-bar">${amAssigner && !done ? `<a class="x-lnk" href="#" onclick="openEditTaskModal('${t.id}');return false;">Edit</a>` : ''}${more.length ? `<button class="ib" aria-label="More" title="More" onclick="tkMore(event, '${t.id}')">${icon('dots-three')}</button><template id="tkMoreItems">${more.join('')}</template>` : ''}</span></div>
 <div class="tkp-h">${tkCb(t, 'lg')}<h3>${escapeHtml(t.title)}${t.priority === 'high' && !done ? `<span class="tk-flag" title="High priority">${icon('flag')}</span>` : ''}</h3></div>
 <div class="tkp-meta">
@@ -263,12 +265,59 @@ ${(() => { const wa = typeof waTasks !== 'undefined' ? waTasks.find(x => x.task_
 </div>
 ${acts}
 ${notes ? `<div class="sp-sec"><b>Notes</b></div><p class="tkp-notes">${escapeHtml(notes)}</p>` : ''}
+${tkFilesHtml(t, amAssigner || amAssignee || canApprove())}
 ${ck.length ? `<div class="sp-sec"><b>Checklist</b><span>${ckDone} of ${ck.length}</span></div>${ckHtml}` : ''}
 ${done && t.completionLink ? `<div class="sp-sec"><b>When it was finished</b></div><p class="tkp-notes"><a href="${safeUrl(normalizeUrl(t.completionLink))}" target="_blank" rel="noopener">${escapeHtml(truncateLinkDisplay(t.completionLink, 46))}</a></p>` : ''}
 <div class="sp-sec"><b>Activity</b></div>${evHtml}
 ${taskCommentsReady ? `<form class="tkp-cmt" onsubmit="event.preventDefault();postTaskComment('${t.id}')"><input id="tkpCmt" class="tf" placeholder="Write a comment…" aria-label="Write a comment" autocomplete="off" maxlength="4000"><button class="btn" type="submit">Post</button></form>` : ''}
 </aside>`;
 }
+// ---- Files on a task (Nov 23): listed in its panel; click opens one (an image in the viewer), ----
+// Add Files… or dropping files on the panel attaches more, × takes one off.
+const tkFileUrls = {};   // path -> { url, at }: signed links last an hour, reused for 50 minutes
+function tkFilesHtml(t, can){
+  const files = t.attachments || [];
+  if(!files.length && !can) return '';
+  const kb = n => !n ? '' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+  const row = a => `<a class="tkp-file" href="#" data-path="${escapeHtml(a.path)}" data-name="${escapeHtml(a.name)}" target="_blank" rel="noopener" onclick="return tkOpenFile(event, this)">${icon(/\.(png|jpe?g|gif|webp|heic|svg)$/i.test(a.name) ? 'image' : 'file-text')}<span class="nm">${escapeHtml(a.name)}</span><span class="sz">${kb(a.size)}</span>${can ? `<button class="ib" aria-label="Remove ${escapeHtml(a.name)}" title="Remove" onclick="event.preventDefault();event.stopPropagation();tkRemoveFile('${t.id}',${jsArg(a.path)},${jsArg(a.name)})">${icon('x')}</button>` : ''}</a>`;
+  return `<div class="sp-sec tkp-fh"><b>Files</b>${files.length ? `<span>${files.length}</span>` : ''}${can ? `<label class="x-lnk tkp-fadd">Add Files…<input type="file" multiple hidden onchange="tkAddFiles('${t.id}', this.files);this.value=''"></label>` : ''}</div>
+${files.length ? `<div class="tkp-files">${files.map(row).join('')}</div>` : `<p class="tkp-fnone">No files yet. Add some, or drop them on this panel.</p>`}`;
+}
+async function tkFillFiles(root){
+  const links = [...(root || document).querySelectorAll('.tkp-file[data-path]')];
+  for(const a of links){
+    const p = a.dataset.path, hit = tkFileUrls[p];
+    let url = hit && Date.now() - hit.at < 50 * 60000 ? hit.url : null;
+    if(!url){ const { data } = await supabaseClient.storage.from('attachments').createSignedUrl(p, 3600); url = data && data.signedUrl; if(url) tkFileUrls[p] = { url, at: Date.now() }; }
+    if(url && a.isConnected){ a.href = url; a.dataset.ready = '1'; }
+  }
+}
+function tkOpenFile(e, a){
+  const img = /\.(png|jpe?g|gif|webp|svg)$/i.test(a.dataset.name || '');
+  if(a.dataset.ready){ if(img && typeof openImageLightbox === 'function'){ e.preventDefault(); openImageLightbox(a.href, a.dataset.name); return false; } return true; }
+  e.preventDefault();
+  supabaseClient.storage.from('attachments').createSignedUrl(a.dataset.path, 3600).then(({ data }) => {
+    if(!data || !data.signedUrl) return showToast('error', 'Couldn’t open the file', 'Try again in a moment.');
+    if(img && typeof openImageLightbox === 'function') openImageLightbox(data.signedUrl, a.dataset.name); else window.open(data.signedUrl, '_blank', 'noopener');
+  });
+  return false;
+}
+async function tkAddFiles(taskId, list){
+  const files = [].slice.call(list || []); if(!files.length) return;
+  showToast('info', `Attaching ${files.length === 1 ? files[0].name : files.length + ' files'}…`, '');
+  const r = await uploadTaskFiles(taskId, files);
+  await loadMyTasks(); renderTasks();
+  if(r.failed.length) showToast('error', r.added.length ? 'Some files weren’t attached' : 'Not attached', taskFilesError(r.failed));
+  else showToast('success', r.added.length === 1 ? 'File attached' : `${r.added.length} files attached`, r.added.length === 1 ? r.added[0].name : '');
+}
+async function tkRemoveFile(taskId, path, name){
+  if(!(await confirmDialog(`Remove “${name}” from this task?`, { confirmLabel: 'Remove', destructive: true }))) return;
+  const ok = await removeTaskFiles(taskId, [path]);
+  await loadMyTasks(); renderTasks();
+  ok ? showToast('success', 'Removed', name) : showToast('error', 'Not removed', 'Try again in a moment.');
+}
+function tkFilesDrag(e, on){ if(!e.dataTransfer || ![].includes.call(e.dataTransfer.types || [], 'Files')) return; e.preventDefault(); if(on) e.currentTarget.classList.add('is-drop'); else if(!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('is-drop'); }
+function tkFilesDrop(e, taskId){ if(!e.dataTransfer || !e.dataTransfer.files.length) return; e.preventDefault(); e.currentTarget.classList.remove('is-drop'); tkAddFiles(taskId, e.dataTransfer.files); }
 function tkMore(e, id){
   e.stopPropagation();
   const had = document.getElementById('tkMenu'); had?.remove(); if(had) return;

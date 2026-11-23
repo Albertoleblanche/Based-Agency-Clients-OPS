@@ -359,6 +359,12 @@ html.ui-w .rmi-r .cb.closed{background:var(--uw-c2)}
 html.ui-w .sp{top:10px;right:18px;bottom:18px;max-width:calc(100% - 36px);border-left:0;border-radius:var(--uw-r-sec);background:var(--grp);padding:14px 26px 28px;box-shadow:0 0 0 1px var(--sep),0 30px 70px -24px rgba(0,0,0,.6),var(--uw-hi)}
 html.ui-w .mac[data-theme="light"] .sp{box-shadow:0 0 0 1px var(--sep),0 24px 60px -20px rgba(0,0,0,.2)}
 html.ui-w .sp-bar{margin:0 -6px 10px}
+/* a panel's toolbar at the foot (All Clients, This Week) is part of the panel: same surface, flush
+   with its bottom edge (the card's rounded corners clip it), a hairline above */
+html.ui-w .sp.has-foot{padding-bottom:0}
+html.ui-w .sp.tkp.is-drop{box-shadow:0 0 0 2px var(--accent),0 30px 70px -24px rgba(0,0,0,.6)}
+html.ui-w :is(.nt-file,.tkp-file){border-radius:var(--uw-r-ctl-in)}
+html.ui-w .sp-foot{background:var(--grp);border-top:1px solid var(--sep);padding:6px 18px 8px}
 html.ui-w .sp-bar .ib{width:32px;height:32px;border-radius:var(--uw-r-ctl);box-shadow:0 0 0 1px var(--sep)}
 html.ui-w :is(.sp-head .tx b,.sp-status > b){font-weight:500}
 html.ui-w .tkp-h h3{font-size:22px;font-weight:400;letter-spacing:-.02em;line-height:1.25}
@@ -367,7 +373,8 @@ html.ui-w .tkp-meta{border-color:var(--sep)}
 html.ui-w .tkp-late{color:var(--uw-risk);font-weight:400}
 html.ui-w :is(.tkp-acts,.sp-acts) .btn{height:38px;border-radius:var(--uw-r-ctl)}
 html.ui-w .rmp-dacts .btn{height:38px;border-radius:var(--uw-r-ctl)}
-html.ui-w .rmp-dr .tf{border-radius:var(--uw-r-ctl)}
+html.ui-w :is(.rmp-dr .tf,.rmp-sk){border-radius:var(--uw-r-ctl)}
+html.ui-w .rmp-sk-subj{height:36px}   /* the same height as the new look's fields, so nothing moves when it's written */
 html.ui-w .tkp-a b{font-weight:500}
 html.ui-w .tkp-ad{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase}
 
