@@ -3499,7 +3499,8 @@ html.ui-w .wa-rt-big b{font-family:var(--mono);font-weight:500}
 
 /* ---- WhatsApp, by client (Nov 24 redesign) --------------------------------------------------------
    The client comes first: a section per client, its name outside the card, its requests inside. */
-.wx{--wx-r:18px;--wx-pad:22px;--wx-ease:cubic-bezier(.23,1,.32,1);width:100%;max-width:1240px;margin:0 auto;padding:34px 44px 88px;box-sizing:border-box}
+.wx{--wx-r:18px;--wx-pad:22px;--wx-ease:cubic-bezier(.23,1,.32,1);width:100%;padding:30px 40px 60px;box-sizing:border-box}
+html.ui-w .wx{padding:6px 26px 30px var(--uw-gl)}
 .wx *{box-sizing:border-box}
 .wx-hd{display:flex;align-items:flex-end;justify-content:space-between;gap:18px 24px;flex-wrap:wrap;margin-bottom:26px}
 .wx-h{margin:0;font-size:30px;line-height:1.12;font-weight:650;letter-spacing:-.022em}
@@ -3516,7 +3517,7 @@ html.ui-w .wa-rt-big b{font-family:var(--mono);font-weight:500}
 .wx-hd-a{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .wx-hd-a .pop-sel{width:auto;min-width:0}
 .wx-body{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:28px;align-items:start}
-.wx.has-panel{max-width:none;margin:0;padding-right:calc(500px + 56px)}
+.wx.has-panel,html.ui-w .wx.has-panel{padding-right:calc(500px + 44px)}
 .wx.has-panel .wx-body{grid-template-columns:minmax(0,1fr)}
 .wx.has-panel .wx-side{display:none}
 .wx-main{min-width:0}
@@ -3527,17 +3528,19 @@ html.ui-w .wa-rt-big b{font-family:var(--mono);font-weight:500}
 .wx-groups{display:flex;flex-direction:column;gap:28px}
 .wx-groups + .es{margin-top:40px}
 /* a client's heading */
-.wx-cs-h{display:flex;align-items:center;gap:16px;padding:0 4px 12px}
-.wx-cs-l{display:flex;flex:1 1 auto;flex-direction:column;gap:2px;min-width:0}
-.wx-cs-t{display:inline-flex;align-items:center;gap:7px;max-width:100%;margin-left:-6px;padding:3px 8px 3px 4px;border:0;border-radius:8px;background:none;color:var(--label);font:inherit;font-size:17px;font-weight:650;letter-spacing:-.012em;text-align:left;cursor:default;transition:background-color 150ms ease,transform 140ms var(--wx-ease)}
+.wx-cs-h{display:flex;align-items:center;gap:16px;padding:0 4px 10px}
+.wx-cs-l{display:flex;flex:1 1 auto;align-items:baseline;gap:10px;min-width:0}
+.wx-cs-t{display:inline-flex;flex:0 1 auto;align-items:center;gap:7px;max-width:100%;min-width:0;margin-left:-6px;padding:3px 8px 3px 4px;border:0;border-radius:8px;background:none;color:var(--label);font:inherit;font-size:17px;font-weight:650;letter-spacing:-.012em;text-align:left;cursor:default;transition:background-color 150ms ease,transform 140ms var(--wx-ease)}
 .wx-cs-t span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wx-cs-t:active{transform:scale(.98)}
 .wx-cs-t.is-static{margin-left:0;padding-left:0;color:var(--blue)}
 .wx-chev{width:15px;height:15px;flex:0 0 auto;color:var(--label-3);transform:rotate(90deg);transition:transform 240ms var(--wx-ease)}
 .wx-cs.is-closed .wx-chev{transform:none}
-.wx-cs-sub{display:flex;align-items:baseline;gap:6px;min-width:0;padding-left:23px;font-size:13px;color:var(--label-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wx-cs-sub{display:flex;flex:0 1 auto;align-items:baseline;gap:6px;min-width:0;font-size:13px;color:var(--label-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wx-cs-sub > span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .wx-cs-sub i{font-style:normal}
-.wx-again .wx-cs-sub{padding-left:0;white-space:normal}
+.wx-again .wx-cs-l{flex-direction:column;align-items:flex-start;gap:2px}
+.wx-again .wx-cs-sub{white-space:normal}
 .wx-mood{font-weight:500}
 .wx-mood.y{color:var(--yellow)}
 .wx-mood.g{color:var(--green)}
@@ -3548,6 +3551,8 @@ html.ui-w .wa-rt-big b{font-family:var(--mono);font-weight:500}
 .wx-cs-r a:active{opacity:.6}
 .wx-cs-r a svg{width:13px;height:13px}
 .wx-vr{width:1px;height:14px;background:var(--sep-strong,var(--sep))}
+.wx-cs-r .wx-link{height:26px;padding:0 8px;font-size:12.5px;color:var(--blue)}
+.wx-cs-r .wx-link svg{width:12px;height:12px}
 /* its requests, folding away */
 .wx-cs-body{display:grid;grid-template-rows:1fr;opacity:1;transition:grid-template-rows 280ms var(--wx-ease),opacity 200ms ease}
 .wx-cs.is-closed .wx-cs-body{grid-template-rows:0fr;opacity:0}
@@ -3636,12 +3641,13 @@ button.wx-t.on + button.wx-t{box-shadow:none}
 .wx-mood-r .wx-mood{display:inline-block;margin-top:3px;font-size:12.5px}
 .wx-mood-r p{margin:3px 0 0;font-size:12.5px;line-height:1.45;color:var(--label-2)}
 .wx-how{margin:2px 4px 0;font-size:12px;line-height:1.55;color:var(--label-3)}
-@media (max-width:1100px){ .wx-body{grid-template-columns:minmax(0,1fr)} .wx.has-panel{padding-right:44px} }
+@media (max-width:1100px){ .wx-body{grid-template-columns:minmax(0,1fr)} .wx.has-panel,html.ui-w .wx.has-panel{padding-right:26px} }
 @media (max-width:700px){
   .wx{padding:20px 16px 64px}
   .wx-h{font-size:24px}
   .wx-cs-h{flex-wrap:wrap;gap:6px 12px}
   .wx-cs-r{margin-left:23px}
+  .wx-cs-l{flex-wrap:wrap;row-gap:2px}
   .wx-row{padding:14px 16px}
 }
 @media (prefers-reduced-motion:reduce){ .wx-cs-body,.wx-chev,.wx-row,.wx-cs-t{transition:none} }

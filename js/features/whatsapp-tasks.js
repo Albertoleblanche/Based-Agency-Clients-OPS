@@ -159,15 +159,40 @@ function waCleanName(n){
 function waGroup(t){ return waGroups.find(x => x.jid === t.group_jid) || null; }
 function waGroupName(t){ const g = waGroup(t); return g ? g.name : ''; }
 function waNorm(s){ return String(s || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim(); }
-// The Radar client an item is about: the group's link if it has one, else the same (or a longer) name.
+// The Radar client an item is about: the group's link if it has one, else the same (or a longer) name;
+// "Cordovan Art Schools" finds "Cordovan Art School" (a plural s doesn't count).
+function waLoose(s){ return waNorm(s).split(' ').map(w => w.length > 3 ? w.replace(/s$/, '') : w).join(' '); }
 function waClient(t){
   const all = typeof liveClients === 'function' ? liveClients() : [];
   const g = waGroup(t);
   if(g && g.client_id){ const c = all.find(x => String(x.id) === String(g.client_id)); if(c) return c; }
   const n = waNorm(t.client); if(!n) return null;
+  const pre = (a, b) => Math.min(a.length, b.length) > 4 && (a.startsWith(b + ' ') || b.startsWith(a + ' '));
+  const l = waLoose(t.client);
   return all.find(c => waNorm(c.name) === n)
-    || all.find(c => { const cn = waNorm(c.name); return Math.min(cn.length, n.length) > 4 && (cn.startsWith(n + ' ') || n.startsWith(cn + ' ')); })
+    || all.find(c => pre(waNorm(c.name), n))
+    || all.find(c => waLoose(c.name) === l)
+    || all.find(c => pre(waLoose(c.name), l))
     || null;
+}
+// Link a group to a Radar client, from its section on the WhatsApp screen.
+function waLinkPickHtml(jid, name){
+  const all = typeof liveClients === 'function' ? liveClients().slice().sort((a, b) => a.name.localeCompare(b.name)) : [];
+  if(!all.length) return '<span class="t-3">Not in Radar</span>';
+  return `<label class="pop pop-sel wx-link" title="Its group isn’t linked to a client in Radar"><span class="pl">Link to a Client</span>${icon('caret-down')}<select aria-label="Link ${escapeHtml(name)} to a client" onchange="waLinkGroup('${escapeHtml(jid)}', this.value)"><option value="">Link to a Client</option>${all.map(c => `<option value="${escapeHtml(String(c.id))}">${escapeHtml(c.name)}</option>`).join('')}</select></label>`;
+}
+async function waLinkGroup(jid, clientId){
+  const g = waGroups.find(x => x.jid === jid); if(!g || !clientId) return;
+  const before = g.client_id;
+  g.client_id = clientId; renderWhatsapp();
+  const { data, error } = await supabaseClient.from('wa_groups').update({ client_id: clientId, updated_at: new Date().toISOString() }).eq('jid', jid).select();
+  if(error || !data || !data.length){
+    g.client_id = before; renderWhatsapp();
+    showToast('error', 'Couldn’t link the group', error ? error.message : 'An admin can link it in Settings → WhatsApp.'); return;
+  }
+  if(typeof winGroups !== 'undefined' && Array.isArray(winGroups)){ const w = winGroups.find(x => x.jid === jid); if(w) w.client_id = clientId; }
+  const c = (typeof liveClients === 'function' ? liveClients() : []).find(x => String(x.id) === String(clientId));
+  showToast('success', `Linked to ${c ? c.name : 'the client'}`, 'Its requests show under that client now.');
 }
 function waClientLabel(t){ const c = waClient(t); return c ? c.name : waCleanName(t.client || (waGroup(t) || {}).name || 'Unknown client'); }
 function waMono(t, cls){ const c = waClient(t); return monoHtml(c || { id: 'wa:' + t.client, name: t.client }, cls); }
@@ -326,7 +351,7 @@ function renderWhatsapp(){
 }
 
 // Why an open item needs someone now, in a few words, or null.
-const WA_RANK = { urgent: 0, reply: 1, late: 2, due: 3, high: 4 };
+const WA_RANK = { urgent: 0, reply: 1, late: 2, due: 3, high: 4, today: 5 };
 function waWhy(t, waits){
   if(t.status !== 'open') return null;
   if(t.urgent_at) return { k: 'urgent', text: 'Urgent', red: true };
@@ -336,7 +361,7 @@ function waWhy(t, waits){
   if(t.due_date && t.due_date < today) return { k: 'late', text: `Was due ${fmtShortDate(new Date(t.due_date + 'T12:00:00'))}`, red: true };
   if(waLate(t)) return { k: 'late', text: t.kind === 'promise' ? `Promised ${waAgeWord(t)} ago` : `Waiting ${waAgeWord(t)}` };
   if(t.due_date === today) return { k: 'due', text: 'Due today' };
-  if(waDueToday(t)) return { k: 'due', text: 'Answer today' };
+  if(waDueToday(t)) return { k: 'today', text: 'Answer today' };   // the usual pace: listed, not Needs attention
   if(t.priority === 'high') return { k: 'high', text: 'High priority' };
   return null;
 }
@@ -404,7 +429,7 @@ function waDraw(root){
   const open = allOpen.filter(pickCl), done = allDone.filter(pickCl);
   const waits = lead ? waWaitMap(open) : new Map();
   const whyOf = new Map(open.map(t => [t.id, waWhy(t, waits)]));
-  const needs = open.filter(t => whyOf.get(t.id));
+  const needs = open.filter(t => { const w = whyOf.get(t.id); return w && w.k !== 'today'; });
   const useMine = lead && who === 'all';
   const isMine = t => t.owner_user_id === me;
   const tier = t => t.urgent_at ? 0 : useMine && isMine(t) ? 1 : 2;
@@ -439,6 +464,8 @@ function waDraw(root){
   if(open.length){
     const mineN = useMine ? open.filter(isMine).length : 0;
     subBits.push(`<b>${open.length} request${open.length === 1 ? '' : 's'}${mineN ? ` · ${waYoursWords(mineN, open.length)}` : ''}</b>`);
+    const todayN = open.filter(t => { const w = whyOf.get(t.id); return w && w.k === 'today'; }).length;
+    if(todayN) subBits.push(`${todayN} to answer today`);
   }
   const againN = again.length;
   if(againN) subBits.push(`<span class="t-blue">${againN === 1 ? 'A client' : againN + ' clients'} wrote again after done</span>`);
@@ -510,7 +537,10 @@ function waSecHtml(k, ts, o){
   const oldest = o.past ? null : live.filter(waLate).sort((a, b) => new Date(a.first_seen) - new Date(b.first_seen))[0];
   const urgent = !o.past && live.some(t => t.urgent_at);
   const closed = waFolded().has(k);
-  const link = c ? `<a href="#" onclick="openClientInspectorFor('${escapeHtml(String(c.id))}');return false;">Open Client${icon('caret-right')}</a>` : '<span class="t-3">Not in Radar</span>';
+  const jid = ts[0] && ts[0].group_jid;
+  const canLink = !c && jid && o.lead && ((typeof canApprove === 'function' && canApprove()) || waCanSetup());
+  const link = c ? `<a href="#" onclick="openClientInspectorFor('${escapeHtml(String(c.id))}');return false;">Open Client${icon('caret-right')}</a>`
+    : canLink ? waLinkPickHtml(jid, k) : '<span class="t-3">Not in Radar</span>';
   return `<section class="wx-cs${closed ? ' is-closed' : ''}" data-k="${escapeHtml(k)}" aria-label="${escapeHtml(k)}">
 <header class="wx-cs-h"><div class="wx-cs-l"><button class="wx-cs-t" aria-expanded="${!closed}" onclick="waFold(this)">${icon('caret-right', { cls: 'wx-chev' })}<span>${escapeHtml(k)}</span></button>${meta || mood ? `<div class="wx-cs-sub">${meta ? `<span>${meta}</span>` : ''}${meta && mood ? '<i>·</i>' : ''}${mood}</div>` : ''}</div>
 <div class="wx-cs-r">${urgent ? '<em class="wa-urg">Urgent</em>' : ''}<span class="wx-cs-n">${escapeHtml(count)}</span>${oldest ? `<span class="t-red">oldest ${escapeHtml(waAgeWord(oldest))}</span>` : ''}<i class="wx-vr" aria-hidden="true"></i>${link}</div></header>
@@ -539,7 +569,9 @@ function waRowHtml(t, sel, o){
   } else {
     sub = `<span class="s"><em class="wa-k k-${t.kind}">${escapeHtml(WA_KIND[t.kind] || 'Request')}</em>${quote ? `<i class="wa-dot">·</i>${quote}` : ''}</span>`;
     const mine = o.useMine && o.isMine && o.isMine(t);
-    right = `${showWho ? `<b class="wx-who${mine ? ' is-me' : ''}">${escapeHtml(mine ? 'You' : waOwnerName(t))}</b>` : ''}<span class="rmi-when${waLate(t) ? ' is-late' : waDays(t) === 0 ? ' is-new' : ''}">${escapeHtml(waWaitWord(t))}</span>`;
+    const today = toDateStr(rNow());
+    const when = t.due_date && t.due_date > today ? `Due ${fmtShortDate(new Date(t.due_date + 'T12:00:00'))}` : waAgeWord(t);
+    right = `${showWho ? `<b class="wx-who${mine ? ' is-me' : ''}">${escapeHtml(mine ? 'You' : waOwnerName(t))}</b>` : ''}<span class="rmi-when${waLate(t) ? ' is-late' : waDays(t) === 0 ? ' is-new' : ''}">${escapeHtml(when)}</span>`;
   }
   return `<div class="wa-r wx-row${closed ? ' is-done' : ''}${sel && sel.id === t.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectWa('${t.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)selectWa('${t.id}')">${cb}
 <div class="tx">${why}<b>${escapeHtml(t.title)}</b>${sub}</div><div class="wx-row-r">${right}</div></div>`;
@@ -552,7 +584,7 @@ function waNextHtml(t, why){
 <div class="wx-next-cl">${c ? `<a href="#" onclick="openClientInspectorFor('${escapeHtml(String(c.id))}');return false;">${escapeHtml(name)}${icon('caret-right')}</a>` : `<b>${escapeHtml(name)}</b>`}${svc ? `<span>${escapeHtml(svc)}</span>` : ''}</div>
 ${why ? `<span class="wx-why${why.red ? ' is-red' : ''}">${escapeHtml(why.text)}</span>` : ''}
 <h3>${escapeHtml(t.title)}</h3>
-<span class="wx-next-k">${escapeHtml(WA_KIND[t.kind] || 'Request')}${why && (why.k === 'late' || why.k === 'due') ? '' : ` · ${escapeHtml(waWaitWord(t))}`}</span>
+<span class="wx-next-k">${escapeHtml(WA_KIND[t.kind] || 'Request')}${why && (why.k === 'late' || why.k === 'due' || why.k === 'today') ? '' : ` · ${escapeHtml(waAgeWord(t))}`}</span>
 ${t.source_excerpt ? `<div class="wx-said"><span class="who">In the group · ${escapeHtml(waWhen(t.first_seen))}</span><p>${escapeHtml(t.source_excerpt)}</p></div>` : ''}
 <div class="wx-pa"><button class="btn btn-p" onclick="waMarkDone('${t.id}')">${icon('check')}Mark Done</button><button class="btn" onclick="selectWa('${t.id}')">Open the Chat</button></div>
 ${typeof waUpdateSwitchHtml === 'function' ? waUpdateSwitchHtml(t) : ''}
