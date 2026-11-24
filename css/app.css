@@ -3556,9 +3556,6 @@ html.ui-w .wx{padding:6px 26px 30px var(--uw-gl)}
 .wx-cs-r{display:flex;align-items:center;gap:10px;flex:0 0 auto;margin-left:auto;font-size:13px;color:var(--label-2);white-space:nowrap}
 .wx-cs-r .wa-urg{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:6px;background:color-mix(in srgb,var(--red) 14%,transparent)}
 .wx-cs-r a{display:inline-flex;align-items:center;gap:1px;color:var(--blue);text-decoration:none;transition:opacity 150ms ease}
-.wx-cs-r a.wx-cs-n{color:var(--label-2)}
-.wx-cs-n .wa-dot{margin:0 5px}
-@media (hover:hover) and (pointer:fine){ .wx-cs-r a.wx-cs-n:hover{color:var(--blue)} }
 .wx-cs-r a:active{opacity:.6}
 .wx-cs-r a svg{width:13px;height:13px}
 .wx-vr{width:1px;height:14px;background:var(--sep-strong,var(--sep))}
