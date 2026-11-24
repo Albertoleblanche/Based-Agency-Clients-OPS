@@ -1,19 +1,22 @@
 import { config } from './config.js';
 import { db, check } from './db.js';
 import { ROLES, ROLE_KEYS } from './roles.js';
+import { clientForGroup } from './clients.js';
 
-async function claude(system, user){
+const MOODS = ['happy', 'neutral', 'frustrated', 'angry'];
+
+export async function claude(system, user, opts = {}){
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': config.anthropicKey(), 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: config.model, max_tokens: 3000, system, messages: [{ role: 'user', content: user }] }),
+    body: JSON.stringify({ model: opts.model || config.model, max_tokens: opts.maxTokens || 3000, system, messages: [{ role: 'user', content: user }] }),
   });
   if(!res.ok) throw new Error(`Anthropic ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const j = await res.json();
   return (j.content || []).map(b => b.text || '').join('');
 }
 
-function parseJson(text){
+export function parseJson(text){
   const m = text.match(/\{[\s\S]*\}/);
   if(!m) throw new Error('No JSON in model reply');
   return JSON.parse(m[0]);
@@ -52,8 +55,10 @@ You are also given RECENTLY CLOSED tasks (the team marked them done, or the chat
 Reply with ONLY JSON:
 {"new_tasks":[{"title":"short imperative, max 120 chars","detail":"1-2 sentences of context","kind":"request|question|promise|issue","owner":"${ROLE_KEYS.join('|')}","priority":"low|normal|high","due_date":"YYYY-MM-DD or null","msg_ids":[message numbers],"excerpt":"short client quote"}],
  "resolve":[{"task_id":"id of an open task","reason":"why"}],
- "reopen":[{"task_id":"id of a recently closed task","reason":"what the client now needs, 1 sentence","msg_ids":[message numbers],"excerpt":"short client quote"}]}
-Use priority high only for urgent wording, site down, money, or an angry client. Return empty arrays when nothing applies.`;
+ "reopen":[{"task_id":"id of a recently closed task","reason":"what the client now needs, 1 sentence","msg_ids":[message numbers],"excerpt":"short client quote"}],
+ "mood":{"level":"happy|neutral|frustrated|angry","reason":"1 short sentence on why","excerpt":"the client's own words that show it, max 20 words"}}
+Use priority high only for urgent wording, site down, money, or an angry client. Return empty arrays when nothing applies.
+MOOD is how the CLIENT comes across across all the [CLIENT] messages shown, most recent weighing most: happy (thanks, praise, good results), neutral (ordinary requests and questions), frustrated (impatience, repeating themselves, "still", "again", disappointment), angry (complaints, threats to leave, harsh words). Judge only the client, never the team. Use null for mood when the client wrote nothing in these messages.`;
 
 export async function analyzeGroup(group, since){
   const cutoff = new Date(Date.now() - config.contextDays * 86400000).toISOString();
@@ -126,5 +131,18 @@ export async function analyzeGroup(group, since){
   }
   // Still-open tasks in an active chat stay fresh.
   await db().from('wa_tasks').update({ last_seen: now }).eq('group_jid', group.jid).eq('status', 'open');
+  // How the client comes across this week, for Health (Nov 24)
+  await saveMood(group, msgs, out.mood, clientName);
   return { created, resolved, reopened, seen: fresh, items };
+}
+
+// The client's mood from a check, only when they wrote something in what was read (Nov 24).
+export async function saveMood(group, msgs, mood, clientName, deps = {}){
+  const DB = deps.db || db;
+  if(!mood || !MOODS.includes(mood.level) || !msgs.some(m => !m.from_team)) return false;
+  let client = null; try { client = await (deps.clientForGroup || clientForGroup)(group); } catch(e){}
+  const { error } = await DB().from('wa_moods').insert({ group_jid: group.jid, client_id: client ? client.id : null, client: client ? client.name : clientName,
+    level: mood.level, reason: mood.reason ? String(mood.reason).slice(0, 300) : null, excerpt: mood.excerpt ? String(mood.excerpt).slice(0, 300) : null });
+  if(error){ if(!/wa_moods|relation|schema cache/i.test(error.message)) console.error('  mood not saved:', error.message); return false; }
+  return true;
 }

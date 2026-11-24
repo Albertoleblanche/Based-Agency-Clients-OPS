@@ -267,7 +267,8 @@ function healthPhrase(h, c){
   const words = h.signals.map(s => ({
     hours: h.hp.used > h.hp.budget ? 'over budget' : 'on pace to go over budget', under: 'hours under-used',
     noupdate: 'updates keep slipping', late: 'updates keep slipping', quiet: 'nothing logged lately',
-    tasks: s.title.toLowerCase(), flag: 'flagged by ' + (firstName(clientOwner(c)) || 'the owner') }[s.key] || s.title.toLowerCase()));
+    tasks: s.title.toLowerCase(), flag: 'flagged by ' + (firstName(clientOwner(c)) || 'the owner'),
+    mood: s.l === 'r' ? 'upset on WhatsApp' : 'sounds frustrated on WhatsApp' }[s.key] || s.title.toLowerCase()));
   const u = [...new Set(words)];
   if(!u.length) return '';
   const txt = u.length === 1 ? u[0] : `${u.slice(0, -1).join(', ')}, and ${u[u.length - 1]}`;

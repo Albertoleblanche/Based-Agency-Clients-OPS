@@ -59,7 +59,7 @@ function loadWaTasks(){
 // anyone else, so asking for them up front costs nothing.
 async function waLoadNow(){
   const safe = q => Promise.resolve(q).catch(e => ({ error: { message: e?.message || String(e) } }));
-  const [acc, tk, r, s, g, lc, cl, su] = await Promise.all([
+  const [acc, tk, r, s, g, lc, cl, su, ...ins] = await Promise.all([
     safe(supabaseClient.rpc('wa_access')),
     safe(supabaseClient.from('wa_tasks').select('*').order('first_seen', { ascending: true })),
     safe(supabaseClient.from('wa_runs').select('*').order('started_at', { ascending: false }).limit(20)),
@@ -68,6 +68,7 @@ async function waLoadNow(){
     safe(supabaseClient.rpc('wa_last_contact')),
     safe(supabaseClient.from('wa_messages').select('group_jid,ts').eq('from_team', false).gte('ts', new Date(Date.now() - 14 * 86400000).toISOString()).order('ts', { ascending: false }).limit(3000)),
     safe(supabaseClient.rpc('wa_can_setup')),
+    ...(typeof waInsightQueries === 'function' ? waInsightQueries().map(safe) : []),
   ]);
   waAccessLevel = !acc.error && ['manage', 'own', 'none'].includes(acc.data) ? acc.data : null;
   waSetupOk = !su.error && typeof su.data === 'boolean' ? su.data : null;
@@ -81,6 +82,7 @@ async function waLoadNow(){
   }
   waTasks = tk.data || []; waReady = true;
   updateWaNav();
+  if(typeof waInsightsApply === 'function') waInsightsApply(ins, waCanManage());
   if(waCanManage()){
     waRuns = r.data || []; waSettings = s.data || null; waGroups = g.data || []; waContact = lc.error ? null : (lc.data || []);
     if(!cl.error){ waClientLast = new Map(); (cl.data || []).forEach(m => { if(!waClientLast.has(m.group_jid)) waClientLast.set(m.group_jid, m.ts); }); }
@@ -329,7 +331,8 @@ function waDraw(root){
   const lead = waCanManage();
   const who = lead ? (waWho || 'all') : 'mine';
   const pick = t => who === 'all' ? true : who === 'mine' ? t.owner_user_id === currentUser.id : t.owner_key === who;
-  const open = waTasks.filter(t => t.status === 'open' && pick(t)).sort((a, b) => new Date(a.first_seen) - new Date(b.first_seen));
+  // urgent first (Nov 24: the live watch marks them), then the longest wait
+  const open = waTasks.filter(t => t.status === 'open' && pick(t)).sort((a, b) => (b.urgent_at ? 1 : 0) - (a.urgent_at ? 1 : 0) || new Date(a.first_seen) - new Date(b.first_seen));
   const wk = waWeekStart().getTime();
   const done = waTasks.filter(t => t.status !== 'open' && pick(t) && new Date(t.answered_at || t.updated_at || t.first_seen).getTime() >= wk)
     .sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
@@ -354,6 +357,8 @@ function waDraw(root){
   const againN = waTab === 'open' ? waTasks.filter(t => pick(t) && waWroteAgain(t)).length : 0;
   if(againN) subBits.push(`<span class="t-blue">${againN === 1 ? 'A client' : againN + ' clients'} wrote again after done</span>`);
   if(waTab === 'open' && open.length){
+    const urgentN = open.filter(t => t.urgent_at).length;
+    if(urgentN) subBits.push(`<span class="t-red"><b>${urgentN} urgent</b></span>`);
     if(late.length) subBits.push(`<span class="t-red">${late.length} waiting over 1 business day</span>`);
     const due = open.filter(waDueToday).length, today = open.filter(t => waDays(t) === 0).length;
     if(due) subBits.push(`${due} to answer today`);
@@ -397,7 +402,7 @@ function waRowHtml(t, sel, who){
   const cb = !closed
     ? (can ? `<button class="cb rem" role="checkbox" aria-checked="false" aria-label="Mark done" title="Mark done" onclick="event.stopPropagation();checkOff(this, () => waMarkDone('${t.id}'))"></button>` : '<span class="cb rem is-off"></span>')
     : `<span class="cb rem${t.status === 'dismissed' ? ' closed' : ' done'}" role="img" aria-label="${t.status === 'dismissed' ? 'Not a task' : 'Done'}">${icon(t.status === 'dismissed' ? 'x' : 'check', { weight: 'bold' })}</span>`;
-  const kind = [t.priority === 'high' && !closed ? '<em class="wa-hi">High priority</em>' : '', `<em class="wa-k k-${t.kind}">${escapeHtml(WA_KIND[t.kind] || 'Request')}</em>`].filter(Boolean).join('<i class="wa-dot">·</i>');
+  const kind = [t.urgent_at && !closed ? '<em class="wa-urg">Urgent</em>' : t.priority === 'high' && !closed ? '<em class="wa-hi">High priority</em>' : '', `<em class="wa-k k-${t.kind}">${escapeHtml(WA_KIND[t.kind] || 'Request')}</em>`].filter(Boolean).join('<i class="wa-dot">·</i>');
   const quote = t.source_excerpt ? `<span class="wa-x">“${escapeHtml(t.source_excerpt)}”</span>` : '';
   let right;
   if(closed){
@@ -461,8 +466,11 @@ function waSideHtml(who, conn){
   // the new look draws each part of the side as its own card
   const card = h => h && typeof uiStyleOn === 'function' && uiStyleOn() ? `<div class="wa-card">${h}</div>` : h;
   return `<aside class="wa-side">
+${card(typeof waSignalsCardHtml === 'function' ? waSignalsCardHtml() : '')}
 ${card(open.length ? `<div class="rmi-sec"><b>Who has what</b></div><div class="wa-ppl">${people}</div>` : '')}
+${card(typeof waRepliesCardHtml === 'function' ? waRepliesCardHtml() : '')}
 ${card(waQuietHtml())}
+${card(typeof waDetailsCardHtml === 'function' ? waDetailsCardHtml() : '')}
 ${card(`<div class="rmi-sec"><b>Checks</b></div>
 <div class="wa-chk"><div class="wa-st">${st}</div><p>${escapeHtml(txt)}</p>${act}</div>
 ${lock}`)}</aside>`;
@@ -654,7 +662,8 @@ function waPanelHtml(t){
   const facts = [`<span>${escapeHtml(kind)}</span>`];
   let acts;
   if(!closed){
-    if(t.priority === 'high') facts.push('<em class="wa-hi">High priority</em>');
+    if(t.urgent_at) facts.push(`<em class="wa-urg">Urgent</em>`);
+    else if(t.priority === 'high') facts.push('<em class="wa-hi">High priority</em>');
     const d = waDays(t), word = d === 0 ? 'New today' : waDueToday(t) ? `Answer today · waiting ${waAgeWord(t)}` : `Waiting ${waAgeWord(t)}`;
     facts.push(`<b class="${waLate(t) ? 'is-red' : d === 0 ? 'is-new' : ''}">${escapeHtml(word)}</b>`);
     acts = can ? `${taskBtn}<button class="btn" onclick="waDismiss('${t.id}')">Not a Task</button><button class="btn btn-p" onclick="waMarkDone('${t.id}')">${icon('check')}Mark Done</button>` : '';
@@ -664,7 +673,9 @@ function waPanelHtml(t){
     facts.push(`<b class="${t.status === 'dismissed' ? '' : 'is-ok'}">${escapeHtml(word)}</b>`);
     const again = waWroteAgain(t);
     if(again) facts.push(`<b class="is-new">The client wrote again ${escapeHtml(waAt(again))}</b>`);
-    acts = can ? `${t.task_id ? taskBtn : ''}<button class="btn${again ? ' btn-p' : ''}" onclick="waReopen('${t.id}')">Reopen</button>` : '';
+    if(t.improvement_id) facts.push('<b class="is-ok">In the weekly update</b>');
+    const addUpd = can && typeof waUpdateFits === 'function' && waUpdateFits(t) ? `<button class="btn" onclick="waAddToUpdate('${t.id}')">${icon('plus')}Add to Update</button>` : '';
+    acts = can ? `${t.task_id ? taskBtn : ''}${addUpd}<button class="btn${again ? ' btn-p' : ''}" onclick="waReopen('${t.id}')">Reopen</button>` : '';
   }
   const sum = t.detail || `First seen ${waWhen(t.first_seen)}.`;
   const owner = can && !closed
@@ -690,6 +701,7 @@ ${t.task_id ? `<span class="tkp-k">Task</span><span class="tkp-v"><a href="#" on
 <div class="wap-top"><div class="wap-who">${who}</div><h3>${escapeHtml(t.title)}</h3><div class="wap-facts">${facts.join('<i>·</i>')}</div></div>
 <p class="wap-sum">${escapeHtml(sum)}</p>
 ${acts ? `<div class="sp-acts">${acts}</div>` : ''}
+${can && !closed && typeof waUpdateSwitchHtml === 'function' ? waUpdateSwitchHtml(t) : ''}
 ${waChatHtml(t)}
 ${meta}
 ${can && !closed ? `<p class="wa-learn">${icon('sparkle')}<span>Changing who has it, or Not a Task, teaches the agent for its next check.</span></p>` : ''}
@@ -718,12 +730,17 @@ function waLinkedTask(t){ return t && t.task_id != null && typeof tasks !== 'und
 async function waMarkDone(id){
   const t = waTasks.find(x => x.id === id), task = waLinkedTask(t), open = !!task && task.status !== 'done';
   const mine = open && (task.assigneeId === currentUser?.id || task.assignerId === currentUser?.id);
+  const fits = typeof waUpdateFits === 'function' && waUpdateFits(t) && waAddPref();
   const ok = await waUpdate(id, { status: 'done' });
   if(!ok) return false;
+  // and, unless switched off, a line in the client's weekly update (Nov 24)
+  const upd = fits ? await waAddToUpdate(id, true) : null;
+  const updWords = upd ? `Added to ${upd.name}’s update.` : '';
   if(mine){
     const done = await finishTask(task.id, 'Done in WhatsApp.', null, { fromWhatsapp: true, quiet: true });
-    showToast('success', 'Marked done', done ? 'Its task is done too.' : '');
-  } else showToast('success', 'Marked done', open ? `${firstName((teamProfiles.find(p => p.id === task.assigneeId) || {}).name || 'Its owner')} still has the task for it.` : '');
+    showToast('success', 'Marked done', [done ? 'Its task is done too.' : '', updWords].filter(Boolean).join(' '));
+  } else showToast('success', 'Marked done', [open ? `${firstName((teamProfiles.find(p => p.id === task.assigneeId) || {}).name || 'Its owner')} still has the task for it.` : '', updWords].filter(Boolean).join(' '));
+  if(upd) renderWhatsapp();
   return true;
 }
 // Reopened here, the finished task made from it opens again too.

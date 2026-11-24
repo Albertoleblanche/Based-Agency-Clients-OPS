@@ -372,7 +372,7 @@ ${w.off ? `<div class="cl-mc"><span class="k">This week’s win</span><b>${escap
   const ownerCell = approver
     ? `<label class="cl-own"><select onchange="setClientOwner(${A}, this.value)" aria-label="Owner"><option value=""${how !== 'set' ? ' selected' : ''}>Automatic${how !== 'set' && owner ? ` (${escapeHtml(owner)})` : ''}</option>${people.map(n => `<option${how === 'set' && owner === n ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('')}</select><span>${escapeHtml(owner || 'Nobody yet')}</span>${icon('caret-down', { weight: 'bold' })}</label>`
     : escapeHtml(owner || 'Nobody yet');
-  const contact = [clientContact(c), c.email].filter(Boolean).map(escapeHtml).join(' · ');
+  const contact = [clientContact(c), c.email, (c.customFieldValues || {}).phone].filter(Boolean).map(escapeHtml).join(' · ');
   const site = c.website ? `<a class="cl-link" href="${safeUrl(c.website.startsWith('http') ? c.website : 'https://' + c.website)}" target="_blank" rel="noopener">${escapeHtml(c.website.replace(/^https?:\/\//, '').replace(/\/$/, ''))}</a>` : '';
   const kv = (k, v) => v ? `<div class="cl-kv"><span>${k}</span><span>${v}</span></div>` : '';
   const details = kv('Owner', ownerCell) + (why2 ? `<p class="cl-own-note">${escapeHtml(why2)}${approver ? ' Choose someone to make it fixed.' : ''}</p>` : '')
@@ -390,6 +390,7 @@ ${nums}
 ${clientFoldHtml('win', 'Weekly win', clientWinSummary(c), clientWinHtml(c))}
 ${clientFoldHtml('det', 'Details', escapeHtml(detSum), `<div class="cl-kvs">${details}</div>`)}
 ${typeof clientMeetingsOn === 'function' && clientMeetingsOn(c) ? clientFoldHtml('mt', `${appLogo('granola', 'xs')}Meetings`, escapeHtml(lastMetWords(c) || 'No meeting with them yet'), clientMeetingsHtml(c, 5)) : ''}
+${typeof clientWaOn === 'function' && clientWaOn(c) ? clientFoldHtml('wa', `${appLogo('whatsapp', 'xs')}WhatsApp`, clientWaSummary(c), clientWaHtml(c)) : ''}
 </div>
 ${waOutsideNoteHtml(c)}
 </div>

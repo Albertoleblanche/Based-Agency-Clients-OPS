@@ -13,6 +13,11 @@ export const config = {
   anthropicKey: () => need('ANTHROPIC_API_KEY'),
   slackToken: () => process.env.SLACK_BOT_TOKEN || '',
   model: process.env.CLAUDE_MODEL || 'claude-sonnet-5-5',
+  // The quick read of each new burst of client messages (urgent, needs a reply, signals, details)
+  watchModel: process.env.WATCH_MODEL || 'claude-haiku-5-5',
+  // Work hours for counting how long a client has waited, and the wait that nudges the owner
+  workHours: (process.env.WORK_HOURS || '9-18').split('-').map(Number),
+  waitNudgeMinutes: Number(process.env.WAIT_NUDGE_MINUTES || 120),
   tz: process.env.TZ || 'America/New_York',
   digestTimes: list(process.env.DIGEST_TIMES, '09:00,15:00'),
   groupPattern: new RegExp(process.env.GROUP_NAME_PATTERN || 'marketing', 'i'),

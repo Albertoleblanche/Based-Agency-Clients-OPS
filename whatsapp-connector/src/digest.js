@@ -14,7 +14,7 @@ export async function runDigest({ dry = false, notify = true } = {}){
   const startedAt = new Date().toISOString();
   const since = await lastDigestTime();
   const profiles = await loadProfiles();
-  const groups = check(await db().from('wa_groups').select('jid,name').eq('active', true), 'load groups');
+  const groups = check(await db().from('wa_groups').select('jid,name,client_id').eq('active', true), 'load groups');
 
   let seen = 0, created = 0, resolved = 0, reopened = 0, failures = 0;
   const fresh = [];

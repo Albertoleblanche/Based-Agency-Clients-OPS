@@ -62,6 +62,23 @@ While test mode is on:
 
 To go live, run the last line of that file. Radar and the connector switch over within a minute.
 
+## The live watch
+
+Each new burst of client messages gets a quick read about 90 seconds after the client stops writing
+(a fast, cheap model, `WATCH_MODEL`). It answers four things:
+
+- **Urgent?** (site down, leads stopped, money, an upset client, due today) → an item at once, marked
+  Urgent in Radar, and an alert to its owner in Slack, Radar's bell and their phone.
+- **Needs a reply?** → if nobody on the team writes in the group within `WAIT_NUDGE_MINUTES` of work
+  time (`WORK_HOURS`, weekdays), the client's owner is nudged.
+- **Account signals** (pausing, cancelling, budget, a competitor, growing, a new service, a referral)
+  → Radar's admins.
+- **The client's details** (contact, email, phone, website) → suggested on the client in Radar.
+
+Alerts go out on weekdays 7:00–21:00 only; what's found outside waits for the morning. Each check also
+rates the client's mood for Health. It all needs `addendum-whatsapp-insights.sql`; until that's run
+the watch stays off.
+
 ## Keep it running
 
 The connector is a background worker: it needs to be on all the time (it reads messages as they

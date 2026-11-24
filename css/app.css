@@ -3460,3 +3460,38 @@ html.ui-w .hg-dot.r{background:var(--uw-risk)} html.ui-w .hg-dot.y{background:va
 .uw-cew > .uw-join{flex:none}
 .db-ev:has(.db-join){grid-template-columns:62px 3px minmax(0,1fr) auto}
 .db-ev .db-join{align-self:center}
+
+/* ---- WhatsApp insights (Nov 24): urgent, account signals, reply times, client details, mood ---- */
+.wa-urg{flex:0 0 auto;font-style:normal;font-size:12px;font-weight:600;color:var(--red)}
+.wap-facts .wa-urg{font-size:13px}
+.wa-sigs,.wa-dets{display:flex;flex-direction:column}
+.wa-sig,.wa-det{display:flex;flex-direction:column;align-items:stretch;gap:5px;padding:10px 0}
+:is(.wa-sig,.wa-det) + :is(.wa-sig,.wa-det){border-top:.5px solid var(--sep)}
+.wa-sig-t{display:flex;align-items:flex-start;gap:9px;flex:1 1 auto;min-width:0;margin:0;padding:0;border:0;background:none;color:var(--label);font:inherit;text-align:left;cursor:default}
+.wa-sig-t:disabled{opacity:1}
+.wa-sig .dot{flex:0 0 auto;width:7px;height:7px;margin-top:6px;border-radius:50%;background:var(--green)}
+.wa-sig.is-risk .dot{background:var(--red)}
+:is(.wa-sig,.wa-det) .tx{display:flex;flex-direction:column;gap:2px;min-width:0;font-size:13px;line-height:1.35}
+:is(.wa-sig,.wa-det) .tx b{font-weight:600}
+:is(.wa-sig,.wa-det) .k{font-size:11.5px;color:var(--label-2)}
+.wa-sig.is-risk .k{color:var(--red)}
+.wa-det .v{font-weight:500;overflow-wrap:anywhere}
+:is(.wa-sig,.wa-det) .q{font-size:12px;color:var(--label-3);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.wa-sig-a{display:flex;align-items:center;gap:16px;padding-left:16px;font-size:12.5px}
+.wa-det .wa-sig-a{padding-left:0}
+.wa-sig-a .lnk-b.is-2{color:var(--label-2)}
+.wa-sig-n{margin-left:auto;font-size:12px;font-weight:500;color:var(--red)}
+.wa-rt-k{margin-left:auto;font-size:12px}
+.wa-rt-big{display:flex;align-items:baseline;gap:8px;margin:2px 0 6px;font-size:12.5px;color:var(--label-2)}
+.wa-rt-big b{font-size:22px;font-weight:600;color:var(--label);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.wa-rt-sub{margin:10px 0 2px;font-size:11.5px;font-weight:600;color:var(--label-3)}
+.wa-qc.wa-rt{display:grid;grid-template-columns:minmax(0,1fr) auto 64px;cursor:default}
+.wa-qc.wa-rt:hover{background:none}
+.wa-qc.wa-rt span:last-child{text-align:right}
+.wap-upd{display:flex;align-items:center;gap:10px;margin:14px 0 0;font-size:12.5px;line-height:1.4;color:var(--label-2)}
+.wap-upd .sw{flex:0 0 auto}
+.cl-wa-q{margin:2px 0 8px;font-size:12.5px;line-height:1.45;color:var(--label-2)}
+.cl-wa-sub{margin:12px 0 0;font-size:11.5px;font-weight:600;color:var(--label-3)}
+.cl-wa .wa-sig,.cl-wa .wa-det{padding:8px 0}
+html.ui-w .wa-rt-big b{font-family:var(--mono);font-weight:500}
+.wa-qc span.t-red{color:var(--red)}

@@ -38,6 +38,9 @@ const NOTIFICATION_TYPE_META = {
   email_sent:              { label:'A client email is sent', section:'Client Work', visibleTo:'approver' },
   reminder_follow_up_due:  { label:'A client follow-up you own comes due', section:'Client Work' },
   whatsapp_request:        { label:'A client asks you for something on WhatsApp', section:'Client Work' },
+  whatsapp_urgent:         { label:'A client message on WhatsApp looks urgent', section:'Client Work' },
+  whatsapp_waiting:        { label:'A client of yours has waited too long for a reply on WhatsApp', section:'Client Work' },
+  whatsapp_signal:         { label:'A client mentions pausing, budget, a competitor or growing (WhatsApp)', section:'Client Work', visibleTo:'admin' },
   reminder_added:          { label:'A client promises something in a meeting (a follow-up is added)', section:'Client Work' },
   reminder_escalated:      { label:'A client follow-up has gone unanswered for a week', section:'Client Work', visibleTo:'approver' },
   client_danger_maxed:     { label:'A client\'s danger score hits 5/5', section:'Client Work' },
@@ -251,6 +254,10 @@ async function handleNotifClick(id){
     const me = myName(), all = Object.values(reviewItems()).flat().filter(x => x.c.id === n.target_id);
     const x = (!canApprove() && all.find(y => y.d.author === me)) || all[0];
     if(x){ hidePop(document.getElementById('notifPanel')); openReviewDraft(x.c.id, x.d.author); return; }
+  }
+  if(n.target_view==='whatsapp' && n.target_id && typeof waOpenItem === 'function'){
+    hidePop(document.getElementById('notifPanel'));
+    waOpenItem(n.target_id); return;
   }
   if(n.target_view){
     hidePop(document.getElementById('notifPanel'));

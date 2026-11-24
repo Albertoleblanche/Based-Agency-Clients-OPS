@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import { config, isClientGroup } from './config.js';
 import { db, logRun } from './db.js';
 import { setQr } from './settings.js';
+import { watchMessages } from './watch.js';
 
 const groupNames = new Map(); // jid -> subject (client groups only)
 // Messages (group chats only) that arrive before the list of groups to read is known, as happens
@@ -123,7 +124,9 @@ async function ingest(messages){
   }
   if(!rows.length) return;
   const { error } = await db().from('wa_messages').upsert(rows, { onConflict: 'group_jid,wa_msg_id', ignoreDuplicates: true });
-  if(error) console.error('wa_messages upsert failed:', error.message);
+  if(error){ console.error('wa_messages upsert failed:', error.message); return; }
+  // a live client message: the quick read of what's new, a minute or two after they stop writing (watch.js)
+  watchMessages(rows);
 }
 
 export async function connect({ onReady, onLogout } = {}){

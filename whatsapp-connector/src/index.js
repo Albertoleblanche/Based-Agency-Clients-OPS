@@ -3,6 +3,7 @@ import { config } from './config.js';
 import { connect, getStatus, stop, relink, syncActiveGroups, refreshGroups, groupsReady } from './wa.js';
 import { loadSettings, applySettings, heartbeat, clearRelinkFlag, clearCheckFlag } from './settings.js';
 import { runDigest, alertAdmins, sendHeldAlerts } from './digest.js';
+import { sendPending } from './alerts.js';
 
 const args = new Set(process.argv.slice(2));
 const dry = args.has('--dry');
@@ -71,6 +72,9 @@ async function main(){
       }
     } catch(e){ console.error('Settings sync failed:', e.message); }
   }, 30000);
+  // Alerts from the live watch that are due (urgent, a client waiting too long, account signals), every
+  // two minutes: they wait for work hours, and a wait is only nudged once enough work time has passed.
+  setInterval(() => { sendPending().catch(e => console.error('Alerts failed:', e.message)); }, 2 * 60000);
   // Ask WhatsApp for the group list every 30 minutes (switches in Radar are applied from the database every 30s).
   setInterval(() => { if(getStatus() === 'open') refreshGroups().catch(() => {}); }, 30 * 60000);
   if(args.has('--digest-now')) setTimeout(() => safeDigest({ dry }), 20000);

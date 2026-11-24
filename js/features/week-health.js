@@ -453,7 +453,10 @@ function clientHealth(c){
     const n = daysBetween(met, now);
     if(n >= 35) sig.push({ l: 'y', key: 'met', icon: 'users-three', title: 'No meeting lately', since: addDays(met, 35), text: `Last met ${n} days ago.` });
   }
-  const prio = ['hours', 'noupdate', 'late', 'quiet', 'under', 'tasks', 'flag', 'met'];
+  // How they come across on WhatsApp this week (Nov 24): frustrated is Watch, upset is At risk
+  const mood = typeof waMoodSignal === 'function' ? waMoodSignal(c) : null;
+  if(mood) sig.push(mood);
+  const prio = ['hours', 'noupdate', 'late', 'mood', 'quiet', 'under', 'tasks', 'flag', 'met'];
   sig.sort((a, b) => (a.l === 'r' ? 0 : 1) - (b.l === 'r' ? 0 : 1) || prio.indexOf(a.key) - prio.indexOf(b.key));
   let level = sig.some(s => s.l === 'r') ? 'r' : (sig.length ? 'y' : 'g');
   if(level === 'y' && T.importantBump && (c.importance || 0) >= 8) level = 'r';
