@@ -336,6 +336,12 @@ function waRedraw(){
 function setWa(k, v){ if(k === 'tab') waTab = v; if(k === 'who') waWho = v; if(k === 'client') waClientSel = v || null; window._waSel = null; renderWhatsapp(); }
 function selectWa(id){ window._waSel = window._waSel === id ? null : id; delete waChatTop[id]; renderWhatsapp(); if(window._waSel) waLoadChat(id); }
 function closeWaPanel(){ window._waSel = null; renderWhatsapp(); }
+// A client's "N waiting": All waiting, just that client's requests.
+function waShowClient(k){
+  waTab = 'open'; waClientSel = k || null; window._waSel = null;
+  renderWhatsapp();
+  const sp = document.querySelector('#whatsappRoot .sp-page'); if(sp) sp.scrollTo({ top: 0, behavior: typeof motionOK === 'function' && motionOK() ? 'smooth' : 'auto' });
+}
 function renderWhatsappTasks(){ renderWhatsapp(); }   // the old name, still called by realtime
 // Never a blank screen: before the first load a spinner, and if drawing fails, what happened and Try Again.
 function renderWhatsapp(){
@@ -450,7 +456,7 @@ function waDraw(root){
         at: past ? -Math.max(...ts.map(t => new Date(waClosedAt(t) || 0).getTime())) : Math.min(...ts.map(age)) };
     });
     secs.sort((a, b) => a.top - b.top || a.rank - b.rank || a.at - b.at);
-    return secs.map(x => waSecHtml(x.k, x.ts, { past, lead, who, sel, whyOf, useMine, isMine, live: past ? [] : open.filter(t => waClientLabel(t) === x.k) })).join('');
+    return secs.map(x => waSecHtml(x.k, x.ts, { past, lead, who, sel, whyOf, useMine, isMine, tab, onlyClient: !!waClientSel || !lead, live: past ? [] : open.filter(t => waClientLabel(t) === x.k) })).join('');
   };
   const again = tab !== 'done' ? waTasks.filter(t => pickWho(t) && pickCl(t) && waWroteAgain(t)) : [];
   const againHtml = again.length ? `<section class="wx-cs wx-again" data-k="_again" aria-label="The client wrote again"><header class="wx-cs-h"><div class="wx-cs-l"><span class="wx-cs-t is-static">The client wrote again</span><div class="wx-cs-sub"><span>Marked done, then the client wrote in the group. Open it to read what they said.</span></div></div><div class="wx-cs-r"><span>${again.length}</span></div></header><div class="wx-cs-body"><div class="wx-cs-in"><div class="wx-cs-card">${again.map(t => waRowHtml(t, sel, { who, lead, useMine, isMine })).join('')}</div></div></div></section>` : '';
@@ -529,7 +535,8 @@ function waSecHtml(k, ts, o){
   const own = o.lead && c && c.customFieldValues && c.customFieldValues.owner ? firstName(String(c.customFieldValues.owner)) : '';
   const m = c && typeof waMoodFor === 'function' ? waMoodFor(c) : null;
   const mood = m && m.level !== 'neutral' ? `<span class="wx-mood ${m.level === 'happy' ? 'g' : m.level === 'angry' ? 'r' : 'y'}">${escapeHtml(WA_MOOD[m.level])}</span>` : '';
-  const meta = [svc, own ? `${own}’s client` : ''].filter(Boolean).map(escapeHtml).join(' · ');
+  const pill = svc ? `<span class="wx-svc">${escapeHtml(svc)}</span>` : '';
+  const meta = [own ? `${escapeHtml(own)}’s client` : '', mood].filter(Boolean).join('<i>·</i>');
   const live = o.live && o.live.length ? o.live : ts.filter(t => t.status === 'open');   // the client's whole list, whichever tab
   const n = o.past ? ts.length : live.length;
   const mineN = o.useMine ? live.filter(o.isMine).length : 0;
@@ -539,11 +546,13 @@ function waSecHtml(k, ts, o){
   const closed = waFolded().has(k);
   const jid = ts[0] && ts[0].group_jid;
   const canLink = !c && jid && o.lead && ((typeof canApprove === 'function' && canApprove()) || waCanSetup());
-  const link = c ? `<a href="#" onclick="openClientInspectorFor('${escapeHtml(String(c.id))}');return false;">Open Client${icon('caret-right')}</a>`
+  const link = c ? `<a href="#" onclick="openClientDetail('${escapeHtml(String(c.id))}');return false;">Open Client${icon('caret-right')}</a>`
     : canLink ? waLinkPickHtml(jid, k) : '<span class="t-3">Not in Radar</span>';
   return `<section class="wx-cs${closed ? ' is-closed' : ''}" data-k="${escapeHtml(k)}" aria-label="${escapeHtml(k)}">
-<header class="wx-cs-h"><div class="wx-cs-l"><button class="wx-cs-t" aria-expanded="${!closed}" onclick="waFold(this)">${icon('caret-right', { cls: 'wx-chev' })}<span>${escapeHtml(k)}</span></button>${meta || mood ? `<div class="wx-cs-sub">${meta ? `<span>${meta}</span>` : ''}${meta && mood ? '<i>·</i>' : ''}${mood}</div>` : ''}</div>
-<div class="wx-cs-r">${urgent ? '<em class="wa-urg">Urgent</em>' : ''}<span class="wx-cs-n">${escapeHtml(count)}</span>${oldest ? `<span class="t-red">oldest ${escapeHtml(waAgeWord(oldest))}</span>` : ''}<i class="wx-vr" aria-hidden="true"></i>${link}</div></header>
+<header class="wx-cs-h"><div class="wx-cs-l"><button class="wx-cs-t" aria-expanded="${!closed}" onclick="waFold(this)">${icon('caret-right', { cls: 'wx-chev' })}<span>${escapeHtml(k)}</span></button>${pill || meta ? `<div class="wx-cs-sub">${pill}${meta ? `<span class="wx-cs-m">${meta}</span>` : ''}</div>` : ''}</div>
+<div class="wx-cs-r">${urgent ? '<em class="wa-urg">Urgent</em>' : ''}${(() => { const txt = `${escapeHtml(count)}${oldest ? `<i class="wa-dot">·</i><span class="t-red">oldest ${escapeHtml(waAgeWord(oldest))}</span>` : ''}`;
+    return o.past || (o.onlyClient && o.tab === 'open') ? `<span class="wx-cs-n">${txt}</span>`
+      : `<a href="#" class="wx-cs-n" title="Show ${escapeHtml(k)}’s waiting requests" onclick="waShowClient(this.closest('.wx-cs').dataset.k);return false;">${txt}${icon('caret-right')}</a>`; })()}<i class="wx-vr" aria-hidden="true"></i>${link}</div></header>
 <div class="wx-cs-body"><div class="wx-cs-in"><div class="wx-cs-card">${ts.map(t => waRowHtml(t, o.sel, { ...o, why: o.whyOf && o.whyOf.get(t.id) })).join('')}</div></div></div></section>`;
 }
 function waRowHtml(t, sel, o){
@@ -581,7 +590,7 @@ function waNextHtml(t, why){
   const c = waClient(t), name = waClientLabel(t), svc = c && c.service ? String(c.service) : '';
   return `<section class="wx-card wx-next" aria-label="Next up">
 <div class="wx-eb">Next up</div>
-<div class="wx-next-cl">${c ? `<a href="#" onclick="openClientInspectorFor('${escapeHtml(String(c.id))}');return false;">${escapeHtml(name)}${icon('caret-right')}</a>` : `<b>${escapeHtml(name)}</b>`}${svc ? `<span>${escapeHtml(svc)}</span>` : ''}</div>
+<div class="wx-next-cl">${c ? `<a href="#" onclick="openClientDetail('${escapeHtml(String(c.id))}');return false;">${escapeHtml(name)}${icon('caret-right')}</a>` : `<b>${escapeHtml(name)}</b>`}${svc ? `<span>${escapeHtml(svc)}</span>` : ''}</div>
 ${why ? `<span class="wx-why${why.red ? ' is-red' : ''}">${escapeHtml(why.text)}</span>` : ''}
 <h3>${escapeHtml(t.title)}</h3>
 <span class="wx-next-k">${escapeHtml(WA_KIND[t.kind] || 'Request')}${why && (why.k === 'late' || why.k === 'due' || why.k === 'today') ? '' : ` · ${escapeHtml(waAgeWord(t))}`}</span>

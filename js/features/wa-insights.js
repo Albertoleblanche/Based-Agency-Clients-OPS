@@ -177,7 +177,7 @@ function waWatchHtml(){
   const risks = list.filter(x => x.risk).length, opens = list.filter(x => !x.risk && x.open).length;
   const row = x => {
     const ids = x.sigs.map(s => s.id).join(',');
-    const acts = [x.c ? `<button class="lnk-b" onclick="openClientInspectorFor('${escapeHtml(String(x.c.id))}')">Open Client</button>` : '',
+    const acts = [x.c ? `<button class="lnk-b" onclick="openClientDetail('${escapeHtml(String(x.c.id))}')">Open Client</button>` : '',
       ids ? `<button class="lnk-b is-2" onclick="waSignalsSet('${ids}', 'handled')">Mark Handled</button>` : ''].filter(Boolean).join('');
     return `<div class="wx-w ${x.risk ? 'is-risk' : x.open ? 'is-open' : 'is-quiet'}"><i class="dot" aria-hidden="true"></i><div><b>${escapeHtml(x.name)}</b>
 ${x.lines.map(l => `<p>${l.tone ? `<span class="wx-mood ${l.tone}">${escapeHtml(l.t)}</span>` : escapeHtml(l.t)}${l.q ? ` <span class="q">“${escapeHtml(l.q)}”</span>` : ''}</p>`).join('')}

@@ -309,7 +309,9 @@ async function checkForNewNotificationToasts(){
       // a meeting about to start: the toast has Join (Nov 23)
       const ev = n.type === 'meeting_soon' && typeof calendarEvents !== 'undefined' ? calendarEvents.find(e => String(e.id) === String(n.target_id)) : null;
       const m = ev && typeof meetingLink === 'function' ? meetingLink(ev) : null;
-      showToast(type, n.title, n.body || '', m ? { action: 'Join', onAction: () => window.open(m.url, '_blank', 'noopener'), duration: 20000 } : undefined);
+      // Nov 24: they stayed only 4 seconds (the Granola notes ones too); now 15, with Open when there's somewhere to go
+      const open = n.target_view || n.target_id ? { action: 'Open', duration: 15000, onAction: async () => { if(!notifications.some(x => x.id === n.id) && typeof loadNotifications === 'function') await loadNotifications(); handleNotifClick(n.id); } } : { duration: 15000 };
+      showToast(type, n.title, n.body || '', m ? { action: 'Join', onAction: () => window.open(m.url, '_blank', 'noopener'), duration: 20000 } : open);
     });
   }
 }

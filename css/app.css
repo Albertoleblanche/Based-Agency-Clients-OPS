@@ -3529,18 +3529,18 @@ html.ui-w .wx{padding:6px 26px 30px var(--uw-gl)}
 .wx-groups + .es{margin-top:40px}
 /* a client's heading */
 .wx-cs-h{display:flex;align-items:center;gap:16px;padding:0 4px 10px}
-.wx-cs-l{display:flex;flex:1 1 auto;align-items:baseline;gap:10px;min-width:0}
-.wx-cs-t{display:inline-flex;flex:0 1 auto;align-items:center;gap:7px;max-width:100%;min-width:0;margin-left:-6px;padding:3px 8px 3px 4px;border:0;border-radius:8px;background:none;color:var(--label);font:inherit;font-size:17px;font-weight:650;letter-spacing:-.012em;text-align:left;cursor:default;transition:background-color 150ms ease,transform 140ms var(--wx-ease)}
+.wx-cs-l{display:flex;flex:1 1 auto;flex-direction:column;align-items:flex-start;gap:3px;min-width:0}
+.wx-cs-t{display:inline-flex;flex:0 1 auto;align-items:center;gap:7px;max-width:100%;min-width:0;margin-left:-6px;padding:1px 8px 1px 4px;border:0;border-radius:8px;background:none;color:var(--label);font:inherit;font-size:17px;font-weight:650;letter-spacing:-.012em;text-align:left;cursor:default;transition:background-color 150ms ease,transform 140ms var(--wx-ease)}
 .wx-cs-t span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wx-cs-t:active{transform:scale(.98)}
 .wx-cs-t.is-static{margin-left:0;padding-left:0;color:var(--blue)}
 .wx-chev{width:15px;height:15px;flex:0 0 auto;color:var(--label-3);transform:rotate(90deg);transition:transform 240ms var(--wx-ease)}
 .wx-cs.is-closed .wx-chev{transform:none}
-.wx-cs-sub{display:flex;flex:0 1 auto;align-items:baseline;gap:6px;min-width:0;font-size:13px;color:var(--label-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.wx-cs-sub > span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.wx-cs-sub{display:flex;align-items:center;gap:8px;max-width:100%;min-width:0;padding-left:20px;font-size:13px;color:var(--label-3);white-space:nowrap}
+.wx-cs-sub .wx-cs-m{display:inline-flex;align-items:baseline;gap:6px;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.wx-svc{display:inline-flex;align-items:center;flex:0 1 auto;min-width:0;height:20px;padding:0 9px;border-radius:10px;background:var(--fill-2);color:var(--label-2);font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis}
 .wx-cs-sub i{font-style:normal}
-.wx-again .wx-cs-l{flex-direction:column;align-items:flex-start;gap:2px}
-.wx-again .wx-cs-sub{white-space:normal}
+.wx-again .wx-cs-sub{padding-left:0;white-space:normal}
 .wx-mood{font-weight:500}
 .wx-mood.y{color:var(--yellow)}
 .wx-mood.g{color:var(--green)}
@@ -3548,6 +3548,9 @@ html.ui-w .wx{padding:6px 26px 30px var(--uw-gl)}
 .wx-cs-r{display:flex;align-items:center;gap:10px;flex:0 0 auto;margin-left:auto;font-size:13px;color:var(--label-2);white-space:nowrap}
 .wx-cs-r .wa-urg{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:6px;background:color-mix(in srgb,var(--red) 14%,transparent)}
 .wx-cs-r a{display:inline-flex;align-items:center;gap:1px;color:var(--blue);text-decoration:none;transition:opacity 150ms ease}
+.wx-cs-r a.wx-cs-n{color:var(--label-2)}
+.wx-cs-n .wa-dot{margin:0 5px}
+@media (hover:hover) and (pointer:fine){ .wx-cs-r a.wx-cs-n:hover{color:var(--blue)} }
 .wx-cs-r a:active{opacity:.6}
 .wx-cs-r a svg{width:13px;height:13px}
 .wx-vr{width:1px;height:14px;background:var(--sep-strong,var(--sep))}
@@ -3647,7 +3650,6 @@ button.wx-t.on + button.wx-t{box-shadow:none}
   .wx-h{font-size:24px}
   .wx-cs-h{flex-wrap:wrap;gap:6px 12px}
   .wx-cs-r{margin-left:23px}
-  .wx-cs-l{flex-wrap:wrap;row-gap:2px}
   .wx-row{padding:14px 16px}
 }
 @media (prefers-reduced-motion:reduce){ .wx-cs-body,.wx-chev,.wx-row,.wx-cs-t{transition:none} }

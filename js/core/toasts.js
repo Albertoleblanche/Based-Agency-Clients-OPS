@@ -110,7 +110,7 @@ function showToast(type, title, detail, opts){
   // Exposed on the element itself (not just private to this closure) so
   // the stack-wide hover-to-expand handler can pause/resume every toast
   // in the stack, not just whichever one the cursor happens to be over.
-  const duration = opts && opts.duration ? opts.duration : opts && opts.action ? 7000 : 4200;
+  const duration = opts && opts.duration ? opts.duration : opts && opts.action ? 9000 : 6000;   // Nov 24: long enough to read (was 4.2 s)
   let remaining = duration;
   let lastStart = Date.now();
   let dismissTimer = setTimeout(()=>dismissToastEl(el), duration);
