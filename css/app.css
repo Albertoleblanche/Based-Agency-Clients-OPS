@@ -3857,3 +3857,30 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 @media (prefers-reduced-motion:reduce){.su,.su-card,.su-badge{animation:none}}
 .su .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .su-h h2,.su-hello h2{color:var(--label)}
+/* Set Up Radar, round two (Nov 24): Optional, the phone, the sidebar reminder */
+.su-grp{margin:14px 10px 4px;font-size:11.5px;font-weight:600;letter-spacing:.02em;color:var(--label-3)}
+.su-sum-h{display:block!important;padding:18px 2px 4px!important;border-bottom:0!important;font-size:11.5px;font-weight:600;letter-spacing:.02em;color:var(--label-3)}
+.su-phone{display:flex;flex-direction:column;gap:22px;max-width:580px;margin-top:24px}
+.su-url{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:18px 20px;border-radius:14px;background:var(--fill-2)}
+.su-url > span{font-size:12.5px;color:var(--label-2)}
+.su-url > b{font-size:20px;font-weight:600;letter-spacing:-.01em;color:var(--label);word-break:break-all}
+.su-url-a{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.su-url-a .btn{gap:6px}
+.su-url-a svg{width:14px;height:14px}
+.su-url-a .app-logo.xs{width:15px;height:15px;border-radius:4px}
+.su-psteps li::before{content:counter(gl)}
+.su-nudge{margin:auto 4px 8px;display:flex;align-items:center;gap:2px;padding:4px 4px 4px 6px;border-radius:11px;background:var(--fill-2)}
+.su-nudge[hidden]{display:none}
+.su-nudge:not([hidden]) + .stm{margin-top:0}
+.su-nudge-b{display:flex;align-items:center;gap:10px;flex:1 1 auto;min-width:0;padding:5px 4px;border:0;border-radius:8px;background:none;font:inherit;color:var(--label);text-align:left;cursor:default;transition:transform .1s ease}
+.su-nudge-b:active{transform:scale(.98)}
+.su-nudge-b .tx{display:flex;flex-direction:column;min-width:0}
+.su-nudge-b b{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.su-nudge-b .tx span{font-size:12px;color:var(--label-2);white-space:nowrap}
+.su-ring{flex:none;width:22px;height:22px}
+.su-ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.su-ring circle{fill:none;stroke-width:2.6;stroke:var(--sep-strong)}
+.su-ring circle.v{stroke:var(--green);stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:calc(1 - var(--p));transition:stroke-dashoffset .5s cubic-bezier(.23,1,.32,1)}
+.su-nudge-x{flex:none;width:26px;height:26px;color:var(--label-3)}
+.su-nudge-x svg{width:13px;height:13px}
+@media (hover:hover) and (pointer:fine){.su-nudge-x:hover{color:var(--label)}}

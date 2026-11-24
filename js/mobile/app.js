@@ -446,6 +446,14 @@ function mWaitingDrafts(){
   return out.sort((a, b) => new Date(b.d.draftPendingSince || 0) - new Date(a.d.draftPendingSince || 0));
 }
 function mMine(c){ return canApprove() || clientOwner(c) === myName(); }
+// Opened from the Home Screen with notifications not asked for yet (Nov 24, the phone step of Set Up
+// Radar): one card on Today to turn them on, until they're on or you say not now.
+function mPushCardHtml(){
+  const home = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  if(!home || !('Notification' in window) || Notification.permission !== 'default') return '';
+  try{ if(localStorage.getItem('m-push-card') === 'later') return ''; }catch(e){}
+  return `<div class="m-pcard"><span class="m-pcard-i" aria-hidden="true">${icon('bell')}</span><div class="tx"><b>Get notified on this phone</b><span>Tasks, reviews and nudges, even when Radar is closed.</span></div><button class="ibtn s" onclick="mEnablePush().then(() => mRenderTab())">Turn On</button><button class="m-pcard-x" aria-label="Not now" onclick="try{localStorage.setItem('m-push-card','later')}catch(e){};mRenderTab()">${icon('x', { weight: 'bold' })}</button></div>`;
+}
 function mTodayHtml(){
   const list = attentionEligibleClients(), sum = weekSummary(list);
   const behind = sum.ws.filter(w => mMine(w.c) && needsUpdate(w)).sort(dueOrder);
@@ -461,6 +469,7 @@ function mTodayHtml(){
   const due = tasks.filter(t => t.assigneeId === currentUser.id && t.status !== 'done' && !t.cancelledAt && t.dueDate && t.dueDate <= todayStr).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   return `<div class="ihead"><button onclick="mOpenProfile()" aria-label="My profile">${avHtml(me.name || '?')}</button><div class="r"><button aria-label="Search" onclick="mOpenSearch()">${icon('magnifying-glass')}</button><button aria-label="Notifications${unread ? ', ' + unread + ' new' : ''}" onclick="mOpenNotifications()">${icon('bell')}${unread ? `<span class="bd is-${notifTopSeverity(notifications)}"></span>` : ''}</button></div></div>
 <h1 class="big">Today</h1><p class="big-sub">${mEsc(sub)}</p>
+${mPushCardHtml()}
 ${mGlanceHtml(behind, waiting, health)}
 ${mTimerCardHtml()}
 ${behind.length ? mIsh(lateN ? `${behind.length} due or overdue` : `${behind.length} due today`, "mOpenWeek()") + `<div class="ig">${behindRows}</div>` : ''}

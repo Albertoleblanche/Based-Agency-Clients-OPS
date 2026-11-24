@@ -241,7 +241,7 @@ module.exports = async function handler(req, res) {
     catch (e) { res.status(400).json({ error: 'Malformed JSON body' }); return; }
 
     const { action, text } = body;
-    if (!text && action !== 'personal-summaries') { res.status(400).json({ error: 'Missing text' }); return; }
+    if (!text && action !== 'personal-summaries' && action !== 'phone-link') { res.status(400).json({ error: 'Missing text' }); return; }
 
     // ---- Existing daily-summary flow, unchanged from before the rename ----
     if (!action || action === 'summary') {
@@ -297,6 +297,15 @@ module.exports = async function handler(req, res) {
         return;
       }
       res.status(200).json({ success: true });
+      return;
+    }
+
+    // ---- Your own link to Radar, for your phone (Set Up Radar, Nov 24): to you only, any day ----
+    if (action === 'phone-link') {
+      const appUrl = (process.env.APP_URL || `https://${req.headers['x-forwarded-host'] || req.headers.host}`).replace(/\/+$/, '');
+      const text1 = `Here’s Radar for your phone: <${appUrl}/|Open Radar>\nOn iPhone, open it in Safari, tap Share, then Add to Home Screen. On Android, open it in Chrome, tap ⋮, then Install app. Then open Radar from your Home Screen and turn on notifications in More → Settings.`;
+      const result = await sendSlackDM(admin, callerData.user.id, 'phone_link', text1, null, { anyDay: true });
+      res.status(200).json(result);
       return;
     }
 

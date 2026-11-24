@@ -520,3 +520,14 @@ body.mac.mobile { overflow: hidden; background: var(--ios-bg, #F2F2F7); -webkit-
 /* Icons8's credit, bottom right (Nov 24) */
 .app .m-i8{margin:18px 4px 6px;text-align:right;font-size:11px}
 .app .msgp .m-i8{margin:14px 0 0}
+
+/* Today: turn on notifications on this phone (Nov 24) */
+.app .m-pcard{display:flex;align-items:center;gap:12px;margin:16px 0 4px;padding:14px 12px 14px 14px;border-radius:16px;background:var(--grp,var(--card));box-shadow:0 0 0 .5px var(--sep)}
+.app .m-pcard-i{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:10px;background:var(--fill-2);color:var(--label)}
+.app .m-pcard-i svg{width:19px;height:19px}
+.app .m-pcard .tx{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.app .m-pcard b{font-size:15px;font-weight:600}
+.app .m-pcard .tx span{font-size:13px;color:var(--label-2);line-height:1.35}
+.app .m-pcard-x{flex:none;width:28px;height:28px;display:grid;place-items:center;border:0;border-radius:50%;background:none;color:var(--label-3)}
+.app .m-pcard-x svg{width:14px;height:14px}
+.app .m-pcard .ibtn{flex:none;width:auto;height:34px;padding:0 14px;border-radius:17px;font-size:15px}
