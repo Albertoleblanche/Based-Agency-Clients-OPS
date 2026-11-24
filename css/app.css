@@ -3705,3 +3705,5 @@ button.wx-t.on + button.wx-t{box-shadow:none}
 /* a meeting's suggestions, picked out when you open them from the bell (Nov 24) */
 .tk-sg-r{transition:background-color 400ms ease}
 .tk-sg-r.is-hl{background:color-mix(in srgb,var(--blue) 12%,transparent);border-radius:10px}
+.alert-sheet .sheet-a.is-row{flex-wrap:wrap;justify-content:flex-end}
+#tdHadL[hidden],.td-had[hidden]{display:none}

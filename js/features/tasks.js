@@ -578,10 +578,11 @@ async function confirmTaskCompletion(taskId){
     if(minutes > 960 && !(await confirmDialog(`That's ${formatMinutes(minutes)} for one task. Did you mean minutes instead of hours?`, { confirmLabel: 'Log It Anyway', cancelLabel: 'Let Me Fix It' }))) return;
     time = { clientId, minutes, pick };
     // already logged for this client since the task was made? (Nov 24: not twice in Harvest)
-    const t0 = tasks.find(x => x.id === taskId), had = t0 && t0.clientId === clientId ? taskTimeSince(t0) : [];
+    const t0 = tasks.find(x => x.id === taskId), had = t0 && t0.clientId === clientId ? taskTimeSince(t0, pick) : [];
     if(had.length){
-      const v = await choiceDialog({ title: 'Log this time too?', body: `${taskTimeWords(t0, had)} If that was for this task, it would be in Harvest twice.`,
-        choices: [{ label: 'Mark Done Without Logging Again', value: 'skip', primary: true }, { label: `Log ${formatMinutes(minutes)} Too`, value: 'log' }] });
+      const v = await choiceDialog({ title: 'Is this time already logged?', row: true,
+        body: `${taskTimeWords(t0, had)}\n\nIf that was this task, mark it done without the time, so it isn’t in Harvest twice.`,
+        choices: [{ label: `Log ${formatMinutes(minutes)} Again`, value: 'log' }, { label: 'Mark Done Without Time', value: 'skip', primary: true }] });
       if(v === null) return;
       if(v === 'skip') time = null;
     }
@@ -595,17 +596,40 @@ async function confirmTaskCompletion(taskId){
 // ---- No double time (Nov 24) ----------------------------------------------------------------------
 // Time you already logged for a task's client since the task was made (by hand, from Queue, a timer):
 // Mark Done says so and asks before logging more, so the same work doesn't reach Harvest twice.
-function taskTimeSince(t){
+function taskTimeSince(t, pick){
   if(!t || !t.clientId || typeof timeEntries === 'undefined' || !currentUser) return [];
   const since = t.createdAt ? toDateStr(new Date(t.createdAt)) : toDateStr(new Date());
-  return timeEntries.filter(e => e.userId === currentUser.id && e.clientId === t.clientId && e.date >= since);
+  return timeEntries.filter(e => e.userId === currentUser.id && e.clientId === t.clientId && e.date >= since && taskTimeSameWork(e, pick));
 }
-// "You logged 1h 30m for Northline Roofing since this task was made (Tue: “Homepage promo”)."
+// The same work in Harvest (Nov 24): the same project and task (Harvest sets Billable by the task),
+// not just the same client. Without a pick yet, anything for the client counts.
+function taskTimeSameWork(e, pick){
+  if(!pick || (!pick.projectId && !pick.service)) return true;
+  if(pick.projectId){
+    if(e.harvestProjectId) return Number(e.harvestProjectId) === Number(pick.projectId) && (!pick.taskId || !e.harvestTaskId || Number(e.harvestTaskId) === Number(pick.taskId));
+    return !!e.service && e.service === pick.service;
+  }
+  return !e.service || e.service === pick.service;
+}
+// "Website · Design, Billable"
+function taskTimeKind(e){
+  const w = typeof hvEntryWords === 'function' ? hvEntryWords(e) : (e.service || '');
+  let bill = '';
+  if(e.harvestProjectId && e.harvestTaskId && typeof hvProjectTasks === 'function'){
+    const tk = hvProjectTasks(e.harvestProjectId, e.harvestTaskId, true).find(x => Number(x.id) === Number(e.harvestTaskId));
+    if(tk) bill = tk.billable ? 'Billable' : 'Non-billable';
+  }
+  return [w, bill].filter(Boolean).join(', ');
+}
+// What you already logged, plainly:
+// "On Tue you logged 1h for Together Design & Build Dallas (Website · Design, Billable): “Redo the yelp…”"
 function taskTimeWords(t, had){
-  const c = clients.find(x => x.id === t.clientId), total = had.reduce((n, e) => n + (e.minutes || 0), 0);
-  const last = had.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
-  const what = last && last.description ? `${fmtDay(new Date(last.date + 'T12:00:00'))}: “${last.description.length > 50 ? last.description.slice(0, 50) + '…' : last.description}”` : '';
-  return `You logged ${formatMinutes(total)} for ${c ? c.name : 'this client'} since this task was made${what ? ` (${what})` : ''}.`;
+  const c = clients.find(x => x.id === t.clientId), name = c ? c.name : 'this client', total = had.reduce((n, e) => n + (e.minutes || 0), 0);
+  const byDay = had.slice().sort((a, b) => String(b.date).localeCompare(String(a.date))), last = byDay[0];
+  const day = e => fmtDay(new Date(e.date + 'T12:00:00')), kind = last ? taskTimeKind(last) : '';
+  const said = last && last.description ? `: “${last.description.length > 60 ? last.description.slice(0, 60) + '…' : last.description}”` : '';
+  if(had.length === 1) return `On ${day(last)} you logged ${formatMinutes(total)} for ${name}${kind ? ` (${kind})` : ''}${said}.`;
+  return `Since this task was made you logged ${formatMinutes(total)} for ${name}${kind ? ` (${kind})` : ''}, the latest on ${day(last)}${said}.`;
 }
 // Logging time by hand for a client you have a task open for: is it that task's time? Then the task is
 // marked done with it, once. Returns { go } to log the time as usual, { taskId } when a task took it, or null.
@@ -617,10 +641,14 @@ async function timeForOpenTask(clientId, description){
   // the one it most looks like first, then the one due soonest
   const near = typeof mtSame === 'function' && description ? open.filter(t => mtSame(description, t.title)) : [];
   const order = [...near, ...open.filter(t => !near.includes(t)).sort((a, b) => String(a.dueDate || '9999').localeCompare(String(b.dueDate || '9999')))].slice(0, 3);
-  const v = await choiceDialog({
-    title: open.length === 1 ? 'Is this time for your task?' : 'Is this time for one of your tasks?',
-    body: `You have ${open.length === 1 ? `“${cut(open[0].title)}”` : `${open.length} tasks`} open for ${c ? c.name : 'this client'}. If this time is for ${open.length === 1 ? 'it' : 'one of them'}, mark it done with this time, so it isn’t logged again when you finish it.`,
-    choices: [...order.map((t, i) => ({ label: `Mark “${cut(t.title)}” Done`, value: t.id, primary: i === 0 && near.length > 0 })), { label: 'Just Log the Time', value: '_time', primary: !near.length }],
+  const v = open.length === 1 ? await choiceDialog({
+    title: 'Is this time for your open task?', row: true,
+    body: `“${cut(open[0].title)}” is open for ${c ? c.name : 'this client'}.\n\nIf this time is for it, it’s marked done with this time, so finishing it later doesn’t log the time again.`,
+    choices: [{ label: 'No, Just Log It', value: '_time', primary: !near.length }, { label: 'Yes, Mark It Done', value: open[0].id, primary: near.length > 0 }],
+  }) : await choiceDialog({
+    title: 'Is this time for one of your open tasks?',
+    body: `You have ${open.length} tasks open for ${c ? c.name : 'this client'}. If this time is for one, it’s marked done with this time, so finishing it later doesn’t log the time again.`,
+    choices: [...order.map((t, i) => ({ label: `Mark “${cut(t.title)}” Done`, value: t.id, primary: i === 0 && near.length > 0 })), { label: 'None, Just Log It', value: '_time', primary: !near.length }],
   });
   if(v === null) return null;
   return v === '_time' ? { go: true } : { taskId: v };

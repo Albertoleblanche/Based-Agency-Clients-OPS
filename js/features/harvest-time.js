@@ -362,6 +362,7 @@ function hvUseRecent(prefix, clientSelId, clientId, projectId, taskId){
 }
 // The client, project or task changed: redraw what depends on it.
 function hvPickChanged(prefix, what, clientSelId){
+  if(prefix === 'td' && typeof tdHadRefresh === 'function') setTimeout(tdHadRefresh, 0);   // Mark Done's "already logged" note follows the pick
   const wrap = document.getElementById(prefix + 'Pick'); if(!wrap) return;
   const cid = document.getElementById(clientSelId || (prefix === 'timerModal' ? 'timerModalClient' : prefix === 'editEntry' ? 'editEntryClient' : prefix === 'li' ? 'liClient' : prefix + 'Client'))?.value || '';
   if(what === 'task'){
