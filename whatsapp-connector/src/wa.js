@@ -44,6 +44,14 @@ function looksLikeTeam(m){
   return !!n && config.teamHints.some(h => n === h || n.startsWith(h + ' '));
 }
 
+let lastGroupsLine = '';
+let groupsTimer = null;
+// Group changes arrive in bursts (dozens while a new link catches up): ask WhatsApp once, 5 s after the last one.
+function refreshGroupsSoon(){
+  clearTimeout(groupsTimer);
+  groupsTimer = setTimeout(() => refreshGroups().catch(() => {}), 5000);
+}
+
 // Asks WhatsApp for the group list (infrequent), stores every group's NAME, and marks which are read.
 // A group is read when its name matches the client rule, unless an admin switched it by hand in Radar.
 export async function refreshGroups(){
@@ -70,7 +78,8 @@ export async function refreshGroups(){
   }
   groupsLoaded = true;
   await syncActiveGroups();
-  console.log(`Reading ${groupNames.size} client groups (of ${rows.length} groups on this number). Personal chats are never read.`);
+  const line = `Reading ${groupNames.size} client groups (of ${rows.length} groups on this number). Personal chats are never read.`;
+  if(line !== lastGroupsLine){ console.log(line); lastGroupsLine = line; }
 }
 
 // Cheap, database-only: picks up on/off switches changed in Radar.
@@ -142,8 +151,8 @@ export async function connect({ onReady, onLogout } = {}){
   sock.ev.on('creds.update', saveCreds);
   sock.ev.on('messages.upsert', ({ messages }) => { intake(messages).catch(e => console.error('ingest error', e.message)); });
   sock.ev.on('messaging-history.set', ({ messages }) => { intake(messages || []).catch(e => console.error('history ingest error', e.message)); });
-  sock.ev.on('groups.upsert', () => refreshGroups().catch(() => {}));
-  sock.ev.on('groups.update', () => refreshGroups().catch(() => {}));
+  sock.ev.on('groups.upsert', refreshGroupsSoon);
+  sock.ev.on('groups.update', refreshGroupsSoon);
 
   sock.ev.on('connection.update', async (u) => {
     if(mine !== sock) return;   // events from a replaced socket (after re-link) are ignored
