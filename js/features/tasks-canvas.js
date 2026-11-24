@@ -42,19 +42,26 @@ function tkCb(t, cls){
   return mine ? `<button class="tk-cb${cls ? ' ' + cls : ''}" role="checkbox" aria-checked="false" aria-label="Mark done" title="Mark done" onclick="event.stopPropagation();moveTaskToStatus('${t.id}','done')"></button>`
     : `<span class="tk-cb is-off${cls ? ' ' + cls : ''}" title="Only ${escapeHtml(tkWho(t.assigneeId))} can mark this done"></span>`;
 }
+// A task you gave someone that's past due: Remind, right on its row (Nov 24)
+function tkRemindBtn(t){
+  const today = toDateStr(new Date());
+  if(t.status === 'done' || t.cancelledAt || t.assignerId !== currentUser?.id || t.assigneeId === currentUser?.id || !t.dueDate || t.dueDate >= today || typeof nudgeSheet !== 'function') return '';
+  const who = tkWho(t.assigneeId);
+  return `<button class="ib tk-remind" aria-label="Remind ${escapeHtml(who)}" title="Remind ${escapeHtml(who)} on Slack" onclick="event.stopPropagation();remindTaskAssignee('${t.id}')">${icon('paper-plane-tilt')}</button>`;
+}
 function tkCardHtml(t){
   const c = clients.find(x => x.id === t.clientId), [due, kind] = tkDue(t);
   const flag = t.priority === 'high' ? `<span class="tk-flag" title="High priority">${icon('flag')}</span>` : '';
   return `<article class="tk-c${t.color ? ' has-c c-' + t.color : ''}${window._taskSel === t.id ? ' is-sel' : ''}" role="button" tabindex="0" aria-label="${escapeHtml(t.title)}" onclick="selectTask('${t.id}')" onkeydown="if((event.key==='Enter'||event.key===' ')&&event.target===this){event.preventDefault();selectTask('${t.id}')}">
 <div class="tk-ct">${tkCb(t)}<b>${escapeHtml(t.title)}</b>${flag}</div>
 ${c ? `<div class="tk-cm"><span class="tk-cl">${escapeHtml(c.name)}${focusMark(c)}</span></div>` : ''}
-<div class="tk-cf"><span class="tk-due ${kind}">${escapeHtml(due)}</span><span class="tk-who">${escapeHtml(tkWho(t.assigneeId))}</span></div></article>`;
+<div class="tk-cf"><span class="tk-due ${kind}">${escapeHtml(due)}</span><span class="tk-who">${escapeHtml(tkWho(t.assigneeId))}</span>${tkRemindBtn(t)}</div></article>`;
 }
 function tkListRowHtml(t){
   const c = clients.find(x => x.id === t.clientId), [due, kind] = tkDue(t), done = t.status === 'done';
   return `<div class="tk-lr${done ? ' is-done' : ''}${window._taskSel === t.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectTask('${t.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)selectTask('${t.id}')">${tkCb(t)}
 <div class="tx"><b>${t.color && !done ? `<i class="cc-dot c-${t.color}" aria-hidden="true"></i>` : ''}${escapeHtml(t.title)}${t.priority === 'high' && !done ? `<span class="tk-flag" title="High priority">${icon('flag')}</span>` : ''}</b><span class="s">${c ? escapeHtml(c.name) + focusMark(c) + ' · ' : ''}${escapeHtml(tkWho(t.assigneeId))}</span></div>
-<span class="tk-due ${kind}">${escapeHtml(done && t.completedAt ? 'Done ' + fmtShortDate(new Date(t.completedAt)) : due)}</span></div>`;
+${tkRemindBtn(t)}<span class="tk-due ${kind}">${escapeHtml(done && t.completedAt ? 'Done ' + fmtShortDate(new Date(t.completedAt)) : due)}</span></div>`;
 }
 
 function renderTasks(){
@@ -136,14 +143,27 @@ async function toggleTaskCheck(id, line){
   const { error } = await supabaseClient.from('tasks').update({ description }).eq('id', id);
   if(error){ t.description = before; renderTasks(); showToast('error', 'Not saved', error.message); }
 }
-async function remindTaskAssignee(id){
+// Remind whoever has a task you assigned (Nov 24): from your Slack, as you, and in their bell; the
+// message fits where it stands (past due, due today, coming up).
+function remindTaskAssignee(id){
   const t = tasks.find(x => x.id === id); if(!t) return;
   const who = teamProfiles.find(p => p.id === t.assigneeId); if(!who) return;
-  const [due] = tkDue(t);
-  await sendNotification(t.assigneeId, 'task_reminder', `Reminder: ${t.title}`, `${myName() || 'Someone'} is checking in on this${due ? ` (${due.toLowerCase()})` : ''}.`, 'tasks', t.id);
-  addTaskActivity(id, { at: new Date().toISOString(), text: `<b>You</b> reminded ${escapeHtml(firstName(who.name))}` });
-  showToast('success', `Reminded ${firstName(who.name)}`, 'They’ll see it in their notifications.');
-  renderTasks();
+  const c = t.clientId ? clients.find(x => x.id === t.clientId) : null, today = toDateStr(new Date());
+  const what = `“${t.title}”${c ? ` for ${shortClientName(c.name)}` : ''}`;
+  const day = t.dueDate ? fmtDay(new Date(t.dueDate + 'T12:00:00')) : '';
+  const text = t.dueDate && t.dueDate < today ? `how’s ${what} going? It was due ${day}. Is anything blocking it, or does it need a new date?`
+    : t.dueDate === today ? `just checking on ${what}, it’s due today. Will it make it?`
+    : `how’s ${what} coming along?${day ? ` It’s due ${day}.` : ''}`;
+  const done = () => { addTaskActivity(id, { at: new Date().toISOString(), text: `<b>You</b> reminded ${escapeHtml(firstName(who.name))}` }); renderTasks(); };
+  if(typeof nudgeSheet !== 'function'){
+    const [due] = tkDue(t);
+    sendNotification(t.assigneeId, 'task_reminder', `Reminder: ${t.title}`, `${myName() || 'Someone'} is checking in on this${due ? ` (${due.toLowerCase()})` : ''}.`, 'tasks', t.id);
+    showToast('success', `Reminded ${firstName(who.name)}`, 'They’ll see it in their notifications.'); done(); return;
+  }
+  nudgeSheet({ title: `Remind ${firstName(who.name)}`, sub: t.title, to: [who], text,
+    link: { view: 'tasks', id: t.id, label: 'Open the task in Radar' },
+    notif: { type: 'task_reminder', title: `${firstName(myName() || 'A teammate')} asks about “${t.title}”` },
+    key: 'task:' + t.id, sentWord: 'Reminded', onSent: done });
 }
 // The color, changed from the panel (only the person who assigned it can change it).
 async function setTaskColor(v){
@@ -222,7 +242,8 @@ function taskPanelHtml(t){
     : amAssignee && !amAssigner ? `You <em>from ${escapeHtml(assigner ? assigner.name : 'someone')}</em>` : 'You';
   let acts = '';
   if(!done){
-    const remind = amAssigner && !amAssignee && assignee ? `<button class="btn${amAssignee ? '' : ' btn-p'}" onclick="remindTaskAssignee('${t.id}')">${icon('bell-ring')}Remind ${escapeHtml(firstName(assignee.name))}</button>` : '';
+    const rWhen = amAssigner && !amAssignee && assignee && typeof nudgeWhenWords === 'function' ? nudgeWhenWords('task:' + t.id, 'Reminded') : '';
+    const remind = amAssigner && !amAssignee && assignee ? `<button class="btn${late ? ' btn-p' : ''}" onclick="remindTaskAssignee('${t.id}')">${icon('paper-plane-tilt')}${rWhen ? 'Remind Again…' : `Remind ${escapeHtml(firstName(assignee.name))}…`}</button>${rWhen ? `<span class="nd-when">${escapeHtml(rWhen)}</span>` : ''}` : '';
     const mark = amAssignee ? `<button class="btn btn-p" onclick="moveTaskToStatus('${t.id}','done')">${icon('check')}Mark Done</button>` : '';
     acts = remind || mark ? `<div class="tkp-acts">${remind}${mark}</div>` : '';
   } else if(amAssignee || amAssigner){

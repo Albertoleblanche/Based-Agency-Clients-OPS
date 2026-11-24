@@ -3707,8 +3707,27 @@ button.wx-t.on + button.wx-t{box-shadow:none}
 .tk-sg-r.is-hl{background:color-mix(in srgb,var(--blue) 12%,transparent);border-radius:10px}
 .alert-sheet .sheet-a.is-row{flex-wrap:wrap;justify-content:flex-end}
 #tdHadL[hidden],.td-had[hidden]{display:none}
-/* Remind Approvers (Queue, Nov 24) */
-.f label.pick.qn-p{height:30px;gap:8px}
-.qn-p .qn-via{font-size:12px;color:var(--label-3)}
-.qn-note{margin:8px 0 0;font-size:12.5px;line-height:1.45;color:var(--label-2)}
+/* Message as you (nudge-sheet.js, Nov 24) */
+.f label.pick.nd-p{height:30px;gap:8px}
+.nd-via{font-size:12px;color:var(--label-3)}
+.nd-one{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;min-height:30px}
+.nd-who{display:inline-flex;align-items:baseline;gap:8px;font-size:14px}
+.nd-who b{font-weight:500}
+.nd-note{margin:8px 0 0;font-size:12.5px;line-height:1.45;color:var(--label-2)}
+.nd-when{align-self:center;font-size:12.5px;color:var(--label-3);white-space:nowrap}
 .qu-nudged{align-self:center;margin-right:4px;font-size:12.5px;color:var(--label-3);white-space:nowrap}
+/* WhatsApp: Nudge on a teammate's request (approvers) */
+.wx-row .wx-nudge{opacity:0;transition:opacity 150ms ease}
+.wx-row:hover .wx-nudge,.wx-row:focus-within .wx-nudge,.wx-row .wx-nudge.is-on{opacity:1}
+.wx-row .wx-nudge.is-on{color:var(--label-2)}
+.wap-nudged{margin-left:auto}
+@media (hover:none){.wx-row .wx-nudge{opacity:1}}
+.tk-remind{flex:0 0 auto;width:24px;height:24px;margin-left:auto;color:var(--label-2)}
+.tk-cf .tk-remind{margin:-4px -4px -4px -6px}
+.tk-cf:has(.tk-remind) .tk-who{margin-left:auto}
+.tk-lr .tk-remind{margin:0 4px 0 0}
+/* Notes: When (Nov 24) */
+.n1-when .pl{display:inline-flex;align-items:center;gap:6px}
+.n1-when .pl svg{width:14px;height:14px;color:var(--label-2)}
+.n1-when.is-on .pl{color:var(--blue)}
+.n1-when.is-on .pl svg{color:var(--blue)}

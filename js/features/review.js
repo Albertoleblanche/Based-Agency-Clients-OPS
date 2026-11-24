@@ -214,7 +214,7 @@ function reviewReadHtml(x, list, split){
   const more = `<button class="ib" aria-label="More" title="More" onclick="reviewMore(event,${A})">${icon('dots-three')}</button>`;
   const top = editing
     ? `${nav}<span class="rvn-editing">${icon('pencil-simple')}Editing ${mine ? 'your' : escapeHtml(firstName(d.author)) + '’s'} draft</span><span class="rvn-sp"></span><button class="btn" onclick="cancelReviewEdit()">Cancel</button><button class="btn btn-p" onclick="toggleReviewEdit(${A})">Save Changes</button>`
-    : `${nav}<span class="rvn-sp"></span>${rework ? `<button class="btn rvn-q" onclick="toggleReviewEdit(${A})">${icon('pencil-simple')}Edit</button><button class="btn rvn-q" onclick="generateDraft(${A})">${icon('sparkle')}Rewrite</button>` : ''}${more}`;
+    : `${nav}<span class="rvn-sp"></span>${approver && !mine && tab !== 'sent' && typeof nudgeSheet === 'function' ? `<button class="btn rvn-q" onclick="askWriter(${A})" title="Ask ${escapeHtml(firstName(d.author))} about it, on Slack as you">${icon('message-circle')}Ask ${escapeHtml(firstName(d.author))}…</button>` : ''}${rework ? `<button class="btn rvn-q" onclick="toggleReviewEdit(${A})">${icon('pencil-simple')}Edit</button><button class="btn rvn-q" onclick="generateDraft(${A})">${icon('sparkle')}Rewrite</button>` : ''}${more}`;
   // The client, as the email's header.
   const to = clientContact(c), ch = winChannel(c), wa = ch === 'whatsapp';
   const drafted = tab === 'approved' && d.approvedBy ? ` · approved by ${d.approvedBy === myName() ? 'you' : escapeHtml(firstName(d.approvedBy))}${d.approvedAt ? ' at ' + escapeHtml(fmtTime(new Date(d.approvedAt))) : ''}`
@@ -326,6 +326,7 @@ function reviewPartsHtml(x, list, split){
     const tierHtml = tab !== 'sent' && approver && winsDbReady() ? `<button class="pop wn-pop rvp-tier" onclick="winTierMenu(event,${A})" aria-label="Tier">${tier ? tierTag(tier) : '<span class="t-3">Tier</span>'}${icon('caret-down', { weight: 'bold' })}</button>` : tier ? tierTag(tier) : '';
     const note = dl && dl.gone ? `<span class="rvp-n is-red">${dl.allGone ? 'Its work was deleted' : `${dl.gone} deleted`}</span>` : dl && dl.edited.length ? `<span class="rvp-n">${dl.edited.length} edited since</span>` : dl && dl.added.length ? `<span class="rvp-n">${dl.added.length} new since</span>` : '';
     const acts = editing ? '' : [
+      approver && p.author !== me && p.state !== 'sent' && typeof nudgeSheet === 'function' ? `<button class="btn rvp-b rvn-q" onclick="askWriter(${A})" title="Ask ${escapeHtml(firstName(p.author))} about it, on Slack as you">${icon('message-circle')}Ask ${escapeHtml(firstName(p.author))}…</button>` : '',
       approver && p.state !== 'approved' && p.state !== 'sent' ? `<button class="btn rvp-b" onclick="approvePart(${A})">${icon('check')}Approve</button>` : '',
       rework ? `<button class="btn rvp-b rvn-q" onclick="toggleReviewEdit(${A})">${icon('pencil-simple')}Edit</button><button class="btn rvp-b rvn-q" onclick="generateDraft(${A})">${icon('sparkle')}Rewrite</button>` : '',
     ].join('');
@@ -409,12 +410,32 @@ function reviewCopyParts(clientId){
   navigator.clipboard?.writeText(`Your weekly update — ${updateRangeLabel(c)}\n\n${combineParts(ds)}`).then(() => showToast('success', 'Copied', 'The email is on your clipboard.'), () => {});
 }
 // Remind someone to send their part (or write one) for this client.
+// Remind a teammate whose part isn't in yet: from your Slack, as you, and in their bell (Nov 24)
 async function remindPart(clientId, author){
   const c = clients.find(x => x.id === clientId), p = profileByName(author);
   if(!c || !p){ showToast('info', 'Nobody to remind', `${author} isn’t on the team any more.`); return; }
-  const d = getDraftFor(c, author), has = d && d.draft && !d.draftSentAt && d.draftStatus === 'pending';
-  await sendNotification(p.id, 'update_behind', `${c.name}: your part of this week’s update`, has ? 'Send your part for review, so it goes out with the others.' : 'Write your part from the work you logged, so it goes out with the others.', 'queue', c.id);
-  showToast('success', `Reminded ${firstName(author)}`, 'In the app, and on Slack if they use it.');
+  const d = getDraftFor(c, author), has = d && d.draft && !d.draftSentAt && d.draftStatus === 'pending', name = shortClientName(c.name);
+  if(typeof nudgeSheet !== 'function'){
+    await sendNotification(p.id, 'update_behind', `${c.name}: your part of this week’s update`, has ? 'Send your part for review, so it goes out with the others.' : 'Write your part from the work you logged, so it goes out with the others.', 'queue', c.id);
+    showToast('success', `Reminded ${firstName(author)}`, 'In the app, and on Slack if they use it.'); return;
+  }
+  nudgeSheet({ title: `Remind ${firstName(author)}`, sub: `${c.name} · their part of this week’s update`, to: [p],
+    text: has ? `your part of ${name}’s update is written but not sent for review yet. Can you send it, so it goes out with the others?`
+      : `could you write your part of ${name}’s update from the work you logged? The rest can go out with it.`,
+    link: { view: 'queue', id: c.id, label: 'Open your update in Radar' },
+    notif: { type: 'update_behind', title: `${c.name}: your part of this week’s update` },
+    key: `part:${c.id}:${author}`, sentWord: 'Reminded' });
+}
+// Ask a writer about their part before approving it, as you (Nov 24): on Slack and in their bell
+function askWriter(clientId, author){
+  const c = clients.find(x => x.id === clientId), p = profileByName(author);
+  if(!c || !p){ showToast('info', 'Nobody to ask', `${author} isn’t on the team any more.`); return; }
+  const name = shortClientName(c.name);
+  nudgeSheet({ title: `Ask ${firstName(author)}`, sub: `${c.name} · their part of this week’s update`, to: [p],
+    text: `I’m looking at your part of ${name}’s update in Review. `,
+    link: { view: 'queue', id: c.id, label: 'Open your update in Radar' },
+    notif: { type: 'review_question', title: `${firstName(myName() || 'An approver')} has a question about ${name}’s update` },
+    key: `ask:${c.id}:${author}`, sendLabel: 'Send' });
 }
 
 // The win's rows in the rail: its tier, how the client gets it, the group, and who sends it.

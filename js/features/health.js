@@ -265,6 +265,14 @@ function healthPanelHtml(c, h, closeFn){
     else { title = 'No next step yet'; sub = 'Plan a fix or a check-in with a date, and it becomes a task for the owner.';
       acts = `<div class="sp-acts"><button class="btn" onclick="markHealthHandled('${c.id}')">Mark Handled</button><button class="btn btn-p" onclick="planNextStep('${c.id}')">${icon('plus')}Plan Next Step</button></div>`; }
   }
+  // an approver asks the owner, from their Slack, as them (Nov 24)
+  const ownerP = owner && typeof profileByName === 'function' ? profileByName(owner) : null;
+  if(lvl !== 'g' && ownerP && ownerP.id !== currentUser.id && !ownerP.access_revoked && canApprove() && typeof nudgeSheet === 'function'){
+    const when = typeof nudgeWhenWords === 'function' ? nudgeWhenWords('health:' + c.id, 'Asked') : '';
+    const ask = `<button class="btn" onclick="healthAskOwner('${c.id}')">${icon('message-circle')}${when ? 'Ask Again…' : `Ask ${escapeHtml(firstName(ownerP.name))}…`}</button>`;
+    acts = acts ? acts.replace('<div class="sp-acts">', `<div class="sp-acts">${ask}`) : `<div class="sp-acts">${ask}</div>`;
+    if(when) acts = acts.replace(/<\/div>$/, `<span class="nd-when">${escapeHtml(when)}</span></div>`);
+  }
   const why = h.signals.map(s => `<div class="hp-w"><span class="sig ${s.l}">${icon(s.icon)}</span><div class="tx"><b>${escapeHtml(s.title)}</b><span>${escapeHtml(s.text)}</span></div><span class="hp-since">${escapeHtml(relDay(s.since))}</span></div>`).join('');
   const weeks = healthWeeks(), hist = healthTrail(c, h, weeks);
   const trail = `<div class="sp-sec hx-ro"><b>The last 12 weeks</b><span></span></div>${healthTrailHtml(hist, 'cz-tl').replace('<div class="tl cz-tl"', `<div class="tl cz-tl" data-h="${hist.map(k => k || '.').join('')}"`)}${healthAxisHtml(weeks)}`;
@@ -301,3 +309,19 @@ function healthEvents(c, h){
   return ev.filter(e => e.at <= rNow()).sort((a, b) => b.at - a.at);
 }
 function openSettingsTab(tab){ switchView('settings'); if(typeof switchSettingsTab === 'function') setTimeout(() => { try{ switchSettingsTab(tab); }catch(e){} }, 0); }
+
+
+// Ask the owner of a client at risk or on watch (Nov 24): from your Slack, as you, with Radar's reasons,
+// and in their bell (opening the client in Health).
+function healthAskOwner(clientId){
+  const c = clients.find(x => x.id === clientId); if(!c) return;
+  const h = typeof clientHealth === 'function' ? clientHealth(c) : null, owner = clientOwner(c), p = owner && profileByName(owner);
+  if(!p){ showToast('info', 'Nobody to ask', 'This client has no owner on the team.'); return; }
+  const lvl = h ? (h.quiet ? h.rawLevel : h.level) : 'y', name = shortClientName(c.name);
+  const why = h && h.signals.length ? h.signals.slice(0, 3).map(s => s.title.replace(/\.$/, '')).join('; ') : '';
+  nudgeSheet({ title: `Ask ${firstName(p.name)}`, sub: `${c.name} · ${lvl === 'r' ? 'at risk' : 'on watch'}`, to: [p],
+    text: `what’s going on with ${name}? Radar has them ${lvl === 'r' ? 'at risk' : 'on watch'}${why ? `: ${why}` : ''}. Do you know why, and what’s the next step?`,
+    link: { view: 'health', id: c.id, label: 'Open it in Radar' },
+    notif: { type: 'health_ask', title: `${firstName(myName() || 'An approver')} asks about ${name}` },
+    key: 'health:' + c.id, sentWord: 'Asked', onSent: () => { if(typeof renderHealth === 'function') renderHealth(); } });
+}

@@ -579,7 +579,8 @@ function waRowHtml(t, sel, o){
     const mine = o.useMine && o.isMine && o.isMine(t);
     const today = toDateStr(rNow());
     const when = t.due_date && t.due_date > today ? `Due ${fmtShortDate(new Date(t.due_date + 'T12:00:00'))}` : waAgeWord(t);
-    right = `${showWho ? `<b class="wx-who${mine ? ' is-me' : ''}">${escapeHtml(mine ? 'You' : waOwnerName(t))}</b>` : ''}<span class="rmi-when${waLate(t) ? ' is-late' : waDays(t) === 0 ? ' is-new' : ''}">${escapeHtml(when)}</span>`;
+    const nudge = showWho && !mine && waCanNudge(t) ? `<button class="ib wx-nudge${waLate(t) ? ' is-on' : ''}" aria-label="Nudge ${escapeHtml(waOwnerName(t))}" title="Nudge ${escapeHtml(waOwnerName(t))} on Slack" onclick="event.stopPropagation();waNudgeOwner('${t.id}')">${icon('paper-plane-tilt')}</button>` : '';
+    right = `${nudge}${showWho ? `<b class="wx-who${mine ? ' is-me' : ''}">${escapeHtml(mine ? 'You' : waOwnerName(t))}</b>` : ''}<span class="rmi-when${waLate(t) ? ' is-late' : waDays(t) === 0 ? ' is-new' : ''}">${escapeHtml(when)}</span>`;
   }
   return `<div class="wa-r wx-row${closed ? ' is-done' : ''}${sel && sel.id === t.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectWa('${t.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)selectWa('${t.id}')">${cb}
 <div class="tx">${why}<b>${escapeHtml(t.title)}</b>${sub}</div><div class="wx-row-r">${right}</div></div>`;
@@ -844,6 +845,10 @@ function waPanelHtml(t){
     const d = waDays(t), word = d === 0 ? 'New today' : waDueToday(t) ? `Answer today · waiting ${waAgeWord(t)}` : `Waiting ${waAgeWord(t)}`;
     facts.push(`<b class="${waLate(t) ? 'is-red' : d === 0 ? 'is-new' : ''}">${escapeHtml(word)}</b>`);
     acts = can ? `${taskBtn}<button class="btn" onclick="waDismiss('${t.id}')">Not a Task</button><button class="btn btn-p" onclick="waMarkDone('${t.id}')">${icon('check')}Mark Done</button>` : '';
+    if(waCanNudge(t)){
+      const when = typeof nudgeWhenWords === 'function' ? nudgeWhenWords(waNudgeKey(t)) : '';
+      acts = `<button class="btn" onclick="waNudgeOwner('${t.id}')">${icon('paper-plane-tilt')}${when ? 'Nudge Again…' : `Nudge ${escapeHtml(firstName(waOwnerProfile(t).name))}…`}</button>${acts}${when ? `<span class="nd-when wap-nudged">${escapeHtml(when)}</span>` : ''}`;
+    }
   } else {
     const word = t.status === 'dismissed' ? 'Not a task' : t.status === 'answered' && t.answered_at ? `Answered in the group ${waWhenLower(t.answered_at)}`
       : `${t.status === 'answered' ? 'Answered in the group' : 'Done'}${t.updated_at ? ' ' + waWhenLower(t.updated_at) : ''}`;
@@ -950,8 +955,40 @@ async function waReassign(id, key){
     const first = String(p.name || '').trim().split(/\s+/)[0].toLowerCase();
     return first === key || (key === 'dan' && first === 'daniel');
   });
-  const name = (WA_OWNERS.find(o => o[0] === key) || [, key])[1];
-  return waUpdate(id, { owner_key: key, owner_user_id: person ? person.id : null }, `Assigned to ${name}`, person ? '' : `No one named ${name} on the team yet, so it’s unassigned in Radar.`);
+  const name = person ? firstName(person.name) : (WA_OWNERS.find(o => o[0] === key) || [, key])[1];
+  if(!person) return waUpdate(id, { owner_key: key, owner_user_id: null }, `Assigned to ${name}`, `No one named ${name} on the team yet, so it’s unassigned in Radar.`);
+  const ok = await waUpdate(id, { owner_key: key, owner_user_id: person.id });
+  if(!ok) return false;
+  // handed to a teammate: tell them, from your Slack, as you (Nov 24)
+  if(person.id !== currentUser.id && !person.access_revoked && typeof nudgeSheet === 'function')
+    showToast('success', `Assigned to ${name}`, 'Tell them, with the client’s message?', { action: `Tell ${firstName(person.name)}…`, onAction: () => waHandOff(id) });
+  else showToast('success', `Assigned to ${name}`, '');
+  return true;
+}
+
+// ---- A message as you about a request (Nov 24, js/features/nudge-sheet.js) ---------------------------
+// Approvers nudge whoever has an open request nobody has answered; handing one over tells the new owner.
+function waOwnerProfile(t){ return t && t.owner_user_id ? (teamProfiles || []).find(p => p.id === t.owner_user_id && !p.access_revoked) || null : null; }
+function waCanNudge(t){ const p = waOwnerProfile(t); return !!(t && t.status === 'open' && waCanManage() && p && p.id !== currentUser.id && typeof nudgeSheet === 'function'); }
+function waNudgeKey(t){ return 'wa:' + t.id; }
+function waAskedWhen(t){ const d = waDays(t); return d === 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`; }
+function waNudgeOwner(id){
+  const t = waTasks.find(x => x.id === id), p = waOwnerProfile(t); if(!t || !p) return;
+  const cl = waClientLabel(t);
+  nudgeSheet({ title: `Nudge ${firstName(p.name)}`, sub: `${cl} · ${t.title}`, to: [p],
+    text: `${cl} asked on WhatsApp ${waAskedWhen(t)}: “${t.title}”, and they’re still waiting on an answer. Can you reply to them${waLate(t) || waDueToday(t) ? ' today' : ''}? If it’s already handled, mark it done in Radar.`,
+    link: { view: 'whatsapp', id: t.id, label: 'Open it in Radar' },
+    notif: { type: 'whatsapp_nudge', title: `${firstName(myName() || 'A lead')} asks about ${cl} on WhatsApp` },
+    key: waNudgeKey(t), sentWord: 'Nudged', onSent: () => renderWhatsapp() });
+}
+function waHandOff(id){
+  const t = waTasks.find(x => x.id === id), p = waOwnerProfile(t); if(!t || !p) return;
+  const cl = waClientLabel(t);
+  nudgeSheet({ title: `Tell ${firstName(p.name)}`, sub: `${cl} · ${t.title}`, to: [p],
+    text: `can you take this one? ${cl} asked on WhatsApp ${waAskedWhen(t)}: “${t.title}”.${t.source_excerpt ? ` They wrote: “${t.source_excerpt}”` : ''}`,
+    link: { view: 'whatsapp', id: t.id, label: 'Open it in Radar' },
+    notif: { type: 'whatsapp_handoff', title: `${firstName(myName() || 'A teammate')} handed you ${cl}’s WhatsApp request` },
+    key: 'wa-hand:' + t.id });
 }
 // Make a Task: the New Task sheet, filled in from the item; once it's created the item links to it.
 function waMakeTask(id){

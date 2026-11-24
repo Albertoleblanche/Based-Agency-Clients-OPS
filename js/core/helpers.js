@@ -152,7 +152,7 @@ function getWeekStart(d){
 // something is late or at risk, yellow when it's waiting on you, blue for news.
 const NOTIF_RED = ['update_behind', 'reminder_escalated', 'client_danger_maxed'];
 const NOTIF_YELLOW = ['draft_ready', 'win_approved', 'draft_written', 'task_assigned', 'reminder_follow_up_due', 'harvest_client', 'email_change_requested', 'event_invited', 'event_rsvp',
-  'task_due', 'task_overdue', 'task_wrap_up', 'whatsapp_waiting', 'review_nudge'];
+  'task_due', 'task_overdue', 'task_wrap_up', 'whatsapp_waiting', 'review_nudge', 'whatsapp_nudge', 'whatsapp_handoff', 'review_question', 'health_ask'];
 function notifSeverity(n){
   const t = String((n && n.type) || '');
   return NOTIF_RED.includes(t) || t.includes('denied') ? 'red' : NOTIF_YELLOW.includes(t) ? 'yellow' : 'blue';

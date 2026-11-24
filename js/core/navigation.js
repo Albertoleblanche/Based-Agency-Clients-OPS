@@ -294,6 +294,13 @@ function parseRouteHash(hash){
   if(!raw) return null;
   const client = raw.match(/^client\/(.+)$/);
   if(client){ try{ return { view:'clientdetail', clientId: decodeURIComponent(client[1]) }; }catch(e){ return null; } }
+  // a link to one item (Nov 24, from Slack messages sent as you): #tasks/<id>, #whatsapp/<id>, …
+  const item = raw.match(/^(tasks|whatsapp|reminders|teamqueue|queue|health)\/(.+)$/);
+  if(item){
+    let id; try{ id = decodeURIComponent(item[2]); }catch(e){ return null; }
+    const v = item[1] === 'teamqueue' && typeof queueHasReview === 'function' && queueHasReview() ? 'queue' : item[1];
+    return { view: v, itemId: id };
+  }
   if(raw === 'teamqueue' && typeof queueHasReview === 'function' && queueHasReview()) return { view: 'queue' };
   return { view: raw };
 }
@@ -335,7 +342,7 @@ async function openScreenFromAddress(hash){
   if(!currentUser) return;
   const route = parseRouteHash(hash) || { view:'overview' };
   const already = route.view === currentViewName && (route.view !== 'clientdetail' || route.clientId === currentDetailClientId);
-  if(already) return;
+  if(already && !route.itemId) return;
   _routingFromAddress = true;
   let opened;
   try{
@@ -353,7 +360,25 @@ async function openScreenFromAddress(hash){
   const corrected = routeHashFor(currentViewName);
   if(location.hash && location.hash !== corrected && !/gcal=|slackme=/.test(location.hash)) history.replaceState(null, '', corrected);
   await opened;
+  if(route.itemId && route.view === currentViewName) openLinkedItem(route.view, route.itemId);
 }
+// The item a link names, open in its screen (the same as opening it from the bell)
+async function openLinkedItem(view, id){
+  try{
+    if(view === 'tasks' && typeof notifOpenTask === 'function') return notifOpenTask(id);
+    if(view === 'whatsapp' && typeof waOpenItem === 'function') return waOpenItem(id);
+    if(view === 'reminders'){ if(typeof clientReminders !== 'undefined' && !clientReminders.length && typeof loadClientReminders === 'function') await loadClientReminders(); window._remSel = id; if(typeof renderReminders === 'function') renderReminders(); return; }
+    if(view === 'queue' && typeof openQueueClient === 'function') return openQueueClient(id);
+    if(view === 'health'){ window._healthSel = id; if(typeof renderHealth === 'function') renderHealth(); return; }
+    if(view === 'teamqueue' && typeof reviewItems === 'function' && typeof openReviewDraft === 'function'){
+      const all = Object.values(reviewItems()).flat().filter(x => x.c.id === id);
+      const x = (!canApprove() && all.find(y => y.d.author === myName())) || all[0];
+      if(x) openReviewDraft(x.c.id, x.d.author);
+    }
+  }catch(e){ console.warn('openLinkedItem', e); }
+}
+// A link to one item, for messages (Slack): https://…/#tasks/<id>
+function itemLink(view, id){ return `${location.origin}/#${view}${id ? '/' + encodeURIComponent(id) : ''}`; }
 
 // Leaving a screen closes its right-hand panel, so the screen is back to its list when you return.
 // It redraws once the screen is hidden, so nothing animates out of sight or on the way back.
