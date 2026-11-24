@@ -3524,6 +3524,11 @@ html.ui-w .wx{padding:6px 26px 30px var(--uw-gl)}
 .wx-main > .es{margin-top:56px}
 .wx-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px}
 .wx-lh{margin:0;font-size:16px;font-weight:650;letter-spacing:-.01em}
+.wx-only{display:flex;align-items:center;gap:12px;margin:-6px 0 16px;font-size:13.5px;color:var(--label-2)}
+.wx .wx-back{display:inline-flex;align-items:center;gap:2px;height:30px;margin-left:-6px;padding:0 10px 0 4px;border:0;border-radius:8px;background:transparent;color:var(--blue);font:inherit;font-size:14px;font-weight:500;cursor:default;transition:background-color 150ms ease,transform 140ms cubic-bezier(.23,1,.32,1)}
+.wx .wx-back svg{width:16px;height:16px}
+.wx .wx-back:active{transform:scale(.97)}
+@media (hover:hover) and (pointer:fine){ .wx .wx-back:hover{background:var(--fill)} }
 .wx-all{font-size:13px}
 .wx-groups{display:flex;flex-direction:column;gap:28px}
 .wx-groups + .es{margin-top:40px}

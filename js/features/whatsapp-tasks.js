@@ -333,7 +333,7 @@ function waRedraw(){
 // The client comes first: each client is a section, its name outside the card (service, whose client,
 // how they sound, how many wait and the oldest wait), its requests in a card below, folding away.
 // Urgent first, for anyone; for admins and approvers their own requests next; then the longest waits.
-function setWa(k, v){ if(k === 'tab') waTab = v; if(k === 'who') waWho = v; if(k === 'client') waClientSel = v || null; window._waSel = null; renderWhatsapp(); }
+function setWa(k, v){ if(k === 'tab'){ waTab = v; waClientSel = null; } if(k === 'who') waWho = v; if(k === 'client') waClientSel = v || null; window._waSel = null; renderWhatsapp(); }
 function selectWa(id){ window._waSel = window._waSel === id ? null : id; delete waChatTop[id]; renderWhatsapp(); if(window._waSel) waLoadChat(id); }
 function closeWaPanel(){ window._waSel = null; renderWhatsapp(); }
 // A client's "N waiting": All waiting, just that client's requests.
@@ -502,7 +502,8 @@ ${waCheckBtn()}`
 
   let main;
   if(lead){
-    const bar = `<div class="wx-bar">${seg([['needs', 'Needs attention', needs.length], ['open', 'All waiting', open.length], ['done', 'Done this week', done.length]])}${rows.length ? foldBtn : ''}</div>`;
+    const back = waClientSel ? `<div class="wx-only"><button class="wx-back" onclick="setWa('client','')">${icon('caret-left')}All Clients</button><span>Only ${escapeHtml(waClientSel)}</span></div>` : '';
+    const bar = `${back}<div class="wx-bar">${seg([['needs', 'Needs attention', needs.length], ['open', 'All waiting', open.length], ['done', 'Done this week', done.length]])}${rows.length ? foldBtn : ''}</div>`;
     let list;
     if(rows.length) list = `<div class="wx-groups">${tab !== 'done' ? againHtml : ''}${sections(rows, tab === 'done')}</div>`;
     else if(tab === 'needs' && open.length) list = `${againHtml ? `<div class="wx-groups">${againHtml}</div>` : ''}${emptyState({ icon: 'check-circle', tone: 'ok', title: 'Nothing needs attention', text: `${open.length} waiting, none urgent, late or due today.`, link: `See all ${open.length} waiting`, onLink: "setWa('tab','open')" })}`;
