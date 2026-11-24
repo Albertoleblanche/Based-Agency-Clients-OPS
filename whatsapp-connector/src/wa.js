@@ -165,7 +165,7 @@ export async function connect({ onReady, onLogout } = {}){
       status = 'closed';
       if(code === DisconnectReason.loggedOut){
         status = 'logged_out';
-        console.error('WhatsApp session was logged out. Delete the auth folder and run again to re-link.');
+        console.error('WhatsApp session was logged out. Press Re-link… in Radar → Settings → WhatsApp and scan the new code.');
         await logRun({ kind: 'error', ok: false, connection: 'logged_out', note: 'WhatsApp session logged out — re-scan the QR code' });
         await onLoggedOut();
       } else {
@@ -178,6 +178,13 @@ export async function connect({ onReady, onLogout } = {}){
   return sock;
 }
 
+// Empties the login folder but keeps the folder itself: on a server it is often a mounted
+// volume, which can't be deleted.
+function clearAuth(){
+  fs.mkdirSync(config.authDir, { recursive: true });
+  for(const f of fs.readdirSync(config.authDir)) fs.rmSync(`${config.authDir}/${f}`, { recursive: true, force: true });
+}
+
 // Unlinks this number and starts a fresh QR (triggered from Radar's Setup panel).
 export async function relink(){
   console.log('Re-link requested from Radar: clearing the saved login and showing a new QR code.');
@@ -185,7 +192,7 @@ export async function relink(){
   sock = null; status = 'closed';
   try { await old?.logout(); } catch {}
   try { old?.end?.(undefined); } catch {}
-  fs.rmSync(config.authDir, { recursive: true, force: true });
+  clearAuth();
   await logRun({ kind: 'status', connection: 'closed', note: 're-link requested from Radar' });
   await connect({});
 }

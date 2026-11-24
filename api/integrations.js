@@ -90,7 +90,7 @@ module.exports = async function handler(req, res) {
     res.writeHead(302, { Location: to }); res.end();
     return;
   }
-  // The WhatsApp connector (the office PC) asks for phone pushes for the Radar notifications it just
+  // The WhatsApp connector (its own server) asks for phone pushes for the Radar notifications it just
   // added (Nov 23). It proves itself with the service key it already holds; Radar holds the push keys.
   if (route === 'service-push') {
     const key = String(req.headers['x-radar-service-key'] || ''), want = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '');

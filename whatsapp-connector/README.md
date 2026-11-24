@@ -29,7 +29,7 @@ Run a digest right now: `npm run digest-now`.
 ## Managing it from Radar (Eric and Dan)
 
 After the connector is running once, open Radar → Settings → **WhatsApp** (or WhatsApp settings on the WhatsApp screen):
-- **Connection:** shows whether the office PC is running it and WhatsApp is linked. When a code is needed
+- **Connection:** shows whether the connector is running and WhatsApp is linked. When a code is needed
   (first link, or after Re-link) the QR code appears right there to scan. No Command Prompt needed.
   **Check Now** reads the groups right away (within 30 seconds of pressing it) and updates the list;
   it sends no Slack messages, those go at the set times.
@@ -64,9 +64,41 @@ To go live, run the last line of that file. Radar and the connector switch over 
 
 ## Keep it running
 
-The PC must be on and awake at 9:00 and 15:00. Easiest: Task Scheduler → create a task
-"At log on" that runs `npm start` in this folder, and set Power options → sleep to "Never".
-(Moving to a small cloud server later only means copying this folder and the `auth` folder.)
+The connector is a background worker: it needs to be on all the time (it reads messages as they
+arrive and posts at 9:00 and 15:00). Two ways:
+
+**On a server (recommended).** This folder has a `Dockerfile`, so any host that runs Docker works.
+Railway is the simplest:
+
+1. railway.com → New Project → Deploy from GitHub repo → this repo. In the service's Settings, set
+   **Root Directory** to `/whatsapp-connector`. Railway builds the `Dockerfile` on its own.
+2. Settings → **Volumes** → add a volume mounted at `/data`. The WhatsApp login is kept there
+   (`AUTH_DIR=/data/auth`), so redeploys don't ask for a new QR code.
+3. **Variables** → add the same values as the PC's `.env` (Raw Editor lets you paste them all).
+   Keep `TZ` set to the team's time zone.
+4. Settings → Restart policy → **Always**. No domain or port is needed.
+5. Stop the PC copy first (close its window and remove it from Task Scheduler), then deploy.
+   Only one copy may run at a time: two copies fight over the same Radar settings and post twice.
+6. Radar → Settings → WhatsApp → **Re-link…** shows the server's QR code. Scan it with the agency
+   phone (WhatsApp → Settings → Linked devices → Link a device).
+
+Pushing to the branch redeploys it. The login stays on the volume.
+
+**On the office PC.** The PC must be on and awake at 9:00 and 15:00. Task Scheduler → create a
+task "At log on" that runs `npm start` in this folder, and set Power options → sleep to "Never".
+
+## Moving to the agency's own number
+
+1. Get a SIM or eSIM for the agency and put **WhatsApp Business** on a spare phone. Set the
+   profile name to **Based Agency**.
+2. Have a group admin add that number to every client group. WhatsApp only shows a new member
+   messages sent after they joined; everything read so far stays in Radar.
+3. Once it is in all the groups, press **Re-link…** in Radar and scan with the new phone.
+   Then remove the old link from your own phone (Linked devices → tap it → Log out).
+4. Your own messages no longer count as "our side" automatically. Make sure `TEAM_SENDER_HINTS`
+   has the WhatsApp profile name of everyone on the team, including you.
+5. Keep the phone charged on Wi-Fi and open WhatsApp on it at least once a week. WhatsApp logs
+   out linked devices if the phone itself isn't used for 14 days.
 
 ## How it decides who gets what
 
@@ -88,10 +120,10 @@ where it was marked done.
 
 WhatsApp can drop linked devices. The connector writes an error to Radar (a red dot on the
 WhatsApp screen and in Settings → WhatsApp) and DMs Eric and Dan. Press **Re-link…** there for a
-new code, or delete the `auth` folder and run `npm run link` again.
+new code and scan it with the agency phone.
 
 ## Risk to know about
 
 Linking through a QR code uses an unofficial library; WhatsApp's terms don't allow it and the
 number could be restricted. This build keeps the footprint small (read-only, client groups
-only, no read receipts). Using a spare number later is a one-line change: link that number instead.
+only, no read receipts). Running it on the agency's own number (above) keeps that risk away from anyone's personal number.

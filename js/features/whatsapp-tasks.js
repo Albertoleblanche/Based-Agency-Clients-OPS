@@ -211,14 +211,18 @@ function waRunText(r){
 }
 function waNextText(){ const n = waNextCheck(); return n ? `Next ${daysBetween(dayStart(rNow()), dayStart(n)) === 0 ? 'at ' : ''}${waAt(n.toISOString())}.` : ''; }
 
+// How to (re)start the connector: it runs on a server now, or on the office PC before the move.
+const WA_START = 'Restart it where it runs: on the server press Restart, or on the office PC double-click “2 - Start”.';
+const WA_START_FIRST = 'Start it on its server (see the connector README), or on the office PC double-click “2 - Start”, and leave it running.';
+
 // Where the connection stands, for leads.
 //   key: 'missing' | 'stopped' | 'qr' | 'signedout' | 'reconnecting' | 'connected'
 function waConnState(){
   const s = waSettings;
-  if(waReady === false || !s) return { key: 'missing', dot: 'hollow', text: 'Not set up yet', long: 'An admin runs schema-whatsapp-tasks.sql in Supabase → SQL Editor, then starts Radar WhatsApp on the office PC.' };
+  if(waReady === false || !s) return { key: 'missing', dot: 'hollow', text: 'Not set up yet', long: 'An admin runs schema-whatsapp-tasks.sql in Supabase → SQL Editor, then starts Radar WhatsApp.' };
   if(!waRunning()) return s.heartbeat_at
-    ? { key: 'stopped', dot: 'red', text: 'Office PC isn’t running it', long: `Last seen ${waWhen(s.heartbeat_at)}. On the office PC, open the radar-whatsapp folder and double-click “2 - Start”.` }
-    : { key: 'stopped', dot: 'red', text: 'Not started on the office PC yet', long: 'On the office PC, open the radar-whatsapp folder and double-click “2 - Start”.' };
+    ? { key: 'stopped', dot: 'red', text: 'Radar WhatsApp isn’t running', long: `Last seen ${waWhen(s.heartbeat_at)}. ${WA_START}` }
+    : { key: 'stopped', dot: 'red', text: 'Radar WhatsApp isn’t started yet', long: WA_START_FIRST };
   if(s.qr && s.qr_at && Date.now() - new Date(s.qr_at).getTime() < WA_STALE_MS) return { key: 'qr', dot: 'gray', text: 'Not linked yet', long: 'Scan the code with WhatsApp on the phone that’s in the client groups.' };
   const conn = waRuns.find(r => r.kind === 'status' || r.kind === 'error');
   if(conn && conn.connection === 'logged_out') return { key: 'signedout', dot: 'red', text: 'WhatsApp signed out', long: 'The phone unlinked it. Re-link to get a new code to scan.' };
@@ -259,11 +263,11 @@ async function waCheckNow(){
     await loadWaTasks();
     const asked = waSettings && waSettings.check_requested_at;
     if(asked && Date.now() - new Date(asked).getTime() > 90000){
-      // still waiting to be picked up: the PC is running an older version, or isn't running
+      // still waiting to be picked up: the connector is an older version, or isn't running
       clearInterval(waCheckTimer); waCheckTimer = null; waCheckAt = null;
       await supabaseClient.from('wa_settings').update({ check_requested_at: null }).eq('id', 1);
       if(waSettings) waSettings.check_requested_at = null;
-      showToast('error', 'The office PC didn’t start the check', waRunning() ? 'It needs the update: copy the src folder from connector-update.zip into radar-whatsapp, then start it again.' : 'Radar WhatsApp isn’t running on it.');
+      showToast('error', 'Radar WhatsApp didn’t start the check', waRunning() ? 'It needs the latest version. Redeploy it, then try again.' : 'Radar WhatsApp isn’t running.');
       waRedraw(); return;
     }
     if(!waChecking()){
@@ -483,7 +487,7 @@ function waSetupHtml(){
   const running = !missing && waRunning(), linked = conn.key === 'connected';
   const steps = [];
   if(missing) steps.push({ t: 'Add WhatsApp to the database', d: 'An admin runs schema-whatsapp-tasks.sql in Supabase → SQL Editor. It’s safe to run more than once.', done: false, act: '' });
-  steps.push({ t: 'Start Radar WhatsApp on the office PC', d: running ? 'Done. The PC checked in a few seconds ago.' : waSettings && waSettings.heartbeat_at ? `It stopped ${waAt(waSettings.heartbeat_at)}. Open the radar-whatsapp folder and double-click “2 - Start”.` : 'Open the radar-whatsapp folder on the PC and double-click “2 - Start”. Leave it running.', done: running, act: '' });
+  steps.push({ t: 'Start Radar WhatsApp', d: running ? 'Done. It checked in a few seconds ago.' : waSettings && waSettings.heartbeat_at ? `It stopped ${waAt(waSettings.heartbeat_at)}. ${WA_START}` : WA_START_FIRST, done: running, act: '' });
   steps.push({ t: 'Link WhatsApp', d: 'Scan a code with the phone that’s in the client groups. It only reads; it never sends.', done: linked,
     act: running && !linked ? `<button class="btn" onclick="openSettingsTab('whatsapp')">Show the Code</button>` : '' });
   steps.push({ t: 'Choose the groups it reads', d: 'Groups with “Marketing” in the name start on. You can turn any group on or off.', done: linked && waGroups.some(g => g.active),
@@ -501,7 +505,7 @@ function waSetupHtml(){
 
 // ---- What it read: the messages the agent has to go on, group by group -----------------------
 // So you can check it against WhatsApp: if a group shows messages but no items, the agent read
-// them and found nothing owed; if it shows none, nothing reached the office PC.
+// them and found nothing owed; if it shows none, nothing reached the connector.
 let waRead = null;             // null · 'loading' · { groups: Map(jid -> {n, last, who}), first, error }
 async function waShowRead(){
   window._waSel = 'read'; waRead = 'loading'; renderWhatsapp();
@@ -799,9 +803,9 @@ function waWhoSeesRow(){
 function waPcRow(){
   const s = waSettings, run = waRunning();
   const sub = run ? 'Radar WhatsApp is running · seen a few seconds ago'
-    : s && s.heartbeat_at ? `Stopped · last seen ${waWhen(s.heartbeat_at)}. Open the radar-whatsapp folder on the PC and double-click “2 - Start”.`
-    : 'Not started yet. Open the radar-whatsapp folder on the PC and double-click “2 - Start”.';
-  return `<div class="fr"><span class="was-ic gray">${icon('desktop')}</span><div class="l"><b>Office PC</b><span>${escapeHtml(sub)}</span></div><span class="st"><span class="dot ${run ? 'green' : 'red'}"></span>${run ? 'Running' : 'Not running'}</span></div>`;
+    : s && s.heartbeat_at ? `Stopped · last seen ${waWhen(s.heartbeat_at)}. ${WA_START}`
+    : `Not started yet. ${WA_START_FIRST}`;
+  return `<div class="fr"><span class="was-ic gray">${icon('server')}</span><div class="l"><b>Connector</b><span>${escapeHtml(sub)}</span></div><span class="st"><span class="dot ${run ? 'green' : 'red'}"></span>${run ? 'Running' : 'Not running'}</span></div>`;
 }
 function waConnHtml(){
   const st = waConnState(), s = waSettings;
@@ -809,9 +813,9 @@ function waConnHtml(){
   if(st.key === 'qr' && waQrOk()) return `<div class="was-link"><img class="was-qr" src="${s.qr}" alt="Code to scan with WhatsApp" width="150" height="150">
 <div class="was-lt"><b>Scan this with WhatsApp</b><ol><li>Open WhatsApp on the phone that’s in the client groups.</li><li>Go to Settings, then Linked devices, then Link a device.</li><li>Point the phone at this code.</li></ol>
 <span class="st"><span class="dot gray"></span>Waiting for the scan · the code refreshes by itself</span></div></div>${waPcRow()}${waWhoSeesRow()}`;
-  if(st.key === 'stopped') return `${waPcRow()}<div class="fr"><span class="was-ic">${icon('message-circle')}</span><div class="l"><b>WhatsApp</b><span>${s.heartbeat_at ? 'It reconnects by itself once the PC is running again.' : 'You’ll scan a code here once the PC is running.'}</span></div></div>${waWhoSeesRow()}`;
+  if(st.key === 'stopped') return `${waPcRow()}<div class="fr"><span class="was-ic">${icon('message-circle')}</span><div class="l"><b>WhatsApp</b><span>${s.heartbeat_at ? 'It reconnects by itself once Radar WhatsApp is running again.' : 'You’ll scan a code here once Radar WhatsApp is running.'}</span></div></div>${waWhoSeesRow()}`;
   if(st.key === 'connected'){
-    return `<div class="fr"><span class="was-ic">${icon('message-circle')}</span><div class="l"><b>WhatsApp</b><span>Linked · the office PC checked in a few seconds ago</span></div><span class="st"><span class="dot green"></span>Connected</span><button class="btn" onclick="waRelink()">Re-link…</button></div>
+    return `<div class="fr"><span class="was-ic">${icon('message-circle')}</span><div class="l"><b>WhatsApp</b><span>Linked · checked in a few seconds ago</span></div><span class="st"><span class="dot green"></span>Connected</span><button class="btn" onclick="waRelink()">Re-link…</button></div>
 <div class="fr"><div class="l"><b>Last check</b><span>${escapeHtml(waChecking() ? 'Checking the groups now. It usually takes a minute or two.' : `${waRunText(waLastRun())} ${waNextText()}`)}</span></div>${waCheckBtn()}</div>${waWhoSeesRow()}`;
   }
   return `<div class="fr"><span class="was-ic${st.key === 'signedout' ? ' red' : ''}">${icon('message-circle')}</span><div class="l"><b>${escapeHtml(st.text)}</b><span>${escapeHtml(st.long)}</span></div><button class="btn" onclick="waRelink()">Re-link…</button></div>${waPcRow()}${waWhoSeesRow()}`;
@@ -820,7 +824,7 @@ function setWhatsapp(){
   const sec = html => `<div class="wa-sec">${html}</div>`;
   if(waReady === false || !waSettings) return sec(`<div class="set-h">Connection</div><div class="form-grp" id="waConnBox">${waConnHtml()}</div>
 ${emptyState({ compact: true, icon: 'message-circle', tone: 'blue', title: 'Add WhatsApp to the database first', html: true,
-    text: 'Run <code>schema-whatsapp-tasks.sql</code> in Supabase → SQL Editor, then start Radar WhatsApp on the office PC. This page then shows the code to scan.' })}`);
+    text: 'Run <code>schema-whatsapp-tasks.sql</code> in Supabase → SQL Editor, then start Radar WhatsApp. This page then shows the code to scan.' })}`);
   const s = waSettings;
   const tzs = WA_TIMEZONES.includes(s.timezone) ? WA_TIMEZONES : [s.timezone, ...WA_TIMEZONES];
   const times = waTimes();
@@ -914,7 +918,7 @@ async function waSaveSettings(patch, okMsg){
   const { error } = await supabaseClient.from('wa_settings').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', 1);
   if(error){ showToast('error', 'Not saved', error.message); return false; }
   Object.assign(waSettings, patch);
-  if(okMsg) showToast('success', okMsg, 'The office PC picks it up within a minute.');
+  if(okMsg) showToast('success', okMsg, 'Radar WhatsApp picks it up within a minute.');
   return true;
 }
 async function waToggleGroup(jid, on){
@@ -939,7 +943,7 @@ async function waTurnAll(on){
   renderSettingsView();
   const { error } = await supabaseClient.from('wa_groups').update({ active: !!on, manual: true, updated_at: new Date().toISOString() }).in('jid', list.map(g => g.jid));
   if(error){ was.forEach(w => Object.assign(w.g, { active: w.active, manual: w.manual })); renderSettingsView(); showToast('error', 'Not saved', error.message); return; }
-  showToast('success', `${list.length} group${list.length === 1 ? '' : 's'} turned ${on ? 'on' : 'off'}`, 'The office PC picks it up within a minute.');
+  showToast('success', `${list.length} group${list.length === 1 ? '' : 's'} turned ${on ? 'on' : 'off'}`, 'Radar WhatsApp picks it up within a minute.');
 }
 async function waTimeSel(i, v){
   const t = waTimes();
