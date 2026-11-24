@@ -452,9 +452,12 @@ function waDraw(root){
     secs.sort((a, b) => a.top - b.top || a.rank - b.rank || a.at - b.at);
     return secs.map(x => waSecHtml(x.k, x.ts, { past, lead, who, sel, whyOf, useMine, isMine, live: past ? [] : open.filter(t => waClientLabel(t) === x.k) })).join('');
   };
-  const again = tab !== 'done' ? waTasks.filter(t => pickWho(t) && pickCl(t) && waWroteAgain(t)) : [];
+  const again = waTasks.filter(t => pickWho(t) && pickCl(t) && waWroteAgain(t));
+  const againIds = new Set(again.map(t => t.id));
+  const doneRest = done.filter(t => !againIds.has(t.id));
+  const doneN = doneRest.length + again.length;
   const againHtml = again.length ? `<section class="wx-cs wx-again" data-k="_again" aria-label="The client wrote again"><header class="wx-cs-h"><div class="wx-cs-l"><span class="wx-cs-t is-static">The client wrote again</span><div class="wx-cs-sub"><span>Marked done, then the client wrote in the group. Open it to read what they said.</span></div></div><div class="wx-cs-r"><span>${again.length}</span></div></header><div class="wx-cs-body"><div class="wx-cs-in"><div class="wx-cs-card">${again.map(t => waRowHtml(t, sel, { who, lead, useMine, isMine })).join('')}</div></div></div></section>` : '';
-  const rows = tab === 'needs' ? needs : tab === 'open' ? open : done;
+  const rows = tab === 'needs' ? needs : tab === 'open' ? open : doneRest;
 
   // the heading: how many clients wait, then how many requests and the checks
   const whoName = who === 'mine' ? 'you' : who === 'all' ? 'the team' : (WA_OWNERS.find(o => o[0] === who) || [, who])[1];
@@ -468,7 +471,8 @@ function waDraw(root){
     if(todayN) subBits.push(`${todayN} to answer today`);
   }
   const againN = again.length;
-  if(againN) subBits.push(`<span class="t-blue">${againN === 1 ? 'A client' : againN + ' clients'} wrote again after done</span>`);
+  const againWords = `${againN === 1 ? 'A client' : againN + ' clients'} wrote again after done`;
+  if(againN && tab !== 'done') subBits.push(`<a href="#" class="wx-again-l" onclick="setWa('tab','done');return false;">${againWords}${icon('caret-right')}</a>`);
   if(lead){
     if(conn.key === 'connected'){
       const last = waLastRun(), next = waNextCheck();
@@ -491,27 +495,29 @@ function waDraw(root){
     ? `<label class="pop pop-sel"><span class="pl">${escapeHtml(curWho[1])}</span>${icon('caret-down')}<select aria-label="Whose items" onchange="setWa('who',this.value)">${whoOpts.map(([v, n]) => `<option value="${v}"${v === who ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('')}</select></label>
 ${clientNames.length > 1 ? `<label class="pop pop-sel"><span class="pl">${escapeHtml(waClientSel || 'All clients')}</span>${icon('caret-down')}<select aria-label="Which clients" onchange="setWa('client',this.value)"><option value="">All clients</option>${clientNames.map(n => `<option value="${escapeHtml(n)}"${n === waClientSel ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('')}</select></label>` : ''}
 ${waCheckBtn()}`
-    : seg([['open', 'Waiting', open.length], ['done', 'Done this week', done.length]]);
+    : seg([['open', 'Waiting', open.length], ['done', 'Done this week', doneN]]);
   const foldBtn = `<button class="lnk-b wx-all" id="waFoldAll" onclick="waFoldAll()">Collapse All</button>`;
 
   let main;
   if(lead){
     const back = waClientSel ? `<div class="wx-only"><button class="wx-back" onclick="setWa('client','')">${icon('caret-left')}All Clients</button><span>Only ${escapeHtml(waClientSel)}</span></div>` : '';
-    const bar = `${back}<div class="wx-bar">${seg([['needs', 'Needs attention', needs.length], ['open', 'All waiting', open.length], ['done', 'Done this week', done.length]])}${rows.length ? foldBtn : ''}</div>`;
+    const bar = `${back}<div class="wx-bar">${seg([['needs', 'Needs attention', needs.length], ['open', 'All waiting', open.length], ['done', 'Done this week', doneN]])}${rows.length || (tab === 'done' && again.length) ? foldBtn : ''}</div>`;
     let list;
-    if(rows.length) list = `<div class="wx-groups">${tab !== 'done' ? againHtml : ''}${sections(rows, tab === 'done')}</div>`;
-    else if(tab === 'needs' && open.length) list = `${againHtml ? `<div class="wx-groups">${againHtml}</div>` : ''}${emptyState({ icon: 'check-circle', tone: 'ok', title: 'Nothing needs attention', text: `${open.length} waiting, none urgent, late or due today.`, link: `See all ${open.length} waiting`, onLink: "setWa('tab','open')" })}`;
-    else list = `${againHtml ? `<div class="wx-groups">${againHtml}</div>` : ''}${waEmptyHtml(who, open, done)}`;
+    if(tab === 'done' && (rows.length || again.length)) list = `<div class="wx-groups">${againHtml}${sections(rows, true)}</div>`;
+    else if(rows.length) list = `<div class="wx-groups">${sections(rows, false)}</div>`;
+    else if(tab === 'needs' && open.length) list = emptyState({ icon: 'check-circle', tone: 'ok', title: 'Nothing needs attention', text: `${open.length} waiting, none urgent, late or due today.`, link: `See all ${open.length} waiting`, onLink: "setWa('tab','open')" });
+    else list = waEmptyHtml(who, open, done, againN);
     main = `${bar}${list}`;
   } else if(tab === 'open'){
     const sorted = open.slice().sort((a, b) => tier(a) - tier(b) || rank(a) - rank(b) || age(a) - age(b));
     const next = sorted[0], rest = sorted.slice(1);
     main = next
-      ? `${waNextHtml(next, whyOf.get(next.id))}${rest.length || againHtml ? `<div class="wx-bar"><h3 class="wx-lh">Also waiting on you</h3>${foldBtn}</div><div class="wx-groups">${againHtml}${sections(rest, false)}</div>` : ''}`
-      : `${againHtml ? `<div class="wx-groups">${againHtml}</div>` : ''}${waEmptyHtml(who, open, done)}`;
+      ? `${waNextHtml(next, whyOf.get(next.id))}${rest.length ? `<div class="wx-bar"><h3 class="wx-lh">Also waiting on you</h3>${foldBtn}</div><div class="wx-groups">${sections(rest, false)}</div>` : ''}`
+      : waEmptyHtml(who, open, done, againN);
   } else {
-    main = done.length ? `<div class="wx-bar"><span></span>${foldBtn}</div><div class="wx-groups">${sections(done, true)}</div>` : waEmptyHtml(who, open, done);
+    main = doneRest.length || again.length ? `<div class="wx-bar"><span></span>${foldBtn}</div><div class="wx-groups">${againHtml}${sections(doneRest, true)}</div>` : waEmptyHtml(who, open, done, 0);
   }
+
 
   const side = lead ? waSideHtml(who, conn, allOpen) : waMeSideHtml(allOpen, allDone);
   const prev = root.querySelector('.sp-page')?.scrollTop || 0;
@@ -592,20 +598,21 @@ ${t.source_excerpt ? `<div class="wx-said"><span class="who">In the group · ${e
 ${typeof waUpdateSwitchHtml === 'function' ? waUpdateSwitchHtml(t) : ''}
 </section>`;
 }
-function waEmptyHtml(who, open, done){
+function waEmptyHtml(who, open, done, againN){
   const tab = waTab || (waCanManage() ? 'needs' : 'open');
+  const again = againN ? { link: `${againN === 1 ? 'A client' : againN + ' clients'} wrote again after done`, onLink: "setWa('tab','done')" } : null;
   if(tab === 'done') return emptyState({ icon: 'check-circle', title: 'Nothing done this week yet',
     text: 'Items you mark done, or that the team answers in the group, show here until Sunday.',
     link: open.length ? `See the ${open.length} waiting` : '', onLink: "setWa('tab','open')" });
   if(!waCanManage()) return emptyState({ icon: 'message-circle', tone: 'ok', title: 'Nothing waiting on you',
-    text: 'When a client asks you for something in a WhatsApp group, it shows here and in Slack after the next check.' });
+    text: 'When a client asks you for something in a WhatsApp group, it shows here and in Slack after the next check.', ...(again || {}) });
   const others = waTasks.filter(t => t.status === 'open').length;
   if(who !== 'all' && others) return emptyState({ icon: 'check-circle', tone: 'ok', title: `Nothing waiting on ${who === 'mine' ? 'you' : (WA_OWNERS.find(o => o[0] === who) || [, who])[1]}`,
     text: `${others} ${others === 1 ? 'is' : 'are'} waiting on the rest of the team.`, action: 'Show Everyone', onAction: "setWa('who','all')" });
   const doneWk = waTasks.filter(t => t.status !== 'open' && new Date(t.answered_at || t.updated_at || t.first_seen).getTime() >= waWeekStart().getTime()).length;
   return emptyState({ icon: 'check-circle', tone: 'ok', title: 'All caught up',
     text: 'When a client asks for something in a group, it shows here after the next check, with who should handle it.',
-    link: doneWk ? `See the ${doneWk} done this week` : '', onLink: "setWa('tab','done')" });
+    link: again ? again.link : doneWk ? `See the ${doneWk} done this week` : '', onLink: "setWa('tab','done')" });
 }
 // Admins and approvers: clients to watch, details to confirm, the team, and test mode.
 function waSideHtml(who, conn, open){
