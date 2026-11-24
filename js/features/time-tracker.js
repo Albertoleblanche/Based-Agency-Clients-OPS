@@ -613,6 +613,15 @@ async function addManualEntry(){
   if(totalMinutes > 960 && !(await confirmDialog(`That's ${formatMinutes(totalMinutes)} for a single entry — did you mean minutes instead of hours?`, {confirmLabel:'Log it anyway', cancelLabel:'Let me fix it'}))) return;
   if(asWork && !(await okToLogDuplicate(clientId, description))) return;   // logged already? (data.js)
   const btn = clickedBtn();
+  // a task open for this client: its time? Then it's marked done with this time, once (Nov 24)
+  const forTask = typeof timeForOpenTask === 'function' ? await timeForOpenTask(clientId, description) : { go: true };
+  if(!forTask) return;
+  if(forTask.taskId){
+    const today = toDateStr(new Date());
+    closeAppModal();
+    await finishTask(forTask.taskId, description || '', null, { doneDate: dateVal <= today ? dateVal : today, time: { clientId, minutes: totalMinutes, pick } });
+    return;
+  }
   setBtnLoading(btn, 'Saving…');
   // as work: the improvement first, then the time as its own entry, linked to it (as Queue's Log does)
   let imp = null;

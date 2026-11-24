@@ -111,7 +111,7 @@ export async function analyzeGroup(group, since){
       source_msg_ids: [...new Set([...(t.source_msg_ids || []), ...ids])],
       source_excerpt: r.excerpt ? String(r.excerpt).slice(0, 400) : t.source_excerpt,
     }).eq('id', t.id);
-    if(error) console.error('  reopen failed:', error.message); else { reopened++; reopenedTitles.push(t.title.toLowerCase()); items.push({ title: t.title, client: clientName, owner_key: t.owner_key, reopened: true }); }
+    if(error) console.error('  reopen failed:', error.message); else { reopened++; reopenedTitles.push(t.title.toLowerCase()); items.push({ id: t.id, title: t.title, client: clientName, owner_key: t.owner_key, reopened: true }); }
   }
   const existingTitles = new Set([...openTasks.map(t => t.title.toLowerCase()), ...reopenedTitles]);
   for(const t of out.new_tasks || []){
@@ -119,15 +119,15 @@ export async function analyzeGroup(group, since){
     const owner = ROLE_KEYS.includes(t.owner) ? t.owner : 'eric';
     const ids = (t.msg_ids || []).map(n => msgs[Number(n) - 1]?.wa_msg_id).filter(Boolean);
     const due = /^\d{4}-\d{2}-\d{2}$/.test(t.due_date || '') ? t.due_date : null;
-    const { error } = await db().from('wa_tasks').insert({
+    const { data: made, error } = await db().from('wa_tasks').insert({
       group_jid: group.jid, client: clientName,
       title: String(t.title).slice(0, 300), detail: t.detail || null,
       kind: ['request', 'question', 'promise', 'issue'].includes(t.kind) ? t.kind : 'request',
       owner_key: owner, ai_owner_key: owner,
       priority: ['low', 'normal', 'high'].includes(t.priority) ? t.priority : 'normal',
       due_date: due, source_msg_ids: ids, source_excerpt: t.excerpt ? String(t.excerpt).slice(0, 400) : null,
-    });
-    if(error) console.error('  task insert failed:', error.message); else { created++; items.push({ title: String(t.title).slice(0, 300), client: clientName, owner_key: owner, high: t.priority === 'high' }); }
+    }).select('id').single();
+    if(error) console.error('  task insert failed:', error.message); else { created++; items.push({ id: made && made.id, title: String(t.title).slice(0, 300), client: clientName, owner_key: owner, high: t.priority === 'high' }); }
   }
   // Still-open tasks in an active chat stay fresh.
   await db().from('wa_tasks').update({ last_seen: now }).eq('group_jid', group.jid).eq('status', 'open');

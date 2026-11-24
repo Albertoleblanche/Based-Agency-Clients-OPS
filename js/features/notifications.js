@@ -28,6 +28,9 @@ const NOTIFICATION_TYPE_META = {
   task_cancelled:          { label:'A task assigned to you is cancelled', section:'Tasks' },
   task_edited:             { label:'A task assigned to you changes', section:'Tasks' },
   task_suggested:          { label:'A task is suggested from a meeting you were in', section:'Tasks' },
+  task_due:                { label:'Your tasks due today, in the morning', section:'Tasks' },
+  task_overdue:            { label:'A task of yours is past its due date', section:'Tasks' },
+  task_wrap_up:            { label:'Late in the day: what’s still open for today', section:'Tasks' },
   draft_ready:             { label:'A draft is ready for your approval', section:'Client Work', visibleTo:'approver' },
   draft_approved:          { label:'Your update or submitted work is approved', section:'Client Work' },
   win_approved:            { label:'Your WhatsApp update is approved, for you to send', section:'Client Work' },
@@ -61,7 +64,10 @@ const NOTIFICATION_TYPE_META = {
 // never even written to the table. Not just hidden after the fact: it
 // can't trigger a toast or sit in their bell either, since it was never
 // stored in the first place.
+// What you did yourself never comes back to you as a notification (Nov 24); reminders do.
+const NOTIF_SELF_OK = new Set(['plan_reminder', 'task_due', 'task_overdue', 'task_wrap_up', 'meeting_soon', 'reminder_follow_up_due']);
 async function sendNotification(userId, type, title, body, targetView, targetId, alreadyToasted){
+  if(typeof currentUser !== 'undefined' && currentUser && userId === currentUser.id && !NOTIF_SELF_OK.has(type)) return;
   // Muting a type mutes it everywhere; "app:", "push:" or "slack:" before it mutes one place
   // only (Settings → Notifications).
   const recipient = teamProfiles.find(p=>p.id===userId);
@@ -137,7 +143,7 @@ async function sendPushNotification(userId, title, body, url){
 
 async function loadNotifications(){
   if(!currentUser){ notifications = []; return; }
-  const { data, error } = await supabaseClient.from('notifications').select('*').eq('user_id', currentUser.id).order('created_at', { ascending:false }).limit(50);
+  const { data, error } = await supabaseClient.from('notifications').select('*').eq('user_id', currentUser.id).order('created_at', { ascending:false }).limit(120);
   if(error){ console.error('loadNotifications error', error); notifications = []; return; }
   notifications = (data || []).filter(n => n.type !== 'weekly_focus_report');   // the weekly report was removed
   updateNotifBadge();
@@ -245,9 +251,20 @@ async function handleNotifClick(id){
   }
   if(n.target_view==='clients' && n.target_id){
     hidePop(document.getElementById('notifPanel'));
-    if(clients.some(c=>c.id===n.target_id && !c.deletedAt)) openClientInspectorFor(n.target_id);
+    if(clients.some(c=>c.id===n.target_id && !c.deletedAt)) openClientDetail(n.target_id);   // the client's page (Nov 24)
     else switchView('clients');
     return;
+  }
+  // the item itself, not just its screen (Nov 24)
+  if(n.target_view==='tasks' && n.target_id){ hidePop(document.getElementById('notifPanel')); notifOpenTask(n.target_id); return; }
+  if(n.target_view==='calendar' && n.target_id && typeof openEventDetailModal === 'function'
+    && typeof calendarEvents !== 'undefined' && calendarEvents.some(e => String(e.id) === String(n.target_id))){
+    hidePop(document.getElementById('notifPanel'));
+    switchView('calendar'); setTimeout(() => openEventDetailModal(n.target_id), 80); return;
+  }
+  if(n.target_view==='reminders' && n.target_id && typeof clientReminders !== 'undefined' && clientReminders.some(r => String(r.id) === String(n.target_id))){
+    hidePop(document.getElementById('notifPanel'));
+    switchView('reminders'); setTimeout(() => { window._remSel = n.target_id; if(typeof renderReminders === 'function') renderReminders(); }, 0); return;
   }
   // an update in Review: open it there (yours first if you wrote one for that client)
   if(n.target_view==='teamqueue' && n.target_id && typeof reviewItems === 'function' && typeof openReviewDraft === 'function'){
@@ -269,11 +286,32 @@ async function handleNotifClick(id){
   }
 }
 
+// A task from a notification: Tasks, with it open (or says it's gone)
+async function notifOpenTask(id){
+  if(!(tasks || []).some(t => t.id === id) && typeof loadMyTasks === 'function') await loadMyTasks();
+  const t = (tasks || []).find(x => x.id === id);
+  switchView('tasks');
+  if(!t || t.cancelledAt){ showToast('info', 'That task isn’t there anymore', t && t.cancelledAt ? 'It was cancelled.' : 'It may have been deleted.'); return; }
+  setTimeout(() => { window._taskSel = id; if(typeof renderTasks === 'function') renderTasks(); if(typeof loadTaskComments === 'function') loadTaskComments(id); }, 0);
+  notifSeenFor(id);
+}
+// Opening an item reads its notifications: the bell doesn't keep telling you about what you've seen.
+async function notifSeenFor(targetId){
+  if(!targetId || !Array.isArray(notifications)) return;
+  const ids = notifications.filter(n => !n.read && n.target_id != null && String(n.target_id) === String(targetId)).map(n => n.id);
+  if(!ids.length) return;
+  notifications.forEach(n => { if(ids.includes(n.id)) n.read = true; });
+  updateNotifBadge();
+  const p = document.getElementById('notifPanel'); if(p && p.style.display === 'block') renderNotifPanel();
+  await supabaseClient.from('notifications').update({ read: true }).in('id', ids);
+}
+
 async function markAllNotificationsRead(){
-  const unreadIds = notifications.filter(n=>!n.read).map(n=>n.id);
+  const tab = typeof notifTabSel !== 'undefined' && typeof notifTabOf === 'function' ? notifTabSel : 'all';
+  const unreadIds = notifications.filter(n=>!n.read && (tab === 'all' || notifTabOf(n) === tab)).map(n=>n.id);
   if(!unreadIds.length) return;
   await supabaseClient.from('notifications').update({ read:true }).in('id', unreadIds);
-  notifications.forEach(n=>n.read=true);
+  notifications.forEach(n=>{ if(unreadIds.includes(n.id)) n.read=true; });
   updateNotifBadge();
   renderNotifPanel();
 }

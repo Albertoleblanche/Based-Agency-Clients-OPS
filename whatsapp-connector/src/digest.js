@@ -142,7 +142,10 @@ export async function notifyRadar(items, profiles, deps){
     const title = list.length === 1 ? `${list[0].client} on WhatsApp${list[0].reopened ? ', again' : ''}` : `${list.length} new WhatsApp requests${again ? ` (${again} again)` : ''}`;
     const body = list.slice(0, 3).map(x => list.length === 1 ? x.title : `${x.client}: ${x.title}`).join(' · ') + (list.length > 3 ? ` · and ${list.length - 3} more` : '') + (high ? ' (high priority)' : '');
     if(!m.includes('app:' + TYPE)){
-      const { error } = await DB().from('notifications').insert({ user_id: p.id, type: TYPE, title, body, target_view: 'whatsapp', read: false });
+      // one request: the bell opens it (Nov 24); more: the WhatsApp screen
+      const row = { user_id: p.id, type: TYPE, title, body, target_view: 'whatsapp', read: false };
+      if(list.length === 1 && list[0].id) row.target_id = String(list[0].id);
+      const { error } = await DB().from('notifications').insert(row);
       if(error) console.error('  notification failed:', error.message);
     }
     if(!m.includes('push:' + TYPE)) pushes.push({ userId: p.id, title, body, view: 'whatsapp' });

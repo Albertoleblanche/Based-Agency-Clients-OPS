@@ -8,7 +8,7 @@ const TASK_COLS = [['todo', 'To Do'], ['in_progress', 'In Progress'], ['in_revie
 function setTasksScope(v){ tasksScope = v; renderTasks(); }
 function setTasksClient(v){ tasksClient = v; renderTasks(); }
 function setTasksLayout(v){ tasksLayout = v; try{ localStorage.setItem('bda_tasks_layout', v); }catch(e){} renderTasks(); }
-function selectTask(id){ window._taskSel = window._taskSel === id ? null : id; renderTasks(); if(window._taskSel) loadTaskComments(id); }
+function selectTask(id){ window._taskSel = window._taskSel === id ? null : id; if(window._taskSel && typeof notifSeenFor === 'function') notifSeenFor(id); renderTasks(); if(window._taskSel) loadTaskComments(id); }
 function closeTaskPanel(){ window._taskSel = null; renderTasks(); }
 
 // Anywhere else in the app a task still opens as a sheet; on Tasks it opens in the panel.

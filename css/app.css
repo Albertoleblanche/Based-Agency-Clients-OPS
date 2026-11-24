@@ -530,6 +530,15 @@ button.set-tab { font-size: 12px; }
 /* ---- The bell ---- */
 .notif-panel .btn.sm { height: 22px; padding: 0 6px; font-size: 13px; }
 .notif-empty { padding: 26px 16px; text-align: center; font-size: 14px; color: var(--label-2); }
+.notif-panel { width: 400px; }
+.notif-tabs { position: sticky; top: 41px; z-index: 1; padding: 6px 10px 6px; background: var(--menu); }
+.notif-seg { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--fill-2); }
+.notif-tabs button { flex: 1 1 auto; display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 26px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; color: var(--label-2); font: inherit; font-size: 12.5px; font-weight: 500; white-space: nowrap; cursor: default; transition: background-color 150ms ease, color 150ms ease, transform 140ms cubic-bezier(.23,1,.32,1); }
+.notif-tabs button.on { background: var(--seg-on, var(--card)); color: var(--label); box-shadow: 0 1px 2px rgba(0,0,0,.14); }
+.notif-tabs button:active { transform: scale(.97); }
+.notif-tabs .c { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--blue); color: #fff; font-size: 10.5px; font-weight: 600; line-height: 16px; text-align: center; box-sizing: border-box; }
+.ngrp-h { position: sticky; top: 83px; padding: 10px 14px 4px; background: var(--menu); font-size: 11.5px; font-weight: 600; letter-spacing: .02em; color: var(--label-3); }
+.ngrp + .ngrp { margin-top: 2px; }
 .nrow { display: flex; gap: 10px; padding: 10px 12px; border-bottom: .5px solid var(--sep); cursor: default; }
 .nrow:last-child { border-bottom: 0; }
 .nrow:hover, .nrow:focus-visible { background: var(--fill); outline: none; }
@@ -1081,6 +1090,7 @@ a.ty-rel:hover{opacity:.8}
 .mac[data-theme="dark"]{--seg-on:#E6E6EA}
 .mac[data-theme="dark"] .seg .on{color:#1C1C1E;box-shadow:0 1px 2px rgba(0,0,0,.35)}
 .mac[data-theme="dark"] .seg .on .c{color:#6E6E73}
+.mac[data-theme="dark"] .notif-tabs button.on{color:#1C1C1E;box-shadow:0 1px 2px rgba(0,0,0,.35)}
 
 /* ---- Notes: every note as a page; one opens as a sheet in the middle (canvas NotesOptA/Open/Create) ---- */
 .nt-st{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--label-2);white-space:nowrap}
@@ -3660,3 +3670,8 @@ button.wx-t.on + button.wx-t{box-shadow:none}
   .wx-row{padding:14px 16px}
 }
 @media (prefers-reduced-motion:reduce){ .wx-cs-body,.wx-chev,.wx-row,.wx-cs-t{transition:none} }
+
+/* Nov 24: an alert sheet with more than two answers; Mark Done's note about time already logged */
+.alert-sheet .sheet-a.is-col{flex-direction:column;align-items:stretch;gap:8px}
+.alert-sheet .sheet-a.is-col .btn{justify-content:center;width:100%;margin:0}
+.td-had{margin:2px 0 4px;font-size:12.5px;line-height:1.45;color:var(--label-2)}

@@ -88,7 +88,8 @@ function activateCommandPaletteItem(i){
 // ---- The bell: notifications as a menu of rows ------------------------------------------------
 const NOTIF_ICON = { draft_ready: 'envelope-open', draft_approved: 'check-circle', win_approved: 'message-circle', draft_sent: 'paper-plane-tilt', task_assigned: 'list-checks', task_edited: 'list-checks',
   task_completed: 'check-circle', event_invited: 'calendar-blank', event_updated: 'calendar-blank', event_cancelled: 'calendar-blank', event_rsvp: 'calendar-blank',
-  reminder_due: 'bell-ring', reminder_added: 'bell', meeting_soon: 'video', task_suggested: 'list-checks', whatsapp_request: 'message-circle', whatsapp_urgent: 'flag', whatsapp_waiting: 'clock', whatsapp_signal: 'activity', health: 'heartbeat', mention: 'note-pencil' };
+  reminder_due: 'bell-ring', reminder_added: 'bell', meeting_soon: 'video', task_suggested: 'list-checks', whatsapp_request: 'message-circle', whatsapp_urgent: 'flag', whatsapp_waiting: 'clock', whatsapp_signal: 'activity', health: 'heartbeat', mention: 'note-pencil',
+  task_due: 'list-checks', task_overdue: 'clock', task_wrap_up: 'list-checks', task_cancelled: 'list-checks', task_comment: 'message-circle', task_reminder: 'bell' };
 function notifWhen(iso){
   const d = new Date(iso), mins = Math.round((Date.now() - d) / 60000);
   if(mins < 1) return 'Just now';
@@ -98,14 +99,51 @@ function notifWhen(iso){
   if(k === 1) return 'Yesterday';
   return k < 7 ? fmtDay(d) : fmtShortDate(d);
 }
+// Tabs by kind (Nov 24): All, Tasks, Clients, WhatsApp, Calendar, each with what's unread; in a tab,
+// grouped by day (Today, Yesterday, Earlier this week, Older), so it isn't one long mixed list.
+const NOTIF_TABS = [['all', 'All'], ['tasks', 'Tasks'], ['clients', 'Clients'], ['whatsapp', 'WhatsApp'], ['calendar', 'Calendar']];
+let notifTabSel = 'all';
+function notifTabOf(n){
+  const t = String(n.type || '');
+  if(t.startsWith('whatsapp')) return 'whatsapp';
+  if(t.startsWith('task') || t === 'plan_reminder') return 'tasks';
+  if(t.startsWith('event_') || t === 'meeting_soon') return 'calendar';
+  if(t === 'profile_changed' || t === 'email_change_requested') return 'other';
+  return 'clients';
+}
+function notifSetTab(k){
+  notifTabSel = k; renderNotifPanel();
+  const l = document.getElementById('notifPanelList'); if(l) l.scrollTop = 0;
+}
+function notifDayGroup(iso){
+  const k = daysBetween(dayStart(new Date(iso)), dayStart(new Date()));
+  if(k <= 0) return 'Today';
+  if(k === 1) return 'Yesterday';
+  return k < 7 ? 'Earlier this week' : 'Older';
+}
 function renderNotifPanel(){
   const el = document.getElementById('notifPanelList');
   if(!el) return;
   const head = document.querySelector('#notifPanel .notif-panel-head span');
-  if(head) head.style.display = notifications.length ? '' : 'none';
+  const list = notifTabSel === 'all' ? notifications : notifications.filter(n => notifTabOf(n) === notifTabSel);
+  if(head) head.style.display = list.length ? '' : 'none';
+  // the tabs, between the heading and the list
+  let tabs = document.getElementById('notifTabs');
+  if(!tabs){
+    tabs = document.createElement('div'); tabs.id = 'notifTabs'; tabs.className = 'notif-tabs'; tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', 'Show');
+    el.parentElement.insertBefore(tabs, el);
+  }
+  tabs.innerHTML = '<div class="notif-seg">' + NOTIF_TABS.map(([k, t]) => {
+    const unread = notifications.filter(n => !n.read && (k === 'all' || notifTabOf(n) === k)).length;
+    return `<button class="${notifTabSel === k ? 'on' : ''}" role="tab" aria-selected="${notifTabSel === k}" onclick="event.stopPropagation();notifSetTab('${k}')">${t}${unread ? `<span class="c">${unread > 99 ? '99+' : unread}</span>` : ''}</button>`;
+  }).join('') + '</div>';
   if(!notifications.length){ el.innerHTML = '<div class="notif-empty">You’re all caught up.</div>'; return; }
-  el.innerHTML = notifications.map(n => `<div class="nrow${n.read ? '' : ' unread'}" role="button" tabindex="0" onclick="handleNotifClick('${n.id}')" onkeydown="if(event.key==='Enter') handleNotifClick('${n.id}')">
+  if(!list.length){ el.innerHTML = `<div class="notif-empty">Nothing in ${escapeHtml((NOTIF_TABS.find(x => x[0] === notifTabSel) || [, 'this tab'])[1])} yet.</div>`; return; }
+  const row = n => `<div class="nrow${n.read ? '' : ' unread'}" role="button" tabindex="0" onclick="handleNotifClick('${n.id}')" onkeydown="if(event.key==='Enter') handleNotifClick('${n.id}')">
 <span class="nrow-ic">${icon(NOTIF_ICON[n.type] || 'bell')}</span>
 <div class="nrow-tx"><b>${sanitizeInlineHtml(n.title)}</b>${n.body ? `<span>${sanitizeInlineHtml(n.body)}</span>` : ''}</div>
-<div class="nrow-r"><time>${notifWhen(n.created_at)}</time><span class="nrow-act">${n.read ? '' : `<i class="nrow-dot is-${notifSeverity(n)}" aria-label="Unread"></i>`}<button class="ib" aria-label="Delete" onclick="event.stopPropagation();deleteNotification('${n.id}')">${icon('x')}</button></span></div></div>`).join('');
+<div class="nrow-r"><time>${notifWhen(n.created_at)}</time><span class="nrow-act">${n.read ? '' : `<i class="nrow-dot is-${notifSeverity(n)}" aria-label="Unread"></i>`}<button class="ib" aria-label="Delete" onclick="event.stopPropagation();deleteNotification('${n.id}')">${icon('x')}</button></span></div></div>`;
+  const groups = [];
+  list.forEach(n => { const g = notifDayGroup(n.created_at); let x = groups.find(y => y.g === g); if(!x) groups.push(x = { g, items: [] }); x.items.push(n); });
+  el.innerHTML = groups.map(x => `<section class="ngrp" aria-label="${x.g}"><div class="ngrp-h">${x.g}</div>${x.items.map(row).join('')}</section>`).join('');
 }

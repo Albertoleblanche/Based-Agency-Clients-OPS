@@ -367,7 +367,7 @@ async function saveNewTask(){
     updateTasksNavBadge();
     if(addToCalendar) await addTaskToCalendar(data.id);
     if(assigneeId !== currentUser.id){
-      sendNotification(assigneeId, 'task_assigned', 'New task assigned to you', `${myName()||'Someone'}: "${title}"`, 'tasks');
+      sendNotification(assigneeId, 'task_assigned', 'New task assigned to you', `${myName()||'Someone'}: "${title}"`, 'tasks', data.id);
     }
   } else {
     closeAppModal();
@@ -400,7 +400,7 @@ async function saveEditTask(taskId){
   renderTasks();
   error ? showToast('error','Save failed', error.message) : showToast('success','Task updated','Changes saved.');
   if(!error && !reassigned && assigneeId !== currentUser.id){
-    sendNotification(assigneeId, 'task_edited', 'Task updated', `${myName()||'Someone'} updated "${title}".`, 'tasks');
+    sendNotification(assigneeId, 'task_edited', 'Task updated', `${myName()||'Someone'} updated "${title}".`, 'tasks', taskId);
   }
 }
 
@@ -577,11 +577,53 @@ async function confirmTaskCompletion(taskId){
     if(!pick.ok){ showToast('error', 'Almost there', pick.msg); return; }
     if(minutes > 960 && !(await confirmDialog(`That's ${formatMinutes(minutes)} for one task. Did you mean minutes instead of hours?`, { confirmLabel: 'Log It Anyway', cancelLabel: 'Let Me Fix It' }))) return;
     time = { clientId, minutes, pick };
+    // already logged for this client since the task was made? (Nov 24: not twice in Harvest)
+    const t0 = tasks.find(x => x.id === taskId), had = t0 && t0.clientId === clientId ? taskTimeSince(t0) : [];
+    if(had.length){
+      const v = await choiceDialog({ title: 'Log this time too?', body: `${taskTimeWords(t0, had)} If that was for this task, it would be in Harvest twice.`,
+        choices: [{ label: 'Mark Done Without Logging Again', value: 'skip', primary: true }, { label: `Log ${formatMinutes(minutes)} Too`, value: 'log' }] });
+      if(v === null) return;
+      if(v === 'skip') time = null;
+    }
   }
   const btn = document.getElementById('taskCompletionConfirmBtn');
   setBtnLoading(btn, 'Saving…');
   await finishTask(taskId, notes, link, { doneDate, time });
   restoreBtn(btn);
+}
+
+// ---- No double time (Nov 24) ----------------------------------------------------------------------
+// Time you already logged for a task's client since the task was made (by hand, from Queue, a timer):
+// Mark Done says so and asks before logging more, so the same work doesn't reach Harvest twice.
+function taskTimeSince(t){
+  if(!t || !t.clientId || typeof timeEntries === 'undefined' || !currentUser) return [];
+  const since = t.createdAt ? toDateStr(new Date(t.createdAt)) : toDateStr(new Date());
+  return timeEntries.filter(e => e.userId === currentUser.id && e.clientId === t.clientId && e.date >= since);
+}
+// "You logged 1h 30m for Northline Roofing since this task was made (Tue: “Homepage promo”)."
+function taskTimeWords(t, had){
+  const c = clients.find(x => x.id === t.clientId), total = had.reduce((n, e) => n + (e.minutes || 0), 0);
+  const last = had.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+  const what = last && last.description ? `${fmtDay(new Date(last.date + 'T12:00:00'))}: “${last.description.length > 50 ? last.description.slice(0, 50) + '…' : last.description}”` : '';
+  return `You logged ${formatMinutes(total)} for ${c ? c.name : 'this client'} since this task was made${what ? ` (${what})` : ''}.`;
+}
+// Logging time by hand for a client you have a task open for: is it that task's time? Then the task is
+// marked done with it, once. Returns { go } to log the time as usual, { taskId } when a task took it, or null.
+async function timeForOpenTask(clientId, description){
+  if(!currentUser || typeof tasks === 'undefined') return { go: true };
+  const open = tasks.filter(t => t.assigneeId === currentUser.id && t.clientId === clientId && !t.cancelledAt && t.status !== 'done' && !t.hiddenByAssignee);
+  if(!open.length) return { go: true };
+  const c = clients.find(x => x.id === clientId), cut = s => s.length > 44 ? s.slice(0, 44) + '…' : s;
+  // the one it most looks like first, then the one due soonest
+  const near = typeof mtSame === 'function' && description ? open.filter(t => mtSame(description, t.title)) : [];
+  const order = [...near, ...open.filter(t => !near.includes(t)).sort((a, b) => String(a.dueDate || '9999').localeCompare(String(b.dueDate || '9999')))].slice(0, 3);
+  const v = await choiceDialog({
+    title: open.length === 1 ? 'Is this time for your task?' : 'Is this time for one of your tasks?',
+    body: `You have ${open.length === 1 ? `“${cut(open[0].title)}”` : `${open.length} tasks`} open for ${c ? c.name : 'this client'}. If this time is for ${open.length === 1 ? 'it' : 'one of them'}, mark it done with this time, so it isn’t logged again when you finish it.`,
+    choices: [...order.map((t, i) => ({ label: `Mark “${cut(t.title)}” Done`, value: t.id, primary: i === 0 && near.length > 0 })), { label: 'Just Log the Time', value: '_time', primary: !near.length }],
+  });
+  if(v === null) return null;
+  return v === '_time' ? { go: true } : { taskId: v };
 }
 
 // Finishing a task, from the Mark Done sheet or from somewhere else (a WhatsApp item marked done).
@@ -660,7 +702,7 @@ async function finishTask(taskId, notes, link, opts){
     let notifBody = `${myName()||'Someone'} marked "${t.title}" as done.`;
     if(notes) notifBody += ` Note: "${notes.length>100 ? notes.slice(0,100)+'…' : notes}"`;
     if(link) notifBody += ` Link: ${link}`;
-    sendNotification(t.assignerId, 'task_completed', 'Task completed', notifBody, 'tasks');
+    sendNotification(t.assignerId, 'task_completed', 'Task completed', notifBody, 'tasks', t.id);
   }
   return true;
 }
@@ -683,7 +725,7 @@ async function cancelTask(taskId){
   closeAppModal();
   error ? showToast('error','Save failed', error.message) : showToast('success','Task cancelled','Removed for both of you.');
   if(!error && t.assigneeId !== currentUser.id){
-    sendNotification(t.assigneeId, 'task_cancelled', 'Task cancelled', `${myName()||'Someone'} cancelled "${t.title}".`, 'tasks');
+    sendNotification(t.assigneeId, 'task_cancelled', 'Task cancelled', `${myName()||'Someone'} cancelled "${t.title}".`, 'tasks', t.id);
   }
 }
 

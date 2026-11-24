@@ -37,6 +37,34 @@ function confirmDialog(message, options){
   });
 }
 
+// More than two answers (Nov 24): an alert sheet with a button for each, one under the other.
+// choices: [{ label, value, primary }]. Resolves with the value picked, or null (Cancel, Escape).
+function choiceDialog(o){
+  o = o || {};
+  return new Promise(resolve => {
+    const previousFocus = document.activeElement;
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.zIndex = '1100';
+    overlay.innerHTML = `<div class="modal-card alert-sheet" role="alertdialog" aria-labelledby="choiceDialogTitle" style="max-width:420px">
+<h3 id="choiceDialogTitle">${escapeHtml(o.title || '')}</h3>${o.body ? `<p>${escapeHtml(o.body)}</p>` : ''}
+<div class="sheet-a is-col">${(o.choices || []).map((c, i) => `<button class="btn${c.primary ? ' btn-p' : ''}" data-i="${i}">${escapeHtml(c.label)}</button>`).join('')}<button class="btn btn-q" data-i="-1">${escapeHtml(o.cancelLabel || 'Cancel')}</button></div></div>`;
+    function finish(v){
+      overlay.style.pointerEvents = 'none';
+      typeof animateThen === 'function' ? animateThen(overlay, [{ opacity: 1 }, { opacity: 0 }], 160, 'ease-out', () => overlay.remove()) : overlay.remove();
+      document.removeEventListener('keydown', onKeydown, true);
+      if(previousFocus && typeof previousFocus.focus === 'function') previousFocus.focus();
+      resolve(v);
+    }
+    function onKeydown(e){ if(e.key === 'Escape'){ e.stopPropagation(); finish(null); } }
+    overlay.onclick = e => { if(e.target === overlay) finish(null); };
+    document.addEventListener('keydown', onKeydown, true);
+    document.body.appendChild(overlay);
+    overlay.querySelectorAll('.sheet-a .btn').forEach(b => { b.onclick = () => { const i = Number(b.dataset.i); finish(i < 0 ? null : o.choices[i].value); }; });
+    setTimeout(() => (overlay.querySelector('.sheet-a .btn-p') || overlay.querySelector('.sheet-a .btn'))?.focus(), 10);
+  });
+}
+
 // View sheets start on their main button, like a Mac sheet's default button.
 function sheetFocusPrimary(){ setTimeout(() => document.querySelector('#appModalOverlay .btn-p, #appModalOverlay .sheet-a .btn:last-child')?.focus(), 30); }
 
@@ -443,6 +471,7 @@ function completeTaskModalHtml(taskId){
 <div class="f">
 <label for="taskDoneDate">Finished</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sheetDateField('taskDoneDate', today, { past: true, from: -14, to: 0, max: today })}</div>
 ${canLog ? `<label for="taskDoneTime">Time spent</label><div class="td-dur"><input id="taskDoneTime" class="tf" style="width:96px" placeholder="1:30" autocomplete="off" oninput="taskDoneTimeTyped()"><span class="t-2">Optional. It goes into Time on that day.</span></div>
+${(() => { const had = typeof taskTimeSince === 'function' ? taskTimeSince(t) : []; return had.length ? `<span></span><p class="td-had">${escapeHtml(taskTimeWords(t, had))} If that was for this task, leave the time empty so it isn’t in Harvest twice.</p>` : ''; })()}
 <div id="tdTime" class="td-time">${c ? `<input type="hidden" id="tdClient" value="${c.id}">` : `<label for="tdClient">Client</label><div>${sheetPop('tdClient', 'Client', sheetClientOptions('', true), '', "hvPickChanged('td','client')", { placeholder: 'Choose a client' })}</div>`}${typeof hvPickBlockHtml === 'function' ? hvPickBlockHtml('td', c ? c.id : '', d.projectId, d.taskId) : ''}</div>` : ''}
 <label class="top" for="taskCompletionNotes">Notes</label><textarea id="taskCompletionNotes" class="tf" spellcheck="true" placeholder="Anything ${escapeHtml(who)} should know: what you found, what’s left">${escapeHtml(t.completionNotes || '')}</textarea>
 <label for="taskCompletionLink">Link</label><input id="taskCompletionLink" class="tf" value="${escapeHtml(t.completionLink || '')}" placeholder="A doc, a page you built, a file">

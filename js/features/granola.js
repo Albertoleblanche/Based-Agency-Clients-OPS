@@ -45,10 +45,12 @@ async function tkSgAddAll(clientKey){
   const btn = document.querySelector(`.tk-sg-all[data-sgall="${clientKey}"]`);
   if(btn){ btn.disabled = true; btn.textContent = 'Adding…'; }
   list.forEach(s => tkSgBusy(s.id, true));
-  let added = 0, failed = 0;
-  for(const s of list){ const r = await addSuggestedTask(s.id); if(r.error) failed++; else added++; }
+  let added = 0, failed = 0, had = 0;
+  for(const s of list){ const r = await addSuggestedTask(s.id); if(r.error) failed++; else if(r.already) had++; else added++; }
   const c = clientKey && clients.find(x => x.id === clientKey);
-  if(added) showToast(failed ? 'info' : 'success', `Added ${added} task${added === 1 ? '' : 's'}`, `${c ? c.name + ': ' : ''}${failed ? `${failed} didn’t go in; try those again.` : 'They’re in your tasks.'}`);
+  const hadWords = had ? ` ${had === 1 ? 'One was' : `${had} were`} already in your tasks.` : '';
+  if(added) showToast(failed ? 'info' : 'success', `Added ${added} task${added === 1 ? '' : 's'}`, `${c ? c.name + ': ' : ''}${failed ? `${failed} didn’t go in; try those again.` : 'They’re in your tasks.'}${hadWords}`);
+  else if(had && !failed) showToast('info', 'Already in your tasks', `${c ? c.name + ': ' : ''}nothing new to add.`);
   else showToast('error', 'Not added', 'Try again in a moment.');
   await loadMyTasks(); renderTasks(); if(typeof updateTasksNavBadge === 'function') updateTasksNavBadge();
 }
@@ -82,7 +84,7 @@ async function tkSgAdd(id){
   tkSgBusy(id, true);
   const r = await addSuggestedTask(id);
   if(r.error){ tkSgBusy(id, false); showToast('error', 'Not added', r.error.message || 'Try again in a moment.'); return; }
-  showToast('success', 'Added to your tasks', r.task.title);
+  showToast(r.already ? 'info' : 'success', r.already ? 'Already in your tasks' : 'Added to your tasks', r.task.title);
   tkSgOut(id, async () => { await loadMyTasks(); renderTasks(); if(typeof updateTasksNavBadge === 'function') updateTasksNavBadge(); });
 }
 function tkSgEdit(id){

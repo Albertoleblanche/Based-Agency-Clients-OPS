@@ -650,9 +650,21 @@ async function decideSuggestion(id, status, taskId){
   if(!error && taskSuggestions) taskSuggestions = status === 'pending' ? taskSuggestions : taskSuggestions.filter(x => x.id !== id);
   return !error;
 }
+// The same task already there for that person (Nov 24): open, or done in the last 3 weeks, nearly the
+// same words, for the same client (or one of them has none). Adding from a meeting doesn't make it twice.
+function taskDupeOf(o){
+  if(typeof tasks === 'undefined' || !tasks || !o || !o.title || !o.assigneeId) return null;
+  const recent = Date.now() - 21 * 864e5, same = (a, b) => String(a).trim().toLowerCase() === String(b).trim().toLowerCase() || mtSame(a, b);
+  return tasks.find(t => t.assigneeId === o.assigneeId && !t.cancelledAt
+    && (t.status !== 'done' || new Date(t.completedAt || 0).getTime() > recent)
+    && (!o.clientId || !t.clientId || String(t.clientId) === String(o.clientId)) && same(o.title, t.title)) || null;
+}
 // Add as it is: the task is yours, from you, with the meeting's notes as its link.
 async function addSuggestedTask(id){
   const s = (taskSuggestions || []).find(x => x.id === id); if(!s) return { error: { message: 'Already decided.' } };
+  // already one of your tasks: settled as added, nothing new (Nov 24)
+  const dup = taskDupeOf({ assigneeId: currentUser.id, clientId: s.clientId, title: s.title });
+  if(dup){ await decideSuggestion(id, 'added', dup.id); return { task: dup, already: true }; }
   const res = await insertTaskRow({ title: s.title, description: suggestionNotes(s), priority: s.priority || 'medium', status: 'todo', assigner_id: currentUser.id, assignee_id: currentUser.id,
     due_date: s.dueDate || null, client_id: s.clientId || null, link: s.sourceUrl || null });
   if(res.error || !res.data) return { error: res.error || { message: 'Not saved' } };
@@ -1079,11 +1091,11 @@ function mtInsert(m, sp, assigneeId){
   return insertTaskRow({ title: sp.title, description: mtTaskNotes(m, sp), priority: 'medium', status: 'todo', assigner_id: currentUser.id, assignee_id: assigneeId,
     client_id: sp.clientId || null, link: m.url || null, due_date: mtDue(sp) || null });
 }
-function mtNotify(uid, title){
+function mtNotify(uid, title, taskId){
   if(uid === currentUser.id) return;
   const words = `${(typeof myName === 'function' && myName()) || 'Someone'}: "${title}"`;
-  if(typeof mNotify === 'function') mNotify(uid, 'task_assigned', 'New task assigned to you', words, 'tasks');
-  else if(typeof sendNotification === 'function') sendNotification(uid, 'task_assigned', 'New task assigned to you', words, 'tasks');
+  if(typeof mNotify === 'function') mNotify(uid, 'task_assigned', 'New task assigned to you', words, 'tasks', taskId);
+  else if(typeof sendNotification === 'function') sendNotification(uid, 'task_assigned', 'New task assigned to you', words, 'tasks', taskId);
 }
 function mtAfterChange(m){
   meetingRedraw(m);
@@ -1096,6 +1108,8 @@ function mtAfterChange(m){
 async function meetingAdd(id, key, btn){
   const m = (granolaMeetings || []).find(x => x.id === id), sp = mtSpec(m, key); if(!sp) return;
   if(mtSpecTasks(m, sp).length){ meetingRedraw(m); return; }
+  const dup = taskDupeOf({ assigneeId: currentUser.id, clientId: sp.clientId, title: sp.title });
+  if(dup){ showToast('info', 'Already in your tasks', dup.title); return; }
   const lab = btn && btn.querySelector('span');
   if(btn){ btn.disabled = true; if(lab) lab.textContent = 'Adding…'; }
   const res = await mtInsert(m, sp, currentUser.id);
@@ -1130,19 +1144,23 @@ async function meetingAll(id, btn){
   const open = meetingItems(m).flatMap(g => g.items).map(it => mtSpec(m, it.key)).filter(sp => sp && !mtSpecTasks(m, sp).length && (can ? sp.whoId : true));
   if(!open.length) return;
   if(btn){ btn.disabled = true; btn.textContent = can ? 'Assigning…' : 'Adding…'; }
-  const per = {};
+  const per = {}, made = [];
+  let already = 0;
   for(const sp of open){
     const who = can ? sp.whoId : currentUser.id;
+    // the same task already there for them, or twice in this meeting: once (Nov 24)
+    if(taskDupeOf({ assigneeId: who, clientId: sp.clientId, title: sp.title }) || made.some(x => x.who === who && mtSame(x.title, sp.title))){ already++; continue; }
+    made.push({ who, title: sp.title });
     const res = await mtInsert(m, sp, who);
     if(res.error || !res.data) continue;
     per[who] = (per[who] || 0) + 1;
     mtKnow(res.data);
     await meetingSettle(m, sp, res.data);
-    mtNotify(who, res.data.title);
+    mtNotify(who, res.data.title, res.data.id);
   }
   const n = Object.values(per).reduce((a, b) => a + b, 0);
   mtAfterChange(m);
-  if(!n){ showToast('error', 'Nothing added', 'Try again in a moment.'); return; }
+  if(!n){ already ? showToast('info', 'Nothing new to add', `${already === 1 ? 'It’s' : 'They’re'} already in ${can ? 'their' : 'your'} tasks.`) : showToast('error', 'Nothing added', 'Try again in a moment.'); return; }
   if(can) showToast('success', `Assigned ${n} task${n === 1 ? '' : 's'}`, Object.entries(per).map(([uid, k]) => `${uid === currentUser.id ? 'You' : mtName(uid)} ${k}`).join(' · '));
   else showToast('success', `Added ${n} task${n === 1 ? '' : 's'} to yours`, m.title);
 }
@@ -1383,7 +1401,7 @@ async function saveNewTask(){
   if(typeof renderCalendar === 'function') renderCalendar();
   if(afterCreate) await afterCreate(data);
   const assignee = teamProfiles.find(p => p.id === f.assigneeId);
-  if(f.assigneeId !== currentUser.id) sendNotification(f.assigneeId, 'task_assigned', 'New task assigned to you', `${myName() || 'Someone'}: "${f.title}"`, 'tasks');
+  if(f.assigneeId !== currentUser.id) sendNotification(f.assigneeId, 'task_assigned', 'New task assigned to you', `${myName() || 'Someone'}: "${f.title}"`, 'tasks', data.id);
   if(filesFailed.length) showToast('error', `Task created, ${filesFailed.length === 1 ? 'a file' : filesFailed.length + ' files'} not attached`, taskFilesError(filesFailed));
   else if(!calOk) showToast('info', 'Task created', 'It couldn’t be added to your calendar. Try again from the task.');
   else showToast('success', f.assigneeId === currentUser.id ? 'Task created' : 'Task assigned', f.assigneeId === currentUser.id ? (addCal ? 'Added to your tasks and your calendar.' : 'Added to your tasks.') : `${assignee ? firstName(assignee.name) : 'They'} will be notified.`);
@@ -1409,5 +1427,5 @@ async function saveEditTask(taskId){
   await loadMyTasks();
   renderTasks();
   error ? showToast('error', 'Save failed', error.message) : filesFailed.length ? showToast('error', 'Saved, but not every file was attached', taskFilesError(filesFailed)) : showToast('success', 'Task updated', 'Changes saved.');
-  if(!error && !reassigned && f.assigneeId !== currentUser.id) sendNotification(f.assigneeId, 'task_edited', 'Task updated', `${myName() || 'Someone'} updated "${f.title}".`, 'tasks');
+  if(!error && !reassigned && f.assigneeId !== currentUser.id) sendNotification(f.assigneeId, 'task_edited', 'Task updated', `${myName() || 'Someone'} updated "${f.title}".`, 'tasks', taskId);
 }

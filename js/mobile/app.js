@@ -613,7 +613,7 @@ async function mSgAdd(id){
   const r = await addSuggestedTask(id);
   if(r.error){ document.querySelectorAll(`.msug[data-sg="${id}"] button`).forEach(b => { b.disabled = false; }); showToast('error', 'Not added', r.error.message || ''); return; }
   mSgOut(id, () => mRefresh());
-  showToast('success', 'Added to your tasks', r.task.title);
+  showToast(r.already ? 'info' : 'success', r.already ? 'Already in your tasks' : 'Added to your tasks', r.task.title);
 }
 function mSgEdit(id){
   const s = (taskSuggestions || []).find(x => x.id === id); if(!s) return;
@@ -643,7 +643,7 @@ async function mCompleteTask(id){
   t.status = 'done'; t.completedAt = new Date().toISOString(); mRenderTab(); mTop()?.refresh();
   const { error } = await supabaseClient.from('tasks').update({ status: 'done', completed_at: t.completedAt }).eq('id', id);
   if(error){ showToast('error', 'Couldn’t mark it done', error.message); await mRefresh(); return; }
-  if(t.assignerId && t.assignerId !== currentUser.id) mNotify(t.assignerId, 'task_completed', 'A task you assigned is done', `${myName()}: "${t.title}"`, 'tasks');
+  if(t.assignerId && t.assignerId !== currentUser.id) mNotify(t.assignerId, 'task_completed', 'A task you assigned is done', `${myName()}: "${t.title}"`, 'tasks', t.id);
   // the same as on the computer: a client's task goes into its history, and its WhatsApp item is done too
   if(t.clientId && typeof insertImprovementRow === 'function') await insertImprovementRow(t.clientId, { author: myName() || 'Team member', text: t.description ? `${t.title} — ${t.description}` : t.title, includeInEmail: false, source: 'task' });
   const wa = typeof syncWaItemsForTask === 'function' ? await syncWaItemsForTask(id, 'done') : 0;
@@ -996,6 +996,7 @@ function mLog(clientId, type, description, teamText){
 }
 function mNotifUrl(view, id){ return view === 'client-detail' && id ? '/#client/' + encodeURIComponent(id) : view && /^[a-z-]+$/.test(view) ? '/#' + view : '/'; }
 async function mNotify(userId, type, title, body, view, targetId){
+  if(currentUser && userId === currentUser.id) return;   // nothing about what you did yourself (Nov 24)
   const p = teamProfiles.find(x => x.id === userId), m = (p && p.muted_notification_types) || [];
   if(m.includes(type)) return;
   if(!m.includes('app:' + type)) await supabaseClient.from('notifications').insert({ user_id: userId, type, title, body, target_view: view, ...(targetId ? { target_id: targetId } : {}) });
@@ -1341,7 +1342,8 @@ async function mNotifTap(id){
   if(v === 'client-detail' && n.target_id) mOpenClient(n.target_id);
   else if(v === 'teamqueue' || (v === 'approve' && n.type !== 'update_behind' && n.type !== 'draft_written')) mSwitchTab('review');
   else if(v === 'approve'){ mSwitchTab('today'); n.target_id ? mOpenClient(n.target_id) : mOpenWeek(); }
-  else if(v === 'tasks') mSwitchTab('tasks');
+  else if(v === 'tasks'){ mSwitchTab('tasks'); if(n.target_id && tasks.some(t => t.id === n.target_id)) mOpenTask(n.target_id); }   // the task itself (Nov 24)
+  else if(v === 'clients' && n.target_id && clients.some(c => c.id === n.target_id)){ mSwitchTab('today'); mOpenClient(n.target_id); }
   else if(v === 'reminders'){ mSwitchTab('more'); mOpenReminders(); }
   else if(v === 'calendar'){ mSwitchTab('more'); mOpenCalendar(); }
   else if(v === 'health'){ mSwitchTab('today'); mOpenClients('health'); }
@@ -1674,7 +1676,7 @@ async function mSaveTask(){
   if(T.time) await setTaskDueTime(data.id, T.time);
   const files = window._mTaskFiles || [];
   const up = files.length ? await uploadTaskFiles(data.id, files) : { failed: [] };
-  if(T.assigneeId !== currentUser.id){ const p = teamProfiles.find(x => x.id === T.assigneeId); mNotify(T.assigneeId, 'task_assigned', 'New task assigned to you', `${myName()}: "${title}"`, 'tasks'); }
+  if(T.assigneeId !== currentUser.id){ const p = teamProfiles.find(x => x.id === T.assigneeId); mNotify(T.assigneeId, 'task_assigned', 'New task assigned to you', `${myName()}: "${title}"`, 'tasks', data.id); }
   if(T.afterSave){ try{ await T.afterSave(data); }catch(e){} }   // e.g. a meeting's suggestion it came from
   mCloseSheet(true); await mRefresh();
   if(up.failed.length) showToast('error', 'Task added, files not attached', taskFilesError(up.failed));

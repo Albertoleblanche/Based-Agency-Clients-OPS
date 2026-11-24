@@ -334,7 +334,7 @@ function waRedraw(){
 // how they sound, how many wait and the oldest wait), its requests in a card below, folding away.
 // Urgent first, for anyone; for admins and approvers their own requests next; then the longest waits.
 function setWa(k, v){ if(k === 'tab'){ waTab = v; waClientSel = null; } if(k === 'who') waWho = v; if(k === 'client') waClientSel = v || null; window._waSel = null; renderWhatsapp(); }
-function selectWa(id){ window._waSel = window._waSel === id ? null : id; delete waChatTop[id]; renderWhatsapp(); if(window._waSel) waLoadChat(id); }
+function selectWa(id){ window._waSel = window._waSel === id ? null : id; delete waChatTop[id]; renderWhatsapp(); if(window._waSel){ waLoadChat(id); if(typeof notifSeenFor === 'function') notifSeenFor(id); } }
 function closeWaPanel(){ window._waSel = null; renderWhatsapp(); }
 function renderWhatsappTasks(){ renderWhatsapp(); }   // the old name, still called by realtime
 // Never a blank screen: before the first load a spinner, and if drawing fails, what happened and Try Again.
@@ -936,7 +936,7 @@ async function waReopen(id){
 // From another screen (the Dashboard, a task): the WhatsApp page with this item open.
 function waOpenItem(id){
   switchView('whatsapp');
-  setTimeout(() => { window._waSel = id; renderWhatsapp(); waLoadChat(id); }, 0);
+  setTimeout(() => { window._waSel = id; renderWhatsapp(); waLoadChat(id); if(typeof notifSeenFor === 'function') notifSeenFor(id); }, 0);
 }
 function waSetPriority(id, v){ return waUpdate(id, { priority: v }); }
 function waDueChanged(v){ const id = window._waSel; if(id) waUpdate(id, { due_date: v || null }, v ? 'Due date set' : 'Due date removed'); }
