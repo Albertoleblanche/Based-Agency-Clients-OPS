@@ -554,7 +554,7 @@ function mTasksHtml(){
   granolaWatch(() => { if(mTab === 'tasks') mRenderTab(); });
   const gr = granolaOn ? `<button aria-label="Check Granola for new tasks" title="Check Granola" class="mgr${mGranolaBusy ? ' is-busy' : ''}" onclick="mGranolaCheck()"${mGranolaBusy ? ' disabled' : ''}>${appLogo('granola', 'sm')}</button>` : '';
   const gm = typeof gmailOnHere === 'function' && gmailOnHere() ? `<button aria-label="Check Gmail for new tasks" title="Check Gmail" class="mgr${mGmailBusy ? ' is-busy' : ''}" onclick="mGmailCheck()"${mGmailBusy ? ' disabled' : ''}>${appLogo('gmail', 'sm')}</button>` : '';
-  const i8 = /lg-gmail/.test(gm + sg) ? icons8Credit(['gmail'], 'ifoot') : '';   // Icons8's Gmail icon, credited (Nov 24)
+  const i8 = /lg-gmail/.test(gm + sg) ? icons8Credit(['gmail'], 'm-i8') : '';   // Icons8's Gmail icon, credited (Nov 24)
   return `<div class="inav"><div class="r">${gr}${gm}<button aria-label="Filter by client" onclick="mPickTaskClient()" style="${c ? 'color:var(--label)' : ''}">${icon('funnel-simple')}</button></div></div>
 <h1 class="big">Tasks</h1><p class="big-sub">${vis.length} open${overdue ? ` · ${overdue} overdue` : ''}${c ? ` · ${mEsc(c.name)}` : ''}</p>
 ${mSeg([['everyone', 'Everyone'], ['mine', 'Mine', mineN], ['byme', 'Assigned by me']], 'mSetTaskScope', mTaskScope)}
@@ -587,7 +587,7 @@ function mSgPreview(id){
   const s = (taskSuggestions || []).find(x => x.id === id); if(!s) return;
   const body = () => `<div class="sgp msgp"><h3 class="sgp-h">${mEsc(s.title)}</h3>${suggestionPreviewHtml(s)}
 <div class="msgp-a"><button class="ibtn msgp-add" onclick="mCloseSheet(true);mSgAdd('${s.id}')">Add to My Tasks</button>
-<div class="msgp-2"><button class="ibtn s" onclick="mCloseSheet(true);setTimeout(() => mSgEdit('${s.id}'), 320)">Edit</button><button class="ibtn s msgp-x" onclick="mCloseSheet(true);mSgDismiss('${s.id}')">Dismiss</button></div></div></div>`;
+<div class="msgp-2"><button class="ibtn s" onclick="mCloseSheet(true);setTimeout(() => mSgEdit('${s.id}'), 320)">Edit</button><button class="ibtn s msgp-x" onclick="mCloseSheet(true);mSgDismiss('${s.id}')">Dismiss</button></div></div>${s.source === 'gmail' ? icons8Credit(['gmail'], 'm-i8') : ''}</div>`;
   mOpenSheet('Suggested Task', body(), { cancel: 'Close' });
   if(granolaMeetings === null && s.sourceId) loadGranolaMeetings().then(() => { const sh = $m('mSheet'); const sc = sh && sh.querySelector('.sheet-scroll'); if(sc && !sh.hidden) sc.innerHTML = body(); });
 }

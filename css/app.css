@@ -3752,7 +3752,33 @@ button.wx-t.on + button.wx-t{box-shadow:none}
 .i8-credit{margin:10px 0 0;font-size:11.5px;line-height:1.4;color:var(--label-3)}
 .i8-credit a{color:inherit;text-decoration:underline;text-decoration-color:var(--sep-strong);text-underline-offset:2px;transition:color .15s ease}
 @media (hover:hover) and (pointer:fine){.i8-credit a:hover{color:var(--label-2)}}
-.tk .tk-i8{margin:28px 0 4px;text-align:center}
-.sgp-i8{margin-top:14px}
-.sh-i8{margin:12px 0 0}
 .app-logo.lg-gmail img,.app-logo.lg-gcalendar img,.app-logo.lg-gsheets img{width:70%;height:70%}
+
+/* Gmail label "Radar" setup (Nov 24) */
+.gl{display:flex;flex-direction:column;gap:14px}
+.gl-p{margin:0;font-size:14px;line-height:1.5;color:var(--label-2)}
+.gl-steps{margin:0;padding:0;list-style:none;counter-reset:gl;display:flex;flex-direction:column;gap:16px}
+.gl-steps li{counter-increment:gl;position:relative;padding-left:34px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.gl-steps li::before{content:counter(gl);position:absolute;left:0;top:0;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:600;background:var(--fill-2);color:var(--label)}
+.gl-steps b{font-size:14px;font-weight:600}
+.gl-steps span{font-size:13px;line-height:1.5;color:var(--label-2)}
+.gl-steps a{color:var(--label);text-decoration:underline;text-decoration-color:var(--sep-strong);text-underline-offset:2px}
+.gl-code{margin-top:8px;border-radius:12px;background:var(--fill-2);box-shadow:0 0 0 .5px var(--sep);overflow:hidden}
+.gl-code-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 8px 8px 16px;border-bottom:.5px solid var(--sep)}
+.gl-code-h span{font-size:12px;font-weight:500;color:var(--label-2)}
+.gl-code pre{margin:0;padding:12px 16px 14px;max-height:220px;overflow:auto;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--label);white-space:pre;tab-size:2}
+.gl-copy{gap:6px}
+.gl-copy svg{width:14px;height:14px}
+.gl-note{margin:0;font-size:12.5px;line-height:1.5;color:var(--label-2)}
+.gl-on{display:flex;align-items:center;gap:10px;margin:0;font-size:13px;color:var(--label-2)}
+/* the credit sits in the page's bottom-right corner, pushed down when the page is short (Nov 24) */
+.i8-corner{margin:0;text-align:right;align-self:flex-end;justify-self:end}
+.sp-page.has-i8{display:flex;flex-direction:column}
+.sp-page.has-i8 > .tk{flex:1 0 auto}
+.sp-page.has-i8 > .i8-corner{padding:0 20px 14px}
+#settingsRoot.has-i8{display:flex;flex-direction:column}
+#settingsRoot.has-i8 > .set-body{flex:1 0 auto}
+#settingsRoot.has-i8 > .i8-corner{padding:0 20px 14px}
+html.ui-w #settingsRoot.settings-pane.has-i8{display:grid;grid-template-rows:1fr auto}
+html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;padding:14px 0 0}
+.sh-i8{margin:14px 0 0;text-align:right}

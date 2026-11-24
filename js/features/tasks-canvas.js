@@ -118,8 +118,8 @@ function renderTasks(){
   if(window._taskSel && !sel) window._taskSel = null;
   const prev = root.querySelector('.sp-page')?.scrollTop || 0, prevSp = root.querySelector('.sp:not(.sp-leaving)')?.scrollTop || 0, cmt = document.getElementById('tkpCmt')?.value || '';
   const sg = typeof tkSuggestHtml === 'function' ? tkSuggestHtml() : '';   // tasks from meetings (granola.js)
-  const i8 = /lg-gmail/.test(head + sg) && typeof icons8Credit === 'function' ? icons8Credit(['gmail'], 'tk-i8') : '';   // Icons8's Gmail icon, credited (Nov 24)
-  root.innerHTML = `<div class="spw"><div class="sp-page"><div class="tk">${head}${sg}${body}${i8}</div></div>${sel ? taskPanelHtml(sel) : ''}</div>`;
+  root.innerHTML = `<div class="spw"><div class="sp-page"><div class="tk">${head}${sg}${body}</div></div>${sel ? taskPanelHtml(sel) : ''}</div>`;
+  if(typeof icons8Corner === 'function') icons8Corner(root.querySelector('.sp-page'));   // Icons8's Gmail icon, credited in the corner (Nov 24)
   const sp = root.querySelector('.sp-page'); if(sp) sp.scrollTop = prev;
   const pn = root.querySelector('.sp:not(.sp-leaving)'); if(pn){ pn.scrollTop = prevSp; pn._st = prevSp; }
   const ci = document.getElementById('tkpCmt'); if(ci && cmt) ci.value = cmt;

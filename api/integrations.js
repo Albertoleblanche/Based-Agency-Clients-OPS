@@ -36,6 +36,11 @@
 // POST /api/integrations  body: { provider: 'granola', action: 'check' } (anyone on the team: Check Granola in
 //   Tasks, at most once a minute) | { action: 'connect' (key) | 'disconnect' | 'read-now' | 'read-again' (note) } (admins) | { action: 'remove-meeting' | 'restore-meeting' | 'meeting-tasks' | 'meeting-recap' (note, again) } (people in the meeting, admins, approvers) — tasks from Granola meetings, lib/granola-tasks.js. The webhook Granola calls is
 //   /hooks/granola, in api/send-slack-message.js (it needs the raw body).
+// GET  /api/integrations?provider=gmail → your Gmail (read only) and your Gmail label's status
+// POST /api/integrations  body: { provider: 'gmail', action: 'start' | 'disconnect' | 'read' (force) | 'label-key'
+//   (a new key for your label script; the old one stops working) | 'label-off' } — lib/gmail-tasks.js, lib/gmail-label.js
+// POST /api/integrations?route=gmail-label (before the sign-in check; header x-radar-key): an email
+//   someone labelled "Radar" in Gmail, from their own Apps Script → a suggested task (lib/gmail-label.js)
 //
 // Two more things live here, reached by rewrites in vercel.json, before the sign-in check:
 //   /mcp → ?route=mcp: Radar's MCP server for ChatGPT and Claude (lib/mcp-server.js). They sign in
@@ -63,6 +68,7 @@ const { connectGranola, disconnectGranola, granolaStatus, granolaCatchUp, granol
 const { handleMcp, protectedResourceMetadata } = require('../lib/mcp-server');
 const { slackMeAuthUrl, slackMeCallback, slackMeStatus, slackMeDisconnect, slackMeSend } = require('../lib/slack-me');
 const { gmailAuthUrl, gmailStatus, gmailDisconnect, readGmailFor, gmailTick } = require('../lib/gmail-tasks');
+const { labelStatus, labelNewKey, labelOff, fromLabel } = require('../lib/gmail-label');
 const { calendarTick } = require('../lib/meeting-alerts');
 
 module.exports = async function handler(req, res) {
@@ -78,6 +84,16 @@ module.exports = async function handler(req, res) {
   // Vercel Cron calls it three times a day with CRON_SECRET; Supabase pg_cron every five minutes,
   // with no key, so then it runs at most every four minutes whoever asks.
   // Tasks from Gmail, a few times a day (vercel.json crons): everyone connected (lib/gmail-tasks.js)
+  // A Gmail label (Nov 24): someone's own Apps Script sends an email they labelled "Radar" (lib/gmail-label.js)
+  if (route === 'gmail-label') {
+    if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
+    try {
+      const r = await fromLabel(createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY), String(req.headers['x-radar-key'] || '').trim(), typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {}));
+      res.status(r.status).json(r.body);
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+    return;
+  }
+
   if (route === 'gmail-tick') {
     if (process.env.CRON_SECRET && (req.headers.authorization || '') !== `Bearer ${process.env.CRON_SECRET}`) { res.status(401).json({ error: 'Not allowed' }); return; }
     try { res.status(200).json(await gmailTick(createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY), { budgetMs: 45000 })); }
@@ -171,12 +187,14 @@ module.exports = async function handler(req, res) {
     if (provider === 'gmail') {
       const { data: me } = await admin.from('team_profiles').select('access_revoked').eq('id', userId).maybeSingle();
       if (!me || me.access_revoked) { res.status(403).json({ error: 'Only team members can do this.' }); return; }
-      if (req.method === 'GET') { res.status(200).json(await gmailStatus(admin, userId)); return; }
+      if (req.method === 'GET') { res.status(200).json(Object.assign(await gmailStatus(admin, userId), { label: await labelStatus(admin, userId) })); return; }
       const appUrl = (process.env.APP_URL || `https://${req.headers['x-forwarded-host'] || req.headers.host}`).replace(/\/+$/, '');
       const b = req.body || {};
       const r = b.action === 'start' ? gmailAuthUrl(userId, appUrl)
         : b.action === 'disconnect' ? await gmailDisconnect(admin, userId)
         : b.action === 'read' ? await readGmailFor(admin, userId, { force: !!b.force })
+        : b.action === 'label-key' ? await labelNewKey(admin, userId)
+        : b.action === 'label-off' ? await labelOff(admin, userId)
         : { error: `Unknown action: ${b.action}`, status: 400 };
       res.status(r.error && r.status ? r.status : 200).json(r);
       return;

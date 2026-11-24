@@ -125,6 +125,7 @@ function renderSettingsView(){
   const pageHead = uw && cur && !sub ? `<h2 class="set-pt">${cur[1]}</h2>` : '';
   root.innerHTML = `<div class="set-tb">${menuHead}<div class="set-tabs" role="toolbar" aria-label="Settings sections">${tabs.map(([k, t, ic]) => `<button class="set-tab${k === tab ? ' on' : ''}" ${k === tab ? 'aria-current="page"' : ''} onclick="switchSettingsTab('${k}')">${uw ? icon(ic) : ''}${t}</button>`).join('')}${menuEnd}<span class="set-ink" aria-hidden="true"></span></div></div>
 <div class="set-body set-${settingsTab}">${pageHead}${head}${draw()}<p class="set-foot">Changes save as you make them.</p></div>`;
+  if(typeof icons8Corner === 'function') icons8Corner(root);   // Icons8's icons, credited in the corner (Nov 24)
   placeSetInk();
   if(keep){ const el = document.getElementById(keep); if(el && el.tagName !== 'BUTTON') el.focus(); }
   if(settingsTab === 'ai' || settingsTab === 'connections') applyAiConn();
@@ -610,7 +611,6 @@ ${sm.connected ? `${st('green', 'Connected')}<button class="btn" onclick="slackM
   return `<div class="set-h">Apps</div><div class="form-grp cn-g">${rows.join('')}</div>
 ${yours}
 <p class="set-note cn-live">${st(live ? 'green' : 'yellow', live ? 'Live: changes show for everyone as they’re made' : 'Reconnecting… changes show for everyone once it’s back')}</p>
-${icons8Credit(['gsheets'].concat(gRow ? ['gcalendar'] : [], gmRow ? ['gmail'] : []), 'set-note')}
 <p class="t-2 set-note" id="sheetSyncStatus"></p>`;
 }
 // ---- Tasks from Slack (Nov 23, lib/slack-tasks.js) -------------------------------------------------
@@ -673,8 +673,8 @@ function openIntegrationSheet(which){
 <span></span><p class="t-2" style="font-size:13px;margin:0">In Google Sheets: File → Share → Publish to web → CSV. A normal edit link won’t work.</p>
 <label for="csvPasteArea" class="top">Or paste</label><textarea class="tf" id="csvPasteArea" style="height:90px" placeholder="Paste copied cells or CSV here"></textarea>
 </div>
-${icons8Credit(['gsheets'], 'sh-i8')}
-<div class="sheet-a"><button class="btn" onclick="importPastedCsv()">Import Pasted</button><button class="btn" style="margin-right:auto" onclick="exportRosterCsv()">${icon('export')}Export CSV</button><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="saveAndSyncSheet().then(()=>{closeAppModal();renderSettingsView();})">Save &amp; Sync</button></div>`, 560);
+<div class="sheet-a"><button class="btn" onclick="importPastedCsv()">Import Pasted</button><button class="btn" style="margin-right:auto" onclick="exportRosterCsv()">${icon('export')}Export CSV</button><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="saveAndSyncSheet().then(()=>{closeAppModal();renderSettingsView();})">Save &amp; Sync</button></div>
+${icons8Credit(['gsheets'], 'sh-i8')}`, 560);
   }
 }
 

@@ -179,6 +179,14 @@ function icons8Credit(apps, cls){
   const joined = names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : names[0];
   return `<p class="i8-credit${cls ? ' ' + cls : ''}">${joined} icon${list.length > 1 ? 's' : ''} by <a href="https://icons8.com" target="_blank" rel="noopener">Icons8</a></p>`;
 }
+// A page's credit, in its bottom-right corner: for whichever of these icons the page shows now
+function icons8Corner(page){
+  if(!page) return;
+  const old = page.querySelector(':scope > .i8-corner'); if(old) old.remove();
+  const used = Object.keys(ICONS8).filter(k => page.querySelector('.app-logo.lg-' + k));
+  page.classList.toggle('has-i8', !!used.length);
+  if(used.length) page.insertAdjacentHTML('beforeend', icons8Credit(used, 'i8-corner'));
+}
 function appLogo(app, size){
   const a = APP_LOGOS[app]; if(!a) return '';
   return `<span class="app-logo is-${a[1]} lg-${app}${size ? ' ' + size : ''}" aria-hidden="true"><img src="/icons/apps/${app}.png" alt="" width="96" height="96" decoding="async" draggable="false"></span>`;

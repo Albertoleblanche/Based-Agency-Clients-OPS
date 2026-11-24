@@ -803,8 +803,7 @@ function suggestionPreviewHtml(s){
   if(s.source === 'gmail') return `<p class="sgp-meta">${appLogo('gmail', 'xs')}<span>${meet}${sub.slice(1).map(x => ' · ' + escapeHtml(x)).join('')}</span></p>
 ${s.description ? `<div class="sgp-sec"><span class="sgp-k">What it’s about</span><p class="sgp-d">${escapeHtml(s.description)}</p></div>` : ''}
 ${s.quote ? `<div class="sgp-sec"><span class="sgp-k">What they wrote</span><blockquote class="sgp-q">${escapeHtml(s.quote)}</blockquote></div>` : ''}
-${s.sourceUrl ? `<p class="sgp-open"><a class="x-lnk" href="${safeUrl(s.sourceUrl)}" target="_blank" rel="noopener">Open the email in Gmail</a></p>` : ''}
-${icons8Credit(['gmail'], 'sgp-i8')}`;
+${s.sourceUrl ? `<p class="sgp-open"><a class="x-lnk" href="${safeUrl(s.sourceUrl)}" target="_blank" rel="noopener">Open the email in Gmail</a></p>` : ''}`;
   const ex = suggestionExcerpt(s);
   const loading = granolaMeetings === null && s.sourceId;
   return `<p class="sgp-meta">${appLogo('granola', 'xs')}<span>${meet}${sub.slice(1).map(x => ' · ' + escapeHtml(x)).join('')}</span></p>

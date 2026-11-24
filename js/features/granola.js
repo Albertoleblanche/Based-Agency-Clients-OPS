@@ -72,7 +72,7 @@ async function tkSgRefresh(){
 function tkSgPreview(id){
   const s = (taskSuggestions || []).find(x => x.id === id); if(!s) return;
   openAppModal(`<h3 class="sgp-h">${escapeHtml(s.title)}</h3><div class="sgp" id="sgpBody">${suggestionPreviewHtml(s)}</div>
-<div class="sheet-a sgp-a"><button class="btn sgp-x" onclick="closeAppModal();tkSgDismiss('${s.id}')">Dismiss</button><span class="sgp-gap"></span><button class="btn" onclick="closeAppModal();tkSgEdit('${s.id}')">Edit…</button><button class="btn btn-p" id="sgpAdd" onclick="closeAppModal();tkSgAdd('${s.id}')">Add to My Tasks</button></div>`, 560);
+<div class="sheet-a sgp-a"><button class="btn sgp-x" onclick="closeAppModal();tkSgDismiss('${s.id}')">Dismiss</button><span class="sgp-gap"></span><button class="btn" onclick="closeAppModal();tkSgEdit('${s.id}')">Edit…</button><button class="btn btn-p" id="sgpAdd" onclick="closeAppModal();tkSgAdd('${s.id}')">Add to My Tasks</button></div>${s.source === 'gmail' ? icons8Credit(['gmail'], 'sh-i8') : ''}`, 560);
   setTimeout(() => document.getElementById('sgpAdd')?.focus({ preventScroll: true }), 30);   // after the sheet's own first focus
   // the meeting's notes, for the excerpt, if they aren't here yet
   if(granolaMeetings === null && s.sourceId) loadGranolaMeetings().then(() => { const b = document.getElementById('sgpBody'); if(b) b.innerHTML = suggestionPreviewHtml(s); });
