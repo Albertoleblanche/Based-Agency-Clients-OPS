@@ -16,13 +16,16 @@ const SETUP_STEPS = [
   { k: 'phone', name: 'Radar on your phone' },
   { k: 'calendar', name: 'Google Calendar' },
   { k: 'gmail', name: 'Gmail' },
-  { k: 'summary', name: 'Daily summary', only: () => typeof canApprove === 'function' && !canApprove() },
+  { k: 'summary', name: 'Daily summary', only: () => suPreview || (typeof canApprove === 'function' && !canApprove()) },
   { k: 'label', name: 'Gmail label', optional: true },
   { k: 'ai', name: 'ChatGPT and Claude', optional: true },
   { k: 'done', name: 'All set' },
 ];
 const SETUP_SNOOZE_MS = 20 * 3600000;   // after Finish Later, it opens by itself again at most once a day
 let suAt = 'welcome', suPush = null, suPhone = null, suGcal = null, suLoaded = false;
+// Preview (#setup?preview, Settings → Connections → Preview): what someone new sees. Nothing is
+// connected yet; the buttons pretend to connect, and nothing is saved or sent.
+let suPreview = false, suPv = {}, suPvSkipped = new Set(), suPvKey = null;
 const suKey = n => `setup-${n}-${(currentUser && currentUser.id) || ''}`;
 function suGet(n){ try{ return localStorage.getItem(suKey(n)); }catch(e){ return null; } }
 function suSet(n, v){ try{ v == null ? localStorage.removeItem(suKey(n)) : localStorage.setItem(suKey(n), v); }catch(e){} }
@@ -44,10 +47,13 @@ function setupMaybeOpen(){
   if(/=/.test(location.hash) || /^#setup/.test(location.hash)) return;
   setupOpen();
 }
-// step: a step's key; nothing: where you left off (or Welcome)
-function setupOpen(step){
+// step: a step's key; nothing: where you left off (or Welcome). opts.preview: what someone new sees
+function setupOpen(step, opts){
+  const preview = !!(opts && opts.preview);
+  if(preview && !suPreview){ suPv = {}; suPvSkipped = new Set(); suPvKey = null; }
+  suPreview = preview;
   const steps = setupSteps(), has = k => steps.some(s => s.k === k);
-  const resume = suGet('at');
+  const resume = preview ? null : suGet('at');
   suAt = has(step) ? step : has(resume) ? resume : 'welcome';
   let root = document.getElementById('setupRoot');
   const fresh = !root;
@@ -64,7 +70,11 @@ function setupOpen(step){
   if(fresh) setTimeout(() => suFocusMain(), 60);
   setupRefresh();
 }
-function suHash(){ const h = suAt === 'welcome' ? '#setup' : `#setup/${suAt}`; if(location.hash !== h) history.replaceState(null, '', h); suSet('at', suAt === 'done' ? null : suAt); }
+function suHash(){
+  const h = (suAt === 'welcome' ? '#setup' : `#setup/${suAt}`) + (suPreview ? '?preview' : '');
+  if(location.hash !== h) history.replaceState(null, '', h);
+  if(!suPreview) suSet('at', suAt === 'done' ? null : suAt);
+}
 function setupClose(){
   const root = document.getElementById('setupRoot'); if(!root) return;
   root.id = ''; root.classList.add('is-out');
@@ -76,11 +86,18 @@ function setupClose(){
 }
 // Finish Later: the sidebar keeps the place, and it opens by itself again tomorrow at the earliest
 function setupLater(){
+  if(suPreview){ setupClose(); suPreview = false; showToast('info', 'Preview closed', 'Nothing was connected or saved.'); return; }
   suSet('snooze', String(Date.now()));
   setupClose();
   if(suPending()) showToast('info', 'Finish setting up anytime', 'It’s in the sidebar, where you left off.');
 }
 async function setupFinish(tour){
+  if(suPreview){
+    setupClose(); suPreview = false;
+    if(tour && typeof startTour === 'function') setTimeout(() => startTour(), 260);
+    else showToast('info', 'That was the preview', 'Nothing was connected or saved. Someone new sees this the first time they sign in.');
+    return;
+  }
   const at = new Date().toISOString();
   if(suPending()){
     const { error } = await supabaseClient.from('team_profiles').update({ setup_done_at: at }).eq('id', currentUser.id);
@@ -162,6 +179,7 @@ function setupLoad(){
 function setupRefresh(){ return setupLoad(); }
 // 'done' (connected), 'off' (yours to do), 'na' (not set up for the team yet), null (checking)
 function suStatus(k){
+  if(suPreview) return k === 'welcome' || k === 'done' ? null : suPv[k] ? 'done' : 'off';
   const sm = typeof slackMe !== 'undefined' && slackMe && !slackMe.checking ? slackMe : null;
   const gm = typeof gmailState !== 'undefined' ? gmailState : null;
   const ai = typeof aiAppsState !== 'undefined' ? aiAppsState : null;
@@ -176,33 +194,75 @@ function suStatus(k){
   return null;
 }
 // Skipping Slack, with no Slack linked: Radar's own messages can't reach you either
-const suNoSlackId = () => !(myProfile && myProfile.slack_user_id);
+const suNoSlackId = () => suPreview ? !suPv.slack : !(myProfile && myProfile.slack_user_id);
 
 // ---- drawing ----------------------------------------------------------------------------------------
 function setupRender(dir){
   const root = document.getElementById('setupRoot'); if(!root) return;
   const steps = setupSteps(), i = Math.max(0, steps.findIndex(s => s.k === suAt)), step = steps[i];
-  const rail = root.querySelector('.su-rail'), skipped = suSkipped();
   const counted = steps.filter(s => s.k !== 'welcome' && s.k !== 'done');
-  const item = s => { const st = suStatus(s.k), on = s.k === suAt, sk = (skipped.has(s.k) || st === 'na') && st !== 'done';
-    const mark = s.k === 'welcome' || s.k === 'done' ? icon(s.k === 'done' ? 'check' : 'compass') : st === 'done' ? icon('check') : sk ? icon('minus') : String(counted.indexOf(s) + 1);
-    const cls = (on ? ' is-on' : '') + (st === 'done' ? ' is-done' : '') + (sk ? ' is-skip' : '');
-    return `<li><button class="su-st${cls}" onclick="setupGo('${s.k}')"${on ? ' aria-current="step"' : ''}><span class="su-n" aria-hidden="true">${mark}</span><span class="su-sn">${escapeHtml(s.name)}</span>${st === 'done' && s.k !== 'done' ? '<span class="sr-only">, done</span>' : ''}</button></li>`; };
-  const opt = steps.filter(s => s.optional), main = steps.filter(s => !s.optional && s.k !== 'done');
-  rail.innerHTML = `<div class="su-brand"><span class="brand-mark" aria-hidden="true">BA</span><b>Set Up Radar</b></div>
-<ol class="su-steps">${main.map(item).join('')}${opt.length ? `<li class="su-grp" aria-hidden="true">Optional</li>${opt.map(item).join('')}` : ''}${item(steps[steps.length - 1])}</ol>
-<button class="su-later" onclick="setupLater()">Finish Later</button>`;
+  suRail(root, steps, counted);
   const pane = document.getElementById('suPane'), foot = document.getElementById('suFoot');
   const html = suStepHtml(step, i, counted);
-  // the same step, redrawn as its status comes in: only what changed, no movement
-  if(dir === null && pane.dataset.k === step.k){ if(pane.innerHTML !== html.body) pane.innerHTML = html.body; foot.innerHTML = html.foot; return; }
+  // the same step, as its status comes in: only the parts that changed fade in; nothing moves
+  if(dir === null && pane.dataset.k === step.k){ suPatch(pane, html.body); suPatch(foot, html.foot); return; }
   pane.dataset.k = step.k;
   pane.innerHTML = html.body; foot.innerHTML = html.foot;
   pane.scrollTop = 0;
-  if(dir && !matchMedia('(prefers-reduced-motion: reduce)').matches){
-    pane.animate([{ opacity: 0, transform: `translateX(${dir * 14}px)` }, { opacity: 1, transform: 'none' }], { duration: 240, easing: 'cubic-bezier(.23,1,.32,1)' });
+  if(dir && !suStill()){
+    pane.animate([{ opacity: 0, transform: `translateX(${dir * 16}px)` }, { opacity: 1, transform: 'none' }], { duration: 260, easing: 'cubic-bezier(.23,1,.32,1)' });
+    foot.animate([{ opacity: .4 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' });
   }
 }
+const suStill = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+// The list of steps is drawn once; after that only its marks and the highlight change, and the
+// highlight slides to the step you're on.
+function suRail(root, steps, counted){
+  const rail = root.querySelector('.su-rail'), keys = steps.map(s => s.k).join(',') + (suPreview ? ':pv' : '');
+  if(rail.dataset.keys !== keys){
+    const item = s => `<li><button class="su-st" data-k="${s.k}" onclick="setupGo('${s.k}')"><span class="su-n" aria-hidden="true"></span><span class="su-sn">${escapeHtml(s.name)}</span><span class="sr-only su-sr"></span></button></li>`;
+    const opt = steps.filter(s => s.optional), main = steps.filter(s => !s.optional && s.k !== 'done');
+    rail.innerHTML = `<div class="su-brand"><span class="brand-mark" aria-hidden="true">BA</span><b>Set Up Radar</b>${suPreview ? '<span class="su-pv">Preview</span>' : ''}</div>
+<div class="su-list"><span class="su-ink" aria-hidden="true"></span><ol class="su-steps">${main.map(item).join('')}${opt.length ? `<li class="su-grp" aria-hidden="true">Optional</li>${opt.map(item).join('')}` : ''}${item(steps[steps.length - 1])}</ol></div>
+${suPreview ? '<p class="su-pvnote">A preview of what someone new sees. Nothing is connected or saved.</p>' : ''}<button class="su-later" onclick="setupLater()">${suPreview ? 'Close Preview' : 'Finish Later'}</button>`;
+    rail.dataset.keys = keys; rail.dataset.at = '';
+  }
+  const skipped = suPreview ? suPvSkipped : suSkipped();
+  rail.querySelectorAll('.su-st').forEach(b => {
+    const k = b.dataset.k, s = steps.find(x => x.k === k), st = suStatus(k), on = k === suAt, sk = (skipped.has(k) || st === 'na') && st !== 'done';
+    const mark = k === 'welcome' || k === 'done' ? icon(k === 'done' ? 'check' : 'compass') : st === 'done' ? icon('check') : sk ? icon('minus') : String(counted.indexOf(s) + 1);
+    const n = b.querySelector('.su-n'); if(n.innerHTML !== mark) n.innerHTML = mark;
+    b.classList.toggle('is-on', on); b.classList.toggle('is-done', st === 'done'); b.classList.toggle('is-skip', sk);
+    if(on) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
+    b.querySelector('.su-sr').textContent = st === 'done' && k !== 'done' ? ', done' : '';
+  });
+  // the highlight: under the step you're on, sliding there from the last one
+  const on = rail.querySelector('.su-st.is-on'), ink = rail.querySelector('.su-ink');
+  if(on && ink){
+    const y = on.offsetTop, h = on.offsetHeight, first = !rail.dataset.at;
+    if(first || suStill()) ink.style.transition = 'none';
+    ink.style.transform = `translateY(${y}px)`; ink.style.height = h + 'px';
+    if(first || suStill()){ ink.offsetHeight; ink.style.transition = ''; }
+    rail.dataset.at = suAt;
+  }
+}
+// Replaces only the children that changed, and fades those in
+function suPatch(el, html){
+  const tpl = document.createElement('div'); tpl.innerHTML = html;
+  const next = [...tpl.childNodes], cur = [...el.childNodes];
+  const same = (a, b) => a.nodeType === b.nodeType && (a.nodeType === 1 ? a.outerHTML === b.outerHTML : a.textContent === b.textContent);
+  const had = document.activeElement && el.contains(document.activeElement) ? document.activeElement : null;
+  for(let n = 0; n < Math.max(next.length, cur.length); n++){
+    const a = cur[n], b = next[n];
+    if(!b){ a.remove(); continue; }
+    if(!a){ el.appendChild(b); suFadeIn(b); continue; }
+    if(same(a, b)) continue;
+    el.replaceChild(b, a); suFadeIn(b);
+  }
+  // focus stays on the same button (by its label) if it was replaced
+  if(had && !had.isConnected){ const t = had.textContent; const again = [...el.querySelectorAll('button')].find(x => x.textContent === t); if(again) again.focus({ preventScroll: true }); }
+}
+function suFadeIn(node){ if(node.nodeType !== 1 || suStill() || !node.animate) return; node.animate([{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.23,1,.32,1)' }); }
 function suAppUrl(){ return location.origin.replace(/\/+$/, '') + '/'; }
 // One step: { body, foot }
 function suStepHtml(step, i, counted){
@@ -249,21 +309,21 @@ function suStepHtml(step, i, counted){
       (checking || (st === 'done' ? state('ok', 'Connected.') : st === 'na' ? state('off', 'Google sign-in isn’t set up for the team yet. An admin adds it once.') : ''));
     f = foot(st === 'off' ? `<button class="btn btn-p" onclick="suCalendar()">Connect Google Calendar…</button>` : next(), true);
   } else if(k === 'gmail'){
-    const g = (typeof gmailState !== 'undefined' && gmailState) || {};
+    const g = suPreview ? { email: (myProfile && myProfile.email) || '' } : ((typeof gmailState !== 'undefined' && gmailState) || {});
     body = head(appLogo('gmail', 'xl'), 'Gmail', 'Radar reads new emails from your clients and suggests what they ask for as tasks, with a link back to the email.') + got(['Only your clients’ emails are opened; nothing else is read', 'Read only: Radar can’t send, delete or change anything', 'Suggestions wait in Tasks for you to add or dismiss']) +
       (checking || (st === 'done' ? state('ok', `Connected${g.email ? ' as ' + escapeHtml(g.email) : ''}.`) : st === 'na' ? state('off', g.needsSetup ? (isAdmin() ? 'Run addendum-gmail.sql in Supabase first.' : 'An admin finishes setting this up first.') : 'Google sign-in isn’t set up for the team yet.') : ''));
     f = foot(st === 'off' ? `<button class="btn btn-p" onclick="suGmail()">Connect Gmail…</button>` : next(), true);
   } else if(k === 'summary'){
     const rank = p => p.role === 'admin' ? 2 : p.role === 'approver' ? 1 : 0;
     const people = (teamProfiles || []).filter(p => p.id !== currentUser.id && !p.access_revoked && p.slack_user_id).sort((a, b) => rank(b) - rank(a) || String(a.name).localeCompare(String(b.name)));
-    const cur = myProfile && myProfile.daily_summary_slack_id;
+    const cur = suPreview ? suPv.summaryId : myProfile && myProfile.daily_summary_slack_id;
     const role = p => p.role === 'admin' ? 'Admin' : p.role === 'approver' ? 'Approver' : '';
     body = head(suGlyph('clipboard-text'), 'Your daily summary', 'At the end of the day, send what you worked on, client by client, from Timesheet’s Today card. Who should get it?') +
       (people.length ? `<div class="ds-pk su-pk" role="radiogroup" aria-label="Who gets your daily summary">${people.map(p => `<button role="radio" aria-checked="${cur === p.slack_user_id}" onclick="suSummaryPick('${p.id}')"><span class="ck"></span><span>${escapeHtml(p.name)}</span><span class="r">${role(p)}</span></button>`).join('')}</div>`
         : state('off', 'Nobody on the team has Slack linked in Radar yet. You can choose later, on Timesheet.'));
     f = foot(next(), true);
   } else if(k === 'label'){
-    const key = typeof gmailLabelKeyNow !== 'undefined' ? gmailLabelKeyNow : null;
+    const key = suPreview ? suPvKey : typeof gmailLabelKeyNow !== 'undefined' ? gmailLabelKeyNow : null;
     body = head(suGlyph('tag'), 'Gmail label “Radar”', 'For any other email you want in Radar: label it “Radar” and it becomes a task within 5 minutes. A small script in your Google account sends only the emails you label.') +
       (key ? `<div class="su-script">${gmailLabelStepsHtml(key)}</div>`
         : checking || (st === 'done' ? state('ok', 'Your script is set up. Label an email “Radar” to try it.') : st === 'na' ? state('off', isAdmin() ? 'Run addendum-gmail-label.sql in Supabase first.' : 'An admin finishes setting this up first.')
@@ -296,22 +356,36 @@ function setupGo(k, dir){
   setupRender(dir != null ? dir : (to >= from ? 1 : -1));
   suFocusMain();
 }
-function setupNext(){ const steps = setupSteps(), i = steps.findIndex(s => s.k === suAt); if(suAt === 'label' && typeof gmailLabelKeyNow !== 'undefined') gmailLabelKeyNow = null; if(i < steps.length - 1) setupGo(steps[i + 1].k, 1); }
+function setupNext(){ const steps = setupSteps(), i = steps.findIndex(s => s.k === suAt); if(suAt === 'label'){ if(typeof gmailLabelKeyNow !== 'undefined') gmailLabelKeyNow = null; suPvKey = null; } if(i < steps.length - 1) setupGo(steps[i + 1].k, 1); }
 function setupBack(){ const steps = setupSteps(), i = steps.findIndex(s => s.k === suAt); if(i > 0) setupGo(steps[i - 1].k, -1); }
-function setupSkip(){ const s = suSkipped(); s.add(suAt); suSet('skipped', JSON.stringify([...s])); setupNudge(); setupNext(); }
+function setupSkip(){
+  if(suPreview){ suPvSkipped.add(suAt); setupNext(); return; }
+  const s = suSkipped(); s.add(suAt); suSet('skipped', JSON.stringify([...s])); setupNudge(); setupNext();
+}
+// Preview: the button shows it connecting, then the step is connected, and a note says what really happens
+const SU_PV_SAYS = { slack: 'In the real setup, Slack asks you to allow Radar, then brings you back here, connected.',
+  calendar: 'In the real setup, Google asks you to allow Radar to see your calendar, then brings you back here, connected.',
+  gmail: 'In the real setup, Google asks you to allow Radar to read your clients’ emails, then brings you back here, connected.',
+  notify: 'In the real setup, your browser asks you to allow notifications from Radar.' };
+function suPvFake(k){
+  const btn = document.querySelector('#suFoot .btn-p'); if(btn) setBtnLoading(btn, 'Connecting…');
+  setTimeout(() => { suPv[k] = true; setupRender(null); if(SU_PV_SAYS[k]) showToast('info', 'Preview', SU_PV_SAYS[k]); }, 650);
+}
 
 // ---- each step's action ------------------------------------------------------------------------------
 async function suPushOn(){
+  if(suPreview){ suPvFake('notify'); return; }
   if(typeof enablePushNotifications !== 'function') return;
   await enablePushNotifications();
   suPush = await suPushState(); setupRender(null); setupNudge();
   if(suPush === 'on') setTimeout(() => { if(suAt === 'notify') setupNext(); }, 700);
 }
 // Slack, Google and Gmail sign in on their own pages, then send you back here (#setup/<step>)
-function suSlack(){ if(typeof slackMeConnect === 'function') slackMeConnect(); }
-function suCalendar(){ try{ sessionStorage.setItem('gcal-back', '#setup/calendar'); }catch(e){} if(typeof connectGoogleCalendar === 'function') connectGoogleCalendar(); }
-function suGmail(){ if(typeof gmailConnect === 'function') gmailConnect(); }
+function suSlack(){ if(suPreview) return suPvFake('slack'); if(typeof slackMeConnect === 'function') slackMeConnect(); }
+function suCalendar(){ if(suPreview) return suPvFake('calendar'); try{ sessionStorage.setItem('gcal-back', '#setup/calendar'); }catch(e){} if(typeof connectGoogleCalendar === 'function') connectGoogleCalendar(); }
+function suGmail(){ if(suPreview) return suPvFake('gmail'); if(typeof gmailConnect === 'function') gmailConnect(); }
 async function suLabel(){
+  if(suPreview){ suPvKey = 'rgl_PREVIEW_' + 'x'.repeat(24); suPv.label = true; setupRender(null); return; }
   const btn = document.getElementById('suLabelGo'); if(btn) setBtnLoading(btn, 'Making it…');
   const r = await gmailCall({ action: 'label-key' });
   if(!r.key){ if(btn) restoreBtn(btn); showToast('error', 'Couldn’t make your script', r.error || 'Try again.'); return; }
@@ -321,6 +395,7 @@ async function suLabel(){
 }
 async function suSummaryPick(id){
   const p = (teamProfiles || []).find(x => x.id === id); if(!p || !p.slack_user_id) return;
+  if(suPreview){ suPv.summaryId = p.slack_user_id; suPv.summary = true; setupRender(null); return; }
   const was = myProfile.daily_summary_slack_id;
   myProfile.daily_summary_slack_id = p.slack_user_id; setupRender(null); setupNudge();
   const { error } = await supabaseClient.from('team_profiles').update({ daily_summary_slack_id: p.slack_user_id }).eq('id', currentUser.id);
@@ -334,6 +409,7 @@ function suCopyLink(){
   else showToast('info', 'Radar’s address', suAppUrl());
 }
 async function suSendLink(){
+  if(suPreview){ showToast('info', 'Preview', 'In the real setup, Radar sends you this link in Slack, to open on your phone.'); return; }
   const b = document.getElementById('suSendLink'); if(b) setBtnLoading(b, 'Sending…');
   let r = {};
   try{

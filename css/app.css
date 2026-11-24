@@ -3884,3 +3884,17 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 .su-nudge-x{flex:none;width:26px;height:26px;color:var(--label-3)}
 .su-nudge-x svg{width:13px;height:13px}
 @media (hover:hover) and (pointer:fine){.su-nudge-x:hover{color:var(--label)}}
+/* Set Up Radar, motion (Nov 24): the highlight slides between steps; Preview */
+.su-list{position:relative;margin-top:22px;min-height:0;overflow:auto}
+.su-list .su-steps{position:relative;z-index:1;margin:0;overflow:visible}
+.su-ink{position:absolute;left:0;right:0;top:0;height:40px;border-radius:10px;background:var(--fill-2);pointer-events:none;transition:transform 320ms cubic-bezier(.23,1,.32,1),height 320ms cubic-bezier(.23,1,.32,1);will-change:transform}
+.su-list .su-st.is-on{background:transparent}
+@media (hover:hover) and (pointer:fine){.su-list .su-st:not(.is-on):hover{background:color-mix(in srgb,var(--fill-2) 55%,transparent)}}
+.su-pv{margin-left:auto;padding:2px 8px;border-radius:999px;background:var(--fill-2);font-size:11px;font-weight:600;color:var(--label-2)}
+.su-pvnote{margin:auto 8px 0;font-size:12px;line-height:1.45;color:var(--label-3)}
+.su-pvnote + .su-later{margin-top:10px}
+.su-rail{gap:0}
+.su-later{margin-top:auto}
+.su-nudge{animation:suNudgeIn 320ms cubic-bezier(.23,1,.32,1)}
+@keyframes suNudgeIn{from{opacity:0;transform:translateY(6px)}}
+@media (prefers-reduced-motion:reduce){.su-ink,.su-ring circle.v{transition:none}.su-nudge{animation:none}}

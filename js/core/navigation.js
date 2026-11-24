@@ -349,7 +349,7 @@ function updateDocumentTitle(name){
 async function openScreenFromAddress(hash){
   if(!currentUser) return;
   const route = parseRouteHash(hash) || { view:'overview' };
-  if(route.view === 'setup'){ if(typeof setupOpen === 'function') setupOpen(route.step); return; }
+  if(route.view === 'setup'){ if(typeof setupOpen === 'function') setupOpen(route.step, { preview: /[?&]preview\b/.test(String(hash || '')) }); return; }
   if(document.getElementById('setupRoot') && typeof setupClose === 'function') setupClose();   // Back out of the setup
   const already = route.view === currentViewName && (route.view !== 'clientdetail' || route.clientId === currentDetailClientId);
   if(already && !route.itemId) return;
