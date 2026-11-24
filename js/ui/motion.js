@@ -179,7 +179,7 @@ function checkOff(btn, then){
   btn.classList.add('checking');
   btn.setAttribute('aria-checked', 'true');
   btn.innerHTML = typeof icon === 'function' ? icon('check', { weight: 'bold' }) : '✓';
-  const row = btn.closest('.row, .ir, .kanban-card, .tk, .rmi-r');
+  const row = btn.closest('.row, .ir, .kanban-card, .tk, .rmi-r, .wx-row');
   if(motionOK()){
     btn.animate?.([{ transform: 'scale(.8)' }, { transform: 'scale(1.12)', offset: .6 }, { transform: 'scale(1)' }], { duration: 260, easing: EASE_OUT });
     row?.animate?.([{ opacity: 1 }, { opacity: .45 }], { duration: 260, delay: 60, easing: EASE_OUT, fill: 'forwards' });

@@ -14,12 +14,12 @@ let waSettings = null;
 let waLoaded = false;
 let waReady = null;            // null: not loaded · false: the tables aren't there yet · true
 let waWho = null;              // 'mine' | 'all' | an owner key (leads only); null = the default
-let waTab = 'open';            // 'open' | 'done'
+let waTab = null;              // 'needs' | 'open' | 'done'; null = the default (Needs attention for leads, Waiting for members)
+let waClientSel = null;        // leads: one client's name, or null for all
 let waRealtimeStarted = false;
 let waAccessLevel = null;      // 'manage' | 'own' | 'none' from the database; null = it doesn't say (older setup)
 let waSetupOk = null;          // may change the setup (wa_can_setup()); null = the database doesn't say yet
 let waContact = null;          // leads: when the team last wrote in each group it reads (wa_last_contact); null = the database doesn't say
-let waQuietAll = false;        // Quiet clients: show them all
 let waCheckAt = null;          // when Check Now was pressed in this tab (ISO)
 let waCheckTimer = null;
 const waChat = {};             // item id -> its messages ([] when there are none) · 'loading' · 'none' (the database can't say)
@@ -31,7 +31,6 @@ const WA_KIND = { request: 'Request', question: 'Question', promise: 'We promise
 const WA_KIND_IC = { request: 'list-checks', question: 'circle-help', promise: 'handshake', issue: 'flag' };
 const WA_STALE_MS = 120000;    // the connector writes a heartbeat about every 30 s
 const WA_QUIET_DAYS = 7;       // no message or update from us in this many days: a quiet client
-const WA_QUIET_SHOWN = 4;
 
 // Who sees what (wa_access(), read with the rest in waLoadNow). Before the test-mode update the
 // database doesn't say, so the role decides.
@@ -305,8 +304,11 @@ function waRedraw(){
   if(waSettingsOpen()){ const box = document.getElementById('waConnBox'); if(box) box.innerHTML = waConnHtml(); }
 }
 
-// ---- the screen ------------------------------------------------------------------------------
-function setWa(k, v){ if(k === 'tab') waTab = v; if(k === 'who') waWho = v; window._waSel = null; renderWhatsapp(); }
+// ---- the screen (Nov 24 redesign: by client) ------------------------------------------------------
+// The client comes first: each client is a section, its name outside the card (service, whose client,
+// how they sound, how many wait and the oldest wait), its requests in a card below, folding away.
+// Urgent first, for anyone; for admins and approvers their own requests next; then the longest waits.
+function setWa(k, v){ if(k === 'tab') waTab = v; if(k === 'who') waWho = v; if(k === 'client') waClientSel = v || null; window._waSel = null; renderWhatsapp(); }
 function selectWa(id){ window._waSel = window._waSel === id ? null : id; delete waChatTop[id]; renderWhatsapp(); if(window._waSel) waLoadChat(id); }
 function closeWaPanel(){ window._waSel = null; renderWhatsapp(); }
 function renderWhatsappTasks(){ renderWhatsapp(); }   // the old name, still called by realtime
@@ -322,6 +324,57 @@ function renderWhatsapp(){
     root.innerHTML = `<div class="spw"><div class="sp-page"><div class="wa">${emptyState({ icon: 'refresh-cw', title: 'WhatsApp couldn’t be shown', text: String(e && e.message || e), action: 'Try Again', onAction: 'openWhatsappView()' })}</div></div></div>`;
   }
 }
+
+// Why an open item needs someone now, in a few words, or null.
+const WA_RANK = { urgent: 0, reply: 1, late: 2, due: 3, high: 4 };
+function waWhy(t, waits){
+  if(t.status !== 'open') return null;
+  if(t.urgent_at) return { k: 'urgent', text: 'Urgent', red: true };
+  const w = waits && waits.get(t.id);
+  if(w) return { k: 'reply', text: `The client has waited ${waMinWords(w.mins)} for a reply`, red: true };
+  const today = toDateStr(rNow());
+  if(t.due_date && t.due_date < today) return { k: 'late', text: `Was due ${fmtShortDate(new Date(t.due_date + 'T12:00:00'))}`, red: true };
+  if(waLate(t)) return { k: 'late', text: t.kind === 'promise' ? `Promised ${waAgeWord(t)} ago` : `Waiting ${waAgeWord(t)}` };
+  if(t.due_date === today) return { k: 'due', text: 'Due today' };
+  if(waDueToday(t)) return { k: 'due', text: 'Answer today' };
+  if(t.priority === 'high') return { k: 'high', text: 'High priority' };
+  return null;
+}
+// The connector's "waiting on a reply" (leads), put on the oldest open item in that group.
+function waWaitMap(open){
+  const m = new Map();
+  if(typeof waWaitingNow !== 'function' || typeof WA_NUDGE_MIN === 'undefined') return m;
+  waWaitingNow().filter(w => w.mins >= WA_NUDGE_MIN).forEach(w => {
+    const t = open.filter(x => x.group_jid === w.group_jid).sort((a, b) => new Date(a.first_seen) - new Date(b.first_seen))[0];
+    if(t && !m.has(t.id)) m.set(t.id, w);
+  });
+  return m;
+}
+// Folded client sections, kept on this device.
+let waFoldedSet = null;
+function waFolded(){ if(!waFoldedSet){ try { waFoldedSet = new Set(JSON.parse(localStorage.getItem('wa-folded') || '[]')); } catch(e){ waFoldedSet = new Set(); } } return waFoldedSet; }
+function waSaveFolded(){ try { localStorage.setItem('wa-folded', JSON.stringify([...waFolded()])); } catch(e){} }
+// No redraw: the section folds in place, so it animates.
+function waFold(btn){
+  const sec = btn.closest('.wx-cs'); if(!sec) return;
+  const closed = !sec.classList.contains('is-closed');
+  sec.classList.toggle('is-closed', closed); btn.setAttribute('aria-expanded', String(!closed));
+  closed ? waFolded().add(sec.dataset.k) : waFolded().delete(sec.dataset.k);
+  waSaveFolded(); waFoldAllWord();
+}
+function waFoldAll(){
+  const secs = [...document.querySelectorAll('#whatsappRoot .wx-cs')];
+  const shut = !(secs.length && secs.every(x => x.classList.contains('is-closed')));
+  secs.forEach(x => { x.classList.toggle('is-closed', shut); x.querySelector('.wx-cs-t')?.setAttribute('aria-expanded', String(!shut)); shut ? waFolded().add(x.dataset.k) : waFolded().delete(x.dataset.k); });
+  waSaveFolded(); waFoldAllWord();
+}
+function waFoldAllWord(){
+  const b = document.getElementById('waFoldAll'); if(!b) return;
+  const secs = [...document.querySelectorAll('#whatsappRoot .wx-cs')];
+  b.textContent = secs.length && secs.every(x => x.classList.contains('is-closed')) ? 'Expand All' : 'Collapse All';
+}
+function waYoursWords(n, of){ return n === of ? (n === 1 ? 'it’s yours' : 'all yours') : `${n} ${n === 1 ? 'is' : 'are'} yours`; }
+
 function waDraw(root){
   if(waHidden()){ root.innerHTML = ''; return; }
   if(waLoadError && !waTasks.length && !waSettings){
@@ -330,16 +383,6 @@ function waDraw(root){
   }
   const lead = waCanManage();
   const who = lead ? (waWho || 'all') : 'mine';
-  const pick = t => who === 'all' ? true : who === 'mine' ? t.owner_user_id === currentUser.id : t.owner_key === who;
-  // urgent first (Nov 24: the live watch marks them), then the longest wait
-  const open = waTasks.filter(t => t.status === 'open' && pick(t)).sort((a, b) => (b.urgent_at ? 1 : 0) - (a.urgent_at ? 1 : 0) || new Date(a.first_seen) - new Date(b.first_seen));
-  const wk = waWeekStart().getTime();
-  const done = waTasks.filter(t => t.status !== 'open' && pick(t) && new Date(t.answered_at || t.updated_at || t.first_seen).getTime() >= wk)
-    .sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
-  const reading = window._waSel === 'read' && lead;
-  const sel = !reading && window._waSel && waTasks.find(t => t.id === window._waSel);
-  if(window._waSel && !sel && !reading) window._waSel = null;
-
   const conn = lead ? waConnState() : null;
   const never = lead && !waTasks.length && !waRuns.some(r => r.kind === 'digest');
   // Not linked yet (or not set up): the steps to start, instead of an empty list.
@@ -347,79 +390,177 @@ function waDraw(root){
     root.innerHTML = `<div class="spw"><div class="sp-page"><div class="wa">${waSetupHtml()}</div></div></div>`;
     return;
   }
+  let tab = waTab || (lead ? 'needs' : 'open');
+  if(!lead && tab === 'needs') tab = 'open';
+  const me = currentUser.id;
+  const pickWho = t => who === 'all' ? true : who === 'mine' ? t.owner_user_id === me : t.owner_key === who;
+  const allOpen = waTasks.filter(t => t.status === 'open' && pickWho(t));
+  const wk = waWeekStart().getTime();
+  const allDone = waTasks.filter(t => t.status !== 'open' && pickWho(t) && new Date(t.answered_at || t.updated_at || t.first_seen).getTime() >= wk);
+  // one client at a time, for leads
+  const clientNames = [...new Set([...allOpen, ...allDone].map(waClientLabel))].sort((a, b) => a.localeCompare(b));
+  if(waClientSel && !clientNames.includes(waClientSel)) waClientSel = null;
+  const pickCl = t => !lead || !waClientSel || waClientLabel(t) === waClientSel;
+  const open = allOpen.filter(pickCl), done = allDone.filter(pickCl);
+  const waits = lead ? waWaitMap(open) : new Map();
+  const whyOf = new Map(open.map(t => [t.id, waWhy(t, waits)]));
+  const needs = open.filter(t => whyOf.get(t.id));
+  const useMine = lead && who === 'all';
+  const isMine = t => t.owner_user_id === me;
+  const tier = t => t.urgent_at ? 0 : useMine && isMine(t) ? 1 : 2;
+  const rank = t => { const w = whyOf.get(t.id); return w ? WA_RANK[w.k] : 9; };
+  const age = t => new Date(t.first_seen).getTime();
+  const reading = window._waSel === 'read' && lead;
+  const sel = !reading && window._waSel && waTasks.find(t => t.id === window._waSel);
+  if(window._waSel && !sel && !reading) window._waSel = null;
 
-  const rows = waTab === 'open' ? open : done;
-  const late = open.filter(waLate), fresh = open.filter(t => !waLate(t)), high = open.filter(t => t.priority === 'high');
+  // the client sections
+  const sections = (items, past) => {
+    const by = new Map();
+    items.forEach(t => { const k = waClientLabel(t); if(!by.has(k)) by.set(k, []); by.get(k).push(t); });
+    const secs = [...by.entries()].map(([k, ts]) => {
+      if(past) ts.sort((a, b) => new Date(waClosedAt(b) || 0) - new Date(waClosedAt(a) || 0));
+      else ts.sort((a, b) => tier(a) - tier(b) || rank(a) - rank(b) || age(a) - age(b));
+      return { k, ts, top: past ? 0 : Math.min(...ts.map(tier)), rank: past ? 0 : Math.min(...ts.map(rank)),
+        at: past ? -Math.max(...ts.map(t => new Date(waClosedAt(t) || 0).getTime())) : Math.min(...ts.map(age)) };
+    });
+    secs.sort((a, b) => a.top - b.top || a.rank - b.rank || a.at - b.at);
+    return secs.map(x => waSecHtml(x.k, x.ts, { past, lead, who, sel, whyOf, useMine, isMine, live: past ? [] : open.filter(t => waClientLabel(t) === x.k) })).join('');
+  };
+  const again = tab !== 'done' ? waTasks.filter(t => pickWho(t) && pickCl(t) && waWroteAgain(t)) : [];
+  const againHtml = again.length ? `<section class="wx-cs wx-again" data-k="_again" aria-label="The client wrote again"><header class="wx-cs-h"><div class="wx-cs-l"><span class="wx-cs-t is-static">The client wrote again</span><div class="wx-cs-sub"><span>Marked done, then the client wrote in the group. Open it to read what they said.</span></div></div><div class="wx-cs-r"><span>${again.length}</span></div></header><div class="wx-cs-body"><div class="wx-cs-in"><div class="wx-cs-card">${again.map(t => waRowHtml(t, sel, { who, lead, useMine, isMine })).join('')}</div></div></div></section>` : '';
+  const rows = tab === 'needs' ? needs : tab === 'open' ? open : done;
+
+  // the heading: how many clients wait, then how many requests and the checks
   const whoName = who === 'mine' ? 'you' : who === 'all' ? 'the team' : (WA_OWNERS.find(o => o[0] === who) || [, who])[1];
-  const h2 = waTab === 'done' ? (done.length ? `${done.length} done this week` : 'Nothing done this week yet')
-    : open.length ? `${open.length} waiting on ${whoName}` : `Nothing waiting on ${whoName}`;
+  const nClients = new Set(open.map(waClientLabel)).size;
+  const h2 = open.length ? `${nClients} client${nClients === 1 ? '' : 's'} waiting on ${whoName}` : `Nothing waiting on ${whoName}`;
   const subBits = [];
-  const againN = waTab === 'open' ? waTasks.filter(t => pick(t) && waWroteAgain(t)).length : 0;
-  if(againN) subBits.push(`<span class="t-blue">${againN === 1 ? 'A client' : againN + ' clients'} wrote again after done</span>`);
-  if(waTab === 'open' && open.length){
-    const urgentN = open.filter(t => t.urgent_at).length;
-    if(urgentN) subBits.push(`<span class="t-red"><b>${urgentN} urgent</b></span>`);
-    if(late.length) subBits.push(`<span class="t-red">${late.length} waiting over 1 business day</span>`);
-    const due = open.filter(waDueToday).length, today = open.filter(t => waDays(t) === 0).length;
-    if(due) subBits.push(`${due} to answer today`);
-    if(today) subBits.push(`${today} new today`);
+  if(open.length){
+    const mineN = useMine ? open.filter(isMine).length : 0;
+    subBits.push(`<b>${open.length} request${open.length === 1 ? '' : 's'}${mineN ? ` · ${waYoursWords(mineN, open.length)}` : ''}</b>`);
   }
-  if(lead && conn.key === 'connected'){
-    const last = waLastRun(), next = waNextCheck();
-    if(last) subBits.push(`checked at <b>${escapeHtml(waAt(last.started_at))}</b>${next ? `, next ${daysBetween(dayStart(rNow()), dayStart(next)) === 0 ? 'at ' : ''}${escapeHtml(waAt(next.toISOString()))}` : ''}`);
-  } else if(!lead) subBits.push('From the client WhatsApp groups');
-  if(waTab === 'done') subBits.splice(0, subBits.length, 'Marked done, answered in the group, or not a task, since Monday');
+  const againN = again.length;
+  if(againN) subBits.push(`<span class="t-blue">${againN === 1 ? 'A client' : againN + ' clients'} wrote again after done</span>`);
+  if(lead){
+    if(conn.key === 'connected'){
+      const last = waLastRun(), next = waNextCheck();
+      subBits.push(`<span class="wx-st"><i class="dot green" aria-hidden="true"></i>Connected${last ? ` · checked at ${escapeHtml(waAt(last.started_at))}` : ''}${next ? ` · next ${daysBetween(dayStart(rNow()), dayStart(next)) === 0 ? 'at ' : ''}${escapeHtml(waAt(next.toISOString()))}` : ''}</span>`);
+      subBits.push(`<button class="lnk-b" onclick="waShowRead()">What it read</button>`);
+    } else {
+      const fix = waCanSetup() ? `<a href="#" onclick="openSettingsTab('whatsapp');return false;">${conn.key === 'qr' ? 'Show the Code' : conn.key === 'signedout' ? 'Re-link' : 'Open WhatsApp Settings'}</a>` : '<span>An admin fixes it in Settings → WhatsApp.</span>';
+      subBits.push(`<span class="wx-st"><i class="dot ${conn.dot}" aria-hidden="true"></i>${escapeHtml(conn.text)}</span>`, fix);
+    }
+  } else {
+    const first = open.slice().sort((a, b) => tier(a) - tier(b) || rank(a) - rank(b) || age(a) - age(b))[0];
+    subBits.push(first && first.urgent_at ? 'Start with the urgent one.' : 'From your clients’ WhatsApp groups.');
+    if(waNextCheck()) subBits.push(escapeHtml(waNextText().replace(/\.$/, '')));
+  }
 
   const whoOpts = [['all', 'Everyone'], ['mine', 'Mine'], ...WA_OWNERS];
   const curWho = whoOpts.find(o => o[0] === who) || whoOpts[0];
-  const filters = `<div class="seg" role="tablist" aria-label="Show">${[['open', 'Waiting', open.length], ['done', 'Done this week', done.length]].map(([k, t, c]) => `<button class="${waTab === k ? 'on' : ''}" role="tab" aria-selected="${waTab === k}" onclick="setWa('tab','${k}')">${t} <span class="c">${c}</span></button>`).join('')}</div>
-${lead ? `<label class="pop pop-sel"><span class="pl">${escapeHtml(curWho[1])}</span>${icon('caret-down')}<select aria-label="Whose items" onchange="setWa('who',this.value)">${whoOpts.map(([v, n]) => `<option value="${v}"${v === who ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('')}</select></label>` : ''}`;
+  const seg = tabs => `<div class="seg" role="tablist" aria-label="Show">${tabs.map(([k, t, c]) => `<button class="${tab === k ? 'on' : ''}" role="tab" aria-selected="${tab === k}" onclick="setWa('tab','${k}')">${t} <span class="c">${c}</span></button>`).join('')}</div>`;
+  const hdRight = lead
+    ? `<label class="pop pop-sel"><span class="pl">${escapeHtml(curWho[1])}</span>${icon('caret-down')}<select aria-label="Whose items" onchange="setWa('who',this.value)">${whoOpts.map(([v, n]) => `<option value="${v}"${v === who ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('')}</select></label>
+${clientNames.length > 1 ? `<label class="pop pop-sel"><span class="pl">${escapeHtml(waClientSel || 'All clients')}</span>${icon('caret-down')}<select aria-label="Which clients" onchange="setWa('client',this.value)"><option value="">All clients</option>${clientNames.map(n => `<option value="${escapeHtml(n)}"${n === waClientSel ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('')}</select></label>` : ''}
+${waCheckBtn()}`
+    : seg([['open', 'Waiting', open.length], ['done', 'Done this week', done.length]]);
+  const foldBtn = `<button class="lnk-b wx-all" id="waFoldAll" onclick="waFoldAll()">Collapse All</button>`;
 
-  // Grouped under the client's name, so two things split from one message read as one client.
-  // Waiting: the client who has waited longest first; done: the most recent first.
-  const byClient = items => { const m = new Map(); items.forEach(t => { const k = waClientLabel(t); if(!m.has(k)) m.set(k, []); m.get(k).push(t); }); return [...m.entries()]; };
-  // each client its own block: the name, its service under it, and how many (Nov 23)
-  const groupHtml = ([name, ts]) => { const c = waClient(ts[0]), svc = c && c.service ? String(c.service) : '';
-    return `<section class="wa-g" aria-label="${escapeHtml(name)}"><div class="wa-gh"><div class="wa-gt"><b>${escapeHtml(name)}</b>${svc ? `<span class="svc">${escapeHtml(svc)}</span>` : ''}</div><span class="n" aria-label="${ts.length} ${ts.length === 1 ? 'item' : 'items'}">${ts.length}</span></div>${ts.map(t => waRowHtml(t, sel, who)).join('')}</section>`; };
-  const again = waTab === 'open' ? waTasks.filter(t => pick(t) && waWroteAgain(t)) : [];
-  const againHtml = again.length ? `<section class="wa-g wa-again" aria-label="Written to again"><div class="wa-gh"><div class="wa-gt"><b>The client wrote again</b></div><span class="n">${again.length}</span></div><p class="wa-again-p">Marked done, then the client wrote in the group. Open it to read what they said.</p>${again.map(t => waRowHtml(t, sel, who)).join('')}</section>` : '';
-  let list;
-  if(waTab === 'open' && (open.length || again.length)) list = `${againHtml}${open.length ? `<p class="wa-sort">By client, longest wait first</p>${byClient(open).map(groupHtml).join('')}` : ''}`;
-  else if(waTab === 'done' && done.length) list = `<p class="wa-sort">By client, most recent first</p>${byClient(done).map(groupHtml).join('')}`;
-  else list = waEmptyHtml(who, open, done);
+  let main;
+  if(lead){
+    const bar = `<div class="wx-bar">${seg([['needs', 'Needs attention', needs.length], ['open', 'All waiting', open.length], ['done', 'Done this week', done.length]])}${rows.length ? foldBtn : ''}</div>`;
+    let list;
+    if(rows.length) list = `<div class="wx-groups">${tab !== 'done' ? againHtml : ''}${sections(rows, tab === 'done')}</div>`;
+    else if(tab === 'needs' && open.length) list = `${againHtml ? `<div class="wx-groups">${againHtml}</div>` : ''}${emptyState({ icon: 'check-circle', tone: 'ok', title: 'Nothing needs attention', text: `${open.length} waiting, none urgent, late or due today.`, link: `See all ${open.length} waiting`, onLink: "setWa('tab','open')" })}`;
+    else list = `${againHtml ? `<div class="wx-groups">${againHtml}</div>` : ''}${waEmptyHtml(who, open, done)}`;
+    main = `${bar}${list}`;
+  } else if(tab === 'open'){
+    const sorted = open.slice().sort((a, b) => tier(a) - tier(b) || rank(a) - rank(b) || age(a) - age(b));
+    const next = sorted[0], rest = sorted.slice(1);
+    main = next
+      ? `${waNextHtml(next, whyOf.get(next.id))}${rest.length || againHtml ? `<div class="wx-bar"><h3 class="wx-lh">Also waiting on you</h3>${foldBtn}</div><div class="wx-groups">${againHtml}${sections(rest, false)}</div>` : ''}`
+      : `${againHtml ? `<div class="wx-groups">${againHtml}</div>` : ''}${waEmptyHtml(who, open, done)}`;
+  } else {
+    main = done.length ? `<div class="wx-bar"><span></span>${foldBtn}</div><div class="wx-groups">${sections(done, true)}</div>` : waEmptyHtml(who, open, done);
+  }
 
-  const side = lead ? waSideHtml(who, conn) : '';
+  const side = lead ? waSideHtml(who, conn, allOpen) : waMeSideHtml(allOpen, allDone);
   const prev = root.querySelector('.sp-page')?.scrollTop || 0;
-  root.innerHTML = `<div class="spw"><div class="sp-page"><div class="wa${lead ? '' : ' wa-solo'}">
-<div class="rmi-hd"><div><h2>${escapeHtml(h2)}</h2><p>${subBits.join(' · ').replace(/^[a-z]/, x => x.toUpperCase())}</p></div><div class="rmi-f">${filters}</div></div>
-<div class="wa-body"><div class="wa-main">${list}</div>${side}</div>
+  root.innerHTML = `<div class="spw"><div class="sp-page"><div class="wx${lead ? '' : ' wx-solo'}${sel || reading ? ' has-panel' : ''}">
+<header class="wx-hd"><div><h2 class="wx-h">${escapeHtml(h2)}</h2><p class="wx-sub">${subBits.join('<i class="wx-sep">·</i>')}</p></div><div class="wx-hd-a">${hdRight}</div></header>
+<div class="wx-body"><div class="wx-main">${main}</div>${side}</div>
 </div></div>${sel ? waPanelHtml(sel) : reading ? waReadPanelHtml() : ''}</div>`;
   const sp = root.querySelector('.sp-page'); if(sp) sp.scrollTop = prev;
+  waFoldAllWord();
   waChatScroll();
 }
-function waRowHtml(t, sel, who){
-  const closed = t.status !== 'open', can = waCanEdit(t), lead = waCanManage();
+// One client: its name and facts outside the card, its requests inside.
+function waSecHtml(k, ts, o){
+  const c = waClient(ts[0]);
+  const svc = c && c.service ? String(c.service) : '';
+  const own = o.lead && c && c.customFieldValues && c.customFieldValues.owner ? firstName(String(c.customFieldValues.owner)) : '';
+  const m = c && typeof waMoodFor === 'function' ? waMoodFor(c) : null;
+  const mood = m && m.level !== 'neutral' ? `<span class="wx-mood ${m.level === 'happy' ? 'g' : m.level === 'angry' ? 'r' : 'y'}">${escapeHtml(WA_MOOD[m.level])}</span>` : '';
+  const meta = [svc, own ? `${own}’s client` : ''].filter(Boolean).map(escapeHtml).join(' · ');
+  const live = o.live && o.live.length ? o.live : ts.filter(t => t.status === 'open');   // the client's whole list, whichever tab
+  const n = o.past ? ts.length : live.length;
+  const mineN = o.useMine ? live.filter(o.isMine).length : 0;
+  const count = o.past ? `${n} done` : `${n} waiting${mineN ? ` · ${waYoursWords(mineN, n)}` : ''}`;
+  const oldest = o.past ? null : live.filter(waLate).sort((a, b) => new Date(a.first_seen) - new Date(b.first_seen))[0];
+  const urgent = !o.past && live.some(t => t.urgent_at);
+  const closed = waFolded().has(k);
+  const link = c ? `<a href="#" onclick="openClientInspectorFor('${escapeHtml(String(c.id))}');return false;">Open Client${icon('caret-right')}</a>` : '<span class="t-3">Not in Radar</span>';
+  return `<section class="wx-cs${closed ? ' is-closed' : ''}" data-k="${escapeHtml(k)}" aria-label="${escapeHtml(k)}">
+<header class="wx-cs-h"><div class="wx-cs-l"><button class="wx-cs-t" aria-expanded="${!closed}" onclick="waFold(this)">${icon('caret-right', { cls: 'wx-chev' })}<span>${escapeHtml(k)}</span></button>${meta || mood ? `<div class="wx-cs-sub">${meta ? `<span>${meta}</span>` : ''}${meta && mood ? '<i>·</i>' : ''}${mood}</div>` : ''}</div>
+<div class="wx-cs-r">${urgent ? '<em class="wa-urg">Urgent</em>' : ''}<span class="wx-cs-n">${escapeHtml(count)}</span>${oldest ? `<span class="t-red">oldest ${escapeHtml(waAgeWord(oldest))}</span>` : ''}<i class="wx-vr" aria-hidden="true"></i>${link}</div></header>
+<div class="wx-cs-body"><div class="wx-cs-in"><div class="wx-cs-card">${ts.map(t => waRowHtml(t, o.sel, { ...o, why: o.whyOf && o.whyOf.get(t.id) })).join('')}</div></div></div></section>`;
+}
+function waRowHtml(t, sel, o){
+  o = o || {};
+  const closed = t.status !== 'open', can = waCanEdit(t);
   const cb = !closed
     ? (can ? `<button class="cb rem" role="checkbox" aria-checked="false" aria-label="Mark done" title="Mark done" onclick="event.stopPropagation();checkOff(this, () => waMarkDone('${t.id}'))"></button>` : '<span class="cb rem is-off"></span>')
     : `<span class="cb rem${t.status === 'dismissed' ? ' closed' : ' done'}" role="img" aria-label="${t.status === 'dismissed' ? 'Not a task' : 'Done'}">${icon(t.status === 'dismissed' ? 'x' : 'check', { weight: 'bold' })}</span>`;
-  const kind = [t.urgent_at && !closed ? '<em class="wa-urg">Urgent</em>' : t.priority === 'high' && !closed ? '<em class="wa-hi">High priority</em>' : '', `<em class="wa-k k-${t.kind}">${escapeHtml(WA_KIND[t.kind] || 'Request')}</em>`].filter(Boolean).join('<i class="wa-dot">·</i>');
+  const why = !closed && o.why ? `<span class="wx-why${o.why.red ? ' is-red' : ''}">${escapeHtml(o.why.text)}</span>` : '';
   const quote = t.source_excerpt ? `<span class="wa-x">“${escapeHtml(t.source_excerpt)}”</span>` : '';
-  let right;
+  const showWho = o.lead && o.who !== 'mine';
+  let sub, right;
   if(closed){
     const again = waWroteAgain(t);
-    const word = again ? 'Client wrote again' : t.status === 'dismissed' ? 'Not a task' : t.status === 'answered' ? 'Answered in the group' : 'Done';
-    const when = again || t.answered_at || t.updated_at;
-    right = `<span class="rmi-when${again ? ' is-new' : ''}">${word}</span><span class="rmi-d">${when ? escapeHtml(again ? waAt(when) : new Date(when).toLocaleDateString('en-US', { weekday: 'short' })) : ''}</span>`;
+    const when = again || waClosedAt(t);
+    const day = when ? new Date(when).toLocaleDateString('en-US', { weekday: 'short' }) : '';
+    sub = `<span class="s"><em class="wa-k k-${t.kind}">${escapeHtml(WA_KIND[t.kind] || 'Request')}</em>${[showWho ? waOwnerName(t) : '', day].filter(Boolean).map(x => `<i class="wa-dot">·</i><span>${escapeHtml(x)}</span>`).join('')}</span>`;
+    const addUpd = !again && !t.improvement_id && can && t.status !== 'dismissed' && typeof waUpdateFits === 'function' && waUpdateFits(t);
+    const word = again ? 'Client wrote again' : t.status === 'dismissed' ? 'Not a task' : t.improvement_id ? 'In the weekly update' : t.status === 'answered' ? 'Answered in the group' : 'Done';
+    right = addUpd
+      ? `<span class="rmi-when">Done</span><button class="lnk-b wx-add" onclick="event.stopPropagation();waAddToUpdate('${t.id}')">Add to Update</button>`
+      : `<span class="rmi-when${again ? ' is-new' : t.improvement_id ? ' is-ok' : ''}">${word}</span>${again ? `<span class="rmi-d">${escapeHtml(waAt(again))}</span>` : ''}`;
   } else {
-    const showWho = lead && who !== 'mine';
-    const due = t.due_date ? `Due ${t.due_date === toDateStr(rNow()) ? 'today' : fmtShortDate(new Date(t.due_date + 'T12:00:00'))}` : '';
-    right = `<span class="rmi-when${waLate(t) ? ' is-late' : waDays(t) === 0 ? ' is-new' : ''}">${escapeHtml(waWaitWord(t))}</span><span class="rmi-d">${escapeHtml(showWho ? waOwnerName(t) : due)}</span>`;
+    sub = `<span class="s"><em class="wa-k k-${t.kind}">${escapeHtml(WA_KIND[t.kind] || 'Request')}</em>${quote ? `<i class="wa-dot">·</i>${quote}` : ''}</span>`;
+    const mine = o.useMine && o.isMine && o.isMine(t);
+    right = `${showWho ? `<b class="wx-who${mine ? ' is-me' : ''}">${escapeHtml(mine ? 'You' : waOwnerName(t))}</b>` : ''}<span class="rmi-when${waLate(t) ? ' is-late' : waDays(t) === 0 ? ' is-new' : ''}">${escapeHtml(waWaitWord(t))}</span>`;
   }
-  return `<div class="rmi-r wa-r${closed ? ' is-done' : ''}${sel && sel.id === t.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectWa('${t.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)selectWa('${t.id}')">${cb}
-<div class="tx"><b>${escapeHtml(t.title)}</b><span class="s">${kind}${quote}</span></div><div class="rmi-w">${right}</div></div>`;
+  return `<div class="wa-r wx-row${closed ? ' is-done' : ''}${sel && sel.id === t.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectWa('${t.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)selectWa('${t.id}')">${cb}
+<div class="tx">${why}<b>${escapeHtml(t.title)}</b>${sub}</div><div class="wx-row-r">${right}</div></div>`;
+}
+// A team member's next thing to do, large, with its buttons; the rest sits under it by client.
+function waNextHtml(t, why){
+  const c = waClient(t), name = waClientLabel(t), svc = c && c.service ? String(c.service) : '';
+  return `<section class="wx-card wx-next" aria-label="Next up">
+<div class="wx-eb">Next up</div>
+<div class="wx-next-cl">${c ? `<a href="#" onclick="openClientInspectorFor('${escapeHtml(String(c.id))}');return false;">${escapeHtml(name)}${icon('caret-right')}</a>` : `<b>${escapeHtml(name)}</b>`}${svc ? `<span>${escapeHtml(svc)}</span>` : ''}</div>
+${why ? `<span class="wx-why${why.red ? ' is-red' : ''}">${escapeHtml(why.text)}</span>` : ''}
+<h3>${escapeHtml(t.title)}</h3>
+<span class="wx-next-k">${escapeHtml(WA_KIND[t.kind] || 'Request')}${why && (why.k === 'late' || why.k === 'due') ? '' : ` · ${escapeHtml(waWaitWord(t))}`}</span>
+${t.source_excerpt ? `<div class="wx-said"><span class="who">In the group · ${escapeHtml(waWhen(t.first_seen))}</span><p>${escapeHtml(t.source_excerpt)}</p></div>` : ''}
+<div class="wx-pa"><button class="btn btn-p" onclick="waMarkDone('${t.id}')">${icon('check')}Mark Done</button><button class="btn" onclick="selectWa('${t.id}')">Open the Chat</button></div>
+${typeof waUpdateSwitchHtml === 'function' ? waUpdateSwitchHtml(t) : ''}
+</section>`;
 }
 function waEmptyHtml(who, open, done){
-  if(waTab === 'done') return emptyState({ icon: 'check-circle', title: 'Nothing done this week yet',
+  const tab = waTab || (waCanManage() ? 'needs' : 'open');
+  if(tab === 'done') return emptyState({ icon: 'check-circle', title: 'Nothing done this week yet',
     text: 'Items you mark done, or that the team answers in the group, show here until Sunday.',
     link: open.length ? `See the ${open.length} waiting` : '', onLink: "setWa('tab','open')" });
   if(!waCanManage()) return emptyState({ icon: 'message-circle', tone: 'ok', title: 'Nothing waiting on you',
@@ -432,48 +573,55 @@ function waEmptyHtml(who, open, done){
     text: 'When a client asks for something in a group, it shows here after the next check, with who should handle it.',
     link: doneWk ? `See the ${doneWk} done this week` : '', onLink: "setWa('tab','done')" });
 }
-function waSideHtml(who, conn){
-  const open = waTasks.filter(t => t.status === 'open');
-  const people = WA_OWNERS.map(([k, n]) => {
-    const mine = open.filter(t => t.owner_key === k), late = mine.filter(waLate).length;
-    return `<button class="wa-pp${who === k ? ' on' : ''}" onclick="setWa('who','${who === k ? 'all' : k}')" aria-pressed="${who === k}"><span>${n}</span><b>${mine.length || '–'}</b><em>${late ? `${late} waiting long` : ''}</em></button>`;
-  }).join('');
-  const reading = waGroups.filter(g => g.active).length;
-  let st, txt, act = '';
-  if(conn.key === 'connected'){
-    st = `<span class="dot green"></span><b>Connected</b><span>reading ${reading} group${reading === 1 ? '' : 's'}</span>`;
-    txt = `${waRunText(waLastRun()).replace(/^Today at /, 'Last at ')} ${waNextText()}`;
-    act = `<div class="wa-chk-a">${waCheckBtn()}<button class="lnk-b" onclick="waShowRead()">What it read</button></div>`;
-  } else if(conn.key === 'qr' || conn.key === 'reconnecting'){
-    st = `<span class="dot ${conn.dot}"></span><b>${escapeHtml(conn.text)}</b>`;
-    txt = conn.long;
-    act = waCanSetup() ? `<button class="btn" onclick="openSettingsTab('whatsapp')">Show the Code</button>` : '';
-    if(!waCanSetup()) txt = `${txt} ${WA_ADMINS_NOTE}`;
-  } else {
-    st = `<span class="dot ${conn.dot}"></span><b>${escapeHtml(conn.text)}</b>`;
-    txt = conn.long;
-    if(conn.key === 'signedout'){
-      if(waCanSetup()) act = `<button class="btn" onclick="openSettingsTab('whatsapp')">Re-link…</button>`;
-      else txt = 'The phone unlinked it. An admin re-links it in Settings → WhatsApp.';
-    }
-  }
+// Admins and approvers: clients to watch, details to confirm, the team, and test mode.
+function waSideHtml(who, conn, open){
+  const card = h => h ? `<section class="wx-card wx-sec">${h}</section>` : '';
   const testers = waTesters(), onlyMe = testers.length === 1 && testers[0] === currentUser.id;
   const setLink = waCanSetup() ? ` <a href="#" onclick="openSettingsTab('whatsapp');return false;">WhatsApp settings</a>` : '';
   const lock = testers.length
     ? `<p class="wa-lock">${icon('lock-simple')}<span>Test mode: ${onlyMe ? 'only you see this and get' : `only the ${testers.length} testers see this and get`} its Slack messages.${setLink}</span></p>`
     : waCanSetup() ? `<p class="wa-lock">${icon('settings')}<span>${setLink.trim()}</span></p>`
     : `<p class="wa-lock">${icon('settings')}<span>Admins manage the WhatsApp setup for the whole team.</span></p>`;
-  // the new look draws each part of the side as its own card
-  const card = h => h && typeof uiStyleOn === 'function' && uiStyleOn() ? `<div class="wa-card">${h}</div>` : h;
-  return `<aside class="wa-side">
-${card(typeof waSignalsCardHtml === 'function' ? waSignalsCardHtml() : '')}
-${card(open.length ? `<div class="rmi-sec"><b>Who has what</b></div><div class="wa-ppl">${people}</div>` : '')}
-${card(typeof waRepliesCardHtml === 'function' ? waRepliesCardHtml() : '')}
-${card(waQuietHtml())}
+  return `<aside class="wx-side">
+${card(typeof waWatchHtml === 'function' ? waWatchHtml() : '')}
 ${card(typeof waDetailsCardHtml === 'function' ? waDetailsCardHtml() : '')}
-${card(`<div class="rmi-sec"><b>Checks</b></div>
-<div class="wa-chk"><div class="wa-st">${st}</div><p>${escapeHtml(txt)}</p>${act}</div>
-${lock}`)}</aside>`;
+${card(waTeamHtml(who, open))}
+${lock}</aside>`;
+}
+// Who has what: open, waiting over a day, and how fast they answer. A name shows just theirs.
+function waTeamHtml(who, open){
+  const st = typeof waReplyStats === 'function' ? waReplyStats(7) : null;
+  const rows = WA_OWNERS.map(([k, n]) => {
+    const mine = open.filter(t => t.owner_key === k), p = st && st.people.find(x => x.who === n);
+    return { k, n, open: mine.length, late: mine.filter(waLate).length, reply: p ? waMinWords(p.median) : '' };
+  });
+  if(!open.length && !(st && st.n)) return '';
+  const shown = rows.filter(r => r.open || r.reply), rest = rows.filter(r => !r.open && !r.reply);
+  return `<div class="wx-sec-h"><b>Team</b><span class="r">last 7 days${st && st.n ? ` · typical first reply ${escapeHtml(waMinWords(st.median))}` : ''}</span></div>
+<div class="wx-t h" aria-hidden="true"><span></span><span>Open</span><span>Over a day</span><span>First reply</span></div>
+${shown.map(r => `<button class="wx-t wa-pp${who === r.k ? ' on' : ''}" onclick="setWa('who','${who === r.k ? 'all' : r.k}')" aria-pressed="${who === r.k}"><span>${r.n}</span><span>${r.open || '–'}</span><span class="${r.late ? 't-red' : ''}">${r.late || '–'}</span><span>${escapeHtml(r.reply || '–')}</span></button>`).join('')}
+${rest.length ? `<p class="wx-t-q">Nothing open: ${escapeHtml(rest.map(r => r.n).join(', ').replace(/, ([^,]*)$/, ' and $1'))}</p>` : ''}`;
+}
+// A team member's side: their week, and how their clients sound in the groups.
+function waMeSideHtml(open, done){
+  const inUpd = done.filter(t => t.improvement_id).length;
+  const late = open.filter(waLate).sort((a, b) => new Date(a.first_seen) - new Date(b.first_seen));
+  const stat = (k, v, s) => `<div class="wx-stat"><span>${k}</span><b>${v}</b>${s ? `<small>${s}</small>` : ''}</div>`;
+  const week = `<div class="wx-sec-h"><b>Your week</b></div>
+${stat('Done', done.length, done.length ? `${inUpd} of them ${inUpd === 1 ? 'is' : 'are'} in your clients’ weekly updates.` : 'Mark items done here as you finish them.')}
+${stat('Waiting over a day', late.length, late.length ? `${escapeHtml(waClientLabel(late[0]))} has waited longest.` : 'Nothing has waited long.')}`;
+  const seen = new Map();
+  [...open, ...done].forEach(t => { const c = waClient(t); if(c && !seen.has(String(c.id))) seen.set(String(c.id), c); });
+  const moods = typeof waMoodFor === 'function' ? [...seen.values()].map(c => ({ c, m: waMoodFor(c) })).filter(x => x.m) : [];
+  const lvl = { angry: 0, frustrated: 1, happy: 2, neutral: 3 };
+  moods.sort((a, b) => lvl[a.m.level] - lvl[b.m.level]);
+  const moodHtml = moods.length ? `<div class="wx-sec-h"><b>Your clients on WhatsApp</b></div><p class="wx-sec-p">How they come across in their groups this week.</p>
+${moods.map(({ c, m }) => `<div class="wx-mood-r"><b>${escapeHtml(c.name)}</b><span class="wx-mood ${m.level === 'happy' ? 'g' : m.level === 'angry' ? 'r' : m.level === 'frustrated' ? 'y' : ''}">${escapeHtml(WA_MOOD[m.level])}</span>${m.excerpt ? `<p>“${escapeHtml(m.excerpt)}”</p>` : m.reason ? `<p>${escapeHtml(m.reason)}</p>` : ''}</div>`).join('')}` : '';
+  return `<aside class="wx-side">
+<section class="wx-card wx-sec">${week}</section>
+${moodHtml ? `<section class="wx-card wx-sec">${moodHtml}</section>` : ''}
+<p class="wx-how">Radar reads your clients’ groups a few times a day and lists what they ask you for. Urgent messages reach you right away. It never writes in the groups.</p>
+</aside>`;
 }
 // ---- Quiet clients -----------------------------------------------------------------------------
 // Clients whose group Radar reads where nobody from the team has written, and no update or win went
@@ -499,18 +647,6 @@ function waQuietClients(){
     out.push({ c, days, owner: (c.customFieldValues && c.customFieldValues.owner) || '' });
   });
   return out.sort((a, b) => (b.days ?? 1e6) - (a.days ?? 1e6) || a.c.name.localeCompare(b.c.name));
-}
-function waQuietHtml(){
-  if(!Array.isArray(waContact)) return '';
-  const q = waQuietClients();
-  if(!q.length) return '';
-  const shown = waQuietAll ? q : q.slice(0, WA_QUIET_SHOWN);
-  const row = x => `<button class="wa-qc" onclick="openClientInspectorFor('${escapeHtml(String(x.c.id))}')" title="Open ${escapeHtml(x.c.name)}"><b>${escapeHtml(x.c.name)}</b><span>${escapeHtml([x.owner ? firstName(x.owner) : '', x.days === null ? 'nothing yet' : `${x.days} days`].filter(Boolean).join(' · '))}</span></button>`;
-  const more = q.length > WA_QUIET_SHOWN
-    ? `<button class="lnk-b wa-qc-more" data-grow="wa-quiet" data-turn="180" aria-expanded="${waQuietAll}" onclick="waQuietAll=!waQuietAll;renderWhatsapp()">${waQuietAll ? 'Show less' : `Show all ${q.length}`}${icon('caret-down', { weight: 'bold' })}</button>` : '';
-  return `<div class="rmi-sec"><b>Quiet clients</b><span class="n">${q.length}</span></div>
-<div class="wa-quiet" data-grow-key="wa-quiet">${shown.map(row).join('')}</div>${more}
-<p class="wa-qc-note">No message or update from us in ${WA_QUIET_DAYS} days or more.</p>`;
 }
 // Before WhatsApp is linked: three steps, each with its one thing to do.
 function waSetupHtml(){

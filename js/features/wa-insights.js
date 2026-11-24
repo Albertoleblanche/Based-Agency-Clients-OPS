@@ -14,7 +14,7 @@ let waDetails = null;   // leads: wa_detail_suggestions waiting for a decision
 let waMoods = null;     // everyone who sees WhatsApp: wa_moods of the last 3 weeks, newest first
 let waTurns = null;     // leads: wa_reply_turns(14), newest first
 let waWaits = null;     // leads: wa_alerts 'waiting' not answered yet
-let waSigAll = false, waDetAll = false;
+let waDetAll = false;
 const WA_WORK = [9, 18];        // the hours a wait is counted in (as the connector's WORK_HOURS)
 const WA_NUDGE_MIN = 120;       // the connector nudges the owner after this much work time
 
@@ -137,25 +137,56 @@ function waSigRow(s, inPanel){
 <button class="wa-sig-t"${open ? ` onclick="${open}"` : ' disabled'} title="${open ? `Open ${escapeHtml(name)}` : ''}"><i class="dot" aria-hidden="true"></i><span class="tx">${inPanel ? '' : `<b>${escapeHtml(name)}</b>`}<span class="k">${s.type === 'risk' ? 'Risk' : 'Opening'} · ${escapeHtml(WA_SIG_KIND[s.kind] || WA_SIG_KIND.other)} · ${escapeHtml(relDayLower(new Date(s.created_at)))}</span><span class="s">${escapeHtml(s.summary)}</span>${s.excerpt ? `<span class="q">“${escapeHtml(s.excerpt)}”</span>` : ''}</span></button>
 <span class="wa-sig-a"><button class="lnk-b" onclick="waSignalSet(${s.id}, 'handled')">Mark Handled</button><button class="lnk-b is-2" onclick="waSignalSet(${s.id}, 'dismissed')">Dismiss</button></span></div>`;
 }
-function waSignalsCardHtml(){
-  const list = waSigOpen(); if(!list.length) return '';
-  const shown = waSigAll ? list : list.slice(0, 3);
-  const more = list.length > 3 ? `<button class="lnk-b wa-qc-more" data-grow="wa-sig" aria-expanded="${waSigAll}" data-turn="180" onclick="waSigAll=!waSigAll;renderWhatsapp()">${waSigAll ? 'Show less' : `Show all ${list.length}`}${icon('caret-down', { weight: 'bold' })}</button>` : '';
-  const risks = list.filter(s => s.type === 'risk').length;
-  return `<div class="rmi-sec"><b>Account signals</b><span class="n">${list.length}</span>${risks ? `<span class="wa-sig-n">${risks} risk${risks === 1 ? '' : 's'}</span>` : ''}</div>
-<div class="wa-sigs" data-grow-key="wa-sig">${shown.map(s => waSigRow(s)).join('')}</div>${more}`;
+// Clients to watch: what clients said that's worth acting on, one line each per client. Account signals
+// (risks first, then openings), a client who sounds frustrated or upset, a client waiting on a reply with
+// nothing open for it, and quiet clients.
+let waWatchAll = false;
+const WA_WATCH_SHOWN = 4;
+function waWatchList(){
+  const by = new Map();
+  const get = (c, name) => { const k = c ? 'c' + c.id : 'n' + waNorm(name); if(!by.has(k)) by.set(k, { c, name: c ? c.name : name, lines: [], sigs: [], risk: false, open: false, quiet: false }); return by.get(k); };
+  waSigOpen().slice().sort((a, b) => (a.type === 'risk' ? 0 : 1) - (b.type === 'risk' ? 0 : 1)).forEach(s => {
+    const c = waRowClient(s), x = get(c, c ? c.name : waCleanName(s.client));
+    x.sigs.push(s); s.type === 'risk' ? x.risk = true : x.open = true;
+    x.lines.push({ t: s.summary, q: s.excerpt || '' });
+  });
+  if(Array.isArray(waMoods) && typeof liveClients === 'function'){
+    const seen = new Set();
+    waMoods.forEach(m => {
+      const c = waRowClient(m); if(!c || seen.has(String(c.id))) return; seen.add(String(c.id));
+      const cur = waMoodFor(c); if(!cur) return;
+      if(cur.level === 'frustrated' || cur.level === 'angry'){ const x = get(c); x.risk = true; x.lines.push({ t: WA_MOOD[cur.level], q: cur.excerpt || '', tone: cur.level === 'angry' ? 'r' : 'y' }); }
+      else if(cur.level === 'happy' && by.has('c' + c.id)) by.get('c' + c.id).lines.push({ t: 'Happy', q: cur.excerpt || '', tone: 'g' });
+    });
+  }
+  const openGroups = new Set((waTasks || []).filter(t => t.status === 'open').map(t => t.group_jid));
+  waWaitingNow().filter(w => w.mins >= WA_NUDGE_MIN && !openGroups.has(w.group_jid)).forEach(w => {
+    const x = get(w.c, w.c ? w.c.name : waGroupLabel(w.group_jid)); x.risk = true;
+    x.lines.push({ t: `Waiting ${waMinWords(w.mins)} for a reply`, q: w.excerpt || '', tone: 'r' });
+  });
+  if(typeof waQuietClients === 'function') waQuietClients().forEach(({ c, days }) => {
+    const x = get(c); x.quiet = !x.risk && !x.open;
+    x.lines.push({ t: days === null ? 'Quiet: no message or update from us yet.' : `Quiet for ${days} days: no message or update from us.` });
+  });
+  const rank = x => x.risk ? 0 : x.open ? 1 : 2;
+  return [...by.values()].sort((a, b) => rank(a) - rank(b));
 }
-function waRepliesCardHtml(){
-  const st = waReplyStats(7); if(!st) return '';
-  const waiting = waWaitingNow();
-  if(!st.n && !waiting.length) return '';
-  const waitRows = waiting.slice(0, 3).map(w => `<button class="wa-qc" ${w.c ? `onclick="openClientInspectorFor('${escapeHtml(String(w.c.id))}')"` : 'disabled'} title="${w.excerpt ? `“${escapeHtml(w.excerpt)}”` : ''}"><b>${escapeHtml(w.c ? w.c.name : waGroupLabel(w.group_jid))}</b><span class="${w.mins >= WA_NUDGE_MIN ? 't-red' : ''}">waiting ${escapeHtml(waMinWords(w.mins))}</span></button>`).join('');
-  const ppl = st.people.filter(p => p.who !== 'Others' || st.people.length === 1).slice(0, 6)
-    .map(p => `<div class="wa-qc wa-rt"><b>${escapeHtml(p.who)}</b><span>${escapeHtml(waMinWords(p.median))}</span><span class="t-3">${p.n} repl${p.n === 1 ? 'y' : 'ies'}</span></div>`).join('');
-  return `<div class="rmi-sec"><b>Reply times</b><span class="t-3 wa-rt-k">last 7 days, work hours</span></div>
-${st.n ? `<p class="wa-rt-big"><b>${escapeHtml(waMinWords(st.median))}</b><span>typical first reply · ${st.n} time${st.n === 1 ? '' : 's'} a client wrote</span></p>` : ''}
-${waiting.length ? `<div class="wa-rt-sub">Waiting now</div>${waitRows}` : ''}
-${ppl ? `<div class="wa-rt-sub">By person</div>${ppl}` : ''}`;
+function waWatchHtml(){
+  const list = waWatchList(); if(!list.length) return '';
+  const shown = waWatchAll ? list : list.slice(0, WA_WATCH_SHOWN);
+  const risks = list.filter(x => x.risk).length, opens = list.filter(x => !x.risk && x.open).length;
+  const row = x => {
+    const ids = x.sigs.map(s => s.id).join(',');
+    const acts = [x.c ? `<button class="lnk-b" onclick="openClientInspectorFor('${escapeHtml(String(x.c.id))}')">Open Client</button>` : '',
+      ids ? `<button class="lnk-b is-2" onclick="waSignalsSet('${ids}', 'handled')">Mark Handled</button>` : ''].filter(Boolean).join('');
+    return `<div class="wx-w ${x.risk ? 'is-risk' : x.open ? 'is-open' : 'is-quiet'}"><i class="dot" aria-hidden="true"></i><div><b>${escapeHtml(x.name)}</b>
+${x.lines.map(l => `<p>${l.tone ? `<span class="wx-mood ${l.tone}">${escapeHtml(l.t)}</span>` : escapeHtml(l.t)}${l.q ? ` <span class="q">“${escapeHtml(l.q)}”</span>` : ''}</p>`).join('')}
+${acts ? `<div class="wx-w-a">${acts}</div>` : ''}</div></div>`;
+  };
+  const more = list.length > WA_WATCH_SHOWN ? `<button class="lnk-b wa-qc-more" aria-expanded="${waWatchAll}" onclick="waWatchAll=!waWatchAll;renderWhatsapp()">${waWatchAll ? 'Show less' : `Show all ${list.length}`}${icon('caret-down', { weight: 'bold' })}</button>` : '';
+  return `<div class="wx-sec-h"><b>Clients to watch</b><span class="n">${list.length}</span>${risks || opens ? `<span class="r">${[risks ? `${risks} to look after` : '', opens ? `${opens} opening${opens === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ')}</span>` : ''}</div>
+<p class="wx-sec-p">What clients said on WhatsApp that’s worth acting on.</p>
+<div class="wx-ws">${shown.map(row).join('')}</div>${more}`;
 }
 // Details found in the chats for clients in Radar
 const WA_FIELD = { contact: 'Contact', email: 'Email', phone: 'Phone', website: 'Website' };
@@ -171,7 +202,8 @@ function waDetailsCardHtml(){
   const list = waDetailsOpen(); if(!list.length) return '';
   const shown = waDetAll ? list : list.slice(0, 3);
   const more = list.length > 3 ? `<button class="lnk-b wa-qc-more" data-grow="wa-det" aria-expanded="${waDetAll}" data-turn="180" onclick="waDetAll=!waDetAll;renderWhatsapp()">${waDetAll ? 'Show less' : `Show all ${list.length}`}${icon('caret-down', { weight: 'bold' })}</button>` : '';
-  return `<div class="rmi-sec"><b>Client details from the chats</b><span class="n">${list.length}</span></div>
+  return `<div class="wx-sec-h"><b>Details to confirm</b><span class="n">${list.length}</span></div>
+<p class="wx-sec-p">Found in the chats. Add them to the client in one click.</p>
 <div class="wa-dets" data-grow-key="wa-det">${shown.map(d => waDetailRow(d)).join('')}</div>${more}`;
 }
 
@@ -218,6 +250,15 @@ async function waSignalSet(id, status){
   s.status = status; waInsightsRedraw();
   const { error } = await supabaseClient.from('wa_signals').update({ status, handled_by: currentUser?.id || null, handled_at: new Date().toISOString() }).eq('id', id);
   if(error){ s.status = before; waInsightsRedraw(); showToast('error', 'Not saved', error.message); return; }
+  showToast('success', status === 'handled' ? 'Marked handled' : 'Dismissed', '');
+}
+async function waSignalsSet(ids, status){
+  const list = String(ids).split(',').map(id => (waSignals || []).find(x => String(x.id) === id)).filter(Boolean);
+  if(!list.length) return;
+  const before = list.map(x => x.status);
+  list.forEach(x => { x.status = status; }); waInsightsRedraw();
+  const { error } = await supabaseClient.from('wa_signals').update({ status, handled_by: currentUser?.id || null, handled_at: new Date().toISOString() }).in('id', list.map(x => x.id));
+  if(error){ list.forEach((x, i) => { x.status = before[i]; }); waInsightsRedraw(); showToast('error', 'Not saved', error.message); return; }
   showToast('success', status === 'handled' ? 'Marked handled' : 'Dismissed', '');
 }
 async function waDetailDismiss(id){
