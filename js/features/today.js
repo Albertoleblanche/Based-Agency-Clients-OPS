@@ -325,7 +325,7 @@ function todayDayModel(ds){
   });
   (typeof clientReminders !== 'undefined' ? clientReminders : []).filter(r => r.status === 'waiting' && r.askedBy === currentUser?.id && r.followUpDate === ds).forEach(r => {
     const c = clients.find(x => x.id === r.clientId);
-    items.push({ src: 'follow', c, title: `Ask ${c ? shortClientName(c.name) : 'the client'} again: “${r.question}”`, sub: 'If they haven’t answered by then', go: `openReminderDetailModal('${r.id}')`, tick: `todayFollowAnswered('${r.id}')`, tickLabel: 'They answered' });
+    items.push({ src: 'follow', c, title: `Ask ${typeof remOnWho === 'function' ? remOnWho(r, true) : c ? shortClientName(c.name) : 'the client'} again: “${r.question}”`, sub: 'If they haven’t answered by then', go: `openReminderDetailModal('${r.id}')`, tick: `todayFollowAnswered('${r.id}')`, tickLabel: 'They answered' });
   });
   (typeof notes !== 'undefined' ? notes : []).filter(n => n.followUpDate === ds && n.status !== 'done').forEach(n => {
     const c = clients.find(x => x.id === n.clientId);
@@ -379,7 +379,7 @@ function todayFromElsewhere(todayStr, now){
   (typeof clientReminders !== 'undefined' ? clientReminders : []).filter(r => r.status === 'waiting' && r.askedBy === me && r.followUpDate && r.followUpDate <= todayStr)
     .sort((a, b) => a.followUpDate.localeCompare(b.followUpDate)).forEach(r => {
       const c = cl(r.clientId);
-      out.push({ src: 'follow', age: todayDaysSince(r.followUpDate, todayStr), c, title: `Ask ${c ? shortClientName(c.name) : 'the client'} again: “${r.question}”`, sub: `No answer yet${r.askedDate ? ' · you asked ' + fmtShortDate(new Date(r.askedDate + 'T12:00:00')) : ''}`, late: r.followUpDate < todayStr, when: since(r.followUpDate), go: `openReminderDetailModal('${r.id}')`, tick: `todayFollowAnswered('${r.id}')`, tickLabel: 'They answered' });
+      out.push({ src: 'follow', age: todayDaysSince(r.followUpDate, todayStr), c, title: `Ask ${typeof remOnWho === 'function' ? remOnWho(r, true) : c ? shortClientName(c.name) : 'the client'} again: “${r.question}”`, sub: `No answer yet${r.askedDate ? ' · you asked ' + fmtShortDate(new Date(r.askedDate + 'T12:00:00')) : ''}`, late: r.followUpDate < todayStr, when: since(r.followUpDate), go: `openReminderDetailModal('${r.id}')`, tick: `todayFollowAnswered('${r.id}')`, tickLabel: 'They answered' });
     });
   // notes you set to come back to
   (typeof notes !== 'undefined' ? notes : []).filter(n => n.followUpDate && n.status !== 'done' && n.followUpDate <= todayStr)

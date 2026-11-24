@@ -9,9 +9,24 @@ async function loadClientReminders(){
   if(error){ console.error('loadClientReminders error', error); clientReminders = []; return; }
   clientReminders = (data||[]).map(r=>({
     id:r.id, clientId:r.client_id, question:r.question, askedBy:r.asked_by,
-    askedDate:r.asked_date, followUpDate:r.follow_up_date, status:r.status, resolvedAt:r.resolved_at
+    askedDate:r.asked_date, followUpDate:r.follow_up_date, status:r.status, resolvedAt:r.resolved_at,
+    waitingOn:r.waiting_on || null
   }));
   updateRemindersNavBadge();
+}
+
+// Waiting on a teammate (Nov 23): a reminder can wait on someone on the team instead of a client
+// (client_reminders.waiting_on); the client is then optional. These say who it's waiting on.
+function remMate(r){
+  if(!r || !r.waitingOn) return null;
+  return (typeof teamProfiles !== 'undefined' ? teamProfiles : []).find(p => p.id === r.waitingOn) || { id: r.waitingOn, name: 'Someone no longer on the team', gone: true };
+}
+// "Ana", or the client's name ("Oakridge" with short), or "the client"
+function remOnWho(r, short){
+  const m = remMate(r);
+  if(m) return m.gone ? 'a teammate' : firstName(m.name);
+  const c = (typeof clients !== 'undefined' ? clients : []).find(x => x.id === r.clientId);
+  return c ? (short && typeof shortClientName === 'function' ? shortClientName(c.name) : c.name) : 'the client';
 }
 
 // Only three statuses are ever actually stored — 'waiting', 'answered',
@@ -155,27 +170,37 @@ function openNewReminderModal(presetClientId){
 }
 
 async function saveNewReminder(){
-  const clientId = document.getElementById('reminderClient').value;
+  const mate = document.querySelector('.rmn-on .on')?.dataset.m === 'mate';   // waiting on a teammate (Nov 23)
+  const waitingOn = mate ? (document.getElementById('reminderMate')?.value || '') : '';
+  const clientId = (mate ? document.getElementById('reminderClientOpt')?.value : document.getElementById('reminderClient').value) || '';
   const question = document.getElementById('reminderQuestion').value.trim();
   const followUpDate = document.getElementById('reminderFollowUpDate').value;
   const addToCalendar = document.getElementById('reminderAddToCalendarInput')?.checked;
-  if(!clientId){ showToast('error','Pick a client','Select which client this is about.'); return; }
+  if(mate && !waitingOn){ showToast('error','Pick who','Choose the teammate you’re waiting on.'); return; }
+  if(!mate && !clientId){ showToast('error','Pick a client','Select which client this is about.'); return; }
   if(!question){ showToast('error','Nothing to track','Write the question or request first.'); return; }
   if(!followUpDate){ showToast('error','Follow-up date required','Pick a date to be reminded.'); return; }
   if(followUpDate < toDateStr(new Date())){ showToast('error','Date is in the past','Pick today or a future date.'); return; }
   const btn = clickedBtn();
   setBtnLoading(btn, 'Saving…');
-  const { data, error } = await supabaseClient.from('client_reminders').insert({
-    client_id: clientId, question, asked_by: currentUser.id, follow_up_date: followUpDate, status: 'waiting'
-  }).select().single();
+  const row = { client_id: clientId || null, question, asked_by: currentUser.id, follow_up_date: followUpDate, status: 'waiting' };
+  if(mate) row.waiting_on = waitingOn;
+  const { data, error } = await supabaseClient.from('client_reminders').insert(row).select().single();
   restoreBtn(btn);
-  if(error){ showToast('error','Save failed', error.message); return; }
+  if(error){
+    const setup = mate && /waiting_on|client_id|null value|schema cache/i.test(error.message || '');
+    showToast('error', 'Save failed', setup ? 'Reminders for a teammate need a one-time database update: run addendum-teammate-reminders.sql in Supabase → SQL Editor.' : error.message);
+    return;
+  }
   await loadClientReminders();
   renderReminders();
   closeAppModal();
   showToast('success','Reminder created', `You'll be notified on ${reminderFollowUpLabel(followUpDate)}.`);
   const c = clients.find(x=>x.id===clientId);
-  if(c) logClientActivity(clientId, 'reminder_created', `${myName()||'Someone'} logged a question for ${c.name}: "${question.length>80?question.slice(0,80)+'…':question}" — following up ${reminderFollowUpLabel(followUpDate)}.`);
+  const m = mate ? (teamProfiles || []).find(p => p.id === waitingOn) : null;
+  if(c) logClientActivity(clientId, 'reminder_created', mate
+    ? `${myName()||'Someone'} is waiting on ${m ? firstName(m.name) : 'a teammate'} for ${c.name}: "${question.length>80?question.slice(0,80)+'…':question}" — following up ${reminderFollowUpLabel(followUpDate)}.`
+    : `${myName()||'Someone'} logged a question for ${c.name}: "${question.length>80?question.slice(0,80)+'…':question}" — following up ${reminderFollowUpLabel(followUpDate)}.`);
   if(addToCalendar && data) await addReminderToCalendar(data.id);
 }
 

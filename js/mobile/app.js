@@ -191,7 +191,7 @@ async function mLoadAll(){
   tasks = (tr.data || []).map(t => ({ id: t.id, title: t.title, description: t.description || '', priority: t.priority, status: t.status, assignerId: t.assigner_id, assigneeId: t.assignee_id,
     clientId: t.client_id, dueDate: t.due_date, link: t.link, attachments: t.attachments || [], createdAt: t.created_at, completedAt: t.completed_at, cancelledAt: t.cancelled_at,
     hiddenByAssigner: t.hidden_by_assigner, hiddenByAssignee: t.hidden_by_assignee }));
-  clientReminders = (rr.data || []).map(r => ({ id: r.id, clientId: r.client_id, question: r.question, askedBy: r.asked_by, askedDate: r.asked_date, followUpDate: r.follow_up_date, status: r.status }));
+  clientReminders = (rr.data || []).map(r => ({ id: r.id, clientId: r.client_id, question: r.question, askedBy: r.asked_by, askedDate: r.asked_date, followUpDate: r.follow_up_date, status: r.status, waitingOn: r.waiting_on || null }));
   notes = (nr.data || []).map(n => ({ id: n.id, clientId: n.client_id, title: n.title, text: n.text, status: n.status, link: n.link, followUpDate: n.follow_up_date, updatedAt: n.updated_at }));
   try{ await loadTaskSuggestions(); }catch(e){ taskSuggestions = []; }   // tasks from meetings (Granola)
   if(typeof granolaAutoStart === 'function') granolaAutoStart();      // and they come in by themselves
@@ -1070,13 +1070,16 @@ function mOpenCalendar(){
     return `<h1 class="big">Calendar</h1><p class="big-sub">The next two weeks</p>${days.join('') || `<div style="margin-top:16px">${mEmpty('Nothing scheduled', '')}</div>`}`;
   }, { right: `<button aria-label="New event" onclick="mOpenEventSheet()">${icon('plus')}</button>` });
 }
+// Waiting on a teammate (Nov 23): their first name, else the client's name
+function mRemMate(r){ return r && r.waitingOn ? (teamProfiles.find(p => p.id === r.waitingOn) || { id: r.waitingOn, name: 'A teammate', gone: true }) : null; }
+function mRemOn(r){ const m = mRemMate(r); if(m) return m.gone ? 'a teammate' : firstName(m.name); const c = clients.find(x => x.id === r.clientId); return c ? c.name : 'the client'; }
 function mOpenReminders(){
   mPush('Reminders', () => {
     const disp = r => (r.status === 'waiting' && r.followUpDate && r.followUpDate <= toDateStr(new Date())) ? 'due' : r.status;
     const open = clientReminders.filter(r => r.status === 'waiting').sort((a, b) => focusIdFirst(a.clientId, b.clientId) || (a.followUpDate || '').localeCompare(b.followUpDate || ''));
-    const row = r => { const c = clients.find(x => x.id === r.clientId), due = disp(r) === 'due'; return mIr(`<button class="cb rem" role="checkbox" aria-checked="false" aria-label="Mark answered" onclick="event.stopPropagation();checkOff(this, () => mAnswerReminder('${r.id}'))"></button>`, mEsc(r.question), `${mEsc(c ? c.name : '')}${r.followUpDate ? ' · ' + (due ? '<span class="t-red">Follow up ' + (r.followUpDate === toDateStr(new Date()) ? 'today' : fmtShortDate(new Date(r.followUpDate + 'T12:00:00'))) + '</span>' : 'Follow up ' + fmtShortDate(new Date(r.followUpDate + 'T12:00:00'))) : ''}`, '', `mReminderActions('${r.id}')`, { n: true, div: true }); };
-    return `<h1 class="big">Reminders</h1><p class="big-sub">${open.filter(r => disp(r) === 'due').length} to follow up · ${open.length} waiting on clients</p>
-<div class="ig" style="margin-top:16px">${open.map(row).join('') || '<div class="ir"><span class="t n" style="color:var(--label-2)">Nothing waiting on a client</span></div>'}</div>`;
+    const row = r => { const c = clients.find(x => x.id === r.clientId), due = disp(r) === 'due', m = mRemMate(r); return mIr(`<button class="cb rem" role="checkbox" aria-checked="false" aria-label="Mark answered" onclick="event.stopPropagation();checkOff(this, () => mAnswerReminder('${r.id}'))"></button>`, mEsc(r.question), `${m ? `<span class="rmi-mate">${icon('user')}${mEsc(mRemOn(r))}</span>${c ? ' · ' + mEsc(c.name) : ''}` : mEsc(c ? c.name : '')}${r.followUpDate ? ' · ' + (due ? '<span class="t-red">Follow up ' + (r.followUpDate === toDateStr(new Date()) ? 'today' : fmtShortDate(new Date(r.followUpDate + 'T12:00:00'))) + '</span>' : 'Follow up ' + fmtShortDate(new Date(r.followUpDate + 'T12:00:00'))) : ''}`, '', `mReminderActions('${r.id}')`, { n: true, div: true }); };
+    return `<h1 class="big">Reminders</h1><p class="big-sub">${open.filter(r => disp(r) === 'due').length} to follow up · ${open.length} waiting${open.some(r => r.waitingOn) ? '' : ' on clients'}</p>
+<div class="ig" style="margin-top:16px">${open.map(row).join('') || '<div class="ir"><span class="t n" style="color:var(--label-2)">Nothing waiting</span></div>'}</div>`;
   }, { right: `<button aria-label="New reminder" onclick="mOpenReminderSheet()">${icon('plus')}</button>` });
 }
 async function mAnswerReminder(id){
@@ -1090,7 +1093,7 @@ function mReminderActions(id){
   mActions(r.question, [
     ...(r.status === 'waiting' ? [{ label: 'Draft a Nudge', fn: () => mOpenNudge(id) }] : []),
     { label: 'Mark Answered', fn: async () => { await supabaseClient.from('client_reminders').update({ status: 'answered', resolved_at: new Date().toISOString() }).eq('id', id); await mRefresh(); showToast('success', 'Marked answered', c ? c.name : ''); } },
-    { label: 'Make a Task', fn: () => mOpenTaskSheet({ title: c ? `Follow up with ${c.name}` : 'Follow up', clientId: r.clientId, description: r.question }) },
+    { label: 'Make a Task', fn: () => mOpenTaskSheet({ title: r.waitingOn ? `Follow up with ${mRemOn(r)}` : c ? `Follow up with ${c.name}` : 'Follow up', clientId: r.clientId, description: r.question }) },
     { label: 'Delete Reminder', danger: true, fn: async () => { await supabaseClient.from('client_reminders').delete().eq('id', id); await mRefresh(); showToast('success', 'Reminder deleted', ''); } },
   ]);
 }
@@ -1102,7 +1105,8 @@ function mWorkday(d){ const k = d.getDay(); return k === 6 ? addDays(d, 2) : k =
 function mOpenNudge(id){
   const r = clientReminders.find(x => x.id === id); if(!r) return;
   const c = clients.find(x => x.id === r.clientId);
-  mNudge_ = { id, ch: c && typeof winChannel === 'function' && winChannel(c) === 'whatsapp' ? 'whatsapp' : 'email', state: 'writing', subject: '', body: '', n: 0 };
+  mNudge_ = { id, ch: r.waitingOn ? 'slack' : c && typeof winChannel === 'function' && winChannel(c) === 'whatsapp' ? 'whatsapp' : 'email', state: 'writing', subject: '', body: '', n: 0 };
+  if(r.waitingOn) mSlackMeStatus();
   const entry = mPush('Nudge', () => mNudgeBody(), { navTitle: true });
   mNudge_.entry = entry;
   mWriteNudge();
@@ -1115,7 +1119,9 @@ async function mWriteNudge(ch){
   n.state = 'writing'; n.plain = false; const k = ++n.n;
   n.entry && n.entry.refresh();
   const asked = r.askedDate ? new Date(r.askedDate + 'T12:00:00') : null;
-  const o = { client: c ? c.name : 'the client', contact: clientContact(c), ask: r.question,
+  const o = n.ch === 'slack' ? { teammate: mRemOn(r) === 'a teammate' ? 'there' : mRemOn(r), client: c ? c.name : '', ask: r.question, askedOn: asked ? asked.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : '',
+    waitedDays: asked ? Math.max(0, daysBetween(dayStart(asked), dayStart(new Date()))) : null, sender: firstName(myName() || ''), whatsapp: true }
+  : { client: c ? c.name : 'the client', contact: clientContact(c), ask: r.question,
     askedOn: asked ? asked.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : '',
     waitedDays: asked ? Math.max(0, daysBetween(dayStart(asked), dayStart(new Date()))) : null,
     sender: firstName(myName() || ''), agency: (typeof settings !== 'undefined' && settings.appName) || 'Based Agency', whatsapp: n.ch === 'whatsapp' };
@@ -1135,6 +1141,7 @@ function mNudgeBody(){
   const n = mNudge_; if(!n) return '';
   const r = clientReminders.find(x => x.id === n.id), c = r && clients.find(x => x.id === r.clientId);
   if(!r) return mEmpty('This reminder is gone', '');
+  if(n.ch === 'slack') return mSlackNudgeBody(n, r, c);
   const email = n.ch === 'email', to = c && c.email ? String(c.email).split(',')[0].trim() : '';
   const who = clientContact(c) || (c ? c.name : 'the client');
   const seg = `<div class="seg inudge-ch" role="tablist" aria-label="Send by">${[['email', 'Email'], ['whatsapp', 'WhatsApp']].map(([k, t]) => `<button class="${n.ch === k ? 'on' : ''}" role="tab" aria-selected="${n.ch === k}" ${n.state === 'writing' ? 'disabled' : ''} onclick="${n.ch === k ? '' : `mWriteNudge('${k}')`}">${t}</button>`).join('')}</div>`;
@@ -1149,6 +1156,34 @@ function mNudgeBody(){
 <div class="ir" style="align-items:flex-start"><textarea class="iarea" id="mNudgeBody" aria-label="Message" spellcheck="true" oninput="mNudge_ && (mNudge_.body = this.value)">${mEsc(n.body)}</textarea></div></div>
 <p class="inudge-n">${email ? (to ? `To ${mEsc(to)}.` : `No email on file for ${mEsc(c ? c.name : 'this client')}, so copy it into your mail.`) : 'Paste it in their group.'} The next follow-up moves to ${next}.${email && to ? ` <button class="inudge-again" onclick="mWriteNudge()">Write again</button>` : ''}</p>
 </div><div class="ibar">${primary}</div>`;
+}
+// A teammate (Nov 23): a Slack message, sent from your own Slack (lib/slack-me.js), or copied
+let mSlackMe = null;
+async function mSlackMeStatus(){
+  if(mSlackMe) return mSlackMe;
+  try{ const res = await fetch('/api/integrations?provider=slack-me', { headers: await apiAuthHeaders() }); mSlackMe = res.ok ? await res.json() : { connected: false }; }catch(e){ mSlackMe = { connected: false }; }
+  mNudge_ && mNudge_.entry && mNudge_.entry.refresh();
+  return mSlackMe;
+}
+function mSlackNudgeBody(n, r, c){
+  const m = mRemMate(r), first = mRemOn(r), sm = mSlackMe || {}, canSend = sm.connected && m && !m.gone && m.slack_user_id;
+  const head = `<div class="idraft inudge"><div style="font-size:17px;font-weight:600">${mEsc(m && !m.gone ? m.name : 'A teammate')}</div><div class="inudge-q">${mEsc(r.question)}${c ? ' · ' + mEsc(c.name) : ''}</div>`;
+  if(n.state === 'writing') return `${head}<div class="inudge-w" aria-live="polite">${icon('sparkle')}Writing a Slack message to ${mEsc(first)}…</div><i class="inudge-sk"></i><i class="inudge-sk"></i><i class="inudge-sk"></i></div>`;
+  const next = mWorkday(addDays(new Date(), 1)).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const note = canSend ? `Goes from your Slack, as you.` : sm.connected ? `${mEsc(first)} has no Slack account linked in Radar, so copy it.` : `Connect your Slack on the desktop (Settings → Connections) to send it as you, or copy it.`;
+  return `${head}
+<div class="ig flat inudge-f"><div class="ir" style="align-items:flex-start"><textarea class="iarea" id="mNudgeBody" aria-label="Message" spellcheck="true" oninput="mNudge_ && (mNudge_.body = this.value)">${mEsc(n.body)}</textarea></div></div>
+<p class="inudge-n">${note} The next follow-up moves to ${next}. <button class="inudge-again" onclick="mWriteNudge()">Write again</button></p>
+</div><div class="ibar">${canSend ? `<button class="ibtn s" style="flex:0 0 108px" onclick="mCopyNudge()">${icon('copy')}Copy</button><button class="ibtn p" onclick="mSlackSend()">${icon('paper-plane-tilt')}Send on Slack</button>` : `<button class="ibtn p" onclick="mCopyNudge()">${icon('copy')}Copy</button>`}</div>`;
+}
+async function mSlackSend(){
+  const n = mNudge_; if(!n) return;
+  const r = clientReminders.find(x => x.id === n.id); if(!r) return;
+  const text = String(n.body || '').trim(); if(!text){ showToast('error', 'Nothing to send', 'Write the message first.'); return; }
+  let out = {};
+  try{ const res = await fetch('/api/integrations', { method: 'POST', headers: await apiAuthHeaders(), body: JSON.stringify({ provider: 'slack-me', action: 'send', toProfileId: r.waitingOn, text }) }); out = await res.json().catch(() => ({})); }catch(e){ out = { error: 'Couldn’t reach Radar. Try again.' }; }
+  if(!out.ok){ if(out.notConnected) mSlackMe = { connected: false }; n.entry && n.entry.refresh(); showToast('error', 'Not sent', out.error || 'Try again in a moment.'); return; }
+  await mNudged('slack');
 }
 async function mMailNudge(){
   const n = mNudge_; if(!n) return;
@@ -1168,13 +1203,13 @@ async function mCopyNudge(){
 async function mNudged(how){
   const n = mNudge_; if(!n) return;
   const r = clientReminders.find(x => x.id === n.id), c = r && clients.find(x => x.id === r.clientId);
-  const next = mWorkday(addDays(new Date(), 3));
+  const next = mWorkday(addDays(new Date(), r && r.waitingOn ? 1 : 3));   // a teammate: the next working day
   mNudge_ = null; mPop();
   const { error } = await supabaseClient.from('client_reminders').update({ follow_up_date: toDateStr(next) }).eq('id', n.id);
   if(error){ showToast('error', 'Follow-up date not moved', error.message); return; }
   await mRefresh();
-  showToast('success', how === 'mail' ? 'Nudge ready in Mail' : how === 'whatsapp' ? 'Nudge copied for WhatsApp' : 'Nudge copied', `Next follow-up ${next.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}.`);
-  if(c && r && typeof logClientActivity === 'function') logClientActivity(r.clientId, 'reminder_nudged', `${myName() || 'Someone'} nudged ${c.name} about "${r.question.length > 80 ? r.question.slice(0, 80) + '…' : r.question}".`);
+  showToast('success', how === 'slack' ? `Sent to ${mRemOn(r)} on Slack` : how === 'mail' ? 'Nudge ready in Mail' : how === 'whatsapp' ? 'Nudge copied for WhatsApp' : 'Nudge copied', `Next follow-up ${next.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}.`);
+  if(c && r && !r.waitingOn && typeof logClientActivity === 'function') logClientActivity(r.clientId, 'reminder_nudged', `${myName() || 'Someone'} nudged ${c.name} about "${r.question.length > 80 ? r.question.slice(0, 80) + '…' : r.question}".`);
 }
 function mMeetingsHtml(){
   if(typeof granolaMeetings === 'undefined') return '';
@@ -1632,27 +1667,33 @@ async function mSaveTask(){
 
 let mRem_ = {};
 function mOpenReminderSheet(){
-  mRem_ = { clientId: '', date: toDateStr(mWorkday(addDays(new Date(), 3))) };   // never a weekend
+  mRem_ = { clientId: '', mate: '', date: toDateStr(mWorkday(addDays(new Date(), 3))) };   // never a weekend
   mKeep('mRemQ', '');
-  window.mRemBody = () => `<div class="ig flat" style="margin-top:12px">${mRowPick('Client', mEsc(mClientName(mRem_.clientId) || 'Choose'), "mRemPick('client')", !!mRem_.clientId)}</div>
-<div class="ig flat" style="margin-top:20px"><div class="ir" style="align-items:flex-start"><textarea class="iarea" id="mRemQ" placeholder="What are you waiting to hear back on?" oninput="mKeep('mRemQ',this.value)"></textarea></div></div>
-<div class="ig flat" style="margin-top:20px">${mRowPick('Follow up', sheetDayLabel(new Date(mRem_.date + 'T12:00:00')), "mRemPick('date')", true)}<div class="ir"><span class="ilab">Add to my calendar</span>${mSw('mRemCal', true, 'Add to my calendar')}</div></div>`;
+  // Waiting on: a client, or a teammate (Nov 23; then the client is optional)
+  window.mRemBody = () => { const m = mRem_.mate && teamProfiles.find(p => p.id === mRem_.mate);
+    return `<div class="ig flat" style="margin-top:12px">${mRowPick('Waiting on', mEsc(m ? m.name : 'A client'), "mRemPick('who')", true)}${mRowPick(m ? 'Client (optional)' : 'Client', mEsc(mClientName(mRem_.clientId) || (m ? 'None' : 'Choose')), "mRemPick('client')", !!mRem_.clientId)}</div>
+<div class="ig flat" style="margin-top:20px"><div class="ir" style="align-items:flex-start"><textarea class="iarea" id="mRemQ" placeholder="${m ? 'What are you waiting on from them?' : 'What are you waiting to hear back on?'}" oninput="mKeep('mRemQ',this.value)"></textarea></div></div>
+<div class="ig flat" style="margin-top:20px">${mRowPick('Follow up', sheetDayLabel(new Date(mRem_.date + 'T12:00:00')), "mRemPick('date')", true)}<div class="ir"><span class="ilab">Add to my calendar</span>${mSw('mRemCal', true, 'Add to my calendar')}</div></div>`; };
   mOpenSheet('New Reminder', window.mRemBody(), { done: 'mSaveReminder()', doneLabel: 'Add' });
 }
 function mRemPick(what){
   mKeep('mRemQ', mSheetVal('mRemQ'));
   const back = () => { $m('mSheet').querySelector('.sheet-scroll').innerHTML = window.mRemBody(); mRestoreSheetState(); };
-  if(what === 'client') mPickClient(mRem_.clientId, v => { mRem_.clientId = v; back(); });
+  if(what === 'client') mPickClient(mRem_.clientId, v => { mRem_.clientId = v; back(); }, mRem_.mate ? 'None' : null);
+  else if(what === 'who') mPick('Waiting on', [['', 'A client'], ...teamProfiles.filter(p => p.id !== currentUser.id && !p.access_revoked).sort((a, b) => a.name.localeCompare(b.name)).map(p => [p.id, p.name, 'Teammate'])], mRem_.mate, v => { if(v != null){ mRem_.mate = v; if(v && mRem_.date === toDateStr(mWorkday(addDays(new Date(), 3)))) mRem_.date = toDateStr(mWorkday(addDays(new Date(), 1))); } back(); });
   else mDayPick('Follow up', mRem_.date, 0, 30, null, v => { mRem_.date = v; back(); });
 }
 async function mSaveReminder(){
   const q = mSheetVal('mRemQ').trim();
-  if(!mRem_.clientId){ showToast('error', 'Choose a client', ''); return; }
+  if(!mRem_.clientId && !mRem_.mate){ showToast('error', 'Choose a client', ''); return; }
   if(!q){ showToast('error', 'Write the question first', ''); return; }
   const cal = mIsOn('mRemCal');
-  const { data, error } = await supabaseClient.from('client_reminders').insert({ client_id: mRem_.clientId, question: q, asked_by: currentUser.id, follow_up_date: mRem_.date, status: 'waiting' }).select().single();
-  if(error){ showToast('error', 'Couldn’t add it', error.message); return; }
-  if(cal && data){ const c = clients.find(x => x.id === mRem_.clientId); await supabaseClient.from('calendar_events').insert({ title: c ? `Follow up: ${c.name}` : 'Client follow-up', description: q, start_at: `${mRem_.date}T00:00:00`, end_at: `${mRem_.date}T23:59:59`, all_day: true, client_id: mRem_.clientId, created_by: currentUser.id, event_type: 'reminder', related_reminder_id: data.id }); }
+  const row = { client_id: mRem_.clientId || null, question: q, asked_by: currentUser.id, follow_up_date: mRem_.date, status: 'waiting' };
+  if(mRem_.mate) row.waiting_on = mRem_.mate;
+  const { data, error } = await supabaseClient.from('client_reminders').insert(row).select().single();
+  if(error){ showToast('error', 'Couldn’t add it', mRem_.mate && /waiting_on|client_id|null value|schema cache/i.test(error.message || '') ? 'Reminders for a teammate need a one-time database update (addendum-teammate-reminders.sql).' : error.message); return; }
+  const mt = mRem_.mate && teamProfiles.find(p => p.id === mRem_.mate);
+  if(cal && data){ const c = clients.find(x => x.id === mRem_.clientId); await supabaseClient.from('calendar_events').insert({ title: mt ? `Follow up: ${firstName(mt.name)}${c ? ' (' + c.name + ')' : ''}` : c ? `Follow up: ${c.name}` : 'Client follow-up', description: q, start_at: `${mRem_.date}T00:00:00`, end_at: `${mRem_.date}T23:59:59`, all_day: true, client_id: mRem_.clientId || null, created_by: currentUser.id, event_type: 'reminder', related_reminder_id: data.id }); }
   mCloseSheet(true); await mRefresh(); showToast('success', 'Reminder added', `Follow up ${sheetDayLabel(new Date(mRem_.date + 'T12:00:00'))}.`);
 }
 

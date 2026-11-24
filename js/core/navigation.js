@@ -351,7 +351,7 @@ async function openScreenFromAddress(hash){
     _routingFromAddress = false;
   }
   const corrected = routeHashFor(currentViewName);
-  if(location.hash && location.hash !== corrected && !/gcal=/.test(location.hash)) history.replaceState(null, '', corrected);
+  if(location.hash && location.hash !== corrected && !/gcal=|slackme=/.test(location.hash)) history.replaceState(null, '', corrected);
   await opened;
 }
 

@@ -5,7 +5,8 @@
 // Needs winFirstNames (js/core/win-prompt.js).
 
 function followUpPrompt(o){
-  // o: { client, contact, ask, askedOn, waitedDays, sender, agency, whatsapp }
+  // o: { client, contact, ask, askedOn, waitedDays, sender, agency, whatsapp } | { teammate, client?, ask, askedOn, waitedDays, sender }
+  if(o.teammate) return followUpTeammatePrompt(o);
   const who = String(o.contact || '').trim(), first = typeof winFirstNames === 'function' ? winFirstNames(who) : who.split(/\s+/)[0];
   const kind = o.whatsapp ? 'WhatsApp message to their group' : 'email';
   return `Write a short follow-up ${kind} to ${o.client}, a home-services/construction client, from ${o.sender ? o.sender + ' at ' : ''}their marketing agency (${o.agency || 'Based Agency'}). We asked them something and are still waiting on the answer.
@@ -30,8 +31,29 @@ ${o.whatsapp
 - Reply with JSON only, no other text: {"subject": "...", "body": "..."}`}`;
 }
 
+// A teammate (Nov 23): a Slack message from the person, to someone on their own team.
+function followUpTeammatePrompt(o){
+  return `Write a short Slack direct message from ${o.sender || 'me'} to ${o.teammate}, a teammate at the same marketing agency. ${o.sender || 'I'} asked ${o.teammate} for something and is waiting on it.
+
+What I'm waiting on (my own internal note, NOT text to copy): ${o.ask}${o.client ? `\nIt's for the client: ${o.client}` : ''}
+Asked: ${o.askedOn || 'recently'}${o.waitedDays != null ? ` (${o.waitedDays} day${o.waitedDays === 1 ? '' : 's'} ago, for your context only)` : ''}
+
+How to write it:
+- Turn the note into the one thing I need from them, said plainly. Never copy its wording.
+- Like a quick message between teammates who get along: casual, direct, friendly. Start with "Hey ${o.teammate}," and ask the one question; make it easy to answer (a rough ETA is fine).
+- Only use facts from the note. Never invent a deadline, a date, a reason or a detail.
+- Never pushy or passive-aggressive: no "just checking in", "friendly reminder", "as per my last message", "still waiting", "bumping this", and no counting days.
+- One to three short sentences, 10 to 40 words. No sign-off, no emojis, no markdown.
+- Reply with JSON only, no other text: {"subject": "", "body": "the message"}`;
+}
+
 // When the AI can't write it: a plain, friendly version.
 function followUpPlain(o){
+  if(o.teammate){
+    const t = String(o.ask || '').replace(/\s+$/, '').replace(/[.?!]+$/, '');
+    const forC = o.client && !t.toLowerCase().includes(String(o.client).toLowerCase().split(/\s+/)[0]) ? ` for ${o.client}` : '';
+    return { subject: '', body: `Hey ${o.teammate}, any update on ${t.charAt(0).toLowerCase() + t.slice(1)}${forC}? Thanks!` };
+  }
   const who = String(o.contact || '').trim(), first = typeof winFirstNames === 'function' ? winFirstNames(who) : who.split(/\s+/)[0];
   const ask = String(o.ask || '').replace(/^\s*follow(?:ing)?[\s-]*up\s+(?:with\s+\S+\s+)?(?:on|about|re:?)\s+/i, '').replace(/\s+$/, '').replace(/[.?!]+$/, '');
   if(o.whatsapp) return { subject: '', body: `Hey ${first || 'guys'}! Quick one: any update on ${ask.charAt(0).toLowerCase() + ask.slice(1)}?` };
@@ -55,4 +77,4 @@ function followUpParse(text, whatsapp){
   return { subject: '', body: followUpNoEmoji(t.replace(/^```\w*\n?|```$/g, '')) };
 }
 
-if(typeof module !== 'undefined' && module.exports) module.exports = { followUpPrompt, followUpPlain, followUpParse, followUpNoEmoji };
+if(typeof module !== 'undefined' && module.exports) module.exports = { followUpPrompt, followUpTeammatePrompt, followUpPlain, followUpParse, followUpNoEmoji };

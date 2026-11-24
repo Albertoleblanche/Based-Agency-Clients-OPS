@@ -508,3 +508,6 @@ body.mac.mobile { overflow: hidden; background: var(--ios-bg, #F2F2F7); -webkit-
 .msgp-2 .msgp-x { color: var(--label-2); }
 /* More → Notes: new meetings from Granola (Nov 23) */
 .m-new { display: inline-block; padding: 1px 8px; border-radius: 10px; background: var(--label); color: var(--ios-bg, #fff); font-size: 13px; font-weight: 600; }
+/* a reminder waiting on a teammate (Nov 23) */
+.rmi-mate{display:inline-flex;align-items:center;gap:3px}
+.rmi-mate svg{width:12px;height:12px;flex:none;opacity:.75}

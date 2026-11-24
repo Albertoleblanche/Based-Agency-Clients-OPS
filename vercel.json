@@ -37,6 +37,10 @@
       "destination": "/api/integrations?route=oauth-resource"
     },
     {
+      "source": "/slack/oauth",
+      "destination": "/api/integrations?route=slack-me-callback"
+    },
+    {
       "source": "/hooks/granola",
       "destination": "/api/send-slack-message?source=granola"
     },

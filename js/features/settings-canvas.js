@@ -512,6 +512,7 @@ async function loadIntegrationStatuses(){
     canApprove() ? harvestApiCall(null).catch(() => null) : null,
   ]);
   integ.google = g; integ.harvest = h;
+  if(typeof remSlackMeStatus === 'function'){ try{ integ.slackMe = await remSlackMeStatus(true); }catch(e){} }
   if(typeof loadGranolaState === 'function') await loadGranolaState();
   if(typeof loadAiApps === 'function') await loadAiApps();
   if(isAdmin() && !aiConnCache){ try{ aiConnCache = await adminActionCall('get-ai-connections'); }catch(e){} }
@@ -541,7 +542,11 @@ function setConnections(){
 ${g.connected ? `${st('green', 'Connected')}<button class="btn" onclick="syncGoogleCalendar().then(loadIntegrationStatuses)">Sync Now</button>` : `<button class="btn" onclick="connectGoogleCalendar()">Connect…</button>`}</div>` : '';
   // ChatGPT and Claude: each person connects their own (ai-apps.js)
   const aiRow = typeof aiAppsRowStatus === 'function' ? go('openAiAppsSheet()', appLogoPair('chatgpt', 'claude'), 'ChatGPT and Claude', 'Use Radar from their apps, as you', aiAppsRowStatus(st)) : '';
-  const yours = gRow || aiRow ? `<div class="set-h">Yours</div><div class="form-grp cn-g">${aiRow}${gRow}</div>` : '';
+  // Slack, as you (Nov 23): nudges to teammates go from your own Slack (lib/slack-me.js)
+  const sm = integ.slackMe;
+  const smRow = sm ? `<div class="fr cn-r">${appLogo('slack')}<div class="l"><b>Slack, as you</b><span>${sm.connected ? 'Nudges to teammates go from your Slack, as you' : sm.configured ? 'Send nudges to teammates from your own Slack' : 'Send nudges to teammates from your own Slack (an admin sets it up once)'}</span></div>
+${sm.connected ? `${st('green', 'Connected')}<button class="btn" onclick="slackMeDisconnect()">Disconnect</button>` : sm.configured ? `<button class="btn" onclick="slackMeConnect()">Connect…</button>` : isAdmin() ? `${st('hollow', 'Not set up')}<button class="btn" onclick="slackMeSetupSheet()">Set Up…</button>` : st('hollow', 'Not set up')}</div>` : '';
+  const yours = gRow || aiRow || smRow ? `<div class="set-h">Yours</div><div class="form-grp cn-g">${aiRow}${smRow}${gRow}</div>` : '';
   const live = (supabaseClient.getChannels ? supabaseClient.getChannels() : []).some(c => c.state === 'joined');
   return `<div class="set-h">Apps</div><div class="form-grp cn-g">${rows.join('')}</div>
 ${yours}
@@ -577,6 +582,20 @@ function slackTasksHtml(st){
 <li>For <code>/task</code>: under <b>Slash Commands</b>, edit /task and tick <b>Escape channels, users, and links sent to your app</b>, so people and links come through.</li>
 </ol></details>
 <p class="sl-cmd">By command still works: <code>/task @person what to do due:friday</code>, with any links in it kept on the task.</p>`;
+}
+// What an admin does once so each person can connect their own Slack (lib/slack-me.js)
+function slackMeSetupSheet(){
+  const url = `${location.origin}/slack/oauth`;
+  openAppModal(`<h3 class="ap-h">${appLogo('slack', 'sm')}Slack, as each person</h3>
+<p class="t-2" style="font-size:13.5px;line-height:1.5;margin:0 0 10px">So a nudge to a teammate goes from the sender’s own Slack, not the Radar bot. Once, in the Slack app Radar already uses:</p>
+<ol class="sl-steps" style="font-size:13.5px;line-height:1.55;padding-left:20px;margin:0">
+<li>At api.slack.com/apps, open the Radar app. <b>OAuth &amp; Permissions → Redirect URLs</b>: add<span class="sl-url"><code>${esc(url)}</code><button type="button" class="btn sm" onclick="copyToClipboard(${jsArg(url)}).then(()=>{this.textContent='Copied';setTimeout(()=>{this.textContent='Copy'},1600)})">Copy</button></span></li>
+<li>Same page, <b>User Token Scopes</b>: add <code>chat:write</code> and <code>im:write</code>. Save.</li>
+<li><b>Basic Information → App Credentials</b>: copy the Client ID and Client Secret into Vercel as <code>SLACK_CLIENT_ID</code> and <code>SLACK_CLIENT_SECRET</code>, then redeploy.</li>
+<li>Run <code>addendum-teammate-reminders.sql</code> in Supabase → SQL Editor.</li>
+</ol>
+<p class="t-2" style="font-size:13px;margin:12px 0 0">Then each person presses Connect here once, and Slack asks them to allow it.</p>
+<div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal()">Done</button></div>`, 560);
 }
 function openIntegrationSheet(which){
   if(which === 'harvest'){

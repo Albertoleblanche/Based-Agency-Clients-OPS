@@ -190,7 +190,7 @@ async function showApp(session, o){
     // Open the screen the address points at (a refresh, bookmark, shared
     // link or push notification). The Google Calendar return is handled
     // separately in init() below.
-    if(location.hash && !/gcal=/.test(location.hash)) openScreenFromAddress(location.hash);
+    if(location.hash && !/gcal=|slackme=/.test(location.hash)) openScreenFromAddress(location.hash);
   }catch(e){
     console.error('showApp failed', e);
     document.body.classList.add('signed-out');
@@ -230,6 +230,22 @@ async function showApp(session, o){
       else if(outcome==='error') showToast('error','Connection failed','Something went wrong connecting Google Calendar — try again.');
     }
     history.replaceState(null, '', window.location.pathname + (session ? '#profile' : ''));
+  }
+
+  // Slack sends you back to #settings?slackme=connected|denied|wrong-account|setup|error after you let
+  // Radar send messages as you (Nov 23): back to where you pressed Connect, and say how it went.
+  if(hash.includes('slackme=')){
+    const outcome = new URLSearchParams(hash.split('?')[1] || '').get('slackme');
+    let back = '#reminders'; try{ back = sessionStorage.getItem('slackme-back') || '#settings'; sessionStorage.removeItem('slackme-back'); }catch(e){}
+    history.replaceState(null, '', window.location.pathname + (session ? back : ''));
+    if(session){
+      if(typeof slackMe !== 'undefined') slackMe = null;
+      openScreenFromAddress(back);
+      const say = { connected: ['success', 'Slack connected', 'Nudges to teammates now go from your Slack, as you.'], denied: ['info', 'Not connected', 'You can connect your Slack anytime from Settings → Connections.'],
+        'wrong-account': ['error', 'That’s a different Slack account', 'Sign in to Slack as yourself (the account on your Radar profile) and try again.'],
+        setup: ['error', 'Almost there', 'An admin needs to run addendum-teammate-reminders.sql in Supabase first.'] }[outcome] || ['error', 'Slack didn’t connect', 'Something went wrong. Try again.'];
+      showToast(...say);
+    }
   }
 
   // Back/Forward, or an address typed/pasted into the bar → open that screen.

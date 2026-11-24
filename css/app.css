@@ -3403,3 +3403,9 @@ html.ui-w .tk-sg{border-radius:var(--uw-r-card);box-shadow:0 0 0 1px var(--sep),
 /* Settings → Notifications: the Sound row stands apart from the note under it (Nov 23) */
 .form-grp.nt-snd{margin-bottom:18px}
 .nt-snd .fr .l{display:flex;flex-direction:column;gap:2px}
+/* Reminders waiting on a teammate (Nov 23): who, with a person mark; the nudge goes on Slack */
+.rmi-mate{display:inline-flex;align-items:center;gap:4px}
+.rmi-mate svg{width:13px;height:13px;flex:none;opacity:.75}
+.rmp-dh .rmp-via{display:inline-flex;align-items:center;gap:5px;margin-left:8px;font-size:12.5px;color:var(--label-2)}
+.rmp-dh .rmp-via svg{width:13px;height:13px}
+.rmn-on button{min-width:96px}

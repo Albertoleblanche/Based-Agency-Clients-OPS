@@ -31,8 +31,11 @@ function remRowHtml(r, primary){
     const at = r.resolvedAt ? fmtShortDate(new Date(r.resolvedAt)) : '';
     right = `<span class="rmi-when">${r.status === 'answered' ? 'Answered' : 'Closed'} ${at}</span><span class="rmi-d">${r.askedDate && r.resolvedAt ? 'after ' + remWaited(r.askedDate, r.resolvedAt) : ''}</span>`;
   }
+  // waiting on a teammate (Nov 23): who, then the client it's for
+  const mate = remMate(r);
+  const subj = mate ? `<span class="rmi-mate">${icon('user')}${escapeHtml(mate.gone ? 'A teammate' : firstName(mate.name))}</span>${c ? ' · ' + escapeHtml(c.name) : ''}` : `${escapeHtml(c ? c.name : '')}${focusMark(c)}`;
   return `<div class="rmi-r${open ? '' : ' is-done'}${window._remSel === r.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectReminder('${r.id}')" onkeydown="if((event.key==='Enter'||event.key===' ')&&event.target===this){event.preventDefault();selectReminder('${r.id}')}">${remCb(r)}
-<div class="tx"><b>${escapeHtml(r.question)}</b><span class="s">${escapeHtml(c ? c.name : '')}${focusMark(c)} · ${escapeHtml(firstName(who))} asked ${escapeHtml(asked)}</span></div>
+<div class="tx"><b>${escapeHtml(r.question)}</b><span class="s">${subj} · ${escapeHtml(firstName(who))} asked ${escapeHtml(asked)}</span></div>
 <div class="rmi-w">${right}</div>${act}</div>`;
 }
 // The circle: ticks a question answered (with the same little check as everywhere else), or shows
@@ -51,7 +54,8 @@ function renderRemindersNow(){
   const everyone = seesEveryone(), base = everyone ? clientReminders : clientReminders.filter(r => r.askedBy === currentUser?.id);
   if(!everyone) remWho = 'all';
   let rs = base.slice();
-  if(remClient !== 'all') rs = rs.filter(r => r.clientId === remClient);
+  if(remClient === 'team') rs = rs.filter(r => r.waitingOn);
+  else if(remClient !== 'all') rs = rs.filter(r => r.clientId === remClient);
   if(remWho !== 'all') rs = rs.filter(r => r.askedBy === remWho);
   const byFu = (a, b) => focusIdFirst(a.clientId, b.clientId) || (a.followUpDate || '9999').localeCompare(b.followUpDate || '9999') || (a.askedDate || '').localeCompare(b.askedDate || '');
   const byDone = (a, b) => new Date(b.resolvedAt || 0) - new Date(a.resolvedAt || 0);
@@ -62,31 +66,33 @@ function renderRemindersNow(){
   const uw = typeof uiStyleOn === 'function' && uiStyleOn();
   const sec = (t, list, cls) => list.length ? `<section class="rmi-g"><div class="rmi-sec${cls ? ' ' + cls : ''}"><b>${t}</b><span>${list.length}</span></div>${list.map((r, i) => remRowHtml(r, !uw && cls === 'is-due' && i === 0)).join('')}</section>` : '';
   let main;
-  if(remTab === 'open') main = sec('Due', due, 'is-due') + sec('Waiting on the client', waiting) + sec('Answered this week', recent);
+  const anyMate = base.some(r => r.waitingOn);
+  if(remTab === 'open') main = sec('Due', due, 'is-due') + sec(anyMate ? 'Waiting' : 'Waiting on the client', waiting) + sec('Answered this week', recent);
   else main = sec(remTab === 'answered' ? 'Answered' : 'Closed', remTab === 'answered' ? answered : closed);
   if(!main) main = remTab === 'open'
-    ? emptyState({ icon: 'bell-ring', tone: clientReminders.length ? 'ok' : 'blue', title: clientReminders.length ? 'Nothing is waiting on clients' : 'No follow-ups yet',
-        text: 'When you ask a client something, add it here with when to chase it. Radar reminds you, and the team can see you’re waiting on an answer.',
+    ? emptyState({ icon: 'bell-ring', tone: clientReminders.length ? 'ok' : 'blue', title: clientReminders.length ? 'Nothing is waiting' : 'No follow-ups yet',
+        text: 'When you ask a client or a teammate for something, add it here with when to chase it. Radar reminds you, and the team can see you’re waiting on an answer.',
         action: 'New Reminder', actionIcon: 'plus', onAction: 'openNewReminderModal()' })
     : emptyState({ icon: remTab === 'answered' ? 'check-circle' : 'archive', title: `Nothing ${remTab === 'answered' ? 'answered' : 'closed'} yet`,
         text: remTab === 'answered' ? 'Follow-ups the client answered show here.' : 'Follow-ups you closed without an answer show here.' });
   const usedClients = [...new Set(base.map(r => r.clientId))].map(id => clients.find(c => c.id === id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
+  if(remClient === 'team' && !anyMate) remClient = 'all';
   const askers = [...new Set(clientReminders.map(r => r.askedBy))].map(id => teamProfiles.find(p => p.id === id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
   const curC = usedClients.find(c => c.id === remClient), curW = askers.find(p => p.id === remWho);
-  const all = base.filter(r => (remClient === 'all' || r.clientId === remClient) && (remWho === 'all' || r.askedBy === remWho));
+  const all = base.filter(r => (remClient === 'all' || (remClient === 'team' ? r.waitingOn : r.clientId === remClient)) && (remWho === 'all' || r.askedBy === remWho));
   const n = k => all.filter(r => r.status === k).length;
   const sel = window._remSel && clientReminders.find(r => r.id === window._remSel);
   if(window._remSel && !sel) window._remSel = null;
   const prev = root.querySelector('.sp-page')?.scrollTop || 0, prevSp = root.querySelector('.sp:not(.sp-leaving)')?.scrollTop || 0;
   root.innerHTML = `<div class="spw"><div class="sp-page"><div class="rmi">
-<div class="rmi-hd"><div><h2>${due.length ? `${due.length} follow-up${due.length === 1 ? ' is' : 's are'} due` : 'No follow-ups are due'}</h2><p>${everyone ? 'Questions your team asked clients, and when to chase them.' : 'Questions you asked clients, and when to chase them.'}</p></div>
+<div class="rmi-hd"><div><h2>${due.length ? `${due.length} follow-up${due.length === 1 ? ' is' : 's are'} due` : 'No follow-ups are due'}</h2><p>${everyone ? 'What your team is waiting on from clients and teammates, and when to chase it.' : 'What you’re waiting on from clients and teammates, and when to chase it.'}</p></div>
 <div class="rmi-f"><div class="seg" role="tablist" aria-label="Show">${[['open', 'Waiting', n('waiting')], ['answered', 'Answered', n('answered')], ['closed', 'Closed', n('closed')]].map(([k, t, c]) => `<button class="${remTab === k ? 'on' : ''}" role="tab" aria-selected="${remTab === k}" onclick="setRem('tab','${k}')">${t} <span class="c">${c}</span></button>`).join('')}</div>
-<label class="pop pop-sel"><span class="pl">Client: ${escapeHtml(curC ? curC.name : 'All')}</span>${icon('caret-down')}<select aria-label="Client" onchange="setRem('client',this.value)"><option value="all">All</option>${usedClients.map(c => `<option value="${c.id}"${c === curC ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></label>
+<label class="pop pop-sel"><span class="pl">${remClient === 'team' ? 'Teammates' : `Client: ${escapeHtml(curC ? curC.name : 'All')}`}</span>${icon('caret-down')}<select aria-label="Client" onchange="setRem('client',this.value)"><option value="all">All</option>${anyMate ? `<option value="team"${remClient === 'team' ? ' selected' : ''}>Teammates</option>` : ''}${usedClients.map(c => `<option value="${c.id}"${c === curC ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></label>
 ${everyone ? `<label class="pop pop-sel"><span class="pl">${escapeHtml(curW ? curW.name : 'Everyone')}</span>${icon('caret-down')}<select aria-label="Asked by" onchange="setRem('who',this.value)"><option value="all">Everyone</option>${askers.map(p => `<option value="${p.id}"${p === curW ? ' selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}</select></label>` : ''}</div></div>
 ${main}</div></div>${sel ? remPanelHtml(sel) : ''}</div>`;
   const sp = root.querySelector('.sp-page'); if(sp) sp.scrollTop = prev;
   const pn = root.querySelector('.sp:not(.sp-leaving)'); if(pn){ pn.scrollTop = prevSp; pn._st = prevSp; }
-  if(currentViewName === 'reminders') setToolbar(null, 'Client follow-ups');
+  if(currentViewName === 'reminders') setToolbar(null, 'Follow-ups');
 }
 
 // ---- the panel: a follow-up on the right, like a task -----------------------------------------
@@ -104,8 +110,9 @@ function remPanelHtml(r){
   const resolvedAt = r.resolvedAt ? fmtShortDate(new Date(r.resolvedAt)) : '';
   const linked = (typeof calendarEvents !== 'undefined' ? calendarEvents : []).find(e => e.relatedReminderId === r.id);
   const late = open && remWhen(r)[1];
+  const mate = remMate(r), mateFirst = mate ? (mate.gone ? 'a teammate' : firstName(mate.name)) : '';
   const status = due ? `<span class="rmp-st is-due">Due</span>`
-    : open ? `Waiting on the client`
+    : open ? `Waiting on ${mate ? escapeHtml(mateFirst) : 'the client'}`
     : `<span class="rmp-st${r.status === 'answered' ? ' is-ok' : ''}">${r.status === 'answered' ? 'Answered' : 'Closed'}${resolvedAt ? ' ' + resolvedAt : ''}</span>`;
   const follow = open ? `<span class="tkp-k">Follow up</span><span class="tkp-v rmp-fu${late ? ' tkp-late' : ''}">${sheetDateField('remFollowUp', r.followUpDate || '', { from: 0, to: 30, min: toDateStr(new Date()), none: r.followUpDate ? '' : 'No date', after: 'remSetFollowUp' })}</span>` : '';
   const waited = r.askedDate ? remWaited(r.askedDate, open ? null : r.resolvedAt) : '';
@@ -115,7 +122,7 @@ function remPanelHtml(r){
     : open ? `<div class="tkp-acts" data-k="acts-open"><button class="btn${due ? ' btn-p' : ''}" onclick="nudgeReminder('${r.id}')">${icon('sparkle')}Draft Nudge</button><button class="btn${due ? '' : ' btn-p'}" onclick="markReminderStatus('${r.id}','answered')">${icon('check')}Mark Answered</button></div>`
     : `<div class="tkp-acts" data-k="acts-done"><button class="btn" onclick="markReminderStatus('${r.id}','waiting')">${icon('rotate-ccw')}Reopen</button></div>`;
   const ev = [];
-  if(r.askedDate) ev.push({ at: r.askedDate + 'T12:00:00', html: `<b>${escapeHtml(r.askedBy === currentUser?.id ? 'You' : firstName(owner ? owner.name : 'Someone'))}</b> asked ${escapeHtml(c ? c.name : 'the client')}` });
+  if(r.askedDate) ev.push({ at: r.askedDate + 'T12:00:00', html: `<b>${escapeHtml(r.askedBy === currentUser?.id ? 'You' : firstName(owner ? owner.name : 'Someone'))}</b> asked ${escapeHtml(mate ? mateFirst : c ? c.name : 'the client')}` });
   (remSessionActivity[r.id] || []).forEach(x => ev.push(x));
   if(!open && r.resolvedAt) ev.push({ at: r.resolvedAt, html: r.status === 'answered' ? `Marked answered${waited ? `, after ${waited}` : ''}` : 'Closed without an answer' });
   ev.sort((a, b) => new Date(b.at) - new Date(a.at));
@@ -130,6 +137,7 @@ function remPanelHtml(r){
 <div class="sp-bar"><button class="ib" aria-label="Close" onclick="closeRemPanel()">${icon('x')}</button><span class="tkp-bar"><button class="ib" aria-label="More" onclick="remMore(event)">${icon('dots-three')}</button><template id="remMoreItems">${more.join('')}</template></span></div>
 <div class="tkp-h">${remCb(r, 'lg')}<textarea class="rmp-q" id="remQ" rows="1" spellcheck="true" aria-label="Question" maxlength="1000" onkeydown="remQKey(event)" onblur="remSaveQuestion('${r.id}')">${escapeHtml(r.question)}</textarea></div>
 <div class="tkp-meta">
+${mate ? `<span class="tkp-k">Waiting on</span><span class="tkp-v">${escapeHtml(mate.name)}</span>` : ''}
 ${c ? `<span class="tkp-k">Client</span><span class="tkp-v"><a href="#" onclick="openClientDetail('${c.id}');return false;">${escapeHtml(c.name)}</a></span>` : ''}
 <span class="tkp-k">Asked by</span><span class="tkp-v">${escapeHtml(ownerName)}</span>
 <span class="tkp-k">Asked</span><span class="tkp-v">${escapeHtml(asked || '—')}${open && waited ? `<em>waiting ${waited}</em>` : ''}</span>
@@ -197,9 +205,15 @@ async function remAddToCalendar(id){
 const remDrafts = {};   // reminder id -> { ch: 'email' | 'whatsapp', state: 'writing' | 'ready', subject, body, plain, n }
 // The next weekday from a date: the team doesn't work weekends.
 function remWorkday(d){ const k = d.getDay(); return k === 6 ? addDays(d, 2) : k === 0 ? addDays(d, 1) : d; }
-function remNudgeCh(c){ return c && typeof winChannel === 'function' && winChannel(c) === 'whatsapp' ? 'whatsapp' : 'email'; }
+function remNudgeCh(c, r){ return r && r.waitingOn ? 'slack' : c && typeof winChannel === 'function' && winChannel(c) === 'whatsapp' ? 'whatsapp' : 'email'; }
 function remNudgeFacts(r, c, ch){
   const asked = r.askedDate ? remDay(r.askedDate) : null;
+  if(ch === 'slack'){   // a teammate, on Slack (Nov 23)
+    const m = remMate(r);
+    return { teammate: m && !m.gone ? firstName(m.name) : 'there', client: c ? c.name : '', ask: r.question,
+      askedOn: asked ? asked.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : '',
+      waitedDays: asked ? Math.max(0, daysBetween(asked, dayStart(new Date()))) : null, sender: firstName(myName() || ''), slack: true, whatsapp: true };
+  }
   return { client: c ? c.name : 'the client', contact: typeof clientContact === 'function' ? clientContact(c) : '', ask: r.question,
     askedOn: asked ? asked.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : '',
     waitedDays: asked ? Math.max(0, daysBetween(asked, dayStart(new Date()))) : null,
@@ -213,7 +227,8 @@ function nudgeReminder(id){
 async function remDraftNudge(id, ch){
   const r = clientReminders.find(x => x.id === id); if(!r) return;
   const c = clients.find(x => x.id === r.clientId), prev = remDrafts[id];
-  const d = remDrafts[id] = { ch: ch || (prev && prev.ch) || remNudgeCh(c), state: 'writing', subject: '', body: '', plain: false, n: ((prev && prev.n) || 0) + 1 };
+  const d = remDrafts[id] = { ch: r.waitingOn ? 'slack' : (ch || (prev && prev.ch) || remNudgeCh(c, r)), state: 'writing', subject: '', body: '', plain: false, n: ((prev && prev.n) || 0) + 1 };
+  if(d.ch === 'slack') remSlackMeStatus();   // can it go from your Slack? (asked once, kept)
   renderReminders();
   const o = remNudgeFacts(r, c, d.ch);
   let out = null;
@@ -232,6 +247,7 @@ async function remDraftNudge(id, ch){
 function remDraftEdit(id, k, v){ const d = remDrafts[id]; if(d) d[k] = v; }
 function remDiscardNudge(id){ delete remDrafts[id]; renderReminders(); }
 function remDraftHtml(r, c, d){
+  if(d.ch === 'slack') return remSlackDraftHtml(r, c, d);
   const email = d.ch === 'email', to = c && c.email ? String(c.email).split(',')[0].trim() : '', ch = email ? 'email' : 'wa';
   const who = (typeof clientContact === 'function' && clientContact(c)) || (c ? c.name : 'the client');
   const next = remDay(toDateStr(remWorkday(addDays(new Date(), 3)))).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -254,6 +270,75 @@ function remDraftHtml(r, c, d){
 <div class="rmp-dacts" data-k="btns-${ch}" data-state="${writing ? 'off' : 'on'}">${primary}${answered}</div>
 <p class="rmp-dn" data-k="note-${ch}">${note}</p></div>`;
 }
+// When the next follow-up lands after a nudge: three working days for a client, the next working
+// day for a teammate (Nov 23).
+function remNextFollow(r){ return remWorkday(addDays(new Date(), r && r.waitingOn ? 1 : 3)); }
+
+// ---- a teammate, on Slack, from your own Slack (Nov 23, lib/slack-me.js) ------------------------
+// The nudge is a Slack message to edit, then Send on Slack (it goes from your Slack, as you), or Copy.
+// Until you connect your Slack (once, Settings → Connections), Copy and Connect Slack.
+let slackMe = null;   // { connected, configured, needsSetup } once asked
+async function remSlackMeStatus(force){
+  if(slackMe && !force) return slackMe;
+  if(!force) slackMe = slackMe || { checking: true };
+  try{ const res = await fetch('/api/integrations?provider=slack-me', { headers: await apiAuthHeaders() }); slackMe = res.ok ? await res.json() : { connected: false, configured: false }; }
+  catch(e){ slackMe = { connected: false, configured: false }; }
+  if(currentViewName === 'reminders') renderReminders();
+  return slackMe;
+}
+async function slackMeConnect(){
+  let j = {};
+  try{ const res = await fetch('/api/integrations', { method: 'POST', headers: await apiAuthHeaders(), body: JSON.stringify({ provider: 'slack-me', action: 'start' }) }); j = await res.json().catch(() => ({})); }catch(e){ j = { error: 'Couldn’t reach Radar. Try again.' }; }
+  if(j.url){ try{ sessionStorage.setItem('slackme-back', location.hash || '#reminders'); }catch(e){} location.href = j.url; return; }
+  showToast('info', j.notConfigured ? 'Slack sign-in isn’t set up yet' : 'Couldn’t start', j.notConfigured ? (isAdmin() ? 'Set it up once in Settings → Connections → Slack, as you.' : 'Ask an admin to set it up in Settings → Connections.') : (j.error || 'Try again.'));
+}
+async function slackMeDisconnect(){
+  if(!(await confirmDialog('Disconnect your Slack? Nudges to teammates won’t go from your Slack until you connect it again.', { confirmLabel: 'Disconnect' }))) return;
+  try{ await fetch('/api/integrations', { method: 'POST', headers: await apiAuthHeaders(), body: JSON.stringify({ provider: 'slack-me', action: 'disconnect' }) }); }catch(e){}
+  slackMe = { connected: false, configured: true };
+  showToast('success', 'Slack disconnected', 'Connect it again anytime.');
+  if(typeof loadIntegrationStatuses === 'function' && currentViewName === 'settings') loadIntegrationStatuses();
+}
+function remSlackDraftHtml(r, c, d){
+  const m = remMate(r), first = m && !m.gone ? firstName(m.name) : 'them';
+  const hasId = !!(m && !m.gone && m.slack_user_id), sm = slackMe || {};
+  const next = remDay(toDateStr(remNextFollow(r))).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const writing = d.state === 'writing', off = writing ? ' disabled' : '';
+  const head = `<div class="sp-sec rmp-dh" data-k="head"><b>Nudge</b><span class="rmp-via">${icon('paper-plane-tilt')}Slack, to ${escapeHtml(first)}</span><span class="rmp-dt"><button class="ib" aria-label="Write again" title="Write again"${off} onclick="remDraftNudge('${r.id}')">${icon('arrows-clockwise')}</button><button class="ib" aria-label="Discard the nudge" title="Discard" onclick="remDiscardNudge('${r.id}')">${icon('x')}</button></span></div>`;
+  const answered = `<button class="btn rmp-ans" onclick="markReminderStatus('${r.id}','answered')">${icon('check')}Mark Answered</button>`;
+  const canSend = sm.connected && hasId;
+  const primary = canSend
+    ? `<button class="btn btn-p" onclick="remSlackSend('${r.id}')"${off}>${icon('paper-plane-tilt')}Send on Slack</button><button class="btn" onclick="remCopyNudge('${r.id}')"${off}>${icon('copy')}Copy</button>`
+    : `<button class="btn btn-p" onclick="remCopyNudge('${r.id}')"${off}>${icon('copy')}Copy</button>${!sm.connected && sm.configured && hasId ? `<button class="btn" onclick="slackMeConnect()">Connect Slack…</button>` : ''}`;
+  const note = sm.checking ? `Checking your Slack… The next follow-up moves to ${next}.`
+    : canSend ? `Goes from your Slack, as you, to ${escapeHtml(first)}. The next follow-up moves to ${next}.`
+    : !hasId ? `${escapeHtml(m && !m.gone ? firstName(m.name) : 'They')} ${m && !m.gone ? 'has' : 'have'} no Slack account linked in Radar (Team → Slack), so copy it into Slack. The next follow-up moves to ${next}.`
+    : sm.configured ? `Connect your Slack once to send it as you, or copy it. The next follow-up moves to ${next}.`
+    : `Copy it into Slack. Sending it as you needs Slack sign-in set up once by an admin. The next follow-up moves to ${next}.`;
+  const body = writing
+    ? `<div class="rmp-sk rmp-sk-body is-wa" data-k="sk-body-slack" aria-live="polite"><p class="rmp-dw">${icon('sparkle')}Writing a Slack message to ${escapeHtml(first)}…</p><i></i><i></i><i></i></div>`
+    : `<textarea class="tf rmp-body is-wa" id="remDrBody" data-k="body-slack-${d.n}" aria-label="Message" spellcheck="true" oninput="remDraftEdit('${r.id}','body',this.value)">${escapeHtml(d.body)}</textarea>`;
+  return `${head}<div class="rmp-dr${writing ? ' is-writing' : ''}">${body}
+<div class="rmp-dacts" data-k="btns-slack-${canSend ? 'send' : 'copy'}" data-state="${writing ? 'off' : 'on'}">${primary}${answered}</div>
+<p class="rmp-dn" data-k="note-slack">${note}</p></div>`;
+}
+async function remSlackSend(id){
+  const r = clientReminders.find(x => x.id === id), d = remDrafts[id]; if(!r || !d) return;
+  const text = String(d.body || '').trim();
+  if(!text){ showToast('error', 'Nothing to send', 'Write the message first.'); return; }
+  const btn = clickedBtn(); setBtnLoading(btn, 'Sending…');
+  let out = {};
+  try{ const res = await fetch('/api/integrations', { method: 'POST', headers: await apiAuthHeaders(), body: JSON.stringify({ provider: 'slack-me', action: 'send', toProfileId: r.waitingOn, text }) }); out = await res.json().catch(() => ({})); }
+  catch(e){ out = { error: 'Couldn’t reach Radar. Try again.' }; }
+  restoreBtn(btn);
+  if(!out.ok){
+    if(out.notConnected){ slackMe = Object.assign({}, slackMe, { connected: false }); renderReminders(); }
+    showToast('error', 'Not sent', out.error || 'Try again in a moment.');
+    return;
+  }
+  await remNudged(id, 'slack');
+}
+
 // The nudge changes shape (open, written, Email ↔ WhatsApp, written again, discarded, sent) in
 // place: the section eases from its old height to the new one, only the parts that are new fade
 // in, and buttons that come on brighten. A redraw that changes nothing (a teammate's change
@@ -295,17 +380,17 @@ async function remCopyNudge(id){
 }
 async function remNudged(id, how){
   const r = clientReminders.find(x => x.id === id); if(!r) return;
-  const c = clients.find(x => x.id === r.clientId);
-  const next = toDateStr(remWorkday(addDays(new Date(), 3)));
+  const c = clients.find(x => x.id === r.clientId), m = remMate(r);
+  const next = toDateStr(remNextFollow(r));
   delete remDrafts[id];
-  (remSessionActivity[id] = remSessionActivity[id] || []).push({ at: new Date().toISOString(), html: `<b>You</b> nudged ${escapeHtml(c ? c.name : 'them')}` });
+  (remSessionActivity[id] = remSessionActivity[id] || []).push({ at: new Date().toISOString(), html: `<b>You</b> nudged ${escapeHtml(m ? remOnWho(r) : c ? c.name : 'them')}${how === 'slack' ? ' on Slack' : ''}` });
   const { error } = await supabaseClient.from('client_reminders').update({ follow_up_date: next }).eq('id', id);
   if(error){ renderReminders(); showToast('error', 'Follow-up date not moved', error.message); return; }
   await loadClientReminders();
   renderReminders();
   const day = remDay(next).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  showToast('success', how === 'mail' ? 'Nudge ready in your mail app' : how === 'whatsapp' ? 'Nudge copied for WhatsApp' : 'Nudge copied', `Next follow-up ${day}.`);
-  if(c) logClientActivity(r.clientId, 'reminder_nudged', `${myName() || 'Someone'} nudged ${c.name} about "${r.question.length > 80 ? r.question.slice(0, 80) + '…' : r.question}".`);
+  showToast('success', how === 'slack' ? `Sent to ${remOnWho(r)} on Slack` : how === 'mail' ? 'Nudge ready in your mail app' : how === 'whatsapp' ? 'Nudge copied for WhatsApp' : 'Nudge copied', how === 'slack' ? `From your Slack. Next follow-up ${day}.` : `Next follow-up ${day}.`);
+  if(c && !m) logClientActivity(r.clientId, 'reminder_nudged', `${myName() || 'Someone'} nudged ${c.name} about "${r.question.length > 80 ? r.question.slice(0, 80) + '…' : r.question}".`);
 }
 
 // Notes moved to notes-canvas.js (the gallery and the note sheet).

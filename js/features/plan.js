@@ -110,7 +110,7 @@ function planAheadItems(toDs){
   (typeof notes !== 'undefined' ? notes : []).filter(n => n.followUpDate && n.status !== 'done' && n.followUpDate <= toDs).forEach(n =>
     out.push({ kind: 'note', group: 'follow', id: n.id, date: n.followUpDate, title: n.title || 'Untitled note', sub: `Note${cName(n.clientId) ? ' · ' + cName(n.clientId) : ''}`, color: n.color, late: n.followUpDate < today }));
   (typeof clientReminders !== 'undefined' ? clientReminders : []).filter(r => r.status === 'waiting' && r.askedBy === me && r.followUpDate && r.followUpDate <= toDs).forEach(r =>
-    out.push({ kind: 'reminder', group: 'follow', id: r.id, date: r.followUpDate, title: r.question, sub: `Waiting on ${cName(r.clientId) || 'the client'}`, late: r.followUpDate < today }));
+    out.push({ kind: 'reminder', group: 'follow', id: r.id, date: r.followUpDate, title: r.question, sub: `Waiting on ${r.waitingOn && typeof remOnWho === 'function' ? remOnWho(r) : cName(r.clientId) || 'the client'}`, late: r.followUpDate < today }));
   (typeof calendarEvents !== 'undefined' ? calendarEvents : []).filter(e => !e.relatedTaskId && !e.relatedNoteId && !e.relatedReminderId && (e.createdBy === me || (e.attendeeIds || []).includes(me)))
     .forEach(e => { const st = new Date(e.startAt), ds = toDateStr(st); if(ds < today || ds > toDs) return;
       const fu = planIsFollowEvent(e), type = e.eventType && e.eventType !== 'other' && typeof CALENDAR_TYPE_META !== 'undefined' && CALENDAR_TYPE_META[e.eventType] ? CALENDAR_TYPE_META[e.eventType].label : 'Event';

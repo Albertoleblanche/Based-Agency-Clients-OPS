@@ -154,7 +154,7 @@ function uwRemindersSmall(){
   const over = rs.filter(r => r.followUpDate && r.followUpDate < today).length;
   const soon = rs.filter(r => r.followUpDate === today || r.followUpDate === tom).length;
   const cells = rs.slice(0, 12).map(r => `<i class="${r.followUpDate && r.followUpDate < today ? 'od' : r.followUpDate === today || r.followUpDate === tom ? 'nx' : ''}"></i>`).join('');
-  const sub = ['waiting on clients', over ? `<span class="uw-risk">${over} overdue</span>` : '', soon ? `${soon} today or tomorrow` : ''].filter(Boolean).join(', ');
+  const sub = [rs.some(r => r.waitingOn) ? 'waiting on answers' : 'waiting on clients', over ? `<span class="uw-risk">${over} overdue</span>` : '', soon ? `${soon} today or tomorrow` : ''].filter(Boolean).join(', ');
   return `<a class="uw-w uw-sm" href="#reminders" onclick="switchView('reminders');return false;" aria-label="Reminders">${uwHead('reminders', dbNavIcon('reminders'), dbTitle('reminders'), cells ? `<span class="uw-rd uw-sp">${cells}</span>` : '')}
 <div class="uw-smb"><div class="uw-big md">${rs.length}</div><div class="uw-bigsub">${sub}</div></div></a>`;
 }

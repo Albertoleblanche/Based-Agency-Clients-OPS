@@ -172,11 +172,11 @@ function dbRemindersCard(n){
   const rs = (typeof clientReminders !== 'undefined' ? clientReminders : []).filter(r => r.status === 'waiting' && (canApprove() || r.askedBy === me))
     .sort((a, b) => focusIdFirst(a.clientId, b.clientId) || (a.followUpDate || '9999').localeCompare(b.followUpDate || '9999'));
   const over = rs.filter(r => r.followUpDate && r.followUpDate < today).length, due = rs.filter(r => r.followUpDate === today).length;
-  const summ = ['Waiting on clients', over ? `<span class="t-red">${over} overdue</span>` : '', due ? `${due} to follow up today` : ''].filter(Boolean).join(' · ');
+  const summ = [rs.some(r => r.waitingOn) ? 'Waiting on answers' : 'Waiting on clients', over ? `<span class="t-red">${over} overdue</span>` : '', due ? `${due} to follow up today` : ''].filter(Boolean).join(' · ');
   const rows = rs.slice(0, n).map(r => {
     const c = clients.find(x => x.id === r.clientId), by = r.askedBy !== me && (teamProfiles || []).find(p => p.id === r.askedBy);
     const fw = r.followUpDate ? `<span class="${r.followUpDate < today ? 't-red' : ''}">${escapeHtml(dbFollowWord(r.followUpDate))}</span>` : (r.askedDate ? `Asked ${escapeHtml(dbDayWord(r.askedDate))}` : '');
-    const sub = [c ? escapeHtml(c.name) : '', by ? `Asked by ${escapeHtml(firstName(by.name))}` : '', fw].filter(Boolean).join(' · ');
+    const sub = [r.waitingOn && typeof remOnWho === 'function' ? `Waiting on ${escapeHtml(remOnWho(r))}` : '', c ? escapeHtml(c.name) : '', by ? `Asked by ${escapeHtml(firstName(by.name))}` : '', fw].filter(Boolean).join(' · ');
     return `<li class="db-r db-go" data-item onclick="openReminderDetailModal('${r.id}')"><span class="db-tx"><b class="db-q">${escapeHtml(r.question || '')}</b><span class="s">${sub}</span></span></li>`;
   }).join('');
   const body = `<p class="db-sum">${summ}</p>` + (rs.length ? `<ul class="db-l">${rows}</ul>` : dbNone('Nothing waiting on a client.'));

@@ -27,6 +27,9 @@
 //   at once (Match Harvest Clients); one result each.
 //   link-harvest (admins and approvers): { harvestId, targetId } — from where time is logged: Harvest
 //   knows this Radar client under another name; its link moves here (moveHarvestLink).
+// GET  /api/integrations?provider=slack-me → is your own Slack connected (to nudge teammates as you)
+// POST /api/integrations  body: { provider: 'slack-me', action: 'start' (→ Slack's sign-in link) | 'disconnect'
+//        | 'send', toProfileId, text } — lib/slack-me.js. Slack comes back to /slack/oauth (?route=slack-me-callback).
 // POST /api/integrations  body: { provider: 'push', action: 'send',
 //        targetUserId, title, body, url }
 // GET  /api/integrations?provider=granola → Granola status (anyone on the team)
@@ -58,6 +61,7 @@ const {
 const { sendPushToUser, pushUrlFor } = require('../lib/push-notify');
 const { connectGranola, disconnectGranola, granolaStatus, granolaCatchUp, granolaReadNow, granolaReadAgain, removeGranolaMeeting, restoreGranolaMeeting, pullMeetingTasks, draftMeetingRecap } = require('../lib/granola-tasks');
 const { handleMcp, protectedResourceMetadata } = require('../lib/mcp-server');
+const { slackMeAuthUrl, slackMeCallback, slackMeStatus, slackMeDisconnect, slackMeSend } = require('../lib/slack-me');
 
 module.exports = async function handler(req, res) {
   const route = (req.query || {}).route;
@@ -68,6 +72,14 @@ module.exports = async function handler(req, res) {
     return;
   }
   if (route === 'mcp') { await handleMcp(req, res); return; }
+  // Slack sends someone back here after they let Radar send messages as them (/slack/oauth, Nov 23)
+  if (route === 'slack-me-callback') {
+    const appUrl = (process.env.APP_URL || `https://${req.headers['x-forwarded-host'] || req.headers.host}`).replace(/\/+$/, '');
+    let to = `${appUrl}/#settings?slackme=error`;
+    try { to = await slackMeCallback(createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY), req.query || {}, appUrl); } catch (e) {}
+    res.writeHead(302, { Location: to }); res.end();
+    return;
+  }
   // The WhatsApp connector (the office PC) asks for phone pushes for the Radar notifications it just
   // added (Nov 23). It proves itself with the service key it already holds; Radar holds the push keys.
   if (route === 'service-push') {
@@ -109,8 +121,24 @@ module.exports = async function handler(req, res) {
     const userId = userData.user.id;
     const provider = req.method === 'GET' ? req.query.provider : (req.body || {}).provider;
 
-    if (provider !== 'google' && provider !== 'harvest' && provider !== 'push' && provider !== 'granola') {
-      res.status(400).json({ error: 'Missing or unknown provider — expected "google", "harvest", "push" or "granola".' });
+    if (provider !== 'google' && provider !== 'harvest' && provider !== 'push' && provider !== 'granola' && provider !== 'slack-me') {
+      res.status(400).json({ error: 'Missing or unknown provider — expected "google", "harvest", "push", "granola" or "slack-me".' });
+      return;
+    }
+
+    // ================= SLACK AS YOU (Nov 23) =================
+    // Each person's own Slack, to nudge a teammate as themselves (lib/slack-me.js).
+    if (provider === 'slack-me') {
+      const { data: me } = await admin.from('team_profiles').select('access_revoked').eq('id', userId).maybeSingle();
+      if (!me || me.access_revoked) { res.status(403).json({ error: 'Only team members can do this.' }); return; }
+      if (req.method === 'GET') { res.status(200).json(await slackMeStatus(admin, userId)); return; }
+      const appUrl = (process.env.APP_URL || `https://${req.headers['x-forwarded-host'] || req.headers.host}`).replace(/\/+$/, '');
+      const b = req.body || {};
+      const r = b.action === 'start' ? slackMeAuthUrl(userId, appUrl)
+        : b.action === 'disconnect' ? await slackMeDisconnect(admin, userId)
+        : b.action === 'send' ? await slackMeSend(admin, userId, { toProfileId: b.toProfileId, text: b.text })
+        : { error: `Unknown action: ${b.action}`, status: 400 };
+      res.status(r.error ? (r.status || 400) : 200).json(r);
       return;
     }
 

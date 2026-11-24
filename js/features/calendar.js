@@ -645,7 +645,7 @@ async function addReminderToCalendar(reminderId){
   if(!r || !r.followUpDate) return;
   const c = clients.find(x=>x.id===r.clientId);
   const { error } = await supabaseClient.from('calendar_events').insert({
-    title: c ? `Follow up: ${c.name}` : 'Client follow-up', description: r.question || null,
+    title: r.waitingOn && typeof remOnWho === 'function' ? `Follow up: ${remOnWho(r)}${c ? ' (' + c.name + ')' : ''}` : c ? `Follow up: ${c.name}` : 'Client follow-up', description: r.question || null,
     start_at: `${r.followUpDate}T00:00:00`, end_at: `${r.followUpDate}T23:59:59`, all_day: true,
     client_id: r.clientId, created_by: currentUser.id, event_type: 'reminder', related_reminder_id: r.id
   });

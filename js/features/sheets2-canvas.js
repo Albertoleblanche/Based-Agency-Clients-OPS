@@ -42,17 +42,42 @@ function sheetFocusPrimary(){ setTimeout(() => document.querySelector('#appModal
 
 // ---- Reminders ------------------------------------------------------------------------------
 const REMINDER_DOT = { waiting: 'yellow', due: 'red', answered: 'green', closed: 'hollow' };
-function openNewReminderModal(presetClientId){
-  const fu = toDateStr(typeof remWorkday === 'function' ? remWorkday(addDays(new Date(), 3)) : addDays(new Date(), 3));   // never a weekend
+// Waiting on a client, or on a teammate (Nov 23): then the client is optional, and the nudge goes to
+// them on Slack, from your own Slack.
+function openNewReminderModal(presetClientId, presetMateId){
+  const mate = !!presetMateId;
+  const fu = toDateStr(typeof remWorkday === 'function' ? remWorkday(addDays(new Date(), mate ? 1 : 3)) : addDays(new Date(), 3));   // never a weekend
+  const mates = (teamProfiles || []).filter(p => p.id !== currentUser?.id && !p.access_revoked).sort((a, b) => a.name.localeCompare(b.name)).map(p => [p.id, p.name]);
+  const hid = on => on ? '' : ' hidden';
   openAppModal(`<h3>New Reminder</h3>
 <div class="f">
-<label for="reminderClient">Client</label><div>${sheetPop('reminderClient', 'Client', sheetClientOptions(), presetClientId || '', '', { placeholder: 'Choose a client' })}</div>
-<label class="top" for="reminderQuestion">Question</label><textarea id="reminderQuestion" class="tf" spellcheck="true" placeholder="What are you waiting to hear back on? e.g. the latest project photos"></textarea>
+<label>Waiting on</label><div><div class="seg rmn-on" role="tablist" aria-label="Waiting on">${[['client', 'A client'], ['mate', 'A teammate']].map(([k, t]) => `<button type="button" class="${(k === 'mate') === mate ? 'on' : ''}" role="tab" aria-selected="${(k === 'mate') === mate}" data-m="${k}" onclick="remNewMode('${k}')">${t}</button>`).join('')}</div></div>
+<label for="reminderMate" class="rmn-m"${hid(mate)}>Teammate</label><div class="rmn-m"${hid(mate)}>${sheetPop('reminderMate', 'Teammate', mates, presetMateId || '', '', { placeholder: 'Choose who' })}</div>
+<label for="reminderClient" class="rmn-c"${hid(!mate)}>Client</label><div class="rmn-c"${hid(!mate)}>${sheetPop('reminderClient', 'Client', sheetClientOptions(), presetClientId || '', '', { placeholder: 'Choose a client' })}</div>
+<label for="reminderClientOpt" class="rmn-m"${hid(mate)}>Client</label><div class="rmn-m"${hid(mate)}>${sheetPop('reminderClientOpt', 'Client (optional)', [['', 'No client']].concat(sheetClientOptions()), presetClientId || '', '')}</div>
+<label class="top" for="reminderQuestion">${mate ? 'Request' : 'Question'}</label><textarea id="reminderQuestion" class="tf" spellcheck="true" placeholder="${mate ? 'What are you waiting on from them? e.g. the landing page copy' : 'What are you waiting to hear back on? e.g. the latest project photos'}"></textarea>
 <label for="reminderFollowUpDate">Follow up</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sheetDateField('reminderFollowUpDate', fu, { from: 0, to: 30, min: toDateStr(new Date()) })}</div>
 <span></span><div class="sw-line">${sheetSwCk('reminderAddToCalendarInput', true, 'Add to my calendar')}Add to my calendar</div>
 </div>
 <div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="saveNewReminder()">Create Reminder</button></div>`, 520);
-  setTimeout(() => document.getElementById(presetClientId ? 'reminderQuestion' : 'reminderClient')?.focus(), 30);
+  setTimeout(() => document.getElementById(mate ? (presetMateId ? 'reminderQuestion' : 'reminderMate') : presetClientId ? 'reminderQuestion' : 'reminderClient')?.focus(), 30);
+}
+function remNewMode(m){
+  const mate = m === 'mate';
+  document.querySelectorAll('.rmn-on button').forEach(b => { const on = b.dataset.m === m; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+  document.querySelectorAll('#appModalOverlay .rmn-m').forEach(e => { e.hidden = !mate; });
+  document.querySelectorAll('#appModalOverlay .rmn-c').forEach(e => { e.hidden = mate; });
+  const q = document.getElementById('reminderQuestion'), ql = document.querySelector('#appModalOverlay label[for="reminderQuestion"]');
+  if(q) q.placeholder = mate ? 'What are you waiting on from them? e.g. the landing page copy' : 'What are you waiting to hear back on? e.g. the latest project photos';
+  if(ql) ql.textContent = mate ? 'Request' : 'Question';
+  // the follow-up day, if it's still the suggested one: the next working day for a teammate, three for a client
+  const fd = document.getElementById('reminderFollowUpDate'), wd = n => toDateStr(remWorkday(addDays(new Date(), n)));
+  if(fd && fd.value === wd(mate ? 3 : 1)){
+    const v = wd(mate ? 1 : 3);
+    if(![...fd.options].some(o => o.value === v)) fd.add(new Option(sheetDateLabelLong(v), v), fd.options[fd.options.length - 1]);
+    fd.value = v; fd.dataset.prev = v; syncPopSel(fd);
+  }
+  document.getElementById(mate ? 'reminderMate' : 'reminderClient')?.focus();
 }
 function openReminderDetailModal(id){
   const r = clientReminders.find(x => x.id === id);
@@ -64,9 +89,10 @@ function openReminderDetailModal(id){
   const resolved = display === 'answered' || display === 'closed';
   const asked = r.askedDate ? fmtShortDate(new Date(r.askedDate + 'T12:00:00')) : '';
   openAppModal(`<div class="sheet-meta"><span class="st"><span class="dot ${REMINDER_DOT[display] || 'yellow'}"></span>${escapeHtml(meta.label)}</span>${c ? `<a href="#" onclick="closeAppModal();openClientDetail('${c.id}');return false;">${escapeHtml(c.name)}${icon('caret-right', { weight: 'bold' })}</a>` : ''}</div>
-<h3>Client Follow-up</h3>
+<h3>${r.waitingOn ? 'Follow-up' : 'Client Follow-up'}</h3>
 <div class="f">
-<label class="top" for="reminderEditQuestion">Question</label><textarea id="reminderEditQuestion" class="tf" spellcheck="true">${escapeHtml(r.question)}</textarea>
+${r.waitingOn ? `<label>Waiting on</label><div style="font-size:14px">${escapeHtml((remMate(r) || {}).name || 'A teammate')}</div>` : ''}
+<label class="top" for="reminderEditQuestion">${r.waitingOn ? 'Request' : 'Question'}</label><textarea id="reminderEditQuestion" class="tf" spellcheck="true">${escapeHtml(r.question)}</textarea>
 <label>Asked by</label><div style="font-size:14px">${owner ? escapeHtml(owner.name) : '—'}${asked ? `<span class="t-2"> · ${asked}</span>` : ''}</div>
 <label for="reminderEditFollowUp">Follow up</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sheetDateField('reminderEditFollowUp', r.followUpDate || '', { from: 0, to: 30, min: toDateStr(new Date()), disabled: resolved })}</div>
 </div>

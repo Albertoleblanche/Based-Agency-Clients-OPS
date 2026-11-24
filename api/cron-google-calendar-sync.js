@@ -39,23 +39,28 @@ async function notifyDueReminders(admin) {
   // implies is a one-time nudge, not a daily nag.
   const { data: due, error } = await admin
     .from('client_reminders')
-    .select('id, client_id, question, asked_by, follow_up_date')
+    .select('*')
     .eq('status', 'waiting')
     .lte('follow_up_date', today)
     .is('reminder_notified_at', null);
   if (error || !due || !due.length) return { notified: 0 };
 
-  const names = await clientNames(admin, due.map(r => r.client_id));
+  const names = await clientNames(admin, due.map(r => r.client_id).filter(Boolean));
+  // waiting on a teammate (Nov 23): their first name instead of a client's
+  const mateIds = [...new Set(due.map(r => r.waiting_on).filter(Boolean))];
+  const mates = {};
+  if (mateIds.length) { const { data: ps } = await admin.from('team_profiles').select('id, name').in('id', mateIds); (ps || []).forEach(p => { mates[p.id] = String(p.name || '').split(' ')[0] || 'Your teammate'; }); }
 
   for (const r of due) {
-    const clientName = names[r.client_id] || 'A client';
+    const clientName = r.waiting_on ? (mates[r.waiting_on] || 'Your teammate') : (names[r.client_id] || 'A client');
+    const line = r.waiting_on ? `Time to check with ${clientName} on: "${r.question}"` : `${clientName} hasn't responded to: "${r.question}"`;
     await admin.from('notifications').insert({
       user_id: r.asked_by, type: 'reminder_follow_up_due', title: 'Follow-up needed',
-      body: `You haven't received a response from ${clientName} regarding: "${r.question}"`,
+      body: r.waiting_on ? line : `You haven't received a response from ${clientName} regarding: "${r.question}"`,
       target_view: 'reminders',
     });
-    try{ await sendPushToUser(admin, r.asked_by, 'Follow-up needed', `${clientName} hasn't responded to: "${r.question}"`, pushUrlFor('reminders')); }catch(e){}
-    try{ await sendSlackDM(admin, r.asked_by, 'reminder_follow_up_due', `*Follow-up needed*\n${clientName} hasn't responded to: "${r.question}"`); }catch(e){}
+    try{ await sendPushToUser(admin, r.asked_by, 'Follow-up needed', line, pushUrlFor('reminders')); }catch(e){}
+    try{ await sendSlackDM(admin, r.asked_by, 'reminder_follow_up_due', `*Follow-up needed*\n${line}`); }catch(e){}
     await admin.from('client_reminders').update({ reminder_notified_at: today }).eq('id', r.id);
   }
   return { notified: due.length };
@@ -69,13 +74,15 @@ async function notifyEscalatedReminders(admin) {
   // Still waiting, and its follow-up date was at least 7 days ago —
   // genuinely stale, not just "due today." escalated_at ensures this
   // fires once per reminder, not every day it remains unanswered.
-  const { data: stale, error } = await admin
+  const { data: staleAll, error } = await admin
     .from('client_reminders')
-    .select('id, client_id, question, asked_by, follow_up_date')
+    .select('*')
     .eq('status', 'waiting')
     .lte('follow_up_date', sevenDaysAgo)
     .is('escalated_at', null);
-  if (error || !stale || !stale.length) return { escalated: 0 };
+  // only what a client hasn't answered goes to admins and approvers; waiting on a teammate stays yours
+  const stale = (staleAll || []).filter(r => !r.waiting_on && r.client_id);
+  if (error || !stale.length) return { escalated: 0 };
 
   const { data: admins } = await admin.from('team_profiles').select('id, role').in('role', ['admin', 'approver']);
   if (!admins || !admins.length) return { escalated: 0 };
