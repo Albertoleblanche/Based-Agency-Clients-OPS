@@ -294,11 +294,11 @@ ${oNames.length ? `<div class="rvn-rs rvn-s2"><b>Other parts</b><span>${oNames.l
   else if(x.st === 'review') foot = !queueHasReview()
     ? `<span class="rvn-ft-note">${icon('clock')}In Review, where it’s approved and sent</span><span class="rvn-sp"></span><button class="btn btn-p rvn-main" onclick="openReviewDraft(${A})">Open in Review</button>`
     : ch === 'whatsapp' && typeof reviewWaFootHtml === 'function' ? reviewWaFootHtml(c, d, 'waiting', A)
-    : `<span class="rvn-ft-note">${icon('clock')}Waiting for an approver. You’ll get a notification when it’s sent.</span><span class="rvn-sp"></span>`;
+    : `<span class="rvn-ft-note">${icon('clock')}Waiting for an approver. You’ll get a notification when it’s sent.</span><span class="rvn-sp"></span>${quNudgeBtnHtml(c, d, 'review')}`;
   else if(x.st === 'sent') foot = ch === 'whatsapp' && typeof reviewWaFootHtml === 'function' ? reviewWaFootHtml(c, d, 'sent', A)
     : `<span class="rvn-ft-note">${icon('check-circle')}Sent ${escapeHtml(relDayLower(sentAt))} at ${escapeHtml(fmtTime(sentAt))}${c.email ? ' to ' + escapeHtml(c.email) : ''}${d.draftSentBy ? ' by ' + (d.draftSentBy === me ? 'you' : escapeHtml(d.draftSentBy)) : ''}</span><span class="rvn-sp"></span>${ch === 'both' ? `<button class="btn" onclick="copyWinText(${A})">${icon('copy')}Copy for WhatsApp</button>` : ''}`;
   else foot = ch === 'whatsapp' && typeof reviewWaFootHtml === 'function' ? reviewWaFootHtml(c, d, 'approved', A)
-    : `<span class="rvn-ft-note">${icon('check-circle')}Approved. An approver sends it, and you’ll get a notification.</span><span class="rvn-sp"></span>`;
+    : `<span class="rvn-ft-note">${icon('check-circle')}Approved. An approver sends it, and you’ll get a notification.</span><span class="rvn-sp"></span>${quNudgeBtnHtml(c, d, 'approved')}`;
   const doc = `<div class="rvn-doc">${head}${sentAt ? '' : work}${draft}</div>`;
   if(split) return { main: `<div class="rvn-top">${top}</div>
 <div class="rvn-mail"><div class="rvn-cols is-one">${doc}</div></div>
@@ -524,3 +524,98 @@ openReviewDraft = (function(orig){
     return orig(clientId, author);
   };
 })(openReviewDraft);
+
+
+// ---- Remind the approvers (Nov 24) ------------------------------------------------------------------
+// An update of yours waiting in Review (or approved, waiting to be sent): a message to the approvers
+// from your own Slack, as you, and in their bell in Radar. Without your Slack connected, or for an
+// approver with no Slack linked, Radar's own Slack message goes instead, so they still see it there.
+const QU_NUDGED_KEY = 'qu-nudged';
+function quNudgedAt(c, d){
+  try{ const m = JSON.parse(localStorage.getItem(QU_NUDGED_KEY) || '{}'); const v = m[c.id]; return v && v.k === quNudgeKey(d) ? new Date(v.at) : null; }catch(e){ return null; }
+}
+function quNudgeKey(d){ return d ? String(d.draftPendingSince || d.draftApprovedAt || d.author || '') : ''; }
+function quNudgeApprovers(){
+  return (teamProfiles || []).filter(p => !p.access_revoked && p.id !== currentUser.id && (p.role === 'admin' || p.role === 'approver'));
+}
+function quNudgeBtnHtml(c, d, st){
+  if(!d || !quNudgeApprovers().length) return '';
+  (window._quNudgeD = window._quNudgeD || {})[c.id] = d;   // the update this is about, for the sheet
+  const at = quNudgedAt(c, d);
+  return `${at ? `<span class="qu-nudged">Reminded ${escapeHtml(relDayLower(at) === 'today' ? 'at ' + fmtTime(at) : relDayLower(at))}</span>` : ''}<button class="btn" onclick="quNudgeOpen('${c.id}','${st}')">${icon('paper-plane-tilt')}${at ? 'Remind Again…' : 'Remind Approvers…'}</button>`;
+}
+function quNudgeText(c, d, st){
+  const name = shortClientName(c.name);
+  if(st === 'approved') return `${name}’s weekly update is approved and waiting to be sent. Could you send it when you get a chance?`;
+  const since = d && d.draftPendingSince ? new Date(d.draftPendingSince) : null;
+  const days = since ? Math.floor((Date.now() - since) / 864e5) : 0;
+  const when = since ? (toDateStr(since) === toDateStr(new Date()) ? fmtTime(since) : fmtDay(since)) : '';
+  return `${name}’s weekly update has been waiting in Review${since ? ` since ${when}${days >= 2 ? ` (${days} days)` : ''}` : ''}. Could you take a look when you get a chance?`;
+}
+async function quNudgeOpen(clientId, st){
+  const c = clients.find(x => x.id === clientId); if(!c) return;
+  const d = (window._quNudgeD || {})[c.id] || c;
+  const people = quNudgeApprovers();
+  if(!people.length){ showToast('info', 'No approvers to remind', 'Nobody else on the team can approve updates.'); return; }
+  const sm = typeof remSlackMeStatus === 'function' ? (slackMe && !slackMe.checking ? slackMe : await remSlackMeStatus(true)) : {};
+  window._quNudge = { clientId, st };
+  const row = p => {
+    const via = sm.connected && p.slack_user_id ? 'Slack, as you' : p.slack_user_id ? 'Slack, from Radar' : 'Radar only';
+    return `<label class="pick qn-p"><input type="checkbox" class="ck-native" value="${p.id}" checked onchange="quNudgeNote()"><span>${escapeHtml(p.name)}</span><span class="qn-via">${via}</span></label>`;
+  };
+  openAppModal(`<h3>Remind Approvers</h3>
+<p class="t-2" style="margin:-8px 0 14px;font-size:14px">${escapeHtml(c.name)} · ${st === 'approved' ? 'approved, not sent yet' : 'your update in Review'}</p>
+<div class="f">
+<label class="top">To</label><div class="pick-people" id="qnTo">${people.map(row).join('')}</div>
+<label class="top" for="qnText">Message</label><div><textarea id="qnText" class="tf" rows="4" spellcheck="true" oninput="quNudgeNote()">${escapeHtml(quNudgeText(c, d, st))}</textarea>
+<p class="qn-note" id="qnNote"></p></div>
+</div>
+<div class="sheet-a">${!sm.connected && sm.configured ? `<button class="btn" style="margin-right:auto" onclick="slackMeConnect()">Connect Your Slack…</button>` : ''}<button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" id="qnSend" onclick="quNudgeSend()">${icon('paper-plane-tilt')}Send</button></div>`, 560);
+  quNudgeNote();
+  setTimeout(() => document.getElementById('qnSend')?.focus({ preventScroll: true }), 30);
+}
+// Says exactly where it goes, for who's ticked
+function quNudgeNote(){
+  const n = document.getElementById('qnNote'), btn = document.getElementById('qnSend'); if(!n) return;
+  const ids = [...document.querySelectorAll('#qnTo input:checked')].map(i => i.value), sm = slackMe || {};
+  const to = quNudgeApprovers().filter(p => ids.includes(p.id));
+  const first = p => firstName(p.name);
+  if(btn) btn.disabled = !to.length || !(document.getElementById('qnText')?.value || '').trim();
+  if(!to.length){ n.textContent = 'Pick who to remind.'; return; }
+  const asMe = to.filter(p => sm.connected && p.slack_user_id), bot = to.filter(p => !(sm.connected && p.slack_user_id) && p.slack_user_id), none = to.filter(p => !p.slack_user_id);
+  const list = a => a.length === 1 ? first(a[0]) : a.slice(0, -1).map(first).join(', ') + ' and ' + first(a[a.length - 1]);
+  const bits = [];
+  if(asMe.length) bits.push(`from your Slack, as you, to ${list(asMe)} (starting “Hi ${first(asMe[0])},”)`);
+  if(bot.length) bits.push(`on Slack from Radar to ${list(bot)}${sm.configured && !sm.connected ? ' (connect your Slack to send it as you)' : ''}`);
+  if(none.length) bits.push(`${list(none)} ${none.length === 1 ? 'has' : 'have'} no Slack linked, so in Radar only`);
+  n.textContent = `It goes to their bell in Radar, with a link to the update, and ${bits.join('; ')}.`;
+}
+async function quNudgeSend(){
+  const o = window._quNudge || {}, c = clients.find(x => x.id === o.clientId); if(!c) return;
+  const text = (document.getElementById('qnText')?.value || '').trim();
+  const ids = [...document.querySelectorAll('#qnTo input:checked')].map(i => i.value);
+  const to = quNudgeApprovers().filter(p => ids.includes(p.id));
+  if(!text || !to.length) return;
+  const btn = document.getElementById('qnSend'); setBtnLoading(btn, 'Sending…');
+  const sm = slackMe || {}, me = myName(), link = `${location.origin}/#teamqueue`;
+  let asMe = 0, lost = false;
+  for(const p of to){
+    let sentAsMe = false;
+    if(sm.connected && p.slack_user_id && !lost){
+      try{
+        const res = await fetch('/api/integrations', { method: 'POST', headers: await apiAuthHeaders(),
+          body: JSON.stringify({ provider: 'slack-me', action: 'send', toProfileId: p.id, text: `Hi ${firstName(p.name)}, ${text}\n<${link}|Open it in Radar>` }) });
+        const out = await res.json().catch(() => ({}));
+        if(out.ok){ sentAsMe = true; asMe++; }
+        else if(out.notConnected){ lost = true; slackMe = Object.assign({}, slackMe, { connected: false }); }
+      }catch(e){}
+    }
+    // the bell (and the phone); Radar's own Slack message only where yours didn't go
+    await sendNotification(p.id, 'review_nudge', `${firstName(me)} asks you to check ${shortClientName(c.name)}’s update`, text, 'teamqueue', c.id, false, { noSlack: sentAsMe });
+  }
+  try{ const m = JSON.parse(localStorage.getItem(QU_NUDGED_KEY) || '{}'); m[c.id] = { at: new Date().toISOString(), k: quNudgeKey((window._quNudgeD || {})[c.id] || c) }; localStorage.setItem(QU_NUDGED_KEY, JSON.stringify(m)); }catch(e){}
+  restoreBtn(btn); closeAppModal();
+  const names = to.map(p => firstName(p.name)), who = names.length === 1 ? names[0] : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+  showToast('success', `Reminded ${who}`, asMe === to.length ? 'On Slack as you, and in Radar.' : asMe ? `On Slack as you to ${asMe}, the rest from Radar; and in Radar.` : lost ? 'Your Slack connection ended, so it went from Radar. Connect it again in Settings.' : 'In Radar, and on Slack from Radar.');
+  if(typeof renderMyQueue === 'function') renderMyQueue();
+}

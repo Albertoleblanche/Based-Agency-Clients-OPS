@@ -36,8 +36,14 @@ async function sendTaskNudge(type, list){
   if(!muted.includes('app:' + type)){
     const row = { user_id: currentUser.id, type, title, body, target_view: 'tasks', read: false };
     if(target) row.target_id = target;
-    const { error } = await supabaseClient.from('notifications').insert(row);
+    const { data: made, error } = await supabaseClient.from('notifications').insert(row).select('id, created_at').single();
     if(error) return false;
+    // another computer sent the same one at the same moment: keep the first, drop this one
+    if(made && made.id){
+      const { data: same } = await supabaseClient.from('notifications').select('id, created_at').eq('user_id', currentUser.id).eq('type', type)
+        .gte('created_at', dayStart(new Date()).toISOString()).order('created_at', { ascending: true }).order('id', { ascending: true });
+      if(same && same.length > 1 && same[0].id !== made.id){ await supabaseClient.from('notifications').delete().eq('id', made.id); return false; }
+    }
   }
   // urgent: a high-priority task in it goes to your phone and Slack too
   if(list.some(t => t.priority === 'high')){
@@ -57,6 +63,8 @@ async function runTaskNudges(){
   if(h >= NUDGE_FROM.task_overdue && late.length) plan.push(['task_overdue', late]);
   if(h >= NUDGE_FROM.task_wrap_up && h < 21 && due.length) plan.push(['task_wrap_up', due]);
   if(!plan.length) return;
+  // one tab at a time in this browser (each open tab checks)
+  try{ const k = 'nudge-lock-' + currentUser.id, at = Number(localStorage.getItem(k) || 0); if(Date.now() - at < 60000) return; localStorage.setItem(k, String(Date.now())); }catch(e){}
   nudgeBusy = true;
   try {
     // once a day each, on any device: what you were already told today

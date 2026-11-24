@@ -23,6 +23,7 @@ const NOTIFICATION_TYPE_META = {
   update_behind:           { label:'A client update you hold is overdue', section:'Weekly Updates' },
   draft_written:           { label:'A draft is written for you to check', section:'Weekly Updates' },
   monday_summary:          { label:'The Monday summary', section:'Weekly Updates', visibleTo:'approver' },
+  review_nudge:            { label:'A teammate asks you to check their update in Review', section:'Weekly Updates', visibleTo:'approver' },
   task_assigned:           { label:'A task is assigned to you', section:'Tasks' },
   task_completed:          { label:'A task you assigned is completed', section:'Tasks' },
   task_cancelled:          { label:'A task assigned to you is cancelled', section:'Tasks' },
@@ -66,7 +67,7 @@ const NOTIFICATION_TYPE_META = {
 // stored in the first place.
 // What you did yourself never comes back to you as a notification (Nov 24); reminders do.
 const NOTIF_SELF_OK = new Set(['plan_reminder', 'task_due', 'task_overdue', 'task_wrap_up', 'meeting_soon', 'reminder_follow_up_due']);
-async function sendNotification(userId, type, title, body, targetView, targetId, alreadyToasted){
+async function sendNotification(userId, type, title, body, targetView, targetId, alreadyToasted, opts){
   if(typeof currentUser !== 'undefined' && currentUser && userId === currentUser.id && !NOTIF_SELF_OK.has(type)) return;
   // Muting a type mutes it everywhere; "app:", "push:" or "slack:" before it mutes one place
   // only (Settings → Notifications).
@@ -79,7 +80,8 @@ async function sendNotification(userId, type, title, body, targetView, targetId,
     await supabaseClient.from('notifications').insert(row);
   }
   if(!muted.includes('push:'+type)) sendPushNotification(userId, title, body, notificationUrl(targetView, targetId));
-  if(!muted.includes('slack:'+type)) sendSlackNotification(userId, type, title, body);
+  // opts.noSlack: the person already got it on Slack another way (a message sent as you)
+  if(!muted.includes('slack:'+type) && !(opts && opts.noSlack)) sendSlackNotification(userId, type, title, body);
 }
 
 // Best-effort Slack DM alongside the in-app notification above — same
@@ -381,6 +383,20 @@ async function markAllNotificationsRead(){
 // person's very first-ever session there's nothing to compare against, so
 // this just starts the clock instead of flooding them with toasts for
 // their entire notification history.
+// Each notice shows as a note once: its id is claimed before it shows, in this tab and every other tab of
+// this browser (localStorage), so overlapping checks can't show it twice. The last 300 are remembered.
+const NOTIF_SHOWN_KEY = 'notif_shown_ids';
+const notifShownHere = new Set();
+function notifToastClaim(id){
+  if(!id || notifShownHere.has(id)) return false;
+  let list = [];
+  try{ list = JSON.parse(localStorage.getItem(NOTIF_SHOWN_KEY) || '[]'); }catch(e){}
+  if(list.includes(id)){ notifShownHere.add(id); return false; }
+  notifShownHere.add(id);
+  list.push(id);
+  try{ localStorage.setItem(NOTIF_SHOWN_KEY, JSON.stringify(list.slice(-300))); }catch(e){}
+  return true;
+}
 async function checkForNewNotificationToasts(){
   if(!currentUser) return;
   const storageKey = `notif_last_checked_${currentUser.id}`;
@@ -397,11 +413,16 @@ async function checkForNewNotificationToasts(){
   // instead of both calls racing against the same stale timestamp and
   // both showing a toast for the same notification.
   localStorage.setItem(storageKey, now);
+  // Nov 24: the checkpoint is this computer's clock but created_at is the server's, so a computer a little
+  // behind saw the same notice as new on every check (the live update, the nudge, the poll): three notes
+  // for one notice. Now it looks a few minutes back and shows each notice once, by its id, across tabs.
+  const since = new Date(new Date(lastChecked).getTime() - 5 * 60000).toISOString();
   const { data, error } = await supabaseClient.from('notifications').select('*')
-    .eq('user_id', currentUser.id).eq('read', false).gt('created_at', lastChecked).order('created_at', { ascending:true });
-  if(!error && data && data.length){
+    .eq('user_id', currentUser.id).eq('read', false).gt('created_at', since).order('created_at', { ascending:true });
+  const fresh = !error && data ? data.filter(n => notifToastClaim(n.id)) : [];
+  if(fresh.length){
     if(typeof radarChime === 'function') radarChime();   // one chime for what just came in (Nov 23)
-    data.forEach(n=>{
+    fresh.forEach(n=>{
       const type = n.type.includes('denied') ? 'error' : n.type.includes('approved') ? 'success' : 'info';
       // a meeting about to start: the toast has Join (Nov 23)
       const ev = n.type === 'meeting_soon' && typeof calendarEvents !== 'undefined' ? calendarEvents.find(e => String(e.id) === String(n.target_id)) : null;

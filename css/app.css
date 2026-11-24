@@ -3707,3 +3707,8 @@ button.wx-t.on + button.wx-t{box-shadow:none}
 .tk-sg-r.is-hl{background:color-mix(in srgb,var(--blue) 12%,transparent);border-radius:10px}
 .alert-sheet .sheet-a.is-row{flex-wrap:wrap;justify-content:flex-end}
 #tdHadL[hidden],.td-had[hidden]{display:none}
+/* Remind Approvers (Queue, Nov 24) */
+.f label.pick.qn-p{height:30px;gap:8px}
+.qn-p .qn-via{font-size:12px;color:var(--label-3)}
+.qn-note{margin:8px 0 0;font-size:12.5px;line-height:1.45;color:var(--label-2)}
+.qu-nudged{align-self:center;margin-right:4px;font-size:12.5px;color:var(--label-3);white-space:nowrap}
