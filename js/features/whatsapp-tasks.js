@@ -812,7 +812,8 @@ const WA_ROLE_DEFAULTS = {
 };
 const WA_TIMEZONES = ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'America/Sao_Paulo', 'UTC'];
 const WA_OFF_SHOWN = 4;        // "Not reading" shows this many, then Show N more
-let waGroupQuery = '', waPoll = null, waShowAllOff = false, waRoleEdit = null;
+const WA_ON_SHOWN = 10;        // "Reading" shows this many, then Show N more (Nov 24: 24 groups made a long page)
+let waGroupQuery = '', waPoll = null, waShowAllOff = false, waShowAllOn = false, waRoleEdit = null;
 
 function waQrOk(){
   const s = waSettings;
@@ -899,9 +900,12 @@ function waGroupsHtml(){
   if(!total) return head + `<div class="form-grp">${emptyState({ compact: true, icon: 'users', title: 'No groups yet',
     text: waConnState().key === 'connected' ? 'WhatsApp is still sending the list. They show here within a minute or two.' : 'They show here a minute after WhatsApp is linked.' })}</div>`;
   const shownOff = q || waShowAllOff ? off : off.slice(0, WA_OFF_SHOWN);
+  const shownOn = q || waShowAllOn ? reading : reading.slice(0, WA_ON_SHOWN);
+  const moreOn = !q && reading.length > WA_ON_SHOWN
+    ? `<div class="fr was-more"><button class="lnk-b" data-grow="wa-on" aria-expanded="${waShowAllOn}" data-turn="180" onclick="waToggleOn()">${waShowAllOn ? 'Show less' : `Show ${reading.length - WA_ON_SHOWN} more`}${icon('caret-down', { weight: 'bold' })}</button></div>` : '';
   const more = !q && off.length > WA_OFF_SHOWN
     ? `<div class="fr was-more"><button class="lnk-b" data-grow="wa-off" aria-expanded="${waShowAllOff}" data-turn="180" onclick="waToggleOff()">${waShowAllOff ? 'Show less' : `Show ${off.length - WA_OFF_SHOWN} more`}${icon('caret-down', { weight: 'bold' })}</button></div>` : '';
-  const rows = (reading.length ? `<div class="was-sub">Reading<span>${reading.length}</span></div>${reading.map(waGroupRow).join('')}` : '')
+  const rows = (reading.length ? `<div class="was-sub">Reading<span>${reading.length}</span></div><div data-grow-key="wa-on">${shownOn.map(waGroupRow).join('')}</div>${moreOn}` : '')
     + (off.length ? `<div class="was-sub">Not reading<span>${off.length}</span></div><div data-grow-key="wa-off">${shownOff.map(waGroupRow).join('')}</div>${more}` : '')
     || `<div class="fr"><div class="l"><span>No group matches “${escapeHtml(waGroupQuery)}”.</span></div></div>`;
   return head + `<div class="form-grp">${total > 6 ? `<div class="fr was-find"><input class="tf wa-gq" type="search" placeholder="Find a group" aria-label="Find a group" value="${escapeHtml(waGroupQuery)}" oninput="waFindGroup(this.value)"></div>` : ''}<div id="waGroupRows">${rows}</div></div>`;
@@ -912,6 +916,7 @@ function waFindGroup(v){
   const f = document.querySelector('.wa-gq'); if(f){ f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
 }
 function waToggleOff(){ waShowAllOff = !waShowAllOff; renderSettingsView(); }
+function waToggleOn(){ waShowAllOn = !waShowAllOn; renderSettingsView(); }
 function waRoleOpen(k){ waRoleEdit = k; renderSettingsView(); setTimeout(() => { const ta = document.getElementById('waRoleTa'); if(ta){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } }, 0); }
 function waRoleCancel(){ waRoleEdit = null; renderSettingsView(); }
 async function waRoleDone(k){
