@@ -93,8 +93,14 @@ module.exports = async function handler(req, res) {
   // The WhatsApp connector (its own server) asks for phone pushes for the Radar notifications it just
   // added (Nov 23). It proves itself with the service key it already holds; Radar holds the push keys.
   if (route === 'service-push') {
-    const key = String(req.headers['x-radar-service-key'] || ''), want = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '');
-    const same = key.length === want.length && want.length > 20 && require('crypto').timingSafeEqual(Buffer.from(key), Buffer.from(want));
+    const key = String(req.headers['x-radar-service-key'] || '').trim(), want = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+    let same = key.length === want.length && want.length > 20 && require('crypto').timingSafeEqual(Buffer.from(key), Buffer.from(want));
+    // The connector (Railway) and Radar (Vercel) can hold different forms of the same project's service
+    // key (Supabase's newer sb_secret_ key and the older JWT): any key Supabase itself takes as the admin
+    // key is the connector's (Nov 24: pushes were refused with 401)
+    if (!same && req.method === 'POST' && key.length > 20 && process.env.SUPABASE_URL) {
+      try { const r = await createClient(process.env.SUPABASE_URL, key, { auth: { persistSession: false } }).auth.admin.listUsers({ page: 1, perPage: 1 }); same = !!r && !r.error; } catch (e) {}
+    }
     if (req.method !== 'POST' || !same) { res.status(401).json({ error: 'Not allowed' }); return; }
     const admin = createClient(process.env.SUPABASE_URL, want);
     const pushes = Array.isArray((req.body || {}).pushes) ? req.body.pushes.slice(0, 50) : [];
