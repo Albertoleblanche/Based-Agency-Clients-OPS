@@ -312,7 +312,7 @@ function renderWhatsappTasks(){ renderWhatsapp(); }   // the old name, still cal
 function renderWhatsapp(){
   const root = document.getElementById('whatsappRoot');
   if(!root || !currentUser) return;
-  if(currentViewName === 'whatsapp') setToolbar(null, 'Client chats');
+  if(currentViewName === 'whatsapp') setToolbar(null, 'Beta · Client chats');
   if(!waLoaded){ root.innerHTML = `<div class="spw"><div class="sp-page"><div class="wa">${skeletonHtml('whatsapp', 'Loading WhatsApp…')}</div></div></div>`; return; }
   try{ waDraw(root); }
   catch(e){

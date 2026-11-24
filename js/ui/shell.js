@@ -87,6 +87,18 @@ function openReviewDraft(clientId, author){
   switchView('teamqueue');
 }
 
+// One or two digits stay a circle; three or more widen into a pill (data-wide). Each feature
+// sets its own count, so this watches the six numbered ones instead.
+const NAV_NUMBERED = ['navTasksBadge', 'navWhatsappBadge', 'navQueueBadge', 'navNotesBadge', 'navClientsBadge', 'navRemindersBadge'];
+function navFitCounts(){
+  NAV_NUMBERED.forEach(id => {
+    const el = document.getElementById(id); if(!el || el._fit) return;
+    const fit = () => el.toggleAttribute('data-wide', el.textContent.trim().length > 2);
+    fit(); el._fit = new MutationObserver(fit); el._fit.observe(el, { childList: true, characterData: true, subtree: true });
+  });
+}
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', navFitCounts); else navFitCounts();
+
 // Sidebar counts as on the canvas: All Clients (roster size), Health (needs attention),
 // Review (drafts waiting, bold), Tasks and Reminders (yours). Zero hides the count.
 function updateShellBadges(){

@@ -125,7 +125,7 @@ const VIEW_TITLES = {
   plan: ['Plan', 'Your next six weeks — private to you'],
   'task-archive': ['Finished Tasks', 'Everything that’s been done'],
   reminders: ['Reminders', "Client questions waiting on a response, visible to the whole team"],
-  whatsapp: ['WhatsApp', 'Open requests and questions from client WhatsApp groups'],
+  whatsapp: ['WhatsApp', 'Beta · Client chats'],
   calendar: ['Calendar', "The whole team's calendar in one place — meetings, deadlines, and reminders"],
   time: ['Time', 'Your timesheet, reports and payroll'],
   team: ['Team', "Everyone on the team, and what they do here"],
