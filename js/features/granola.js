@@ -17,7 +17,8 @@ function tkSuggestHtml(){
   if(!list.length) return '';
   const shown = tkSgAll ? list : list.slice(0, 4);
   const row = s => {
-    const sub = suggestionSub(s), meet = s.sourceUrl ? `<a href="${safeUrl(s.sourceUrl)}" target="_blank" rel="noopener" title="Open the notes in Granola">${escapeHtml(sub[0])}</a>` : escapeHtml(sub[0]);
+    const mail = s.source === 'gmail';
+    const sub = suggestionSub(s), meet = s.sourceUrl ? `<a href="${safeUrl(s.sourceUrl)}" target="_blank" rel="noopener" title="${mail ? 'Open the email in Gmail' : 'Open the notes in Granola'}">${mail ? icon('envelope-simple') : ''}${escapeHtml(sub[0])}</a>` : escapeHtml(sub[0]);
     return `<div class="tk-sg-r" data-sg="${s.id}"><div class="tx" role="button" tabindex="0" aria-label="Preview “${escapeHtml(s.title)}”" onclick="if(!event.target.closest('a'))tkSgPreview('${s.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();tkSgPreview('${s.id}')}"><b>${escapeHtml(s.title)}</b><span class="s">${meet}${sub.slice(1).map(x => ' · ' + escapeHtml(x)).join('')}</span>${s.quote ? `<span class="q">“${escapeHtml(s.quote)}”</span>` : ''}</div>`
       + `<div class="tk-sg-a"><button class="btn sm" onclick="tkSgAdd('${s.id}')">Add</button><button class="btn sm" onclick="tkSgEdit('${s.id}')">Edit…</button>`
       + `<button class="ib" aria-label="Dismiss “${escapeHtml(s.title)}”" title="Dismiss" onclick="tkSgDismiss('${s.id}')">${icon('x')}</button></div></div>`;
@@ -35,7 +36,12 @@ function tkSuggestHtml(){
     const head = many || all ? `<div class="tk-sg-g"><span>${escapeHtml(name)}</span><span class="n">${g.items.length}</span>${all}</div>` : '';
     return head + rows.map(row).join('');
   }).join('');
-  return `<section class="tk-sg" aria-label="Suggested from your Granola meetings"><div class="tk-sg-h">${appLogo('granola', 'xs')}<b>From your Granola meetings</b><span class="n">${list.length}</span><span class="w">Found in your Granola notes. Add the ones that are yours to do.</span></div>
+  // where they're from (Nov 24): Granola meetings, clients' emails, or both
+  const fromMail = list.some(s => s.source === 'gmail'), fromMeet = list.some(s => s.source !== 'gmail');
+  const [logo, head, why] = fromMail && fromMeet ? [appLogoPair('granola', 'google', 'xs'), 'Suggested for you', 'From your Granola meetings and your clients’ emails. Add the ones that are yours to do.']
+    : fromMail ? [appLogo('google', 'xs'), 'From your clients’ emails', 'Found in your Gmail. Add the ones that are yours to do.']
+    : [appLogo('granola', 'xs'), 'From your Granola meetings', 'Found in your Granola notes. Add the ones that are yours to do.'];
+  return `<section class="tk-sg" aria-label="${escapeHtml(head)}"><div class="tk-sg-h">${logo}<b>${head}</b><span class="n">${list.length}</span><span class="w">${why}</span></div>
 ${body}${list.length > 4 ? `<button class="x-lnk tk-sg-more" onclick="tkSgAll=!tkSgAll;renderTasks()">${tkSgAll ? 'Show fewer' : `Show all ${list.length}`}</button>` : ''}</section>`;
 }
 // Add All (Nov 23): every suggestion waiting for one client becomes your task, as it is.
@@ -55,6 +61,7 @@ async function tkSgAddAll(clientKey){
   await loadMyTasks(); renderTasks(); if(typeof updateTasksNavBadge === 'function') updateTasksNavBadge();
 }
 async function tkSgRefresh(){
+  if(typeof gmailMaybeRead === 'function') gmailMaybeRead();   // new client emails too (Nov 24)
   if(tkSgRefresh.busy) return;
   tkSgRefresh.busy = true;
   const before = (taskSuggestions || []).map(s => s.id).join();

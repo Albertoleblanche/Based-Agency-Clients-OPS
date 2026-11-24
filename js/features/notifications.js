@@ -30,6 +30,7 @@ const NOTIFICATION_TYPE_META = {
   task_cancelled:          { label:'A task assigned to you is cancelled', section:'Tasks' },
   task_edited:             { label:'A task assigned to you changes', section:'Tasks' },
   task_suggested:          { label:'A task is suggested from a meeting you were in', section:'Tasks' },
+  task_from_email:         { label:'A task is suggested from a client’s email (Gmail)', section:'Tasks' },
   task_due:                { label:'Your tasks due today, in the morning', section:'Tasks' },
   task_overdue:            { label:'A task of yours is past its due date', section:'Tasks' },
   task_wrap_up:            { label:'Late in the day: what’s still open for today', section:'Tasks' },
@@ -261,7 +262,7 @@ async function handleNotifClick(id){
     else switchView('clients');
     return;
   }
-  if(view==='tasks' && n.type === 'task_suggested'){ hidePop(panel); notifOpenSuggestions(n); return; }
+  if(view==='tasks' && (n.type === 'task_suggested' || n.type === 'task_from_email')){ hidePop(panel); notifOpenSuggestions(n); return; }
   if(view==='tasks' && tid){ hidePop(panel); notifOpenTask(tid); return; }
   if(view==='calendar' && tid && typeof openEventDetailModal === 'function'
     && typeof calendarEvents !== 'undefined' && calendarEvents.some(e => String(e.id) === String(tid))){
@@ -338,8 +339,9 @@ async function notifOpenSuggestions(n){
   if(typeof loadTaskSuggestions === 'function' && (typeof taskSuggestions === 'undefined' || !taskSuggestions)) { try { await loadTaskSuggestions(); } catch(e){} }
   const open = (typeof suggestionsOpen === 'function' ? suggestionsOpen(taskSuggestions || []) : (taskSuggestions || []).filter(s => s.status === 'pending'));
   const m = /“([^”]+)”/.exec(n.body || '');
-  const fromIt = open.filter(s => (n.target_id && s.sourceId === n.target_id) || (m && s.sourceTitle === m[1]));
-  if(!fromIt.length){ showToast('info', 'Nothing left to decide from that meeting', 'Its suggestions were added or dismissed.'); return; }
+  const mail = n.type === 'task_from_email';
+  const fromIt = open.filter(s => (n.target_id && s.sourceId === n.target_id) || (!n.target_id && (mail ? s.source === 'gmail' : m && s.sourceTitle === m[1])));
+  if(!fromIt.length){ showToast('info', mail ? 'Nothing left to decide from those emails' : 'Nothing left to decide from that meeting', 'Its suggestions were added or dismissed.'); return; }
   if(fromIt.length === 1 && typeof tkSgPreview === 'function'){ setTimeout(() => tkSgPreview(fromIt[0].id), 60); return; }
   if(typeof tkSgAll !== 'undefined') tkSgAll = true;
   if(typeof renderTasks === 'function') renderTasks();

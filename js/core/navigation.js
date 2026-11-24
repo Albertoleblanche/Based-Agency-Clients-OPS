@@ -87,6 +87,11 @@ function applyRoleVisibility(){
     payrollTab.style.display = isAdmin() ? 'flex' : 'none';
     if(!isAdmin() && document.getElementById('ttab-payroll')?.classList.contains('active')){ switchTimeTab('timesheet'); }
   }
+  const dailySummaryTab = document.getElementById('dailySummaryTab');
+  if(dailySummaryTab){
+    dailySummaryTab.style.display = canApprove() ? 'flex' : 'none';
+    if(!canApprove() && document.getElementById('ttab-dailysummary')?.classList.contains('active')){ switchTimeTab('timesheet'); }
+  }
   const settingsGeneralTab = document.getElementById('settingsGeneralTab');
   if(settingsGeneralTab){
     settingsGeneralTab.style.display = canApprove() ? 'flex' : 'none';
@@ -358,7 +363,7 @@ async function openScreenFromAddress(hash){
     _routingFromAddress = false;
   }
   const corrected = routeHashFor(currentViewName);
-  if(location.hash && location.hash !== corrected && !/gcal=|slackme=/.test(location.hash)) history.replaceState(null, '', corrected);
+  if(location.hash && location.hash !== corrected && !/gcal=|slackme=|gmail=/.test(location.hash)) history.replaceState(null, '', corrected);
   await opened;
   if(route.itemId && route.view === currentViewName) openLinkedItem(route.view, route.itemId);
 }

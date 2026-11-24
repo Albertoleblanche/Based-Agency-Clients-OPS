@@ -192,7 +192,7 @@ async function showApp(session, o){
     // Open the screen the address points at (a refresh, bookmark, shared
     // link or push notification). The Google Calendar return is handled
     // separately in init() below.
-    if(location.hash && !/gcal=|slackme=/.test(location.hash)) openScreenFromAddress(location.hash);
+    if(location.hash && !/gcal=|slackme=|gmail=/.test(location.hash)) openScreenFromAddress(location.hash);
   }catch(e){
     console.error('showApp failed', e);
     document.body.classList.add('signed-out');
@@ -233,6 +233,9 @@ async function showApp(session, o){
     }
     history.replaceState(null, '', window.location.pathname + (session ? '#profile' : ''));
   }
+
+  // Google sends you back to #settings?gmail=… after you connect Gmail (Nov 24, gmail.js)
+  if(typeof gmailReturn === 'function') gmailReturn(hash, session);
 
   // Slack sends you back to #settings?slackme=connected|denied|wrong-account|setup|error after you let
   // Radar send messages as you (Nov 23): back to where you pressed Connect, and say how it went.

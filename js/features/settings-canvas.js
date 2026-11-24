@@ -68,6 +68,24 @@ function fr(title, sub, ctrl, opts){
   opts = opts || {};
   return `<div class="fr"${opts.top ? ' style="align-items:flex-start"' : ''}><div class="l"><b${opts.plain ? ' style="font-weight:400"' : ''}>${title}</b>${sub ? `<span>${sub}</span>` : ''}</div>${ctrl || ''}</div>`;
 }
+// Your daily summary sent to a Slack ID other than your own goes from your Slack, as you (Nov 24)
+function dsSlackSub(){
+  const v = String((myProfile && myProfile.daily_summary_slack_id) || '').trim();
+  if(!v || v === myProfile.slack_user_id) return 'Leave empty to use your usual Slack';
+  const sm = (typeof slackMe !== 'undefined' && slackMe) || {};
+  const who = typeof dsRecipient === 'function' && dsRecipient().name ? `To ${esc(dsRecipient().name)}, ` : '';
+  const say = t => who ? who + t.charAt(0).toLowerCase() + t.slice(1) : t;
+  if(sm.checking || !('connected' in sm)) return say('Goes from your Slack, as you, once it’s connected');
+  if(sm.connected) return say('Goes from your Slack, as you');
+  if(sm.configured === false) return say('Radar sends it (Slack as you isn’t set up yet)');
+  return say('Radar sends it until you <button class="link-row" onclick="slackMeConnect()">connect your Slack</button>, so it goes as you');
+}
+async function dsSlackSubRefresh(ask){
+  const put = () => { const i = document.getElementById('dailySummarySlackIdInput'), el = i && i.closest('.fr') && i.closest('.fr').querySelector('.l > span'); if(el) el.innerHTML = dsSlackSub(); };
+  put();
+  const v = String((myProfile && myProfile.daily_summary_slack_id) || '').trim();
+  if(ask && v && typeof remSlackMeStatus === 'function'){ const sm = typeof slackMe !== 'undefined' && slackMe; if(!sm || sm.checking) await remSlackMeStatus(true); put(); }
+}
 function swHtml(on, label, js, disabled){ return `<button class="sw${on ? ' on' : ''}" role="switch" aria-checked="${!!on}" aria-label="${esc(label)}" onclick="${js}"${disabled ? ' disabled' : ''}></button>`; }
 function popSel(label, options, value, onchange, opts){
   opts = opts || {};
@@ -543,6 +561,7 @@ async function loadIntegrationStatuses(){
     one(async () => { if(canApprove() && typeof loadSlackClientChannels === 'function'){ if(!slackChannelsLoaded) await loadSlackClientChannels(); integ.slackUnlinked = activeClients().filter(c => !slackClientChannels[c.id]).length; } }),
     one(async () => { if(typeof loadWaTasks === 'function') await loadWaTasks(); }),
     one(async () => { if(typeof remSlackMeStatus === 'function') integ.slackMe = await remSlackMeStatus(true); }),
+    one(async () => { if(typeof gmailStatusLoad === 'function') await gmailStatusLoad(); }),
   ]);
   integSave();
 }
@@ -584,7 +603,9 @@ ${g.connected ? `${st('green', 'Connected')}<button class="btn" onclick="syncGoo
   const sm = integ.slackMe;
   const smRow = !sm || sm.checking ? `<div class="fr cn-r">${appLogo('slack')}<div class="l"><b>Slack, as you</b><span>Send nudges to teammates from your own Slack</span></div>${st('', 'Checking…')}</div>` : `<div class="fr cn-r">${appLogo('slack')}<div class="l"><b>Slack, as you</b><span>${sm.connected ? 'Nudges to teammates go from your Slack, as you' : sm.configured ? 'Send nudges to teammates from your own Slack' : 'Send nudges to teammates from your own Slack (an admin sets it up once)'}</span></div>
 ${sm.connected ? `${st('green', 'Connected')}<button class="btn" onclick="slackMeDisconnect()">Disconnect</button>` : sm.configured ? `<button class="btn" onclick="slackMeConnect()">Connect…</button>` : isAdmin() ? `${st('hollow', 'Not set up')}<button class="btn" onclick="slackMeSetupSheet()">Set Up…</button>` : st('hollow', 'Not set up')}</div>`;
-  const yours = gRow || aiRow || smRow ? `<div class="set-h">Yours</div><div class="form-grp cn-g">${aiRow}${smRow}${gRow}</div>` : '';
+  // Gmail (Nov 24): tasks from your clients' emails (gmail.js)
+  const gmRow = typeof gmailRowHtml === 'function' ? gmailRowHtml(st) : '';
+  const yours = gRow || aiRow || smRow || gmRow ? `<div class="set-h">Yours</div><div class="form-grp cn-g">${aiRow}${smRow}${gRow}${gmRow}</div>` : '';
   const live = (supabaseClient.getChannels ? supabaseClient.getChannels() : []).some(c => c.state === 'joined');
   return `<div class="set-h">Apps</div><div class="form-grp cn-g">${rows.join('')}</div>
 ${yours}
@@ -720,9 +741,10 @@ ${fr(esc(currentUser.email || ''), admin ? 'You can change it here. A link goes 
 </div>
 <div class="set-h">Daily summary</div>
 <div class="form-grp">
-${fr('Send my summary to a different Slack ID', 'Leave empty to use your usual Slack', `<input id="dailySummarySlackIdInput" class="tf" style="width:200px" value="${esc(myProfile.daily_summary_slack_id || '')}" placeholder="Member ID" onchange="saveDailySummarySlackId(this.value.trim())">`)}
+${fr('Send my summary to a different Slack ID', dsSlackSub(), `<input id="dailySummarySlackIdInput" class="tf" style="width:200px" value="${esc(myProfile.daily_summary_slack_id || '')}" placeholder="Member ID" onchange="saveDailySummarySlackId(this.value.trim())">`)}
 </div></div>`;
   if(!admin) renderMyEmailRequests();
+  dsSlackSubRefresh(true);
   if(typeof loadPushStatus === 'function') loadPushStatus();
   if(typeof loadGoogleCalendarStatus === 'function') loadGoogleCalendarStatus();
   if(keep){ const el = document.getElementById(keep); if(el) el.focus(); }

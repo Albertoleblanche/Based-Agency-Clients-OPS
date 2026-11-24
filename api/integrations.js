@@ -62,6 +62,7 @@ const { sendPushToUser, pushUrlFor } = require('../lib/push-notify');
 const { connectGranola, disconnectGranola, granolaStatus, granolaCatchUp, granolaReadNow, granolaReadAgain, removeGranolaMeeting, restoreGranolaMeeting, pullMeetingTasks, draftMeetingRecap } = require('../lib/granola-tasks');
 const { handleMcp, protectedResourceMetadata } = require('../lib/mcp-server');
 const { slackMeAuthUrl, slackMeCallback, slackMeStatus, slackMeDisconnect, slackMeSend } = require('../lib/slack-me');
+const { gmailAuthUrl, gmailStatus, gmailDisconnect, readGmailFor, gmailTick } = require('../lib/gmail-tasks');
 const { calendarTick } = require('../lib/meeting-alerts');
 
 module.exports = async function handler(req, res) {
@@ -76,6 +77,13 @@ module.exports = async function handler(req, res) {
   // Meetings (Nov 23): Google Calendar synced and "about to start" alerts sent (lib/meeting-alerts.js).
   // Vercel Cron calls it three times a day with CRON_SECRET; Supabase pg_cron every five minutes,
   // with no key, so then it runs at most every four minutes whoever asks.
+  // Tasks from Gmail, a few times a day (vercel.json crons): everyone connected (lib/gmail-tasks.js)
+  if (route === 'gmail-tick') {
+    if (process.env.CRON_SECRET && (req.headers.authorization || '') !== `Bearer ${process.env.CRON_SECRET}`) { res.status(401).json({ error: 'Not allowed' }); return; }
+    try { res.status(200).json(await gmailTick(createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY), { budgetMs: 45000 })); }
+    catch (e) { res.status(500).json({ error: String(e) }); }
+    return;
+  }
   if (route === 'calendar-tick') {
     const force = !!process.env.CRON_SECRET && (req.headers.authorization || '') === `Bearer ${process.env.CRON_SECRET}`;
     try { res.status(200).json(await calendarTick(createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY), { force })); }
@@ -137,8 +145,8 @@ module.exports = async function handler(req, res) {
     const userId = userData.user.id;
     const provider = req.method === 'GET' ? req.query.provider : (req.body || {}).provider;
 
-    if (provider !== 'google' && provider !== 'harvest' && provider !== 'push' && provider !== 'granola' && provider !== 'slack-me') {
-      res.status(400).json({ error: 'Missing or unknown provider — expected "google", "harvest", "push", "granola" or "slack-me".' });
+    if (provider !== 'google' && provider !== 'harvest' && provider !== 'push' && provider !== 'granola' && provider !== 'slack-me' && provider !== 'gmail') {
+      res.status(400).json({ error: 'Missing or unknown provider — expected "google", "harvest", "push", "granola", "slack-me" or "gmail".' });
       return;
     }
 
@@ -155,6 +163,22 @@ module.exports = async function handler(req, res) {
         : b.action === 'send' ? await slackMeSend(admin, userId, { toProfileId: b.toProfileId, text: b.text })
         : { error: `Unknown action: ${b.action}`, status: 400 };
       res.status(r.error ? (r.status || 400) : 200).json(r);
+      return;
+    }
+
+    // ================= GMAIL (Nov 24) =================
+    // Your own work Gmail, read only: tasks from clients' emails, suggested in Tasks (lib/gmail-tasks.js).
+    if (provider === 'gmail') {
+      const { data: me } = await admin.from('team_profiles').select('access_revoked').eq('id', userId).maybeSingle();
+      if (!me || me.access_revoked) { res.status(403).json({ error: 'Only team members can do this.' }); return; }
+      if (req.method === 'GET') { res.status(200).json(await gmailStatus(admin, userId)); return; }
+      const appUrl = (process.env.APP_URL || `https://${req.headers['x-forwarded-host'] || req.headers.host}`).replace(/\/+$/, '');
+      const b = req.body || {};
+      const r = b.action === 'start' ? gmailAuthUrl(userId, appUrl)
+        : b.action === 'disconnect' ? await gmailDisconnect(admin, userId)
+        : b.action === 'read' ? await readGmailFor(admin, userId, { force: !!b.force })
+        : { error: `Unknown action: ${b.action}`, status: 400 };
+      res.status(r.error && r.status ? r.status : 200).json(r);
       return;
     }
 

@@ -19,6 +19,18 @@
     {
       "path": "/api/integrations?route=calendar-tick&run=20",
       "schedule": "0 20 * * *"
+    },
+    {
+      "path": "/api/integrations?route=gmail-tick&run=13",
+      "schedule": "0 13 * * 1-5"
+    },
+    {
+      "path": "/api/integrations?route=gmail-tick&run=17",
+      "schedule": "0 17 * * 1-5"
+    },
+    {
+      "path": "/api/integrations?route=gmail-tick&run=21",
+      "schedule": "0 21 * * 1-5"
     }
   ],
   "functions": {

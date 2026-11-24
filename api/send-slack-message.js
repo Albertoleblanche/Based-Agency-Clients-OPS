@@ -38,6 +38,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 const { sendSlackDM } = require('../lib/slack-notify');
+const { slackMeSendToId } = require('../lib/slack-me');
 const { sendPushToUser, pushUrlFor } = require('../lib/push-notify');
 const { parseTaskCommandText, handleSlackEvent } = require('../lib/slack-tasks');
 const { handleGranolaHook } = require('../lib/granola-tasks');
@@ -334,16 +335,31 @@ module.exports = async function handler(req, res) {
         if (!person.userId || !person.entries || !person.entries.length) continue;
 
         const { data: profile } = await admin
-          .from('team_profiles').select('daily_summary_slack_id, slack_user_id').eq('id', person.userId).maybeSingle();
-        const overrideId = profile?.daily_summary_slack_id || null;
+          .from('team_profiles').select('name, daily_summary_slack_id, slack_user_id, muted_notification_types').eq('id', person.userId).maybeSingle();
+        const overrideId = (profile?.daily_summary_slack_id || '').trim() || null;
 
+        // what you worked on, client by client; no hours (Nov 24)
         const entryLines = person.entries.map(e =>
-          `• ${e.client}${e.service ? ` (${e.service})` : ''} — ${formatMinutesServer(e.minutes)}${e.description ? `: ${e.description}` : ''}`
+          `• ${e.client}${e.service ? ` (${e.service})` : ''}${e.description ? `: ${e.description}` : ''}`
         ).join('\n');
-        const personalText = `*Your Daily Summary — ${dateLabel}*\n\n${entryLines}\n\n*Total:* ${formatMinutesServer(person.totalMinutes)}`;
 
+        // Sent to a Slack ID other than their own: it goes from their own Slack, as them (Nov 24).
+        // If they haven't connected Slack as themselves (or their Slack can't post it), Radar's bot
+        // sends it, saying whose summary it is.
+        if (overrideId && overrideId !== profile?.slack_user_id) {
+          const muted = profile.muted_notification_types || [];
+          if (muted.includes('daily_summary') || muted.includes('slack:daily_summary')) { results.push({ userId: person.userId, name: person.name, sent: false, reason: 'muted' }); continue; }
+          const mine = await slackMeSendToId(admin, person.userId, overrideId, `*My Daily Summary — ${dateLabel}*\n\n${entryLines}`);
+          if (mine.ok) { results.push({ userId: person.userId, name: person.name, sent: true, via: 'them' }); continue; }
+          const who = profile?.name || person.name || 'Daily Summary';
+          const result = await sendSlackDM(admin, person.userId, 'daily_summary', `*${who}’s Daily Summary — ${dateLabel}*\n\n${entryLines}`, overrideId, { anyDay: true });
+          results.push({ userId: person.userId, name: person.name, ...result, via: 'radar', notAsThem: mine.notConnected ? 'not_connected' : (mine.error || 'slack_error') });
+          continue;
+        }
+
+        const personalText = `*Your Daily Summary — ${dateLabel}*\n\n${entryLines}`;
         const result = await sendSlackDM(admin, person.userId, 'daily_summary', personalText, overrideId, { anyDay: true });   // someone pressed Send
-        results.push({ userId: person.userId, name: person.name, ...result });
+        results.push({ userId: person.userId, name: person.name, ...result, via: 'radar' });
       }
 
       res.status(200).json({ results });

@@ -89,7 +89,7 @@ function activateCommandPaletteItem(i){
 const NOTIF_ICON = { draft_ready: 'envelope-open', draft_approved: 'check-circle', win_approved: 'message-circle', draft_sent: 'paper-plane-tilt', task_assigned: 'list-checks', task_edited: 'list-checks',
   task_completed: 'check-circle', event_invited: 'calendar-blank', event_updated: 'calendar-blank', event_cancelled: 'calendar-blank', event_rsvp: 'calendar-blank',
   reminder_due: 'bell-ring', reminder_added: 'bell', meeting_soon: 'video', task_suggested: 'list-checks', whatsapp_request: 'message-circle', whatsapp_urgent: 'flag', whatsapp_waiting: 'clock', whatsapp_signal: 'activity', health: 'heartbeat', mention: 'note-pencil',
-  task_due: 'list-checks', task_overdue: 'clock', task_wrap_up: 'list-checks', task_cancelled: 'list-checks', task_comment: 'message-circle', task_reminder: 'bell', review_nudge: 'paper-plane-tilt', whatsapp_nudge: 'paper-plane-tilt', whatsapp_handoff: 'message-circle', review_question: 'message-circle', health_ask: 'heartbeat' };
+  task_due: 'list-checks', task_overdue: 'clock', task_wrap_up: 'list-checks', task_cancelled: 'list-checks', task_comment: 'message-circle', task_reminder: 'bell', review_nudge: 'paper-plane-tilt', whatsapp_nudge: 'paper-plane-tilt', whatsapp_handoff: 'message-circle', review_question: 'message-circle', health_ask: 'heartbeat', task_from_email: 'envelope-simple' };
 function notifWhen(iso){
   const d = new Date(iso), mins = Math.round((Date.now() - d) / 60000);
   if(mins < 1) return 'Just now';

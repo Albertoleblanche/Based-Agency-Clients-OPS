@@ -610,7 +610,7 @@ function ntReadForm(){
 let taskSuggestions = null, taskSuggestionsAt = 0;   // my pending ones; null until loaded
 function suggestionFromDb(r){
   return { id: r.id, title: r.title, description: r.description || '', clientId: r.client_id || '', dueDate: r.due_date || '', priority: r.priority || 'medium',
-    sourceTitle: r.source_title || 'a meeting', sourceUrl: r.source_url || '', sourceAt: r.source_at || r.created_at, quote: r.quote || '', sourceId: r.source_id || '', assigneeId: r.assignee_id || null, status: r.status || 'pending' };
+    source: r.source || 'granola', sourceTitle: r.source_title || (r.source === 'gmail' ? 'an email' : 'a meeting'), sourceUrl: r.source_url || '', sourceAt: r.source_at || r.created_at, quote: r.quote || '', sourceId: r.source_id || '', assigneeId: r.assignee_id || null, status: r.status || 'pending' };
 }
 async function loadTaskSuggestions(){
   if(typeof currentUser === 'undefined' || !currentUser) return [];
@@ -643,6 +643,10 @@ function suggestionSub(s){
 }
 function suggestionNotes(s){
   const when = s.sourceAt ? new Date(s.sourceAt) : null;
+  if(s.source === 'gmail'){
+    const c = s.clientId ? clients.find(x => x.id === s.clientId) : null;
+    return [s.description, s.quote ? `“${s.quote}”` : '', `From ${c ? `${c.name}’s` : 'a client’s'} email “${s.sourceTitle}”${when ? `, ${fmtShortDate(when)}` : ''}${s.sourceUrl ? `: ${s.sourceUrl}` : ''}`].filter(Boolean).join('\n\n');
+  }
   return [s.description, `From the meeting “${s.sourceTitle}”${when ? `, ${fmtShortDate(when)}` : ''}${s.sourceUrl ? `: ${s.sourceUrl}` : ''}`].filter(Boolean).join('\n\n');
 }
 async function decideSuggestion(id, status, taskId){
@@ -795,6 +799,11 @@ function suggestionExcerpt(s){
 // The preview's body (shared by the desktop sheet and the iPhone sheet).
 function suggestionPreviewHtml(s){
   const sub = suggestionSub(s), meet = s.sourceUrl ? `<a href="${safeUrl(s.sourceUrl)}" target="_blank" rel="noopener">${escapeHtml(sub[0])}</a>` : escapeHtml(sub[0]);
+  // from a client's email (Nov 24): its subject, what they wrote, and the email in Gmail
+  if(s.source === 'gmail') return `<p class="sgp-meta">${appLogo('google', 'xs')}<span>${meet}${sub.slice(1).map(x => ' · ' + escapeHtml(x)).join('')}</span></p>
+${s.description ? `<div class="sgp-sec"><span class="sgp-k">What it’s about</span><p class="sgp-d">${escapeHtml(s.description)}</p></div>` : ''}
+${s.quote ? `<div class="sgp-sec"><span class="sgp-k">What they wrote</span><blockquote class="sgp-q">${escapeHtml(s.quote)}</blockquote></div>` : ''}
+${s.sourceUrl ? `<p class="sgp-open"><a class="x-lnk" href="${safeUrl(s.sourceUrl)}" target="_blank" rel="noopener">Open the email in Gmail</a></p>` : ''}`;
   const ex = suggestionExcerpt(s);
   const loading = granolaMeetings === null && s.sourceId;
   return `<p class="sgp-meta">${appLogo('granola', 'xs')}<span>${meet}${sub.slice(1).map(x => ' · ' + escapeHtml(x)).join('')}</span></p>

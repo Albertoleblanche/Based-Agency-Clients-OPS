@@ -64,7 +64,13 @@ async function saveDailySummarySlackId(value){
   if(error){ showToast('error','Could not save', error.message); return; }
   myProfile.daily_summary_slack_id = value || null;
   await loadTeamProfiles();
-  showToast('success', value ? 'Saved' : 'Cleared', value ? 'Your daily summary will go there instead.' : 'Your daily summary will use your regular Slack DM ID.');
+  if(typeof dsSlackSubRefresh === 'function') await dsSlackSubRefresh(true);
+  const sm = (typeof slackMe !== 'undefined' && slackMe) || {};
+  const other = value && value !== myProfile.slack_user_id;
+  showToast('success', value ? 'Saved' : 'Cleared', !value ? 'Your daily summary will use your regular Slack DM ID.'
+    : !other ? 'Your daily summary will go to your own Slack.'
+    : sm.connected ? 'Your daily summary will go there, from your Slack, as you.'
+    : 'Your daily summary will go there. Radar sends it until you connect your Slack.');
 }
 
 function renderProfileEmailPanel(){

@@ -5,19 +5,22 @@
 let timeTab = 'timesheet';
 const TIME_TABS = [['timesheet', 'Timesheet'], ['reports', 'Reports'], ['dailysummary', 'Daily Summary'], ['payroll', 'Payroll']];
 
+// Daily Summary is the team's (approvers and admins); a member sends their own from Timesheet's
+// "Today by client" card (Nov 24). Payroll is admins'.
+function timeTabOk(k){ return (k !== 'payroll' || isAdmin()) && (k !== 'dailysummary' || canApprove()); }
 function timeToolbarTabsHtml(){
-  const tabs = TIME_TABS.filter(([k]) => k !== 'payroll' || isAdmin());
+  const tabs = TIME_TABS.filter(([k]) => timeTabOk(k));
   return `<div class="seg" role="tablist" aria-label="Time views">${tabs.map(([k, t]) => `<button class="${timeTab === k ? 'on' : ''}" role="tab" aria-selected="${timeTab === k}" onclick="switchTimeTab('${k}')">${t}</button>`).join('')}</div>`;
 }
 function switchTimeTab(name){
-  if(name === 'payroll' && !isAdmin()) name = 'timesheet';
+  if(!timeTabOk(name)) name = 'timesheet';
   timeTab = name;
   document.querySelectorAll('#view-time > .tview').forEach(v => { v.hidden = v.id !== 'timeRoot-' + name; });
   if(currentViewName === 'time') setToolbarActions('time');
   renderTimeView();
 }
 function renderTimeView(){
-  if(timeTab === 'payroll' && !isAdmin()) timeTab = 'timesheet';
+  if(!timeTabOk(timeTab)) timeTab = 'timesheet';
   document.querySelectorAll('#view-time > .tview').forEach(v => { v.hidden = v.id !== 'timeRoot-' + timeTab; });
   if(timeTab === 'timesheet') renderTimesheet();
   else if(timeTab === 'reports') renderReports();
@@ -235,7 +238,10 @@ function renderTimesheet(){
     if(tsAnchor === today && timerState.running) byC[timerState.clientId] = (byC[timerState.clientId] || 0) + runningMinutes();
     const by = Object.entries(byC).sort((a, b) => b[1] - a[1]).map(([id, m]) => { const c = clients.find(x => x.id === id); return `<div class="tm1-by">${tsClientMono(c)}<span class="tm1-bn">${escapeHtml(c ? c.name : 'Client removed')}</span><b>${hmm(m)}</b></div>`; }).join('');
     const big = uw && by ? `<div class="tmi-big" id="tsBig" data-base="${totalMin}"${tsAnchor === today && timerState.running ? ' data-run="1"' : ''}>${tsBigHtml(totalMin + (tsAnchor === today ? runToday : 0))}</div>` : '';
-    side = card(`<div class="tmx-sec"><b>${tsAnchor === today ? 'Today' : tsD(tsAnchor).toLocaleDateString('en-US', { weekday: 'long' })} by client</b></div>${big}${by || '<p class="tmi-none">Nothing yet.</p>'}`) + card(monthSec);
+    // members send their own summary for the day from here (Nov 24)
+    const send = !canApprove() && (byDay[tsAnchor] || []).length && typeof tsSendHtml === 'function' ? tsSendHtml(tsAnchor) : '';
+    side = card(`<div class="tmx-sec"><b>${tsAnchor === today ? 'Today' : tsD(tsAnchor).toLocaleDateString('en-US', { weekday: 'long' })} by client</b></div>${big}${by || '<p class="tmi-none">Nothing yet.</p>'}${send}`) + card(monthSec);
+    if(send && currentViewName === 'time' && typeof slackMe !== 'undefined' && !slackMe && typeof remSlackMeStatus === 'function') remSlackMeStatus().then(() => { const el = document.getElementById('tsSendS'); if(el) el.innerHTML = tsSendSub(tsAnchor); });
   } else if(tsView === 'week'){
     const ks = Object.keys(byDay); if(isCur && !ks.includes(today)) ks.push(today);
     ks.sort().reverse();
@@ -587,7 +593,7 @@ function renderDailySummaryList(data, dir, part){
   const dStr = data.date || toDateStr(dailySummaryDate), dayName = new Date(dStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' });
   const people = (data.summary || []).slice().sort((a, b) => a.name.localeCompare(b.name));
   const impsBy = name => clients.reduce((s, c) => s + (c.improvements || []).filter(i => i.author === name && String(i.date || '').slice(0, 10) === dStr).length, 0);
-  const total = people.reduce((s, p) => s + p.totalMinutes, 0), totalImps = people.reduce((s, p) => s + impsBy(p.name), 0);
+  const totalImps = people.reduce((s, p) => s + impsBy(p.name), 0);   // no hours here (Nov 24): who worked on what
   if(!people.length){
     const isToday = dStr === toDateStr(rNow());
     root.innerHTML = dsHeaderHtml(canApprove() ? `Nobody logged time on ${dayName}.` : `You didn't log any time on ${dayName}.`) + `<div class="ds-body">${emptyState({ icon: 'clipboard-text',
@@ -605,14 +611,13 @@ function renderDailySummaryList(data, dir, part){
       : `<button class="btn btn-q sm" onclick="event.stopPropagation();switchView('team')">Add ${escapeHtml(firstName(person.name))}’s Slack ID</button>`;
     const n = impsBy(person.name);
     return `<div class="grp og"><div class="og-h" role="button" tabindex="0" onclick="openDailySummaryDetail('${person.userId}')">${avHtml(person.name, 'style="width:28px;height:28px;font-size:12px"')}
-<div class="tx"><b>${escapeHtml(person.name)}</b><span>${hmLong(person.totalMinutes)} logged · ${n} improvement${n === 1 ? '' : 's'} · ${ents.length} entr${ents.length === 1 ? 'y' : 'ies'}</span></div><div class="r">${st}</div></div>
-${ents.slice(0, 3).map(e => `<div class="og-i" style="padding-left:52px"><div class="tx"><span>${escapeHtml(e.description || e.service || 'No description')}</span><span class="s">${escapeHtml(e.client)}</span></div><div class="r"><span class="dur">${hmm(e.minutes)}</span></div></div>`).join('')}
+<div class="tx"><b>${escapeHtml(person.name)}</b><span>${n} improvement${n === 1 ? '' : 's'} · ${ents.length} entr${ents.length === 1 ? 'y' : 'ies'} logged</span></div><div class="r">${st}</div></div>
+${ents.slice(0, 3).map(e => `<div class="og-i" style="padding-left:52px"><div class="tx"><span>${escapeHtml(e.description || e.service || 'No description')}</span><span class="s">${escapeHtml(e.client)}</span></div></div>`).join('')}
 ${more > 0 ? `<div class="og-i" style="padding-left:52px"><button class="link-row t-2" style="font-size:13px" onclick="openDailySummaryDetail('${person.userId}')">${more} more ${more === 1 ? 'entry' : 'entries'}</button></div>` : ''}</div>`;
   }).join('');
   const worked = new Set(people.flatMap(p => p.entries.map(e => e.client)));
   const act = activeClients();
   const untouched = act.filter(c => !worked.has(c.name));
-  const long = people.filter(p => p.totalMinutes > 9 * 60).map(p => p.name);
   // Clients nobody touched that day, longest without time first, so the ones slipping stand out
   // instead of a wall of names. Clients with no time ever go last.
   const lastBy = {};
@@ -627,14 +632,13 @@ ${more > 0 ? `<div class="og-i" style="padding-left:52px"><button class="link-ro
   const ntSec = untouched.length
     ? `<div class="ds-nt-cap">Longest without time first</div><div class="ds-nt" data-grow-key="ds-nt">${ntRows}</div>${ntMore}`
     : '<p class="ds-nt-none">Every client got time.</p>';
-  root.innerHTML = dsHeaderHtml(`${hmLong(total)} logged by ${people.length} ${people.length === 1 ? 'person' : 'people'} · ${totalImps} improvement${totalImps === 1 ? '' : 's'} · each person gets their own summary`) +
+  root.innerHTML = dsHeaderHtml(`${people.length} ${people.length === 1 ? 'person' : 'people'} logged work · ${totalImps} improvement${totalImps === 1 ? '' : 's'} · each person gets their own summary`) +
 `<div class="ds-body"><div class="cols" style="margin-top:18px"><div class="col-main">${cards}</div>
 <aside class="col-side">
 <section class="panel"><h3>Team total<span>${dayName}</span></h3>
-<div class="kv"><span>Hours logged</span><b style="font-weight:500" class="dur">${hmLong(total)}</b></div>
+<div class="kv"><span>People who logged work</span><b style="font-weight:500">${people.length}</b></div>
 <div class="kv"><span>Improvements</span><b style="font-weight:500">${totalImps}</b></div>
-<div class="kv"><span>Clients worked on</span><b style="font-weight:500">${act.filter(c => worked.has(c.name)).length} of ${act.length}</b></div>
-<div class="kv"><span>Over 9 hours</span><b style="font-weight:500">${long.length ? long.map(escapeHtml).join(', ') : 'Nobody'}</b></div></section>
+<div class="kv"><span>Clients worked on</span><b style="font-weight:500">${act.filter(c => worked.has(c.name)).length} of ${act.length}</b></div></section>
 <section class="panel ds-ntp"><h3>Not touched ${dayName}<span>${untouched.length ? `${untouched.length} of ${act.length}` : ''}</span></h3>${ntSec}</section>
 </aside></div></div>`;
   dsMotion(dir, part);

@@ -3189,6 +3189,7 @@ body.sidebar-collapsed .nav-beta{display:none}
 .tk-sg-r .tx b{font-size:14px;font-weight:550;line-height:1.3}
 .tk-sg-r .s{font-size:12.5px;color:var(--label-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tk-sg-r .s a{color:inherit;text-decoration:underline;text-decoration-color:color-mix(in srgb,var(--label-2) 40%,transparent);text-underline-offset:2px}
+.tk-sg-r .s a svg{width:13px;height:13px;margin-right:5px;vertical-align:-2px;flex:none}
 .tk-sg-r .q{font-size:12.5px;color:var(--label-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tk-sg-a{display:flex;align-items:center;gap:6px;flex:none}
 .tk-sg-a .ib{width:28px;height:28px}
@@ -3731,3 +3732,18 @@ button.wx-t.on + button.wx-t{box-shadow:none}
 .n1-when .pl svg{width:14px;height:14px;color:var(--label-2)}
 .n1-when.is-on .pl{color:var(--blue)}
 .n1-when.is-on .pl svg{color:var(--blue)}
+
+/* Timesheet → Today by client: a member sends their own summary to Slack (Nov 24) */
+.tmi-send{display:flex;flex-direction:column;align-items:stretch;gap:8px;margin-top:14px;padding-top:16px;border-top:1px solid var(--sep)}
+.tmi-send-b{justify-content:center;gap:8px;height:36px;font-size:13.5px;font-weight:500}
+.tmi-send-b .app-logo{width:16px;height:16px}
+.tmi-send-s{font-size:12.5px;line-height:1.4;color:var(--label-2);text-align:center}
+.tmi-send-s .link-row{display:inline;color:var(--label);text-decoration:underline;text-decoration-color:var(--sep-strong);text-underline-offset:2px}
+.ds-pk{display:flex;flex-direction:column;gap:2px;margin:0 0 4px}
+.ds-pk button{display:flex;align-items:center;gap:12px;width:100%;height:42px;padding:0 12px;border:0;border-radius:10px;background:none;font:inherit;font-size:14px;color:var(--label);text-align:left;cursor:default;transition:background-color .15s ease,transform .1s ease}
+@media (hover:hover) and (pointer:fine){.ds-pk button:hover{background:var(--fill-2)}}
+.ds-pk button:active{transform:scale(.99)}
+.ds-pk button[aria-checked="true"]{background:var(--fill-2)}
+.ds-pk .ck{flex:none;width:16px;height:16px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--sep-strong);transition:box-shadow .15s ease}
+.ds-pk button[aria-checked="true"] .ck{box-shadow:inset 0 0 0 5px var(--label)}
+.ds-pk .r{margin-left:auto;font-size:12.5px;color:var(--label-3)}
