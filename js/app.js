@@ -193,6 +193,8 @@ async function showApp(session, o){
     // link or push notification). The Google Calendar return is handled
     // separately in init() below.
     if(location.hash && !/gcal=|slackme=|gmail=/.test(location.hash)) openScreenFromAddress(location.hash);
+    // The first time someone signs in: Set Up Radar (Nov 24, setup.js)
+    if(typeof setupMaybeOpen === 'function') setupMaybeOpen();
   }catch(e){
     console.error('showApp failed', e);
     document.body.classList.add('signed-out');
@@ -225,13 +227,21 @@ async function showApp(session, o){
   const hash = window.location.hash;
   if(hash.startsWith('#profile') && hash.includes('gcal=')){
     const outcome = new URLSearchParams(hash.split('?')[1]).get('gcal');
-    if(session){
+    // connected from Set Up Radar: back to it (Nov 24)
+    let gBack = ''; try{ gBack = sessionStorage.getItem('gcal-back') || ''; sessionStorage.removeItem('gcal-back'); }catch(e){}
+    if(session && gBack){
+      history.replaceState(null, '', window.location.pathname + gBack);
+      openScreenFromAddress(gBack);
+      if(outcome==='connected') showToast('success','Google Calendar connected','Your meetings are coming into Radar.');
+      else if(outcome==='denied') showToast('info','Not connected','You can connect Google Calendar later in Settings → Connections.');
+      else showToast('error','Google Calendar didn’t connect','Something went wrong. Try again.');
+    } else if(session){
       await switchView('profile');
       if(outcome==='connected') showToast('success','Google Calendar connected','Click "Sync now" to pull in your meetings.');
       else if(outcome==='denied') showToast('info','Not connected','You can connect Google Calendar anytime from this page.');
       else if(outcome==='error') showToast('error','Connection failed','Something went wrong connecting Google Calendar — try again.');
     }
-    history.replaceState(null, '', window.location.pathname + (session ? '#profile' : ''));
+    if(!gBack || !session) history.replaceState(null, '', window.location.pathname + (session ? '#profile' : ''));
   }
 
   // Google sends you back to #settings?gmail=… after you connect Gmail (Nov 24, gmail.js)

@@ -608,7 +608,9 @@ ${sm.connected ? `${st('green', 'Connected')}<button class="btn" onclick="slackM
   const gmRow = typeof gmailRowHtml === 'function' ? gmailRowHtml(st) : '';
   const yours = gRow || aiRow || smRow || gmRow ? `<div class="set-h">Yours</div><div class="form-grp cn-g">${aiRow}${smRow}${gRow}${gmRow}</div>` : '';
   const live = (supabaseClient.getChannels ? supabaseClient.getChannels() : []).some(c => c.state === 'joined');
-  return `<div class="set-h">Apps</div><div class="form-grp cn-g">${rows.join('')}</div>
+  // Set Up Radar (Nov 24): everything that's yours, step by step
+  const su = typeof setupOpen === 'function' ? `<div class="su-cta"><span class="app-logo is-glyph" aria-hidden="true">${icon('compass')}</span><div class="l"><b>Set Up Radar</b><span>Connect everything that’s yours, one step at a time.</span></div><button class="btn" onclick="setupOpen('welcome')">Start…</button></div>` : '';
+  return `${su}<div class="set-h">Apps</div><div class="form-grp cn-g">${rows.join('')}</div>
 ${yours}
 <p class="set-note cn-live">${st(live ? 'green' : 'yellow', live ? 'Live: changes show for everyone as they’re made' : 'Reconnecting… changes show for everyone once it’s back')}</p>
 <p class="t-2 set-note" id="sheetSyncStatus"></p>`;

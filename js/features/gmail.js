@@ -147,13 +147,9 @@ function sendToRadar() {
 function label_(name) { return GmailApp.getUserLabelByName(name) || GmailApp.createLabel(name); }
 `;
 }
-function gmailLabelSheet(){
-  const l = (gmailState && gmailState.label) || {};
-  const key = gmailLabelKeyNow;
-  const intro = `<p class="gl-p">Label any email “Radar” in Gmail, and within 5 minutes it’s a suggested task in Tasks, with a link back to the email. Only the emails you label are sent. A small script in your own Google account does it; you set it up once.</p>`;
-  let body, actions;
-  if(key){
-    body = `${intro}<ol class="gl-steps">
+// The four steps, with your script (the sheet, and Set Up Radar)
+function gmailLabelStepsHtml(key){
+  return `<ol class="gl-steps">
 <li><b>Open a new Apps Script project</b><span>Go to <a href="https://script.new" target="_blank" rel="noopener">script.new</a>, signed in to your work Google account. Name it “Radar label”.</span></li>
 <li><b>Replace its code with yours</b><span>Select everything there, paste this in, and save (⌘S or Ctrl+S).</span>
 <div class="gl-code"><div class="gl-code-h"><span>Your script</span><button class="btn sm gl-copy" id="glCopy" onclick="gmailLabelCopy()">${icon('copy')}Copy</button></div><pre id="glScript">${escapeHtml(gmailLabelScript(key))}</pre></div></li>
@@ -161,6 +157,14 @@ function gmailLabelSheet(){
 <li><b>Label an email “Radar”</b><span>It’s in Tasks within 5 minutes, and the email’s label becomes “Radar/Sent”.</span></li>
 </ol>
 <p class="gl-note">This script holds your key, and Radar shows it only now. Keep it private: anyone with it could send emails to your Tasks.</p>`;
+}
+function gmailLabelSheet(){
+  const l = (gmailState && gmailState.label) || {};
+  const key = gmailLabelKeyNow;
+  const intro = `<p class="gl-p">Label any email “Radar” in Gmail, and within 5 minutes it’s a suggested task in Tasks, with a link back to the email. Only the emails you label are sent. A small script in your own Google account does it; you set it up once.</p>`;
+  let body, actions;
+  if(key){
+    body = `${intro}${gmailLabelStepsHtml(key)}`;
     actions = `<button class="btn btn-p" id="glMain" onclick="closeAppModal()">Done</button>`;
   } else if(l.on){
     const since = l.createdAt ? new Date(l.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';

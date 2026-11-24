@@ -297,6 +297,9 @@ function notificationUrl(targetView, targetId){
 function parseRouteHash(hash){
   const raw = String(hash || '').replace(/^#\/?/, '').split('?')[0];
   if(!raw) return null;
+  // Set Up Radar (Nov 24): #setup, #setup/<step>
+  const setup = raw.match(/^setup(?:\/([a-z]+))?$/);
+  if(setup) return { view: 'setup', step: setup[1] || 'welcome' };
   const client = raw.match(/^client\/(.+)$/);
   if(client){ try{ return { view:'clientdetail', clientId: decodeURIComponent(client[1]) }; }catch(e){ return null; } }
   // a link to one item (Nov 24, from Slack messages sent as you): #tasks/<id>, #whatsapp/<id>, …
@@ -346,6 +349,8 @@ function updateDocumentTitle(name){
 async function openScreenFromAddress(hash){
   if(!currentUser) return;
   const route = parseRouteHash(hash) || { view:'overview' };
+  if(route.view === 'setup'){ if(typeof setupOpen === 'function') setupOpen(route.step); return; }
+  if(document.getElementById('setupRoot') && typeof setupClose === 'function') setupClose();   // Back out of the setup
   const already = route.view === currentViewName && (route.view !== 'clientdetail' || route.clientId === currentDetailClientId);
   if(already && !route.itemId) return;
   _routingFromAddress = true;

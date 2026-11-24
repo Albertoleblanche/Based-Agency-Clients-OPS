@@ -3782,3 +3782,78 @@ button.wx-t.on + button.wx-t{box-shadow:none}
 html.ui-w #settingsRoot.settings-pane.has-i8{display:grid;grid-template-rows:1fr auto}
 html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;padding:14px 0 0}
 .sh-i8{margin:14px 0 0;text-align:right}
+
+/* ---- Set Up Radar (Nov 24, setup.js): the first-run walk through everything that's yours ---- */
+.su{position:fixed;inset:0;z-index:190;display:grid;place-items:center;padding:32px;background:var(--scrim);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);animation:suIn 200ms ease-out}
+.su-card{display:grid;grid-template-columns:248px minmax(0,1fr);width:min(1000px,100%);height:min(700px,calc(100vh - 64px));border-radius:22px;overflow:hidden;background:var(--window);box-shadow:var(--shadow-win);animation:suCardIn 300ms cubic-bezier(.23,1,.32,1)}
+@keyframes suIn{from{opacity:0}}
+@keyframes suCardIn{from{opacity:0;transform:translateY(8px) scale(.975)}}
+.su.is-out{opacity:0;transition:opacity 180ms ease-out;pointer-events:none}
+.su.is-out .su-card{transform:scale(.985);transition:transform 180ms ease-out}
+.su-rail{display:flex;flex-direction:column;min-height:0;padding:22px 14px 16px;background:color-mix(in srgb,var(--label) 3.5%,var(--window));border-right:.5px solid var(--sep)}
+.su-brand{display:flex;align-items:center;gap:10px;padding:0 8px}
+.su-brand .brand-mark{width:28px;height:28px;font-size:11px;border-radius:8px}
+.su-brand b{font-size:14.5px;font-weight:600;letter-spacing:-.01em}
+.su-steps{list-style:none;margin:22px 0 0;padding:0;display:flex;flex-direction:column;gap:2px;overflow:auto}
+.su-st{display:flex;align-items:center;gap:12px;width:100%;height:40px;padding:0 10px;border:0;border-radius:10px;background:none;font:inherit;font-size:14px;color:var(--label-2);text-align:left;cursor:default;transition:background-color .15s ease,color .15s ease,transform .1s ease}
+@media (hover:hover) and (pointer:fine){.su-st:hover{background:var(--fill-2);color:var(--label)}}
+.su-st:active{transform:scale(.985)}
+.su-st.is-on{background:var(--fill-2);color:var(--label);font-weight:500}
+.su-n{display:grid;place-items:center;flex:none;width:22px;height:22px;border-radius:50%;font-size:11.5px;font-weight:600;background:var(--fill-2);color:var(--label-2);transition:background-color .2s ease,color .2s ease}
+.su-n svg{width:13px;height:13px}
+.su-st.is-on .su-n{background:var(--label);color:var(--window)}
+.su-st.is-done .su-n{background:var(--green);color:#fff}
+.su-st.is-skip .su-n{background:transparent;box-shadow:inset 0 0 0 1.5px var(--sep-strong);color:var(--label-3)}
+.su-sn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.su-later{margin-top:auto;align-self:flex-start;padding:8px 10px;border:0;border-radius:8px;background:none;font:inherit;font-size:13px;color:var(--label-2);cursor:default;transition:color .15s ease,background-color .15s ease}
+@media (hover:hover) and (pointer:fine){.su-later:hover{color:var(--label);background:var(--fill-2)}}
+.su-main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.su-pane{flex:1 1 auto;min-height:0;overflow:auto;padding:46px 56px 28px}
+.su-foot{display:flex;align-items:center;gap:10px;padding:16px 24px 20px;border-top:.5px solid var(--sep)}
+.su-gap{flex:1}
+.su-of{margin:0 0 16px;font-size:12.5px;font-weight:500;color:var(--label-3)}
+.su-h{display:flex;align-items:center;gap:16px}
+.su-h h2{margin:0;font-size:26px;line-height:1.2;font-weight:650;letter-spacing:-.02em}
+.su-h > .app-logo{width:46px;height:46px;border-radius:12px}
+.su-h > .app-pair{width:48px;height:48px}
+.su-glyph{background:var(--fill-2);color:var(--label)}
+.su-glyph svg{width:52%;height:52%}
+.su-why{max-width:580px;margin:14px 0 0;font-size:15px;line-height:1.55;color:var(--label-2)}
+.su-get{list-style:none;display:flex;flex-direction:column;gap:11px;margin:24px 0 0;padding:0}
+.su-get li{display:flex;align-items:flex-start;gap:10px;font-size:14px;line-height:1.45;color:var(--label)}
+.su-get svg{flex:none;width:16px;height:16px;margin-top:2px;color:var(--green)}
+.su-state{display:flex;align-items:flex-start;gap:10px;max-width:580px;margin:24px 0 0;padding:12px 14px;border-radius:12px;background:var(--fill-2);font-size:14px;line-height:1.5;color:var(--label-2)}
+.su-state .dot{margin-top:6px;flex:none}
+.su-state.is-ok{color:var(--label)}
+.su-hello{max-width:560px;margin:0 auto;padding-top:46px;text-align:center}
+.su-hello h2{margin:26px 0 0;font-size:30px;line-height:1.15;font-weight:650;letter-spacing:-.025em}
+.su-hello .su-why{margin:14px auto 0}
+.su-logos{display:flex;justify-content:center;gap:12px}
+.su-logos > .app-logo,.su-logos > .app-pair{width:44px;height:44px}
+.su-logos > .app-logo{border-radius:12px}
+.su-note{margin:18px auto 0;font-size:13px;color:var(--label-3)}
+.su-end{padding-top:30px}
+.su-badge{display:grid;place-items:center;width:56px;height:56px;margin:0 auto;border-radius:50%;background:var(--green);color:#fff;animation:suPop 420ms cubic-bezier(.23,1,.32,1)}
+.su-badge svg{width:28px;height:28px}
+@keyframes suPop{from{transform:scale(.8);opacity:0}}
+.su-sum{list-style:none;max-width:420px;margin:26px auto 0;padding:0;text-align:left}
+.su-sum li{display:flex;align-items:flex-start;gap:12px;padding:11px 2px;border-bottom:.5px solid var(--sep)}
+.su-sum li:last-child{border-bottom:0}
+.su-sum svg{flex:none;width:16px;height:16px;margin-top:2px;color:var(--label-3)}
+.su-sum li.is-done svg{color:var(--green)}
+.su-sum li > span{display:flex;flex-direction:column;gap:2px;font-size:14px}
+.su-sum li > span > b{font-weight:500}
+.su-sum li > span > span{font-size:12.5px;color:var(--label-2)}
+.su-script{margin-top:22px}
+.su-ai{margin-top:18px}
+.su-ai .ai-about{display:none}
+.su-pk{max-width:520px;margin-top:22px}
+.su-cta{display:flex;align-items:center;gap:14px;margin:0 0 24px;padding:14px 16px;border-radius:14px;background:var(--grp);box-shadow:0 0 0 .5px var(--sep)}
+.su-cta .app-logo{width:32px;height:32px;border-radius:9px;background:var(--fill-2);color:var(--label)}
+.su-cta .l{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.su-cta b{font-size:14px;font-weight:600}
+.su-cta span{font-size:13px;color:var(--label-2)}
+@media (max-width:760px){.su{padding:0}.su-card{grid-template-columns:1fr;height:100vh;border-radius:0}.su-rail{display:none}.su-pane{padding:32px 22px 20px}}
+@media (prefers-reduced-motion:reduce){.su,.su-card,.su-badge{animation:none}}
+.su .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.su-h h2,.su-hello h2{color:var(--label)}
