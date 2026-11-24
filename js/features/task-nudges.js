@@ -25,7 +25,7 @@ function nudgeWords(type, list){
   // one task: the title says which, the body says for whom and what to do (no repeating it)
   const c = one ? nudgeClient(one) : '', wasDue = one && one.dueDate ? fmtDay(new Date(one.dueDate + 'T12:00:00')) : '';
   if(type === 'task_due') return { title: one ? `${first}, due today: ${one.title}` : `${first}, ${n} tasks are due today`, body: one ? (c ? `For ${c}.` : '') : lines };
-  if(type === 'task_overdue') return { title: one ? `${first}, “${one.title}” is past due` : `${first}, ${n} tasks are past due`, body: one ? `${[c, wasDue ? 'due ' + wasDue : ''].filter(Boolean).join(', ')}${c || wasDue ? '. ' : ''}Finish it or give it a new date.` : lines };
+  if(type === 'task_overdue') return { title: one ? `${first}, “${one.title}” is past due` : `${first}, ${n} tasks are past due`, body: one ? `${[c, wasDue ? 'due ' + wasDue : ''].filter(Boolean).join(', ').replace(/^./, x => x.toUpperCase())}${c || wasDue ? '. ' : ''}Finish it or give it a new date.` : lines };
   return { title: one ? `${first}, still open for today: ${one.title}` : `${first}, ${n} tasks for today aren’t done yet`, body: one ? `Before you wrap up: finish it${c ? ` for ${c}` : ''} or give it a new date.` : `Before you wrap up: ${lines}` };
 }
 async function sendTaskNudge(type, list){

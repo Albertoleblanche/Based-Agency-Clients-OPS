@@ -112,8 +112,23 @@ function notifTabOf(n){
   return 'clients';
 }
 function notifSetTab(k){
+  if(k === notifTabSel) return;
   notifTabSel = k; renderNotifPanel();
-  const l = document.getElementById('notifPanelList'); if(l) l.scrollTop = 0;
+  const l = document.getElementById('notifPanelList');
+  if(l){
+    l.scrollTop = 0;
+    if(typeof motionOK !== 'function' || motionOK()) l.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: 'ease-out' });
+  }
+}
+// The highlight under the selected tab slides there (Nov 24); the first time it's placed without moving.
+function notifMoveThumb(){
+  const tabs = document.getElementById('notifTabs'), th = tabs && tabs.querySelector('.notif-thumb'), on = tabs && tabs.querySelector('button.on');
+  if(!th || !on || !on.offsetWidth) return;
+  const first = !th.style.width || th.style.width === '0px';
+  if(first) th.classList.add('no-anim');
+  th.style.width = on.offsetWidth + 'px';
+  th.style.transform = `translateX(${on.offsetLeft}px)`;
+  if(first){ void th.offsetWidth; th.classList.remove('no-anim'); }
 }
 function notifDayGroup(iso){
   const k = daysBetween(dayStart(new Date(iso)), dayStart(new Date()));
@@ -128,15 +143,20 @@ function renderNotifPanel(){
   const list = notifTabSel === 'all' ? notifications : notifications.filter(n => notifTabOf(n) === notifTabSel);
   if(head) head.style.display = list.length ? '' : 'none';
   // the tabs, between the heading and the list
+  // built once and then updated, so the selected tab's highlight can slide
   let tabs = document.getElementById('notifTabs');
   if(!tabs){
     tabs = document.createElement('div'); tabs.id = 'notifTabs'; tabs.className = 'notif-tabs'; tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', 'Show');
+    tabs.innerHTML = '<div class="notif-seg"><span class="notif-thumb" aria-hidden="true"></span>' + NOTIF_TABS.map(([k, t]) =>
+      `<button data-k="${k}" role="tab" onclick="event.stopPropagation();notifSetTab('${k}')">${t}<span class="c"></span></button>`).join('') + '</div>';
     el.parentElement.insertBefore(tabs, el);
   }
-  tabs.innerHTML = '<div class="notif-seg">' + NOTIF_TABS.map(([k, t]) => {
-    const unread = notifications.filter(n => !n.read && (k === 'all' || notifTabOf(n) === k)).length;
-    return `<button class="${notifTabSel === k ? 'on' : ''}" role="tab" aria-selected="${notifTabSel === k}" onclick="event.stopPropagation();notifSetTab('${k}')">${t}${unread ? `<span class="c">${unread > 99 ? '99+' : unread}</span>` : ''}</button>`;
-  }).join('') + '</div>';
+  tabs.querySelectorAll('button[data-k]').forEach(b => {
+    const k = b.dataset.k, on = k === notifTabSel, unread = notifications.filter(n => !n.read && (k === 'all' || notifTabOf(n) === k)).length;
+    b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on));
+    b.querySelector('.c').textContent = unread ? (unread > 99 ? '99+' : String(unread)) : '';
+  });
+  notifMoveThumb();
   if(!notifications.length){ el.innerHTML = '<div class="notif-empty">You’re all caught up.</div>'; return; }
   if(!list.length){ el.innerHTML = `<div class="notif-empty">Nothing in ${escapeHtml((NOTIF_TABS.find(x => x[0] === notifTabSel) || [, 'this tab'])[1])} yet.</div>`; return; }
   const row = n => `<div class="nrow${n.read ? '' : ' unread'}" role="button" tabindex="0" onclick="handleNotifClick('${n.id}')" onkeydown="if(event.key==='Enter') handleNotifClick('${n.id}')">

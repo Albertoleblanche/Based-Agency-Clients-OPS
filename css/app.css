@@ -86,7 +86,18 @@ body.sidebar-collapsed .app-win .side { display: none; }
 .field > input, .field > select, .field > textarea { width: 100%; }
 
 /* ---------- toasts ---------- */
-.toast-stack { position: fixed; z-index: 300; left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+.toast-stack { position: fixed; z-index: 300; left: 50%; bottom: 22px; width: 440px; max-width: calc(100vw - 32px); transform: translateX(-50%); pointer-events: none; }
+/* Nov 24: one card in front, the older ones peeking above it; hover and they fan out upward to read */
+.toast-stack .toast { position: absolute; left: 0; right: 0; bottom: 0; min-width: 0; max-width: none; box-sizing: border-box; transform-origin: 50% 100%; animation: none;
+  transition: transform 420ms cubic-bezier(.32,.72,0,1), opacity 240ms ease, height 320ms cubic-bezier(.32,.72,0,1), background-color 200ms ease; }
+.toast-stack .toast > * { transition: opacity 180ms ease; }
+.toast-stack .toast.toast-behind > * { opacity: 0; }
+/* the shadow falls downward, so it doesn't grey the edges of the cards behind; those are solid card colour */
+.toast-stack .toast { box-shadow: 0 12px 30px -8px rgba(0,0,0,.22), 0 1px 3px rgba(0,0,0,.08); }
+.mac[data-theme="dark"] .toast-stack .toast { box-shadow: 0 12px 30px -8px rgba(0,0,0,.55), 0 0 0 .5px rgba(255,255,255,.08); }
+.toast-stack .toast.toast-behind { background: var(--card); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.toast-stack.is-open { pointer-events: auto; }
+@media (prefers-reduced-motion: reduce) { .toast-stack .toast { transition: opacity 200ms ease; } }
 .toast { pointer-events: auto; display: flex; align-items: flex-start; gap: 10px; min-width: 300px; max-width: 440px; padding: 11px 14px; border-radius: 12px;
   background: var(--menu); -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6); box-shadow: var(--shadow-pop); font-size: 14px; animation: sheetIn 220ms cubic-bezier(.32,.72,0,1); }
 .toast-title { font-weight: 600; }
@@ -530,14 +541,22 @@ button.set-tab { font-size: 12px; }
 /* ---- The bell ---- */
 .notif-panel .btn.sm { height: 22px; padding: 0 6px; font-size: 13px; }
 .notif-empty { padding: 26px 16px; text-align: center; font-size: 14px; color: var(--label-2); }
-.notif-panel { width: 400px; }
-.notif-tabs { position: sticky; top: 41px; z-index: 1; padding: 6px 10px 6px; background: var(--menu); }
-.notif-seg { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--fill-2); }
-.notif-tabs button { flex: 1 1 auto; display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 26px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; color: var(--label-2); font: inherit; font-size: 12.5px; font-weight: 500; white-space: nowrap; cursor: default; transition: background-color 150ms ease, color 150ms ease, transform 140ms cubic-bezier(.23,1,.32,1); }
-.notif-tabs button.on { background: var(--seg-on, var(--card)); color: var(--label); box-shadow: 0 1px 2px rgba(0,0,0,.14); }
+/* One height whatever the tab (Nov 24): the heading and tabs stay put, the list scrolls inside */
+.notif-panel { width: 420px; max-width: calc(100vw - 16px); max-height: none; overflow: hidden; }
+#notifPanelList { height: min(440px, calc(100vh - 190px)); overflow-y: auto; overscroll-behavior: contain; }
+.notif-tabs { position: relative; z-index: 1; padding: 6px 10px 6px; background: var(--menu); border-bottom: .5px solid var(--sep); }
+.notif-seg { position: relative; display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--fill-2); }
+/* the selected tab is one highlight that slides to the tab you pick */
+.notif-thumb { position: absolute; top: 2px; bottom: 2px; left: 0; width: 0; border-radius: 6px; background: var(--seg-on, var(--card)); box-shadow: 0 1px 2px rgba(0,0,0,.14); pointer-events: none; transition: transform 260ms cubic-bezier(.32,.72,0,1), width 260ms cubic-bezier(.32,.72,0,1); }
+.notif-thumb.no-anim { transition: none; }
+.notif-tabs button { position: relative; z-index: 1; flex: 1 1 auto; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 26px; padding: 0 5px; border: 0; border-radius: 6px; background: transparent; color: var(--label-2); font: inherit; font-size: 12.5px; font-weight: 500; white-space: nowrap; cursor: default; transition: color 200ms ease, transform 140ms cubic-bezier(.23,1,.32,1); }
+.notif-tabs button.on { color: var(--label); }
 .notif-tabs button:active { transform: scale(.97); }
-.notif-tabs .c { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--blue); color: #fff; font-size: 10.5px; font-weight: 600; line-height: 16px; text-align: center; box-sizing: border-box; }
-.ngrp-h { position: sticky; top: 83px; padding: 10px 14px 4px; background: var(--menu); font-size: 11.5px; font-weight: 600; letter-spacing: .02em; color: var(--label-3); }
+.notif-tabs .c { min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px; background: var(--blue); color: #fff; font-size: 10px; font-weight: 600; line-height: 15px; text-align: center; box-sizing: border-box; }
+.notif-tabs .c:empty { display: none; }
+.ngrp-h { position: sticky; top: 0; z-index: 1; padding: 10px 14px 4px; background: var(--menu); font-size: 11.5px; font-weight: 600; letter-spacing: .02em; color: var(--label-3); }
+@media (prefers-reduced-motion: reduce) { .notif-thumb { transition: none; } }
+#notifPanelList > .notif-empty { display: flex; align-items: center; justify-content: center; height: 100%; box-sizing: border-box; }
 .ngrp + .ngrp { margin-top: 2px; }
 .nrow { display: flex; gap: 10px; padding: 10px 12px; border-bottom: .5px solid var(--sep); cursor: default; }
 .nrow:last-child { border-bottom: 0; }
@@ -1090,7 +1109,10 @@ a.ty-rel:hover{opacity:.8}
 .mac[data-theme="dark"]{--seg-on:#E6E6EA}
 .mac[data-theme="dark"] .seg .on{color:#1C1C1E;box-shadow:0 1px 2px rgba(0,0,0,.35)}
 .mac[data-theme="dark"] .seg .on .c{color:#6E6E73}
-.mac[data-theme="dark"] .notif-tabs button.on{color:#1C1C1E;box-shadow:0 1px 2px rgba(0,0,0,.35)}
+/* classic look: the selected segment is muted white with dark text; the new look keeps its dark segment, white text */
+html:not(.ui-w) .mac[data-theme="dark"] .notif-tabs button.on{color:#1C1C1E}
+.mac[data-theme="dark"] .notif-thumb{box-shadow:0 1px 2px rgba(0,0,0,.35)}
+html.ui-w .mac[data-theme="dark"] .notif-thumb{background:rgba(255,255,255,.14);box-shadow:none}
 
 /* ---- Notes: every note as a page; one opens as a sheet in the middle (canvas NotesOptA/Open/Create) ---- */
 .nt-st{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--label-2);white-space:nowrap}
@@ -3451,7 +3473,7 @@ html.ui-w .tk-sg{border-radius:var(--uw-r-card);box-shadow:0 0 0 1px var(--sep),
 .hg-wl{font-size:12.5px;color:var(--label-2);margin-right:2px}
 .hg-c{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:99px;background:var(--fill);font-size:12.5px;color:var(--label)}
 .hg-c b{font-weight:600;font-variant-numeric:tabular-nums}
-html.ui-w .hg-t{background:var(--card,var(--grp));box-shadow:0 0 0 1px var(--sep),var(--uw-shadow,none)}
+html.ui-w .hg-t{background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow,none)}
 html.ui-w .hg-b{font-size:30px;font-weight:400}
 html.ui-w .hg-t.ok .hg-b{color:var(--uw-good)} html.ui-w .hg-t.warn .hg-b{color:var(--uw-watch)} html.ui-w .hg-t.bad .hg-b{color:var(--uw-risk)}
 html.ui-w .hg-t.ok .hg-m i{color:var(--uw-good)} html.ui-w .hg-t.warn .hg-m i{color:var(--uw-watch)} html.ui-w .hg-t.bad .hg-m i{color:var(--uw-risk)}
@@ -3675,3 +3697,7 @@ button.wx-t.on + button.wx-t{box-shadow:none}
 .alert-sheet .sheet-a.is-col{flex-direction:column;align-items:stretch;gap:8px}
 .alert-sheet .sheet-a.is-col .btn{justify-content:center;width:100%;margin:0}
 .td-had{margin:2px 0 4px;font-size:12.5px;line-height:1.45;color:var(--label-2)}
+
+/* Queue (Nov 24): your work fills the card; the draft letter keeps a readable line length */
+.qu .rvn-doc{max-width:none}
+.qu .rvn-doc .rvn-body,.qu .rvn-doc .rvn-edit,.qu .rvn-doc .qu-subj{max-width:760px}

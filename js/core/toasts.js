@@ -15,46 +15,49 @@ function restackToasts(){
   const stack = document.getElementById('toastStack');
   if(!stack) return;
   const toasts = [...stack.children].filter(el=>el.classList.contains('toast') && !el.classList.contains('leaving'));
-  const dir = 1; // anchored top-right like macOS notifications — older toasts stack downward, away from the top edge
+  // Anchored at the bottom of the window (Nov 24): older cards sit above the newest and fan out upward,
+  // so on hover they open into view instead of running off the bottom edge.
+  const dir = -1;
+  const front = toasts[toasts.length - 1];
+  if(!front){ stack.style.height = ''; stack.classList.remove('is-open'); return; }
 
   if(toastStackExpanded){
-    // Every toast becomes fully visible, full size, and individually
-    // interactive — spaced out by each one's own actual measured height
-    // (not a fixed offset per position), since toasts vary in length
-    // depending on their content.
-    let cumulativeOffset = 0;
-    const gap = 10;
-    for(let i = toasts.length - 1, depthFromFront = 0; i >= 0; i--, depthFromFront++){
+    // Every card full size and readable, each spaced by its own height (cards vary with their text).
+    // The stack itself takes the whole height, so moving between cards doesn't close it.
+    let offset = 0;
+    const gap = 10, room = Math.max(160, window.innerHeight - 120);
+    for(let i = toasts.length - 1, depth = 0; i >= 0; i--, depth++){
       const el = toasts[i];
-      el.classList.remove('behind');
+      el.classList.remove('toast-behind');
       el.style.height = '';
-      el.style.zIndex = String(1000 - depthFromFront);
-      el.style.pointerEvents = 'auto';
-      el.style.opacity = '1';
-      el.style.transform = `translateY(${dir * cumulativeOffset}px) scale(1)`;
-      cumulativeOffset += el.offsetHeight + gap;
+      el.style.zIndex = String(1000 - depth);
+      const h = el.offsetHeight, fits = offset + h <= room || depth === 0;
+      el.style.pointerEvents = fits ? 'auto' : 'none';
+      el.style.opacity = fits ? '1' : '0';
+      el.style.transform = `translateY(${dir * offset}px) scale(1)`;
+      if(fits) offset += h + gap;
     }
+    stack.style.height = Math.max(0, offset - gap) + 'px';
+    stack.classList.add('is-open');
     return;
   }
 
-  // Newest toast is always the most recently appended (last child) —
-  // walk from the end backward to assign depth-from-front correctly.
-  // Cards behind the front one take its height and hide their content,
-  // so only their edges peek out — a long older toast never shows its
-  // text below a short new one.
-  const front = toasts[toasts.length - 1];
-  if(front){ front.classList.remove('behind'); front.style.height = ''; }
-  const frontHeight = front ? front.offsetHeight : 0;
+  // Newest in front; the ones behind take its height and hide their text, so only their edges show.
+  front.classList.remove('toast-behind'); front.style.height = '';
+  const frontHeight = front.offsetHeight;
+  stack.style.height = frontHeight + 'px';
+  stack.classList.remove('is-open');
   for(let i = toasts.length - 1, depthFromFront = 0; i >= 0; i--, depthFromFront++){
     const el = toasts[i];
-    el.classList.toggle('behind', depthFromFront > 0);
+    el.classList.toggle('toast-behind', depthFromFront > 0);
     el.style.height = depthFromFront > 0 ? frontHeight + 'px' : '';
     const depth = Math.min(depthFromFront, TOAST_STACK_MAX_VISIBLE);
     el.style.zIndex = String(1000 - depthFromFront);
-    el.style.pointerEvents = depthFromFront === 0 ? 'auto' : 'none';
+    // the cards behind take the pointer too, so hovering their edge opens the stack
+    el.style.pointerEvents = depthFromFront > TOAST_STACK_MAX_VISIBLE ? 'none' : 'auto';
     const beyondMax = depthFromFront > TOAST_STACK_MAX_VISIBLE;
-    el.style.opacity = beyondMax ? '0' : (1 - depth * 0.22).toFixed(2);
-    el.style.transform = `translateY(${dir * depth * 10}px) scale(${(1 - depth * 0.055).toFixed(3)})`;
+    el.style.opacity = beyondMax ? '0' : (1 - depth * 0.12).toFixed(2);
+    el.style.transform = `translateY(${dir * depth * 9}px) scale(${(1 - depth * 0.05).toFixed(3)})`;
   }
 }
 
@@ -97,7 +100,7 @@ function showToast(type, title, detail, opts){
   // would mean the browser never paints this starting state at all, so
   // there'd be nothing for the transition to animate from.
   el.style.opacity = '0';
-  el.style.transform = 'scale(.94)';
+  el.style.transform = 'translateY(14px) scale(.97)';
   stack.appendChild(el);
   requestAnimationFrame(()=> requestAnimationFrame(restackToasts));
   const act = el.querySelector('.toast-act');
@@ -146,7 +149,7 @@ function showToastWithCopy(type, title, detail, copyText){
   const copyId = 'copytext-' + Date.now();
   el.innerHTML = `<span class="toast-icon">${ic}</span><span class="toast-text"><b class="toast-t">${escapeHtml(title)}</b>${escapeHtml(detail)}<br><textarea class="toast-copy-area" id="${copyId}" readonly>${escapeHtml(copyText)}</textarea><span class="row-link" style="font-size:12.5px;" onclick="copyToastText('${copyId}', this)">Copy details</span></span><span class="toast-close" onclick="dismissToastEl(this.parentElement)">✕</span>`;
   el.style.opacity = '0';
-  el.style.transform = 'scale(.94)';
+  el.style.transform = 'translateY(14px) scale(.97)';
   stack.appendChild(el);
   requestAnimationFrame(()=> requestAnimationFrame(restackToasts));
 }

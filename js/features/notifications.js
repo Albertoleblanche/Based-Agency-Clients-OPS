@@ -251,7 +251,7 @@ async function handleNotifClick(id){
   }
   if(n.target_view==='clients' && n.target_id){
     hidePop(document.getElementById('notifPanel'));
-    if(clients.some(c=>c.id===n.target_id && !c.deletedAt)) openClientDetail(n.target_id);   // the client's page (Nov 24)
+    if(clients.some(c=>c.id===n.target_id && !c.deletedAt)) openClientInspectorFor(n.target_id);   // its panel in All Clients (Finish Setup lives there)
     else switchView('clients');
     return;
   }
