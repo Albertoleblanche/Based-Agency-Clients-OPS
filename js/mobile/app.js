@@ -553,11 +553,13 @@ function mTasksHtml(){
     || `<div style="margin-top:22px">${mEmpty(mTaskScope === 'mine' ? 'Nothing on your list' : 'No open tasks', 'Tap + to add one.')}</div>`;
   granolaWatch(() => { if(mTab === 'tasks') mRenderTab(); });
   const gr = granolaOn ? `<button aria-label="Check Granola for new tasks" title="Check Granola" class="mgr${mGranolaBusy ? ' is-busy' : ''}" onclick="mGranolaCheck()"${mGranolaBusy ? ' disabled' : ''}>${appLogo('granola', 'sm')}</button>` : '';
-  return `<div class="inav"><div class="r">${gr}<button aria-label="Filter by client" onclick="mPickTaskClient()" style="${c ? 'color:var(--label)' : ''}">${icon('funnel-simple')}</button></div></div>
+  const gm = typeof gmailOnHere === 'function' && gmailOnHere() ? `<button aria-label="Check Gmail for new tasks" title="Check Gmail" class="mgr${mGmailBusy ? ' is-busy' : ''}" onclick="mGmailCheck()"${mGmailBusy ? ' disabled' : ''}>${appLogo('gmail', 'sm')}</button>` : '';
+  const i8 = /lg-gmail/.test(gm + sg) ? icons8Credit(['gmail'], 'ifoot') : '';   // Icons8's Gmail icon, credited (Nov 24)
+  return `<div class="inav"><div class="r">${gr}${gm}<button aria-label="Filter by client" onclick="mPickTaskClient()" style="${c ? 'color:var(--label)' : ''}">${icon('funnel-simple')}</button></div></div>
 <h1 class="big">Tasks</h1><p class="big-sub">${vis.length} open${overdue ? ` · ${overdue} overdue` : ''}${c ? ` · ${mEsc(c.name)}` : ''}</p>
 ${mSeg([['everyone', 'Everyone'], ['mine', 'Mine', mineN], ['byme', 'Assigned by me']], 'mSetTaskScope', mTaskScope)}
 ${body}
-${mVisibleTasks().some(t => t.status === 'done') ? `<p class="ifoot" style="margin-top:16px"><button onclick="mOpenDoneTasks()" style="color:var(--label-2)">Show finished tasks</button></p>` : ''}`;
+${mVisibleTasks().some(t => t.status === 'done') ? `<p class="ifoot" style="margin-top:16px"><button onclick="mOpenDoneTasks()" style="color:var(--label-2)">Show finished tasks</button></p>` : ''}${i8}`;
 }
 // Check Granola: the notepad in the Tasks bar reads new meetings now (shared with the desktop).
 let mGranolaBusy = false;
@@ -566,6 +568,15 @@ async function mGranolaCheck(){
   mGranolaBusy = true; mRenderTab();
   let r; try{ r = await checkGranolaNow(); } finally { mGranolaBusy = false; }
   showToast(r.type, r.title, r.text);
+  mRenderTab();
+}
+// Check Gmail (Nov 24): the Gmail logo in the Tasks bar reads your clients' new emails now (gmail.js).
+let mGmailBusy = false;
+async function mGmailCheck(){
+  if(mGmailBusy) return;
+  mGmailBusy = true; mRenderTab();
+  let r; try{ r = await gmailReadNow(); } finally { mGmailBusy = false; }
+  gmailReadToast(r);
   mRenderTab();
 }
 // Tasks suggested from meetings (Nov 23, Granola): Add makes it your task; tapping it opens New Task
@@ -586,8 +597,13 @@ function mSuggestHtml(){
   if(!list.length) return '';
   const row = s => `<div class="ir msug" data-sg="${s.id}"><button class="tx" onclick="mSgPreview('${s.id}')"><span class="t n">${mEsc(s.title)}</span><span class="s">${mEsc(suggestionSub(s).join(' · '))}</span></button>`
     + `<button class="msg-add" onclick="mSgAdd('${s.id}')">Add</button><button class="msg-x" aria-label="Dismiss ${mEsc(s.title)}" onclick="mSgDismiss('${s.id}')">${icon('x', { weight: 'bold' })}</button></div>`;
-  return `<div class="ish"><h2 class="ish-lg">${appLogo('granola', 'xs')}From Your Granola Meetings</h2>${list.length > 4 ? `<button onclick="mSgAll=!mSgAll;mRenderTab()">${mSgAll ? 'Fewer' : 'See All'}</button>` : ''}</div>
-<div class="ig msg-list">${(mSgAll ? list : list.slice(0, 4)).map(row).join('')}${mSgAllRows(list)}</div><p class="ifoot">Found in your Granola notes. Add the ones that are yours to do.</p>`;
+  // where they're from (Nov 24): Granola meetings, clients' emails, or both
+  const fromMail = list.some(s => s.source === 'gmail'), fromMeet = list.some(s => s.source !== 'gmail');
+  const [logo, head, why] = fromMail && fromMeet ? [appLogoPair('granola', 'gmail', 'xs'), 'Suggested for You', 'From your Granola meetings and your clients’ emails. Add the ones that are yours to do.']
+    : fromMail ? [appLogo('gmail', 'xs'), 'From Your Clients’ Emails', 'Found in your Gmail. Add the ones that are yours to do.']
+    : [appLogo('granola', 'xs'), 'From Your Granola Meetings', 'Found in your Granola notes. Add the ones that are yours to do.'];
+  return `<div class="ish"><h2 class="ish-lg">${logo}${head}</h2>${list.length > 4 ? `<button onclick="mSgAll=!mSgAll;mRenderTab()">${mSgAll ? 'Fewer' : 'See All'}</button>` : ''}</div>
+<div class="ig msg-list">${(mSgAll ? list : list.slice(0, 4)).map(row).join('')}${mSgAllRows(list)}</div><p class="ifoot">${why}</p>`;
 }
 // Add All (Nov 23): for a client with more than 3 waiting
 function mSgAllRows(list){

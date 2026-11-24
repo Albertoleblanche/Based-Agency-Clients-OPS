@@ -166,7 +166,19 @@ function notifTopSeverity(list){
 // Logos that fill their square (Claude, Granola, Harvest) sit edge to edge; marks on white (ChatGPT,
 // Google, Slack) sit inset on a white tile, as on a home screen. Two apps in one row overlap.
 const APP_LOGOS = { claude: ['Claude', 'fill'], chatgpt: ['ChatGPT', 'mark'], granola: ['Granola', 'fill'],
-  google: ['Google', 'mark'], slack: ['Slack', 'mark'], harvest: ['Harvest', 'fill'], whatsapp: ['WhatsApp', 'mark'] };
+  google: ['Google', 'mark'], slack: ['Slack', 'mark'], harvest: ['Harvest', 'fill'], whatsapp: ['WhatsApp', 'mark'],
+  gmail: ['Gmail', 'mark'], gcalendar: ['Google Calendar', 'mark'], gsheets: ['Google Sheets', 'mark'] };
+// Gmail, Google Calendar and Google Sheets icons are Icons8's (Nov 24): free with a link to Icons8
+// wherever they show. icons8Credit(['gmail', …]) is that line.
+const ICONS8 = { gmail: ['Gmail', 'https://icons8.com/icon/Iq5AZypojpBD/logotipo-do-gmail'],
+  gcalendar: ['Google Calendar', 'https://icons8.com/icons/set/google-calendar'],
+  gsheets: ['Google Sheets', 'https://icons8.com/icon/30461/google-sheets'] };
+function icons8Credit(apps, cls){
+  const list = [...new Set(apps || [])].filter(a => ICONS8[a]); if(!list.length) return '';
+  const names = list.map(a => `<a href="${ICONS8[a][1]}" target="_blank" rel="noopener">${ICONS8[a][0]}</a>`);
+  const joined = names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : names[0];
+  return `<p class="i8-credit${cls ? ' ' + cls : ''}">${joined} icon${list.length > 1 ? 's' : ''} by <a href="https://icons8.com" target="_blank" rel="noopener">Icons8</a></p>`;
+}
 function appLogo(app, size){
   const a = APP_LOGOS[app]; if(!a) return '';
   return `<span class="app-logo is-${a[1]} lg-${app}${size ? ' ' + size : ''}" aria-hidden="true"><img src="/icons/apps/${app}.png" alt="" width="96" height="96" decoding="async" draggable="false"></span>`;

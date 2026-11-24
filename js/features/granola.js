@@ -38,8 +38,8 @@ function tkSuggestHtml(){
   }).join('');
   // where they're from (Nov 24): Granola meetings, clients' emails, or both
   const fromMail = list.some(s => s.source === 'gmail'), fromMeet = list.some(s => s.source !== 'gmail');
-  const [logo, head, why] = fromMail && fromMeet ? [appLogoPair('granola', 'google', 'xs'), 'Suggested for you', 'From your Granola meetings and your clients’ emails. Add the ones that are yours to do.']
-    : fromMail ? [appLogo('google', 'xs'), 'From your clients’ emails', 'Found in your Gmail. Add the ones that are yours to do.']
+  const [logo, head, why] = fromMail && fromMeet ? [appLogoPair('granola', 'gmail', 'xs'), 'Suggested for you', 'From your Granola meetings and your clients’ emails. Add the ones that are yours to do.']
+    : fromMail ? [appLogo('gmail', 'xs'), 'From your clients’ emails', 'Found in your Gmail. Add the ones that are yours to do.']
     : [appLogo('granola', 'xs'), 'From your Granola meetings', 'Found in your Granola notes. Add the ones that are yours to do.'];
   return `<section class="tk-sg" aria-label="${escapeHtml(head)}"><div class="tk-sg-h">${logo}<b>${head}</b><span class="n">${list.length}</span><span class="w">${why}</span></div>
 ${body}${list.length > 4 ? `<button class="x-lnk tk-sg-more" onclick="tkSgAll=!tkSgAll;renderTasks()">${tkSgAll ? 'Show fewer' : `Show all ${list.length}`}</button>` : ''}</section>`;

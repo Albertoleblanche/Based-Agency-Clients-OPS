@@ -3747,3 +3747,12 @@ button.wx-t.on + button.wx-t{box-shadow:none}
 .ds-pk .ck{flex:none;width:16px;height:16px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--sep-strong);transition:box-shadow .15s ease}
 .ds-pk button[aria-checked="true"] .ck{box-shadow:inset 0 0 0 5px var(--label)}
 .ds-pk .r{margin-left:auto;font-size:12.5px;color:var(--label-3)}
+
+/* Icons8's Gmail, Google Calendar and Google Sheets icons are credited wherever they show (Nov 24) */
+.i8-credit{margin:10px 0 0;font-size:11.5px;line-height:1.4;color:var(--label-3)}
+.i8-credit a{color:inherit;text-decoration:underline;text-decoration-color:var(--sep-strong);text-underline-offset:2px;transition:color .15s ease}
+@media (hover:hover) and (pointer:fine){.i8-credit a:hover{color:var(--label-2)}}
+.tk .tk-i8{margin:28px 0 4px;text-align:center}
+.sgp-i8{margin-top:14px}
+.sh-i8{margin:12px 0 0}
+.app-logo.lg-gmail img,.app-logo.lg-gcalendar img,.app-logo.lg-gsheets img{width:70%;height:70%}

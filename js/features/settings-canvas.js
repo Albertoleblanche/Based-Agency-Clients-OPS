@@ -593,9 +593,9 @@ function setConnections(){
     integ.slackUnlinked == null ? st('', 'Checking…') : integ.slackUnlinked ? st('yellow', `${integ.slackUnlinked} client${integ.slackUnlinked === 1 ? '' : 's'} not linked`) : st('green', 'Connected')));
   if(typeof granolaRowStatus === 'function') rows.push(go('openGranolaSheet()', appLogo('granola'), 'Granola', 'Action items from meetings, suggested as tasks', granolaRowStatus(st)));
   if(isAdmin()){ const w = aiConnWords(); rows.push(go("switchSettingsTab('ai')", appLogoPair('claude', 'chatgpt'), 'AI', 'Claude and ChatGPT: drafts, the Assistant and weekly insights', w == null ? st('', 'Checking…', 'cnAiSt') : w ? st('green', w, 'cnAiSt') : st('hollow', 'Not connected', 'cnAiSt'))); }
-  rows.push(go("openIntegrationSheet('sheet')", appLogo('google'), 'Google Sheet', settings.sheetCsvUrl ? 'Pulls the client list from a published sheet' : 'Keep a copy of the client list in a sheet',
+  rows.push(go("openIntegrationSheet('sheet')", appLogo('gsheets'), 'Google Sheet', settings.sheetCsvUrl ? 'Pulls the client list from a published sheet' : 'Keep a copy of the client list in a sheet',
     settings.sheetCsvUrl ? st('green', 'Connected') : st('hollow', 'Not connected')));
-  const gRow = g == null ? `<div class="fr cn-r">${appLogo('google')}<div class="l"><b>Google Calendar</b><span>Your meetings in the team calendar</span></div>${st('', 'Checking…')}</div>` : g && g.googleConfigured ? `<div class="fr cn-r">${appLogo('google')}<div class="l"><b>Google Calendar</b><span>${g.connected ? `Your meetings in the team calendar${g.lastSyncedAt ? ' · synced ' + claudeWhen(g.lastSyncedAt).toLowerCase() : ''}` : 'Bring your meetings into the team calendar'}</span></div>
+  const gRow = g == null ? `<div class="fr cn-r">${appLogo('gcalendar')}<div class="l"><b>Google Calendar</b><span>Your meetings in the team calendar</span></div>${st('', 'Checking…')}</div>` : g && g.googleConfigured ? `<div class="fr cn-r">${appLogo('gcalendar')}<div class="l"><b>Google Calendar</b><span>${g.connected ? `Your meetings in the team calendar${g.lastSyncedAt ? ' · synced ' + claudeWhen(g.lastSyncedAt).toLowerCase() : ''}` : 'Bring your meetings into the team calendar'}</span></div>
 ${g.connected ? `${st('green', 'Connected')}<button class="btn" onclick="syncGoogleCalendar().then(loadIntegrationStatuses)">Sync Now</button>` : `<button class="btn" onclick="connectGoogleCalendar()">Connect…</button>`}</div>` : '';
   // ChatGPT and Claude: each person connects their own (ai-apps.js)
   const aiRow = typeof aiAppsRowStatus === 'function' ? go('openAiAppsSheet()', appLogoPair('chatgpt', 'claude'), 'ChatGPT and Claude', 'Use Radar from their apps, as you', aiAppsRowStatus(st)) : '';
@@ -610,6 +610,7 @@ ${sm.connected ? `${st('green', 'Connected')}<button class="btn" onclick="slackM
   return `<div class="set-h">Apps</div><div class="form-grp cn-g">${rows.join('')}</div>
 ${yours}
 <p class="set-note cn-live">${st(live ? 'green' : 'yellow', live ? 'Live: changes show for everyone as they’re made' : 'Reconnecting… changes show for everyone once it’s back')}</p>
+${icons8Credit(['gsheets'].concat(gRow ? ['gcalendar'] : [], gmRow ? ['gmail'] : []), 'set-note')}
 <p class="t-2 set-note" id="sheetSyncStatus"></p>`;
 }
 // ---- Tasks from Slack (Nov 23, lib/slack-tasks.js) -------------------------------------------------
@@ -666,12 +667,13 @@ function openIntegrationSheet(which){
     loadSlackChannelsPanel();
     loadSlackTasksState();
   } else {
-    openAppModal(`<h3 class="ap-h">${appLogo('google', 'sm')}Google Sheet</h3>
+    openAppModal(`<h3 class="ap-h">${appLogo('gsheets', 'sm')}Google Sheet</h3>
 <div class="f" style="grid-template-columns:120px minmax(0,1fr)">
 <label for="sheetCsvUrl">Published link</label><input class="tf" id="sheetCsvUrl" value="${esc(settings.sheetCsvUrl || '')}" placeholder="https://docs.google.com/…/pub?output=csv">
 <span></span><p class="t-2" style="font-size:13px;margin:0">In Google Sheets: File → Share → Publish to web → CSV. A normal edit link won’t work.</p>
 <label for="csvPasteArea" class="top">Or paste</label><textarea class="tf" id="csvPasteArea" style="height:90px" placeholder="Paste copied cells or CSV here"></textarea>
 </div>
+${icons8Credit(['gsheets'], 'sh-i8')}
 <div class="sheet-a"><button class="btn" onclick="importPastedCsv()">Import Pasted</button><button class="btn" style="margin-right:auto" onclick="exportRosterCsv()">${icon('export')}Export CSV</button><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="saveAndSyncSheet().then(()=>{closeAppModal();renderSettingsView();})">Save &amp; Sync</button></div>`, 560);
   }
 }

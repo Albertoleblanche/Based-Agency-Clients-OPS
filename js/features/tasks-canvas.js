@@ -89,7 +89,7 @@ function renderTasks(){
   const curC = usedClients.find(c => c.id === tasksClient);
   const sub = [overdue.length ? `<b>${overdue.length} ${overdue.length === 1 ? 'is' : 'are'} overdue.</b>` : '', review.length ? `${review.length} ${review.length === 1 ? 'is' : 'are'} waiting on your review.` : ''].filter(Boolean).join(' ') || (open.length ? 'Nothing is overdue.' : 'Nothing open right now.');
   const head = `<div class="tk-hd"><div><h2>${open.length ? `${open.length} open task${open.length === 1 ? '' : 's'}` : 'No open tasks'}</h2><p>${sub}</p></div>
-<div class="tk-f">${typeof tkGranolaBtn === 'function' ? tkGranolaBtn() : ''}${(everyone ? [['everyone', 'Everyone', ''], ['mine', 'Mine', mineN]] : byMe.length ? [['mine', 'Mine', mineN], ['byme', 'Assigned by Me', byMeN]] : [])
+<div class="tk-f">${typeof tkGranolaBtn === 'function' ? tkGranolaBtn() : ''}${typeof tkGmailBtn === 'function' ? tkGmailBtn() : ''}${(everyone ? [['everyone', 'Everyone', ''], ['mine', 'Mine', mineN]] : byMe.length ? [['mine', 'Mine', mineN], ['byme', 'Assigned by Me', byMeN]] : [])
   .map(([k, t, n], i, a) => (i ? '' : '<div class="seg" role="tablist" aria-label="Whose">') + `<button class="${tasksScope === k ? 'on' : ''}" role="tab" aria-selected="${tasksScope === k}" onclick="setTasksScope('${k}')">${t}${n !== '' ? ` <span class="c">${n}</span>` : ''}</button>` + (i === a.length - 1 ? '</div>' : '')).join('')}
 <label class="pop pop-sel"><span class="pl">Client: ${escapeHtml(curC ? curC.name : 'All')}</span>${icon('caret-down')}<select aria-label="Client" onchange="setTasksClient(this.value)"><option value="all">All</option>${usedClients.map(c => `<option value="${c.id}"${c === curC ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></label>
 <div class="seg tk-view" role="tablist" aria-label="Layout"><button class="${tasksLayout === 'list' ? 'on' : ''}" role="tab" aria-selected="${tasksLayout === 'list'}" onclick="setTasksLayout('list')">${icon('list-bullets')}List</button><button class="${tasksLayout === 'columns' ? 'on' : ''}" role="tab" aria-selected="${tasksLayout === 'columns'}" onclick="setTasksLayout('columns')">${icon('squares-four')}Columns</button></div></div></div>`;
@@ -118,7 +118,8 @@ function renderTasks(){
   if(window._taskSel && !sel) window._taskSel = null;
   const prev = root.querySelector('.sp-page')?.scrollTop || 0, prevSp = root.querySelector('.sp:not(.sp-leaving)')?.scrollTop || 0, cmt = document.getElementById('tkpCmt')?.value || '';
   const sg = typeof tkSuggestHtml === 'function' ? tkSuggestHtml() : '';   // tasks from meetings (granola.js)
-  root.innerHTML = `<div class="spw"><div class="sp-page"><div class="tk">${head}${sg}${body}</div></div>${sel ? taskPanelHtml(sel) : ''}</div>`;
+  const i8 = /lg-gmail/.test(head + sg) && typeof icons8Credit === 'function' ? icons8Credit(['gmail'], 'tk-i8') : '';   // Icons8's Gmail icon, credited (Nov 24)
+  root.innerHTML = `<div class="spw"><div class="sp-page"><div class="tk">${head}${sg}${body}${i8}</div></div>${sel ? taskPanelHtml(sel) : ''}</div>`;
   const sp = root.querySelector('.sp-page'); if(sp) sp.scrollTop = prev;
   const pn = root.querySelector('.sp:not(.sp-leaving)'); if(pn){ pn.scrollTop = prevSp; pn._st = prevSp; }
   const ci = document.getElementById('tkpCmt'); if(ci && cmt) ci.value = cmt;

@@ -25,19 +25,51 @@ async function gmailDisconnect(){
   showToast('success', 'Gmail disconnected', 'Connect it again anytime.');
   if(typeof loadIntegrationStatuses === 'function' && currentViewName === 'settings') loadIntegrationStatuses();
 }
-// Check Now (Settings): reads now, and says what it found
-async function gmailCheckNow(){
-  const btn = typeof clickedBtn === 'function' ? clickedBtn() : null; if(btn) setBtnLoading(btn, 'Checking…');
+// Reads now (Settings → Check Now, and Check Gmail in Tasks), and says what it found
+async function gmailReadNow(){
   const r = await gmailCall({ action: 'read', force: true });
-  if(btn) restoreBtn(btn);
   gmailReadAt = Date.now();
+  if(r.suggested && typeof loadTaskSuggestions === 'function') await loadTaskSuggestions();
+  await gmailStatusLoad();
+  return r;
+}
+function gmailReadToast(r){
   if(r.error) showToast('error', 'Gmail wasn’t read', r.error);
   else if(r.skipped === 'recent') showToast('info', 'Just checked', 'Radar read your Gmail less than a minute ago.');
   else if(r.skipped) showToast('info', 'Not read', r.skipped === 'no AI key' ? 'The AI isn’t set up on the server.' : r.skipped);
   else showToast('success', r.suggested ? `${r.suggested} task${r.suggested === 1 ? '' : 's'} suggested` : 'Nothing new to do', `${r.fromClients || 0} new email${r.fromClients === 1 ? '' : 's'} from clients${r.waiting ? `, ${r.waiting} more at the next check` : ''}.`);
-  await gmailStatusLoad();
-  if(r.suggested && typeof loadTaskSuggestions === 'function'){ await loadTaskSuggestions(); if(currentViewName === 'tasks' && typeof renderTasks === 'function') renderTasks(); }
+}
+async function gmailCheckNow(){
+  const btn = typeof clickedBtn === 'function' ? clickedBtn() : null; if(btn) setBtnLoading(btn, 'Checking…');
+  const r = await gmailReadNow();
+  if(btn) restoreBtn(btn);
+  gmailReadToast(r);
+  if(r.suggested && currentViewName === 'tasks' && typeof renderTasks === 'function') renderTasks();
   if(currentViewName === 'settings' && typeof loadIntegrationStatuses === 'function') loadIntegrationStatuses();
+}
+// Check Gmail, in Tasks next to Check Granola (Nov 24): shown once your Gmail is connected.
+let tkGmailBusy = false, gmailAsked = false;
+function gmailOnHere(){
+  if(gmailState === null && !gmailAsked){
+    gmailAsked = true;
+    gmailStatusLoad().then(() => {
+      if(!gmailState || !gmailState.connected) return;
+      if(typeof currentViewName !== 'undefined' && currentViewName === 'tasks' && typeof renderTasks === 'function') renderTasks();
+      if(typeof mTab !== 'undefined' && mTab === 'tasks' && typeof mRenderTab === 'function') mRenderTab();
+    });
+  }
+  return !!(gmailState && gmailState.connected);
+}
+function tkGmailBtn(){
+  if(!gmailOnHere()) return '';
+  return `<button class="btn tk-gr" id="tkGmail" onclick="tkGmailCheck()"${tkGmailBusy ? ' disabled' : ''} title="Look for new requests in your clients’ emails">${tkGmailBusy ? '<span class="tk-gr-spin" aria-hidden="true"></span>Checking…' : `${appLogo('gmail', 'xs')}Check Gmail`}</button>`;
+}
+async function tkGmailCheck(){
+  if(tkGmailBusy) return;
+  tkGmailBusy = true; renderTasks();
+  let r; try{ r = await gmailReadNow(); } finally { tkGmailBusy = false; }
+  gmailReadToast(r);
+  renderTasks();
 }
 // Opening Tasks: if you're connected, new client emails are read (the server skips it if it read in
 // the last 10 minutes), and anything it suggests shows up in the list.
@@ -55,7 +87,7 @@ async function gmailMaybeRead(){
 // Settings → Connections → Yours
 function gmailRowHtml(st){
   const g = gmailState;
-  const head = sub => `<div class="fr cn-r">${appLogo('google')}<div class="l"><b>Gmail</b><span>${sub}</span></div>`;
+  const head = sub => `<div class="fr cn-r">${appLogo('gmail')}<div class="l"><b>Gmail</b><span>${sub}</span></div>`;
   if(!g) return `${head('Tasks from your clients’ emails, suggested in Tasks')}${st('', 'Checking…')}</div>`;
   if(g.needsSetup) return `${head('Tasks from your clients’ emails, suggested in Tasks')}${st('hollow', isAdmin() ? 'Run addendum-gmail.sql' : 'Not set up')}</div>`;
   if(!g.configured) return `${head('Tasks from your clients’ emails, suggested in Tasks')}${st('hollow', 'Not set up')}</div>`;
