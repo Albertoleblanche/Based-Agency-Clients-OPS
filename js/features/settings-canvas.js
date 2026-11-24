@@ -15,7 +15,7 @@ const SETTINGS_TABS = [
 // pages inside Connections
 const SETTINGS_SUB = {
   harvest: ['Harvest', () => canApprove() && typeof setHarvest === 'function'],
-  whatsapp: ['WhatsApp', () => typeof waCanManage === 'function' && waCanManage() && !waHidden()],
+  whatsapp: ['WhatsApp', () => typeof waCanSetup === 'function' && waCanSetup() && !waHidden()],
   ai: ['AI', () => isAdmin()],
 };
 const SETTINGS_ALIAS = { fields: 'clients', areas: 'clients', integrations: 'connections' };
@@ -569,7 +569,7 @@ function setConnections(){
     h && h.connected ? `Clients, projects, tasks and time${h.setup && h.setup.syncedAt && typeof hvWhen === 'function' ? ' · read ' + hvWhen(h.setup.syncedAt) : ''}` : 'Time logged the way Harvest is set up',
     h == null ? st('', 'Checking…') : h.connected ? st('green', 'Connected') : st('hollow', 'Not connected')));
   const wa = typeof waIntegrationRow === 'function' ? waIntegrationRow() : null;
-  if(wa) rows.push(go("switchSettingsTab('whatsapp')", appLogo('whatsapp'), 'WhatsApp', 'Reads client groups and lists what clients are waiting on', wa[3]));
+  if(wa) rows.push(go(wa[5] || "switchSettingsTab('whatsapp')", appLogo('whatsapp'), 'WhatsApp', wa[2], wa[3]));
   if(approver) rows.push(go("openIntegrationSheet('slack')", appLogo('slack'), 'Slack', 'Client channels, reminders and daily summaries',
     integ.slackUnlinked == null ? st('', 'Checking…') : integ.slackUnlinked ? st('yellow', `${integ.slackUnlinked} client${integ.slackUnlinked === 1 ? '' : 's'} not linked`) : st('green', 'Connected')));
   if(typeof granolaRowStatus === 'function') rows.push(go('openGranolaSheet()', appLogo('granola'), 'Granola', 'Action items from meetings, suggested as tasks', granolaRowStatus(st)));

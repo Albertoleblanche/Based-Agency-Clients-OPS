@@ -307,7 +307,7 @@ function winChannelMenu(e, clientId){
 function winGroupMenu(e, clientId){
   const c = clients.find(x => x.id === clientId); if(!c) return;
   const g = winGroupFor(c), list = winGroups.filter(x => x.active !== false).slice().sort((a, b) => winCleanGroupName(a.name).localeCompare(winCleanGroupName(b.name)));
-  if(!list.length){ showToast('info', 'No WhatsApp groups yet', 'Link WhatsApp in Settings → WhatsApp, then pick the group here.'); return; }
+  if(!list.length){ showToast('info', 'No WhatsApp groups yet', 'Once an admin links WhatsApp in Settings → WhatsApp, pick the group here.'); return; }
   winMenu(e, list.map(x => ({ on: g && g.jid === x.jid, fn: `setWinGroup('${clientId}',${jsArg(x.jid)})`,
     html: `<span>${escapeHtml(x.name)}</span>${x.client_id && String(x.client_id) !== String(clientId) ? `<span class="wn-mt">${escapeHtml((clients.find(k => String(k.id) === String(x.client_id)) || {}).name || 'another client')}</span>` : ''}` }))
     .concat(g && String(g.client_id || '') === String(clientId) ? ['-', { on: false, fn: `setWinGroup('${clientId}',null)`, html: 'Unlink This Group' }] : []), 'grp' + clientId);

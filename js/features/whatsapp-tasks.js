@@ -1,7 +1,8 @@
 // WhatsApp: what clients are waiting on, found by the connector in client WhatsApp groups.
-// Everyone sees their own; admins and approvers see everyone's and set it up in Settings.
-// In test mode (wa_settings.pilot_user_ids) only the testers see any of it, whatever their role;
-// the database says which applies to whoever is signed in (wa_access()).
+// Everyone sees their own; admins and approvers see everyone's. The setup in Settings → WhatsApp
+// is one for the whole team and only admins change it (wa_can_setup()).
+// In test mode (wa_settings.pilot_user_ids) only the testers see any of it, whatever their role,
+// and they set it up; the database says which applies to whoever is signed in (wa_access()).
 // The data is written by whatsapp-connector/ (read-only); this screen reads the items and lets
 // people mark them done, reassign them, make a task of them, or say they weren't tasks (which
 // teaches the agent). Same tables and columns as schema-whatsapp-tasks.sql.
@@ -16,6 +17,7 @@ let waWho = null;              // 'mine' | 'all' | an owner key (leads only); nu
 let waTab = 'open';            // 'open' | 'done'
 let waRealtimeStarted = false;
 let waAccessLevel = null;      // 'manage' | 'own' | 'none' from the database; null = it doesn't say (older setup)
+let waSetupOk = null;          // may change the setup (wa_can_setup()); null = the database doesn't say yet
 let waContact = null;          // leads: when the team last wrote in each group it reads (wa_last_contact); null = the database doesn't say
 let waQuietAll = false;        // Quiet clients: show them all
 let waCheckAt = null;          // when Check Now was pressed in this tab (ISO)
@@ -34,6 +36,10 @@ const WA_QUIET_SHOWN = 4;
 // Who sees what (wa_access(), read with the rest in waLoadNow). Before the test-mode update the
 // database doesn't say, so the role decides.
 function waCanManage(){ return waAccessLevel ? waAccessLevel === 'manage' : canApprove(); }
+// Linking the number, the groups, the times, who handles what, going live: admins (testers while
+// testing). Before addendum-whatsapp-admins.sql the database doesn't say, and leads still can.
+function waCanSetup(){ return waSetupOk === null ? waCanManage() : waSetupOk; }
+const WA_ADMINS_NOTE = 'An admin does this in Settings → WhatsApp.';
 function waHidden(){ return waAccessLevel ? waAccessLevel === 'none' : (waReady === false && !canApprove()); }
 function waTesters(){ return (waSettings && Array.isArray(waSettings.pilot_user_ids)) ? waSettings.pilot_user_ids : []; }
 function updateWaNav(){
@@ -53,7 +59,7 @@ function loadWaTasks(){
 // anyone else, so asking for them up front costs nothing.
 async function waLoadNow(){
   const safe = q => Promise.resolve(q).catch(e => ({ error: { message: e?.message || String(e) } }));
-  const [acc, tk, r, s, g, lc, cl] = await Promise.all([
+  const [acc, tk, r, s, g, lc, cl, su] = await Promise.all([
     safe(supabaseClient.rpc('wa_access')),
     safe(supabaseClient.from('wa_tasks').select('*').order('first_seen', { ascending: true })),
     safe(supabaseClient.from('wa_runs').select('*').order('started_at', { ascending: false }).limit(20)),
@@ -61,8 +67,10 @@ async function waLoadNow(){
     safe(supabaseClient.from('wa_groups').select('*').order('name', { ascending: true })),
     safe(supabaseClient.rpc('wa_last_contact')),
     safe(supabaseClient.from('wa_messages').select('group_jid,ts').eq('from_team', false).gte('ts', new Date(Date.now() - 14 * 86400000).toISOString()).order('ts', { ascending: false }).limit(3000)),
+    safe(supabaseClient.rpc('wa_can_setup')),
   ]);
   waAccessLevel = !acc.error && ['manage', 'own', 'none'].includes(acc.data) ? acc.data : null;
+  waSetupOk = !su.error && typeof su.data === 'boolean' ? su.data : null;
   waLoadError = null;
   if(waAccessLevel === 'none'){ waTasks = []; waLoaded = true; waReady = true; updateWaNav(); updateWaNavBadge(); return false; }
   if(tk.error){
@@ -245,10 +253,19 @@ function waCheckBtn(){
   if(waChecking()) return `<button class="btn wa-chk-b" disabled>${icon('loader', { cls: 'spin' })}Checking…</button>`;
   return `<button class="btn wa-chk-b" onclick="waCheckNow()"${waConnState().key === 'connected' ? '' : ' disabled title="WhatsApp isn’t connected"'}>${icon('arrows-clockwise')}Check Now</button>`;
 }
+// Ask the connector for a check (or clear a request it never picked up). wa_request_check lets
+// approvers do it without being able to change the setup; older databases take the plain update.
+async function waAskCheck(clear){
+  const r = await supabaseClient.rpc('wa_request_check', { p_clear: !!clear });
+  if(!r.error && (typeof r.data === 'string' || r.data === null)) return { at: clear ? null : (r.data || new Date().toISOString()), error: null };
+  if(r.error && !/wa_request_check|PGRST202|does not exist|Could not find/i.test(`${r.error.code || ''} ${r.error.message || ''}`)) return { at: null, error: r.error };
+  const at = clear ? null : new Date().toISOString();
+  const { error } = await supabaseClient.from('wa_settings').update({ check_requested_at: at }).eq('id', 1);
+  return { at, error };
+}
 async function waCheckNow(){
   if(waConnState().key !== 'connected'){ showToast('error', 'WhatsApp isn’t connected', waConnState().long); return; }
-  const at = new Date().toISOString();
-  const { error } = await supabaseClient.from('wa_settings').update({ check_requested_at: at }).eq('id', 1);
+  const { at, error } = await waAskCheck(false);
   if(error){
     showToast('error', 'Couldn’t ask for a check', waMissingCol(error) ? 'Check Now needs a one-time database update: run addendum-whatsapp-check-now.sql in Supabase → SQL Editor.' : error.message);
     return;
@@ -265,7 +282,7 @@ async function waCheckNow(){
     if(asked && Date.now() - new Date(asked).getTime() > 90000){
       // still waiting to be picked up: the connector is an older version, or isn't running
       clearInterval(waCheckTimer); waCheckTimer = null; waCheckAt = null;
-      await supabaseClient.from('wa_settings').update({ check_requested_at: null }).eq('id', 1);
+      await waAskCheck(true);
       if(waSettings) waSettings.check_requested_at = null;
       showToast('error', 'Radar WhatsApp didn’t start the check', waRunning() ? 'It needs the latest version. Redeploy it, then try again.' : 'Radar WhatsApp isn’t running.');
       waRedraw(); return;
@@ -425,16 +442,22 @@ function waSideHtml(who, conn){
   } else if(conn.key === 'qr' || conn.key === 'reconnecting'){
     st = `<span class="dot ${conn.dot}"></span><b>${escapeHtml(conn.text)}</b>`;
     txt = conn.long;
-    act = `<button class="btn" onclick="openSettingsTab('whatsapp')">Show the Code</button>`;
+    act = waCanSetup() ? `<button class="btn" onclick="openSettingsTab('whatsapp')">Show the Code</button>` : '';
+    if(!waCanSetup()) txt = `${txt} ${WA_ADMINS_NOTE}`;
   } else {
     st = `<span class="dot ${conn.dot}"></span><b>${escapeHtml(conn.text)}</b>`;
     txt = conn.long;
-    if(conn.key === 'signedout') act = `<button class="btn" onclick="openSettingsTab('whatsapp')">Re-link…</button>`;
+    if(conn.key === 'signedout'){
+      if(waCanSetup()) act = `<button class="btn" onclick="openSettingsTab('whatsapp')">Re-link…</button>`;
+      else txt = 'The phone unlinked it. An admin re-links it in Settings → WhatsApp.';
+    }
   }
   const testers = waTesters(), onlyMe = testers.length === 1 && testers[0] === currentUser.id;
+  const setLink = waCanSetup() ? ` <a href="#" onclick="openSettingsTab('whatsapp');return false;">WhatsApp settings</a>` : '';
   const lock = testers.length
-    ? `<p class="wa-lock">${icon('lock-simple')}<span>Test mode: ${onlyMe ? 'only you see this and get' : `only the ${testers.length} testers see this and get`} its Slack messages. <a href="#" onclick="openSettingsTab('whatsapp');return false;">WhatsApp settings</a></span></p>`
-    : `<p class="wa-lock">${icon('settings')}<span><a href="#" onclick="openSettingsTab('whatsapp');return false;">WhatsApp settings</a></span></p>`;
+    ? `<p class="wa-lock">${icon('lock-simple')}<span>Test mode: ${onlyMe ? 'only you see this and get' : `only the ${testers.length} testers see this and get`} its Slack messages.${setLink}</span></p>`
+    : waCanSetup() ? `<p class="wa-lock">${icon('settings')}<span>${setLink.trim()}</span></p>`
+    : `<p class="wa-lock">${icon('settings')}<span>Admins manage the WhatsApp setup for the whole team.</span></p>`;
   // the new look draws each part of the side as its own card
   const card = h => h && typeof uiStyleOn === 'function' && uiStyleOn() ? `<div class="wa-card">${h}</div>` : h;
   return `<aside class="wa-side">
@@ -488,10 +511,11 @@ function waSetupHtml(){
   const steps = [];
   if(missing) steps.push({ t: 'Add WhatsApp to the database', d: 'An admin runs schema-whatsapp-tasks.sql in Supabase → SQL Editor. It’s safe to run more than once.', done: false, act: '' });
   steps.push({ t: 'Start Radar WhatsApp', d: running ? 'Done. It checked in a few seconds ago.' : waSettings && waSettings.heartbeat_at ? `It stopped ${waAt(waSettings.heartbeat_at)}. ${WA_START}` : WA_START_FIRST, done: running, act: '' });
-  steps.push({ t: 'Link WhatsApp', d: 'Scan a code with the phone that’s in the client groups. It only reads; it never sends.', done: linked,
-    act: running && !linked ? `<button class="btn" onclick="openSettingsTab('whatsapp')">Show the Code</button>` : '' });
-  steps.push({ t: 'Choose the groups it reads', d: 'Groups with “Marketing” in the name start on. You can turn any group on or off.', done: linked && waGroups.some(g => g.active),
-    act: linked ? `<button class="btn" onclick="openSettingsTab('whatsapp')">Choose Groups</button>` : '' });
+  const setup = waCanSetup();
+  steps.push({ t: 'Link WhatsApp', d: `Scan a code with the phone that’s in the client groups. It only reads; it never sends.${setup ? '' : ` ${WA_ADMINS_NOTE}`}`, done: linked,
+    act: setup && running && !linked ? `<button class="btn" onclick="openSettingsTab('whatsapp')">Show the Code</button>` : '' });
+  steps.push({ t: 'Choose the groups it reads', d: `Groups with “Marketing” in the name start on. ${setup ? 'You can turn any group on or off.' : WA_ADMINS_NOTE}`, done: linked && waGroups.some(g => g.active),
+    act: setup && linked ? `<button class="btn" onclick="openSettingsTab('whatsapp')">Choose Groups</button>` : '' });
   const next = steps.findIndex(s => !s.done), n = steps.filter(s => s.done).length;
   const rows = steps.map((s, i) => `<div class="wa-step${s.done ? ' is-done' : ''}${i === next ? ' is-next' : ''}">
 <span class="wa-sn">${s.done ? icon('check', { weight: 'bold' }) : i + 1}</span>
@@ -797,8 +821,8 @@ function waQrOk(){
 function waWhoSeesRow(){
   const testers = waTesters(), onlyMe = testers.length === 1 && testers[0] === currentUser?.id;
   return testers.length
-    ? `<div class="fr"><div class="l"><b>Who sees it</b><span>Test mode: ${onlyMe ? 'only you see' : `only the ${testers.length} testers see`} WhatsApp in Radar and get its Slack messages. Nobody else is told. To go live, run the last line of addendum-whatsapp-test-mode.sql.</span></div><span class="st">${icon('lock-simple')}${onlyMe ? 'Only you' : testers.length + ' testers'}</span></div>`
-    : `<div class="fr"><div class="l"><b>Who sees it</b><span>Everyone sees the items that are theirs. Admins and approvers see them all and get the full list in Slack.</span></div><span class="st"><span class="dot green"></span>Live</span></div>`;
+    ? `<div class="fr"><div class="l"><b>Who sees it</b><span>Test mode: ${onlyMe ? 'only you see' : `only the ${testers.length} testers see`} WhatsApp in Radar and get its Slack messages. Nobody else is told.</span></div><span class="st">${icon('lock-simple')}${onlyMe ? 'Only you' : testers.length + ' testers'}</span><button class="btn btn-p" onclick="waGoLive()">Go Live…</button></div>`
+    : `<div class="fr"><div class="l"><b>Who sees it</b><span>Everyone sees the items that are theirs. Admins and approvers see them all and get the full list in Slack. This setup is the same for the whole team, and only admins change it.</span></div><span class="st"><span class="dot green"></span>Live</span></div>`;
 }
 function waPcRow(){
   const s = waSettings, run = waRunning();
@@ -971,6 +995,26 @@ async function waRelink(){
 // Settings → Integrations shows WhatsApp with the others.
 function waIntegrationRow(){
   if(!waCanManage() || waHidden()) return null;
-  const st = waConnState();
-  return ['message-circle', 'WhatsApp', 'Reads client groups and lists what clients are waiting on', `<span class="st"><span class="dot ${st.dot}"></span>${escapeHtml(st.text)}</span>`, `<button class="btn" onclick="switchSettingsTab('whatsapp')">Settings…</button>`];
+  const st = waConnState(), setup = waCanSetup();
+  return ['message-circle', 'WhatsApp', setup ? 'Reads client groups and lists what clients are waiting on' : 'Reads client groups for the whole team. Admins manage it.', `<span class="st"><span class="dot ${st.dot}"></span>${escapeHtml(st.text)}</span>`,
+    setup ? `<button class="btn" onclick="switchSettingsTab('whatsapp')">Settings…</button>` : '', setup ? "switchSettingsTab('whatsapp')" : "switchView('whatsapp')"];
+}
+// Test mode → live, from the Who sees it row. Testers who aren't admins lose this page after it,
+// so the dialog says so.
+async function waGoLive(){
+  const admin = typeof isAdmin === 'function' && isAdmin();
+  const ok = await confirmDialog(`Everyone on the team then sees the WhatsApp items that are theirs and gets them in Slack. Admins and approvers see them all.${admin ? '' : ' After this only admins can change the WhatsApp settings, so this page will no longer show for you.'}`,
+    { title: 'Go live for the whole team?', confirmLabel: 'Go Live' });
+  if(!ok) return;
+  const { error } = await supabaseClient.rpc('wa_go_live');
+  if(error){
+    const missing = /wa_go_live|PGRST202|Could not find/i.test(`${error.code || ''} ${error.message || ''}`);
+    showToast('error', 'Not live yet', missing ? 'This needs a one-time database update: run addendum-whatsapp-admins.sql in Supabase → SQL Editor.' : error.message);
+    return;
+  }
+  if(waSettings) waSettings.pilot_user_ids = [];
+  await loadWaTasks();
+  showToast('success', 'WhatsApp is live for the team', 'Everyone gets their items from the next check.');
+  if(typeof renderSettingsView === 'function') renderSettingsView();
+  updateWaNav();
 }
