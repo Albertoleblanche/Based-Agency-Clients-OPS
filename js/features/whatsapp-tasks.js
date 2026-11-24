@@ -534,9 +534,9 @@ function waSecHtml(k, ts, o){
   const svc = c && c.service ? String(c.service) : '';
   const own = o.lead && c && c.customFieldValues && c.customFieldValues.owner ? firstName(String(c.customFieldValues.owner)) : '';
   const m = c && typeof waMoodFor === 'function' ? waMoodFor(c) : null;
-  const mood = m && m.level !== 'neutral' ? `<span class="wx-mood ${m.level === 'happy' ? 'g' : m.level === 'angry' ? 'r' : 'y'}">${escapeHtml(WA_MOOD[m.level])}</span>` : '';
-  const pill = svc ? `<span class="wx-svc">${escapeHtml(svc)}</span>` : '';
-  const meta = [own ? `${escapeHtml(own)}’s client` : '', mood].filter(Boolean).join('<i>·</i>');
+  // how the client feels on WhatsApp: a pill
+  const mood = m && m.level !== 'neutral' ? `<span class="wx-feel ${m.level === 'happy' ? 'g' : m.level === 'angry' ? 'r' : 'y'}" title="How they come across in their WhatsApp group this week">${escapeHtml(WA_MOOD[m.level])}</span>` : '';
+  const meta = [svc, own ? `${own}’s client` : ''].filter(Boolean).map(escapeHtml).join(' · ');
   const live = o.live && o.live.length ? o.live : ts.filter(t => t.status === 'open');   // the client's whole list, whichever tab
   const n = o.past ? ts.length : live.length;
   const mineN = o.useMine ? live.filter(o.isMine).length : 0;
@@ -549,7 +549,7 @@ function waSecHtml(k, ts, o){
   const link = c ? `<a href="#" onclick="openClientDetail('${escapeHtml(String(c.id))}');return false;">Open Client${icon('caret-right')}</a>`
     : canLink ? waLinkPickHtml(jid, k) : '<span class="t-3">Not in Radar</span>';
   return `<section class="wx-cs${closed ? ' is-closed' : ''}" data-k="${escapeHtml(k)}" aria-label="${escapeHtml(k)}">
-<header class="wx-cs-h"><div class="wx-cs-l"><button class="wx-cs-t" aria-expanded="${!closed}" onclick="waFold(this)">${icon('caret-right', { cls: 'wx-chev' })}<span>${escapeHtml(k)}</span></button>${pill || meta ? `<div class="wx-cs-sub">${pill}${meta ? `<span class="wx-cs-m">${meta}</span>` : ''}</div>` : ''}</div>
+<header class="wx-cs-h"><div class="wx-cs-l"><button class="wx-cs-t" aria-expanded="${!closed}" onclick="waFold(this)">${icon('caret-right', { cls: 'wx-chev' })}<span>${escapeHtml(k)}</span></button>${meta || mood ? `<div class="wx-cs-sub">${meta ? `<span class="wx-cs-m">${meta}</span>` : ''}${mood}</div>` : ''}</div>
 <div class="wx-cs-r">${urgent ? '<em class="wa-urg">Urgent</em>' : ''}${(() => { const txt = `${escapeHtml(count)}${oldest ? `<i class="wa-dot">·</i><span class="t-red">oldest ${escapeHtml(waAgeWord(oldest))}</span>` : ''}`;
     return o.past || (o.onlyClient && o.tab === 'open') ? `<span class="wx-cs-n">${txt}</span>`
       : `<a href="#" class="wx-cs-n" title="Show ${escapeHtml(k)}’s waiting requests" onclick="waShowClient(this.closest('.wx-cs').dataset.k);return false;">${txt}${icon('caret-right')}</a>`; })()}<i class="wx-vr" aria-hidden="true"></i>${link}</div></header>
@@ -657,7 +657,7 @@ ${stat('Waiting over a day', late.length, late.length ? `${escapeHtml(waClientLa
   const lvl = { angry: 0, frustrated: 1, happy: 2, neutral: 3 };
   moods.sort((a, b) => lvl[a.m.level] - lvl[b.m.level]);
   const moodHtml = moods.length ? `<div class="wx-sec-h"><b>Your clients on WhatsApp</b></div><p class="wx-sec-p">How they come across in their groups this week.</p>
-${moods.map(({ c, m }) => `<div class="wx-mood-r"><b>${escapeHtml(c.name)}</b><span class="wx-mood ${m.level === 'happy' ? 'g' : m.level === 'angry' ? 'r' : m.level === 'frustrated' ? 'y' : ''}">${escapeHtml(WA_MOOD[m.level])}</span>${m.excerpt ? `<p>“${escapeHtml(m.excerpt)}”</p>` : m.reason ? `<p>${escapeHtml(m.reason)}</p>` : ''}</div>`).join('')}` : '';
+${moods.map(({ c, m }) => `<div class="wx-mood-r"><b>${escapeHtml(c.name)}</b><span class="wx-feel ${m.level === 'happy' ? 'g' : m.level === 'angry' ? 'r' : m.level === 'frustrated' ? 'y' : ''}">${escapeHtml(WA_MOOD[m.level])}</span>${m.excerpt ? `<p>“${escapeHtml(m.excerpt)}”</p>` : m.reason ? `<p>${escapeHtml(m.reason)}</p>` : ''}</div>`).join('')}` : '';
   return `<aside class="wx-side">
 <section class="wx-card wx-sec">${week}</section>
 ${moodHtml ? `<section class="wx-card wx-sec">${moodHtml}</section>` : ''}
