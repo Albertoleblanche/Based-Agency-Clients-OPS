@@ -41,7 +41,7 @@ html.ui-w .mac[data-theme] .app-win .side .src-i{height:36px;border-radius:12px;
 html.ui-w .mac[data-theme] .app-win .side .src-i.on{background:var(--sb-on);color:var(--sb-strong);box-shadow:var(--uw-shadow),var(--uw-hi)}
 html.ui-w .mac[data-theme] .app-win .side .src-i:active{transform:scale(.97);transition-duration:100ms}
 /* Tasks, WhatsApp and Queue: what's on you, so a solid pill you see at a glance (Nov 23; was grey on grey) */
-html.ui-w .mac .app-win .side .src-i :is(#navTasksBadge,#navWhatsappBadge,#navQueueBadge,#navNotesBadge,#navClientsBadge){font-family:var(--mono);font-weight:600;font-size:11px;background:var(--label);color:var(--grp)}
+html.ui-w .mac .app-win .side .src-i :is(#navTasksBadge,#navWhatsappBadge,#navQueueBadge,#navNotesBadge,#navClientsBadge,#navRemindersBadge){font-family:var(--mono);font-weight:600;font-size:11px;background:var(--label);color:var(--grp)}
 html.ui-w .mac .side-foot{border-top-color:var(--sep)}
 html.ui-w .mac .side-brand .brand-mark{border-radius:9px}
 html.ui-w .mac .stm{border-radius:16px;background:var(--grp);box-shadow:0 0 0 1px var(--sep)}

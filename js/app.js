@@ -185,6 +185,8 @@ async function showApp(session, o){
     if(myProfile?.ai_chat_enabled){ loadClaudeHistory().then(renderClaudeMessages); }
     await checkForNewNotificationToasts();
     setupRealtimeSubscriptions();
+    if(typeof integPrefetch === 'function') integPrefetch();   // Settings → Connections ready before it's opened
+    if(typeof gcalAutoStart === 'function') gcalAutoStart();   // your calendar kept current, meetings announced (Nov 23)
     // Read what changed in Harvest's clients, projects and tasks (the server skips it if it read in the last 10 minutes).
     if(typeof harvestSyncInBackground === 'function') harvestSyncInBackground();
     // Open the screen the address points at (a refresh, bookmark, shared

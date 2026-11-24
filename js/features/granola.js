@@ -22,8 +22,35 @@ function tkSuggestHtml(){
       + `<div class="tk-sg-a"><button class="btn sm" onclick="tkSgAdd('${s.id}')">Add</button><button class="btn sm" onclick="tkSgEdit('${s.id}')">Edit…</button>`
       + `<button class="ib" aria-label="Dismiss “${escapeHtml(s.title)}”" title="Dismiss" onclick="tkSgDismiss('${s.id}')">${icon('x')}</button></div></div>`;
   };
+  // by client (Nov 23): a client with more than 3 gets Add All
+  const groups = [];
+  list.forEach(s => { const k = s.clientId || ''; let g = groups.find(x => x.k === k); if(!g) groups.push(g = { k, items: [] }); g.items.push(s); });
+  const many = groups.length > 1;
+  let left = tkSgAll ? Infinity : 4;
+  const body = groups.map(g => {
+    const rows = g.items.slice(0, Math.max(0, left)); left -= rows.length;
+    if(!rows.length) return '';
+    const c = g.k && clients.find(x => x.id === g.k), name = c ? c.name : 'No client';
+    const all = g.items.length > 3 ? `<button class="btn sm tk-sg-all" data-sgall="${g.k}" onclick="tkSgAddAll('${g.k}')">Add All ${g.items.length}</button>` : '';
+    const head = many || all ? `<div class="tk-sg-g"><span>${escapeHtml(name)}</span><span class="n">${g.items.length}</span>${all}</div>` : '';
+    return head + rows.map(row).join('');
+  }).join('');
   return `<section class="tk-sg" aria-label="Suggested from your Granola meetings"><div class="tk-sg-h">${appLogo('granola', 'xs')}<b>From your Granola meetings</b><span class="n">${list.length}</span><span class="w">Found in your Granola notes. Add the ones that are yours to do.</span></div>
-${shown.map(row).join('')}${list.length > 4 ? `<button class="x-lnk tk-sg-more" onclick="tkSgAll=!tkSgAll;renderTasks()">${tkSgAll ? 'Show fewer' : `Show all ${list.length}`}</button>` : ''}</section>`;
+${body}${list.length > 4 ? `<button class="x-lnk tk-sg-more" onclick="tkSgAll=!tkSgAll;renderTasks()">${tkSgAll ? 'Show fewer' : `Show all ${list.length}`}</button>` : ''}</section>`;
+}
+// Add All (Nov 23): every suggestion waiting for one client becomes your task, as it is.
+async function tkSgAddAll(clientKey){
+  const list = suggestionsOpen(taskSuggestions || []).filter(s => (s.clientId || '') === clientKey);
+  if(!list.length) return;
+  const btn = document.querySelector(`.tk-sg-all[data-sgall="${clientKey}"]`);
+  if(btn){ btn.disabled = true; btn.textContent = 'Adding…'; }
+  list.forEach(s => tkSgBusy(s.id, true));
+  let added = 0, failed = 0;
+  for(const s of list){ const r = await addSuggestedTask(s.id); if(r.error) failed++; else added++; }
+  const c = clientKey && clients.find(x => x.id === clientKey);
+  if(added) showToast(failed ? 'info' : 'success', `Added ${added} task${added === 1 ? '' : 's'}`, `${c ? c.name + ': ' : ''}${failed ? `${failed} didn’t go in; try those again.` : 'They’re in your tasks.'}`);
+  else showToast('error', 'Not added', 'Try again in a moment.');
+  await loadMyTasks(); renderTasks(); if(typeof updateTasksNavBadge === 'function') updateTasksNavBadge();
 }
 async function tkSgRefresh(){
   if(tkSgRefresh.busy) return;

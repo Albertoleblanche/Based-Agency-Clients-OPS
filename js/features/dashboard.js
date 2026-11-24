@@ -143,7 +143,8 @@ function dbCalendarCard(cap){
     const c = e.clientId && clients.find(x => x.id === e.clientId), first = (e.description || '').split('\n')[0];
     const sub = c ? c.name : first || (e.endAt && !e.allDay ? 'Until ' + fmtTime(new Date(e.endAt)) : '');
     const tone = typeof calColor === 'function' ? calColor(e) : (DB_EV_TONE[e.eventType] || (c ? 'green' : 'blue'));   // the calendar's colours
-    return `<li class="db-ev db-go${past ? ' is-past' : ''}"${past ? '' : ' data-item'} onclick="openEventDetailModal('${e.id}')"><time>${e.allDay ? 'All day' : fmtTime(new Date(e.startAt))}</time><i class="db-evb ${tone}"></i><span class="db-tx"><b>${escapeHtml(e.title || 'Untitled')}</b><span class="s">${escapeHtml(sub)}</span></span></li>`;
+    const join = typeof meetingJoinable === 'function' && meetingJoinable(e) ? joinMeetingBtn(e, 'sm btn-p db-join') : '';
+    return `<li class="db-ev db-go${past ? ' is-past' : ''}"${past ? '' : ' data-item'} onclick="openEventDetailModal('${e.id}')"><time>${e.allDay ? 'All day' : fmtTime(new Date(e.startAt))}</time><i class="db-evb ${tone}"></i><span class="db-tx"><b>${escapeHtml(e.title || 'Untitled')}</b><span class="s">${escapeHtml(sub)}</span></span>${join}</li>`;
   };
   const nowLi = `<li class="db-now" aria-label="Now, ${fmtTime(now)}"><time>${fmtTime(now)}</time><i></i></li>`;
   // Today: the last two that already happened, a line at now, and what's left

@@ -48,7 +48,8 @@ async function loadCalendarEvents(){
     googleEventId:e.google_event_id, googleOwner:e.google_calendar_owner,
     location:e.location||'', attendeeIds:e.attendee_ids||[],
     rsvps:e.rsvps||{}, recurrenceGroupId:e.recurrence_group_id, recurrenceLabel:e.recurrence_label,
-    relatedTaskId:e.related_task_id, relatedNoteId:e.related_note_id, reminderMinutes:e.reminder_minutes
+    relatedTaskId:e.related_task_id, relatedNoteId:e.related_note_id, reminderMinutes:e.reminder_minutes,
+    relatedReminderId:e.related_reminder_id || null, meetingUrl:e.meeting_url || null
   }));
   calendarDataLoaded = true;
   updateCalendarNavBadge();

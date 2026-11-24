@@ -204,7 +204,8 @@ async function mLoadAll(){
   notifications = nf.data || [];
   teamProfiles = pr.data || [];
   myProfile = teamProfiles.find(p => p.id === uid) || myProfile;
-  calendarEvents = (ev.data || []).map(e => ({ id: e.id, title: e.title, startAt: e.start_at, endAt: e.end_at, allDay: e.all_day, clientId: e.client_id, location: e.location, eventType: e.event_type, attendeeIds: e.attendee_ids || [], createdBy: e.created_by }));
+  calendarEvents = (ev.data || []).map(e => ({ id: e.id, title: e.title, startAt: e.start_at, endAt: e.end_at, allDay: e.all_day, clientId: e.client_id, location: e.location, eventType: e.event_type, attendeeIds: e.attendee_ids || [], createdBy: e.created_by,
+    description: e.description || '', meetingUrl: e.meeting_url || null, googleEventId: e.google_event_id || null, googleOwner: e.google_calendar_owner || null }));
   await Promise.all([loadUpdateHistory(), loadHealthHandled(), loadTaskDueTimes(), typeof hvTimeLoad === 'function' ? hvTimeLoad() : null]);
 }
 
@@ -586,7 +587,20 @@ function mSuggestHtml(){
   const row = s => `<div class="ir msug" data-sg="${s.id}"><button class="tx" onclick="mSgPreview('${s.id}')"><span class="t n">${mEsc(s.title)}</span><span class="s">${mEsc(suggestionSub(s).join(' · '))}</span></button>`
     + `<button class="msg-add" onclick="mSgAdd('${s.id}')">Add</button><button class="msg-x" aria-label="Dismiss ${mEsc(s.title)}" onclick="mSgDismiss('${s.id}')">${icon('x', { weight: 'bold' })}</button></div>`;
   return `<div class="ish"><h2 class="ish-lg">${appLogo('granola', 'xs')}From Your Granola Meetings</h2>${list.length > 4 ? `<button onclick="mSgAll=!mSgAll;mRenderTab()">${mSgAll ? 'Fewer' : 'See All'}</button>` : ''}</div>
-<div class="ig msg-list">${(mSgAll ? list : list.slice(0, 4)).map(row).join('')}</div><p class="ifoot">Found in your Granola notes. Add the ones that are yours to do.</p>`;
+<div class="ig msg-list">${(mSgAll ? list : list.slice(0, 4)).map(row).join('')}${mSgAllRows(list)}</div><p class="ifoot">Found in your Granola notes. Add the ones that are yours to do.</p>`;
+}
+// Add All (Nov 23): for a client with more than 3 waiting
+function mSgAllRows(list){
+  const by = {}; list.forEach(s => { const k = s.clientId || ''; (by[k] = by[k] || []).push(s); });
+  return Object.entries(by).filter(([, v]) => v.length > 3).map(([k, v]) => { const c = k && clients.find(x => x.id === k);
+    return `<button class="ir msg-all" data-sgall="${k}" onclick="mSgAddAll('${k}')"><span class="t n">Add All ${v.length}${c ? ` for ${mEsc(c.name)}` : ''}</span></button>`; }).join('');
+}
+async function mSgAddAll(k){
+  const list = suggestionsOpen(taskSuggestions || []).filter(s => (s.clientId || '') === k); if(!list.length) return;
+  const b = document.querySelector(`.msg-all[data-sgall="${k}"]`); if(b){ b.disabled = true; b.querySelector('.t').textContent = 'Adding…'; }
+  let added = 0; for(const s of list){ const r = await addSuggestedTask(s.id); if(!r.error) added++; }
+  await mRefresh();
+  showToast(added === list.length ? 'success' : added ? 'info' : 'error', added ? `Added ${added} task${added === 1 ? '' : 's'}` : 'Not added', added === list.length ? 'They’re in your tasks.' : 'Some didn’t go in; try those again.');
 }
 function mSgOut(id, then){
   const row = document.querySelector(`.msug[data-sg="${id}"]`);
@@ -1064,7 +1078,9 @@ function mOpenCalendar(){
       const ts = mVisibleTasks().filter(t => t.status !== 'done' && t.dueDate === ds && t.assigneeId === currentUser.id);
       const dueHere = attentionEligibleClients().filter(c => { const due = clientDue(c).due; return toDateStr(due < t0 ? t0 : due) === ds; });
       const send = dueHere.length ? [mIr(`<span class="gl" style="color:var(--red)">${icon('paper-plane-tilt')}</span>`, `${dueHere.length} update${dueHere.length === 1 ? '' : 's'} due`, mEsc(dueHere.slice(0, 3).map(c => c.name).join(', ') + (dueHere.length > 3 ? '…' : '')), '', k === 0 ? 'mOpenWeek()' : null, { n: true })] : [];
-      const rows = [...send, ...evs.map(e => mIr(`<span class="gl">${icon('calendar-blank')}</span>`, mEsc(e.title), mEsc(clients.find(c => c.id === e.clientId)?.name || e.location || ''), e.allDay ? 'All day' : fmtTime(new Date(e.startAt)), null, { n: true })), ...ts.map(mTaskRow)];
+      const rows = [...send, ...evs.map(e => { const m = meetingLink(e), live = meetingJoinable(e);   // Join on a meeting with a link (Nov 23)
+        return mIr(`<span class="gl">${icon(m ? 'video' : 'calendar-blank')}</span>`, mEsc(e.title), mEsc(clients.find(c => c.id === e.clientId)?.name || (m ? m.name : e.location) || ''),
+          m && !e.allDay && new Date(e.endAt || e.startAt) > new Date() ? `<a class="m-join${live ? ' live' : ''}" href="${mEsc(m.url)}" target="_blank" rel="noopener">${live ? 'Join' : fmtTime(new Date(e.startAt))}</a>` : e.allDay ? 'All day' : fmtTime(new Date(e.startAt)), null, { n: true }); }), ...ts.map(mTaskRow)];
       if(rows.length) days.push(`${mIsh(k === 0 ? 'Today' : k === 1 ? 'Tomorrow' : d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }))}<div class="ig">${rows.join('')}</div>`);
     }
     return `<h1 class="big">Calendar</h1><p class="big-sub">The next two weeks</p>${days.join('') || `<div style="margin-top:16px">${mEmpty('Nothing scheduled', '')}</div>`}`;

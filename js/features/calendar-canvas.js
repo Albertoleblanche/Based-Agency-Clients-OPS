@@ -114,6 +114,7 @@ function renderCalendar(){
   if(typeof updateCalendarNavBadge === 'function') updateCalendarNavBadge();
   if(typeof closeEventPreview === 'function') closeEventPreview(true);
   if(!root) return;
+  if(currentViewName === 'calendar' && typeof gcalSyncQuiet === 'function') gcalSyncQuiet(3 * 60000);   // fresh when you look (Nov 23)
   if(typeof calendarDataLoaded !== 'undefined' && !calendarDataLoaded){ root.classList.remove('is-month'); root.innerHTML = skeletonHtml('calendar', 'Loading the calendar…'); return; }
   // the new look opens on the month the first time, with Coming up beside the grid
   const uw = typeof uiStyleOn === 'function' && uiStyleOn();
@@ -195,7 +196,7 @@ function calUpcomingRender(on){
     const rows = list.slice(0, Math.max(0, 12 - shown)); shown += rows.length;
     if(i > 0 && !rows.length) return '';
     return `<div class="cu-d"><span>${name}</span><span>${list.length ? `${list.length} ${list.length === 1 ? 'thing' : 'things'}` : 'Nothing yet'}</span></div>`
-      + rows.map(e => `<button class="cu-r${e._done ? ' done' : ''} ${calColor(e)}" onclick="calOpen('${e.id}',this)"><span class="cu-t">${escapeHtml(when(e))}</span><span class="cu-x"><b>${escapeHtml(e.title)}</b>${sub(e) ? `<span>${escapeHtml(sub(e))}</span>` : ''}</span></button>`).join('');
+      + rows.map(e => `<div class="cu-rw"><button class="cu-r${e._done ? ' done' : ''} ${calColor(e)}" onclick="calOpen('${e.id}',this)"><span class="cu-t">${escapeHtml(when(e))}</span><span class="cu-x"><b>${escapeHtml(e.title)}</b>${sub(e) ? `<span>${escapeHtml(sub(e))}</span>` : ''}</span></button>${typeof meetingJoinable === 'function' && meetingJoinable(e) ? joinMeetingBtn(e, 'sm btn-p cu-join') : ''}</div>`).join('');
   }).join('');
   el.innerHTML = `<div class="cu-h"><span class="cu-ic">${icon('calendar-blank')}</span><b>Coming up</b><span class="cu-n">Next ${days - 1} days</span></div><div class="cu-l">${groups}</div>`;
 }

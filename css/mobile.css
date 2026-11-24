@@ -511,3 +511,8 @@ body.mac.mobile { overflow: hidden; background: var(--ios-bg, #F2F2F7); -webkit-
 /* a reminder waiting on a teammate (Nov 23) */
 .rmi-mate{display:inline-flex;align-items:center;gap:3px}
 .rmi-mate svg{width:12px;height:12px;flex:none;opacity:.75}
+.msg-all{justify-content:center}
+.msg-all .t{color:var(--blue);font-weight:600}
+/* a meeting's time links to it; while it's on or about to start it says Join (Nov 23) */
+.m-join{color:var(--label-2);text-decoration:none;font-variant-numeric:tabular-nums}
+.m-join.live{display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:99px;background:var(--green);color:#fff;font-weight:600}

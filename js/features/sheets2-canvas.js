@@ -192,12 +192,14 @@ function eventPreviewHtml(e, inSheet){
   const people = organizer && (others.length || !mine) ? `<div class="evp-p"><span class="n">${escapeHtml(organizer.name)}</span><span class="st t-2">Organizer</span></div>` + others.join('') : others.join('');
   const row = (ic, html) => `<div class="evp-r">${icon(ic)}<span>${html}</span></div>`;
   const place = typeof calPlace === 'function' ? calPlace({ location: e.location }) : e.location;
-  const loc = !e.location ? '' : /^https?:\/\//i.test(e.location)
+  const meet = typeof meetingLink === 'function' ? meetingLink(e) : null, ended = new Date(e.endAt || e.startAt) < new Date();
+  const loc = !e.location || (meet && /^https?:\/\//i.test(e.location)) ? '' : /^https?:\/\//i.test(e.location)
     ? `<a href="${safeUrl(e.location)}" target="_blank" rel="noopener">${escapeHtml(place && place !== 'Online' ? 'Join ' + place : truncateLinkDisplay(e.location, 40))}</a>`
     : escapeHtml(e.location);
   const alert = reminderLabel(e.reminderMinutes);
   const tStage = task ? (tDone ? `done${task.completedAt ? ' ' + fmtShortDate(new Date(task.completedAt)) : ''}` : ({ todo: 'to do', in_progress: 'in progress', in_review: 'in review' }[task.status] || 'to do')) : '';
   const rows = [task && row('list-todo', `<a href="#" onclick="closeEventPreview();closeAppModal();openTaskDetailModal('${task.id}');return false;">Open the task</a><span class="t-2"> · ${escapeHtml(tStage)}</span>`),
+    meet && row('video', `<a href="${escapeHtml(meet.url)}" target="_blank" rel="noopener">${escapeHtml(meet.name === 'the meeting' ? 'Join the meeting' : 'Join on ' + meet.name)}</a>`),
     loc && row(/^https?:\/\//i.test(e.location) ? 'video' : 'map-pin', loc),
     c && row('buildings', `<a href="#" onclick="closeEventPreview();closeAppModal();openClientDetail('${c.id}');return false;">${escapeHtml(c.name)}</a>`),
     alert && row('bell', 'Alert ' + escapeHtml(alert.toLowerCase())),
@@ -213,6 +215,8 @@ function eventPreviewHtml(e, inSheet){
   else if(mine && !google) foot = `<button class="ib evp-del" aria-label="Delete event" title="Delete" onclick="closeEventPreview();${del}">${icon('trash')}</button><span class="evp-sp"></span><button class="btn" onclick="closeEventPreview();openEditEventForm('${e.id}')">Edit</button>`;
   else if(invited && !google) foot = `<button class="btn" onclick="closeEventPreview();openRequestChangeModal('${e.id}')">Ask for a Change</button><span class="evp-sp"></span><button class="btn" onclick="closeEventPreview();respondToEvent('${e.id}','declined')"${myRsvp === 'declined' ? ' disabled' : ''}>${myRsvp === 'declined' ? 'Not Going' : 'Decline'}</button><button class="btn" onclick="closeEventPreview();respondToEvent('${e.id}','confirmed')"${myRsvp === 'confirmed' ? ' disabled' : ''}>${myRsvp === 'confirmed' ? 'Going' : 'Accept'}</button>`;
   else if(google) foot = `<span class="t-2 evp-note">Change it in Google Calendar; edits show here at the next sync.</span>`;
+  // a meeting with a link: Join first, the one bright button while it's on or about to be (Nov 23)
+  if(meet && !ended && !task){ const live = meetingJoinable(e); foot = `<div class="evp-join">${joinMeetingBtn(e, live ? 'btn-p' : '')}${live ? '<span class="evp-live">Starting soon</span>' : ''}</div>` + foot; }
   if(inSheet) foot = foot.replace(/closeEventPreview\(\);/g, 'closeAppModal();') + (foot.includes('class="btn"') ? '' : `<span class="evp-sp"></span><button class="btn" onclick="closeAppModal()">Close</button>`);
   return `<div class="evp${inSheet ? ' in-sheet' : ''}">
 <div class="evp-k"><span class="dot ${col}"></span>${escapeHtml(kind)}</div>

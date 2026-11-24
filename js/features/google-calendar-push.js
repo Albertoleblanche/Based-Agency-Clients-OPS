@@ -224,3 +224,58 @@ async function disconnectGoogleCalendar(){
     showToast('error','Failed','Network error — try again.');
   }
 }
+
+
+// ---- Your Google Calendar, kept current while Radar is open (Nov 23) ----------------------------
+// A quiet sync a few seconds after Radar opens, every 10 minutes while it's in front, when you come
+// back to it after 10 minutes away, and when the Calendar opens if it's been 3 minutes; new, moved
+// and deleted meetings show without pressing Sync. (The server also syncs on its own: see
+// lib/meeting-alerts.js.) Only when your Google Calendar is connected.
+const gcalAuto = { at: 0, busy: false, connected: null };
+async function gcalSyncQuiet(minAgeMs){
+  if(gcalAuto.busy || gcalAuto.connected === false || Date.now() - gcalAuto.at < (minAgeMs || 0)) return;
+  gcalAuto.busy = true;
+  try{
+    if(gcalAuto.connected == null){ const st = await fetchGoogleCalendarStatus(); gcalAuto.connected = !!(st && st.googleConfigured && st.connected); if(!gcalAuto.connected) return; }
+    const { data: { session } } = await supabaseClient.auth.getSession(); if(!session) return;
+    const sig = () => JSON.stringify((typeof calendarEvents !== 'undefined' ? calendarEvents : []).map(e => [e.id, e.startAt, e.endAt, e.title, e.meetingUrl]));
+    const r = await fetch('/api/integrations', { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: 'google', action: 'sync' }) });
+    gcalAuto.at = Date.now();
+    if(r.ok){ const before = sig(); await loadCalendarEvents(); if(sig() !== before && currentViewName === 'calendar' && typeof renderCalendar === 'function') renderCalendar(); }
+  }catch(e){} finally{ gcalAuto.busy = false; }
+}
+
+// ---- A meeting about to start (Nov 23) ------------------------------------------------------------
+// While Radar is open: at the meeting's own alert time (else 10 minutes before), a notification with
+// Join, unless the server already sent it (the same notification, so never twice).
+const meetAsked = new Set();
+async function meetingSoonCheck(){
+  if(!currentUser || typeof calendarEvents === 'undefined') return;
+  const me = currentUser.id, now = Date.now();
+  const muted = (myProfile && myProfile.muted_notification_types) || [];
+  if(muted.includes('meeting_soon') || muted.includes('app:meeting_soon')) return;
+  const mine = calendarEvents.filter(e => !e.allDay && e.startAt && (e.googleEventId ? e.googleOwner === me : (e.createdBy === me || (e.attendeeIds || []).includes(me)) && !(e.rsvps && e.rsvps[me] && e.rsvps[me].status === 'declined')));
+  for(const e of mine){
+    const lead = Math.min(Math.max(Number(e.reminderMinutes) > 0 ? Number(e.reminderMinutes) : 10, 1), 30);
+    const mins = (new Date(e.startAt).getTime() - now) / 60000;
+    if(mins > lead || mins < -2 || meetAsked.has(e.id)) continue;
+    meetAsked.add(e.id);
+    const { data: had } = await supabaseClient.from('notifications').select('id').eq('user_id', me).eq('type', 'meeting_soon').eq('target_id', String(e.id)).limit(1);
+    if(had && had.length) continue;
+    const left = Math.max(0, Math.round(mins)), m = typeof meetingLink === 'function' ? meetingLink(e) : null;
+    await supabaseClient.from('notifications').insert({ user_id: me, type: 'meeting_soon', title: left <= 0 ? `Starting now: ${e.title}` : `In ${left} minute${left === 1 ? '' : 's'}: ${e.title}`,
+      body: m ? `Join on ${m.name}` : (e.location || 'On your calendar'), target_view: 'calendar', target_id: String(e.id), read: false });
+    if(typeof checkForNewNotificationToasts === 'function') checkForNewNotificationToasts();
+    if(typeof loadNotifications === 'function') loadNotifications();
+  }
+}
+function gcalAutoStart(){
+  if(gcalAutoStart.on) return; gcalAutoStart.on = true;
+  setTimeout(() => gcalSyncQuiet(0), 8000);
+  setInterval(() => {
+    if(document.visibilityState !== 'visible') return;
+    gcalSyncQuiet(9.5 * 60000);
+  }, 60000);
+  setInterval(meetingSoonCheck, 30000); setTimeout(meetingSoonCheck, 12000);
+  document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible'){ gcalSyncQuiet(10 * 60000); meetingSoonCheck(); } });
+}

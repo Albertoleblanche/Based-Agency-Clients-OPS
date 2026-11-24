@@ -506,23 +506,61 @@ ${f('setSignatureAddress', 'address', 'Address', '')}
 // Harvest, WhatsApp and AI open as pages here; Slack and Google Sheet open a sheet; Google Calendar
 // is yours alone and connects in place.
 let integ = { google: null, harvest: null, slackUnlinked: null };
+// Connections shows at once (Nov 23): what was known last time comes back straight away (kept on this
+// device), every check runs at the same time, and each row fills in as soon as its own answer is in,
+// instead of all of them waiting for the slowest.
+const integKey = () => `radar-integ-${currentUser?.id || ''}`;
+function integHydrate(){
+  if(integ._hydrated) return; integ._hydrated = true;
+  try{
+    const c = JSON.parse(localStorage.getItem(integKey()) || 'null'); if(!c) return;
+    if(integ.google == null && c.google) integ.google = c.google;
+    if(integ.slackMe == null && c.slackMe && typeof slackMe !== 'undefined'){ integ.slackMe = c.slackMe; if(!slackMe) slackMe = c.slackMe; }
+    if(integ.slackUnlinked == null && c.slackUnlinked != null) integ.slackUnlinked = c.slackUnlinked;
+    if(c.ai && typeof aiAppsState !== 'undefined' && aiAppsState.ready == null) aiAppsState = c.ai;
+    if(c.granola && typeof granolaState !== 'undefined' && granolaState == null) granolaState = c.granola;
+  }catch(e){}
+}
+function integSave(){
+  try{ localStorage.setItem(integKey(), JSON.stringify({ google: integ.google, slackMe: integ.slackMe || null, slackUnlinked: integ.slackUnlinked,
+    ai: typeof aiAppsState !== 'undefined' && aiAppsState.ready != null ? aiAppsState : null,
+    granola: typeof granolaState !== 'undefined' && granolaState && !granolaState.error ? { connected: granolaState.connected, needsSql: granolaState.needsSql, lastError: granolaState.lastError || null } : null })); }catch(e){}
+}
+let integRedrawQ = false;
+function integRedraw(){
+  if(integRedrawQ) return; integRedrawQ = true;
+  requestAnimationFrame(() => { integRedrawQ = false; if(currentViewName === 'settings' && settingsTab === 'connections') renderSettingsView(); });
+}
 async function loadIntegrationStatuses(){
-  const [g, h] = await Promise.all([
-    typeof fetchGoogleCalendarStatus === 'function' ? fetchGoogleCalendarStatus() : null,
-    canApprove() ? harvestApiCall(null).catch(() => null) : null,
+  integHydrate();
+  const one = p => Promise.resolve().then(p).catch(() => {}).then(integRedraw);
+  await Promise.all([
+    one(async () => { if(typeof fetchGoogleCalendarStatus === 'function'){ const g = await fetchGoogleCalendarStatus(); if(g) integ.google = g; } }),
+    one(async () => { if(canApprove()) integ.harvest = await harvestApiCall(null).catch(() => null); }),
+    one(async () => { if(typeof loadGranolaState === 'function') await loadGranolaState(); }),
+    one(async () => { if(typeof loadAiApps === 'function') await loadAiApps(); }),
+    one(async () => { if(isAdmin() && !aiConnCache) aiConnCache = await adminActionCall('get-ai-connections'); }),
+    one(async () => { if(canApprove() && typeof loadSlackClientChannels === 'function'){ if(!slackChannelsLoaded) await loadSlackClientChannels(); integ.slackUnlinked = activeClients().filter(c => !slackClientChannels[c.id]).length; } }),
+    one(async () => { if(typeof loadWaTasks === 'function') await loadWaTasks(); }),
+    one(async () => { if(typeof remSlackMeStatus === 'function') integ.slackMe = await remSlackMeStatus(true); }),
   ]);
-  integ.google = g; integ.harvest = h;
-  if(typeof remSlackMeStatus === 'function'){ try{ integ.slackMe = await remSlackMeStatus(true); }catch(e){} }
-  if(typeof loadGranolaState === 'function') await loadGranolaState();
-  if(typeof loadAiApps === 'function') await loadAiApps();
-  if(isAdmin() && !aiConnCache){ try{ aiConnCache = await adminActionCall('get-ai-connections'); }catch(e){} }
-  if(canApprove() && typeof loadSlackClientChannels === 'function'){
-    try{ if(!slackChannelsLoaded) await loadSlackClientChannels(); integ.slackUnlinked = activeClients().filter(c => !slackClientChannels[c.id]).length; }catch(e){}
-  }
-  if(typeof loadWaTasks === 'function'){ try{ await loadWaTasks(); }catch(e){} }
-  if(currentViewName === 'settings' && settingsTab === 'connections') renderSettingsView();
+  integSave();
+}
+// A few seconds after Radar opens, the quick checks run once in the background, so the first visit
+// to Connections already knows them.
+function integPrefetch(){
+  setTimeout(async () => {
+    integHydrate();
+    await Promise.all([
+      typeof fetchGoogleCalendarStatus === 'function' ? fetchGoogleCalendarStatus().then(g => { if(g) integ.google = g; }).catch(() => {}) : null,
+      typeof loadAiApps === 'function' ? loadAiApps().catch(() => {}) : null,
+      typeof remSlackMeStatus === 'function' ? remSlackMeStatus(true).then(x => { integ.slackMe = x; }).catch(() => {}) : null,
+    ]);
+    integSave(); integRedraw();
+  }, 5000);
 }
 function setConnections(){
+  integHydrate();
   const st = (color, text, id) => `<span class="st"${id ? ` id="${id}"` : ''}><span class="dot ${color}"></span>${text}</span>`;
   const g = integ.google, h = integ.harvest, approver = canApprove();
   const go = (js, logo, name, sub, status) => `<button class="fr cn-r" onclick="${js}">${logo}<div class="l"><b>${name}</b><span>${sub}</span></div>${status}${icon('caret-right', { weight: 'bold' })}</button>`;
@@ -538,14 +576,14 @@ function setConnections(){
   if(isAdmin()){ const w = aiConnWords(); rows.push(go("switchSettingsTab('ai')", appLogoPair('claude', 'chatgpt'), 'AI', 'Claude and ChatGPT: drafts, the Assistant and weekly insights', w == null ? st('', 'Checking…', 'cnAiSt') : w ? st('green', w, 'cnAiSt') : st('hollow', 'Not connected', 'cnAiSt'))); }
   rows.push(go("openIntegrationSheet('sheet')", appLogo('google'), 'Google Sheet', settings.sheetCsvUrl ? 'Pulls the client list from a published sheet' : 'Keep a copy of the client list in a sheet',
     settings.sheetCsvUrl ? st('green', 'Connected') : st('hollow', 'Not connected')));
-  const gRow = g && g.googleConfigured ? `<div class="fr cn-r">${appLogo('google')}<div class="l"><b>Google Calendar</b><span>${g.connected ? `Your meetings in the team calendar${g.lastSyncedAt ? ' · synced ' + claudeWhen(g.lastSyncedAt).toLowerCase() : ''}` : 'Bring your meetings into the team calendar'}</span></div>
+  const gRow = g == null ? `<div class="fr cn-r">${appLogo('google')}<div class="l"><b>Google Calendar</b><span>Your meetings in the team calendar</span></div>${st('', 'Checking…')}</div>` : g && g.googleConfigured ? `<div class="fr cn-r">${appLogo('google')}<div class="l"><b>Google Calendar</b><span>${g.connected ? `Your meetings in the team calendar${g.lastSyncedAt ? ' · synced ' + claudeWhen(g.lastSyncedAt).toLowerCase() : ''}` : 'Bring your meetings into the team calendar'}</span></div>
 ${g.connected ? `${st('green', 'Connected')}<button class="btn" onclick="syncGoogleCalendar().then(loadIntegrationStatuses)">Sync Now</button>` : `<button class="btn" onclick="connectGoogleCalendar()">Connect…</button>`}</div>` : '';
   // ChatGPT and Claude: each person connects their own (ai-apps.js)
   const aiRow = typeof aiAppsRowStatus === 'function' ? go('openAiAppsSheet()', appLogoPair('chatgpt', 'claude'), 'ChatGPT and Claude', 'Use Radar from their apps, as you', aiAppsRowStatus(st)) : '';
   // Slack, as you (Nov 23): nudges to teammates go from your own Slack (lib/slack-me.js)
   const sm = integ.slackMe;
-  const smRow = sm ? `<div class="fr cn-r">${appLogo('slack')}<div class="l"><b>Slack, as you</b><span>${sm.connected ? 'Nudges to teammates go from your Slack, as you' : sm.configured ? 'Send nudges to teammates from your own Slack' : 'Send nudges to teammates from your own Slack (an admin sets it up once)'}</span></div>
-${sm.connected ? `${st('green', 'Connected')}<button class="btn" onclick="slackMeDisconnect()">Disconnect</button>` : sm.configured ? `<button class="btn" onclick="slackMeConnect()">Connect…</button>` : isAdmin() ? `${st('hollow', 'Not set up')}<button class="btn" onclick="slackMeSetupSheet()">Set Up…</button>` : st('hollow', 'Not set up')}</div>` : '';
+  const smRow = !sm || sm.checking ? `<div class="fr cn-r">${appLogo('slack')}<div class="l"><b>Slack, as you</b><span>Send nudges to teammates from your own Slack</span></div>${st('', 'Checking…')}</div>` : `<div class="fr cn-r">${appLogo('slack')}<div class="l"><b>Slack, as you</b><span>${sm.connected ? 'Nudges to teammates go from your Slack, as you' : sm.configured ? 'Send nudges to teammates from your own Slack' : 'Send nudges to teammates from your own Slack (an admin sets it up once)'}</span></div>
+${sm.connected ? `${st('green', 'Connected')}<button class="btn" onclick="slackMeDisconnect()">Disconnect</button>` : sm.configured ? `<button class="btn" onclick="slackMeConnect()">Connect…</button>` : isAdmin() ? `${st('hollow', 'Not set up')}<button class="btn" onclick="slackMeSetupSheet()">Set Up…</button>` : st('hollow', 'Not set up')}</div>`;
   const yours = gRow || aiRow || smRow ? `<div class="set-h">Yours</div><div class="form-grp cn-g">${aiRow}${smRow}${gRow}</div>` : '';
   const live = (supabaseClient.getChannels ? supabaseClient.getChannels() : []).some(c => c.state === 'joined');
   return `<div class="set-h">Apps</div><div class="form-grp cn-g">${rows.join('')}</div>

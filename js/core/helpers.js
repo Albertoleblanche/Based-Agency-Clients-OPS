@@ -207,3 +207,30 @@ function radarChime(force){
   window._radarChimes = (window._radarChimes || 0) + 1;
   return true;
 }
+
+// ---- Joining a meeting (Nov 23) ---------------------------------------------------------------
+// The link to join: Google Meet from Google Calendar (calendar_events.meeting_url), else a Zoom, Meet,
+// Teams, Webex or Whereby link in the place or the notes, else a place that is a link.
+const MEET_LINK_RE = /https?:\/\/[^\s<>"')\]]*(?:zoom\.us|meet\.google\.com|teams\.microsoft\.com|teams\.live\.com|webex\.com|whereby\.com|gotomeeting\.com|meet\.jit\.si)[^\s<>"')\]]*/i;
+function meetingLink(e){
+  if(!e) return null;
+  const loc = String(e.location || '').trim();
+  let u = e.meetingUrl || (loc.match(MEET_LINK_RE) || [])[0] || (String(e.description || '').match(MEET_LINK_RE) || [])[0] || (/^https?:\/\/\S+$/i.test(loc) ? loc : '');
+  if(!u) return null;
+  u = u.replace(/[.,;]+$/, '');
+  if(!/^https:\/\//i.test(u)) return null;
+  const name = /zoom\.us/i.test(u) ? 'Zoom' : /meet\.google/i.test(u) ? 'Google Meet' : /teams\.(microsoft|live)/i.test(u) ? 'Teams' : /webex/i.test(u) ? 'Webex' : /whereby/i.test(u) ? 'Whereby' : 'the meeting';
+  return { url: u, name };
+}
+// Joinable now: from 15 minutes before it starts until it ends (not all-day ones)
+function meetingJoinable(e, now){
+  if(!e || e.allDay || !meetingLink(e)) return false;
+  const t = (now || new Date()).getTime(), s = new Date(e.startAt).getTime(), en = new Date(e.endAt || e.startAt).getTime() || s + 3600000;
+  return t >= s - 15 * 60000 && t <= Math.max(en, s + 5 * 60000);
+}
+// The Join button: a link to the meeting, in a new tab. "Join Google Meet", or just "Join" when small.
+function joinMeetingBtn(e, cls){
+  const m = meetingLink(e); if(!m) return '';
+  const small = /\bsm\b/.test(cls || ''), label = small || m.name === 'the meeting' ? 'Join' : 'Join ' + m.name;
+  return `<a class="btn ${cls || ''} join-b" href="${escapeHtml(m.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${typeof icon === 'function' ? icon('video') : ''}${escapeHtml(label)}</a>`;
+}

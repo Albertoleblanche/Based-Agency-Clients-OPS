@@ -3015,10 +3015,10 @@ body > .notif-panel{position:fixed;top:auto;right:auto;z-index:1000}
 .appear i.ap-night{background:linear-gradient(180deg,#FFFFFF 0%,#E4E5EA 34%,#3A3A40 62%,#1E1E20 100%)}
 /* Tasks, WhatsApp and the Queue keep their number (how many are on you is worth reading at a
    glance); every other count stays a dot. The same grey pill as before the dots. */
-.app-win .side .src-i :is(#navTasksBadge,#navWhatsappBadge,#navQueueBadge,#navNotesBadge,#navClientsBadge){display:inline-flex;align-items:center;justify-content:center;min-width:20px;width:auto;height:20px;padding:0 6px;margin-right:0;border-radius:999px;font-size:11.5px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;color:var(--label);background:var(--fill-2);overflow:visible}
-.app-win .side .src-i :is(#navTasksBadge,#navWhatsappBadge,#navQueueBadge,#navNotesBadge,#navClientsBadge){background:var(--label);color:var(--window)}   /* solid, easy to see (Nov 23) */
+.app-win .side .src-i :is(#navTasksBadge,#navWhatsappBadge,#navQueueBadge,#navNotesBadge,#navClientsBadge,#navRemindersBadge){display:inline-flex;align-items:center;justify-content:center;min-width:20px;width:auto;height:20px;padding:0 6px;margin-right:0;border-radius:999px;font-size:11.5px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;color:var(--label);background:var(--fill-2);overflow:visible}
+.app-win .side .src-i :is(#navTasksBadge,#navWhatsappBadge,#navQueueBadge,#navNotesBadge,#navClientsBadge,#navRemindersBadge){background:var(--label);color:var(--window)}   /* solid, easy to see (Nov 23) */
 @supports (text-box: trim-both cap alphabetic){
-  .app-win .side .src-i :is(#navTasksBadge,#navWhatsappBadge,#navQueueBadge,#navNotesBadge,#navClientsBadge){display:inline-block;box-sizing:border-box;padding-block:calc((20px - 1cap) / 2) 0;text-align:center;text-box:trim-both cap alphabetic}
+  .app-win .side .src-i :is(#navTasksBadge,#navWhatsappBadge,#navQueueBadge,#navNotesBadge,#navClientsBadge,#navRemindersBadge){display:inline-block;box-sizing:border-box;padding-block:calc((20px - 1cap) / 2) 0;text-align:center;text-box:trim-both cap alphabetic}
 }
 /* the sidebar's selection moves at once, like a Mac sidebar's (it used to fade, so the old row
    stayed lit while the page was already changing); only the press still eases */
@@ -3409,3 +3409,49 @@ html.ui-w .tk-sg{border-radius:var(--uw-r-card);box-shadow:0 0 0 1px var(--sep),
 .rmp-dh .rmp-via{display:inline-flex;align-items:center;gap:5px;margin-left:8px;font-size:12.5px;color:var(--label-2)}
 .rmp-dh .rmp-via svg{width:13px;height:13px}
 .rmn-on button{min-width:96px}
+/* Granola suggestions in Tasks, by client; Add All for a client with more than 3 (Nov 23) */
+.tk-sg-g{display:flex;align-items:center;gap:8px;padding:10px 12px 8px 16px;border-top:.5px solid var(--sep);font-size:12.5px;font-weight:600;color:var(--label-2)}
+.tk-sg-g .n{font-weight:500;color:var(--label-3);font-variant-numeric:tabular-nums}
+.tk-sg-g .tk-sg-all{margin-left:auto}
+.tk-sg-g + .tk-sg-r{border-top:0}
+/* Health → at a glance (Nov 23): where you stand, before the rows */
+.hg{margin:18px 0 6px}
+.hg-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.hg-t{display:flex;flex-direction:column;gap:6px;min-width:0;padding:14px 16px 13px;border-radius:18px;background:var(--grp);box-shadow:0 0 0 .5px var(--sep)}
+.hg-l{font-size:12.5px;font-weight:500;color:var(--label-2)}
+.hg-b{font-size:28px;font-weight:500;letter-spacing:-.03em;line-height:1.05;font-variant-numeric:tabular-nums;color:var(--label)}
+.hg-b small{font-size:14px;font-weight:500;letter-spacing:0;color:var(--label-2);margin-left:1px}
+.hg-t.ok .hg-b{color:var(--green)} .hg-t.warn .hg-b{color:var(--yellow)} .hg-t.bad .hg-b{color:var(--red)}
+.hg-s{font-size:12.5px;line-height:1.4;color:var(--label-2)}
+.hg-d.up{color:var(--green)} .hg-d.down{color:var(--red)}
+.hg-bad{color:var(--red)}
+.hg-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin:0 4px 0 0;vertical-align:1px}
+.hg-dot.r{background:var(--red)} .hg-dot.y{background:var(--yellow);margin-left:6px}
+.hg-m{position:relative;display:block;height:4px;border-radius:99px;background:var(--fill-2);overflow:visible;margin:2px 0 1px}
+.hg-m i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:currentColor;color:var(--label-2)}
+.hg-t.ok .hg-m i{color:var(--green)} .hg-t.warn .hg-m i{color:var(--yellow)} .hg-t.bad .hg-m i{color:var(--red)}
+.hg-m em{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;border-radius:2px;background:var(--label)}
+.hg-why{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:12px}
+.hg-wl{font-size:12.5px;color:var(--label-2);margin-right:2px}
+.hg-c{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:99px;background:var(--fill);font-size:12.5px;color:var(--label)}
+.hg-c b{font-weight:600;font-variant-numeric:tabular-nums}
+html.ui-w .hg-t{background:var(--card,var(--grp));box-shadow:0 0 0 1px var(--sep),var(--uw-shadow,none)}
+html.ui-w .hg-b{font-size:30px;font-weight:400}
+html.ui-w .hg-t.ok .hg-b{color:var(--uw-good)} html.ui-w .hg-t.warn .hg-b{color:var(--uw-watch)} html.ui-w .hg-t.bad .hg-b{color:var(--uw-risk)}
+html.ui-w .hg-t.ok .hg-m i{color:var(--uw-good)} html.ui-w .hg-t.warn .hg-m i{color:var(--uw-watch)} html.ui-w .hg-t.bad .hg-m i{color:var(--uw-risk)}
+html.ui-w .hg-dot.r{background:var(--uw-risk)} html.ui-w .hg-dot.y{background:var(--uw-watch)}
+/* Join a meeting (Nov 23): in the event's card, beside one that's on now or soon */
+.join-b{display:inline-flex;align-items:center;gap:6px;text-decoration:none}
+.join-b svg{width:15px;height:15px;flex:none}
+.btn.sm.join-b svg{width:13px;height:13px}
+.evp-join{display:flex;align-items:center;gap:10px;width:100%;padding-bottom:10px;margin-bottom:2px;border-bottom:.5px solid var(--sep)}
+.evp-f:has(.evp-join){flex-wrap:wrap}
+.evp-live{font-size:12.5px;font-weight:500;color:var(--green)}
+.cu-rw{position:relative;display:flex;align-items:center;gap:6px}
+.cu-rw > .cu-r{flex:1 1 auto;min-width:0}
+.cu-rw > .cu-join{flex:none}
+.uw-cew{display:flex;align-items:center;gap:8px}
+.uw-cew > .uw-ce{flex:1 1 auto;min-width:0}
+.uw-cew > .uw-join{flex:none}
+.db-ev:has(.db-join){grid-template-columns:62px 3px minmax(0,1fr) auto}
+.db-ev .db-join{align-self:center}

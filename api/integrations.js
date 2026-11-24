@@ -62,6 +62,7 @@ const { sendPushToUser, pushUrlFor } = require('../lib/push-notify');
 const { connectGranola, disconnectGranola, granolaStatus, granolaCatchUp, granolaReadNow, granolaReadAgain, removeGranolaMeeting, restoreGranolaMeeting, pullMeetingTasks, draftMeetingRecap } = require('../lib/granola-tasks');
 const { handleMcp, protectedResourceMetadata } = require('../lib/mcp-server');
 const { slackMeAuthUrl, slackMeCallback, slackMeStatus, slackMeDisconnect, slackMeSend } = require('../lib/slack-me');
+const { calendarTick } = require('../lib/meeting-alerts');
 
 module.exports = async function handler(req, res) {
   const route = (req.query || {}).route;
@@ -72,6 +73,15 @@ module.exports = async function handler(req, res) {
     return;
   }
   if (route === 'mcp') { await handleMcp(req, res); return; }
+  // Meetings (Nov 23): Google Calendar synced and "about to start" alerts sent (lib/meeting-alerts.js).
+  // Vercel Cron calls it three times a day with CRON_SECRET; Supabase pg_cron every five minutes,
+  // with no key, so then it runs at most every four minutes whoever asks.
+  if (route === 'calendar-tick') {
+    const force = !!process.env.CRON_SECRET && (req.headers.authorization || '') === `Bearer ${process.env.CRON_SECRET}`;
+    try { res.status(200).json(await calendarTick(createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY), { force })); }
+    catch (e) { res.status(500).json({ error: String(e) }); }
+    return;
+  }
   // Slack sends someone back here after they let Radar send messages as them (/slack/oauth, Nov 23)
   if (route === 'slack-me-callback') {
     const appUrl = (process.env.APP_URL || `https://${req.headers['x-forwarded-host'] || req.headers.host}`).replace(/\/+$/, '');

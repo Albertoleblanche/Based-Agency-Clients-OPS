@@ -47,6 +47,7 @@ const NOTIFICATION_TYPE_META = {
   event_invited:           { label:"You're invited to a calendar event", section:'Calendar' },
   event_updated:           { label:'A calendar event you\'re on changes', section:'Calendar' },
   event_cancelled:         { label:'A calendar event you\'re on is cancelled', section:'Calendar' },
+  meeting_soon:            { label:'A meeting is about to start (with the link to join)', section:'Calendar' },
   email_change_requested:  { label:'Someone requests an email change', section:'Account', visibleTo:'admin' },
   profile_changed:         { label:'Your role, title, or access changes', section:'Account' },
 };
@@ -298,7 +299,10 @@ async function checkForNewNotificationToasts(){
     if(typeof radarChime === 'function') radarChime();   // one chime for what just came in (Nov 23)
     data.forEach(n=>{
       const type = n.type.includes('denied') ? 'error' : n.type.includes('approved') ? 'success' : 'info';
-      showToast(type, n.title, n.body || '');
+      // a meeting about to start: the toast has Join (Nov 23)
+      const ev = n.type === 'meeting_soon' && typeof calendarEvents !== 'undefined' ? calendarEvents.find(e => String(e.id) === String(n.target_id)) : null;
+      const m = ev && typeof meetingLink === 'function' ? meetingLink(ev) : null;
+      showToast(type, n.title, n.body || '', m ? { action: 'Join', onAction: () => window.open(m.url, '_blank', 'noopener'), duration: 20000 } : undefined);
     });
   }
 }

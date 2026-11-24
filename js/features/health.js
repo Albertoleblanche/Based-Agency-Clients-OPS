@@ -146,10 +146,52 @@ ${group('fix', 'Being fixed', 'A plan is underway, or it was handled and is sett
 
   root.innerHTML = `<div class="spw"><div class="sp-page"><div class="hx">
 <div class="hx-top"><div><h1 class="hx-h">${escapeHtml(headline)}</h1>${subline ? `<p class="hx-s">${uw && slipped ? `<b>${escapeHtml(slipped)}</b>${escapeHtml(subline.slice(slipped.length))}` : escapeHtml(subline)}</p>` : ''}</div><div class="hx-ctl">${show}${seg}</div></div>
-${body}</div></div>${sel ? healthPanelHtml(sel.c, sel.h) : ''}</div>`;
+${all.length ? healthGlanceHtml(all, weekAgo) : ''}${body}</div></div>${sel ? healthPanelHtml(sel.c, sel.h) : ''}</div>`;
   root._hlWeeks = weeks;
   hlBindScrub(root);
   if(currentViewName === 'health') setToolbar('Health', !scoped ? 'How clients are doing, and who is fixing what' : 'How your clients are doing');
+}
+
+// ---- At a glance (Nov 23): where you stand, before the rows --------------------------------------
+// Healthy (and how that moved since last week), how many need care, updates on time over the last 4
+// weeks, hours used this month against the budgets and the month gone, and follow-ups waiting. Then
+// what's behind the clients that need care, by reason. All for the clients shown (yours, or a person's).
+function healthGlanceHtml(all, weekAgo){
+  const n = all.length, now = rNow();
+  const lv = x => x.h.level, cnt = k => all.filter(x => lv(x) === k).length;
+  const g = cnt('g'), r = cnt('r'), y = cnt('y'), pct = Math.round(g / n * 100);
+  const was = all.filter(x => weekAgo[x.c.id]), wasG = was.filter(x => weekAgo[x.c.id].level === 'g').length;
+  const wasPct = was.length ? Math.round(wasG / was.length * 100) : null, d = wasPct == null ? null : pct - wasPct;
+  const delta = d == null || d === 0 ? `<span class="hg-d">same as last week</span>` : `<span class="hg-d ${d > 0 ? 'up' : 'down'}">${d > 0 ? '+' : '−'}${Math.abs(d)} pts vs last week</span>`;
+  // updates on time: the last 4 finished weeks, every client that gets one
+  let on = 0, tot = 0;
+  all.filter(x => !x.h.off).forEach(x => { (x.h.seq || []).slice(3, 7).forEach(k => { if(k === 'n' || k === 'p') return; tot++; if(k === 'o') on++; }); });
+  const wk = all.filter(x => !x.h.off).map(x => clientWeek(x.c));
+  const sentNow = wk.filter(w => w.sent).length, lateNow = wk.filter(w => w.late).length;
+  // hours: the clients with a monthly budget
+  const hb = all.map(x => x.h.hp || hoursPace(x.c)).filter(hp => hp && hp.budget);
+  const used = hb.reduce((t, h) => t + h.used, 0), budget = hb.reduce((t, h) => t + h.budget, 0);
+  const dim = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(), monthPct = Math.round(now.getDate() / dim * 100), usedPct = budget ? Math.round(used / budget * 100) : 0;
+  const overPace = all.filter(x => x.h.signals.some(sg => sg.key === 'hours')).length, under = all.filter(x => x.h.signals.some(sg => sg.key === 'under')).length;
+  // follow-ups with these clients
+  const ids = new Set(all.map(x => x.c.id));
+  const fu = (typeof clientReminders !== 'undefined' ? clientReminders : []).filter(rm => rm.status === 'waiting' && !rm.waitingOn && ids.has(rm.clientId));
+  const fuDue = fu.filter(rm => reminderDisplayStatus(rm) === 'due').length;
+  const tile = (k, label, big, sub, tone, bar) => `<div class="hg-t${tone ? ' ' + tone : ''}" data-k="${k}"><span class="hg-l">${label}</span><b class="hg-b">${big}</b>${bar || ''}<span class="hg-s">${sub}</span></div>`;
+  const meter = (p, mark) => `<span class="hg-m" aria-hidden="true"><i style="width:${Math.min(100, Math.max(0, p))}%"></i>${mark != null ? `<em style="left:${Math.min(100, mark)}%"></em>` : ''}</span>`;
+  const tiles = [
+    tile('healthy', 'Healthy', `${pct}<small>%</small>`, `${g} of ${n} client${n === 1 ? '' : 's'} · ${delta}`, pct >= 80 ? 'ok' : pct < 50 ? 'bad' : '', meter(pct)),
+    tile('care', 'Need care', `${r + y}`, r + y ? `<span class="hg-dot r"></span>${r} at risk <span class="hg-dot y"></span>${y} on watch` : 'Nothing needs care', r ? 'bad' : y ? 'warn' : 'ok'),
+    tile('updates', 'Updates on time', tot ? `${Math.round(on / tot * 100)}<small>%</small>` : '—', `${tot ? `last 4 weeks · ` : ''}${sentNow} sent this week${lateNow ? `, <span class="hg-bad">${lateNow} overdue</span>` : ''}`, tot && on / tot < .7 ? 'warn' : '', tot ? meter(on / tot * 100) : ''),
+    budget ? tile('hours', 'Hours this month', `${Math.round(used)}<small> / ${Math.round(budget)} h</small>`, `${usedPct}% used, ${monthPct}% of the month gone${overPace ? ` · <span class="hg-bad">${overPace} on pace to go over</span>` : under ? ` · ${under} under-used` : ''}`, overPace ? 'warn' : '', meter(usedPct, monthPct)) : '',
+    tile('follow', 'Follow-ups', `${fu.length}`, fu.length ? `waiting on clients${fuDue ? ` · <span class="hg-bad">${fuDue} due</span>` : ''}` : 'Nothing waiting on clients', fuDue ? 'warn' : ''),
+  ].filter(Boolean).join('');
+  // why the ones that need care do
+  const WHY = { noupdate: 'Updates slipping', late: 'Updates slipping', quiet: 'Nothing logged', hours: 'Over hours', under: 'Hours under-used', tasks: 'Tasks overdue', flag: 'Flagged at risk', met: 'No meeting lately' };
+  const why = {};
+  all.filter(x => x.h.rawLevel !== 'g').forEach(x => { const seen = new Set(); x.h.signals.forEach(sg => { const w = WHY[sg.key]; if(w && !seen.has(w)){ seen.add(w); why[w] = (why[w] || 0) + 1; } }); });
+  const reasons = Object.entries(why).sort((a, b) => b[1] - a[1]);
+  return `<section class="hg" aria-label="At a glance"><div class="hg-row">${tiles}</div>${reasons.length ? `<div class="hg-why"><span class="hg-wl">Why</span>${reasons.map(([w, k]) => `<span class="hg-c">${escapeHtml(w)}<b>${k}</b></span>`).join('')}</div>` : ''}</section>`;
 }
 
 function healthRemind(id){
