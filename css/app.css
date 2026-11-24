@@ -3022,8 +3022,9 @@ body > .notif-panel{position:fixed;top:auto;right:auto;z-index:1000}
   .app-win .side .src-i :is(#navTasksBadge,#navWhatsappBadge,#navQueueBadge,#navNotesBadge,#navClientsBadge,#navRemindersBadge){display:inline-block;box-sizing:border-box;padding-block:calc((18px - 1cap) / 2) 0;text-align:center;text-box:trim-both cap alphabetic}
 }
 /* Beta, next to WhatsApp: quiet, the sidebar's own grey (orange stays for New) */
-.app-win .side .src-i .nav-beta{flex:0 0 auto;margin-left:-4px;padding:2px 6px;border-radius:6px;font-size:10px;font-weight:600;line-height:1.2;letter-spacing:.02em;color:var(--label-2);background:var(--fill-2)}
-.mac[data-theme] .app-win .side .src-i.on .nav-beta{color:var(--sb-strong)}
+.app-win .side .src-i .nav-beta{flex:0 0 auto;margin-left:-4px;padding:2px 6px;border-radius:6px;font-size:10px;font-weight:600;line-height:1.2;letter-spacing:.02em;color:#fff;background:#007AFF}
+.mac[data-theme] .app-win .side .src-i.on .nav-beta,.mac[data-theme] .app-win .side .src-i .nav-beta{color:#fff}
+.mac[data-theme="dark"] .app-win .side .src-i .nav-beta{background:#0A84FF}
 body.sidebar-collapsed .nav-beta{display:none}
 /* the sidebar's selection moves at once, like a Mac sidebar's (it used to fade, so the old row
    stayed lit while the page was already changing); only the press still eases */
