@@ -3701,3 +3701,7 @@ button.wx-t.on + button.wx-t{box-shadow:none}
 /* Queue (Nov 24): your work fills the card; the draft letter keeps a readable line length */
 .qu .rvn-doc{max-width:none}
 .qu .rvn-doc .rvn-body,.qu .rvn-doc .rvn-edit,.qu .rvn-doc .qu-subj{max-width:760px}
+
+/* a meeting's suggestions, picked out when you open them from the bell (Nov 24) */
+.tk-sg-r{transition:background-color 400ms ease}
+.tk-sg-r.is-hl{background:color-mix(in srgb,var(--blue) 12%,transparent);border-radius:10px}

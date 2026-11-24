@@ -244,46 +244,105 @@ async function handleNotifClick(id){
     updateNotifBadge();
     renderNotifPanel();
   }
-  if(n.target_view==='client-detail' && n.target_id){
-    hidePop(document.getElementById('notifPanel'));
-    openClientDetail(n.target_id);
-    return;
-  }
-  if(n.target_view==='clients' && n.target_id){
-    hidePop(document.getElementById('notifPanel'));
-    if(clients.some(c=>c.id===n.target_id && !c.deletedAt)) openClientInspectorFor(n.target_id);   // its panel in All Clients (Finish Setup lives there)
+  const panel = document.getElementById('notifPanel'), view = n.target_view;
+  // the item itself, not just its screen (Nov 24): a notice that doesn't name it (one about several
+  // things, or one from before notices carried it) has it worked out from what it says
+  const tid = n.target_id || await notifGuessTarget(n);
+  if(view==='client-detail' && tid){ hidePop(panel); openClientDetail(tid); return; }
+  if(view==='clients' && tid){
+    hidePop(panel);
+    if(clients.some(c=>c.id===tid && !c.deletedAt)) openClientInspectorFor(tid);   // its panel in All Clients (Finish Setup lives there)
     else switchView('clients');
     return;
   }
-  // the item itself, not just its screen (Nov 24)
-  if(n.target_view==='tasks' && n.target_id){ hidePop(document.getElementById('notifPanel')); notifOpenTask(n.target_id); return; }
-  if(n.target_view==='calendar' && n.target_id && typeof openEventDetailModal === 'function'
-    && typeof calendarEvents !== 'undefined' && calendarEvents.some(e => String(e.id) === String(n.target_id))){
-    hidePop(document.getElementById('notifPanel'));
-    switchView('calendar'); setTimeout(() => openEventDetailModal(n.target_id), 80); return;
+  if(view==='tasks' && n.type === 'task_suggested'){ hidePop(panel); notifOpenSuggestions(n); return; }
+  if(view==='tasks' && tid){ hidePop(panel); notifOpenTask(tid); return; }
+  if(view==='calendar' && tid && typeof openEventDetailModal === 'function'
+    && typeof calendarEvents !== 'undefined' && calendarEvents.some(e => String(e.id) === String(tid))){
+    hidePop(panel);
+    switchView('calendar'); setTimeout(() => openEventDetailModal(tid), 80); return;
   }
-  if(n.target_view==='reminders' && n.target_id && typeof clientReminders !== 'undefined' && clientReminders.some(r => String(r.id) === String(n.target_id))){
-    hidePop(document.getElementById('notifPanel'));
-    switchView('reminders'); setTimeout(() => { window._remSel = n.target_id; if(typeof renderReminders === 'function') renderReminders(); }, 0); return;
+  if(view==='reminders' && tid && typeof clientReminders !== 'undefined' && clientReminders.some(r => String(r.id) === String(tid))){
+    hidePop(panel);
+    switchView('reminders'); setTimeout(() => { window._remSel = tid; if(typeof renderReminders === 'function') renderReminders(); }, 0); return;
   }
   // an update in Review: open it there (yours first if you wrote one for that client)
-  if(n.target_view==='teamqueue' && n.target_id && typeof reviewItems === 'function' && typeof openReviewDraft === 'function'){
-    const me = myName(), all = Object.values(reviewItems()).flat().filter(x => x.c.id === n.target_id);
+  if(view==='teamqueue' && tid && typeof reviewItems === 'function' && typeof openReviewDraft === 'function'){
+    const me = myName(), all = Object.values(reviewItems()).flat().filter(x => x.c.id === tid);
     const x = (!canApprove() && all.find(y => y.d.author === me)) || all[0];
-    if(x){ hidePop(document.getElementById('notifPanel')); openReviewDraft(x.c.id, x.d.author); return; }
+    if(x){ hidePop(panel); openReviewDraft(x.c.id, x.d.author); return; }
+    // already sent: that client's update in your Queue
+    if(typeof openQueueClient === 'function' && clients.some(c => c.id === tid)){ hidePop(panel); openQueueClient(tid); return; }
   }
-  if(n.target_view==='whatsapp' && n.target_id && typeof waOpenItem === 'function'){
-    hidePop(document.getElementById('notifPanel'));
-    waOpenItem(n.target_id); return;
+  if(view==='queue' && tid && typeof openQueueClient === 'function' && clients.some(c => c.id === tid)){ hidePop(panel); openQueueClient(tid); return; }
+  if(view==='whatsapp' && tid && typeof waOpenItem === 'function'){ hidePop(panel); waOpenItem(tid); return; }
+  if(view){
+    hidePop(panel);
+    if(view==='plan' && tid) window._planSel = tid;
+    switchView(view);
+    if(view==='approve' && tid && clients.find(c=>c.id===tid)) openQueueCardModal(tid);
   }
-  if(n.target_view){
-    hidePop(document.getElementById('notifPanel'));
-    if(n.target_view==='plan' && n.target_id) window._planSel = n.target_id;
-    switchView(n.target_view);
-    if(n.target_view==='approve' && n.target_id && clients.find(c=>c.id===n.target_id)){
-      openQueueCardModal(n.target_id);
+}
+
+// What a notice is about, when it doesn't say by id. Tasks: the most urgent of the ones it counted
+// (from the day it was sent, else today); a follow-up: the reminder its question is from; a client
+// notice: the first client it names; an event reply: the event it names.
+async function notifGuessTarget(n){
+  const words = `${n.title || ''} ${n.body || ''}`, me = currentUser && currentUser.id;
+  try {
+    if(['task_due', 'task_wrap_up', 'task_overdue'].includes(n.type)){
+      if(typeof tasks === 'undefined' || !Array.isArray(tasks)) return null;
+      if(!tasks.length && typeof loadMyTasks === 'function') await loadMyTasks();
+      const PRI = { high: 0, medium: 1, low: 2 };
+      const open = tasks.filter(t => t.assigneeId === me && !t.cancelledAt && t.status !== 'done' && !t.hiddenByAssignee)
+        .sort((a, b) => (PRI[a.priority] ?? 1) - (PRI[b.priority] ?? 1) || String(a.dueDate || '').localeCompare(String(b.dueDate || '')));
+      const named = open.find(t => t.title && words.includes(t.title));
+      if(named) return named.id;
+      const sent = toDateStr(new Date(n.created_at || Date.now())), today = toDateStr(new Date());
+      const pick = n.type === 'task_overdue' ? open.filter(t => t.dueDate && t.dueDate < today) : open.filter(t => t.dueDate === sent).concat(open.filter(t => t.dueDate === today));
+      return pick[0] ? pick[0].id : null;
     }
-  }
+    if(n.target_view === 'reminders' && typeof clientReminders !== 'undefined'){
+      if(!clientReminders.length && typeof loadClientReminders === 'function') await loadClientReminders();
+      const r = clientReminders.find(x => x.question && words.includes(x.question) && x.status !== 'closed')
+        || clientReminders.find(x => x.question && words.includes(x.question));
+      return r ? r.id : null;
+    }
+    if(['approve', 'teamqueue', 'queue', 'clients', 'client-detail'].includes(n.target_view) && Array.isArray(clients)){
+      // the first client the notice names (the longest name wins where one contains another)
+      let best = null, at = Infinity;
+      clients.filter(c => !c.deletedAt && c.name).forEach(c => {
+        const k = words.indexOf(c.name);
+        if(k >= 0 && (k < at || (k === at && c.name.length > best.name.length))){ best = c; at = k; }
+      });
+      return best ? best.id : null;
+    }
+    if(n.target_view === 'calendar' && typeof calendarEvents !== 'undefined' && Array.isArray(calendarEvents)){
+      const ev = calendarEvents.filter(e => e.title && words.includes(e.title)).sort((a, b) => String(b.start || b.startAt || '').localeCompare(String(a.start || a.startAt || '')))[0];
+      return ev ? ev.id : null;
+    }
+  } catch(e){ console.warn('notifGuessTarget', e); }
+  return null;
+}
+
+// Tasks suggested from a meeting: one opens its preview; several are shown in Tasks, that meeting's
+// highlighted. The notice names the meeting (and, from Nov 24, carries its id).
+async function notifOpenSuggestions(n){
+  switchView('tasks');
+  if(typeof loadTaskSuggestions === 'function' && (typeof taskSuggestions === 'undefined' || !taskSuggestions)) { try { await loadTaskSuggestions(); } catch(e){} }
+  const open = (typeof suggestionsOpen === 'function' ? suggestionsOpen(taskSuggestions || []) : (taskSuggestions || []).filter(s => s.status === 'pending'));
+  const m = /“([^”]+)”/.exec(n.body || '');
+  const fromIt = open.filter(s => (n.target_id && s.sourceId === n.target_id) || (m && s.sourceTitle === m[1]));
+  if(!fromIt.length){ showToast('info', 'Nothing left to decide from that meeting', 'Its suggestions were added or dismissed.'); return; }
+  if(fromIt.length === 1 && typeof tkSgPreview === 'function'){ setTimeout(() => tkSgPreview(fromIt[0].id), 60); return; }
+  if(typeof tkSgAll !== 'undefined') tkSgAll = true;
+  if(typeof renderTasks === 'function') renderTasks();
+  setTimeout(() => {
+    const rows = fromIt.map(s => document.querySelector(`.tk-sg-r[data-sg="${s.id}"]`)).filter(Boolean);
+    if(!rows.length) return;
+    rows[0].scrollIntoView({ block: 'center', behavior: typeof motionOK === 'function' && !motionOK() ? 'auto' : 'smooth' });
+    rows.forEach(r => { r.classList.add('is-hl'); setTimeout(() => r.classList.remove('is-hl'), 2400); });
+  }, 120);
 }
 
 // A task from a notification: Tasks, with it open (or says it's gone)

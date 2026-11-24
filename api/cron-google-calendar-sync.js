@@ -57,7 +57,7 @@ async function notifyDueReminders(admin) {
     await admin.from('notifications').insert({
       user_id: r.asked_by, type: 'reminder_follow_up_due', title: 'Follow-up needed',
       body: r.waiting_on ? line : `You haven't received a response from ${clientName} regarding: "${r.question}"`,
-      target_view: 'reminders',
+      target_view: 'reminders', target_id: String(r.id),   // the bell opens that follow-up (Nov 24)
     });
     try{ await sendPushToUser(admin, r.asked_by, 'Follow-up needed', line, pushUrlFor('reminders')); }catch(e){}
     try{ await sendSlackDM(admin, r.asked_by, 'reminder_follow_up_due', `*Follow-up needed*\n${line}`); }catch(e){}
