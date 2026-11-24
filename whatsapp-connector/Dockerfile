@@ -1,7 +1,7 @@
 # Radar WhatsApp connector, for an always-on server (Railway, Fly.io, any VPS with Docker).
 # It is a background worker: no web port. The WhatsApp login lives in AUTH_DIR, which must be
 # on a persistent volume or every redeploy asks for a new QR code.
-FROM node:20-slim
+FROM node:22-slim
 
 # git: the WhatsApp library pulls one package (libsignal) straight from GitHub.
 RUN apt-get update \
