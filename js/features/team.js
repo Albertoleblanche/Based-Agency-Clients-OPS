@@ -99,12 +99,25 @@ function teamCardAvatarHtml(m){
 // Named list rather than hardcoded checkboxes — adding a future
 // permission (the user's own "we can expand later") is one line here,
 // not new HTML in the modal below.
+// Extra access an admin can give, on top of a role (Nov 25; the list and its rules are in
+// js/core/session.js). roles: who it's for (an approver already has the approver powers).
 const EXTRA_PERMISSIONS_META = [
-  { key:'view_team_queue', label: "See Team Queue (everyone's drafts)" },
-  { key:'delete_tasks', label: 'Permanently delete tasks' },
-  { key:'delete_clients', label: 'Manage & permanently delete clients from Trash' },
-  { key:'lower_danger_score', label: "Clear a client's Risk flag" },
+  { key:'approve_updates', label: 'Approves and sends updates', sub: 'Anyone’s draft in Review: approve, skip, send', roles: ['member'] },
+  { key:'view_team_queue', label: 'Sees everyone’s drafts', sub: 'Review, read only', roles: ['member'] },
+  { key:'edit_clients', label: 'Adds and edits clients', sub: 'Edit Client, Bulk Edit, owners, Focus, Risk, setup, Harvest links', roles: ['member'] },
+  { key:'lower_danger_score', label: 'Clears a client’s Risk flag', roles: ['member'] },
+  { key:'delete_tasks', label: 'Deletes tasks for good', roles: ['member'] },
+  { key:'delete_clients', label: 'Restores and deletes clients', sub: 'Trash, Recently Deleted', roles: ['member'] },
+  { key:'manage_settings', label: 'Settings & connections', sub: 'Harvest, Granola, Slack, Gmail, WhatsApp, AI, and the update and Health rules', roles: ['member', 'approver'] },
 ];
+// the switches for someone: [meta, on, implied-by-another]
+function extraAccessRows(m){
+  const x = (m && m.extra_permissions) || [];
+  return EXTRA_PERMISSIONS_META.filter(p => m && p.roles.includes(m.role)).map(p => {
+    const implied = p.key === 'view_team_queue' && x.includes('approve_updates');
+    return { p, on: implied || x.includes(p.key), implied };
+  });
+}
 
 function openTeamMemberDetail(id){
   const m = teamProfiles.find(x=>x.id===id);
@@ -146,14 +159,10 @@ function openTeamMemberDetail(id){
   // members, since admins/approvers already have those by role), an
   // admin needs to be able to revoke Assistant access from a specific
   // admin/approver too, not just grant it to a member.
-  // lower_danger_score: approvers and admins clear flags by role (Nov 25), so it's for members only.
-  const lowerDangerRow = m.role === 'member'
-    ? toggleRow(EXTRA_PERMISSIONS_META.find(p=>p.key==='lower_danger_score').label, (m.extra_permissions||[]).includes('lower_danger_score'), `changeTeamPermission('${m.id}','lower_danger_score',${!(m.extra_permissions||[]).includes('lower_danger_score')})`, true)
-    : '';
-  const memberOnlyPermissionRows = m.role==='member'
-    ? EXTRA_PERMISSIONS_META.filter(p=>p.key!=='lower_danger_score').map((p,i)=> toggleRow(p.label, (m.extra_permissions||[]).includes(p.key), `changeTeamPermission('${m.id}','${p.key}',${!(m.extra_permissions||[]).includes(p.key)})`, true))
-    : [];
-  const allToggleRows = [ toggleRow('AI Assistant access', !!m.ai_chat_enabled, `toggleMemberAiChatEnabled('${m.id}', ${!!m.ai_chat_enabled})`, true), ...(lowerDangerRow ? [lowerDangerRow] : []), ...memberOnlyPermissionRows ];
+  // extra access on top of the role (Nov 25): approver powers for members, Settings & connections for
+  // approvers and members too
+  const extraRows = extraAccessRows(m).filter(r => !r.implied).map(r => toggleRow(r.p.label, r.on, `changeTeamPermission('${m.id}','${r.p.key}',${!r.on})`, true));
+  const allToggleRows = [ toggleRow('AI Assistant access', !!m.ai_chat_enabled, `toggleMemberAiChatEnabled('${m.id}', ${!!m.ai_chat_enabled})`, true), ...extraRows ];
   // Strip the trailing divider off the last row in the list so the
   // section doesn't end on a stray line right before its own caption.
   const permissionsHtml = allToggleRows.map((row,i)=> i===allToggleRows.length-1 ? row.replace('border-bottom:1px solid var(--border);','') : row).join('');
@@ -161,7 +170,7 @@ function openTeamMemberDetail(id){
     <div style="grid-column:1/-1;padding-top:14px;margin-top:2px;border-top:1px solid var(--border);">
       <span style="${sectionHeadingStyle}">Extra Permissions</span>
       <div style="margin-top:8px;">${permissionsHtml}</div>
-      <p style="font-size:11px;color:var(--muted-lt);margin:8px 0 0;">${m.role==='member' ? 'Grants specific extra access without changing their role.' : 'Everything else here is already covered automatically by role — these are the specific things worth adjusting per person instead.'}</p>
+      <p style="font-size:11px;color:var(--muted-lt);margin:8px 0 0;">${m.role==='admin' ? 'Admins can do everything already.' : 'Extra access on top of their role, without changing it. Roles, extra access, passwords and removing people stay with admins.'}</p>
     </div>` : '';
   openAppModal(`
     <div class="modal-head"><span class="panel-title">${escapeHtml(m.name)}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
@@ -243,13 +252,18 @@ async function changeTeamPermission(userId, key, granted){
   const m = teamProfiles.find(p=>p.id===userId);
   if(!m) return;
   const current = m.extra_permissions || [];
+  if(granted && !EXTRA_PERMISSIONS_META.some(p => p.key === key && p.roles.includes(m.role))) return;
   const updated = granted ? [...new Set([...current, key])] : current.filter(k=>k!==key);
   const { error } = await supabaseClient.from('team_profiles').update({ extra_permissions: updated }).eq('id', userId);
   if(error){ showToast('error','Could not save', error.message); await loadTeamProfiles(); return; }
   m.extra_permissions = updated;
   await loadTeamProfiles();
+  if(typeof renderTeam === 'function' && typeof currentViewName !== 'undefined' && currentViewName === 'team') renderTeam();
   const label = EXTRA_PERMISSIONS_META.find(p=>p.key===key)?.label || key;
-  showToast('success', granted ? 'Permission granted' : 'Permission removed', `${label} — ${granted ? 'now allowed' : 'no longer allowed'} for ${m.name}.`);
+  showToast('success', granted ? 'Access given' : 'Access taken away', `${firstName(m.name) || m.name}: ${label}${granted ? '' : ', not anymore'}.`);
+  // they hear about it (it changes what they see the next time Radar loads)
+  if(userId !== currentUser?.id && typeof sendNotification === 'function')
+    sendNotification(userId, 'profile_changed', granted ? `You can now: ${label}` : `Taken away: ${label}`, `${myName() || 'An admin'} ${granted ? 'gave you extra access' : 'took back extra access'}, on top of your role. It’s on your profile.`, 'profile');
   if(document.getElementById('appModalOverlay')) openTeamMemberDetail(userId);
 }
 

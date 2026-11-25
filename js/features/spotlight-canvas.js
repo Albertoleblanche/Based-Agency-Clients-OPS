@@ -6,9 +6,9 @@ function spotNorm(s){ return String(s || '').toLowerCase(); }
 function spotDraftAction(c){
   const w = clientWeek(c), me = myName();
   if(w.sent) return null;
-  if(w.draft) return { icon: 'envelope-open', title: `Open this week’s draft for ${c.name}`, run: () => canApprove() ? openReviewDraft(c.id, w.draft.author) : (window._weekSel = c.id, switchView('approve')) };
+  if(w.draft) return { icon: 'envelope-open', title: `Open this week’s draft for ${c.name}`, run: () => canApproveUpdates() ? openReviewDraft(c.id, w.draft.author) : (window._weekSel = c.id, switchView('approve')) };
   if(w.forEmail.length){
-    const author = w.forEmail.find(i => i.author === me) ? me : (canApprove() ? (w.owner || w.forEmail[0].author) : me);
+    const author = w.forEmail.find(i => i.author === me) ? me : (canApproveUpdates() ? (w.owner || w.forEmail[0].author) : me);
     return { icon: 'note-pencil', title: `Start this week’s draft for ${c.name}`, run: () => generateDraft(c.id, author) };
   }
   return { icon: 'note-pencil', title: `Log an improvement for ${c.name}`, run: () => openQueueLogImprovementModal(c.id) };

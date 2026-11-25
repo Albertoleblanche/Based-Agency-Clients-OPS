@@ -36,7 +36,7 @@ function aiAppsInner(){
   const s = aiAppsState;
   const intro = `<p class="t-2 ai-about">Ask ChatGPT or Claude about your clients, tasks, follow-ups and hours, and have it add or finish tasks, plan sprints in your Plan, add follow-ups and log time, as you, with what you can see and do in Radar.</p>`;
   if(s.ready == null) return intro + `<p class="t-2 gr-st">Checking…</p>`;
-  if(!s.ready) return intro + (isAdmin()
+  if(!s.ready) return intro + (canManageSettings()
     ? `<div class="ai-setup"><b>${icon('warning')}One-time setup in Supabase</b><ol>
 <li>Open the project in Supabase: <b>Authentication → OAuth Server</b>, and turn the OAuth server on.</li>
 <li>Turn on <b>dynamic client registration</b> (“Allow Dynamic OAuth Apps”), so ChatGPT and Claude can register themselves.</li>

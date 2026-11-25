@@ -55,7 +55,7 @@ function updateClientsBulkBar(){
 }
 
 async function bulkDeleteClients(){
-  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can delete clients.'); return; }
+  if(!hasAccess('delete_clients')){ showToast('error','Not allowed','Only admins and approvers can delete clients.'); return; }
   const ids = [...selectedClientIds];
   if(!ids.length) return;
   if(!(await confirmDialog(`Move ${ids.length} client${ids.length!==1?'s':''} to Trash? Their improvements, drafts, time entries, and notes stay intact and this can be undone from Trash.`, {confirmLabel:'Move to Trash'}))) return;
@@ -251,8 +251,8 @@ function renderClientsTable(){
     tbody.innerHTML = `<tr><td colspan="7">${emptyStateHtml(
       '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 21a8 8 0 0 0-16 0" /> <circle cx="10" cy="8" r="5" /> <path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3" /></svg>',
       'No clients yet',
-      canApprove() ? 'This is where your whole roster lives — add your first client to start tracking their work.' : 'This is where your whole roster lives — ask an admin or approver to add the first client.',
-      canApprove() ? '<button class="btn btn-brand" onclick="openAddClientForm()">+ Add client</button>' : ''
+      canEditClients() ? 'This is where your whole roster lives — add your first client to start tracking their work.' : 'This is where your whole roster lives — ask an admin or approver to add the first client.',
+      canEditClients() ? '<button class="btn btn-brand" onclick="openAddClientForm()">+ Add client</button>' : ''
     )}</td></tr>`;
     if(countEl) countEl.textContent = '';
     const pag = document.getElementById('clientsPagination'); if(pag) pag.innerHTML = '';
@@ -383,7 +383,7 @@ function renderClientInspector(){
     <p class="ci-sub">${escapeHtml(c.service||'')}${escapeHtml(since)}</p>
     <div class="ci-btns">
       <button type="button" class="btn btn-brand" onclick="openClientDetail('${c.id}')">Open Client</button>
-      ${canApprove() ? `<button type="button" class="btn btn-outline" onclick="openEditClientForm('${c.id}')">Edit</button>` : ''}
+      ${canEditClients() ? `<button type="button" class="btn btn-outline" onclick="openEditClientForm('${c.id}')">Edit</button>` : ''}
     </div>
     ${riskHtml}
     <div class="ci-sec">Health</div>
@@ -405,7 +405,7 @@ function renderClientInspector(){
       ${action('New Reminder', `openNewReminderModal('${c.id}')`)}
       ${c.email ? `<a class="ci-act" href="mailto:${escapeHtml(c.email)}">Email ${escapeHtml(c.email)}</a>` : ''}
       ${c.website ? `<a class="ci-act" href="${safeUrl(c.website.startsWith('http') ? c.website : 'https://'+c.website)}" target="_blank" rel="noopener">Open Website</a>` : ''}
-      ${canApprove() ? action('Delete Client…', `deleteClient('${c.id}')`, 'ci-danger') : ''}
+      ${hasAccess('delete_clients') ? action('Delete Client…', `deleteClient('${c.id}')`, 'ci-danger') : ''}
     </div>`;
   if(kept){
     const ta = document.getElementById('imp-'+c.id);
@@ -471,7 +471,7 @@ document.addEventListener('click', function(e){
 });
 
 async function deleteClient(id){
-  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can delete clients.'); return; }
+  if(!hasAccess('delete_clients')){ showToast('error','Not allowed','Only admins and approvers can delete clients.'); return; }
   const c = clients.find(x=>x.id===id);
   if(!c) return;
   if(!(await confirmDialog(`Move ${c.name} to Trash? Their improvements, drafts, time entries, and notes stay intact and this can be undone from Trash.`, {confirmLabel:'Move to Trash'}))) return;

@@ -447,7 +447,7 @@ function mSheetVal(id){ const el = $m(id); return el ? el.value : ''; }
 
 // ---- Today -----------------------------------------------------------------------------------
 function mWaitingDrafts(){
-  const me = myName(), approver = canApprove(), out = [];
+  const me = myName(), approver = canApproveUpdates(), out = [];
   attentionEligibleClients().forEach(c => (c.drafts || []).forEach(d => {
     if(d.draftStatus !== 'pending' || !d.draft) return;
     if(approver ? (d.author === me || (d.readyToNotify && !draftHasNoWork(c, d))) : d.author === me) out.push({ c, d });
@@ -483,7 +483,7 @@ ${mGlanceHtml(behind, waiting, health)}
 ${mTimerCardHtml()}
 ${behind.length ? mIsh(lateN ? `${behind.length} due or overdue` : `${behind.length} due today`, "mOpenWeek()") + `<div class="ig">${behindRows}</div>` : ''}
 ${health.length ? mIsh('Health', "mOpenClients('health')") + `<div class="ig">${healthRows}</div>` : ''}
-${waiting.length ? mIsh(`${waiting.length} waiting for ${canApprove() ? 'review' : 'you'}`, "mSwitchTab('review')") + `<div class="ig">${waitRows}</div>` : ''}
+${waiting.length ? mIsh(`${waiting.length} waiting for ${canApproveUpdates() ? 'review' : 'you'}`, "mSwitchTab('review')") + `<div class="ig">${waitRows}</div>` : ''}
 ${due.length ? mIsh('Due today', "mSwitchTab('tasks')") + `<div class="ig">${due.slice(0, 5).map(mTaskRow).join('')}</div>` : ''}
 ${!behind.length && !health.length && !waiting.length && !due.length ? `<div style="margin-top:22px">${mEmpty('You’re all caught up', mNextDue(sum.ws.filter(w => mMine(w.c))))}</div>` : ''}`;
 }
@@ -491,7 +491,7 @@ ${!behind.length && !health.length && !waiting.length && !due.length ? `<div sty
 function mGlanceHtml(behind, waiting, health){
   const lateN = behind.filter(w => w.late).length, dueN = behind.length - lateN, riskN = health.filter(x => x.h.level === 'r').length;
   const tile = (n, label, ic, cls, tap) => `<button class="ikpi${n ? ' ' + cls : ''}" onclick="${tap}"><span class="k-ic">${icon(ic, { weight: 'bold' })}</span><b>${n}</b><span>${label}</span></button>`;
-  return `<div class="ikpis">${tile(lateN, 'Overdue', 'clock', 'red', 'mOpenWeek()')}${tile(dueN, 'Due today', 'clock', 'yellow', 'mOpenWeek()')}${canApprove() ? tile(waiting.length, 'To review', 'tray', 'blue', "mSwitchTab('review')") : tile(riskN, 'At risk', 'heart-pulse', 'red', "mOpenClients('health')")}</div>`;
+  return `<div class="ikpis">${tile(lateN, 'Overdue', 'clock', 'red', 'mOpenWeek()')}${tile(dueN, 'Due today', 'clock', 'yellow', 'mOpenWeek()')}${canApproveUpdates() ? tile(waiting.length, 'To review', 'tray', 'blue', "mSwitchTab('review')") : tile(riskN, 'At risk', 'heart-pulse', 'red', "mOpenClients('health')")}</div>`;
 }
 // "Next up: Oakridge Flooring, due tomorrow."
 function mNextDue(ws){ const n = ws.filter(w => w.sent).sort((a, b) => a.daysLeft - b.daysLeft)[0]; return n ? `Next up: ${mEsc(n.c.name)}, ${n.dueText.toLowerCase()}.` : ''; }
@@ -508,7 +508,7 @@ ${groups.filter(g => g[1].length).map(([t, list, cls]) => mIsh(t, null, cls) + `
 }
 // A due client opens its draft when one is waiting, otherwise the client.
 function mBehindTap(w){
-  const d = (w.c.drafts || []).find(x => x.draftStatus === 'pending' && x.draft && (canApprove() || x.author === myName()) && !draftHasNoWork(w.c, x));
+  const d = (w.c.drafts || []).find(x => x.draftStatus === 'pending' && x.draft && (canApproveUpdates() || x.author === myName()) && !draftHasNoWork(w.c, x));
   return d ? `mOpenDraft('${w.c.id}',${jsArg(d.author)})` : `mOpenClient('${w.c.id}')`;
 }
 // Health in a phone-sized phrase: "Over budget, updates late".
@@ -855,7 +855,7 @@ async function mMoveTask(id, status){
 
 // ---- Review ----------------------------------------------------------------------------------
 function mReviewItems(allClients){
-  const cyc = updateCycle(), me = myName(), approver = canApprove(), out = { waiting: [], approved: [], sent: [] };
+  const cyc = updateCycle(), me = myName(), approver = canApproveUpdates(), out = { waiting: [], approved: [], sent: [] };
   attentionEligibleClients().filter(c => allClients || mReviewClient === 'all' || c.id === mReviewClient).forEach(c => (c.drafts || []).forEach(d => {
     if(!approver && d.author !== me) return;
     if(d.draftSentAt){ if(new Date(d.draftSentAt) >= cyc.weekStart) out.sent.push({ c, d, at: d.draftSentAt }); }
@@ -878,19 +878,19 @@ function mDraftRow(x){
   const row = `<button class="ir" onclick="mOpenDraft('${c.id}',${jsArg(d.author)})" style="align-items:flex-start;padding:12px 16px">${monoHtml(c)}<div class="tx">
 <div style="display:flex;gap:8px;align-items:baseline"><span class="t" style="flex:1">${mEsc(c.name)}</span><span style="font-size:14px;color:var(--label-2)">${mReviewWhen(x)}</span></div>
 <span class="s">Weekly update · ${mEsc(d.author)}</span><span class="s2">${stale ? 'New work was logged after you approved this draft.' : mEsc(String(d.draft || '').replace(/\s+/g, ' ').slice(0, 140))}</span>${stale ? `<span style="margin-top:4px">${mDot('yellow', 'Needs re-review')}</span>` : ''}</div></button>`;
-  if(mReviewTab !== 'waiting' || !canApprove()) return row;
+  if(mReviewTab !== 'waiting' || !canApproveUpdates()) return row;
   return `<div class="swipe" data-c="${c.id}" data-a="${mEsc(d.author)}">${row}<div class="acts"><button style="background:#636366" onclick="mSkipDraft('${c.id}',${jsArg(d.author)})">Skip</button><button style="background:var(--accent-fill)" onclick="mApproveDraft('${c.id}',${jsArg(d.author)})">Approve</button></div></div>`;
 }
 function mReviewHtml(){
   const it = mReviewItems(), list = it[mReviewTab];
   const fc = mReviewClient !== 'all' ? clients.find(x => x.id === mReviewClient) : null;
-  const sub = (canApprove() ? `${mPlural(it.waiting.length, 'draft')} waiting${it.approved.length ? ` · ${it.approved.length} approved, not sent` : ''}` : 'Your drafts this week') + (fc ? ` · ${fc.name}` : '');
+  const sub = (canApproveUpdates() ? `${mPlural(it.waiting.length, 'draft')} waiting${it.approved.length ? ` · ${it.approved.length} approved, not sent` : ''}` : 'Your drafts this week') + (fc ? ` · ${fc.name}` : '');
   setTimeout(mWireSwipes, 0);
   return `<div class="inav"><div class="r"><button aria-label="Filter by client" onclick="mPickReviewClient()"${fc ? ' style="color:var(--label)"' : ''}>${icon('funnel-simple')}</button></div></div>
 <h1 class="big">Review</h1><p class="big-sub">${sub}</p>
 ${mSeg([['waiting', 'Waiting', it.waiting.length], ['approved', 'Approved', it.approved.length], ['sent', 'Sent', it.sent.length]], 'mSetReviewTab', mReviewTab)}
 ${list.length ? `<div class="ig" style="margin-top:16px">${list.map(mDraftRow).join('')}</div>` : `<div style="margin-top:16px">${mEmpty(mReviewTab === 'waiting' ? 'Nothing waiting' : 'Nothing here yet', mReviewTab === 'waiting' ? 'Drafts appear here when they’re sent for review.' : '')}</div>`}
-${mReviewTab === 'waiting' && list.length && canApprove() ? '<p class="ifoot">Swipe left on a draft to approve or skip it.</p>' : ''}`;
+${mReviewTab === 'waiting' && list.length && canApproveUpdates() ? '<p class="ifoot">Swipe left on a draft to approve or skip it.</p>' : ''}`;
 }
 function mWireSwipes(){
   document.querySelectorAll('#mMain .swipe').forEach(sw => {
@@ -929,12 +929,12 @@ function mOpenDraft(clientId, author){
         ? `<button class="ibtn s" style="flex:0 0 116px" onclick="mWinCopy('${c.id}',${jsArg(d.author)})">Copy Again</button><button class="ibtn p" onclick="mWinSent('${c.id}',${jsArg(d.author)})">${icon('check')}Mark as Sent</button>`
         : `<button class="ibtn p" onclick="mWinCopy('${c.id}',${jsArg(d.author)})">${icon('copy')}Copy for WhatsApp</button>`;
       else if(d.draftStatus === 'approved') bar = '';
-      else if(canApprove()) bar = `<button class="ibtn p" onclick="mApproveDraft('${c.id}',${jsArg(d.author)}, true)">${icon('check')}Approve</button>`;
+      else if(canApproveUpdates()) bar = `<button class="ibtn p" onclick="mApproveDraft('${c.id}',${jsArg(d.author)}, true)">${icon('check')}Approve</button>`;
       else if(d.author === me && !d.readyToNotify && !draftHasNoWork(c, d)) bar = `<button class="ibtn p" onclick="mSendForReview('${c.id}',${jsArg(d.author)})">${icon('paper-plane-tilt')}Send for Review</button>`;
     }
     else if(!d.draftSentAt){
-      if(canApprove() && d.draftStatus === 'approved') bar = `<button class="ibtn p" onclick="mSendDraft('${c.id}',${jsArg(d.author)})">${icon('paper-plane-tilt')}Send Now</button>`;
-      else if(canApprove()) bar = `<button class="ibtn s" style="flex:0 0 116px" onclick="mApproveDraft('${c.id}',${jsArg(d.author)}, true)">Approve</button><button class="ibtn p" onclick="mApproveAndSend('${c.id}',${jsArg(d.author)})">${icon('paper-plane-tilt')}Approve &amp; Send</button>`;
+      if(canApproveUpdates() && d.draftStatus === 'approved') bar = `<button class="ibtn p" onclick="mSendDraft('${c.id}',${jsArg(d.author)})">${icon('paper-plane-tilt')}Send Now</button>`;
+      else if(canApproveUpdates()) bar = `<button class="ibtn s" style="flex:0 0 116px" onclick="mApproveDraft('${c.id}',${jsArg(d.author)}, true)">Approve</button><button class="ibtn p" onclick="mApproveAndSend('${c.id}',${jsArg(d.author)})">${icon('paper-plane-tilt')}Approve &amp; Send</button>`;
       else if(d.author === myName() && !d.readyToNotify && !draftHasNoWork(c, d)) bar = `<button class="ibtn p" onclick="mSendForReview('${c.id}',${jsArg(d.author)})">${icon('paper-plane-tilt')}Send for Review</button>`;
     }
     return `<div class="idraft">
@@ -946,7 +946,7 @@ ${editing ? `<textarea id="mDraftEdit" spellcheck="true">${mEsc(d.draft || '')}<
   }, { right: '' });
   const setRight = () => {
     const { d } = mDraftFor(clientId, author);
-    const can = d && !d.draftSentAt && (canApprove() || (d.author === myName() && !d.readyToNotify));
+    const can = d && !d.draftSentAt && (canApproveUpdates() || (d.author === myName() && !d.readyToNotify));
     entry.el.querySelector('.inav .r').innerHTML = can ? `<button onclick="mToggleDraftEdit()">${editing ? '<b>Done</b>' : 'Edit'}</button>` : '';
   };
   window.mToggleDraftEdit = async () => {
@@ -980,7 +980,7 @@ function mDraftBody(text){
   return out.join('');
 }
 async function mApproveDraft(clientId, author, stay, quiet){
-  if(!canApprove()) return;
+  if(!canApproveUpdates()) return;
   const { c, d } = mDraftFor(clientId, author); if(!d) return;
   const edited = $m('mDraftEdit')?.value;
   const ids = d.draftImprovementIds || [];
@@ -998,7 +998,7 @@ async function mApproveDraft(clientId, author, stay, quiet){
   if(!stay && mStack.length) mPop();
 }
 async function mSkipDraft(clientId, author){
-  if(!canApprove() || !(await confirmDialog(`Nothing is sent, and its improvements won’t go in a later draft.`, { title: `Skip ${author}’s update?`, confirmLabel: 'Skip', danger: true }))) return;
+  if(!canApproveUpdates() || !(await confirmDialog(`Nothing is sent, and its improvements won’t go in a later draft.`, { title: `Skip ${author}’s update?`, confirmLabel: 'Skip', danger: true }))) return;
   const { c, d } = mDraftFor(clientId, author); if(!d) return;
   const ids = d.draftImprovementIds || [];
   const ok = await saveDraftFor(clientId, author, { draftStatus: 'none', draft: '', draftImprovementIds: [], draftSentAt: null, draftSentBy: '' });
@@ -1013,7 +1013,7 @@ async function mSendForReview(clientId, author){
   const v = $m('mDraftEdit')?.value;
   const ok = await saveDraftFor(clientId, author, { readyToNotify: true, ...(v != null ? { draft: v } : {}) });
   if(!ok){ showToast('error', 'Couldn’t send it for review', 'Try again.'); return; }
-  for(const a of teamProfiles.filter(p => (p.role === 'admin' || p.role === 'approver') && p.id !== currentUser.id && !p.access_revoked)) mNotify(a.id, 'draft_ready', `${c.name}: draft ready for review`, `${author}'s weekly update is ready.`, 'teamqueue', c.id);
+  for(const a of teamWithAccess('approve_updates')) mNotify(a.id, 'draft_ready', `${c.name}: draft ready for review`, `${author}'s weekly update is ready.`, 'teamqueue', c.id);
   await mRefresh(); showToast('success', 'Sent for review', `${c.name} is in Review.`);
 }
 // WhatsApp wins: copy it (which claims it, so nobody sends it twice), then Mark as Sent.
@@ -1085,7 +1085,7 @@ function mOpenClients(mode){
     const list = activeClients().map(c => ({ c, h: clientHealth(c) })).sort((a, b) => focusFirst(a.c, b.c) || (mode === 'health' ? ({ r: 0, y: 1, g: 2 }[a.h.level] - { r: 0, y: 1, g: 2 }[b.h.level]) || a.c.name.localeCompare(b.c.name) : a.c.name.localeCompare(b.c.name)));
     const vis = list.filter(x => !q || x.c.name.toLowerCase().includes(q));
     // added from Harvest, waiting for an approver to finish their info (on a computer)
-    const su = mode === 'health' || !canApprove() ? [] : setupClients().filter(c => !q || c.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name));
+    const su = mode === 'health' || !canEditClients() ? [] : setupClients().filter(c => !q || c.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name));
     return `<h1 class="big">${mode === 'health' ? 'Health' : 'Clients'}</h1><p class="big-sub">${list.filter(x => x.h.level === 'r').length} at risk · ${list.filter(x => x.h.level === 'y').length} to watch</p>
 <div class="isearch">${icon('magnifying-glass')}<input placeholder="Search" value="${mEsc(q)}" oninput="mClientsQ(this.value)" aria-label="Search clients"></div>
 ${su.length ? `${mIsh('Needs setup')}<div class="ig">${su.map(c => mIr(monoHtml(c), mEsc(c.name) + focusMark(c), 'Added from Harvest', '', `mOpenClient('${c.id}')`)).join('')}</div>${mIsh('Clients')}` : ''}
@@ -1116,7 +1116,7 @@ ${mIsh('Logged')}<div class="ig">${imps.map(i => mIr('', mEsc(i.text), `${mEsc(i
 function mRiskHtml(c, h){
   if(!h || h.off) return '';
   const f = h.flag, cons = h.concerns || [], me = currentUser ? currentUser.id : null;
-  const btn = !canApprove() ? `<div style="margin:12px 16px 0"><button class="ibtn s" onclick="mOpenConcern('${c.id}')">${icon('flag')}Flag a Concern</button></div>` : '';
+  const btn = !canEditClients() ? `<div style="margin:12px 16px 0"><button class="ibtn s" onclick="mOpenConcern('${c.id}')">${icon('flag')}Flag a Concern</button></div>` : '';
   if(!f && !cons.length) return btn;
   const facts = riskFacts(c, f && f.from ? f.from : null), wl = h.work.level;
   const dot = l => `<span class="dot ${l === 'r' ? 'red' : l === 'y' ? 'yellow' : 'green'}"></span>`;
@@ -1141,7 +1141,7 @@ async function mSaveConcern(){
   const me = myName() || 'Someone';
   const { data, error } = await supabaseClient.from('client_concerns').insert({ client_id: c.id, reason: why.slice(0, 500), raised_by: me, raised_by_id: currentUser.id }).select().single();
   if(error || !data){ if(btn) btn.disabled = false; showToast('error', 'Not flagged', /client_concerns|PGRST205|42P01|schema cache/i.test(`${error && error.code} ${error && error.message}`) ? 'Concerns need a one-time database update: an admin runs addendum-risk-flags.sql.' : 'Try again in a moment.'); return; }
-  for(const p of teamProfiles.filter(p => (p.role === 'admin' || p.role === 'approver') && !p.access_revoked && p.id !== currentUser.id))
+  for(const p of teamWithAccess('edit_clients'))
     await mNotify(p.id, 'client_concern', `${shortClientName(c.name)}: a concern from ${firstName(me)}`, `“${why.slice(0, 200)}” It’s on Watch until you put it At risk or clear it.`, 'health', c.id);
   mLog(c.id, 'client_updated', `${me} flagged a concern: “${why.slice(0, 120)}”`, `Flagged a concern about <b>${escapeHtml(c.name)}</b>.`);
   mCloseSheet(true); await mRefresh(); mTop()?.refresh();
@@ -1164,7 +1164,7 @@ function mClientMeetingsHtml(c){
 // Focus (Nov 23): an approver switches it here too; everyone sees it (js/core/data.js)
 function mFocusHtml(c){
   const on = isFocus(c);
-  if(!canApprove()) return on ? `<span class="fo-tg on is-ro">${icon('target')}Focus client</span>` : '';
+  if(!canEditClients()) return on ? `<span class="fo-tg on is-ro">${icon('target')}Focus client</span>` : '';
   return `<button class="fo-tg${on ? ' on' : ''}" aria-pressed="${on}" onclick="mSetFocus('${c.id}', ${!on})">${icon('target')}${on ? 'Focus client' : 'Add to Focus'}</button>`;
 }
 async function mSetFocus(id, on){
@@ -1708,7 +1708,7 @@ function mHvRows(st, pickFn){
   if(none){
     const fix = hvHarvestNameFor(st.clientId);
     return `<div class="ir"><span class="ilab">Project</span><span class="t n" style="white-space:normal;text-align:right;color:var(--label-2);font-size:15px">${mEsc(none)}</span></div>`
-      + (!fix ? '' : canApprove() ? `<button class="ir mhv-link" onclick="${pickFn}('link')"><span class="t">${fix.rc && !clientInSetup(fix.rc) ? 'Link Here Instead…' : 'Link to Harvest…'}</span></button>`
+      + (!fix ? '' : canEditClients() ? `<button class="ir mhv-link" onclick="${pickFn}('link')"><span class="t">${fix.rc && !clientInSetup(fix.rc) ? 'Link Here Instead…' : 'Link to Harvest…'}</span></button>`
         : hvAsked(st.clientId) ? '' : `<button class="ir mhv-link" onclick="hvAskApprovers(${mEsc(JSON.stringify(String(st.clientId)))}, null).then(ok => { if(ok) this.remove(); })"><span class="t">Ask an Approver</span></button>`);
   }
   const { mine } = hvClientProjects(st.clientId);

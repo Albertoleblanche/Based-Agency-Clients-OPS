@@ -1454,8 +1454,8 @@ function waIntegrationRow(){
 // Test mode → live, from the Who sees it row. Testers who aren't admins lose this page after it,
 // so the dialog says so.
 async function waGoLive(){
-  const admin = typeof isAdmin === 'function' && isAdmin();
-  const ok = await confirmDialog(`Everyone on the team then sees the WhatsApp items that are theirs and gets them in Slack. Admins and approvers see them all.${admin ? '' : ' After this only admins can change the WhatsApp settings, so this page will no longer show for you.'}`,
+  const admin = typeof canManageSettings === 'function' && canManageSettings();
+  const ok = await confirmDialog(`Everyone on the team then sees the WhatsApp items that are theirs and gets them in Slack. Admins and approvers see them all.${admin ? '' : ' After this only admins, and anyone given Settings & connections, change the WhatsApp settings, so this page will no longer show for you.'}`,
     { title: 'Go live for the whole team?', confirmLabel: 'Go Live' });
   if(!ok) return;
   const { error } = await supabaseClient.rpc('wa_go_live');

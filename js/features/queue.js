@@ -602,7 +602,7 @@ openReviewDraft = (function(orig){
 // from your own Slack, as you, and in their bell (js/features/nudge-sheet.js).
 function quNudgeKey(c, d){ return `review:${c.id}:${d ? String(d.draftPendingSince || d.draftApprovedAt || d.author || '') : ''}`; }
 function quNudgeApprovers(){
-  return (teamProfiles || []).filter(p => !p.access_revoked && p.id !== currentUser.id && (p.role === 'admin' || p.role === 'approver'));
+  return teamWithAccess('approve_updates');
 }
 function quNudgeBtnHtml(c, d, st){
   if(!d || !quNudgeApprovers().length || typeof nudgeSheet !== 'function') return '';

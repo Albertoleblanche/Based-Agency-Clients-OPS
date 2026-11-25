@@ -513,7 +513,7 @@ async function saveLogBatch(clientId, items, another){
 // approved parts go out as one email. Clients due within 2 days are picked to start with.
 let gsList = [], gsPick = new Set();
 function gsCandidates(){
-  const me = myName(), mineOnly = !canApprove(), out = [];
+  const me = myName(), mineOnly = !canApproveUpdates(), out = [];
   const onTeam = n => teamProfiles.some(p => p.name === n && !p.access_revoked);
   const byDate = (a, b) => new Date(a.date) - new Date(b.date), s = n => n === 1 ? '' : 's';
   weekVisibleClients().forEach(c => {
@@ -589,7 +589,7 @@ async function createGroupDrafts(){
     else fail++;
   }
   if(ok){
-    const approvers = teamProfiles.filter(p => (p.role === 'admin' || p.role === 'approver') && p.id !== currentUser?.id);
+    const approvers = teamWithAccess('approve_updates');
     const one = picks.length === 1 ? picks[0].c : null;
     for(const a of approvers) await sendNotification(a.id, 'draft_ready', one ? `${one.name}: draft ready for review` : `${ok} drafts ready for review`, `Created with Group & Send by ${myName() || 'a teammate'}.`, 'teamqueue', one ? one.id : undefined);
   }

@@ -44,7 +44,7 @@ function resetClientFormFields(){
 }
 
 function openAddClientForm(){
-  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can add clients.'); return; }
+  if(!canEditClients()){ showToast('error','Not allowed','Only admins and approvers can add clients.'); return; }
   editingClientId = null;
   openAppModal(clientFormHtml('Add client', 'Save client'), 560);
   resetClientFormFields();
@@ -79,7 +79,7 @@ function renderDangerWeights(){
 }
 
 async function saveDangerWeights(){
-  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  if(!canManageSettings()){ showToast('error','Not allowed','Only admins can change this.'); return; }
   const weights = {};
   DANGER_WEIGHT_META.forEach(w=>{ weights[w.key] = parseInt(document.getElementById(`dangerWeight-${w.key}`).value); });
   settings.dangerWeights = weights;
@@ -130,7 +130,7 @@ function computeSuggestedDanger(c){
 }
 
 function openEditClientForm(id){
-  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can edit clients.'); return; }
+  if(!canEditClients()){ showToast('error','Not allowed','Only admins and approvers can edit clients.'); return; }
   const c = clients.find(x=>x.id===id);
   if(!c){ showToast('error','Client not found','Someone may have removed this — refreshing.'); fullRefresh(); return; }
   editingClientId = id;
@@ -284,7 +284,7 @@ async function saveClientForm(){
   // block reaching this form at all for a member, but this covers the
   // edge case of the modal already being open when a role changes
   // mid-session, or the function being called directly some other way.
-  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can add or edit clients.'); return; }
+  if(!canEditClients()){ showToast('error','Not allowed','Only admins and approvers can add or edit clients.'); return; }
   const name = document.getElementById('ncName').value.trim();
   if(!name){ showToast('error','Client name required','Enter a name before saving.'); return; }
   const emailValue = document.getElementById('ncEmail').value.trim();

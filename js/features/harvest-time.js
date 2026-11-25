@@ -212,7 +212,7 @@ async function hvLinkHarvest(harvestId, targetId){
 // Asks, links, and reloads what depends on it. Returns true when linked.
 async function hvLinkClientToHarvest(clientId){
   const c = clients.find(x => String(x.id) === String(clientId)), fix = hvHarvestNameFor(clientId);
-  if(!c || !fix || !canApprove()) return false;
+  if(!c || !fix || !canEditClients()) return false;
   if(!(await confirmDialog(hvLinkConfirmWords(fix, c), { title: `Link ${c.name} to Harvest?`, confirmLabel: 'Link' }))) return false;
   try{ await hvLinkHarvest(fix.hc.harvest_id, c.id); }catch(e){ showToast('error', 'Couldn’t link it', e.message); return false; }
   if(typeof loadAll === 'function' && typeof mLoadAll !== 'function') await loadAll();
@@ -229,7 +229,7 @@ function hvAsked(clientId){ try{ return !!localStorage.getItem(hvAskedKey(client
 async function hvAskApprovers(clientId, btn){
   const c = clients.find(x => String(x.id) === String(clientId)), fix = hvHarvestNameFor(clientId);
   if(!c || hvAsked(clientId)) return false;
-  const who = (typeof teamProfiles !== 'undefined' ? teamProfiles : []).filter(p => !p.access_revoked && (p.role === 'admin' || p.role === 'approver') && p.id !== (myProfile && myProfile.id));
+  const who = teamWithAccess('edit_clients');
   if(!who.length){ showToast('info', 'No approver to ask', 'Radar has no admin or approver yet.'); return false; }
   const title = `${myName() || 'Someone'} asks to link ${c.name} to Harvest`;
   const body = fix && fix.rc && !clientInSetup(fix.rc) ? `Harvest’s “${fix.hc.name}” is linked to ${fix.rc.name}. Open ${c.name}, then Details → Harvest → Change.`
@@ -257,7 +257,7 @@ async function hvLinkFromPick(prefix, clientId){
 // which, and picking it moves the link here (with the time on its projects).
 function hvLinkedHarvestOf(clientId){ return hvTimeOn() ? (hvTime.clients || []).find(x => String(x.radar_client_id || '') === String(clientId)) || null : null; }
 function hvLinkSheet(clientId){
-  const c = clients.find(x => String(x.id) === String(clientId)); if(!c || !canApprove() || !hvTimeOn()) return;
+  const c = clients.find(x => String(x.id) === String(clientId)); if(!c || !canEditClients() || !hvTimeOn()) return;
   const cur = hvLinkedHarvestOf(clientId);
   const nameOf = id => { const x = clients.find(y => String(y.id) === String(id)); return x && !x.deletedAt ? x : null; };
   const list = (hvTime.clients || []).filter(hc => hc.is_active !== false || (cur && hc.harvest_id === cur.harvest_id))
@@ -295,7 +295,7 @@ function hvDetailsHtml(c){
   if(!hvTimeOn() || !c) return '';
   const cur = hvLinkedHarvestOf(c.id), fix = !cur && hvHarvestNameFor(c.id);
   const words = cur ? `“${escapeHtml(cur.name)}”` : fix ? `Not linked <span class="t-3">· Harvest has “${escapeHtml(fix.hc.name)}”</span>` : '<span class="t-3">Not linked</span>';
-  const act = canApprove() ? ` <a class="x-lnk hvl-act" href="#" onclick="hvLinkSheet(${jsArg(c.id)});return false;">${cur ? 'Change…' : 'Link…'}</a>`
+  const act = canEditClients() ? ` <a class="x-lnk hvl-act" href="#" onclick="hvLinkSheet(${jsArg(c.id)});return false;">${cur ? 'Change…' : 'Link…'}</a>`
     : !cur && fix && !hvAsked(c.id) ? ` <a class="x-lnk hvl-act" href="#" onclick="hvAskApprovers(${jsArg(c.id)}, this);return false;">Ask an Approver</a>` : '';
   return `<div class="cl-kv"><span>Harvest</span><span class="hvl-v">${typeof appLogo === 'function' ? appLogo('harvest', 'xs') : ''}<span>${words}${act}</span></span></div>`;
 }
@@ -305,7 +305,7 @@ function hvNoPickWords(clientId){
   const { all, mine, linked } = hvClientProjects(clientId);
   if(mine.length) return null;
   if(!linked){
-    const fix = hvHarvestNameFor(clientId), ask = canApprove() ? '' : hvAsked(clientId) ? ' You asked an approver to link them.' : ' An approver can link them.';
+    const fix = hvHarvestNameFor(clientId), ask = canEditClients() ? '' : hvAsked(clientId) ? ' You asked an approver to link them.' : ' An approver can link them.';
     if(fix && fix.rc && !clientInSetup(fix.rc)) return `Harvest’s “${fix.hc.name}” is linked to ${fix.rc.name}, so this time stays in Radar.${ask}`;
     if(fix) return `Harvest calls this client “${fix.hc.name}”, so this time stays in Radar until they’re linked.${ask}`;
   }
@@ -326,7 +326,7 @@ function hvPickRowsHtml(prefix, clientId, projectId, taskId, service){
   const none = hvNoPickWords(clientId);
   if(none){
     const fix = hvHarvestNameFor(clientId);
-    const btn = !fix ? '' : canApprove() ? `<button type="button" class="btn sm hvp-link" onclick="hvLinkFromPick('${prefix}', ${jsArg(clientId)})">${fix.rc && !clientInSetup(fix.rc) ? 'Link Here Instead…' : 'Link Them…'}</button>`
+    const btn = !fix ? '' : canEditClients() ? `<button type="button" class="btn sm hvp-link" onclick="hvLinkFromPick('${prefix}', ${jsArg(clientId)})">${fix.rc && !clientInSetup(fix.rc) ? 'Link Here Instead…' : 'Link Them…'}</button>`
       : hvAsked(clientId) ? '' : `<button type="button" class="btn sm hvp-link" onclick="hvAskApprovers(${jsArg(clientId)}, this)">Ask an Approver</button>`;
     return `<label>Project</label><div class="hvp-none t-2">${escapeHtml(none)}${btn}</div>`;
   }

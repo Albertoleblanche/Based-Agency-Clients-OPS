@@ -502,7 +502,7 @@ async function trashWork(ids){
 async function workAfterDelete(effects, moved, soft){
   const me = typeof myName === 'function' ? myName() : '', who = me || 'Someone', uid = currentUser ? currentUser.id : null;
   const tell = typeof sendNotification === 'function' ? sendNotification : null;
-  const approvers = (typeof teamProfiles !== 'undefined' ? teamProfiles : []).filter(p => (p.role === 'admin' || p.role === 'approver') && p.id !== uid && !p.access_revoked);
+  const approvers = (typeof teamProfiles !== 'undefined' ? teamProfiles : []).filter(p => profileHasAccess(p, 'approve_updates') && p.id !== uid);
   const told = new Set();
   const where = soft ? 'It’s in your Recently Deleted if you need it back.' : '';
   for(const { c, d, kind } of effects){

@@ -141,7 +141,7 @@ function granolaRowStatus(st){
 }
 const granolaWhen = t => { if(!t) return ''; const d = new Date(t); return `${relDay(d).toLowerCase() === 'today' ? 'today' : relDay(d)} at ${fmtTime(d)}`; };
 function granolaSheetInner(){
-  const g = granolaState, admin = isAdmin();
+  const g = granolaState, admin = canManageSettings();
   const about = `<p class="t-2 gr-about">When a meeting’s notes are ready in Granola, Radar picks out the action items for people on the team and suggests each one to its person in Tasks, where they add it or dismiss it.</p>`;
   if(g == null) return about + `<p class="t-2 gr-st">Checking…</p>`;
   if(g.error) return about + `<p class="gr-warn">${icon('warning')}Radar couldn’t check Granola just now. <button class="btn sm" onclick="granolaState=null;document.getElementById('granolaBox').innerHTML=granolaSheetInner();loadGranolaState()">Try Again</button></p>`;

@@ -369,9 +369,9 @@ function suStepHtml(step, i, counted){
     const noId = suNoSlackId();
     body = head(appLogo('slack', 'xl'), 'Slack, as you', 'Radar reaches you in Slack, and messages you send teammates from Radar go from your own Slack, as you, not from the Radar bot.') + got(['Radar’s messages to you: tasks, drafts to review, reminders', 'Nudges and reminders to teammates, with a link to the item', 'Radar only sends what you send; it doesn’t read your Slack']) +
       (checking || (st === 'done' ? state('ok', 'Connected.')
-        : st === 'na' ? state('off', isAdmin() ? 'Slack sign-in isn’t set up for the team yet. It takes a few minutes in Slack’s app settings.' : 'An admin sets up Slack sign-in for the team first. You can connect later in Settings → Connections.')
+        : st === 'na' ? state('off', canManageSettings() ? 'Slack sign-in isn’t set up for the team yet. It takes a few minutes in Slack’s app settings.' : 'An admin sets up Slack sign-in for the team first. You can connect later in Settings → Connections.')
         : noId ? state('off', 'Your Slack isn’t linked to Radar yet. Until you connect it, Radar’s own messages can’t reach you in Slack.') : ''));
-    f = foot(st === 'off' ? `<button class="btn btn-p" onclick="suSlack()">Connect Slack…</button>` : st === 'na' && isAdmin() ? `<button class="btn" onclick="slackMeSetupSheet()">Set Up for the Team…</button>${next()}` : next(), true);
+    f = foot(st === 'off' ? `<button class="btn btn-p" onclick="suSlack()">Connect Slack…</button>` : st === 'na' && canManageSettings() ? `<button class="btn" onclick="slackMeSetupSheet()">Set Up for the Team…</button>${next()}` : next(), true);
   } else if(k === 'notify'){
     body = head(suGlyph('bell'), 'Notifications on this computer', 'So you hear about what needs you, even when Radar isn’t open.') + got(['A task given to you, or one past its date', 'A client waiting on you, and drafts to review', 'Nudges from teammates']) +
       (checking || (st === 'done' ? state('ok', 'On for this computer.')

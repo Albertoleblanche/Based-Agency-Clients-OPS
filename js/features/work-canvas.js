@@ -290,7 +290,7 @@ async function slackMeConnect(){
   let j = {};
   try{ const res = await fetch('/api/integrations', { method: 'POST', headers: await apiAuthHeaders(), body: JSON.stringify({ provider: 'slack-me', action: 'start' }) }); j = await res.json().catch(() => ({})); }catch(e){ j = { error: 'Couldn’t reach Radar. Try again.' }; }
   if(j.url){ try{ sessionStorage.setItem('slackme-back', location.hash || '#reminders'); }catch(e){} location.href = j.url; return; }
-  showToast('info', j.notConfigured ? 'Slack sign-in isn’t set up yet' : 'Couldn’t start', j.notConfigured ? (isAdmin() ? 'Set it up once in Settings → Connections → Slack, as you.' : 'Ask an admin to set it up in Settings → Connections.') : (j.error || 'Try again.'));
+  showToast('info', j.notConfigured ? 'Slack sign-in isn’t set up yet' : 'Couldn’t start', j.notConfigured ? (canManageSettings() ? 'Set it up once in Settings → Connections → Slack, as you.' : 'Ask an admin to set it up in Settings → Connections.') : (j.error || 'Try again.'));
 }
 async function slackMeDisconnect(){
   if(!(await confirmDialog('Disconnect your Slack? Nudges to teammates won’t go from your Slack until you connect it again.', { confirmLabel: 'Disconnect' }))) return;

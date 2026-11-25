@@ -86,7 +86,7 @@ ${typeof clientImportanceCell === 'function' ? clientImportanceCell(c) : ''}</di
 
 // ---- the panel: finish setup ------------------------------------------------------------------
 function clientSetupPanelHtml(c){
-  const A = `'${c.id}'`, approver = canApprove(), cfv = c.customFieldValues || {};
+  const A = `'${c.id}'`, approver = canEditClients(), cfv = c.customFieldValues || {};
   const steps = clientSetupSteps(c), left = steps.filter(s => !s.ok), ok = k => steps.find(s => s.k === k).ok;
   const off = !getsUpdates(c), ch = off ? 'none' : winChannel(c), g = winGroupFor(c), d = winDay(c);
   const ps = hvProjectsOf(c), hc = hvLinkOf(c);
@@ -153,7 +153,7 @@ ${clientQuickActionsHtml(c)}
 // Save one field from the setup list. Keeps the cursor where it was when the list redraws.
 async function setClientSetupField(clientId, field, value){
   const c = clients.find(x => x.id === clientId); if(!c) return;
-  if(!canApprove()){ showToast('error', 'Not allowed', 'Only admins and approvers set up clients.'); return; }
+  if(!canEditClients()){ showToast('error', 'Not allowed', 'Only admins and approvers set up clients.'); return; }
   if(field === 'email'){
     value = String(value || '').split(',').map(s => s.trim()).filter(Boolean).join(', ');
     if(value && value.split(', ').some(a => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a))){ showToast('error', 'That email doesn’t look right', 'Use name@company.com, with commas between addresses.'); return; }
@@ -169,7 +169,7 @@ async function setClientSetupField(clientId, field, value){
 }
 
 async function finishClientSetup(clientId){
-  const c = clients.find(x => x.id === clientId); if(!c || !canApprove()) return;
+  const c = clients.find(x => x.id === clientId); if(!c || !canEditClients()) return;
   if(clientSetupSteps(c).some(s => !s.ok)){ showToast('info', 'Almost there', clientSetupLeftWords(c) + '.'); return; }
   const cfv = Object.assign({}, c.customFieldValues || {});
   delete cfv.harvestSetup; cfv.harvestSetupDone = toDateStr(new Date());
@@ -181,7 +181,7 @@ async function finishClientSetup(clientId){
 }
 
 async function clientNotRadar(clientId){
-  const c = clients.find(x => x.id === clientId); if(!c || !canApprove()) return;
+  const c = clients.find(x => x.id === clientId); if(!c || !canEditClients()) return;
   if(!(await confirmDialog(`Leave ${c.name} out of Radar? It goes to Trash, and Harvest won’t add it again. You can restore it from Trash.`, { confirmLabel: 'Leave It Out' }))) return;
   if(!(await leaveClientOut(c))){ showToast('error', 'Couldn’t save', 'Try again in a moment.'); return; }
   showToast('success', `${c.name} is left out`, 'Harvest won’t add it again.');
@@ -200,7 +200,7 @@ async function leaveClientOut(c){
 // Same as a client Radar already has: the server moves the Harvest link and anything logged here.
 async function hvLinkClient(clientId, targetId){
   const c = clients.find(x => x.id === clientId), t = clients.find(x => x.id === targetId);
-  if(!c || !t || !canApprove()) return;
+  if(!c || !t || !canEditClients()) return;
   closeAppModal();
   if(!(await confirmDialog(`Harvest calls this client ${c.name}. Radar keeps ${t.name}, with Harvest’s projects and time, and removes the copy it added.`, { title: `Link to ${t.name}?`, confirmLabel: 'Link' }))) return;
   try{
@@ -230,7 +230,7 @@ function hvSameAsSheet(clientId){
 let hvMatch = {}; // setup client id -> '' (new client) | '__skip' | Radar client id
 function hvMatchTargets(){ return activeClients().filter(x => !hvLinkOf(x)).sort((a, b) => a.name.localeCompare(b.name)); }
 async function openMatchClientsSheet(){
-  if(!canApprove()) return;
+  if(!canEditClients()) return;
   if(!hvLinks) await hvLoadLinks();
   const su = setupClients(), targets = hvMatchTargets();
   if(!su.length){ showToast('info', 'Nothing to match', 'Every client from Harvest is set up.'); return; }
@@ -273,7 +273,7 @@ function hvMatchRefresh(){
   if(save) save.disabled = !!dup || !(link + skip);
 }
 async function saveMatchClients(){
-  if(!canApprove()) return;
+  if(!canEditClients()) return;
   const links = [], skips = [];
   Object.entries(hvMatch).forEach(([id, v]) => { if(v === '__skip') skips.push(id); else if(v) links.push({ clientId: id, targetId: v }); });
   if(!links.length && !skips.length) return;

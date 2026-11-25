@@ -16,7 +16,7 @@ ${a || l ? `<div class="es-a">${a}${l}</div>` : ''}</div>`;
 }
 // No clients yet: what the screen will show once there are some, and (for those who can) New Client.
 function emptyNoClients(what, o){
-  const can = typeof canApprove === 'function' && canApprove();
+  const can = typeof canEditClients === 'function' && canEditClients();
   return emptyState(Object.assign({ icon: 'building-2', tone: 'blue', title: 'No clients yet',
     text: `${what} ${can ? 'Add your first client to start.' : 'An admin or approver adds clients; they show here once they do.'}`,
     action: can ? 'New Client' : '', actionIcon: 'plus', onAction: 'openAddClientForm()' }, o || {}));

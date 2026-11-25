@@ -13,6 +13,7 @@
 //   body: { action: 'reset-password' | 'approve-email-change' |
 //           'create-member' | 'delete-user' | 'toggle-access', ...fields }
 
+const { profileHasAccess } = require('../lib/access');
 const { createClient } = require('@supabase/supabase-js');
 const { CLAUDE_MODEL, OPENAI_MODEL } = require('../lib/ai-client');
 const { sendPushToUser, pushUrlFor } = require('../lib/push-notify');
@@ -118,13 +119,16 @@ module.exports = async function handler(req, res) {
       return;
     }
     const { data: callerProfile, error: profileErr } = await admin
-      .from('team_profiles').select('role, extra_permissions').eq('id', callerData.user.id).maybeSingle();
+      .from('team_profiles').select('role, extra_permissions, access_revoked').eq('id', callerData.user.id).maybeSingle();
     if (profileErr || !callerProfile) {
       res.status(403).json({ error: 'Only admins can perform this action' });
       return;
     }
-    if (callerProfile.role !== 'admin') {
-      res.status(403).json({ error: 'Only admins can perform this action' });
+    // the AI accounts are part of Settings & connections, which an admin can give someone (Nov 25);
+    // people (passwords, access, invites, emails) stay with admins
+    const settingsAction = ['get-ai-connections', 'connect-ai-provider', 'disconnect-ai-provider'].includes(action);
+    if (callerProfile.role !== 'admin' && !(settingsAction && profileHasAccess(callerProfile, 'manage_settings'))) {
+      res.status(403).json({ error: settingsAction ? 'Only admins, or someone given Settings & connections, can do this' : 'Only admins can perform this action' });
       return;
     }
     const callerId = callerData.user.id;

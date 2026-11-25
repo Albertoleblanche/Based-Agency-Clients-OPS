@@ -9,7 +9,8 @@
 //     are told. Whoever raised it can withdraw it.
 // addendum-risk-flags.sql: reasons and reviews (client_danger_history.reason, kind) and concerns.
 
-function riskLead(){ return typeof canApprove === 'function' && canApprove(); }
+// sets Risk, reviews flags and closes concerns: admins and approvers, or anyone who can edit clients
+function riskLead(){ return typeof canEditClients === 'function' && canEditClients(); }
 function riskDay(d){ return d ? fmtShortDate(new Date(d)) : ''; }
 // Where a cleared flag goes back to: what it was before it was raised (below 3), else 1
 function riskBefore(c){
@@ -156,7 +157,7 @@ async function saveConcern(){
   clientConcerns.push({ id: data.id, clientId: c.id, reason: data.reason, raisedBy: me, raisedById: currentUser.id, createdAt: new Date(Math.min(Date.parse(data.created_at) || Date.now(), Date.now())), resolvedAt: null, resolvedBy: '', outcome: null });
   if(typeof logClientActivity === 'function') logClientActivity(c.id, 'client_updated', `${me} flagged a concern: “${why.slice(0, 120)}”`);
   // the approvers and admins hear about it (not whoever raised it)
-  const leads = (typeof teamProfiles !== 'undefined' ? teamProfiles : []).filter(p => (p.role === 'admin' || p.role === 'approver') && !p.access_revoked && p.id !== currentUser.id);
+  const leads = teamWithAccess('edit_clients');
   if(typeof sendNotification === 'function') leads.forEach(p => sendNotification(p.id, 'client_concern', `${shortClientName(c.name)}: a concern from ${firstName(me)}`, `“${why.slice(0, 200)}” It’s on Watch until you put it At risk or clear it.`, 'health', c.id));
   closeAppModal(); window._ccSheet = null;
   riskRefresh();

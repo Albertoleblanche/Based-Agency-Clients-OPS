@@ -158,17 +158,41 @@ let currentDetailClientId = null;  // which client's detail page is open, if any
 
 function myName(){ return myProfile ? myProfile.name : ''; }
 function canApprove(){ return !!myProfile && (myProfile.role === 'admin' || myProfile.role === 'approver'); }
-function hasPermission(key){ return canApprove() || !!(myProfile && (myProfile.extra_permissions||[]).includes(key)); }
 function isAdmin(){ return !!myProfile && myProfile.role === 'admin'; }
-// Deliberately NOT built on hasPermission()/canApprove() — those treat
-// "approver or admin" as the same automatic base tier, but this one is
-// admin-only by default, with a specific per-person override (see the
-// "Lower a client's danger score" toggle on the team card) rather than a
-// role-wide grant. An approver doesn't get this just for being an
-// approver, unlike everything hasPermission() covers.
+
+// Extra access (Nov 25): what each role does by default, and what an admin can give someone on top
+// of their role, one switch each in Team, without changing the role. Approver powers go to members;
+// Settings & connections (an admin's) goes to approvers and members. Roles, extra access, passwords
+// and removing people stay with admins. The server and the database check the same list
+// (lib/access.js, addendum-extra-access.sql).
+const ACCESS_LEVEL = {
+  view_team_queue: 'approver',     // sees everyone's drafts in Review
+  approve_updates: 'approver',     // approves, skips and sends anyone's update (and sees them all)
+  edit_clients: 'approver',        // adds and edits clients: Bulk Edit, owners, Focus, Risk, setup, Harvest links
+  lower_danger_score: 'approver',  // clears a Risk flag
+  delete_tasks: 'approver',        // deletes tasks for good
+  delete_clients: 'approver',      // moves clients to Trash, restores them and deletes them for good
+  manage_settings: 'admin',        // Settings and connections: Harvest, Granola, Slack, Gmail, WhatsApp, AI, the rules
+};
+function profileHasAccess(p, key){
+  if(!p || p.access_revoked) return false;
+  if(p.role === 'admin') return true;
+  if(p.role === 'approver' && ACCESS_LEVEL[key] === 'approver') return true;
+  const x = p.extra_permissions || [];
+  return x.includes(key) || (key === 'view_team_queue' && x.includes('approve_updates'));
+}
+function hasAccess(key){ return profileHasAccess(myProfile, key); }
+function hasPermission(key){ return hasAccess(key); }
+function canEditClients(){ return hasAccess('edit_clients'); }
+function canApproveUpdates(){ return hasAccess('approve_updates'); }
+function canManageSettings(){ return hasAccess('manage_settings'); }
+// the update and Health rules in Settings: approvers by role, or anyone given Settings & connections
+function canChangeRules(){ return canApprove() || canManageSettings(); }
+// who to tell about something only some can act on: everyone else with that access
+function teamWithAccess(key){ return (typeof teamProfiles !== 'undefined' ? teamProfiles : []).filter(p => profileHasAccess(p, key) && (!currentUser || p.id !== currentUser.id)); }
 // Clearing a flag (lowering a Risk): admins and approvers (Nov 25: approvers too; they're the ones who
 // raise them), or a member given the permission in Team.
-function canLowerDangerScore(){ return isAdmin() || (typeof canApprove === 'function' && canApprove()) || !!(myProfile && (myProfile.extra_permissions||[]).includes('lower_danger_score')); }
+function canLowerDangerScore(){ return hasAccess('lower_danger_score'); }
 
 let lastProfileError = null;
 async function loadMyProfile(){

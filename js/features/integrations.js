@@ -38,7 +38,7 @@ function setSlackChannelsPage(page){
 function renderSlackChannelsList(){
   const el = document.getElementById('slackChannelsPanelBody');
   if(!el) return;
-  const canEdit = isAdmin();
+  const canEdit = canManageSettings();
   const query = slackChannelsSearchQuery.trim().toLowerCase();
   const matching = liveClients()
     .filter(c => !query || c.name.toLowerCase().includes(query))
@@ -56,7 +56,7 @@ function renderSlackChannelsList(){
   el.innerHTML = `
     <p class="sl-chan-note">
       Link each client to its Slack channel (the one bridged to their WhatsApp group) so updates and alerts land there, and a task asked for in it is for that client. Paste the <b>channel ID</b> from the channel’s own details in Slack, not its name; Radar needs to be invited to the channel.
-      ${!canEdit ? '<br><br><b>Only admins can add or change these</b>; you can see what’s set up.' : ''}
+      ${!canEdit ? '<br><br><b>Only admins, and anyone given Settings &amp; connections, can add or change these</b>; you can see what’s set up.' : ''}
     </p>
     <input type="text" id="slackChannelsSearchInput" placeholder="Search clients…" value="${escapeHtml(slackChannelsSearchQuery)}" oninput="filterSlackChannelsPanel()" style="width:100%;font-size:13.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);margin-bottom:12px;">
     ${pageClients.map(c=>{

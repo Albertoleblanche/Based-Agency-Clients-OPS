@@ -560,7 +560,7 @@ function sheetSetSelect(id, value){
   sel.value = v; syncPopSel(sel);
 }
 function openAddClientForm(){
-  if(!canApprove()){ showToast('error', 'Not allowed', 'Only admins and approvers can add clients.'); return; }
+  if(!canEditClients()){ showToast('error', 'Not allowed', 'Only admins and approvers can add clients.'); return; }
   // with Harvest connected, clients start there and come in on their own (client-setup.js)
   if(typeof harvestOwnsClients === 'function' && harvestOwnsClients()){ openAddInHarvestSheet(); return; }
   editingClientId = null; window._ncDangerWas = 0;
@@ -568,7 +568,7 @@ function openAddClientForm(){
   setTimeout(() => document.getElementById('ncName')?.focus(), 30);
 }
 function openEditClientForm(id){
-  if(!canApprove()){ showToast('error', 'Not allowed', 'Only admins and approvers can edit clients.'); return; }
+  if(!canEditClients()){ showToast('error', 'Not allowed', 'Only admins and approvers can edit clients.'); return; }
   const c = clients.find(x => x.id === id);
   if(!c){ showToast('error', 'Client not found', 'Someone may have removed it. Refreshing.'); fullRefresh(); return; }
   editingClientId = id;

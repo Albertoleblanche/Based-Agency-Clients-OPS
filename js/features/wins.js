@@ -55,7 +55,7 @@ function chGlyph(c){
 }
 async function setWinSetting(clientId, key, value){
   const c = clients.find(x => x.id === clientId); if(!c) return;
-  if(!canApprove()){ showToast('error', 'Not allowed', 'Only admins and approvers change how a client gets its win.'); return; }
+  if(!canEditClients()){ showToast('error', 'Not allowed', 'Only admins and approvers change how a client gets its win.'); return; }
   const cfv = Object.assign({}, c.customFieldValues || {});
   if(value === '' || value == null) delete cfv[key]; else cfv[key] = value;
   const prev = c.customFieldValues;
@@ -73,7 +73,7 @@ function setWinChannel(clientId, v){
 // morning automations skip it. Its work is still logged and its hours tracked.
 async function setWeeklyUpdate(clientId, on, o){
   const c = clients.find(x => x.id === clientId); if(!c) return;
-  if(!canApprove()){ showToast('error', 'Not allowed', 'Only admins and approvers change how a client gets its win.'); return; }
+  if(!canEditClients()){ showToast('error', 'Not allowed', 'Only admins and approvers change how a client gets its win.'); return; }
   if(getsUpdates(c) === !!on && !(o && o.channel)) return;
   const cfv = Object.assign({}, c.customFieldValues || {}), prev = c.customFieldValues;
   if(on) delete cfv.weeklyUpdate; else cfv.weeklyUpdate = 'off';
@@ -88,7 +88,7 @@ async function setWeeklyUpdate(clientId, on, o){
 function setWinDay(clientId, v){ return setWinSetting(clientId, 'winDay', v ? Number(v) : ''); }
 // Link a WhatsApp group to the client (and unlink any other group from it).
 async function setWinGroup(clientId, jid){
-  if(!canApprove()){ showToast('error', 'Not allowed', 'Only admins and approvers link groups.'); return; }
+  if(!canEditClients()){ showToast('error', 'Not allowed', 'Only admins and approvers link groups.'); return; }
   const before = winGroups.map(g => Object.assign({}, g));
   winGroups.forEach(g => { if(String(g.client_id || '') === String(clientId)) g.client_id = null; if(g.jid === jid) g.client_id = clientId; });
   winsRerender();
@@ -159,7 +159,7 @@ function winSendState(d){
   return { k: 'ready', by: d.author };
 }
 function winSender(d){ const s = winSendState(d); return s.k === 'copied' ? s.by : d ? d.author : ''; }
-function mayCopyWin(d){ return !!d && (canApprove() || d.author === myName()); }
+function mayCopyWin(d){ return !!d && (canApproveUpdates() || d.author === myName()); }
 function winGroupWords(c){ const g = winGroupFor(c); return g ? winCleanGroupName(g.name) : 'their WhatsApp group'; }
 
 // Copy it for WhatsApp, and claim the send. If someone else already copied it, warn first.

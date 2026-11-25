@@ -46,7 +46,7 @@ function clBulkMenu(e){
 }
 document.addEventListener('keydown', e => { if(e.key === 'Escape' && clBulk && !document.querySelector('#appModalOverlay[style*="flex"]') && document.getElementById('view-clients')?.classList.contains('active')) clBulkEnd(); });
 function clBulkStart(){
-  if(!canApprove()) return; clBulk = new Set(); inspectedClientId = null; renderClientsTable();
+  if(!canEditClients()) return; clBulk = new Set(); inspectedClientId = null; renderClientsTable();
   if(window._lastInput === 'key' || typeof motionOK !== 'function' || !motionOK()) return;
   const bar = document.querySelector('#clientsRoot .cl-bulk');
   bar?.animate?.([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.23,1,.32,1)' });
@@ -56,7 +56,7 @@ function clBulkEnd(){ clBulk = null; renderClientsTable(); }
 // Bulk Edit with these clients ticked and the sheet open: This Week's "Set Owners" for the clients
 // with no owner yet (Nov 22). The list shows every client so each ticked one is in view.
 function clBulkEditClients(ids){
-  if(!canApprove() || !ids || !ids.length) return;
+  if(!canEditClients() || !ids || !ids.length) return;
   clientsSeg = 'all'; clientsOwnerFilter = 'all'; clientsMine = false; clientFilters.search = '';
   if(currentViewName !== 'clients') switchView('clients');
   clBulk = new Set(ids.filter(id => clients.some(c => c.id === id))); inspectedClientId = null; renderClientsTable();
@@ -91,7 +91,7 @@ ${n ? `<button class="lnk-b" onclick="clBulkSetAll(false)">Clear</button>` : ''}
 }
 // The sheet: every field starts on "Keep as is", so only what you change changes.
 function openClientsBulkSheet(){
-  if(!clBulk || !clBulk.size || !canApprove()) return;
+  if(!clBulk || !clBulk.size || !canEditClients()) return;
   const picked = clients.filter(c => clBulk.has(c.id)), n = picked.length;
   const names = picked.slice(0, 3).map(c => c.name).join(', ') + (n > 3 ? ` and ${n - 3} more` : '');
   const keep = [['', 'Keep as is']];
@@ -115,7 +115,7 @@ function bkDangerChanged(){
   ['bkDangerWhyL', 'bkDangerWhyW'].forEach(id => { const el = document.getElementById(id); if(el) el.hidden = !(v >= 3); });
 }
 async function saveClientsBulk(){
-  if(!clBulk || !canApprove()) return;
+  if(!clBulk || !canEditClients()) return;
   const v = id => (document.getElementById(id) || {}).value || '';
   const fields = {}, words = [];
   if(v('bkStatus')){ fields.status = v('bkStatus'); words.push(`status to ${fields.status}`); }
@@ -167,19 +167,19 @@ function focusSinceWords(c){
 }
 function focusToggleHtml(c){
   const on = isFocus(c), tip = escapeHtml(FOCUS_WORDS);
-  if(!canApprove()) return on ? `<span class="fo-tg on is-ro" tabindex="0" data-hovertip="${tip}">${icon('target')}Focus</span>` : '';
+  if(!canEditClients()) return on ? `<span class="fo-tg on is-ro" tabindex="0" data-hovertip="${tip}">${icon('target')}Focus</span>` : '';
   return `<button class="fo-tg${on ? ' on' : ''}" aria-pressed="${on}" aria-label="${on ? 'Focus client: click to take it off Focus' : 'Add to Focus'}" data-hovertip="${tip}" onclick="setClientFocus('${c.id}', ${!on})">${icon('target')}Focus</button>`;
 }
 // Details → Focus: what it is, on or off, and the switch for admins and approvers.
 function focusDetailsHtml(c){
   const on = isFocus(c), A = jsArg(c.id);
   const state = on ? `<b class="fo-on">${icon('target')}On</b><span class="t-3">${escapeHtml(focusSinceWords(c))}</span>` : '<span class="t-3">Off</span>';
-  const sw = canApprove() && typeof swHtml === 'function' ? swHtml(on, 'Focus client', `setClientFocus(${A}, ${!on})`) : '';
+  const sw = canEditClients() && typeof swHtml === 'function' ? swHtml(on, 'Focus client', `setClientFocus(${A}, ${!on})`) : '';
   return `<div class="cl-kv fo-kv"><span>Focus</span><span class="fo-kv-v"><span class="fo-st">${state}</span>${sw}</span></div>
-<p class="cl-own-note fo-note">The owner asked the team to give it extra attention: it comes first in every list, Health watches it more closely, and it leads the morning reminders and the Monday summary.${canApprove() ? '' : ' Admins and approvers choose Focus clients.'}</p>`;
+<p class="cl-own-note fo-note">The owner asked the team to give it extra attention: it comes first in every list, Health watches it more closely, and it leads the morning reminders and the Monday summary.${canEditClients() ? '' : ' Admins and approvers choose Focus clients.'}</p>`;
 }
 async function setClientFocus(ids, on){
-  if(!canApprove()){ showToast('error', 'Not allowed', 'Only admins and approvers choose the Focus clients.'); return; }
+  if(!canEditClients()){ showToast('error', 'Not allowed', 'Only admins and approvers choose the Focus clients.'); return; }
   ids = [].concat(ids);
   const one = ids.length === 1 ? clients.find(x => x.id === ids[0]) : null;
   const r = await saveClientFocus(ids, on);
@@ -248,7 +248,7 @@ function renderClientsTable(){
   const rows = ac.map(rowOf);
   // added from Harvest, waiting for an approver to finish their info (client-setup.js)
   // Needs setup is an approver's job: members don't see those clients here until they're set up
-  const su = canApprove() ? setupClients() : [], suOwner = c => (c.customFieldValues || {}).owner || '';
+  const su = canEditClients() ? setupClients() : [], suOwner = c => (c.customFieldValues || {}).owner || '';
   const services = [...new Set(ac.concat(su).flatMap(serviceParts))].sort((a, b) => a.localeCompare(b));
   if(clientFilters.service !== 'all' && !services.includes(clientFilters.service)) clientFilters.service = 'all'; // a project that's gone
   const suShown = clientsSeg !== 'all' ? [] : su.filter(c => (clientFilters.service === 'all' || serviceHas(c, clientFilters.service)) && (clientsOwnerFilter === 'all' || suOwner(c) === clientsOwnerFilter)
@@ -259,7 +259,7 @@ function renderClientsTable(){
   const needsCare = r => r.h.level !== 'g' && r.c.status !== 'Paused' && !r.w.off;
   const needs = rows.filter(needsCare), notSent = rows.filter(r => !r.w.sent && !r.w.off);
   const focusRows = rows.filter(r => isFocus(r.c));
-  if(clientsSeg === 'focus' && !focusRows.length && !canApprove()) clientsSeg = 'all';
+  if(clientsSeg === 'focus' && !focusRows.length && !canEditClients()) clientsSeg = 'all';
   let shown = clientsSeg === 'attention' ? needs : clientsSeg === 'behind' ? notSent : clientsSeg === 'focus' ? focusRows : rows;
   shown = shown.filter(r => (clientFilters.service === 'all' || serviceHas(r.c, clientFilters.service)) && (clientsOwnerFilter === 'all' || r.owner === clientsOwnerFilter)
     && (!clientFilters.search || r.c.name.toLowerCase().includes(clientFilters.search) || (r.c.email || '').toLowerCase().includes(clientFilters.search)));
@@ -294,14 +294,14 @@ ${clientImportanceCell(c)}</div>`;
   const sNeeds = shown.filter(needsCare), sOk = shown.filter(r => !needsCare(r));
   const group = (title, list) => list.length ? `<div class="cl-g" role="presentation"><b>${title}</b><span>${uw ? '· ' : ''}${list.length}</span></div>${list.map(row).join('')}` : '';
   // approvers match them all to Radar's clients in one sheet (client-setup.js)
-  const suMatch = canApprove() && typeof openMatchClientsSheet === 'function' && ac.some(c => !hvLinkOf(c)) ? `<span class="cl-g-act"><button class="x-lnk" onclick="openMatchClientsSheet()">Match to Existing Clients</button>${infoTip(CL_TIPS.match, 'What does Match to Existing Clients do?')}</span>` : '';
+  const suMatch = canEditClients() && typeof openMatchClientsSheet === 'function' && ac.some(c => !hvLinkOf(c)) ? `<span class="cl-g-act"><button class="x-lnk" onclick="openMatchClientsSheet()">Match to Existing Clients</button>${infoTip(CL_TIPS.match, 'What does Match to Existing Clients do?')}</span>` : '';
   const suGroup = suShown.length ? `<div class="cl-g" role="presentation"><b>Needs setup</b><span>${suShown.length}</span>${suMatch}</div>${suShown.map(clientSetupRowHtml).join('')}` : '';
   const body = shown.length || suShown.length ? suGroup + group('Needs attention', sNeeds) + group('On track', sOk)
     : clientsSeg === 'focus' && !focusRows.length ? `<div class="cl-empty fo-empty">${icon('target')}<b>No Focus clients yet</b><span>When the owner asks the team to give a client extra attention, switch on Focus in its panel or with Bulk Edit. Focus clients come first in every list, and Health watches them closer.</span></div>`
     : ac.length || su.length ? `<div class="cl-empty">No clients match.<a class="x-lnk" href="#" onclick="clearClientsCanvasFilters();return false;">Clear Filters</a></div>`
     : emptyNoClients('Every client lives here: who owns it, its health, this week’s update and how much it matters.');
   // Focus: the clients the owner asked us to give extra attention (shown once there are any, or to approvers)
-  const seg = [['all', 'All', rows.length + su.length], ...(focusRows.length || canApprove() ? [['focus', 'Focus', focusRows.length]] : []), ['attention', 'Needs attention', needs.length], ['behind', 'Not sent yet', notSent.length]]
+  const seg = [['all', 'All', rows.length + su.length], ...(focusRows.length || canEditClients() ? [['focus', 'Focus', focusRows.length]] : []), ['attention', 'Needs attention', needs.length], ['behind', 'Not sent yet', notSent.length]]
     .map(([k, t, n]) => `<button class="${clientsSeg === k ? 'on' : ''}" role="tab" aria-selected="${clientsSeg === k}" onclick="setClientsSeg('${k}')">${t} <span class="c">${n}</span></button>`).join('');
   const sortIc = icon('caret-down', { weight: 'bold' });
   // a client outside your areas, opened from search or elsewhere, still opens
@@ -315,7 +315,7 @@ ${clientImportanceCell(c)}</div>`;
 ${hasAreas ? `<label class="pop-wrap">Show: <select class="pop" onchange="setClientsMine(this.value)"><option value="mine"${mineOn ? ' selected' : ''}>My clients</option><option value="all"${mineOn ? '' : ' selected'}>All clients</option></select></label>` : ''}
 <label class="pop-wrap">Owner: <select class="pop" onchange="setClientsOwner(this.value)"><option value="all">All</option>${owners.map(o => `<option${clientsOwnerFilter === o ? ' selected' : ''}>${escapeHtml(o)}</option>`).join('')}</select></label>
 <label class="pop-wrap">${harvestOwnsServices() ? 'Project' : 'Service'}: <select class="pop" onchange="setClientsService(this.value)"><option value="all">All</option>${services.map(s => `<option${clientFilters.service === s ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('')}</select></label>
-${canApprove() && !clBulk ? `<button class="btn cl-bulk-btn" onclick="clBulkMenu(event)" aria-haspopup="menu">Bulk Edit${icon('caret-down', { weight: 'bold' })}</button>` : ''}</div>
+${canEditClients() && !clBulk ? `<button class="btn cl-bulk-btn" onclick="clBulkMenu(event)" aria-haspopup="menu">Bulk Edit${icon('caret-down', { weight: 'bold' })}</button>` : ''}</div>
 <div class="cl-table${uw ? ' is-uw' : ''}" role="table" aria-label="Clients">
 ${uw ? `<div class="cl-th"><span class="cl-thi">${icon('briefcase')}</span><b>${mineOn ? 'My clients' : 'All clients'}</b><span class="cl-thn">${shown.length}</span></div>
 <div class="cl-head" role="row"><button role="columnheader" class="${clientSort.field === 'name' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'name',dir:clientSort.field==='name'&&clientSort.explicit&&clientSort.dir==='asc'?'desc':'asc',explicit:true};renderClientsTable()">Client${clientSort.field === 'name' && clientSort.explicit ? sortIc : ''}</button><span role="columnheader">Service</span><span role="columnheader">Owner</span><span role="columnheader" class="cl-hh"><button class="${clientSort.explicit ? '' : 'is-sort'}" onclick="clientSort={field:'health'};renderClientsTable()">Health${clientSort.explicit ? '' : sortIc}</button></span><span role="columnheader">This week</span><span role="columnheader" class="cl-hh"><button class="${clientSort.field === 'importance' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'importance',dir:clientSort.field==='importance'&&clientSort.explicit&&clientSort.dir==='desc'?'asc':'desc',explicit:true};renderClientsTable()">Importance${clientSort.field === 'importance' && clientSort.explicit ? sortIc : ''}</button></span></div>` : `<div class="cl-head" role="row"><button role="columnheader" class="${clientSort.field === 'name' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'name',dir:clientSort.field==='name'&&clientSort.explicit&&clientSort.dir==='asc'?'desc':'asc',explicit:true};renderClientsTable()">Client${clientSort.field === 'name' && clientSort.explicit ? sortIc : ''}</button><span role="columnheader">Owner</span><span role="columnheader" class="cl-hh"><button class="${clientSort.explicit ? '' : 'is-sort'}" onclick="clientSort={field:'health'};renderClientsTable()">Health${clientSort.explicit ? '' : sortIc}</button></span><span role="columnheader">This week</span><span role="columnheader">Last 8 weeks${infoTip(CL_TIPS.hist, 'What do the dots mean?')}</span><span role="columnheader" class="cl-hh"><button class="${clientSort.field === 'importance' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'importance',dir:clientSort.field==='importance'&&clientSort.explicit&&clientSort.dir==='desc'?'asc':'desc',explicit:true};renderClientsTable()">Importance${clientSort.field === 'importance' && clientSort.explicit ? sortIc : ''}</button></span></div>`}
@@ -341,7 +341,7 @@ function clientQuickActionsHtml(c){
 // The client panel: the one thing to do, then three numbers (this week, hours, on time), why it
 // needs attention and the details you'd look up (owner settable). The everyday actions sit at the foot.
 function clientPanelHtml({ c, h, w, owner }){
-  const next = nextStepTask(c), lvl = h.quiet ? h.rawLevel : h.level, approver = canApprove();
+  const next = nextStepTask(c), lvl = h.quiet ? h.rawLevel : h.level, approver = canEditClients();
   const start = c.startDate ? new Date(c.startDate + 'T12:00:00') : null;
   const meta = [owner, c.service].filter(Boolean).map(escapeHtml).join(' · ');
   const why = healthPhrase(h, c);
@@ -370,7 +370,7 @@ function clientPanelHtml({ c, h, w, owner }){
   // three numbers: this week's update (opens it in This Week), hours this month, on time
   const hp = h.hp, ots = onTimeSummary(h.seq), lateNow = w.late && !w.sent;
   const weekB = w.off ? 'Off' : w.sent ? 'Sent' : lateNow ? lateWords(w) : w.dueText;
-  const weekS = w.off ? 'No weekly update' : w.sent ? relDay(w.last) : w.done >= 3 ? 'Approved, not sent yet' : w.done === 2 ? (approver ? 'Waiting for you' : 'Waiting for review')
+  const weekS = w.off ? 'No weekly update' : w.sent ? relDay(w.last) : w.done >= 3 ? 'Approved, not sent yet' : w.done === 2 ? (canApproveUpdates() ? 'Waiting for you' : 'Waiting for review')
     : w.draft ? 'Not sent for review' : w.forEmail.length ? 'Not written yet' : w.logged.length ? 'Only internal work logged' : 'Nothing logged yet';
   const hoursB = hp.budget ? `<span${hp.used > hp.budget ? ' class="t-red"' : ''}>${Math.round(hp.used)}</span> / ${hp.budget} h` : `${Math.round(hp.used)} h`;
   const hoursS = hp.budget ? `<span class="s${hp.projected > hp.budget ? ' t-red' : ''}">On pace for ${Math.round(hp.projected)} h</span>` : '<span class="s">No monthly budget</span>';
@@ -430,7 +430,7 @@ function clientWinSummary(c){
 }
 // How the client gets its win: email, its WhatsApp group or both, which group, and the day.
 function clientWinHtml(c){
-  const approver = canApprove(), off = !getsUpdates(c), ch = off ? 'none' : winChannel(c), g = winGroupFor(c), d = winDay(c), A = `'${c.id}'`;
+  const approver = canEditClients(), off = !getsUpdates(c), ch = off ? 'none' : winChannel(c), g = winGroupFor(c), d = winDay(c), A = `'${c.id}'`;
   const kv = (k, v) => `<div class="cl-kv"><span>${k}</span><span>${v}</span></div>`;
   // None: no weekly update (the agency itself, an internal client), Nov 22
   const seg = approver ? `<span class="seg wn-seg" role="radiogroup" aria-label="Sends by">${[['whatsapp', 'WhatsApp', 'message-circle'], ['email', 'Email', ''], ['both', 'Both', ''], ['none', 'None', '']]
@@ -450,7 +450,7 @@ function clientWinHtml(c){
 }
 // No email yet when sending: open Edit Client on the email field (or say who can add it).
 function askForClientEmail(c){
-  if(canApprove()){ openClientEmailField(c.id); showToast('info', `Add ${c.name}’s email`, 'Save it, then send.'); }
+  if(canEditClients()){ openClientEmailField(c.id); showToast('info', `Add ${c.name}’s email`, 'Save it, then send.'); }
   else showToast('info', `${c.name} needs an email`, 'An admin or approver adds it in Edit Client, then it can go out.');
 }
 // Edit Client, ready to type the email (the fix the Weekly win and Review point to).
@@ -460,7 +460,7 @@ function openClientEmailField(clientId){
 }
 // The main contact, from the panel: saves as it's typed in (on change).
 async function setClientContact(clientId, value){
-  const c = clients.find(x => x.id === clientId); if(!c || !canApprove()) return;
+  const c = clients.find(x => x.id === clientId); if(!c || !canEditClients()) return;
   const v = String(value || '').trim().replace(/\s+/g, ' ').slice(0, 80);
   if(v === clientContact(c)) return;
   const cfv = Object.assign({}, c.customFieldValues || {});
@@ -481,7 +481,7 @@ function clientPanelMore(e, clientId){
   m.style.top = (r.bottom + 4) + 'px'; m.style.right = (window.innerWidth - r.right) + 'px';
   m.innerHTML = `<button class="mi" role="menuitem" onclick="openClientDetail('${c.id}')">${icon('buildings')}Open Client Page</button>
 ${c.website ? `<a class="mi" role="menuitem" href="${safeUrl(c.website.startsWith('http') ? c.website : 'https://' + c.website)}" target="_blank" rel="noopener">${icon('globe')}Open Website</a>` : ''}
-${canApprove() ? `<button class="mi" role="menuitem" onclick="setClientFocus('${c.id}', ${!isFocus(c)})">${icon('target')}${isFocus(c) ? 'Take Off Focus' : 'Add to Focus'}</button><button class="mi" role="menuitem" onclick="openEditClientForm('${c.id}')">${icon('pencil-simple')}Edit Client…</button><div class="msep"></div><button class="mi danger" role="menuitem" onclick="deleteClient('${c.id}')">${icon('trash')}Delete Client…</button>` : ''}`;
+${canEditClients() ? `<button class="mi" role="menuitem" onclick="setClientFocus('${c.id}', ${!isFocus(c)})">${icon('target')}${isFocus(c) ? 'Take Off Focus' : 'Add to Focus'}</button><button class="mi" role="menuitem" onclick="openEditClientForm('${c.id}')">${icon('pencil-simple')}Edit Client…</button>${hasAccess('delete_clients') ? `<div class="msep"></div><button class="mi danger" role="menuitem" onclick="deleteClient('${c.id}')">${icon('trash')}Delete Client…</button>` : ''}` : ''}`;
   document.body.appendChild(m);
   setTimeout(() => document.addEventListener('click', () => m.remove(), { once: true }), 0);
 }

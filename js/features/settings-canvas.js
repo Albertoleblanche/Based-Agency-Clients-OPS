@@ -8,21 +8,21 @@ let settingsTab = 'general';   // the page shown: a tab, or a page inside Connec
 const SETTINGS_TABS = [
   ['general', 'General', 'gear-six', () => true],
   ['updates', 'Updates', 'heartbeat', () => true],
-  ['clients', 'Clients', 'buildings', () => canApprove()],
+  ['clients', 'Clients', 'buildings', () => canChangeRules()],
   ['connections', 'Connections', 'plugs-connected', () => true],
   ['notifications', 'Notifications', 'bell', () => true],
 ];
 // pages inside Connections
 const SETTINGS_SUB = {
-  harvest: ['Harvest', () => canApprove() && typeof setHarvest === 'function'],
+  harvest: ['Harvest', () => canChangeRules() && typeof setHarvest === 'function'],
   whatsapp: ['WhatsApp', () => typeof waCanSetup === 'function' && waCanSetup() && !waHidden()],
-  ai: ['AI', () => isAdmin()],
+  ai: ['AI', () => canManageSettings()],
 };
 const SETTINGS_ALIAS = { fields: 'clients', areas: 'clients', integrations: 'connections' };
 let setScrollTo = null;   // a section to bring into view once the page is drawn
 function settingsPage(name){
   name = SETTINGS_ALIAS[name] || name;
-  if(name === 'ai' && !isAdmin()) return 'updates';   // a member's AI setting is how their drafts are written
+  if(name === 'ai' && !canManageSettings()) return 'updates';   // a member's AI setting is how their drafts are written
   if(SETTINGS_SUB[name]) return SETTINGS_SUB[name][1]() ? name : 'connections';
   const t = SETTINGS_TABS.find(x => x[0] === name);
   return t && t[3]() ? name : 'general';
@@ -41,7 +41,7 @@ function switchSettingsTab(name){
     body.animate([{ opacity: .35, transform: dx ? `translateX(${dx}px)` : 'translateY(3px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.23,1,.32,1)' });
   }
   setInkSlide = false;
-  if(to === 'ai' || to === 'connections'){ if(isAdmin()) loadAiProviderConnectionStatus(); }
+  if(to === 'ai' || to === 'connections'){ if(canManageSettings()) loadAiProviderConnectionStatus(); }
   if(to === 'connections') loadIntegrationStatuses();
   if(to === 'harvest' && typeof hvRefreshAll === 'function') hvRefreshAll();
   if(to === 'whatsapp' && typeof waStartPoll === 'function') waStartPoll();
@@ -135,7 +135,7 @@ function renderSettingsView(){
 
 // ---- General ----------------------------------------------------------------------------------
 function setGeneral(){
-  const canWs = canApprove();
+  const canWs = canChangeRules();
   const brand = settings.brandColor || '#C64C19';
   const logo = settings.appIcon ? `<img src="${esc(settings.appIcon)}" alt="" class="logo" style="object-fit:cover">` : `<span class="logo brand-mark">BA</span>`;
   const full = themePrefNow(), night = nightHours(full), pref = night ? 'night' : full;
@@ -205,7 +205,7 @@ ${rows}
 const DAY_OPTS = DAY_NAMES.map((d, i) => [i, d]);
 // ---- Updates (the weekly update and client health) ---------------------------------------------
 function setUpdates(){
-  const a = updateAutomation(), t = healthThresholds(), can = canApprove(), admin = isAdmin();
+  const a = updateAutomation(), t = healthThresholds(), can = canChangeRules(), admin = canManageSettings();
   const sig = settings.emailSignature || {};
   const auto = (k, title, sub) => fr(title, sub, swHtml(a[k], title, `saveAutomation('${k}')`, !can));
   const range = (a0, b0, step) => { const o = []; for(let v = a0; v <= b0; v += step) o.push(v); return o; };
@@ -417,7 +417,7 @@ function ohRefresh(){
   if(currentViewName === 'settings') renderSettingsView();
 }
 async function saveOutsideService(id, v){
-  const c = clients.find(x => x.id === id); if(!c || !canApprove()) return;
+  const c = clients.find(x => x.id === id); if(!c || !canChangeRules()) return;
   if(!(await updateClientRow(id, { service: v }))){ showToast('error', 'Couldn’t save', 'Try again in a moment.'); ohRefresh(); return; }
   c.service = v;
   showToast('success', 'Saved', v ? `${c.name}: ${v}` : `${c.name} has no service`);
@@ -472,7 +472,7 @@ function cfMenu(e, id, i, n){
 // ---- Connections → AI: the accounts, which one the Assistant uses, and the weekly insights ------
 // Drafts are written with ChatGPT; the Assistant uses the one picked here.
 function setAi(){
-  const admin = isAdmin(), provider = settings.aiProvider === 'openai' ? 'openai' : 'claude';
+  const admin = canManageSettings(), provider = settings.aiProvider === 'openai' ? 'openai' : 'claude';
   const conn = p => `<div class="fr">${appLogo(p === 'claude' ? 'claude' : 'chatgpt')}<div class="l"><b>${p === 'claude' ? 'Claude' : 'ChatGPT'}</b><span id="aiConnectionStatus-${p}">Checking…</span></div><input id="${p === 'claude' ? 'setClaudeModel' : 'setOpenaiModel'}" class="tf" style="width:170px" value="${esc(p === 'claude' ? settings.claudeModel || '' : settings.openaiModel || '')}" placeholder="${esc(p === 'claude' ? DEFAULT_CLAUDE_MODEL : DEFAULT_OPENAI_MODEL)}" aria-label="${p === 'claude' ? 'Claude' : 'ChatGPT'} model" onchange="saveAiModel('${p}', this.value)" title="Model"><button class="btn" id="aiConnectionBtn-${p}" onclick="openAiProviderConnectModal('${p}')">Connect…</button></div>`;
   return `<div class="set-h">Accounts</div><div class="form-grp">${conn('claude')}${conn('openai')}</div>
 <p class="set-note">Each account’s key stays on the server. The box is the model it uses. Drafts are written with ChatGPT.</p>
@@ -555,11 +555,11 @@ async function loadIntegrationStatuses(){
   const one = p => Promise.resolve().then(p).catch(() => {}).then(integRedraw);
   await Promise.all([
     one(async () => { if(typeof fetchGoogleCalendarStatus === 'function'){ const g = await fetchGoogleCalendarStatus(); if(g) integ.google = g; } }),
-    one(async () => { if(canApprove()) integ.harvest = await harvestApiCall(null).catch(() => null); }),
+    one(async () => { if(canChangeRules()) integ.harvest = await harvestApiCall(null).catch(() => null); }),
     one(async () => { if(typeof loadGranolaState === 'function') await loadGranolaState(); }),
     one(async () => { if(typeof loadAiApps === 'function') await loadAiApps(); }),
-    one(async () => { if(isAdmin() && !aiConnCache) aiConnCache = await adminActionCall('get-ai-connections'); }),
-    one(async () => { if(canApprove() && typeof loadSlackClientChannels === 'function'){ if(!slackChannelsLoaded) await loadSlackClientChannels(); integ.slackUnlinked = activeClients().filter(c => !slackClientChannels[c.id]).length; } }),
+    one(async () => { if(canManageSettings() && !aiConnCache) aiConnCache = await adminActionCall('get-ai-connections'); }),
+    one(async () => { if(canChangeRules() && typeof loadSlackClientChannels === 'function'){ if(!slackChannelsLoaded) await loadSlackClientChannels(); integ.slackUnlinked = activeClients().filter(c => !slackClientChannels[c.id]).length; } }),
     one(async () => { if(typeof loadWaTasks === 'function') await loadWaTasks(); }),
     one(async () => { if(typeof remSlackMeStatus === 'function') integ.slackMe = await remSlackMeStatus(true); }),
     one(async () => { if(typeof gmailStatusLoad === 'function') await gmailStatusLoad(); }),
@@ -582,7 +582,7 @@ function integPrefetch(){
 function setConnections(){
   integHydrate();
   const st = (color, text, id) => `<span class="st"${id ? ` id="${id}"` : ''}><span class="dot ${color}"></span>${text}</span>`;
-  const g = integ.google, h = integ.harvest, approver = canApprove();
+  const g = integ.google, h = integ.harvest, approver = canChangeRules();
   const go = (js, logo, name, sub, status) => `<button class="fr cn-r" onclick="${js}">${logo}<div class="l"><b>${name}</b><span>${sub}</span></div>${status}${icon('caret-right', { weight: 'bold' })}</button>`;
   const rows = [];
   if(approver) rows.push(go("switchSettingsTab('harvest')", appLogo('harvest'), 'Harvest',
@@ -593,7 +593,7 @@ function setConnections(){
   if(approver) rows.push(go("openIntegrationSheet('slack')", appLogo('slack'), 'Slack', 'Client channels, reminders and daily summaries',
     integ.slackUnlinked == null ? st('', 'Checking…') : integ.slackUnlinked ? st('yellow', `${integ.slackUnlinked} client${integ.slackUnlinked === 1 ? '' : 's'} not linked`) : st('green', 'Connected')));
   if(typeof granolaRowStatus === 'function') rows.push(go('openGranolaSheet()', appLogo('granola'), 'Granola', 'Action items from meetings, suggested as tasks', granolaRowStatus(st)));
-  if(isAdmin()){ const w = aiConnWords(); rows.push(go("switchSettingsTab('ai')", appLogoPair('claude', 'chatgpt'), 'AI', 'Claude and ChatGPT: drafts, the Assistant and weekly insights', w == null ? st('', 'Checking…', 'cnAiSt') : w ? st('green', w, 'cnAiSt') : st('hollow', 'Not connected', 'cnAiSt'))); }
+  if(canManageSettings()){ const w = aiConnWords(); rows.push(go("switchSettingsTab('ai')", appLogoPair('claude', 'chatgpt'), 'AI', 'Claude and ChatGPT: drafts, the Assistant and weekly insights', w == null ? st('', 'Checking…', 'cnAiSt') : w ? st('green', w, 'cnAiSt') : st('hollow', 'Not connected', 'cnAiSt'))); }
   rows.push(go("openIntegrationSheet('sheet')", appLogo('gsheets'), 'Google Sheet', settings.sheetCsvUrl ? 'Pulls the client list from a published sheet' : 'Keep a copy of the client list in a sheet',
     settings.sheetCsvUrl ? st('green', 'Connected') : st('hollow', 'Not connected')));
   const gRow = g == null ? `<div class="fr cn-r">${appLogo('gcalendar')}<div class="l"><b>Google Calendar</b><span>Your meetings in the team calendar</span></div>${st('', 'Checking…')}</div>` : g && g.googleConfigured ? `<div class="fr cn-r">${appLogo('gcalendar')}<div class="l"><b>Google Calendar</b><span>${g.connected ? `Your meetings in the team calendar${g.lastSyncedAt ? ' · synced ' + claudeWhen(g.lastSyncedAt).toLowerCase() : ''}` : 'Bring your meetings into the team calendar'}</span></div>
@@ -603,7 +603,7 @@ ${g.connected ? `${st('green', 'Connected')}<button class="btn" onclick="syncGoo
   // Slack, as you (Nov 23): nudges to teammates go from your own Slack (lib/slack-me.js)
   const sm = integ.slackMe;
   const smRow = !sm || sm.checking ? `<div class="fr cn-r">${appLogo('slack')}<div class="l"><b>Slack, as you</b><span>Send nudges to teammates from your own Slack</span></div>${st('', 'Checking…')}</div>` : `<div class="fr cn-r">${appLogo('slack')}<div class="l"><b>Slack, as you</b><span>${sm.connected ? 'Nudges to teammates go from your Slack, as you' : sm.configured ? 'Send nudges to teammates from your own Slack' : 'Send nudges to teammates from your own Slack (an admin sets it up once)'}</span></div>
-${sm.connected ? `${st('green', 'Connected')}<button class="btn" onclick="slackMeDisconnect()">Disconnect</button>` : sm.configured ? `<button class="btn" onclick="slackMeConnect()">Connect…</button>` : isAdmin() ? `${st('hollow', 'Not set up')}<button class="btn" onclick="slackMeSetupSheet()">Set Up…</button>` : st('hollow', 'Not set up')}</div>`;
+${sm.connected ? `${st('green', 'Connected')}<button class="btn" onclick="slackMeDisconnect()">Disconnect</button>` : sm.configured ? `<button class="btn" onclick="slackMeConnect()">Connect…</button>` : canManageSettings() ? `${st('hollow', 'Not set up')}<button class="btn" onclick="slackMeSetupSheet()">Set Up…</button>` : st('hollow', 'Not set up')}</div>`;
   // Gmail (Nov 24): tasks from your clients' emails (gmail.js)
   const gmRow = typeof gmailRowHtml === 'function' ? gmailRowHtml(st) : '';
   const yours = gRow || aiRow || smRow || gmRow ? `<div class="set-h">Yours</div><div class="form-grp cn-g">${aiRow}${smRow}${gRow}${gmRow}</div>` : '';
@@ -624,7 +624,7 @@ async function loadSlackTasksState(){
   const el = document.getElementById('slackTasksBox'); if(el) el.innerHTML = slackTasksHtml(slackTasksState);
 }
 function toggleSlackAutoTasks(){
-  if(!isAdmin()) return;
+  if(!canManageSettings()) return;
   changeSettings(s => { s.slackAutoTasks = s.slackAutoTasks === false; });
   const el = document.getElementById('slackTasksBox'); if(el) el.innerHTML = slackTasksHtml(slackTasksState);
 }
@@ -701,7 +701,7 @@ function setNotifications(){
   const sections = new Map();
   Object.entries(NOTIFICATION_TYPE_META).forEach(([type, meta]) => {
     if(meta.visibleTo === 'admin' && !isAdmin()) return;
-    if(meta.visibleTo === 'approver' && !canApprove()) return;
+    if(meta.visibleTo === 'approver' && !(canApprove() || canApproveUpdates() || canEditClients())) return;
     const s = meta.section || 'Other';
     if(!sections.has(s)) sections.set(s, []);
     sections.get(s).push([type, meta]);

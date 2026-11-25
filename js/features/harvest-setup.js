@@ -85,7 +85,7 @@ function hvWhen(iso){ const d = new Date(iso), k = daysBetween(dayStart(d), dayS
 const hvUserName = u => [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email || 'Someone';
 
 function setHarvest(){
-  const h = integ.harvest, d = hvData, admin = isAdmin();
+  const h = integ.harvest, d = hvData, admin = canManageSettings();
   const st = (color, text) => `<span class="st"><span class="dot ${color}"></span>${text}</span>`;
   if(h == null || (d == null && h && h.connected)){
     if(h == null) harvestApiCall(null).then(x => { integ.harvest = x; renderSettingsView(); }).catch(() => { integ.harvest = { connected: false }; renderSettingsView(); });

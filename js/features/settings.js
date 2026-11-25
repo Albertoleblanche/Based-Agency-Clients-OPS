@@ -241,12 +241,12 @@ function renderNavLabelsSettings(){
   if(!grid) return;
   const labels = settings.navLabels || {};
   grid.innerHTML = Object.entries(NAV_LABEL_DEFAULTS).map(([view, defaultLabel])=>`
-    <div><label>${defaultLabel}</label><input value="${escapeHtml(labels[view]||'')}" placeholder="${defaultLabel}" onchange="saveNavLabel('${view}', this.value)" ${isAdmin()?'':'disabled'}></div>
+    <div><label>${defaultLabel}</label><input value="${escapeHtml(labels[view]||'')}" placeholder="${defaultLabel}" onchange="saveNavLabel('${view}', this.value)" ${canManageSettings()?'':'disabled'}></div>
   `).join('');
 }
 
 async function saveNavLabel(view, value){
-  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  if(!canManageSettings()){ showToast('error','Not allowed','Only admins, or someone given Settings & connections, can change this.'); return; }
   settings.navLabels = settings.navLabels || {};
   const trimmed = value.trim();
   if(trimmed) settings.navLabels[view] = trimmed;
@@ -257,7 +257,7 @@ async function saveNavLabel(view, value){
 }
 
 async function saveAppBranding(){
-  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  if(!canManageSettings()){ showToast('error','Not allowed','Only admins, or someone given Settings & connections, can change this.'); return; }
   const name = document.getElementById('appNameInput').value.trim();
   const description = document.getElementById('appDescriptionInput').value.trim();
   const color = document.getElementById('brandColorInput').value;
@@ -339,7 +339,7 @@ async function toggleNotificationMute(type, muted){
 }
 
 async function saveAiProvider(provider){
-  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  if(!canManageSettings()){ showToast('error','Not allowed','Only admins, or someone given Settings & connections, can change this.'); return; }
   settings.aiProvider = provider;
   const ok = await persistSettings();
   ok ? showToast('success','Saved', provider==='openai' ? 'Weekly insights now use ChatGPT.' : 'Weekly insights now use Claude.') : showToast('error','Save failed','Could not save — try again.');
@@ -350,12 +350,12 @@ function renderAiProviderChoice(){
   // inputs — a non-admin shouldn't see connection status, model strings,
   // or the proactive-insights controls at all.
   const adminOnly = document.getElementById('adminOnlyAiSettings');
-  if(adminOnly) adminOnly.style.display = isAdmin() ? 'block' : 'none';
+  if(adminOnly) adminOnly.style.display = canManageSettings() ? 'block' : 'none';
   const provider = settings.aiProvider === 'openai' ? 'openai' : 'claude';
   const claudeRadio = document.getElementById('aiProviderClaude');
   const openaiRadio = document.getElementById('aiProviderOpenai');
-  if(claudeRadio){ claudeRadio.checked = provider==='claude'; claudeRadio.disabled = !isAdmin(); }
-  if(openaiRadio){ openaiRadio.checked = provider==='openai'; openaiRadio.disabled = !isAdmin(); }
+  if(claudeRadio){ claudeRadio.checked = provider==='claude'; claudeRadio.disabled = !canManageSettings(); }
+  if(openaiRadio){ openaiRadio.checked = provider==='openai'; openaiRadio.disabled = !canManageSettings(); }
   document.getElementById('aiProviderCard-claude')?.classList.toggle('active', provider==='claude');
   document.getElementById('aiProviderCard-openai')?.classList.toggle('active', provider==='openai');
   // loadAiProviderConnectionStatus() was previously only wired to the
@@ -368,21 +368,21 @@ function renderAiProviderChoice(){
   // status has come back), covers that gap without spamming the network
   // on every renderAll() pass.
   const claudeStatusEl = document.getElementById('aiConnectionStatus-claude');
-  if(isAdmin() && claudeStatusEl && claudeStatusEl.textContent === 'Checking…'){
+  if(canManageSettings() && claudeStatusEl && claudeStatusEl.textContent === 'Checking…'){
     loadAiProviderConnectionStatus();
   }
   const nameInput = document.getElementById('setAssistantName');
-  if(nameInput && document.activeElement !== nameInput){ nameInput.value = settings.assistantName || ''; nameInput.disabled = !isAdmin(); }
+  if(nameInput && document.activeElement !== nameInput){ nameInput.value = settings.assistantName || ''; nameInput.disabled = !canManageSettings(); }
   const instructionsInput = document.getElementById('setAssistantInstructions');
-  if(instructionsInput && document.activeElement !== instructionsInput){ instructionsInput.value = settings.assistantCustomInstructions || ''; instructionsInput.disabled = !isAdmin(); }
+  if(instructionsInput && document.activeElement !== instructionsInput){ instructionsInput.value = settings.assistantCustomInstructions || ''; instructionsInput.disabled = !canManageSettings(); }
   const claudeModelInput = document.getElementById('setClaudeModel');
   const openaiModelInput = document.getElementById('setOpenaiModel');
   // Placeholders set here, not in the markup — static HTML can't read
   // these JS constants (it used to show the literal "${...}" text).
   if(claudeModelInput) claudeModelInput.placeholder = DEFAULT_CLAUDE_MODEL;
   if(openaiModelInput) openaiModelInput.placeholder = DEFAULT_OPENAI_MODEL;
-  if(claudeModelInput && document.activeElement !== claudeModelInput){ claudeModelInput.value = settings.claudeModel || ''; claudeModelInput.disabled = !isAdmin(); }
-  if(openaiModelInput && document.activeElement !== openaiModelInput){ openaiModelInput.value = settings.openaiModel || ''; openaiModelInput.disabled = !isAdmin(); }
+  if(claudeModelInput && document.activeElement !== claudeModelInput){ claudeModelInput.value = settings.claudeModel || ''; claudeModelInput.disabled = !canManageSettings(); }
+  if(openaiModelInput && document.activeElement !== openaiModelInput){ openaiModelInput.value = settings.openaiModel || ''; openaiModelInput.disabled = !canManageSettings(); }
   // Client email signature fields — same focus-guard pattern as the
   // fields above, so this doesn't clobber whatever's mid-edit on a
   // realtime update or an unrelated renderAll() pass.
@@ -396,7 +396,7 @@ function renderAiProviderChoice(){
   const sigFieldMap = { setSignatureCompanyName:'companyName', setSignatureTeamLine:'teamLine', setSignaturePhone:'phone', setSignatureEmail:'email', setSignatureWebsite:'website', setSignatureAddress:'address' };
   Object.keys(sigFieldMap).forEach(elId=>{
     const el = document.getElementById(elId);
-    if(el && document.activeElement !== el){ el.value = sig[sigFieldMap[elId]] || ''; el.disabled = !isAdmin(); }
+    if(el && document.activeElement !== el){ el.value = sig[sigFieldMap[elId]] || ''; el.disabled = !canManageSettings(); }
   });
 }
 
@@ -407,7 +407,7 @@ function renderAiProviderChoice(){
 // than storing an empty string that every downstream caller would need to
 // separately guard against.
 async function saveAiModel(which, value){
-  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  if(!canManageSettings()){ showToast('error','Not allowed','Only admins, or someone given Settings & connections, can change this.'); return; }
   const trimmed = value.trim();
   if(which === 'claude') settings.claudeModel = trimmed || DEFAULT_CLAUDE_MODEL;
   else settings.openaiModel = trimmed || DEFAULT_OPENAI_MODEL;
@@ -458,7 +458,7 @@ async function loadAiProviderConnectionStatus(){
 }
 
 function openAiProviderConnectModal(provider){
-  if(!isAdmin()){ showToast('error','Not allowed','Only admins can connect a provider.'); return; }
+  if(!canManageSettings()){ showToast('error','Not allowed','Only admins, or someone given Settings & connections, can connect a provider.'); return; }
   const label = provider==='claude' ? 'Claude (Anthropic)' : 'ChatGPT (OpenAI)';
   const keyHint = provider==='claude' ? 'sk-ant-…' : 'sk-…';
   // Only the openai slot supports a custom endpoint — Claude's API shape
@@ -499,7 +499,7 @@ async function submitAiProviderConnect(provider){
 }
 
 async function disconnectAiProvider(provider){
-  if(!isAdmin()){ showToast('error','Not allowed','Only admins can disconnect a provider.'); return; }
+  if(!canManageSettings()){ showToast('error','Not allowed','Only admins, or someone given Settings & connections, can disconnect a provider.'); return; }
   const label = provider==='claude' ? 'Claude' : 'ChatGPT';
   if(!(await confirmDialog(`Disconnect ${label}? Weekly insights won't be able to use it until reconnected (or until a Vercel environment variable is set instead).`, {confirmLabel:'Disconnect', destructive:true}))) return;
   try{
@@ -512,7 +512,7 @@ async function disconnectAiProvider(provider){
 }
 
 async function saveAssistantName(value){
-  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  if(!canManageSettings()){ showToast('error','Not allowed','Only admins, or someone given Settings & connections, can change this.'); return; }
   settings.assistantName = value.trim() || 'Assistant';
   const ok = await persistSettings();
   if(ok){ applyAssistantName(); applyNavLabels(); }
@@ -520,7 +520,7 @@ async function saveAssistantName(value){
 }
 
 async function saveAssistantInstructions(value){
-  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  if(!canManageSettings()){ showToast('error','Not allowed','Only admins, or someone given Settings & connections, can change this.'); return; }
   settings.assistantCustomInstructions = value.trim();
   const ok = await persistSettings();
   ok ? showToast('success','Saved','Custom instructions updated — they apply to the Assistant\'s next reply onward.') : showToast('error','Save failed','Could not save — try again.');
@@ -534,7 +534,7 @@ async function saveAssistantInstructions(value){
 // clients reading the email in most mail apps.
 async function uploadEmailSignatureLogo(file){
   if(!file) return;
-  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  if(!canManageSettings()){ showToast('error','Not allowed','Only admins, or someone given Settings & connections, can change this.'); return; }
   if(!file.type.startsWith('image/')){ showToast('error','Not an image','Please choose an image file.'); return; }
   if(file.size > 2*1024*1024){ showToast('error','Too large','Logo needs to be under 2MB.'); return; }
   const ext = file.name.split('.').pop();
@@ -568,7 +568,7 @@ async function uploadEmailSignatureLogo(file){
 }
 
 async function saveEmailSignatureField(key, value){
-  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  if(!canManageSettings()){ showToast('error','Not allowed','Only admins, or someone given Settings & connections, can change this.'); return; }
   if(!settings.emailSignature) settings.emailSignature = {};
   settings.emailSignature[key] = value.trim();
   const ok = await persistSettings();

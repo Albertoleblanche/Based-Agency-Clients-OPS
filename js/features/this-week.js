@@ -16,7 +16,7 @@ function closeWeekPanel(){ window._weekSel = null; window._weekDraftEdit = null;
 
 // Who the update waits on, the row's words and its one button. bucket: 'now' | 'wait'.
 function weekTodo(w){
-  const me = myName(), approver = canApprove(), c = w.c, d = w.draft;
+  const me = myName(), approver = canApproveUpdates(), c = w.c, d = w.draft;
   const holder = w.holder && w.holder !== 'approvers' ? w.holder : null, who = firstName(holder || w.owner || '');
   const remind = [`remindHolder('${c.id}')`, 'Remind ' + who];
   if(w.done >= 3 && winViaWhatsapp(c)){
@@ -80,7 +80,7 @@ function wbEntry(c, monday, today){
   const lateDays = sentNow ? 0 : Math.round((today - at) / 864e5);
   // Who has it: the owner until there's a draft, then its writer; approvers while it's in review
   // (and to send an approved email); a WhatsApp win goes back to whoever sends it.
-  const approver = canApprove(), wa = step === 'approved' && winViaWhatsapp(c);
+  const approver = canApproveUpdates(), wa = step === 'approved' && winViaWhatsapp(c);
   let whoFull = sentNow ? '' : step === 'review' || (step === 'approved' && !wa) ? (approver ? me : 'approvers')
     : wa ? (winSendState(w.draft).k === 'copied' ? winSendState(w.draft).by : w.draft.author)
     : step === 'draft' ? w.draft.author : (w.holder && w.holder !== 'approvers' ? w.holder : w.owner) || '';
@@ -114,7 +114,7 @@ function renderThisWeek(){
   const rows = Object.entries(byWho).sort((a, b) => (b[0] === me) - (a[0] === me) || b[1].length - a[1].length).map(([full, es]) => {
     const late = es.filter(e => e.late).length, name = !full ? 'No owner yet' : full === me ? 'You' : full === 'approvers' ? 'Approvers' : full;
     const steps = WB_STEPS.filter(([k]) => es.some(e => e.step === k)).map(([k, t]) => `${es.filter(e => e.step === k).length} ${t.toLowerCase()}`).join(', ');
-    const remind = !full ? (canApprove() ? `<a class="x-lnk" href="#" onclick="clBulkEditClients([${es.map(e => `'${e.c.id}'`).join(',')}]);return false;">Set Owner${es.length === 1 ? '' : 's'}</a>` : '')
+    const remind = !full ? (canEditClients() ? `<a class="x-lnk" href="#" onclick="clBulkEditClients([${es.map(e => `'${e.c.id}'`).join(',')}]);return false;">Set Owner${es.length === 1 ? '' : 's'}</a>` : '')
       : full !== me && full !== 'approvers' && profileByName(full) ? `<a class="x-lnk" href="#" onclick="remindHolders([${es.map(e => `'${e.c.id}'`).join(',')}]);return false;">Remind</a>` : '';
     return `<li><b>${escapeHtml(name)}</b><span class="c">${es.length}</span><span class="s">${late ? `<em>${late} late</em> · ` : ''}${escapeHtml(steps)}</span>${remind}</li>`;
   });
@@ -200,7 +200,7 @@ async function saveWeekDraftEdit(clientId, author){
   renderThisWeek(); showToast('success', 'Draft saved', '');
 }
 function weekPanelHtml(w){
-  const c = w.c, me = myName(), d = w.draft, approver = canApprove();
+  const c = w.c, me = myName(), d = w.draft, approver = canApproveUpdates();
   const t = w.sent ? null : (w.todo || weekTodo(w));
   const holder = w.holder && w.holder !== 'approvers' ? w.holder : w.owner;
   let eyebrow, title, sub, acts = '';
@@ -300,7 +300,7 @@ async function sendDraftForReview(id, author){
   if(draftHasNoWork(c, getDraftFor(c, author))){ showToast('error', 'Nothing left in this draft', 'Everything it was written from was deleted. Rewrite it from what’s logged now, or log the work first.'); renderAll(); return; }
   const ok = await saveDraftFor(id, author, { readyToNotify: true });
   if(!ok){ showToast('error', 'Couldn’t send for review', 'Try again in a moment.'); return; }
-  const approvers = teamProfiles.filter(p => (p.role === 'admin' || p.role === 'approver') && p.id !== currentUser?.id);
+  const approvers = teamWithAccess('approve_updates');
   for(const a of approvers) await sendNotification(a.id, 'draft_ready', `${c.name}: draft ready for review`, `${author}'s weekly update is ready.`, 'teamqueue', c.id);
   showToast('success', 'Sent for review', `Approvers get a notification. You’ll get one when it’s ${typeof winViaWhatsapp === 'function' && winViaWhatsapp(c) ? 'approved' : 'sent'}.`);
   renderAll();

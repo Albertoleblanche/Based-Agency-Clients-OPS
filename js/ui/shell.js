@@ -41,7 +41,7 @@ function newMenuItems(){
     ['Start Timer', 'timer', "openTimerModal()"],
     ['Time Worked', 'clock', "openManualEntryModal()"],
   ];
-  if(typeof canApprove === 'function' && canApprove()) items.push(['Client', 'building-2', "openAddClientForm()"]);
+  if(typeof canEditClients === 'function' && canEditClients()) items.push(['Client', 'building-2', "openAddClientForm()"]);
   return items;
 }
 function toggleNewMenu(){
@@ -106,7 +106,7 @@ function updateShellBadges(){
   if(typeof attentionEligibleClients === 'function'){
     const list = attentionEligibleClients();
     // All Clients: for admins and approvers, the clients waiting for setup (Nov 23); nothing for others
-    set('navClientsBadge', canApprove() && typeof setupClients === 'function' ? setupClients().length : 0);
+    set('navClientsBadge', canEditClients() && typeof setupClients === 'function' ? setupClients().length : 0);
     const cb = document.getElementById('navClientsBadge'); if(cb) cb.title = cb.textContent !== '0' ? `${cb.textContent} need${cb.textContent === '1' ? 's' : ''} setup` : '';
     set('navHealthBadge', (typeof healthScopeClients === 'function' ? healthScopeClients() : list).filter(c => clientHealth(c).level !== 'g').length);
   }

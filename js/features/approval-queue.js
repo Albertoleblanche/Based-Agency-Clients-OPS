@@ -488,7 +488,7 @@ function teamQueueMemberClients(member, filterKey){
   // have no personal Approval Queue tab (see applyRoleVisibility()), so
   // Team Queue is where they take their own work from logged to sent.
   const readyForReview = (c, author) => {
-    if(author===myName() && canApprove()) return true;
+    if(author===myName() && canApproveUpdates()) return true;
     const d = getDraftFor(c, author);
     if(d.draftStatus==='approved') return true;
     if(d.draftStatus!=='pending') return false;
@@ -528,7 +528,7 @@ function renderTeamQueue(){
   updateTeamQueueFilterCounts();
   updateTeamQueueFiltersActiveBadge();
   const actionsRow = document.getElementById('adminOnlyQueueActionsRow');
-  if(actionsRow) actionsRow.style.display = canApprove() ? 'flex' : 'none';
+  if(actionsRow) actionsRow.style.display = canApproveUpdates() ? 'flex' : 'none';
   if(!slackChannelsLoaded) loadSlackClientChannels().then(renderTeamQueue);
   if(!ac.length){ el.innerHTML = `<div class="panel">${emptyStateHtml(
     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 21a8 8 0 0 0-16 0" /> <circle cx="10" cy="8" r="5" /> <path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3" /></svg>',
@@ -668,7 +668,7 @@ async function notifyForMemberInternally(memberId){
   if(!member) return;
   const isSelf = member.name === myName();
   const pending = markMemberDraftsReady(member);
-  const approvers = teamProfiles.filter(p => (p.role==='admin' || p.role==='approver') && p.id !== currentUser?.id);
+  const approvers = teamWithAccess('approve_updates');
   if(!approvers.length){ showToast('info','Nobody to notify', 'No other admins or approvers on the team yet.'); return; }
   for(const approver of approvers){
     await sendNotification(approver.id, 'draft_ready', `${member.name}'s drafts ready for approval`,
@@ -723,13 +723,13 @@ function queueCardHtml(c, scopeAuthor, showAuthor, selected, view){
         // (approveAndSendOwnDraft), rather than making them click Approve
         // and then Send on their own work as if someone else needed to
         // sign off on it first.
-        const canSkipApproval = d.draftStatus==='pending' && scopeAuthor===myName() && canApprove();
+        const canSkipApproval = d.draftStatus==='pending' && scopeAuthor===myName() && canApproveUpdates();
         // Once a draft has actually been sent, "Send"/"Slack" stop being
         // the relevant actions — the one useful new action at that point
         // is archiving it off the board (see archiveSentDraft()), so that
         // replaces them here rather than sitting alongside them.
         if(d.draftStatus==='approved' && d.draftSentAt){
-          if(!canApprove()) return `
+          if(!canApproveUpdates()) return `
       <button class="btn btn-brand" onclick="openQueueCardModal('${c.id}',${jsArg(scopeAuthor||'')})"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /> <circle cx="12" cy="12" r="3" /></svg>Details</button>
       `;
           return `
@@ -738,7 +738,7 @@ function queueCardHtml(c, scopeAuthor, showAuthor, selected, view){
       `;
         }
         if(d.draftStatus==='approved' || canSkipApproval){
-          if(!canApprove()) return `
+          if(!canApproveUpdates()) return `
       <button class="btn btn-brand" onclick="openQueueCardModal('${c.id}',${jsArg(scopeAuthor||'')})"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /> <circle cx="12" cy="12" r="3" /></svg>Details</button>
       `;
           return `
@@ -842,19 +842,19 @@ function queueDetailHtml(c, author){
       <div class="q-bulk">
         ${shownImprovements.length ? `<div class="q-bulk-title">Logged ${activeDateFilterLabel()} (${shownImprovements.length}) — ${shownImprovements.filter(i=>i.includeInEmail!==false).length} included in email</div><div class="q-bulk-list"><ul>${shownImprovements.map(i=>`<li style="${i.includeInEmail===false?'opacity:.55;':''}">${i.includeInEmail===false ? '<span style="color:var(--muted-lt);font-size:10.5px;">[not in email]</span> ' : ''}${escapeHtml(i.text)} — <span style="color:var(--muted-lt);">${escapeHtml(i.author)}</span></li>`).join('')}</ul></div>` : `<i>No improvements logged by ${escapeHtml(author)} ${activeDateFilterLabel()} — nothing to send.</i>`}
       </div>
-      ${d.draft ? `<textarea spellcheck="true" class="draft" id="draft-${c.id}" ${d.draftStatus==='approved' && !canApprove() ? 'disabled' : ''}>${escapeHtml(d.draft)}</textarea>` : ''}
+      ${d.draft ? `<textarea spellcheck="true" class="draft" id="draft-${c.id}" ${d.draftStatus==='approved' && !canApproveUpdates() ? 'disabled' : ''}>${escapeHtml(d.draft)}</textarea>` : ''}
       ${d.draft && !c.email ? `<span class="warn-text">No client email on file — add one in Clients</span>` : ''}
     </div>
     <div class="modal-actions">
       ${d.draftStatus==='approved' && d.draftSentAt ? `
       <span style="font-size:14px;color:var(--muted-lt);">✓ Sent on ${new Date(d.draftSentAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} — nothing left to do here. New work logged by ${escapeHtml(author)} for ${escapeHtml(c.name)} will start a fresh draft cycle on its own.</span>
       ` : `
-      ${c.improvements.some(i=>i.author===author) && !(d.draftStatus==='approved' && !canApprove()) && canGenerateOrRegenerateDraft(c, author) ? `<button class="btn btn-dark" id="gen-${c.id}" onclick="generateDraft('${c.id}',${jsArg(author)})" title="${d.draft?'Regenerate':'Generate'} with AI"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" /> <path d="M20 2v4" /> <path d="M22 4h-4" /> <circle cx="4" cy="20" r="2" /></svg>${d.draft?'Regenerate':'Generate'}</button>` : ''}
-      ${d.draft && canApprove() ? (author===myName() ? `<button class="btn btn-brand" onclick="approveAndSendOwnDraft('${c.id}',${jsArg(author)})" ${d.draftStatus==='approved'?'disabled':''}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /> <path d="m21.854 2.147-10.94 10.939" /></svg>Send</button>
+      ${c.improvements.some(i=>i.author===author) && !(d.draftStatus==='approved' && !canApproveUpdates()) && canGenerateOrRegenerateDraft(c, author) ? `<button class="btn btn-dark" id="gen-${c.id}" onclick="generateDraft('${c.id}',${jsArg(author)})" title="${d.draft?'Regenerate':'Generate'} with AI"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" /> <path d="M20 2v4" /> <path d="M22 4h-4" /> <circle cx="4" cy="20" r="2" /></svg>${d.draft?'Regenerate':'Generate'}</button>` : ''}
+      ${d.draft && canApproveUpdates() ? (author===myName() ? `<button class="btn btn-brand" onclick="approveAndSendOwnDraft('${c.id}',${jsArg(author)})" ${d.draftStatus==='approved'?'disabled':''}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /> <path d="m21.854 2.147-10.94 10.939" /></svg>Send</button>
       <button class="btn btn-outline" onclick="skipDraft('${c.id}',${jsArg(author)})" title="Excludes these improvements from future drafts too — they won't reappear next week">Skip &amp; exclude</button>` : `<button class="btn btn-brand" onclick="approveDraft('${c.id}',${jsArg(author)})" ${d.draftStatus==='approved'?'disabled':''}>Approve</button>
       <button class="btn btn-outline" onclick="skipDraft('${c.id}',${jsArg(author)})" title="Excludes these improvements from future drafts too — they won't reappear next week">Skip &amp; exclude</button>`) : ''}
-      ${d.draft && !canApprove() && d.draftStatus!=='approved' ? `<span class="warn-text" style="color:var(--muted-lt);">Only admins and approvers can approve or skip drafts.</span>` : ''}
-      ${d.draftStatus==='approved' && !canApprove() ? `<span style="font-size:14px;color:var(--muted-lt);">✓ ${escapeHtml(author)}'s update was approved.</span>` : ''}
+      ${d.draft && !canApproveUpdates() && d.draftStatus!=='approved' ? `<span class="warn-text" style="color:var(--muted-lt);">Only admins and approvers can approve or skip drafts.</span>` : ''}
+      ${d.draftStatus==='approved' && !canApproveUpdates() ? `<span style="font-size:14px;color:var(--muted-lt);">✓ ${escapeHtml(author)}'s update was approved.</span>` : ''}
       `}
     </div>`;
 }
@@ -957,7 +957,7 @@ async function generateDraft(id, author){
   if(!c) return;
   const d = getDraftFor(c, author);
   if(!canGenerateOrRegenerateDraft(c, author)){
-    showToast('error','Not allowed', (d.draftStatus==='pending' && d.readyToNotify===true && !canApprove())
+    showToast('error','Not allowed', (d.draftStatus==='pending' && d.readyToNotify===true && !canApproveUpdates())
       ? "This draft's already been marked ready for approval — an admin or approver needs to act on it before it can be regenerated."
       : d.draft
         ? 'Only admins, approvers, or the person this draft belongs to can regenerate it.'
@@ -980,7 +980,7 @@ async function generateDraft(id, author){
   // A part of the client's update (Nov 22): each person writes theirs from their own work; the parts
   // go to the client as one email. Checked: this author's work for this update.
   const thisUpdate = new Set(clientWeek(c).forEmail.filter(i => i.author === author).map(i => i.id));
-  const eligibleImprovements = canApprove() ? allEligible : allEligible.filter(i => i.author === author);
+  const eligibleImprovements = canApproveUpdates() ? allEligible : allEligible.filter(i => i.author === author);
   if(!eligibleImprovements.length){
     showToast('error','Nothing to include', c.improvements.some(i=>i.author===author)
       ? `${author} has logged items for ${c.name}, but none are marked "Include in email" yet — review them in Past Improvements.`
@@ -1054,7 +1054,7 @@ async function confirmGenerateDraftSelection(id, author){
     // approvers as awaiting review until the owning member explicitly
     // clicks Ready to Notify again.
     // An approver rewriting a draft that's in Review keeps it there: they're the one reviewing it.
-    fields.readyToNotify = !!(d.readyToNotify && !d.draftSentAt && canApprove() && !stayedApproved);
+    fields.readyToNotify = !!(d.readyToNotify && !d.draftSentAt && canApproveUpdates() && !stayedApproved);
     // Exactly what's in this draft cycle, from the picker's selection —
     // not re-derived from a date range. Read back by approveDraft() to
     // know precisely which rows to flip include_in_email off for.
@@ -1245,14 +1245,14 @@ function canGenerateOrRegenerateDraft(c, author){
   // reviewing it would silently change what they're looking at.
   // Approvers/admins keep full control regardless, since they're the
   // ones with authority over what happens next.
-  if(d.draftStatus==='pending' && d.readyToNotify===true && !canApprove()) return false;
+  if(d.draftStatus==='pending' && d.readyToNotify===true && !canApproveUpdates()) return false;
   // Each person can always work on their own draft (subject to the lock
   // above) — draft state is now genuinely per-author, so "is this my own
   // draft" replaces the old "did I contribute to the shared draft"
   // question entirely. Anyone else's draft is admin/approver territory,
   // matching their oversight role across the whole team.
   if(author === myName()) return true;
-  return canApprove();
+  return canApproveUpdates();
 }
 
 // Whoever's actual logged work is included in this specific draft — reads
@@ -1282,7 +1282,7 @@ function queueDraftTextarea(id){
 }
 
 async function approveDraft(id, author, opts){
-  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can approve drafts.'); return false; }
+  if(!canApproveUpdates()){ showToast('error','Not allowed','Only admins and approvers can approve drafts.'); return false; }
   const ta = queueDraftTextarea(id);
   { const c0 = clients.find(x=>x.id===id); if(c0 && blockIfWorkDeleted(c0, getDraftFor(c0, author))) return false; }
   setBtnLoading(clickedBtn(), 'Approving…');
@@ -1356,7 +1356,7 @@ async function approveAndSendOwnDraft(id, author){
 }
 
 async function skipDraft(id, author){
-  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can skip drafts.'); return; }
+  if(!canApproveUpdates()){ showToast('error','Not allowed','Only admins and approvers can skip drafts.'); return; }
   setBtnLoading(clickedBtn(), 'Skipping…');
   await loadAll();
   const c = clients.find(x=>x.id===id);

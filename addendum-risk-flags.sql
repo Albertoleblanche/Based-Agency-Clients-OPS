@@ -25,10 +25,11 @@ create or replace function public.rf_is_team() returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (select 1 from public.team_profiles tp where tp.id = auth.uid() and coalesce(tp.access_revoked, false) = false);
 $$;
+-- (admins, approvers, and anyone an admin let edit clients: addendum-extra-access.sql)
 create or replace function public.rf_is_lead() returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (select 1 from public.team_profiles tp where tp.id = auth.uid() and coalesce(tp.access_revoked, false) = false
-                 and tp.role in ('admin', 'approver'));
+                 and (tp.role in ('admin', 'approver') or coalesce(to_jsonb(tp.extra_permissions), '[]'::jsonb) ? 'edit_clients'));
 $$;
 grant execute on function public.rf_is_team() to authenticated;
 grant execute on function public.rf_is_lead() to authenticated;

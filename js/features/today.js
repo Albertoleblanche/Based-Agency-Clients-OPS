@@ -8,7 +8,7 @@ function todayPlural(n, one, many){ return `${n} ${n === 1 ? one : (many || one 
 // Drafts waiting on the person looking at the screen. Approvers: what the team sent for
 // review plus their own drafts. Everyone else: their own drafts that are written.
 function todayWaitingDrafts(){
-  const me = myName(), approver = canApprove(), out = [];
+  const me = myName(), approver = canApproveUpdates(), out = [];
   attentionEligibleClients().forEach(c => (c.drafts || []).forEach(d => {
     if(d.draftStatus !== 'pending' || d.draftSentAt || draftHasNoWork(c, d)) return;   // a draft with nothing behind it isn't waiting on anyone
     const mine = d.author === me;
@@ -61,8 +61,8 @@ function todayRowAction(w){
     if(sender === me) return st.k === 'copied' ? [`markWinSent('${c.id}',${jsArg(d.author)})`, 'Mark as Sent'] : [`copyWinForWhatsapp('${c.id}',${jsArg(d.author)})`, 'Copy for WhatsApp'];
     return [`openWeekClient('${c.id}')`, 'Open'];
   }
-  if(w.done >= 3) return canApprove() ? [`sendApprovedDraft('${c.id}',${jsArg(d.author)})`, 'Send Now'] : d && d.author === me ? [`openReviewDraft('${c.id}',${jsArg(d.author)})`, 'Open'] : [`openWeekClient('${c.id}')`, 'Open'];
-  if(w.done === 2) return canApprove() || (d && d.author === me) ? [`openReviewDraft('${c.id}',${jsArg(d.author)})`, 'Open'] : [`openWeekClient('${c.id}')`, 'Open'];
+  if(w.done >= 3) return canApproveUpdates() ? [`sendApprovedDraft('${c.id}',${jsArg(d.author)})`, 'Send Now'] : d && d.author === me ? [`openReviewDraft('${c.id}',${jsArg(d.author)})`, 'Open'] : [`openWeekClient('${c.id}')`, 'Open'];
+  if(w.done === 2) return canApproveUpdates() || (d && d.author === me) ? [`openReviewDraft('${c.id}',${jsArg(d.author)})`, 'Open'] : [`openWeekClient('${c.id}')`, 'Open'];
   if(holder && holder !== me) return [`remindHolder('${c.id}')`, 'Remind ' + firstName(holder)];
   if(d && draftHasNoWork(c, d)) return w.logged.some(i => i.author === me && i.includeInEmail !== false) ? [`generateDraft('${c.id}',${jsArg(me)})`, 'Rewrite Draft'] : [`openQueueLogImprovementModal('${c.id}')`, 'Log Improvement'];
   if(d) return [`sendDraftForReview('${c.id}',${jsArg(d.author)})`, 'Send for Review'];
@@ -102,7 +102,7 @@ function hmText(min){ min = Math.round(min); const h = Math.floor(min / 60), m =
 // Everything Today shows, worked out once: the lead, what else is yours, what's waiting on others,
 // and what's done. The page draws it; the layout can change without touching this.
 function todayModel(){
-  const me = myName(), approver = canApprove(), now = rNow(), todayStr = toDateStr(now);
+  const me = myName(), approver = canApproveUpdates(), now = rNow(), todayStr = toDateStr(now);
   const list = attentionEligibleClients();
   const ws = list.map(clientWeek);
   const behind = ws.filter(w => myClientsFilter(w.c) && needsUpdate(w)).sort(dueOrder);
@@ -217,9 +217,9 @@ function wkDay(ds){
   let lead = [];
   if(m.lead && !m.lead.item){
     if(m.lead.c) lead = [{ src: 'update', c: m.lead.c, title: m.lead.title, sub: m.lead.subHtml || escapeHtml(m.lead.sub || ''), go: m.lead.go, step: m.lead.label }];
-    else lead = todayWaitingDrafts().filter(x => canApprove() || !x.d.readyToNotify).map(x => {
+    else lead = todayWaitingDrafts().filter(x => canApproveUpdates() || !x.d.readyToNotify).map(x => {
       const c = x.c, n = shortClientName(c.name), a = jsArg(x.d.author), me = myName(), sub = escapeHtml(c.name);
-      if(canApprove()) return { src: 'update', c, title: `Review ${n}’s draft`, sub, go: `openReviewDraft('${c.id}',${a})`, step: 'Open' };
+      if(canApproveUpdates()) return { src: 'update', c, title: `Review ${n}’s draft`, sub, go: `openReviewDraft('${c.id}',${a})`, step: 'Open' };
       if(!draftHasNoWork(c, x.d)) return { src: 'update', c, title: `Send ${n}’s draft for review`, sub, go: `sendDraftForReview('${c.id}',${a})`, step: 'Send for Review' };
       const mineLogged = (clientWeek(c).logged || []).some(i => i.author === me && i.includeInEmail !== false);
       return mineLogged ? { src: 'update', c, title: `Rewrite ${n}’s draft`, sub, go: `generateDraft('${c.id}',${jsArg(me)})`, step: 'Rewrite Draft' }
@@ -304,7 +304,7 @@ function wkHover(ds){
 // What's due on another day of this week: wins due that day (yours, or waiting on approvers if you
 // are one), tasks due, follow-ups and notes to come back to. Past days also list what got done.
 function todayDayModel(ds){
-  const me = myName(), approver = canApprove(), now = rNow(), mon = todayMonday(now), wd = new Date(ds + 'T12:00:00').getDay();
+  const me = myName(), approver = canApproveUpdates(), now = rNow(), mon = todayMonday(now), wd = new Date(ds + 'T12:00:00').getDay();
   const items = [], others = [], done = [];
   // A later day skips what's already on Today (a draft to review now isn't also Thursday's), so each client shows once.
   const onToday = ds > toDateStr(now) ? (t => new Set(t.items.concat(t.others).map(x => x.c && x.c.id).filter(Boolean)))(wkDay(toDateStr(now))) : new Set();

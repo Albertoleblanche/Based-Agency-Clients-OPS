@@ -51,6 +51,7 @@
 // cron-google-calendar-sync.js now, not here — this file only handles
 // requests from a real signed-in user's browser.
 
+const { profileHasAccess } = require('../lib/access');
 const { createClient } = require('@supabase/supabase-js');
 const { syncGoogleCalendarForUser } = require('../lib/google-calendar-sync');
 const {
@@ -203,7 +204,7 @@ module.exports = async function handler(req, res) {
 
     // ================= GRANOLA =================
     if (provider === 'granola') {
-      const { data: me } = await admin.from('team_profiles').select('role, access_revoked, name').eq('id', userId).maybeSingle();
+      const { data: me } = await admin.from('team_profiles').select('role, access_revoked, name, extra_permissions').eq('id', userId).maybeSingle();
       if (!me || me.access_revoked) { res.status(403).json({ error: 'Only team members can see this.' }); return; }
       const viewer = { id: userId, role: me.role, name: me.name || null, email: userData.user.email };
       const appUrl = (process.env.APP_URL || `https://${req.headers['x-forwarded-host'] || req.headers.host}`).replace(/\/+$/, '');
@@ -218,7 +219,7 @@ module.exports = async function handler(req, res) {
         res.status(r.error ? (r.status || 400) : 200).json(r);
         return;
       }
-      if (me.role !== 'admin') { res.status(403).json({ error: 'Only admins can manage the Granola connection.' }); return; }
+      if (!profileHasAccess(me, 'manage_settings')) { res.status(403).json({ error: 'Only admins, or someone given Settings & connections, can manage the Granola connection.' }); return; }
       if (action === 'connect') {
         const r = await connectGranola(admin, { key, appUrl, userId });
         if (r.error) { res.status(400).json(r); return; }
@@ -286,8 +287,10 @@ module.exports = async function handler(req, res) {
 
     // ================= HARVEST =================
     if (provider === 'harvest') {
-    const { data: profile } = await admin.from('team_profiles').select('role').eq('id', userId).maybeSingle();
+    const { data: profile } = await admin.from('team_profiles').select('role, access_revoked, extra_permissions').eq('id', userId).maybeSingle();
     const isAdmin = profile?.role === 'admin';
+    // extra access (Nov 25): the connection is Settings & connections; linking clients is editing them
+    const canSettings = profileHasAccess(profile, 'manage_settings'), canClients = profileHasAccess(profile, 'edit_clients');
 
     if (req.method === 'GET') {
       // select('*') so this still answers before addendum-harvest-sync.sql adds its columns;
@@ -334,8 +337,8 @@ module.exports = async function handler(req, res) {
 
     const isApprover = isAdmin || profile?.role === 'approver';
     const adminActions = ['connect', 'disconnect', 'sync-now'];
-    if (adminActions.includes(action) && !isAdmin) {
-      res.status(403).json({ error: 'Only admins can manage the Harvest connection.' });
+    if (adminActions.includes(action) && !canSettings) {
+      res.status(403).json({ error: 'Only admins, or someone given Settings & connections, can manage the Harvest connection.' });
       return;
     }
 
@@ -368,7 +371,7 @@ module.exports = async function handler(req, res) {
     if (action === 'sync-setup') {
       if (!profile) { res.status(403).json({ error: 'Only team members can sync Harvest.' }); return; }
       if (!connection) { res.status(200).json({ skipped: 'not-connected' }); return; }
-      const force = !!(req.body || {}).force && isApprover;
+      const force = !!(req.body || {}).force && (isApprover || canSettings);
       if (!('setup_synced_at' in connection)) { res.status(200).json({ skipped: 'needs-sql' }); return; }
       const last = connection.setup_synced_at ? new Date(connection.setup_synced_at).getTime() : 0;
       if (!force && Date.now() - last < 10 * 60000) { res.status(200).json({ skipped: 'recent', syncedAt: connection.setup_synced_at }); return; }
@@ -392,7 +395,7 @@ module.exports = async function handler(req, res) {
 
     // Match Harvest Clients: link several at once (the app sends up to 15 per request)
     if (action === 'link-clients') {
-      if (!isApprover) { res.status(403).json({ error: 'Only admins and approvers link clients.' }); return; }
+      if (!canClients) { res.status(403).json({ error: 'Only admins, approvers, or someone who can edit clients link them.' }); return; }
       const links = Array.isArray((req.body || {}).links) ? req.body.links.slice(0, 30) : [];
       if (!links.length) { res.status(400).json({ error: 'Pick the clients to link.' }); return; }
       const results = [];
@@ -409,7 +412,7 @@ module.exports = async function handler(req, res) {
     }
     // The time form's Link: Harvest knows this client under another name (lib/harvest-sync.js)
     if (action === 'link-harvest') {
-      if (!isApprover) { res.status(403).json({ error: 'Only admins and approvers link clients.' }); return; }
+      if (!canClients) { res.status(403).json({ error: 'Only admins, approvers, or someone who can edit clients link them.' }); return; }
       const { harvestId, targetId } = req.body || {};
       if (!harvestId || !targetId) { res.status(400).json({ error: 'Pick the clients to link.' }); return; }
       const r = await moveHarvestLink(admin, Number(harvestId), String(targetId));
@@ -417,7 +420,7 @@ module.exports = async function handler(req, res) {
       return;
     }
     if (action === 'link-client') {
-      if (!isApprover) { res.status(403).json({ error: 'Only admins and approvers link clients.' }); return; }
+      if (!canClients) { res.status(403).json({ error: 'Only admins, approvers, or someone who can edit clients link them.' }); return; }
       const { clientId, targetId } = req.body || {};
       if (!clientId || !targetId || clientId === targetId) { res.status(400).json({ error: 'Pick the client it’s the same as.' }); return; }
       const r = await linkHarvestClient(admin, String(clientId), String(targetId));

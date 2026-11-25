@@ -15,9 +15,9 @@ function applyRoleVisibility(){
   const memberFilterField = document.getElementById('improvementsMemberFilterField');
   if(memberFilterField) memberFilterField.style.display = canApprove() ? 'block' : 'none';
   const addClientBtn = document.getElementById('addClientBtn');
-  if(addClientBtn) addClientBtn.style.display = canApprove() ? 'inline-flex' : 'none';
+  if(addClientBtn) addClientBtn.style.display = canEditClients() ? 'inline-flex' : 'none';
   const editClientDetailBtn = document.getElementById('editClientDetailBtn');
-  if(editClientDetailBtn) editClientDetailBtn.style.display = canApprove() ? 'inline-flex' : 'none';
+  if(editClientDetailBtn) editClientDetailBtn.style.display = canEditClients() ? 'inline-flex' : 'none';
   const teamQueueNavItem = document.getElementById('teamQueueNavItem');
   if(teamQueueNavItem){
     // Review is for approvers (and anyone who sees everyone's drafts). A member's own drafts,
@@ -57,11 +57,11 @@ function applyRoleVisibility(){
   }
   const clientsBulkModeBtn = document.getElementById('clientsBulkModeBtn');
   if(clientsBulkModeBtn){
-    clientsBulkModeBtn.style.display = canApprove() ? 'inline-flex' : 'none';
+    clientsBulkModeBtn.style.display = canEditClients() ? 'inline-flex' : 'none';
     // Bulk delete is admin/approver-only — if someone loses that status
     // mid-session while bulk mode happens to be on, back them out of it
     // rather than leave selection UI up they can no longer act on.
-    if(!canApprove() && clientBulkModeOn) toggleClientBulkMode();
+    if(!canEditClients() && clientBulkModeOn) toggleClientBulkMode();
   }
   const teammatesTab = document.getElementById('teammatesReportTab');
   if(teammatesTab){
@@ -94,13 +94,13 @@ function applyRoleVisibility(){
   }
   const settingsGeneralTab = document.getElementById('settingsGeneralTab');
   if(settingsGeneralTab){
-    settingsGeneralTab.style.display = canApprove() ? 'flex' : 'none';
-    if(!canApprove() && document.getElementById('stab-general')?.classList.contains('active')){ switchSettingsTab('integrations'); }
+    settingsGeneralTab.style.display = canChangeRules() ? 'flex' : 'none';
+    if(!canChangeRules() && document.getElementById('stab-general')?.classList.contains('active')){ switchSettingsTab('integrations'); }
   }
   const settingsFieldsTab = document.getElementById('settingsFieldsTab');
   if(settingsFieldsTab){
-    settingsFieldsTab.style.display = canApprove() ? 'flex' : 'none';
-    if(!canApprove() && document.getElementById('stab-fields')?.classList.contains('active')){ switchSettingsTab('integrations'); }
+    settingsFieldsTab.style.display = canChangeRules() ? 'flex' : 'none';
+    if(!canChangeRules() && document.getElementById('stab-fields')?.classList.contains('active')){ switchSettingsTab('integrations'); }
   }
   const settingsNotifTab = document.getElementById('settingsNotifTab');
   if(settingsNotifTab){
@@ -382,7 +382,7 @@ async function openLinkedItem(view, id){
     if(view === 'health'){ window._healthSel = id; if(typeof renderHealth === 'function') renderHealth(); return; }
     if(view === 'teamqueue' && typeof reviewItems === 'function' && typeof openReviewDraft === 'function'){
       const all = Object.values(reviewItems()).flat().filter(x => x.c.id === id);
-      const x = (!canApprove() && all.find(y => y.d.author === myName())) || all[0];
+      const x = (!canApproveUpdates() && all.find(y => y.d.author === myName())) || all[0];
       if(x) openReviewDraft(x.c.id, x.d.author);
     }
   }catch(e){ console.warn('openLinkedItem', e); }
@@ -468,7 +468,7 @@ async function switchView(name){
     // Called here, ahead of 7 unrelated network requests, instead of after
     // them — there was never a reason for this page specifically to wait.
     if(name==='profile'){ renderProfilePage(); }
-    if(name==='settings' && typeof renderSettingsView === 'function'){ renderSettingsView(); if(settingsTab === 'integrations') loadIntegrationStatuses(); if(settingsTab === 'ai' && isAdmin()) loadAiProviderConnectionStatus(); if(settingsTab === 'whatsapp' && typeof waStartPoll === 'function') waStartPoll(); }
+    if(name==='settings' && typeof renderSettingsView === 'function'){ renderSettingsView(); if(settingsTab === 'integrations') loadIntegrationStatuses(); if(settingsTab === 'ai' && canManageSettings()) loadAiProviderConnectionStatus(); if(settingsTab === 'whatsapp' && typeof waStartPoll === 'function') waStartPoll(); }
     // WhatsApp shows what it has straight away and loads its own tables, instead of waiting for
     // everything else below to load first.
     if(name==='whatsapp' && typeof openWhatsappView === 'function') openWhatsappView();
@@ -525,12 +525,12 @@ function switchSettingsTab(name){
   if(name==='notifications') renderNotificationPrefs();
   if(name==='ai'){
     const adminOnly = document.getElementById('adminOnlyAiSettings');
-    if(adminOnly) adminOnly.style.display = isAdmin() ? 'block' : 'none';
-    if(isAdmin()) loadAiProviderConnectionStatus();
+    if(adminOnly) adminOnly.style.display = canManageSettings() ? 'block' : 'none';
+    if(canManageSettings()) loadAiProviderConnectionStatus();
   }
   if(name==='integrations'){
     const approverOnly = document.getElementById('approverOnlyIntegrations');
-    if(approverOnly) approverOnly.style.display = canApprove() ? 'block' : 'none';
-    if(canApprove()) loadSlackChannelsPanel();
+    if(approverOnly) approverOnly.style.display = canChangeRules() ? 'block' : 'none';
+    if(canChangeRules()) loadSlackChannelsPanel();
   }
 }

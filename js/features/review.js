@@ -109,7 +109,7 @@ function renderTeamQueue(){
 <div class="tx"><b>${escapeHtml(x.c.name)}${focusMark(x.c)}</b><span class="s wn-rs">${chGlyph(x.c)}<span>${line}</span></span></div>
 <div class="rvn-rr">${reviewTab === 'approved' ? '' : when ? `<time>${escapeHtml(when)}</time>` : ''}${flag}</div></a>`;
   }).join('') || `<div class="rvn-empty"><b>${reviewTab === 'waiting' ? 'Nothing waiting' : reviewTab === 'approved' ? 'Nothing approved and unsent' : 'Nothing sent this week'}</b>${reviewTab === 'waiting' ? 'Drafts show up here when they’re sent for review.' : ''}</div>`;
-  const sortNote = reviewTab === 'waiting' && !canApprove() ? 'Yours · oldest first' : reviewTab === 'waiting' ? `Oldest first${dueN ? ` · ${lateN ? `${lateN} late` + (dueN > lateN ? `, ${dueN - lateN} due today` : '') : `${dueN} due today`}` : ''}`
+  const sortNote = reviewTab === 'waiting' && !canApproveUpdates() ? 'Yours · oldest first' : reviewTab === 'waiting' ? `Oldest first${dueN ? ` · ${lateN ? `${lateN} late` + (dueN > lateN ? `, ${dueN - lateN} due today` : '') : `${dueN} due today`}` : ''}`
     : reviewTab === 'approved' ? (list.some(x => winViaWhatsapp(x.c)) ? 'Not sent yet · whoever copies a win sends it' : 'Approved, not sent yet') : 'Sent this week · newest first';
   const prevRead = root.querySelector('.rvn-mail')?.scrollTop || 0, prevKey = root.dataset.sel || '';
   root.innerHTML = `<div class="rvn">
@@ -117,7 +117,7 @@ function renderTeamQueue(){
 <div class="rvn-lh"><div class="seg" role="tablist" aria-label="Drafts">${tabs}</div></div>
 <p class="rvn-sort">${sortNote}</p>
 <div class="rvn-rows">${rows}</div>
-${list.length > 1 ? `<p class="rvn-keys"><span><kbd>J</kbd><kbd>K</kbd> next and previous</span>${canApprove() && reviewTab === 'waiting' ? '<span><kbd>⌘</kbd><kbd>↩</kbd> approve &amp; send</span>' : ''}</p>` : ''}
+${list.length > 1 ? `<p class="rvn-keys"><span><kbd>J</kbd><kbd>K</kbd> next and previous</span>${canApproveUpdates() && reviewTab === 'waiting' ? '<span><kbd>⌘</kbd><kbd>↩</kbd> approve &amp; send</span>' : ''}</p>` : ''}
 </section>
 ${(() => {
   // the new look: the letter and "Before you send" are two cards, as on the canvas
@@ -129,7 +129,7 @@ ${(() => {
   root.dataset.sel = sel ? key(sel) : '';
   if(sel && prevKey === key(sel)){ const m = root.querySelector('.rvn-mail'); if(m) m.scrollTop = prevRead; }
   const waitN = rowsOf('waiting').length;
-  if(currentViewName === 'teamqueue') setToolbar(null, canApprove()
+  if(currentViewName === 'teamqueue') setToolbar(null, canApproveUpdates()
     ? `${waitN} win${waitN === 1 ? '' : 's'} waiting${dueN ? ` · ${lateN ? lateN + ' late' : dueN + ' due today'}` : ''}`
     : reviewMemberSub(items));
   const badge = document.getElementById('navTeamPendingBadge');
@@ -143,7 +143,7 @@ function reviewToSend(items){
 }
 function reviewBadgeCount(items){
   items = items || reviewItems();
-  return canApprove() ? reviewRows(items, 'waiting').length : reviewToSend(items).length;
+  return canApproveUpdates() ? reviewRows(items, 'waiting').length : reviewToSend(items).length;
 }
 // A member's subtitle: "1 to send on WhatsApp · 2 waiting for an approver"
 function reviewMemberSub(items){
@@ -153,7 +153,7 @@ function reviewMemberSub(items){
 // "Maya copied it 2:22 PM" · "Bruno sends it, not copied yet" · "Email · you send it"
 function reviewSendWords(c, d){
   const me = myName();
-  if(!winViaWhatsapp(c)) return `Email · ${canApprove() ? 'you send it' : 'an approver sends it'}`;
+  if(!winViaWhatsapp(c)) return `Email · ${canApproveUpdates() ? 'you send it' : 'an approver sends it'}`;
   const st = winSendState(d);
   if(st.k === 'copied') return `${st.by === me ? 'You' : firstName(st.by)} copied it ${st.at ? fmtTime(new Date(st.at)) : ''}`.trim();
   return d.author === me ? 'You send it, not copied yet' : `${firstName(d.author)} sends it, not copied yet`;
@@ -198,14 +198,14 @@ function draftDelta(c, d){
 // send it for review.
 function canReworkDraft(c, d){
   if(d.draftSentAt || d.draftStatus === 'approved') return false;
-  if(canApprove()) return true;
+  if(canApproveUpdates()) return true;
   return d.author === myName() && !d.readyToNotify;
 }
 
 function reviewReadHtml(x, list, split){
   const c = x.c, d = x.d, h = clientHealth(c), w = clientWeek(c), seq = weekHistory(c), ots = onTimeSummary(seq);
   const k = c.id + '|' + d.author, editing = window._reviewEditing === k;
-  const i = list.indexOf(x), approver = canApprove(), mine = d.author === myName();
+  const i = list.indexOf(x), approver = canApproveUpdates(), mine = d.author === myName();
   const tab = d.draftSentAt ? 'sent' : d.draftStatus === 'approved' ? 'approved' : 'waiting';
   const A = `'${c.id}',${jsArg(d.author)}`;
   const dl = draftDelta(c, d), rework = canReworkDraft(c, d);
@@ -277,7 +277,7 @@ ${body}</div>`;
 const PART_STATE_WORDS = { writing: 'Writing, not sent for review', review: 'Waiting for you', approved: 'Approved', sent: 'Sent' };
 // The parts that go in this email: approved ones, ones sent for review, and an approver's own part
 // (they don't send their own for review). Someone else's part still being written doesn't.
-function partInMail(p){ return p.state === 'approved' || p.state === 'review' || p.state === 'sent' || (p.state === 'writing' && p.author === myName() && canApprove()); }
+function partInMail(p){ return p.state === 'approved' || p.state === 'review' || p.state === 'sent' || (p.state === 'writing' && p.author === myName() && canApproveUpdates()); }
 // People with work logged for this update's email and no part yet: their work waits for next time.
 function partsMissing(c, parts){
   const by = {}; clientWeek(c).forEmail.forEach(i => { if(!parts.some(p => p.author === i.author)) by[i.author] = (by[i.author] || 0) + 1; });
@@ -302,7 +302,7 @@ function reviewGroupRowHtml(x, on, seen){
 // stands, and Approve / Edit / Rewrite for that part alone. Parts still being written, and work with
 // no part yet, show where they'd go. One Approve & Send at the bottom sends the parts as one email.
 function reviewPartsHtml(x, list, split){
-  const c = x.c, me = myName(), approver = canApprove(), i = list.indexOf(x), tab = reviewTab;
+  const c = x.c, me = myName(), approver = canApproveUpdates(), i = list.indexOf(x), tab = reviewTab;
   const h = clientHealth(c), w = clientWeek(c), seq = weekHistory(c), ots = onTimeSummary(seq);
   const parts = x.parts, inMail = parts.filter(partInMail), later = tab === 'sent' ? [] : parts.filter(p => !partInMail(p));
   const missing = tab === 'sent' ? [] : partsMissing(c, parts);
@@ -397,7 +397,7 @@ function reviewPartsMore(e, clientId){
   Object.assign(m.style, { position: 'fixed', zIndex: '1200' });
   const r = e.currentTarget.getBoundingClientRect();
   m.style.top = (r.bottom + 4) + 'px'; m.style.right = (window.innerWidth - r.right) + 'px';
-  m.innerHTML = `${waiting && canApprove() && reviewTab !== 'sent' ? `<button class="mi" role="menuitem" onclick="approveAllParts('${clientId}')">${icon('check-circle')}Approve All, Send Later</button><div class="msep"></div>` : ''}
+  m.innerHTML = `${waiting && canApproveUpdates() && reviewTab !== 'sent' ? `<button class="mi" role="menuitem" onclick="approveAllParts('${clientId}')">${icon('check-circle')}Approve All, Send Later</button><div class="msep"></div>` : ''}
 <button class="mi" role="menuitem" onclick="openClientDetail('${clientId}')">${icon('buildings')}Open Client Page</button>
 <button class="mi" role="menuitem" onclick="reviewCopyParts('${clientId}')">${icon('clipboard-text')}Copy Text</button>`;
   document.body.appendChild(m);
@@ -440,7 +440,7 @@ function askWriter(clientId, author){
 
 // The win's rows in the rail: its tier, how the client gets it, the group, and who sends it.
 function reviewWinRowsHtml(c, d, tab){
-  const approver = canApprove(), me = myName(), ch = winChannel(c), A = `'${c.id}',${jsArg(d.author)}`, t = winTier(d);
+  const approver = canApproveUpdates(), me = myName(), ch = winChannel(c), A = `'${c.id}',${jsArg(d.author)}`, t = winTier(d);
   const rows = [];
   if(winsDbReady()) rows.push(`<div class="rvn-kv"><span>Win</span><span>${approver && tab !== 'sent'
     ? `<button class="pop wn-pop" onclick="winTierMenu(event,${A})" aria-label="Tier">${t ? tierTag(t, true) : '<span class="t-3">Pick a tier</span>'}${icon('caret-down', { weight: 'bold' })}</button>` : t ? tierTag(t, true) : '<span class="t-3">No tier</span>'}</span></div>`);
@@ -461,7 +461,7 @@ function reviewWinRowsHtml(c, d, tab){
 // Under a WhatsApp win: approving hands it back to whoever wrote it; once approved, copying it
 // claims it, and anyone else is warned before sending it too.
 function reviewWaFootHtml(c, d, tab, A){
-  const me = myName(), approver = canApprove(), mine = d.author === me, first = firstName(d.author), wa = icon('message-circle');
+  const me = myName(), approver = canApproveUpdates(), mine = d.author === me, first = firstName(d.author), wa = icon('message-circle');
   const auto = winsDbReady() && winGroupFor(c), group = winGroupFor(c) ? escapeHtml(winCleanGroupName(winGroupFor(c).name)) : 'the group';
   const note = (ic, html, cls) => `<span class="rvn-ft-note${cls ? ' ' + cls : ''}">${ic}<span>${html}</span></span><span class="rvn-sp"></span>`;
   if(tab === 'sent'){
@@ -502,7 +502,7 @@ function reviewMore(e, clientId, author){
   const r = e.currentTarget.getBoundingClientRect();
   m.style.top = (r.bottom + 4) + 'px'; m.style.right = (window.innerWidth - r.right) + 'px';
   const A = `'${clientId}',${jsArg(author)}`;
-  m.innerHTML = `${waiting && canApprove() ? `<button class="mi" role="menuitem" onclick="approveDraft(${A})">${icon('check-circle')}Approve, Send Later</button><div class="msep"></div>` : ''}
+  m.innerHTML = `${waiting && canApproveUpdates() ? `<button class="mi" role="menuitem" onclick="approveDraft(${A})">${icon('check-circle')}Approve, Send Later</button><div class="msep"></div>` : ''}
 <button class="mi" role="menuitem" onclick="openClientDetail('${clientId}')">${icon('buildings')}Open Client Page</button>
 ${winViaWhatsapp(c) && !waiting ? '' : `<button class="mi" role="menuitem" onclick="reviewCopy(${A})">${icon('clipboard-text')}Copy Text</button>`}`;
   document.body.appendChild(m);
@@ -529,7 +529,7 @@ document.addEventListener('keydown', e => {
   if(document.querySelector('#appModalOverlay[style*="flex"], .cmdk-overlay[style*="block"]')) return;
   const typing = e.target.closest && e.target.closest('input, textarea, select, [contenteditable="true"]');
   if(e.key === 'Enter' && (e.metaKey || e.ctrlKey)){
-    if(!canApprove() || reviewTab !== 'waiting' || window._reviewEditing) return;
+    if(!canApproveUpdates() || reviewTab !== 'waiting' || window._reviewEditing) return;
     e.preventDefault();
     if(window._reviewSel.author === '*') approveAndSendParts(window._reviewSel.clientId);
     else approveAndSendOwnDraft(window._reviewSel.clientId, window._reviewSel.author);
@@ -544,7 +544,7 @@ document.addEventListener('keydown', e => {
 // Nothing selected because there's nothing in this tab: say what comes here, and where it starts.
 function reviewEmptyHtml(items){
   if(!activeClients().length) return emptyNoClients('Updates written for clients come here to be read and approved before they go out.');
-  if(reviewTab === 'waiting' && !canApprove()) return emptyState({ icon: 'inbox', tone: 'ok', title: 'Nothing waiting',
+  if(reviewTab === 'waiting' && !canApproveUpdates()) return emptyState({ icon: 'inbox', tone: 'ok', title: 'Nothing waiting',
     text: 'Your client updates show here once they’re written. Send one for review and an approver gets a notification; you get one when it’s approved or sent.',
     action: 'Open This Week', onAction: "switchView('approve')",
     link: items.approved.length ? `${items.approved.length} approved, not sent` : '', onLink: "setReviewTab('approved')" });

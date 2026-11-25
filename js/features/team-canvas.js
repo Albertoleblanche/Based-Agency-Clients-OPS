@@ -73,7 +73,7 @@ function emailReqRow(r){
 async function addTitle(){ await addFieldOption('title'); drawTeam(); }
 async function removeTitle(v){ await removeFieldOption('title', v); drawTeam(); }
 
-const ROLE_INFO = [['member', 'Member', 'Logs improvements and time. Can’t approve drafts.'], ['approver', 'Approver', 'Everything a member can do, plus approve, skip and send drafts.'], ['admin', 'Admin', 'Full access, including the team, roles, payroll and settings.']];
+const ROLE_INFO = [['member', 'Member', 'Logs improvements and time.'], ['approver', 'Approver', 'Everything a member can do, plus approve, skip and send drafts, and add and edit clients.'], ['admin', 'Admin', 'Full access, including the team, roles, payroll and settings.']];
 function teamInspHtml(m){
   const { admin, self, full, titleCtl, roles, canRole, extras, slack, rate, owns, fu, acts, danger } = teamParts(m);
   return `<aside class="insp" aria-label="${escapeHtml(m.name)}">
@@ -83,7 +83,7 @@ ${acts ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px">${act
 <div class="set-h" style="margin:22px 0 6px">Job title</div>${titleCtl}
 ${full ? `<div class="set-h" style="margin:22px 0 2px">Permissions</div><div ${canRole ? 'role="radiogroup" aria-label="Permissions"' : ''}>${roles}</div>` : `<div class="set-h" style="margin:22px 0 6px">Role</div><span style="font-size:14px">${escapeHtml(TEAM_ROLE_WORD[m.role] || roleDisplayLabel(m.role))}</span>`}
 ${self && admin ? '<p class="t-2" style="font-size:13px;margin:2px 0 0">You can’t change your own role.</p>' : ''}
-${extras ? `<div class="set-h" style="margin:18px 0 4px">Also allowed</div>${extras}` : ''}
+${extras ? `<div class="set-h" style="margin:18px 0 4px">Extra access</div>${extras}` : ''}
 <div class="set-h" style="margin:18px 0 4px">Details</div>
 ${full ? `<div class="kv" style="align-items:center"><span>Slack</span>${slack}</div>` : ''}
 ${admin ? `<div class="kv"><span>Hourly rate</span><b style="font-weight:500">${rate ? money(rate) : 'None'}</b></div>` : ''}
@@ -105,16 +105,19 @@ function teamParts(m){
     : `<span style="font-size:14px">${escapeHtml(m.title || 'No title')}</span>`;
   const canRole = admin && !self;
   const roles = ROLE_INFO.map(([k, t, d]) => `<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0"${canRole ? ` role="radio" tabindex="0" aria-checked="${m.role === k}" onclick="${m.role === k ? '' : `changeTeamRole('${m.id}','${k}')`}" onkeydown="if(event.key==='Enter'||event.key===' ')this.click()"` : ''}><span class="rd${m.role === k ? ' on' : ''}" aria-hidden="true"></span><div><div style="font-size:14px;font-weight:500">${t}</div><div class="t-2" style="font-size:13px;line-height:1.4">${d}</div></div></div>`).join('');
-  // extra access beyond the role, one switch each
-  const sw = (label, on, js) => `<div class="kv" style="align-items:center"><span style="color:var(--label)">${label}</span><button class="sw${on ? ' on' : ''}" role="switch" aria-checked="${on}" aria-label="${escapeHtml(label)}" onclick="${js}"></button></div>`;
+  // extra access on top of the role (Nov 25), one switch each: approver powers for a member, Settings &
+  // connections for an approver or a member. Admins switch them; you see your own.
+  const rows = extraAccessRows(m);
+  const sw = r => {
+    const label = escapeHtml(r.p.label), sub = r.implied ? 'Comes with Approves and sends updates' : r.p.sub || '';
+    const ctl = admin
+      ? `<button class="sw${r.on ? ' on' : ''}" role="switch" aria-checked="${r.on}" aria-label="${label}"${r.implied ? ' disabled' : ` onclick="changeTeamPermission('${m.id}','${r.p.key}',${!r.on})"`}></button>`
+      : `<b style="font-weight:500">${r.on ? 'Yes' : 'No'}</b>`;
+    return `<div class="kv xa-r" style="align-items:center"><span class="xa-l"><span style="color:var(--label)">${label}</span>${sub ? `<small>${escapeHtml(sub)}</small>` : ''}</span>${ctl}</div>`;
+  };
   let extras = '';
-  if(admin){
-    if(m.role === 'member') extras += sw('Can clear a client’s Risk flag', extra.includes('lower_danger_score'), `changeTeamPermission('${m.id}','lower_danger_score',${!extra.includes('lower_danger_score')})`);
-    if(m.role === 'member') EXTRA_PERMISSIONS_META.filter(p => p.key !== 'lower_danger_score').forEach(p => {
-      const label = { view_team_queue: 'Sees everyone’s drafts', delete_tasks: 'Can delete tasks for good', delete_clients: 'Can restore and delete clients' }[p.key] || p.label;
-      extras += sw(label, extra.includes(p.key), `changeTeamPermission('${m.id}','${p.key}',${!extra.includes(p.key)})`);
-    });
-  }
+  if(admin) extras = rows.map(sw).join('') + (rows.length ? `<p class="xa-n">On top of their role, without changing it. Roles, extra access, passwords and removing people stay with admins.</p>` : '');
+  else if(self) extras = rows.filter(r => r.on).map(sw).join('');
   const rate = admin && typeof payrollRates !== 'undefined' ? payrollRates[m.id] : null;
   const owns = teamOwns(m), fu = teamOpenFollowUps(m);
   const slack = admin
@@ -171,7 +174,7 @@ ${chips}
 <div class="tm-cols${full ? '' : ' is-dir'}">
 ${full ? `<div><div class="tm-sec"><span class="uw-mono">PERMISSIONS</span></div><div ${canRole ? 'role="radiogroup" aria-label="Permissions"' : ''}>${roles}</div>
 ${self && admin ? '<p class="tm-none">You can’t change your own role.</p>' : ''}
-${extras ? `<div class="tm-sec"><span class="uw-mono">ALSO ALLOWED</span></div>${extras}` : ''}</div>` : ''}
+${extras ? `<div class="tm-sec"><span class="uw-mono">EXTRA ACCESS</span></div>${extras}` : ''}</div>` : ''}
 <div><div class="tm-sec"><span class="uw-mono">DETAILS</span></div>
 <div class="kv" style="align-items:center"><span>Job title</span>${titleCtl}</div>
 ${full ? `<div class="kv" style="align-items:center"><span>Slack</span>${slack}</div>` : ''}

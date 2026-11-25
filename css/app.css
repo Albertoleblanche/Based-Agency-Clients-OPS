@@ -4101,3 +4101,11 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 .cp-why .rk{margin:4px 0 10px}
 @media (max-width:560px){ .rk-cols,.rk.is-none{grid-template-columns:1fr} .rk-c + .rk-c{box-shadow:inset 0 .5px 0 var(--sep)} }
 .rk .lnk-b svg{width:12px;height:12px}
+
+/* Team → extra access (Nov 25): a switch per power, with what it covers under the name */
+.xa-r{gap:12px}
+.xa-l{display:flex;flex-direction:column;gap:2px;min-width:0}
+.xa-l small{font-size:12px;line-height:1.35;color:var(--label-3)}
+.xa-r .sw{flex:none}
+.xa-r .sw[disabled]{opacity:.45;cursor:default}
+.xa-n{margin:8px 0 0;font-size:12px;line-height:1.4;color:var(--label-3)}

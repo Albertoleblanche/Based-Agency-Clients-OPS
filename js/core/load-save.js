@@ -233,7 +233,7 @@ async function confirmSendEmail(){
 // Lets other admins/approvers know a client email went out, since whoever
 // clicked Send is the only one who'd otherwise know it happened.
 async function notifyOthersOfEmailSent(to, subject){
-  const recipients = teamProfiles.filter(p=> (p.role==='admin' || p.role==='approver') && p.id!==currentUser.id);
+  const recipients = teamWithAccess('approve_updates');
   for(const p of recipients){
     await sendNotification(p.id, 'email_sent', 'Client email sent', `${myName()||'Someone'} sent "${subject}" to ${to}.`, 'approve');
   }

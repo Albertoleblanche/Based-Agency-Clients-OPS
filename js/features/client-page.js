@@ -70,14 +70,14 @@ ${callout}`;
 ${w.off ? `<div class="panel" style="padding:18px"><b>No weekly update</b><p class="t-2" style="margin:4px 0 0">It stays off This Week, Today, the Queue and Health. Work and hours are still logged here.</p></div>`
   : `<div class="panel" style="padding:18px 18px 16px"><div class="stepper">${stepper}</div>${weekBtns}</div>`}
 ${(() => { const card = typeof riskCardHtml === 'function' ? riskCardHtml(c, h) : '', ws = card ? h.work.signals : h.signals;   // the work and the flag (Nov 25)
-  return (card || ws.length) ? `<div class="h2"><h2>${h.level === 'r' ? 'Why it’s at risk' : h.level === 'y' ? 'Why it’s on Watch' : 'Health'}${ws.length ? `<span class="c">${ws.length}</span>` : ''}</h2>${canApprove() ? `<a href="#settings" onclick="openSettingsTab('updates');return false;">Adjust signals</a>` : ''}</div>${card}${ws.length ? `<div class="grp cp-wsig">${signalRowsHtml({ signals: ws })}</div>` : ''}` : ''; })()}
+  return (card || ws.length) ? `<div class="h2"><h2>${h.level === 'r' ? 'Why it’s at risk' : h.level === 'y' ? 'Why it’s on Watch' : 'Health'}${ws.length ? `<span class="c">${ws.length}</span>` : ''}</h2>${canChangeRules() ? `<a href="#settings" onclick="openSettingsTab('updates');return false;">Adjust signals</a>` : ''}</div>${card}${ws.length ? `<div class="grp cp-wsig">${signalRowsHtml({ signals: ws })}</div>` : ''}` : ''; })()}
 <div class="h2"><h2>Improvements<span class="c">${imps.length}</span></h2>${waCanWork(c) ? `<a href="#" onclick="openQueueLogImprovementModal('${c.id}');return false;">Log Improvement</a>` : ''}</div>
 <div class="grp">${impRows(imps.slice(0, 6)) || '<div class="row sm"><span class="s t-2" style="font-size:13px">Nothing logged yet.</span></div>'}</div>
 ${imps.length > 6 ? `<p style="margin:8px 2px 0"><a class="btn btn-q sm" href="#" onclick="setCdTab('improvements');return false;">All ${imps.length} improvements</a></p>` : ''}`;
   document.getElementById('cdOverviewSide').innerHTML = `
 <section class="panel"><h3>Hours this month<span>${h.hp.budget ? `<b class="${h.hp.used > h.hp.budget ? 't-red' : ''}" style="font-weight:600">${Math.round(h.hp.used)}</b> of ${h.hp.budget}` : Math.round(h.hp.used) + ' h'}</span></h3>${h.hp.budget ? paceChartHtml(c, 300, 140) : '<p class="t-2" style="font-size:13px;margin:0">No monthly budget set.</p>'}</section>
 ${w.off ? `<section class="panel"><h3>Weekly updates<span>Off</span></h3><div class="t-2" style="font-size:13px">No weekly update${sentAt ? ' · last sent ' + fmtShortDate(sentAt) : ''}</div></section>` : `<section class="panel"><h3>Weekly updates<span>${ots.total ? `On time ${ots.onTime} of ${ots.total}` : ''}</span></h3><div style="display:flex;align-items:center;justify-content:space-between;font-size:13px">${histDotsHtml(seq)}<span class="t-2">${sentAt ? 'Last sent ' + fmtShortDate(sentAt) : 'None sent yet'}</span></div></section>`}
-<section class="panel"><h3>Details${canApprove() ? `<span><a href="#" onclick="openEditClientFormFromDetail();return false;" style="color:var(--label);font-weight:500">Edit</a></span>` : ''}</h3>
+<section class="panel"><h3>Details${canEditClients() ? `<span><a href="#" onclick="openEditClientFormFromDetail();return false;" style="color:var(--label);font-weight:500">Edit</a></span>` : ''}</h3>
 ${kv('Status', escapeHtml(c.status || '—'))}${kv('Importance', `${c.importance || 0} of 10`)}${kv('Risk flag', `${c.danger || 0} of 5`)}
 ${kv('Monthly budget', c.monthlyHourBudget ? `${c.monthlyHourBudget} hours` : '—')}
 <div class="kv"><span>Owner</span><span style="display:inline-flex;align-items:center;gap:6px;color:var(--label)">${owner ? avHtml(owner) + escapeHtml(owner) : '—'}</span></div>
@@ -90,7 +90,7 @@ ${c.sow ? `<section class="panel"><h3>Scope</h3><p style="margin:0;font-size:14p
   // ---- other tabs
   document.getElementById('cdImpTab').innerHTML = `<div class="h2"><h2>Improvements<span class="c">${imps.length}</span></h2>${waCanWork(c) ? `<a href="#" onclick="openQueueLogImprovementModal('${c.id}');return false;">Log Improvement</a>` : ''}</div>
 <div class="grp">${imps.map(i => { const idx = c.improvements.indexOf(i); return impRows([i]).replace('</div></div>', `${workLockedBy(i) ? `<span class="ib act is-lock" role="img" title="${escapeHtml(workLockedWords(workLockedBy(i)))}" aria-label="Locked until it’s sent">${icon('lock')}</span>`
-  : canApprove() || i.author === myName() ? `<button class="ib act" title="Edit" aria-label="Edit" onclick="startEditImprovement('${c.id}',${idx})">${icon('pencil-simple')}</button><button class="ib act" title="Delete" aria-label="Delete" onclick="deleteImprovement('${c.id}',${idx})">${icon('trash')}</button>` : ''}</div></div>`); }).join('') || '<div class="row sm"><span class="s t-2">Nothing logged yet.</span></div>'}</div>`;
+  : canApproveUpdates() || i.author === myName() ? `<button class="ib act" title="Edit" aria-label="Edit" onclick="startEditImprovement('${c.id}',${idx})">${icon('pencil-simple')}</button><button class="ib act" title="Delete" aria-label="Delete" onclick="deleteImprovement('${c.id}',${idx})">${icon('trash')}</button>` : ''}</div></div>`); }).join('') || '<div class="row sm"><span class="s t-2">Nothing logged yet.</span></div>'}</div>`;
   const entries = (typeof timeEntries !== 'undefined' ? timeEntries : []).filter(e => e.clientId === c.id).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 60);
   const total = entries.reduce((s, e) => s + e.minutes, 0);
   document.getElementById('cdTimeTab').innerHTML = `<div class="h2"><h2>Time<span class="c">${Math.round(total / 6) / 10} h</span></h2>${waCanWork(c) ? `<a href="#" onclick="openTimerModal('${c.id}');return false;">Track Time</a>` : ''}</div>
@@ -119,7 +119,7 @@ function cpUwGridHtml(c, x){
   // set to "No weekly update" (the agency itself, an internal client): nothing is due (Nov 22)
   const update = w.off ? `<section class="uw-w uw-s6 cp-up">${head('activity', 'This week’s update', '<span class="cp-due">Off</span>')}
 <div class="uw-fn"><div class="uw-mono">NO WEEKLY UPDATE</div><h3>No weekly update</h3><p>It stays off This Week, Today, the Queue and Health. Work and hours are still logged here.</p></div>
-${canApprove() ? `<div class="uw-fa cp-fa"><button class="uw-wb" onclick="setWeeklyUpdate('${c.id}',true)">Turn the weekly update on${icon('arrow-right')}</button></div>` : ''}</section>`
+${canEditClients() ? `<div class="uw-fa cp-fa"><button class="uw-wb" onclick="setWeeklyUpdate('${c.id}',true)">Turn the weekly update on${icon('arrow-right')}</button></div>` : ''}</section>`
   : `<section class="uw-w uw-s6 cp-up">${head('activity', 'This week’s update', `<span class="cp-due${w.late ? ' is-late' : ''}">${escapeHtml(w.sent ? 'Sent' : w.dueText)}</span>`)}
 <div class="uw-fn"><div class="uw-mono">${done >= 4 ? 'DONE · SENT' : 'NOW · ' + names[done]}</div><h3>${escapeHtml(state)}</h3><p>${escapeHtml(detail)}</p></div>
 ${uwSteps(w)}${act}
@@ -140,7 +140,7 @@ ${bud ? `<div class="cp-pacew"><div class="cp-pace"><i class="${over || (hp.proj
   // why it's at risk (or what's fine)
   const card = typeof riskCardHtml === 'function' ? riskCardHtml(c, h) : '', ws = card ? h.work.signals : h.signals;   // the work and the flag (Nov 25)
   const sigs = ws.map(sg => `<div class="cp-sig"><span class="cp-si ${sg.l}">${icon(sg.icon)}</span><span class="cp-st"><b>${escapeHtml(sg.title)}</b><span>${escapeHtml(sg.text)}</span></span><span class="cp-since">${escapeHtml((relDay(sg.since).toLowerCase() === 'today' ? 'today' : relDay(sg.since)).toUpperCase())}</span></div>`).join('');
-  const why = `<section class="uw-w uw-s4 cp-why">${head('flag', h.level === 'r' ? 'Why it’s at risk' : h.level === 'y' ? 'Why it’s on Watch' : 'Signals', canApprove() ? pill('Adjust', `openSettingsTab('updates')`) : '', ws.length || '')}
+  const why = `<section class="uw-w uw-s4 cp-why">${head('flag', h.level === 'r' ? 'Why it’s at risk' : h.level === 'y' ? 'Why it’s on Watch' : 'Signals', canChangeRules() ? pill('Adjust', `openSettingsTab('updates')`) : '', ws.length || '')}
 ${card}<div class="cp-l">${sigs || `<p class="uw-none">${icon('check-circle')}Nothing is slipping in the work.</p>`}</div></section>`;
   // the latest improvements
   const impRows = imps.slice(0, 5).map(i => `<div class="cp-imp"><span class="uw-mono">${escapeHtml(fmtShortDate(new Date(i.date)).toUpperCase())}</span><span class="cp-it"><b>${escapeHtml(i.text)}</b><span>${escapeHtml([c.service, i.author ? firstName(i.author) : ''].filter(Boolean).join(' · '))}</span></span><em>${escapeHtml(impStatus(i))}</em></div>`).join('');
@@ -151,7 +151,7 @@ ${imps.length > 5 ? `<a class="uw-foot" href="#" onclick="setCdTab('improvements
   const kv = (k, v) => v ? `<div><span>${k}</span><b>${v}</b></div>` : '';
   const ch = typeof winChannel === 'function' ? ({ whatsapp: 'WhatsApp', email: 'Email', both: 'Email and WhatsApp' })[winChannel(c)] : '';
   const site = c.website ? `<a href="${safeUrl(c.website.startsWith('http') ? c.website : 'https://' + c.website)}" target="_blank" rel="noopener">${escapeHtml(c.website.replace(/^https?:\/\//, '').replace(/\/$/, ''))}</a>` : '';
-  const details = `<section class="uw-w uw-s3 cp-det">${head('building-2', 'Details', canApprove() ? pill('Edit', `openEditClientFormFromDetail()`) : '')}
+  const details = `<section class="uw-w uw-s3 cp-det">${head('building-2', 'Details', canEditClients() ? pill('Edit', `openEditClientFormFromDetail()`) : '')}
 <div class="cp-kv">${kv('Owner', owner ? escapeHtml(owner) : '—')}${kv('Importance', `${c.importance || 0} of 10`)}${kv('Risk flag', `${c.danger || 0} of 5`)}${kv('Monthly budget', c.monthlyHourBudget ? `${c.monthlyHourBudget} h` : '—')}${kv('Website', site)}${kv('Contact', c.email ? `<a href="mailto:${escapeHtml(c.email)}">${escapeHtml(c.email)}</a>` : '')}${kv('Sends by', ch)}${c.status !== 'Active' ? kv('Status', escapeHtml(c.status || '—')) : ''}</div></section>`;
   return `<div class="cp-pg">${update}${health}${hours}${why}${improvements}${details}</div>`;
 }
