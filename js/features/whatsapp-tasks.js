@@ -675,7 +675,8 @@ ${moodHtml ? `<section class="wx-card wx-sec">${moodHtml}</section>` : ''}
 // ---- Quiet clients -----------------------------------------------------------------------------
 // Clients whose group Radar reads where nobody from the team has written, and no update or win went
 // out, in WA_QUIET_DAYS days. Only groups it has read for that long count, so a new group isn't
-// called quiet just because Radar hasn't seen its history.
+// called quiet just because Radar hasn't seen its history. A paused client isn't quiet (nothing's
+// owed while they're paused), nor is one set to No weekly update: attentionEligibleClients() (Nov 25).
 function waContactFor(c){
   if(!Array.isArray(waContact) || !c) return null;
   const linked = waContact.find(r => String(r.client_id || '') === String(c.id));
@@ -684,9 +685,9 @@ function waContactFor(c){
   return n ? waContact.find(r => !r.client_id && winNorm(waCleanName(r.name)) === n) || null : null;
 }
 function waQuietClients(){
-  if(!Array.isArray(waContact) || typeof activeClients !== 'function') return [];
+  if(!Array.isArray(waContact) || typeof attentionEligibleClients !== 'function') return [];
   const today = dayStart(rNow()), out = [];
-  activeClients().forEach(c => {
+  attentionEligibleClients().forEach(c => {
     const r = waContactFor(c);
     if(!r || !r.reading_since || daysBetween(dayStart(new Date(r.reading_since)), today) < WA_QUIET_DAYS) return;
     const sent = typeof lastSentAt === 'function' ? lastSentAt(c) : null;

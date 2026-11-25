@@ -219,7 +219,8 @@ function renderPlan(){
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 2)
     .map(n => ({ ic: 'sticky-note', t: n.title || 'Untitled note', s: `${(clients.find(c => c.id === n.clientId) || {}).name || ''} · from your notes`, run: `openNewSprintModal({ clientId: '${n.clientId}', noteId: '${n.id}' })` }));
   const me = myName();
-  const room = activeClients().filter(c => c.monthlyHourBudget && clientOwner(c) === me && !planSprints.some(s => !s.doneAt && s.clientId === c.id && s.end >= today))
+  // (not a paused client: no new work while they're paused)
+  const room = activeClients().filter(c => c.status !== 'Paused' && c.monthlyHourBudget && clientOwner(c) === me && !planSprints.some(s => !s.doneAt && s.clientId === c.id && s.end >= today))
     .map(c => ({ c, left: c.monthlyHourBudget - monthHours(c, now) })).filter(x => x.left >= 8).sort((a, b) => b.left - a.left).slice(0, 3 - Math.min(ideas.length, 1))
     .map(({ c, left }) => ({ ic: 'clock', t: c.name, s: `${Math.round(left)} h of budget left this month`, run: `openNewSprintModal({ clientId: '${c.id}' })` }));
   const worth = [...ideas, ...room].slice(0, 3);
