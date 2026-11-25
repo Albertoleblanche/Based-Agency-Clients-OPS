@@ -547,15 +547,23 @@ function mTaskDue(t){
 // other steps a tap away (they open under it). Tapping the row opens the next step.
 let mFoldNow = null;
 const mSprintOpen = new Set();
-function mSprintToggle(e, sid){ e.stopPropagation(); mSprintOpen.has(sid) ? mSprintOpen.delete(sid) : mSprintOpen.add(sid); mRenderTab(); }
+// The steps open in place, easing open and shut (the CSS: .msp-steps-w); no new render (Nov 25).
+function mSprintMoreWords(n){ return `${n} more step${n === 1 ? '' : 's'}`; }
+function mSprintToggle(e, sid){
+  e.stopPropagation();
+  const open = !mSprintOpen.has(sid);
+  open ? mSprintOpen.add(sid) : mSprintOpen.delete(sid);
+  document.querySelectorAll(`[data-sprint="${sid}"]`).forEach(el => el.classList.toggle('is-open', open));
+  document.querySelectorAll(`.msp-more[data-sprint-btn="${sid}"]`).forEach(b => { b.setAttribute('aria-expanded', open); const t = b.querySelector('.msp-more-t'); if(t) t.textContent = open ? 'Hide steps' : mSprintMoreWords(+b.dataset.n || 0); });
+}
 function mSprintRow(t, g){
   const c = clients.find(x => x.id === (g.sprint.clientId || t.clientId)), open = mSprintOpen.has(g.sprint.id), n = g.rest.length;
   const sub = [c ? mEsc(shortClientName(c.name)) : '', mTaskDue(t), g.late > 1 ? `<span class="t-red">${g.late} late</span>` : ''].filter(Boolean).join(' · ');
-  const more = n ? `<button class="msp-more" aria-expanded="${open}" onclick="mSprintToggle(event,'${g.sprint.id}')">${open ? 'Hide steps' : `${n} more step${n === 1 ? '' : 's'}`}${icon('caret-down', { weight: 'bold' })}</button>` : '';
-  const steps = open ? g.rest.map(x => `<div class="ir tap msp-st" role="button" tabindex="0" onclick="mOpenTask('${x.id}')" onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();this.click()}">${mCb(x)}<div class="tx"><span class="t n">${mEsc(x.title)}</span></div><div class="r">${mTaskDue(x)}</div></div>`).join('') : '';
+  const more = n ? `<button class="msp-more" data-sprint-btn="${g.sprint.id}" data-n="${n}" aria-expanded="${open}" onclick="mSprintToggle(event,'${g.sprint.id}')"><span class="msp-more-t">${open ? 'Hide steps' : mSprintMoreWords(n)}</span>${icon('caret-down', { weight: 'bold' })}</button>` : '';
+  const steps = g.rest.map(x => `<div class="ir tap msp-st" role="button" tabindex="0" onclick="mOpenTask('${x.id}')" onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();this.click()}">${mCb(x)}<div class="tx"><span class="t n">${mEsc(x.title)}</span></div><div class="r">${mTaskDue(x)}</div></div>`).join('');
   return `<div class="ir tap msp${open ? ' is-open' : ''}" role="button" tabindex="0" onclick="mOpenTask('${t.id}')" onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();this.click()}">${mCb(t)}`
     + `<div class="tx"><span class="msp-l">${icon('plan')}<span class="msp-n">Sprint · ${mEsc(g.sprint.title)}</span><span class="msp-c">${g.done} of ${g.total} done</span></span><span class="t n">${mEsc(t.title)}</span>${sub ? `<span class="s">${sub}</span>` : ''}${more}</div></div>`
-    + `${steps ? `<div class="msp-steps">${steps}</div>` : ''}`;
+    + `${steps ? `<div class="msp-steps-w${open ? ' is-open' : ''}" data-sprint="${g.sprint.id}"><div class="msp-steps-c"><div class="msp-steps">${steps}</div></div></div>` : ''}`;
 }
 function mTaskRow(t){
   const g = t.status !== 'done' && mFoldNow && mFoldNow.lead.get(t.id);

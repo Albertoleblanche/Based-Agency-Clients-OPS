@@ -52,7 +52,18 @@ function tkRemindBtn(t){
 // ---- sprints in Tasks (Nov 25): one row per sprint, its next step (sprintFold in data.js) ----
 let tkFoldNow = null;                 // this render's sprints, by the step that stands for them
 const tkSprintOpen = new Set();       // sprints showing all their steps
-function tkSprintToggle(e, sid){ e.stopPropagation(); tkSprintOpen.has(sid) ? tkSprintOpen.delete(sid) : tkSprintOpen.add(sid); renderTasks(); }
+// Showing and hiding the steps opens them in place (Nov 25): no new render, so the list doesn't jump
+// and the height eases open and shut (the CSS: .tk-steps-w). The set keeps it through later renders.
+function tkSprintMoreWords(n){ return `${n} more step${n === 1 ? '' : 's'}`; }
+function tkSprintToggle(e, sid){
+  e.stopPropagation();
+  const open = !tkSprintOpen.has(sid);
+  open ? tkSprintOpen.add(sid) : tkSprintOpen.delete(sid);
+  document.querySelectorAll(`[data-sprint="${sid}"]`).forEach(el => {
+    el.classList.toggle('sp-open', open);
+    el.querySelectorAll('.tk-more').forEach(b => { b.setAttribute('aria-expanded', open); b.textContent = open ? 'Hide steps' : tkSprintMoreWords(+b.dataset.n || 0); });
+  });
+}
 function tkSprintPlan(e, sid){ e.stopPropagation(); if(typeof openPlanSprint === 'function') openPlanSprint(sid); else switchView('plan'); }
 function tkSprintLabel(g){
   return `<span class="tk-sp">${icon('plan')}<span class="tk-sp-n">Sprint · ${escapeHtml(g.sprint.title)}</span><span class="tk-sp-c">${g.done} of ${g.total} done</span></span>`;
@@ -60,20 +71,22 @@ function tkSprintLabel(g){
 function tkSprintLate(g){ return g.late > 1 ? `<span class="tk-sp-late">${g.late} late</span>` : ''; }
 function tkSprintBtn(g){
   const open = tkSprintOpen.has(g.sprint.id), n = g.rest.length;
-  return n ? `<button class="tk-more" aria-expanded="${open}" onclick="tkSprintToggle(event,'${g.sprint.id}')">${open ? 'Hide steps' : `${n} more step${n === 1 ? '' : 's'}`}</button>` : '';
+  return n ? `<button class="tk-more" data-n="${n}" aria-expanded="${open}" onclick="tkSprintToggle(event,'${g.sprint.id}')">${open ? 'Hide steps' : tkSprintMoreWords(n)}</button>` : '';
 }
 function tkSprintMore(g){ return tkSprintLate(g) + tkSprintBtn(g); }
+// the steps are always there, folded to no height until shown
+function tkSprintAttrs(g){ return ` data-sprint="${g.sprint.id}"`; }
 function tkSprintSteps(g){
-  if(!tkSprintOpen.has(g.sprint.id)) return '';
-  return `<div class="tk-steps">${g.rest.map(t => { const [due, kind] = tkDue(t);
+  if(!g.rest.length) return '';
+  return `<div class="tk-steps-w"><div class="tk-steps-c"><div class="tk-steps">${g.rest.map(t => { const [due, kind] = tkDue(t);
     return `<div class="tk-st${window._taskSel === t.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="event.stopPropagation();selectTask('${t.id}')" onkeydown="if((event.key==='Enter'||event.key===' ')&&event.target===this){event.preventDefault();event.stopPropagation();selectTask('${t.id}')}">${tkCb(t)}<span class="tx">${escapeHtml(t.title)}</span><span class="tk-due ${kind}">${escapeHtml(due)}</span></div>`; }).join('')}
-<button class="x-lnk tk-st-plan" onclick="tkSprintPlan(event,'${g.sprint.id}')">Open in Plan</button></div>`;
+<button class="x-lnk tk-st-plan" onclick="tkSprintPlan(event,'${g.sprint.id}')">Open Sprint</button></div></div></div>`;
 }
 function tkCardHtml(t){
   const g = tkFoldNow && tkFoldNow.lead.get(t.id);
   const c = clients.find(x => x.id === t.clientId), [due, kind] = tkDue(t);
   const flag = t.priority === 'high' ? `<span class="tk-flag" title="High priority">${icon('flag')}</span>` : '';
-  return `<article class="tk-c${t.color ? ' has-c c-' + t.color : ''}${window._taskSel === t.id ? ' is-sel' : ''}" role="button" tabindex="0" aria-label="${escapeHtml(t.title)}" onclick="selectTask('${t.id}')" onkeydown="if((event.key==='Enter'||event.key===' ')&&event.target===this){event.preventDefault();selectTask('${t.id}')}">
+  return `<article class="tk-c${t.color ? ' has-c c-' + t.color : ''}${g && tkSprintOpen.has(g.sprint.id) ? ' sp-open' : ''}${window._taskSel === t.id ? ' is-sel' : ''}"${g ? tkSprintAttrs(g) : ''} role="button" tabindex="0" aria-label="${escapeHtml(t.title)}" onclick="selectTask('${t.id}')" onkeydown="if((event.key==='Enter'||event.key===' ')&&event.target===this){event.preventDefault();selectTask('${t.id}')}">
 ${g ? tkSprintLabel(g) : ''}<div class="tk-ct">${tkCb(t)}<b>${escapeHtml(t.title)}</b>${flag}</div>
 ${c ? `<div class="tk-cm"><span class="tk-cl">${escapeHtml(c.name)}${focusMark(c)}</span></div>` : ''}
 <div class="tk-cf"><span class="tk-due ${kind}">${escapeHtml(due)}</span><span class="tk-who">${g ? tkSprintMore(g) : escapeHtml(tkWho(t.assigneeId))}</span>${tkRemindBtn(t)}</div>${g ? tkSprintSteps(g) : ''}</article>`;
@@ -81,7 +94,7 @@ ${c ? `<div class="tk-cm"><span class="tk-cl">${escapeHtml(c.name)}${focusMark(c
 function tkListRowHtml(t){
   const g = t.status !== 'done' && tkFoldNow && tkFoldNow.lead.get(t.id);
   const c = clients.find(x => x.id === t.clientId), [due, kind] = tkDue(t), done = t.status === 'done';
-  return `<div class="tk-lr${done ? ' is-done' : ''}${g ? ' is-sprint' : ''}${window._taskSel === t.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectTask('${t.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)selectTask('${t.id}')">${tkCb(t)}
+  return `<div class="tk-lr${done ? ' is-done' : ''}${g ? ' is-sprint' : ''}${g && tkSprintOpen.has(g.sprint.id) ? ' sp-open' : ''}${window._taskSel === t.id ? ' is-sel' : ''}"${g ? tkSprintAttrs(g) : ''} role="button" tabindex="0" onclick="selectTask('${t.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)selectTask('${t.id}')">${tkCb(t)}
 <div class="tx">${g ? tkSprintLabel(g) : ''}<b>${t.color && !done ? `<i class="cc-dot c-${t.color}" aria-hidden="true"></i>` : ''}${escapeHtml(t.title)}${t.priority === 'high' && !done ? `<span class="tk-flag" title="High priority">${icon('flag')}</span>` : ''}</b><span class="s">${g
     ? [c ? escapeHtml(c.name) + focusMark(c) : '', tkSprintLate(g), tkSprintBtn(g)].filter(Boolean).join(' · ')
     : (c ? escapeHtml(c.name) + focusMark(c) + ' · ' : '') + escapeHtml(tkWho(t.assigneeId))}</span></div>
@@ -308,7 +321,7 @@ ${c ? `<span class="tkp-k">Client</span><span class="tkp-v"><a href="#" onclick=
 ${taskCanAskDate(t) ? `<span class="tkp-k" aria-hidden="true"></span><span class="tkp-ask">Only ${escapeHtml(firstName(assigner.name))} can change the date.<a class="x-lnk" href="#" onclick="askTaskDateMove('${t.id}');return false;">Ask ${escapeHtml(firstName(assigner.name))}</a></span>` : ''}
 <span class="tkp-k">Status</span><span class="tkp-v">${status}</span>
 ${amAssigner ? `<span class="tkp-k">Color</span><span class="tkp-v">${colorSwatchesHtml('tkpColor', t.color, 'setTaskColor', { small: true })}</span>` : t.color ? `<span class="tkp-k">Color</span><span class="tkp-v"><i class="cc-dot c-${t.color}" aria-hidden="true"></i>${itemColorName(t.color)}</span>` : ''}
-${sp ? `<span class="tkp-k">Sprint</span><span class="tkp-v"><a href="#" onclick="openPlanSprint('${sp.id}');return false;"><i class="cc-dot${sp.color ? ' c-' + sp.color : ''}" aria-hidden="true"></i>${escapeHtml(sp.title)}</a></span>` : ''}
+${sp ? `<span class="tkp-k">Sprint</span><span class="tkp-v"><a href="#" onclick="openPlanSprint('${sp.id}');return false;"><i class="cc-dot${sp.color ? ' c-' + sp.color : ''}" aria-hidden="true"></i>${escapeHtml(sp.title)}</a></span>${tkpSprintLine(sp)}` : ''}
 ${t.link ? `<span class="tkp-k">Link</span><span class="tkp-v"><a href="${safeUrl(normalizeUrl(t.link))}" target="_blank" rel="noopener">${escapeHtml(truncateLinkDisplay(t.link, 40))}</a></span>` : ''}
 ${(() => { const wa = typeof waTasks !== 'undefined' ? waTasks.find(x => x.task_id != null && String(x.task_id) === String(t.id)) : null;
   return wa ? `<span class="tkp-k">WhatsApp</span><span class="tkp-v"><a href="#" onclick="waOpenItem(${jsArg(wa.id)});return false;">${escapeHtml(waGroupName(wa) ? waCleanName(waGroupName(wa)) + ' group' : waClientLabel(wa))}</a>${wa.status === 'done' ? '<em>done</em>' : ''}</span>` : ''; })()}
@@ -321,6 +334,12 @@ ${done && t.completionLink ? `<div class="sp-sec"><b>When it was finished</b></d
 <div class="sp-sec"><b>Activity</b></div>${evHtml}
 ${taskCommentsReady ? `<form class="tkp-cmt" onsubmit="event.preventDefault();postTaskComment('${t.id}')"><input id="tkpCmt" class="tf" placeholder="Write a comment…" aria-label="Write a comment" autocomplete="off" maxlength="4000"><button class="btn" type="submit">Post</button></form>` : ''}
 </aside>`;
+}
+// Under the sprint's name in a step's panel (Nov 25): how far along it is, and Open Sprint (Plan, with
+// the sprint picked).
+function tkpSprintLine(sp){
+  const all = tasks.filter(x => x.sprintId === sp.id && !x.cancelledAt), done = all.filter(x => x.status === 'done').length;
+  return `<span class="tkp-k" aria-hidden="true"></span><span class="tkp-sp"><span>${done} of ${all.length} step${all.length === 1 ? '' : 's'} done${sp.doneAt ? ' · sprint done' : ''}</span><button class="x-lnk" onclick="openPlanSprint('${sp.id}')">Open Sprint</button></span>`;
 }
 // ---- Files on a task (Nov 23): listed in its panel; click opens one (an image in the viewer), ----
 // Add Files… or dropping files on the panel attaches more, × takes one off.

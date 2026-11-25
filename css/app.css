@@ -1418,8 +1418,15 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .tk-c .tk-sp-late{margin-right:8px}
 /* List: the steps open under the row, full width, their dates in the row's date column */
 .tk-lr.is-sprint{flex-wrap:wrap;row-gap:0}
-.tk-lr > .tk-steps{flex:0 0 calc(100% - 30px);margin-left:30px}
-.tk-steps{display:flex;flex-direction:column;margin-top:8px;padding-top:6px;box-shadow:inset 0 .5px 0 var(--sep)}
+.tk-lr > .tk-steps-w{flex:0 0 calc(100% - 30px);margin-left:30px}
+/* the steps fold open and shut in place (Nov 25): the row's height eases with them, the steps fade in
+   as it opens; folded, they're out of reach (visibility) */
+.tk-steps-w{display:grid;grid-template-rows:0fr}
+.sp-open > .tk-steps-w{grid-template-rows:1fr}
+.tk-steps-c{min-height:0;overflow:hidden;visibility:hidden;margin:0 -8px;padding:0 8px}   /* room for a step's hover */
+.sp-open > .tk-steps-w > .tk-steps-c{visibility:visible}
+.tk-steps{display:flex;flex-direction:column;margin-top:8px;padding:6px 0 3px;box-shadow:inset 0 .5px 0 var(--sep);opacity:0;transform:translateY(-4px)}
+.sp-open > .tk-steps-w .tk-steps{opacity:1;transform:none}
 .tk-c .tk-steps{margin:2px 0 0 28px}
 .tk-c .tk-st{align-items:flex-start}
 .tk-c .tk-st .tx{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.35}
@@ -1433,8 +1440,17 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .tk-st.is-sel{background:var(--select)}
 .tk-st-plan{align-self:flex-start;margin:6px 0 2px;padding:0;border:0;background:none;font:inherit;font-size:12.5px;font-weight:500;color:var(--blue);cursor:pointer}
 .tk-st-plan:hover{text-decoration:underline}
-@media (prefers-reduced-motion: no-preference){ .tk-steps{animation:tkStepsIn 180ms cubic-bezier(.23,1,.32,1)} }
-@keyframes tkStepsIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: no-preference){
+  .tk-steps-w{transition:grid-template-rows 260ms cubic-bezier(.32,.72,0,1)}
+  .tk-steps-c{transition:visibility 0s linear 260ms}
+  .sp-open > .tk-steps-w > .tk-steps-c{transition-delay:0s}
+  .tk-steps{transition:opacity 160ms ease-out,transform 260ms cubic-bezier(.32,.72,0,1)}
+  .sp-open > .tk-steps-w .tk-steps{transition:opacity 200ms ease-out 40ms,transform 260ms cubic-bezier(.32,.72,0,1)}
+}
+/* a step's panel: how far along its sprint is, and Open Sprint */
+.tkp-sp{display:inline-flex;align-items:baseline;flex-wrap:wrap;gap:4px 12px;margin-top:-6px;font-size:12.5px;color:var(--label-3)}
+.tkp-sp .x-lnk{font-size:12.5px;color:var(--blue)}
+.tkp-sp .x-lnk:hover{text-decoration:underline;text-underline-offset:2px}
 .tk-ls{display:flex;align-items:center;gap:8px;margin:26px 0 4px}
 .tk-ls b{font-size:15px;font-weight:650}
 .tk-ls span{font-size:13px;font-weight:600;color:var(--label-3)}

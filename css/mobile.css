@@ -552,14 +552,23 @@ body.mac.mobile { overflow: hidden; background: var(--ios-bg, #F2F2F7); -webkit-
 .app .msp-more:active{opacity:.5}
 .app .msp-more svg{width:11px;height:11px;color:var(--label-2)}
 .app .msp-more[aria-expanded="true"] svg{transform:rotate(180deg)}
-.app .msp-steps{position:relative}
-.app .msp-steps::before,.app .msp-steps + .ir::before{content:"";position:absolute;z-index:1;top:0;left:56px;right:0;border-top:.5px solid var(--sep)}
+.app .msp-steps-w{display:grid;grid-template-rows:0fr}
+.app .msp-steps-w.is-open{grid-template-rows:1fr}
+.app .msp-steps-c{min-height:0;overflow:hidden;visibility:hidden}
+.app .msp-steps-w.is-open .msp-steps-c{visibility:visible}
+.app .msp-steps{opacity:0;transform:translateY(-6px)}
+.app .msp-steps-w.is-open .msp-steps{opacity:1;transform:none}
+.app .msp-st:first-child::before{content:"";position:absolute;z-index:1;top:0;left:56px;right:0;border-top:.5px solid var(--sep)}
+.app .msp-steps-w + .ir::before{content:"";position:absolute;z-index:1;top:0;left:56px;right:0;border-top:.5px solid var(--sep)}
 .app .msp-st{padding-left:50px}
 .app .msp-st + .msp-st::before{left:90px}
 .app .msp-st .t{font-size:15px}
 .app .msp-st .r{font-size:14px}
 @media (prefers-reduced-motion: no-preference){
-  .app .msp-more svg{transition:transform 200ms cubic-bezier(.23,1,.32,1)}
-  .app .msp-steps{animation:mspIn 200ms cubic-bezier(.23,1,.32,1)}
-  @keyframes mspIn{from{opacity:0;transform:translateY(-4px)}}
+  .app .msp-more svg{transition:transform 260ms cubic-bezier(.32,.72,0,1)}
+  .app .msp-steps-w{transition:grid-template-rows 300ms cubic-bezier(.32,.72,0,1)}
+  .app .msp-steps-c{transition:visibility 0s linear 300ms}
+  .app .msp-steps-w.is-open .msp-steps-c{transition-delay:0s}
+  .app .msp-steps{transition:opacity 160ms ease-out,transform 300ms cubic-bezier(.32,.72,0,1)}
+  .app .msp-steps-w.is-open .msp-steps{transition:opacity 220ms ease-out 40ms,transform 300ms cubic-bezier(.32,.72,0,1)}
 }
