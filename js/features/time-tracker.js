@@ -613,8 +613,11 @@ async function addManualEntry(force){
   if(totalMinutes > 960 && !(await confirmDialog(`That's ${formatMinutes(totalMinutes)} for a single entry — did you mean minutes instead of hours?`, {confirmLabel:'Log it anyway', cancelLabel:'Let me fix it'}))) return;
   // the same time already logged (here or in Harvest): say so, with the one logged to edit (Nov 25)
   if(force !== true){
-    const dup = await timeDuplicateOf({ clientId, dateStr: dateVal, minutes: totalMinutes, projectId: pick.projectId, taskId: pick.taskId });
-    if(dup){ manualDupShow(dup, clientId); return; }
+    // "Checking…" only when it takes a moment (Harvest still answering)
+    const btn0 = clickedBtn(), slow = setTimeout(() => setBtnLoading(btn0, 'Checking…'), 300);
+    const dup = await timeDuplicateOf({ clientId, dateStr: dateVal, minutes: totalMinutes, projectId: pick.projectId, taskId: pick.taskId, service, description });
+    clearTimeout(slow); restoreBtn(btn0);
+    if(dup){ manualDupShow(dup, clientId, asWork); return; }
   }
   if(asWork && !(await okToLogDuplicate(clientId, description))) return;   // logged already? (data.js)
   const btn = clickedBtn();
@@ -657,24 +660,35 @@ async function addManualEntry(force){
   renderTimesheet(); renderReports();
 }
 
-// Add Time found the same time already logged: the sheet says so, and its buttons become Edit That
-// One (the one logged), Add It Anyway, and Cancel. Changing anything in the sheet puts them back.
-function manualDupShow(dup, clientId){
+// Add Time found the same time already logged: the sheet says so above its buttons, which become
+// Cancel, Add It Anyway and Edit That One. Logging it as work, the main one is Use That Time: the work
+// gets the time already there, and nothing new goes to Harvest. A timer still running for the client:
+// Add It Anyway, or Keep the Timer. Changing what makes it the same time puts the buttons back.
+let manualDup = null;
+function manualDupShow(dup, clientId, asWork){
   const card = document.querySelector('#appModalOverlay .sheet-a')?.parentElement; if(!card) return;
   const foot = card.querySelector('.sheet-a');
   card.querySelector('.tdup')?.remove();
   if(!foot.dataset.was) foot.dataset.was = foot.innerHTML;
+  manualDup = dup;
+  const why = timeDupWhy(dup), q = dup.description ? (dup.description.length > 140 ? dup.description.slice(0, 140) + '…' : dup.description) : '';
   const note = document.createElement('div');
   note.className = 'tdup'; note.setAttribute('role', 'status');
-  note.innerHTML = `<span class="tdup-ic" aria-hidden="true">${icon('clock')}</span><div><b>You already logged this time</b><span>${escapeHtml(timeDupWords(dup, clientId))}</span>${dup.description ? `<q>${escapeHtml(dup.description.length > 140 ? dup.description.slice(0, 140) + '…' : dup.description)}</q>` : ''}</div>`;
+  note.innerHTML = `<span class="tdup-ic" aria-hidden="true">${icon(dup.timer ? 'timer' : 'clock')}</span><div><b>${escapeHtml(timeDupTitle(dup))}</b><span>${escapeHtml(timeDupWords(dup, clientId))}</span>${q ? `<q>${escapeHtml(q)}</q>` : ''}${why ? `<span class="tdup-why">${escapeHtml(why)}</span>` : ''}</div>`;
   foot.before(note);
-  foot.innerHTML = `<button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn" onclick="addManualEntry(true)">Add It Anyway</button><button class="btn btn-p" onclick="manualDupEdit('${dup.id}')">${dup.locked ? 'See That One' : 'Edit That One'}</button>`;
-  // only what makes it the same time (client, day, length, project, task): not the notes, and not a
-  // field merely losing focus
-  const key = () => ['manualClient', 'manualDate', 'manualDuration', 'manualProject', 'manualTask'].map(id => (document.getElementById(id) || {}).value || '').join('|');
+  const useTime = asWork && !dup.timer && !dup.logged;
+  foot.innerHTML = dup.timer
+    ? `<button class="btn" onclick="addManualEntry(true)">Add It Anyway</button><button class="btn btn-p" onclick="closeAppModal()">Keep the Timer</button>`
+    : `<button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn" onclick="addManualEntry(true)">Add It Anyway</button>${useTime
+      ? `<button class="btn btn-p" onclick="manualDupUseTime()">Use That Time</button>`
+      : `<button class="btn btn-p" onclick="manualDupEdit('${dup.id}')">${dup.locked ? 'See That One' : 'Edit That One'}</button>`}`;
+  // only what makes it the same time (client, day, length, project, task, and whether it's work): not
+  // the notes, and not a field merely losing focus
+  const key = () => ['manualClient', 'manualDate', 'manualDuration', 'manualProject', 'manualTask'].map(id => (document.getElementById(id) || {}).value || '').join('|') + (typeof sheetIsOn === 'function' && sheetIsOn('manualWork') ? '|w' : '');
   const was = key();
-  const back = () => { if(key() === was) return; note.remove(); if(foot.dataset.was){ foot.innerHTML = foot.dataset.was; delete foot.dataset.was; } card.removeEventListener('input', back, true); card.removeEventListener('change', back, true); };
-  card.addEventListener('input', back, true); card.addEventListener('change', back, true);
+  const back = () => { if(key() === was) return; note.remove(); manualDup = null; if(foot.dataset.was){ foot.innerHTML = foot.dataset.was; delete foot.dataset.was; } card.removeEventListener('input', back, true); card.removeEventListener('change', back, true); card.removeEventListener('click', backSoon, true); };
+  const backSoon = () => setTimeout(back, 0);   // switches flip on click
+  card.addEventListener('input', back, true); card.addEventListener('change', back, true); card.addEventListener('click', backSoon, true);
   foot.querySelector('.btn-p')?.focus();
 }
 async function manualDupEdit(id){
@@ -682,6 +696,30 @@ async function manualDupEdit(id){
   if(!timeEntries.some(e => e.id === id)) await loadTimeEntries();
   if(timeEntries.some(e => e.id === id)) setTimeout(() => openTimeEntryModal(id), 200);
   else showToast('info', 'Couldn’t open it', 'It’s on your Timesheet for that day.');
+}
+// Logging it as work, with the time already logged: the work, then that entry linked to it (as Log as
+// Work on a Timesheet entry does). No new time, so nothing new in Harvest.
+async function manualDupUseTime(){
+  const dup = manualDup; if(!dup || !dup.id) return;
+  const clientId = document.getElementById('manualClient').value, dateVal = document.getElementById('manualDate').value;
+  const description = document.getElementById('manualDesc').value.trim();
+  const pick = typeof hvPickValue === 'function' && clientId ? hvPickValue('manual', clientId) : { ok: true, service: document.getElementById('manualService')?.value || '' };
+  if(!description){ showToast('error', 'Say what you worked on', 'The notes are what shows in Queue.'); document.getElementById('manualDesc')?.focus(); return; }
+  if(!(await okToLogDuplicate(clientId, description))) return;
+  const btn = clickedBtn(); setBtnLoading(btn, 'Saving…');
+  const c0 = clients.find(x => x.id === clientId), today = toDateStr(new Date());
+  const imp = await insertImprovementFull(clientId, { author: myName() || 'Team member', text: description, includeInEmail: true, source: 'time',
+    date: (dateVal === today ? new Date() : new Date(dateVal + 'T12:00:00')).toISOString(),
+    service: c0 && typeof serviceFromHarvest === 'function' && serviceFromHarvest(c0) ? (pick.projectId ? pick.service : improvementServiceFor(c0)) : pick.service || '' });
+  if(!imp){ restoreBtn(btn); showToast('error', 'Save failed', 'Couldn’t log it as work. Try again in a moment.'); return; }
+  const linked = await workTimeLink(dup.id, imp.id);
+  restoreBtn(btn); closeAppModal(); manualDup = null;
+  if(typeof logClientActivity === 'function') logClientActivity(clientId, 'improvement_logged', `${myName() || 'Team member'} logged an improvement: "${description.length > 80 ? description.slice(0, 80) + '…' : description}"`);
+  if(typeof quRefreshAll === 'function') quRefreshAll(clientId);
+  await loadTimeEntries(); renderTimesheet(); renderReports();
+  !linked
+    ? showToast('info', 'Logged as work', 'It’s in Queue, but its time didn’t link. Open the entry on your Timesheet to try again.')
+    : showToast('success', 'Logged as work, with that time', `${formatMinutes(dup.minutes)} already logged for ${c0 ? c0.name : 'the client'} is its time. Nothing new went to Harvest.`);
 }
 
 /* --- Timesheet --- */

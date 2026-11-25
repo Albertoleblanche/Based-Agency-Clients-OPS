@@ -530,32 +530,148 @@ function workDuplicateOf(clientId, text){
   }) || null;
 }
 // ---- The same time twice (Nov 25) ----
-// Adding time by hand: time already logged by you for the same client, on the same day, just as long,
-// and billable the same way (in Radar, or in Harvest and read into Radar) is most likely the same
-// time again. Asks the database, not just what's loaded, so time read from Harvest a minute ago counts.
-// Billable comes from the Harvest task; when either side has none, billable isn't compared.
+// Adding time by hand (Add Time, logging work with its time) first looks for that time already
+// logged: your own entries for the client that day, in Radar and in Harvest. Harvest's are read fresh
+// for that day when Add Time opens (timeFreshDay), since the regular read only runs when someone opens
+// Radar and at night. It's the same time when:
+//   - it's just as long, unless it's plainly other work: another task, and notes with nothing in common;
+//   - it's a few minutes off (a Harvest timer's 1:27 against a typed 1:30) on the same task, or with
+//     notes in common;
+//   - its notes are one part of an entry the time was added to (adding to a task merges: "A · B").
+// Billable against non-billable is never the same work. A timer still running for the client (Radar's
+// or Harvest's) counts too: stopping it would log that time as well.
 function timeBillable(projectId, taskId){
   if(!projectId || !taskId || typeof hvProjectTasks !== 'function' || typeof hvTimeOn !== 'function' || !hvTimeOn()) return null;
   const t = hvProjectTasks(projectId, taskId, true).find(x => x.id === Number(taskId));
   return t ? !!t.billable : null;
 }
-async function timeDuplicateOf({ clientId, dateStr, minutes, projectId, taskId }){
-  if(!clientId || !dateStr || !minutes) return null;
-  const { data, error } = await supabaseClient.from('time_entries').select('*')
-    .eq('user_id', currentUser.id).eq('client_id', clientId).eq('entry_date', dateStr).eq('minutes', minutes).is('deleted_at', null).limit(10);
-  if(error || !data || !data.length) return null;
-  const b = timeBillable(projectId, taskId);
-  const e = data.find(x => { const xb = timeBillable(x.harvest_project_id, x.harvest_task_id); return b === null || xb === null || b === xb; });
-  if(!e) return null;
-  const xb = timeBillable(e.harvest_project_id, e.harvest_task_id);
-  return { id: e.id, minutes: e.minutes, date: e.entry_date, description: e.description || '', fromHarvest: e.source === 'harvest', locked: !!e.harvest_locked,
-    billable: xb === null ? '' : xb ? 'Billable' : 'Non-billable' };
+const TIME_STOP = new Set('the and for with from into onto this that these those our their your his her its was were are has have had been not but out all any some more also just then than them they over per via about after before again'.split(' '));
+function timeWordsOf(s){
+  return new Set(String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^a-z0-9]+/)
+    .filter(w => w.length >= 3 && !TIME_STOP.has(w)).map(w => w.length > 5 ? w.replace(/(ing|ed|es|s)$/, '') : w));
 }
-// "1:30 for Harbor Kitchen & Bath on Tue, Nov 25 · Billable · logged in Harvest"
+// true: the notes say the same thing; false: both say something, nothing in common; null: can't tell
+function timeNotesSame(a, b){
+  const A = timeWordsOf(a), B = timeWordsOf(b);
+  if(!A.size || !B.size) return null;
+  let n = 0; A.forEach(w => { if(B.has(w)) n++; });
+  return n > 0 && n / Math.min(A.size, B.size) >= 0.5 ? true : n === 0 ? false : null;
+}
+// nearly the very same notes (most words shared, either way round)
+function timeNotesClose(a, b){
+  const A = timeWordsOf(a), B = timeWordsOf(b);
+  if(!A.size || !B.size) return false;
+  let n = 0; A.forEach(w => { if(B.has(w)) n++; });
+  return n / Math.max(A.size, B.size) >= 0.8;
+}
+// true / false / null (can't tell): the same Harvest project and task, or the same service
+function timeSameTask(n, x){
+  const xp = x.harvest_project_id, xt = x.harvest_task_id;
+  if(n.projectId && xp){
+    if(Number(n.projectId) !== Number(xp)) return false;
+    return n.taskId && xt ? Number(n.taskId) === Number(xt) : null;
+  }
+  const ns = n.projectId && typeof hvProjectName === 'function' ? hvProjectName(n.projectId) : n.service, xs = xp && typeof hvProjectName === 'function' ? hvProjectName(xp) : x.service;
+  if(!ns || !xs) return null;
+  return ns !== xs ? false : null;
+}
+// Harvest's side of a day, read now (once a minute at most per day). Resolves with the read's answer,
+// or null (no Harvest, not linked, offline). Add Time starts it when it opens and when the day changes.
+const timeFresh = new Map();
+function timeFreshDay(dateStr){
+  if(!dateStr || typeof hvTimeOn !== 'function' || !hvTimeOn() || typeof supabaseClient === 'undefined') return Promise.resolve(null);
+  const had = timeFresh.get(dateStr);
+  if(had && Date.now() - had.at < 60000) return had.p;
+  const p = supabaseClient.auth.getSession().then(({ data: { session } }) => !session ? null
+    : fetch('/api/integrations', { method: 'POST', headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'harvest', action: 'read-day', date: dateStr }) })
+      .then(r => r.ok ? r.json() : null).then(r => r && !r.skipped ? r : null))
+    .catch(() => null);
+  timeFresh.set(dateStr, { at: Date.now(), p });
+  return p;
+}
+// at most `ms` waiting for it: saving never hangs on Harvest
+function timeFreshWait(dateStr, ms){ return Promise.race([timeFreshDay(dateStr), new Promise(r => setTimeout(() => r(null), ms || 2500))]); }
+
+async function timeDuplicateOf({ clientId, dateStr, minutes, projectId, taskId, service, description }){
+  if(!clientId || !dateStr || !minutes) return null;
+  const fresh = await timeFreshWait(dateStr, 2500);
+  const { data, error } = await supabaseClient.from('time_entries').select('*')
+    .eq('user_id', currentUser.id).eq('client_id', clientId).eq('entry_date', dateStr).is('deleted_at', null).limit(50);
+  const n = { projectId, taskId, service }, b = timeBillable(projectId, taskId), desc = (description || '').trim();
+  let best = null;
+  (error ? [] : data || []).forEach(x => {
+    const xb = timeBillable(x.harvest_project_id, x.harvest_task_id);
+    if(b !== null && xb !== null && b !== xb) return;                                     // billable vs not: other work
+    const d = Math.abs(minutes - x.minutes), task = timeSameTask(n, x), notes = timeNotesSame(desc, x.description);
+    const parts = String(x.description || '').split(' · ');
+    const part = !!desc && parts.length > 1 && minutes < x.minutes && parts.some(p => timeNotesClose(desc, p));
+    const near = d > 0 && d <= Math.max(5, Math.round(Math.max(minutes, x.minutes) * 0.1));
+    let score = 0;
+    if(part) score = 9;
+    else if(d === 0){ if(task === false && notes === false) return; score = 4; }
+    else if(near && (task === true || notes === true)) score = 2;
+    else return;
+    score += (task === true ? 2 : 0) + (notes === true ? 2 : 0);
+    if(!best || score > best.score) best = { score, x, exact: d === 0, part };
+  });
+  if(best){
+    const x = best.x, xb = timeBillable(x.harvest_project_id, x.harvest_task_id);
+    return { id: x.id, minutes: x.minutes, date: x.entry_date, description: x.description || '', fromHarvest: x.source === 'harvest', locked: !!x.harvest_locked,
+      exact: best.exact, part: best.part, logged: !!(x.logged || x.improvement_id),
+      kind: typeof hvEntryWords === 'function' ? hvEntryWords({ harvestProjectId: x.harvest_project_id, harvestTaskId: x.harvest_task_id, service: x.service }) : (x.service || ''),
+      billable: xb === null ? '' : xb ? 'Billable' : 'Non-billable' };
+  }
+  // a timer running for this client that day, long enough to hold this time
+  const today = toDateStr(new Date());
+  if(dateStr === today && typeof timerState !== 'undefined' && timerState && timerState.running && timerState.clientId === clientId && timerState.startedAt){
+    const ran = Math.floor((Date.now() - timerState.startedAt) / 60000);
+    if(toDateStr(new Date(timerState.startedAt)) === dateStr && ran >= 10 && minutes <= ran + 10) return { timer: 'radar', minutes: ran, description: timerState.description || '' };
+  }
+  const run = fresh && (fresh.running || []).find(r => String(r.client_id) === String(clientId) && r.minutes >= 10 && minutes <= r.minutes + 10);
+  if(run) return { timer: 'harvest', minutes: run.minutes, description: run.notes || '' };
+  return null;
+}
+// "1:27 for Harbor Kitchen & Bath today · Website · Design · Billable · in Harvest"
 function timeDupWords(dup, clientId){
-  const c = clients.find(x => x.id === clientId);
+  const c = clients.find(x => x.id === clientId), hm = m => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+  if(dup.timer) return `${hm(dup.minutes)} so far for ${c ? c.name : 'this client'}${dup.timer === 'harvest' ? ', in Harvest' : ''}`;
   const day = dup.date === toDateStr(new Date()) ? 'today' : 'on ' + fmtShortDate(new Date(dup.date + 'T12:00:00'));
-  return [`${Math.floor(dup.minutes / 60)}:${String(dup.minutes % 60).padStart(2, '0')} for ${c ? c.name : 'this client'} ${day}`, dup.billable, dup.fromHarvest ? 'logged in Harvest' : ''].filter(Boolean).join(' · ');
+  return [`${hm(dup.minutes)} for ${c ? c.name : 'this client'} ${day}`, dup.kind, dup.billable, dup.fromHarvest ? 'in Harvest' : ''].filter(Boolean).join(' · ');
+}
+function timeDupTitle(dup){
+  return dup.timer ? (dup.timer === 'harvest' ? 'Your Harvest timer is running for this client' : 'Your timer is running for this client')
+    : dup.exact || dup.part ? 'You already logged this time' : 'This looks like time you already logged';
+}
+// One line on why, for what the words don't show
+function timeDupWhy(dup){
+  if(dup.timer) return 'Stopping it will log that time too.';
+  if(dup.part) return 'It’s part of an entry that time was added to.';
+  return '';
+}
+// Logging work with its time (Log, Queue, the phone): the same time already logged? Use it as this
+// work's time (nothing new in Harvest), add the time too, or, when that time is already other work's,
+// log the work without time. Resolves { pick: 'use' | 'add' | 'none', id, minutes }, or null to stop.
+// A timer running for the client isn't asked about here: Log has its own Use Timer.
+async function workTimeCheck({ clientId, dateStr, minutes, projectId, taskId, service, text }){
+  if(!minutes) return { pick: 'add' };
+  const dup = await timeDuplicateOf({ clientId, dateStr, minutes, projectId, taskId, service, description: text });
+  if(!dup || dup.timer) return { pick: 'add' };
+  const choices = dup.logged
+    ? [{ label: 'Log Without Time', value: 'none' }, { label: 'Add the Time Too', value: 'add', primary: true }]
+    : [{ label: 'Add the Time Too', value: 'add' }, { label: 'Use That Time', value: 'use', primary: true }];
+  const q = dup.description ? `“${dup.description.length > 100 ? dup.description.slice(0, 100) + '…' : dup.description}”` : '';
+  const say = dup.logged ? 'That time is already logged as other work.' : 'Use it as this work’s time, so it isn’t in Harvest twice.';
+  const v = typeof choiceDialog === 'function' ? await choiceDialog({ title: timeDupTitle(dup), body: `${timeDupWords(dup, clientId)}${q ? '\n' + q : ''}\n\n${say}`, row: true, choices })
+    : typeof mActions === 'function' ? await new Promise(res => mActions(`${timeDupTitle(dup)}: ${timeDupWords(dup, clientId)}${q ? ', ' + q : ''}. ${say}`, choices.slice().reverse().map(c => ({ label: c.label, fn: () => res(c.value) })), () => res(null)))
+    : 'add';
+  return v === null ? null : { pick: v, id: dup.id, minutes: dup.minutes };
+}
+// That entry becomes this work's time: linked, so deleting either deletes both (as Log as Work does)
+async function workTimeLink(entryId, impId){
+  let r = await supabaseClient.from('time_entries').update({ logged: true, improvement_id: impId }).eq('id', entryId);
+  if(r.error && workColumnMissing(r.error, 'improvement_id')) r = await supabaseClient.from('time_entries').update({ logged: true }).eq('id', entryId);
+  return !r.error;
 }
 async function okToLogDuplicate(clientId, text){
   const dup = workDuplicateOf(clientId, text); if(!dup) return true;

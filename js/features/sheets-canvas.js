@@ -282,6 +282,11 @@ async function saveQueueLogImprovement(another){
   if(!(await okToLogDuplicate(clientId, text))) return;   // logged already? (data.js)
   const picked = g('liService')?.value || '';
   const dateStr = g('liDate')?.value || toDateStr(new Date());
+  // its time already logged (here or in Harvest)? Use that, add it too, or log without (Nov 25)
+  const c1 = clients.find(x => x.id === clientId);
+  const tc = minutes && !(logSheet.useTimer && timerState.running && timerState.clientId === clientId)
+    ? await workTimeCheck({ clientId, dateStr, minutes, projectId: pick.projectId, taskId: pick.taskId, service: pick.projectId ? pick.service : picked || (c1 && c1.service) || '', text }) : { pick: 'add' };
+  if(!tc) return;
   const include = sheetIsOn('liInclude');
   const author = myName() || 'Team member';
   const files = logSheet.files.slice(), useTimer = logSheet.useTimer, fromNote = logSheet.fromNote || null;
@@ -299,7 +304,8 @@ async function saveQueueLogImprovement(another){
   // Work for the email changes what the writer's draft should say; internal work doesn't.
   if(include){ const inv = invalidateStaleDraft(c, author); if(inv) await saveDraftFor(clientId, author, { draftStatus: 'none', draft: '' }); }
   let timeOk = true;
-  if(minutes){
+  if(minutes && tc.pick === 'use'){ timeOk = await workTimeLink(tc.id, imp.id); await loadTimeEntries(); if(typeof renderTimesheet === 'function') renderTimesheet(); }
+  else if(minutes && tc.pick === 'add'){
     if(useTimer && timerState.running && timerState.clientId === clientId){
       if(!timerState.service){ timerState.service = service; saveTimerState(); }
       if(pick.projectId){ timerState.projectId = pick.projectId; timerState.taskId = pick.taskId; timerState.service = pick.service; saveTimerState(); }
@@ -321,9 +327,10 @@ async function saveQueueLogImprovement(another){
   refreshClientDetailActivityIfOpen(clientId);
   restoreBtn(btn);
   renderAll();
-  const extras = [minutes && timeOk ? `${hmLong(minutes)} on your timesheet` : '', up.saved ? `${up.saved} screenshot${up.saved === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ');
+  const tm = tc.pick === 'use' ? tc.minutes : tc.pick === 'add' ? minutes : 0;
+  const extras = [tm && timeOk ? `${hmLong(tm)} on your timesheet${tc.pick === 'use' ? ', the time already there' : ''}` : '', up.saved ? `${up.saved} screenshot${up.saved === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ');
   if(up.failed) showToast('info', 'Logged, without some screenshots', `${up.failed} file${up.failed === 1 ? '' : 's'} couldn’t be uploaded. The improvement is saved for ${c.name}.`);
-  else if(minutes && !timeOk) showToast('info', 'Logged, without the time', `The improvement is saved for ${c.name}, but the time didn’t save. Add it on the Timesheet.`);
+  else if(tm && !timeOk) showToast('info', 'Logged, without the time', `The improvement is saved for ${c.name}, but the time didn’t ${tc.pick === 'use' ? 'link' : 'save'}. Add it on the Timesheet.`);
   else showToast('success', 'Improvement logged', `Saved for ${c.name}${extras ? ' · ' + extras : ''}.`);
   if(another){
     logSheet.files = []; logSheet.useTimer = false;

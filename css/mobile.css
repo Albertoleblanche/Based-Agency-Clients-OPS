@@ -537,5 +537,6 @@ body.mac.mobile { overflow: hidden; background: var(--ios-bg, #F2F2F7); -webkit-
 .m-tdup span{display:block;margin-top:3px;font-size:14px;line-height:1.4;color:var(--label-2)}
 .m-tdup q{display:block;margin-top:6px;font-size:14px;line-height:1.4;color:var(--label-2);quotes:'“' '”'}
 .m-tdup q::before{content:open-quote}.m-tdup q::after{content:close-quote}
+.m-tdup span.m-tdup-why{margin-top:6px;color:var(--label)}
 .m-tdup-a{display:flex;gap:10px;margin-top:12px}
 .m-tdup-a .ibtn{flex:1;width:auto;margin:0}

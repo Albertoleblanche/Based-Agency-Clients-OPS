@@ -3985,5 +3985,6 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 .tdup div>span{display:block;margin-top:2px;font-size:13px;line-height:1.4;color:var(--label-2)}
 .tdup q{display:block;margin-top:6px;font-size:13px;line-height:1.4;color:var(--label-2);quotes:'“' '”'}
 .tdup q::before{content:open-quote}.tdup q::after{content:close-quote}
+.tdup div>span.tdup-why{margin-top:6px;color:var(--label)}
 @keyframes tdupIn{from{opacity:0;transform:translateY(-4px)}}
 @media (prefers-reduced-motion:reduce){.tdup{animation:none}}

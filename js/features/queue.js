@@ -465,6 +465,9 @@ async function quLog(clientId){
   const today = toDateStr(new Date()), dateStr = g('quDate')?.value || today;
   const when = dateStr === today ? new Date() : new Date(dateStr + 'T12:00:00');
   const service = typeof serviceFromHarvest === 'function' && serviceFromHarvest(c) ? (pick.projectId ? pick.service : improvementServiceFor(c)) : c.service || '';
+  // its time already logged (here or in Harvest)? Use that, add it too, or log without (Nov 25)
+  const tc = typeof workTimeCheck === 'function' ? await workTimeCheck({ clientId, dateStr, minutes, projectId: pick.projectId, taskId: pick.taskId, service: pick.projectId ? pick.service : service, text }) : { pick: 'add' };
+  if(!tc) return;
   const author = myName() || 'Team member';
   if(ta) ta.disabled = true;
   const imp = typeof insertImprovementFull === 'function'
@@ -473,7 +476,11 @@ async function quLog(clientId){
   if(!imp){ if(ta) ta.disabled = false; showToast('error', 'Couldn’t log that', 'Try again in a moment.'); return; }
   // the time, on your timesheet for that day (and to Harvest for a Harvest client)
   let timeOk = true;
-  if(minutes){
+  if(minutes && tc.pick === 'use'){
+    timeOk = await workTimeLink(tc.id, imp.id);
+    if(typeof loadTimeEntries === 'function') await loadTimeEntries();
+    if(typeof renderTimesheet === 'function') renderTimesheet();
+  } else if(minutes && tc.pick === 'add'){
     const r = await mergeOrInsertTimeEntry({ clientId, service: pick.projectId ? pick.service : service, dateStr, minutes, description: text, projectId: pick.projectId, taskId: pick.taskId, improvementId: imp.id });
     if(r.error) timeOk = false;
     else {
@@ -488,7 +495,10 @@ async function quLog(clientId){
   window._quForm = { id: clientId, date: dateStr, time: '' };
   if(typeof logClientActivity === 'function') logClientActivity(clientId, 'improvement_logged', `${author} logged an improvement: "${text.length > 80 ? text.slice(0, 80) + '…' : text}"`);
   quRefreshAll(clientId);
-  if(minutes && !timeOk) showToast('info', 'Logged, without the time', `The work is saved for ${c.name}, but the time didn’t save. Add it on the Timesheet.`);
+  const tmin = tc.pick === 'use' ? tc.minutes : tc.pick === 'add' ? minutes : 0;
+  if(tmin && !timeOk) showToast('info', 'Logged, without the time', `The work is saved for ${c.name}, but the time didn’t ${tc.pick === 'use' ? 'link' : 'save'}. Add it on the Timesheet.`);
+  else if(tc.pick === 'use') showToast('success', 'Logged, with the time already there', `${hmLong(tmin)}${dateStr === today ? '' : ' on ' + fmtShortDate(when)} is its time. Nothing new went to Harvest.`);
+  else if(tc.pick === 'none') showToast('success', 'Logged', 'Without time: that time is already other work’s.');
   else if(minutes) showToast('success', 'Logged', `${hmLong(minutes)} on your timesheet${dateStr === today ? '' : ' for ' + fmtShortDate(when)}.`);
   const again = g('quNew'); if(again) again.focus();
 }

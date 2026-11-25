@@ -371,6 +371,11 @@ ${hvPickBlockHtml('manual', cid, d.projectId, d.taskId)}
 <span></span><div class="mw-row">${sheetSw('manualWork', false, 'Log it as work')}<div><b>Log it as work</b><span>The notes become an improvement in Queue, ready for the client update.</span></div></div>
 </div>
 <div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="addManualEntry()">Add Time</button></div>`, 520);
+  // your Harvest time that day, read now, so saving can tell if this time is already there (Nov 25)
+  if(typeof timeFreshDay === 'function'){
+    timeFreshDay(day);
+    document.getElementById('manualDate')?.closest('div')?.addEventListener('change', ev => { if(ev.target && ev.target.id === 'manualDate' && ev.target.value) timeFreshDay(ev.target.value); });
+  }
 }
 // Edit Time's "Log it as work" is the same switch as the Queue's Email switch (Nov 23): on when the
 // time is logged as work and in the client update, off when it isn't (or the Queue left it out of the

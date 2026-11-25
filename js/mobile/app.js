@@ -408,8 +408,9 @@ ${options.length > 8 ? `<div class="isearch">${icon('magnifying-glass')}<input p
 }
 // An action sheet: a few choices about one thing, with Cancel apart, rising from the bottom.
 let mActCbs = [];
-function mActions(title, items){
-  mActCbs = items.map(x => x.fn);
+let mActCancel = null;
+function mActions(title, items, onCancel){
+  mActCbs = items.map(x => x.fn); mActCancel = onCancel || null;
   let el = $m('mAct');
   if(!el){ el = document.createElement('div'); el.id = 'mAct'; el.className = 'iact'; document.body.appendChild(el); }
   el.innerHTML = `<div class="iact-scrim" onclick="mActDone(-1)"></div><div class="iact-panel" role="dialog" aria-label="${mEsc(title)}">
@@ -420,7 +421,7 @@ function mActions(title, items){
 function mActDone(k){
   const el = $m('mAct'); if(!el) return;
   el.classList.remove('in');
-  const fn = mActCbs[k]; mActCbs = [];
+  const fn = k < 0 ? mActCancel : mActCbs[k]; mActCbs = []; mActCancel = null;
   setTimeout(() => { if(!el.classList.contains('in')) el.innerHTML = ''; }, 320);
   if(fn) fn();
 }
@@ -1492,6 +1493,10 @@ async function mSaveLog(){
   const pick = minutes && hvTimeOn() ? mHvValue(L) : { ok: true, projectId: null, taskId: null };
   if(!pick.ok){ showToast('error', 'Almost there', pick.msg); return; }
   if(!(await okToLogDuplicate(L.clientId, text))) return;   // logged already? (data.js)
+  // its time already logged (here or in Harvest)? Use that, add it too, or log without (Nov 25)
+  const tc = minutes && !(L.useTimer && timerState.running && timerState.clientId === L.clientId)
+    ? await workTimeCheck({ clientId: L.clientId, dateStr: L.date, minutes, projectId: pick.projectId, taskId: pick.taskId, service: pick.service || L.service, text }) : { pick: 'add' };
+  if(!tc) return;
   const include = mIsOn('mLogInclude'), author = myName() || 'Team member';
   const btn = $m('mSheetDone'); if(btn) btn.disabled = true;
   const when = L.date === toDateStr(new Date()) ? new Date() : new Date(L.date + 'T12:00:00');
@@ -1500,14 +1505,16 @@ async function mSaveLog(){
   const imp = await insertImprovementFull(L.clientId, { author, text, includeInEmail: include, source: 'manual', date: when.toISOString(), service });
   if(!imp){ if(btn) btn.disabled = false; showToast('error', 'Couldn’t save it', 'Try again in a moment.'); return; }
   // new work never wipes a draft (as on desktop): it shows as new since the draft, or goes in the next update
-  if(minutes){
+  if(minutes && tc.pick === 'use') await workTimeLink(tc.id, imp.id);
+  else if(minutes && tc.pick === 'add'){
     if(L.useTimer && timerState.running && timerState.clientId === L.clientId){ timerState.service = pick.projectId ? pick.service : service; timerState.projectId = pick.projectId; timerState.taskId = pick.taskId; timerState.description = text; await mStopTimer(true, true, imp.id); }
     else await mAddTime({ clientId: L.clientId, service: pick.projectId ? pick.service : service, dateStr: L.date, minutes, description: text, logged: true, projectId: pick.projectId, taskId: pick.taskId, improvementId: imp.id });
   }
   mLog(L.clientId, 'improvement_logged', `${author} logged an improvement: "${text.slice(0, 80)}"`, `Logged an improvement for <b>${escapeHtml(c ? c.name : '')}</b>.`);
   mCloseSheet(true);
   await mRefresh();
-  showToast('success', 'Improvement logged', `${c ? c.name : ''}${minutes ? ` · ${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')} on your timesheet` : ''}`);
+  const tm = tc.pick === 'use' ? tc.minutes : tc.pick === 'add' ? minutes : 0;
+  showToast('success', 'Improvement logged', `${c ? c.name : ''}${tm ? ` · ${Math.floor(tm / 60)}:${String(tm % 60).padStart(2, '0')} on your timesheet${tc.pick === 'use' ? ', the time already there' : ''}` : ''}`);
 }
 // One entry per client, project, task and day (or client, service and day before Harvest), like
 // the desktop timesheet. It goes to Harvest straight away, as the desktop does.
@@ -1613,20 +1620,42 @@ function mOpenTimeSheet(presetClientId, preset){
 <p class="ifoot">What you worked on becomes an improvement in Queue, ready for the client update.</p>`;
   mOpenSheet('Add Time', window.mTimeBody(), { done: 'mSaveTime()', doneLabel: 'Add' });
   if(preset.minutes || preset.desc) mRestoreSheetState();   // a meeting's time, filled in (Nov 23)
+  if(typeof timeFreshDay === 'function') timeFreshDay(mTime_.date);   // your Harvest time that day, read now (Nov 25)
 }
 // Add Time found the same time already logged: a note at the top of the sheet, with Edit That One
-// and Add It Anyway. Changing anything takes it away.
+// and Add It Anyway; logging it as work, Use That Time; a timer running for it, Keep the Timer.
+// Changing the time, the day, the client or the work switch takes it away.
 function mTimeDupShow(dup){
   const sc = $m('mSheet')?.querySelector('.sheet-scroll'); if(!sc) return;
   sc.querySelector('.m-tdup')?.remove();
-  const el = document.createElement('div');
+  const el = document.createElement('div'), why = timeDupWhy(dup);
   el.className = 'm-tdup'; el.setAttribute('role', 'status');
-  el.innerHTML = `<b>You already logged this time</b><span>${mEsc(timeDupWords(dup, mTime_.clientId))}</span>${dup.description ? `<q>${mEsc(dup.description.slice(0, 140))}</q>` : ''}
-<div class="m-tdup-a"><button class="ibtn s" onclick="mTime_.force=true;mSaveTime()">Add It Anyway</button><button class="ibtn p" onclick="mEditTimeSheet('${dup.id}')">${dup.locked ? 'See That One' : 'Edit That One'}</button></div>`;
+  const main = dup.timer ? `<button class="ibtn p" onclick="mCloseSheet()">Keep the Timer</button>`
+    : mTime_.work && !dup.logged ? `<button class="ibtn p" onclick="mTimeUseTime('${dup.id}',${Number(dup.minutes) || 0})">Use That Time</button>`
+    : `<button class="ibtn p" onclick="mEditTimeSheet('${dup.id}')">${dup.locked ? 'See That One' : 'Edit That One'}</button>`;
+  el.innerHTML = `<b>${mEsc(timeDupTitle(dup))}</b><span>${mEsc(timeDupWords(dup, mTime_.clientId))}</span>${dup.description ? `<q>${mEsc(dup.description.slice(0, 140))}</q>` : ''}${why ? `<span class="m-tdup-why">${mEsc(why)}</span>` : ''}
+<div class="m-tdup-a"><button class="ibtn s" onclick="mTime_.force=true;mSaveTime()">Add It Anyway</button>${main}</div>`;
   sc.prepend(el); sc.scrollTop = 0;
   const was = mSheetVal('mTimeDur');
-  const gone = e => { if(e.target && e.target.id !== 'mTimeDur' || mSheetVal('mTimeDur') === was) return; el.remove(); sc.removeEventListener('input', gone, true); };
-  sc.addEventListener('input', gone, true);
+  const off = () => { el.remove(); sc.removeEventListener('input', gone, true); sc.removeEventListener('click', flip, true); };
+  const gone = e => { if(e.target && e.target.id === 'mTimeDur' && mSheetVal('mTimeDur') !== was) off(); };
+  const flip = e => { if(e.target && e.target.closest && e.target.closest('#mTimeWork')) off(); };
+  sc.addEventListener('input', gone, true); sc.addEventListener('click', flip, true);
+}
+// Logging it as work with the time already there: the work, and that entry linked to it. No new time.
+async function mTimeUseTime(id, minutes){
+  const T = mTime_, desc = mSheetVal('mTimeDesc').trim(), pick = mHvValue(T);
+  if(!desc){ showToast('error', 'Say what you worked on', 'That’s what shows in Queue.'); $m('mTimeDesc')?.focus(); return; }
+  if(!(await okToLogDuplicate(T.clientId, desc))) return;
+  const c = clients.find(x => x.id === T.clientId), when = T.date === toDateStr(new Date()) ? new Date() : new Date(T.date + 'T12:00:00');
+  const imp = await insertImprovementFull(T.clientId, { author: myName() || 'Team member', text: desc, includeInEmail: true, source: 'time', date: when.toISOString(),
+    service: c && serviceFromHarvest(c) ? (pick.projectId ? pick.service : improvementServiceFor(c)) : pick.service });
+  if(!imp){ showToast('error', 'Couldn’t log it as work', 'Try again in a moment.'); return; }
+  const linked = await workTimeLink(id, imp.id);
+  mLog(T.clientId, 'improvement_logged', `${myName() || 'Team member'} logged an improvement: "${desc.slice(0, 80)}"`, `Logged an improvement for <b>${escapeHtml(mClientName(T.clientId))}</b>.`);
+  mCloseSheet(true); await mRefresh();
+  !linked ? showToast('info', 'Logged as work', 'It’s in Queue, but its time didn’t link.')
+    : showToast('success', 'Logged as work, with that time', `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')} already logged is its time.`);
 }
 // Time already logged, from the phone: how long and the notes (the rest on the desktop Timesheet)
 async function mEditTimeSheet(id){
@@ -1661,7 +1690,7 @@ function mTimePick(what){
   if(what === 'client') mPickClient(mTime_.clientId, v => { mTime_.clientId = v; const c = clients.find(x => x.id === v); if(c && c.service) mTime_.service = c.service; mHvClient(mTime_); back(); });
   if(what === 'project' || what === 'task') mHvPick(mTime_, what, back);
   if(what === 'service') mPick('Service', [...new Set([mTime_.service, ...(settings.serviceOptions || [])].filter(Boolean))].map(x => [x, x]), mTime_.service, v => { mTime_.service = v; back(); });
-  if(what === 'date') mDayPick('Date', mTime_.date, -30, 0, null, v => { mTime_.date = v; back(); });
+  if(what === 'date') mDayPick('Date', mTime_.date, -30, 0, null, v => { mTime_.date = v; if(typeof timeFreshDay === 'function') timeFreshDay(v); back(); });
 }
 async function mSaveTime(){
   const T = mTime_, raw = mSheetVal('mTimeDur').trim(), minutes = parseSpent(raw), desc = mSheetVal('mTimeDesc').trim();
@@ -1670,12 +1699,12 @@ async function mSaveTime(){
   const pick = mHvValue(T);
   if(!pick.ok){ showToast('error', 'Almost there', pick.msg); return; }
   if(minutes > 16 * 60 && !(await confirmDialog(`That’s ${Math.floor(minutes / 60)} hours in one entry.`, { title: 'Log it anyway?', confirmLabel: 'Log It' }))) return;
-  // the same time already logged (here or in Harvest): say so, with the one logged to edit (Nov 25)
+  if(T.work && !desc){ showToast('error', 'Say what you worked on', 'That’s what shows in Queue.'); $m('mTimeDesc')?.focus(); return; }
+  // the same time already logged (here or in Harvest), or a timer running for it: say so (Nov 25)
   if(!T.force){
-    const dup = await timeDuplicateOf({ clientId: T.clientId, dateStr: T.date, minutes, projectId: pick.projectId, taskId: pick.taskId });
+    const dup = await timeDuplicateOf({ clientId: T.clientId, dateStr: T.date, minutes, projectId: pick.projectId, taskId: pick.taskId, service: pick.service, description: desc });
     if(dup){ mTimeDupShow(dup); return; }
   }
-  if(T.work && !desc){ showToast('error', 'Say what you worked on', 'That’s what shows in Queue.'); $m('mTimeDesc')?.focus(); return; }
   if(T.work && !(await okToLogDuplicate(T.clientId, desc))) return;   // logged already? (data.js)
   const btn = $m('mSheetDone'); if(btn) btn.disabled = true;
   // as work (Nov 23): the improvement first, then the time as its own entry, linked to it

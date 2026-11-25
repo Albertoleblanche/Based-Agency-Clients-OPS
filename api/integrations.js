@@ -56,6 +56,7 @@ const { syncGoogleCalendarForUser } = require('../lib/google-calendar-sync');
 const {
   syncHarvestSetup,
   syncHarvestTime,
+  readHarvestDay,
   linkHarvestClient,
   moveHarvestLink,
   validateHarvestCredentials,
@@ -376,6 +377,16 @@ module.exports = async function handler(req, res) {
       try { result.time = await syncHarvestTime(admin, connection, { full: force }); }
       catch (e) { result.time = { error: e.status === 403 ? 'This token isn\'t allowed to read time entries.' : e.message }; }
       res.status(200).json(result);
+      return;
+    }
+
+    // your time in Harvest on one day, read now (Add Time, Nov 25): so the same time logged in Harvest a
+    // minute ago is caught, and a Harvest timer running for the client is mentioned
+    if (action === 'read-day') {
+      if (!profile) { res.status(403).json({ error: 'Only team members can do this.' }); return; }
+      if (!connection) { res.status(200).json({ skipped: 'not-connected' }); return; }
+      try { res.status(200).json(await readHarvestDay(admin, connection, { profileId: userId, date: (req.body || {}).date })); }
+      catch (e) { res.status(200).json({ skipped: 'harvest', error: e.status === 403 ? 'This token isn\'t allowed to read your time.' : e.message }); }
       return;
     }
 
