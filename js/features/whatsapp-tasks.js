@@ -11,6 +11,9 @@ let waTasks = [];
 let waRuns = [];
 let waGroups = [];
 let waSettings = null;
+// Members (Nov 25): they don't read the setup, so wa_check_status() tells them where the checks stand
+// (running, linked, last and next check, a check asked for), for Check Now and the times on their screen.
+let waStatus = null;
 let waLoaded = false;
 let waReady = null;            // null: not loaded · false: the tables aren't there yet · true
 let waWho = null;              // 'mine' | 'all' | an owner key (leads only); null = the default
@@ -61,7 +64,7 @@ function loadWaTasks(){
 // anyone else, so asking for them up front costs nothing.
 async function waLoadNow(){
   const safe = q => Promise.resolve(q).catch(e => ({ error: { message: e?.message || String(e) } }));
-  const [acc, tk, r, s, g, lc, cl, su, tn, tsn, ...ins] = await Promise.all([
+  const [acc, tk, r, s, g, lc, cl, su, tn, tsn, st, ...ins] = await Promise.all([
     safe(supabaseClient.rpc('wa_access')),
     safe(supabaseClient.from('wa_tasks').select('*').order('first_seen', { ascending: true })),
     safe(supabaseClient.from('wa_runs').select('*').order('started_at', { ascending: false }).limit(20)),
@@ -72,6 +75,7 @@ async function waLoadNow(){
     safe(supabaseClient.rpc('wa_can_setup')),
     safe(supabaseClient.from('wa_team_numbers').select('*').order('created_at', { ascending: true })),
     safe(supabaseClient.from('wa_team_seen').select('*').order('groups', { ascending: false })),
+    safe(supabaseClient.rpc('wa_check_status')),
     ...(typeof waInsightQueries === 'function' ? waInsightQueries().map(safe) : []),
   ]);
   waAccessLevel = !acc.error && ['manage', 'own', 'none'].includes(acc.data) ? acc.data : null;
@@ -92,7 +96,7 @@ async function waLoadNow(){
     waTeamNums = tn.error ? (waMissing(tn.error) ? null : waTeamNums) : (tn.data || []);
     if(!tsn.error) waTeamSeen = tsn.data || [];
     if(!cl.error){ waClientLast = new Map(); (cl.data || []).forEach(m => { if(!waClientLast.has(m.group_jid)) waClientLast.set(m.group_jid, m.ts); }); await waLoadPausedLast().catch(() => {}); }
-  }
+  } else waStatusApply(st.error ? null : st.data);
   waLoaded = true;
   updateWaNavBadge();
   waStartRealtime();
@@ -213,9 +217,19 @@ function waWhenLower(iso){ const w = claudeWhen(iso); return /^(Today|Yesterday)
 function waWhen(iso){ const d = new Date(iso); return `${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}, ${fmtTime(d)}`; }
 function waHm(hhmm){ const [h, m] = String(hhmm).split(':').map(Number); return `${(h % 12) || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; }
 function waWeekStart(){ const d = dayStart(rNow()); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; }
-function waTz(){ return (waSettings && waSettings.timezone) || 'America/New_York'; }
+// The setup (leads), or for a member the part of it wa_check_status() shares.
+function waS(){ return waSettings || waStatus; }
+// A member's status, in the shape the setup and the runs have, so the same helpers read it.
+function waStatusApply(d){
+  if(!d || typeof d !== 'object' || Array.isArray(d)){ waStatus = null; waRuns = []; return; }
+  waStatus = { heartbeat_at: d.heartbeat_at || null, qr: d.linking_at ? 'pending' : null, qr_at: d.linking_at || null, check_requested_at: d.check_requested_at || null,
+    digest_times: Array.isArray(d.digest_times) ? d.digest_times : null, timezone: d.timezone || null };
+  waRuns = [...(d.connection ? [{ id: 'conn', kind: 'status', connection: d.connection, started_at: d.connection_at || d.heartbeat_at }] : []),
+    ...(d.last_check_at ? [{ id: 'chk:' + d.last_check_at, kind: 'digest', started_at: d.last_check_at, finished_at: d.last_check_done_at || null }] : [])];
+}
+function waTz(){ return (waS() && waS().timezone) || 'America/New_York'; }
 function waCity(z){ return String(z).split('/').pop().replace(/_/g, ' '); }
-function waTimes(){ return (waSettings && waSettings.digest_times && waSettings.digest_times.length ? waSettings.digest_times : ['09:00', '15:00']).slice(); }
+function waTimes(){ const s = waS(); return (s && s.digest_times && s.digest_times.length ? s.digest_times : ['09:00', '15:00']).slice(); }
 function waTzParts(date, tz){
   const o = {};
   new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
@@ -230,7 +244,7 @@ function waZoned(y, m, d, hhmm, tz){
   return new Date(t);
 }
 function waNextCheck(){
-  if(!waSettings) return null;
+  if(!waS()) return null;
   const tz = waTz(), now = rNow(), p = waTzParts(now, tz), times = waTimes().sort();
   for(let k = 0; k < 5; k++){
     const day = new Date(Date.UTC(p.y, p.m - 1, p.d + k, 12));
@@ -240,7 +254,7 @@ function waNextCheck(){
   return null;
 }
 function waLastRun(){ return waRuns.find(r => r.kind === 'digest') || null; }
-function waRunning(){ return !!(waSettings && waSettings.heartbeat_at && Date.now() - new Date(waSettings.heartbeat_at).getTime() <= WA_STALE_MS); }
+function waRunning(){ const s = waS(); return !!(s && s.heartbeat_at && Date.now() - new Date(s.heartbeat_at).getTime() <= WA_STALE_MS); }
 function waRunText(r){
   if(!r) return 'No check yet.';
   const bits = [`read ${r.messages_seen || 0} new message${r.messages_seen === 1 ? '' : 's'}`];
@@ -259,7 +273,7 @@ const WA_START_FIRST = 'Start it on its server (see the connector README), or on
 // Where the connection stands, for leads.
 //   key: 'missing' | 'stopped' | 'qr' | 'signedout' | 'reconnecting' | 'connected'
 function waConnState(){
-  const s = waSettings;
+  const s = waS();
   if(waReady === false || !s) return { key: 'missing', dot: 'hollow', text: 'Not set up yet', long: 'An admin runs schema-whatsapp-tasks.sql in Supabase → SQL Editor, then starts Radar WhatsApp.' };
   if(!waRunning()) return s.heartbeat_at
     ? { key: 'stopped', dot: 'red', text: 'Radar WhatsApp isn’t running', long: `Last seen ${waWhen(s.heartbeat_at)}. ${WA_START}` }
@@ -276,54 +290,64 @@ function waConnState(){
 
 // ---- Check Now -----------------------------------------------------------------------------
 function waChecking(){
-  if(waSettings && waSettings.check_requested_at) return true;      // the connector hasn't picked it up yet
+  if(waS() && waS().check_requested_at) return true;      // the connector hasn't picked it up yet
   if(!waCheckAt) return false;
   const since = new Date(waCheckAt).getTime() - 60000;
   if(waRuns.some(r => r.kind === 'digest' && new Date(r.started_at).getTime() >= since)) return false;
   return Date.now() - new Date(waCheckAt).getTime() < 15 * 60000;
 }
+// Everyone has it (Nov 25): admins and approvers, and members for their own items. A member before the
+// database update gets it too, and pressing it says what's needed.
 function waCheckBtn(){
   if(waChecking()) return `<button class="btn wa-chk-b" disabled>${icon('loader', { cls: 'spin' })}Checking…</button>`;
-  return `<button class="btn wa-chk-b" onclick="waCheckNow()"${waConnState().key === 'connected' ? '' : ' disabled title="WhatsApp isn’t connected"'}>${icon('arrows-clockwise')}Check Now</button>`;
+  const off = (waCanManage() || waS()) && waConnState().key !== 'connected';
+  return `<button class="btn wa-chk-b" onclick="waCheckNow()"${off ? ` disabled title="WhatsApp isn’t connected${waCanManage() ? '' : ' right now'}"` : ''}>${icon('arrows-clockwise')}Check Now</button>`;
 }
 // Ask the connector for a check (or clear a request it never picked up). wa_request_check lets
-// approvers do it without being able to change the setup; older databases take the plain update.
+// anyone who sees WhatsApp do it without being able to change the setup; older databases take the
+// plain update (leads only: a member can't write the setup).
 async function waAskCheck(clear){
   const r = await supabaseClient.rpc('wa_request_check', { p_clear: !!clear });
   if(!r.error && (typeof r.data === 'string' || r.data === null)) return { at: clear ? null : (r.data || new Date().toISOString()), error: null };
-  if(r.error && !/wa_request_check|PGRST202|does not exist|Could not find/i.test(`${r.error.code || ''} ${r.error.message || ''}`)) return { at: null, error: r.error };
+  if(r.error && (!waCanManage() || !/wa_request_check|PGRST202|does not exist|Could not find/i.test(`${r.error.code || ''} ${r.error.message || ''}`))) return { at: null, error: r.error };
   const at = clear ? null : new Date().toISOString();
   const { error } = await supabaseClient.from('wa_settings').update({ check_requested_at: at }).eq('id', 1);
   return { at, error };
 }
+const WA_MEMBERS_SQL = 'Check Now for everyone needs a one-time database update: an admin runs addendum-whatsapp-members-check.sql in Supabase → SQL Editor.';
 async function waCheckNow(){
-  if(waConnState().key !== 'connected'){ showToast('error', 'WhatsApp isn’t connected', waConnState().long); return; }
+  const lead = waCanManage();
+  if(!lead && !waStatus){ showToast('error', 'Check Now isn’t on yet', WA_MEMBERS_SQL); return; }
+  if(waConnState().key !== 'connected'){ showToast('error', 'WhatsApp isn’t connected', lead ? waConnState().long : 'Radar can’t read the groups right now. An admin fixes it in Settings → WhatsApp; the list stays as it is until then.'); return; }
   const { at, error } = await waAskCheck(false);
   if(error){
-    showToast('error', 'Couldn’t ask for a check', waMissingCol(error) ? 'Check Now needs a one-time database update: run addendum-whatsapp-check-now.sql in Supabase → SQL Editor.' : error.message);
+    showToast('error', 'Couldn’t ask for a check', waMissingCol(error) ? 'Check Now needs a one-time database update: run addendum-whatsapp-check-now.sql in Supabase → SQL Editor.'
+      : !lead && /42501|Only admins/i.test(`${error.code || ''} ${error.message || ''}`) ? WA_MEMBERS_SQL : error.message);
     return;
   }
-  if(waSettings) waSettings.check_requested_at = at;
+  if(waS()) waS().check_requested_at = at;
   waCheckAt = at;
   waRedraw();
   showToast('info', 'Checking the groups', 'It usually takes a minute or two. The list updates by itself.');
   if(waCheckTimer) clearInterval(waCheckTimer);
-  const before = waLastRun()?.id;
+  const before = waLastRun()?.id, had = new Set(waTasks.map(t => t.id));
   waCheckTimer = setInterval(async () => {
     await loadWaTasks();
-    const asked = waSettings && waSettings.check_requested_at;
+    const asked = waS() && waS().check_requested_at;
     if(asked && Date.now() - new Date(asked).getTime() > 90000){
       // still waiting to be picked up: the connector is an older version, or isn't running
       clearInterval(waCheckTimer); waCheckTimer = null; waCheckAt = null;
       await waAskCheck(true);
-      if(waSettings) waSettings.check_requested_at = null;
-      showToast('error', 'Radar WhatsApp didn’t start the check', waRunning() ? 'It needs the latest version. Redeploy it, then try again.' : 'Radar WhatsApp isn’t running.');
+      if(waS()) waS().check_requested_at = null;
+      showToast('error', 'Radar WhatsApp didn’t start the check', !lead ? 'It didn’t answer. Try again in a few minutes; if it still doesn’t, tell an admin.' : waRunning() ? 'It needs the latest version. Redeploy it, then try again.' : 'Radar WhatsApp isn’t running.');
       waRedraw(); return;
     }
     if(!waChecking()){
       clearInterval(waCheckTimer); waCheckTimer = null;
       const r = waLastRun();
-      if(r && r.id !== before) showToast('success', 'Checked', r.tasks_new ? `Found ${r.tasks_new} new.` : 'Nothing new.');
+      // a member hears about their own items; the count of everything found is the team's
+      const mineNew = waTasks.filter(t => !had.has(t.id) && t.status === 'open').length;
+      if(r && r.id !== before) showToast('success', 'Checked', lead ? (r.tasks_new ? `Found ${r.tasks_new} new.` : 'Nothing new.') : mineNew ? `${mineNew} new for you.` : 'Nothing new for you.');
       waCheckAt = null;
       waRefreshChat();
     }
@@ -491,8 +515,8 @@ function waDraw(root){
     }
   } else {
     const first = open.slice().sort((a, b) => tier(a) - tier(b) || rank(a) - rank(b) || age(a) - age(b))[0];
-    subBits.push(first && first.urgent_at ? 'Start with the urgent one.' : 'From your clients’ WhatsApp groups.');
-    if(waNextCheck()) subBits.push(escapeHtml(waNextText().replace(/\.$/, '')));
+    const chk = waMeCheckedBits();
+    subBits.push(first && first.urgent_at ? 'Start with the urgent one.' : chk.length ? '' : 'From your clients’ WhatsApp groups.', ...chk);
   }
 
   const whoOpts = [['all', 'Everyone'], ['mine', 'Mine'], ...WA_OWNERS];
@@ -502,7 +526,7 @@ function waDraw(root){
     ? `<label class="pop pop-sel"><span class="pl">${escapeHtml(curWho[1])}</span>${icon('caret-down')}<select aria-label="Whose items" onchange="setWa('who',this.value)">${whoOpts.map(([v, n]) => `<option value="${v}"${v === who ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('')}</select></label>
 ${clientNames.length > 1 ? `<label class="pop pop-sel"><span class="pl">${escapeHtml(waClientSel || 'All clients')}</span>${icon('caret-down')}<select aria-label="Which clients" onchange="setWa('client',this.value)"><option value="">All clients</option>${clientNames.map(n => `<option value="${escapeHtml(n)}"${n === waClientSel ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('')}</select></label>` : ''}
 ${waCheckBtn()}`
-    : seg([['open', 'Waiting', open.length], ['done', 'Done this week', doneN]]);
+    : `${seg([['open', 'Waiting', open.length], ['done', 'Done this week', doneN]])}${waCheckBtn()}`;
   const foldBtn = `<button class="lnk-b wx-all" id="waFoldAll" onclick="waFoldAll()">Collapse All</button>`;
 
   let main;
@@ -529,7 +553,7 @@ ${waCheckBtn()}`
   const side = lead ? waSideHtml(who, conn, allOpen) : waMeSideHtml(allOpen, allDone);
   const prev = root.querySelector('.sp-page')?.scrollTop || 0;
   root.innerHTML = `<div class="spw"><div class="sp-page"><div class="wx${lead ? '' : ' wx-solo'}${sel || reading ? ' has-panel' : ''}">
-<header class="wx-hd"><div><h2 class="wx-h">${escapeHtml(h2)}</h2><p class="wx-sub">${subBits.join('<i class="wx-sep">·</i>')}</p></div><div class="wx-hd-a">${hdRight}</div></header>
+<header class="wx-hd"><div><h2 class="wx-h">${escapeHtml(h2)}</h2><p class="wx-sub">${subBits.filter(Boolean).join('<i class="wx-sep">·</i>')}</p></div><div class="wx-hd-a">${hdRight}</div></header>
 <div class="wx-body"><div class="wx-main">${main}</div>${side}</div>
 </div></div>${sel ? waPanelHtml(sel) : reading ? waReadPanelHtml() : ''}</div>`;
   const sp = root.querySelector('.sp-page'); if(sp) sp.scrollTop = prev;
@@ -672,6 +696,14 @@ ${shown.map(r => `<button class="wx-t wa-pp${who === r.k ? ' on' : ''}" onclick=
 ${rest.length ? `<p class="wx-t-q">Nothing open: ${escapeHtml(rest.map(r => r.n).join(', ').replace(/, ([^,]*)$/, ' and $1'))}</p>` : ''}`;
 }
 // A team member's side: their week, and how their clients sound in the groups.
+// A member's line on the checks: "Checked at 11:00 AM · next at 3:00 PM", "Checking the groups now", or
+// that WhatsApp isn't connected (the button is off then too).
+function waMeCheckedBits(){
+  if(waChecking()) return ['Checking the groups now'];
+  if(waStatus && waConnState().key !== 'connected') return ['<span class="wx-st"><i class="dot red" aria-hidden="true"></i>Not connected right now</span>'];
+  const last = waLastRun(), next = waNextCheck(), today = d => daysBetween(dayStart(rNow()), dayStart(d)) === 0 ? 'at ' : '';
+  return [last ? `Checked ${today(new Date(last.started_at))}${waAt(last.started_at)}` : '', next ? `${last ? 'next' : 'Next check'} ${today(next)}${waAt(next.toISOString())}` : ''].filter(Boolean).map(escapeHtml);
+}
 function waMeSideHtml(open, done){
   const inUpd = done.filter(t => t.improvement_id).length;
   const late = open.filter(waLate).sort((a, b) => new Date(a.first_seen) - new Date(b.first_seen));
@@ -689,7 +721,7 @@ ${moods.map(({ c, m }) => `<div class="wx-mood-r"><b>${escapeHtml(c.name)}</b><s
   return `<aside class="wx-side">
 <section class="wx-card wx-sec">${week}</section>
 ${moodHtml ? `<section class="wx-card wx-sec">${moodHtml}</section>` : ''}
-<p class="wx-how">Radar reads your clients’ groups a few times a day and lists what they ask you for. Urgent messages reach you right away. It never writes in the groups.</p>
+<p class="wx-how">Radar reads your clients’ groups a few times a day and lists what they ask you for, or right away when you press Check Now. Urgent messages reach you right away. It never writes in the groups.</p>
 </aside>`;
 }
 // ---- Quiet clients -----------------------------------------------------------------------------
