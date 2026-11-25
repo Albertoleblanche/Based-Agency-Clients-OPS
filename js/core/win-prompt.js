@@ -1,8 +1,11 @@
 // The weekly update prompt, written as a win the way the Nov 9–17 sprints described it: a win is
 // something that's a win in the client's mind (a lead, a call, a booked job, a ranking), not "we did
-// this many pages". One win, told like a person texting the client, with the proof, then "let us
-// know how it goes" or what's next. Priority 1 a real result, 2 something we changed because of
-// what we saw in their data, 3 the work, told as what it's doing to get them there.
+// this many pages". It leads with one win, told like a person texting the client, with the proof,
+// then "let us know how it goes" or what's next. Priority 1 a real result, 2 something we changed
+// because of what we saw in their data, 3 the work, told as what it's doing to get them there.
+// Since Nov 25 it covers the rest of the week's work too (one logged item is often several things
+// done to the account or site): the win first, then the rest in the same voice, as what it does for
+// them; behind-the-scenes steps stay out.
 // It greets the client's main contact by first name ("Hey Mike, big win for you!"), or "Hey guys".
 // One copy for the app (js/core/drafting.js) and the server (lib/update-automations.js), so the
 // drafts read the same whoever writes them.
@@ -19,12 +22,13 @@ Work logged this week:
 ${o.bullets}`;
   const wins = `What a win is:
 - A win is something that's a win in the client's mind, not ours. To a home-services owner that's a lead, a call, a booked job, a lower cost per lead, showing up higher on Google, homeowners picking them over a competitor. "We built 10 pages" is a win for us; "homeowners searching for your service in your city now find you" is a win for them.
-- Pick ONE win from the log, the strongest one, in this order:
+- Lead with ONE win from the log, the strongest one, in this order:
   1. A real result: a lead or call that came in, a booked job, cost per lead going down, a page moving up in Google, more traffic.
   2. Something we changed because of what we saw in their numbers: blocked junk calls, made more of the ads that are working, built pages for searches that are bringing people in. Say what we saw, then what we did. Don't say "proactively"; just say it.
   3. Only when there's neither: the work, told as what it's doing to get them more calls and jobs.
-- Write the whole message about that one win. A second item gets one short sentence at most, only if it's strong. Never a list, never "Also this week", never headings.
-- Keep its numbers, pages, places and dates from the log: they're the proof.
+- Then tell them the rest of what we did for them this week: every change the client would care about, so nothing worth telling them is left out. One logged item often holds several changes; each one counts. Say each as what it does for them (more calls, more quote requests, better leads), and put related changes in one sentence. Keep it flowing as the same message: never a list, never "Also this week", never headings.
+- Leave out behind-the-scenes steps the client doesn't need: backups, baseline benchmarks, testing, internal tools. If we planned what comes next (an audit, a roadmap), say it in a few words as what's next.
+- Keep the numbers, pages, places and dates from the log: they're the proof.
 - Never claim a result that isn't in the log, and never make up what we "saw". For new work, say what it's there to do, not an outcome that hasn't happened.
 
 How it sounds, like these, where [name] is the main contact's first name ("guys" when there's none). The voice only; never borrow their facts:
@@ -46,9 +50,9 @@ ${wins}
 
 Shape:
 - Like a person texting. Open with a short, excited line to ${who ? first : 'the team'} that calls it a win, like "Hey ${first || 'guys'}, big win for you!" or "${who ? first : 'Hey guys'}, great news!" Vary it from week to week, and keep it honest to the size of the win: a real result is a big win; work in progress is good news.
-- Then the win in two or three short sentences, the result first.
+- Then the win in two or three short sentences, the result first, and the rest of the week's work in a sentence or two.
 - End with "Let us know how it goes" or what's next and when.
-- 25 to 70 words, plain text, no markdown, at most one emoji.
+- 25 to 70 words for a single change, up to 120 when the week has several; plain text, no markdown, at most one emoji.
 
 ${rules}`;
 
@@ -74,8 +78,9 @@ ${wins}
 Shape:
 - Open with a short, excited line to ${who ? first : 'the team'} that calls it a win, like "Hi ${first || 'there'}, big win for you this week!" Keep it honest to the size of the win.
 - Then the win in two to four short sentences, the result first, in the same warm, excited voice as the examples.
+- Then the rest of the week's work, in a short paragraph or two.
 - End with what's next and when, or "let us know how it goes".
-- 40 to 110 words, plain language, no lists, no signature block.
+- 40 to 110 words for a single change, up to 180 when the week has several; plain language, no lists, no signature block.
 
 ${rules}`;
 }
