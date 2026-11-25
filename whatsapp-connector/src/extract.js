@@ -41,7 +41,7 @@ If it is unclear, assign "eric" (main point of contact). Never invent other owne
 ${reassigned.length ? '\nLEARN FROM PAST CORRECTIONS (the team reassigned these):\n' + reassigned.map(c => `- "${c.title}" → ${c.owner_key} (not ${c.ai_owner_key})`).join('\n') : ''}
 ${notTasks.length ? '\nTHE TEAM MARKED THESE AS NOT REAL TASKS — do not create similar ones:\n' + notTasks.map(c => `- "${c.title}"`).join('\n') : ''}
 
-Messages are marked [CLIENT] or [TEAM]. Find what the agency still owes the client:
+Messages are marked [CLIENT] or [TEAM]. A client can have the same first name as someone on the team: the [TEAM] or [CLIENT] mark says who wrote it, never the name. Find what the agency still owes the client:
 - request: the client asked for something to be done
 - question: the client asked something that has not been answered
 - promise: the agency said it would do something and has not confirmed it is done

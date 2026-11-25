@@ -25,6 +25,9 @@ let waCheckTimer = null;
 const waChat = {};             // item id -> its messages ([] when there are none) · 'loading' · 'none' (the database can't say)
 const waChatTop = {};          // item id -> where its chat is scrolled to, while it stays open
 let waClientLast = null;       // leads: group jid -> when the client last wrote there (last 14 days); null = not known
+// Who's the team, by phone number (Nov 25): the numbers (null = the table isn't there yet) and the
+// connector's suggestions, people in most of the client groups (addendum-whatsapp-team-numbers.sql)
+let waTeamNums = null, waTeamSeen = [], waTeamAdding = false;
 
 const WA_OWNERS = [['albert', 'Albert'], ['stan', 'Stan'], ['eric', 'Eric'], ['charlie', 'Charlie'], ['dan', 'Dan'], ['joey', 'Joey']];
 const WA_KIND = { request: 'Request', question: 'Question', promise: 'We promised', issue: 'Problem' };
@@ -58,7 +61,7 @@ function loadWaTasks(){
 // anyone else, so asking for them up front costs nothing.
 async function waLoadNow(){
   const safe = q => Promise.resolve(q).catch(e => ({ error: { message: e?.message || String(e) } }));
-  const [acc, tk, r, s, g, lc, cl, su, ...ins] = await Promise.all([
+  const [acc, tk, r, s, g, lc, cl, su, tn, tsn, ...ins] = await Promise.all([
     safe(supabaseClient.rpc('wa_access')),
     safe(supabaseClient.from('wa_tasks').select('*').order('first_seen', { ascending: true })),
     safe(supabaseClient.from('wa_runs').select('*').order('started_at', { ascending: false }).limit(20)),
@@ -67,6 +70,8 @@ async function waLoadNow(){
     safe(supabaseClient.rpc('wa_last_contact')),
     safe(supabaseClient.from('wa_messages').select('group_jid,ts').eq('from_team', false).gte('ts', new Date(Date.now() - 14 * 86400000).toISOString()).order('ts', { ascending: false }).limit(3000)),
     safe(supabaseClient.rpc('wa_can_setup')),
+    safe(supabaseClient.from('wa_team_numbers').select('*').order('created_at', { ascending: true })),
+    safe(supabaseClient.from('wa_team_seen').select('*').order('groups', { ascending: false })),
     ...(typeof waInsightQueries === 'function' ? waInsightQueries().map(safe) : []),
   ]);
   waAccessLevel = !acc.error && ['manage', 'own', 'none'].includes(acc.data) ? acc.data : null;
@@ -84,6 +89,8 @@ async function waLoadNow(){
   if(typeof waInsightsApply === 'function') waInsightsApply(ins, waCanManage());
   if(waCanManage()){
     waRuns = r.data || []; waSettings = s.data || null; waGroups = g.data || []; waContact = lc.error ? null : (lc.data || []);
+    waTeamNums = tn.error ? (waMissing(tn.error) ? null : waTeamNums) : (tn.data || []);
+    if(!tsn.error) waTeamSeen = tsn.data || [];
     if(!cl.error){ waClientLast = new Map(); (cl.data || []).forEach(m => { if(!waClientLast.has(m.group_jid)) waClientLast.set(m.group_jid, m.ts); }); }
   }
   waLoaded = true;
@@ -1093,6 +1100,7 @@ ${emptyState({ compact: true, icon: 'message-circle', tone: 'blue', title: 'Add 
     tzSub = `${waHm(times[0])} in ${waCity(waTz())} is ${fmtTime(at)} for you`;
   }
   return sec(`<div class="set-h">Connection</div><div class="form-grp" id="waConnBox">${waConnHtml()}</div>`)
+    + sec(waWhoHtml())
     + sec(waGroupsHtml())
     + sec(`<div class="set-h">When it checks</div>
 <div class="form-grp"><div class="fr"><div class="l"><b>Weekdays at</b><span>${waTesters().length ? `It reads the groups, then sends ${waTesters().length === 1 && waTesters()[0] === currentUser?.id ? 'you' : 'the testers'} the full list in Slack.` : 'It reads the groups, then sends each person their list in Slack.'}</span></div>
@@ -1108,6 +1116,106 @@ function waRoleRow(k, n){
 <div class="was-ed"><textarea class="tf" id="waRoleTa" rows="3" aria-label="What ${n} handles">${escapeHtml(note || WA_ROLE_DEFAULTS[k])}</textarea>
 <div class="was-eda">${note ? `<button class="btn" onclick="waRoleDefault('${k}')">Use the Default</button>` : ''}<button class="btn" onclick="waRoleCancel()">Cancel</button><button class="btn btn-p" onclick="waRoleDone('${k}')">Done</button></div></div></div>`;
   return `<div class="fr was-r"><div class="l"><b>${n}${note ? '<span class="was-tag">Edited</span>' : ''}</b><span>${escapeHtml(note || WA_ROLE_DEFAULTS[k])}</span></div><button class="lnk-b" onclick="waRoleOpen('${k}')">Edit</button></div>`;
+}
+// ---- Who's on the team (Nov 25) ----------------------------------------------------------------
+// The connector tells the team's messages from the client's by phone number: the linked phone and
+// the numbers here. A client called Dan is never taken for Dan. Until one is listed, first names
+// decide, as before. People in most of the client groups are suggested (a client is in one or two):
+// say who they are, or that they're not the team.
+function waFmtNum(n){
+  n = String(n || '');
+  if(n.startsWith('lid:')) return 'Number hidden by WhatsApp';
+  if(/^1\d{10}$/.test(n)) return `+1 (${n.slice(1, 4)}) ${n.slice(4, 7)}-${n.slice(7)}`;
+  if(/^55\d{10,11}$/.test(n)){ const r = n.slice(4); return `+55 ${n.slice(2, 4)} ${r.slice(0, -4)}-${r.slice(-4)}`; }
+  if(/^44\d{10}$/.test(n)) return `+44 ${n.slice(2, 6)} ${n.slice(6)}`;
+  return '+' + n;
+}
+// what someone typed, as digits with the country code (10 digits on their own: a US number)
+function waNumIn(v){
+  const raw = String(v || '').trim(), d = raw.replace(/\D/g, '');
+  if(!raw.startsWith('+') && d.length === 10) return '1' + d;
+  return /^\d{8,15}$/.test(d) ? d : null;
+}
+function waTeamPeople(){ return (teamProfiles || []).filter(p => !p.access_revoked).sort((a, b) => a.name.localeCompare(b.name)); }
+function waTeamName(t){
+  const p = t.profile_id && (teamProfiles || []).find(x => x.id === t.profile_id);
+  const seen = waTeamSeen.find(x => x.number === t.number);
+  return p ? p.name : t.label || (seen && seen.name) || 'Someone on the team';
+}
+function waWhoHtml(){
+  const head = `<div class="set-h">Who’s on the team</div>`;
+  if(waTeamNums === null) return head + `<p class="t-2 wa-p">Radar can tell the team’s messages from the client’s by phone number. To turn that on, run <code>addendum-whatsapp-team-numbers.sql</code> in Supabase → SQL Editor. Until then it goes by first names, so a client called Dan counts as the team.</p>`;
+  const can = waCanSetup(), own = waSettings && waSettings.linked_number, nums = waTeamNums;
+  const have = new Set(nums.map(t => t.number));
+  const seen = waTeamSeen.filter(x => !have.has(x.number) && !x.dismissed && x.number !== own).sort((a, b) => b.groups - a.groups || String(a.name || '').localeCompare(String(b.name || '')));
+  const intro = nums.length
+    ? 'Radar tells the team’s messages from the client’s by phone number, so a client called Dan is never taken for Dan.'
+    : 'Radar tells the team’s messages from the client’s by phone number. Until you add the team’s numbers here, it goes by first names, so a client called Dan counts as the team.';
+  const ownRow = `<div class="fr wat-r"><span class="was-ic">${icon('smartphone')}</span><div class="l"><b>This phone</b><span>${own ? escapeHtml(waFmtNum(own)) + ' · ' : ''}Radar reads the groups with it, so its messages are always the team’s.</span></div></div>`;
+  const numRow = t => `<div class="fr wat-r"><span class="was-ic gray">${icon('user')}</span><div class="l"><b>${escapeHtml(waTeamName(t))}</b><span>${escapeHtml(waFmtNum(t.number))}</span></div>${can ? `<button class="lnk-b" onclick="waTeamRemove('${escapeHtml(t.number)}')">Remove</button>` : ''}</div>`;
+  const people = waTeamPeople();
+  const pickOpts = [['', 'Who is this?'], ...people.map(p => [p.id, p.name]), ['__other', 'Someone else on the team'], ['__no', 'Not the team']];
+  const seenRow = x => `<div class="fr wat-r wat-s"><span class="was-ic gray">${icon('circle-help')}</span><div class="l"><b>${escapeHtml(x.name || waFmtNum(x.number))}</b><span>${x.name ? escapeHtml(waFmtNum(x.number)) + ' · ' : ''}in ${x.groups} of ${x.total} client groups</span></div>${can ? popSel(`Who is ${x.name || waFmtNum(x.number)}?`, pickOpts, '', `waTeamPick('${escapeHtml(x.number)}', this.value)`, { width: 150 }) : ''}</div>`;
+  const sorted = nums.slice().sort((a, b) => waTeamName(a).localeCompare(waTeamName(b)));
+  const listed = new Set(nums.map(t => t.profile_id).filter(Boolean));
+  const missing = nums.length ? people.filter(p => !listed.has(p.id)) : [];
+  const addRow = !can ? '' : waTeamAdding
+    ? `<div class="fr wat-add"><input class="tf" id="waTeamNum" type="tel" inputmode="tel" autocomplete="off" placeholder="+1 555 123 4567" aria-label="WhatsApp number, with the country code" onkeydown="if(event.key==='Enter')waTeamAdd();if(event.key==='Escape')waTeamAddClose()">
+${popSel('Whose number', [['', 'Whose is it?'], ...people.map(p => [p.id, p.name])], '', 'this.closest(\'.wat-add\').dataset.who = this.value; this.parentNode.querySelector(\'span\').textContent = this.options[this.selectedIndex].text', { width: 150 })}
+<span class="wat-a"><button class="btn" onclick="waTeamAddClose()">Cancel</button><button class="btn btn-p" onclick="waTeamAdd()">Add</button></span></div>`
+    : `<div class="fr was-more"><button class="lnk-b wat-addb" onclick="waTeamAddOpen()">${icon('plus')}Add a Number</button></div>`;
+  return head + `<p class="t-2 wa-p">${intro}</p><div class="form-grp" id="waTeamBox">${ownRow}${sorted.map(numRow).join('')}
+${seen.length ? `<div class="was-sub">In most client groups<span>${seen.length}</span></div>${seen.map(seenRow).join('')}` : ''}
+${missing.length ? `<div class="fr wat-miss"><div class="l"><span>No number yet: ${escapeHtml(missing.map(p => firstName(p.name)).join(', '))}</span></div></div>` : ''}${addRow}</div>`;
+}
+async function waTeamSave(row){
+  const { error } = await supabaseClient.from('wa_team_numbers').insert({ ...row, added_by: currentUser?.id || null });
+  if(error){ showToast('error', /duplicate|23505/i.test(`${error.code} ${error.message}`) ? 'That number is already on the team' : 'Not saved', /duplicate|23505/i.test(`${error.code} ${error.message}`) ? '' : error.message); return false; }
+  waTeamNums = [...(waTeamNums || []), { ...row, created_at: new Date().toISOString() }];
+  return true;
+}
+async function waTeamPick(number, v){
+  if(!v) return;
+  const x = waTeamSeen.find(s => s.number === number) || { number };
+  const who = x.name || waFmtNum(number);
+  if(v === '__no'){
+    const { error } = await supabaseClient.from('wa_team_seen').update({ dismissed: true }).eq('number', number);
+    if(error){ showToast('error', 'Not saved', error.message); return renderSettingsView(); }
+    x.dismissed = true; renderSettingsView();
+    showToast('success', 'Not the team', `${who}’s messages count as the client’s.`, { action: 'Undo', onAction: async () => {
+      const { error: e } = await supabaseClient.from('wa_team_seen').update({ dismissed: false }).eq('number', number);
+      if(!e){ x.dismissed = false; renderSettingsView(); }
+    } });
+    return;
+  }
+  const p = v !== '__other' && (teamProfiles || []).find(t => t.id === v);
+  if(!(await waTeamSave({ number, profile_id: p ? p.id : null, label: p ? null : (x.name || null) }))) return renderSettingsView();
+  renderSettingsView();
+  showToast('success', `${p ? firstName(p.name) : who} is on the team`, 'Their messages count as the team’s from now on, and the ones already read are fixed within a minute.');
+}
+async function waTeamRemove(number){
+  const t = (waTeamNums || []).find(x => x.number === number); if(!t) return;
+  const { error } = await supabaseClient.from('wa_team_numbers').delete().eq('number', number);
+  if(error){ showToast('error', 'Not removed', error.message); return; }
+  waTeamNums = waTeamNums.filter(x => x.number !== number);
+  renderSettingsView();
+  showToast('success', `${waTeamName(t)} removed`, 'Messages from that number count as the client’s.', { action: 'Undo', onAction: async () => {
+    const { created_at, ...row } = t;
+    const { error: e } = await supabaseClient.from('wa_team_numbers').insert(row);
+    if(!e){ waTeamNums = [...waTeamNums, t]; renderSettingsView(); }
+  } });
+}
+function waTeamAddOpen(){ waTeamAdding = true; renderSettingsView(); setTimeout(() => document.getElementById('waTeamNum')?.focus(), 0); }
+function waTeamAddClose(){ waTeamAdding = false; renderSettingsView(); }
+async function waTeamAdd(){
+  const box = document.querySelector('.wat-add'), input = document.getElementById('waTeamNum');
+  const number = waNumIn(input && input.value), who = box && box.dataset.who;
+  if(!number){ showToast('error', 'Check the number', 'Type it with the country code, like +1 555 123 4567 or +55 11 91234 5678.'); input?.focus(); return; }
+  if(!who){ showToast('error', 'Whose number is it?', 'Pick who it belongs to.'); box?.querySelector('select')?.focus(); return; }
+  if(!(await waTeamSave({ number, profile_id: who, label: null }))) return;
+  waTeamAdding = false; renderSettingsView();
+  const p = (teamProfiles || []).find(t => t.id === who);
+  showToast('success', `${p ? firstName(p.name) : 'They'}’re on the team`, `${waFmtNum(number)} counts as the team from now on.`);
 }
 function waGroupSub(g){
   if(g.active && g.manual && !g.auto_match) return 'On because you turned it on';

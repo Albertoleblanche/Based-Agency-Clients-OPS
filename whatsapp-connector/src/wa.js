@@ -7,6 +7,7 @@ import { config, isClientGroup } from './config.js';
 import { db, logRun } from './db.js';
 import { setQr } from './settings.js';
 import { watchMessages } from './watch.js';
+import { numberOf, isTeam, noteName, setOwn, learnGroups, saveSeen, saveOwn, team } from './team.js';
 
 const groupNames = new Map(); // jid -> subject (client groups only)
 // Messages (group chats only) that arrive before the list of groups to read is known, as happens
@@ -39,11 +40,8 @@ function textOf(m){
     || null;
 }
 
-function looksLikeTeam(m){
-  if(m.key.fromMe) return true;
-  const n = String(m.pushName || '').toLowerCase();
-  return !!n && config.teamHints.some(h => n === h || n.startsWith(h + ' '));
-}
+// Who's the team is decided by phone number now (team.js), not by name.
+let senderCol = true;   // wa_messages.sender_id exists (addendum-whatsapp-team-numbers.sql)
 
 let lastGroupsLine = '';
 let groupsTimer = null;
@@ -78,6 +76,9 @@ export async function refreshGroups(){
     if(error){ console.error('Saving the group list to Radar failed:', error.message); return; }
   }
   groupsLoaded = true;
+  // which private id is which number, and who's in most of the client groups (the team, suggested in Radar)
+  const reading = new Set(rows.filter(r => r.active).map(r => r.jid));
+  saveSeen(learnGroups(all, reading)).catch(e => console.error('Saving who’s in the groups failed:', e.message));
   await syncActiveGroups();
   const line = `Reading ${groupNames.size} client groups (of ${rows.length} groups on this number). Personal chats are never read.`;
   if(line !== lastGroupsLine){ console.log(line); lastGroupsLine = line; }
@@ -113,17 +114,25 @@ async function ingest(messages){
     const text = textOf(m);
     if(!text || !m.key.id) continue;
     const secs = Number(m.messageTimestamp?.low ?? m.messageTimestamp ?? 0);
+    const num = numberOf(m);
+    noteName(num, m.pushName);
     rows.push({
       wa_msg_id: m.key.id,
       group_jid: jid,
-      sender: m.pushName || (m.key.participant || '').split('@')[0] || null,
-      from_team: looksLikeTeam(m),
+      sender: m.pushName || (num && !num.startsWith('lid:') ? '+' + num : null) || null,
+      ...(senderCol ? { sender_id: num } : {}),
+      from_team: isTeam(m, num),
       text: text.slice(0, 4000),
       ts: new Date((secs || Math.floor(Date.now()/1000)) * 1000).toISOString(),
     });
   }
   if(!rows.length) return;
-  const { error } = await db().from('wa_messages').upsert(rows, { onConflict: 'group_jid,wa_msg_id', ignoreDuplicates: true });
+  let { error } = await db().from('wa_messages').upsert(rows, { onConflict: 'group_jid,wa_msg_id', ignoreDuplicates: true });
+  if(error && senderCol && /sender_id|column|42703|PGRST204/i.test(`${error.code || ''} ${error.message || ''}`)){
+    // before addendum-whatsapp-team-numbers.sql: store them without the number
+    senderCol = false; rows.forEach(r => { delete r.sender_id; });
+    ({ error } = await db().from('wa_messages').upsert(rows, { onConflict: 'group_jid,wa_msg_id', ignoreDuplicates: true }));
+  }
   if(error){ console.error('wa_messages upsert failed:', error.message); return; }
   // a live client message: the quick read of what's new, a minute or two after they stop writing (watch.js)
   watchMessages(rows);
@@ -166,7 +175,9 @@ export async function connect({ onReady, onLogout } = {}){
     }
     if(u.connection === 'open'){
       status = 'open'; groupsLoaded = false; emptyTries = 0;
-      console.log('WhatsApp connected (read-only).');
+      setOwn(mine.user);
+      console.log(`WhatsApp connected (read-only)${team.own ? ` as +${team.own}` : ''}.`);
+      saveOwn().catch(() => {});
       try { await setQr(null); } catch {}
       await logRun({ kind: 'status', connection: 'open', note: 'connected' });
       try { await refreshGroups(); } catch(e){ console.error(`Couldn't get the group list yet (${e.message}). Trying again in 30 seconds.`); }

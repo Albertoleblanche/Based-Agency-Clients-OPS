@@ -79,6 +79,26 @@ Alerts go out on weekdays 7:00–21:00 only; what's found outside waits for the 
 rates the client's mood for Health. It all needs `addendum-whatsapp-insights.sql`; until that's run
 the watch stays off.
 
+## Who's the team
+
+Radar tells the team's messages from the client's by **phone number**, not by name, so a client
+called Dan is never taken for Dan:
+
+- The linked phone (the agency's number) is always the team.
+- Anyone else is the team only if their number is in Radar → Settings → WhatsApp → **Who's on the team**.
+- You don't have to type them: the connector suggests anyone who's in most of the client groups it
+  reads (a client is in one or two). Pick who each one is, or **Not the team**. **Add a Number** adds
+  one by hand. Only those people are saved, never everyone in the groups.
+- WhatsApp sometimes hides numbers in groups behind a private id. The connector matches it to the
+  number from the group list; when even that is hidden, the person is kept by the hidden id, and
+  picking who they are works the same.
+- When the list changes, the messages already read are marked again within a minute, so the
+  agent's past reads of who answered stay right from then on.
+- Until the first number is listed (or before `addendum-whatsapp-team-numbers.sql` is run), first
+  names (`TEAM_SENDER_HINTS`) still decide, as before.
+
+It needs `addendum-whatsapp-team-numbers.sql` (Supabase → SQL Editor).
+
 ## Keep it running
 
 The connector is a background worker: it needs to be on all the time (it reads messages as they
@@ -112,8 +132,8 @@ task "At log on" that runs `npm start` in this folder, and set Power options →
    messages sent after they joined; everything read so far stays in Radar.
 3. Once it is in all the groups, press **Re-link…** in Radar and scan with the new phone.
    Then remove the old link from your own phone (Linked devices → tap it → Log out).
-4. Your own messages no longer count as "our side" automatically. Make sure `TEAM_SENDER_HINTS`
-   has the WhatsApp profile name of everyone on the team, including you.
+4. Your own number is then a teammate's, not the phone's. In Radar → Settings → WhatsApp → **Who's on
+   the team** it shows under "In most client groups": pick yourself (see "Who's the team" below).
 5. Keep the phone charged on Wi-Fi and open WhatsApp on it at least once a week. WhatsApp logs
    out linked devices if the phone itself isn't used for 14 days.
 

@@ -4,6 +4,7 @@ import { connect, getStatus, stop, relink, syncActiveGroups, refreshGroups, grou
 import { loadSettings, applySettings, heartbeat, clearRelinkFlag, clearCheckFlag } from './settings.js';
 import { runDigest, alertAdmins, sendHeldAlerts } from './digest.js';
 import { sendPending } from './alerts.js';
+import { loadTeamNumbers } from './team.js';
 
 const args = new Set(process.argv.slice(2));
 const dry = args.has('--dry');
@@ -52,6 +53,7 @@ async function main(){
     console.log(`Digest scheduled on weekdays at ${config.digestTimes.join(', ')} (${config.tz}).`);
   };
   applySettings(await loadSettings());
+  await loadTeamNumbers().catch(() => {});
   schedule();
 
   // Every 30s: tell Radar we're alive, pick up setup changes (times, roles, group switches, re-link).
@@ -60,6 +62,7 @@ async function main(){
       await heartbeat();
       const s = await loadSettings();
       if(applySettings(s)) schedule();
+      await loadTeamNumbers();   // who's the team, by number (Radar → Settings → WhatsApp)
       await syncActiveGroups();
       // until the group list has reached Radar (WhatsApp can be slow right after linking), keep asking
       if(getStatus() === 'open' && !groupsReady()) await refreshGroups().catch(e => console.error(`Couldn't get the group list yet (${e.message}). Trying again in 30 seconds.`));

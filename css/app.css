@@ -3933,4 +3933,13 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
   .su-nudge-x:hover{color:var(--label);background:var(--fill-2)}
 }
 @media (hover:none){.su-nudge-x{opacity:1}.su-nc{opacity:0}}
-@media (prefers-reduced-motion:reduce){.su-nudge,.su-nudge-b,.su-seg,.su-seg i,.su-nx svg,.su-nc,.su-nudge-x{transition:none;animation:none}}
+@media (prefers-reduced-motion:reduce){.su-nudge,.su-nudge-b,.su-seg,.su-seg i,.su-nx svg,.su-nc,.su-nudge-x{transition:none;animation:none}}/* WhatsApp → Who's on the team (Nov 25) */
+.wat-r .l b{font-weight:500}
+.wat-s .pop-sel{flex:none}
+.wat-miss .l span{color:var(--label-3)}
+.wat-addb{display:inline-flex;align-items:center;gap:6px}
+.wat-addb svg{width:13px;height:13px}
+.wat-add{flex-wrap:wrap;gap:8px 10px}
+.mac .wat-add .tf{flex:1 1 180px;min-width:0;height:30px;padding:0 10px}
+.wat-add .pop-sel{flex:none}
+.wat-a{display:flex;gap:8px;margin-left:auto}

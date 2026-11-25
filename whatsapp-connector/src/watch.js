@@ -40,7 +40,7 @@ export function watchSoon(jid, now = Date.now()){
   timers.set(jid, { timer, first });
 }
 
-const SYSTEM = () => `You watch WhatsApp group chats between a marketing agency (Based Agency) and one of its clients, right as the client writes. Messages are marked [CLIENT] or [TEAM]; the ones marked NEW just arrived. Judge only the NEW client messages, using the rest as context.
+const SYSTEM = () => `You watch WhatsApp group chats between a marketing agency (Based Agency) and one of its clients, right as the client writes. Messages are marked [CLIENT] or [TEAM]; the ones marked NEW just arrived. A client can have the same first name as someone on the team: the [TEAM] or [CLIENT] mark says who wrote it, never the name. Judge only the NEW client messages, using the rest as context.
 
 TEAM AND WHO HANDLES WHAT:
 ${ROLES.map(r => `- ${r.key}: ${r.does}`).join('\n')}
