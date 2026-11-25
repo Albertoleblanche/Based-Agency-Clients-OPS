@@ -397,6 +397,20 @@ async function loadHealthHandled(){
   const raw = await safeGet('health-handled');
   try{ healthHandled = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : {}; }catch(e){ healthHandled = {}; }
 }
+// The Risk on a client (1 to 5) and who set it (Nov 25). Radar keeps who changes it from now on; a
+// Risk from before (an import, the first setup) names nobody: it used to say the owner flagged it,
+// which they often hadn't. Approvers change it in Edit Client or Bulk Edit.
+function riskFlagBy(c){
+  const h = typeof dangerHistory !== 'undefined' && Array.isArray(dangerHistory)
+    ? dangerHistory.filter(x => x.clientId === c.id).sort((a, b) => (+b.recordedAt || 0) - (+a.recordedAt || 0))[0] : null;   // undated: oldest
+  const by = h && h.danger === c.danger && h.setBy ? h.setBy : '';
+  const me = typeof myName === 'function' ? myName() : '';
+  const who = by ? (me && by === me ? 'you' : (firstName(by) || by)) : '';
+  const change = typeof canApprove === 'function' && canApprove() ? 'Change it in Edit Client.' : 'An approver can change it in Edit Client.';
+  return who
+    ? { who, title: `Flagged by ${who}`, text: `Risk set to ${c.danger} of 5 on ${fmtShortDate(h.recordedAt)}. ${change}` }
+    : { who: '', title: `Risk set to ${c.danger} of 5`, text: `Set on the client before Radar kept track of who. ${change}` };
+}
 function clientHealth(c){
   const T = clientThresholds(c), now = rNow(), sig = [];
   const lvl = (v, [w, r]) => (v >= r ? 'r' : (v >= w ? 'y' : null));
@@ -445,7 +459,7 @@ function clientHealth(c){
   const lo = lvl(overdue.length, T.overdueTasks);
   if(lo) sig.push({ l: lo, key: 'tasks', icon: 'list-checks', title: `${overdue.length} tasks overdue`, since: now, text: overdue.map(t => t.title).slice(0, 2).join(' · ') });
   const lf = (typeof settings !== 'undefined' && settings.ownerRiskFlag === false) ? null : lvl(c.danger || 0, T.ownerFlag);
-  if(lf) sig.push({ l: lf, key: 'flag', icon: 'flag', title: `Flagged by ${firstName(clientOwner(c)) || 'the owner'}`, since: now, text: `Risk set to ${c.danger} of 5.` });
+  if(lf){ const f = riskFlagBy(c); sig.push({ l: lf, key: 'flag', icon: 'flag', title: f.title, since: now, text: f.text }); }
   // No meeting lately (Nov 23): only for a client the team meets on Granola (it has a last meeting), and
   // only Watch: a gap in meetings alone never makes a client At risk
   const met = typeof clientLastMet === 'function' ? clientLastMet(c) : null;

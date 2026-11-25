@@ -225,10 +225,15 @@ function checkDuplicateClientName(){
 // "already was at 5/5, someone just re-saved the client" — without it,
 // every unrelated edit to a client already at max danger would re-fire
 // the alert below, which would train people to ignore it.
+// Who set it is kept too (Nov 25), so Health can say "Flagged by Dan" and not guess from the owner.
+// Before the set_by column (addendum-risk-set-by.sql) it's saved without.
 function logDangerHistory(clientId, danger, previousDanger){
-  supabaseClient.from('client_danger_history').insert({ client_id: clientId, danger }).then(({error})=>{
+  const row = { client_id: clientId, danger, set_by: (typeof myName === 'function' && myName()) || null };
+  supabaseClient.from('client_danger_history').insert(row).then(({error})=>{
+    if(error && /set_by/.test(error.message || '')) return supabaseClient.from('client_danger_history').insert({ client_id: clientId, danger });
     if(error) console.error('logDangerHistory error', error);
-  });
+  }).then(r => { if(r && r.error) console.error('logDangerHistory error', r.error); });
+  if(typeof dangerHistory !== 'undefined' && Array.isArray(dangerHistory)) dangerHistory.push({ clientId, danger, recordedAt: new Date(), setBy: row.set_by || '' });
   if(danger === 5 && previousDanger !== 5) alertClientDangerMaxed(clientId);
   else if(previousDanger != null && danger < previousDanger) alertClientDangerDecreased(clientId, previousDanger, danger);
 }

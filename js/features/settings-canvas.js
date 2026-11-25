@@ -243,10 +243,10 @@ ${pair('hoursPacePct', 'Hours used, on pace for', paceO, paceO)}
 <div class="fr"><div class="l"><b>Hours under-used by mid-month</b></div><span class="mcol">${popSel('Hours under-used — watch', underO, t.underUsedPct, 'saveSignalValue(\'underUsedPct\',this.value)', { disabled: !can })}</span><span class="mcol"><span class="t-3">—</span></span></div>
 ${pair('nothingLoggedDays', 'Nothing logged', days, days)}
 ${pair('overdueTasks', 'Overdue tasks', taskO, taskO)}
-${flagOn ? pair('ownerFlag', 'Owner’s risk flag', flagO, flagO) : ''}
+${flagOn ? pair('ownerFlag', 'Risk on the client', flagO, flagO) : ''}
 </div>
 <div class="form-grp set-gap">
-${fr('Owners can flag a client’s risk, 1 to 5', 'From the client’s panel. It counts as a signal above.', swHtml(flagOn, 'Owners can flag a client’s risk', 'changeSettings(s => { s.ownerRiskFlag = s.ownerRiskFlag === false; })'))}
+${fr('A client’s Risk, 1 to 5, counts in Health', 'Approvers set it in Edit Client or Bulk Edit; Radar notes who. It counts as a signal above.', swHtml(flagOn, 'A client’s Risk counts in Health', 'changeSettings(s => { s.ownerRiskFlag = s.ownerRiskFlag === false; })'))}
 ${fr('Flag important clients sooner', 'Importance 8 or more moves up one level', swHtml(t.importantBump, 'Flag important clients sooner', 'saveSignalToggle(\'importantBump\')', !can))}
 ${fr('Focus clients are watched closer', escapeHtml(focusRuleWords(t)), `<a class="set-lnk" href="#" onclick="setClientsSeg('focus');switchView('clients');return false;">${(typeof focusClients === 'function' ? focusClients().length : 0) || 'No'} Focus client${(typeof focusClients === 'function' ? focusClients().length : 0) === 1 ? '' : 's'}</a>`)}
 ${fr('Quiet a handled signal for', 'Comes back sooner if it gets worse', popSel('Quiet a handled signal for', [3, 5, 7, 10, 14].map(v => [v, `${v} days`]), t.quietDays, 'saveSignalValue(\'quietDays\',this.value)', { disabled: !can }))}

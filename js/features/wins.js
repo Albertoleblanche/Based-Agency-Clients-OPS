@@ -267,7 +267,7 @@ function healthPhrase(h, c){
   const words = h.signals.map(s => ({
     hours: h.hp.used > h.hp.budget ? 'over budget' : 'on pace to go over budget', under: 'hours under-used',
     noupdate: 'updates keep slipping', late: 'updates keep slipping', quiet: 'nothing logged lately',
-    tasks: s.title.toLowerCase(), flag: 'flagged by ' + (firstName(clientOwner(c)) || 'the owner'),
+    tasks: s.title.toLowerCase(), flag: (f => f.who ? `flagged by ${f.who}` : `risk set to ${c.danger} of 5`)(riskFlagBy(c)),
     mood: s.l === 'r' ? 'upset on WhatsApp' : 'sounds frustrated on WhatsApp' }[s.key] || s.title.toLowerCase()));
   const u = [...new Set(words)];
   if(!u.length) return '';

@@ -186,7 +186,7 @@ let dangerHistory = [];
 async function loadDangerHistory(){
   const { data, error } = await supabaseClient.from('client_danger_history').select('*');
   if(error){ console.error('loadDangerHistory error', error); dangerHistory = []; return; }
-  dangerHistory = (data||[]).map(h => ({ clientId: h.client_id, danger: h.danger, recordedAt: new Date(h.recorded_at) }));
+  dangerHistory = (data||[]).map(h => ({ clientId: h.client_id, danger: h.danger, recordedAt: new Date(h.recorded_at), setBy: h.set_by || '' }));
 }
 
 // One-time backfill for clients that predate this feature — gives every

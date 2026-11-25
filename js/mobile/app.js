@@ -206,7 +206,8 @@ async function mLoadAll(){
   myProfile = teamProfiles.find(p => p.id === uid) || myProfile;
   calendarEvents = (ev.data || []).map(e => ({ id: e.id, title: e.title, startAt: e.start_at, endAt: e.end_at, allDay: e.all_day, clientId: e.client_id, location: e.location, eventType: e.event_type, attendeeIds: e.attendee_ids || [], createdBy: e.created_by,
     description: e.description || '', meetingUrl: e.meeting_url || null, googleEventId: e.google_event_id || null, googleOwner: e.google_calendar_owner || null }));
-  await Promise.all([loadUpdateHistory(), loadHealthHandled(), loadTaskDueTimes(), typeof hvTimeLoad === 'function' ? hvTimeLoad() : null]);
+  await Promise.all([loadUpdateHistory(), loadHealthHandled(), loadTaskDueTimes(), typeof hvTimeLoad === 'function' ? hvTimeLoad() : null,
+    typeof loadDangerHistory === 'function' ? loadDangerHistory() : null]);   // who set a client's Risk (Nov 25)
 }
 
 async function mBoot(o){
