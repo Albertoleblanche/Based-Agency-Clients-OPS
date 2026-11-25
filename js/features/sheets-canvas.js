@@ -100,7 +100,8 @@ function improvementRowFromDb(r){
   return { id: r.id, clientId: r.client_id, author: r.author || '', text: r.text, date: r.date, includeInEmail: r.include_in_email, source: r.source,
     service: r.service || '', attachments: Array.isArray(r.attachments) ? r.attachments : [],
     ...(r.deleted_at ? { deletedAt: r.deleted_at, deletedBy: r.deleted_by || null } : {}),   // deleted work (data.js)
-    createdAt: r.created_at || null, editedAt: r.edited_at || null, carryOver: !!r.carry_over };   // addendum-flow-gaps.sql
+    createdAt: r.created_at || null, editedAt: r.edited_at || null, carryOver: !!r.carry_over,   // addendum-flow-gaps.sql
+    timeEntryId: r.time_entry_id || null };   // logged in a batch, with one time (addendum-work-batches.sql)
 }
 function isMissingColumnError(e){ return !!e && (e.code === '42703' || e.code === 'PGRST204' || /column/i.test(e.message || '') && /(does not exist|could not find)/i.test(e.message || '')); }
 async function insertImprovementFull(clientId, f){
@@ -186,7 +187,7 @@ function liPickSuggested(id){
   document.getElementById('liText')?.focus();
 }
 function openQueueLogImprovementModal(presetClientId){
-  logSheet = { files: [], useTimer: false, serviceTouched: false };
+  logSheet = { files: [], useTimer: false, serviceTouched: false, itemFiles: {}, itemOff: new Set(), keys: [], asOne: false, notesTouched: false, attachTo: null };
   const me = myName() || 'Team member';
   const list = waWorkable(liveClients(), '').sort((a, b) => a.name.localeCompare(b.name));
   const fromView = typeof currentViewName !== 'undefined' && currentViewName === 'clientdetail' && typeof currentDetailClientId !== 'undefined' ? currentDetailClientId : '';
@@ -206,17 +207,19 @@ function openQueueLogImprovementModal(presetClientId){
   openAppModal(`<h3>Log Improvement</h3>
 <div class="f">
 <label for="liClient"${sugRows ? ' class="top"' : ''}>Client</label><div>${sheetPop('liClient', 'Client', list.map(x => [x.id, x.name]), cid, 'liClientChanged()', { placeholder: 'Choose a client', top: sugTop })}${sugRows}</div>
-<label class="top" for="liText">What did you do?</label><textarea id="liText" class="tf" style="height:84px" spellcheck="true" placeholder="What changed, with the number or result if there is one"></textarea>
+<label class="top" for="liText">What did you do?</label><div><textarea id="liText" class="tf" style="height:84px;width:100%" spellcheck="true" placeholder="What changed, with the number or result if there is one. Several things? One per line." oninput="liItemsSync()"></textarea><div id="liItems" class="li-items"></div></div>
 <div id="liSvc" class="hvp">${liServiceRowHtml(c)}</div>
 <label for="liDate">Date</label><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${sheetDateField('liDate', toDateStr(new Date()), { past: true, from: -13, to: 0, max: toDateStr(new Date()) })}</div>
-<label for="liTime">Time spent</label><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><input id="liTime" class="tf" style="width:80px" placeholder="0:30" autocomplete="off" oninput="logSheet.useTimer=false;liTimeChanged()">${timerLink}</div>
+<label for="liTime">Time spent</label><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><input id="liTime" class="tf" style="width:80px" placeholder="0:30" autocomplete="off" oninput="logSheet.useTimer=false;liTimeChanged();liNotesSync()"><span id="liTimeFor" class="t-2" style="font-size:13px"></span>${timerLink}</div>
 <div id="liPick" class="hvp"></div>
-<span></span><div style="display:flex;align-items:flex-start;gap:10px;font-size:14px">${sheetSw('liInclude', !c || getsUpdates(c), 'Include in the client email', 'logSheet.incTouched=true')}<div><div>Include in the client email</div><div class="t-2" id="liIncHint" style="font-size:13px">${liIncHint(c)}</div></div></div>
-${improvementExtrasReady === false ? '' : `<label>Screenshots</label><div class="fchips" id="liFiles"></div>`}
+<label class="top" for="liNotes" id="liNotesL" hidden>Time notes</label><div id="liNotesW" hidden><textarea id="liNotes" class="tf" style="height:76px;width:100%" spellcheck="true" oninput="logSheet.notesTouched=true;liFit(this,64,160)"></textarea><div class="t-2 li-nh">What the time says on your timesheet${typeof hvTimeOn === 'function' && hvTimeOn() ? ' and in Harvest' : ''}: one entry for all of them.</div></div>
+<span></span><div style="display:flex;align-items:flex-start;gap:10px;font-size:14px">${sheetSw('liInclude', !c || getsUpdates(c), 'Include in the client email', 'logSheet.incTouched=true;liItemsSync()')}<div><div>Include in the client email</div><div class="t-2" id="liIncHint" style="font-size:13px">${liIncHint(c)}</div></div></div>
+${improvementExtrasReady === false ? '' : `<label id="liFilesL">Screenshots</label><div class="fchips" id="liFiles"></div>`}
 <label>Logged by</label><div style="font-size:14px">${sheetWho(me)}</div>
 </div>
 <input type="file" id="liFileInput" multiple accept="image/*,.pdf" hidden onchange="liAddFiles(this)">
-<div class="sheet-a"><button class="btn" style="margin-right:auto" onclick="saveQueueLogImprovement(true)">Log &amp; Add Another</button><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" onclick="saveQueueLogImprovement()">Log Improvement</button></div>`, 520);
+<input type="file" id="liItemFileInput" multiple accept="image/*,.pdf" hidden onchange="liItemAddFiles(this)">
+<div class="sheet-a"><button class="btn" style="margin-right:auto" onclick="saveQueueLogImprovement(true)">Log &amp; Add Another</button><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" id="liSaveBtn" onclick="saveQueueLogImprovement()">Log Improvement</button></div>`, 520);
   liRenderFiles();
   setTimeout(() => { const el = document.getElementById(cid ? 'liText' : 'liClient'); if(el) el.focus(); }, 30);
 }
@@ -251,7 +254,84 @@ function liUseTimer(){
   if(txt && !txt.value.trim() && timerState.description) txt.value = timerState.description;
   logSheet.useTimer = true;
   liTimeChanged(true);
+  liItemsSync();
 }
+// ---- Several things at once (Nov 25) ----
+// One improvement per line: the lines show as a list under the box (each its own improvement, with its
+// own screenshots and email switch, or removed), and Time spent is asked once for all of them, as one
+// time entry with a few lines of notes. "Log as One" keeps it a single improvement. data.js has the
+// splitting (workSplitItems) and the notes (workTimeNotes).
+function liKey(s){ return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim(); }
+function liItems(){
+  if(!logSheet || logSheet.asOne) return null;
+  const items = workSplitItems(document.getElementById('liText')?.value || '');
+  return items.length > 1 ? items : null;
+}
+function liItemsSync(){
+  const box = document.getElementById('liItems'); if(!box || !logSheet) return;
+  const items = liItems(), keys = items ? items.map(liKey) : [];
+  // screenshots go with the lines in a list, and back to the sheet for one improvement
+  if(items && logSheet.files.length){ logSheet.itemFiles[keys[0]] = (logSheet.itemFiles[keys[0]] || []).concat(logSheet.files); logSheet.files = []; }
+  if(!items){ const all = Object.values(logSheet.itemFiles).flat(); if(all.length){ logSheet.files = logSheet.files.concat(all).slice(0, 8); } logSheet.itemFiles = {}; }
+  // a line keeps its screenshots and email switch when its words change (same place in the list)
+  if(items){
+    const prev = logSheet.keys || [];
+    Object.keys(logSheet.itemFiles).forEach(k => { if(keys.includes(k)) return; const to = keys[prev.indexOf(k)]; if(to && !logSheet.itemFiles[to]) logSheet.itemFiles[to] = logSheet.itemFiles[k]; delete logSheet.itemFiles[k]; });
+    [...logSheet.itemOff].forEach(k => { if(keys.includes(k)) return; const to = keys[prev.indexOf(k)]; logSheet.itemOff.delete(k); if(to) logSheet.itemOff.add(to); });
+    logSheet.keys = keys;
+  }
+  const all = workSplitItems(document.getElementById('liText')?.value || '');
+  const master = sheetIsOn('liInclude');
+  box.innerHTML = items ? `<div class="li-ih"><b>${items.length} improvements</b><button type="button" class="lnk-b" onclick="liAsOne(true)">Log as One</button></div>
+<ol class="li-il">${items.map((t, i) => { const k = keys[i], on = master && !logSheet.itemOff.has(k), files = logSheet.itemFiles[k] || [];
+    return `<li class="li-ir${on ? '' : ' is-off'}"><span class="li-n">${i + 1}</span><div class="li-tx"><span class="li-t">${escapeHtml(t)}</span>${files.length ? `<span class="li-fs">${files.map((f, j) => `<span class="fchip">${icon(f.type && f.type.startsWith('image/') ? 'image' : 'file-text')}<span>${escapeHtml(f.name)}</span><button type="button" aria-label="Remove ${escapeHtml(f.name)}" onclick="liItemFileRemove(${i},${j})">${icon('x')}</button></span>`).join('')}</span>` : ''}${on ? '' : '<span class="li-int">Internal</span>'}</div>`
+      + `<button type="button" class="li-b${on ? ' on' : ''}" aria-pressed="${on}" ${master ? '' : 'disabled '}title="${on ? 'In the client email. Click to keep it internal.' : master ? 'Internal. Click to put it in the client email.' : 'The whole log is internal (the switch below)'}" aria-label="Line ${i + 1} in the client email" onclick="liItemEmail(${i})">${icon('envelope-simple')}</button>`
+      + `<button type="button" class="li-b" title="Add screenshots" aria-label="Add screenshots to line ${i + 1}" onclick="liItemAttach(${i})">${icon('paperclip')}</button>`
+      + `<button type="button" class="li-b" title="Remove this line" aria-label="Remove line ${i + 1}" onclick="liItemRemove(${i})">${icon('x')}</button></li>`; }).join('')}</ol>
+<p class="li-ip">Each line is its own improvement in the client’s log. Time spent is for all of them.</p>`
+    : logSheet.asOne && all.length > 1 ? `<div class="li-ih is-one"><span>Logged as one improvement.</span><button type="button" class="lnk-b" onclick="liAsOne(false)">Split Into ${all.length}</button></div>` : '';
+  // the sheet's own screenshots are for one improvement; a list has them per line
+  ['liFilesL', 'liFiles'].forEach(id => { const el = document.getElementById(id); if(el) el.hidden = !!items; });
+  if(!items) liRenderFiles();
+  const save = document.getElementById('liSaveBtn'); if(save) save.textContent = items ? `Log ${items.length} Improvements` : 'Log Improvement';
+  liFit(document.getElementById('liText'), 84, 180);
+  liNotesSync();
+}
+// a box grows with what's in it, up to a point
+function liFit(el, min, max){ if(!el) return; el.style.height = 'auto'; el.style.height = Math.max(min, Math.min(max, el.scrollHeight + 2)) + 'px'; }
+// Time for a list: "for all 5", and its notes (a few lines of what was done, until you change them)
+function liNotesSync(){
+  const items = liItems(), has = !!(document.getElementById('liTime')?.value || '').trim();
+  const fr = document.getElementById('liTimeFor'); if(fr) fr.textContent = items ? `for all ${items.length}` : '';
+  const show = !!items && has, n = document.getElementById('liNotes');
+  ['liNotesL', 'liNotesW'].forEach(id => { const el = document.getElementById(id); if(el) el.hidden = !show; });
+  if(show && n && !logSheet.notesTouched) n.value = workTimeNotes(items);
+  if(show) liFit(n, 64, 160);
+}
+function liAsOne(v){ logSheet.asOne = !!v; liItemsSync(); document.getElementById('liText')?.focus(); }
+function liItemEmail(i){
+  const k = (logSheet.keys || [])[i]; if(!k) return;
+  logSheet.itemOff.has(k) ? logSheet.itemOff.delete(k) : logSheet.itemOff.add(k);
+  liItemsSync();
+}
+function liItemRemove(i){
+  const items = liItems(); if(!items) return;
+  const k = liKey(items[i]); delete logSheet.itemFiles[k]; logSheet.itemOff.delete(k);
+  items.splice(i, 1);
+  const ta = document.getElementById('liText'); if(ta) ta.value = items.join('\n');
+  logSheet.keys = items.map(liKey);
+  liItemsSync();
+}
+function liItemAttach(i){ logSheet.attachTo = (logSheet.keys || [])[i] || null; document.getElementById('liItemFileInput')?.click(); }
+function liItemAddFiles(input){
+  const k = logSheet.attachTo, add = [...(input.files || [])]; input.value = '';
+  if(!k) return;
+  const big = add.filter(f => f.size > 10 * 1024 * 1024);
+  logSheet.itemFiles[k] = (logSheet.itemFiles[k] || []).concat(add.filter(f => f.size <= 10 * 1024 * 1024)).slice(0, 8);
+  if(big.length) showToast('error', 'Too large', `${big.map(f => f.name).join(', ')} ${big.length === 1 ? 'is' : 'are'} over 10 MB.`);
+  liItemsSync();
+}
+function liItemFileRemove(i, j){ const k = (logSheet.keys || [])[i]; if(k && logSheet.itemFiles[k]){ logSheet.itemFiles[k].splice(j, 1); if(!logSheet.itemFiles[k].length) delete logSheet.itemFiles[k]; } liItemsSync(); }
 function liAddFiles(input){
   const add = [...(input.files || [])];
   const big = add.filter(f => f.size > 10 * 1024 * 1024);
@@ -273,6 +353,8 @@ async function saveQueueLogImprovement(another){
   if(!clientId){ showToast('error', 'Pick a client', 'Choose which client this is for.'); return; }
   if(isClientPaused(clientId)){ showPausedClientWarning(clientId); return; }
   if(!text){ showToast('error', 'Nothing to log', 'Write what you did first.'); g('liText')?.focus(); return; }
+  const items = liItems();
+  if(items) return saveLogBatch(clientId, items, another);   // several at once, one time (Nov 25)
   const timeRaw = (g('liTime')?.value || '').trim();
   const minutes = timeRaw ? parseSpent(timeRaw) : 0;
   if(timeRaw && !minutes){ showToast('error', 'Check the time', 'Try 0:30, 45m or 1h 30m.'); g('liTime')?.focus(); return; }
@@ -333,12 +415,94 @@ async function saveQueueLogImprovement(another){
   else if(tm && !timeOk) showToast('info', 'Logged, without the time', `The improvement is saved for ${c.name}, but the time didn’t ${tc.pick === 'use' ? 'link' : 'save'}. Add it on the Timesheet.`);
   else showToast('success', 'Improvement logged', `Saved for ${c.name}${extras ? ' · ' + extras : ''}.`);
   if(another){
-    logSheet.files = []; logSheet.useTimer = false;
+    Object.assign(logSheet, { files: [], useTimer: false, itemFiles: {}, itemOff: new Set(), keys: [], asOne: false, notesTouched: false });
     if(g('liText')) g('liText').value = '';
     if(g('liTime')) g('liTime').value = '';
     if(g('liPick')) g('liPick').innerHTML = '';
     const tb = g('liTimerBtn'); if(tb && !timerState.running) tb.remove();
-    liRenderFiles();
+    liItemsSync();
+    g('liText')?.focus();
+  } else closeAppModal();
+}
+
+// Several improvements with one time (Nov 25): each line is its own improvement (its own screenshots and
+// email switch); the time is asked about once and saved once, as one entry for all of them
+// (workLinkBatch, data.js). The checks run once: lines already logged are named (skip them or log them
+// too), and time already logged that day (Use That Time links it to all of them).
+async function saveLogBatch(clientId, items, another){
+  const g = id => document.getElementById(id);
+  const timeRaw = (g('liTime')?.value || '').trim();
+  const minutes = timeRaw ? parseSpent(timeRaw) : 0;
+  if(timeRaw && !minutes){ showToast('error', 'Check the time', 'Try 0:30, 45m or 1h 30m.'); g('liTime')?.focus(); return; }
+  const pick = minutes && g('liPick') && g('liPick').innerHTML && typeof hvPickValue === 'function' ? hvPickValue('li', clientId) : { ok: true, projectId: null, taskId: null };
+  if(!pick.ok){ showToast('error', 'Almost there', pick.msg); return; }
+  if(minutes > 960 && !(await confirmDialog(`That’s ${hmLong(minutes)} for these ${items.length} improvements. Log it anyway?`, { confirmLabel: 'Log It', cancelLabel: 'Fix It' }))) return;
+  const c1 = clients.find(x => x.id === clientId);
+  // lines already logged for the client lately: named, to skip or log too
+  const list = await workDupsAsk(clientId, items);
+  if(!list) return;
+  const notes = (g('liNotes')?.value || '').trim() || workTimeNotes(list);
+  const picked = g('liService')?.value || '';
+  const dateStr = g('liDate')?.value || toDateStr(new Date());
+  const tc = minutes && !(logSheet.useTimer && timerState.running && timerState.clientId === clientId)
+    ? await workTimeCheck({ clientId, dateStr, minutes, projectId: pick.projectId, taskId: pick.taskId, service: pick.projectId ? pick.service : picked || (c1 && c1.service) || '', text: notes }) : { pick: 'add' };
+  if(!tc) return;
+  const master = sheetIsOn('liInclude'), author = myName() || 'Team member';
+  const plan = list.map(t => { const k = liKey(t); return { text: t, include: master && !logSheet.itemOff.has(k), files: (logSheet.itemFiles[k] || []).slice() }; });
+  const useTimer = logSheet.useTimer;
+  const btn = clickedBtn();
+  setBtnLoading(btn, 'Saving…');
+  await loadAll();
+  const c = clients.find(x => x.id === clientId);
+  if(!c){ restoreBtn(btn); showToast('error', 'Client not found', 'This client may have been removed by someone else.'); return; }
+  const service = serviceFromHarvest(c) ? (pick.projectId ? pick.service : improvementServiceFor(c)) : picked || c.service || '';
+  const when = dateStr === toDateStr(new Date()) ? new Date() : new Date(dateStr + 'T12:00:00');
+  const imps = [];
+  for(const x of plan){
+    const imp = await insertImprovementFull(clientId, { author, text: x.text, includeInEmail: x.include, source: 'manual', date: when.toISOString(), service });
+    if(imp) imps.push([imp, x]);
+  }
+  if(!imps.length){ restoreBtn(btn); showToast('error', 'Save failed', 'Could not save these improvements. Try again.'); return; }
+  if(imps.some(([, x]) => x.include)){ const inv = invalidateStaleDraft(c, author); if(inv) await saveDraftFor(clientId, author, { draftStatus: 'none', draft: '' }); }
+  // the time: once, for all of them
+  const first = imps[0][0], all = imps.map(([i]) => i);
+  let timeOk = true, entryId = null;
+  if(minutes && tc.pick === 'use'){ timeOk = await workTimeLink(tc.id, first.id); entryId = tc.id; }
+  else if(minutes && tc.pick === 'add'){
+    if(useTimer && timerState.running && timerState.clientId === clientId){
+      if(!timerState.service){ timerState.service = service; }
+      if(pick.projectId){ timerState.projectId = pick.projectId; timerState.taskId = pick.taskId; timerState.service = pick.service; }
+      timerState.description = notes; saveTimerState();
+      entryId = await stopAndSaveTimer({ quiet: true, improvementId: first.id });
+      if(entryId) await supabaseClient.from('time_entries').update({ logged: true }).eq('id', entryId); else timeOk = false;
+    } else {
+      const r = await mergeOrInsertTimeEntry({ clientId, service: pick.projectId ? pick.service : service, dateStr, minutes, description: notes, projectId: pick.projectId, taskId: pick.taskId, improvementId: first.id });
+      if(r.error) timeOk = false;
+      else { entryId = r.entryId; if(!r.merged && r.entryId) await supabaseClient.from('time_entries').update({ logged: true }).eq('id', r.entryId); }
+    }
+  }
+  if(entryId && timeOk) await workLinkBatch(all, entryId);
+  if(minutes && tc.pick === 'add' && entryId && !useTimer) syncEntryToHarvestBackground(entryId);
+  if(minutes){ await loadTimeEntries(); if(typeof renderTimesheet === 'function') renderTimesheet(); }
+  let up = { saved: 0, failed: 0 };
+  for(const [imp, x] of imps) if(x.files.length){ const u = await uploadImprovementFiles(imp, x.files); up.saved += u.saved; up.failed += u.failed; }
+  logClientActivity(clientId, 'improvement_logged', `${author} logged ${all.length} improvements: ${all.slice(0, 3).map(i => `"${workCut(i.text, 50)}"`).join(', ')}${all.length > 3 ? ` and ${all.length - 3} more` : ''}`);
+  refreshClientDetailActivityIfOpen(clientId);
+  restoreBtn(btn);
+  renderAll();
+  const tm = tc.pick === 'use' ? tc.minutes : tc.pick === 'add' ? minutes : 0;
+  const missed = plan.length - imps.length;
+  const extras = [tm && timeOk ? `${hmLong(tm)} on your timesheet${tc.pick === 'use' ? ', the time already there' : ''}` : '', up.saved ? `${up.saved} screenshot${up.saved === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ');
+  if(missed) showToast('info', `${imps.length} of ${plan.length} logged`, `${missed} didn’t save; log ${missed === 1 ? 'it' : 'them'} again.`);
+  else if(up.failed) showToast('info', 'Logged, without some screenshots', `${up.failed} file${up.failed === 1 ? '' : 's'} couldn’t be uploaded. The improvements are saved for ${c.name}.`);
+  else if(tm && !timeOk) showToast('info', 'Logged, without the time', `The improvements are saved for ${c.name}, but the time didn’t ${tc.pick === 'use' ? 'link' : 'save'}. Add it on the Timesheet.`);
+  else showToast('success', `${imps.length} improvements logged`, `Saved for ${c.name}${extras ? ' · ' + extras : ''}.`);
+  if(another){
+    Object.assign(logSheet, { files: [], useTimer: false, itemFiles: {}, itemOff: new Set(), keys: [], asOne: false, notesTouched: false });
+    ['liText', 'liTime', 'liNotes'].forEach(id => { if(g(id)) g(id).value = ''; });
+    if(g('liPick')) g('liPick').innerHTML = '';
+    const tb = g('liTimerBtn'); if(tb && !timerState.running) tb.remove();
+    liItemsSync();
     g('liText')?.focus();
   } else closeAppModal();
 }

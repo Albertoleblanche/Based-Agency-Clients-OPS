@@ -285,7 +285,7 @@ async function saveDraftFor(clientId, author, fields){
 function improvementRowFromDb(r){
   return { id:r.id, clientId:r.client_id, author:r.author||'', text:r.text, date:r.date, includeInEmail:r.include_in_email, source:r.source,
     ...(r.deleted_at ? { deletedAt: r.deleted_at, deletedBy: r.deleted_by || null } : {}),
-    createdAt: r.created_at || null, editedAt: r.edited_at || null, carryOver: !!r.carry_over };
+    createdAt: r.created_at || null, editedAt: r.edited_at || null, carryOver: !!r.carry_over, timeEntryId: r.time_entry_id || null };
 }
 
 // Real per-row update — replaces the old "mutate the roster array, then
@@ -344,10 +344,42 @@ function workColumnMissing(error, col){
 function workCut(s, n){ s = String(s || ''); n = n || 80; return s.length > n ? s.slice(0, n) + '…' : s; }
 function workHm(min){ min = Math.max(0, Math.round(min || 0)); return `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`; }
 function workProfile(name){ return (typeof teamProfiles !== 'undefined' ? teamProfiles : []).find(p => p.name === name && !p.access_revoked) || null; }
-// The time on your timesheet logged with this work (only your own time is loaded here)
+// The time on your timesheet logged with this work (only your own time is loaded here). Time shared by
+// a batch goes only when all of the batch's work does: deleting some of it keeps the time (Nov 25).
 function workMinutes(ids){
   const set = new Set(ids);
-  return (typeof timeEntries !== 'undefined' ? timeEntries : []).filter(e => e.improvementId && set.has(e.improvementId)).reduce((n, e) => n + (e.minutes || 0), 0);
+  return (typeof timeEntries !== 'undefined' ? timeEntries : []).filter(e => e.improvementId && set.has(e.improvementId) && workBatchOf(e.id).every(i => set.has(i.id))).reduce((n, e) => n + (e.minutes || 0), 0);
+}
+// ---- Several improvements, one time (Nov 25) ----
+// Time is a block of work; improvements are the several things it got done. Log Improvement takes one
+// per line, with one Time spent for all of them: one entry in Harvest. The entry is linked to the
+// first (time_entries.improvement_id, as for one) and each carries the entry
+// (client_improvements.time_entry_id, addendum-work-batches.sql).
+function workBatchOf(entryId){ return entryId ? clientImprovements.filter(i => i.timeEntryId === entryId) : []; }
+// The lines of what was done, as separate improvements: one per line, without the bullet or number
+// in front ("- ", "• ", "1. ", "2) ", "[x] "). One line is one improvement, as written.
+function workSplitItems(text){
+  const lines = String(text || '').split(/\r?\n/).map(l => l.replace(/^\s*(?:[-*•·–—>]|\d{1,2}[.)]|\[[ xX]?\])\s+/, '').trim()).filter(Boolean);
+  return lines.length > 1 ? lines : [String(text || '').trim()].filter(Boolean);
+}
+// The time entry's notes for a batch: a few lines of what was done (as time is usually written), the
+// rest counted.
+function workTimeNotes(items){
+  const cut = s => s.length > 90 ? s.slice(0, 89).trimEnd() + '…' : s, max = items.length > 6 ? 5 : 6;
+  return items.slice(0, max).map(cut).join('\n') + (items.length > max ? `\n+${items.length - max} more` : '');
+}
+// Links each of the batch's work to its time. Before addendum-work-batches.sql there's nowhere to say
+// so: the time is then left on its own (not linked to the first), so deleting that work keeps it.
+async function workLinkBatch(imps, entryId){
+  if(!entryId || imps.length < 2) return true;
+  const { error } = await supabaseClient.from('client_improvements').update({ time_entry_id: entryId }).in('id', imps.map(i => i.id));
+  if(error){
+    if(workColumnMissing(error, 'time_entry_id')) await supabaseClient.from('time_entries').update({ improvement_id: null, logged: true }).eq('id', entryId);
+    else console.error('workLinkBatch', error);
+    return false;
+  }
+  imps.forEach(i => { i.timeEntryId = entryId; });
+  return true;
 }
 // Drafts that used this work, as they are now: kind is written, review, approved or sent
 function workDraftEffects(items){
@@ -376,12 +408,15 @@ function workDeleteQuestion(items, opts){
   const mins = workMinutes(items.map(i => i.id)), others = [...new Set(items.filter(i => i.author !== me).map(i => i.author))];
   const harvest = typeof hvTimeOn === 'function' && hvTimeOn() ? ' and out of Harvest' : '';
   const head = opts.fromTime
-    ? `Delete this time and the work it was logged with, “${workCut(items[0].text)}”?`
+    ? (n === 1 ? `Delete this time and the work it was logged with, “${workCut(items[0].text)}”?` : `Delete this time and the ${n} improvements it was logged with?`)
     : `Delete ${n === 1 ? `“${workCut(items[0].text)}”` : `${n} work items`}?`;
+  // logged in a batch with other work that stays: the time stays with that work
+  const set = new Set(items.map(i => i.id)), kept = [...new Set(items.map(i => i.timeEntryId).filter(Boolean))].map(id => workBatchOf(id).filter(i => !set.has(i.id))).filter(l => l.length);
   const notes = [];
-  if(opts.fromTime) notes.push(`Both come off your timesheet${harvest}, and out of the client’s log.`);
+  if(opts.fromTime) notes.push(`${n === 1 ? 'Both come' : 'They all come'} off your timesheet${harvest}, and out of the client’s log.`);
   else if(mins) notes.push(`The ${workHm(mins)} logged with ${it} comes off your timesheet${harvest} too.`);
-  else if(others.length) notes.push(`Any time logged with ${it} goes too.`);
+  else if(others.length && !kept.length) notes.push(`Any time logged with ${it} goes too.`);
+  if(kept.length && !opts.fromTime){ const k = kept.reduce((a, l) => a + l.length, 0); notes.push(`The time logged with ${it} stays, with the other ${k === 1 ? 'improvement' : `${k} improvements`} it was logged for.`); }
   const fx = workDraftEffects(items), back = fx.filter(e => e.kind === 'review' || e.kind === 'approved'), sent = fx.filter(e => e.kind === 'sent');
   if(back.length > 2) notes.push(`${back.length} drafts in review or approved used ${it}, so they go back to their writers to rewrite, and they’re told.`);
   else back.forEach(({ d, kind }) => {
@@ -412,11 +447,19 @@ async function workTimeMove(mode, ids){
   if(!done && typeof currentUser !== 'undefined' && currentUser){
     const t = () => supabaseClient.from('time_entries'), uid = currentUser.id;
     if(mode === 'trash'){
-      const { data } = await t().update({ deleted_at: new Date().toISOString() }).in('improvement_id', ids).eq('user_id', uid).is('deleted_at', null).select('id, harvest_entry_id');
+      // time shared with work that stays moves over to it instead (a batch, Nov 25)
+      const { data: mine } = await t().select('id').in('improvement_id', ids).eq('user_id', uid).is('deleted_at', null);
+      const keep = new Set();
+      for(const e of mine || []){ const other = workBatchOf(e.id).find(i => !ids.includes(i.id)); if(other){ keep.add(e.id); await t().update({ improvement_id: other.id }).eq('id', e.id); } }
+      const go = (mine || []).map(e => e.id).filter(id => !keep.has(id));
+      const { data } = go.length ? await t().update({ deleted_at: new Date().toISOString() }).in('id', go).select('id, harvest_entry_id') : { data: [] };
       (data || []).filter(e => e.harvest_entry_id).forEach(e => workHarvest({ action: 'delete-entry', harvestEntryId: e.harvest_entry_id }));
     } else if(mode === 'restore'){
+      // a batch's time comes back with any of its work, and is linked to work that's back
+      const batch = [...new Set(deletedWork.concat(clientImprovements).filter(i => ids.includes(i.id) && i.timeEntryId).map(i => i.timeEntryId))];
       const { data } = await t().update({ deleted_at: null, harvest_entry_id: null, harvest_sync_status: 'pending', harvest_sync_error: null })
-        .in('improvement_id', ids).eq('user_id', uid).not('deleted_at', 'is', null).select('id');
+        .or(`improvement_id.in.(${ids.join(',')})${batch.length ? `,id.in.(${batch.join(',')})` : ''}`).eq('user_id', uid).not('deleted_at', 'is', null).select('id, improvement_id');
+      for(const e of data || []){ if(!ids.includes(e.improvement_id)){ const w = deletedWork.concat(clientImprovements).find(i => ids.includes(i.id) && i.timeEntryId === e.id); if(w) await t().update({ improvement_id: w.id }).eq('id', e.id); } }
       (data || []).forEach(e => workHarvest({ action: 'sync-entry', timeEntryId: e.id }));
     } else await t().delete().in('improvement_id', ids).eq('user_id', uid).not('deleted_at', 'is', null);
   }
@@ -707,6 +750,22 @@ async function okToLogDuplicate(clientId, text){
   const c = clients.find(x => x.id === clientId), me = typeof myName === 'function' ? myName() : '';
   const who = dup.author === me ? 'You' : firstName(dup.author);
   return await confirmDialog(`${who} already logged this for ${c ? c.name : 'this client'} on ${fmtShortDate(new Date(dup.date))}: “${workCut(dup.text, 90)}”.`, { title: 'Log it again?', confirmLabel: 'Log It Again', cancelLabel: 'Don’t Log' });
+}
+
+// Several lines at once (Nov 25): the ones already logged lately are named once, to skip or log too.
+// Returns the lines to log, or null when they backed out.
+async function workDupsAsk(clientId, items){
+  if(items.length < 2) return (await okToLogDuplicate(clientId, items[0])) ? items : null;
+  const dups = items.filter(t => workDuplicateOf(clientId, t)); if(!dups.length) return items;
+  const c = clients.find(x => x.id === clientId), allDup = dups.length === items.length;
+  const title = dups.length === 1 ? 'One of these is already logged' : `${dups.length} of these are already logged`;
+  const body = `${dups.map(t => `“${workCut(t, 90)}”`).join('\n')}\n\nLogged for ${c ? c.name : 'this client'} in the last 30 days.`;
+  const choices = [{ label: dups.length === 1 ? 'Log It Too' : 'Log Them Too', value: 'all' }, ...(allDup ? [] : [{ label: dups.length === 1 ? 'Skip That One' : 'Skip Those', value: 'skip', primary: true }])];
+  const v = typeof choiceDialog === 'function' ? await choiceDialog({ title, body, row: true, choices })
+    : typeof mActions === 'function' ? await new Promise(res => mActions(`${title}: ${dups.map(t => `“${workCut(t, 60)}”`).join(', ')}.`, choices.slice().reverse().map(x => ({ label: x.label, fn: () => res(x.value) })), () => res(null)))
+    : 'all';
+  if(v === null) return null;
+  return v === 'skip' ? items.filter(t => !dups.includes(t)) : items;
 }
 
 // Saving changed words for a piece of work, with when (edited_at, addendum-flow-gaps.sql), so a draft

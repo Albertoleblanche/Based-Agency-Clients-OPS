@@ -1528,6 +1528,32 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .rvn-empty b{color:var(--label);font-weight:600}
 /* Log Improvement: Worth logging for, under the Client picker */
 .li-sg{display:flex;flex-direction:column;margin-top:8px}
+/* Log Improvement: several things at once, one per line (Nov 25) */
+.li-items:empty{display:none}
+.li-items{margin-top:10px}
+.li-ih{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;font-size:12.5px;color:var(--label-2)}
+.li-ip{margin:6px 0 0;font-size:12.5px;line-height:1.4;color:var(--label-2)}
+.li-ih b{font-size:13px;font-weight:600;color:var(--label)}
+.li-ih .lnk-b{margin-left:auto;font-size:12.5px}
+.li-ih.is-one{margin:0}
+.li-il{list-style:none;margin:0;padding:0;border-radius:10px;background:color-mix(in srgb,var(--fill) 55%,transparent);box-shadow:inset 0 0 0 .5px var(--sep);max-height:280px;overflow-y:auto;overscroll-behavior:contain}
+.li-ir{position:relative;display:flex;align-items:flex-start;gap:8px;padding:7px 6px 7px 10px}
+.li-ir + .li-ir::before{content:"";position:absolute;top:0;left:32px;right:0;border-top:.5px solid var(--sep)}
+.li-n{flex:0 0 14px;padding-top:2px;font-size:12px;font-variant-numeric:tabular-nums;color:var(--label-3);text-align:right}
+.li-tx{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:5px;padding-top:1px}
+.li-t{font-size:13px;line-height:1.4;color:var(--label);overflow-wrap:anywhere}
+.li-ir.is-off .li-t{color:var(--label-2)}
+.li-int{align-self:flex-start;font-size:11px;font-weight:500;color:var(--label-3)}
+.li-fs{display:flex;flex-wrap:wrap;gap:4px}
+.li-fs .fchip{height:22px;font-size:12px;max-width:180px}
+.li-b{flex:0 0 auto;display:grid;place-items:center;width:26px;height:26px;border:0;border-radius:6px;background:none;color:var(--label-3);cursor:pointer;transition:background-color 120ms ease,color 120ms ease,transform 100ms ease-out}
+.li-b svg{width:14px;height:14px}
+.li-b.on{color:var(--blue)}
+.li-b:disabled{opacity:.4;cursor:default}
+.li-b:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+@media (hover:hover) and (pointer:fine){ .li-b:not(:disabled):hover{background:var(--fill-2);color:var(--label)} .li-b.on:not(:disabled):hover{color:var(--blue)} }
+.li-b:not(:disabled):active{transform:scale(.94)}
+.li-nh{margin-top:4px;font-size:12.5px}
 .li-sgh{font-size:11.5px;color:var(--label-3);margin:0 0 2px 2px}
 .li-sgr{display:flex;align-items:baseline;gap:8px;min-width:0;padding:6px 8px;margin:0 -6px;border:0;border-radius:8px;background:none;color:inherit;font:inherit;text-align:left;cursor:default;transition:background-color 120ms ease,transform 120ms ease}
 .li-sgr b{font-size:13px;font-weight:600;white-space:nowrap}
@@ -1681,6 +1707,9 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .qu-pf{margin-top:2px;grid-template-columns:84px minmax(0,1fr)}
 .qu-pf > label:not(.pop){font-size:12.5px;text-align:left}
 .qu-hint{margin:8px 0 0;font-size:12px;color:var(--label-3)}
+.qu-many{margin:6px 0 2px;font-size:12.5px;color:var(--label-2)}
+.qu-many b{color:var(--label);font-weight:600}
+.qu-many .lnk-b{margin-left:4px}
 .qu-hint kbd{font:600 10.5px/1 -apple-system,system-ui,sans-serif;padding:2px 5px;border-radius:4px;background:var(--fill-2);color:var(--label-2)}
 .qu-none{margin:12px 0 0;font-size:13px;color:var(--label-2)}
 .qu-dn{margin:12px 0 0;font-size:12.5px;line-height:1.45;color:var(--label-2)}

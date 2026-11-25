@@ -572,3 +572,20 @@ body.mac.mobile { overflow: hidden; background: var(--ios-bg, #F2F2F7); -webkit-
   .app .msp-steps{transition:opacity 160ms ease-out,transform 300ms cubic-bezier(.32,.72,0,1)}
   .app .msp-steps-w.is-open .msp-steps{transition:opacity 220ms ease-out 40ms,transform 300ms cubic-bezier(.32,.72,0,1)}
 }
+/* Log Improvement: several things at once, one per line (Nov 25) */
+.app .msl-h{display:flex;align-items:baseline;justify-content:space-between;margin:14px 32px 6px;font-size:13px;color:var(--label-2)}
+.app .msl-h span{font-weight:600;color:var(--label)}
+.app .msl-h .link,.app #mLogItems .ifoot .link{border:0;background:none;padding:0;font:inherit;font-size:13px;font-weight:500;color:var(--blue)}
+.app .msl-r{align-items:flex-start;gap:6px;padding-top:9px;padding-bottom:9px;padding-right:6px}
+.app .msl .msl-r + .msl-r::before{left:40px}
+.app .msl-n{flex:0 0 18px;padding-top:3px;font-size:13px;font-variant-numeric:tabular-nums;color:var(--label-3);text-align:right}
+.app .msl-t{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px;padding:1px 0 0 4px;font-size:15px;line-height:1.35;overflow-wrap:anywhere}
+.app .msl-t em{font-style:normal;font-size:12px;font-weight:500;color:var(--label-3)}
+.app .msl-r.is-off .msl-t{color:var(--label-2)}
+.app .msl-b{position:relative;flex:0 0 auto;display:grid;place-items:center;width:32px;height:32px;margin-top:-4px;border:0;border-radius:8px;background:none;color:var(--label-3);-webkit-tap-highlight-color:transparent}
+.app .msl-b::after{content:"";position:absolute;inset:-6px -2px}
+.app .msl-b svg{width:17px;height:17px}
+.app .msl-b.on{color:var(--blue)}
+.app .msl-b:disabled{opacity:.4}
+.app .msl-b:active{background:var(--fill)}
+.app .msl-notes{min-height:84px}

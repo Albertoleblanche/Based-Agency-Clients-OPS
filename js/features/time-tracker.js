@@ -80,6 +80,13 @@ async function loadMyTrashedTimeEntries(){
 // with a piece of work comes back with that work.
 async function restoreTimeEntry(id){
   const e = (typeof trashData !== 'undefined' ? trashData.time : []).find(x => x.id === id);
+  // time logged for several improvements: they all come back with it
+  const batch = e ? deletedWork.filter(w => w.timeEntryId === e.id) : [];
+  if(batch.length > 1){
+    const r = await restoreWork(batch.map(w => w.id));
+    renderAll(); await renderTrash();
+    return r.ok ? showToast('success', 'Restored', `The time and its ${batch.length} improvements are back${typeof hvTimeOn === 'function' && hvTimeOn() ? ', and in Harvest again' : ''}.`) : showToast('error', 'Couldn’t restore it', 'Try again in a moment.');
+  }
   if(e && e.improvementId && deletedWork.some(w => w.id === e.improvementId)) return trRestoreWork(e.improvementId);
   const ok = await restoreTimeRows([id]);
   await loadTimeEntries();
@@ -619,7 +626,10 @@ async function addManualEntry(force){
     clearTimeout(slow); restoreBtn(btn0);
     if(dup){ manualDupShow(dup, clientId, asWork); return; }
   }
-  if(asWork && !(await okToLogDuplicate(clientId, description))) return;   // logged already? (data.js)
+  // as work, several lines are several improvements under this one time (Nov 25); logged already? (data.js)
+  const lines = asWork ? await workDupsAsk(clientId, workSplitItems(description)) : [];
+  if(asWork && !lines) return;
+  if(asWork && !lines.length){ showToast('info', 'Nothing logged', 'Those were all logged already.'); return; }
   const btn = clickedBtn();
   // a task open for this client: its time? Then it's marked done with this time, once (Nov 24)
   const forTask = typeof timeForOpenTask === 'function' ? await timeForOpenTask(clientId, description) : { go: true };
@@ -631,13 +641,11 @@ async function addManualEntry(force){
     return;
   }
   setBtnLoading(btn, 'Saving…');
-  // as work: the improvement first, then the time as its own entry, linked to it (as Queue's Log does)
-  let imp = null;
+  // as work: the improvements first, then the time as its own entry, linked to them (as Queue's Log does)
+  let imp = null, imps = [];
   if(asWork){
-    const c0 = clients.find(x => x.id === clientId), today = toDateStr(new Date());
-    const when = dateVal === today ? new Date() : new Date(dateVal + 'T12:00:00');
-    imp = await insertImprovementFull(clientId, { author: myName() || 'Team member', text: description, includeInEmail: true, source: 'time', date: when.toISOString(),
-      service: c0 && typeof serviceFromHarvest === 'function' && serviceFromHarvest(c0) ? (pick.projectId ? service : improvementServiceFor(c0)) : service });
+    imps = await manualWorkLines(clientId, lines, dateVal, pick, service);
+    imp = imps[0] || null;
     if(!imp){ restoreBtn(btn); showToast('error', 'Save failed', 'Couldn’t log it as work. Try again in a moment.'); return; }
   }
   const { error, merged, entryId } = await mergeOrInsertTimeEntry({
@@ -647,11 +655,12 @@ async function addManualEntry(force){
   const c = clients.find(x=>x.id===clientId);
   if(error){ showToast('error','Save failed', error.message); if(imp && typeof quRefreshAll === 'function') quRefreshAll(clientId); return; }
   if(imp && entryId) await supabaseClient.from('time_entries').update({ logged: true }).eq('id', entryId);
+  if(imps.length > 1 && entryId) await workLinkBatch(imps, entryId);
   closeAppModal();
   if(imp){
-    if(typeof logClientActivity === 'function') logClientActivity(clientId, 'improvement_logged', `${myName() || 'Team member'} logged an improvement: "${description.length > 80 ? description.slice(0, 80) + '…' : description}"`);
+    manualWorkActivity(clientId, imps);
     if(typeof quRefreshAll === 'function') quRefreshAll(clientId);
-    showToast('success', 'Time added and logged as work', `${formatMinutes(totalMinutes)} for ${c ? c.name : 'the client'}; it’s in Queue.`);
+    showToast('success', 'Time added and logged as work', `${formatMinutes(totalMinutes)} for ${c ? c.name : 'the client'}${imps.length > 1 ? `, as ${imps.length} improvements` : ''}; it’s in Queue.`);
   } else merged
     ? showToast('success','Time added', `${formatMinutes(totalMinutes)} added to today's existing entry for ${c?c.name:'client'}.`)
     : showToast('success','Time added', `${formatMinutes(totalMinutes)} added for ${c?c.name:'client'}.`);
@@ -705,21 +714,39 @@ async function manualDupUseTime(){
   const description = document.getElementById('manualDesc').value.trim();
   const pick = typeof hvPickValue === 'function' && clientId ? hvPickValue('manual', clientId) : { ok: true, service: document.getElementById('manualService')?.value || '' };
   if(!description){ showToast('error', 'Say what you worked on', 'The notes are what shows in Queue.'); document.getElementById('manualDesc')?.focus(); return; }
-  if(!(await okToLogDuplicate(clientId, description))) return;
+  const lines = await workDupsAsk(clientId, workSplitItems(description));   // several lines: several improvements (Nov 25)
+  if(!lines) return;
+  if(!lines.length){ showToast('info', 'Nothing logged', 'Those were all logged already.'); return; }
   const btn = clickedBtn(); setBtnLoading(btn, 'Saving…');
-  const c0 = clients.find(x => x.id === clientId), today = toDateStr(new Date());
-  const imp = await insertImprovementFull(clientId, { author: myName() || 'Team member', text: description, includeInEmail: true, source: 'time',
-    date: (dateVal === today ? new Date() : new Date(dateVal + 'T12:00:00')).toISOString(),
-    service: c0 && typeof serviceFromHarvest === 'function' && serviceFromHarvest(c0) ? (pick.projectId ? pick.service : improvementServiceFor(c0)) : pick.service || '' });
+  const c0 = clients.find(x => x.id === clientId);
+  const imps = await manualWorkLines(clientId, lines, dateVal, pick, pick.service || '');
+  const imp = imps[0];
   if(!imp){ restoreBtn(btn); showToast('error', 'Save failed', 'Couldn’t log it as work. Try again in a moment.'); return; }
   const linked = await workTimeLink(dup.id, imp.id);
+  if(linked && imps.length > 1) await workLinkBatch(imps, dup.id);
   restoreBtn(btn); closeAppModal(); manualDup = null;
-  if(typeof logClientActivity === 'function') logClientActivity(clientId, 'improvement_logged', `${myName() || 'Team member'} logged an improvement: "${description.length > 80 ? description.slice(0, 80) + '…' : description}"`);
+  manualWorkActivity(clientId, imps);
   if(typeof quRefreshAll === 'function') quRefreshAll(clientId);
   await loadTimeEntries(); renderTimesheet(); renderReports();
   !linked
     ? showToast('info', 'Logged as work', 'It’s in Queue, but its time didn’t link. Open the entry on your Timesheet to try again.')
     : showToast('success', 'Logged as work, with that time', `${formatMinutes(dup.minutes)} already logged for ${c0 ? c0.name : 'the client'} is its time. Nothing new went to Harvest.`);
+}
+
+// Add Time's notes as work: one improvement per line (one line is one, as before)
+async function manualWorkLines(clientId, lines, dateVal, pick, service){
+  const c0 = clients.find(x => x.id === clientId), today = toDateStr(new Date());
+  const when = (dateVal === today ? new Date() : new Date(dateVal + 'T12:00:00')).toISOString();
+  const svc = c0 && typeof serviceFromHarvest === 'function' && serviceFromHarvest(c0) ? (pick.projectId ? (pick.service || service) : improvementServiceFor(c0)) : service;
+  const out = [];
+  for(const text of lines){ const i = await insertImprovementFull(clientId, { author: myName() || 'Team member', text, includeInEmail: true, source: 'time', date: when, service: svc }); if(i) out.push(i); }
+  return out;
+}
+function manualWorkActivity(clientId, imps){
+  if(typeof logClientActivity !== 'function' || !imps.length) return;
+  const who = myName() || 'Team member', cut = t => t.length > 80 ? t.slice(0, 80) + '…' : t;
+  logClientActivity(clientId, 'improvement_logged', imps.length === 1 ? `${who} logged an improvement: "${cut(imps[0].text)}"`
+    : `${who} logged ${imps.length} improvements: ${imps.slice(0, 3).map(i => `"${cut(i.text).slice(0, 50)}"`).join(', ')}${imps.length > 3 ? ` and ${imps.length - 3} more` : ''}`);
 }
 
 /* --- Timesheet --- */
@@ -1021,8 +1048,11 @@ async function deleteTimeEntry(id){
   const linked = timeEntries.find(e => e.id === id);
   const work = linked && linked.improvementId ? clientImprovements.find(i => i.id === linked.improvementId) : null;
   if(work){
-    if(workLockedToast(work)) return;   // its work is in an update in review or approved
-    const r = await deleteWorkAsk([work.id], { fromTime: true });
+    // logged for several improvements at once (a batch): the time and all of them go together
+    const all = [work, ...workBatchOf(id).filter(i => i.id !== work.id)];
+    const locked = all.find(i => workLockedBy(i));
+    if(locked){ workLockedToast(locked); return; }   // its work is in an update in review or approved
+    const r = await deleteWorkAsk(all.map(i => i.id), { fromTime: true });
     if(r && r.ok){ renderTimesheet(); renderReports(); if(typeof renderAll === 'function') renderAll(); }
     return;
   }

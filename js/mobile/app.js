@@ -1447,7 +1447,7 @@ ${q && !cl.length && !ts.length && !ns.length ? `<div style="margin-top:20px">${
 
 // ---- sheets: log, task, reminder, note, event, timer ------------------------------------------
 function mRowPick(label, valueText, onclick, set){ return `<button class="ir" onclick="${onclick}"><span class="ilab">${label}</span><span class="ival${set ? ' set' : ''}">${valueText}</span>${icon('caret-right', { cls: 'chev', weight: 'bold' })}</button>`; }
-function mSw(id, on, label){ return `<button class="ios-sw${on ? ' on' : ''}" id="${id}" role="switch" aria-checked="${!!on}" aria-label="${mEsc(label)}" onclick="this.classList.toggle('on');this.setAttribute('aria-checked',this.classList.contains('on'))"></button>`; }
+function mSw(id, on, label, extra){ return `<button class="ios-sw${on ? ' on' : ''}" id="${id}" role="switch" aria-checked="${!!on}" aria-label="${mEsc(label)}" onclick="this.classList.toggle('on');this.setAttribute('aria-checked',this.classList.contains('on'))${extra ? ';' + extra : ''}"></button>`; }
 function mIsOn(id){ return !!$m(id)?.classList.contains('on'); }
 function mClientName(id){ return clients.find(c => c.id === id)?.name || ''; }
 // suggest: worth logging for first, with why (logSuggestions, week-health.js); the rest A to Z
@@ -1465,9 +1465,49 @@ function mOpenLog(presetClientId){
   let cid = presetClientId || (timerState.running ? timerState.clientId : '') || '';
   if(cid && !waCanWork(clients.find(x => x.id === cid))) cid = '';
   const c = clients.find(x => x.id === cid);
-  mLog_ = { clientId: cid, service: c && c.service || (settings.serviceOptions || [])[0] || '', date: toDateStr(new Date()), useTimer: false };
+  mLog_ = { clientId: cid, service: c && c.service || (settings.serviceOptions || [])[0] || '', date: toDateStr(new Date()), useTimer: false, itemOff: new Set(), asOne: false, notes: '', notesTouched: false };
   mHvClient(mLog_);
   mOpenSheet('Log Improvement', mLogBody(), { done: 'mSaveLog()', doneLabel: 'Log' });
+  setTimeout(mLogItemsSync, 0);
+}
+// Several things at once (Nov 25): one improvement per line, listed under the box (each with its email
+// switch, or removed), and Time spent once for all of them, as one entry with a few lines of notes.
+function mLogItems(){
+  if(mLog_.asOne) return null;
+  const items = workSplitItems(mSheetVal('mLogText'));
+  return items.length > 1 ? items : null;
+}
+function mLogItemsSync(){
+  const box = $m('mLogItems'); if(!box) return;
+  const items = mLogItems(), all = workSplitItems(mSheetVal('mLogText')), master = mIsOn('mLogInclude');
+  box.innerHTML = items ? `<div class="msl-h"><span>${items.length} improvements</span><button class="link" onclick="mLogAsOne(true)">Log as One</button></div>
+<div class="ig flat msl">${items.map((t, i) => { const on = master && !mLog_.itemOff.has(liKey(t));
+    return `<div class="ir msl-r${on ? '' : ' is-off'}"><span class="msl-n">${i + 1}</span><span class="msl-t">${mEsc(t)}${on ? '' : '<em>Internal</em>'}</span>`
+      + `<button class="msl-b${on ? ' on' : ''}" aria-pressed="${on}" aria-label="Line ${i + 1} in the client email"${master ? '' : ' disabled'} onclick="mLogItemEmail(${i})">${icon('envelope-simple')}</button>`
+      + `<button class="msl-b" aria-label="Remove line ${i + 1}" onclick="mLogItemRemove(${i})">${icon('x')}</button></div>`; }).join('')}</div>
+<p class="ifoot">Each line is its own improvement in the client’s log. Time spent is for all of them.</p>`
+    : `<p class="ifoot">What you did, in a sentence the client would understand.${mLog_.asOne && all.length > 1 ? ` Logged as one. <button class="link" onclick="mLogAsOne(false)">Split Into ${all.length}</button>` : ' Several things? One per line.'}</p>`;
+  const done = $m('mSheetDone'); if(done) done.textContent = items ? `Log ${items.length}` : 'Log';
+  mLogNotesSync();
+}
+function mLogNotesSync(){
+  const items = mLogItems(), show = !!items && !!mSheetVal('mLogTime').trim(), w = $m('mLogNotesW'), n = $m('mLogNotes');
+  if(w) w.hidden = !show;
+  if(show && n) n.value = mLog_.notesTouched ? mLog_.notes : workTimeNotes(items);
+}
+function mLogAsOne(v){ mLog_.asOne = !!v; mLogItemsSync(); }
+function mLogItemEmail(i){ const items = mLogItems(); if(!items) return; const k = liKey(items[i]); mLog_.itemOff.has(k) ? mLog_.itemOff.delete(k) : mLog_.itemOff.add(k); mLogItemsSync(); }
+function mLogItemRemove(i){
+  const items = mLogItems(); if(!items) return;
+  mLog_.itemOff.delete(liKey(items[i])); items.splice(i, 1);
+  const ta = $m('mLogText'); if(ta){ ta.value = items.join('\n'); mKeep('mLogText', ta.value); }
+  mLogItemsSync();
+}
+// The sheet drawn again (a row picked, time typed): what's typed stays
+function mLogRedraw(text){
+  const t = text != null ? text : mSheetVal('mLogText'), tm = mSheetVal('mLogTime');
+  $m('mSheet').querySelector('.sheet-scroll').innerHTML = mLogBody(); $m('mLogText').value = t; $m('mLogTime').value = tm;
+  mLogItemsSync();
 }
 function mLogBody(){
   const L = mLog_, lc = clients.find(x => x.id === L.clientId);
@@ -1475,14 +1515,16 @@ function mLogBody(){
   const svcRow = (lc ? serviceFromHarvest(lc) : harvestOwnsServices()) ? '' : mRowPick('Service', mEsc(L.service || 'None'), 'mLogPick(\'service\')', !!L.service);
   const dateLabel = L.date === toDateStr(new Date()) ? 'Today' : sheetDayLabel(new Date(L.date + 'T12:00:00'));
   return `<div class="ig flat" style="margin-top:12px">${mRowPick('Client', mEsc(mClientName(L.clientId) || 'Choose'), 'mLogPick(\'client\')', !!L.clientId)}</div>
-<div class="ig flat" style="margin-top:20px"><div class="ir" style="align-items:flex-start"><textarea class="iarea" id="mLogText" placeholder="What did you do?" spellcheck="true" oninput="mKeep('mLogText',this.value)"></textarea></div></div>
-<p class="ifoot">What you did, in a sentence the client would understand.</p>
+<div class="ig flat" style="margin-top:20px"><div class="ir" style="align-items:flex-start"><textarea class="iarea" id="mLogText" placeholder="What did you do?" spellcheck="true" oninput="mKeep('mLogText',this.value);mLogItemsSync()"></textarea></div></div>
+<div id="mLogItems"><p class="ifoot">What you did, in a sentence the client would understand. Several things? One per line.</p></div>
 <div class="ig flat" style="margin-top:20px">
 ${svcRow}
 ${mRowPick('Date', dateLabel, 'mLogPick(\'date\')', true)}
-<div class="ir"><label class="ilab" for="mLogTime">Time spent</label><input class="tm" id="mLogTime" inputmode="decimal" placeholder="0:30" oninput="mKeep('mLogTime',this.value);mLog_.useTimer=false" onchange="mLogTimeSet()">${timerState.running ? `<button class="link" onclick="mLogUseTimer()">Use timer</button>` : ''}</div>
+<div class="ir"><label class="ilab" for="mLogTime">Time spent</label><input class="tm" id="mLogTime" inputmode="decimal" placeholder="0:30" oninput="mKeep('mLogTime',this.value);mLog_.useTimer=false;mLogNotesSync()" onchange="mLogTimeSet()">${timerState.running ? `<button class="link" onclick="mLogUseTimer()">Use timer</button>` : ''}</div>
 ${hvTimeOn() && L.hasTime ? mHvRows(L, 'mLogPick') : ''}</div>${hvTimeOn() && L.hasTime && mHvBill(L) ? `<p class="ifoot">Time spent is ${mHvBill(L).toLowerCase()}.</p>` : ''}
-<div class="ig flat" style="margin-top:20px"><div class="ir"><span class="ilab">Include in the client email</span>${mSw('mLogInclude', mLogIncOn(), 'Include in the client email')}</div></div>
+<div id="mLogNotesW" hidden><div class="ig flat" style="margin-top:20px"><div class="ir" style="align-items:flex-start"><textarea class="iarea msl-notes" id="mLogNotes" placeholder="Time notes" spellcheck="true" oninput="mLog_.notes=this.value;mLog_.notesTouched=true"></textarea></div></div>
+<p class="ifoot">Time notes: what the time says on your timesheet${hvTimeOn() ? ' and in Harvest' : ''}. One entry for all of them.</p></div>
+<div class="ig flat" style="margin-top:20px"><div class="ir"><span class="ilab">Include in the client email</span>${mSw('mLogInclude', mLogIncOn(), 'Include in the client email', 'mLogItemsSync()')}</div></div>
 <p class="ifoot">${lc && !getsUpdates(lc) ? `${mEsc(lc.name)} gets no weekly update, so its work stays internal.` : 'Turn off for internal work the client doesn’t need to hear about.'}</p>`;
 }
 // "Include in the client email" starts on, or off for a client with no weekly update (Nov 22). Once
@@ -1493,7 +1535,7 @@ function mLogPick(what){
   const keepInc = mIsOn('mLogInclude');
   // flipped by hand: keep it; else follow the client (picking another client may change the default)
   mLog_.inc = keepInc !== mLogIncDefault() ? keepInc : null;
-  const back = () => { const t = mSheetVal('mLogText'), tm = mSheetVal('mLogTime'); $m('mSheet').querySelector('.sheet-scroll').innerHTML = mLogBody(); $m('mLogText').value = t; $m('mLogTime').value = tm; };
+  const back = () => mLogRedraw();
   mKeep('mLogText', mSheetVal('mLogText')); mKeep('mLogTime', mSheetVal('mLogTime'));
   if(what === 'link'){ hvLinkClientToHarvest(mLog_.clientId).then(ok => { if(ok){ mHvClient(mLog_); back(); } }); return; }
   if(what === 'client') mPickClient(mLog_.clientId, v => { mLog_.clientId = v; const c = clients.find(x => x.id === v); if(c && c.service) mLog_.service = c.service; mHvClient(mLog_); back(); }, null, true);
@@ -1506,9 +1548,9 @@ function mLogTimeSet(){
   const has = !!mSheetVal('mLogTime').trim();
   if(!hvTimeOn() || has === !!mLog_.hasTime) return;
   mLog_.hasTime = has;
-  const keepInc = mIsOn('mLogInclude'), t = mSheetVal('mLogText'), tm = mSheetVal('mLogTime');
+  const keepInc = mIsOn('mLogInclude');
   mLog_.inc = keepInc !== mLogIncDefault() ? keepInc : null;
-  $m('mSheet').querySelector('.sheet-scroll').innerHTML = mLogBody(); $m('mLogText').value = t; $m('mLogTime').value = tm;
+  mLogRedraw();
 }
 function mLogUseTimer(){
   const m = Math.max(1, Math.round((Date.now() - timerState.startedAt) / 60000));
@@ -1516,13 +1558,16 @@ function mLogUseTimer(){
   mLog_.useTimer = true;
   if(timerState.projectId && timerState.clientId === mLog_.clientId){ mLog_.projectId = timerState.projectId; mLog_.taskId = timerState.taskId; }
   mLogTimeSet();
-  if(timerState.clientId && mLog_.clientId !== timerState.clientId){ mLog_.clientId = timerState.clientId; const t = mSheetVal('mLogText'), tm = mSheetVal('mLogTime'); $m('mSheet').querySelector('.sheet-scroll').innerHTML = mLogBody(); $m('mLogText').value = t || timerState.description || ''; $m('mLogTime').value = tm; mLog_.useTimer = true; }
+  if(timerState.clientId && mLog_.clientId !== timerState.clientId){ mLog_.clientId = timerState.clientId; mLogRedraw(mSheetVal('mLogText') || timerState.description || ''); mLog_.useTimer = true; }
   else if(!mSheetVal('mLogText').trim() && timerState.description) $m('mLogText').value = timerState.description;
+  mLogItemsSync();
 }
 async function mSaveLog(){
   const L = mLog_, text = mSheetVal('mLogText').trim(), raw = mSheetVal('mLogTime').trim();
   if(!L.clientId){ showToast('error', 'Choose a client', 'Tap Client to pick one.'); return; }
   if(!text){ showToast('error', 'Nothing to log', 'Write what you did first.'); $m('mLogText').focus(); return; }
+  const items = mLogItems();
+  if(items) return mSaveLogBatch(items);   // several at once, one time (Nov 25)
   const minutes = raw ? parseSpent(raw) : 0;
   if(raw && !minutes){ showToast('error', 'Check the time', 'Try 0:30, 45m or 1h 30m.'); return; }
   const pick = minutes && hvTimeOn() ? mHvValue(L) : { ok: true, projectId: null, taskId: null };
@@ -1550,6 +1595,39 @@ async function mSaveLog(){
   await mRefresh();
   const tm = tc.pick === 'use' ? tc.minutes : tc.pick === 'add' ? minutes : 0;
   showToast('success', 'Improvement logged', `${c ? c.name : ''}${tm ? ` · ${Math.floor(tm / 60)}:${String(tm % 60).padStart(2, '0')} on your timesheet${tc.pick === 'use' ? ', the time already there' : ''}` : ''}`);
+}
+async function mSaveLogBatch(items){
+  const L = mLog_, raw = mSheetVal('mLogTime').trim(), minutes = raw ? parseSpent(raw) : 0;
+  if(raw && !minutes){ showToast('error', 'Check the time', 'Try 0:30, 45m or 1h 30m.'); return; }
+  const pick = minutes && hvTimeOn() ? mHvValue(L) : { ok: true, projectId: null, taskId: null };
+  if(!pick.ok){ showToast('error', 'Almost there', pick.msg); return; }
+  const list = await workDupsAsk(L.clientId, items);   // lines already logged: skip them or log them too
+  if(!list) return;
+  if(!list.length){ showToast('info', 'Nothing logged', 'Those were all logged already.'); return; }
+  const notes = (mSheetVal('mLogNotes') || '').trim() || workTimeNotes(list);
+  const c = clients.find(x => x.id === L.clientId);
+  const tc = minutes && !(L.useTimer && timerState.running && timerState.clientId === L.clientId)
+    ? await workTimeCheck({ clientId: L.clientId, dateStr: L.date, minutes, projectId: pick.projectId, taskId: pick.taskId, service: pick.service || L.service, text: notes }) : { pick: 'add' };
+  if(!tc) return;
+  const master = mIsOn('mLogInclude');
+  const btn = $m('mSheetDone'); if(btn) btn.disabled = true;
+  const service = c && serviceFromHarvest(c) ? (pick.projectId ? pick.service : improvementServiceFor(c)) : L.service;
+  const imps = await mWorkLines(L.clientId, list.map(text => ({ text, include: master && !L.itemOff.has(liKey(text)) })), L.date, pick, 'manual', L.service);
+  if(!imps.length){ if(btn) btn.disabled = false; showToast('error', 'Couldn’t save them', 'Try again in a moment.'); return; }
+  let entryId = null;
+  if(minutes && tc.pick === 'use'){ if(await workTimeLink(tc.id, imps[0].id)) entryId = tc.id; }
+  else if(minutes && tc.pick === 'add'){
+    if(L.useTimer && timerState.running && timerState.clientId === L.clientId){ timerState.service = pick.projectId ? pick.service : service; timerState.projectId = pick.projectId; timerState.taskId = pick.taskId; timerState.description = notes; entryId = await mStopTimer(true, true, imps[0].id); }
+    else entryId = await mAddTime({ clientId: L.clientId, service: pick.projectId ? pick.service : service, dateStr: L.date, minutes, description: notes, logged: true, projectId: pick.projectId, taskId: pick.taskId, improvementId: imps[0].id });
+  }
+  if(entryId) await workLinkBatch(imps, entryId);
+  mWorkActivity(L.clientId, imps);
+  mCloseSheet(true);
+  await mRefresh();
+  const tm = tc.pick === 'use' ? tc.minutes : tc.pick === 'add' && entryId ? minutes : 0;
+  const lost = list.length - imps.length;
+  showToast(lost ? 'info' : 'success', lost ? `${imps.length} of ${list.length} logged` : `${imps.length} improvements logged`,
+    `${c ? c.name : ''}${tm ? ` · ${Math.floor(tm / 60)}:${String(tm % 60).padStart(2, '0')} on your timesheet${tc.pick === 'use' ? ', the time already there' : ''}` : ''}${lost ? ` · ${lost} didn’t save` : ''}`);
 }
 // One entry per client, project, task and day (or client, service and day before Harvest), like
 // the desktop timesheet. It goes to Harvest straight away, as the desktop does.
@@ -1681,13 +1759,15 @@ function mTimeDupShow(dup){
 async function mTimeUseTime(id, minutes){
   const T = mTime_, desc = mSheetVal('mTimeDesc').trim(), pick = mHvValue(T);
   if(!desc){ showToast('error', 'Say what you worked on', 'That’s what shows in Queue.'); $m('mTimeDesc')?.focus(); return; }
-  if(!(await okToLogDuplicate(T.clientId, desc))) return;
-  const c = clients.find(x => x.id === T.clientId), when = T.date === toDateStr(new Date()) ? new Date() : new Date(T.date + 'T12:00:00');
-  const imp = await insertImprovementFull(T.clientId, { author: myName() || 'Team member', text: desc, includeInEmail: true, source: 'time', date: when.toISOString(),
-    service: c && serviceFromHarvest(c) ? (pick.projectId ? pick.service : improvementServiceFor(c)) : pick.service });
+  const lines = await workDupsAsk(T.clientId, workSplitItems(desc));   // several lines: several improvements (Nov 25)
+  if(!lines) return;
+  if(!lines.length){ showToast('info', 'Nothing logged', 'Those were all logged already.'); return; }
+  const imps = await mWorkLines(T.clientId, lines.map(text => ({ text, include: true })), T.date, pick, 'time');
+  const imp = imps[0];
   if(!imp){ showToast('error', 'Couldn’t log it as work', 'Try again in a moment.'); return; }
   const linked = await workTimeLink(id, imp.id);
-  mLog(T.clientId, 'improvement_logged', `${myName() || 'Team member'} logged an improvement: "${desc.slice(0, 80)}"`, `Logged an improvement for <b>${escapeHtml(mClientName(T.clientId))}</b>.`);
+  if(linked && imps.length > 1) await workLinkBatch(imps, id);
+  mWorkActivity(T.clientId, imps);
   mCloseSheet(true); await mRefresh();
   !linked ? showToast('info', 'Logged as work', 'It’s in Queue, but its time didn’t link.')
     : showToast('success', 'Logged as work, with that time', `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')} already logged is its time.`);
@@ -1740,21 +1820,37 @@ async function mSaveTime(){
     const dup = await timeDuplicateOf({ clientId: T.clientId, dateStr: T.date, minutes, projectId: pick.projectId, taskId: pick.taskId, service: pick.service, description: desc });
     if(dup){ mTimeDupShow(dup); return; }
   }
-  if(T.work && !(await okToLogDuplicate(T.clientId, desc))) return;   // logged already? (data.js)
+  // as work, several lines are several improvements under this one time (Nov 25); logged already? (data.js)
+  const lines = T.work ? await workDupsAsk(T.clientId, workSplitItems(desc)) : [];
+  if(T.work && !lines) return;
+  if(T.work && !lines.length){ showToast('info', 'Nothing logged', 'Those were all logged already.'); return; }
   const btn = $m('mSheetDone'); if(btn) btn.disabled = true;
-  // as work (Nov 23): the improvement first, then the time as its own entry, linked to it
-  let imp = null;
+  // as work (Nov 23): the improvements first, then the time as its own entry, linked to them
+  let imps = [];
   if(T.work){
-    const c = clients.find(x => x.id === T.clientId), when = T.date === toDateStr(new Date()) ? new Date() : new Date(T.date + 'T12:00:00');
-    imp = await insertImprovementFull(T.clientId, { author: myName() || 'Team member', text: desc, includeInEmail: true, source: 'time', date: when.toISOString(),
-      service: c && serviceFromHarvest(c) ? (pick.projectId ? pick.service : improvementServiceFor(c)) : pick.service });
-    if(!imp){ if(btn) btn.disabled = false; showToast('error', 'Couldn’t log it as work', 'Try again in a moment.'); return; }
+    imps = await mWorkLines(T.clientId, lines.map(text => ({ text, include: true })), T.date, pick, 'time');
+    if(!imps.length){ if(btn) btn.disabled = false; showToast('error', 'Couldn’t log it as work', 'Try again in a moment.'); return; }
   }
+  const imp = imps[0] || null;
   const id = await mAddTime({ clientId: T.clientId, service: pick.service, dateStr: T.date, minutes, description: desc, projectId: pick.projectId, taskId: pick.taskId, logged: !!imp, improvementId: imp ? imp.id : null });
   if(!id){ if(btn) btn.disabled = false; showToast('error', 'Couldn’t add the time', 'Try again in a moment.'); return; }
-  if(imp) mLog(T.clientId, 'improvement_logged', `${myName() || 'Team member'} logged an improvement: "${desc.slice(0, 80)}"`, `Logged an improvement for <b>${escapeHtml(mClientName(T.clientId))}</b>.`);
+  if(imps.length > 1) await workLinkBatch(imps, id);
+  if(imp) mWorkActivity(T.clientId, imps);
   mCloseSheet(true); await mRefresh();
-  showToast('success', imp ? 'Time added and logged as work' : 'Time added', `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')} for ${mClientName(T.clientId)}${imp ? '; it’s in Queue' : ''}`);
+  showToast('success', imp ? 'Time added and logged as work' : 'Time added', `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')} for ${mClientName(T.clientId)}${imps.length > 1 ? `, as ${imps.length} improvements` : ''}${imp ? '; it’s in Queue' : ''}`);
+}
+// Work from the phone: one improvement per line, each with its own email choice
+async function mWorkLines(clientId, rows, dateStr, pick, source, svc){
+  const c = clients.find(x => x.id === clientId), when = (dateStr === toDateStr(new Date()) ? new Date() : new Date(dateStr + 'T12:00:00')).toISOString();
+  const service = c && serviceFromHarvest(c) ? (pick.projectId ? pick.service : improvementServiceFor(c)) : (svc || pick.service);
+  const out = [];
+  for(const r of rows){ const i = await insertImprovementFull(clientId, { author: myName() || 'Team member', text: r.text, includeInEmail: r.include, source, date: when, service }); if(i) out.push(i); }
+  return out;
+}
+function mWorkActivity(clientId, imps){
+  const who = myName() || 'Team member', name = escapeHtml(mClientName(clientId));
+  if(imps.length === 1) return mLog(clientId, 'improvement_logged', `${who} logged an improvement: "${imps[0].text.slice(0, 80)}"`, `Logged an improvement for <b>${name}</b>.`);
+  mLog(clientId, 'improvement_logged', `${who} logged ${imps.length} improvements: ${imps.slice(0, 3).map(i => `"${i.text.slice(0, 50)}"`).join(', ')}${imps.length > 3 ? ` and ${imps.length - 3} more` : ''}`, `Logged ${imps.length} improvements for <b>${name}</b>.`);
 }
 async function mStopTimer(quiet, logged, improvementId){
   if(!timerState.running) return;
@@ -1764,6 +1860,7 @@ async function mStopTimer(quiet, logged, improvementId){
   clearInterval(mTimerTick);
   const id = await mAddTime({ clientId: t.clientId, service: t.service, dateStr: toDateStr(new Date()), minutes, description: t.description, logged, projectId: t.projectId || null, taskId: t.taskId || null, improvementId: improvementId || null });
   if(!quiet){ await mRefresh(); showToast(id ? 'success' : 'error', id ? 'Time saved' : 'Couldn’t save the time', id ? `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')} for ${mClientName(t.clientId)}` : 'Add it on the desktop Timesheet.'); }
+  return id;
 }
 
 let mTask_ = {};

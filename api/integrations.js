@@ -446,7 +446,11 @@ module.exports = async function handler(req, res) {
         workIds = (imps || []).filter(i => i.deleted_at && (isApprover || (me && i.author === me.name) || i.deleted_by === userId)).map(i => String(i.id));
       }
       if (!workIds.length) { res.status(200).json({ moved: 0 }); return; }
-      let q = admin.from('time_entries').select('*').in('improvement_id', workIds);
+      // Several improvements logged with one time (a batch, Nov 25; client_improvements.time_entry_id,
+      // addendum-work-batches.sql): restoring any of them brings the time back too
+      const batchIds = mode === 'restore' ? [...new Set((imps || []).filter(i => workIds.includes(String(i.id)) && i.time_entry_id).map(i => String(i.time_entry_id)))] : [];
+      let q = admin.from('time_entries').select('*');
+      q = batchIds.length ? q.or(`improvement_id.in.(${workIds.join(',')}),id.in.(${batchIds.join(',')})`) : q.in('improvement_id', workIds);
       q = mode === 'trash' ? q.is('deleted_at', null) : q.not('deleted_at', 'is', null);
       const { data: entries, error: tErr } = await q;
       if (tErr) {
@@ -454,7 +458,22 @@ module.exports = async function handler(req, res) {
         if (/improvement_id/.test(tErr.message || '')) { res.status(200).json({ moved: 0 }); return; }
         res.status(500).json({ error: tErr.message }); return;
       }
-      const list = entries || [], eIds = list.map(e => e.id);
+      let list = entries || [];
+      // a batch's time stays while any of its work does: it moves over to that work instead
+      if (mode === 'trash' && list.length) {
+        const { data: sib, error: sErr } = await admin.from('client_improvements').select('id, time_entry_id').in('time_entry_id', list.map(e => e.id)).is('deleted_at', null);
+        if (!sErr) for (const e of list.slice()) {
+          const other = (sib || []).find(i => String(i.time_entry_id) === String(e.id) && !workIds.includes(String(i.id)));
+          if (other) { await admin.from('time_entries').update({ improvement_id: other.id }).eq('id', e.id); list = list.filter(x => x.id !== e.id); }
+        }
+      }
+      // back with its work: linked to work that's back
+      if (mode === 'restore') for (const e of list) {
+        if (workIds.includes(String(e.improvement_id))) continue;
+        const w = (imps || []).find(i => workIds.includes(String(i.id)) && String(i.time_entry_id) === String(e.id));
+        if (w) await admin.from('time_entries').update({ improvement_id: w.id }).eq('id', e.id);
+      }
+      const eIds = list.map(e => e.id);
       if (mode === 'trash') {
         if (eIds.length) await admin.from('time_entries').update({ deleted_at: new Date().toISOString() }).in('id', eIds);
         if (connection) for (const e of list) if (e.harvest_entry_id) await deleteTimeEntryFromHarvest(connection, e.harvest_entry_id);

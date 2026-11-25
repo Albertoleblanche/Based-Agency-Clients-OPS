@@ -178,6 +178,17 @@ function quRestoreComposer(root, k){
   if(k.focus){ ta.focus(); try{ ta.setSelectionRange(k.s, k.s); }catch(e){} }
 }
 function quGrow(ta){ ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 160) + 'px'; }
+// Several lines (Nov 25): each its own improvement, with one time for all of them (data.js, workSplitItems)
+function quItems(){ const t = document.getElementById('quNew')?.value || ''; const items = workSplitItems(t); return window._quAsOne || items.length < 2 ? null : items; }
+function quNewSync(){
+  const el = document.getElementById('quMany'), btn = document.querySelector('#quLogBtn span'), items = quItems(), all = workSplitItems(document.getElementById('quNew')?.value || '');
+  if(!all.length || all.length < 2) window._quAsOne = false;
+  if(btn) btn.textContent = items ? `Log ${items.length}` : 'Log';
+  if(!el) return;
+  el.hidden = all.length < 2;
+  el.innerHTML = items ? `<b>${items.length} improvements</b>, one per line. Time spent is for all of them, as one entry. <button class="lnk-b" onclick="window._quAsOne=true;quNewSync()">Log as One</button>`
+    : all.length > 1 ? `Logged as one improvement. <button class="lnk-b" onclick="window._quAsOne=false;quNewSync()">Split Into ${all.length}</button>` : '';
+}
 
 function queueEmptyHtml(items){
   if(!activeClients().length) return emptyNoClients('Work you log for clients collects here, client by client, until it goes out in an update.');
@@ -234,12 +245,12 @@ function queueReadHtml(x, list, split){
 <label class="qu-em"><span>Email</span><button class="sw${on ? ' on' : ''}" role="switch" aria-checked="${on}" aria-label="Include in the email: ${escapeHtml(it.text.slice(0, 60))}" onclick="quToggleEmail(${I})"></button></label>
 <button class="ib act" title="Edit" aria-label="Edit" onclick="quStartEdit('${it.id}')">${icon('pencil-simple')}</button><button class="ib act" title="Delete" aria-label="Delete" onclick="quDeleteImp(${I})">${icon('trash')}</button></div>`;
   };
-  const quComposer = `<div class="qu-new"><textarea spellcheck="true" id="quNew" rows="1" placeholder="Log more for ${escapeHtml(shortClientName(c.name))}…" aria-label="Log more work for ${escapeHtml(c.name)}" oninput="quGrow(this)" onkeydown="quNewKey(event,'${c.id}')"></textarea>
+  const quComposer = `<div class="qu-new"><textarea spellcheck="true" id="quNew" rows="1" placeholder="Log more for ${escapeHtml(shortClientName(c.name))}…" aria-label="Log more work for ${escapeHtml(c.name)}" oninput="quGrow(this);quNewSync()" onkeydown="quNewKey(event,'${c.id}')"></textarea><p class="qu-many" id="quMany" hidden></p>
 <div class="qu-nf"><label class="qu-fl" for="quDate">Date</label>${sheetDateField('quDate', form.date, { past: true, from: -13, to: 0, max: toDateStr(new Date()) })}
 <label class="qu-fl" for="quTime">Time spent</label><input id="quTime" class="tf qu-time" placeholder="0:30" autocomplete="off" aria-label="Time spent" value="${escapeHtml(form.time)}" aria-required="true" oninput="this.classList.remove('is-need');quTimeChanged('${c.id}')" onkeydown="quNewKey(event,'${c.id}')">
-<span class="rvn-sp"></span><button class="btn" onclick="quLog('${c.id}')">${icon('plus')}Log</button></div>
+<span class="rvn-sp"></span><button class="btn" id="quLogBtn" onclick="quLog('${c.id}')">${icon('plus')}<span>Log</span></button></div>
 <input type="hidden" id="quClient" value="${c.id}"><div class="f qu-pf" id="quPick"></div></div>
-<p class="qu-hint">The time spent is required and goes on your timesheet${typeof hvTimeOn === 'function' && hvTimeOn() ? ' and in Harvest' : ''}. New work goes in the email; switch Email off to keep it internal. <kbd>↩</kbd> logs it.</p>`;
+<p class="qu-hint">The time spent is required and goes on your timesheet${typeof hvTimeOn === 'function' && hvTimeOn() ? ' and in Harvest' : ''}. New work goes in the email; switch Email off to keep it internal. <kbd>↩</kbd> logs it. Did several things? One per line (<kbd>⇧↩</kbd>), with one time for all of them.</p>`;
   const work = `<section class="qu-sec qu-mine" aria-label="Your work"><div class="qu-sh"><b>Your work</b><span class="c">${x.mine.length}</span>${x.mine.length ? `<span class="qu-shs">${myEmail} for the email${out ? ` · ${out} internal` : ''}</span>` : ''}</div>
 ${x.st === 'next' ? `<p class="qu-nextn">Logged after you sent ${escapeHtml(shortClientName(c.name))}’s update for review, so it goes in the next one. <a class="fix-lnk" href="#" onclick="openQueueClient('${c.id}','review');return false;">See the one ${x.held && x.held.draftStatus === 'approved' ? 'approved' : 'in review'}</a></p>` : ''}
 ${x.mine.map(itemRow).join('') || '<p class="qu-none">Nothing of yours logged since the last update.</p>'}
@@ -454,6 +465,8 @@ async function quLog(clientId){
   if(typeof isClientPaused === 'function' && isClientPaused(clientId)){ showPausedClientWarning(clientId); return; }
   const c = clients.find(x => x.id === clientId);
   if(!c) return;
+  const items = quItems();
+  if(items) return quLogBatch(c, items);   // several lines, one time (Nov 25)
   // the time spent is required: every item logged here goes on the timesheet
   const timeRaw = (g('quTime')?.value || '').trim(), minutes = timeRaw ? parseSpent(timeRaw) : 0;
   if(!timeRaw){ showToast('error', 'Add the time spent', 'How long did it take? Try 0:30, 45m or 1h 30m.'); g('quTime')?.focus(); g('quTime')?.classList.add('is-need'); return; }
@@ -500,6 +513,54 @@ async function quLog(clientId){
   else if(tc.pick === 'use') showToast('success', 'Logged, with the time already there', `${hmLong(tmin)}${dateStr === today ? '' : ' on ' + fmtShortDate(when)} is its time. Nothing new went to Harvest.`);
   else if(tc.pick === 'none') showToast('success', 'Logged', 'Without time: that time is already other work’s.');
   else if(minutes) showToast('success', 'Logged', `${hmLong(minutes)} on your timesheet${dateStr === today ? '' : ' for ' + fmtShortDate(when)}.`);
+  const again = g('quNew'); if(again) again.focus();
+}
+
+// Several improvements with one time: the time is asked about and saved once, as one entry for all of
+// them (notes: a few lines of what was done); lines already logged are named once.
+async function quLogBatch(c, items){
+  const g = id => document.getElementById(id), clientId = c.id, ta = g('quNew');
+  const timeRaw = (g('quTime')?.value || '').trim(), minutes = timeRaw ? parseSpent(timeRaw) : 0;
+  if(!timeRaw){ showToast('error', 'Add the time spent', `How long did these ${items.length} take, all together? Try 0:30, 45m or 1h 30m.`); g('quTime')?.focus(); g('quTime')?.classList.add('is-need'); return; }
+  if(!minutes){ showToast('error', 'Check the time', 'Try 0:30, 45m or 1h 30m.'); g('quTime')?.focus(); g('quTime')?.classList.add('is-need'); return; }
+  const pick = g('quPick')?.innerHTML && typeof hvPickValue === 'function' ? hvPickValue('qu', clientId) : { ok: true, projectId: null, taskId: null };
+  if(!pick.ok){ showToast('error', 'Almost there', pick.msg); return; }
+  if(minutes > 960 && !(await confirmDialog(`That’s ${hmLong(minutes)} for these ${items.length} improvements. Log it anyway?`, { confirmLabel: 'Log It', cancelLabel: 'Fix It' }))) return;
+  const list = await workDupsAsk(clientId, items);
+  if(!list) return;
+  if(!list.length){ showToast('info', 'Nothing logged', 'Those were all logged already.'); return; }
+  const today = toDateStr(new Date()), dateStr = g('quDate')?.value || today;
+  const when = dateStr === today ? new Date() : new Date(dateStr + 'T12:00:00');
+  const service = typeof serviceFromHarvest === 'function' && serviceFromHarvest(c) ? (pick.projectId ? pick.service : improvementServiceFor(c)) : c.service || '';
+  const notes = workTimeNotes(list);
+  const tc = await workTimeCheck({ clientId, dateStr, minutes, projectId: pick.projectId, taskId: pick.taskId, service: pick.projectId ? pick.service : service, text: notes });
+  if(!tc) return;
+  const author = myName() || 'Team member';
+  if(ta) ta.disabled = true;
+  const imps = [];
+  for(const text of list){ const i = await insertImprovementFull(clientId, { author, text, includeInEmail: true, source: 'manual', date: when.toISOString(), service }); if(i) imps.push(i); }
+  if(!imps.length){ if(ta) ta.disabled = false; showToast('error', 'Couldn’t log those', 'Try again in a moment.'); return; }
+  let timeOk = true, entryId = null;
+  if(tc.pick === 'use'){ timeOk = await workTimeLink(tc.id, imps[0].id); entryId = timeOk ? tc.id : null; }
+  else if(tc.pick === 'add'){
+    const r = await mergeOrInsertTimeEntry({ clientId, service: pick.projectId ? pick.service : service, dateStr, minutes, description: notes, projectId: pick.projectId, taskId: pick.taskId, improvementId: imps[0].id });
+    if(r.error) timeOk = false;
+    else { entryId = r.entryId; if(!r.merged && r.entryId) await supabaseClient.from('time_entries').update({ logged: true }).eq('id', r.entryId); syncEntryToHarvestBackground(r.entryId); }
+  }
+  if(entryId) await workLinkBatch(imps, entryId);
+  if(typeof loadTimeEntries === 'function') await loadTimeEntries();
+  if(typeof renderTimesheet === 'function') renderTimesheet();
+  if(ta){ ta.value = ''; ta.disabled = false; ta.style.height = ''; }
+  const tm = g('quTime'); if(tm) tm.value = '';
+  window._quForm = { id: clientId, date: dateStr, time: '' }; window._quAsOne = false;
+  if(typeof logClientActivity === 'function') logClientActivity(clientId, 'improvement_logged', `${author} logged ${imps.length} improvements: ${imps.slice(0, 3).map(i => `"${i.text.length > 50 ? i.text.slice(0, 50) + '…' : i.text}"`).join(', ')}${imps.length > 3 ? ` and ${imps.length - 3} more` : ''}`);
+  quRefreshAll(clientId);
+  const tmin = tc.pick === 'use' ? tc.minutes : tc.pick === 'add' ? minutes : 0, lost = list.length - imps.length;
+  if(lost) showToast('info', `${imps.length} of ${list.length} logged`, `${lost} didn’t save; log ${lost === 1 ? 'it' : 'them'} again.`);
+  else if(tmin && !timeOk) showToast('info', `${imps.length} logged, without the time`, `The work is saved for ${c.name}, but the time didn’t ${tc.pick === 'use' ? 'link' : 'save'}. Add it on the Timesheet.`);
+  else if(tc.pick === 'use') showToast('success', `${imps.length} improvements logged`, `With the ${hmLong(tmin)} already there as their time. Nothing new went to Harvest.`);
+  else if(tc.pick === 'none') showToast('success', `${imps.length} improvements logged`, 'Without time: that time is already other work’s.');
+  else showToast('success', `${imps.length} improvements logged`, `${hmLong(minutes)} on your timesheet${dateStr === today ? '' : ' for ' + fmtShortDate(when)}, one entry for all of them.`);
   const again = g('quNew'); if(again) again.focus();
 }
 

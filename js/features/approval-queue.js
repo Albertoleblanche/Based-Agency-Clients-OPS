@@ -1026,7 +1026,12 @@ async function confirmGenerateDraftSelection(id, author){
     });
     const data = await response.json();
     const text = (data.text || '').trim();
-    const stayedApproved = d.draftStatus === 'approved';
+    // Rewording a part that's approved and not sent yet, from the same work, keeps it approved: what
+    // was approved is the work, not the AI's wording of it. A part already sent is done, so writing
+    // again starts the next update (pending, not sent): before Nov 25 it stayed "approved and sent",
+    // so the new draft never showed in Queue. Different work wasn't what was approved either.
+    const was = (d.draftImprovementIds || []).map(String).sort().join('|'), now = checkedIds.map(String).sort().join('|');
+    const stayedApproved = d.draftStatus === 'approved' && !d.draftSentAt && !!d.draft && (!was || was === now);
     const fields = { draft: text || 'Could not generate a draft — try again.' };
     // Regenerating an already-approved draft doesn't require re-approval —
     // what was actually approved is the underlying included improvements,
@@ -1049,7 +1054,7 @@ async function confirmGenerateDraftSelection(id, author){
     // approvers as awaiting review until the owning member explicitly
     // clicks Ready to Notify again.
     // An approver rewriting a draft that's in Review keeps it there: they're the one reviewing it.
-    fields.readyToNotify = !!(d.readyToNotify && canApprove() && !stayedApproved);
+    fields.readyToNotify = !!(d.readyToNotify && !d.draftSentAt && canApprove() && !stayedApproved);
     // Exactly what's in this draft cycle, from the picker's selection —
     // not re-derived from a date range. Read back by approveDraft() to
     // know precisely which rows to flip include_in_email off for.
