@@ -128,7 +128,7 @@ function waGroupLabel(jid){ const g = (waGroups || []).find(x => x.jid === jid);
 
 // ---- the WhatsApp screen's side: account signals, reply times, client details --------------------
 const WA_SIG_KIND = { pause: 'Wants to pause', cancel: 'Talks about cancelling', budget: 'Budget', competitor: 'Another agency', unhappy: 'Unhappy with results',
-  expansion: 'Growing', new_service: 'Asks about a new service', referral: 'A referral', hiring: 'Hiring', other: 'Worth knowing' };
+  expansion: 'Growing', new_service: 'Asks about a new service', referral: 'A referral', hiring: 'Hiring', resume: 'Wants to restart', other: 'Worth knowing' };
 function waSigOpen(){ return Array.isArray(waSignals) ? waSignals.filter(s => s.status === 'new') : []; }
 function waSigRow(s, inPanel){
   const c = waRowClient(s), name = c ? c.name : waCleanName(s.client);
@@ -164,6 +164,12 @@ function waWatchList(){
     const x = get(w.c, w.c ? w.c.name : waGroupLabel(w.group_jid)); x.risk = true;
     x.lines.push({ t: `Waiting ${waMinWords(w.mins)} for a reply`, q: w.excerpt || '', tone: 'r' });
   });
+  // a paused client writing in their group: a chance to bring them back
+  if(typeof waPausedGroups === 'function') waPausedGroups().forEach(({ c, jid, at }) => {
+    const x = get(c), m = waPausedLast && waPausedLast.get(jid);
+    x.open = true; x.back = true;
+    x.lines.push({ t: `Paused, and wrote ${relDayLower(new Date(at))}: a chance to bring them back.`, q: m && m.text ? String(m.text).replace(/\s+/g, ' ').slice(0, 140) : '', tone: 'g' });
+  });
   if(typeof waQuietClients === 'function') waQuietClients().forEach(({ c, days }) => {
     const x = get(c); x.quiet = !x.risk && !x.open;
     x.lines.push({ t: days === null ? 'Quiet: no message or update from us yet.' : `Quiet for ${days} days: no message or update from us.` });
@@ -179,7 +185,7 @@ function waWatchHtml(){
     const ids = x.sigs.map(s => s.id).join(',');
     const acts = [x.c ? `<button class="lnk-b" onclick="openClientDetail('${escapeHtml(String(x.c.id))}')">Open Client</button>` : '',
       ids ? `<button class="lnk-b is-2" onclick="waSignalsSet('${ids}', 'handled')">Mark Handled</button>` : ''].filter(Boolean).join('');
-    return `<div class="wx-w ${x.risk ? 'is-risk' : x.open ? 'is-open' : 'is-quiet'}"><i class="dot" aria-hidden="true"></i><div><b>${escapeHtml(x.name)}</b>
+    return `<div class="wx-w ${x.risk ? 'is-risk' : x.open ? 'is-open' : 'is-quiet'}"><i class="dot" aria-hidden="true"></i><div>${typeof waPausedTag === 'function' && waPausedTag(x.c) ? `<span class="wx-w-n"><b>${escapeHtml(x.name)}</b>${waPausedTag(x.c)}</span>` : `<b>${escapeHtml(x.name)}</b>`}
 ${x.lines.map(l => `<p>${l.tone ? `<span class="wx-mood ${l.tone}">${escapeHtml(l.t)}</span>` : escapeHtml(l.t)}${l.q ? ` <span class="q">“${escapeHtml(l.q)}”</span>` : ''}</p>`).join('')}
 ${acts ? `<div class="wx-w-a">${acts}</div>` : ''}</div></div>`;
   };

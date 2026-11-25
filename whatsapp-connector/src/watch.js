@@ -20,7 +20,7 @@ import { sendPending } from './alerts.js';
 const QUIET_MS = 90000, MAX_WAIT_MS = 5 * 60000, LIVE_MS = 20 * 60000;
 const timers = new Map();      // group jid -> { timer, first }
 const lastRead = new Map();    // group jid -> the newest message time the watch has read
-const SIGNAL_KINDS = ['pause', 'cancel', 'budget', 'competitor', 'unhappy', 'expansion', 'new_service', 'referral', 'hiring', 'other'];
+const SIGNAL_KINDS = ['pause', 'cancel', 'budget', 'competitor', 'unhappy', 'expansion', 'new_service', 'referral', 'hiring', 'resume', 'other'];
 const FIELDS = ['contact', 'email', 'phone', 'website'];
 
 // Called with each batch of stored messages; only live client messages count (not the history
@@ -50,7 +50,7 @@ Answer four questions:
 2. NEEDS_REPLY: after the NEW messages, does the client still need an answer or acknowledgement from the team? false for thanks, "ok", emojis, FYIs, or when the team already answered after it.
 3. SIGNALS: does a NEW client message say something the agency's owner should know about the account? Only when the client says it plainly:
    risks: pause (wants to pause or stop for a while), cancel (ending, not renewing), budget (cutting or questioning spend), competitor (another agency or doing it themselves), unhappy (unhappy with results, value or service)
-   openings: expansion (new location, more crews, growing), new_service (asks about a service they don't have), referral (mentions someone who could use the agency), hiring
+   openings: expansion (new location, more crews, growing), new_service (asks about a service they don't have), referral (mentions someone who could use the agency), hiring, resume (a PAUSED client talks about restarting, coming back, or new work)
    Never guess. Return [] when nothing applies.
 4. DETAILS: does a NEW client message give the client business's own details: the main contact person's name, their business email, a phone number for the business or contact, or the business website? Only values written in the messages, exactly as written. Not the agency's details, not other companies'. Return [] when none.
 
@@ -91,7 +91,9 @@ export async function watchGroup(jid, deps = {}){
   const freshIds = new Set(fresh.map(m => m.wa_msg_id));
   const lines = msgs.map((m, i) => `#${i + 1}${freshIds.has(m.wa_msg_id) ? ' NEW' : ''} [${m.from_team ? 'TEAM' : 'CLIENT'}] ${m.ts.slice(0, 16).replace('T', ' ')} ${m.sender || '?'}: ${String(m.text).replace(/\s+/g, ' ').slice(0, 500)}`);
   const user = `Client: ${cname}\nNow: ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC\n`
-    + `What Radar already has for them: contact ${have.contact || '(none)'}, email ${have.email || '(none)'}, phone ${have.phone || '(none)'}, website ${have.website || '(none)'}\n\n`
+    + `What Radar already has for them: contact ${have.contact || '(none)'}, email ${have.email || '(none)'}, phone ${have.phone || '(none)'}, website ${have.website || '(none)'}\n`
+    + (client && client.status === 'Paused' ? 'This client is PAUSED in Radar: no work is going on for them now. Anything about restarting, coming back or new work is an opening (kind resume); asking to stay paused or to end is a risk.\n' : '')
+    + '\n'
     + `OPEN ITEMS:\n${open.length ? open.map(t => `- ${t.title}`).join('\n') : '(none)'}\n\nMESSAGES:\n${lines.join('\n')}`;
 
   let out;

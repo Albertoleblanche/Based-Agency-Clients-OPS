@@ -91,7 +91,7 @@ async function waLoadNow(){
     waRuns = r.data || []; waSettings = s.data || null; waGroups = g.data || []; waContact = lc.error ? null : (lc.data || []);
     waTeamNums = tn.error ? (waMissing(tn.error) ? null : waTeamNums) : (tn.data || []);
     if(!tsn.error) waTeamSeen = tsn.data || [];
-    if(!cl.error){ waClientLast = new Map(); (cl.data || []).forEach(m => { if(!waClientLast.has(m.group_jid)) waClientLast.set(m.group_jid, m.ts); }); }
+    if(!cl.error){ waClientLast = new Map(); (cl.data || []).forEach(m => { if(!waClientLast.has(m.group_jid)) waClientLast.set(m.group_jid, m.ts); }); await waLoadPausedLast().catch(() => {}); }
   }
   waLoaded = true;
   updateWaNavBadge();
@@ -537,6 +537,25 @@ ${waCheckBtn()}`
   waChatScroll();
 }
 // One client: its name and facts outside the card, its requests inside.
+// Paused (Nov 25): a paused client's name says so wherever WhatsApp shows it, and a paused client
+// writing in their group is a chance to bring them back (Clients to watch, wa-insights.js).
+const WA_PAUSED_DAYS = 14;
+let waPausedLast = null;   // group jid -> the paused client's newest message in WA_PAUSED_DAYS days
+function waIsPaused(c){ return !!(c && c.status === 'Paused'); }
+function waPausedTag(c){ return waIsPaused(c) ? '<span class="wx-paused" title="Paused in Radar: no work going on for them now">Paused</span>' : ''; }
+function waPausedGroups(){
+  if(!waClientLast || typeof waContactFor !== 'function') return [];
+  return (clients || []).filter(c => !c.deletedAt && waIsPaused(c)).map(c => ({ c, r: waContactFor(c) }))
+    .filter(x => x.r && x.r.group_jid && waClientLast.has(x.r.group_jid)).map(x => ({ c: x.c, jid: x.r.group_jid, at: waClientLast.get(x.r.group_jid) }));
+}
+async function waLoadPausedLast(){
+  const gs = waPausedGroups(); if(!gs.length){ waPausedLast = new Map(); return; }
+  const { data, error } = await supabaseClient.from('wa_messages').select('group_jid,sender,text,ts').in('group_jid', gs.map(g => g.jid))
+    .eq('from_team', false).gte('ts', new Date(Date.now() - WA_PAUSED_DAYS * 86400000).toISOString()).order('ts', { ascending: false }).limit(60);
+  if(error) return;
+  const m = new Map(); (data || []).forEach(r => { if(!m.has(r.group_jid)) m.set(r.group_jid, r); });
+  waPausedLast = m;
+}
 function waSecHtml(k, ts, o){
   const c = waClient(ts[0]);
   const svc = c && c.service ? String(c.service) : '';
@@ -545,6 +564,7 @@ function waSecHtml(k, ts, o){
   // how the client feels on WhatsApp: a pill
   const mood = m && m.level !== 'neutral' ? `<span class="wx-feel ${m.level === 'happy' ? 'g' : m.level === 'angry' ? 'r' : 'y'}" title="How they come across in their WhatsApp group this week">${escapeHtml(WA_MOOD[m.level])}</span>` : '';
   const meta = [svc, own ? `${own}’s client` : ''].filter(Boolean).map(escapeHtml).join(' · ');
+  const paused = waPausedTag(c);
   const live = o.live && o.live.length ? o.live : ts.filter(t => t.status === 'open');   // the client's whole list, whichever tab
   const n = o.past ? ts.length : live.length;
   const mineN = o.useMine ? live.filter(o.isMine).length : 0;
@@ -557,7 +577,7 @@ function waSecHtml(k, ts, o){
   const link = c ? `<a href="#" onclick="openClientDetail('${escapeHtml(String(c.id))}');return false;">Open Client${icon('caret-right')}</a>`
     : canLink ? waLinkPickHtml(jid, k) : '<span class="t-3">Not in Radar</span>';
   return `<section class="wx-cs${closed ? ' is-closed' : ''}" data-k="${escapeHtml(k)}" aria-label="${escapeHtml(k)}">
-<header class="wx-cs-h"><div class="wx-cs-l"><button class="wx-cs-t" aria-expanded="${!closed}" onclick="waFold(this)">${icon('caret-right', { cls: 'wx-chev' })}<span>${escapeHtml(k)}</span></button>${meta || mood ? `<div class="wx-cs-sub">${meta ? `<span class="wx-cs-m">${meta}</span>` : ''}${mood}</div>` : ''}</div>
+<header class="wx-cs-h"><div class="wx-cs-l"><button class="wx-cs-t" aria-expanded="${!closed}" onclick="waFold(this)">${icon('caret-right', { cls: 'wx-chev' })}<span>${escapeHtml(k)}</span></button>${meta || mood || paused ? `<div class="wx-cs-sub">${paused}${meta ? `<span class="wx-cs-m">${meta}</span>` : ''}${mood}</div>` : ''}</div>
 <div class="wx-cs-r">${urgent ? '<em class="wa-urg">Urgent</em>' : ''}<span class="wx-cs-n">${escapeHtml(count)}${oldest ? ` · <span class="t-red">oldest ${escapeHtml(waAgeWord(oldest))}</span>` : ''}</span><i class="wx-vr" aria-hidden="true"></i>${link}</div></header>
 <div class="wx-cs-body"><div class="wx-cs-in"><div class="wx-cs-card">${ts.map(t => waRowHtml(t, o.sel, { ...o, why: o.whyOf && o.whyOf.get(t.id) })).join('')}</div></div></div></section>`;
 }
@@ -843,7 +863,7 @@ function waPanelHtml(t){
   const taskBtn = t.task_id ? `<button class="btn" onclick="waOpenTask('${t.id}')">${icon('list-checks')}Open Task</button>` : `<button class="btn" onclick="waMakeTask('${t.id}')">${icon('plus')}Make a Task</button>`;
   // Read top down: whose it is, what they want, the facts in one line, the agent's summary, what to do.
   const cname = c ? c.name : waCleanName(t.client || (g || {}).name || 'Unknown client');
-  const who = c ? `<a href="#" class="wap-cl" onclick="openClientDetail('${c.id}');return false;">${escapeHtml(c.name)}</a>`
+  const who = c ? `<a href="#" class="wap-cl" onclick="openClientDetail('${c.id}');return false;">${escapeHtml(c.name)}</a>${waPausedTag(c)}`
     : `<span class="wap-cl">${escapeHtml(cname)}</span><em>not in Radar</em>`;
   const facts = [`<span>${escapeHtml(kind)}</span>`];
   let acts;
@@ -1121,7 +1141,7 @@ function waRoleRow(k, n){
 // ---- Who's on the team (Nov 25) ----------------------------------------------------------------
 // The connector tells the team's messages from the client's by phone number: the linked phone and
 // the numbers here. A client called Dan is never taken for Dan. Until one is listed, first names
-// decide, as before. People in most of the client groups are suggested (a client is in one or two):
+// decide, as before. People in three or more client groups are suggested (a client is in one or two):
 // say who they are, or that they're not the team.
 function waFmtNum(n){
   n = String(n || '');
@@ -1145,13 +1165,18 @@ function waTeamName(t){
 }
 function waWhoHtml(){
   const head = `<div class="set-h">Who’s on the team</div>`;
-  if(waTeamNums === null) return head + `<p class="t-2 wa-p">Radar can tell the team’s messages from the client’s by phone number. To turn that on, run <code>addendum-whatsapp-team-numbers.sql</code> in Supabase → SQL Editor. Until then it goes by first names, so a client called Dan counts as the team.</p>`;
+  if(waTeamNums === null) return head + `<p class="t-2 wa-p">Radar can tell the team’s messages from the client’s by phone number. To turn that on, run <code>addendum-whatsapp-team-numbers.sql</code> in Supabase → SQL Editor.</p>`;
   const can = waCanSetup(), own = waSettings && waSettings.linked_number, nums = waTeamNums;
   const have = new Set(nums.map(t => t.number));
   const seen = waTeamSeen.filter(x => !have.has(x.number) && !x.dismissed && x.number !== own).sort((a, b) => b.groups - a.groups || String(a.name || '').localeCompare(String(b.name || '')));
   const intro = nums.length
     ? 'Radar tells the team’s messages from the client’s by phone number, so a client called Dan is never taken for Dan.'
-    : 'Radar tells the team’s messages from the client’s by phone number. Until you add the team’s numbers here, it goes by first names, so a client called Dan counts as the team.';
+    : 'Radar tells the team’s messages from the client’s by phone number.';
+  // the connector says the number it's linked as once it's up to date; until then it can't suggest anyone
+  const old = !own && waRunning() && waConnState().key === 'connected';
+  const waitRow = seen.length || nums.length ? '' : old
+    ? `<div class="fr wat-r wat-wait"><span class="was-ic gray">${icon('server')}</span><div class="l"><b>Waiting for the connector’s update</b><span>The connector running now is the version from before this. Redeploy it (Railway) and the people in several client groups show here to pick from, a minute after it reconnects.</span></div></div>`
+    : `<div class="fr wat-r wat-wait"><span class="was-ic gray">${icon('users')}</span><div class="l"><b>Looking at who’s in the client groups</b><span>Anyone in three or more of them shows here to pick from, from any country. It reads the group list when it connects and every 30 minutes, or press Check Now.</span></div></div>`;
   const ownRow = `<div class="fr wat-r"><span class="was-ic">${icon('smartphone')}</span><div class="l"><b>This phone</b><span>${own ? escapeHtml(waFmtNum(own)) + ' · ' : ''}Radar reads the groups with it, so its messages are always the team’s.</span></div></div>`;
   const numRow = t => `<div class="fr wat-r"><span class="was-ic gray">${icon('user')}</span><div class="l"><b>${escapeHtml(waTeamName(t))}</b><span>${escapeHtml(waFmtNum(t.number))}</span></div>${can ? `<button class="lnk-b" onclick="waTeamRemove('${escapeHtml(t.number)}')">Remove</button>` : ''}</div>`;
   const people = waTeamPeople();
@@ -1161,12 +1186,12 @@ function waWhoHtml(){
   const listed = new Set(nums.map(t => t.profile_id).filter(Boolean));
   const missing = nums.length ? people.filter(p => !listed.has(p.id)) : [];
   const addRow = !can ? '' : waTeamAdding
-    ? `<div class="fr wat-add"><input class="tf" id="waTeamNum" type="tel" inputmode="tel" autocomplete="off" placeholder="+1 555 123 4567" aria-label="WhatsApp number, with the country code" onkeydown="if(event.key==='Enter')waTeamAdd();if(event.key==='Escape')waTeamAddClose()">
+    ? `<div class="fr wat-add"><input class="tf" id="waTeamNum" type="tel" inputmode="tel" autocomplete="off" placeholder="+55 11 91234 5678" aria-label="WhatsApp number, with the country code (+1, +55, +44…)" onkeydown="if(event.key==='Enter')waTeamAdd();if(event.key==='Escape')waTeamAddClose()">
 ${popSel('Whose number', [['', 'Whose is it?'], ...people.map(p => [p.id, p.name])], '', 'this.closest(\'.wat-add\').dataset.who = this.value; this.parentNode.querySelector(\'span\').textContent = this.options[this.selectedIndex].text', { width: 150 })}
 <span class="wat-a"><button class="btn" onclick="waTeamAddClose()">Cancel</button><button class="btn btn-p" onclick="waTeamAdd()">Add</button></span></div>`
     : `<div class="fr was-more"><button class="lnk-b wat-addb" onclick="waTeamAddOpen()">${icon('plus')}Add a Number</button></div>`;
   return head + `<p class="t-2 wa-p">${intro}</p><div class="form-grp" id="waTeamBox">${ownRow}${sorted.map(numRow).join('')}
-${seen.length ? `<div class="was-sub">In most client groups<span>${seen.length}</span></div>${seen.map(seenRow).join('')}` : ''}
+${seen.length ? `<div class="was-sub">In several client groups<span>${seen.length}</span></div>${seen.map(seenRow).join('')}` : waitRow}
 ${missing.length ? `<div class="fr wat-miss"><div class="l"><span>No number yet: ${escapeHtml(missing.map(p => firstName(p.name)).join(', '))}</span></div></div>` : ''}${addRow}</div>`;
 }
 async function waTeamSave(row){
@@ -1211,7 +1236,7 @@ function waTeamAddClose(){ waTeamAdding = false; renderSettingsView(); }
 async function waTeamAdd(){
   const box = document.querySelector('.wat-add'), input = document.getElementById('waTeamNum');
   const number = waNumIn(input && input.value), who = box && box.dataset.who;
-  if(!number){ showToast('error', 'Check the number', 'Type it with the country code, like +1 555 123 4567 or +55 11 91234 5678.'); input?.focus(); return; }
+  if(!number){ showToast('error', 'Check the number', 'Type it with + and the country code, like +55 11 91234 5678 or +44 7700 900123. Ten digits on their own count as a US number.'); input?.focus(); return; }
   if(!who){ showToast('error', 'Whose number is it?', 'Pick who it belongs to.'); box?.querySelector('select')?.focus(); return; }
   if(!(await waTeamSave({ number, profile_id: who, label: null }))) return;
   waTeamAdding = false; renderSettingsView();

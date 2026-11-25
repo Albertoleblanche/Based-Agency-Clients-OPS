@@ -5,7 +5,7 @@ import { db, check } from './db.js';
 let cache = { at: 0, list: [] };
 export async function loadClients(force = false){
   if(!force && Date.now() - cache.at < 600000) return cache.list;
-  const data = check(await db().from('clients').select('id,name,email,website,custom_field_values,deleted_at'), 'load clients');
+  const data = check(await db().from('clients').select('id,name,email,website,status,custom_field_values,deleted_at'), 'load clients');
   cache = { at: Date.now(), list: (data || []).filter(c => !c.deleted_at) };
   return cache.list;
 }

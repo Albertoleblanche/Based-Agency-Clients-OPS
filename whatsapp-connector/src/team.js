@@ -9,9 +9,9 @@
 // which id is which number, so the connector keeps that map and still finds the number. When it
 // doesn't, the person is known by that id instead ("lid:<digits>"), which works the same way.
 //
-// It also suggests the team: a number that's in most of the client groups it reads is almost
+// It also suggests the team: a number that's in three or more of the client groups it reads is almost
 // certainly ours (a client is in one or two). Those, and only those, are saved for Radar to show
-// (wa_team_seen), with how many groups they're in and the name they use on WhatsApp.
+// (wa_team_seen), with how many groups they're in and the name they use on WhatsApp. Any country.
 import { config } from './config.js';
 import { db as realDb } from './db.js';
 
@@ -75,8 +75,9 @@ export function learnGroups(all, reading){
     }
   }
   const total = reading.size;
-  // a client is in one or two groups; the team is in most of them
-  const need = total <= 2 ? total : Math.max(3, Math.ceil(total * 0.3));
+  // a client is in one or two groups; anyone in three or more is almost surely the team (someone who
+  // only works on a few clients included), and "Not the team" handles the odd client who isn't
+  const need = Math.min(total, 3);
   const seen = [];
   if(total) for(const [num, n] of counts) if(n >= need) seen.push({ number: num, groups: n, total });
   return seen.sort((a, b) => b.groups - a.groups);
@@ -100,10 +101,10 @@ export async function saveSeen(seen, deps = {}){
   return true;
 }
 
-// The linked phone's number, for Radar to show.
-export async function saveOwn(deps = {}){
+// The linked phone's number, for Radar to show. `had` is what Radar has now (skips a write when it's the same).
+export async function saveOwn(deps = {}, had){
   const D = deps.db || realDb;
-  if(!team.own) return;
+  if(!team.own || had === team.own) return;
   const { error } = await D().from('wa_settings').update({ linked_number: team.own }).eq('id', 1);
   if(error && !/linked_number|column|42703|PGRST204/i.test(error.message || '')) console.error('Saving the linked number failed:', error.message);
 }

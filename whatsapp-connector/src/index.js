@@ -4,7 +4,7 @@ import { connect, getStatus, stop, relink, syncActiveGroups, refreshGroups, grou
 import { loadSettings, applySettings, heartbeat, clearRelinkFlag, clearCheckFlag } from './settings.js';
 import { runDigest, alertAdmins, sendHeldAlerts } from './digest.js';
 import { sendPending } from './alerts.js';
-import { loadTeamNumbers } from './team.js';
+import { loadTeamNumbers, saveOwn } from './team.js';
 
 const args = new Set(process.argv.slice(2));
 const dry = args.has('--dry');
@@ -63,6 +63,7 @@ async function main(){
       const s = await loadSettings();
       if(applySettings(s)) schedule();
       await loadTeamNumbers();   // who's the team, by number (Radar → Settings → WhatsApp)
+      if(s && 'linked_number' in s) await saveOwn({}, s.linked_number);   // e.g. linked before the SQL was run
       await syncActiveGroups();
       // until the group list has reached Radar (WhatsApp can be slow right after linking), keep asking
       if(getStatus() === 'open' && !groupsReady()) await refreshGroups().catch(e => console.error(`Couldn't get the group list yet (${e.message}). Trying again in 30 seconds.`));
@@ -71,6 +72,7 @@ async function main(){
       if(s?.check_requested_at && getStatus() === 'open' && !running){
         await clearCheckFlag();
         console.log('Check Now from Radar: reading the groups now.');
+        refreshGroups().catch(() => {});   // and who's in them (the team suggestions)
         safeDigest({ dry, notify: false });
       }
     } catch(e){ console.error('Settings sync failed:', e.message); }

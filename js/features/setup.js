@@ -283,12 +283,17 @@ function setupRender(dir){
 const suStill = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 // The list of steps is drawn once; after that only its marks and the highlight change, and the
 // highlight slides to the step you're on.
+// Radar's logo: the app icon set in Settings → General, else BA (as in the sidebar)
+function suBrandMark(){
+  const src = typeof settings !== 'undefined' && settings && settings.appIcon;
+  return src ? `<img src="${escapeHtml(src)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">` : 'BA';
+}
 function suRail(root, steps, counted){
   const rail = root.querySelector('.su-rail'), keys = steps.map(s => s.k).join(',') + (suPreview ? (suPvExisting ? ':pvx' : ':pv') : '');
   if(rail.dataset.keys !== keys){
     const item = s => `<li><button class="su-st" data-k="${s.k}" onclick="setupGo('${s.k}')"><span class="su-n" aria-hidden="true"></span><span class="su-sn">${escapeHtml(s.name)}</span><span class="sr-only su-sr"></span></button></li>`;
     const opt = steps.filter(s => s.optional), main = steps.filter(s => !s.optional && s.k !== 'done');
-    rail.innerHTML = `<div class="su-brand"><span class="brand-mark" aria-hidden="true">BA</span><b>Set Up Radar</b>${suPreview ? '<span class="su-pv">Preview</span>' : ''}</div>
+    rail.innerHTML = `<div class="su-brand"><span class="brand-mark" aria-hidden="true">${suBrandMark()}</span><b>Set Up Radar</b>${suPreview ? '<span class="su-pv">Preview</span>' : ''}</div>
 <div class="su-list"><span class="su-ink" aria-hidden="true"></span><ol class="su-steps">${main.map(item).join('')}${opt.length ? `<li class="su-grp" aria-hidden="true">Optional</li>${opt.map(item).join('')}` : ''}${item(steps[steps.length - 1])}</ol></div>
 ${suPreview ? `<p class="su-pvnote">A preview of what ${suPvExisting ? 'someone already on Radar' : 'someone new'} sees. Nothing is connected or saved.<button class="su-pvsw" onclick="setupOpen('welcome', { preview: true, existing: ${!suPvExisting} })">See it as ${suPvExisting ? 'someone new' : 'someone already here'}</button></p>` : ''}<button class="su-later" onclick="setupLater()">${suPreview ? 'Close Preview' : 'Finish Later'}</button>`;
     rail.dataset.keys = keys; rail.dataset.at = '';

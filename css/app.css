@@ -3849,7 +3849,7 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 .su-ai .ai-about{display:none}
 .su-pk{max-width:520px;margin-top:22px}
 .su-cta{display:flex;align-items:center;gap:14px;margin:0 0 24px;padding:14px 16px;border-radius:14px;background:var(--grp);box-shadow:0 0 0 .5px var(--sep)}
-.su-cta .app-logo{width:32px;height:32px;border-radius:9px;background:var(--fill-2);color:var(--label)}
+.su-cta .brand-mark{width:34px;height:34px;border-radius:9px;font-size:12.5px;color:#fff}
 .su-cta .l{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
 .su-cta b{font-size:14px;font-weight:600}
 .su-cta span{font-size:13px;color:var(--label-2)}
@@ -3943,3 +3943,10 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 .mac .wat-add .tf{flex:1 1 180px;min-width:0;height:30px;padding:0 10px}
 .wat-add .pop-sel{flex:none}
 .wat-a{display:flex;gap:8px;margin-left:auto}
+/* WhatsApp: a paused client says so (Nov 25) */
+.wx-paused{display:inline-flex;align-items:center;flex:0 0 auto;height:18px;padding:0 7px;border-radius:9px;background:var(--fill-2);color:var(--label-2);font-size:11.5px;font-weight:500;letter-spacing:.01em;vertical-align:1px}
+.wx-w-n{display:flex;align-items:center;gap:7px;min-width:0}
+.wx-w-n b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wx-cs-sub .wx-paused{margin-right:2px}
+.wap-cl + .wx-paused{margin-left:7px}
+.wat-wait .l b{font-weight:500}

@@ -13,7 +13,7 @@ import { inAlertHours, workMinutes, minutesWords } from './hours.js';
 import { loadClients, clientOwnerName } from './clients.js';
 
 const SIGNAL_WORDS = { pause: 'wants to pause', cancel: 'talks about cancelling', budget: 'mentions budget', competitor: 'mentions another agency or competitor',
-  unhappy: 'sounds unhappy with the results', expansion: 'is growing', new_service: 'asks about a new service', referral: 'mentions a referral', hiring: 'is hiring', other: 'said something worth knowing' };
+  unhappy: 'sounds unhappy with the results', expansion: 'is growing', new_service: 'asks about a new service', referral: 'mentions a referral', hiring: 'is hiring', resume: 'is paused and talks about restarting', other: 'said something worth knowing' };
 export const signalWords = k => SIGNAL_WORDS[k] || SIGNAL_WORDS.other;
 
 const link = () => config.radarUrl ? `\n<${config.radarUrl}|Open in Radar>` : '';
