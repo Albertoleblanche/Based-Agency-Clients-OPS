@@ -48,8 +48,16 @@ async function uploadAvatar(file){
 
 async function saveProfileBasicInfo(){
   const name = document.getElementById('profileNameInput').value.trim();
-  const phone = document.getElementById('profilePhoneInput').value.trim();
+  let phone = document.getElementById('profilePhoneInput').value.trim();
   if(!name){ showToast('error','Name required','Your name can\'t be empty.'); return; }
+  // the phone is your WhatsApp number (Who's on the team matches it): kept with its country code
+  if(phone && phone !== (myProfile.phone || '')){
+    const d = phone.replace(/\D/g, '');
+    const num = phone.startsWith('+') ? (/^\d{8,15}$/.test(d) ? d : null) : d.length === 10 ? '1' + d : null;
+    if(!num){ showToast('error', 'Check the number', 'Start with + and the country code, like +55 41 98875-3180 or +1 305 555 0101.'); document.getElementById('profilePhoneInput').focus(); return; }
+    phone = typeof waFmtNum === 'function' ? waFmtNum(num) : '+' + num;
+    document.getElementById('profilePhoneInput').value = phone;
+  }
   const { error } = await supabaseClient.from('team_profiles').update({ name, phone }).eq('id', currentUser.id);
   if(error){ showToast('error','Save failed', error.message); return; }
   myProfile.name = name; myProfile.phone = phone;
@@ -104,6 +112,7 @@ async function saveDirectEmailChange(){
   const { error } = await supabaseClient.auth.updateUser({ email: newEmail });
   if(error){ showToast('error','Update failed', error.message); return; }
   showToast('success','Confirmation sent', `Check ${newEmail} for a link to confirm the change.`);
+  return true;
 }
 
 async function submitEmailChangeRequest(){
@@ -122,6 +131,7 @@ async function submitEmailChangeRequest(){
   document.getElementById('requestEmailInput').value = '';
   renderMyEmailRequests();
   showToast('success','Request submitted','An admin will review it soon.');
+  return true;
 }
 
 async function renderMyEmailRequests(){
@@ -129,12 +139,12 @@ async function renderMyEmailRequests(){
   if(!el) return;
   const { data, error } = await supabaseClient.from('email_change_requests').select('*').eq('user_id', currentUser.id).order('created_at',{ascending:false}).limit(5);
   if(error || !data || !data.length){ el.innerHTML = ''; return; }
-  const statusMeta = { pending:{cls:'pill-mid',label:'Pending'}, approved:{cls:'pill-good',label:'Approved'}, denied:{cls:'pill-bad',label:'Denied'} };
-  el.innerHTML = `<label style="font-family:var(--font);font-size:10.5px;color:var(--muted);display:block;margin-bottom:8px;">Your requests</label>` +
-    data.map(r=>{
-      const s = statusMeta[r.status];
-      return `<div class="integ-row"><div><div class="integ-name">${escapeHtml(r.requested_email)}</div><div class="integ-desc">${new Date(r.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div></div><span class="pill ${s.cls}">${escapeHtml(s.label)}</span></div>`;
-    }).join('');
+  // as rows in the Sign-in card (Nov 25): the address you asked for, when, and where it stands
+  const statusMeta = { pending: { dot: 'gray', label: 'Waiting for an admin' }, approved: { dot: 'green', label: 'Approved' }, denied: { dot: 'red', label: 'Not approved' } };
+  el.innerHTML = data.map(r => {
+    const s = statusMeta[r.status] || statusMeta.pending;
+    return `<div class="fr"><div class="l"><b>${escapeHtml(r.requested_email)}</b><span>Asked ${new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span></div><span class="st"><span class="dot ${s.dot}"></span>${escapeHtml(s.label)}</span></div>`;
+  }).join('');
 }
 
 function updateEmailRequestBadges(count){

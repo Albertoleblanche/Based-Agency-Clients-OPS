@@ -222,8 +222,8 @@ async function showApp(session, o){
   }
 
   // Google redirects back to #profile?gcal=connected|denied|error after the
-  // OAuth flow — pick that up, land on Profile, and clean the URL so a
-  // refresh doesn't re-show the same toast.
+  // OAuth flow — pick that up, land on Settings → Connections (where Google Calendar lives; it left
+  // My Profile on Nov 25), and clean the URL so a refresh doesn't re-show the same toast.
   const hash = window.location.hash;
   if(hash.startsWith('#profile') && hash.includes('gcal=')){
     const outcome = new URLSearchParams(hash.split('?')[1]).get('gcal');
@@ -236,12 +236,13 @@ async function showApp(session, o){
       else if(outcome==='denied') showToast('info','Not connected','You can connect Google Calendar later in Settings → Connections.');
       else showToast('error','Google Calendar didn’t connect','Something went wrong. Try again.');
     } else if(session){
-      await switchView('profile');
-      if(outcome==='connected') showToast('success','Google Calendar connected','Click "Sync now" to pull in your meetings.');
-      else if(outcome==='denied') showToast('info','Not connected','You can connect Google Calendar anytime from this page.');
+      history.replaceState(null, '', window.location.pathname + '#settings');
+      if(typeof openSettingsTab === 'function') openSettingsTab('connections'); else await switchView('settings');
+      if(outcome==='connected') showToast('success','Google Calendar connected','Your meetings are coming into Radar. Sync Now pulls them in right away.');
+      else if(outcome==='denied') showToast('info','Not connected','You can connect Google Calendar anytime from here.');
       else if(outcome==='error') showToast('error','Connection failed','Something went wrong connecting Google Calendar — try again.');
     }
-    if(!gBack || !session) history.replaceState(null, '', window.location.pathname + (session ? '#profile' : ''));
+    if(!session) history.replaceState(null, '', window.location.pathname);
   }
 
   // Google sends you back to #settings?gmail=… after you connect Gmail (Nov 24, gmail.js)

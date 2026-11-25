@@ -716,41 +716,76 @@ function setNotifications(){
 }
 
 // ---- My Profile ---------------------------------------------------------------------------------
+// Who you are (your photo, name, title and role), then what's yours to set: your name and WhatsApp
+// number, your sign-in email, notifications on this device, where your daily summary goes. Your apps
+// (Slack, Google Calendar, Gmail) live in Settings → Connections; one row leads there (Nov 25).
+let pfEmailEditing = false, pfPush = null;
 function renderProfilePage(){
   const root = document.getElementById('profileRoot');
   if(!root || !myProfile) return;
   const keep = document.activeElement && document.activeElement.id;
-  const avatar = myProfile.avatar_url ? `<img src="${safeUrl(myProfile.avatar_url)}" alt="" style="width:64px;height:64px;border-radius:50%;object-fit:cover">` : avHtml(myProfile.name, 'style="width:64px;height:64px;font-size:22px"');
-  const admin = isAdmin();
-  root.innerHTML = `<div class="set-body" style="padding-top:26px">
-<div style="display:flex;align-items:center;gap:16px;margin:0 4px 22px">${avatar}<div style="min-width:0"><h1 class="lt" style="font-size:22px">${esc(myProfile.name)}</h1><p class="lt-sub" style="margin-top:2px">${esc(myProfile.title || roleDisplayLabel(myProfile.role))} · ${esc(currentUser.email || '')}</p></div>
-<span style="flex:1"></span><input type="file" id="avatarFileInput" accept="image/*" hidden onchange="uploadAvatar(this.files[0])"><button class="btn" onclick="document.getElementById('avatarFileInput').click()">${myProfile.avatar_url ? 'Change Photo…' : 'Add Photo…'}</button></div>
+  const photo = myProfile.avatar_url ? `<img src="${safeUrl(myProfile.avatar_url)}" alt="">` : avHtml(myProfile.name);
+  const admin = isAdmin(), role = roleDisplayLabel(myProfile.role);
+  const emailRow = pfEmailEditing
+    ? `<div class="fr pf-ed"><div class="l"><b>New email</b><span>${admin ? 'A link goes to the new address to confirm it.' : 'An admin approves the change.'}</span></div>
+<input id="${admin ? 'directEmailInput' : 'requestEmailInput'}" class="tf" type="email" style="width:220px" placeholder="new@based-agency.com" onkeydown="if(event.key==='Escape')pfEmailEdit(false);if(event.key==='Enter')pfEmailSend()">
+<button class="btn" onclick="pfEmailEdit(false)">Cancel</button><button class="btn btn-p" onclick="pfEmailSend()">${admin ? 'Change' : 'Ask'}</button></div>`
+    : `<div class="fr"><div class="l"><b>Email</b><span>${esc(currentUser.email || '')}</span></div><button class="btn" onclick="pfEmailEdit(true)">${admin ? 'Change…' : 'Ask to Change…'}</button></div>`;
+  root.innerHTML = `<div class="set-body pf" style="padding-top:26px">
+<section class="pf-hero">
+<button class="pf-av" onclick="document.getElementById('avatarFileInput').click()" aria-label="${myProfile.avatar_url ? 'Change your photo' : 'Add a photo'}" title="${myProfile.avatar_url ? 'Change photo' : 'Add a photo'}">${photo}<span class="pf-cam" aria-hidden="true">${icon('camera')}</span></button>
+<input type="file" id="avatarFileInput" accept="image/*" hidden onchange="uploadAvatar(this.files[0])">
+<div class="pf-id"><h1>${esc(myProfile.name)}</h1><p>${myProfile.title ? `<span>${esc(myProfile.title)}</span>` : ''}<span class="pf-role">${esc(role)}</span></p></div>
+</section>
 <div class="set-h">About you</div>
 <div class="form-grp">
 ${fr('Name', 'How the team and your clients see you', `<input id="profileNameInput" class="tf" style="width:240px" value="${esc(myProfile.name || '')}" onchange="saveProfileField()">`)}
-${fr('Phone', '', `<input id="profilePhoneInput" class="tf" style="width:240px" value="${esc(myProfile.phone || '')}" placeholder="(555) 123-4567" onchange="saveProfileField()">`)}
+${fr('Phone', 'Your WhatsApp number, with the country code. It’s how Radar knows your messages in client groups are the team’s.', `<input id="profilePhoneInput" class="tf" type="tel" inputmode="tel" style="width:240px" value="${esc(myProfile.phone || '')}" placeholder="+1 555 123 4567" onchange="saveProfileField()">`)}
 </div>
-<div class="set-h">Sign-in email</div>
-<div class="form-grp">
-${fr(esc(currentUser.email || ''), admin ? 'You can change it here. A link goes to the new address to confirm.' : 'An admin approves changes to it.', `<input id="${admin ? 'directEmailInput' : 'requestEmailInput'}" class="tf" style="width:200px" placeholder="new@based-agency.com"><button class="btn" onclick="${admin ? 'saveDirectEmailChange()' : 'submitEmailChangeRequest()'}">${admin ? 'Change' : 'Ask to Change'}</button>`)}
-<div id="myEmailRequestsList"></div>
-</div>
-<div class="set-h">On this device</div>
-<div class="form-grp">
-<div class="fr" style="align-items:flex-start"><div class="l"><b>Push notifications</b><span>Alerts even when the app isn’t open</span></div><div id="pushStatusBox" class="integ-inline" style="max-width:340px"></div></div>
-</div>
-<div class="set-h">Your calendar</div>
-<div class="form-grp">
-<div class="fr" style="align-items:flex-start"><div class="l"><b>Google Calendar</b><span>Your meetings appear in the team calendar</span></div><div id="gcalStatusBox" class="integ-inline" style="max-width:340px"></div></div>
-</div>
+<div class="set-h">Sign-in</div>
+<div class="form-grp">${emailRow}<div id="myEmailRequestsList"></div></div>
+<div class="set-h">Notifications</div>
+<div class="form-grp"><div class="fr" id="pfPushRow">${pfPushHtml()}</div>
+<button class="fr set-go" onclick="openSettingsTab('notifications')"><div class="l"><b>Which alerts you get</b><span>In Radar, in Slack and on your devices</span></div><span class="t-2">Notifications</span>${icon('caret-right', { weight: 'bold' })}</button></div>
 <div class="set-h">Daily summary</div>
 <div class="form-grp">
-${fr('Send my summary to a different Slack ID', dsSlackSub(), `<input id="dailySummarySlackIdInput" class="tf" style="width:200px" value="${esc(myProfile.daily_summary_slack_id || '')}" placeholder="Member ID" onchange="saveDailySummarySlackId(this.value.trim())">`)}
-</div></div>`;
-  if(!admin) renderMyEmailRequests();
+${fr('Send it to a different Slack ID', dsSlackSub(), `<input id="dailySummarySlackIdInput" class="tf" style="width:200px" value="${esc(myProfile.daily_summary_slack_id || '')}" placeholder="Member ID" onchange="saveDailySummarySlackId(this.value.trim())">`)}
+</div>
+<div class="set-h">Your apps</div>
+<div class="form-grp"><button class="fr set-go pf-apps" onclick="openSettingsTab('connections')"><span class="pf-lg" aria-hidden="true">${typeof appLogo === 'function' ? appLogo('slack') + appLogo('gcalendar') + appLogo('gmail') : ''}</span><div class="l"><b>Slack, Google Calendar and Gmail</b><span>Connect them, or see what’s connected</span></div><span class="t-2">Connections</span>${icon('caret-right', { weight: 'bold' })}</button></div>
+</div>`;
+  if(typeof icons8Corner === 'function') icons8Corner(root.querySelector('.set-body'));
+  if(!isAdmin()) renderMyEmailRequests();
   dsSlackSubRefresh(true);
-  if(typeof loadPushStatus === 'function') loadPushStatus();
-  if(typeof loadGoogleCalendarStatus === 'function') loadGoogleCalendarStatus();
+  pfPushLoad();
   if(keep){ const el = document.getElementById(keep); if(el) el.focus(); }
+}
+// Push notifications on this device: what they are now, and one button
+function pfPushHtml(){
+  const st = pfPush;
+  const head = '<div class="l"><b>Push notifications</b><span>';
+  if(st == null) return `${head}Checking…</span></div>`;
+  if(st === 'unsupported') return `${head}This browser can’t show them. On an iPhone, add Radar to the Home Screen first, then turn them on there.</span></div>`;
+  if(st === 'blocked') return `${head}Blocked for this site. Allow them in your browser’s site settings (the icon left of the address), then come back.</span></div><span class="st"><span class="dot red"></span>Blocked</span>`;
+  if(st === 'on') return `${head}On for this device: approvals, reminders and messages reach you even when Radar is closed.</span></div><span class="st"><span class="dot green"></span>On</span><button class="btn" onclick="pfPushSet(false)">Turn Off</button>`;
+  return `${head}Approvals, reminders and messages reach you even when Radar is closed.</span></div><button class="btn btn-p" onclick="pfPushSet(true)">Turn On</button>`;
+}
+async function pfPushLoad(){
+  pfPush = typeof suPushState === 'function' ? await suPushState() : 'unsupported';
+  const row = document.getElementById('pfPushRow'); if(row) row.innerHTML = pfPushHtml();
+}
+async function pfPushSet(on){
+  if(on){ if(typeof enablePushNotifications === 'function') await enablePushNotifications(); }
+  else if(typeof disablePushNotifications === 'function') await disablePushNotifications();
+  await pfPushLoad();
+  if(typeof setupNudge === 'function') setupNudge();
+}
+function pfEmailEdit(on){
+  pfEmailEditing = !!on; renderProfilePage();
+  if(on) setTimeout(() => document.getElementById(isAdmin() ? 'directEmailInput' : 'requestEmailInput')?.focus(), 0);
+}
+async function pfEmailSend(){
+  const ok = isAdmin() ? await saveDirectEmailChange() : await submitEmailChangeRequest();
+  if(ok){ pfEmailEditing = false; renderProfilePage(); }
 }
 async function saveProfileField(){ await saveProfileBasicInfo(); }

@@ -1157,6 +1157,15 @@ function waNumIn(v){
   if(!raw.startsWith('+') && d.length === 10) return '1' + d;
   return /^\d{8,15}$/.test(d) ? d : null;
 }
+// The phone in someone's Radar profile (My Profile → Phone), matched to the numbers in the groups
+// (Nov 25): the same number, or the same last digits (a profile often leaves out the country code,
+// and Brazil's extra 9 comes and goes).
+function waSameNum(a, b){
+  if(!a || !b || a.startsWith('lid:') || b.startsWith('lid:')) return false;
+  return a === b || (a.length >= 10 && b.length >= 10 && a.slice(-8) === b.slice(-8));
+}
+function waProfileNum(p){ const d = String((p && p.phone) || '').replace(/\D/g, ''); return d.length >= 8 ? (waNumIn(p.phone) || d) : null; }
+function waProfileFor(number){ return waTeamPeople().find(p => waSameNum(waProfileNum(p), number)) || null; }
 function waTeamPeople(){ return (teamProfiles || []).filter(p => !p.access_revoked).sort((a, b) => a.name.localeCompare(b.name)); }
 function waTeamName(t){
   const p = t.profile_id && (teamProfiles || []).find(x => x.id === t.profile_id);
@@ -1168,7 +1177,8 @@ function waWhoHtml(){
   if(waTeamNums === null) return head + `<p class="t-2 wa-p">Radar can tell the team’s messages from the client’s by phone number. To turn that on, run <code>addendum-whatsapp-team-numbers.sql</code> in Supabase → SQL Editor.</p>`;
   const can = waCanSetup(), own = waSettings && waSettings.linked_number, nums = waTeamNums;
   const have = new Set(nums.map(t => t.number));
-  const seen = waTeamSeen.filter(x => !have.has(x.number) && !x.dismissed && x.number !== own).sort((a, b) => b.groups - a.groups || String(a.name || '').localeCompare(String(b.name || '')));
+  const seen = waTeamSeen.filter(x => !have.has(x.number) && !x.dismissed && x.number !== own)
+    .sort((a, b) => (waProfileFor(b.number) ? 1 : 0) - (waProfileFor(a.number) ? 1 : 0) || b.groups - a.groups || String(a.name || '').localeCompare(String(b.name || '')));   // matches with Radar phones first
   const intro = nums.length
     ? 'Radar tells the team’s messages from the client’s by phone number, so a client called Dan is never taken for Dan.'
     : 'Radar tells the team’s messages from the client’s by phone number.';
@@ -1180,18 +1190,32 @@ function waWhoHtml(){
   const ownRow = `<div class="fr wat-r"><span class="was-ic">${icon('smartphone')}</span><div class="l"><b>This phone</b><span>${own ? escapeHtml(waFmtNum(own)) + ' · ' : ''}Radar reads the groups with it, so its messages are always the team’s.</span></div></div>`;
   const numRow = t => `<div class="fr wat-r"><span class="was-ic gray">${icon('user')}</span><div class="l"><b>${escapeHtml(waTeamName(t))}</b><span>${escapeHtml(waFmtNum(t.number))}</span></div>${can ? `<button class="lnk-b" onclick="waTeamRemove('${escapeHtml(t.number)}')">Remove</button>` : ''}</div>`;
   const people = waTeamPeople();
-  const pickOpts = [['', 'Who is this?'], ...people.map(p => [p.id, p.name]), ['__other', 'Someone else on the team'], ['__no', 'Not the team']];
-  const seenRow = x => `<div class="fr wat-r wat-s"><span class="was-ic gray">${icon('circle-help')}</span><div class="l"><b>${escapeHtml(x.name || waFmtNum(x.number))}</b><span>${x.name ? escapeHtml(waFmtNum(x.number)) + ' · ' : ''}in ${x.groups} of ${x.total} client groups</span></div>${can ? popSel(`Who is ${x.name || waFmtNum(x.number)}?`, pickOpts, '', `waTeamPick('${escapeHtml(x.number)}', this.value)`, { width: 150 }) : ''}</div>`;
+  const pickOpts = first => [['', first], ...people.map(p => [p.id, p.name]), ['__other', 'Someone else on the team'], ['__no', 'Not the team']];
+  // a suggestion whose number is someone's phone in Radar says so, with one click to confirm
+  const seenRow = x => {
+    const p = waProfileFor(x.number), title = x.name || (p ? p.name : waFmtNum(x.number));
+    const sub = [x.name || p ? waFmtNum(x.number) : '', `in ${x.groups} of ${x.total} client groups`].filter(Boolean).map(escapeHtml).join(' · ');
+    const match = p ? `<span class="wat-m">${icon('check', { weight: 'bold' })}${escapeHtml(p.name)}’s phone in Radar</span>` : '';
+    const ctl = !can ? '' : (p ? `<button class="btn wat-yes" onclick="waTeamPick('${escapeHtml(x.number)}', '${p.id}')">It’s ${escapeHtml(firstName(p.name))}</button>` : '')
+      + popSel(`Who is ${title}?`, pickOpts(p ? 'Someone else?' : 'Who is this?'), '', `waTeamPick('${escapeHtml(x.number)}', this.value)`, { width: p ? 140 : 150 });
+    return `<div class="fr wat-r wat-s${p ? ' is-match' : ''}"><span class="was-ic ${p ? '' : 'gray'}">${icon(p ? 'user' : 'circle-help')}</span><div class="l"><b>${escapeHtml(title)}</b><span>${sub}</span>${match}</div><span class="wat-c">${ctl}</span></div>`;
+  };
+  const matches = seen.filter(x => waProfileFor(x.number));
+  // teammates with a phone in Radar that isn't on the team yet, and isn't among the suggestions
+  const listedIds = new Set(nums.map(t => t.profile_id).filter(Boolean));
+  const fromProfile = people.filter(p => !listedIds.has(p.id) && waProfileNum(p) && !nums.some(t => waSameNum(t.number, waProfileNum(p))) && !seen.some(x => waSameNum(x.number, waProfileNum(p))) && !waSameNum(own, waProfileNum(p)));
+  const profRow = p => `<div class="fr wat-r wat-p"><span class="was-ic gray">${icon('user')}</span><div class="l"><b>${escapeHtml(p.name)}</b><span>${escapeHtml(waFmtNum(waProfileNum(p)))} · the phone in their Radar profile</span></div>${can ? `<button class="btn" onclick="waTeamAddProfile('${p.id}')">Add</button>` : ''}</div>`;
   const sorted = nums.slice().sort((a, b) => waTeamName(a).localeCompare(waTeamName(b)));
   const listed = new Set(nums.map(t => t.profile_id).filter(Boolean));
-  const missing = nums.length ? people.filter(p => !listed.has(p.id)) : [];
+  const missing = nums.length ? people.filter(p => !listed.has(p.id) && !fromProfile.includes(p) && !matches.some(x => waProfileFor(x.number) === p)) : [];
   const addRow = !can ? '' : waTeamAdding
     ? `<div class="fr wat-add"><input class="tf" id="waTeamNum" type="tel" inputmode="tel" autocomplete="off" placeholder="+55 11 91234 5678" aria-label="WhatsApp number, with the country code (+1, +55, +44…)" onkeydown="if(event.key==='Enter')waTeamAdd();if(event.key==='Escape')waTeamAddClose()">
 ${popSel('Whose number', [['', 'Whose is it?'], ...people.map(p => [p.id, p.name])], '', 'this.closest(\'.wat-add\').dataset.who = this.value; this.parentNode.querySelector(\'span\').textContent = this.options[this.selectedIndex].text', { width: 150 })}
 <span class="wat-a"><button class="btn" onclick="waTeamAddClose()">Cancel</button><button class="btn btn-p" onclick="waTeamAdd()">Add</button></span></div>`
     : `<div class="fr was-more"><button class="lnk-b wat-addb" onclick="waTeamAddOpen()">${icon('plus')}Add a Number</button></div>`;
   return head + `<p class="t-2 wa-p">${intro}</p><div class="form-grp" id="waTeamBox">${ownRow}${sorted.map(numRow).join('')}
-${seen.length ? `<div class="was-sub">In several client groups<span>${seen.length}</span></div>${seen.map(seenRow).join('')}` : waitRow}
+${seen.length ? `<div class="was-sub">In several client groups<span>${seen.length}</span>${can && matches.length > 1 ? `<button class="lnk-b wat-all" onclick="waTeamAddMatches()">Add the ${matches.length} matches</button>` : ''}</div>${seen.map(seenRow).join('')}` : waitRow}
+${fromProfile.length ? `<div class="was-sub">From Radar profiles<span>${fromProfile.length}</span></div>${fromProfile.map(profRow).join('')}` : ''}
 ${missing.length ? `<div class="fr wat-miss"><div class="l"><span>No number yet: ${escapeHtml(missing.map(p => firstName(p.name)).join(', '))}</span></div></div>` : ''}${addRow}</div>`;
 }
 async function waTeamSave(row){
@@ -1218,6 +1242,22 @@ async function waTeamPick(number, v){
   if(!(await waTeamSave({ number, profile_id: p ? p.id : null, label: p ? null : (x.name || null) }))) return renderSettingsView();
   renderSettingsView();
   showToast('success', `${p ? firstName(p.name) : who} is on the team`, 'Their messages count as the team’s from now on, and the ones already read are fixed within a minute.');
+}
+// every suggestion whose number is someone's phone in Radar, in one go
+async function waTeamAddMatches(){
+  const have = new Set((waTeamNums || []).map(t => t.number)), own = waSettings && waSettings.linked_number;
+  const todo = waTeamSeen.filter(x => !have.has(x.number) && !x.dismissed && x.number !== own).map(x => ({ x, p: waProfileFor(x.number) })).filter(m => m.p);
+  let n = 0;
+  for(const { x, p } of todo) if(await waTeamSave({ number: x.number, profile_id: p.id, label: null })) n++;
+  renderSettingsView();
+  if(n) showToast('success', `${n} on the team`, todo.slice(0, n).map(m => firstName(m.p.name)).join(', ') + '. Their messages count as the team’s from now on.');
+}
+// the phone in their Radar profile, as their WhatsApp number
+async function waTeamAddProfile(id){
+  const p = (teamProfiles || []).find(t => t.id === id), number = p && waProfileNum(p); if(!number) return;
+  if(!(await waTeamSave({ number, profile_id: p.id, label: null }))) return;
+  renderSettingsView();
+  showToast('success', `${firstName(p.name)} is on the team`, `${waFmtNum(number)} counts as the team from now on.`);
 }
 async function waTeamRemove(number){
   const t = (waTeamNums || []).find(x => x.number === number); if(!t) return;
