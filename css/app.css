@@ -3977,3 +3977,13 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 @media (prefers-reduced-motion:reduce){.pf-av,.pf-cam{transition:none}}
 /* Who's on the team: their photo in Radar, the size of the symbol it replaces */
 .wat-av{flex:0 0 auto;width:28px;height:28px;border-radius:50%;object-fit:cover;box-shadow:0 0 0 .5px var(--sep)}
+/* Add Time: the same time already logged (Nov 25) */
+.tdup{display:flex;gap:12px;align-items:flex-start;margin:16px 0 0;padding:12px 14px;border-radius:12px;background:var(--fill);animation:tdupIn 220ms cubic-bezier(.23,1,.32,1)}
+.tdup-ic{flex:none;width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--grp);color:var(--label-2);box-shadow:0 0 0 .5px var(--sep)}
+.tdup-ic svg{width:15px;height:15px}
+.tdup b{display:block;font-size:13.5px;font-weight:600;color:var(--label)}
+.tdup div>span{display:block;margin-top:2px;font-size:13px;line-height:1.4;color:var(--label-2)}
+.tdup q{display:block;margin-top:6px;font-size:13px;line-height:1.4;color:var(--label-2);quotes:'“' '”'}
+.tdup q::before{content:open-quote}.tdup q::after{content:close-quote}
+@keyframes tdupIn{from{opacity:0;transform:translateY(-4px)}}
+@media (prefers-reduced-motion:reduce){.tdup{animation:none}}

@@ -529,6 +529,34 @@ function workDuplicateOf(clientId, text){
     return n / (A.size + B.size - n) >= 0.85;
   }) || null;
 }
+// ---- The same time twice (Nov 25) ----
+// Adding time by hand: time already logged by you for the same client, on the same day, just as long,
+// and billable the same way (in Radar, or in Harvest and read into Radar) is most likely the same
+// time again. Asks the database, not just what's loaded, so time read from Harvest a minute ago counts.
+// Billable comes from the Harvest task; when either side has none, billable isn't compared.
+function timeBillable(projectId, taskId){
+  if(!projectId || !taskId || typeof hvProjectTasks !== 'function' || typeof hvTimeOn !== 'function' || !hvTimeOn()) return null;
+  const t = hvProjectTasks(projectId, taskId, true).find(x => x.id === Number(taskId));
+  return t ? !!t.billable : null;
+}
+async function timeDuplicateOf({ clientId, dateStr, minutes, projectId, taskId }){
+  if(!clientId || !dateStr || !minutes) return null;
+  const { data, error } = await supabaseClient.from('time_entries').select('*')
+    .eq('user_id', currentUser.id).eq('client_id', clientId).eq('entry_date', dateStr).eq('minutes', minutes).is('deleted_at', null).limit(10);
+  if(error || !data || !data.length) return null;
+  const b = timeBillable(projectId, taskId);
+  const e = data.find(x => { const xb = timeBillable(x.harvest_project_id, x.harvest_task_id); return b === null || xb === null || b === xb; });
+  if(!e) return null;
+  const xb = timeBillable(e.harvest_project_id, e.harvest_task_id);
+  return { id: e.id, minutes: e.minutes, date: e.entry_date, description: e.description || '', fromHarvest: e.source === 'harvest', locked: !!e.harvest_locked,
+    billable: xb === null ? '' : xb ? 'Billable' : 'Non-billable' };
+}
+// "1:30 for Harbor Kitchen & Bath on Tue, Nov 25 · Billable · logged in Harvest"
+function timeDupWords(dup, clientId){
+  const c = clients.find(x => x.id === clientId);
+  const day = dup.date === toDateStr(new Date()) ? 'today' : 'on ' + fmtShortDate(new Date(dup.date + 'T12:00:00'));
+  return [`${Math.floor(dup.minutes / 60)}:${String(dup.minutes % 60).padStart(2, '0')} for ${c ? c.name : 'this client'} ${day}`, dup.billable, dup.fromHarvest ? 'logged in Harvest' : ''].filter(Boolean).join(' · ');
+}
 async function okToLogDuplicate(clientId, text){
   const dup = workDuplicateOf(clientId, text); if(!dup) return true;
   const c = clients.find(x => x.id === clientId), me = typeof myName === 'function' ? myName() : '';

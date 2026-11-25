@@ -596,7 +596,7 @@ function openManualEntryFromTask(taskId){
   if(descInput) descInput.value = t.title || '';
 }
 
-async function addManualEntry(){
+async function addManualEntry(force){
   const clientId = document.getElementById('manualClient').value;
   const pick = typeof hvPickValue === 'function' && clientId ? hvPickValue('manual', clientId) : { ok: true, service: document.getElementById('manualService')?.value || '' };
   const service = pick.service || '';
@@ -611,6 +611,11 @@ async function addManualEntry(){
   if(!totalMinutes || totalMinutes<=0){ showToast('error','Enter a duration','Try something like "1h 30m" or "1.5".'); return; }
   if(asWork && !description){ showToast('error', 'Say what you worked on', 'The notes are what shows in Queue.'); document.getElementById('manualDesc')?.focus(); return; }
   if(totalMinutes > 960 && !(await confirmDialog(`That's ${formatMinutes(totalMinutes)} for a single entry — did you mean minutes instead of hours?`, {confirmLabel:'Log it anyway', cancelLabel:'Let me fix it'}))) return;
+  // the same time already logged (here or in Harvest): say so, with the one logged to edit (Nov 25)
+  if(force !== true){
+    const dup = await timeDuplicateOf({ clientId, dateStr: dateVal, minutes: totalMinutes, projectId: pick.projectId, taskId: pick.taskId });
+    if(dup){ manualDupShow(dup, clientId); return; }
+  }
   if(asWork && !(await okToLogDuplicate(clientId, description))) return;   // logged already? (data.js)
   const btn = clickedBtn();
   // a task open for this client: its time? Then it's marked done with this time, once (Nov 24)
@@ -650,6 +655,33 @@ async function addManualEntry(){
   syncEntryToHarvestBackground(entryId);
   await loadTimeEntries();
   renderTimesheet(); renderReports();
+}
+
+// Add Time found the same time already logged: the sheet says so, and its buttons become Edit That
+// One (the one logged), Add It Anyway, and Cancel. Changing anything in the sheet puts them back.
+function manualDupShow(dup, clientId){
+  const card = document.querySelector('#appModalOverlay .sheet-a')?.parentElement; if(!card) return;
+  const foot = card.querySelector('.sheet-a');
+  card.querySelector('.tdup')?.remove();
+  if(!foot.dataset.was) foot.dataset.was = foot.innerHTML;
+  const note = document.createElement('div');
+  note.className = 'tdup'; note.setAttribute('role', 'status');
+  note.innerHTML = `<span class="tdup-ic" aria-hidden="true">${icon('clock')}</span><div><b>You already logged this time</b><span>${escapeHtml(timeDupWords(dup, clientId))}</span>${dup.description ? `<q>${escapeHtml(dup.description.length > 140 ? dup.description.slice(0, 140) + '…' : dup.description)}</q>` : ''}</div>`;
+  foot.before(note);
+  foot.innerHTML = `<button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn" onclick="addManualEntry(true)">Add It Anyway</button><button class="btn btn-p" onclick="manualDupEdit('${dup.id}')">${dup.locked ? 'See That One' : 'Edit That One'}</button>`;
+  // only what makes it the same time (client, day, length, project, task): not the notes, and not a
+  // field merely losing focus
+  const key = () => ['manualClient', 'manualDate', 'manualDuration', 'manualProject', 'manualTask'].map(id => (document.getElementById(id) || {}).value || '').join('|');
+  const was = key();
+  const back = () => { if(key() === was) return; note.remove(); if(foot.dataset.was){ foot.innerHTML = foot.dataset.was; delete foot.dataset.was; } card.removeEventListener('input', back, true); card.removeEventListener('change', back, true); };
+  card.addEventListener('input', back, true); card.addEventListener('change', back, true);
+  foot.querySelector('.btn-p')?.focus();
+}
+async function manualDupEdit(id){
+  closeAppModal();
+  if(!timeEntries.some(e => e.id === id)) await loadTimeEntries();
+  if(timeEntries.some(e => e.id === id)) setTimeout(() => openTimeEntryModal(id), 200);
+  else showToast('info', 'Couldn’t open it', 'It’s on your Timesheet for that day.');
 }
 
 /* --- Timesheet --- */

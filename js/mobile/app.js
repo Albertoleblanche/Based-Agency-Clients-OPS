@@ -1602,7 +1602,7 @@ function mOpenTimeSheet(presetClientId, preset){
   if(!waPresetOk(presetClientId)) return;
   preset = preset || {};
   const c = clients.find(x => x.id === presetClientId);
-  mTime_ = { clientId: presetClientId || '', service: (c && c.service) || (settings.serviceOptions || [])[0] || '', date: preset.date || toDateStr(new Date()), work: false };
+  mTime_ = { clientId: presetClientId || '', service: (c && c.service) || (settings.serviceOptions || [])[0] || '', date: preset.date || toDateStr(new Date()), work: false, force: false };
   mHvClient(mTime_);
   mKeep('mTimeDur', preset.minutes ? `${Math.floor(preset.minutes / 60)}:${String(preset.minutes % 60).padStart(2, '0')}` : ''); mKeep('mTimeDesc', preset.desc || '');
   window.mTimeBody = () => `<div class="ig flat" style="margin-top:12px">${mRowPick('Client', mEsc(mClientName(mTime_.clientId) || 'Choose'), "mTimePick('client')", !!mTime_.clientId)}${mHvRows(mTime_, 'mTimePick')}${mRowPick('Date', mTime_.date === toDateStr(new Date()) ? 'Today' : sheetDayLabel(new Date(mTime_.date + 'T12:00:00')), "mTimePick('date')", true)}
@@ -1613,6 +1613,46 @@ function mOpenTimeSheet(presetClientId, preset){
 <p class="ifoot">What you worked on becomes an improvement in Queue, ready for the client update.</p>`;
   mOpenSheet('Add Time', window.mTimeBody(), { done: 'mSaveTime()', doneLabel: 'Add' });
   if(preset.minutes || preset.desc) mRestoreSheetState();   // a meeting's time, filled in (Nov 23)
+}
+// Add Time found the same time already logged: a note at the top of the sheet, with Edit That One
+// and Add It Anyway. Changing anything takes it away.
+function mTimeDupShow(dup){
+  const sc = $m('mSheet')?.querySelector('.sheet-scroll'); if(!sc) return;
+  sc.querySelector('.m-tdup')?.remove();
+  const el = document.createElement('div');
+  el.className = 'm-tdup'; el.setAttribute('role', 'status');
+  el.innerHTML = `<b>You already logged this time</b><span>${mEsc(timeDupWords(dup, mTime_.clientId))}</span>${dup.description ? `<q>${mEsc(dup.description.slice(0, 140))}</q>` : ''}
+<div class="m-tdup-a"><button class="ibtn s" onclick="mTime_.force=true;mSaveTime()">Add It Anyway</button><button class="ibtn p" onclick="mEditTimeSheet('${dup.id}')">${dup.locked ? 'See That One' : 'Edit That One'}</button></div>`;
+  sc.prepend(el); sc.scrollTop = 0;
+  const was = mSheetVal('mTimeDur');
+  const gone = e => { if(e.target && e.target.id !== 'mTimeDur' || mSheetVal('mTimeDur') === was) return; el.remove(); sc.removeEventListener('input', gone, true); };
+  sc.addEventListener('input', gone, true);
+}
+// Time already logged, from the phone: how long and the notes (the rest on the desktop Timesheet)
+async function mEditTimeSheet(id){
+  const { data: e } = await supabaseClient.from('time_entries').select('*').eq('id', id).maybeSingle();
+  if(!e){ showToast('error', 'Couldn’t open it', 'Try again in a moment.'); return; }
+  const c = clients.find(x => x.id === e.client_id), dur = `${Math.floor(e.minutes / 60)}:${String(e.minutes % 60).padStart(2, '0')}`;
+  const day = e.entry_date === toDateStr(new Date()) ? 'Today' : sheetDayLabel(new Date(e.entry_date + 'T12:00:00'));
+  mKeep('mEdDur', dur); mKeep('mEdDesc', e.description || '');
+  const head = `<div class="ig flat" style="margin-top:12px">${mIr('', 'Client', '', mEsc(c ? c.name : ''), null, { n: true })}${mIr('', 'Date', '', mEsc(day), null, { n: true })}`;
+  if(e.harvest_locked){
+    mOpenSheet('Time', `${head}${mIr('', 'Time worked', '', dur, null, { n: true })}</div>${e.description ? `<p class="ifoot">${mEsc(e.description)}</p>` : ''}<p class="ifoot">Invoiced in Harvest, so it can’t change here.</p>`, { cancel: 'Close' });
+    return;
+  }
+  mOpenSheet('Edit Time', `${head}<div class="ir"><label class="ilab" for="mEdDur">Time worked</label><input class="tm" id="mEdDur" inputmode="decimal" value="${mEsc(dur)}" oninput="mKeep('mEdDur',this.value)"></div></div>
+<p class="ifoot">1:30, 45m or 1.5 all work. Project and task change on the desktop Timesheet.</p>
+<div class="ig flat" style="margin-top:20px"><div class="ir" style="align-items:flex-start"><textarea class="iarea" id="mEdDesc" placeholder="What did you work on?" style="min-height:72px" oninput="mKeep('mEdDesc',this.value)">${mEsc(e.description || '')}</textarea></div></div>`,
+    { done: `mSaveTimeEdit('${id}')`, doneLabel: 'Save' });
+}
+async function mSaveTimeEdit(id){
+  const minutes = parseSpent(mSheetVal('mEdDur').trim()), description = mSheetVal('mEdDesc').trim();
+  if(!minutes){ showToast('error', 'How long did you work?', 'Try 1:30, 45m or 1.5.'); $m('mEdDur')?.focus(); return; }
+  const { error } = await supabaseClient.from('time_entries').update({ minutes, description, harvest_sync_status: 'pending' }).eq('id', id);
+  if(error){ showToast('error', 'Couldn’t save it', error.message); return; }
+  mSyncToHarvest(id);
+  mCloseSheet(true); await mRefresh();
+  showToast('success', 'Time saved', `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}`);
 }
 function mTimePick(what){
   mKeep('mTimeDur', mSheetVal('mTimeDur')); mKeep('mTimeDesc', mSheetVal('mTimeDesc'));
@@ -1630,6 +1670,11 @@ async function mSaveTime(){
   const pick = mHvValue(T);
   if(!pick.ok){ showToast('error', 'Almost there', pick.msg); return; }
   if(minutes > 16 * 60 && !(await confirmDialog(`That’s ${Math.floor(minutes / 60)} hours in one entry.`, { title: 'Log it anyway?', confirmLabel: 'Log It' }))) return;
+  // the same time already logged (here or in Harvest): say so, with the one logged to edit (Nov 25)
+  if(!T.force){
+    const dup = await timeDuplicateOf({ clientId: T.clientId, dateStr: T.date, minutes, projectId: pick.projectId, taskId: pick.taskId });
+    if(dup){ mTimeDupShow(dup); return; }
+  }
   if(T.work && !desc){ showToast('error', 'Say what you worked on', 'That’s what shows in Queue.'); $m('mTimeDesc')?.focus(); return; }
   if(T.work && !(await okToLogDuplicate(T.clientId, desc))) return;   // logged already? (data.js)
   const btn = $m('mSheetDone'); if(btn) btn.disabled = true;
