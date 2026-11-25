@@ -1090,3 +1090,13 @@ html.ui-w .mac .cl-bmenu .mi > svg{margin-top:2px}
 html.ui-w .sgp-h{font-weight:500}
 @media (hover:hover) and (pointer:fine){ html.ui-w .tk-sg-r .tx:hover{background:var(--uw-c2)} }
 html.ui-w .sgp-ex{background:var(--uw-c2);border-radius:12px}
+/* Team: Set Up Radar, who has finished it (Nov 24) */
+html.ui-w .tm-su-bar{height:4px;margin:2px 6px 0;border-radius:99px;background:var(--uw-c2);overflow:hidden}
+html.ui-w .tm-su-bar i{display:block;height:100%;border-radius:inherit;background:var(--green);transition:width .5s var(--uw-ease)}
+html.ui-w .tm-su-p{margin:12px 6px 10px;font-size:12.5px;line-height:1.45;color:var(--label-2)}
+html.ui-w .tm-su .tm-chips{padding:0 6px}
+html.ui-w .tm-su-a{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:14px 6px 4px}
+html.ui-w .tm-su-a .btn{gap:6px}
+html.ui-w .tm-su-a svg{width:14px;height:14px}
+html.ui-w .tm-su-w{font-size:12px;color:var(--label-3)}
+@media (prefers-reduced-motion:reduce){html.ui-w .tm-su-bar i{transition:none}}

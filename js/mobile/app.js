@@ -1372,6 +1372,7 @@ async function mNotifTap(id){
   else if(v === 'reminders'){ mSwitchTab('more'); mOpenReminders(); }
   else if(v === 'calendar'){ mSwitchTab('more'); mOpenCalendar(); }
   else if(v === 'health'){ mSwitchTab('today'); mOpenClients('health'); }
+  else if(v === 'setup'){ mSwitchTab('today'); showToast('info', 'Set Up Radar is on your computer', 'Open Radar there to connect your apps. On this phone: More → Settings → Push notifications.'); }
   else mSwitchTab('today');
 }
 function mOpenFromHash(hash){

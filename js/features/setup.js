@@ -8,6 +8,10 @@
 // does, connects in place, and can be skipped. Google and Slack send you back to #setup/<step>.
 // Finish Later: it closes, the sidebar says how much is left, and it opens by itself again at most
 // once a day, where you left off, until you finish.
+// People already on Radar before it existed (team_profiles.joined_before_setup): no full-screen Welcome.
+// If everything that matters is already connected, it's marked done quietly; otherwise they get the
+// sidebar card ("Connect your apps", New) and one note, and it opens at the first thing left, headed
+// "Connect the rest of your apps". Anyone can remind the team from the Team page (Set Up Radar card).
 
 const SETUP_STEPS = [
   { k: 'welcome', name: 'Welcome' },
@@ -25,7 +29,7 @@ const SETUP_SNOOZE_MS = 20 * 3600000;   // after Finish Later, it opens by itsel
 let suAt = 'welcome', suPush = null, suPhone = null, suGcal = null, suLoaded = false;
 // Preview (#setup?preview, Settings → Connections → Preview): what someone new sees. Nothing is
 // connected yet; the buttons pretend to connect, and nothing is saved or sent.
-let suPreview = false, suPv = {}, suPvSkipped = new Set(), suPvKey = null;
+let suPreview = false, suPv = {}, suPvSkipped = new Set(), suPvKey = null, suPvExisting = false;
 const suKey = n => `setup-${n}-${(currentUser && currentUser.id) || ''}`;
 function suGet(n){ try{ return localStorage.getItem(suKey(n)); }catch(e){ return null; } }
 function suSet(n, v){ try{ v == null ? localStorage.removeItem(suKey(n)) : localStorage.setItem(suKey(n), v); }catch(e){} }
@@ -33,6 +37,11 @@ function suSkipped(){ try{ return new Set(JSON.parse(suGet('skipped') || '[]'));
 function setupSteps(){ return SETUP_STEPS.filter(s => !s.only || s.only()); }
 const suFirst = () => { const n = (myProfile && myProfile.name) || ''; return typeof firstName === 'function' ? firstName(n) : n.split(' ')[0]; };
 const suPending = () => !!(myProfile && 'setup_done_at' in myProfile && !myProfile.setup_done_at);
+// on Radar before Set Up Radar existed (addendum-setup.sql marks everyone there that day)
+const suWasHere = () => !!(myProfile && myProfile.joined_before_setup);
+const suExisting = () => suPreview ? suPvExisting : suWasHere();   // in the preview: the version being previewed
+// the first step that matters and isn't done yet (else All set)
+function suFirstMissing(){ const s = suLeft()[0]; return s ? s.k : 'done'; }
 
 // ---- opening and closing ---------------------------------------------------------------------------
 // After sign-in: someone who hasn't finished gets the reminder in the sidebar, and the setup itself
@@ -41,7 +50,15 @@ const suPending = () => !!(myProfile && 'setup_done_at' in myProfile && !myProfi
 function setupMaybeOpen(){
   setupNudge();
   if(!suPending()) return;
-  setupLoad();
+  const existing = suExisting();
+  // once it's known where everything stands: all of it connected → done, quietly; someone already on
+  // Radar → one note that it's new (and the card in the sidebar)
+  setupLoad().then(() => {
+    if(!suPending() || document.getElementById('setupRoot')) return;
+    if(!suLeft().length){ suQuietDone(); return; }
+    if(existing) suNews();
+  });
+  if(existing) return;
   const snoozed = Number(suGet('snooze') || 0);
   if(snoozed && Date.now() - snoozed < SETUP_SNOOZE_MS) return;
   if(/=/.test(location.hash) || /^#setup/.test(location.hash)) return;
@@ -49,12 +66,18 @@ function setupMaybeOpen(){
 }
 // step: a step's key; nothing: where you left off (or Welcome). opts.preview: what someone new sees
 function setupOpen(step, opts){
-  const preview = !!(opts && opts.preview);
-  if(preview && !suPreview){ suPv = {}; suPvSkipped = new Set(); suPvKey = null; }
+  const preview = !!(opts && opts.preview), pvOld = !!(opts && opts.existing);
+  if(preview && (!suPreview || pvOld !== suPvExisting)){
+    suPvExisting = pvOld; suPvSkipped = new Set(); suPvKey = null;
+    suPv = pvOld ? { slack: true, notify: true, calendar: true } : {};   // someone already here has some of it
+  }
   suPreview = preview;
+  if(!preview) suSet('seen', '1');
   const steps = setupSteps(), has = k => steps.some(s => s.k === k);
   const resume = preview ? null : suGet('at');
-  suAt = has(step) ? step : has(resume) ? resume : 'welcome';
+  // where you left off; someone already on Radar starts at the first thing left
+  const start = suExisting() && suLoaded ? suFirstMissing() : 'welcome';
+  suAt = has(step) ? step : has(resume) ? resume : has(start) ? start : 'welcome';
   let root = document.getElementById('setupRoot');
   const fresh = !root;
   if(fresh){
@@ -71,7 +94,7 @@ function setupOpen(step, opts){
   setupRefresh();
 }
 function suHash(){
-  const h = (suAt === 'welcome' ? '#setup' : `#setup/${suAt}`) + (suPreview ? '?preview' : '');
+  const h = (suAt === 'welcome' ? '#setup' : `#setup/${suAt}`) + (suPreview ? (suPvExisting ? '?preview=existing' : '?preview') : '');
   if(location.hash !== h) history.replaceState(null, '', h);
   if(!suPreview) suSet('at', suAt === 'done' ? null : suAt);
 }
@@ -98,15 +121,31 @@ async function setupFinish(tour){
     else showToast('info', 'That was the preview', 'Nothing was connected or saved. Someone new sees this the first time they sign in.');
     return;
   }
-  const at = new Date().toISOString();
-  if(suPending()){
-    const { error } = await supabaseClient.from('team_profiles').update({ setup_done_at: at }).eq('id', currentUser.id);
-    if(!error) myProfile.setup_done_at = at;
-  }
-  ['at', 'skipped', 'snooze'].forEach(n => suSet(n, null));
+  if(suPending()) await suMarkDone();
   setupClose(); setupNudge();
   if(tour && typeof startTour === 'function') setTimeout(() => startTour(), 260);
   else showToast('success', 'You’re set up', 'Change any of it in Settings → Connections.');
+}
+// team_profiles.setup_done_at, here and in the team list (the Team page shows who's finished)
+async function suMarkDone(){
+  const at = new Date().toISOString();
+  const { error } = await supabaseClient.from('team_profiles').update({ setup_done_at: at }).eq('id', currentUser.id);
+  if(error) return false;
+  myProfile.setup_done_at = at;
+  const me = (typeof teamProfiles !== 'undefined' ? teamProfiles : []).find(p => p.id === currentUser.id); if(me) me.setup_done_at = at;
+  ['at', 'skipped', 'snooze', 'news', 'seen'].forEach(n => suSet(n, null));
+  if(typeof currentViewName !== 'undefined' && currentViewName === 'team' && typeof drawTeam === 'function') drawTeam();
+  return true;
+}
+// Everything that matters is already connected: done, without a word
+async function suQuietDone(){ if(await suMarkDone()) setupNudge(); }
+// Someone already on Radar, the first time: one note that it's new, opening at the first thing left
+function suNews(){
+  if(suGet('news')) return;
+  suSet('news', String(Date.now()));
+  const n = suLeft().length;
+  showToast('info', 'New: connect your apps in one place', `${n} thing${n === 1 ? '' : 's'} left to connect, about ${n < 2 ? 'a minute' : n + ' minutes'}. It’s in the sidebar too.`,
+    { action: 'Set Up', duration: 15000, onAction: () => setupOpen(suFirstMissing()) });
 }
 function suKeydown(e){
   if(!document.getElementById('setupRoot') || document.getElementById('appModalOverlay')) return;   // a sheet on top handles its own keys
@@ -135,11 +174,13 @@ function setupNudge(){
   const left = suLoaded ? suLeft().length : null, doneN = suLoaded ? main.length - left : 0;
   const pct = suLoaded && main.length ? doneN / main.length : 0;
   const sub = left == null ? 'Connect your apps' : left ? `${left} step${left === 1 ? '' : 's'} left` : 'Everything’s connected';
-  el.hidden = false;
-  el.innerHTML = `<button class="su-nudge-b" onclick="setupOpen()" aria-label="Finish setting up Radar: ${escapeHtml(sub)}"><span class="su-ring" style="--p:${pct.toFixed(3)}" aria-hidden="true"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="8"/><circle class="v" cx="10" cy="10" r="8" pathLength="1"/></svg></span><span class="tx"><b>Finish setting up</b><span>${escapeHtml(sub)}</span></span></button><button class="ib su-nudge-x" aria-label="Hide this" title="Hide this" onclick="setupNudgeHide()">${icon('x')}</button>`;
+  // someone already on Radar: "Connect your apps", marked New until they first open it
+  const old = suWasHere(), title = old ? 'Set Up Radar' : 'Finish setting up', isNew = old && !suGet('seen');
+  el.hidden = false; el.classList.toggle('is-new', isNew);
+  el.innerHTML = `<button class="su-nudge-b" onclick="setupOpen()" aria-label="${escapeHtml(title)}${isNew ? ', new' : ''}: ${escapeHtml(sub)}"><span class="su-ring" style="--p:${pct.toFixed(3)}" aria-hidden="true"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="8"/><circle class="v" cx="10" cy="10" r="8" pathLength="1"/></svg></span><span class="tx"><b>${title}</b><span>${isNew ? '<i class="su-new">New</i>' : ''}${escapeHtml(sub)}</span></span></button><button class="ib su-nudge-x" aria-label="Hide this" title="Hide this" onclick="setupNudgeHide()">${icon('x')}</button>`;
 }
 async function setupNudgeHide(){
-  if(!(await confirmDialog('Hide Finish Setting Up? You can still set up anything from the menu under your name: Set Up Radar.', { confirmLabel: 'Hide' }))) return;
+  if(!(await confirmDialog(`Hide ${suWasHere() ? 'Connect Your Apps' : 'Finish Setting Up'}? You can still set up anything from the menu under your name: Set Up Radar.`, { confirmLabel: 'Hide' }))) return;
   await setupFinish(false);
 }
 
@@ -218,13 +259,13 @@ const suStill = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 // The list of steps is drawn once; after that only its marks and the highlight change, and the
 // highlight slides to the step you're on.
 function suRail(root, steps, counted){
-  const rail = root.querySelector('.su-rail'), keys = steps.map(s => s.k).join(',') + (suPreview ? ':pv' : '');
+  const rail = root.querySelector('.su-rail'), keys = steps.map(s => s.k).join(',') + (suPreview ? (suPvExisting ? ':pvx' : ':pv') : '');
   if(rail.dataset.keys !== keys){
     const item = s => `<li><button class="su-st" data-k="${s.k}" onclick="setupGo('${s.k}')"><span class="su-n" aria-hidden="true"></span><span class="su-sn">${escapeHtml(s.name)}</span><span class="sr-only su-sr"></span></button></li>`;
     const opt = steps.filter(s => s.optional), main = steps.filter(s => !s.optional && s.k !== 'done');
     rail.innerHTML = `<div class="su-brand"><span class="brand-mark" aria-hidden="true">BA</span><b>Set Up Radar</b>${suPreview ? '<span class="su-pv">Preview</span>' : ''}</div>
 <div class="su-list"><span class="su-ink" aria-hidden="true"></span><ol class="su-steps">${main.map(item).join('')}${opt.length ? `<li class="su-grp" aria-hidden="true">Optional</li>${opt.map(item).join('')}` : ''}${item(steps[steps.length - 1])}</ol></div>
-${suPreview ? '<p class="su-pvnote">A preview of what someone new sees. Nothing is connected or saved.</p>' : ''}<button class="su-later" onclick="setupLater()">${suPreview ? 'Close Preview' : 'Finish Later'}</button>`;
+${suPreview ? `<p class="su-pvnote">A preview of what ${suPvExisting ? 'someone already on Radar' : 'someone new'} sees. Nothing is connected or saved.<button class="su-pvsw" onclick="setupOpen('welcome', { preview: true, existing: ${!suPvExisting} })">See it as ${suPvExisting ? 'someone new' : 'someone already here'}</button></p>` : ''}<button class="su-later" onclick="setupLater()">${suPreview ? 'Close Preview' : 'Finish Later'}</button>`;
     rail.dataset.keys = keys; rail.dataset.at = '';
   }
   const skipped = suPreview ? suPvSkipped : suSkipped();
@@ -275,7 +316,19 @@ function suStepHtml(step, i, counted){
   const foot = (primary, skip) => `${back}<span class="su-gap"></span>${skip && st !== 'done' ? `<button class="btn btn-q su-skip" onclick="setupSkip()">Skip</button>` : ''}${primary}`;
   const next = label => `<button class="btn btn-p" onclick="setupNext()">${label || 'Continue'}</button>`;
   let body = '', f = '';
-  if(k === 'welcome'){
+  if(k === 'welcome' && suExisting()){
+    // someone already on Radar: what's connected, what's left, and on to the first thing left
+    const main = counted.filter(s => !s.optional), left = main.filter(s => { const x = suStatus(s.k); return x !== 'done' && x !== 'na'; });
+    const known = main.every(s => suStatus(s.k) != null);
+    const li = s => { const x = suStatus(s.k), d = x === 'done';
+      return `<li class="${d ? 'is-done' : x === 'na' ? 'is-na' : ''}">${d ? icon('check') : '<i class="su-o" aria-hidden="true"></i>'}<span class="su-hv"><b>${escapeHtml(s.name)}</b>${x === 'na' ? '<span>Not set up for the team yet</span>' : ''}${d ? '<span class="sr-only">, connected</span>' : ''}</span></li>`; };
+    body = `<div class="su-hello su-again"><div class="su-logos" aria-hidden="true">${[appLogo('slack'), suGlyph('bell'), suGlyph('smartphone'), appLogo('gcalendar'), appLogo('gmail')].join('')}</div>
+<h2 id="suTitle">Connect the rest of your apps</h2>
+<p class="su-why">New in Radar: everything that’s yours to connect, in one place. Some of it you’ve already done.</p>
+<ul class="su-sum su-have">${main.map(li).join('')}</ul>
+<p class="su-note">${!known ? 'Checking what’s connected…' : left.length ? `${left.length} left, about ${left.length < 2 ? 'a minute' : left.length + ' minutes'}. Skip anything you like.` : 'All of it’s connected.'}</p></div>`;
+    f = foot(next(), false);
+  } else if(k === 'welcome'){
     const logos = [appLogo('slack'), suGlyph('bell'), suGlyph('smartphone'), appLogo('gcalendar'), appLogo('gmail')];
     body = `<div class="su-hello"><div class="su-logos" aria-hidden="true">${logos.join('')}</div>
 <h2 id="suTitle">Welcome to Radar${suFirst() ? ', ' + escapeHtml(suFirst()) : ''}</h2>
@@ -356,7 +409,14 @@ function setupGo(k, dir){
   setupRender(dir != null ? dir : (to >= from ? 1 : -1));
   suFocusMain();
 }
-function setupNext(){ const steps = setupSteps(), i = steps.findIndex(s => s.k === suAt); if(suAt === 'label'){ if(typeof gmailLabelKeyNow !== 'undefined') gmailLabelKeyNow = null; suPvKey = null; } if(i < steps.length - 1) setupGo(steps[i + 1].k, 1); }
+// Continue: on to the next step that isn't connected yet (they're ticked in the list, and on All set)
+function setupNext(){
+  const steps = setupSteps(), i = steps.findIndex(s => s.k === suAt);
+  if(suAt === 'label'){ if(typeof gmailLabelKeyNow !== 'undefined') gmailLabelKeyNow = null; suPvKey = null; }
+  let j = i + 1;
+  while(j < steps.length - 1 && suStatus(steps[j].k) === 'done') j++;
+  if(j < steps.length) setupGo(steps[j].k, 1);
+}
 function setupBack(){ const steps = setupSteps(), i = steps.findIndex(s => s.k === suAt); if(i > 0) setupGo(steps[i - 1].k, -1); }
 function setupSkip(){
   if(suPreview){ suPvSkipped.add(suAt); setupNext(); return; }

@@ -62,6 +62,7 @@ const NOTIFICATION_TYPE_META = {
   meeting_soon:            { label:'A meeting is about to start (with the link to join)', section:'Calendar' },
   email_change_requested:  { label:'Someone requests an email change', section:'Account', visibleTo:'admin' },
   profile_changed:         { label:'Your role, title, or access changes', section:'Account' },
+  setup_reminder:          { label:'A teammate asks you to finish setting up Radar', section:'Account' },
 };
 
 // Central place every notification insert should go through, instead of
@@ -283,6 +284,7 @@ async function handleNotifClick(id){
   }
   if(view==='queue' && tid && typeof openQueueClient === 'function' && clients.some(c => c.id === tid)){ hidePop(panel); openQueueClient(tid); return; }
   if(view==='whatsapp' && tid && typeof waOpenItem === 'function'){ hidePop(panel); waOpenItem(tid); return; }
+  if(view==='setup'){ hidePop(panel); if(typeof setupOpen === 'function') setupOpen(); return; }   // where they left off
   if(view){
     hidePop(panel);
     if(view==='plan' && tid) window._planSel = tid;

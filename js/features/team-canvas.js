@@ -40,15 +40,16 @@ function drawTeam(){
 
   let body = '';
   if(teamTab === 'members'){
+    const su = teamSetupOn();
     const rows = people.map(m => {
       const self = m.id === currentUser?.id, on = m.id === teamSelId, owns = teamOwns(m);
       return `<div class="row${on ? ' sel' : ''}" role="button" tabindex="0" ${on ? 'aria-current="true" style="background:var(--select)"' : ''} onclick="selectTeamMember('${m.id}')" onkeydown="if(event.key==='Enter')selectTeamMember('${m.id}')"${m.access_revoked ? ' data-off="1"' : ''}>${avHtml(m.name, 'style="width:32px;height:32px;font-size:13px"')}
 <div class="tx"><span class="t">${escapeHtml(m.name)}${self ? ' (you)' : ''}</span><span class="s">${escapeHtml(m.title || ({ member: 'Member', approver: 'Approver', admin: 'Admin' }[m.role] || ''))}${m.access_revoked ? ' · access revoked' : ''}</span></div>
-<div class="r"><span style="width:84px">${{ member: 'Member', approver: 'Approver', admin: 'Admin' }[m.role] || escapeHtml(roleDisplayLabel(m.role))}</span><span style="width:70px">${owns ? `${owns} client${owns === 1 ? '' : 's'}` : '—'}</span>${admin ? `<span class="dur" style="width:64px;text-align:right">${hmLong(teamWeekMinutes(m.id))}</span>` : ''}</div></div>`;
+<div class="r"><span style="width:84px">${{ member: 'Member', approver: 'Approver', admin: 'Admin' }[m.role] || escapeHtml(roleDisplayLabel(m.role))}</span><span style="width:70px">${owns ? `${owns} client${owns === 1 ? '' : 's'}` : '—'}</span>${su ? `<span class="tm-su-col${m.setup_done_at ? ' is-done' : ''}" style="width:70px">${m.setup_done_at ? 'Done' : m.access_revoked ? '—' : 'Not yet'}</span>` : ''}${admin ? `<span class="dur" style="width:64px;text-align:right">${hmLong(teamWeekMinutes(m.id))}</span>` : ''}</div></div>`;
     }).join('');
     const waiting = admin && emailRequests.length ? `<div class="h2"><h2>Waiting for you<span class="c">${emailRequests.length}</span></h2></div><div class="grp">${emailRequests.map(emailReqRow).join('')}</div>` : '';
-    body = `<div class="mhead" style="padding:0 14px 6px 58px"><span>Name</span><span style="width:84px;flex:0 0 auto">Role</span><span style="width:70px;flex:0 0 auto">Owns</span>${admin ? '<span style="width:64px;flex:0 0 auto;text-align:right">This week</span>' : ''}</div>
-<div class="grp">${rows || '<div class="empty">No one on the team yet.</div>'}</div>${waiting}
+    body = `<div class="mhead" style="padding:0 14px 6px 58px"><span>Name</span><span style="width:84px;flex:0 0 auto">Role</span><span style="width:70px;flex:0 0 auto">Owns</span>${su ? '<span style="width:70px;flex:0 0 auto">Setup</span>' : ''}${admin ? '<span style="width:64px;flex:0 0 auto;text-align:right">This week</span>' : ''}</div>
+<div class="grp">${rows || '<div class="empty">No one on the team yet.</div>'}</div>${teamSetupLineHtml()}${waiting}
 ${admin && people.filter(m => !m.access_revoked).length <= 1 ? emptyState({ compact: true, icon: 'users-three', tone: 'blue', title: 'It’s just you so far',
   text: 'Add your teammates to give them clients to own, tasks to do and updates to write. They get an email to sign in.', action: 'Add Member', actionIcon: 'user-plus', onAction: 'openAddMemberSheet()', cls: 'tm-es' }) : ''}
 ${admin ? '' : '<p class="t-2" style="font-size:13px;margin:12px 4px 0">Only admins can add people or change roles.</p>'}`;
@@ -87,6 +88,7 @@ ${extras ? `<div class="set-h" style="margin:18px 0 4px">Also allowed</div>${ext
 ${full ? `<div class="kv" style="align-items:center"><span>Slack</span>${slack}</div>` : ''}
 ${admin ? `<div class="kv"><span>Hourly rate</span><b style="font-weight:500">${rate ? money(rate) : 'None'}</b></div>` : ''}
 <div class="kv"><span>Owns</span><b style="font-weight:500">${owns} client${owns === 1 ? '' : 's'}</b></div>
+${teamSetupOn() ? `<div class="kv"><span>Set Up Radar</span><b style="font-weight:500">${m.setup_done_at ? 'Finished' : 'Not finished'}</b></div>` : ''}
 ${full ? `<div class="kv"><span>Open follow-ups</span><b style="font-weight:500">${fu}</b></div>` : ''}
 ${m.phone ? `<div class="kv"><span>Phone</span><b style="font-weight:500">${escapeHtml(m.phone)}</b></div>` : ''}
 ${danger}
@@ -142,7 +144,7 @@ function teamUwHtml(people, sel, admin){
 <div class="tm-l">${rows || '<p class="tm-none">No one on the team yet.</p>'}</div>
 ${admin ? `<button class="tm-add" onclick="openAddMemberSheet()">${icon('plus')}Add someone</button>` : '<p class="tm-none">Only admins can add people or change roles.</p>'}</section>`;
   const waiting = admin && emailRequests.length ? `<section class="tm-card"><div class="tm-h"><b>Waiting for you</b><span class="tm-c">${emailRequests.length}</span></div><div class="grp tm-flat">${emailRequests.map(emailReqRow).join('')}</div></section>` : '';
-  return `<div class="tm-uw"><div class="tm-side">${people_}${waiting}</div>${sel ? teamProfileHtml(sel) : ''}</div>`;
+  return `<div class="tm-uw"><div class="tm-side">${people_}${teamSetupCardHtml()}${waiting}</div>${sel ? teamProfileHtml(sel) : ''}</div>`;
 }
 function teamProfileHtml(m){
   const { admin, self, full, titleCtl, roles, canRole, extras, slack, rate, owns, fu, acts, danger } = teamParts(m);
@@ -175,11 +177,49 @@ ${extras ? `<div class="tm-sec"><span class="uw-mono">ALSO ALLOWED</span></div>$
 ${full ? `<div class="kv" style="align-items:center"><span>Slack</span>${slack}</div>` : ''}
 ${admin ? `<div class="kv"><span>Hourly rate</span><b style="font-weight:500">${rate ? money(rate) : 'None'}</b></div>` : ''}
 <div class="kv"><span>Owns</span><b style="font-weight:500">${owns} client${owns === 1 ? '' : 's'}</b></div>
+${teamSetupOn() ? `<div class="kv"><span>Set Up Radar</span><b style="font-weight:500">${m.setup_done_at ? 'Finished' : 'Not finished'}</b></div>` : ''}
 ${full ? `<div class="kv"><span>Open follow-ups</span><b style="font-weight:500">${fu}</b></div>` : ''}
 ${m.phone ? `<div class="kv"><span>Phone</span><b style="font-weight:500">${escapeHtml(m.phone)}</b></div>` : ''}
 ${danger}</div>
 </div></section>`;
 }
+// ---- Set Up Radar: who has finished it, and a reminder for who hasn't (Nov 24) ----
+// Shown once addendum-setup.sql adds team_profiles.setup_done_at. Anyone can send the reminder: like
+// every nudge, from your own Slack as you (else Radar's), and to their bell; it opens their setup
+// where they left off.
+function teamSetupOn(){ return (teamProfiles || []).some(p => 'setup_done_at' in p); }
+function teamSetupLeft(){ return (teamProfiles || []).filter(p => !p.access_revoked && 'setup_done_at' in p && !p.setup_done_at); }
+function teamSetupCardHtml(){
+  if(!teamSetupOn()) return '';
+  const all = teamProfiles.filter(p => !p.access_revoked), left = teamSetupLeft(); if(!left.length || !all.length) return '';
+  const meId = currentUser?.id, mine = left.some(p => p.id === meId), others = left.filter(p => p.id !== meId);
+  const doneN = all.length - left.length, when = typeof nudgeWhenWords === 'function' ? nudgeWhenWords('setup-remind', 'Reminded') : '';
+  const who = left.length === 1 ? (mine ? 'You haven’t' : `${escapeHtml(firstName(left[0].name))} hasn’t`) : `${left.length} people haven’t`;
+  const chips = left.slice().sort((a, b) => (a.id === meId ? -1 : b.id === meId ? 1 : a.name.localeCompare(b.name)))
+    .map(p => `<button class="tm-chip" onclick="selectTeamMember('${p.id}')">${p.id === meId ? 'You' : escapeHtml(p.name)}</button>`).join('');
+  return `<section class="tm-card tm-su" aria-label="Set Up Radar"><div class="tm-h"><span class="tm-ic">${icon('compass')}</span><b>Set Up Radar</b><span class="tm-c">${doneN} of ${all.length}</span></div>
+<div class="tm-su-bar" role="img" aria-label="${doneN} of ${all.length} finished"><i style="width:${(doneN / all.length * 100).toFixed(1)}%"></i></div>
+<p class="tm-su-p">${who} finished connecting their apps.</p>
+<div class="tm-chips">${chips}</div>
+<div class="tm-su-a">${others.length ? `<button class="btn" onclick="teamRemindSetup()">${icon('paper-plane-tilt')}Remind ${others.length === 1 ? escapeHtml(firstName(others[0].name)) : 'Them'}…</button>` : ''}${mine ? `<button class="btn${others.length ? ' btn-q' : ' btn-p'}" onclick="setupOpen()">Finish Yours</button>` : ''}${when ? `<span class="tm-su-w">${escapeHtml(when)}</span>` : ''}</div></section>`;
+}
+// the classic look: one line under the list
+function teamSetupLineHtml(){
+  if(!teamSetupOn()) return '';
+  const others = teamSetupLeft().filter(p => p.id !== currentUser?.id); if(!others.length) return '';
+  const when = typeof nudgeWhenWords === 'function' ? nudgeWhenWords('setup-remind', 'Reminded') : '';
+  return `<div class="tm-su-line"><span>${others.length === 1 ? `${escapeHtml(firstName(others[0].name))} hasn’t` : `${others.length} people haven’t`} finished setting up Radar.${when ? ` ${escapeHtml(when)}.` : ''}</span><button class="btn sm" onclick="teamRemindSetup()">Remind ${others.length === 1 ? escapeHtml(firstName(others[0].name)) : 'Them'}…</button></div>`;
+}
+function teamRemindSetup(){
+  const to = teamSetupLeft().filter(p => p.id !== currentUser?.id); if(!to.length) return;
+  const me = firstName(myName() || 'A teammate');
+  nudgeSheet({ title: to.length === 1 ? `Remind ${firstName(to[0].name)}` : 'Remind the Team', sub: 'Finish setting up Radar', to, pick: to.length > 1,
+    text: 'Radar can now connect your apps in one place: Slack, notifications, your phone, Google Calendar and Gmail. It takes about five minutes, and it opens where you left off.',
+    link: { view: 'setup', id: null, label: 'Open Set Up Radar' },
+    notif: { type: 'setup_reminder', title: `${me} asks you to finish setting up Radar` },
+    key: 'setup-remind', sendLabel: 'Send Reminder', sentWord: 'Reminded', onSent: () => drawTeam() });
+}
+
 // The old pop-up for a person now just selects them here.
 function openTeamMemberDetail(id){ teamSelId = id; teamTab = 'members'; if(currentViewName !== 'team') switchView('team'); else drawTeam(); }
 

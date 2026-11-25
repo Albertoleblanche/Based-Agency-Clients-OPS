@@ -3898,3 +3898,19 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 .su-nudge{animation:suNudgeIn 320ms cubic-bezier(.23,1,.32,1)}
 @keyframes suNudgeIn{from{opacity:0;transform:translateY(6px)}}
 @media (prefers-reduced-motion:reduce){.su-ink,.su-ring circle.v{transition:none}.su-nudge{animation:none}}
+/* Set Up Radar for people already on Radar (Nov 24): New in the sidebar, what's connected on Welcome,
+   the preview switch; the Team page's Setup column and line */
+.su-new{display:inline-block;margin-right:6px;padding:0 6px;border-radius:999px;background:var(--blue-bg);color:var(--blue);font-style:normal;font-size:10.5px;font-weight:600;line-height:16px;letter-spacing:.01em;vertical-align:1px}
+.su-nudge.is-new .su-ring circle:not(.v){stroke:color-mix(in srgb,var(--blue) 45%,var(--sep-strong))}
+.su-have{margin-top:24px}
+.su-have li{align-items:center}
+.su-have .su-hv{flex:1}
+.su-o{flex:none;width:16px;height:16px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--sep-strong)}
+.su-have li.is-na > span > b{color:var(--label-2)}
+.su .su-pvsw{display:block;margin:8px 0 0;padding:0;border:0;background:none;font:inherit;font-weight:500;color:var(--blue);text-align:left;cursor:default}
+.su .su-pvsw:active{opacity:.7}
+@media (hover:hover) and (pointer:fine){.su .su-pvsw:hover{text-decoration:underline;text-underline-offset:2px}}
+.tm-su-col{color:var(--label-2)}
+.tm-su-col.is-done{color:var(--label)}
+.tm-su-line{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 4px 0;font-size:13px;color:var(--label-2)}
+.tm-su-line .btn{flex:none}
