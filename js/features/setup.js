@@ -413,7 +413,7 @@ function suStepHtml(step, i, counted){
         : got(['You choose exactly which emails go in', 'Works for anyone’s email, not just clients’', 'Set up once, in about two minutes'])));
     f = foot(key ? next('I’ve Set It Up') : st === 'off' ? `<button class="btn btn-p" id="suLabelGo" onclick="suLabel()">Get My Script</button>` : next(), true);
   } else if(k === 'ai'){
-    body = head(appLogoPair('chatgpt', 'claude', 'xl'), 'ChatGPT and Claude', 'Ask ChatGPT or Claude about your clients, tasks and hours, and have it add tasks, add follow-ups or log time, as you.') +
+    body = head(appLogoPair('chatgpt', 'claude', 'xl'), 'ChatGPT and Claude', 'Ask ChatGPT or Claude about your clients, tasks and hours, and have it add tasks, plan sprints, add follow-ups or log time, as you.') +
       `<div class="su-ai" id="aiAppsBox">${typeof aiAppsInner === 'function' ? aiAppsInner() : ''}</div>`;
     f = foot(next(), true);
   } else {

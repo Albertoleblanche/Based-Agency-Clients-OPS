@@ -41,8 +41,8 @@
     document.title = `Allow ${app} to use Radar?`;
     show(`<h1>Allow ${esc(app)} to use Radar?</h1>
 <p class="sub">Signed in as ${esc(email)}. <a href="#" id="other">Not you?</a></p>
-<ul class="can"><li>${CHECK}<span>See the clients, tasks, follow-ups and hours you can see in Radar</span></li>
-<li>${CHECK}<span>Add and finish tasks, add follow-ups and log time, as you</span></li>
+<ul class="can"><li>${CHECK}<span>See the clients, tasks, follow-ups and hours you can see in Radar, and your Plan</span></li>
+<li>${CHECK}<span>Add and finish tasks, plan sprints, add follow-ups and log time, as you</span></li>
 <li>${CHECK}<span>It never sends anything to a client</span></li></ul>
 <div class="row"><button class="sec" id="deny">Don’t Allow</button><button class="pri" id="allow">Allow</button></div>
 <p class="foot">You can disconnect it any time in Radar: Settings → Connections → ChatGPT and Claude.</p>`);
