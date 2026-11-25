@@ -592,7 +592,7 @@ function setConnections(){
   if(wa) rows.push(go(wa[5] || "switchSettingsTab('whatsapp')", appLogo('whatsapp'), 'WhatsApp', wa[2], wa[3]));
   if(approver) rows.push(go("openIntegrationSheet('slack')", appLogo('slack'), 'Slack', 'Client channels, reminders and daily summaries',
     integ.slackUnlinked == null ? st('', 'Checking…') : integ.slackUnlinked ? st('yellow', `${integ.slackUnlinked} client${integ.slackUnlinked === 1 ? '' : 's'} not linked`) : st('green', 'Connected')));
-  if(typeof granolaRowStatus === 'function') rows.push(go('openGranolaSheet()', appLogo('granola'), 'Granola', 'Action items from meetings, suggested as tasks', granolaRowStatus(st)));
+  if(typeof granolaRowStatus === 'function') rows.push(go('openGranolaSheet()', appLogo('granola'), 'Granola', 'Action items as tasks; what clients owe you as follow-ups', granolaRowStatus(st)));
   if(canManageSettings()){ const w = aiConnWords(); rows.push(go("switchSettingsTab('ai')", appLogoPair('claude', 'chatgpt'), 'AI', 'Claude and ChatGPT: drafts, the Assistant and weekly insights', w == null ? st('', 'Checking…', 'cnAiSt') : w ? st('green', w, 'cnAiSt') : st('hollow', 'Not connected', 'cnAiSt'))); }
   rows.push(go("openIntegrationSheet('sheet')", appLogo('gsheets'), 'Google Sheet', settings.sheetCsvUrl ? 'Pulls the client list from a published sheet' : 'Keep a copy of the client list in a sheet',
     settings.sheetCsvUrl ? st('green', 'Connected') : st('hollow', 'Not connected')));

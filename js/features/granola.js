@@ -21,6 +21,7 @@ function tkSuggestHtml(){
     const sub = suggestionSub(s), meet = s.sourceUrl ? `<a href="${safeUrl(s.sourceUrl)}" target="_blank" rel="noopener" title="${mail ? 'Open the email in Gmail' : 'Open the notes in Granola'}">${mail ? icon('envelope-simple') : ''}${escapeHtml(sub[0])}</a>` : escapeHtml(sub[0]);
     return `<div class="tk-sg-r" data-sg="${s.id}"><div class="tx" role="button" tabindex="0" aria-label="Preview “${escapeHtml(s.title)}”" onclick="if(!event.target.closest('a'))tkSgPreview('${s.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();tkSgPreview('${s.id}')}"><b>${escapeHtml(s.title)}</b><span class="s">${meet}${sub.slice(1).map(x => ' · ' + escapeHtml(x)).join('')}</span>${s.quote ? `<span class="q">“${escapeHtml(s.quote)}”</span>` : ''}</div>`
       + `<div class="tk-sg-a"><button class="btn sm" onclick="tkSgAdd('${s.id}')">Add</button><button class="btn sm" onclick="tkSgEdit('${s.id}')">Edit…</button>`
+      + (s.clientId ? `<button class="ib" aria-label="Move “${escapeHtml(s.title)}” to Reminders" title="It’s something the client owes you: move it to Reminders" onclick="tkSgToReminder('${s.id}')">${icon('bell-ring')}</button>` : '')
       + `<button class="ib" aria-label="Dismiss “${escapeHtml(s.title)}”" title="Dismiss" onclick="tkSgDismiss('${s.id}')">${icon('x')}</button></div></div>`;
   };
   // by client (Nov 23): a client with more than 3 gets Add All
@@ -72,7 +73,7 @@ async function tkSgRefresh(){
 function tkSgPreview(id){
   const s = (taskSuggestions || []).find(x => x.id === id); if(!s) return;
   openAppModal(`<h3 class="sgp-h">${escapeHtml(s.title)}</h3><div class="sgp" id="sgpBody">${suggestionPreviewHtml(s)}</div>
-<div class="sheet-a sgp-a"><button class="btn sgp-x" onclick="closeAppModal();tkSgDismiss('${s.id}')">Dismiss</button><span class="sgp-gap"></span><button class="btn" onclick="closeAppModal();tkSgEdit('${s.id}')">Edit…</button><button class="btn btn-p" id="sgpAdd" onclick="closeAppModal();tkSgAdd('${s.id}')">Add to My Tasks</button></div>${s.source === 'gmail' ? icons8Credit(['gmail'], 'sh-i8') : ''}`, 560);
+<div class="sheet-a sgp-a"><button class="btn sgp-x" onclick="closeAppModal();tkSgDismiss('${s.id}')">Dismiss</button><span class="sgp-gap"></span>${s.clientId ? `<button class="btn" onclick="closeAppModal();tkSgToReminder('${s.id}')" title="It’s something the client owes you">${icon('bell-ring')}To Reminders</button>` : ''}<button class="btn" onclick="closeAppModal();tkSgEdit('${s.id}')">Edit…</button><button class="btn btn-p" id="sgpAdd" onclick="closeAppModal();tkSgAdd('${s.id}')">Add to My Tasks</button></div>${s.source === 'gmail' ? icons8Credit(['gmail'], 'sh-i8') : ''}`, 560);
   setTimeout(() => document.getElementById('sgpAdd')?.focus({ preventScroll: true }), 30);   // after the sheet's own first focus
   // the meeting's notes, for the excerpt, if they aren't here yet
   if(granolaMeetings === null && s.sourceId) loadGranolaMeetings().then(() => { const b = document.getElementById('sgpBody'); if(b) b.innerHTML = suggestionPreviewHtml(s); });
@@ -99,6 +100,16 @@ function tkSgEdit(id){
   const preset = suggestionPreset(s), done = preset.afterCreate;
   preset.afterCreate = async task => { await done(task); if(currentViewName === 'tasks') renderTasks(); };
   openNewTaskModal(currentUser.id, 'todo', preset);
+}
+// Move to Reminders (Nov 25): what the client owes you, waiting on them, not work for you.
+async function tkSgToReminder(id){
+  const s = (taskSuggestions || []).find(x => x.id === id); if(!s) return;
+  tkSgBusy(id, true);
+  const r = await suggestionToReminder(id);
+  if(r.error){ tkSgBusy(id, false); showToast(r.noClient ? 'info' : 'error', r.noClient ? 'It needs a client' : 'Not moved', r.error.message || 'Try again in a moment.'); return; }
+  const c = clients.find(x => x.id === s.clientId);
+  tkSgOut(id, () => renderTasks());
+  showToast('success', 'Moved to Reminders', `${s.title}${c ? ` · waiting on ${c.name}` : ''}`, { action: 'Open', onAction: () => { window._remSel = r.reminder.id; switchView('reminders'); } });
 }
 async function tkSgDismiss(id){
   const s = (taskSuggestions || []).find(x => x.id === id); if(!s) return;

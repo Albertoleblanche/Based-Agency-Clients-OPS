@@ -30,6 +30,7 @@ async function gmailReadNow(){
   const r = await gmailCall({ action: 'read', force: true });
   gmailReadAt = Date.now();
   if(r.suggested && typeof loadTaskSuggestions === 'function') await loadTaskSuggestions();
+  if(r.reminders && typeof loadClientReminders === 'function') await loadClientReminders();   // follow-ups (Nov 25)
   await gmailStatusLoad();
   return r;
 }
@@ -37,7 +38,10 @@ function gmailReadToast(r){
   if(r.error) showToast('error', 'Gmail wasn’t read', r.error);
   else if(r.skipped === 'recent') showToast('info', 'Just checked', 'Radar read your Gmail less than a minute ago.');
   else if(r.skipped) showToast('info', 'Not read', r.skipped === 'no AI key' ? 'The AI isn’t set up on the server.' : r.skipped);
-  else showToast('success', r.suggested ? `${r.suggested} task${r.suggested === 1 ? '' : 's'} suggested` : 'Nothing new to do', `${r.fromClients || 0} new email${r.fromClients === 1 ? '' : 's'} from clients${r.waiting ? `, ${r.waiting} more at the next check` : ''}.`);
+  else {
+    const found = [r.suggested ? `${r.suggested} task${r.suggested === 1 ? '' : 's'} suggested` : '', r.reminders ? `${r.reminders} follow-up${r.reminders === 1 ? '' : 's'} in Reminders` : ''].filter(Boolean);
+    showToast('success', found.length ? found.join(', ').replace(/^./, x => x.toUpperCase()) : 'Nothing new to do', `${r.fromClients || 0} new email${r.fromClients === 1 ? '' : 's'} from clients${r.waiting ? `, ${r.waiting} more at the next check` : ''}.`);
+  }
 }
 async function gmailCheckNow(){
   const btn = typeof clickedBtn === 'function' ? clickedBtn() : null; if(btn) setBtnLoading(btn, 'Checking…');
@@ -83,18 +87,22 @@ async function gmailMaybeRead(){
     await loadTaskSuggestions();
     if(currentViewName === 'tasks' && typeof renderTasks === 'function') renderTasks();
   }
+  if(r && r.reminders && typeof loadClientReminders === 'function'){
+    await loadClientReminders();
+    if(currentViewName === 'reminders' && typeof renderReminders === 'function') renderReminders();
+  }
 }
 // Settings → Connections → Yours
 function gmailRowHtml(st){ return gmailMainRowHtml(st) + gmailLabelRowHtml(st); }
 function gmailMainRowHtml(st){
   const g = gmailState;
   const head = sub => `<div class="fr cn-r">${appLogo('gmail')}<div class="l"><b>Gmail</b><span>${sub}</span></div>`;
-  if(!g) return `${head('Tasks from your clients’ emails, suggested in Tasks')}${st('', 'Checking…')}</div>`;
-  if(g.needsSetup) return `${head('Tasks from your clients’ emails, suggested in Tasks')}${st('hollow', isAdmin() ? 'Run addendum-gmail.sql' : 'Not set up')}</div>`;
-  if(!g.configured) return `${head('Tasks from your clients’ emails, suggested in Tasks')}${st('hollow', 'Not set up')}</div>`;
-  if(!g.connected) return `${head('Tasks from your clients’ emails, suggested in Tasks. Read only.')}<button class="btn" onclick="gmailConnect()">Connect…</button></div>`;
+  if(!g) return `${head('Tasks from your clients’ emails; what they owe you goes to Reminders')}${st('', 'Checking…')}</div>`;
+  if(g.needsSetup) return `${head('Tasks from your clients’ emails; what they owe you goes to Reminders')}${st('hollow', isAdmin() ? 'Run addendum-gmail.sql' : 'Not set up')}</div>`;
+  if(!g.configured) return `${head('Tasks from your clients’ emails; what they owe you goes to Reminders')}${st('hollow', 'Not set up')}</div>`;
+  if(!g.connected) return `${head('Tasks from your clients’ emails; what they owe you goes to Reminders. Read only.')}<button class="btn" onclick="gmailConnect()">Connect…</button></div>`;
   const read = g.lastReadAt && typeof claudeWhen === 'function' ? ' · read ' + claudeWhen(g.lastReadAt).toLowerCase() : '';
-  return `${head(g.lastError ? escapeHtml(g.lastError) : `${escapeHtml(g.email || 'Connected')}: tasks from clients’ emails${read}`)}${g.lastError ? st('yellow', 'Needs attention') : st('green', 'Connected')}<button class="btn" onclick="gmailCheckNow()">Check Now</button><button class="btn" onclick="gmailDisconnect()">Disconnect</button></div>`;
+  return `${head(g.lastError ? escapeHtml(g.lastError) : `${escapeHtml(g.email || 'Connected')}: tasks and follow-ups from clients’ emails${read}`)}${g.lastError ? st('yellow', 'Needs attention') : st('green', 'Connected')}<button class="btn" onclick="gmailCheckNow()">Check Now</button><button class="btn" onclick="gmailDisconnect()">Disconnect</button></div>`;
 }
 // ---- The Gmail label "Radar" (Nov 24, lib/gmail-label.js) ------------------------------------------
 // Label an email "Radar" in Gmail, and a small Apps Script in your own Google account sends it to Radar
@@ -104,8 +112,8 @@ function gmailLabelRowHtml(st){
   const g = gmailState; if(!g) return '';
   const l = g.label || {};
   const head = sub => `<div class="fr cn-r" role="button" tabindex="0" onclick="if(!event.target.closest('button'))gmailLabelSheet()">${appLogo('gmail')}<div class="l"><b>Gmail label “Radar”</b><span>${sub}</span></div>`;
-  if(l.needsSetup) return `${head('Label an email “Radar” and it comes to Radar as a task')}${st('hollow', isAdmin() ? 'Run addendum-gmail-label.sql' : 'Not set up')}</div>`;
-  if(!l.on) return `${head('Label an email “Radar” and it comes to Radar as a task')}<button class="btn" onclick="gmailLabelSheet()">Set Up…</button></div>`;
+  if(l.needsSetup) return `${head('Label an email “Radar”: a task, or a follow-up when the client owes you something')}${st('hollow', isAdmin() ? 'Run addendum-gmail-label.sql' : 'Not set up')}</div>`;
+  if(!l.on) return `${head('Label an email “Radar”: a task, or a follow-up when the client owes you something')}<button class="btn" onclick="gmailLabelSheet()">Set Up…</button></div>`;
   const last = l.lastUsedAt && typeof claudeWhen === 'function' ? ` · last ${claudeWhen(l.lastUsedAt).toLowerCase()}` : '';
   return `${head(`${l.sent ? `${l.sent} email${l.sent === 1 ? '' : 's'} sent to Radar${last}` : 'Set up. Label an email “Radar” to try it'}`)}${st('green', 'On')}<button class="btn" onclick="gmailLabelSheet()">Manage…</button></div>`;
 }
@@ -161,7 +169,7 @@ function gmailLabelStepsHtml(key){
 function gmailLabelSheet(){
   const l = (gmailState && gmailState.label) || {};
   const key = gmailLabelKeyNow;
-  const intro = `<p class="gl-p">Label any email “Radar” in Gmail, and within 5 minutes it’s a suggested task in Tasks, with a link back to the email. Only the emails you label are sent. A small script in your own Google account does it; you set it up once.</p>`;
+  const intro = `<p class="gl-p">Label any email “Radar” in Gmail, and within 5 minutes it’s in Radar with a link back to the email: what it asks of you as a suggested task in Tasks, and what the client owes you (or, in one you sent, what you asked them for) as a follow-up in Reminders. Only the emails you label are sent. A small script in your own Google account does it; you set it up once.</p>`;
   let body, actions;
   if(key){
     body = `${intro}${gmailLabelStepsHtml(key)}`;

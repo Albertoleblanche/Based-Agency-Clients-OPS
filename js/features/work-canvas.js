@@ -35,7 +35,8 @@ function remRowHtml(r, primary){
   const mate = remMate(r);
   const subj = mate ? `<span class="rmi-mate">${icon('user')}${escapeHtml(mate.gone ? 'A teammate' : firstName(mate.name))}</span>${c ? ' · ' + escapeHtml(c.name) : ''}` : `${escapeHtml(c ? c.name : '')}${focusMark(c)}`;
   return `<div class="rmi-r${open ? '' : ' is-done'}${window._remSel === r.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectReminder('${r.id}')" onkeydown="if((event.key==='Enter'||event.key===' ')&&event.target===this){event.preventDefault();selectReminder('${r.id}')}">${remCb(r)}
-<div class="tx"><b>${escapeHtml(r.question)}</b><span class="s">${subj} · ${escapeHtml(firstName(who))} asked ${escapeHtml(asked)}</span></div>
+<div class="tx"><b>${escapeHtml(r.question)}</b><span class="s">${subj} · ${(() => { const src = typeof remSource === 'function' ? remSource(r) : null;
+  return src ? `<span class="rmi-src" title="Radar found it in ${escapeHtml(src.words)}">${icon(src.mail ? 'envelope-simple' : 'notepad')}${src.short}</span> · ${escapeHtml(asked)}` : `${escapeHtml(firstName(who))} asked ${escapeHtml(asked)}`; })()}</span></div>
 <div class="rmi-w">${right}</div>${act}</div>`;
 }
 // The circle: ticks a question answered (with the same little check as everywhere else), or shows
@@ -122,7 +123,9 @@ function remPanelHtml(r){
     : open ? `<div class="tkp-acts" data-k="acts-open"><button class="btn${due ? ' btn-p' : ''}" onclick="nudgeReminder('${r.id}')">${icon('sparkle')}Draft Nudge</button><button class="btn${due ? '' : ' btn-p'}" onclick="markReminderStatus('${r.id}','answered')">${icon('check')}Mark Answered</button></div>`
     : `<div class="tkp-acts" data-k="acts-done"><button class="btn" onclick="markReminderStatus('${r.id}','waiting')">${icon('rotate-ccw')}Reopen</button></div>`;
   const ev = [];
-  if(r.askedDate) ev.push({ at: r.askedDate + 'T12:00:00', html: `<b>${escapeHtml(r.askedBy === currentUser?.id ? 'You' : firstName(owner ? owner.name : 'Someone'))}</b> asked ${escapeHtml(mate ? mateFirst : c ? c.name : 'the client')}` });
+  const src = typeof remSource === 'function' ? remSource(r) : null;
+  if(r.askedDate) ev.push({ at: r.askedDate + 'T12:00:00', html: src ? `Radar found it in ${escapeHtml(src.words)}, for <b>${escapeHtml(r.askedBy === currentUser?.id ? 'you' : firstName(owner ? owner.name : 'someone'))}</b> to follow up`
+    : `<b>${escapeHtml(r.askedBy === currentUser?.id ? 'You' : firstName(owner ? owner.name : 'Someone'))}</b> asked ${escapeHtml(mate ? mateFirst : c ? c.name : 'the client')}` });
   (remSessionActivity[r.id] || []).forEach(x => ev.push(x));
   if(!open && r.resolvedAt) ev.push({ at: r.resolvedAt, html: r.status === 'answered' ? `Marked answered${waited ? `, after ${waited}` : ''}` : 'Closed without an answer' });
   ev.sort((a, b) => new Date(b.at) - new Date(a.at));
@@ -140,6 +143,9 @@ function remPanelHtml(r){
 ${mate ? `<span class="tkp-k">Waiting on</span><span class="tkp-v">${escapeHtml(mate.name)}</span>` : ''}
 ${c ? `<span class="tkp-k">Client</span><span class="tkp-v"><a href="#" onclick="openClientDetail('${c.id}');return false;">${escapeHtml(c.name)}</a></span>` : ''}
 <span class="tkp-k">Asked by</span><span class="tkp-v">${escapeHtml(ownerName)}</span>
+${(() => { const src = typeof remSource === 'function' ? remSource(r) : null; if(!src) return '';
+  const label = escapeHtml(src.title);
+  return `<span class="tkp-k">From</span><span class="tkp-v rmp-src">${typeof appLogo === 'function' ? appLogo(src.app, 'xs') : ''}${src.url ? `<a href="${safeUrl(src.url)}" target="_blank" rel="noopener" title="${src.mail ? 'Open the email in Gmail' : 'Open the notes in Granola'}">${label}</a>` : label}</span>`; })()}
 <span class="tkp-k">Asked</span><span class="tkp-v">${escapeHtml(asked || '—')}${open && waited ? `<em>waiting ${waited}</em>` : ''}</span>
 ${follow}
 <span class="tkp-k">Status</span><span class="tkp-v">${status}</span>

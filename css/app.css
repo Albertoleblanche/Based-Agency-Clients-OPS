@@ -4109,3 +4109,10 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 .xa-r .sw{flex:none}
 .xa-r .sw[disabled]{opacity:.45;cursor:default}
 .xa-n{margin:8px 0 0;font-size:12px;line-height:1.4;color:var(--label-3)}
+
+/* Reminders → a follow-up Radar found in a meeting or an email (Nov 25) */
+.rmi-src{display:inline-flex;align-items:center;gap:4px}
+.rmi-src svg{width:13px;height:13px;flex:none;opacity:.75}
+.rmp-src{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.rmp-src a{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rmp-src .app-logo,.rmp-src img,.rmp-src svg{flex:none}

@@ -191,7 +191,8 @@ async function mLoadAll(){
   tasks = (tr.data || []).map(t => ({ id: t.id, title: t.title, description: t.description || '', priority: t.priority, status: t.status, assignerId: t.assigner_id, assigneeId: t.assignee_id,
     clientId: t.client_id, dueDate: t.due_date, link: t.link, attachments: t.attachments || [], createdAt: t.created_at, completedAt: t.completed_at, cancelledAt: t.cancelled_at,
     hiddenByAssigner: t.hidden_by_assigner, hiddenByAssignee: t.hidden_by_assignee, sprintId: t.sprint_id || null }));
-  clientReminders = (rr.data || []).map(r => ({ id: r.id, clientId: r.client_id, question: r.question, askedBy: r.asked_by, askedDate: r.asked_date, followUpDate: r.follow_up_date, status: r.status, waitingOn: r.waiting_on || null }));
+  clientReminders = (rr.data || []).map(r => ({ id: r.id, clientId: r.client_id, question: r.question, askedBy: r.asked_by, askedDate: r.asked_date, followUpDate: r.follow_up_date, status: r.status, waitingOn: r.waiting_on || null,
+    source: r.source || null, sourceTitle: r.source_title || '', sourceUrl: r.source_url || '' }));
   notes = (nr.data || []).map(n => ({ id: n.id, clientId: n.client_id, title: n.title, text: n.text, status: n.status, link: n.link, followUpDate: n.follow_up_date, updatedAt: n.updated_at }));
   try{ await loadTaskSuggestions(); }catch(e){ taskSuggestions = []; }   // tasks from meetings (Granola)
   if(typeof granolaAutoStart === 'function') granolaAutoStart();      // and they come in by themselves

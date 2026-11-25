@@ -10,7 +10,9 @@ async function loadClientReminders(){
   clientReminders = (data||[]).map(r=>({
     id:r.id, clientId:r.client_id, question:r.question, askedBy:r.asked_by,
     askedDate:r.asked_date, followUpDate:r.follow_up_date, status:r.status, resolvedAt:r.resolved_at,
-    waitingOn:r.waiting_on || null
+    waitingOn:r.waiting_on || null,
+    // from a Granola meeting or a client's email (Nov 25; addendum-reminder-sources.sql)
+    source:r.source || null, sourceTitle:r.source_title || '', sourceUrl:r.source_url || ''
   }));
   updateRemindersNavBadge();
 }
@@ -281,4 +283,12 @@ async function deleteReminder(id){
   renderReminders();
   renderCalendar();
   showToast('success','Reminder deleted','Removed.');
+}
+
+// Where a follow-up came from (Nov 25): Radar found it in a Granola meeting or a client's email.
+// [the words, the link, the app] or null for one added by hand.
+function remSource(r){
+  if(!r || !r.source) return null;
+  const mail = r.source === 'gmail', t = r.sourceTitle || (mail ? 'an email' : 'a meeting');
+  return { mail, words: mail ? `the email “${t}”` : `“${t}”`, short: mail ? 'Email' : 'Meeting', url: r.sourceUrl || '', title: t, app: mail ? 'gmail' : 'granola' };
 }

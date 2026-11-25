@@ -846,6 +846,22 @@ async function addSuggestedTask(id){
   await decideSuggestion(id, 'added', res.data.id);
   return { task: res.data };
 }
+// It's something a client owes us, not a task (Nov 25): a follow-up in Reminders instead, for you, with the
+// meeting or email it came from, due when the suggestion was (or in 3 working days). The suggestion leaves Tasks.
+function sgWorkdays(n){ const d = new Date(rNow()); let k = 0; while(k < n){ d.setDate(d.getDate() + 1); if(d.getDay() !== 0 && d.getDay() !== 6) k++; } return toDateStr(d); }
+async function suggestionToReminder(id){
+  const s = (taskSuggestions || []).find(x => x.id === id); if(!s) return { error: { message: 'Already decided.' } };
+  if(!s.clientId) return { error: { message: 'A follow-up is with a client, and this one has none. Add it as a task, or add the follow-up in Reminders.' }, noClient: true };
+  const today = toDateStr(rNow()), due = s.dueDate && s.dueDate > today ? s.dueDate : sgWorkdays(3);
+  const row = { client_id: s.clientId, question: String(s.title || '').slice(0, 300), asked_by: currentUser.id, follow_up_date: due, status: 'waiting' };
+  const src = { source: s.source === 'gmail' ? 'gmail' : 'granola', source_id: s.sourceId || null, source_title: s.sourceTitle || null, source_url: s.sourceUrl || null };
+  let r = await supabaseClient.from('client_reminders').insert({ ...row, ...src }).select().single();
+  if(r.error && /source/i.test(r.error.message || '')) r = await supabaseClient.from('client_reminders').insert(row).select().single();   // before addendum-reminder-sources.sql
+  if(r.error || !r.data) return { error: r.error || { message: 'Not saved' } };
+  await decideSuggestion(id, 'dismissed');
+  if(typeof loadClientReminders === 'function') await loadClientReminders();
+  return { reminder: r.data };
+}
 // The New Task sheet's preset for "Edit…": change anything, and saving adds it.
 function suggestionPreset(s){
   return { title: s.title, description: suggestionNotes(s), clientId: s.clientId || '', due: s.dueDate || '', priority: s.priority || 'medium', link: s.sourceUrl || '',
@@ -928,6 +944,7 @@ async function checkGranolaNow(){
   let r;
   try{ r = await granolaApi('check'); }catch(e){ return { type: 'error', title: 'Couldn’t check Granola', text: e.message }; }
   try{ await loadTaskSuggestions(); }catch(e){}
+  if(r && r.followUps && typeof loadClientReminders === 'function'){ try{ await loadClientReminders(); }catch(e){} }   // what clients owe you went to Reminders (Nov 25)
   const mine = (taskSuggestions || []).filter(s => !before.has(s.id)).length;
   if(r.error) return { type: 'error', title: 'Granola didn’t answer', text: r.error, mine };
   if(r.skipped === 'not connected'){ granolaSet(false); return { type: 'info', title: 'Granola isn’t connected', text: 'An admin connects it in Settings → Connections.', mine }; }
@@ -936,7 +953,9 @@ async function checkGranolaNow(){
   const later = [r.waiting ? `${r.waiting} ${n(r.waiting, 'meeting is', 'meetings are')} still being written in Granola; Radar reads ${n(r.waiting, 'it', 'them')} once ${n(r.waiting, 'it’s', 'they’re')} done.` : '',
     r.left ? `${r.left} more to read: check again in a minute.` : ''].filter(Boolean).join(' ');
   const plus = t => later ? `${t} ${later}` : t;
-  if(mine) return { type: 'success', title: `${mine} new task${mine === 1 ? '' : 's'} from your meetings`, text: plus('Add the ones that are yours to do.'), mine };
+  const owed = r && r.followUps ? ` ${r.followUps === 1 ? 'One thing a client owes the team went' : `${r.followUps} things clients owe the team went`} to Reminders.` : '';
+  if(mine) return { type: 'success', title: `${mine} new task${mine === 1 ? '' : 's'} from your meetings`, text: plus('Add the ones that are yours to do.' + owed), mine };
+  if(owed) return { type: 'success', title: 'New follow-ups from your meetings', text: plus(owed.trim()), mine };
   if(r.recent) return { type: 'info', title: 'Granola was just checked', text: 'Nothing new for you. New meetings also come in by themselves.', mine };
   if(r.read) return { type: 'info', title: `Read ${r.read} meeting${r.read === 1 ? '' : 's'}`, text: plus('Nothing in them for you.'), mine };
   if(later) return { type: 'info', title: 'Nothing new for you yet', text: later, mine };

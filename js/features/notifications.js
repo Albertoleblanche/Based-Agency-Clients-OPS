@@ -49,7 +49,7 @@ const NOTIFICATION_TYPE_META = {
   whatsapp_nudge:          { label:'A lead asks you to answer a client on WhatsApp', section:'Client Work' },
   whatsapp_handoff:        { label:'A teammate hands you a client’s WhatsApp request', section:'Client Work' },
   whatsapp_signal:         { label:'A client mentions pausing, budget, a competitor or growing (WhatsApp)', section:'Client Work', visibleTo:'admin' },
-  reminder_added:          { label:'A client promises something in a meeting (a follow-up is added)', section:'Client Work' },
+  reminder_added:          { label:'A client owes you something from a meeting or an email (a follow-up is added)', section:'Client Work' },
   reminder_escalated:      { label:'A client follow-up has gone unanswered for a week', section:'Client Work', visibleTo:'approver' },
   health_ask:              { label:'An approver asks you about a client at risk or on watch', section:'Client Work' },
   client_danger_maxed:     { label:'A client\'s danger score hits 5/5', section:'Client Work' },
