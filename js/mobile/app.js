@@ -207,7 +207,7 @@ async function mLoadAll(){
   calendarEvents = (ev.data || []).map(e => ({ id: e.id, title: e.title, startAt: e.start_at, endAt: e.end_at, allDay: e.all_day, clientId: e.client_id, location: e.location, eventType: e.event_type, attendeeIds: e.attendee_ids || [], createdBy: e.created_by,
     description: e.description || '', meetingUrl: e.meeting_url || null, googleEventId: e.google_event_id || null, googleOwner: e.google_calendar_owner || null }));
   await Promise.all([loadUpdateHistory(), loadHealthHandled(), loadTaskDueTimes(), typeof hvTimeLoad === 'function' ? hvTimeLoad() : null,
-    typeof loadDangerHistory === 'function' ? loadDangerHistory() : null, mLoadSprints()]);   // who set a client's Risk (Nov 25)
+    typeof loadDangerHistory === 'function' ? loadDangerHistory() : null, mLoadSprints(), typeof loadClientConcerns === 'function' ? loadClientConcerns() : null]);   // who set a client's Risk (Nov 25)
 }
 // Your sprints from Plan (Nov 25): Tasks shows each one as a single row, its next step (sprintFold in
 // data.js). Plan itself is on the computer; the phone only reads them.
@@ -1105,10 +1105,53 @@ ${mIsh('Needs setup')}<div class="ig"><div class="ir"><span class="t n" style="w
     const steps = STEP_NAMES.map((n, k) => mIr(`<span class="gl" style="color:${w.sent || k < w.done ? 'var(--green)' : w.behind === k ? (w.late ? 'var(--red)' : 'var(--yellow)') : 'var(--label-3)'}">${icon(w.sent || k < w.done ? 'check-circle' : w.behind === k ? 'warning' : 'circle')}</span>`, n, '', k === 3 ? (w.sent ? mEsc(relDay(w.last)) : `<span class="${w.late ? 't-red' : ''}">${mEsc(w.dueText)}</span>`) : '', null, { n: true })).join('');
     return `<div class="idetail" style="display:flex;gap:12px;align-items:center;margin-top:4px">${monoHtml(c, 'lg')}<div style="min-width:0"><h1 style="font-size:24px;font-weight:700;letter-spacing:-.02em;margin:0">${mEsc(c.name)}</h1><div class="ikv">${mEsc([c.service, w.owner].filter(Boolean).join(' · '))}</div>${mFocusHtml(c)}</div></div>
 ${h.level !== 'g' ? `<div class="tags iwrap" style="margin:14px 16px 0">${healthTag(h.level)}${signalChips(h, 4)}</div>` : ''}
+${mRiskHtml(c, h)}
 ${mIsh('This week’s update')}${w.off ? `<div class="ig">${mIr('', 'No weekly update', '', '', null, { n: true })}</div><p class="ifoot">It isn’t on This Week, Today or Health. Work and hours are still logged here.</p>` : `<div class="ig">${steps}</div>`}
 ${waCanWork(c) ? `<div style="margin:12px 16px 0"><button class="ibtn s" onclick="mOpenLog('${c.id}')">${icon('plus')}Log Improvement</button></div>` : `<p class="ifoot" style="margin-top:12px">${mEsc(waOutsideWords(c))}</p>`}
 ${mIsh('Logged')}<div class="ig">${imps.map(i => mIr('', mEsc(i.text), `${mEsc(i.author)} · ${fmtShortDate(new Date(i.date))}${i.includeInEmail === false ? ' · internal' : ''}`, '', null, { n: true })).join('') || '<div class="ir"><span class="t n" style="color:var(--label-2)">Nothing logged yet</span></div>'}</div>${mClientMeetingsHtml(c)}`;
   });
+}
+// The work and the flag (Nov 25): what the team did and the people's read, side by side; concerns,
+// and Flag a Concern for anyone who isn't an approver (they set the Risk on the computer).
+function mRiskHtml(c, h){
+  if(!h || h.off) return '';
+  const f = h.flag, cons = h.concerns || [], me = currentUser ? currentUser.id : null;
+  const btn = !canApprove() ? `<div style="margin:12px 16px 0"><button class="ibtn s" onclick="mOpenConcern('${c.id}')">${icon('flag')}Flag a Concern</button></div>` : '';
+  if(!f && !cons.length) return btn;
+  const facts = riskFacts(c, f && f.from ? f.from : null), wl = h.work.level;
+  const dot = l => `<span class="dot ${l === 'r' ? 'red' : l === 'y' ? 'yellow' : 'green'}"></span>`;
+  const work = mIr('', 'The work', wl === 'g' ? `${facts.words.charAt(0).toUpperCase() + facts.words.slice(1)}${f && f.from ? ' since ' + fmtShortDate(new Date(f.from)) : ''}` : h.work.signals.map(x => x.title).slice(0, 2).join(' · '), `${dot(wl)}${healthWord(wl)}`, null, { n: true, s2: true });
+  const flag = f ? mIr('', 'The flag', `${mEsc([riskWho(f.by) ? (riskWho(f.by) === 'you' ? 'You' : riskWho(f.by)) : '', f.at ? fmtShortDate(f.at) : ''].filter(Boolean).join(', '))}${f.reason ? `: “${mEsc(f.reason)}”` : ''}`, `${dot(f.l)}Risk ${f.danger}`, null, { n: true, s2: true }) : '';
+  const conRows = cons.map(x => mIr('', `Concern from ${mEsc(riskWho(x.raisedBy) === 'you' ? 'you' : (riskWho(x.raisedBy) || 'the team'))}`, `“${mEsc(x.reason)}”`,
+    me && x.raisedById === me ? `<button class="link" onclick="mConcernWithdraw('${x.id}')">Withdraw</button>` : fmtShortDate(x.createdAt), null, { n: true, s2: true })).join('');
+  return `${mIsh('The work and the flag')}<div class="ig">${work}${flag}${conRows}</div><p class="ifoot">${f ? 'Approvers review a flag once the work has been healthy for two weeks, and clear it.' : 'An approver puts the client At risk or clears the concern.'}</p>${btn}`;
+}
+function mOpenConcern(clientId){
+  const c = clients.find(x => x.id === clientId); if(!c) return;
+  if(typeof clientConcernsReady !== 'undefined' && clientConcernsReady === false){ showToast('info', 'Not on yet', 'Concerns need a one-time database update: an admin runs addendum-risk-flags.sql in Supabase.'); return; }
+  window._mcc = clientId; mKeep('mCcWhy', '');
+  mOpenSheet('Flag a Concern', `<p class="ifoot" style="margin:12px 16px 0">About ${mEsc(c.name)}. It puts the client on Watch and tells the approvers; they decide whether it’s At risk.</p>
+<div class="ig flat" style="margin-top:14px"><div class="ir" style="align-items:flex-start"><textarea class="iarea" id="mCcWhy" maxlength="500" placeholder="What you saw or heard" spellcheck="true" oninput="mKeep('mCcWhy',this.value)"></textarea></div></div>`, { done: 'mSaveConcern()', doneLabel: 'Flag' });
+}
+async function mSaveConcern(){
+  const c = clients.find(x => x.id === window._mcc); if(!c) return;
+  const why = mSheetVal('mCcWhy').trim();
+  if(!why){ showToast('error', 'Say what it is', 'One line is enough.'); $m('mCcWhy')?.focus(); return; }
+  const btn = $m('mSheetDone'); if(btn) btn.disabled = true;
+  const me = myName() || 'Someone';
+  const { data, error } = await supabaseClient.from('client_concerns').insert({ client_id: c.id, reason: why.slice(0, 500), raised_by: me, raised_by_id: currentUser.id }).select().single();
+  if(error || !data){ if(btn) btn.disabled = false; showToast('error', 'Not flagged', /client_concerns|PGRST205|42P01|schema cache/i.test(`${error && error.code} ${error && error.message}`) ? 'Concerns need a one-time database update: an admin runs addendum-risk-flags.sql.' : 'Try again in a moment.'); return; }
+  for(const p of teamProfiles.filter(p => (p.role === 'admin' || p.role === 'approver') && !p.access_revoked && p.id !== currentUser.id))
+    await mNotify(p.id, 'client_concern', `${shortClientName(c.name)}: a concern from ${firstName(me)}`, `“${why.slice(0, 200)}” It’s on Watch until you put it At risk or clear it.`, 'health', c.id);
+  mLog(c.id, 'client_updated', `${me} flagged a concern: “${why.slice(0, 120)}”`, `Flagged a concern about <b>${escapeHtml(c.name)}</b>.`);
+  mCloseSheet(true); await mRefresh(); mTop()?.refresh();
+  showToast('success', 'Concern flagged', `${c.name} is on Watch, and the approvers were told.`);
+}
+async function mConcernWithdraw(id){
+  const { data, error } = await supabaseClient.from('client_concerns').update({ resolved_at: new Date().toISOString(), resolved_by: myName() || '', outcome: 'withdrawn' }).eq('id', id).select('id');
+  if(error || !data || !data.length){ showToast('error', 'Not withdrawn', 'Try again in a moment.'); return; }
+  await mRefresh(); mTop()?.refresh();
+  showToast('success', 'Concern withdrawn', '');
 }
 // The client's meetings (Nov 23): when the team last met them, and the meetings you can see
 function mClientMeetingsHtml(c){

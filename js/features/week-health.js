@@ -397,19 +397,85 @@ async function loadHealthHandled(){
   const raw = await safeGet('health-handled');
   try{ healthHandled = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : {}; }catch(e){ healthHandled = {}; }
 }
-// The Risk on a client (1 to 5) and who set it (Nov 25). Radar keeps who changes it from now on; a
-// Risk from before (an import, the first setup) names nobody: it used to say the owner flagged it,
-// which they often hadn't. Approvers change it in Edit Client or Bulk Edit.
+// ---- The flag and the work (Nov 25) ----
+// A client's Risk (1 to 5) is a person's flag: at 3 Health puts the client on Watch, at 4 or 5 At risk.
+// It's shown beside the work (updates, logged work, hours, tasks, meetings, WhatsApp), not instead of
+// it, with who set it, when and why. Once the work has been healthy for two weeks since the flag,
+// approvers and admins are asked to review it (Keep It, or Clear Flag); Radar never lowers it itself.
+// Concerns: anyone on the team raises one, with why; it's Watch until an approver or admin puts the
+// client At risk or clears it. See risk-flags.js for the screens, addendum-risk-flags.sql.
+const FLAG_REVIEW_DAYS = 14;
+function riskRows(c){
+  return (typeof dangerHistory !== 'undefined' && Array.isArray(dangerHistory) ? dangerHistory : [])
+    .filter(x => x.clientId === c.id).sort((a, b) => (+b.recordedAt || 0) - (+a.recordedAt || 0));   // undated: oldest
+}
+// The flag on a client now: its level, who set it and when (the change that set it), why, and the
+// last review (Keep It). null below Watch, or with the Risk signal turned off in Settings.
+// Looking back (a past week on the trail), the Risk is what it was then: the last change on or before
+// that day. Before the first change Radar knows of, it's that value only if it predates tracking (no
+// one's name on it); a change someone made started then.
+function riskRowsThen(c){
+  const rows = riskRows(c);
+  if(!_asOf) return rows;
+  const now = +rNow();
+  return rows.filter(x => !(+x.recordedAt > 0) || +x.recordedAt <= now);
+}
+function riskDangerThen(c){
+  if(!_asOf) return c.danger || 0;
+  const all = riskRows(c).filter(x => x.kind !== 'kept');
+  if(!all.length) return c.danger || 0;
+  const then = riskRowsThen(c).find(x => x.kind !== 'kept');
+  if(then) return then.danger || 0;
+  const first = all[all.length - 1];
+  return first.setBy ? 0 : (first.danger || 0);
+}
+function riskFlag(c){
+  const T = clientThresholds(c), d = riskDangerThen(c);
+  if(typeof settings !== 'undefined' && settings.ownerRiskFlag === false) return null;
+  const l = d >= T.ownerFlag[1] ? 'r' : d >= T.ownerFlag[0] ? 'y' : null;
+  if(!l) return null;
+  const rows = riskRowsThen(c), set = rows.find(x => x.kind !== 'kept' && x.danger === d) || null;
+  const ok = x => x && !isNaN(+x.recordedAt) && +x.recordedAt > 0;
+  const at = ok(set) ? set.recordedAt : null;
+  const kept = rows.find(x => x.kind === 'kept' && x.danger === d && ok(x) && (!at || +x.recordedAt >= +at)) || null;
+  return { l, danger: d, by: (set && set.setBy) || '', at, reason: (set && set.reason) || '', keptBy: kept ? kept.setBy || '' : '', keptAt: kept ? kept.recordedAt : null,
+    from: kept ? kept.recordedAt : at };
+}
+function riskWho(name){ const me = typeof myName === 'function' ? myName() : ''; return !name ? '' : me && name === me ? 'you' : (firstName(name) || name); }
 function riskFlagBy(c){
-  const h = typeof dangerHistory !== 'undefined' && Array.isArray(dangerHistory)
-    ? dangerHistory.filter(x => x.clientId === c.id).sort((a, b) => (+b.recordedAt || 0) - (+a.recordedAt || 0))[0] : null;   // undated: oldest
-  const by = h && h.danger === c.danger && h.setBy ? h.setBy : '';
-  const me = typeof myName === 'function' ? myName() : '';
-  const who = by ? (me && by === me ? 'you' : (firstName(by) || by)) : '';
-  const change = typeof canApprove === 'function' && canApprove() ? 'Change it in Edit Client.' : 'An approver can change it in Edit Client.';
+  const f = riskFlag(c) || { danger: c.danger, by: '', at: null, reason: '' }, who = riskWho(f.by);
+  const said = f.reason ? `: “${f.reason}”` : '';
   return who
-    ? { who, title: `Flagged by ${who}`, text: `Risk set to ${c.danger} of 5 on ${fmtShortDate(h.recordedAt)}. ${change}` }
-    : { who: '', title: `Risk set to ${c.danger} of 5`, text: `Set on the client before Radar kept track of who. ${change}` };
+    ? { who, title: `Flagged by ${who}`, text: `Risk ${f.danger} of 5${f.at ? ' since ' + fmtShortDate(f.at) : ''}${said || '.'}` }
+    : { who: '', title: `Risk set to ${f.danger} of 5`, text: f.reason ? `“${f.reason}”` : 'Set before Radar kept track of who, or why.' };
+}
+// Concerns still open for a client, oldest first
+// (a few minutes' grace: the server's clock can run a little ahead of this one)
+function openConcerns(c){ const by = rNow().getTime() + 10 * 60000; return (typeof clientConcerns !== 'undefined' && Array.isArray(clientConcerns) ? clientConcerns : []).filter(x => x.clientId === c.id && (!x.resolvedAt || new Date(x.resolvedAt).getTime() > by) && new Date(x.createdAt).getTime() <= by); }
+// What the team did for a client since a day: updates sent (and how many on time), work logged, tasks
+// done, the last meeting. For the flag's side of Health.
+function riskFacts(c, from){
+  const since = from ? new Date(from) : addDays(rNow(), -30), now = rNow();
+  const sent = sentTimes(c).filter(d => d >= since && d <= now);
+  const logged = (c.improvements || []).filter(i => { const d = new Date(i.date); return d >= since && d <= now; });
+  const done = (typeof tasks !== 'undefined' ? tasks : []).filter(t => t.clientId === c.id && t.status === 'done' && t.completedAt && new Date(t.completedAt) >= since && new Date(t.completedAt) <= now);
+  const met = typeof clientLastMet === 'function' ? clientLastMet(c) : null;
+  const n = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`;
+  const bits = [sent.length ? `${n(sent.length, 'update')} sent` : 'no update sent', logged.length ? `${logged.length} thing${logged.length === 1 ? '' : 's'} logged` : 'nothing logged',
+    done.length ? `${n(done.length, 'task')} done` : '', met && met >= since ? `met ${fmtShortDate(met)}` : ''].filter(Boolean);
+  return { sent: sent.length, logged: logged.length, done: done.length, met: met && met >= since ? met : null, words: bits.join(', ') };
+}
+// Ready to review: the work healthy now and a week ago, two weeks or more since the flag (or its last
+// review). Flags from before Radar kept dates count from the first day it can tell.
+function flagReview(c, h){
+  const f = h ? h.flag : riskFlag(c); if(!f) return null;
+  const from = f.from || clientStartedAt(c) || null, now = rNow();
+  if(!from || daysBetween(from, now) < FLAG_REVIEW_DAYS) return null;
+  const work = h ? h.work.level : clientHealth(c).work.level;
+  if(work !== 'g') return null;
+  // healthy every day of the last two weeks, not just today
+  for(let i = 1; i < FLAG_REVIEW_DAYS; i++) if(withAsOf(addDays(now, -i), () => clientHealth(c).work.level) !== 'g') return null;
+  return { from, facts: riskFacts(c, from) };
 }
 function clientHealth(c){
   const T = clientThresholds(c), now = rNow(), sig = [];
@@ -419,7 +485,7 @@ function clientHealth(c){
   const w = clientWeek(c);
   // No weekly update (the agency itself, an internal client): Health doesn't watch it, so it never
   // shows Watch or At risk anywhere. Its hours still show in its panel.
-  if(!getsUpdates(c)) return { level: 'g', rawLevel: 'g', quiet: false, signals: [], since: null, short: null, hp: hoursPace(c), seq: weekHistory(c), off: true };
+  if(!getsUpdates(c)) return { level: 'g', rawLevel: 'g', quiet: false, signals: [], since: null, short: null, hp: hoursPace(c), seq: weekHistory(c), off: true, work: { level: 'g', signals: [] }, flag: null, concerns: [] };
   if(noUpd != null){
     const l = lvl(noUpd, T.noUpdateDays);
     if(l) sig.push({ l, key: 'noupdate', icon: 'mail', title: 'Updates keep slipping', since: addDays(last, T.noUpdateDays[0]),
@@ -458,8 +524,11 @@ function clientHealth(c){
   const overdue = (typeof tasks !== 'undefined' ? tasks : []).filter(t => t.clientId === c.id && openAt(t) && t.dueDate && dayStart(new Date(t.dueDate + 'T12:00:00')) < dayStart(now));
   const lo = lvl(overdue.length, T.overdueTasks);
   if(lo) sig.push({ l: lo, key: 'tasks', icon: 'list-checks', title: `${overdue.length} tasks overdue`, since: now, text: overdue.map(t => t.title).slice(0, 2).join(' · ') });
-  const lf = (typeof settings !== 'undefined' && settings.ownerRiskFlag === false) ? null : lvl(c.danger || 0, T.ownerFlag);
-  if(lf){ const f = riskFlagBy(c); sig.push({ l: lf, key: 'flag', icon: 'flag', title: f.title, since: now, text: f.text }); }
+  const flag = riskFlag(c);
+  if(flag){ const f = riskFlagBy(c); sig.push({ l: flag.l, key: 'flag', icon: 'flag', title: f.title, since: flag.at && flag.at <= now ? flag.at : now, text: f.text }); }
+  const cons = openConcerns(c);
+  if(cons.length) sig.push({ l: 'y', key: 'concern', icon: 'flag', title: cons.length === 1 ? `Concern from ${riskWho(cons[0].raisedBy) || 'the team'}` : `${cons.length} concerns from the team`,
+    since: cons[0].createdAt, text: cons.map(x => `“${x.reason}”`).join(' ') });
   // No meeting lately (Nov 23): only for a client the team meets on Granola (it has a last meeting), and
   // only Watch: a gap in meetings alone never makes a client At risk
   const met = typeof clientLastMet === 'function' ? clientLastMet(c) : null;
@@ -470,15 +539,20 @@ function clientHealth(c){
   // How they come across on WhatsApp this week (Nov 24): frustrated is Watch, upset is At risk
   const mood = typeof waMoodSignal === 'function' ? waMoodSignal(c) : null;
   if(mood) sig.push(mood);
-  const prio = ['hours', 'noupdate', 'late', 'mood', 'quiet', 'under', 'tasks', 'flag', 'met'];
+  const prio = ['hours', 'noupdate', 'late', 'mood', 'quiet', 'under', 'tasks', 'flag', 'concern', 'met'];
   sig.sort((a, b) => (a.l === 'r' ? 0 : 1) - (b.l === 'r' ? 0 : 1) || prio.indexOf(a.key) - prio.indexOf(b.key));
-  let level = sig.some(s => s.l === 'r') ? 'r' : (sig.length ? 'y' : 'g');
-  if(level === 'y' && T.importantBump && (c.importance || 0) >= 8) level = 'r';
+  const levelOf = list => { let l = list.some(s => s.l === 'r') ? 'r' : (list.length ? 'y' : 'g'); if(l === 'y' && T.importantBump && (c.importance || 0) >= 8) l = 'r'; return l; };
+  // the work on its own: everything but the flag and concerns (people's reads, shown beside it). Health
+  // is the worse of the work and the flag; a concern is Watch, never more (an important client's bump
+  // to At risk is for the work: only an approver or admin puts a client At risk)
+  const workSig = sig.filter(s => s.key !== 'flag' && s.key !== 'concern'), work = { level: levelOf(workSig), signals: workSig };
+  const rank = { g: 0, y: 1, r: 2 }, worst = (...ls) => ls.reduce((a, b) => (rank[b] > rank[a] ? b : a), 'g');
+  let level = worst(work.level, flag ? flag.l : 'g', cons.length ? 'y' : 'g');
   const h = healthHandled[c.id];
   const quiet = h && new Date(h.at) <= now && addDays(new Date(h.at), T.quietDays) > now && (h.level === level || (h.level === 'r' && level === 'y'));
   const since = sig.length ? sig.map(s => s.since).sort((a, b) => b - a)[0] : null;
   const short = sig.length ? (sig.find(s => s.l === 'r') || sig[0]) : null;
-  return { level: quiet ? 'g' : level, rawLevel: level, quiet, signals: sig, since, short, hp, seq };
+  return { level: quiet ? 'g' : level, rawLevel: level, quiet, signals: sig, since, short, hp, seq, work, flag, concerns: cons };
 }
 // ---- glanceable pieces: colored tags and signal chips instead of sentences ----------------------
 function tagHtml(kind, text, ic){ return `<span class="tag ${kind}">${ic && typeof icon === 'function' ? icon(ic, { weight: 'bold' }) : ''}${escapeHtml(text)}</span>`; }
@@ -522,7 +596,8 @@ function signalChips(h, max){
     late: lateM ? `${lateM[1]}/4 late` : 'Late updates',
     quiet: (s.text.match(/(\d+) days/) || [])[1] ? `${s.text.match(/(\d+) days/)[1]}d quiet` : 'Quiet',
     tasks: s.title.replace(' tasks overdue', ' overdue tasks'),
-    flag: 'Owner flag',
+    flag: `Risk ${h.flag ? h.flag.danger : ''}`.trim(),
+    concern: 'Concern',
     met: (s.text.match(/(\d+) days/) || [])[1] ? `${s.text.match(/(\d+) days/)[1]}d since a meeting` : 'No meeting' }[s.key] || s.title);
   return h.signals.slice(0, max || 3).map(s => `<span class="chip c${s.l}" title="${escapeHtml(s.title + ' — ' + s.text)}">${typeof icon === 'function' ? icon(s.icon) : ''}${escapeHtml(word(s))}</span>`).join('');
 }

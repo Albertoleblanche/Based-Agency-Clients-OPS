@@ -156,6 +156,7 @@ async function showApp(session, o){
     await Promise.all([
       loadTeamProfiles(), loadTimeEntries(), day, msgs,
       loadDangerHistory().then(seedDangerHistoryIfEmpty),
+      typeof loadClientConcerns === 'function' ? loadClientConcerns() : null,   // concerns about clients (Nov 25)
       // The weekly model reads these: without them the first screen counts every client
       // as never updated until the next refresh.
       typeof loadUpdateHistory === 'function' ? loadUpdateHistory() : null,

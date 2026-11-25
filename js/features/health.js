@@ -98,6 +98,12 @@ function renderHealth(){
     else if(h.quiet){ const hd = healthHandled[c.id], until = hd ? addDays(new Date(hd.at), T.quietDays) : null;
       const d = hd ? new Date(hd.at) : null, wd = d ? weekDay(d) : '', when = !d ? '' : wd === 'Today' ? ' today' : /^[A-Z][a-z]{2}$/.test(wd) ? ' on ' + d.toLocaleDateString('en-US', { weekday: 'long' }) : ' on ' + wd;
       why = `Handled${hd ? ' by ' + firstName(hd.by) + when : ''} · healthy again ${until ? fmtShortDate(until) : 'soon'} if it holds`; }
+    else if(everyone && typeof flagReview === 'function' && h.flag && flagReview(c, h)){ const f = h.flag;
+      why = `Flag ready to review: the work has been healthy since ${fmtShortDate(new Date(f.from))}`;
+      act = `<button class="btn sm" onclick="event.stopPropagation();selectHealthClient('${c.id}')">Review Flag</button>`; }
+    else if(everyone && h.concerns && h.concerns.length && !h.flag){ const k = h.concerns[0];
+      why = `Concern from ${firstName(k.raisedBy) || 'the team'}: ${k.reason}`;
+      act = `<button class="btn sm" onclick="event.stopPropagation();selectHealthClient('${c.id}')">Review</button>`; }
     else if(next){ const who = (teamProfiles.find(p => p.id === next.assigneeId) || {}).name;
       why = `Next: ${next.title}${who ? ' · ' + firstName(who) : ''}${next.dueDate ? ' · ' + weekDay(new Date(next.dueDate + 'T12:00:00')) : ''}`;
       act = `<button class="btn sm" onclick="event.stopPropagation();openTaskDetailModal('${next.id}')">Open Task</button>`; }
@@ -187,7 +193,7 @@ function healthGlanceHtml(all, weekAgo){
     tile('follow', 'Follow-ups', `${fu.length}`, fu.length ? `waiting on clients${fuDue ? ` · <span class="hg-bad">${fuDue} due</span>` : ''}` : 'Nothing waiting on clients', fuDue ? 'warn' : ''),
   ].filter(Boolean).join('');
   // why the ones that need care do
-  const WHY = { noupdate: 'Updates slipping', late: 'Updates slipping', quiet: 'Nothing logged', hours: 'Over hours', under: 'Hours under-used', tasks: 'Tasks overdue', flag: 'Flagged at risk', met: 'No meeting lately' };
+  const WHY = { noupdate: 'Updates slipping', late: 'Updates slipping', quiet: 'Nothing logged', hours: 'Over hours', under: 'Hours under-used', tasks: 'Tasks overdue', flag: 'Risk flag', concern: 'Team concern', met: 'No meeting lately' };
   const why = {};
   all.filter(x => x.h.rawLevel !== 'g').forEach(x => { const seen = new Set(); x.h.signals.forEach(sg => { const w = WHY[sg.key]; if(w && !seen.has(w)){ seen.add(w); why[w] = (why[w] || 0) + 1; } }); });
   const reasons = Object.entries(why).sort((a, b) => b[1] - a[1]);
@@ -273,7 +279,9 @@ function healthPanelHtml(c, h, closeFn){
     acts = acts ? acts.replace('<div class="sp-acts">', `<div class="sp-acts">${ask}`) : `<div class="sp-acts">${ask}</div>`;
     if(when) acts = acts.replace(/<\/div>$/, `<span class="nd-when">${escapeHtml(when)}</span></div>`);
   }
-  const why = h.signals.map(s => `<div class="hp-w"><span class="sig ${s.l}">${icon(s.icon)}</span><div class="tx"><b>${escapeHtml(s.title)}</b><span>${escapeHtml(s.text)}</span></div><span class="hp-since">${escapeHtml(relDay(s.since))}</span></div>`).join('');
+  // the people's read (the flag, concerns) is in its own card beside the work, not in Why (Nov 25)
+  const card = typeof riskCardHtml === 'function' ? riskCardHtml(c, h) : '', workSigs = card ? h.signals.filter(s => s.key !== 'flag' && s.key !== 'concern') : h.signals;
+  const why = workSigs.map(s => `<div class="hp-w"><span class="sig ${s.l}">${icon(s.icon)}</span><div class="tx"><b>${escapeHtml(s.title)}</b><span>${escapeHtml(s.text)}</span></div><span class="hp-since">${escapeHtml(relDay(s.since))}</span></div>`).join('');
   const weeks = healthWeeks(), hist = healthTrail(c, h, weeks);
   const trail = `<div class="sp-sec hx-ro"><b>The last 12 weeks</b><span></span></div>${healthTrailHtml(hist, 'cz-tl').replace('<div class="tl cz-tl"', `<div class="tl cz-tl" data-h="${hist.map(k => k || '.').join('')}"`)}${healthAxisHtml(weeks)}`;
   const hp = h.hp, scale = Math.max(hp.budget, hp.projected, hp.used, 1);
@@ -286,7 +294,8 @@ function healthPanelHtml(c, h, closeFn){
 <div class="sp-bar"><button class="ib" aria-label="Close" onclick="${closeFn || 'closeHealthPanel()'}">${icon('x')}</button><a class="x-lnk" href="#" onclick="openClientDetail('${c.id}');return false;">Open client</a></div>
 <div class="sp-head">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}${focusMark(c)}</b><span>${meta}</span></div></div>
 <div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b><span class="sub">${sub}</span>${acts}</div>
-${h.signals.length ? `<div class="sp-sec"><b>Why</b><span>${todayPlural(h.signals.length, 'signal')}</span></div>${why}` : ''}
+${card}
+${workSigs.length ? `<div class="sp-sec"><b>${card ? 'From the work' : 'Why'}</b><span>${todayPlural(workSigs.length, 'signal')}</span></div>${why}` : ''}
 ${trail}
 ${hours}
 <div class="sp-sec"><b>Last 8 weekly updates</b><span>${ots.total ? `${ots.onTime} of ${ots.total} on time` : ''}</span></div>${weekStripHtml(c)}

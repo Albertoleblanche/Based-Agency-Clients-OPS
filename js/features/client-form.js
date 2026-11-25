@@ -227,16 +227,25 @@ function checkDuplicateClientName(){
 // the alert below, which would train people to ignore it.
 // Who set it is kept too (Nov 25), so Health can say "Flagged by Dan" and not guess from the owner.
 // Before the set_by column (addendum-risk-set-by.sql) it's saved without.
-function logDangerHistory(clientId, danger, previousDanger){
+// Why (Nov 25, addendum-risk-flags.sql): the reason it was set, shown on Health; kind 'kept' is a
+// review that left it as it was (Keep It). Before that SQL, saved without them.
+function logDangerHistory(clientId, danger, previousDanger, reason, kind){
   const row = { client_id: clientId, danger, set_by: (typeof myName === 'function' && myName()) || null };
-  supabaseClient.from('client_danger_history').insert(row).then(({error})=>{
+  const extra = { ...(reason ? { reason: String(reason).trim().slice(0, 500) } : {}), ...(kind ? { kind } : {}) };
+  const done = supabaseClient.from('client_danger_history').insert({ ...row, ...extra }).then(({error})=>{
+    if(error && Object.keys(extra).length && /reason|kind/.test(error.message || '')) return supabaseClient.from('client_danger_history').insert(row);
     if(error && /set_by/.test(error.message || '')) return supabaseClient.from('client_danger_history').insert({ client_id: clientId, danger });
     if(error) console.error('logDangerHistory error', error);
   }).then(r => { if(r && r.error) console.error('logDangerHistory error', r.error); });
-  if(typeof dangerHistory !== 'undefined' && Array.isArray(dangerHistory)) dangerHistory.push({ clientId, danger, recordedAt: new Date(), setBy: row.set_by || '' });
-  if(danger === 5 && previousDanger !== 5) alertClientDangerMaxed(clientId);
-  else if(previousDanger != null && danger < previousDanger) alertClientDangerDecreased(clientId, previousDanger, danger);
+  if(typeof dangerHistory !== 'undefined' && Array.isArray(dangerHistory)) dangerHistory.push({ clientId, danger, recordedAt: new Date(), setBy: row.set_by || '', reason: extra.reason || '', kind: kind || null });
+  if(kind !== 'kept'){
+    if(danger === 5 && previousDanger !== 5) alertClientDangerMaxed(clientId, extra.reason);
+    else if(previousDanger != null && danger < previousDanger) alertClientDangerDecreased(clientId, previousDanger, danger);
+  }
+  return done;
 }
+// Setting a Risk of 3 or more, higher than it was, takes a reason: it's what Health shows beside it
+function riskNeedsReason(danger, before){ return Number(danger) >= 3 && Number(danger) > Number(before || 0); }
 
 // Real-time alert the moment a client's danger score maxes out, rather
 // than waiting for it to surface in the weekly focus report's "needs
@@ -244,11 +253,11 @@ function logDangerHistory(clientId, danger, previousDanger){
 // the same "useful to whoever's actually doing the client work, not just
 // admins" reasoning as the weekly report itself — except the person who
 // just set it, since they obviously already know.
-async function alertClientDangerMaxed(clientId){
+async function alertClientDangerMaxed(clientId, reason){
   const c = clients.find(x=>x.id===clientId);
   if(!c) return;
-  const title = `${c.name} just hit max danger (5/5)`;
-  const body = `${myName()||'Someone'} flagged ${c.name} at the highest danger level — might be worth a look before it waits for the weekly report.`;
+  const title = `${c.name} is flagged at the highest Risk (5 of 5)`;
+  const body = `${myName()||'Someone'} flagged ${c.name}${reason ? `: “${reason}”` : ''}. Worth a look before the weekly report.`;
   const recipients = teamProfiles.filter(p=>p.id !== currentUser?.id);
   for(const p of recipients){
     sendNotification(p.id, 'client_danger_maxed', title, body, 'client-detail', clientId);
@@ -262,8 +271,8 @@ async function alertClientDangerMaxed(clientId){
 async function alertClientDangerDecreased(clientId, previousDanger, newDanger){
   const c = clients.find(x=>x.id===clientId);
   if(!c) return;
-  const title = `${c.name}'s danger score went down`;
-  const body = `${myName()||'Someone'} lowered ${c.name}'s danger from ${previousDanger}/5 to ${newDanger}/5.`;
+  const title = newDanger < 3 && previousDanger >= 3 ? `${c.name}’s Risk flag was cleared` : `${c.name}’s Risk went down`;
+  const body = `${myName()||'Someone'} lowered ${c.name}’s Risk from ${previousDanger} to ${newDanger} of 5.`;
   const recipients = teamProfiles.filter(p=>p.id !== currentUser?.id);
   for(const p of recipients){
     sendNotification(p.id, 'client_danger_decreased', title, body, 'client-detail', clientId);
@@ -345,9 +354,15 @@ async function saveClientForm(){
     // specific per-person override on the team card for anyone who
     // needs it without making them a full admin.
     if(Number(fields.danger) < Number(before.danger) && !canLowerDangerScore()){
-      showToast('error','Not allowed','Only admins can lower a client\'s danger score — ask one to adjust it, or to grant you that permission.');
+      showToast('error','Not allowed','Only approvers and admins can lower a client’s Risk. Ask one to clear it.');
       restoreBtn(btn);
       return;
+    }
+    // a Risk of 3 or more, raised: say why (Nov 25)
+    const why = (document.getElementById('ncDangerWhy')?.value || '').trim();
+    if(riskNeedsReason(fields.danger, before.danger) && !why && document.getElementById('ncDangerWhy')){
+      showToast('error', 'Say why', `Risk ${fields.danger} shows on Health with the reason. One line is enough.`);
+      document.getElementById('ncDangerWhy').focus(); restoreBtn(btn); return;
     }
     ok = await updateClientRow(editingClientId, fields);
     if(ok) Object.assign(c, fields);
@@ -370,10 +385,10 @@ async function saveClientForm(){
         : `${myName()||'Someone'} saved this client (no actual field changes).`;
       logClientActivity(loggedClientId, 'client_edited', desc);
       refreshClientDetailActivityIfOpen(loggedClientId);
-      if(before.danger !== fields.danger) logDangerHistory(loggedClientId, fields.danger, before.danger);
+      if(before.danger !== fields.danger) logDangerHistory(loggedClientId, fields.danger, before.danger, why);
     }
   } else {
-    const newId = 'c'+Date.now();
+    const newId = 'c'+Date.now(), newWhy = (document.getElementById('ncDangerWhy')?.value || '').trim();
     const { error: insertErr } = await supabaseClient.from('clients').insert({ id:newId, ...clientFieldsToDb(fields), draft:'', draft_status:'none' });
     ok = !insertErr;
     if(ok) clients.push({ id:newId, ...fields, improvements:[], draft:'', draftStatus:'none' });
@@ -381,7 +396,7 @@ async function saveClientForm(){
     loggedClientId = newId;
     if(ok){
       logClientActivity(loggedClientId, 'client_created', `${myName()||'Someone'} added this client to the roster.`);
-      logDangerHistory(loggedClientId, fields.danger, null);
+      logDangerHistory(loggedClientId, fields.danger, null, newWhy);
     }
   }
   const wasEditing = !!editingClientId;

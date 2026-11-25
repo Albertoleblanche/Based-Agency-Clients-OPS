@@ -4068,3 +4068,36 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 .tdup div>span.tdup-why{margin-top:6px;color:var(--label)}
 @keyframes tdupIn{from{opacity:0;transform:translateY(-4px)}}
 @media (prefers-reduced-motion:reduce){.tdup{animation:none}}
+/* Health: the work and the flag, side by side (Nov 25) */
+.rk{display:flex;flex-direction:column;margin:12px 0 8px;border-radius:12px;background:var(--grp,var(--card));box-shadow:0 0 0 .5px var(--sep);overflow:hidden}
+.rk-cols,.rk.is-none{display:grid;grid-template-columns:1fr 1fr}
+.rk-c{display:flex;flex-direction:column;gap:4px;min-width:0;padding:12px 14px}
+.rk-c + .rk-c{box-shadow:inset .5px 0 0 var(--sep)}
+.rk-k{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--label-3)}
+.rk-lv{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600;color:var(--label)}
+.rk-lv i{flex:none;width:8px;height:8px;border-radius:50%;background:var(--green)}
+.rk-lv.y i{background:var(--yellow)}
+.rk-lv.r i{background:var(--red)}
+.rk-lv em{font-style:normal;font-weight:500;color:var(--label-2)}
+.rk-s{font-size:12.5px;line-height:1.45;color:var(--label-2);overflow-wrap:anywhere}
+.rk-s b{font-weight:600;color:var(--label)}
+.rk-s small{display:block;margin-top:3px;font-size:11.5px;color:var(--label-3)}
+.rk-nof .btn{align-self:flex-start;margin-top:4px}
+.rk .btn svg{width:13px;height:13px}
+.rk-rv{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;padding:12px 14px;box-shadow:inset 0 .5px 0 var(--sep);background:color-mix(in srgb,var(--green) 9%,transparent)}
+.rk-rv > div:first-child{display:flex;flex-direction:column;gap:2px;flex:1 1 220px;min-width:0}
+.rk-rv b{font-size:13px;font-weight:600}
+.rk-rv span{font-size:12.5px;line-height:1.4;color:var(--label-2)}
+.rk-a{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.rk-ft{flex-wrap:wrap;padding:10px 14px;box-shadow:inset 0 .5px 0 var(--sep)}
+.rk-ft span{flex:1 1 200px;font-size:12px;line-height:1.4;color:var(--label-3)}
+.rk-n{margin:0;padding:10px 14px;font-size:12px;line-height:1.4;color:var(--label-3);box-shadow:inset 0 .5px 0 var(--sep)}
+.rk-n .lnk-b{margin-left:4px;font-size:12px}
+.rk-cn{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:10px 14px;box-shadow:inset 0 .5px 0 var(--sep)}
+.rk-cn .rk-lv{flex:0 0 auto;font-size:12.5px}
+.rk-cn .rk-s{flex:1 1 200px;min-width:0}
+.rk-sub{margin:-4px 0 14px;font-size:13px;line-height:1.45}
+.rk-sw{font-size:13px;line-height:1.45;color:var(--label-2)}
+.cp-why .rk{margin:4px 0 10px}
+@media (max-width:560px){ .rk-cols,.rk.is-none{grid-template-columns:1fr} .rk-c + .rk-c{box-shadow:inset 0 .5px 0 var(--sep)} }
+.rk .lnk-b svg{width:12px;height:12px}

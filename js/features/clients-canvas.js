@@ -102,12 +102,17 @@ function openClientsBulkSheet(){
 <label for="bkOwner">Owner</label><div>${sheetPop('bkOwner', 'Owner', keep.concat([['@auto', 'Automatic']], people.map(p => [p, p])), '')}</div>
 <label for="bkStatus">Status</label><div>${sheetPop('bkStatus', 'Status', keep.concat((settings.statusOptions || []).map(s => [s, s])), '')}</div>
 <label for="bkImportance">Importance${infoTip('How much this client matters to the agency, from 1 to 10. At 8 or more, a client on Watch counts as At risk, and it comes first when two updates are due the same day.', 'What does Importance do?')}</label><div>${sheetPop('bkImportance', 'Importance', keep.concat(Array.from({ length: 10 }, (_, i) => [String(i + 1), `${i + 1} of 10`])), '')}</div>
-<label for="bkDanger">Risk${infoTip('Your read on how likely the client is to leave, from 1 (low) to 5 (high). At 3 Health puts the client on Watch; at 4 or 5, At risk. Radar notes who set it.', 'What does Risk do?')}</label><div>${sheetPop('bkDanger', 'Risk', keep.concat([['1', '1 · Low'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5 · High']]), '')}</div>
+<label for="bkDanger">Risk${infoTip('Your read on how likely the client is to leave, from 1 (low) to 5 (high). At 3 Health puts the client on Watch; at 4 or 5, At risk. Radar notes who set it.', 'What does Risk do?')}</label><div>${sheetPop('bkDanger', 'Risk', keep.concat([['1', '1 · Low'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5 · High']]), '', 'bkDangerChanged()')}</div>
+<label for="bkDangerWhy" id="bkDangerWhyL" hidden>Why</label><div id="bkDangerWhyW" hidden><input id="bkDangerWhy" class="tf" maxlength="500" placeholder="What makes them risky, in a line" autocomplete="off"><div class="t-2" style="font-size:12.5px;margin-top:4px">Health shows it beside the Risk, with who set it.</div></div>
 <label for="bkHours">Hours a month</label><div class="bk-h"><input type="number" id="bkHours" class="tf" min="0" step="0.5" placeholder="Keep as is"><span class="t-2">0 removes it</span></div>
 <label for="bkFocus">Focus${infoTip('For clients the owner asked the team to give extra attention. Focus clients come first in every list, Health watches them closer, and the morning reminders and the Monday summary put them on top.', 'What does Focus do?')}</label><div>${sheetPop('bkFocus', 'Focus', keep.concat([['on', 'Add to Focus'], ['off', 'Take off Focus']]), '')}</div>
 <label for="bkWeekly">Weekly update${infoTip('No weekly update is for the agency itself or an internal client: nothing is ever due, so it stays off This Week, Today, the Queue and Health. Work and hours are still logged.', 'What does Weekly update do?')}</label><div>${sheetPop('bkWeekly', 'Weekly update', keep.concat([['on', 'Every week'], ['off', 'No weekly update']]), '')}</div>
 </div>
 <div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" id="bkSave" onclick="saveClientsBulk()">Save to ${n} Client${n === 1 ? '' : 's'}</button></div>`, 520);
+}
+function bkDangerChanged(){
+  const v = Number(document.getElementById('bkDanger')?.value || 0);
+  ['bkDangerWhyL', 'bkDangerWhyW'].forEach(id => { const el = document.getElementById(id); if(el) el.hidden = !(v >= 3); });
 }
 async function saveClientsBulk(){
   if(!clBulk || !canApprove()) return;
@@ -116,6 +121,10 @@ async function saveClientsBulk(){
   if(v('bkStatus')){ fields.status = v('bkStatus'); words.push(`status to ${fields.status}`); }
   if(v('bkImportance')){ fields.importance = Number(v('bkImportance')); words.push(`importance to ${fields.importance}`); }
   if(v('bkDanger')){ fields.danger = Number(v('bkDanger')); words.push(`risk to ${fields.danger}`); }
+  // raising anyone to 3 or more says why (Nov 25)
+  const riskWhy = v('bkDangerWhy').trim();
+  if(fields.danger >= 3 && !riskWhy && clients.some(c => clBulk.has(c.id) && riskNeedsReason(fields.danger, c.danger))){
+    showToast('error', 'Say why', `Risk ${fields.danger} shows on Health with the reason. One line is enough.`); document.getElementById('bkDangerWhy')?.focus(); return; }
   const hrs = v('bkHours').trim();
   if(hrs !== ''){ const h = Math.max(0, Number(hrs) || 0); fields.monthlyHourBudget = h || null; words.push(h ? `hours a month to ${h}` : 'no monthly hours'); }
   // owner and weekly update live in each client's own custom values, so they're merged per client
@@ -139,14 +148,14 @@ async function saveClientsBulk(){
       mine.customFieldValues = cfv;
     }
     const ok = await updateClientRow(c.id, mine);
-    if(ok && mine.danger !== undefined && mine.danger !== riskWas && typeof logDangerHistory === 'function') logDangerHistory(c.id, mine.danger, riskWas);
+    if(ok && mine.danger !== undefined && mine.danger !== riskWas && typeof logDangerHistory === 'function') logDangerHistory(c.id, mine.danger, riskWas, riskWhy);
     if(ok){ Object.assign(c, mine); if(typeof logClientActivity === 'function') logClientActivity(c.id, 'client_updated', `${myName() || 'Someone'} set ${words.join(', ')}${picked.length > 1 ? ` for ${picked.length} clients at once` : ''}.`); }
     return ok;
   }));
   const done = results.filter(Boolean).length, failed = results.length - done;
   closeAppModal();
   if(failed){ picked.forEach((c, i) => { if(results[i]) clBulk.delete(c.id); }); showToast('error', `${failed} client${failed === 1 ? '' : 's'} didn’t save`, `${done} updated. The rest are still ticked: try Edit again.`); renderAll(); return; }
-  showToast('success', `Updated ${done} client${done === 1 ? '' : 's'}`, `Set ${words.join(', ')}.${kept ? ` Risk stayed on ${kept}: lowering it takes an admin.` : ''}`);
+  showToast('success', `Updated ${done} client${done === 1 ? '' : 's'}`, `Set ${words.join(', ')}.${kept ? ` Risk stayed on ${kept}: lowering it takes an approver or admin.` : ''}`);
   clBulk = null; renderAll();
 }
 

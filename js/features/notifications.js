@@ -54,6 +54,8 @@ const NOTIFICATION_TYPE_META = {
   health_ask:              { label:'An approver asks you about a client at risk or on watch', section:'Client Work' },
   client_danger_maxed:     { label:'A client\'s danger score hits 5/5', section:'Client Work' },
   client_danger_decreased: { label:'A client\'s danger score goes down', section:'Client Work' },
+  client_concern:          { label:'A teammate raises a concern about a client', section:'Client Work', visibleTo:'approver' },
+  client_concern_closed:   { label:'An approver closes a concern you raised', section:'Client Work' },
   harvest_client:          { label:'A client is added from Harvest or archived there', section:'Client Work', visibleTo:'approver' },
   event_rsvp:              { label:'Someone RSVPs or requests a change to your event', section:'Calendar' },
   event_invited:           { label:"You're invited to a calendar event", section:'Calendar' },

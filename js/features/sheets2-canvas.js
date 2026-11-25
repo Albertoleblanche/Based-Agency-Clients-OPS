@@ -543,7 +543,8 @@ ${service}
 <label for="ncWeekly">Weekly update</label><div style="display:flex;gap:10px;align-items:center"><span style="flex:none">${sheetPop('ncWeekly', 'Weekly update', [['on', 'Every week'], ['off', 'No weekly update']], (customValues || {}).weeklyUpdate === 'off' ? 'off' : 'on')}</span><span class="t-2" style="font-size:13px">Off for the agency or an internal client</span></div>
 <label for="ncFocus">Focus</label><div style="display:flex;gap:10px;align-items:center"><span style="flex:none">${sheetPop('ncFocus', 'Focus', [['off', 'Not in Focus'], ['on', 'Focus client']], (customValues || {}).focus ? 'on' : 'off')}</span><span class="t-2" style="font-size:13px">Comes first everywhere; Health watches it closer</span></div>
 <label for="ncImportance">Importance</label><div style="display:flex;gap:10px;align-items:center">${sheetPop('ncImportance', 'Importance', Array.from({ length: 10 }, (_, i) => [String(i + 1), `${i + 1} of 10`]), '5')}<span class="t-2" style="font-size:13px">How much this client matters to the agency</span></div>
-<label for="ncDanger">Risk</label><div><div style="display:flex;gap:10px;align-items:center">${sheetPop('ncDanger', 'Risk', [['1', '1 · Low'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5 · High']], '1')}<span class="t-2" style="font-size:13px">Your read on how likely they are to leave</span></div><div id="ncDangerNudge" class="t-2" style="display:none;font-size:13px;margin-top:5px"></div></div>
+<label for="ncDanger">Risk</label><div><div style="display:flex;gap:10px;align-items:center">${sheetPop('ncDanger', 'Risk', [['1', '1 · Low'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5 · High']], '1', 'ncDangerChanged()')}<span class="t-2" style="font-size:13px">Your read on how likely they are to leave</span></div><div id="ncDangerNudge" class="t-2" style="display:none;font-size:13px;margin-top:5px"></div></div>
+<label for="ncDangerWhy" id="ncDangerWhyL" hidden>Why</label><div id="ncDangerWhyW" hidden><input id="ncDangerWhy" class="tf" maxlength="500" placeholder="What makes it risky, in a line" autocomplete="off"><div class="t-2" style="font-size:12.5px;margin-top:4px">Health shows it beside the Risk, with who set it.</div></div>
 <label for="ncBudget">Hours a month</label><div style="display:flex;gap:10px;align-items:center"><input type="number" id="ncBudget" class="tf" style="width:90px" min="0" step="0.5" placeholder="20"><span class="t-2" style="font-size:13px">Leave empty if there’s no budget</span></div>
 <label for="ncStartDate">Client since</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sheetDateField('ncStartDate', '', { none: 'Not set', past: true, from: -14, to: 0, max: toDateStr(new Date()) })}</div>
 <label class="top" for="ncSow">Scope</label><textarea id="ncSow" class="tf" spellcheck="true" placeholder="What the agency does for them, in a line or two"></textarea>
@@ -562,7 +563,7 @@ function openAddClientForm(){
   if(!canApprove()){ showToast('error', 'Not allowed', 'Only admins and approvers can add clients.'); return; }
   // with Harvest connected, clients start there and come in on their own (client-setup.js)
   if(typeof harvestOwnsClients === 'function' && harvestOwnsClients()){ openAddInHarvestSheet(); return; }
-  editingClientId = null;
+  editingClientId = null; window._ncDangerWas = 0;
   openAppModal(clientFormHtml('Add client', 'Save client'), 560);
   setTimeout(() => document.getElementById('ncName')?.focus(), 30);
 }
@@ -582,12 +583,20 @@ function openEditClientForm(id){
   if(g('ncService').tagName === 'SELECT') sheetSetSelect('ncService', c.service);
   sheetSetSelect('ncStatus', c.status);
   sheetSetSelect('ncImportance', c.importance); sheetSetSelect('ncDanger', c.danger);
+  window._ncDangerWas = c.danger || 0; ncDangerChanged();
   if(c.startDate) sheetSetSelect('ncStartDate', c.startDate);
   const suggested = computeSuggestedDanger(c), nudge = g('ncDangerNudge');
   if(nudge && suggested !== null && suggested > c.danger){
     nudge.style.display = 'block';
     nudge.textContent = `Overdue follow-ups, quiet weeks and waiting drafts suggest ${suggested}. Worth a second look.`;
   }
+}
+
+// Raising the Risk to 3 or more asks why (Nov 25): the Why row shows then
+function ncDangerChanged(){
+  const v = Number(document.getElementById('ncDanger')?.value || 0), was = window._ncDangerWas || 0;
+  const show = typeof riskNeedsReason === 'function' ? riskNeedsReason(v, was) : v >= 3;
+  ['ncDangerWhyL', 'ncDangerWhyW'].forEach(id => { const el = document.getElementById(id); if(el) el.hidden = !show; });
 }
 
 // ---- Send Email: the last look before a client email goes out ----------------------------------

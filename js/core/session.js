@@ -166,7 +166,9 @@ function isAdmin(){ return !!myProfile && myProfile.role === 'admin'; }
 // "Lower a client's danger score" toggle on the team card) rather than a
 // role-wide grant. An approver doesn't get this just for being an
 // approver, unlike everything hasPermission() covers.
-function canLowerDangerScore(){ return isAdmin() || !!(myProfile && (myProfile.extra_permissions||[]).includes('lower_danger_score')); }
+// Clearing a flag (lowering a Risk): admins and approvers (Nov 25: approvers too; they're the ones who
+// raise them), or a member given the permission in Team.
+function canLowerDangerScore(){ return isAdmin() || (typeof canApprove === 'function' && canApprove()) || !!(myProfile && (myProfile.extra_permissions||[]).includes('lower_danger_score')); }
 
 let lastProfileError = null;
 async function loadMyProfile(){
@@ -186,7 +188,19 @@ let dangerHistory = [];
 async function loadDangerHistory(){
   const { data, error } = await supabaseClient.from('client_danger_history').select('*');
   if(error){ console.error('loadDangerHistory error', error); dangerHistory = []; return; }
-  dangerHistory = (data||[]).map(h => ({ clientId: h.client_id, danger: h.danger, recordedAt: new Date(h.recorded_at), setBy: h.set_by || '' }));
+  dangerHistory = (data||[]).map(h => ({ clientId: h.client_id, danger: h.danger, recordedAt: new Date(h.recorded_at), setBy: h.set_by || '', reason: h.reason || '', kind: h.kind || null }));
+}
+// Concerns about a client (Nov 25, addendum-risk-flags.sql): anyone on the team raises one, with why;
+// it puts the client on Watch until an approver or admin puts it At risk or clears it. null: the
+// table isn't there yet.
+let clientConcerns = [];
+let clientConcernsReady = null;
+async function loadClientConcerns(){
+  const { data, error } = await supabaseClient.from('client_concerns').select('*').order('created_at', { ascending: true });
+  if(error){ clientConcernsReady = /client_concerns|PGRST205|42P01|does not exist|schema cache/i.test(`${error.code || ''} ${error.message || ''}`) ? false : clientConcernsReady; clientConcerns = clientConcernsReady === false ? [] : clientConcerns; return; }
+  clientConcernsReady = true;
+  clientConcerns = (data || []).map(r => ({ id: r.id, clientId: r.client_id, reason: r.reason || '', raisedBy: r.raised_by || '', raisedById: r.raised_by_id || null,
+    createdAt: new Date(r.created_at), resolvedAt: r.resolved_at ? new Date(r.resolved_at) : null, resolvedBy: r.resolved_by || '', outcome: r.outcome || null }));
 }
 
 // One-time backfill for clients that predate this feature — gives every

@@ -103,7 +103,7 @@ const EXTRA_PERMISSIONS_META = [
   { key:'view_team_queue', label: "See Team Queue (everyone's drafts)" },
   { key:'delete_tasks', label: 'Permanently delete tasks' },
   { key:'delete_clients', label: 'Manage & permanently delete clients from Trash' },
-  { key:'lower_danger_score', label: "Lower a client's danger score" },
+  { key:'lower_danger_score', label: "Clear a client's Risk flag" },
 ];
 
 function openTeamMemberDetail(id){
@@ -146,12 +146,8 @@ function openTeamMemberDetail(id){
   // members, since admins/approvers already have those by role), an
   // admin needs to be able to revoke Assistant access from a specific
   // admin/approver too, not just grant it to a member.
-  // lower_danger_score is admin-only by default (canLowerDangerScore()
-  // doesn't extend it to approvers the way hasPermission() does for the
-  // three below) — so unlike those, granting it to an approver is
-  // meaningful, not redundant. Shown for anyone who isn't already an
-  // admin, not just members.
-  const lowerDangerRow = m.role !== 'admin'
+  // lower_danger_score: approvers and admins clear flags by role (Nov 25), so it's for members only.
+  const lowerDangerRow = m.role === 'member'
     ? toggleRow(EXTRA_PERMISSIONS_META.find(p=>p.key==='lower_danger_score').label, (m.extra_permissions||[]).includes('lower_danger_score'), `changeTeamPermission('${m.id}','lower_danger_score',${!(m.extra_permissions||[]).includes('lower_danger_score')})`, true)
     : '';
   const memberOnlyPermissionRows = m.role==='member'

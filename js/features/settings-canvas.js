@@ -246,8 +246,8 @@ ${pair('overdueTasks', 'Overdue tasks', taskO, taskO)}
 ${flagOn ? pair('ownerFlag', 'Risk on the client', flagO, flagO) : ''}
 </div>
 <div class="form-grp set-gap">
-${fr('A client’s Risk, 1 to 5, counts in Health', 'Approvers set it in Edit Client or Bulk Edit; Radar notes who. It counts as a signal above.', swHtml(flagOn, 'A client’s Risk counts in Health', 'changeSettings(s => { s.ownerRiskFlag = s.ownerRiskFlag === false; })'))}
-${fr('Flag important clients sooner', 'Importance 8 or more moves up one level', swHtml(t.importantBump, 'Flag important clients sooner', 'saveSignalToggle(\'importantBump\')', !can))}
+${fr('A client’s Risk, 1 to 5, counts in Health', 'Approvers and admins set it, with a reason; Health shows it beside the work and asks them to review it once the work has been healthy for two weeks. Anyone can flag a concern (Watch).', swHtml(flagOn, 'A client’s Risk counts in Health', 'changeSettings(s => { s.ownerRiskFlag = s.ownerRiskFlag === false; })'))}
+${fr('Flag important clients sooner', 'Importance 8 or more: Watch from the work becomes At risk', swHtml(t.importantBump, 'Flag important clients sooner', 'saveSignalToggle(\'importantBump\')', !can))}
 ${fr('Focus clients are watched closer', escapeHtml(focusRuleWords(t)), `<a class="set-lnk" href="#" onclick="setClientsSeg('focus');switchView('clients');return false;">${(typeof focusClients === 'function' ? focusClients().length : 0) || 'No'} Focus client${(typeof focusClients === 'function' ? focusClients().length : 0) === 1 ? '' : 's'}</a>`)}
 ${fr('Quiet a handled signal for', 'Comes back sooner if it gets worse', popSel('Quiet a handled signal for', [3, 5, 7, 10, 14].map(v => [v, `${v} days`]), t.quietDays, 'saveSignalValue(\'quietDays\',this.value)', { disabled: !can }))}
 </div>`;
