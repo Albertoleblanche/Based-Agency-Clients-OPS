@@ -190,7 +190,7 @@ async function mLoadAll(){
   clients.forEach(c => { c.improvements = clientImprovements.filter(i => i.clientId === c.id); c.drafts = clientDrafts.filter(d => d.clientId === c.id); });
   tasks = (tr.data || []).map(t => ({ id: t.id, title: t.title, description: t.description || '', priority: t.priority, status: t.status, assignerId: t.assigner_id, assigneeId: t.assignee_id,
     clientId: t.client_id, dueDate: t.due_date, link: t.link, attachments: t.attachments || [], createdAt: t.created_at, completedAt: t.completed_at, cancelledAt: t.cancelled_at,
-    hiddenByAssigner: t.hidden_by_assigner, hiddenByAssignee: t.hidden_by_assignee }));
+    hiddenByAssigner: t.hidden_by_assigner, hiddenByAssignee: t.hidden_by_assignee, sprintId: t.sprint_id || null }));
   clientReminders = (rr.data || []).map(r => ({ id: r.id, clientId: r.client_id, question: r.question, askedBy: r.asked_by, askedDate: r.asked_date, followUpDate: r.follow_up_date, status: r.status, waitingOn: r.waiting_on || null }));
   notes = (nr.data || []).map(n => ({ id: n.id, clientId: n.client_id, title: n.title, text: n.text, status: n.status, link: n.link, followUpDate: n.follow_up_date, updatedAt: n.updated_at }));
   try{ await loadTaskSuggestions(); }catch(e){ taskSuggestions = []; }   // tasks from meetings (Granola)
@@ -207,7 +207,14 @@ async function mLoadAll(){
   calendarEvents = (ev.data || []).map(e => ({ id: e.id, title: e.title, startAt: e.start_at, endAt: e.end_at, allDay: e.all_day, clientId: e.client_id, location: e.location, eventType: e.event_type, attendeeIds: e.attendee_ids || [], createdBy: e.created_by,
     description: e.description || '', meetingUrl: e.meeting_url || null, googleEventId: e.google_event_id || null, googleOwner: e.google_calendar_owner || null }));
   await Promise.all([loadUpdateHistory(), loadHealthHandled(), loadTaskDueTimes(), typeof hvTimeLoad === 'function' ? hvTimeLoad() : null,
-    typeof loadDangerHistory === 'function' ? loadDangerHistory() : null]);   // who set a client's Risk (Nov 25)
+    typeof loadDangerHistory === 'function' ? loadDangerHistory() : null, mLoadSprints()]);   // who set a client's Risk (Nov 25)
+}
+// Your sprints from Plan (Nov 25): Tasks shows each one as a single row, its next step (sprintFold in
+// data.js). Plan itself is on the computer; the phone only reads them.
+let planSprints = [];
+async function mLoadSprints(){
+  const { data, error } = await supabaseClient.from('plan_sprints').select('id,title,client_id,start_date,end_date,done_at').eq('user_id', currentUser.id);
+  planSprints = error ? [] : (data || []).map(r => ({ id: r.id, title: r.title || 'Untitled sprint', clientId: r.client_id || null, start: r.start_date, end: r.end_date, doneAt: r.done_at || null }));
 }
 
 async function mBoot(o){
@@ -536,7 +543,23 @@ function mTaskDue(t){
   const k = daysBetween(dayStart(new Date()), d);
   return k === 1 ? 'Tomorrow' : k < 7 ? fmtDay(d) : fmtShortDate(d);
 }
+// A sprint's row (Nov 25): its name and how far along it is, the next step with its checkbox, and the
+// other steps a tap away (they open under it). Tapping the row opens the next step.
+let mFoldNow = null;
+const mSprintOpen = new Set();
+function mSprintToggle(e, sid){ e.stopPropagation(); mSprintOpen.has(sid) ? mSprintOpen.delete(sid) : mSprintOpen.add(sid); mRenderTab(); }
+function mSprintRow(t, g){
+  const c = clients.find(x => x.id === (g.sprint.clientId || t.clientId)), open = mSprintOpen.has(g.sprint.id), n = g.rest.length;
+  const sub = [c ? mEsc(shortClientName(c.name)) : '', mTaskDue(t), g.late > 1 ? `<span class="t-red">${g.late} late</span>` : ''].filter(Boolean).join(' · ');
+  const more = n ? `<button class="msp-more" aria-expanded="${open}" onclick="mSprintToggle(event,'${g.sprint.id}')">${open ? 'Hide steps' : `${n} more step${n === 1 ? '' : 's'}`}${icon('caret-down', { weight: 'bold' })}</button>` : '';
+  const steps = open ? g.rest.map(x => `<div class="ir tap msp-st" role="button" tabindex="0" onclick="mOpenTask('${x.id}')" onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();this.click()}">${mCb(x)}<div class="tx"><span class="t n">${mEsc(x.title)}</span></div><div class="r">${mTaskDue(x)}</div></div>`).join('') : '';
+  return `<div class="ir tap msp${open ? ' is-open' : ''}" role="button" tabindex="0" onclick="mOpenTask('${t.id}')" onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();this.click()}">${mCb(t)}`
+    + `<div class="tx"><span class="msp-l">${icon('plan')}<span class="msp-n">Sprint · ${mEsc(g.sprint.title)}</span><span class="msp-c">${g.done} of ${g.total} done</span></span><span class="t n">${mEsc(t.title)}</span>${sub ? `<span class="s">${sub}</span>` : ''}${more}</div></div>`
+    + `${steps ? `<div class="msp-steps">${steps}</div>` : ''}`;
+}
 function mTaskRow(t){
+  const g = t.status !== 'done' && mFoldNow && mFoldNow.lead.get(t.id);
+  if(g) return mSprintRow(t, g);
   const c = clients.find(x => x.id === t.clientId), who = teamProfiles.find(p => p.id === t.assigneeId);
   const sub = [c ? mEsc(shortClientName(c.name)) : '', mTaskDue(t)].filter(Boolean).join(' · ');
   const right = (t.priority === 'high' && t.status !== 'done' ? `<span style="display:inline-flex;width:16px;height:16px;color:var(--label-2)">${icon('flag', { label: 'High priority' })}</span>` : '') + (who ? avHtml(who.name) : '');
@@ -549,10 +572,13 @@ function mVisibleTasks(){
 function mTasksHtml(){
   const me = currentUser.id, today = toDateStr(new Date());
   let vis = tasks.filter(t => !t.cancelledAt && t.status !== 'done');
-  const mineN = vis.filter(t => t.assigneeId === me).length;
+  const mineN = sprintFold(vis.filter(t => t.assigneeId === me)).list.length;   // a sprint counts once
   if(mTaskScope === 'mine') vis = vis.filter(t => t.assigneeId === me);
   if(mTaskScope === 'byme') vis = vis.filter(t => t.assignerId === me && t.assigneeId !== me);
   if(mTaskClient !== 'all') vis = vis.filter(t => t.clientId === mTaskClient);
+  // a sprint's steps fold into one row: its next step, in that step's group (Nov 25)
+  const fold = mFoldNow = sprintFold(vis), openN = vis.length;
+  vis = fold.list;
   const order = (a, b) => focusIdFirst(a.clientId, b.clientId) || (a.dueDate || '9999').localeCompare(b.dueDate || '9999') || ((taskDueTimes[a.id] || '99') < (taskDueTimes[b.id] || '99') ? -1 : 1);
   const weekEnd = toDateStr(addDays(new Date(), 6));
   const groups = [['Overdue', vis.filter(t => t.dueDate && t.dueDate < today), 't-red'], ['Today', vis.filter(t => t.dueDate === today)], ['This week', vis.filter(t => t.dueDate && t.dueDate > today && t.dueDate <= weekEnd)],
@@ -567,7 +593,7 @@ function mTasksHtml(){
   const gm = typeof gmailOnHere === 'function' && gmailOnHere() ? `<button aria-label="Check Gmail for new tasks" title="Check Gmail" class="mgr${mGmailBusy ? ' is-busy' : ''}" onclick="mGmailCheck()"${mGmailBusy ? ' disabled' : ''}>${appLogo('gmail', 'sm')}</button>` : '';
   const i8 = /lg-gmail/.test(gm + sg) ? icons8Credit(['gmail'], 'm-i8') : '';   // Icons8's Gmail icon, credited (Nov 24)
   return `<div class="inav"><div class="r">${gr}${gm}<button aria-label="Filter by client" onclick="mPickTaskClient()" style="${c ? 'color:var(--label)' : ''}">${icon('funnel-simple')}</button></div></div>
-<h1 class="big">Tasks</h1><p class="big-sub">${vis.length} open${overdue ? ` · ${overdue} overdue` : ''}${c ? ` · ${mEsc(c.name)}` : ''}</p>
+<h1 class="big">Tasks</h1><p class="big-sub">${fold.sprints ? sprintFoldHeadline(fold, openN) : `${openN} open`}${overdue ? ` · ${overdue} overdue` : ''}${c ? ` · ${mEsc(c.name)}` : ''}</p>
 ${mSeg([['everyone', 'Everyone'], ['mine', 'Mine', mineN], ['byme', 'Assigned by me']], 'mSetTaskScope', mTaskScope)}
 ${body}
 ${mVisibleTasks().some(t => t.status === 'done') ? `<p class="ifoot" style="margin-top:16px"><button onclick="mOpenDoneTasks()" style="color:var(--label-2)">Show finished tasks</button></p>` : ''}${i8}`;

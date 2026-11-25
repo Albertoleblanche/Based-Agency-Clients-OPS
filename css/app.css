@@ -1405,6 +1405,36 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .tk-d .tk-cb{margin-top:0}
 .tk-arch{display:inline-flex;margin-top:14px}
 .tk-list{margin-top:10px}
+.tk-sp{display:flex;align-items:center;gap:6px;min-width:0;font-size:11.5px;font-weight:500;color:var(--label-2);line-height:1.3}
+.tk-sp svg{width:13px;height:13px;flex:0 0 auto;color:var(--label-3)}
+.tk-sp-n{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tk-sp-c{flex:0 0 auto;color:var(--label-3);font-weight:400}
+.tk-sp-c::before{content:"·";margin-right:6px}
+.tk-c .tk-sp{margin-bottom:-2px}
+.tk-lr .tx .tk-sp{margin-bottom:2px}
+.tk-more{display:inline;padding:0;border:0;background:none;font:inherit;font-size:12.5px;font-weight:500;color:var(--blue);cursor:pointer;white-space:nowrap}
+.tk-more:hover{text-decoration:underline}
+.tk-sp-late{color:var(--red);font-weight:600;font-size:12.5px}
+.tk-c .tk-sp-late{margin-right:8px}
+/* List: the steps open under the row, full width, their dates in the row's date column */
+.tk-lr.is-sprint{flex-wrap:wrap;row-gap:0}
+.tk-lr > .tk-steps{flex:0 0 calc(100% - 30px);margin-left:30px}
+.tk-steps{display:flex;flex-direction:column;margin-top:8px;padding-top:6px;box-shadow:inset 0 .5px 0 var(--sep)}
+.tk-c .tk-steps{margin:2px 0 0 28px}
+.tk-c .tk-st{align-items:flex-start}
+.tk-c .tk-st .tx{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.35}
+.tk-c .tk-st .tk-cb{margin-top:1px}
+.tk-c .tk-st .tk-due{flex:0 0 auto;line-height:1.35}
+.tk-st{display:flex;align-items:center;gap:10px;padding:6px 8px;margin:0 -8px;border-radius:8px;font-size:13px;color:var(--label);cursor:default;outline:none}
+.tk-st .tx{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tk-st .tk-cb{width:16px;height:16px;margin-top:0}
+.tk-st:hover{background:var(--fill)}
+.tk-st:focus-visible{box-shadow:0 0 0 3px var(--fill-3)}
+.tk-st.is-sel{background:var(--select)}
+.tk-st-plan{align-self:flex-start;margin:6px 0 2px;padding:0;border:0;background:none;font:inherit;font-size:12.5px;font-weight:500;color:var(--blue);cursor:pointer}
+.tk-st-plan:hover{text-decoration:underline}
+@media (prefers-reduced-motion: no-preference){ .tk-steps{animation:tkStepsIn 180ms cubic-bezier(.23,1,.32,1)} }
+@keyframes tkStepsIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
 .tk-ls{display:flex;align-items:center;gap:8px;margin:26px 0 4px}
 .tk-ls b{font-size:15px;font-weight:650}
 .tk-ls span{font-size:13px;font-weight:600;color:var(--label-3)}

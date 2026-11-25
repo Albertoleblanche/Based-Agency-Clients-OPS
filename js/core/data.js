@@ -529,6 +529,35 @@ function workDuplicateOf(clientId, text){
     return n / (A.size + B.size - n) >= 0.85;
   }) || null;
 }
+// ---- Sprints in Tasks (Nov 25) ----
+// A sprint's open steps (yours, in one of your sprints) show in Tasks as one row: the next step to
+// do, with the sprint's name, how far along it is and how many are late, and the other steps one click
+// away. Plan still lists every step; Today and the calendar still show the step due that day. A
+// teammate's task put in your sprint stays its own row: it's theirs. planSprints is Plan's list on the
+// desktop (plan.js) and the phone's own (mobile/app.js).
+function sprintFold(open){
+  const me = typeof currentUser !== 'undefined' && currentUser ? currentUser.id : null, today = toDateStr(new Date());
+  const sps = typeof planSprints !== 'undefined' && Array.isArray(planSprints) ? planSprints : [];
+  const byId = new Map(sps.map(x => [x.id, x])), steps = new Map();
+  open.forEach(t => { if(t.sprintId && t.assigneeId === me && byId.has(t.sprintId)){ if(!steps.has(t.sprintId)) steps.set(t.sprintId, []); steps.get(t.sprintId).push(t); } });
+  const lead = new Map(), folded = new Set();
+  steps.forEach((list, sid) => {
+    list.sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999') || new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+    const all = (typeof tasks !== 'undefined' ? tasks : []).filter(x => x.sprintId === sid && !x.cancelledAt);
+    lead.set(list[0].id, { sprint: byId.get(sid), next: list[0], rest: list.slice(1), total: all.length, done: all.filter(x => x.status === 'done').length,
+      late: list.filter(x => x.dueDate && x.dueDate < today).length });
+    list.slice(1).forEach(x => folded.add(x.id));
+  });
+  return { list: open.filter(t => !folded.has(t.id)), lead, sprints: lead.size };
+}
+// "4 open tasks and 2 sprints", "2 sprints", "5 open tasks"
+function sprintFoldHeadline(fold, openN){
+  if(!openN) return 'No open tasks';
+  const loose = fold.list.length - fold.sprints, n = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`;
+  if(!fold.sprints) return `${n(openN, 'open task')}`;
+  return loose ? `${n(loose, 'open task')} and ${n(fold.sprints, 'sprint')}` : n(fold.sprints, 'sprint');
+}
+
 // ---- The same time twice (Nov 25) ----
 // Adding time by hand (Add Time, logging work with its time) first looks for that time already
 // logged: your own entries for the client that day, in Radar and in Harvest. Harvest's are read fresh

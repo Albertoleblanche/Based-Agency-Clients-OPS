@@ -49,19 +49,43 @@ function tkRemindBtn(t){
   const who = tkWho(t.assigneeId);
   return `<button class="ib tk-remind" aria-label="Remind ${escapeHtml(who)}" title="Remind ${escapeHtml(who)} on Slack" onclick="event.stopPropagation();remindTaskAssignee('${t.id}')">${icon('paper-plane-tilt')}</button>`;
 }
+// ---- sprints in Tasks (Nov 25): one row per sprint, its next step (sprintFold in data.js) ----
+let tkFoldNow = null;                 // this render's sprints, by the step that stands for them
+const tkSprintOpen = new Set();       // sprints showing all their steps
+function tkSprintToggle(e, sid){ e.stopPropagation(); tkSprintOpen.has(sid) ? tkSprintOpen.delete(sid) : tkSprintOpen.add(sid); renderTasks(); }
+function tkSprintPlan(e, sid){ e.stopPropagation(); if(typeof openPlanSprint === 'function') openPlanSprint(sid); else switchView('plan'); }
+function tkSprintLabel(g){
+  return `<span class="tk-sp">${icon('plan')}<span class="tk-sp-n">Sprint · ${escapeHtml(g.sprint.title)}</span><span class="tk-sp-c">${g.done} of ${g.total} done</span></span>`;
+}
+function tkSprintLate(g){ return g.late > 1 ? `<span class="tk-sp-late">${g.late} late</span>` : ''; }
+function tkSprintBtn(g){
+  const open = tkSprintOpen.has(g.sprint.id), n = g.rest.length;
+  return n ? `<button class="tk-more" aria-expanded="${open}" onclick="tkSprintToggle(event,'${g.sprint.id}')">${open ? 'Hide steps' : `${n} more step${n === 1 ? '' : 's'}`}</button>` : '';
+}
+function tkSprintMore(g){ return tkSprintLate(g) + tkSprintBtn(g); }
+function tkSprintSteps(g){
+  if(!tkSprintOpen.has(g.sprint.id)) return '';
+  return `<div class="tk-steps">${g.rest.map(t => { const [due, kind] = tkDue(t);
+    return `<div class="tk-st${window._taskSel === t.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="event.stopPropagation();selectTask('${t.id}')" onkeydown="if((event.key==='Enter'||event.key===' ')&&event.target===this){event.preventDefault();event.stopPropagation();selectTask('${t.id}')}">${tkCb(t)}<span class="tx">${escapeHtml(t.title)}</span><span class="tk-due ${kind}">${escapeHtml(due)}</span></div>`; }).join('')}
+<button class="x-lnk tk-st-plan" onclick="tkSprintPlan(event,'${g.sprint.id}')">Open in Plan</button></div>`;
+}
 function tkCardHtml(t){
+  const g = tkFoldNow && tkFoldNow.lead.get(t.id);
   const c = clients.find(x => x.id === t.clientId), [due, kind] = tkDue(t);
   const flag = t.priority === 'high' ? `<span class="tk-flag" title="High priority">${icon('flag')}</span>` : '';
   return `<article class="tk-c${t.color ? ' has-c c-' + t.color : ''}${window._taskSel === t.id ? ' is-sel' : ''}" role="button" tabindex="0" aria-label="${escapeHtml(t.title)}" onclick="selectTask('${t.id}')" onkeydown="if((event.key==='Enter'||event.key===' ')&&event.target===this){event.preventDefault();selectTask('${t.id}')}">
-<div class="tk-ct">${tkCb(t)}<b>${escapeHtml(t.title)}</b>${flag}</div>
+${g ? tkSprintLabel(g) : ''}<div class="tk-ct">${tkCb(t)}<b>${escapeHtml(t.title)}</b>${flag}</div>
 ${c ? `<div class="tk-cm"><span class="tk-cl">${escapeHtml(c.name)}${focusMark(c)}</span></div>` : ''}
-<div class="tk-cf"><span class="tk-due ${kind}">${escapeHtml(due)}</span><span class="tk-who">${escapeHtml(tkWho(t.assigneeId))}</span>${tkRemindBtn(t)}</div></article>`;
+<div class="tk-cf"><span class="tk-due ${kind}">${escapeHtml(due)}</span><span class="tk-who">${g ? tkSprintMore(g) : escapeHtml(tkWho(t.assigneeId))}</span>${tkRemindBtn(t)}</div>${g ? tkSprintSteps(g) : ''}</article>`;
 }
 function tkListRowHtml(t){
+  const g = t.status !== 'done' && tkFoldNow && tkFoldNow.lead.get(t.id);
   const c = clients.find(x => x.id === t.clientId), [due, kind] = tkDue(t), done = t.status === 'done';
-  return `<div class="tk-lr${done ? ' is-done' : ''}${window._taskSel === t.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectTask('${t.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)selectTask('${t.id}')">${tkCb(t)}
-<div class="tx"><b>${t.color && !done ? `<i class="cc-dot c-${t.color}" aria-hidden="true"></i>` : ''}${escapeHtml(t.title)}${t.priority === 'high' && !done ? `<span class="tk-flag" title="High priority">${icon('flag')}</span>` : ''}</b><span class="s">${c ? escapeHtml(c.name) + focusMark(c) + ' · ' : ''}${escapeHtml(tkWho(t.assigneeId))}</span></div>
-${tkRemindBtn(t)}<span class="tk-due ${kind}">${escapeHtml(done && t.completedAt ? 'Done ' + fmtShortDate(new Date(t.completedAt)) : due)}</span></div>`;
+  return `<div class="tk-lr${done ? ' is-done' : ''}${g ? ' is-sprint' : ''}${window._taskSel === t.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectTask('${t.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)selectTask('${t.id}')">${tkCb(t)}
+<div class="tx">${g ? tkSprintLabel(g) : ''}<b>${t.color && !done ? `<i class="cc-dot c-${t.color}" aria-hidden="true"></i>` : ''}${escapeHtml(t.title)}${t.priority === 'high' && !done ? `<span class="tk-flag" title="High priority">${icon('flag')}</span>` : ''}</b><span class="s">${g
+    ? [c ? escapeHtml(c.name) + focusMark(c) : '', tkSprintLate(g), tkSprintBtn(g)].filter(Boolean).join(' · ')
+    : (c ? escapeHtml(c.name) + focusMark(c) + ' · ' : '') + escapeHtml(tkWho(t.assigneeId))}</span></div>
+${tkRemindBtn(t)}<span class="tk-due ${kind}">${escapeHtml(done && t.completedAt ? 'Done ' + fmtShortDate(new Date(t.completedAt)) : due)}</span>${g ? tkSprintSteps(g) : ''}</div>`;
 }
 
 function renderTasks(){
@@ -73,13 +97,16 @@ function renderTasks(){
   // Approvers and admins switch between Everyone (every task they're part of) and Mine. A team
   // member sees the tasks assigned to them, and the ones they handed to someone else on their own.
   const everyone = seesEveryone();
-  const mineN = vis.filter(t => t.assigneeId === me && t.status !== 'done').length;
+  const mineN = sprintFold(vis.filter(t => t.assigneeId === me && t.status !== 'done')).list.length;   // a sprint counts once
   const byMe = vis.filter(t => t.assignerId === me && t.assigneeId !== me), byMeN = byMe.filter(t => t.status !== 'done').length;
   if(!everyone && (tasksScope === 'everyone' || (tasksScope === 'byme' && !byMe.length))) tasksScope = 'mine';
   if(tasksScope === 'mine') vis = vis.filter(t => t.assigneeId === me);
   else if(tasksScope === 'byme') vis = byMe;
   if(tasksClient !== 'all') vis = vis.filter(t => t.clientId === tasksClient);
-  const open = vis.filter(t => t.status !== 'done'), overdue = open.filter(t => t.dueDate && t.dueDate < today);
+  const open = vis.filter(t => t.status !== 'done');
+  // a sprint's steps fold into one row: its next step (Nov 25). Overdue counts rows too: a sprint
+  // with late steps is one late row (it says how many are late).
+  const fold = tkFoldNow = sprintFold(open), items = fold.list, overdue = items.filter(t => t.dueDate && t.dueDate < today);
   const review = open.filter(t => t.status === 'in_review' && t.assignerId === me);
   const order = (a, b) => focusIdFirst(a.clientId, b.clientId) || (a.dueDate || '9999').localeCompare(b.dueDate || '9999') || (a.priority === 'high' ? -1 : 0) - (b.priority === 'high' ? -1 : 0) || new Date(b.createdAt) - new Date(a.createdAt);
   const monday = dayStart(addDays(new Date(), -((new Date().getDay() + 6) % 7)));
@@ -88,7 +115,7 @@ function renderTasks(){
   const usedClients = [...new Set(tasks.map(t => t.clientId).filter(Boolean))].map(id => clients.find(c => c.id === id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
   const curC = usedClients.find(c => c.id === tasksClient);
   const sub = [overdue.length ? `<b>${overdue.length} ${overdue.length === 1 ? 'is' : 'are'} overdue.</b>` : '', review.length ? `${review.length} ${review.length === 1 ? 'is' : 'are'} waiting on your review.` : ''].filter(Boolean).join(' ') || (open.length ? 'Nothing is overdue.' : 'Nothing open right now.');
-  const head = `<div class="tk-hd"><div><h2>${open.length ? `${open.length} open task${open.length === 1 ? '' : 's'}` : 'No open tasks'}</h2><p>${sub}</p></div>
+  const head = `<div class="tk-hd"><div><h2>${sprintFoldHeadline(fold, open.length)}</h2><p>${sub}</p></div>
 <div class="tk-f">${typeof tkGranolaBtn === 'function' ? tkGranolaBtn() : ''}${typeof tkGmailBtn === 'function' ? tkGmailBtn() : ''}${(everyone ? [['everyone', 'Everyone', ''], ['mine', 'Mine', mineN]] : byMe.length ? [['mine', 'Mine', mineN], ['byme', 'Assigned by Me', byMeN]] : [])
   .map(([k, t, n], i, a) => (i ? '' : '<div class="seg" role="tablist" aria-label="Whose">') + `<button class="${tasksScope === k ? 'on' : ''}" role="tab" aria-selected="${tasksScope === k}" onclick="setTasksScope('${k}')">${t}${n !== '' ? ` <span class="c">${n}</span>` : ''}</button>` + (i === a.length - 1 ? '</div>' : '')).join('')}
 <label class="pop pop-sel"><span class="pl">Client: ${escapeHtml(curC ? curC.name : 'All')}</span>${icon('caret-down')}<select aria-label="Client" onchange="setTasksClient(this.value)"><option value="all">All</option>${usedClients.map(c => `<option value="${c.id}"${c === curC ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></label>
@@ -106,12 +133,12 @@ function renderTasks(){
     : emptyState({ icon: 'list-checks', tone: 'blue', title: 'No tasks yet', text: 'Give yourself or a teammate something to do, for a client or not. Tasks show here by stage, and on Today and your calendar when they’re due.', action: 'New Task', actionIcon: 'plus', onAction: 'openNewTaskModal()' })) : '';
   if(tkEmpty) body = `<div class="tk-list">${tkEmpty}</div>`;
   else if(tasksLayout === 'list'){
-    body = TASK_COLS.map(([k, label]) => { const ts = open.filter(t => t.status === k).sort(order);
+    body = TASK_COLS.map(([k, label]) => { const ts = items.filter(t => t.status === k).sort(order);
       return ts.length ? `<div class="tk-ls"><b>${label}</b><span>${ts.length}</span><button class="ib" aria-label="Add a task to ${label}" title="New task" onclick="openNewTaskModal(undefined,'${k}')">${icon('plus')}</button></div>${ts.map(tkListRowHtml).join('')}` : ''; }).join('')
       + (done.length ? `<div class="tk-ls"><b>Done</b><span>${doneWeek.length ? `${doneWeek.length} this week` : ''}</span></div>${(doneWeek.length ? doneWeek : done.slice(0, 3)).map(tkListRowHtml).join('')}<a class="x-lnk tk-arch" href="#" onclick="switchView('task-archive');return false;">Finished tasks</a>` : '');
     body = `<div class="tk-list">${body}</div>`;
   } else {
-    body = `<div class="tk-board">${TASK_COLS.map(([k, label]) => { const ts = open.filter(t => t.status === k).sort(order);
+    body = `<div class="tk-board">${TASK_COLS.map(([k, label]) => { const ts = items.filter(t => t.status === k).sort(order);
       return `<section class="tk-col" aria-label="${label}"><div class="tk-ch"><b>${label}</b><span>${ts.length}</span><button class="ib" aria-label="Add a task to ${label}" title="New task" onclick="openNewTaskModal(undefined,'${k}')">${icon('plus')}</button></div>${ts.map(tkCardHtml).join('') || `<p class="tk-none">Nothing here.</p>`}</section>`; }).join('')}${doneCol}</div>`;
   }
   const sel = window._taskSel && tasks.find(t => t.id === window._taskSel);
@@ -124,7 +151,7 @@ function renderTasks(){
   const pn = root.querySelector('.sp:not(.sp-leaving)'); if(pn){ pn.scrollTop = prevSp; pn._st = prevSp; }
   const ci = document.getElementById('tkpCmt'); if(ci && cmt) ci.value = cmt;
   tkFillFiles(root);
-  if(currentViewName === 'tasks') setToolbar(null, `${open.length} open${overdue.length ? ` · ${overdue.length} overdue` : ''}`);
+  if(currentViewName === 'tasks') setToolbar(null, `${items.length} open${overdue.length ? ` · ${overdue.length} overdue` : ''}`);
   if(typeof updateTasksNavBadge === 'function') updateTasksNavBadge();
 }
 

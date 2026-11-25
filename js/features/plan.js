@@ -27,6 +27,9 @@ async function loadPlan(){
   const s = await supabaseClient.from('plan_settings').select('*').eq('user_id', currentUser.id).maybeSingle();
   if(!s.error && s.data && Number(s.data.weekly_hours) > 0) planWeeklyHours = Number(s.data.weekly_hours);
   checkPlanReminders();
+  // Tasks folds each sprint into one row, so its count and list follow the sprints (Nov 25)
+  if(typeof updateTasksNavBadge === 'function') updateTasksNavBadge();
+  if(typeof currentViewName !== 'undefined' && currentViewName === 'tasks' && typeof renderTasks === 'function') renderTasks();
 }
 function planSprint(id){ return planSprints.find(s => s.id === id); }
 
@@ -611,6 +614,11 @@ async function savePlanSprint(){
   if(old && (old.color || null) !== (color || null)){
     const ids = planSteps(old).filter(t => (t.color || null) === (old.color || null) && t.assignerId === currentUser.id).map(t => t.id);
     if(ids.length) await supabaseClient.from('tasks').update({ color }).in('id', ids);
+  }
+  // and so does a changed client, so Tasks' Client filter finds the sprint under its client (Nov 25)
+  if(old && (old.clientId || null) !== (clientId || null)){
+    const ids = planSteps(old).filter(t => (t.clientId || null) === (old.clientId || null) && t.assignerId === currentUser.id).map(t => t.id);
+    if(ids.length) await supabaseClient.from('tasks').update({ client_id: clientId }).in('id', ids);
   }
   closeAppModal(); planSheet = null;
   await Promise.all([loadPlan(), loadMyTasks()]);

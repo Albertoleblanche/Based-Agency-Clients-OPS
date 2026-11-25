@@ -49,7 +49,9 @@ function switchTaskDirectionTab(dir){
 function updateTasksNavBadge(){
   const badge = document.getElementById('navTasksBadge');
   if(!badge || !currentUser) return;
-  const open = tasks.filter(t=> t.status!=='done' && !t.cancelledAt && t.assigneeId===currentUser.id).length;
+  // a sprint's steps count once, as in Tasks (Nov 25)
+  const mine = tasks.filter(t=> t.status!=='done' && !t.cancelledAt && t.assigneeId===currentUser.id);
+  const open = typeof sprintFold === 'function' ? sprintFold(mine).list.length : mine.length;
   badge.textContent = open;
   badge.style.display = open ? '' : 'none';   // the stylesheet lays out the count circle
 }

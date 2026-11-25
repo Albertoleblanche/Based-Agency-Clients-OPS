@@ -540,3 +540,26 @@ body.mac.mobile { overflow: hidden; background: var(--ios-bg, #F2F2F7); -webkit-
 .m-tdup span.m-tdup-why{margin-top:6px;color:var(--label)}
 .m-tdup-a{display:flex;gap:10px;margin-top:12px}
 .m-tdup-a .ibtn{flex:1;width:auto;margin:0}
+/* Tasks: a sprint is one row, its next step; the other steps open under it (Nov 25) */
+.app .msp .tx{gap:1px}
+.app .msp-l{display:flex;align-items:center;gap:5px;min-width:0;margin-bottom:1px;font-size:12px;font-weight:500;line-height:16px;color:var(--label-2)}
+.app .msp-l svg{flex:none;width:13px;height:13px}
+.app .msp-n{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.app .msp-c{flex:none;white-space:nowrap;color:var(--label-3)}
+.app .msp-c::before{content:"·";margin-right:5px}
+.app .msp-more{position:relative;align-self:flex-start;display:inline-flex;align-items:center;gap:5px;margin-top:5px;padding:0;border:0;background:none;color:var(--label);font:inherit;font-size:14px;font-weight:500;white-space:nowrap;-webkit-tap-highlight-color:transparent}
+.app .msp-more::after{content:"";position:absolute;inset:-12px -14px -10px}
+.app .msp-more:active{opacity:.5}
+.app .msp-more svg{width:11px;height:11px;color:var(--label-2)}
+.app .msp-more[aria-expanded="true"] svg{transform:rotate(180deg)}
+.app .msp-steps{position:relative}
+.app .msp-steps::before,.app .msp-steps + .ir::before{content:"";position:absolute;z-index:1;top:0;left:56px;right:0;border-top:.5px solid var(--sep)}
+.app .msp-st{padding-left:50px}
+.app .msp-st + .msp-st::before{left:90px}
+.app .msp-st .t{font-size:15px}
+.app .msp-st .r{font-size:14px}
+@media (prefers-reduced-motion: no-preference){
+  .app .msp-more svg{transition:transform 200ms cubic-bezier(.23,1,.32,1)}
+  .app .msp-steps{animation:mspIn 200ms cubic-bezier(.23,1,.32,1)}
+  @keyframes mspIn{from{opacity:0;transform:translateY(-4px)}}
+}
