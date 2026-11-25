@@ -2475,23 +2475,22 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .cl-qa .btn svg{width:11px;height:11px}
 .cl-g > .itip{margin-left:2px}
 .st-next .sig svg{width:15px;height:15px}
-/* Plan with Claude (claude-plan.js): a row under the next step in a panel, a small button in Health's list */
-.sp-claude{display:flex;align-items:center;gap:10px;width:100%;margin-top:12px;padding:9px 12px;border:0;border-radius:10px;background:var(--fill);color:var(--label);font:inherit;text-align:left;cursor:default;transition:background-color 120ms ease,transform 160ms cubic-bezier(.23,1,.32,1)}
-.sp-claude > span{display:flex;flex-direction:column;gap:1px;flex:1 1 auto;min-width:0}
-.sp-claude b{font-size:13px;font-weight:600}
-.sp-claude small{font-size:12px;color:var(--label-2);line-height:1.35}
-.sp-claude > svg{width:14px;height:14px;flex:0 0 auto;color:var(--label-3)}
-.sp-claude .app-logo,.cl-claude .app-logo,.cp-claude .app-logo{flex:0 0 auto}
-.sp-claude:active{transform:scale(.98);transition-duration:100ms}
-.sp-claude:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 35%,transparent)}
-@media (hover:hover) and (pointer:fine){ .sp-claude:hover{background:var(--fill-2)} }
+/* Plan with Claude (claude-plan.js): its own orange (Claude's), between Mark Handled and the next step's
+   button, with an (i); small (the logo) beside Open Task in Health's list */
+:root{--claude:#D97757;--claude-hover:#C6613F}
+.sp-acts{flex-wrap:wrap}
+.cl-claude-w{display:inline-flex;align-items:center;gap:4px;flex:0 0 auto}
+:is(.mac,html.ui-w .mac,body) .btn.cl-claude-btn.cl-claude-btn.cl-claude-btn{background:var(--claude);color:#fff;border-color:transparent;box-shadow:inset 0 .5px 0 rgba(255,255,255,.22);font-weight:600}
+:is(.mac,html.ui-w .mac,body) .btn.cl-claude-btn.cl-claude-btn.cl-claude-btn:active{background:var(--claude-hover);transform:scale(.97)}
+:is(.mac,html.ui-w .mac,body) .btn.cl-claude-btn.cl-claude-btn.cl-claude-btn:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--claude) 40%,transparent)}
+@media (hover:hover) and (pointer:fine){ :is(.mac,html.ui-w .mac,body) .btn.cl-claude-btn.cl-claude-btn.cl-claude-btn:hover{background:var(--claude-hover);color:#fff} }
 .cl-claude{gap:6px}
 .cl-claude.is-ic{width:28px;padding:0;justify-content:center}
 .hx-act{gap:6px;align-items:center}
-.cp-claude{display:inline-flex;align-items:center;gap:7px;margin-top:8px;border:0;border-radius:10px;background:var(--fill);color:var(--label);font:inherit;font-size:13px;font-weight:600;cursor:default;transition:background-color 120ms ease,transform 160ms cubic-bezier(.23,1,.32,1)}
-.cp-claude:active{transform:scale(.97);transition-duration:100ms}
-@media (hover:hover) and (pointer:fine){ .cp-claude:hover{background:var(--fill-2)} }
-@media (prefers-reduced-motion:reduce){ .sp-claude,.cp-claude{transition:background-color 120ms ease} .sp-claude:active,.cp-claude:active{transform:none} }
+.cp-claude-row{display:flex;justify-content:center;margin-top:8px}
+.cp-claude-row .cl-claude-w{width:100%}
+.cp-claude-row .cl-claude-btn{flex:1 1 auto;justify-content:center;height:38px}
+.next .cl-claude-w{margin:0}
 .su-same{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px;padding:10px 10px 10px 14px;border-radius:10px;background:var(--fill);font-size:13px;line-height:1.4}
 .su-same b{font-weight:600}
 .su-same .btn{flex:0 0 auto;height:28px;padding:0 12px;border-radius:7px}

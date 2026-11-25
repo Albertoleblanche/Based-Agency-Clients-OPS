@@ -62,10 +62,12 @@ function planWithClaude(id){
   window.open(claudeNewChatUrl(claudePlanPrompt(c)), '_blank', 'noopener');
   if(typeof showToast === 'function') showToast('info', 'Opened in Claude', 'The message is ready there, in a new tab. Read it over, then send it.');
 }
-// The button: under the next step in a panel, or a small one beside Open Task in Health's list.
+// The button: Claude's own orange, between Mark Handled and the next step's button, with an (i) that
+// says what it does; small (the logo) beside Open Task in Health's list.
+const CLAUDE_PLAN_TIP = 'Opens Claude in a new tab with this client’s next step ready to start: what they pay us for, why Radar flags them, the work logged lately and what’s still open.\n\nClaude stays inside their scope (anything outside it comes back as an add-on to offer), plans the step, starts on it with you and ends with a win for the client. Nothing is sent until you send it.';
 function planWithClaudeHtml(id, small){
   const A = jsArg(id);
   return small
     ? `<button class="btn sm cl-claude is-ic" onclick="event.stopPropagation();planWithClaude(${A})" aria-label="Plan with Claude" data-hovertip="Plan with Claude: opens Claude with this client’s next step ready to start, inside what they pay us for.">${appLogo('claude', 'xs')}</button>`
-    : `<button class="sp-claude" onclick="planWithClaude(${A})">${appLogo('claude', 'xs')}<span><b>Plan with Claude</b><small>Opens Claude with the next step ready to start, inside what they pay us for.</small></span>${icon('external-link')}</button>`;
+    : `<span class="cl-claude-w"><button class="btn cl-claude-btn" onclick="event.stopPropagation();planWithClaude(${A})">Plan with Claude</button>${typeof infoTip === 'function' ? infoTip(CLAUDE_PLAN_TIP, 'What does Plan with Claude do?') : ''}</span>`;
 }

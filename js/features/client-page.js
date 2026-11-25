@@ -28,7 +28,7 @@ function renderClientPage(){
   else if(h.level !== 'g'){
     callout = `<div class="next" style="margin-top:20px"><span class="sig ${h.level}">${icon(h.level === 'r' ? 'activity' : 'eye')}</span>
 <div class="tx"><b>${healthWord(h.level)} since ${relDay(h.since || rNow()).toLowerCase() === 'today' ? 'today' : relDay(h.since || rNow())}${next ? '' : ' — no next step yet'}</b><span>${escapeHtml(h.signals.map(s => s.title.charAt(0).toUpperCase() + s.title.slice(1)).join(' · '))}</span></div>
-<button class="btn" onclick="openHealthClient('${c.id}')">See Why</button>${typeof planWithClaude === 'function' ? `<button class="btn cl-claude" onclick="planWithClaude(${jsArg(c.id)})">${appLogo('claude', 'xs')}Plan with Claude</button>` : ''}${next ? `<button class="btn" onclick="openTaskDetailModal('${next.id}')">Open Next Step</button>` : `<button class="btn btn-p" onclick="planNextStep('${c.id}')">${icon('plus')}Plan Next Step</button>`}</div>`;
+<button class="btn" onclick="openHealthClient('${c.id}')">See Why</button>${typeof planWithClaudeHtml === 'function' ? planWithClaudeHtml(c.id) : ''}${next ? `<button class="btn" onclick="openTaskDetailModal('${next.id}')">Open Next Step</button>` : `<button class="btn btn-p" onclick="planNextStep('${c.id}')">${icon('plus')}Plan Next Step</button>`}</div>`;
   }
   // the new look: the canvas layout, a grid of cards
   const uw = typeof uiStyleOn === 'function' && uiStyleOn();
@@ -132,7 +132,7 @@ ${uwSteps(w)}${act}
   const hSub = h.off ? 'It gets no weekly update' : h.level === 'g' ? 'Nothing needs care right now' : `${h.signals.length} reason${h.signals.length === 1 ? '' : 's'} · ${next ? 'next: ' + next.title : 'no next step yet'}`;
   const health = `<section class="uw-w uw-s3 cp-h">${head('heart-pulse', 'Health', h.level === 'g' ? '' : pill('See why', `openHealthClient('${c.id}')`))}
 <div class="cp-hb"><div class="cp-word ${h.off ? 'n' : h.level}"><i></i>${escapeHtml(h.off ? 'Not watched' : healthWord(h.level))}</div><div class="uw-bigsub">${escapeHtml(hSub)}</div></div>
-${h.off ? '' : trail}${hBtn ? `<div class="cp-hact">${hBtn}${typeof planWithClaude === 'function' && !h.quiet ? `<button class="cp-claude cp-wide" onclick="planWithClaude(${jsArg(c.id)})">${appLogo('claude', 'xs')}Plan with Claude</button>` : ''}</div>` : ''}</section>`;
+${h.off ? '' : trail}${hBtn ? `<div class="cp-hact">${hBtn}${typeof planWithClaudeHtml === 'function' && !h.quiet ? `<div class="cp-claude-row">${planWithClaudeHtml(c.id)}</div>` : ''}</div>` : ''}</section>`;
   // hours this month against the budget, and where it's heading
   const hp = h.hp || {}, used = Math.round(hp.used || 0), bud = hp.budget || 0, over = bud && used > bud;
   const end = new Date(rNow().getFullYear(), rNow().getMonth() + 1, 0);

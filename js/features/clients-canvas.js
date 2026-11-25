@@ -369,6 +369,7 @@ function clientPanelHtml({ c, h, w, owner }){
   const why = healthPhrase(h, c);
   const A = `'${c.id}'`;
   let eyebrow, title, sub, acts = '';
+  const claude = typeof planWithClaudeHtml === 'function' ? planWithClaudeHtml(c.id) : '';   // Plan with Claude (claude-plan.js)
   // paused, or Radar asking whether it's still a client (client-status.js): that comes first
   const st = typeof clientStatusPanel === 'function' ? clientStatusPanel(c) : null;
   if(st) ({ eyebrow, title, sub, acts } = st);
@@ -376,10 +377,10 @@ function clientPanelHtml({ c, h, w, owner }){
     const sinceTxt = h.since ? (relDay(h.since).toLowerCase() === 'today' ? 'today' : relDay(h.since)) : 'today';
     eyebrow = h.quiet ? `<span class="sp-eb">${icon('check', { weight: 'bold' })}Handled, settling</span>` : `<span class="sp-eb ${lvl === 'r' ? 'red' : 'warn'}"><i class="eb-dot"></i>${lvl === 'r' ? 'At risk' : 'Watch'} since ${escapeHtml(sinceTxt)}</span>`;
     if(next){ title = `Next step: ${next.title}`; sub = `${why ? escapeHtml(why) + ' · ' : ''}${escapeHtml((teamProfiles.find(p => p.id === next.assigneeId) || {}).name || '')}${next.dueDate ? ' · due ' + fmtShortDate(new Date(next.dueDate + 'T12:00:00')) : ''}${nextStepSprintName(next) ? ' · ' + escapeHtml(nextStepSprintName(next)) : ''}`;
-      acts = `<button class="btn" onclick="markHealthHandled(${A})" title="You’ve dealt with it: the warning goes quiet for ${healthThresholds().quietDays} days, unless it gets worse">Mark Handled</button><button class="btn btn-p" onclick="openTaskDetailModal('${next.id}')">Open Task</button>`; }
+      acts = `<button class="btn" onclick="markHealthHandled(${A})" title="You’ve dealt with it: the warning goes quiet for ${healthThresholds().quietDays} days, unless it gets worse">Mark Handled</button>${claude}<button class="btn btn-p" onclick="openTaskDetailModal('${next.id}')">Open Task</button>`; }
     else if(h.quiet){ title = 'Handled, waiting for the numbers to settle'; sub = ''; }
     else { title = why || 'No next step yet'; sub = `Plan a next step and it becomes a task for ${escapeHtml(firstName(owner) || 'the owner')}.`;
-      acts = `<button class="btn" onclick="markHealthHandled(${A})" title="You’ve dealt with it: the warning goes quiet for ${healthThresholds().quietDays} days, unless it gets worse">Mark Handled</button><button class="btn btn-p" onclick="planNextStep(${A})">${icon('plus')}Plan Next Step</button>`; }
+      acts = `<button class="btn" onclick="markHealthHandled(${A})" title="You’ve dealt with it: the warning goes quiet for ${healthThresholds().quietDays} days, unless it gets worse">Mark Handled</button>${claude}<button class="btn btn-p" onclick="planNextStep(${A})">${icon('plus')}Plan Next Step</button>`; }
   } else if(w.off){
     eyebrow = `<span class="sp-eb">${icon('minus-circle', { weight: 'bold' })}Not watched by Health</span>`;
     title = 'No weekly update'; sub = 'Work and hours are still logged here. Pick how it’s sent under Weekly win to turn it back on.';
@@ -423,7 +424,7 @@ ${w.off ? `<div class="cl-mc"><span class="k">This week’s win</span><b>${escap
 <div class="sp-bar"><button class="ib" aria-label="Close" title="Close (Esc)" onclick="closeClientInspector()">${icon('x')}</button><span class="cl-pbar-r"><button class="ib" aria-label="More" title="More" onclick="clientPanelMore(event, ${A})">${icon('dots-three')}</button></span></div>
 <div class="sp-main">
 <div class="sp-head">${monoHtml(c, 'lg')}<div class="tx"><b><a class="sp-nm" href="#" onclick="openClientDetail(${A});return false;" title="Open client page">${escapeHtml(c.name)}${icon('caret-right', { weight: 'bold' })}</a></b><span>${meta}</span></div>${focusToggleHtml(c)}</div>
-<div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b>${sub ? `<span class="sub">${sub}</span>` : ''}${acts ? `<div class="sp-acts">${acts}</div>` : ''}${!st && lvl !== 'g' && !h.quiet && typeof planWithClaudeHtml === 'function' ? planWithClaudeHtml(c.id) : ''}</div>
+<div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b>${sub ? `<span class="sub">${sub}</span>` : ''}${acts ? `<div class="sp-acts">${acts}</div>` : ''}</div>
 ${nums}
 <div class="sp-folds cl-folds">
 ${clientFoldHtml('win', 'Weekly win', clientWinSummary(c), clientWinHtml(c))}

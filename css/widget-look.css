@@ -937,9 +937,8 @@ html.ui-w .cl-pz-n{font-size:11.5px}
 html.ui-w .cl-pz-t{font-size:15px;font-weight:500}
 html.ui-w .cl-wk.is-ask{color:var(--uw-watch);font-weight:500}
 html.ui-w .st-next{margin:18px 0 0;border-radius:var(--uw-r-sec,18px)}
-html.ui-w .sp-claude,html.ui-w .cp-claude{background:var(--uw-c2);border-radius:14px}
-html.ui-w .sp-claude b{font-weight:500}
-html.ui-w .cp-claude{font-weight:500}
+html.ui-w .btn.cl-claude-btn{font-weight:500}
+html.ui-w .cp-claude-row .cl-claude-btn{border-radius:var(--uw-r-ctl)}
 @container (max-width:960px){
   html.ui-w .cl-table.is-uw :is(.cl-head,.cl-r){grid-template-columns:minmax(150px,1.5fr) minmax(64px,.6fr) minmax(150px,1.6fr) minmax(120px,1.2fr) minmax(92px,.75fr)}
   html.ui-w .cl-table.is-uw .cl-head > :nth-child(2),html.ui-w .cl-table.is-uw .cl-r > .cl-sv{display:none}
