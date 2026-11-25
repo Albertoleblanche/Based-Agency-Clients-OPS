@@ -126,15 +126,40 @@ function waWaitingNow(c){
 }
 function waGroupLabel(jid){ const g = (waGroups || []).find(x => x.jid === jid); return g ? waCleanName(g.name) : 'A client'; }
 
+// ---- saying it once (Nov 25) -----------------------------------------------------------------------
+// A client's words are quoted once: not under a line that already says them (a summary written from
+// that very message), and not twice for one client (a mood and a signal read from the same message,
+// one quote holding the other: the longer stays).
+const WA_STOP = new Set('the and for with from that this these those they them their there have has had was were are our your you its not but just been about into what when then than also very will would could should can cant dont didnt isnt its im ive were well she her his him who'.split(' '));
+function waWordsOf(s){
+  return new Set(String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/['’]/g, '').split(/[^a-z0-9]+/)
+    .filter(w => w.length >= 3 && !WA_STOP.has(w)).map(w => w.length > 4 ? w.replace(/s$/, '') : w));
+}
+// most of the quote's words are already in the text
+function waSaysIt(text, quote){
+  const Q = waWordsOf(quote); if(!Q.size) return true;
+  const T = waWordsOf(text); let n = 0; Q.forEach(w => { if(T.has(w)) n++; });
+  return n / Q.size >= 0.6;
+}
+// two quotes of the same words: the shorter mostly inside the longer
+function waSameQuote(a, b){
+  const A = waWordsOf(a), B = waWordsOf(b), [sm, lg] = A.size <= B.size ? [A, B] : [B, A];
+  if(!sm.size) return false;
+  let n = 0; sm.forEach(w => { if(lg.has(w)) n++; });
+  return n / sm.size >= 0.7;
+}
+
 // ---- the WhatsApp screen's side: account signals, reply times, client details --------------------
 const WA_SIG_KIND = { pause: 'Wants to pause', cancel: 'Talks about cancelling', budget: 'Budget', competitor: 'Another agency', unhappy: 'Unhappy with results',
   expansion: 'Growing', new_service: 'Asks about a new service', referral: 'A referral', hiring: 'Hiring', resume: 'Wants to restart', other: 'Worth knowing' };
 function waSigOpen(){ return Array.isArray(waSignals) ? waSignals.filter(s => s.status === 'new') : []; }
-function waSigRow(s, inPanel){
+function waSigRow(s, inPanel, quoted){
   const c = waRowClient(s), name = c ? c.name : waCleanName(s.client);
+  const q = s.excerpt && !waSaysIt(s.summary, s.excerpt) && !(quoted || []).some(x => waSameQuote(x, s.excerpt)) ? s.excerpt : '';
+  if(q && quoted) quoted.push(q);
   const open = c ? `openClientInspectorFor('${escapeHtml(String(c.id))}')` : '';
   return `<div class="wa-sig${s.type === 'risk' ? ' is-risk' : ' is-open'}" data-sig="${s.id}">
-<button class="wa-sig-t"${open ? ` onclick="${open}"` : ' disabled'} title="${open ? `Open ${escapeHtml(name)}` : ''}"><i class="dot" aria-hidden="true"></i><span class="tx">${inPanel ? '' : `<b>${escapeHtml(name)}</b>`}<span class="k">${s.type === 'risk' ? 'Risk' : 'Opening'} · ${escapeHtml(WA_SIG_KIND[s.kind] || WA_SIG_KIND.other)} · ${escapeHtml(relDayLower(new Date(s.created_at)))}</span><span class="s">${escapeHtml(s.summary)}</span>${s.excerpt ? `<span class="q">“${escapeHtml(s.excerpt)}”</span>` : ''}</span></button>
+<button class="wa-sig-t"${open ? ` onclick="${open}"` : ' disabled'} title="${open ? `Open ${escapeHtml(name)}` : ''}"><i class="dot" aria-hidden="true"></i><span class="tx">${inPanel ? '' : `<b>${escapeHtml(name)}</b>`}<span class="k">${s.type === 'risk' ? 'Risk' : 'Opening'} · ${escapeHtml(WA_SIG_KIND[s.kind] || WA_SIG_KIND.other)} · ${escapeHtml(relDayLower(new Date(s.created_at)))}</span><span class="s">${escapeHtml(s.summary)}</span>${q ? `<span class="q">“${escapeHtml(q)}”</span>` : ''}</span></button>
 <span class="wa-sig-a"><button class="lnk-b" onclick="waSignalSet(${s.id}, 'handled')">Mark Handled</button><button class="lnk-b is-2" onclick="waSignalSet(${s.id}, 'dismissed')">Dismiss</button></span></div>`;
 }
 // Clients to watch: what clients said that's worth acting on, one line each per client. Account signals
@@ -155,8 +180,8 @@ function waWatchList(){
     waMoods.forEach(m => {
       const c = waRowClient(m); if(!c || seen.has(String(c.id))) return; seen.add(String(c.id));
       const cur = waMoodFor(c); if(!cur) return;
-      if(cur.level === 'frustrated' || cur.level === 'angry'){ const x = get(c); x.risk = true; x.lines.push({ t: WA_MOOD[cur.level], q: cur.excerpt || '', tone: cur.level === 'angry' ? 'r' : 'y' }); }
-      else if(cur.level === 'happy' && by.has('c' + c.id)) by.get('c' + c.id).lines.push({ t: 'Happy', q: cur.excerpt || '', tone: 'g' });
+      if(cur.level === 'frustrated' || cur.level === 'angry'){ const x = get(c); x.risk = true; x.mood = { t: WA_MOOD[cur.level], q: cur.excerpt || '', tone: cur.level === 'angry' ? 'r' : 'y' }; }
+      else if(cur.level === 'happy' && by.has('c' + c.id)) by.get('c' + c.id).mood = { t: 'Happy', q: cur.excerpt || '', tone: 'g' };
     });
   }
   const openGroups = new Set((waTasks || []).filter(t => t.status === 'open').map(t => t.group_jid));
@@ -174,6 +199,24 @@ function waWatchList(){
     const x = get(c); x.quiet = !x.risk && !x.open;
     x.lines.push({ t: days === null ? 'Quiet: no message or update from us yet.' : `Quiet for ${days} days: no message or update from us.` });
   });
+  // each thing said once: a quote the line already says goes; the same words twice, the longer stays;
+  // the mood's words show only when nothing above says them
+  by.forEach(x => {
+    const quoted = [];
+    x.lines.forEach(l => {
+      if(l.q && l.t && waSaysIt(l.t, l.q)) l.q = '';
+      if(!l.q) return;
+      const k = quoted.find(o => waSameQuote(o.q, l.q));
+      if(!k){ quoted.push(l); return; }
+      if(l.q.length > k.q.length) k.q = l.q;
+      l.q = '';
+    });
+    const q = x.mood && x.mood.q;
+    if(!q) return;
+    const k = quoted.find(o => waSameQuote(o.q, q));
+    if(k){ if(q.length > k.q.length) k.q = q; }
+    else if(!x.lines.some(l => waSaysIt(`${l.t} ${l.q || ''}`, q))) x.lines.unshift({ t: '', q });
+  });
   const rank = x => x.risk ? 0 : x.open ? 1 : 2;
   return [...by.values()].sort((a, b) => rank(a) - rank(b));
 }
@@ -185,8 +228,9 @@ function waWatchHtml(){
     const ids = x.sigs.map(s => s.id).join(',');
     const acts = [x.c ? `<button class="lnk-b" onclick="openClientDetail('${escapeHtml(String(x.c.id))}')">Open Client</button>` : '',
       ids ? `<button class="lnk-b is-2" onclick="waSignalsSet('${ids}', 'handled')">Mark Handled</button>` : ''].filter(Boolean).join('');
-    return `<div class="wx-w ${x.risk ? 'is-risk' : x.open ? 'is-open' : 'is-quiet'}"><i class="dot" aria-hidden="true"></i><div>${typeof waPausedTag === 'function' && waPausedTag(x.c) ? `<span class="wx-w-n"><b>${escapeHtml(x.name)}</b>${waPausedTag(x.c)}</span>` : `<b>${escapeHtml(x.name)}</b>`}
-${x.lines.map(l => `<p>${l.tone ? `<span class="wx-mood ${l.tone}">${escapeHtml(l.t)}</span>` : escapeHtml(l.t)}${l.q ? ` <span class="q">“${escapeHtml(l.q)}”</span>` : ''}</p>`).join('')}
+    const tags = (typeof waPausedTag === 'function' ? waPausedTag(x.c) : '') + (x.mood ? `<span class="wx-tag ${x.mood.tone}">${escapeHtml(x.mood.t)}</span>` : '');
+    return `<div class="wx-w ${x.risk ? 'is-risk' : x.open ? 'is-open' : 'is-quiet'}"><i class="dot" aria-hidden="true"></i><div>${tags ? `<span class="wx-w-n"><b>${escapeHtml(x.name)}</b>${tags}</span>` : `<b>${escapeHtml(x.name)}</b>`}
+${x.lines.map(l => `<p>${l.tone ? `<span class="wx-mood ${l.tone}">${escapeHtml(l.t)}</span>` : escapeHtml(l.t)}${l.q ? `${l.t ? ' ' : ''}<span class="q">“${escapeHtml(l.q)}”</span>` : ''}</p>`).join('')}
 ${acts ? `<div class="wx-w-a">${acts}</div>` : ''}</div></div>`;
   };
   const more = list.length > WA_WATCH_SHOWN ? `<button class="lnk-b wa-qc-more" aria-expanded="${waWatchAll}" onclick="waWatchAll=!waWatchAll;renderWhatsapp()">${waWatchAll ? 'Show less' : `Show all ${list.length}`}${icon('caret-down', { weight: 'bold' })}</button>` : '';
@@ -230,14 +274,19 @@ function clientWaHtml(c){
   const lead = waCanManage(), m = waMoodFor(c);
   const kv = (k, v) => `<div class="cl-kv"><span>${k}</span><span>${v}</span></div>`;
   let h = '';
+  // their words under the mood, unless a signal below already says them
+  const sigs = lead ? waSigOpen().filter(s => waIsClient(s, c)) : [];
+  const mq = m && m.excerpt && !sigs.some(s => waSaysIt(s.summary, m.excerpt)) ? m.excerpt : '';
   if(m) h += kv('Mood', `<span class="${m.level === 'angry' ? 't-red' : m.level === 'frustrated' ? 't-yellow' : m.level === 'happy' ? 't-green' : ''}">${escapeHtml(WA_MOOD[m.level])}</span> <span class="t-3">· ${escapeHtml(relDayLower(new Date(m.at)))}</span>`)
-    + (m.excerpt || m.reason ? `<p class="cl-wa-q">${m.excerpt ? `“${escapeHtml(m.excerpt)}”` : escapeHtml(m.reason)}</p>` : '');
+    + (mq || (!m.excerpt && m.reason) ? `<p class="cl-wa-q">${mq ? `“${escapeHtml(mq)}”` : escapeHtml(m.reason)}</p>` : '');
   if(lead){
     const st = waReplyStats(14, c), w = waWaitingNow(c)[0];
     if(st && st.n) h += kv('First reply', `${escapeHtml(waMinWords(st.median))} <span class="t-3">· typical, ${st.n} time${st.n === 1 ? '' : 's'} in 2 weeks</span>`);
-    if(w) h += kv('Waiting now', `<span class="${w.mins >= WA_NUDGE_MIN ? 't-red' : ''}">${escapeHtml(waMinWords(w.mins))}</span>${w.excerpt ? ` <span class="t-3">· “${escapeHtml(w.excerpt.slice(0, 60))}”</span>` : ''}`);
-    const sig = waSigOpen().filter(s => waIsClient(s, c));
-    if(sig.length) h += `<div class="cl-wa-sub">Account signals</div><div class="wa-sigs">${sig.map(s => waSigRow(s, true)).join('')}</div>`;
+    const quoted = m && m.excerpt ? [m.excerpt] : [];   // said above, or by a summary below: not quoted again
+    const wq = w && w.excerpt && !quoted.some(x => waSameQuote(x, w.excerpt)) ? w.excerpt : '';
+    if(wq) quoted.push(wq);
+    if(w) h += kv('Waiting now', `<span class="${w.mins >= WA_NUDGE_MIN ? 't-red' : ''}">${escapeHtml(waMinWords(w.mins))}</span>${wq ? ` <span class="t-3">· “${escapeHtml(wq.slice(0, 60))}”</span>` : ''}`);
+    if(sigs.length) h += `<div class="cl-wa-sub">Account signals</div><div class="wa-sigs">${sigs.map(s => waSigRow(s, true, quoted)).join('')}</div>`;
     const det = (typeof canApprove === 'function' && canApprove()) || waCanSetup() ? waDetailsOpen(c) : [];
     if(det.length) h += `<div class="cl-wa-sub">Details from the chats</div><div class="wa-dets">${det.map(d => waDetailRow(d, true)).join('')}</div>`;
   }

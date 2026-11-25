@@ -3946,6 +3946,11 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 /* WhatsApp: a paused client says so (Nov 25) */
 .wx-paused{display:inline-flex;align-items:center;flex:0 0 auto;height:18px;padding:0 7px;border-radius:9px;background:var(--fill-2);color:var(--label-2);font-size:11.5px;font-weight:500;letter-spacing:.01em;vertical-align:1px}
 .wx-w-n{display:flex;align-items:center;gap:7px;min-width:0}
+.wx-tag{display:inline-flex;align-items:center;flex:0 0 auto;height:18px;padding:0 7px;border-radius:9px;font-size:11.5px;font-weight:500;letter-spacing:.01em}
+.wx-tag.y{background:color-mix(in srgb, var(--yellow) 16%, transparent);color:color-mix(in srgb, var(--yellow) 82%, var(--label))}
+.wx-tag.r{background:color-mix(in srgb, var(--red) 14%, transparent);color:var(--red)}
+.wx-tag.g{background:color-mix(in srgb, var(--green) 14%, transparent);color:color-mix(in srgb, var(--green) 86%, var(--label))}
+.wx-w-n + p{margin-top:4px}
 .wx-w-n b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wx-cs-sub .wx-paused{margin-right:2px}
 .wap-cl + .wx-paused{margin-left:7px}
