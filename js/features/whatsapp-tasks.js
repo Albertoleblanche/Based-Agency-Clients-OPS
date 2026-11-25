@@ -1166,9 +1166,19 @@ function waSameNum(a, b){
 }
 function waProfileNum(p){ const d = String((p && p.phone) || '').replace(/\D/g, ''); return d.length >= 8 ? (waNumIn(p.phone) || d) : null; }
 function waProfileFor(number){ return waTeamPeople().find(p => waSameNum(waProfileNum(p), number)) || null; }
+// Their photo in Radar when they have one (Nov 25), else the plain symbol
+function waTeamProfile(t){
+  const ps = waTeamPeople();
+  return (t.profile_id && ps.find(p => p.id === t.profile_id)) || waProfileFor(t.number)
+    || (t.label ? ps.find(p => p.name.toLowerCase() === String(t.label).toLowerCase()) : null) || null;
+}
+function waPersonIc(p, sym, tone){
+  return p && p.avatar_url ? `<img class="wat-av" src="${safeUrl(p.avatar_url)}" alt="" loading="lazy" decoding="async">`
+    : `<span class="was-ic${tone ? ' ' + tone : ''}">${icon(sym)}</span>`;
+}
 function waTeamPeople(){ return (teamProfiles || []).filter(p => !p.access_revoked).sort((a, b) => a.name.localeCompare(b.name)); }
 function waTeamName(t){
-  const p = t.profile_id && (teamProfiles || []).find(x => x.id === t.profile_id);
+  const p = (t.profile_id && (teamProfiles || []).find(x => x.id === t.profile_id)) || waProfileFor(t.number);
   const seen = waTeamSeen.find(x => x.number === t.number);
   return p ? p.name : t.label || (seen && seen.name) || 'Someone on the team';
 }
@@ -1188,7 +1198,7 @@ function waWhoHtml(){
     ? `<div class="fr wat-r wat-wait"><span class="was-ic gray">${icon('server')}</span><div class="l"><b>Waiting for the connector’s update</b><span>The connector running now is the version from before this. Redeploy it (Railway) and the people in several client groups show here to pick from, a minute after it reconnects.</span></div></div>`
     : `<div class="fr wat-r wat-wait"><span class="was-ic gray">${icon('users')}</span><div class="l"><b>Looking at who’s in the client groups</b><span>Anyone in three or more of them shows here to pick from, from any country. It reads the group list when it connects and every 30 minutes, or press Check Now.</span></div></div>`;
   const ownRow = `<div class="fr wat-r"><span class="was-ic">${icon('smartphone')}</span><div class="l"><b>This phone</b><span>${own ? escapeHtml(waFmtNum(own)) + ' · ' : ''}Radar reads the groups with it, so its messages are always the team’s.</span></div></div>`;
-  const numRow = t => `<div class="fr wat-r"><span class="was-ic gray">${icon('user')}</span><div class="l"><b>${escapeHtml(waTeamName(t))}</b><span>${escapeHtml(waFmtNum(t.number))}</span></div>${can ? `<button class="lnk-b" onclick="waTeamRemove('${escapeHtml(t.number)}')">Remove</button>` : ''}</div>`;
+  const numRow = t => `<div class="fr wat-r">${waPersonIc(waTeamProfile(t), 'user', 'gray')}<div class="l"><b>${escapeHtml(waTeamName(t))}</b><span>${escapeHtml(waFmtNum(t.number))}</span></div>${can ? `<button class="lnk-b" onclick="waTeamRemove('${escapeHtml(t.number)}')">Remove</button>` : ''}</div>`;
   const people = waTeamPeople();
   const pickOpts = first => [['', first], ...people.map(p => [p.id, p.name]), ['__other', 'Someone else on the team'], ['__no', 'Not the team']];
   // a suggestion whose number is someone's phone in Radar says so, with one click to confirm
@@ -1198,15 +1208,15 @@ function waWhoHtml(){
     const match = p ? `<span class="wat-m">${icon('check', { weight: 'bold' })}${escapeHtml(p.name)}’s phone in Radar</span>` : '';
     const ctl = !can ? '' : (p ? `<button class="btn wat-yes" onclick="waTeamPick('${escapeHtml(x.number)}', '${p.id}')">It’s ${escapeHtml(firstName(p.name))}</button>` : '')
       + popSel(`Who is ${title}?`, pickOpts(p ? 'Someone else?' : 'Who is this?'), '', `waTeamPick('${escapeHtml(x.number)}', this.value)`, { width: p ? 140 : 150 });
-    return `<div class="fr wat-r wat-s${p ? ' is-match' : ''}"><span class="was-ic ${p ? '' : 'gray'}">${icon(p ? 'user' : 'circle-help')}</span><div class="l"><b>${escapeHtml(title)}</b><span>${sub}</span>${match}</div><span class="wat-c">${ctl}</span></div>`;
+    return `<div class="fr wat-r wat-s${p ? ' is-match' : ''}">${p ? waPersonIc(p, 'user', '') : waPersonIc(null, 'circle-help', 'gray')}<div class="l"><b>${escapeHtml(title)}</b><span>${sub}</span>${match}</div><span class="wat-c">${ctl}</span></div>`;
   };
   const matches = seen.filter(x => waProfileFor(x.number));
   // teammates with a phone in Radar that isn't on the team yet, and isn't among the suggestions
-  const listedIds = new Set(nums.map(t => t.profile_id).filter(Boolean));
+  const listedIds = new Set(nums.map(t => (waTeamProfile(t) || {}).id).filter(Boolean));   // whoever each team number is
   const fromProfile = people.filter(p => !listedIds.has(p.id) && waProfileNum(p) && !nums.some(t => waSameNum(t.number, waProfileNum(p))) && !seen.some(x => waSameNum(x.number, waProfileNum(p))) && !waSameNum(own, waProfileNum(p)));
-  const profRow = p => `<div class="fr wat-r wat-p"><span class="was-ic gray">${icon('user')}</span><div class="l"><b>${escapeHtml(p.name)}</b><span>${escapeHtml(waFmtNum(waProfileNum(p)))} · the phone in their Radar profile</span></div>${can ? `<button class="btn" onclick="waTeamAddProfile('${p.id}')">Add</button>` : ''}</div>`;
+  const profRow = p => `<div class="fr wat-r wat-p">${waPersonIc(p, 'user', 'gray')}<div class="l"><b>${escapeHtml(p.name)}</b><span>${escapeHtml(waFmtNum(waProfileNum(p)))} · the phone in their Radar profile</span></div>${can ? `<button class="btn" onclick="waTeamAddProfile('${p.id}')">Add</button>` : ''}</div>`;
   const sorted = nums.slice().sort((a, b) => waTeamName(a).localeCompare(waTeamName(b)));
-  const listed = new Set(nums.map(t => t.profile_id).filter(Boolean));
+  const listed = listedIds;
   const missing = nums.length ? people.filter(p => !listed.has(p.id) && !fromProfile.includes(p) && !matches.some(x => waProfileFor(x.number) === p)) : [];
   const addRow = !can ? '' : waTeamAdding
     ? `<div class="fr wat-add"><input class="tf" id="waTeamNum" type="tel" inputmode="tel" autocomplete="off" placeholder="+55 11 91234 5678" aria-label="WhatsApp number, with the country code (+1, +55, +44…)" onkeydown="if(event.key==='Enter')waTeamAdd();if(event.key==='Escape')waTeamAddClose()">

@@ -3975,3 +3975,5 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 .pf-apps .pf-lg{display:flex;align-items:center;gap:6px;flex:none;margin-right:6px}
 .pf-apps .pf-lg > *{width:22px;height:22px}
 @media (prefers-reduced-motion:reduce){.pf-av,.pf-cam{transition:none}}
+/* Who's on the team: their photo in Radar, the size of the symbol it replaces */
+.wat-av{flex:0 0 auto;width:28px;height:28px;border-radius:50%;object-fit:cover;box-shadow:0 0 0 .5px var(--sep)}
