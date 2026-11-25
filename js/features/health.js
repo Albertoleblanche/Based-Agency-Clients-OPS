@@ -106,7 +106,7 @@ function renderHealth(){
       act = `<button class="btn sm" onclick="event.stopPropagation();selectHealthClient('${c.id}')">Review</button>`; }
     else if(next){ const who = (teamProfiles.find(p => p.id === next.assigneeId) || {}).name;
       why = `Next: ${next.title}${who ? ' · ' + firstName(who) : ''}${next.dueDate ? ' · ' + weekDay(new Date(next.dueDate + 'T12:00:00')) : ''}`;
-      act = `<button class="btn sm" onclick="event.stopPropagation();openTaskDetailModal('${next.id}')">Open Task</button>`; }
+      act = `${typeof planWithClaudeHtml === 'function' ? planWithClaudeHtml(c.id, true) : ''}<button class="btn sm" onclick="event.stopPropagation();openTaskDetailModal('${next.id}')">Open Task</button>`; }
     else {
       why = tableSignal(h, c) || (s ? s.title : 'Needs care');
       if(s && s.key === 'quiet' && owner && owner !== me) act = reminded[c.id] ? `<span class="hx-done">${icon('check')}Reminded</span>`
@@ -293,7 +293,7 @@ function healthPanelHtml(c, h, closeFn){
   return `<aside class="sp" aria-label="${escapeHtml(c.name)}, health">
 <div class="sp-bar"><button class="ib" aria-label="Close" onclick="${closeFn || 'closeHealthPanel()'}">${icon('x')}</button><a class="x-lnk" href="#" onclick="openClientDetail('${c.id}');return false;">Open client</a></div>
 <div class="sp-head">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}${focusMark(c)}</b><span>${meta}</span></div></div>
-<div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b><span class="sub">${sub}</span>${acts}</div>
+<div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b><span class="sub">${sub}</span>${acts}${lvl !== 'g' && !h.quiet && typeof planWithClaudeHtml === 'function' ? planWithClaudeHtml(c.id) : ''}</div>
 ${card}
 ${workSigs.length ? `<div class="sp-sec"><b>${card ? 'From the work' : 'Why'}</b><span>${todayPlural(workSigs.length, 'signal')}</span></div>${why}` : ''}
 ${trail}

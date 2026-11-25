@@ -423,7 +423,7 @@ ${w.off ? `<div class="cl-mc"><span class="k">This week’s win</span><b>${escap
 <div class="sp-bar"><button class="ib" aria-label="Close" title="Close (Esc)" onclick="closeClientInspector()">${icon('x')}</button><span class="cl-pbar-r"><button class="ib" aria-label="More" title="More" onclick="clientPanelMore(event, ${A})">${icon('dots-three')}</button></span></div>
 <div class="sp-main">
 <div class="sp-head">${monoHtml(c, 'lg')}<div class="tx"><b><a class="sp-nm" href="#" onclick="openClientDetail(${A});return false;" title="Open client page">${escapeHtml(c.name)}${icon('caret-right', { weight: 'bold' })}</a></b><span>${meta}</span></div>${focusToggleHtml(c)}</div>
-<div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b>${sub ? `<span class="sub">${sub}</span>` : ''}${acts ? `<div class="sp-acts">${acts}</div>` : ''}</div>
+<div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b>${sub ? `<span class="sub">${sub}</span>` : ''}${acts ? `<div class="sp-acts">${acts}</div>` : ''}${!st && lvl !== 'g' && !h.quiet && typeof planWithClaudeHtml === 'function' ? planWithClaudeHtml(c.id) : ''}</div>
 ${nums}
 <div class="sp-folds cl-folds">
 ${clientFoldHtml('win', 'Weekly win', clientWinSummary(c), clientWinHtml(c))}
