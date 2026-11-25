@@ -620,8 +620,20 @@ function shortSignal(h, max){
     tasks: s.title, flag: s.title }[s.key]));
   return [...new Set(bits)].slice(0, max || 2).join(' · ');
 }
+// A client's next step: a task planned as its next step ("Next step for …", from Plan Next Step), or
+// else (Nov 25) the next open step of a sprint for it in Plan, since a sprint's steps are tasks. Never
+// one that's overdue: a plan that lapsed isn't a plan.
 function nextStepTask(c){
-  return (typeof tasks !== 'undefined' ? tasks : []).find(t => t.clientId === c.id && t.status !== 'done' && !t.cancelledAt && (!t.dueDate || new Date(t.dueDate + 'T23:59:00') >= dayStart(rNow())) && /next step/i.test(t.description || ''));
+  const all = typeof tasks !== 'undefined' ? tasks : [], today = dayStart(rNow());
+  const live = t => t.clientId === c.id && t.status !== 'done' && !t.cancelledAt && (!t.dueDate || new Date(t.dueDate + 'T23:59:00') >= today);
+  return all.find(t => live(t) && /next step/i.test(t.description || ''))
+    || all.filter(t => live(t) && t.sprintId).sort((a, b) => String(a.dueDate || '9999').localeCompare(String(b.dueDate || '9999')))[0]
+    || null;
+}
+// The sprint a next step belongs to, by name, when it's one of yours (sprints are private to their owner)
+function nextStepSprintName(t){
+  const sp = t && t.sprintId && typeof planSprints !== 'undefined' ? planSprints.find(s => s.id === t.sprintId) : null;
+  return sp ? sp.title : '';
 }
 async function markHealthHandled(clientId, note){
   await loadHealthHandled();
