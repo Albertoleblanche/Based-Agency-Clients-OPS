@@ -342,6 +342,8 @@ async function saveClientForm(){
     return;
   }
   fields.customFieldValues = customFieldValues;
+  // paused: when, and by whom; a "Still a client?" question ends with a new status (client-status.js)
+  if(typeof clientStatusCfv === 'function') fields.customFieldValues = clientStatusCfv({ status: editingClientId ? (clients.find(x => x.id === editingClientId) || {}).status : '', customFieldValues }, fields.status, myName() || '');
   let ok, msg, loggedClientId;
   if(editingClientId){
     const c = clients.find(x=>x.id===editingClientId);

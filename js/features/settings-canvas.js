@@ -559,7 +559,7 @@ async function loadIntegrationStatuses(){
     one(async () => { if(typeof loadGranolaState === 'function') await loadGranolaState(); }),
     one(async () => { if(typeof loadAiApps === 'function') await loadAiApps(); }),
     one(async () => { if(canManageSettings() && !aiConnCache) aiConnCache = await adminActionCall('get-ai-connections'); }),
-    one(async () => { if(canChangeRules() && typeof loadSlackClientChannels === 'function'){ if(!slackChannelsLoaded) await loadSlackClientChannels(); integ.slackUnlinked = activeClients().filter(c => !slackClientChannels[c.id]).length; } }),
+    one(async () => { if(canChangeRules() && typeof loadSlackClientChannels === 'function'){ if(!slackChannelsLoaded) await loadSlackClientChannels(); integ.slackUnlinked = activeClients().filter(c => c.status !== 'Paused' && !slackClientChannels[c.id]).length; } }),
     one(async () => { if(typeof loadWaTasks === 'function') await loadWaTasks(); }),
     one(async () => { if(typeof remSlackMeStatus === 'function') integ.slackMe = await remSlackMeStatus(true); }),
     one(async () => { if(typeof gmailStatusLoad === 'function') await gmailStatusLoad(); }),

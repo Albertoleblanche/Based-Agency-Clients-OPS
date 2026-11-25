@@ -1074,7 +1074,7 @@ function mMoreHtml(){
   const g = (ic, t, right, fn) => mIr(`<span class="gl">${icon(ic)}</span>`, t, '', right || '', fn, { n: true });
   return `<h1 class="big" style="margin-top:8px">More</h1>
 <div class="ig" style="margin-top:16px"><button class="ir prof" onclick="mOpenProfile()">${me.avatar_url ? `<img src="${safeUrl(me.avatar_url)}" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover">` : avHtml(me.name || '?')}<div class="tx"><b>${mEsc(me.name || '')}</b><span>${mEsc(roleDisplayLabel(me.role))} · ${mEsc(settings.appName || 'Based Radar')}</span></div>${icon('caret-right', { cls: 'chev', weight: 'bold' })}</button></div>
-<div class="ig" style="margin-top:20px">${g('buildings', 'Clients', String(activeClients().length), "mOpenClients()")}${g('calendar-blank', 'Calendar', '', 'mOpenCalendar()')}${g('bell-ring', 'Reminders', due ? String(due) : '', 'mOpenReminders()')}${g('notepad', 'Notes', typeof granolaNewN !== 'undefined' && granolaNewN ? `<span class="m-new">${granolaNewN} new</span>` : '', 'mOpenNotes()')}${g('timer', 'Time', timerState.running ? `<span class="mClk">${mClock()}</span>` : '', 'mOpenTime()')}</div>
+<div class="ig" style="margin-top:20px">${g('buildings', 'Clients', String(activeClients().filter(c => !isPausedClient(c)).length), "mOpenClients()")}${g('calendar-blank', 'Calendar', '', 'mOpenCalendar()')}${g('bell-ring', 'Reminders', due ? String(due) : '', 'mOpenReminders()')}${g('notepad', 'Notes', typeof granolaNewN !== 'undefined' && granolaNewN ? `<span class="m-new">${granolaNewN} new</span>` : '', 'mOpenNotes()')}${g('timer', 'Time', timerState.running ? `<span class="mClk">${mClock()}</span>` : '', 'mOpenTime()')}</div>
 <div class="ig" style="margin-top:20px">${g('users-three', 'Team', '', 'mOpenTeam()')}${g('trash', 'Recently Deleted', '', 'mOpenDeleted()')}${g('gear-six', 'Settings', '', 'mOpenSettings()')}</div>
 <div class="ig" style="margin-top:20px">${g('desktop', 'Open the Desktop Version', '', "mOpenDesktop()")}</div>`;
 }
@@ -1083,21 +1083,40 @@ function mOpenDesktop(){ try{ localStorage.setItem('bda_force_desktop', '1'); }c
 function mOpenClients(mode){
   let q = '';
   mPush('Clients', () => {
-    const list = activeClients().map(c => ({ c, h: clientHealth(c) })).sort((a, b) => focusFirst(a.c, b.c) || (mode === 'health' ? ({ r: 0, y: 1, g: 2 }[a.h.level] - { r: 0, y: 1, g: 2 }[b.h.level]) || a.c.name.localeCompare(b.c.name) : a.c.name.localeCompare(b.c.name)));
+    // the paused ones aren't working with us right now: they're under Paused Clients (client-status.js)
+    const paused = mode === 'health' ? [] : liveClients().filter(isPausedClient);
+    const list = activeClients().filter(c => !isPausedClient(c)).map(c => ({ c, h: clientHealth(c) })).sort((a, b) => focusFirst(a.c, b.c) || (mode === 'health' ? ({ r: 0, y: 1, g: 2 }[a.h.level] - { r: 0, y: 1, g: 2 }[b.h.level]) || a.c.name.localeCompare(b.c.name) : a.c.name.localeCompare(b.c.name)));
     const vis = list.filter(x => !q || x.c.name.toLowerCase().includes(q));
     // added from Harvest, waiting for an approver to finish their info (on a computer)
     const su = mode === 'health' || !canEditClients() ? [] : setupClients().filter(c => !q || c.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name));
     return `<h1 class="big">${mode === 'health' ? 'Health' : 'Clients'}</h1><p class="big-sub">${list.filter(x => x.h.level === 'r').length} at risk · ${list.filter(x => x.h.level === 'y').length} to watch</p>
 <div class="isearch">${icon('magnifying-glass')}<input placeholder="Search" value="${mEsc(q)}" oninput="mClientsQ(this.value)" aria-label="Search clients"></div>
 ${su.length ? `${mIsh('Needs setup')}<div class="ig">${su.map(c => mIr(monoHtml(c), mEsc(c.name) + focusMark(c), 'Added from Harvest', '', `mOpenClient('${c.id}')`)).join('')}</div>${mIsh('Clients')}` : ''}
-<div class="ig"${su.length ? '' : ' style="margin-top:14px"'}>${vis.map(({ c, h }) => (h.level === 'g' ? mIr(monoHtml(c), mEsc(c.name) + focusMark(c), mEsc(c.service || ''), '', `mOpenClient('${c.id}')`) : mIr(monoHtml(c), mEsc(c.name) + focusMark(c), signalChips(h, 1), healthTag(h.level), `mOpenClient('${c.id}')`, { tags: true }))).join('') || '<div class="ir"><span class="t n">No clients match</span></div>'}</div>`;
+<div class="ig"${su.length ? '' : ' style="margin-top:14px"'}>${vis.map(({ c, h }) => (h.level === 'g' ? mIr(monoHtml(c), mEsc(c.name) + focusMark(c), mEsc(c.service || ''), '', `mOpenClient('${c.id}')`) : mIr(monoHtml(c), mEsc(c.name) + focusMark(c), signalChips(h, 1), healthTag(h.level), `mOpenClient('${c.id}')`, { tags: true }))).join('') || '<div class="ir"><span class="t n">No clients match</span></div>'}</div>
+${paused.length && !q ? `<div class="ig" style="margin-top:20px">${mIr(`<span class="gl">${icon('pause')}</span>`, 'See Paused Clients', '', String(paused.length), 'mOpenPausedClients()')}</div><p class="ifoot">Clients that aren’t working with us right now. Nothing about them is deleted.</p>` : ''}`;
   });
   window.mClientsQ = v => { q = v.toLowerCase(); const top = mTop(); const inp = top.el.querySelector('.isearch input'); const pos = inp.selectionStart; top.refresh(); const i2 = top.el.querySelector('.isearch input'); i2.focus(); i2.setSelectionRange(pos, pos); };
+}
+// Paused clients (client-status.js): their own list, and a note on each one with Make Active.
+function mOpenPausedClients(){
+  mPush('Paused', () => {
+    const list = liveClients().filter(isPausedClient).sort((a, b) => a.name.localeCompare(b.name));
+    const sub = c => { const at = pausedAtDate(c); return [at ? 'Paused ' + fmtShortDate(at) : 'Paused', pausedByWords(c)].filter(Boolean).join(' · '); };
+    return `<h1 class="big">Paused Clients</h1><p class="big-sub">${list.length} not working with us right now</p>
+<div class="ig" style="margin-top:14px">${list.map(c => mIr(monoHtml(c), mEsc(c.name), mEsc(sub(c)), '', `mOpenClient('${c.id}')`)).join('') || '<div class="ir"><span class="t n">No paused clients</span></div>'}</div>`;
+  });
+}
+function mPausedHtml(c){
+  const by = pausedByWords(c);
+  return `${mIsh('Paused')}<div class="ig">${mIr(`<span class="gl">${icon('pause')}</span>`, mEsc(pausedSinceWords(c)), mEsc((by ? by + '. ' : '') + 'It’s off This Week, Health and the reminders.'), '', null, { n: true, s2: true })}</div>
+${canEditClients() ? `<div style="margin:12px 16px 0"><button class="ibtn s" onclick="makeClientActive(${jsArg(c.id)})">Make Active</button></div>` : ''}`;
 }
 function mOpenClient(id){
   const c0 = clients.find(x => x.id === id); if(!c0) return;
   mPush(c0.name, () => {
     const c = clients.find(x => x.id === id) || c0;
+    if(isPausedClient(c) && clientInSetup(c)) return `<div class="idetail" style="display:flex;gap:12px;align-items:center;margin-top:4px">${monoHtml(c, 'lg')}<div style="min-width:0"><h1 style="font-size:24px;font-weight:700;letter-spacing:-.02em;margin:0">${mEsc(c.name)}</h1><div class="ikv">Added from Harvest</div></div></div>
+${mPausedHtml(c)}`;
     if(clientInSetup(c)) return `<div class="idetail" style="display:flex;gap:12px;align-items:center;margin-top:4px">${monoHtml(c, 'lg')}<div style="min-width:0"><h1 style="font-size:24px;font-weight:700;letter-spacing:-.02em;margin:0">${mEsc(c.name)}</h1><div class="ikv">Added from Harvest</div></div></div>
 ${mIsh('Needs setup')}<div class="ig"><div class="ir"><span class="t n" style="white-space:normal;line-height:1.4">An approver finishes its info in All Clients on a computer: who owns it and how it gets its weekly win. Then it shows here like the rest.</span></div></div>
 <div style="margin:12px 16px 0"><button class="ibtn s" onclick="mOpenDesktop()">Open the Computer Version</button></div>`;
@@ -1105,8 +1124,8 @@ ${mIsh('Needs setup')}<div class="ig"><div class="ir"><span class="t n" style="w
     const imps = (c.improvements || []).slice().sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8);
     const steps = STEP_NAMES.map((n, k) => mIr(`<span class="gl" style="color:${w.sent || k < w.done ? 'var(--green)' : w.behind === k ? (w.late ? 'var(--red)' : 'var(--yellow)') : 'var(--label-3)'}">${icon(w.sent || k < w.done ? 'check-circle' : w.behind === k ? 'warning' : 'circle')}</span>`, n, '', k === 3 ? (w.sent ? mEsc(relDay(w.last)) : `<span class="${w.late ? 't-red' : ''}">${mEsc(w.dueText)}</span>`) : '', null, { n: true })).join('');
     return `<div class="idetail" style="display:flex;gap:12px;align-items:center;margin-top:4px">${monoHtml(c, 'lg')}<div style="min-width:0"><h1 style="font-size:24px;font-weight:700;letter-spacing:-.02em;margin:0">${mEsc(c.name)}</h1><div class="ikv">${mEsc([c.service, w.owner].filter(Boolean).join(' · '))}</div>${mFocusHtml(c)}</div></div>
-${h.level !== 'g' ? `<div class="tags iwrap" style="margin:14px 16px 0">${healthTag(h.level)}${signalChips(h, 4)}</div>` : ''}
-${mRiskHtml(c, h)}
+${isPausedClient(c) ? mPausedHtml(c) : `${h.level !== 'g' ? `<div class="tags iwrap" style="margin:14px 16px 0">${healthTag(h.level)}${signalChips(h, 4)}</div>` : ''}
+${mRiskHtml(c, h)}`}
 ${mIsh('This week’s update')}${w.off ? `<div class="ig">${mIr('', 'No weekly update', '', '', null, { n: true })}</div><p class="ifoot">It isn’t on This Week, Today or Health. Work and hours are still logged here.</p>` : `<div class="ig">${steps}</div>`}
 ${waCanWork(c) ? `<div style="margin:12px 16px 0"><button class="ibtn s" onclick="mOpenLog('${c.id}')">${icon('plus')}Log Improvement</button></div>` : `<p class="ifoot" style="margin-top:12px">${mEsc(waOutsideWords(c))}</p>`}
 ${mIsh('Logged')}<div class="ig">${imps.map(i => mIr('', mEsc(i.text), `${mEsc(i.author)} · ${fmtShortDate(new Date(i.date))}${i.includeInEmail === false ? ' · internal' : ''}`, '', null, { n: true })).join('') || '<div class="ir"><span class="t n" style="color:var(--label-2)">Nothing logged yet</span></div>'}</div>${mClientMeetingsHtml(c)}`;

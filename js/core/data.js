@@ -94,7 +94,8 @@ async function saveClientFocus(ids, on){
   }));
   return { done: results.filter(Boolean).length, failed: results.filter(x => !x).length };
 }
-function setupClients(){ return clients.filter(c=>!c.deletedAt && clientInSetup(c)); }
+// waiting for setup; a paused one isn't (it's with the paused clients, client-status.js)
+function setupClients(){ return clients.filter(c=>!c.deletedAt && clientInSetup(c) && c.status!=='Paused'); }
 function isClientPaused(clientId){
   const c = clients.find(x=>x.id===clientId);
   return !!(c && c.status==='Paused');

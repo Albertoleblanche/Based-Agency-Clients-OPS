@@ -22,8 +22,10 @@ function renderClientPage(){
   const start = c.startDate ? new Date(c.startDate + 'T12:00:00') : null;
   const tabs = [['overview', 'Overview', ''], ['improvements', 'Improvements', (c.improvements || []).length], ['time', 'Time', ''], ['notes', 'Notes', myNotes.length], ['activity', 'Activity', '']]
     .map(([k, t, n]) => `<button class="${cdTab === k ? 'on' : ''}" role="tab" aria-selected="${cdTab === k}" onclick="setCdTab('${k}')">${t}${n !== '' && n ? ` <span class="c">${n}</span>` : ''}</button>`).join('');
-  let callout = '';
-  if(h.level !== 'g'){
+  // paused, or Radar asking whether it's still a client (client-status.js), instead of health
+  let callout = typeof clientStatusCalloutHtml === 'function' ? clientStatusCalloutHtml(c) : '';
+  if(callout) callout = callout.replace('class="next st-next', 'style="margin-top:20px" class="next st-next');
+  else if(h.level !== 'g'){
     callout = `<div class="next" style="margin-top:20px"><span class="sig ${h.level}">${icon(h.level === 'r' ? 'activity' : 'eye')}</span>
 <div class="tx"><b>${healthWord(h.level)} since ${relDay(h.since || rNow()).toLowerCase() === 'today' ? 'today' : relDay(h.since || rNow())}${next ? '' : ' — no next step yet'}</b><span>${escapeHtml(h.signals.map(s => s.title.charAt(0).toUpperCase() + s.title.slice(1)).join(' · '))}</span></div>
 <button class="btn" onclick="openHealthClient('${c.id}')">See Why</button>${next ? `<button class="btn" onclick="openTaskDetailModal('${next.id}')">Open Next Step</button>` : `<button class="btn btn-p" onclick="planNextStep('${c.id}')">${icon('plus')}Plan Next Step</button>`}</div>`;
@@ -32,8 +34,8 @@ function renderClientPage(){
   const uw = typeof uiStyleOn === 'function' && uiStyleOn();
   document.getElementById('cdRoot')?.classList.toggle('is-uw', !!uw);
   if(uw){
-    top.innerHTML = `<header class="cp-hd"><div><h1>${escapeHtml(c.name)}</h1><div class="cp-sub">${typeof focusToggleHtml === 'function' ? focusToggleHtml(c) : ''}${h.level !== 'g' ? `<span class="uw-delta bad"><i></i>${escapeHtml(healthWord(h.level))} since ${relDay(h.since || rNow()).toLowerCase() === 'today' ? 'today' : escapeHtml(relDay(h.since || rNow()))}</span>` : h.off ? '<span class="uw-delta n"><i></i>No weekly update</span>' : '<span class="uw-delta"><i></i>Healthy</span>'}<span>${escapeHtml([c.service, owner ? firstName(owner) + ' owns it' : '', c.status !== 'Active' ? c.status : '', start ? 'client since ' + start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : ''].filter(Boolean).join(' · '))}</span></div></div>
-<div class="seg" role="tablist" aria-label="Client sections">${tabs}</div></header>`;
+    top.innerHTML = `<header class="cp-hd"><div><h1>${escapeHtml(c.name)}</h1><div class="cp-sub">${typeof focusToggleHtml === 'function' ? focusToggleHtml(c) : ''}${c.status === 'Paused' ? '<span class="uw-delta n"><i></i>Paused</span>' : h.level !== 'g' ? `<span class="uw-delta bad"><i></i>${escapeHtml(healthWord(h.level))} since ${relDay(h.since || rNow()).toLowerCase() === 'today' ? 'today' : escapeHtml(relDay(h.since || rNow()))}</span>` : h.off ? '<span class="uw-delta n"><i></i>No weekly update</span>' : '<span class="uw-delta"><i></i>Healthy</span>'}<span>${escapeHtml([c.service, owner ? firstName(owner) + ' owns it' : '', c.status !== 'Active' && c.status !== 'Paused' ? c.status : '', start ? 'client since ' + start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : ''].filter(Boolean).join(' · '))}</span></div></div>
+<div class="seg" role="tablist" aria-label="Client sections">${tabs}</div></header>${callout && callout.includes('st-next') ? callout : ''}`;
   } else
   top.innerHTML = `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:16px">
 <span class="mono ${clientColor(c)}" style="width:56px;height:56px;border-radius:14px;font-size:19px" aria-hidden="true">${escapeHtml(clientMono(c))}</span>

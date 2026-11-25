@@ -106,8 +106,11 @@ function updateShellBadges(){
   if(typeof attentionEligibleClients === 'function'){
     const list = attentionEligibleClients();
     // All Clients: for admins and approvers, the clients waiting for setup (Nov 23); nothing for others
-    set('navClientsBadge', canEditClients() && typeof setupClients === 'function' ? setupClients().length : 0);
-    const cb = document.getElementById('navClientsBadge'); if(cb) cb.title = cb.textContent !== '0' ? `${cb.textContent} need${cb.textContent === '1' ? 's' : ''} setup` : '';
+    // clients waiting for setup, and the ones Radar asks about: still a client? (client-status.js)
+    const nSu = canEditClients() && typeof setupClients === 'function' ? setupClients().length : 0;
+    const nAsk = typeof askClients === 'function' ? askClients().length : 0;
+    set('navClientsBadge', nSu + nAsk);
+    const cb = document.getElementById('navClientsBadge'); if(cb) cb.title = [nSu ? `${nSu} need${nSu === 1 ? 's' : ''} setup` : '', nAsk ? `${nAsk} to confirm: still a client?` : ''].filter(Boolean).join(' · ');
     set('navHealthBadge', (typeof healthScopeClients === 'function' ? healthScopeClients() : list).filter(c => clientHealth(c).level !== 'g').length);
   }
   ['navTeamPendingBadge', 'navTasksBadge', 'navRemindersBadge', 'navTeamBadge'].forEach(id => {

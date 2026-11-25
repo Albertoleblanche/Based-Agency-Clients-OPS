@@ -147,6 +147,7 @@ async function saveClientsBulk(){
       Object.entries(cf).forEach(([k, x]) => { if(x == null) delete cfv[k]; else if(!((k === 'focusAt' || k === 'focusBy') && wasFocus)) cfv[k] = x; });
       mine.customFieldValues = cfv;
     }
+    if(mine.status !== undefined && typeof clientStatusCfv === 'function') mine.customFieldValues = clientStatusCfv({ status: c.status, customFieldValues: mine.customFieldValues || c.customFieldValues }, mine.status, myName() || '');
     const ok = await updateClientRow(c.id, mine);
     if(ok && mine.danger !== undefined && mine.danger !== riskWas && typeof logDangerHistory === 'function') logDangerHistory(c.id, mine.danger, riskWas, riskWhy);
     if(ok){ Object.assign(c, mine); if(typeof logClientActivity === 'function') logClientActivity(c.id, 'client_updated', `${myName() || 'Someone'} set ${words.join(', ')}${picked.length > 1 ? ` for ${picked.length} clients at once` : ''}.`); }
@@ -243,13 +244,18 @@ function renderClientsTable(){
   // My clients: your scope of work and what you've worked on lately (work-areas.js). The switch
   // shows when that's some of the clients, not none or all of them.
   const acAll = activeClients(), { yours, has: hasAreas } = myClientsSplit(), mineOn = hasAreas && clientsMine;
-  const ac = mineOn ? yours : acAll;
+  // Paused clients aren't working with us right now: they sit in their own table, under See Paused
+  // Clients (client-status.js), so this one only has the current clients
+  // (a paused one still waiting for setup is with the paused ones too)
+  const scope = mineOn ? yours : acAll, pausedAll = (mineOn ? yours : liveClients()).filter(isPausedClient), pz = clientsPausedOpen;
+  const ac = scope.filter(c => !isPausedClient(c));
+  if(pz && clBulk) [...clBulk].forEach(id => { if(!pausedAll.some(c => c.id === id)) clBulk.delete(id); });
   const rowOf = c => ({ c, h: clientHealth(c), w: weekView(clientWeek(c)), owner: clientOwner(c) });
-  const rows = ac.map(rowOf);
+  const rows = pz ? [] : ac.map(rowOf);
   // added from Harvest, waiting for an approver to finish their info (client-setup.js)
   // Needs setup is an approver's job: members don't see those clients here until they're set up
-  const su = canEditClients() ? setupClients() : [], suOwner = c => (c.customFieldValues || {}).owner || '';
-  const services = [...new Set(ac.concat(su).flatMap(serviceParts))].sort((a, b) => a.localeCompare(b));
+  const su = canEditClients() && !pz ? setupClients() : [], suOwner = c => (c.customFieldValues || {}).owner || '';
+  const services = [...new Set((pz ? pausedAll : ac.concat(su)).flatMap(serviceParts))].sort((a, b) => a.localeCompare(b));
   if(clientFilters.service !== 'all' && !services.includes(clientFilters.service)) clientFilters.service = 'all'; // a project that's gone
   const suShown = clientsSeg !== 'all' ? [] : su.filter(c => (clientFilters.service === 'all' || serviceHas(c, clientFilters.service)) && (clientsOwnerFilter === 'all' || suOwner(c) === clientsOwnerFilter)
     && (!clientFilters.search || c.name.toLowerCase().includes(clientFilters.search) || (c.email || '').toLowerCase().includes(clientFilters.search)))
@@ -259,17 +265,22 @@ function renderClientsTable(){
   const needsCare = r => r.h.level !== 'g' && r.c.status !== 'Paused' && !r.w.off;
   const needs = rows.filter(needsCare), notSent = rows.filter(r => !r.w.sent && !r.w.off);
   const focusRows = rows.filter(r => isFocus(r.c));
-  if(clientsSeg === 'focus' && !focusRows.length && !canEditClients()) clientsSeg = 'all';
+  if(!pz && clientsSeg === 'focus' && !focusRows.length && !canEditClients()) clientsSeg = 'all';
   let shown = clientsSeg === 'attention' ? needs : clientsSeg === 'behind' ? notSent : clientsSeg === 'focus' ? focusRows : rows;
-  shown = shown.filter(r => (clientFilters.service === 'all' || serviceHas(r.c, clientFilters.service)) && (clientsOwnerFilter === 'all' || r.owner === clientsOwnerFilter)
-    && (!clientFilters.search || r.c.name.toLowerCase().includes(clientFilters.search) || (r.c.email || '').toLowerCase().includes(clientFilters.search)));
+  const passes = (c, owner) => (clientFilters.service === 'all' || serviceHas(c, clientFilters.service)) && (clientsOwnerFilter === 'all' || owner === clientsOwnerFilter)
+    && (!clientFilters.search || c.name.toLowerCase().includes(clientFilters.search) || (c.email || '').toLowerCase().includes(clientFilters.search));
+  shown = shown.filter(r => passes(r.c, r.owner));
+  const pausedShown = pz ? pausedAll.filter(c => passes(c, clientOwner(c))).sort((a, b) => a.name.localeCompare(b.name)) : [];
+  // Still a client? Gone quiet, or archived in Harvest with work open: first, for the people who decide
+  const wIdx = clientWorkIndex();
+  const asks = pz ? [] : ac.filter(c => clientStatusAsk(c, wIdx)), askIds = new Set(clientsSeg === 'all' ? asks.map(c => c.id) : []);
   const rank = { r: 0, y: 1, g: 2 };
   const dir = clientSort.dir === 'desc' ? -1 : 1;
   shown.sort(clientSort.field === 'name' && clientSort.explicit ? (a, b) => dir * a.c.name.localeCompare(b.c.name)
     : clientSort.field === 'importance' && clientSort.explicit ? (a, b) => dir * ((a.c.importance || 0) - (b.c.importance || 0)) || a.c.name.localeCompare(b.c.name)
     : (a, b) => focusFirst(a.c, b.c) || rank[a.h.level] - rank[b.h.level] || b.h.signals.filter(s => s.l === 'r').length - a.h.signals.filter(s => s.l === 'r').length || (b.c.importance || 0) - (a.c.importance || 0) || a.c.name.localeCompare(b.c.name));
-  const owners = [...new Set(rows.map(r => r.owner).concat(su.map(suOwner)).filter(Boolean))].sort();
-  if(inspectedClientId && !acAll.some(c => c.id === inspectedClientId) && !setupClients().some(c => c.id === inspectedClientId)) inspectedClientId = null;
+  const owners = [...new Set((pz ? pausedAll.map(clientOwner) : rows.map(r => r.owner)).concat(su.map(suOwner)).filter(Boolean))].sort();
+  if(inspectedClientId && !acAll.some(c => c.id === inspectedClientId) && !setupClients().some(c => c.id === inspectedClientId) && !pausedAll.some(c => c.id === inspectedClientId)) inspectedClientId = null;
   // the new look uses the canvas columns: client, service, owner, health, this week, importance
   const uw = typeof uiStyleOn === 'function' && uiStyleOn();
   const row = ({ c, h, w, owner }) => {
@@ -291,34 +302,41 @@ ${clientImportanceCell(c)}</div>`;
 <span class="cl-l" role="cell">${histDotsHtml(h.seq)}</span>
 ${clientImportanceCell(c)}</div>`;
   };
-  const sNeeds = shown.filter(needsCare), sOk = shown.filter(r => !needsCare(r));
+  const askShown = shown.filter(r => askIds.has(r.c.id)), rest = shown.filter(r => !askIds.has(r.c.id));
+  const sNeeds = rest.filter(needsCare), sOk = rest.filter(r => !needsCare(r));
   const group = (title, list) => list.length ? `<div class="cl-g" role="presentation"><b>${title}</b><span>${uw ? '· ' : ''}${list.length}</span></div>${list.map(row).join('')}` : '';
   // approvers match them all to Radar's clients in one sheet (client-setup.js)
   const suMatch = canEditClients() && typeof openMatchClientsSheet === 'function' && ac.some(c => !hvLinkOf(c)) ? `<span class="cl-g-act"><button class="x-lnk" onclick="openMatchClientsSheet()">Match to Existing Clients</button>${infoTip(CL_TIPS.match, 'What does Match to Existing Clients do?')}</span>` : '';
   const suGroup = suShown.length ? `<div class="cl-g" role="presentation"><b>Needs setup</b><span>${suShown.length}</span>${suMatch}</div>${suShown.map(clientSetupRowHtml).join('')}` : '';
-  const body = shown.length || suShown.length ? suGroup + group('Needs attention', sNeeds) + group('On track', sOk)
+  const askGroup = askShown.length ? `<div class="cl-g" role="presentation"><b>Still clients?</b><span>${uw ? '· ' : ''}${askShown.length}</span>${infoTip(CL_ASK_TIP, 'Why is Radar asking?')}</div>${askShown.map(r => askRowHtml(r.c, wIdx, uw)).join('')}` : '';
+  const body = pz ? pausedTableBody(pausedShown, uw)
+    : shown.length || suShown.length ? suGroup + askGroup + group('Needs attention', sNeeds) + group('On track', sOk)
     : clientsSeg === 'focus' && !focusRows.length ? `<div class="cl-empty fo-empty">${icon('target')}<b>No Focus clients yet</b><span>When the owner asks the team to give a client extra attention, switch on Focus in its panel or with Bulk Edit. Focus clients come first in every list, and Health watches them closer.</span></div>`
     : ac.length || su.length ? `<div class="cl-empty">No clients match.<a class="x-lnk" href="#" onclick="clearClientsCanvasFilters();return false;">Clear Filters</a></div>`
     : emptyNoClients('Every client lives here: who owns it, its health, this week’s update and how much it matters.');
   // Focus: the clients the owner asked us to give extra attention (shown once there are any, or to approvers)
-  const seg = [['all', 'All', rows.length + su.length], ...(focusRows.length || canEditClients() ? [['focus', 'Focus', focusRows.length]] : []), ['attention', 'Needs attention', needs.length], ['behind', 'Not sent yet', notSent.length]]
+  const seg = [['all', 'Active', rows.length + su.length], ...(focusRows.length || canEditClients() ? [['focus', 'Focus', focusRows.length]] : []), ['attention', 'Needs attention', needs.length], ['behind', 'Not sent yet', notSent.length]]
     .map(([k, t, n]) => `<button class="${clientsSeg === k ? 'on' : ''}" role="tab" aria-selected="${clientsSeg === k}" onclick="setClientsSeg('${k}')">${t} <span class="c">${n}</span></button>`).join('');
   const sortIc = icon('caret-down', { weight: 'bold' });
+  // the paused clients, in a table of their own (client-status.js): beside the table's title, or in the bar
+  const pzBtn = `<button class="btn cl-pz" onclick="setClientsPaused(true)" title="Clients that aren’t working with us right now">${icon('pause')}See Paused Clients<span class="cl-pz-n">${pausedAll.length}</span></button>`;
   // a client outside your areas, opened from search or elsewhere, still opens
-  const sel = inspectedClientId ? (rows.find(r => r.c.id === inspectedClientId) || (acAll.find(c => c.id === inspectedClientId) ? rowOf(acAll.find(c => c.id === inspectedClientId)) : null)) : null;
+  const selC = inspectedClientId ? acAll.find(c => c.id === inspectedClientId) || pausedAll.find(c => c.id === inspectedClientId) : null;
+  const sel = inspectedClientId ? (rows.find(r => r.c.id === inspectedClientId) || (selC ? rowOf(selC) : null)) : null;
   // one opened from search or elsewhere still opens, for a member as "Waiting for an approver"
   const suSel = !sel && inspectedClientId ? setupClients().find(c => c.id === inspectedClientId) : null;
   const prev = root.querySelector('.sp-page')?.scrollTop || 0;
   root.innerHTML = `<div class="spw"><div class="sp-page"><div class="cl">
-<div class="cl-bar0"><div class="seg" role="tablist" aria-label="Show">${seg}</div><span class="cl-sp"></span>
+<div class="cl-bar0">${pz ? `<button class="btn cl-back" onclick="setClientsPaused(false)">${icon('caret-left', { weight: 'bold' })}Active Clients</button>${uw ? '' : '<b class="cl-pz-t">Paused clients</b>'}` : `<div class="seg" role="tablist" aria-label="Show">${seg}</div>`}<span class="cl-sp"></span>
 <label class="cl-find">${icon('magnifying-glass')}<input id="clientsFind" type="search" placeholder="Filter clients" aria-label="Filter clients" value="${escapeHtml(clientFilters.search || '')}" oninput="setClientsFind(this.value)"></label>
 ${hasAreas ? `<label class="pop-wrap">Show: <select class="pop" onchange="setClientsMine(this.value)"><option value="mine"${mineOn ? ' selected' : ''}>My clients</option><option value="all"${mineOn ? '' : ' selected'}>All clients</option></select></label>` : ''}
 <label class="pop-wrap">Owner: <select class="pop" onchange="setClientsOwner(this.value)"><option value="all">All</option>${owners.map(o => `<option${clientsOwnerFilter === o ? ' selected' : ''}>${escapeHtml(o)}</option>`).join('')}</select></label>
 <label class="pop-wrap">${harvestOwnsServices() ? 'Project' : 'Service'}: <select class="pop" onchange="setClientsService(this.value)"><option value="all">All</option>${services.map(s => `<option${clientFilters.service === s ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('')}</select></label>
+${!pz && !uw && pausedAll.length ? pzBtn : ''}
 ${canEditClients() && !clBulk ? `<button class="btn cl-bulk-btn" onclick="clBulkMenu(event)" aria-haspopup="menu">Bulk Edit${icon('caret-down', { weight: 'bold' })}</button>` : ''}</div>
 <div class="cl-table${uw ? ' is-uw' : ''}" role="table" aria-label="Clients">
-${uw ? `<div class="cl-th"><span class="cl-thi">${icon('briefcase')}</span><b>${mineOn ? 'My clients' : 'All clients'}</b><span class="cl-thn">${shown.length}</span></div>
-<div class="cl-head" role="row"><button role="columnheader" class="${clientSort.field === 'name' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'name',dir:clientSort.field==='name'&&clientSort.explicit&&clientSort.dir==='asc'?'desc':'asc',explicit:true};renderClientsTable()">Client${clientSort.field === 'name' && clientSort.explicit ? sortIc : ''}</button><span role="columnheader">Service</span><span role="columnheader">Owner</span><span role="columnheader" class="cl-hh"><button class="${clientSort.explicit ? '' : 'is-sort'}" onclick="clientSort={field:'health'};renderClientsTable()">Health${clientSort.explicit ? '' : sortIc}</button></span><span role="columnheader">This week</span><span role="columnheader" class="cl-hh"><button class="${clientSort.field === 'importance' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'importance',dir:clientSort.field==='importance'&&clientSort.explicit&&clientSort.dir==='desc'?'asc':'desc',explicit:true};renderClientsTable()">Importance${clientSort.field === 'importance' && clientSort.explicit ? sortIc : ''}</button></span></div>` : `<div class="cl-head" role="row"><button role="columnheader" class="${clientSort.field === 'name' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'name',dir:clientSort.field==='name'&&clientSort.explicit&&clientSort.dir==='asc'?'desc':'asc',explicit:true};renderClientsTable()">Client${clientSort.field === 'name' && clientSort.explicit ? sortIc : ''}</button><span role="columnheader">Owner</span><span role="columnheader" class="cl-hh"><button class="${clientSort.explicit ? '' : 'is-sort'}" onclick="clientSort={field:'health'};renderClientsTable()">Health${clientSort.explicit ? '' : sortIc}</button></span><span role="columnheader">This week</span><span role="columnheader">Last 8 weeks${infoTip(CL_TIPS.hist, 'What do the dots mean?')}</span><span role="columnheader" class="cl-hh"><button class="${clientSort.field === 'importance' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'importance',dir:clientSort.field==='importance'&&clientSort.explicit&&clientSort.dir==='desc'?'asc':'desc',explicit:true};renderClientsTable()">Importance${clientSort.field === 'importance' && clientSort.explicit ? sortIc : ''}</button></span></div>`}
+${uw ? `<div class="cl-th"><span class="cl-thi">${icon(pz ? 'pause' : 'briefcase')}</span><b>${pz ? (mineOn ? 'My paused clients' : 'Paused clients') : mineOn ? 'My active clients' : 'Active clients'}</b><span class="cl-thn">${pz ? pausedShown.length : shown.length}</span>${pz ? infoTip(CL_PZ_TIP, 'What does Paused mean?') : pausedAll.length ? pzBtn : ''}</div>
+${pz ? pausedHeadHtml(true) : `<div class="cl-head" role="row"><button role="columnheader" class="${clientSort.field === 'name' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'name',dir:clientSort.field==='name'&&clientSort.explicit&&clientSort.dir==='asc'?'desc':'asc',explicit:true};renderClientsTable()">Client${clientSort.field === 'name' && clientSort.explicit ? sortIc : ''}</button><span role="columnheader">Service</span><span role="columnheader">Owner</span><span role="columnheader" class="cl-hh"><button class="${clientSort.explicit ? '' : 'is-sort'}" onclick="clientSort={field:'health'};renderClientsTable()">Health${clientSort.explicit ? '' : sortIc}</button></span><span role="columnheader">This week</span><span role="columnheader" class="cl-hh"><button class="${clientSort.field === 'importance' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'importance',dir:clientSort.field==='importance'&&clientSort.explicit&&clientSort.dir==='desc'?'asc':'desc',explicit:true};renderClientsTable()">Importance${clientSort.field === 'importance' && clientSort.explicit ? sortIc : ''}</button></span></div>`}` : pz ? pausedHeadHtml(false) : `<div class="cl-head" role="row"><button role="columnheader" class="${clientSort.field === 'name' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'name',dir:clientSort.field==='name'&&clientSort.explicit&&clientSort.dir==='asc'?'desc':'asc',explicit:true};renderClientsTable()">Client${clientSort.field === 'name' && clientSort.explicit ? sortIc : ''}</button><span role="columnheader">Owner</span><span role="columnheader" class="cl-hh"><button class="${clientSort.explicit ? '' : 'is-sort'}" onclick="clientSort={field:'health'};renderClientsTable()">Health${clientSort.explicit ? '' : sortIc}</button></span><span role="columnheader">This week</span><span role="columnheader">Last 8 weeks${infoTip(CL_TIPS.hist, 'What do the dots mean?')}</span><span role="columnheader" class="cl-hh"><button class="${clientSort.field === 'importance' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'importance',dir:clientSort.field==='importance'&&clientSort.explicit&&clientSort.dir==='desc'?'asc':'desc',explicit:true};renderClientsTable()">Importance${clientSort.field === 'importance' && clientSort.explicit ? sortIc : ''}</button></span></div>`}
 <div id="clientsTbody" role="rowgroup">${body}</div></div>
 ${clBulkBarHtml()}</div></div>${sel ? clientPanelHtml(sel) : suSel ? clientSetupPanelHtml(suSel) : ''}</div>`;
   const sp = root.querySelector('.sp-page'); if(sp) sp.scrollTop = prev;
@@ -326,7 +344,8 @@ ${clBulkBarHtml()}</div></div>${sel ? clientPanelHtml(sel) : suSel ? clientSetup
   if(sp && clEl && tbl){ const edge = () => clEl.classList.toggle('is-scrolled', tbl.getBoundingClientRect().top < sp.getBoundingClientRect().top - .5); sp.addEventListener('scroll', edge, { passive: true }); edge(); }
   if(currentViewName === 'clients'){
     const used = rows.reduce((a, r) => a + r.h.hp.used, 0), budget = rows.reduce((a, r) => a + (r.h.hp.budget || 0), 0);
-    setToolbar(null, `${mineOn ? `${ac.length} of your clients` : `${ac.length} client${ac.length === 1 ? '' : 's'}`}${focusRows.length ? ` · ${focusRows.length} in Focus` : ''} · ${needs.length} need attention${su.length ? ` · ${su.length} need setup` : ''}${budget ? ` · ${Math.round(used)} of ${Math.round(budget)} h this month` : ''}`);
+    if(pz) setToolbar(null, `${pausedAll.length} paused client${pausedAll.length === 1 ? '' : 's'}${mineOn ? ' of yours' : ''} · not working with us right now`);
+    else setToolbar(null, `${mineOn ? `${ac.length} of your clients` : `${ac.length} client${ac.length === 1 ? '' : 's'}`}${focusRows.length ? ` · ${focusRows.length} in Focus` : ''} · ${needs.length} need attention${su.length ? ` · ${su.length} need setup` : ''}${asks.length ? ` · ${asks.length} to confirm` : ''}${budget ? ` · ${Math.round(used)} of ${Math.round(budget)} h this month` : ''}${pausedAll.length ? ` · ${pausedAll.length} paused` : ''}`);
   }
   const old = document.getElementById('clientInspector'); if(old){ old.hidden = true; old.innerHTML = ''; }
 }
@@ -347,7 +366,10 @@ function clientPanelHtml({ c, h, w, owner }){
   const why = healthPhrase(h, c);
   const A = `'${c.id}'`;
   let eyebrow, title, sub, acts = '';
-  if(lvl !== 'g'){
+  // paused, or Radar asking whether it's still a client (client-status.js): that comes first
+  const st = typeof clientStatusPanel === 'function' ? clientStatusPanel(c) : null;
+  if(st) ({ eyebrow, title, sub, acts } = st);
+  else if(lvl !== 'g'){
     const sinceTxt = h.since ? (relDay(h.since).toLowerCase() === 'today' ? 'today' : relDay(h.since)) : 'today';
     eyebrow = h.quiet ? `<span class="sp-eb">${icon('check', { weight: 'bold' })}Handled, settling</span>` : `<span class="sp-eb ${lvl === 'r' ? 'red' : 'warn'}"><i class="eb-dot"></i>${lvl === 'r' ? 'At risk' : 'Watch'} since ${escapeHtml(sinceTxt)}</span>`;
     if(next){ title = `Next step: ${next.title}`; sub = `${why ? escapeHtml(why) + ' · ' : ''}${escapeHtml((teamProfiles.find(p => p.id === next.assigneeId) || {}).name || '')}${next.dueDate ? ' · due ' + fmtShortDate(new Date(next.dueDate + 'T12:00:00')) : ''}${nextStepSprintName(next) ? ' · ' + escapeHtml(nextStepSprintName(next)) : ''}`;

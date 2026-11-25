@@ -25,7 +25,8 @@ function teamWeekMinutes(id){
   const wk0 = getWeekStart(rNow());
   return timeEntries.filter(e => e.userId === id && new Date(e.date + 'T12:00:00') >= wk0).reduce((s, e) => s + e.minutes, 0);
 }
-function teamOwns(m){ return activeClients().filter(c => clientOwner(c) === m.name).length; }
+// the clients they own that are working with us (not the paused ones, client-status.js)
+function teamOwns(m){ return activeClients().filter(c => c.status !== 'Paused' && clientOwner(c) === m.name).length; }
 function teamOpenFollowUps(m){ return (typeof clientReminders !== 'undefined' ? clientReminders : []).filter(r => r.askedBy === m.id && r.status === 'waiting').length; }
 
 function drawTeam(){
@@ -163,7 +164,7 @@ function teamProfileHtml(m){
     const bars = days.map(x => `<div class="tm-b${x.k === today ? ' now' : ''}${x.k > today ? ' fut' : ''}" title="${x.d.toLocaleDateString('en-US', { weekday: 'long' })}: ${hmLong(x.m)}"><i style="height:${Math.max(Math.min(x.m / 480, 1), .04) * 100}%"></i><span>${x.d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()}</span></div>`).join('');
     hours += `<div class="tm-wk" role="img" aria-label="Hours by day this week">${bars}</div>`;
   }
-  const mine = activeClients().filter(c => clientOwner(c) === m.name).sort((a, b) => a.name.localeCompare(b.name));
+  const mine = activeClients().filter(c => c.status !== 'Paused' && clientOwner(c) === m.name).sort((a, b) => a.name.localeCompare(b.name));
   // the health of someone else's clients is for admins (and you, on your own profile)
   const lv = c => { const l = clientHealth(c).level; return l === 'r' ? 'r' : l === 'y' ? 'am' : 'g'; };
   const chips = mine.length ? `<div class="tm-sec"><span class="uw-mono">CLIENTS</span><span class="uw-mono">${mine.length}</span></div><div class="tm-chips">${mine.map(c => `<button class="tm-chip" onclick="openClientDetail('${c.id}')">${full ? `<i class="${lv(c)}"></i>` : ''}${escapeHtml(c.name)}</button>`).join('')}</div>` : '';
