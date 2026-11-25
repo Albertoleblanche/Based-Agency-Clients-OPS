@@ -96,7 +96,7 @@ function setupOpen(step, opts){
 function suHash(){
   const h = (suAt === 'welcome' ? '#setup' : `#setup/${suAt}`) + (suPreview ? (suPvExisting ? '?preview=existing' : '?preview') : '');
   if(location.hash !== h) history.replaceState(null, '', h);
-  if(!suPreview) suSet('at', suAt === 'done' ? null : suAt);
+  if(!suPreview){ suSet('at', suAt === 'done' ? null : suAt); setupNudge(); }   // the card says what's next
 }
 function setupClose(){
   const root = document.getElementById('setupRoot'); if(!root) return;
@@ -162,25 +162,50 @@ function suFocusMain(){ const b = document.querySelector('#suFoot .btn-p') || do
 
 // ---- "Finish setting up" in the sidebar, until it's done ------------------------------------------------
 function suLeft(){ return setupSteps().filter(s => s.k !== 'welcome' && s.k !== 'done' && !s.optional).filter(s => { const x = suStatus(s.k); return x !== 'done' && x !== 'na'; }); }
+// The card in the sidebar: Set Up Radar, a segment for each step (filling in as each one connects),
+// and what's next, which is where it opens. It's drawn once; after that only what changed is touched,
+// so a segment fills in place, and the first time it appears they fill in one after another.
+function suNudgeNext(){
+  const steps = setupSteps(), at = steps.find(x => x.k === suGet('at'));
+  if(at && at.k !== 'welcome' && at.k !== 'done' && suStatus(at.k) !== 'done') return at;   // where you left off
+  const skipped = suSkipped(), left = suLeft();
+  return left.find(x => !skipped.has(x.k)) || left[0] || null;
+}
+function suNudgeGo(){ const n = suLoaded ? suNudgeNext() : null; setupOpen(suLoaded ? (n ? n.k : 'done') : undefined); }
 function setupNudge(){
   let el = document.getElementById('setupNudge');
   if(!suPending()){ if(el) el.hidden = true; return; }
   if(!el){
     const timer = document.getElementById('sideTimer'); if(!timer) return;
     el = document.createElement('div'); el.id = 'setupNudge'; el.className = 'su-nudge';
+    el.innerHTML = `<button class="su-nudge-b" onclick="suNudgeGo()"><span class="su-nh"><b>Set Up Radar</b><i class="su-new" hidden>New</i><span class="su-nc"></span></span><span class="su-segs" aria-hidden="true"></span><span class="su-nx"><span class="su-nt"></span>${icon('chevron-right')}</span></button><button class="ib su-nudge-x" aria-label="Hide Set Up Radar" title="Hide" onclick="setupNudgeHide()">${icon('x')}</button>`;
     timer.parentNode.insertBefore(el, timer);
   }
-  const main = setupSteps().filter(s => s.k !== 'welcome' && s.k !== 'done' && !s.optional);
-  const left = suLoaded ? suLeft().length : null, doneN = suLoaded ? main.length - left : 0;
-  const pct = suLoaded && main.length ? doneN / main.length : 0;
-  const sub = left == null ? 'Connect your apps' : left ? `${left} step${left === 1 ? '' : 's'} left` : 'Everything’s connected';
-  // someone already on Radar: "Connect your apps", marked New until they first open it
-  const old = suWasHere(), title = old ? 'Set Up Radar' : 'Finish setting up', isNew = old && !suGet('seen');
-  el.hidden = false; el.classList.toggle('is-new', isNew);
-  el.innerHTML = `<button class="su-nudge-b" onclick="setupOpen()" aria-label="${escapeHtml(title)}${isNew ? ', new' : ''}: ${escapeHtml(sub)}"><span class="su-ring" style="--p:${pct.toFixed(3)}" aria-hidden="true"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="8"/><circle class="v" cx="10" cy="10" r="8" pathLength="1"/></svg></span><span class="tx"><b>${title}</b><span>${isNew ? '<i class="su-new">New</i>' : ''}${escapeHtml(sub)}</span></span></button><button class="ib su-nudge-x" aria-label="Hide this" title="Hide this" onclick="setupNudgeHide()">${icon('x')}</button>`;
+  // the steps that count: the main ones, less any not set up for the team yet
+  const main = setupSteps().filter(s => s.k !== 'welcome' && s.k !== 'done' && !s.optional && (!suLoaded || suStatus(s.k) !== 'na'));
+  const done = k => suLoaded && suStatus(k) === 'done', doneN = main.filter(s => done(s.k)).length, left = main.length - doneN;
+  const next = suLoaded ? suNudgeNext() : null, isNew = suWasHere() && !suGet('seen');
+  const line = !suLoaded ? 'Connect your apps' : !left ? 'All connected. Finish up' : next ? `Next: ${next.name}` : `${left} left`;
+  // a progress bar in steps: as many filled as are connected, from the left; the one after, marked
+  const segs = el.querySelector('.su-segs'), n = String(main.length);
+  if(segs.dataset.n !== n){
+    segs.innerHTML = main.map((s, i) => `<span class="su-seg" style="--i:${i}"><i></i></span>`).join('');
+    segs.dataset.n = n;
+    segs.classList.add('is-fill'); segs.offsetWidth;   // drawn empty first, so they fill in, one after another
+    clearTimeout(segs._t); segs._t = setTimeout(() => segs.classList.remove('is-fill'), 900);
+  }
+  segs.querySelectorAll('.su-seg').forEach((g, i) => { g.classList.toggle('is-done', i < doneN); g.classList.toggle('is-next', suLoaded && i === doneN); });
+  const nc = el.querySelector('.su-nc'), nt = el.querySelector('.su-nt'), nw = el.querySelector('.su-new');
+  const count = suLoaded ? `${doneN} of ${main.length}` : '';
+  if(nc.textContent !== count) nc.textContent = count;
+  if(nt.textContent !== line) nt.textContent = line;
+  nw.hidden = !isNew;
+  el.classList.toggle('is-new', isNew); el.classList.toggle('is-all', suLoaded && !left);
+  el.querySelector('.su-nudge-b').setAttribute('aria-label', `Set Up Radar${isNew ? ', new' : ''}${suLoaded ? `: ${doneN} of ${main.length} connected` : ''}. ${line}`);
+  el.hidden = false;
 }
 async function setupNudgeHide(){
-  if(!(await confirmDialog(`Hide ${suWasHere() ? 'Connect Your Apps' : 'Finish Setting Up'}? You can still set up anything from the menu under your name: Set Up Radar.`, { confirmLabel: 'Hide' }))) return;
+  if(!(await confirmDialog('Hide Set Up Radar from the sidebar? You can still set up anything from the menu under your name: Set Up Radar.', { confirmLabel: 'Hide' }))) return;
   await setupFinish(false);
 }
 

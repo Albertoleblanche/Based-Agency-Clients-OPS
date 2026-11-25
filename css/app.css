@@ -3869,21 +3869,6 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 .su-url-a svg{width:14px;height:14px}
 .su-url-a .app-logo.xs{width:15px;height:15px;border-radius:4px}
 .su-psteps li::before{content:counter(gl)}
-.su-nudge{margin:auto 4px 8px;display:flex;align-items:center;gap:2px;padding:4px 4px 4px 6px;border-radius:11px;background:var(--fill-2)}
-.su-nudge[hidden]{display:none}
-.su-nudge:not([hidden]) + .stm{margin-top:0}
-.su-nudge-b{display:flex;align-items:center;gap:10px;flex:1 1 auto;min-width:0;padding:5px 4px;border:0;border-radius:8px;background:none;font:inherit;color:var(--label);text-align:left;cursor:default;transition:transform .1s ease}
-.su-nudge-b:active{transform:scale(.98)}
-.su-nudge-b .tx{display:flex;flex-direction:column;min-width:0}
-.su-nudge-b b{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.su-nudge-b .tx span{font-size:12px;color:var(--label-2);white-space:nowrap}
-.su-ring{flex:none;width:22px;height:22px}
-.su-ring svg{width:100%;height:100%;transform:rotate(-90deg)}
-.su-ring circle{fill:none;stroke-width:2.6;stroke:var(--sep-strong)}
-.su-ring circle.v{stroke:var(--green);stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:calc(1 - var(--p));transition:stroke-dashoffset .5s cubic-bezier(.23,1,.32,1)}
-.su-nudge-x{flex:none;width:26px;height:26px;color:var(--label-3)}
-.su-nudge-x svg{width:13px;height:13px}
-@media (hover:hover) and (pointer:fine){.su-nudge-x:hover{color:var(--label)}}
 /* Set Up Radar, motion (Nov 24): the highlight slides between steps; Preview */
 .su-list{position:relative;margin-top:22px;min-height:0;overflow:auto}
 .su-list .su-steps{position:relative;z-index:1;margin:0;overflow:visible}
@@ -3895,13 +3880,10 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 .su-pvnote + .su-later{margin-top:10px}
 .su-rail{gap:0}
 .su-later{margin-top:auto}
-.su-nudge{animation:suNudgeIn 320ms cubic-bezier(.23,1,.32,1)}
-@keyframes suNudgeIn{from{opacity:0;transform:translateY(6px)}}
-@media (prefers-reduced-motion:reduce){.su-ink,.su-ring circle.v{transition:none}.su-nudge{animation:none}}
+@media (prefers-reduced-motion:reduce){.su-ink{transition:none}}
 /* Set Up Radar for people already on Radar (Nov 24): New in the sidebar, what's connected on Welcome,
    the preview switch; the Team page's Setup column and line */
 .su-new{display:inline-block;margin-right:6px;padding:0 6px;border-radius:999px;background:var(--blue-bg);color:var(--blue);font-style:normal;font-size:10.5px;font-weight:600;line-height:16px;letter-spacing:.01em;vertical-align:1px}
-.su-nudge.is-new .su-ring circle:not(.v){stroke:color-mix(in srgb,var(--blue) 45%,var(--sep-strong))}
 .su-have{margin-top:24px}
 .su-have li{align-items:center}
 .su-have .su-hv{flex:1}
@@ -3914,3 +3896,41 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 .tm-su-col.is-done{color:var(--label)}
 .tm-su-line{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 4px 0;font-size:13px;color:var(--label-2)}
 .tm-su-line .btn{flex:none}
+
+/* Set Up Radar in the sidebar (Nov 24): a card, like the timer under it. Its name (New for people
+   already on Radar) and how many are connected; a segment per step, green as each connects, the next
+   one marked; and what's next, which is where it opens. Hide (×) shows where the count is, on hover. */
+.su-nudge{position:relative;margin:auto 4px 8px;border-radius:12px;background:var(--fill-2);transition:background-color 140ms ease;animation:suNudgeIn 360ms cubic-bezier(.23,1,.32,1)}
+.su-nudge[hidden]{display:none}
+.su-nudge:not([hidden]) + .stm{margin-top:0}
+@keyframes suNudgeIn{from{opacity:0;transform:translateY(8px) scale(.98)}}
+.su-nudge-b{display:flex;flex-direction:column;align-items:stretch;gap:9px;width:100%;padding:11px 12px 10px;border:0;border-radius:inherit;background:none;font:inherit;color:var(--label);text-align:left;cursor:default;transition:transform 160ms cubic-bezier(.23,1,.32,1)}
+.su-nudge-b:active{transform:scale(.98);transition-duration:100ms}
+.su-nh{display:flex;align-items:center;gap:7px;min-width:0;height:20px}
+.su-nh b{font-size:13px;font-weight:600;letter-spacing:-.005em;white-space:nowrap}
+.su-nh .su-new{margin:0;vertical-align:0;background:color-mix(in srgb,var(--blue) 15%,transparent)}
+.su-nh .su-new[hidden]{display:none}
+.su-nc{margin-left:auto;padding-right:1px;font-size:11.5px;font-weight:500;color:var(--label-3);font-variant-numeric:tabular-nums;white-space:nowrap;transition:opacity 120ms ease}
+.su-segs{display:flex;gap:3px}
+.su-seg{flex:1 1 0;height:4px;border-radius:2px;background:var(--fill-3);overflow:hidden;transition:background-color 200ms ease}
+.su-seg i{display:block;height:100%;border-radius:inherit;background:var(--green);transform:scaleX(0);transform-origin:left center;transition:transform 420ms cubic-bezier(.23,1,.32,1)}
+.su-seg.is-done i{transform:none}
+.su-seg.is-next{background:color-mix(in srgb,var(--label) 30%,transparent)}
+.su-segs.is-fill .su-seg i{transition-delay:calc(120ms + var(--i) * 70ms)}
+.su-nx{display:flex;align-items:center;gap:6px;min-width:0;font-size:12px;line-height:16px;color:var(--label-2)}
+.su-nt{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.su-nx svg{flex:none;width:13px;height:13px;color:var(--label-3);transition:transform 160ms cubic-bezier(.23,1,.32,1),color 120ms ease}
+.su-nudge.is-all .su-nt{color:var(--label)}
+.su-nudge-x{position:absolute;top:8px;right:7px;width:24px;height:24px;border-radius:7px;color:var(--label-2);opacity:0;transition:opacity 120ms ease}
+.su-nudge-x svg{width:13px;height:13px}
+.su-nudge:has(:focus-visible) .su-nudge-x{opacity:1}
+.su-nudge:has(:focus-visible) .su-nc{opacity:0}
+@media (hover:hover) and (pointer:fine){
+  .su-nudge:hover{background:var(--fill-3)}
+  .su-nudge:hover .su-nudge-x{opacity:1}
+  .su-nudge:hover .su-nc{opacity:0}
+  .su-nudge:hover .su-nx svg{transform:translateX(2px);color:var(--label-2)}
+  .su-nudge-x:hover{color:var(--label);background:var(--fill-2)}
+}
+@media (hover:none){.su-nudge-x{opacity:1}.su-nc{opacity:0}}
+@media (prefers-reduced-motion:reduce){.su-nudge,.su-nudge-b,.su-seg,.su-seg i,.su-nx svg,.su-nc,.su-nudge-x{transition:none;animation:none}}
