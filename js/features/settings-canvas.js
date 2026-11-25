@@ -643,7 +643,7 @@ function slackTasksHtml(st){
 <li>In each channel where work gets asked for, type <code>/invite @Radar</code>.</li>
 <li>For <code>/task</code>: under <b>Slash Commands</b>, edit /task and tick <b>Escape channels, users, and links sent to your app</b>, so people and links come through.</li>
 </ol></details>
-<p class="sl-cmd">By command still works: <code>/task @person what to do due:friday</code>, with any links in it kept on the task.</p>`;
+<p class="sl-cmd">By command still works: <code>/task @person what to do client:harbor due:friday</code>. Links in it go on the task. Without <code>client:</code>, the client comes from its Slack channel, a link to its website, or its name in the task. <code>/task help</code> shows how.</p>`;
 }
 // What an admin does once so each person can connect their own Slack (lib/slack-me.js)
 function slackMeSetupSheet(){

@@ -40,7 +40,7 @@ const crypto = require('crypto');
 const { sendSlackDM } = require('../lib/slack-notify');
 const { slackMeSendToId } = require('../lib/slack-me');
 const { sendPushToUser, pushUrlFor } = require('../lib/push-notify');
-const { parseTaskCommandText, handleSlackEvent } = require('../lib/slack-tasks');
+const { parseTaskCommandText, handleSlackEvent, teamToday, fmtDue, TASK_HELP } = require('../lib/slack-tasks');
 const { handleGranolaHook } = require('../lib/granola-tasks');
 // Keeps the function running after Slack has its answer (it wants one within 3 seconds; reading a
 // message with the AI can take longer). Without it, the work is done before answering.
@@ -102,7 +102,32 @@ async function handleTaskSlashCommand(req, res, rawBody, admin) {
     return;
   }
 
-  const { assigneeSlackId, dueDate, title, link, description } = parseTaskCommandText(text);
+  if (!text || /^(help|\?)$/i.test(text)) { res.status(200).json({ response_type: 'ephemeral', text: TASK_HELP }); return; }
+
+  // the clients (for client: and to find one by itself), this channel's client, and today where the team is
+  const channelId = params.get('channel_id');
+  const [{ data: clientRows }, { data: chMap }, { data: setRow }] = await Promise.all([
+    admin.from('clients').select('id, name, website, deleted_at'),
+    admin.from('slack_client_channels').select('client_id, slack_channel_id'),
+    admin.from('app_storage').select('value').eq('key', 'settings').maybeSingle(),
+  ]);
+  const clients = (clientRows || []).filter(c => !c.deleted_at);
+  const ch = channelId && (chMap || []).find(m => m.slack_channel_id === channelId);
+  let tz = process.env.TEAM_TIMEZONE || 'America/New_York';
+  try { const st = setRow && setRow.value ? JSON.parse(setRow.value) : {}; if (st.timezone) tz = st.timezone; } catch (e) {}
+  const { date: today } = teamToday(tz);
+  const { assigneeSlackId, dueDate, dueAsk, title, link, description, client, clientHow, clientAsk, clientOptions } =
+    parseTaskCommandText(text, today, { clients, channelClient: ch ? clients.find(c => c.id === ch.client_id) || null : null });
+  if (clientAsk) {
+    res.status(200).json({ response_type: 'ephemeral', text: clientOptions.length
+      ? `More than one client matches “${clientAsk}”: ${clientOptions.join(', ')}. Add more of the name, like \`client:${clientOptions[0].toLowerCase().split(/\s+/).slice(0, 2).join('-').replace(/[^a-z0-9-]/g, '')}\`.`
+      : `No client called “${clientAsk}” in Radar. Part of the name is enough, like \`client:harbor\`. Nothing was added.` });
+    return;
+  }
+  if (dueAsk) {
+    res.status(200).json({ response_type: 'ephemeral', text: `I couldn’t read the due date “${dueAsk}”. Use today, tomorrow, a day like fri, 12/3 or 2026-12-03. Nothing was added.` });
+    return;
+  }
   if (!assigneeSlackId) {
     res.status(200).json({
       response_type: 'ephemeral',
@@ -135,9 +160,9 @@ async function handleTaskSlashCommand(req, res, rawBody, admin) {
   }
 
   const row = { title, description: description || null, priority: 'medium', status: 'todo',
-    assigner_id: runnerProfile.id, assignee_id: assigneeProfile.id, due_date: dueDate, link: link || null };
+    assigner_id: runnerProfile.id, assignee_id: assigneeProfile.id, due_date: dueDate, link: link || null, client_id: client ? client.id : null };
   let { data: task, error } = await admin.from('tasks').insert(row).select().single();
-  if (error && /link/.test(error.message || '')) { const { link: _l, ...rest } = row; ({ data: task, error } = await admin.from('tasks').insert(rest).select().single()); }
+  if (error && /link|client_id/.test(error.message || '')) { const { link: _l, client_id: _c, ...rest } = row; ({ data: task, error } = await admin.from('tasks').insert(rest).select().single()); }
 
   if (error || !task) {
     res.status(200).json({ response_type: 'ephemeral', text: `Couldn't create the task: ${error?.message || 'unknown error'}` });
@@ -148,18 +173,24 @@ async function handleTaskSlashCommand(req, res, rawBody, admin) {
   // session involved in a Slack-originated request), so its three
   // effects — in-app row, push, Slack DM — are replicated by hand here,
   // same as the cron reminder functions already do.
+  const forClient = client ? ` · ${client.name}` : '';
   if (assigneeProfile.id !== runnerProfile.id) {
     await admin.from('notifications').insert({
       user_id: assigneeProfile.id, type: 'task_assigned', title: 'New task assigned to you',
-      body: `${runnerProfile.name || 'Someone'}: "${title}"`, target_view: 'tasks',
+      body: `${runnerProfile.name || 'Someone'}: "${title}"${forClient}`, target_view: 'tasks',
     });
-    try { await sendPushToUser(admin, assigneeProfile.id, 'New task assigned to you', `${runnerProfile.name || 'Someone'}: "${title}"`, pushUrlFor('tasks')); } catch (e) {}
-    try { await sendSlackDM(admin, assigneeProfile.id, 'task_assigned', `*New task assigned to you*\n${runnerProfile.name || 'Someone'}: "${title}"`); } catch (e) {}
+    try { await sendPushToUser(admin, assigneeProfile.id, 'New task assigned to you', `${runnerProfile.name || 'Someone'}: "${title}"${forClient}`, pushUrlFor('tasks')); } catch (e) {}
+    try { await sendSlackDM(admin, assigneeProfile.id, 'task_assigned', `*New task assigned to you*\n${runnerProfile.name || 'Someone'}: "${title}"${forClient}`); } catch (e) {}
   }
+  await admin.from('activity_log').insert({ client_id: client ? client.id : null, user_id: runnerProfile.id, action_type: 'task_created',
+    description: `${runnerProfile.name} added “${title}” for ${assigneeProfile.name} from Slack.` }).then(() => {}, () => {});
 
+  // what it did, and how it found the client (so a wrong guess is easy to spot)
+  const how = { asked: '', channel: ' (this channel’s client)', website: ' (from the link)', name: ' (named in the task)' }[clientHow] || '';
+  const bits = [client ? `Client: ${client.name}${how}` : 'No client (add `client:name` to set one)', dueDate ? `Due ${dueDate === today ? 'today' : fmtDue(dueDate)}` : '', link ? `Link: ${link}` : ''].filter(Boolean);
   res.status(200).json({
     response_type: 'ephemeral',
-    text: `Task "${title}" assigned to ${assigneeProfile.name || 'them'}${dueDate ? ` (due ${dueDate})` : ''}${link ? `, with the link ${link}` : ''}.`,
+    text: `Task “${title}” for ${assigneeProfile.name || 'them'}.\n${bits.join(' · ')}`,
   });
 }
 
