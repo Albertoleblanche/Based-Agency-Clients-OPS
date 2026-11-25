@@ -62,7 +62,7 @@ function clientSameAsGuesses(c){
   const mine = words(c.name);
   if(!mine.length) return [];
   const alike = (a, b) => typeof hvWordAlike === 'function' ? hvWordAlike(a, b) : a === b;
-  return activeClients().filter(x => x.id !== c.id && !hvLinkOf(x)).map(x => {
+  return radarClients().filter(x => x.id !== c.id && !hvLinkOf(x)).map(x => {
     const theirs = words(x.name);
     if(!theirs.length) return null;
     const k = typeof hvNamesAlike === 'function' ? hvNamesAlike(c.name, x.name) : 0;
@@ -216,7 +216,7 @@ async function hvLinkClient(clientId, targetId){
 function hvSameAsSheet(clientId){
   const c = clients.find(x => x.id === clientId); if(!c) return;
   const guesses = clientSameAsGuesses(c).map(x => x.id);
-  const list = activeClients().filter(x => !hvLinkOf(x)).sort((a, b) => (guesses.includes(b.id) - guesses.includes(a.id)) || a.name.localeCompare(b.name));
+  const list = radarClients().filter(x => !hvLinkOf(x)).sort((a, b) => (guesses.includes(b.id) - guesses.includes(a.id)) || a.name.localeCompare(b.name));
   if(!list.length){ showToast('info', 'Nothing to link to', 'Every client in Radar is already linked to Harvest.'); return; }
   openAppModal(`<h3>Same as which client?</h3>
 <p class="t-2" style="margin:-4px 0 14px;font-size:13px;line-height:1.45">Pick the Radar client that Harvest calls ${escapeHtml(c.name)}.</p>
@@ -228,7 +228,7 @@ function hvSameAsSheet(clientId){
 // Radar added a copy. Each row says which Radar client it is (Radar's guess picked), a new client
 // (it stays under Needs setup) or not a Radar client (Trash). One Save does them all.
 let hvMatch = {}; // setup client id -> '' (new client) | '__skip' | Radar client id
-function hvMatchTargets(){ return activeClients().filter(x => !hvLinkOf(x)).sort((a, b) => a.name.localeCompare(b.name)); }
+function hvMatchTargets(){ return radarClients().filter(x => !hvLinkOf(x)).sort((a, b) => a.name.localeCompare(b.name)); }
 async function openMatchClientsSheet(){
   if(!canEditClients()) return;
   if(!hvLinks) await hvLoadLinks();

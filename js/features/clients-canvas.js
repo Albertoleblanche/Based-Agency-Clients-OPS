@@ -134,7 +134,7 @@ async function saveClientsBulk(){
   if(v('bkFocus')){ const on = v('bkFocus') === 'on'; Object.assign(cf, on ? { focus: true, focusAt: new Date().toISOString(), focusBy: myName() || '' } : { focus: null, focusAt: null, focusBy: null }); words.push(on ? 'Focus on' : 'Focus off'); }
   if(!words.length){ showToast('info', 'Nothing to change yet', 'Pick a new value for at least one field.'); return; }
   const btn = document.getElementById('bkSave'); if(btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
-  const picked = clients.filter(c => clBulk.has(c.id));
+  const picked = clients.filter(c => clBulk.has(c.id)), wasPaused = picked.map(c => c.status === 'Paused');
   let kept = 0;
   const results = await Promise.all(picked.map(async c => {
     const mine = Object.assign({}, fields);
@@ -154,6 +154,8 @@ async function saveClientsBulk(){
     return ok;
   }));
   const done = results.filter(Boolean).length, failed = results.length - done;
+  // paused: the rest of the team hears it, in one notification (client-status.js)
+  if(fields.status === 'Paused' && typeof notifyClientsPaused === 'function') notifyClientsPaused(picked.filter((c, i) => results[i] && wasPaused[i] === false));
   closeAppModal();
   if(failed){ picked.forEach((c, i) => { if(results[i]) clBulk.delete(c.id); }); showToast('error', `${failed} client${failed === 1 ? '' : 's'} didn’t save`, `${done} updated. The rest are still ticked: try Edit again.`); renderAll(); return; }
   showToast('success', `Updated ${done} client${done === 1 ? '' : 's'}`, `Set ${words.join(', ')}.${kept ? ` Risk stayed on ${kept}: lowering it takes an approver or admin.` : ''}`);
@@ -244,11 +246,13 @@ function renderClientsTable(){
   // My clients: your scope of work and what you've worked on lately (work-areas.js). The switch
   // shows when that's some of the clients, not none or all of them.
   const acAll = activeClients(), { yours, has: hasAreas } = myClientsSplit(), mineOn = hasAreas && clientsMine;
-  // Paused clients aren't working with us right now: they sit in their own table, under See Paused
-  // Clients (client-status.js), so this one only has the current clients
-  // (a paused one still waiting for setup is with the paused ones too)
-  const scope = mineOn ? yours : acAll, pausedAll = (mineOn ? yours : liveClients()).filter(isPausedClient), pz = clientsPausedOpen;
-  const ac = scope.filter(c => !isPausedClient(c));
+  // Paused clients aren't working with us right now: activeClients() leaves them out, and the people
+  // who edit clients see them in their own table, under See Paused Clients (client-status.js); the rest
+  // of the team only hears when one is paused. A paused one still waiting for setup is there too.
+  const canPz = canEditClients(), mineOf = c => typeof waYours !== 'function' || waYours(c);
+  const pausedAll = liveClients().filter(c => isPausedClient(c) && (!mineOn || mineOf(c))).sort((a, b) => a.name.localeCompare(b.name));
+  const pz = clientsPausedOpen && canPz;
+  const ac = mineOn ? yours : acAll;
   if(pz && clBulk) [...clBulk].forEach(id => { if(!pausedAll.some(c => c.id === id)) clBulk.delete(id); });
   const rowOf = c => ({ c, h: clientHealth(c), w: weekView(clientWeek(c)), owner: clientOwner(c) });
   const rows = pz ? [] : ac.map(rowOf);
@@ -280,7 +284,7 @@ function renderClientsTable(){
     : clientSort.field === 'importance' && clientSort.explicit ? (a, b) => dir * ((a.c.importance || 0) - (b.c.importance || 0)) || a.c.name.localeCompare(b.c.name)
     : (a, b) => focusFirst(a.c, b.c) || rank[a.h.level] - rank[b.h.level] || b.h.signals.filter(s => s.l === 'r').length - a.h.signals.filter(s => s.l === 'r').length || (b.c.importance || 0) - (a.c.importance || 0) || a.c.name.localeCompare(b.c.name));
   const owners = [...new Set((pz ? pausedAll.map(clientOwner) : rows.map(r => r.owner)).concat(su.map(suOwner)).filter(Boolean))].sort();
-  if(inspectedClientId && !acAll.some(c => c.id === inspectedClientId) && !setupClients().some(c => c.id === inspectedClientId) && !pausedAll.some(c => c.id === inspectedClientId)) inspectedClientId = null;
+  if(inspectedClientId && !acAll.some(c => c.id === inspectedClientId) && !setupClients().some(c => c.id === inspectedClientId) && !liveClients().some(c => c.id === inspectedClientId && isPausedClient(c))) inspectedClientId = null;
   // the new look uses the canvas columns: client, service, owner, health, this week, importance
   const uw = typeof uiStyleOn === 'function' && uiStyleOn();
   const row = ({ c, h, w, owner }) => {
@@ -321,7 +325,8 @@ ${clientImportanceCell(c)}</div>`;
   // the paused clients, in a table of their own (client-status.js): beside the table's title, or in the bar
   const pzBtn = `<button class="btn cl-pz" onclick="setClientsPaused(true)" title="Clients that aren’t working with us right now">${icon('pause')}See Paused Clients<span class="cl-pz-n">${pausedAll.length}</span></button>`;
   // a client outside your areas, opened from search or elsewhere, still opens
-  const selC = inspectedClientId ? acAll.find(c => c.id === inspectedClientId) || pausedAll.find(c => c.id === inspectedClientId) : null;
+  // a paused one opens too (from its notification, or the paused clients' table)
+  const selC = inspectedClientId ? acAll.find(c => c.id === inspectedClientId) || liveClients().find(c => c.id === inspectedClientId && isPausedClient(c)) : null;
   const sel = inspectedClientId ? (rows.find(r => r.c.id === inspectedClientId) || (selC ? rowOf(selC) : null)) : null;
   // one opened from search or elsewhere still opens, for a member as "Waiting for an approver"
   const suSel = !sel && inspectedClientId ? setupClients().find(c => c.id === inspectedClientId) : null;
@@ -332,21 +337,19 @@ ${clientImportanceCell(c)}</div>`;
 ${hasAreas ? `<label class="pop-wrap">Show: <select class="pop" onchange="setClientsMine(this.value)"><option value="mine"${mineOn ? ' selected' : ''}>My clients</option><option value="all"${mineOn ? '' : ' selected'}>All clients</option></select></label>` : ''}
 <label class="pop-wrap">Owner: <select class="pop" onchange="setClientsOwner(this.value)"><option value="all">All</option>${owners.map(o => `<option${clientsOwnerFilter === o ? ' selected' : ''}>${escapeHtml(o)}</option>`).join('')}</select></label>
 <label class="pop-wrap">${harvestOwnsServices() ? 'Project' : 'Service'}: <select class="pop" onchange="setClientsService(this.value)"><option value="all">All</option>${services.map(s => `<option${clientFilters.service === s ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('')}</select></label>
-${!pz && !uw && pausedAll.length ? pzBtn : ''}
+${!pz && !uw && canPz && pausedAll.length ? pzBtn : ''}
 ${canEditClients() && !clBulk ? `<button class="btn cl-bulk-btn" onclick="clBulkMenu(event)" aria-haspopup="menu">Bulk Edit${icon('caret-down', { weight: 'bold' })}</button>` : ''}</div>
 <div class="cl-table${uw ? ' is-uw' : ''}" role="table" aria-label="Clients">
-${uw ? `<div class="cl-th"><span class="cl-thi">${icon(pz ? 'pause' : 'briefcase')}</span><b>${pz ? (mineOn ? 'My paused clients' : 'Paused clients') : mineOn ? 'My active clients' : 'Active clients'}</b><span class="cl-thn">${pz ? pausedShown.length : shown.length}</span>${pz ? infoTip(CL_PZ_TIP, 'What does Paused mean?') : pausedAll.length ? pzBtn : ''}</div>
+${uw ? `<div class="cl-th"><span class="cl-thi">${icon(pz ? 'pause' : 'briefcase')}</span><b>${pz ? (mineOn ? 'My paused clients' : 'Paused clients') : mineOn ? 'My active clients' : 'Active clients'}</b><span class="cl-thn">${pz ? pausedShown.length : shown.length}</span>${pz ? infoTip(CL_PZ_TIP, 'What does Paused mean?') : canPz && pausedAll.length ? pzBtn : ''}</div>
 ${pz ? pausedHeadHtml(true) : `<div class="cl-head" role="row"><button role="columnheader" class="${clientSort.field === 'name' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'name',dir:clientSort.field==='name'&&clientSort.explicit&&clientSort.dir==='asc'?'desc':'asc',explicit:true};renderClientsTable()">Client${clientSort.field === 'name' && clientSort.explicit ? sortIc : ''}</button><span role="columnheader">Service</span><span role="columnheader">Owner</span><span role="columnheader" class="cl-hh"><button class="${clientSort.explicit ? '' : 'is-sort'}" onclick="clientSort={field:'health'};renderClientsTable()">Health${clientSort.explicit ? '' : sortIc}</button></span><span role="columnheader">This week</span><span role="columnheader" class="cl-hh"><button class="${clientSort.field === 'importance' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'importance',dir:clientSort.field==='importance'&&clientSort.explicit&&clientSort.dir==='desc'?'asc':'desc',explicit:true};renderClientsTable()">Importance${clientSort.field === 'importance' && clientSort.explicit ? sortIc : ''}</button></span></div>`}` : pz ? pausedHeadHtml(false) : `<div class="cl-head" role="row"><button role="columnheader" class="${clientSort.field === 'name' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'name',dir:clientSort.field==='name'&&clientSort.explicit&&clientSort.dir==='asc'?'desc':'asc',explicit:true};renderClientsTable()">Client${clientSort.field === 'name' && clientSort.explicit ? sortIc : ''}</button><span role="columnheader">Owner</span><span role="columnheader" class="cl-hh"><button class="${clientSort.explicit ? '' : 'is-sort'}" onclick="clientSort={field:'health'};renderClientsTable()">Health${clientSort.explicit ? '' : sortIc}</button></span><span role="columnheader">This week</span><span role="columnheader">Last 8 weeks${infoTip(CL_TIPS.hist, 'What do the dots mean?')}</span><span role="columnheader" class="cl-hh"><button class="${clientSort.field === 'importance' && clientSort.explicit ? 'is-sort' : ''}" onclick="clientSort={field:'importance',dir:clientSort.field==='importance'&&clientSort.explicit&&clientSort.dir==='desc'?'asc':'desc',explicit:true};renderClientsTable()">Importance${clientSort.field === 'importance' && clientSort.explicit ? sortIc : ''}</button></span></div>`}
 <div id="clientsTbody" role="rowgroup">${body}</div></div>
 ${clBulkBarHtml()}</div></div>${sel ? clientPanelHtml(sel) : suSel ? clientSetupPanelHtml(suSel) : ''}</div>`;
   const sp = root.querySelector('.sp-page'); if(sp) sp.scrollTop = prev;
   const clEl = root.querySelector('.cl'), tbl = root.querySelector('.cl-table');
   if(sp && clEl && tbl){ const edge = () => clEl.classList.toggle('is-scrolled', tbl.getBoundingClientRect().top < sp.getBoundingClientRect().top - .5); sp.addEventListener('scroll', edge, { passive: true }); edge(); }
-  if(currentViewName === 'clients'){
-    const used = rows.reduce((a, r) => a + r.h.hp.used, 0), budget = rows.reduce((a, r) => a + (r.h.hp.budget || 0), 0);
-    if(pz) setToolbar(null, `${pausedAll.length} paused client${pausedAll.length === 1 ? '' : 's'}${mineOn ? ' of yours' : ''} · not working with us right now`);
-    else setToolbar(null, `${mineOn ? `${ac.length} of your clients` : `${ac.length} client${ac.length === 1 ? '' : 's'}`}${focusRows.length ? ` · ${focusRows.length} in Focus` : ''} · ${needs.length} need attention${su.length ? ` · ${su.length} need setup` : ''}${asks.length ? ` · ${asks.length} to confirm` : ''}${budget ? ` · ${Math.round(used)} of ${Math.round(budget)} h this month` : ''}${pausedAll.length ? ` · ${pausedAll.length} paused` : ''}`);
-  }
+  // the line under the title says what this list is; the counts are already in the segments and the table
+  if(currentViewName === 'clients') setToolbar(null, pz ? 'Not working with us right now. Nothing about them is deleted.'
+    : mineOn ? 'Your clients that are working with us right now' : 'The clients working with us right now');
   const old = document.getElementById('clientInspector'); if(old){ old.hidden = true; old.innerHTML = ''; }
 }
 

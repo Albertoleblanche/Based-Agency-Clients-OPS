@@ -1074,7 +1074,7 @@ function mMoreHtml(){
   const g = (ic, t, right, fn) => mIr(`<span class="gl">${icon(ic)}</span>`, t, '', right || '', fn, { n: true });
   return `<h1 class="big" style="margin-top:8px">More</h1>
 <div class="ig" style="margin-top:16px"><button class="ir prof" onclick="mOpenProfile()">${me.avatar_url ? `<img src="${safeUrl(me.avatar_url)}" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover">` : avHtml(me.name || '?')}<div class="tx"><b>${mEsc(me.name || '')}</b><span>${mEsc(roleDisplayLabel(me.role))} · ${mEsc(settings.appName || 'Based Radar')}</span></div>${icon('caret-right', { cls: 'chev', weight: 'bold' })}</button></div>
-<div class="ig" style="margin-top:20px">${g('buildings', 'Clients', String(activeClients().filter(c => !isPausedClient(c)).length), "mOpenClients()")}${g('calendar-blank', 'Calendar', '', 'mOpenCalendar()')}${g('bell-ring', 'Reminders', due ? String(due) : '', 'mOpenReminders()')}${g('notepad', 'Notes', typeof granolaNewN !== 'undefined' && granolaNewN ? `<span class="m-new">${granolaNewN} new</span>` : '', 'mOpenNotes()')}${g('timer', 'Time', timerState.running ? `<span class="mClk">${mClock()}</span>` : '', 'mOpenTime()')}</div>
+<div class="ig" style="margin-top:20px">${g('buildings', 'Clients', String(activeClients().length), "mOpenClients()")}${g('calendar-blank', 'Calendar', '', 'mOpenCalendar()')}${g('bell-ring', 'Reminders', due ? String(due) : '', 'mOpenReminders()')}${g('notepad', 'Notes', typeof granolaNewN !== 'undefined' && granolaNewN ? `<span class="m-new">${granolaNewN} new</span>` : '', 'mOpenNotes()')}${g('timer', 'Time', timerState.running ? `<span class="mClk">${mClock()}</span>` : '', 'mOpenTime()')}</div>
 <div class="ig" style="margin-top:20px">${g('users-three', 'Team', '', 'mOpenTeam()')}${g('trash', 'Recently Deleted', '', 'mOpenDeleted()')}${g('gear-six', 'Settings', '', 'mOpenSettings()')}</div>
 <div class="ig" style="margin-top:20px">${g('desktop', 'Open the Desktop Version', '', "mOpenDesktop()")}</div>`;
 }
@@ -1084,8 +1084,8 @@ function mOpenClients(mode){
   let q = '';
   mPush('Clients', () => {
     // the paused ones aren't working with us right now: they're under Paused Clients (client-status.js)
-    const paused = mode === 'health' ? [] : liveClients().filter(isPausedClient);
-    const list = activeClients().filter(c => !isPausedClient(c)).map(c => ({ c, h: clientHealth(c) })).sort((a, b) => focusFirst(a.c, b.c) || (mode === 'health' ? ({ r: 0, y: 1, g: 2 }[a.h.level] - { r: 0, y: 1, g: 2 }[b.h.level]) || a.c.name.localeCompare(b.c.name) : a.c.name.localeCompare(b.c.name)));
+    const paused = mode === 'health' || !canEditClients() ? [] : liveClients().filter(isPausedClient);
+    const list = activeClients().map(c => ({ c, h: clientHealth(c) })).sort((a, b) => focusFirst(a.c, b.c) || (mode === 'health' ? ({ r: 0, y: 1, g: 2 }[a.h.level] - { r: 0, y: 1, g: 2 }[b.h.level]) || a.c.name.localeCompare(b.c.name) : a.c.name.localeCompare(b.c.name)));
     const vis = list.filter(x => !q || x.c.name.toLowerCase().includes(q));
     // added from Harvest, waiting for an approver to finish their info (on a computer)
     const su = mode === 'health' || !canEditClients() ? [] : setupClients().filter(c => !q || c.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name));
@@ -1099,6 +1099,7 @@ ${paused.length && !q ? `<div class="ig" style="margin-top:20px">${mIr(`<span cl
 }
 // Paused clients (client-status.js): their own list, and a note on each one with Make Active.
 function mOpenPausedClients(){
+  if(!canEditClients()) return;
   mPush('Paused', () => {
     const list = liveClients().filter(isPausedClient).sort((a, b) => a.name.localeCompare(b.name));
     const sub = c => { const at = pausedAtDate(c); return [at ? 'Paused ' + fmtShortDate(at) : 'Paused', pausedByWords(c)].filter(Boolean).join(' · '); };
@@ -1495,7 +1496,7 @@ function mOpenFromHash(hash){
 function mOpenSearch(){
   let q = '';
   mPush('Search', () => {
-    const cl = q ? liveClients().filter(c => c.name.toLowerCase().includes(q)).slice(0, 8) : [];
+    const cl = q ? workClients().filter(c => c.name.toLowerCase().includes(q)).slice(0, 8) : [];
     const ts = q ? mVisibleTasks().filter(t => t.status !== 'done' && t.title.toLowerCase().includes(q)).slice(0, 6) : [];
     const ns = q ? notes.filter(n => (n.title || '').toLowerCase().includes(q) || (n.text || '').toLowerCase().includes(q)).slice(0, 4) : [];
     return `<div class="isearch" style="margin-top:4px">${icon('magnifying-glass')}<input id="mSearchQ" placeholder="Clients, tasks and notes" value="${mEsc(q)}" oninput="mSearchQ(this.value)" autocapitalize="none" aria-label="Search"></div>
@@ -1515,7 +1516,7 @@ function mIsOn(id){ return !!$m(id)?.classList.contains('on'); }
 function mClientName(id){ return clients.find(c => c.id === id)?.name || ''; }
 // suggest: worth logging for first, with why (logSuggestions, week-health.js); the rest A to Z
 function mPickClient(cur, cb, none, suggest){
-  const all = waWorkable(liveClients(), cur).slice().sort((a, b) => a.name.localeCompare(b.name));
+  const all = waWorkable(workClients(cur), cur).slice().sort((a, b) => a.name.localeCompare(b.name));
   const sug = suggest && typeof logSuggestions === 'function' ? logSuggestions(4).filter(x => all.includes(x.c)) : [];
   const first = new Set(sug.map(x => x.c.id));
   mPick('Client', [...(none ? [['', none]] : []), ...sug.map(x => [x.c.id, x.c.name, x.why]), ...all.filter(c => !first.has(c.id)).map(c => [c.id, c.name, c.service || ''])], cur, cb);
@@ -1695,6 +1696,7 @@ async function mSaveLogBatch(items){
 // One entry per client, project, task and day (or client, service and day before Harvest), like
 // the desktop timesheet. It goes to Harvest straight away, as the desktop does.
 async function mAddTime({ clientId, service, dateStr, minutes, description, logged, projectId, taskId, improvementId }){
+  if(isClientPaused(clientId)){ showToast('error', 'This client is paused', 'It isn’t working with us right now, so time isn’t logged for it.'); return { error: { message: 'paused' } }; }
   // logged with a piece of work: its own entry, linked to it, as on the desktop (deleting either deletes both)
   if(improvementId){
     const { data, error } = await supabaseClient.from('time_entries').insert({ user_id: currentUser.id, client_id: clientId, entry_date: dateStr, minutes, description, service: service || '', logged: true,

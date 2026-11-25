@@ -57,6 +57,7 @@ const NOTIFICATION_TYPE_META = {
   client_concern:          { label:'A teammate raises a concern about a client', section:'Client Work', visibleTo:'approver' },
   client_concern_closed:   { label:'An approver closes a concern you raised', section:'Client Work' },
   harvest_client:          { label:'A client is added from Harvest or archived there', section:'Client Work', visibleTo:'approver' },
+  client_paused:           { label:'A client is paused (not working with us right now)', section:'Client Work' },
   event_rsvp:              { label:'Someone RSVPs or requests a change to your event', section:'Calendar' },
   event_invited:           { label:"You're invited to a calendar event", section:'Calendar' },
   event_updated:           { label:'A calendar event you\'re on changes', section:'Calendar' },

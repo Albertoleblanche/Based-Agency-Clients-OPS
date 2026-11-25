@@ -86,7 +86,7 @@ function sheetSwCk(id, on, label, extra){
 }
 // forWork: logging time or work, so members only get the clients in their areas (work-areas.js)
 function sheetClientOptions(extraId, forWork){
-  const list = forWork ? waWorkable(liveClients(), extraId) : liveClients().slice();
+  const list = forWork ? waWorkable(workClients(extraId), extraId) : workClients(extraId).slice();   // never a paused one (unless it's the one already picked)
   if(extraId && !list.some(c => c.id === extraId)){ const c = clients.find(x => x.id === extraId); if(c) list.push(c); }
   return list.sort((a, b) => a.name.localeCompare(b.name)).map(c => [c.id, c.name + (c.deletedAt ? ' (deleted)' : '')]);
 }
@@ -189,7 +189,7 @@ function liPickSuggested(id){
 function openQueueLogImprovementModal(presetClientId){
   logSheet = { files: [], useTimer: false, serviceTouched: false, itemFiles: {}, itemOff: new Set(), keys: [], asOne: false, notesTouched: false, attachTo: null };
   const me = myName() || 'Team member';
-  const list = waWorkable(liveClients(), '').sort((a, b) => a.name.localeCompare(b.name));
+  const list = waWorkable(workClients(), '').sort((a, b) => a.name.localeCompare(b.name));
   const fromView = typeof currentViewName !== 'undefined' && currentViewName === 'clientdetail' && typeof currentDetailClientId !== 'undefined' ? currentDetailClientId : '';
   // a client outside your areas: say so instead of opening (members; work-areas.js)
   const pc = typeof presetClientId === 'string' && presetClientId ? clients.find(x => x.id === presetClientId) : null;
@@ -681,7 +681,7 @@ function taskFormHtml(editing, presetAssigneeId, presetContext){
   return `<h3>${t ? 'Edit Task' : 'New Task'}</h3>
 <div class="f">
 <label for="taskTitleInput">Title</label><input id="taskTitleInput" class="tf" spellcheck="true" placeholder="What needs doing?" value="${escapeHtml(title)}">
-<label for="taskClientSelect">Client</label><div>${sheetPop('taskClientSelect', 'Client', [['', 'No client'], ...liveClients().slice().sort((a, b) => a.name.localeCompare(b.name)).map(c => [c.id, c.name])], clientId)}</div>
+<label for="taskClientSelect">Client</label><div>${sheetPop('taskClientSelect', 'Client', [['', 'No client'], ...workClients(clientId).slice().sort((a, b) => a.name.localeCompare(b.name)).map(c => [c.id, c.name])], clientId)}</div>
 <label for="taskAssigneeSelect">Assignee</label><div>${sheetPop('taskAssigneeSelect', 'Assignee', people.map(p => [p.id, p.name + (p.id === currentUser.id ? ' (you)' : '')]), assignee, 'ntAssigneeChanged(this)', { lead: aName ? avHtml(aName, 'id="ntAv"') : '' })}</div>
 <label for="taskDueInput">Due</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap" id="ntDueRow">${sheetDateField('taskDueInput', due, { none: 'No date', from: 0, to: 20, min: toDateStr(new Date()), after: 'ntSyncDue', label: 'Due date' })}${sheetPop('taskTimeInput', 'Due time', taskTimeOptions(), time, '', { disabled: !due })}</div>
 <label>Priority</label><div><div class="seg" role="radiogroup" aria-label="Priority" id="ntPriority">${priSeg}</div></div>

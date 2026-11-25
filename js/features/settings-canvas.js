@@ -386,7 +386,7 @@ function openPersonClientsSheet(pid){
 
 // ---- Clients that aren't in Harvest: a sheet with each one's service and what to do with it ------
 function outsideHarvestClients(){
-  return liveClients().filter(c => !(typeof serviceFromHarvest === 'function' && serviceFromHarvest(c))).sort((a, b) => a.name.localeCompare(b.name));
+  return workClients().filter(c => !(typeof serviceFromHarvest === 'function' && serviceFromHarvest(c))).sort((a, b) => a.name.localeCompare(b.name));
 }
 function ohRowsHtml(){
   const list = outsideHarvestClients(), opts = settings.serviceOptions || [];

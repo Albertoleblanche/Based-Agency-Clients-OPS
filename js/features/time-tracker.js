@@ -157,7 +157,7 @@ function setupClientSearchSelect(searchId, hiddenId, dropdownId){
 
   function showMatches(term){
     const lower = (term||'').toLowerCase();
-    const ac = liveClients();
+    const ac = workClients();   // not the paused ones: no time is logged for them
     const matches = [...ac]
       .filter(c=>c.name.toLowerCase().includes(lower))
       .sort((a,b)=>a.name.localeCompare(b.name))
@@ -328,6 +328,8 @@ function toggleTimer(){
 // while also logging a manual entry) and a stale read would silently
 // lose one of them.
 async function mergeOrInsertTimeEntry({ clientId, service, dateStr, minutes, description, projectId, taskId, improvementId }){
+  // a paused client isn't working with us right now: no time is logged for it (client-status.js)
+  if(typeof isClientPaused === 'function' && isClientPaused(clientId)) return { error: { message: `${(clients.find(x => x.id === clientId) || {}).name || 'This client'} is paused, so time isn’t logged for it.` }, merged: false, entryId: null, paused: true };
   // Time logged with a piece of work is its own entry, linked to it (time_entries.improvement_id), so
   // deleting either one deletes both; it's never merged into other time. Before
   // addendum-deleted-work.sql there's nothing to link it with, and it merges as before.
@@ -961,7 +963,7 @@ function resumeEntryTimer(clientId, description, entryId){
 function openTimeEntryModal(id){
   const e = timeEntries.find(x=>x.id===id);
   if(!e) return;
-  const clientOptions = [...clients].sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${e.clientId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('');
+  const clientOptions = [...clients].filter(c=>c.status!=='Paused' || c.id===e.clientId).sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${e.clientId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('');
   const serviceOptions = `<option value="">No service set</option>` + (settings.serviceOptions||[]).map(s=>`<option value="${escapeHtml(s)}" ${e.service===s?'selected':''}>${escapeHtml(s)}</option>`).join('');
   openAppModal(`
     <div class="modal-head"><span class="panel-title">Edit time entry</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>

@@ -388,6 +388,8 @@ async function saveClientForm(){
       logClientActivity(loggedClientId, 'client_edited', desc);
       refreshClientDetailActivityIfOpen(loggedClientId);
       if(before.danger !== fields.danger) logDangerHistory(loggedClientId, fields.danger, before.danger, why);
+      // paused: the rest of the team hears it (client-status.js)
+      if(fields.status === 'Paused' && before.status !== 'Paused' && typeof notifyClientsPaused === 'function') notifyClientsPaused([c]);
     }
   } else {
     const newId = 'c'+Date.now(), newWhy = (document.getElementById('ncDangerWhy')?.value || '').trim();

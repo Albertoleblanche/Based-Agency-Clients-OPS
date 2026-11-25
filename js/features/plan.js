@@ -448,7 +448,7 @@ function openNewSprintModal(o){
   openAppModal(`<h3>${s ? 'Edit Sprint' : 'New Sprint'}</h3>
 <div class="f pls">
 <label for="psTitle">Title</label><input id="psTitle" class="tf" spellcheck="true" placeholder="e.g. Brightway website refresh" value="${escapeHtml(s ? s.title : note ? note.title || '' : task ? task.title : '')}">
-<label for="psClient">Client</label><div>${sheetPop('psClient', 'Client', [['', 'No client'], ...liveClients().slice().sort((a, b) => a.name.localeCompare(b.name)).map(c => [c.id, c.name])], clientId, 'psSync()')}</div>
+<label for="psClient">Client</label><div>${sheetPop('psClient', 'Client', [['', 'No client'], ...workClients(clientId).slice().sort((a, b) => a.name.localeCompare(b.name)).map(c => [c.id, c.name])], clientId, 'psSync()')}</div>
 <label>Dates</label><div class="pls-row">${sheetDateField('psStart', start, { from: 0, to: 60, label: 'Starts', after: 'psSync' })}<span class="pls-to">to</span>${sheetDateField('psEnd', end, { from: 0, to: 45, label: 'Ends', after: 'psSync' })}<span class="pls-h" id="psDays"></span></div>
 <label>Hours</label><div class="pls-row"><span class="pls-num"><button type="button" aria-label="Fewer hours" onclick="psHours(-1)">−</button><b id="psHours">${planSheet.hours} h</b><button type="button" aria-label="More hours" onclick="psHours(1)">+</button></span><span class="pls-h" id="psBudget"></span></div>
 <label class="top" for="psGoal">Goal</label><textarea id="psGoal" class="tf pls-goal" spellcheck="true" placeholder="What’s done when this sprint is done?">${escapeHtml(s ? s.goal : '')}</textarea>

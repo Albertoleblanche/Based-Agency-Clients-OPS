@@ -279,7 +279,7 @@ function populateTaskAssigneeSelect(selectedId){
 }
 
 function populateTaskClientSelect(selectedId){
-  const options = `<option value="">No related client</option>` + liveClients().sort((a,b)=>a.name.localeCompare(b.name))
+  const options = `<option value="">No related client</option>` + workClients(selectedId).sort((a,b)=>a.name.localeCompare(b.name))
     .map(c=>`<option value="${c.id}" ${c.id===selectedId?'selected':''}>${escapeHtml(c.name)}</option>`).join('');
   return options;
 }

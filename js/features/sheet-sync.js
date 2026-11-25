@@ -158,7 +158,7 @@ function csvEscape(val){
 }
 
 function exportRosterCsv(){
-  const ac = activeClients();
+  const ac = radarClients();   // paused ones too, with their status
   if(!ac.length){ showToast('info','Nothing to export','The roster is empty.'); return; }
   const headers = ['Name','Email','Service','Status','Importance','Danger','SOW'];
   const lines = [headers.join(',')];

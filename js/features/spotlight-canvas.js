@@ -29,7 +29,7 @@ function getCommandPaletteIndex(query){
     ];
   }
   const out = [];
-  const cl = liveClients().filter(c => spotNorm(c.name).includes(q) || spotNorm(c.service).includes(q))
+  const cl = workClients().filter(c => spotNorm(c.name).includes(q) || spotNorm(c.service).includes(q))
     .sort((a, b) => (spotNorm(b.name).startsWith(q) - spotNorm(a.name).startsWith(q)) || a.name.localeCompare(b.name)).slice(0, 5);
   cl.forEach(c => { const o = clientOwner(c); out.push({ group: 'Clients', icon: 'buildings', title: c.name, sub: [c.service, o].filter(Boolean).join(' · '), run: () => openClientDetail(c.id) }); });
   const top = cl[0];

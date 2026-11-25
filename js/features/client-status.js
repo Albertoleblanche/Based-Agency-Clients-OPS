@@ -12,6 +12,7 @@
 const STILL_DAYS = 60;
 let clientsPausedOpen = false;
 function setClientsPaused(on){
+  if(on && !canEditClients()) return;   // the paused clients' table is for the people who edit clients
   clientsPausedOpen = !!on; clBulk = null; inspectedClientId = null;
   renderClientsTable();
   const sp = document.querySelector('#clientsRoot .sp-page'); if(sp) sp.scrollTop = 0;
@@ -30,6 +31,29 @@ function clientStatusCfv(c, status, by){
   if(status !== was || status === 'Paused') delete v.statusAsk;
   if(was === 'Paused' && status && status !== 'Paused'){ v.statusKeptAt = new Date().toISOString(); v.statusKeptBy = by || ''; }
   return v;
+}
+
+// Everyone's time and work, from the server (api/integrations.js ?provider=clients): in the app a person
+// sees only their own time entries and sprints, so a client a teammate works on would look quiet. No
+// question is asked until it's in, or if it can't be read; it's read again after 15 minutes.
+let clientWorkRemote = null, clientWorkLoading = false;
+async function loadClientWorkRemote(){
+  if(clientWorkLoading || (clientWorkRemote && Date.now() - clientWorkRemote.at < 15 * 60000)) return;
+  if(typeof canEditClients !== 'function' || !canEditClients() || typeof supabaseClient === 'undefined') return;
+  clientWorkLoading = true;
+  try{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const res = await fetch('/api/integrations?provider=clients&today=' + toDateStr(rNow()), { headers: { Authorization: 'Bearer ' + (session && session.access_token) } });
+    const j = res.ok ? await res.json() : null;
+    clientWorkRemote = j && typeof j === 'object' ? { at: Date.now(), last: new Map(Object.entries(j.last || {}).map(([k, v]) => [String(k), Date.parse(String(v).slice(0, 10) + 'T12:00:00')])), open: new Set((j.open || []).map(String)) }
+      : { at: Date.now(), failed: true };
+  }catch(e){ clientWorkRemote = { at: Date.now(), failed: true }; }
+  clientWorkLoading = false;
+  if(!clientWorkRemote.failed){
+    if(typeof currentViewName !== 'undefined' && currentViewName === 'clients' && typeof renderClientsTable === 'function') renderClientsTable();
+    if(typeof renderClientPage === 'function') renderClientPage();
+    if(typeof updateShellBadges === 'function') updateShellBadges();
+  }
 }
 
 // The last day anything happened for each client (time, improvements, tasks, sent updates), and the
@@ -51,6 +75,10 @@ function clientWorkIndex(){
   (typeof clientReminders !== 'undefined' ? clientReminders : []).forEach(r => { if(r.clientId && r.status === 'waiting') open.add(r.clientId); });
   const today = toDateStr(rNow());
   (typeof planSprints !== 'undefined' ? planSprints : []).forEach(s => { if(s.clientId && !s.doneAt && s.end >= today) open.add(s.clientId); });
+  if(clientWorkRemote && !clientWorkRemote.failed){
+    clientWorkRemote.last.forEach((t, id) => bump(id, new Date(t)));
+    clientWorkRemote.open.forEach(id => open.add(id));
+  }
   return { last, open };
 }
 function clientLastWork(c, idx){
@@ -58,6 +86,8 @@ function clientLastWork(c, idx){
   return t ? new Date(t) : null;
 }
 function clientDataReady(){
+  if(!clientWorkRemote || clientWorkRemote.failed || Date.now() - clientWorkRemote.at > 15 * 60000) loadClientWorkRemote();
+  if(!clientWorkRemote || clientWorkRemote.failed) return false;
   return (typeof clientsDataLoaded === 'undefined' || clientsDataLoaded)
     && (typeof timeEntriesDataLoaded === 'undefined' || timeEntriesDataLoaded)
     && (typeof tasksDataLoaded === 'undefined' || tasksDataLoaded);
@@ -185,6 +215,30 @@ function clientStatusCalloutHtml(c){
 <div class="tx"><b>${escapeHtml(paused ? s.title : `Still a client? ${clientAskTitle(a)}`)}</b><span>${s.sub}</span></div>${s.acts}</div>`;
 }
 
+// ---- telling the team ------------------------------------------------------------------------------
+// The paused clients' table is for the people who edit clients; everyone else on the team hears when a
+// client is paused, once (one notification for several at once), and that's it. Settings →
+// Notifications: client_paused. After Pause from a row or a panel it waits out the Undo first.
+function notifyClientsPaused(list){
+  list = (list || []).filter(Boolean);
+  if(!list.length || typeof sendNotification !== 'function' || typeof teamProfiles === 'undefined' || !currentUser) return;
+  const me = myName() || 'Someone', one = list.length === 1 ? list[0] : null;
+  const names = list.slice(0, 3).map(c => c.name).join(', ') + (list.length > 3 ? ` and ${list.length - 3} more` : '');
+  const title = one ? `${one.name} is paused` : `${list.length} clients are paused`;
+  const body = one ? `${me} paused it: not working with us right now. It’s off This Week, Health and the reminders.`
+    : `${me} paused ${names}: not working with us right now. They’re off This Week, Health and the reminders.`;
+  teamProfiles.filter(p => p.id !== currentUser.id && !p.access_revoked).forEach(p => {
+    sendNotification(p.id, 'client_paused', title, body, 'clients', one ? one.id : null).catch?.(() => {});
+  });
+}
+const pausedNoteWait = new Map();   // client id → timer, while its Undo is on screen
+function notifyClientPausedSoon(c){
+  clearTimeout(pausedNoteWait.get(c.id));
+  pausedNoteWait.set(c.id, setTimeout(() => { pausedNoteWait.delete(c.id); if(isPausedClient(clients.find(x => x.id === c.id))) notifyClientsPaused([c]); }, 6500));
+}
+function flushPausedNotes(){ [...pausedNoteWait.keys()].forEach(id => { clearTimeout(pausedNoteWait.get(id)); pausedNoteWait.delete(id); const c = clients.find(x => x.id === id); if(isPausedClient(c)) notifyClientsPaused([c]); }); }
+window.addEventListener('pagehide', flushPausedNotes);
+
 // ---- the actions (here and on the phone, js/mobile/app.js) --------------------------------------------
 function noteClientActivity(id, text){
   if(!text) return;
@@ -222,6 +276,7 @@ async function stillClientPause(id){
   const c = clients.find(x => x.id === id); if(!c) return;
   const me = myName() || 'Someone';
   const before = await setClientStatusQuick(id, 'Paused', { log: `${me} paused ${c.name}: not working with us right now.` });
+  if(before) notifyClientPausedSoon(c);
   if(before) showToast('success', `${c.name} is paused`, 'It’s under See Paused Clients now. Nothing was deleted.', { action: 'Undo', onAction: () => undoClientStatus(id, before, `${me} undid pausing ${c.name}.`) });
 }
 async function stillClientKeep(id){

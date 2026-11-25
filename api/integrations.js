@@ -163,8 +163,19 @@ module.exports = async function handler(req, res) {
     const userId = userData.user.id;
     const provider = req.method === 'GET' ? req.query.provider : (req.body || {}).provider;
 
-    if (provider !== 'google' && provider !== 'harvest' && provider !== 'push' && provider !== 'granola' && provider !== 'slack-me' && provider !== 'gmail') {
-      res.status(400).json({ error: 'Missing or unknown provider — expected "google", "harvest", "push", "granola", "slack-me" or "gmail".' });
+    if (provider !== 'google' && provider !== 'harvest' && provider !== 'push' && provider !== 'granola' && provider !== 'slack-me' && provider !== 'gmail' && provider !== 'clients') {
+      res.status(400).json({ error: 'Missing or unknown provider — expected "google", "harvest", "push", "granola", "slack-me", "gmail" or "clients".' });
+      return;
+    }
+
+    // ================= CLIENTS: last work, for "Still a client?" (Nov 25) =================
+    // Everyone's time and work, which the app can't read for a person (lib/client-status.js).
+    if (provider === 'clients') {
+      const { data: me } = await admin.from('team_profiles').select('role, access_revoked, extra_permissions').eq('id', userId).maybeSingle();
+      if (!profileHasAccess(me, 'edit_clients')) { res.status(403).json({ error: 'Only admins, approvers, and people given Add and edit clients can see this.' }); return; }
+      const { clientWork } = require('../lib/client-status');
+      const today = String(req.query.today || '').match(/^\d{4}-\d{2}-\d{2}$/) ? req.query.today : new Date().toISOString().slice(0, 10);
+      res.status(200).json(await clientWork(admin, today));
       return;
     }
 

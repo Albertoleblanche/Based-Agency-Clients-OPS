@@ -20,9 +20,16 @@ let clientsDataLoaded = false;
 // custom_field_values.harvestSetup = 'needed'). Until then it's left out of activeClients(), so
 // This Week, Health, Today, Review and the counts don't count it; liveClients() includes it, for
 // All Clients, search and the client pickers (time is still logged for it).
+// A Paused client isn't working with us right now (client-status.js): it shows nowhere but the paused
+// clients' table (for the people who edit clients), and no time or work is logged for it. So
+// activeClients() leaves it out, and the pickers and search use workClients(); radarClients() is every
+// set-up client, paused or not, for matching names and the roster export.
 function clientInSetup(c){ return !!(c && c.customFieldValues && c.customFieldValues.harvestSetup === 'needed'); }
-function activeClients(){ return clients.filter(c=>!c.deletedAt && !clientInSetup(c)); }
+function activeClients(){ return clients.filter(c=>!c.deletedAt && !clientInSetup(c) && c.status!=='Paused'); }
+function radarClients(){ return clients.filter(c=>!c.deletedAt && !clientInSetup(c)); }
 function liveClients(){ return clients.filter(c=>!c.deletedAt); }
+// the clients to pick, search or log for: not deleted, not paused (keepId: the one already picked stays)
+function workClients(keepId){ return clients.filter(c=>!c.deletedAt && (c.status!=='Paused' || (keepId != null && String(c.id) === String(keepId)))); }
 // The person at the client that updates and wins greet by name ("Mike", "Mike and Sarah").
 function clientContact(c){ return String((c && ((c.customFieldValues && c.customFieldValues.contact) || c.contactName || c.contact_name)) || '').trim(); }
 // ---- Files on a task (Nov 23) ----
@@ -107,21 +114,15 @@ function showPausedClientWarning(clientId){
       <div style="width:44px;height:44px;border-radius:50%;background:var(--amber-bg);color:var(--amber);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="14" y="3" width="5" height="18" rx="1" /> <rect x="5" y="3" width="5" height="18" rx="1" /></svg>
       </div>
-      <div style="font-size:16px;font-weight:600;color:var(--ink);margin-bottom:6px;">${c ? escapeHtml(c.name) : 'This client'} is on pause</div>
-      <div style="font-size:14px;color:var(--muted-lt);line-height:1.5;max-width:320px;margin:0 auto;">There's nothing to log here right now — no active work means nothing to track. If that doesn't sound right, an admin can fill you in.</div>
+      <div style="font-size:16px;font-weight:600;color:var(--ink);margin-bottom:6px;">${c ? escapeHtml(c.name) : 'This client'} is paused</div>
+      <div style="font-size:14px;color:var(--muted-lt);line-height:1.5;max-width:320px;margin:0 auto;">It isn’t working with us right now, so no time or work is logged for it. If that doesn’t sound right, an admin or approver can make it active again.</div>
     </div>
     <div class="modal-actions" style="justify-content:center;">
-      <button class="btn btn-brand" onclick="closeAppModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="14" y="3" width="5" height="18" rx="1" /> <rect x="5" y="3" width="5" height="18" rx="1" /></svg>Sounds good</button>
+      <button class="btn btn-brand" onclick="closeAppModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="14" y="3" width="5" height="18" rx="1" /> <rect x="5" y="3" width="5" height="18" rx="1" /></svg>OK</button>
     </div>`, 380);
 }
-// Paused clients are still real clients (still listed, still selectable,
-// still editable) — they just shouldn't pull attention toward doing new
-// work on them. This is deliberately narrower than activeClients() and
-// only used at the handful of places that actually signal "you should
-// work on this" (Needs Attention, the Risk Breakdown ring, Client Health,
-// pending-approval badges) — not at the many other activeClients() call
-// sites like client-picker dropdowns or duplicate-name checks, where a
-// paused client still needs to be findable.
+// The clients that signal "you should work on this" (Needs Attention, the Risk Breakdown ring, Client
+// Health, pending-approval badges): active ones (paused ones are already out, Nov 25) that get updates.
 // Clients set to "No weekly update" (the agency itself, an internal client) are left out too: no
 // update is ever due, so they stay off Today, This Week, the Queue, Review and Health (Nov 22).
 // Their work is still logged and their hours tracked; they're still in All Clients.

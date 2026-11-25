@@ -38,7 +38,7 @@ const EMAIL_DIGEST_DAY_OF_WEEK = 3; // Wednesday, hardcoded — not admin-config
 async function runEmailDigest(admin, clients, log, settings, resendKey) {
   if (!resendKey) return { skipped: true, reason: 'Missing RESEND_API_KEY' };
 
-  const pending = clients.filter(c => c.draftStatus === 'pending' && !c.deletedAt);
+  const pending = clients.filter(c => c.draftStatus === 'pending' && !c.deletedAt && c.status !== 'Paused');   // a paused client shows nowhere (Nov 25)
   if (!pending.length) return { skipped: true, reason: 'No pending drafts this week — nothing sent.' };
 
   // Role-based against team_profiles, not two named settings fields — see

@@ -188,7 +188,7 @@ function waClient(t){
 }
 // Link a group to a Radar client, from its section on the WhatsApp screen.
 function waLinkPickHtml(jid, name){
-  const all = typeof liveClients === 'function' ? liveClients().slice().sort((a, b) => a.name.localeCompare(b.name)) : [];
+  const all = typeof workClients === 'function' ? workClients().slice().sort((a, b) => a.name.localeCompare(b.name)) : [];
   if(!all.length) return '<span class="t-3">Not in Radar</span>';
   return `<label class="pop pop-sel wx-link" title="Its group isn’t linked to a client in Radar"><span class="pl">Link to a Client</span>${icon('caret-down')}<select aria-label="Link ${escapeHtml(name)} to a client" onchange="waLinkGroup('${escapeHtml(jid)}', this.value)"><option value="">Link to a Client</option>${all.map(c => `<option value="${escapeHtml(String(c.id))}">${escapeHtml(c.name)}</option>`).join('')}</select></label>`;
 }
