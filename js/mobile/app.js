@@ -494,21 +494,27 @@ ${!behind.length && !health.length && !waiting.length && !due.length ? `<div sty
 function mDayPlanCardHtml(){
   if(typeof claudeOn !== 'function' || !claudeOn()) return '';
   if(!dayPlan.at && !dayPlan.loading) setTimeout(() => loadDayPlan(), 0);
-  const p = dayPlan.plan; if(!p || p.empty || !(p.clients || []).length) return '';
-  const f0 = (p.first || [])[0], line = f0 ? (typeof f0 === 'string' ? f0 : `${f0.client ? f0.client + ': ' : ''}${f0.text}`) : `${p.clients.length} client${p.clients.length === 1 ? '' : 's'}: next steps and wins`;
+  const p = dayPlan.plan; if(!p || p.v !== 2 || p.empty) return '';
+  const now = (() => { const d = new Date(); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; })();
+  const next = (p.schedule || []).find(b => b.start >= now) || (p.schedule || [])[0];
+  const line = next ? `${fmtTime(new Date(`2000-01-01T${next.start}:00`))} · ${next.title}` : 'Your day, planned by Claude';
   return `<button class="idp" onclick="mOpenDayPlan()"><span class="idp-ic">${CLAUDE_SPARK}</span><span class="idp-t"><b>Today’s Plan</b><span>${mEsc(line)}</span></span>${icon('caret-right')}</button>`;
 }
 function mDayPlanLoaded(){ if(mTab === 'today' && !mStack.length) mRenderTab(); }
 function mOpenDayPlan(){
   mPush('Today’s Plan', () => {
     const p = dayPlan.plan;
-    if(!p) return `<h1 class="big">Today’s Plan</h1>${mEmpty('No plan for today yet', 'Claude writes it each weekday morning.')}`;
-    const when = p.at ? fmtTime(new Date(p.at)) : '';
-    const first = (p.first || []).length ? mIsh('Today, first') + `<ol class="idp-first">${p.first.map(x => typeof x === 'string' ? `<li>${mEsc(x)}</li>` : `<li>${x.client ? `<b>${mEsc(x.client)}</b> ` : ''}${mEsc(x.text)}</li>`).join('')}</ol>` : '';
-    const rows = (p.clients || []).map(c => `<div class="ig idp-cl"><button class="idp-h" onclick="mOpenClient(${jsArg(c.id)})"><b>${mEsc(c.client)}</b>${icon('caret-right')}</button>`
-      + (c.addon ? `<div class="idp-tag">${addonTagHtml('')}</div>` : '')
-      + `<dl>${c.next ? `<dt>Next step</dt><dd>${mEsc(c.next)}</dd>` : ''}${c.owe ? `<dt>They owe us</dt><dd>${mEsc(c.owe)}</dd>` : ''}${c.win ? `<dt>Win to aim for</dt><dd>${mEsc(c.win)}</dd>` : ''}${c.addon ? `<dt>Add-on to offer</dt><dd>${mEsc(c.addon)}</dd>` : ''}</dl></div>`).join('');
-    return `<h1 class="big">Today’s Plan</h1><p class="big-sub">Written by Claude${when ? ` at ${mEsc(when)}` : ''}</p>${first}${mIsh('Your clients')}${rows}`;
+    if(!p || p.v !== 2) return `<h1 class="big">Today’s Plan</h1>${mEmpty('No plan for today yet', 'Claude plans your day each weekday morning.')}`;
+    const when = p.at ? fmtTime(new Date(p.at)) : '', T = hm => fmtTime(new Date(`2000-01-01T${hm}:00`));
+    const sch = (p.schedule || []).map(b => `<div class="ig idp-cl${b.kind === 'meeting' ? ' is-meet' : ''}"><div class="idp-h"><b>${mEsc(b.title)}</b><span class="idp-tm">${mEsc(T(b.start))}</span></div>`
+      + `<span class="idp-m">${mEsc([b.client, b.kind === 'meeting' ? 'meeting' : '', `${b.minutes} min`].filter(Boolean).join(' · '))}</span>`
+      + (b.prep && b.prep.length ? `<ul class="idp-prep">${b.prep.map(x => `<li>${mEsc(x)}</li>`).join('')}</ul>` : '')
+      + (b.taskId ? `<button class="idp-go" onclick="mOpenTask(${jsArg(b.taskId)})">Open task</button>` : '') + '</div>').join('');
+    const ready = [...(p.followUps || []).map(f => `<li><b>${mEsc(f.client)}</b>: follow-up, ${mEsc(f.ask)}</li>`), ...(p.wins || []).map(w => `<li><b>${mEsc(w.client)}</b>: your win update (${w.state === 'review' ? 'in Review' : 'written'})</li>`)];
+    const ahead = (p.ahead || []).map(x => `<div class="ig idp-cl"><div class="idp-h"><b>${mEsc(x.client)}: ${mEsc(x.title)}</b></div><span class="idp-m">${mEsc(x.why)}</span><ol class="idp-steps">${x.steps.map(st => `<li>${mEsc(st)}</li>`).join('')}</ol></div>`).join('');
+    return `<h1 class="big">Today’s Plan</h1><p class="big-sub">Planned by Claude${when ? ` at ${mEsc(when)}` : ''}</p>${mIsh('Schedule')}${sch || mEmpty('Nothing scheduled', '')}`
+      + (ready.length ? mIsh('Ready to send') + `<ul class="idp-first">${ready.join('')}</ul><p class="idp-note">Send these from Radar on your computer.</p>` : '')
+      + (ahead ? mIsh('Looking ahead') + ahead : '');
   });
 }
 // Three numbers to read at a glance; each opens the list behind it.

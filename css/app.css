@@ -4225,3 +4225,40 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 .cpp-sub{margin:2px 0 12px;font-size:13px;line-height:1.45;color:var(--label-2)}
 .tf.cpp-text{display:block;width:100%;box-sizing:border-box;height:min(46vh,420px);min-height:180px;resize:vertical;font-size:13px;line-height:1.5;padding:10px 12px;white-space:pre-wrap;font-family:inherit}
 .cpp-n{margin-right:auto;font-size:12px;color:var(--label-3,var(--label-2));font-variant-numeric:tabular-nums}
+
+/* Today's Plan v2 (Nov 25): the schedule, ready to send, looking ahead */
+.dp-sum{margin:0;font-size:13px;color:var(--label-2)}
+.dp-sec h4{margin:0 0 8px;font-size:11.5px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--label-2)}
+.dp-sch{display:flex;flex-direction:column}
+.dp-row{display:grid;grid-template-columns:68px minmax(0,1fr);gap:10px;align-items:start;padding:8px 0;border-top:.5px solid var(--sep)}
+.dp-row:first-child{border-top:0;padding-top:0}
+.dp-t{font-size:12.5px;font-weight:500;color:var(--label-2);font-variant-numeric:tabular-nums;padding-top:4px}
+.dp-blk{min-width:0;display:flex;flex-direction:column;gap:2px}
+.dp-bh{display:flex;align-items:center;gap:8px;min-width:0}
+.dp-bh > b{font-size:14px;font-weight:500;line-height:1.35;min-width:0}
+.dp-bh .dp-acts{margin:0 0 0 auto;flex:none}
+.dp-row.is-meet .dp-blk{padding:6px 10px;border-radius:9px;background:color-mix(in srgb,var(--label) 4%,transparent)}
+.dp-row.is-meet .dp-bh > svg{width:15px;height:15px;color:var(--label-2);flex:none}
+.dp-row.is-meet .dp-bh .dp-m{margin-left:4px}
+.dp-row.is-meet .dp-bh > .btn{margin-left:auto}
+.dp-row.is-done .dp-bh > b{color:var(--label-2);text-decoration:line-through}
+.dp-prep{margin:4px 0 2px;padding-left:18px;font-size:13px;line-height:1.45;color:var(--label-2)}
+.dp-rds,.dp-ahs{display:flex;flex-direction:column;gap:8px}
+.dp-rd{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;box-shadow:inset 0 0 0 .5px var(--sep)}
+.dp-ric{display:inline-flex;color:var(--claude);flex:none}
+.dp-ric svg{width:16px;height:16px}
+.dp-rt{min-width:0;flex:1 1 auto;display:flex;flex-direction:column;gap:1px}
+.dp-rt b{font-size:13.5px;font-weight:500}
+.dp-rd .dp-acts{margin:0;flex:none}
+.dp-ah{padding:10px 12px;border-radius:10px;box-shadow:inset 0 0 0 .5px var(--sep)}
+.dp-ah .dp-bh{align-items:baseline;flex-wrap:wrap}
+.dp-ah .dp-bh b a{color:var(--label);text-decoration:none;font-weight:600}
+.dp-kind{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--label-2)}
+.dp-kind svg{width:13px;height:13px}
+.dp-ah.is-risk .dp-kind{color:var(--orange,var(--claude))}
+.dp-ah.is-improve .dp-kind{color:var(--green)}
+.dp-ah.is-addon .dp-kind{color:var(--purple)}
+.dp-ah.is-prep .dp-kind{color:var(--blue)}
+.dp-why{margin:4px 0 0;font-size:13px;line-height:1.45;color:var(--label-2)}
+.dp-steps{margin:6px 0 0;padding-left:20px;font-size:13.5px;line-height:1.5}
+.dp-ah > .dp-acts{margin-top:8px;justify-content:flex-start}

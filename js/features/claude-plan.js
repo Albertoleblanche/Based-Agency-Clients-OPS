@@ -59,9 +59,9 @@ function claudePlanPrompt(c){
 function claudeNewChatUrl(prompt){ return 'https://claude.ai/new?q=' + encodeURIComponent(prompt); }
 // Plan with Claude (Nov 25, later): a popup with the message, to read and change, then Copy Prompt (to
 // paste wherever you use Claude) or Open in Claude (a new chat with it filled in; nothing is sent).
-function planWithClaude(id){
+function planWithClaude(id, extra){
   const c = clients.find(x => x.id === id); if(!c) return;
-  const text = claudePlanPrompt(c);
+  const text = claudePlanPrompt(c) + (extra ? `\n\nWhat I want to think through with you: ${extra}` : '');
   openAppModal(`<h3 class="cpp-h">${CLAUDE_SPARK}<span>Plan with Claude</span><small>${escapeHtml(c.name)}</small></h3>
 <p class="cpp-sub">The message for Claude: this client’s next step, what they pay us for and what’s open. Change anything you like, then copy it or open it in Claude. Nothing is sent until you send it.</p>
 <textarea id="cppText" class="tf cpp-text" spellcheck="true" aria-label="The message for Claude">${escapeHtml(text)}</textarea>
@@ -106,79 +106,97 @@ function dayPlanToolbarHtml(){
   if(!claudeOn()) return '';
   if(!dayPlan.at && !dayPlan.loading) setTimeout(() => loadDayPlan(), 0);
   const p = dayPlan.plan, seen = (() => { try{ return localStorage.getItem(dayPlanSeenKey()); }catch(e){ return null; } })();
-  const fresh = p && !p.empty && seen !== p.at;
-  return `<button class="btn dp-btn" onclick="openDayPlan()" data-hovertip="Your plan for today, from Claude: each client’s next step, what they owe us and a win to aim for." data-tipdelay="1500">${CLAUDE_SPARK}Today’s Plan${fresh ? '<i class="dp-new" aria-label="New"></i>' : ''}</button>`;
+  const fresh = p && p.v === 2 && !p.empty && seen !== p.at;
+  return `<button class="btn dp-btn" onclick="openDayPlan()" data-hovertip="Your day, planned by Claude: the schedule, what’s ready to send, and what’s coming." data-tipdelay="1500">${CLAUDE_SPARK}Today’s Plan${fresh ? '<i class="dp-new" aria-label="New"></i>' : ''}</button>`;
 }
-// Each line is the real thing in Radar (Nov 25): the server sends what it's about (a task, a request from
-// an email or a meeting, a WhatsApp request, a follow-up), so the plan has its buttons, not just words.
-// "Today, first" is a checklist for the day (kept in this browser, with the plan it belongs to).
-function dpDoneKey(){ return `bda_dayplan_done_${currentUser ? currentUser.id : ''}`; }
-function dpDone(p){ try{ const v = JSON.parse(localStorage.getItem(dpDoneKey()) || 'null'); return v && p && v.at === p.at ? new Set(v.done || []) : new Set(); }catch(e){ return new Set(); } }
-function dpTick(i){
-  const p = dayPlan.plan; if(!p) return;
-  const done = dpDone(p); done.has(i) ? done.delete(i) : done.add(i);
-  try{ localStorage.setItem(dpDoneKey(), JSON.stringify({ at: p.at, done: [...done] })); }catch(e){}
-  dayPlanRedraw();
-}
-function dpFirst(p){ return (p.first || []).map(f => typeof f === 'string' ? (() => { const m = f.match(/^([^:]+):\s*(.+)$/); const c = m && clients.find(x => x.name === m[1].trim()); return { id: c ? c.id : null, client: c ? c.name : '', text: c ? m[2] : f, ref: null }; })() : f); }
-function dpTask(ref){ return ref && ref.kind === 'task' && typeof tasks !== 'undefined' ? (tasks || []).find(t => String(t.id) === String(ref.id)) || null : null; }
-// what a line is, in a few words, and its buttons
-function dpRefMeta(ref){
-  if(!ref) return '';
-  if(ref.kind === 'task'){
-    const t = dpTask(ref); if(!t) return 'Your task';
-    if(t.status === 'done') return 'Your task · done';
-    const today = toDateStr(rNow()), due = t.dueDate ? new Date(t.dueDate + 'T12:00:00') : null;
-    return `Your task${due ? ` · due ${fmtShortDate(due)}` : ''}${t.dueDate && t.dueDate < today ? ' · late' : ''}`;
-  }
-  return { suggestion: 'They asked for it · not in your tasks yet', wa: 'Their WhatsApp request', reminder: 'Your follow-up' }[ref.kind] || '';
-}
-function dpNextActs(c){
-  const r = c.nextRef, A = jsArg, sm = (label, js, cls) => `<button type="button" class="btn sm${cls ? ' ' + cls : ''}" onclick="${js}">${label}</button>`;
-  if(r && r.kind === 'task'){
-    const t = dpTask(r);
-    if(t && t.status === 'done') return `<span class="dp-ok">${icon('check', { weight: 'bold' })}Done</span>`;
-    return sm('Open', `dpGo(() => notifOpenTask(${A(r.id)}))`) + (t && t.assigneeId === currentUser.id ? sm(`${icon('check')}Mark Done`, `dpGo(() => moveTaskToStatus(${A(r.id)}, 'done'))`) : '');
-  }
-  if(r && r.kind === 'suggestion') return sm(`${icon('plus')}Add to My Tasks`, `dpAddSuggestion(${A(r.id)}, this)`);
-  if(r && r.kind === 'wa') return sm('Open', `dpGo(() => waOpenItem(${A(r.id)}))`);
-  return sm(`${icon('plus')}Add as Task`, `dpGo(() => openNewTaskModal(currentUser.id, 'todo', { clientId: ${A(c.id)}, title: ${A(c.next)}, due: toDateStr(rNow()) }))`);
-}
-function dpOweActs(c){
-  const r = c.oweRef, A = jsArg;
-  return r && r.kind === 'reminder' ? `<button type="button" class="btn sm" onclick="dpGo(() => openReminderDetailModal(${A(r.id)}))">Follow Up</button>`
-    : `<button type="button" class="btn sm" onclick="dpGo(() => openNewReminderModal(${A(c.id)}))">${icon('plus')}Add Follow-Up</button>`;
-}
-// out of the plan and on to the thing (the plan opens again from the toolbar)
+// Today's Plan v2 (Nov 25): what Claude made this morning (lib/claude-radar.js), to work from.
+//  • Schedule: today's work around your meetings. Each block is in your Tasks (a request from an email
+//    or meeting became your task; new work a new task), due today at its time: Start, Open, Mark Done.
+//    Each client meeting has what to bring up.
+//  • Ready to send: the follow-ups due, written as Radar's Nudge (Review and Send opens it in
+//    Reminders), and your part of the win updates due, written for you (Send to Review).
+//  • Looking ahead: what's coming for your clients and what to do, as a sprint, tasks or with Claude.
+const DP_KIND = { risk: ['triangle-alert', 'Risk'], improve: ['target', 'Improve'], addon: ['circle-plus', 'Add-on'], prep: ['calendar', 'Get ready'] };
 function dpGo(fn){ closeAppModal(); setTimeout(fn, 0); }
-async function dpAddSuggestion(id, btn){
+function dpTaskOf(id){ return id && typeof tasks !== 'undefined' ? (tasks || []).find(t => String(t.id) === String(id)) || null : null; }
+function dpTime(hm){ return fmtTime(new Date(`2000-01-01T${hm}:00`)); }
+function dpMins(n){ const h = Math.floor(n / 60), m = n % 60; return h && m ? `${h} h ${m} min` : h ? `${h} h` : `${m} min`; }
+function dpBlockHtml(b){
+  const A = jsArg, sm = (label, js, cls) => `<button type="button" class="btn sm${cls ? ' ' + cls : ''}" onclick="${js}">${label}</button>`;
+  if(b.kind === 'meeting') return `<div class="dp-row is-meet"><span class="dp-t">${escapeHtml(dpTime(b.start))}</span><div class="dp-blk"><div class="dp-bh">${icon('calendar')}<b>${escapeHtml(b.title)}</b><span class="dp-m">${b.client ? escapeHtml(b.client) + ' · ' : ''}${escapeHtml(dpMins(b.minutes))}</span>${b.url ? `<a class="btn sm" href="${safeUrl(b.url)}" target="_blank" rel="noopener">Join</a>` : ''}</div>
+${b.prep && b.prep.length ? `<ul class="dp-prep">${b.prep.map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul>` : ''}</div></div>`;
+  const t = dpTaskOf(b.taskId), done = t && t.status === 'done', today = toDateStr(rNow());
+  const meta = [b.client, dpMins(b.minutes), b.from === 'suggestion' ? 'their request, now in your tasks' : b.from === 'new' ? 'new task' : b.kind === 'wa' ? 'WhatsApp request' : '', t && t.dueDate && t.dueDate < today ? 'late' : ''].filter(Boolean).join(' · ');
+  const acts = done ? `<span class="dp-ok">${icon('check', { weight: 'bold' })}Done</span>`
+    : (b.clientId ? sm(`${icon('timer')}Start`, `dpGo(() => openTimerModal(${A(b.clientId)}))`) : '')
+      + (b.taskId ? sm('Open', `dpGo(() => notifOpenTask(${A(b.taskId)}))`) + (t && t.assigneeId === currentUser.id ? sm(`${icon('check')}Done`, `dpGo(() => moveTaskToStatus(${A(b.taskId)}, 'done'))`) : '')
+        : b.waId ? sm('Open', `dpGo(() => waOpenItem(${A(b.waId)}))`) : '');
+  return `<div class="dp-row${done ? ' is-done' : ''}"><span class="dp-t">${escapeHtml(dpTime(b.start))}</span><div class="dp-blk"><div class="dp-bh"><b>${escapeHtml(b.title)}</b><div class="dp-acts">${acts}</div></div><span class="dp-m">${escapeHtml(meta)}</span></div></div>`;
+}
+// a follow-up Claude wrote: to Reminders, the Nudge open with it, to read and send
+async function dpNudge(i){
+  const f = ((dayPlan.plan || {}).followUps || [])[i]; if(!f) return;
+  closeAppModal();
+  if(typeof clientReminders === 'undefined' || !(clientReminders || []).some(r => r.id === f.reminderId)) await loadClientReminders();
+  switchView('reminders');
+  setTimeout(() => {
+    window._remSel = f.reminderId;
+    remDrafts[f.reminderId] = { ch: f.ch === 'whatsapp' ? 'whatsapp' : 'email', state: 'ready', subject: f.subject || '', body: f.body || '', plain: !!f.plain, n: 1 };
+    renderReminders();
+  }, 0);
+}
+// your part of a win update Claude wrote: to Review (the latest data first, so Radar sees the draft)
+async function dpWinToReview(i, btn){
+  const w = ((dayPlan.plan || {}).wins || [])[i]; if(!w) return;
+  if(btn){ btn.disabled = true; btn.textContent = 'Sending…'; }
+  if(typeof loadAll === 'function') await loadAll();
+  await sendDraftForReview(w.clientId, myName());
+  const c = clients.find(x => x.id === w.clientId), d = c && typeof getDraftFor === 'function' ? getDraftFor(c, myName()) : null;
+  if(d && d.readyToNotify){ w.state = 'review'; dayPlanRedraw(); }
+  else if(btn && btn.isConnected){ btn.disabled = false; btn.textContent = 'Send to Review'; }
+}
+// a proposal's steps as your tasks (no date: you place them)
+async function dpAddSteps(i, btn){
+  const x = ((dayPlan.plan || {}).ahead || [])[i]; if(!x) return;
   if(btn){ btn.disabled = true; btn.textContent = 'Adding…'; }
-  if(typeof taskSuggestions === 'undefined' || !taskSuggestions || !taskSuggestions.some(x => x.id === id)) await loadTaskSuggestions();
-  const r = await addSuggestedTask(id);
-  if(!btn || !btn.isConnected) return;
-  if(r.error){ btn.disabled = false; btn.innerHTML = `${icon('plus')}Add to My Tasks`; showToast('info', 'Not added', r.error.message === 'Already decided.' ? 'It was already added or dismissed in Tasks.' : r.error.message); return; }
-  btn.outerHTML = `<span class="dp-ok">${icon('check', { weight: 'bold' })}${r.already ? 'Already yours' : 'In your tasks'}</span>`;
+  let n = 0;
+  for(const step of x.steps){
+    const res = await insertTaskRow({ title: step, description: `${x.title}. ${x.why}`, priority: 'medium', status: 'todo', assigner_id: currentUser.id, assignee_id: currentUser.id, client_id: x.clientId || null, due_date: null });
+    if(!res.error && res.data){ n++; if(typeof tasks !== 'undefined' && Array.isArray(tasks) && typeof taskFromDb === 'function') tasks.push(taskFromDb(res.data)); }
+  }
+  if(btn && btn.isConnected) btn.outerHTML = `<span class="dp-ok">${icon('check', { weight: 'bold' })}${n} task${n === 1 ? '' : 's'} added</span>`;
+  showToast(n ? 'success' : 'error', n ? `${n} task${n === 1 ? '' : 's'} added` : 'No tasks added', n ? `For ${x.client}, in your Tasks with no date yet.` : 'Try again in a moment.');
+}
+function dpAheadHtml(x, i){
+  const A = jsArg, [ic, word] = DP_KIND[x.kind] || DP_KIND.improve;
+  const act = x.action === 'sprint' ? `<button type="button" class="btn sm" onclick="dpGo(() => openNewSprintModal({ clientId: ${A(x.clientId)}, preset: { title: ${A(x.title)}, goal: ${A(x.why)}, steps: ${escapeHtml(JSON.stringify(x.steps))} } }))">${icon('route')}Make It a Sprint</button>`
+    : x.action === 'claude' ? `<button type="button" class="btn sm" onclick="dpGo(() => planWithClaude(${A(x.clientId)}, ${A(`${x.title}. ${x.why}\nSteps I have in mind: ${x.steps.join('; ')}.`)}))">${CLAUDE_SPARK}Plan with Claude</button>`
+    : `<button type="button" class="btn sm" onclick="dpAddSteps(${i}, this)">${icon('plus')}Add as Tasks</button>`;
+  return `<div class="dp-ah is-${escapeHtml(x.kind)}"><div class="dp-bh"><span class="dp-kind">${icon(ic)}${word}</span><b><a href="#" onclick="dpGo(() => openClientDetail(${A(x.clientId)}));return false;">${escapeHtml(x.client)}</a>: ${escapeHtml(x.title)}</b></div>
+<p class="dp-why">${escapeHtml(x.why)}</p><ol class="dp-steps">${x.steps.map(st => `<li>${escapeHtml(st)}</li>`).join('')}</ol><div class="dp-acts">${act}</div></div>`;
 }
 function dayPlanBodyHtml(){
   const d = dayPlan;
-  if(d.making) return `<div class="dp-wait">${CLAUDE_SPARK}<p>Claude is writing your plan…</p><span>It reads your tasks, sprints, follow-ups, client emails and WhatsApp. About half a minute.</span></div>`;
+  if(d.making) return `<div class="dp-wait">${CLAUDE_SPARK}<p>Claude is planning your day…</p><span>Your calendar, tasks, clients’ requests and follow-ups, logged work and what’s coming. About half a minute.</span></div>`;
   if(d.loading && !d.plan) return `<div class="dp-wait"><p>Loading…</p></div>`;
   if(d.error && !d.plan) return emptyState({ icon: 'refresh-cw', title: 'The plan couldn’t be loaded', text: d.error, action: 'Try Again', onAction: 'loadDayPlan(true)' });
-  const p = d.plan;
-  if(!p) return emptyState({ icon: 'sparkle', title: 'No plan for today yet', text: `Claude writes it each weekday morning. ${d.last ? 'Yours from ' + fmtShortDate(new Date(d.last + 'T12:00:00')) + ' is out of date. ' : ''}You can have it written now.`, action: 'Make Today’s Plan', onAction: 'makeDayPlanNow()' });
-  if(p.empty) return emptyState({ icon: 'check-circle', tone: 'ok', title: 'Nothing on your clients today', text: 'No open tasks, sprints, follow-ups or requests for the clients you work on.' });
-  const A = id => jsArg(id), done = dpDone(p), first = dpFirst(p);
-  const nDone = first.filter((f, i) => done.has(i)).length;
-  const firstHtml = first.length ? `<section class="dp-first"><header><h4>Today, first</h4><span class="dp-prog${nDone === first.length ? ' is-all' : ''}">${nDone === first.length ? 'All done' : `${nDone} of ${first.length} done`}</span></header>
-<ol>${first.map((f, i) => `<li class="${done.has(i) ? 'is-done' : ''}"><button type="button" class="dp-ck" role="checkbox" aria-checked="${done.has(i)}" aria-label="${escapeHtml(f.text)}" onclick="dpTick(${i})">${done.has(i) ? icon('check', { weight: 'bold' }) : ''}</button><span class="dp-ft">${f.client ? `<em>${escapeHtml(f.client)}</em>` : ''}<span>${escapeHtml(f.text)}</span></span></li>`).join('')}</ol></section>` : '';
-  const line = (cls, ic, label, text, meta, acts) => `<div class="dp-ln ${cls}"><span class="dp-ic" aria-hidden="true">${icon(ic)}</span><div class="dp-tx"><span class="dp-k">${label}</span><p>${escapeHtml(text)}</p>${meta ? `<span class="dp-m">${escapeHtml(meta)}</span>` : ''}</div>${acts ? `<div class="dp-acts">${acts}</div>` : ''}</div>`;
-  const rows = (p.clients || []).map(c => `<section class="dp-cl"><header><a href="#" onclick="closeAppModal();openClientDetail(${A(c.id)});return false;">${escapeHtml(c.client)}${icon('chevron-right')}</a>${c.addon ? addonTagHtml('') : ''}</header>
-${c.next ? line('dp-next', 'arrow-right', 'Next step', c.next, dpRefMeta(c.nextRef), dpNextActs(c)) : ''}
-${c.owe ? line('dp-owe', 'clock', 'They owe us', c.owe, '', dpOweActs(c)) : ''}
-${c.win ? line('dp-win', 'target', 'Win to aim for', c.win, '', '') : ''}
-${c.addon ? line('dp-add', 'circle-plus', 'Add-on to offer', c.addon, '', `<button type="button" class="btn sm" onclick="dpGo(() => planWithClaude(${A(c.id)}))">${CLAUDE_SPARK}Plan with Claude</button>`) : ''}</section>`).join('');
+  const p = d.plan && d.plan.v === 2 ? d.plan : null;
+  if(!p) return emptyState({ icon: 'sparkle', title: 'No plan for today yet', text: d.plan ? 'Today’s Plan now schedules your day, prepares your follow-ups and updates, and looks ahead. Have Claude write today’s.' : `Claude writes it each weekday morning. ${d.last ? 'Yours from ' + fmtShortDate(new Date(d.last + 'T12:00:00')) + ' is out of date. ' : ''}You can have it written now.`, action: 'Make Today’s Plan', onAction: 'makeDayPlanNow()' });
+  if(p.empty) return emptyState({ icon: 'check-circle', tone: 'ok', title: 'Nothing on your clients today', text: 'No meetings, open tasks, sprints, follow-ups or requests for the clients you work on.' });
+  const work = p.schedule.filter(b => b.kind !== 'meeting'), meets = p.schedule.filter(b => b.kind === 'meeting');
+  const mins = work.reduce((a, b) => a + (b.minutes || 0), 0), made = (p.made || []).length;
+  const sum = [`${dpMins(mins)} of work`, meets.length ? `${meets.length} meeting${meets.length === 1 ? '' : 's'}` : '', made ? `${made} new task${made === 1 ? '' : 's'} in your Tasks` : ''].filter(Boolean).join(' · ');
+  const ready = [
+    ...(p.followUps || []).map((f, i) => `<div class="dp-rd"><span class="dp-ric">${icon(f.ch === 'whatsapp' ? 'message-circle' : 'mail')}</span><div class="dp-rt"><b>${escapeHtml(f.client)}: follow-up</b><span class="dp-m">${escapeHtml(f.ask)}</span></div><div class="dp-acts"><button type="button" class="btn sm" onclick="dpNudge(${i})">Review and Send</button></div></div>`),
+    ...(p.wins || []).map((w, i) => `<div class="dp-rd"><span class="dp-ric">${icon('star')}</span><div class="dp-rt"><b>${escapeHtml(w.client)}: your win update</b><span class="dp-m">${w.wins} win${w.wins === 1 ? '' : 's'} · ${w.due < 0 ? 'late' : w.due === 0 ? 'due today' : w.due === 1 ? 'due tomorrow' : `due in ${w.due} days`}</span></div><div class="dp-acts">${
+      w.state === 'review' ? '<span class="dp-ok">In Review</span>' : w.state === 'approved' ? '<span class="dp-ok">Approved</span>'
+        : `<button type="button" class="btn sm" onclick="dpGo(() => openWeekClient(${jsArg(w.clientId)}))">Read</button><button type="button" class="btn sm" onclick="dpWinToReview(${i}, this)">Send to Review</button>`}</div></div>`)].join('');
   const when = p.at ? fmtTime(new Date(p.at)) : '';
-  return `${firstHtml}<div class="dp-list">${rows}</div><p class="dp-foot">${CLAUDE_SPARK}<span>Written by Claude${when ? ` at ${escapeHtml(when)}` : ''} from your tasks, sprints, follow-ups, client emails and WhatsApp. · <button type="button" class="x-lnk" onclick="makeDayPlanNow()">Write It Again</button></span></p>`;
+  return `<p class="dp-sum">${escapeHtml(sum)}</p>
+<section class="dp-sec"><h4>Schedule</h4><div class="dp-sch">${p.schedule.length ? p.schedule.map(dpBlockHtml).join('') : '<p class="dp-m">Nothing scheduled.</p>'}</div></section>
+${ready ? `<section class="dp-sec"><h4>Ready to send</h4><div class="dp-rds">${ready}</div></section>` : ''}
+${(p.ahead || []).length ? `<section class="dp-sec"><h4>Looking ahead</h4><div class="dp-ahs">${p.ahead.map(dpAheadHtml).join('')}</div></section>` : p.aheadMissed ? '<p class="dp-m">The look ahead didn’t come back this time. Write It Again to try.</p>' : ''}
+<p class="dp-foot">${CLAUDE_SPARK}<span>Planned by Claude${when ? ` at ${escapeHtml(when)}` : ''} from your calendar, tasks, clients’ requests, follow-ups and logged work. · <button type="button" class="x-lnk" onclick="makeDayPlanNow()">Write It Again</button></span></p>`;
 }
 function dayPlanRedraw(){ const b = document.getElementById('dpBody'); if(b) b.innerHTML = dayPlanBodyHtml(); }
 function openDayPlan(){
@@ -193,6 +211,7 @@ function openDayPlan(){
 async function makeDayPlanNow(){
   if(dayPlan.making) return;
   dayPlan = { ...dayPlan, making: true, error: null }; dayPlanRedraw();
+  try{ localStorage.removeItem(dpDoneKey()); }catch(e){}
   const r = await claudeApi({ action: 'day-plan' });
   dayPlan = r.error ? { ...dayPlan, making: false } : { ...r, at: Date.now() };
   if(r.error) showToast('error', 'The plan wasn’t written', r.error);

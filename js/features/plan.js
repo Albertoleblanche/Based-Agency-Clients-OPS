@@ -442,7 +442,8 @@ function openNewSprintModal(o){
   }
   // from a meeting's notes (Nov 25): Claude drafts it (psFillFromMeeting)
   const meet = !s && o.meetingId && typeof granolaMeetings !== 'undefined' ? (granolaMeetings || []).find(x => x.id === o.meetingId) : null;
-  planSheet = { edit: s ? s.id : null, steps: s ? [] : [''], hours: s ? Math.round(s.hours) : 10, noteId: o.noteId || null, taskId: task ? task.id : null, meetingId: meet ? meet.id : null };
+  const pre = !s && o.preset ? o.preset : null;   // Claude's proposal (Today's Plan, Nov 25): its title, goal and steps
+  planSheet = { edit: s ? s.id : null, steps: s ? [] : pre && Array.isArray(pre.steps) && pre.steps.length ? pre.steps.slice(0, 10) : [''], hours: s ? Math.round(s.hours) : 10, noteId: o.noteId || null, taskId: task ? task.id : null, meetingId: meet ? meet.id : null };
   const clientId = s ? (s.clientId || '') : (o.clientId || (note && note.clientId) || (task && task.clientId) || '');
   const remOn = s ? new Set((s.reminders || []).filter(r => r.kind && r.kind !== 'custom').map(r => r.kind)) : new Set(['start', 'half', 'end']);
   const noteMenu = meet ? `<span style="margin-right:auto"><button type="button" class="btn cl-claude-btn" id="psFillBtn" onclick="psFillFromMeeting()">${CLAUDE_SPARK}Draft Again</button></span>`
@@ -450,11 +451,11 @@ function openNewSprintModal(o){
     : !s ? `<span style="position:relative;margin-right:auto"><button type="button" class="btn" id="psFillBtn" onclick="psToggleNoteMenu()">${icon('sparkle')}Fill from a note</button><div class="menu" id="psNoteMenu" hidden style="bottom:34px;left:0;width:300px;max-height:260px;overflow:auto"></div></span>` : '';
   openAppModal(`<h3>${s ? 'Edit Sprint' : 'New Sprint'}</h3>
 <div class="f pls">
-<label for="psTitle">Title</label><input id="psTitle" class="tf" spellcheck="true" placeholder="e.g. Brightway website refresh" value="${escapeHtml(s ? s.title : note ? note.title || '' : task ? task.title : meet ? meet.title || '' : '')}">
+<label for="psTitle">Title</label><input id="psTitle" class="tf" spellcheck="true" placeholder="e.g. Brightway website refresh" value="${escapeHtml(s ? s.title : note ? note.title || '' : task ? task.title : meet ? meet.title || '' : pre ? pre.title || '' : '')}">
 <label for="psClient">Client</label><div>${sheetPop('psClient', 'Client', [['', 'No client'], ...workClients(clientId).slice().sort((a, b) => a.name.localeCompare(b.name)).map(c => [c.id, c.name])], clientId, 'psSync()')}</div>
 <label>Dates</label><div class="pls-row">${sheetDateField('psStart', start, { from: 0, to: 60, label: 'Starts', after: 'psSync' })}<span class="pls-to">to</span>${sheetDateField('psEnd', end, { from: 0, to: 45, label: 'Ends', after: 'psSync' })}<span class="pls-h" id="psDays"></span></div>
 <label>Hours</label><div class="pls-row"><span class="pls-num"><button type="button" aria-label="Fewer hours" onclick="psHours(-1)">−</button><b id="psHours">${planSheet.hours} h</b><button type="button" aria-label="More hours" onclick="psHours(1)">+</button></span><span class="pls-h" id="psBudget"></span></div>
-<label class="top" for="psGoal">Goal</label><textarea id="psGoal" class="tf pls-goal" spellcheck="true" placeholder="What’s done when this sprint is done?">${escapeHtml(s ? s.goal : '')}</textarea>
+<label class="top" for="psGoal">Goal</label><textarea id="psGoal" class="tf pls-goal" spellcheck="true" placeholder="What’s done when this sprint is done?">${escapeHtml(s ? s.goal : pre ? pre.goal || '' : '')}</textarea>
 ${s ? '' : `<label class="top">Steps</label><div class="pls-steps" id="psSteps"></div>`}
 ${meet ? `<span></span><div class="pls-addons" id="psAddons" hidden></div>` : ''}
 <label class="top">Remind me</label><div class="pls-rms" id="psRems">${[['start', 'When it starts'], ['half', 'Halfway check-in'], ['end', 'The day before it ends']].map(([k, l]) => `<div class="pls-rm">${sheetCk(remOn.has(k), l, 'psRemToggle(this)').replace('<button', `<button data-k="${k}"`)}<b>${l}</b><span id="psRem-${k}"></span></div>`).join('')}</div>
