@@ -479,7 +479,20 @@ function setAi(){
 <div class="set-h">Assistant</div>
 <div class="form-grp">
 ${fr('Use', 'For the Assistant', `<div class="seg" role="radiogroup" aria-label="AI for the Assistant">${[['claude', 'Claude'], ['openai', 'ChatGPT']].map(([k, t]) => `<button role="radio" aria-checked="${provider === k}" class="${provider === k ? 'on' : ''}" ${admin ? `onclick="saveAiProvider('${k}').then(renderSettingsView)"` : 'disabled'}>${t}</button>`).join('')}</div>`)}
-</div>`;
+</div>
+<div class="set-h">Claude in Radar</div>
+<div class="form-grp">
+${fr('Claude’s notes on clients', 'What you’re missing, tips and ideas on each of your clients. Claude reads a client again when something new comes in.', swHtml(settings.claudeNotes !== false, 'Claude’s notes on clients', "saveClaudeSwitch('claudeNotes')", !admin))}
+${fr('Today’s Plan', 'Each weekday morning Claude decides what the day is for and plans it; a ring in the corner shows how it’s going.', swHtml(settings.claudeDayPlan !== false, 'Today’s Plan', "saveClaudeSwitch('claudeDayPlan')", !admin))}
+</div>
+<p class="set-note">For everyone with the Assistant on. Uses the Claude account above; each person can ask Claude 40 times a day.${admin ? '' : ' Admins turn these on or off.'}</p>`;
+}
+// Settings → AI → Claude in Radar (Nov 25): off stops Claude reading clients or planning mornings, and hides it
+function saveClaudeSwitch(k){
+  if(!canManageSettings() || !['claudeNotes', 'claudeDayPlan'].includes(k)) return;
+  const on = settings[k] === false;   // it was off, so it turns on
+  changeSettings(s => { s[k] = on; }, `${k === 'claudeNotes' ? 'Claude’s notes on clients' : 'Today’s Plan'} ${on ? 'on' : 'off'}.`)
+    .then(() => { if(typeof setToolbarActions === 'function' && typeof currentViewName !== 'undefined' && currentViewName === 'overview') setToolbarActions('overview'); if(typeof dpRingTick === 'function') dpRingTick(); });
 }
 let aiConnCache = null;
 async function loadAiProviderConnectionStatus(){

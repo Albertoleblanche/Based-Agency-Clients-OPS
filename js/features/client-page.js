@@ -41,7 +41,7 @@ function renderClientPage(){
 <span class="mono ${clientColor(c)}" style="width:56px;height:56px;border-radius:14px;font-size:19px" aria-hidden="true">${escapeHtml(clientMono(c))}</span>
 <div style="min-width:0"><h1 class="lt">${escapeHtml(c.name)}</h1><p class="lt-sub" style="margin-top:4px">${typeof focusToggleHtml === 'function' ? focusToggleHtml(c) : ''}${escapeHtml([c.service, c.status !== 'Active' ? c.status : '', start ? 'client since ' + start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : ''].filter(Boolean).join(' · '))}</p></div>
 <span style="flex:1"></span><div class="seg" role="tablist" aria-label="Client sections">${tabs}</div></div>
-${callout}`;
+${callout}${typeof claudeNotesHtml === 'function' && cdTab === 'overview' ? claudeNotesHtml(c, 'classic') : ''}`;
   document.querySelectorAll('#cdRoot .cd-tab').forEach(t => { t.hidden = t.dataset.tab !== cdTab; });
 
   // ---- Overview
@@ -155,5 +155,6 @@ ${imps.length > 5 ? `<a class="uw-foot" href="#" onclick="setCdTab('improvements
   const site = c.website ? `<a href="${safeUrl(c.website.startsWith('http') ? c.website : 'https://' + c.website)}" target="_blank" rel="noopener">${escapeHtml(c.website.replace(/^https?:\/\//, '').replace(/\/$/, ''))}</a>` : '';
   const details = `<section class="uw-w uw-s3 cp-det">${head('building-2', 'Details', canEditClients() ? pill('Edit', `openEditClientFormFromDetail()`) : '')}
 <div class="cp-kv">${kv('Owner', owner ? escapeHtml(owner) : '—')}${kv('Importance', `${c.importance || 0} of 10`)}${kv('Risk flag', `${c.danger || 0} of 5`)}${kv('Monthly budget', c.monthlyHourBudget ? `${c.monthlyHourBudget} h` : '—')}${kv('Website', site)}${kv('Contact', c.email ? `<a href="mailto:${escapeHtml(c.email)}">${escapeHtml(c.email)}</a>` : '')}${kv('Sends by', ch)}${c.status !== 'Active' ? kv('Status', escapeHtml(c.status || '—')) : ''}</div></section>`;
-  return `<div class="cp-pg">${update}${health}${hours}${why}${improvements}${details}</div>`;
+  const cnotes = typeof claudeNotesHtml === 'function' ? claudeNotesHtml(c, 'page') : '';   // Claude's notes (claude-plan.js)
+  return `<div class="cp-pg">${update}${health}${hours}${cnotes}${why}${improvements}${details}</div>`;
 }

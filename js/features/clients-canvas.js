@@ -427,6 +427,7 @@ ${w.off ? `<div class="cl-mc"><span class="k">This week’s win</span><b>${escap
 <div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b>${sub ? `<span class="sub">${sub}</span>` : ''}${acts ? `<div class="sp-acts">${acts}</div>` : ''}</div>
 ${nums}
 <div class="sp-folds cl-folds">
+${typeof claudeNotesFold === 'function' ? claudeNotesFold(c) : ''}
 ${clientFoldHtml('win', 'Weekly win', clientWinSummary(c), clientWinHtml(c))}
 ${clientFoldHtml('det', 'Details', escapeHtml(detSum), `<div class="cl-kvs">${details}</div>`)}
 ${typeof clientMeetingsOn === 'function' && clientMeetingsOn(c) ? clientFoldHtml('mt', `${appLogo('granola', 'xs')}Meetings`, escapeHtml(lastMetWords(c) || 'No meeting with them yet'), clientMeetingsHtml(c, 5)) : ''}
@@ -438,7 +439,7 @@ ${clientQuickActionsHtml(c)}
 </aside>`;
 }
 // Folded rows in the client panel: Weekly win starts open, Details closed; they stay as you leave them.
-let CL_FOLDS = (() => { try { return Object.assign({ win: true }, JSON.parse(localStorage.getItem('cl-folds') || '{}') || {}); } catch(e){ return { win: true }; } })();
+let CL_FOLDS = (() => { try { return Object.assign({ win: true, cn: true }, JSON.parse(localStorage.getItem('cl-folds') || '{}') || {}); } catch(e){ return { win: true, cn: true }; } })();
 function toggleClientFold(k){
   CL_FOLDS[k] = !CL_FOLDS[k];
   try { localStorage.setItem('cl-folds', JSON.stringify(CL_FOLDS)); } catch(e){}

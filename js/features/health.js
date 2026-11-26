@@ -296,6 +296,7 @@ function healthPanelHtml(c, h, closeFn){
 <div class="sp-head">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}${focusMark(c)}</b><span>${meta}</span></div></div>
 <div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b><span class="sub">${sub}</span>${acts}</div>
 ${card}
+${typeof claudeNotesHtml === 'function' ? claudeNotesHtml(c, 'panel') : ''}
 ${workSigs.length ? `<div class="sp-sec"><b>${card ? 'From the work' : 'Why'}</b><span>${todayPlural(workSigs.length, 'signal')}</span></div>${why}` : ''}
 ${trail}
 ${hours}

@@ -492,29 +492,36 @@ ${!behind.length && !health.length && !waiting.length && !due.length ? `<div sty
 // Today's Plan (Nov 25): Claude's plan for your day, for people with the Assistant on (claude-radar.js;
 // written each weekday morning on the server, lib/claude-radar.js)
 function mDayPlanCardHtml(){
-  if(typeof claudeOn !== 'function' || !claudeOn()) return '';
+  if(typeof claudeDayPlanOn !== 'function' || !claudeDayPlanOn()) return '';
   if(!dayPlan.at && !dayPlan.loading) setTimeout(() => loadDayPlan(), 0);
-  const p = dayPlan.plan; if(!p || p.v !== 2 || p.empty) return '';
-  const now = (() => { const d = new Date(); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; })();
-  const next = (p.schedule || []).find(b => b.start >= now) || (p.schedule || [])[0];
-  const line = next ? `${fmtTime(new Date(`2000-01-01T${next.start}:00`))} · ${next.title}` : 'Your day, planned by Claude';
-  return `<button class="idp" onclick="mOpenDayPlan()"><span class="idp-ic">${CLAUDE_SPARK}</span><span class="idp-t"><b>Today’s Plan</b><span>${mEsc(line)}</span></span>${icon('caret-right')}</button>`;
+  const p = typeof dayPlanV3 === 'function' ? dayPlanV3() : null; if(!p) return '';
+  const it = dayPlanItems(), k = it.filter(x => x.done).length;
+  const prog = it.length ? (k === it.length ? 'All done' : `${k} of ${it.length} done`) : '';
+  return `<button class="idp" onclick="mOpenDayPlan()"><span class="idp-ic">${CLAUDE_SPARK}</span><span class="idp-t"><b>Today’s Plan${prog ? `<em>${mEsc(prog)}</em>` : ''}</b><span>${mEsc(p.headline || 'Your day, planned by Claude')}</span></span>${icon('caret-right')}</button>`;
 }
 function mDayPlanLoaded(){ if(mTab === 'today' && !mStack.length) mRenderTab(); }
+// Today's Plan on the iPhone (v3): the plan to read on the go; sending happens on the computer
 function mOpenDayPlan(){
   mPush('Today’s Plan', () => {
-    const p = dayPlan.plan;
-    if(!p || p.v !== 2) return `<h1 class="big">Today’s Plan</h1>${mEmpty('No plan for today yet', 'Claude plans your day each weekday morning.')}`;
-    const when = p.at ? fmtTime(new Date(p.at)) : '', T = hm => fmtTime(new Date(`2000-01-01T${hm}:00`));
-    const sch = (p.schedule || []).map(b => `<div class="ig idp-cl${b.kind === 'meeting' ? ' is-meet' : ''}"><div class="idp-h"><b>${mEsc(b.title)}</b><span class="idp-tm">${mEsc(T(b.start))}</span></div>`
-      + `<span class="idp-m">${mEsc([b.client, b.kind === 'meeting' ? 'meeting' : '', `${b.minutes} min`].filter(Boolean).join(' · '))}</span>`
-      + (b.prep && b.prep.length ? `<ul class="idp-prep">${b.prep.map(x => `<li>${mEsc(x)}</li>`).join('')}</ul>` : '')
-      + (b.taskId ? `<button class="idp-go" onclick="mOpenTask(${jsArg(b.taskId)})">Open task</button>` : '') + '</div>').join('');
-    const ready = [...(p.followUps || []).map(f => `<li><b>${mEsc(f.client)}</b>: follow-up, ${mEsc(f.ask)}</li>`), ...(p.wins || []).map(w => `<li><b>${mEsc(w.client)}</b>: your win update (${w.state === 'review' ? 'in Review' : 'written'})</li>`)];
-    const ahead = (p.ahead || []).map(x => `<div class="ig idp-cl"><div class="idp-h"><b>${mEsc(x.client)}: ${mEsc(x.title)}</b></div><span class="idp-m">${mEsc(x.why)}</span><ol class="idp-steps">${x.steps.map(st => `<li>${mEsc(st)}</li>`).join('')}</ol></div>`).join('');
-    return `<h1 class="big">Today’s Plan</h1><p class="big-sub">Planned by Claude${when ? ` at ${mEsc(when)}` : ''}</p>${mIsh('Schedule')}${sch || mEmpty('Nothing scheduled', '')}`
-      + (ready.length ? mIsh('Ready to send') + `<ul class="idp-first">${ready.join('')}</ul><p class="idp-note">Send these from Radar on your computer.</p>` : '')
-      + (ahead ? mIsh('Looking ahead') + ahead : '');
+    const p = typeof dayPlanV3 === 'function' ? dayPlanV3() : null;
+    if(!p) return `<h1 class="big">Today’s Plan</h1>${mEmpty('No plan for today yet', 'Claude plans your day each weekday morning.')}`;
+    const it = dayPlanItems(), by = Object.fromEntries(it.map(x => [x.id, x])), when = p.at ? fmtTime(new Date(p.at)) : '';
+    const mins = n => { const h = Math.floor(n / 60), m = n % 60; return h && m ? `${h} h ${m} min` : h ? `${h} h` : `${m} min`; };
+    const rows = (p.moves || []).map(m => ({ s: m.start || '99:99', html: (() => { const x = by[m.id] || {};
+      return `<div class="ig idp-cl${x.done ? ' is-done' : ''}"><div class="idp-h"><b>${mEsc(m.title)}</b><span class="idp-tm">${x.done ? 'Done' : mEsc(m.when || '')}</span></div>`
+        + (m.why ? `<span class="idp-m">${mEsc(m.why)}</span>` : '') + `<span class="idp-m">${mEsc(mins(m.minutes))}${x.parts > 1 ? ` · ${x.partsDone} of ${x.parts} done` : ''}</span>`
+        + ((m.taskIds || []).length && !x.done ? `<button class="idp-go" onclick="mOpenTask(${jsArg(((x.tasks || []).find(t => t.status !== 'done') || { id: m.taskIds[0] }).id)})">Open task</button>` : '') + '</div>'; })() }))
+      .concat((p.meetings || []).map(x => ({ s: x.start || '99:99', html: `<div class="ig idp-cl is-meet"><div class="idp-h"><b>${mEsc(x.title)}</b><span class="idp-tm">${mEsc((() => { const t = dpTeamTime(x.start, p.date); return t ? fmtTime(t) : x.start; })())}</span></div><span class="idp-m">${mEsc(x.client ? `Meeting with ${x.client}` : 'Meeting')} · ${mEsc(mins(x.minutes))}</span>${x.prep && x.prep.length ? `<ul class="idp-prep">${x.prep.map(t => `<li>${mEsc(t)}</li>`).join('')}</ul>` : ''}</div>` })))
+      .sort((a, b) => a.s.localeCompare(b.s)).map(r => r.html).join('');
+    const ready = it.filter(x => (x.kind === 'follow' || x.kind === 'win') && !x.done).map(x => `<li><b>${mEsc(x.title)}</b>${x.kind === 'follow' ? `: ${mEsc(x.f.ask)}` : ''}</li>`);
+    const lines = list => list.map(x => `<li>${mEsc(x.text)}</li>`).join('');
+    const k = it.filter(x => x.done).length;
+    return `<h1 class="big">Today’s Plan</h1><p class="big-sub">${it.length ? `${k === it.length ? 'All done' : `${k} of ${it.length} done`} · ` : ''}Planned by Claude${when ? ` at ${mEsc(when)}` : ''}</p>`
+      + `<div class="idp-lead"><b>${mEsc(p.headline)}</b>${p.why ? `<span>${mEsc(p.why)}</span>` : ''}</div>`
+      + mIsh('How I’d run the day') + (rows || mEmpty('Nothing to schedule', ''))
+      + (ready.length ? mIsh('Ready for you to send') + `<ul class="idp-first">${ready.join('')}</ul><p class="idp-note">Send these from Radar on your computer.</p>` : '')
+      + ((p.leftOut || []).length ? mIsh('Left out on purpose') + `<ul class="idp-first is-plain">${lines(p.leftOut)}</ul>` : '')
+      + ((p.comingUp || []).length ? mIsh('Coming up') + `<ul class="idp-first is-plain">${lines(p.comingUp)}</ul>` : '');
   });
 }
 // Three numbers to read at a glance; each opens the list behind it.

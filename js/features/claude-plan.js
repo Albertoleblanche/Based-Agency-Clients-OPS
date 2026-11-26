@@ -99,126 +99,7 @@ function planWithClaudeHtml(id, small){
     : `<button class="btn cl-claude-btn" onclick="event.stopPropagation();planWithClaude(${A})" data-hovertip="${tip}" data-tipdelay="1500">${CLAUDE_SPARK}Plan with Claude</button>`;
 }
 
-// ---- Claude inside Radar (Nov 25) ---------------------------------------------------------------
-// For people whose team card has the Assistant on. The server runs Claude on the agency's key
-// (lib/claude-radar.js); what someone asks for counts toward the Assistant's 40 a day.
-function dayPlanToolbarHtml(){
-  if(!claudeOn()) return '';
-  if(!dayPlan.at && !dayPlan.loading) setTimeout(() => loadDayPlan(), 0);
-  const p = dayPlan.plan, seen = (() => { try{ return localStorage.getItem(dayPlanSeenKey()); }catch(e){ return null; } })();
-  const fresh = p && p.v === 2 && !p.empty && seen !== p.at;
-  return `<button class="btn dp-btn" onclick="openDayPlan()" data-hovertip="Your day, planned by Claude: the schedule, what’s ready to send, and what’s coming." data-tipdelay="1500">${CLAUDE_SPARK}Today’s Plan${fresh ? '<i class="dp-new" aria-label="New"></i>' : ''}</button>`;
-}
-// Today's Plan v2 (Nov 25): what Claude made this morning (lib/claude-radar.js), to work from.
-//  • Schedule: today's work around your meetings. Each block is in your Tasks (a request from an email
-//    or meeting became your task; new work a new task), due today at its time: Start, Open, Mark Done.
-//    Each client meeting has what to bring up.
-//  • Ready to send: the follow-ups due, written as Radar's Nudge (Review and Send opens it in
-//    Reminders), and your part of the win updates due, written for you (Send to Review).
-//  • Looking ahead: what's coming for your clients and what to do, as a sprint, tasks or with Claude.
-const DP_KIND = { risk: ['triangle-alert', 'Risk'], improve: ['target', 'Improve'], addon: ['circle-plus', 'Add-on'], prep: ['calendar', 'Get ready'] };
-function dpGo(fn){ closeAppModal(); setTimeout(fn, 0); }
-function dpTaskOf(id){ return id && typeof tasks !== 'undefined' ? (tasks || []).find(t => String(t.id) === String(id)) || null : null; }
-function dpTime(hm){ return fmtTime(new Date(`2000-01-01T${hm}:00`)); }
-function dpMins(n){ const h = Math.floor(n / 60), m = n % 60; return h && m ? `${h} h ${m} min` : h ? `${h} h` : `${m} min`; }
-function dpBlockHtml(b){
-  const A = jsArg, sm = (label, js, cls) => `<button type="button" class="btn sm${cls ? ' ' + cls : ''}" onclick="${js}">${label}</button>`;
-  if(b.kind === 'meeting') return `<div class="dp-row is-meet"><span class="dp-t">${escapeHtml(dpTime(b.start))}</span><div class="dp-blk"><div class="dp-bh">${icon('calendar')}<b>${escapeHtml(b.title)}</b><span class="dp-m">${b.client ? escapeHtml(b.client) + ' · ' : ''}${escapeHtml(dpMins(b.minutes))}</span>${b.url ? `<a class="btn sm" href="${safeUrl(b.url)}" target="_blank" rel="noopener">Join</a>` : ''}</div>
-${b.prep && b.prep.length ? `<ul class="dp-prep">${b.prep.map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul>` : ''}</div></div>`;
-  const t = dpTaskOf(b.taskId), done = t && t.status === 'done', today = toDateStr(rNow());
-  const meta = [b.client, dpMins(b.minutes), b.from === 'suggestion' ? 'their request, now in your tasks' : b.from === 'new' ? 'new task' : b.kind === 'wa' ? 'WhatsApp request' : '', t && t.dueDate && t.dueDate < today ? 'late' : ''].filter(Boolean).join(' · ');
-  const acts = done ? `<span class="dp-ok">${icon('check', { weight: 'bold' })}Done</span>`
-    : (b.clientId ? sm(`${icon('timer')}Start`, `dpGo(() => openTimerModal(${A(b.clientId)}))`) : '')
-      + (b.taskId ? sm('Open', `dpGo(() => notifOpenTask(${A(b.taskId)}))`) + (t && t.assigneeId === currentUser.id ? sm(`${icon('check')}Done`, `dpGo(() => moveTaskToStatus(${A(b.taskId)}, 'done'))`) : '')
-        : b.waId ? sm('Open', `dpGo(() => waOpenItem(${A(b.waId)}))`) : '');
-  return `<div class="dp-row${done ? ' is-done' : ''}"><span class="dp-t">${escapeHtml(dpTime(b.start))}</span><div class="dp-blk"><div class="dp-bh"><b>${escapeHtml(b.title)}</b><div class="dp-acts">${acts}</div></div><span class="dp-m">${escapeHtml(meta)}</span></div></div>`;
-}
-// a follow-up Claude wrote: to Reminders, the Nudge open with it, to read and send
-async function dpNudge(i){
-  const f = ((dayPlan.plan || {}).followUps || [])[i]; if(!f) return;
-  closeAppModal();
-  if(typeof clientReminders === 'undefined' || !(clientReminders || []).some(r => r.id === f.reminderId)) await loadClientReminders();
-  switchView('reminders');
-  setTimeout(() => {
-    window._remSel = f.reminderId;
-    remDrafts[f.reminderId] = { ch: f.ch === 'whatsapp' ? 'whatsapp' : 'email', state: 'ready', subject: f.subject || '', body: f.body || '', plain: !!f.plain, n: 1 };
-    renderReminders();
-  }, 0);
-}
-// your part of a win update Claude wrote: to Review (the latest data first, so Radar sees the draft)
-async function dpWinToReview(i, btn){
-  const w = ((dayPlan.plan || {}).wins || [])[i]; if(!w) return;
-  if(btn){ btn.disabled = true; btn.textContent = 'Sending…'; }
-  if(typeof loadAll === 'function') await loadAll();
-  await sendDraftForReview(w.clientId, myName());
-  const c = clients.find(x => x.id === w.clientId), d = c && typeof getDraftFor === 'function' ? getDraftFor(c, myName()) : null;
-  if(d && d.readyToNotify){ w.state = 'review'; dayPlanRedraw(); }
-  else if(btn && btn.isConnected){ btn.disabled = false; btn.textContent = 'Send to Review'; }
-}
-// a proposal's steps as your tasks (no date: you place them)
-async function dpAddSteps(i, btn){
-  const x = ((dayPlan.plan || {}).ahead || [])[i]; if(!x) return;
-  if(btn){ btn.disabled = true; btn.textContent = 'Adding…'; }
-  let n = 0;
-  for(const step of x.steps){
-    const res = await insertTaskRow({ title: step, description: `${x.title}. ${x.why}`, priority: 'medium', status: 'todo', assigner_id: currentUser.id, assignee_id: currentUser.id, client_id: x.clientId || null, due_date: null });
-    if(!res.error && res.data){ n++; if(typeof tasks !== 'undefined' && Array.isArray(tasks) && typeof taskFromDb === 'function') tasks.push(taskFromDb(res.data)); }
-  }
-  if(btn && btn.isConnected) btn.outerHTML = `<span class="dp-ok">${icon('check', { weight: 'bold' })}${n} task${n === 1 ? '' : 's'} added</span>`;
-  showToast(n ? 'success' : 'error', n ? `${n} task${n === 1 ? '' : 's'} added` : 'No tasks added', n ? `For ${x.client}, in your Tasks with no date yet.` : 'Try again in a moment.');
-}
-function dpAheadHtml(x, i){
-  const A = jsArg, [ic, word] = DP_KIND[x.kind] || DP_KIND.improve;
-  const act = x.action === 'sprint' ? `<button type="button" class="btn sm" onclick="dpGo(() => openNewSprintModal({ clientId: ${A(x.clientId)}, preset: { title: ${A(x.title)}, goal: ${A(x.why)}, steps: ${escapeHtml(JSON.stringify(x.steps))} } }))">${icon('route')}Make It a Sprint</button>`
-    : x.action === 'claude' ? `<button type="button" class="btn sm" onclick="dpGo(() => planWithClaude(${A(x.clientId)}, ${A(`${x.title}. ${x.why}\nSteps I have in mind: ${x.steps.join('; ')}.`)}))">${CLAUDE_SPARK}Plan with Claude</button>`
-    : `<button type="button" class="btn sm" onclick="dpAddSteps(${i}, this)">${icon('plus')}Add as Tasks</button>`;
-  return `<div class="dp-ah is-${escapeHtml(x.kind)}"><div class="dp-bh"><span class="dp-kind">${icon(ic)}${word}</span><b><a href="#" onclick="dpGo(() => openClientDetail(${A(x.clientId)}));return false;">${escapeHtml(x.client)}</a>: ${escapeHtml(x.title)}</b></div>
-<p class="dp-why">${escapeHtml(x.why)}</p><ol class="dp-steps">${x.steps.map(st => `<li>${escapeHtml(st)}</li>`).join('')}</ol><div class="dp-acts">${act}</div></div>`;
-}
-function dayPlanBodyHtml(){
-  const d = dayPlan;
-  if(d.making) return `<div class="dp-wait">${CLAUDE_SPARK}<p>Claude is planning your day…</p><span>Your calendar, tasks, clients’ requests and follow-ups, logged work and what’s coming. About half a minute.</span></div>`;
-  if(d.loading && !d.plan) return `<div class="dp-wait"><p>Loading…</p></div>`;
-  if(d.error && !d.plan) return emptyState({ icon: 'refresh-cw', title: 'The plan couldn’t be loaded', text: d.error, action: 'Try Again', onAction: 'loadDayPlan(true)' });
-  const p = d.plan && d.plan.v === 2 ? d.plan : null;
-  if(!p) return emptyState({ icon: 'sparkle', title: 'No plan for today yet', text: d.plan ? 'Today’s Plan now schedules your day, prepares your follow-ups and updates, and looks ahead. Have Claude write today’s.' : `Claude writes it each weekday morning. ${d.last ? 'Yours from ' + fmtShortDate(new Date(d.last + 'T12:00:00')) + ' is out of date. ' : ''}You can have it written now.`, action: 'Make Today’s Plan', onAction: 'makeDayPlanNow()' });
-  if(p.empty) return emptyState({ icon: 'check-circle', tone: 'ok', title: 'Nothing on your clients today', text: 'No meetings, open tasks, sprints, follow-ups or requests for the clients you work on.' });
-  const work = p.schedule.filter(b => b.kind !== 'meeting'), meets = p.schedule.filter(b => b.kind === 'meeting');
-  const mins = work.reduce((a, b) => a + (b.minutes || 0), 0), made = (p.made || []).length;
-  const sum = [`${dpMins(mins)} of work`, meets.length ? `${meets.length} meeting${meets.length === 1 ? '' : 's'}` : '', made ? `${made} new task${made === 1 ? '' : 's'} in your Tasks` : ''].filter(Boolean).join(' · ');
-  const ready = [
-    ...(p.followUps || []).map((f, i) => `<div class="dp-rd"><span class="dp-ric">${icon(f.ch === 'whatsapp' ? 'message-circle' : 'mail')}</span><div class="dp-rt"><b>${escapeHtml(f.client)}: follow-up</b><span class="dp-m">${escapeHtml(f.ask)}</span></div><div class="dp-acts"><button type="button" class="btn sm" onclick="dpNudge(${i})">Review and Send</button></div></div>`),
-    ...(p.wins || []).map((w, i) => `<div class="dp-rd"><span class="dp-ric">${icon('star')}</span><div class="dp-rt"><b>${escapeHtml(w.client)}: your win update</b><span class="dp-m">${w.wins} win${w.wins === 1 ? '' : 's'} · ${w.due < 0 ? 'late' : w.due === 0 ? 'due today' : w.due === 1 ? 'due tomorrow' : `due in ${w.due} days`}</span></div><div class="dp-acts">${
-      w.state === 'review' ? '<span class="dp-ok">In Review</span>' : w.state === 'approved' ? '<span class="dp-ok">Approved</span>'
-        : `<button type="button" class="btn sm" onclick="dpGo(() => openWeekClient(${jsArg(w.clientId)}))">Read</button><button type="button" class="btn sm" onclick="dpWinToReview(${i}, this)">Send to Review</button>`}</div></div>`)].join('');
-  const when = p.at ? fmtTime(new Date(p.at)) : '';
-  return `<p class="dp-sum">${escapeHtml(sum)}</p>
-<section class="dp-sec"><h4>Schedule</h4><div class="dp-sch">${p.schedule.length ? p.schedule.map(dpBlockHtml).join('') : '<p class="dp-m">Nothing scheduled.</p>'}</div></section>
-${ready ? `<section class="dp-sec"><h4>Ready to send</h4><div class="dp-rds">${ready}</div></section>` : ''}
-${(p.ahead || []).length ? `<section class="dp-sec"><h4>Looking ahead</h4><div class="dp-ahs">${p.ahead.map(dpAheadHtml).join('')}</div></section>` : p.aheadMissed ? '<p class="dp-m">The look ahead didn’t come back this time. Write It Again to try.</p>' : ''}
-<p class="dp-foot">${CLAUDE_SPARK}<span>Planned by Claude${when ? ` at ${escapeHtml(when)}` : ''} from your calendar, tasks, clients’ requests, follow-ups and logged work. · <button type="button" class="x-lnk" onclick="makeDayPlanNow()">Write It Again</button></span></p>`;
-}
-function dayPlanRedraw(){ const b = document.getElementById('dpBody'); if(b) b.innerHTML = dayPlanBodyHtml(); }
-function openDayPlan(){
-  const p = dayPlan.plan;
-  if(p) try{ localStorage.setItem(dayPlanSeenKey(), p.at); }catch(e){}
-  const day = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-  openAppModal(`<h3 class="dp-h">${CLAUDE_SPARK}<span>Today’s Plan</span><small>${escapeHtml(day)}</small></h3><div class="dp" id="dpBody">${dayPlanBodyHtml()}</div><div class="sheet-a"><button class="btn btn-p" id="dpDone" onclick="closeAppModal()">Done</button></div>`, 700);
-  setTimeout(() => document.getElementById('dpDone')?.focus({ preventScroll: true }), 30);   // not on the first client's name
-  if(currentViewName === 'overview') setToolbarActions('overview');
-  if(!dayPlan.plan && !dayPlan.loading) loadDayPlan(true);
-}
-async function makeDayPlanNow(){
-  if(dayPlan.making) return;
-  dayPlan = { ...dayPlan, making: true, error: null }; dayPlanRedraw();
-  try{ localStorage.removeItem(dpDoneKey()); }catch(e){}
-  const r = await claudeApi({ action: 'day-plan' });
-  dayPlan = r.error ? { ...dayPlan, making: false } : { ...r, at: Date.now() };
-  if(r.error) showToast('error', 'The plan wasn’t written', r.error);
-  else try{ localStorage.setItem(dayPlanSeenKey(), r.plan && r.plan.at); }catch(e){}
-  dayPlanRedraw();
-  if(currentViewName === 'overview') setToolbarActions('overview');
-}
+// Today's Plan lives in day-plan.js (the sheet and the corner ring).
 
 // A meeting → a sprint: from a meeting's notes in Radar, Claude drafts the sprint and Plan's New Sprint
 // opens filled in, to check and save (plan.js psFillFromMeeting).
@@ -230,4 +111,133 @@ function meetingToSprint(id){
   const m = (granolaMeetings || []).find(x => x.id === id); if(!m) return;
   closeAppModal();
   openNewSprintModal({ meetingId: id, clientId: m.clientId || m.metClientId || '' });
+}
+
+// ---- Claude's notes on a client (Nov 25) ---------------------------------------------------------
+// What you're missing, tips and ideas: Claude reads a client again by itself whenever something new
+// comes in (a meeting note, a client email, a WhatsApp message; lib/client-insights.js). On the client's
+// panel (Health, All Clients) and its page, for the people the client belongs to. Settings → AI turns
+// them off. Each note says where it comes from and has its button; Dismiss for good.
+let claudeNotes = { at: 0, by: {} };   // client id → { at, reason, notes, dismissed }
+function claudeNotesOn(){ return claudeOn() && !(typeof settings !== 'undefined' && settings && settings.claudeNotes === false); }
+// yours: you own it, have open tasks for it, or worked on it lately
+function claudeMine(c){
+  if(!c || typeof currentUser === 'undefined' || !currentUser) return false;
+  const me = typeof myName === 'function' ? myName() : '';
+  if(me && (typeof clientOwner === 'function' ? clientOwner(c) : (c.customFieldValues || {}).owner) === me) return true;
+  if(typeof tasks !== 'undefined' && (tasks || []).some(t => t.clientId === c.id && t.assigneeId === currentUser.id && t.status !== 'done' && !t.cancelledAt)) return true;
+  return typeof waRecentIds === 'function' && waRecentIds().has(c.id);
+}
+async function loadClaudeNotes(force){
+  if(!claudeNotesOn() || claudeNotes.loading || (!force && claudeNotes.at && Date.now() - claudeNotes.at < 3 * 60000)) return;
+  claudeNotes.loading = true;
+  const { data, error } = await supabaseClient.from('app_storage').select('key, value').like('key', 'client-insights:%');
+  const by = {};
+  (error ? [] : data || []).forEach(r => { try{ by[r.key.slice('client-insights:'.length)] = typeof r.value === 'string' ? JSON.parse(r.value) : r.value; }catch(e){} });
+  claudeNotes = { at: Date.now(), by: error ? claudeNotes.by : by };
+  claudeNotesRedraw();
+}
+// draws each notes section on screen again, in place
+function claudeNotesRedraw(){
+  document.querySelectorAll('[data-cn-client]').forEach(el => {
+    const c = clients.find(x => x.id === el.dataset.cnClient); if(!c) return;
+    el.outerHTML = claudeNotesHtml(c, el.dataset.cnWhere || 'panel');
+  });
+}
+const CN_KIND = { missing: 'Missing', tip: 'Tip', idea: 'Idea' };
+const CN_REASON = { new: 'after something new came in', first: 'first read', asked: 'when you asked' };
+function cnAgo(at){ const m = Math.round((Date.now() - new Date(at)) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 24 * 60 ? `${Math.round(m / 60)} h ago` : fmtShortDate(new Date(at)); }
+function cnEvidenceHtml(c, e){
+  const A = jsArg;
+  const go = e.kind === 'meeting' && e.id ? `cnOpen(() => loadGranolaMeetings().then(() => openMeetingNotes(${A(e.id)})))`
+    : e.kind === 'warequest' && e.id ? `cnOpen(() => waOpenItem(${A(e.id)}))`
+    : e.kind === 'whatsapp' ? `cnOpen(() => switchView('whatsapp'))`
+    : e.kind === 'task' && e.id ? `cnOpen(() => notifOpenTask(${A(e.id)}))`
+    : e.kind === 'reminder' && e.id ? `cnOpen(async () => { if(!(clientReminders || []).some(r => r.id === ${A(e.id)})) await loadClientReminders(); openReminderDetailModal(${A(e.id)}); })`
+    : e.kind === 'update' ? `cnOpen(() => openWeekClient(${A(c.id)}))` : '';
+  const label = escapeHtml(e.label || e.kind);
+  if(e.kind === 'email' && e.url) return `<a class="cn-ev" href="${safeUrl(e.url)}" target="_blank" rel="noopener">${label}</a>`;
+  return go ? `<button type="button" class="cn-ev" onclick="${go}">${label}</button>` : `<span class="cn-ev is-plain">${label}</span>`;
+}
+function cnOpen(fn){ if(document.getElementById('appModalOverlay')) closeAppModal(); setTimeout(fn, 0); }
+function cnNoteHtml(c, n){
+  const A = jsArg, word = CN_KIND[n.kind] || CN_KIND.tip, sm = (label, js) => `<button type="button" class="btn sm" onclick="${js}">${label}</button>`;
+  const act = n.action === 'task' ? sm(n.steps && n.steps.length > 1 ? 'Add as Tasks' : 'Add as Task', `cnAddTasks(${A(c.id)}, ${A(n.id)}, this)`)
+    : n.action === 'sprint' ? sm('Make It a Sprint', `cnOpen(() => openNewSprintModal({ clientId: ${A(c.id)}, preset: { title: ${A(n.title)}, goal: ${A(n.why)}, steps: ${escapeHtml(JSON.stringify(n.steps || []))} } }))`)
+    : n.action === 'message' && n.message ? sm('Write to Them', `cnMessage(${A(c.id)}, ${A(n.id)})`)
+    : n.action === 'claude' ? sm(`${CLAUDE_SPARK}Plan with Claude`, `planWithClaude(${A(c.id)}, ${A(`${n.title}. ${n.why}`)})`) : '';
+  return `<div class="cn-n is-${escapeHtml(n.kind)}"><div class="cn-top"><span class="cn-kind">${word}</span><b>${escapeHtml(n.title)}</b><button type="button" class="ib cn-x" aria-label="Dismiss “${escapeHtml(n.title)}”" title="Dismiss" onclick="cnDismiss(${A(c.id)}, ${A(n.id)}, this)">${icon('x')}</button></div>
+<p class="cn-why">${escapeHtml(n.why)}</p>
+${n.steps && n.steps.length ? `<ol class="cn-steps">${n.steps.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ol>` : ''}
+${(n.evidence || []).length || act ? `<div class="cn-foot"><div class="cn-evs">${(n.evidence || []).map(e => cnEvidenceHtml(c, e)).join('')}</div>${act ? `<div class="cn-act">${act}</div>` : ''}</div>` : ''}</div>`;
+}
+// the section (panel, or the client page's card); '' when it isn't for you
+function claudeNotesHtml(c, where){
+  if(!c || !claudeNotesOn() || !claudeMine(c)) return '';
+  if(!claudeNotes.at && !claudeNotes.loading) setTimeout(() => loadClaudeNotes(), 0);
+  else if(Date.now() - claudeNotes.at > 3 * 60000) setTimeout(() => loadClaudeNotes(), 0);
+  const v = claudeNotes.by[c.id], A = jsArg(c.id), notes = (v && v.notes) || [];
+  const counts = ['missing', 'tip', 'idea'].map(k => [k, notes.filter(n => n.kind === k).length]).filter(x => x[1]);
+  const sub = cnBusy[c.id] ? 'Claude is reading this client…' : v ? `Read ${cnAgo(v.at)}${CN_REASON[v.reason] ? `, ${CN_REASON[v.reason]}` : ''}` : claudeNotes.at ? 'Not read yet: Claude reads it when something new comes in' : 'Loading…';
+  const count = counts.length ? `<span class="cn-c">${counts.map(([k, n]) => `${n} ${k === 'missing' ? 'missing' : k + (n === 1 ? '' : 's')}`).join(' · ')}</span>` : '';
+  const check = `<button type="button" class="btn sm cn-check" onclick="cnCheck(${A})"${cnBusy[c.id] ? ' disabled' : ''} data-hovertip="Claude reads this client again now: meetings, emails, WhatsApp, tasks, follow-ups and logged work. Counts toward your 40 a day." data-tipdelay="1500">${cnBusy[c.id] ? 'Reading…' : 'Check Now'}</button>`;
+  // the page's card heads like its other cards; a fold already says what it is; a panel has its own head
+  const head = where === 'page' ? `<div class="uw-wh cn-h"><span class="uw-ic cn-ic">${CLAUDE_SPARK}</span><span class="uw-wt">Claude’s notes</span>${count}<span class="uw-sp"></span>${check}</div><p class="cn-sub">${escapeHtml(sub)}</p>`
+    : where === 'fold' ? `<div class="cn-h is-fold"><p class="cn-sub">${escapeHtml(sub)}</p>${check}</div>`
+    : `<div class="cn-h">${CLAUDE_SPARK}<b>Claude’s notes</b>${count}${check}</div><p class="cn-sub">${escapeHtml(sub)}</p>`;
+  const body = notes.length ? `<div class="cn-list">${notes.map(n => cnNoteHtml(c, n)).join('')}</div>` : v && !cnBusy[c.id] ? '<p class="cn-none">Nothing Claude would flag right now.</p>' : '';
+  return where === 'page'
+    ? `<section class="uw-w cp-cn cn" data-cn-client="${escapeHtml(c.id)}" data-cn-where="page">${head}${body}</section>`
+    : `<section class="cn cn-panel" data-cn-client="${escapeHtml(c.id)}" data-cn-where="${escapeHtml(where || 'panel')}">${head}${body}</section>`;
+}
+const cnBusy = {};
+async function cnCheck(id){
+  if(cnBusy[id]) return;
+  cnBusy[id] = true; claudeNotesRedraw();
+  const r = await claudeApi({ action: 'client-insights-check', clientId: id });
+  delete cnBusy[id];
+  if(r.error) showToast('error', 'Claude couldn’t read it', r.error);
+  else claudeNotes.by[id] = r.insights;
+  claudeNotesRedraw();
+}
+async function cnDismiss(id, noteId, btn){
+  const v = claudeNotes.by[id]; if(!v) return;
+  const el = btn && btn.closest('.cn-n'); if(el) el.classList.add('is-going');
+  const r = await claudeApi({ action: 'client-note-dismiss', clientId: id, noteId });
+  if(r.error){ if(el) el.classList.remove('is-going'); showToast('error', 'Not dismissed', r.error); return; }
+  claudeNotes.by[id] = r.insights || { ...v, notes: (v.notes || []).filter(n => n.id !== noteId) };
+  claudeNotesRedraw();
+}
+async function cnAddTasks(id, noteId, btn){
+  const n = ((claudeNotes.by[id] || {}).notes || []).find(x => x.id === noteId); if(!n) return;
+  if(btn){ btn.disabled = true; btn.textContent = 'Adding…'; }
+  const titles = n.steps && n.steps.length ? n.steps : [n.title];
+  let k = 0;
+  for(const t of titles){
+    const res = await insertTaskRow({ title: t, description: `${n.title}. ${n.why}`, priority: 'medium', status: 'todo', assigner_id: currentUser.id, assignee_id: currentUser.id, client_id: id, due_date: null });
+    if(!res.error && res.data){ k++; if(typeof mtKnow === 'function') mtKnow(res.data); }
+  }
+  if(btn && btn.isConnected) btn.outerHTML = `<span class="dp-ok">${icon('check', { weight: 'bold' })}${k} task${k === 1 ? '' : 's'} added</span>`;
+  showToast(k ? 'success' : 'error', k ? `${k} task${k === 1 ? '' : 's'} added` : 'No tasks added', k ? 'In your Tasks, with no date yet.' : 'Try again in a moment.');
+}
+// a message Claude wrote to the client: read it, change it, copy it or open it in your mail
+function cnMessage(id, noteId){
+  const c = clients.find(x => x.id === id), n = ((claudeNotes.by[id] || {}).notes || []).find(x => x.id === noteId); if(!c || !n) return;
+  const to = c.email ? String(c.email).split(',')[0].trim() : '', wa = typeof winChannel === 'function' && winChannel(c) === 'whatsapp';
+  openAppModal(`<h3 class="cpp-h">${CLAUDE_SPARK}<span>Write to ${escapeHtml(c.name)}</span></h3>
+<p class="cpp-sub">${escapeHtml(n.title)}. Claude wrote this; change anything, then copy it${to && !wa ? ' or open it in your mail' : ''}. Nothing is sent until you send it.</p>
+<textarea id="cppText" class="tf cpp-text" spellcheck="true" aria-label="The message">${escapeHtml(n.message)}</textarea>
+<div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn" id="cppCopy" onclick="planWithClaudeCopy()">${icon('copy')}Copy</button>${to && !wa ? `<button class="btn btn-p" onclick="cnMail(${jsArg(to)}, ${jsArg(n.title)})">${icon('mail')}Open in Mail</button>` : ''}</div>`, 640);
+  setTimeout(() => document.getElementById('cppCopy')?.focus({ preventScroll: true }), 30);
+}
+function cnMail(to, subject){
+  const body = (document.getElementById('cppText')?.value || '').trim();
+  window.open(`mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
+  closeAppModal();
+}
+// All Clients' panel: a fold like the others
+function claudeNotesFold(c){
+  const html = claudeNotesHtml(c, 'fold'); if(!html || typeof clientFoldHtml !== 'function') return '';
+  const n = ((claudeNotes.by[c.id] || {}).notes || []).length;
+  return clientFoldHtml('cn', 'Claude’s notes', n ? `${n} note${n === 1 ? '' : 's'}` : 'Nothing flagged', html);
 }

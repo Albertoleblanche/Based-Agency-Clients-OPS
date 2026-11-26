@@ -614,6 +614,13 @@ body.mac.mobile { overflow: hidden; background: var(--ios-bg, #F2F2F7); -webkit-
 .app .idp-cl + .idp-cl { margin-top: 10px; }
 .app .idp-h .idp-tm { font-size: 13px; color: var(--label-2); font-variant-numeric: tabular-nums; flex: none; margin-left: 8px; }
 .app .idp-m { font-size: 13px; color: var(--label-2); }
+.app .idp-t b em { margin-left: 8px; font-style: normal; font-size: 12px; font-weight: 500; color: var(--label-2); font-variant-numeric: tabular-nums; }
+.app .idp-lead { margin: 14px 16px 8px; display: flex; flex-direction: column; gap: 6px; }
+.app .idp-lead b { font-size: 18px; font-weight: 600; line-height: 1.35; letter-spacing: -.01em; }
+.app .idp-lead span { font-size: 15px; line-height: 1.5; color: var(--label-2); }
+.app .idp-cl.is-done .idp-h b { color: var(--label-2); }
+.app .idp-cl.is-done .idp-tm { color: var(--green); }
+.app .idp-first.is-plain { background: var(--grp, var(--card)); }
 .app .idp-cl.is-meet { background: color-mix(in srgb, var(--label) 4%, var(--grp, var(--card))); }
 .app .idp-prep, .app .idp-steps { margin: 4px 0 0; padding-left: 20px; font-size: 14px; line-height: 1.45; }
 .app .idp-go { align-self: flex-start; margin-top: 4px; font-size: 14px; font-weight: 500; color: var(--accent); }
