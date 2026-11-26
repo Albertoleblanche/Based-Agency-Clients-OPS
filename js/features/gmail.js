@@ -91,6 +91,9 @@ function gmailMainRowHtml(st){
   if(!g.configured) return `${head('Tasks from your clients’ emails; what they owe you goes to Reminders')}${st('hollow', 'Not set up')}</div>`;
   if(!g.connected) return `${head('Tasks from your clients’ emails; what they owe you goes to Reminders. Read only.')}<button class="btn" onclick="gmailConnect()">Connect…</button></div>`;
   const read = g.lastReadAt && typeof claudeWhen === 'function' ? ' · read ' + claudeWhen(g.lastReadAt).toLowerCase() : '';
+  // Google ended the access (Nov 26: lib/conn-alerts.js, or what the last read said): connect again
+  const ended = (typeof connLostFor === 'function' && connLostFor('gmail')) || /access ended/i.test(g.lastError || '');
+  if(ended) return `${head('Google ended Radar’s access. Connect again to keep getting tasks from clients’ emails.')}${st('red', 'Stopped working')}<button class="btn" onclick="gmailConnect()">Connect Again…</button></div>`;
   return `${head(g.lastError ? escapeHtml(g.lastError) : `${escapeHtml(g.email || 'Connected')}: tasks and follow-ups from clients’ emails${read}`)}${g.lastError ? st('yellow', 'Needs attention') : st('green', 'Connected')}<button class="btn" onclick="gmailCheckNow()">Check Now</button><button class="btn" onclick="gmailDisconnect()">Disconnect</button></div>`;
 }
 // ---- The Gmail label "Radar" (Nov 24, lib/gmail-label.js) ------------------------------------------

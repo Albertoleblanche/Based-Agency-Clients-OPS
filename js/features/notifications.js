@@ -66,6 +66,7 @@ const NOTIFICATION_TYPE_META = {
   email_change_requested:  { label:'Someone requests an email change', section:'Account', visibleTo:'admin' },
   profile_changed:         { label:'Your role, title, or access changes', section:'Account' },
   setup_reminder:          { label:'A teammate asks you to finish setting up Radar', section:'Account' },
+  connection_lost:         { label:'A connection stops working (your Gmail, Calendar or Slack; for admins also Granola, Harvest, Slack, WhatsApp and the AI keys)', section:'Account' },
 };
 
 // Central place every notification insert should go through, instead of
@@ -288,6 +289,7 @@ async function handleNotifClick(id){
   if(view==='queue' && tid && typeof openQueueClient === 'function' && clients.some(c => c.id === tid)){ hidePop(panel); openQueueClient(tid); return; }
   if(view==='whatsapp' && tid && typeof waOpenItem === 'function'){ hidePop(panel); waOpenItem(tid); return; }
   if(view==='setup'){ hidePop(panel); if(typeof setupOpen === 'function') setupOpen(); return; }   // where they left off
+  if(view==='settings' && n.type === 'connection_lost'){ hidePop(panel); connFix(n.target_id); return; }   // where to fix it (Nov 26)
   if(view){
     hidePop(panel);
     if(view==='plan' && tid) window._planSel = tid;

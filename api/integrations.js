@@ -103,7 +103,12 @@ module.exports = async function handler(req, res) {
 
   if (route === 'gmail-tick') {
     if (process.env.CRON_SECRET && (req.headers.authorization || '') !== `Bearer ${process.env.CRON_SECRET}`) { res.status(401).json({ error: 'Not allowed' }); return; }
-    try { res.status(200).json(await gmailTick(createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY), { budgetMs: 45000 })); }
+    try {
+      const admin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+      const out = await gmailTick(admin, { budgetMs: 45000 });
+      out.whatsapp = await require('../lib/conn-alerts').whatsappHealth(admin).catch(e => ({ error: String(e) }));   // stopped or signed out (Nov 26)
+      res.status(200).json(out);
+    }
     catch (e) { res.status(500).json({ error: String(e) }); }
     return;
   }
@@ -124,6 +129,7 @@ module.exports = async function handler(req, res) {
       // Claude's notes on clients (Nov 25): the clients with something new since their last read,
       // in the time left (lib/client-insights.js). Only when the tick itself ran, not on every call.
       if (!out.skipped) out.insights = await require('../lib/client-insights').insightsTick(admin, { deadline: t0 + 54000 }).catch(e => ({ error: String(e) }));
+      out.whatsapp = await require('../lib/conn-alerts').whatsappHealth(admin).catch(e => ({ error: String(e) }));   // stopped or signed out (Nov 26)
       res.status(200).json(out);
     }
     catch (e) { res.status(500).json({ error: String(e) }); }

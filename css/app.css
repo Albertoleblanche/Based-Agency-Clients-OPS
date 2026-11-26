@@ -3312,6 +3312,7 @@ html.ui-w .tk-sg{border-radius:var(--uw-r-card);box-shadow:0 0 0 1px var(--sep),
 
 /* Settings → Granola, and ChatGPT and Claude */
 .gr-about,.ai-about{font-size:13.5px;line-height:1.5;margin:0 0 14px}
+.ai-who{font-size:13px;line-height:1.5;margin:0 0 14px}
 .gr-st{font-size:13px;margin:4px 0 0}
 .gr-note{font-size:12.5px;line-height:1.5;margin:10px 2px 0}
 .gr-warn{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.5;margin:0;color:var(--label)}

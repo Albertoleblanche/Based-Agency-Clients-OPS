@@ -575,8 +575,31 @@ async function loadIntegrationStatuses(){
     one(async () => { if(typeof loadWaTasks === 'function') await loadWaTasks(); }),
     one(async () => { if(typeof remSlackMeStatus === 'function') integ.slackMe = await remSlackMeStatus(true); }),
     one(async () => { if(typeof gmailStatusLoad === 'function') await gmailStatusLoad(); }),
+    one(connHealthLoad),
   ]);
   integSave();
+}
+// What stopped working (Nov 26, lib/conn-alerts.js): conn-health:<key> (or <key>:<person> for someone's
+// own), kept while it's down. The row says so, red, and clicking it fixes it.
+async function connHealthLoad(){
+  const { data, error } = await supabaseClient.from('app_storage').select('key, value').like('key', 'conn-health:%');
+  if(error) return;
+  integ.health = {};
+  (data || []).forEach(r => { let v = r.value; try{ if(typeof v === 'string') v = JSON.parse(v); }catch(e){ v = null; } if(v && v.lost) integ.health[r.key.slice('conn-health:'.length)] = v; });
+}
+function connLostFor(key){ const h = integ.health || {}; return h[key] || (currentUser && h[`${key}:${currentUser.id}`]) || null; }
+// A notice that something stopped: to where it's fixed
+function connFix(k){
+  const key = String(k || '').split(':')[0];
+  switchView('settings');
+  switchSettingsTab(key === 'harvest' && canChangeRules() ? 'harvest' : (key === 'claude' || key === 'openai') && canManageSettings() ? 'ai' : key === 'whatsapp' ? 'whatsapp' : 'connections');
+  setTimeout(() => {
+    if(key === 'granola' && typeof openGranolaSheet === 'function') openGranolaSheet();
+    else if(key === 'slack' && canChangeRules()) openIntegrationSheet('slack');
+    else if(key === 'gcal' && typeof connectGoogleCalendar === 'function') connectGoogleCalendar();
+    else if(key === 'gmail' && typeof gmailConnect === 'function') gmailConnect();
+    else if(key === 'slackme' && typeof slackMeConnect === 'function') slackMeConnect();
+  }, 80);
 }
 // A few seconds after Radar opens, the quick checks run once in the background, so the first visit
 // to Connections already knows them.
@@ -595,30 +618,32 @@ function setConnections(){
   integHydrate();
   const st = (color, text, id) => `<span class="st"${id ? ` id="${id}"` : ''}><span class="dot ${color}"></span>${text}</span>`;
   const g = integ.google, h = integ.harvest, approver = canChangeRules();
+  const stopped = (key, normal) => connLostFor(key) ? st('red', 'Stopped working') : normal;
   const go = (js, logo, name, sub, status) => `<button class="fr cn-r" onclick="${js}">${logo}<div class="l"><b>${name}</b><span>${sub}</span></div>${status}${icon('caret-right', { weight: 'bold' })}</button>`;
   const rows = [];
   if(approver) rows.push(go("switchSettingsTab('harvest')", appLogo('harvest'), 'Harvest',
     h && h.connected ? `Clients, projects, tasks and time${h.setup && h.setup.syncedAt && typeof hvWhen === 'function' ? ' · read ' + hvWhen(h.setup.syncedAt) : ''}` : 'Time logged the way Harvest is set up',
-    h == null ? st('', 'Checking…') : h.connected ? st('green', 'Connected') : st('hollow', 'Not connected')));
+    h == null ? st('', 'Checking…') : stopped('harvest', h.connected ? st('green', 'Connected') : st('hollow', 'Not connected'))));
   const wa = typeof waIntegrationRow === 'function' ? waIntegrationRow() : null;
-  if(wa) rows.push(go(wa[5] || "switchSettingsTab('whatsapp')", appLogo('whatsapp'), 'WhatsApp', wa[2], wa[3]));
+  if(wa) rows.push(go(wa[5] || "switchSettingsTab('whatsapp')", appLogo('whatsapp'), 'WhatsApp', wa[2], stopped('whatsapp', wa[3])));
   if(approver) rows.push(go("openIntegrationSheet('slack')", appLogo('slack'), 'Slack', 'Client channels, reminders and daily summaries',
-    integ.slackUnlinked == null ? st('', 'Checking…') : integ.slackUnlinked ? st('yellow', `${integ.slackUnlinked} client${integ.slackUnlinked === 1 ? '' : 's'} not linked`) : st('green', 'Connected')));
-  if(typeof granolaRowStatus === 'function') rows.push(go('openGranolaSheet()', appLogo('granola'), 'Granola', 'Action items as tasks; what clients owe you as follow-ups', granolaRowStatus(st)));
-  if(canManageSettings()){ const w = aiConnWords(); rows.push(go("switchSettingsTab('ai')", appLogoPair('claude', 'chatgpt'), 'AI', 'Claude and ChatGPT: drafts, the Assistant and weekly insights', w == null ? st('', 'Checking…', 'cnAiSt') : w ? st('green', w, 'cnAiSt') : st('hollow', 'Not connected', 'cnAiSt'))); }
+    connLostFor('slack') ? st('red', 'Stopped working') : integ.slackUnlinked == null ? st('', 'Checking…') : integ.slackUnlinked ? st('yellow', `${integ.slackUnlinked} client${integ.slackUnlinked === 1 ? '' : 's'} not linked`) : st('green', 'Connected')));
+  if(typeof granolaRowStatus === 'function') rows.push(go('openGranolaSheet()', appLogo('granola'), 'Granola', 'Action items as tasks; what clients owe you as follow-ups', stopped('granola', granolaRowStatus(st))));
+  if(canManageSettings()){ const w = aiConnWords(); rows.push(go("switchSettingsTab('ai')", appLogoPair('claude', 'chatgpt'), 'AI', 'Claude and ChatGPT: drafts, the Assistant and weekly insights', connLostFor('claude') || connLostFor('openai') ? st('red', `${connLostFor('claude') && connLostFor('openai') ? 'Both stopped' : connLostFor('claude') ? 'Claude stopped' : 'ChatGPT stopped'} working`, 'cnAiSt') : w == null ? st('', 'Checking…', 'cnAiSt') : w ? st('green', w, 'cnAiSt') : st('hollow', 'Not connected', 'cnAiSt'))); }
   rows.push(go("openIntegrationSheet('sheet')", appLogo('gsheets'), 'Google Sheet', settings.sheetCsvUrl ? 'Pulls the client list from a published sheet' : 'Keep a copy of the client list in a sheet',
     settings.sheetCsvUrl ? st('green', 'Connected') : st('hollow', 'Not connected')));
   const gRow = g == null ? `<div class="fr cn-r">${appLogo('gcalendar')}<div class="l"><b>Google Calendar</b><span>Your meetings in the team calendar</span></div>${st('', 'Checking…')}</div>` : g && g.googleConfigured ? `<div class="fr cn-r">${appLogo('gcalendar')}<div class="l"><b>Google Calendar</b><span>${g.connected ? `Your meetings in the team calendar${g.lastSyncedAt ? ' · synced ' + claudeWhen(g.lastSyncedAt).toLowerCase() : ''}` : 'Bring your meetings into the team calendar'}</span></div>
-${g.connected ? `${st('green', 'Connected')}<button class="btn" onclick="syncGoogleCalendar().then(loadIntegrationStatuses)">Sync Now</button>` : `<button class="btn" onclick="connectGoogleCalendar()">Connect…</button>`}</div>` : '';
-  // ChatGPT and Claude: each person connects their own (ai-apps.js)
-  const aiRow = typeof aiAppsRowStatus === 'function' ? go('openAiAppsSheet()', appLogoPair('chatgpt', 'claude'), 'ChatGPT and Claude', 'Use Radar from their apps, as you', aiAppsRowStatus(st)) : '';
+${g.connected && connLostFor('gcal') ? `${st('red', 'Stopped working')}<button class="btn" onclick="connectGoogleCalendar()">Connect Again…</button>` : g.connected ? `${st('green', 'Connected')}<button class="btn" onclick="syncGoogleCalendar().then(loadIntegrationStatuses)">Sync Now</button>` : `<button class="btn" onclick="connectGoogleCalendar()">Connect…</button>`}</div>` : '';
+  // Radar in Claude and ChatGPT (ai-apps.js): the company's (Nov 26: added once to the company's Claude or
+  // ChatGPT), so it sits with the team's apps; each person still connects as themselves
+  if(typeof aiAppsRowStatus === 'function') rows.push(go('openAiAppsSheet()', appLogoPair('claude', 'chatgpt'), 'Radar in Claude and ChatGPT', 'Added once to the company’s Claude or ChatGPT; each person connects as themselves', aiAppsRowStatus(st)));
   // Slack, as you (Nov 23): nudges to teammates go from your own Slack (lib/slack-me.js)
   const sm = integ.slackMe;
   const smRow = !sm || sm.checking ? `<div class="fr cn-r">${appLogo('slack')}<div class="l"><b>Slack, as you</b><span>Send nudges to teammates from your own Slack</span></div>${st('', 'Checking…')}</div>` : `<div class="fr cn-r">${appLogo('slack')}<div class="l"><b>Slack, as you</b><span>${sm.connected ? 'Nudges to teammates go from your Slack, as you' : sm.configured ? 'Send nudges to teammates from your own Slack' : 'Send nudges to teammates from your own Slack (an admin sets it up once)'}</span></div>
 ${sm.connected ? `${st('green', 'Connected')}<button class="btn" onclick="slackMeDisconnect()">Disconnect</button>` : sm.configured ? `<button class="btn" onclick="slackMeConnect()">Connect…</button>` : canManageSettings() ? `${st('hollow', 'Not set up')}<button class="btn" onclick="slackMeSetupSheet()">Set Up…</button>` : st('hollow', 'Not set up')}</div>`;
   // Gmail (Nov 24): tasks from your clients' emails (gmail.js)
   const gmRow = typeof gmailRowHtml === 'function' ? gmailRowHtml(st) : '';
-  const yours = gRow || aiRow || smRow || gmRow ? `<div class="set-h">Yours</div><div class="form-grp cn-g">${aiRow}${smRow}${gRow}${gmRow}</div>` : '';
+  const yours = gRow || smRow || gmRow ? `<div class="set-h">Yours</div><div class="form-grp cn-g">${smRow}${gRow}${gmRow}</div>` : '';
   const live = (supabaseClient.getChannels ? supabaseClient.getChannels() : []).some(c => c.state === 'joined');
   // Set Up Radar (Nov 24): everything that's yours, step by step
   const su = typeof setupOpen === 'function' ? `<div class="su-cta"><span class="brand-mark" aria-hidden="true">${suBrandMark()}</span><div class="l"><b>Set Up Radar</b><span>Connect everything that’s yours, one step at a time.</span></div><button class="btn" onclick="setupOpen('welcome')">Start…</button></div>` : '';

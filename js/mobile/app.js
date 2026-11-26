@@ -1509,6 +1509,7 @@ async function mNotifTap(id){
   else if(v === 'calendar'){ mSwitchTab('more'); mOpenCalendar(); }
   else if(v === 'health'){ mSwitchTab('today'); mOpenClients('health'); }
   else if(v === 'setup'){ mSwitchTab('today'); showToast('info', 'Set Up Radar is on your computer', 'Open Radar there to connect your apps. On this phone: More → Settings → Push notifications.'); }
+  else if(v === 'settings' && n.type === 'connection_lost'){ mSwitchTab('today'); showToast('info', 'Fixed on your computer', 'Open Radar there: Settings → Connections. It says what to do.'); }
   else mSwitchTab('today');
 }
 function mOpenFromHash(hash){

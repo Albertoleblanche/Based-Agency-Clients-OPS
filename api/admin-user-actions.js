@@ -278,6 +278,7 @@ module.exports = async function handler(req, res) {
         provider, api_key: trimmedKey, base_url: trimmedBaseUrl, connected_at: new Date().toISOString(), connected_by: callerId,
       });
       if (upsertErr) { res.status(500).json({ error: upsertErr.message }); return; }
+      await require('../lib/conn-alerts').connOk(admin, provider, { force: true }).catch(() => {});   // a new key: working again (Nov 26)
       res.status(200).json({ success: true });
       return;
     }

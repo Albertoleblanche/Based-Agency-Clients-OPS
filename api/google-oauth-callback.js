@@ -88,6 +88,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    await require('../lib/conn-alerts').connOk(admin, 'gcal', { userId, force: true }).catch(() => {});   // connected again (Nov 26)
     res.writeHead(302, { Location: `${appUrl}/#profile?gcal=connected` });
     res.end();
   } catch (e) {
