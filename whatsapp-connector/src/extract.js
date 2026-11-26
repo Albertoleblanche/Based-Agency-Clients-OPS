@@ -1,7 +1,7 @@
 import { config } from './config.js';
 import { db, check } from './db.js';
 import { ROLES, ROLE_KEYS } from './roles.js';
-import { clientForGroup } from './clients.js';
+import { clientForGroup, clientPlan } from './clients.js';
 
 const MOODS = ['happy', 'neutral', 'frustrated', 'angry'];
 
@@ -53,12 +53,13 @@ You are also given the currently OPEN tasks for this group. For each, decide if 
 You are also given RECENTLY CLOSED tasks (the team marked them done, or the chat showed them answered), each with when it was closed. If the client's messages AFTER that time follow up on one of them — they ask for more on it, say it isn't fixed or isn't right, or send something the agency now has to act on (files, details, an approval it was waiting for) — REOPEN it with a one-sentence reason instead of creating a new task. Do not reopen for thanks, likes, "looks good", or anything that only confirms it is fine. Never both reopen a task and create a new one for the same thing.
 
 Reply with ONLY JSON:
-{"new_tasks":[{"title":"short imperative, max 120 chars","detail":"1-2 sentences of context","kind":"request|question|promise|issue","owner":"${ROLE_KEYS.join('|')}","priority":"low|normal|high","due_date":"YYYY-MM-DD or null","msg_ids":[message numbers],"excerpt":"short client quote"}],
+{"new_tasks":[{"title":"short imperative, max 120 chars","detail":"1-2 sentences of context","kind":"request|question|promise|issue","owner":"${ROLE_KEYS.join('|')}","priority":"low|normal|high","due_date":"YYYY-MM-DD or null","msg_ids":[message numbers],"excerpt":"short client quote","in_plan":true}],
  "resolve":[{"task_id":"id of an open task","reason":"why"}],
  "reopen":[{"task_id":"id of a recently closed task","reason":"what the client now needs, 1 sentence","msg_ids":[message numbers],"excerpt":"short client quote"}],
  "mood":{"level":"happy|neutral|frustrated|angry","reason":"1 short sentence on why","excerpt":"the client's own words that show it, max 20 words"}}
 Use priority high only for urgent wording, site down, money, or an angry client. Return empty arrays when nothing applies.
-MOOD is how the CLIENT comes across across all the [CLIENT] messages shown, most recent weighing most: happy (thanks, praise, good results), neutral (ordinary requests and questions), frustrated (impatience, repeating themselves, "still", "again", disappointment), angry (complaints, threats to leave, harsh words). Judge only the client, never the team. Use null for mood when the client wrote nothing in these messages.`;
+MOOD is how the CLIENT comes across across all the [CLIENT] messages shown, most recent weighing most: happy (thanks, praise, good results), neutral (ordinary requests and questions), frustrated (impatience, repeating themselves, "still", "again", disappointment), angry (complaints, threats to leave, harsh words). Judge only the client, never the team. Use null for mood when the client wrote nothing in these messages.
+IN THEIR PLAN: you may be told what the client pays the agency for. Set "in_plan": false on a new task only when it clearly is new work outside that (they pay for Google Ads only and ask for a new website page, a logo, or a blog post), and add "plan_note": under 90 characters, what the work is and what they pay for ("A new landing page: they pay for Google Ads only"). Fixes, reports, questions, access, meetings, issues and anything about work they already pay for are in their plan. When you aren't told what they pay for, or you're unsure, true.`;
 
 export async function analyzeGroup(group, since){
   const cutoff = new Date(Date.now() - config.contextDays * 86400000).toISOString();
@@ -81,7 +82,9 @@ export async function analyzeGroup(group, since){
   const corrections = await recentCorrections();
   const lines = msgs.map((m, i) => `#${i + 1} [${m.from_team ? 'TEAM' : 'CLIENT'}] ${m.ts.slice(0, 16).replace('T', ' ')} ${m.sender || '?'}: ${m.text.replace(/\s+/g, ' ').slice(0, 600)}`);
   const closedAt = t => (t.answered_at || t.updated_at || '').slice(0, 16).replace('T', ' ');
-  const user = `Client group: ${group.name}\nToday: ${new Date().toISOString().slice(0, 10)}\n\nOPEN TASKS:\n${openTasks.length ? openTasks.map(t => `- id=${t.id} [${t.kind}] ${t.title} (owner ${t.owner_key})`).join('\n') : '(none)'}\n\nRECENTLY CLOSED TASKS:\n${closedTasks.length ? closedTasks.map(t => `- id=${t.id} [${t.kind}] ${t.title} (${t.status === 'answered' ? 'answered in the chat' : 'marked done'} ${closedAt(t)})`).join('\n') : '(none)'}\n\nCHAT (oldest first):\n${lines.join('\n')}`;
+  // what the client pays for (Nov 25), so a request outside it is labelled for whoever reviews it
+  const plan = await clientForGroup(group).then(c => clientPlan(c)).catch(() => null);
+  const user = `Client group: ${group.name}\nToday: ${new Date().toISOString().slice(0, 10)}\n${plan ? `What the client pays the agency for: ${plan}\n` : ''}\nOPEN TASKS:\n${openTasks.length ? openTasks.map(t => `- id=${t.id} [${t.kind}] ${t.title} (owner ${t.owner_key})`).join('\n') : '(none)'}\n\nRECENTLY CLOSED TASKS:\n${closedTasks.length ? closedTasks.map(t => `- id=${t.id} [${t.kind}] ${t.title} (${t.status === 'answered' ? 'answered in the chat' : 'marked done'} ${closedAt(t)})`).join('\n') : '(none)'}\n\nCHAT (oldest first):\n${lines.join('\n')}`;
 
   let out;
   try { out = parseJson(await claude(SYSTEM(corrections), user)); }
@@ -119,14 +122,21 @@ export async function analyzeGroup(group, since){
     const owner = ROLE_KEYS.includes(t.owner) ? t.owner : 'eric';
     const ids = (t.msg_ids || []).map(n => msgs[Number(n) - 1]?.wa_msg_id).filter(Boolean);
     const due = /^\d{4}-\d{2}-\d{2}$/.test(t.due_date || '') ? t.due_date : null;
-    const { data: made, error } = await db().from('wa_tasks').insert({
+    const row = {
       group_jid: group.jid, client: clientName,
       title: String(t.title).slice(0, 300), detail: t.detail || null,
       kind: ['request', 'question', 'promise', 'issue'].includes(t.kind) ? t.kind : 'request',
       owner_key: owner, ai_owner_key: owner,
       priority: ['low', 'normal', 'high'].includes(t.priority) ? t.priority : 'normal',
       due_date: due, source_msg_ids: ids, source_excerpt: t.excerpt ? String(t.excerpt).slice(0, 400) : null,
-    }).select('id').single();
+    };
+    // outside what they pay for: labelled, and the person who reviews it decides (Nov 25)
+    if(plan && t.in_plan === false){ row.out_of_scope = true; row.scope_note = t.plan_note ? String(t.plan_note).slice(0, 160) : null; }
+    let { data: made, error } = await db().from('wa_tasks').insert(row).select('id').single();
+    if(error && /out_of_scope|scope_note/i.test(error.message || '')){   // before addendum-out-of-scope.sql
+      delete row.out_of_scope; delete row.scope_note;
+      ({ data: made, error } = await db().from('wa_tasks').insert(row).select('id').single());
+    }
     if(error) console.error('  task insert failed:', error.message); else { created++; items.push({ id: made && made.id, title: String(t.title).slice(0, 300), client: clientName, owner_key: owner, high: t.priority === 'high' }); }
   }
   // Still-open tasks in an active chat stay fresh.

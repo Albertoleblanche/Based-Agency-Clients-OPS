@@ -5,7 +5,7 @@ import { db, check } from './db.js';
 let cache = { at: 0, list: [] };
 export async function loadClients(force = false){
   if(!force && Date.now() - cache.at < 600000) return cache.list;
-  const data = check(await db().from('clients').select('id,name,email,website,status,custom_field_values,deleted_at'), 'load clients');
+  const data = check(await db().from('clients').select('id,name,email,website,status,service,sow,custom_field_values,deleted_at'), 'load clients');
   cache = { at: Date.now(), list: (data || []).filter(c => !c.deleted_at) };
   return cache.list;
 }
@@ -52,4 +52,45 @@ export function sameDetail(field, a, b){
     return s;
   };
   return !!k(a) && k(a) === k(b);
+}
+
+// What the client pays the agency for (Nov 25), so a request outside it comes in labelled "Not in their
+// plan: offer as add-on". The same rules as Radar's lib/client-plan.js: Radar's services and scope of
+// work, and their active Harvest projects (and the areas those cover). Null when nothing is known.
+const AREAS = [['web', 'website'], ['paid', 'paid ads (Google, Meta)'], ['seo', 'SEO'], ['content', 'content'], ['graphics', 'graphics and branding']];
+export function projectAreas(name){
+  const n = norm(name);
+  if(/\blegacy\b/.test(n)) return [];
+  if(/\bmdf\b|marketing domination/.test(n)) return /\btier 1\b/.test(n) ? ['paid'] : ['paid', 'web', 'seo', 'content'];
+  if(/\bweb ?site\b|\bweb design\b|\bhosting\b|\bmaintenance\b/.test(n)) return ['web'];
+  if(/\bbrand|\blogo|\bgraphic/.test(n)) return ['graphics'];
+  if(/\bseo\b|ai domination|\badf\b/.test(n)) return ['seo', 'content'];
+  if(/\bgoogle ads\b|\bppc\b|\bmeta\b|\bfacebook\b|\bpaid\b/.test(n)) return ['paid'];
+  return [];
+}
+export function planLine(c, projectNames){
+  if(!c) return null;
+  const services = [...new Set(String(c.service || '').split(/\s*·\s*/).map(s => s.trim()).filter(Boolean))];
+  const names = (projectNames || []).filter(Boolean);
+  let areas = null;
+  const all = [...services, ...names];   // Radar's services and Harvest's projects together
+  if(all.length){ const lists = all.map(projectAreas); if(lists.every(l => l.length)){ const s = new Set(lists.flat()); areas = AREAS.filter(a => s.has(a[0])).map(a => a[1]); } }
+  const sow = String(c.sow || '').replace(/\s+/g, ' ').trim();
+  if(!services.length && !names.length && !sow) return null;
+  const parts = [];
+  if(services.length || names.length) parts.push(`pays for ${[...new Set([...services, ...names])].join(', ')}`);
+  if(areas && areas.length) parts.push(`that covers ${areas.join(', ')} work only`);
+  if(sow) parts.push(`scope of work: ${sow.length > 400 ? sow.slice(0, 399).replace(/\s+\S*$/, '') + '…' : sow}`);
+  return `${c.name}: ${parts.join('; ')}.`;
+}
+export async function clientPlan(c, deps = {}){
+  if(!c) return null;
+  const DB = deps.db || db;
+  let names = [];
+  try {
+    const { data: hc } = await DB().from('harvest_clients').select('harvest_id').eq('radar_client_id', String(c.id));
+    const ids = (hc || []).map(h => Number(h.harvest_id));
+    if(ids.length){ const { data: ps } = await DB().from('harvest_projects').select('name,is_active').in('client_harvest_id', ids); names = (ps || []).filter(p => p.is_active !== false).map(p => p.name); }
+  } catch { names = []; }
+  return planLine(c, names);
 }

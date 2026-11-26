@@ -394,4 +394,5 @@ function dbWatchSize(root){
   root._dbRo.observe(root);
 }
 // The week board (This Week) used to open from Today; it opens from the Dashboard's toolbar now.
-VIEW_TOOLBAR_ACTIONS.overview = () => `<button class="btn" onclick="wkEnterWeek()">${icon('calendar-days')}This Week</button>`;
+// Today's Plan from Claude (Nov 25, claude-plan.js), for people with the Assistant on, then This Week
+VIEW_TOOLBAR_ACTIONS.overview = () => (typeof dayPlanToolbarHtml === 'function' ? dayPlanToolbarHtml() : '') + `<button class="btn" onclick="wkEnterWeek()">${icon('calendar-days')}This Week</button>`;

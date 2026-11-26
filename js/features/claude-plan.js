@@ -51,7 +51,7 @@ function claudePlanPrompt(c){
   L.push('3. Then start on step 1 with me: draft the actual work (copy, ad variations, a page section, a message to the client, whatever fits).');
   L.push('4. End with a one-line win we can send the client once it’s done: specific and positive, with no mention of problems or delays.');
   L.push('');
-  L.push(`If the Radar connector is on in this chat, use it for more context (get_client "${c.name}", and its meetings), and when we’re done, offer to log the time and the work in Radar and mark the task done; ask me first.${domain ? ` If Gmail is connected, check the latest emails with ${domain} for anything that changes the plan.` : ''}`);
+  L.push(`If the Radar connector is on in this chat, use it for more context (get_client "${c.name}": what they asked for in the emails Radar read, and its meetings), and when we’re done, offer to log the time and the work in Radar and mark the task done; ask me first.${domain ? ` If Gmail is connected, check the latest emails with ${domain} for anything that changes the plan.` : ''}`);
   let out = L.join('\n');
   if(out.length > CLAUDE_PROMPT_MAX) out = out.slice(0, CLAUDE_PROMPT_MAX - 1) + '…';
   return out;
@@ -62,12 +62,70 @@ function planWithClaude(id){
   window.open(claudeNewChatUrl(claudePlanPrompt(c)), '_blank', 'noopener');
   if(typeof showToast === 'function') showToast('info', 'Opened in Claude', 'The message is ready there, in a new tab. Read it over, then send it.');
 }
-// The button: Claude's own orange, between Mark Handled and the next step's button, with an (i) that
-// says what it does; small (the logo) beside Open Task in Health's list.
-const CLAUDE_PLAN_TIP = 'Opens Claude in a new tab with this client’s next step ready to start: what they pay us for, why Radar flags them, the work logged lately and what’s still open.\n\nClaude stays inside their scope (anything outside it comes back as an add-on to offer), plans the step, starts on it with you and ends with a win for the client. Nothing is sent until you send it.';
+// The button (Nov 25): Claude's own orange with its mark, between Mark Handled and the next step's
+// button. The button is its own tip: held under the pointer for 1.5 s it says, briefly, what it does.
+const CLAUDE_PLAN_TIP = 'Opens Claude with this client’s next step ready to start, inside what they pay us for. Nothing is sent until you send it.';
 function planWithClaudeHtml(id, small){
-  const A = jsArg(id);
+  const A = jsArg(id), tip = escapeHtml(CLAUDE_PLAN_TIP);
   return small
-    ? `<button class="btn sm cl-claude is-ic" onclick="event.stopPropagation();planWithClaude(${A})" aria-label="Plan with Claude" data-hovertip="Plan with Claude: opens Claude with this client’s next step ready to start, inside what they pay us for.">${appLogo('claude', 'xs')}</button>`
-    : `<span class="cl-claude-w"><button class="btn cl-claude-btn" onclick="event.stopPropagation();planWithClaude(${A})">Plan with Claude</button>${typeof infoTip === 'function' ? infoTip(CLAUDE_PLAN_TIP, 'What does Plan with Claude do?') : ''}</span>`;
+    ? `<button class="btn sm cl-claude is-ic" onclick="event.stopPropagation();planWithClaude(${A})" aria-label="Plan with Claude" data-hovertip="Plan with Claude. ${tip}">${appLogo('claude', 'xs')}</button>`
+    : `<button class="btn cl-claude-btn" onclick="event.stopPropagation();planWithClaude(${A})" data-hovertip="${tip}" data-tipdelay="1500">${CLAUDE_SPARK}Plan with Claude</button>`;
+}
+
+// ---- Claude inside Radar (Nov 25) ---------------------------------------------------------------
+// For people whose team card has the Assistant on. The server runs Claude on the agency's key
+// (lib/claude-radar.js); what someone asks for counts toward the Assistant's 40 a day.
+function dayPlanToolbarHtml(){
+  if(!claudeOn()) return '';
+  if(!dayPlan.at && !dayPlan.loading) setTimeout(() => loadDayPlan(), 0);
+  const p = dayPlan.plan, seen = (() => { try{ return localStorage.getItem(dayPlanSeenKey()); }catch(e){ return null; } })();
+  const fresh = p && !p.empty && seen !== p.at;
+  return `<button class="btn dp-btn" onclick="openDayPlan()" data-hovertip="Your plan for today, from Claude: each client’s next step, what they owe us and a win to aim for." data-tipdelay="1500">${CLAUDE_SPARK}Today’s Plan${fresh ? '<i class="dp-new" aria-label="New"></i>' : ''}</button>`;
+}
+function dayPlanBodyHtml(){
+  const d = dayPlan;
+  if(d.making) return `<div class="dp-wait">${CLAUDE_SPARK}<p>Claude is writing your plan…</p><span>It reads your tasks, sprints, follow-ups, client emails and WhatsApp. About half a minute.</span></div>`;
+  if(d.loading && !d.plan) return `<div class="dp-wait"><p>Loading…</p></div>`;
+  if(d.error && !d.plan) return emptyState({ icon: 'refresh-cw', title: 'The plan couldn’t be loaded', text: d.error, action: 'Try Again', onAction: 'loadDayPlan(true)' });
+  const p = d.plan;
+  if(!p) return emptyState({ icon: 'sparkle', title: 'No plan for today yet', text: `Claude writes it each weekday morning. ${d.last ? 'Yours from ' + fmtShortDate(new Date(d.last + 'T12:00:00')) + ' is out of date. ' : ''}You can have it written now.`, action: 'Make Today’s Plan', onAction: 'makeDayPlanNow()' });
+  if(p.empty) return emptyState({ icon: 'check-circle', tone: 'ok', title: 'Nothing on your clients today', text: 'No open tasks, sprints, follow-ups or requests for the clients you work on.' });
+  const A = id => jsArg(id);
+  const first = p.first && p.first.length ? `<section class="dp-first"><h4>Today, first</h4><ol>${p.first.map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ol></section>` : '';
+  const rows = (p.clients || []).map(c => `<section class="dp-cl"><header><a href="#" onclick="closeAppModal();openClientDetail(${A(c.id)});return false;">${escapeHtml(c.client)}</a>${c.addon ? addonTagHtml('') : ''}</header>
+<dl>${c.next ? `<dt>Next step</dt><dd>${escapeHtml(c.next)}</dd>` : ''}<dt>They owe us</dt><dd${c.owe ? '' : ' class="t-3"'}>${escapeHtml(c.owe || 'Nothing')}</dd>${c.win ? `<dt>Win to aim for</dt><dd>${escapeHtml(c.win)}</dd>` : ''}${c.addon ? `<dt>Add-on to offer</dt><dd>${escapeHtml(c.addon)}</dd>` : ''}</dl></section>`).join('');
+  const when = p.at ? fmtTime(new Date(p.at)) : '';
+  return `${first}<div class="dp-list">${rows}</div><p class="dp-foot">${CLAUDE_SPARK}<span>Written by Claude${when ? ` at ${escapeHtml(when)}` : ''} from your tasks, sprints, follow-ups, client emails and WhatsApp. · <button type="button" class="x-lnk" onclick="makeDayPlanNow()">Write It Again</button></span></p>`;
+}
+function dayPlanRedraw(){ const b = document.getElementById('dpBody'); if(b) b.innerHTML = dayPlanBodyHtml(); }
+function openDayPlan(){
+  const p = dayPlan.plan;
+  if(p) try{ localStorage.setItem(dayPlanSeenKey(), p.at); }catch(e){}
+  const day = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  openAppModal(`<h3 class="dp-h">${CLAUDE_SPARK}<span>Today’s Plan</span><small>${escapeHtml(day)}</small></h3><div class="dp" id="dpBody">${dayPlanBodyHtml()}</div><div class="sheet-a"><button class="btn btn-p" id="dpDone" onclick="closeAppModal()">Done</button></div>`, 620);
+  setTimeout(() => document.getElementById('dpDone')?.focus({ preventScroll: true }), 30);   // not on the first client's name
+  if(currentViewName === 'overview') setToolbarActions('overview');
+  if(!dayPlan.plan && !dayPlan.loading) loadDayPlan(true);
+}
+async function makeDayPlanNow(){
+  if(dayPlan.making) return;
+  dayPlan = { ...dayPlan, making: true, error: null }; dayPlanRedraw();
+  const r = await claudeApi({ action: 'day-plan' });
+  dayPlan = r.error ? { ...dayPlan, making: false } : { ...r, at: Date.now() };
+  if(r.error) showToast('error', 'The plan wasn’t written', r.error);
+  else try{ localStorage.setItem(dayPlanSeenKey(), r.plan && r.plan.at); }catch(e){}
+  dayPlanRedraw();
+  if(currentViewName === 'overview') setToolbarActions('overview');
+}
+
+// A meeting → a sprint: from a meeting's notes in Radar, Claude drafts the sprint and Plan's New Sprint
+// opens filled in, to check and save (plan.js psFillFromMeeting).
+function meetingSprintBtnHtml(m){
+  if(!claudeOn() || !m || !(m.clientId || m.metClientId)) return '';
+  return `<button type="button" class="btn sm cl-claude-btn mtn-sprint" onclick="meetingToSprint(${jsArg(m.id)})" data-hovertip="Claude turns this meeting’s action items into a sprint in your Plan, inside what the client pays for. You check it before it’s saved." data-tipdelay="1500">${CLAUDE_SPARK}<span>Plan a Sprint</span></button>`;
+}
+function meetingToSprint(id){
+  const m = (granolaMeetings || []).find(x => x.id === id); if(!m) return;
+  closeAppModal();
+  openNewSprintModal({ meetingId: id, clientId: m.clientId || m.metClientId || '' });
 }

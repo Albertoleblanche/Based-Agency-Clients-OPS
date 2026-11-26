@@ -2479,18 +2479,17 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
    button, with an (i); small (the logo) beside Open Task in Health's list */
 :root{--claude:#D97757;--claude-hover:#C6613F}
 .sp-acts{flex-wrap:wrap}
-.cl-claude-w{display:inline-flex;align-items:center;gap:4px;flex:0 0 auto}
 :is(.mac,html.ui-w .mac,body) .btn.cl-claude-btn.cl-claude-btn.cl-claude-btn{background:var(--claude);color:#fff;border-color:transparent;box-shadow:inset 0 .5px 0 rgba(255,255,255,.22);font-weight:600}
 :is(.mac,html.ui-w .mac,body) .btn.cl-claude-btn.cl-claude-btn.cl-claude-btn:active{background:var(--claude-hover);transform:scale(.97)}
 :is(.mac,html.ui-w .mac,body) .btn.cl-claude-btn.cl-claude-btn.cl-claude-btn:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--claude) 40%,transparent)}
 @media (hover:hover) and (pointer:fine){ :is(.mac,html.ui-w .mac,body) .btn.cl-claude-btn.cl-claude-btn.cl-claude-btn:hover{background:var(--claude-hover);color:#fff} }
 .cl-claude{gap:6px}
+.cl-claude-btn{gap:6px;flex:0 0 auto}
+.cl-claude-btn .cl-spark{width:14px;height:14px;flex:none;display:block}
 .cl-claude.is-ic{width:28px;padding:0;justify-content:center}
 .hx-act{gap:6px;align-items:center}
 .cp-claude-row{display:flex;justify-content:center;margin-top:8px}
-.cp-claude-row .cl-claude-w{width:100%}
 .cp-claude-row .cl-claude-btn{flex:1 1 auto;justify-content:center;height:38px}
-.next .cl-claude-w{margin:0}
 .su-same{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px;padding:10px 10px 10px 14px;border-radius:10px;background:var(--fill);font-size:13px;line-height:1.4}
 .su-same b{font-weight:600}
 .su-same .btn{flex:0 0 auto;height:28px;padding:0 12px;border-radius:7px}
@@ -4152,3 +4151,46 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 .rmp-src{display:inline-flex;align-items:center;gap:6px;min-width:0}
 .rmp-src a{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rmp-src .app-logo,.rmp-src img,.rmp-src svg{flex:none}
+
+/* Not in their plan: offer as add-on (Nov 25), on a suggestion or a WhatsApp request outside what the client pays for */
+.sg-addon{display:inline-flex;align-items:center;align-self:flex-start;max-width:100%;padding:1px 8px;border-radius:999px;font-size:11.5px;font-weight:500;line-height:18px;font-style:normal;white-space:nowrap;
+  color:var(--purple);background:color-mix(in srgb,var(--purple) 12%,transparent);box-shadow:inset 0 0 0 .5px color-mix(in srgb,var(--purple) 30%,transparent)}
+.tk-sg-r .tx .sg-addon,.wx-row .tx .sg-addon,.msug .tx .sg-addon{margin:2px 0}
+.sgp-addon{display:flex;flex-direction:column;gap:4px}
+.wx-addon{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12.5px;color:var(--label-2)}
+.mtp-sg + .sg-addon,.sg-addon + .mtp-sg{margin-left:6px}
+
+/* Claude inside Radar (Nov 25): Today's Plan, a sprint from a meeting */
+.dp-btn{position:relative;gap:6px}
+.dp-btn .cl-spark{width:14px;height:14px;flex:none;display:block;color:var(--claude)}
+.dp-new{position:absolute;top:-3px;right:-3px;width:9px;height:9px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 2px var(--bg-window,var(--bg))}
+.dp-h{display:flex;align-items:center;gap:8px}
+.dp-h .cl-spark{width:18px;height:18px;color:var(--claude);flex:none}
+.dp-h small{margin-left:auto;font-size:13px;font-weight:400;color:var(--label-2)}
+.dp{display:flex;flex-direction:column;gap:16px;max-height:min(62vh,640px);overflow:auto;margin:4px -4px 0;padding:0 4px}
+.dp-first{padding:12px 14px;border-radius:12px;background:color-mix(in srgb,var(--claude) 9%,transparent);box-shadow:inset 0 0 0 .5px color-mix(in srgb,var(--claude) 28%,transparent)}
+.dp-first h4,.dp-cl dt{margin:0;font-size:11.5px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--label-2)}
+.dp-first ol{margin:6px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-size:14px;line-height:1.4}
+.dp-list{display:flex;flex-direction:column}
+.dp-cl{padding:12px 0;border-top:.5px solid var(--sep)}
+.dp-cl:first-child{border-top:0;padding-top:0}
+.dp-cl header{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.dp-cl header a{font-size:15px;font-weight:600;color:var(--label);text-decoration:none}
+@media (hover:hover) and (pointer:fine){ .dp-cl header a:hover{color:var(--accent)} }
+.dp-cl dl{display:grid;grid-template-columns:118px 1fr;gap:4px 12px;margin:0}
+.dp-cl dt{line-height:20px}
+.dp-cl dd{margin:0;font-size:14px;line-height:20px}
+.dp-foot{display:flex;align-items:center;gap:6px;margin:0;font-size:12.5px;color:var(--label-2)}
+.dp-foot .cl-spark{width:12px;height:12px;color:var(--claude);flex:none}
+.dp-wait{display:flex;flex-direction:column;align-items:center;gap:6px;padding:36px 12px;text-align:center}
+.dp-wait .cl-spark{width:26px;height:26px;color:var(--claude);animation:dp-spin 2.4s linear infinite}
+.dp-wait p{margin:0;font-size:15px;font-weight:500}
+.dp-wait span{font-size:13px;color:var(--label-2);max-width:340px}
+@keyframes dp-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){ .dp-wait .cl-spark{animation:none} }
+.pls-steps.is-drafting{opacity:.45;pointer-events:none;transition:opacity 160ms ease-out}
+.pls-addons{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--purple) 7%,transparent)}
+.pls-addons ul{margin:0;padding-left:18px;font-size:13.5px;line-height:1.4}
+.pls-addons p{margin:0;font-size:12.5px;color:var(--label-2)}
+.mtn-btns .cl-claude-btn{height:28px}
+@media (max-width:640px){ .dp-cl dl{grid-template-columns:1fr} .dp-cl dt{margin-top:4px} }

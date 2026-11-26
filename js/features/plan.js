@@ -440,19 +440,23 @@ function openNewSprintModal(o){
     while(due > start && !isPlanWorkday(new Date(due + 'T12:00:00'))) due = toDateStr(addDays(new Date(due + 'T12:00:00'), -1));
     end = due;
   }
-  planSheet = { edit: s ? s.id : null, steps: s ? [] : [''], hours: s ? Math.round(s.hours) : 10, noteId: o.noteId || null, taskId: task ? task.id : null };
+  // from a meeting's notes (Nov 25): Claude drafts it (psFillFromMeeting)
+  const meet = !s && o.meetingId && typeof granolaMeetings !== 'undefined' ? (granolaMeetings || []).find(x => x.id === o.meetingId) : null;
+  planSheet = { edit: s ? s.id : null, steps: s ? [] : [''], hours: s ? Math.round(s.hours) : 10, noteId: o.noteId || null, taskId: task ? task.id : null, meetingId: meet ? meet.id : null };
   const clientId = s ? (s.clientId || '') : (o.clientId || (note && note.clientId) || (task && task.clientId) || '');
   const remOn = s ? new Set((s.reminders || []).filter(r => r.kind && r.kind !== 'custom').map(r => r.kind)) : new Set(['start', 'half', 'end']);
-  const noteMenu = task ? `<span style="margin-right:auto"><button type="button" class="btn" id="psFillBtn" onclick="psFillFromTask()">${icon('sparkle')}Suggest Steps</button></span>`
+  const noteMenu = meet ? `<span style="margin-right:auto"><button type="button" class="btn cl-claude-btn" id="psFillBtn" onclick="psFillFromMeeting()">${CLAUDE_SPARK}Draft Again</button></span>`
+    : task ? `<span style="margin-right:auto"><button type="button" class="btn" id="psFillBtn" onclick="psFillFromTask()">${icon('sparkle')}Suggest Steps</button></span>`
     : !s ? `<span style="position:relative;margin-right:auto"><button type="button" class="btn" id="psFillBtn" onclick="psToggleNoteMenu()">${icon('sparkle')}Fill from a note</button><div class="menu" id="psNoteMenu" hidden style="bottom:34px;left:0;width:300px;max-height:260px;overflow:auto"></div></span>` : '';
   openAppModal(`<h3>${s ? 'Edit Sprint' : 'New Sprint'}</h3>
 <div class="f pls">
-<label for="psTitle">Title</label><input id="psTitle" class="tf" spellcheck="true" placeholder="e.g. Brightway website refresh" value="${escapeHtml(s ? s.title : note ? note.title || '' : task ? task.title : '')}">
+<label for="psTitle">Title</label><input id="psTitle" class="tf" spellcheck="true" placeholder="e.g. Brightway website refresh" value="${escapeHtml(s ? s.title : note ? note.title || '' : task ? task.title : meet ? meet.title || '' : '')}">
 <label for="psClient">Client</label><div>${sheetPop('psClient', 'Client', [['', 'No client'], ...workClients(clientId).slice().sort((a, b) => a.name.localeCompare(b.name)).map(c => [c.id, c.name])], clientId, 'psSync()')}</div>
 <label>Dates</label><div class="pls-row">${sheetDateField('psStart', start, { from: 0, to: 60, label: 'Starts', after: 'psSync' })}<span class="pls-to">to</span>${sheetDateField('psEnd', end, { from: 0, to: 45, label: 'Ends', after: 'psSync' })}<span class="pls-h" id="psDays"></span></div>
 <label>Hours</label><div class="pls-row"><span class="pls-num"><button type="button" aria-label="Fewer hours" onclick="psHours(-1)">−</button><b id="psHours">${planSheet.hours} h</b><button type="button" aria-label="More hours" onclick="psHours(1)">+</button></span><span class="pls-h" id="psBudget"></span></div>
 <label class="top" for="psGoal">Goal</label><textarea id="psGoal" class="tf pls-goal" spellcheck="true" placeholder="What’s done when this sprint is done?">${escapeHtml(s ? s.goal : '')}</textarea>
 ${s ? '' : `<label class="top">Steps</label><div class="pls-steps" id="psSteps"></div>`}
+${meet ? `<span></span><div class="pls-addons" id="psAddons" hidden></div>` : ''}
 <label class="top">Remind me</label><div class="pls-rms" id="psRems">${[['start', 'When it starts'], ['half', 'Halfway check-in'], ['end', 'The day before it ends']].map(([k, l]) => `<div class="pls-rm">${sheetCk(remOn.has(k), l, 'psRemToggle(this)').replace('<button', `<button data-k="${k}"`)}<b>${l}</b><span id="psRem-${k}"></span></div>`).join('')}</div>
 <label>Color</label><div>${colorSwatchesHtml('psColor', s ? s.color : null)}</div>
 ${s ? '' : `<span></span><div style="display:flex;align-items:center;gap:10px;font-size:14px">${sheetSw('psCal', true, 'Add to my calendar')}Add to my calendar</div>`}
@@ -463,6 +467,38 @@ ${s ? '' : `<span></span><div style="display:flex;align-items:center;gap:10px;fo
   setTimeout(() => document.getElementById('psTitle')?.focus(), 30);
   if(note && !s) psFillFromNote(note.id);
   if(task) psFillFromTask();
+  if(meet) psFillFromMeeting();
+}
+// Claude drafts the sprint from the meeting's notes: title, goal, how long, the hours and the steps,
+// inside what the client pays for; what's outside it shows under the steps, as add-ons to offer.
+async function psFillFromMeeting(){
+  const ps = planSheet; if(!ps || !ps.meetingId) return;
+  const btn = document.getElementById('psFillBtn'), g = id => document.getElementById(id);
+  if(btn){ btn.disabled = true; btn.innerHTML = `${CLAUDE_SPARK}Drafting…`; }
+  const steps = g('psSteps'); if(steps) steps.classList.add('is-drafting');
+  const r = await claudeApi({ action: 'sprint-from-meeting', note: ps.meetingId });
+  if(planSheet !== ps || !g('psTitle')) return;
+  if(btn){ btn.disabled = false; btn.innerHTML = `${CLAUDE_SPARK}Draft Again`; }
+  if(steps) steps.classList.remove('is-drafting');
+  if(r.error){ showToast('error', 'Claude couldn’t draft it', r.error); return; }
+  g('psTitle').value = r.title || g('psTitle').value;
+  g('psGoal').value = r.goal || g('psGoal').value;
+  if(r.clientId && g('psClient')){ g('psClient').value = r.clientId; syncPopSel(g('psClient')); }
+  const start = g('psStart').value || planDefaultStart();
+  const sel = g('psEnd');
+  if(sel && r.workdays){
+    const end = planAddWorkdays(start, Math.max(1, r.workdays - 1));
+    if(![...sel.options].some(x => x.value === end)) sel.add(new Option(sheetDateLabelLong(end), end), sel.querySelector('option[value="__other"]'));
+    sel.value = end; syncPopSel(sel);
+  }
+  if(r.hours){ ps.hours = r.hours; const h = g('psHours'); if(h) h.textContent = ps.hours + ' h'; }
+  if(Array.isArray(r.steps) && r.steps.length){ ps.steps = r.steps.slice(); psRenderSteps(); }
+  const ad = g('psAddons');
+  if(ad){
+    ad.hidden = !(r.addOns && r.addOns.length);
+    ad.innerHTML = r.addOns && r.addOns.length ? `${addonTagHtml('')}<ul>${r.addOns.map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul><p>Left out of the sprint: they aren’t part of what ${escapeHtml(r.client || 'the client')} pays for.</p>` : '';
+  }
+  psSync();
 }
 function psRenderSteps(focus){
   const el = document.getElementById('psSteps'); if(!el || !planSheet) return;

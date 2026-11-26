@@ -45,9 +45,10 @@ document.addEventListener('mouseover', e => {
   const b = e.target.closest && e.target.closest(ITIP_SEL);
   if(!b || b === ITIP.btn || ITIP.pinned) return;
   clearTimeout(ITIP.timer);
-  // the first tip waits a moment; the next ones open straight away
-  const quick = ITIP.btn || Date.now() - ITIP.lastHide < 700;
-  ITIP.timer = setTimeout(() => itipShow(b), quick ? 0 : 280);
+  // the first tip waits a moment; the next ones open straight away. A button that is its own tip
+  // (data-tipdelay, Nov 25: Plan with Claude) always waits its time, so passing over it shows nothing.
+  const quick = ITIP.btn || Date.now() - ITIP.lastHide < 700, own = Number(b.getAttribute('data-tipdelay')) || 0;
+  ITIP.timer = setTimeout(() => itipShow(b), own || (quick ? 0 : 280));
 });
 document.addEventListener('mouseout', e => {
   const b = e.target.closest && e.target.closest(ITIP_SEL);
@@ -65,6 +66,7 @@ document.addEventListener('click', e => {
     if(ITIP.btn === b && ITIP.pinned) itipHide(); else { itipShow(b); ITIP.pinned = true; }
     return;
   }
+  clearTimeout(ITIP.timer);   // a tip still waiting to show doesn't show after a click
   if(ITIP.pinned) itipHide();
   else if(ITIP.btn && ITIP.btn.hasAttribute('data-hovertip')) itipHide();   // a click on the Focus pill: its tip goes
 }, true);

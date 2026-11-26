@@ -589,3 +589,26 @@ body.mac.mobile { overflow: hidden; background: var(--ios-bg, #F2F2F7); -webkit-
 .app .msl-b:disabled{opacity:.4}
 .app .msl-b:active{background:var(--fill)}
 .app .msl-notes{min-height:84px}
+
+/* Claude inside Radar (Nov 25): Today's Plan on Today, and the "Not in their plan" label */
+.app { --claude: #D97757; }
+.app .sg-addon { display: inline-flex; align-items: center; align-self: flex-start; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 500; line-height: 18px; white-space: nowrap; color: var(--purple); background: color-mix(in srgb, var(--purple) 12%, transparent); }
+.app .msug .tx .sg-addon { margin: 2px 0; }
+.app .idp { display: flex; align-items: center; gap: 12px; width: calc(100% - 32px); margin: 12px 16px 0; padding: 12px 14px; border-radius: 14px; text-align: left; background: color-mix(in srgb, var(--claude) 8%, var(--grp, var(--card))); box-shadow: inset 0 0 0 .5px color-mix(in srgb, var(--claude) 30%, transparent); color: var(--label); }
+.app .idp:active { transform: scale(.98); transition: transform 100ms ease-out; }
+.app .idp-ic { width: 32px; height: 32px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; background: var(--claude); color: #fff; flex: none; }
+.app .idp-ic .cl-spark { width: 18px; height: 18px; display: block; }
+.app .idp-t { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.app .idp-t b { font-size: 15px; font-weight: 600; }
+.app .idp-t span { font-size: 13px; color: var(--label-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app .idp > svg:last-child { width: 16px; height: 16px; color: var(--label-3, var(--label-2)); flex: none; }
+.app .idp-first { margin: 0 16px; padding: 12px 14px 12px 32px; border-radius: 12px; background: color-mix(in srgb, var(--claude) 9%, transparent); display: flex; flex-direction: column; gap: 6px; font-size: 15px; line-height: 1.4; }
+.app .idp-cl { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.app .idp-h { display: flex; align-items: center; justify-content: space-between; width: 100%; color: var(--label); text-align: left; }
+.app .idp-h b { font-size: 16px; font-weight: 600; }
+.app .idp-h svg { width: 15px; height: 15px; color: var(--label-2); }
+.app .idp-cl dl { margin: 0; display: flex; flex-direction: column; gap: 2px; }
+.app .idp-cl dt { margin-top: 6px; font-size: 11.5px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: var(--label-2); }
+.app .idp-cl dt:first-child { margin-top: 0; }
+.app .idp-cl dd { margin: 0; font-size: 15px; line-height: 1.4; }
+.app .idp-cl + .idp-cl { margin-top: 10px; }

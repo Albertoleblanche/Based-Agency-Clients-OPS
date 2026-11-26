@@ -481,12 +481,35 @@ function mTodayHtml(){
 <h1 class="big">Today</h1><p class="big-sub">${mEsc(sub)}</p>
 ${mPushCardHtml()}
 ${mGlanceHtml(behind, waiting, health)}
+${mDayPlanCardHtml()}
 ${mTimerCardHtml()}
 ${behind.length ? mIsh(lateN ? `${behind.length} due or overdue` : `${behind.length} due today`, "mOpenWeek()") + `<div class="ig">${behindRows}</div>` : ''}
 ${health.length ? mIsh('Health', "mOpenClients('health')") + `<div class="ig">${healthRows}</div>` : ''}
 ${waiting.length ? mIsh(`${waiting.length} waiting for ${canApproveUpdates() ? 'review' : 'you'}`, "mSwitchTab('review')") + `<div class="ig">${waitRows}</div>` : ''}
 ${due.length ? mIsh('Due today', "mSwitchTab('tasks')") + `<div class="ig">${due.slice(0, 5).map(mTaskRow).join('')}</div>` : ''}
 ${!behind.length && !health.length && !waiting.length && !due.length ? `<div style="margin-top:22px">${mEmpty('You’re all caught up', mNextDue(sum.ws.filter(w => mMine(w.c))))}</div>` : ''}`;
+}
+// Today's Plan (Nov 25): Claude's plan for your day, for people with the Assistant on (claude-radar.js;
+// written each weekday morning on the server, lib/claude-radar.js)
+function mDayPlanCardHtml(){
+  if(typeof claudeOn !== 'function' || !claudeOn()) return '';
+  if(!dayPlan.at && !dayPlan.loading) setTimeout(() => loadDayPlan(), 0);
+  const p = dayPlan.plan; if(!p || p.empty || !(p.clients || []).length) return '';
+  const line = (p.first || [])[0] || `${p.clients.length} client${p.clients.length === 1 ? '' : 's'}: next steps and wins`;
+  return `<button class="idp" onclick="mOpenDayPlan()"><span class="idp-ic">${CLAUDE_SPARK}</span><span class="idp-t"><b>Today’s Plan</b><span>${mEsc(line)}</span></span>${icon('caret-right')}</button>`;
+}
+function mDayPlanLoaded(){ if(mTab === 'today' && !mStack.length) mRenderTab(); }
+function mOpenDayPlan(){
+  mPush('Today’s Plan', () => {
+    const p = dayPlan.plan;
+    if(!p) return `<h1 class="big">Today’s Plan</h1>${mEmpty('No plan for today yet', 'Claude writes it each weekday morning.')}`;
+    const when = p.at ? fmtTime(new Date(p.at)) : '';
+    const first = (p.first || []).length ? mIsh('Today, first') + `<ol class="idp-first">${p.first.map(x => `<li>${mEsc(x)}</li>`).join('')}</ol>` : '';
+    const rows = (p.clients || []).map(c => `<div class="ig idp-cl"><button class="idp-h" onclick="mOpenClient(${jsArg(c.id)})"><b>${mEsc(c.client)}</b>${icon('caret-right')}</button>`
+      + (c.addon ? `<div class="idp-tag">${addonTagHtml('')}</div>` : '')
+      + `<dl>${c.next ? `<dt>Next step</dt><dd>${mEsc(c.next)}</dd>` : ''}<dt>They owe us</dt><dd>${mEsc(c.owe || 'Nothing')}</dd>${c.win ? `<dt>Win to aim for</dt><dd>${mEsc(c.win)}</dd>` : ''}${c.addon ? `<dt>Add-on to offer</dt><dd>${mEsc(c.addon)}</dd>` : ''}</dl></div>`).join('');
+    return `<h1 class="big">Today’s Plan</h1><p class="big-sub">Written by Claude${when ? ` at ${mEsc(when)}` : ''}</p>${first}${mIsh('Your clients')}${rows}`;
+  });
 }
 // Three numbers to read at a glance; each opens the list behind it.
 function mGlanceHtml(behind, waiting, health){
@@ -641,7 +664,7 @@ function mSuggestHtml(){
   if(typeof taskSuggestions === 'undefined' || !taskSuggestions || mTaskScope === 'byme') return '';
   const list = suggestionsOpen(taskSuggestions).filter(s => mTaskClient === 'all' || s.clientId === mTaskClient);
   if(!list.length) return '';
-  const row = s => `<div class="ir msug" data-sg="${s.id}"><button class="tx" onclick="mSgPreview('${s.id}')"><span class="t n">${mEsc(s.title)}</span><span class="s">${mEsc(suggestionSub(s).join(' · '))}</span></button>`
+  const row = s => `<div class="ir msug" data-sg="${s.id}"><button class="tx" onclick="mSgPreview('${s.id}')"><span class="t n">${mEsc(s.title)}</span>${s.outOfScope ? addonTagHtml('') : ''}<span class="s">${mEsc(suggestionSub(s).join(' · '))}</span></button>`
     + `<button class="msg-add" onclick="mSgAdd('${s.id}')">Add</button><button class="msg-x" aria-label="Dismiss ${mEsc(s.title)}" onclick="mSgDismiss('${s.id}')">${icon('x', { weight: 'bold' })}</button></div>`;
   // where they're from (Nov 24): Granola meetings, clients' emails, or both
   const fromMail = list.some(s => s.source === 'gmail'), fromMeet = list.some(s => s.source !== 'gmail');

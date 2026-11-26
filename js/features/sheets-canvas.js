@@ -781,7 +781,14 @@ function ntReadForm(){
 let taskSuggestions = null, taskSuggestionsAt = 0;   // my pending ones; null until loaded
 function suggestionFromDb(r){
   return { id: r.id, title: r.title, description: r.description || '', clientId: r.client_id || '', dueDate: r.due_date || '', priority: r.priority || 'medium',
-    source: r.source || 'granola', sourceTitle: r.source_title || (r.source === 'gmail' ? 'an email' : 'a meeting'), sourceUrl: r.source_url || '', sourceAt: r.source_at || r.created_at, quote: r.quote || '', sourceId: r.source_id || '', assigneeId: r.assignee_id || null, status: r.status || 'pending' };
+    source: r.source || 'granola', sourceTitle: r.source_title || (r.source === 'gmail' ? 'an email' : 'a meeting'), sourceUrl: r.source_url || '', sourceAt: r.source_at || r.created_at, quote: r.quote || '', sourceId: r.source_id || '', assigneeId: r.assignee_id || null, status: r.status || 'pending',
+    outOfScope: !!r.out_of_scope, scopeNote: r.scope_note || '' };
+}
+// Not in their plan (Nov 25): a request outside what the client pays for comes in with this label, and
+// whoever reviews it decides (add it, offer it as an add-on, or dismiss it). The note says why.
+const ADDON_WORDS = 'Not in their plan: offer as add-on';
+function addonTagHtml(note){
+  return `<span class="sg-addon"${note ? ` data-hovertip="${escapeHtml(note)}"` : ''}>${ADDON_WORDS}</span>`;
 }
 async function loadTaskSuggestions(){
   if(typeof currentUser === 'undefined' || !currentUser) return [];
@@ -990,13 +997,14 @@ function suggestionExcerpt(s){
 function suggestionPreviewHtml(s){
   const sub = suggestionSub(s), meet = s.sourceUrl ? `<a href="${safeUrl(s.sourceUrl)}" target="_blank" rel="noopener">${escapeHtml(sub[0])}</a>` : escapeHtml(sub[0]);
   // from a client's email (Nov 24): its subject, what they wrote, and the email in Gmail
-  if(s.source === 'gmail') return `<p class="sgp-meta">${appLogo('gmail', 'xs')}<span>${meet}${sub.slice(1).map(x => ' · ' + escapeHtml(x)).join('')}</span></p>
+  const addon = s.outOfScope ? `<div class="sgp-sec sgp-addon">${addonTagHtml('')}${s.scopeNote ? `<p class="sgp-d">${escapeHtml(s.scopeNote)}</p>` : ''}</div>` : '';
+  if(s.source === 'gmail') return `<p class="sgp-meta">${appLogo('gmail', 'xs')}<span>${meet}${sub.slice(1).map(x => ' · ' + escapeHtml(x)).join('')}</span></p>${addon}
 ${s.description ? `<div class="sgp-sec"><span class="sgp-k">What it’s about</span><p class="sgp-d">${escapeHtml(s.description)}</p></div>` : ''}
 ${s.quote ? `<div class="sgp-sec"><span class="sgp-k">What they wrote</span><blockquote class="sgp-q">${escapeHtml(s.quote)}</blockquote></div>` : ''}
 ${s.sourceUrl ? `<p class="sgp-open"><a class="x-lnk" href="${safeUrl(s.sourceUrl)}" target="_blank" rel="noopener">Open the email in Gmail</a></p>` : ''}`;
   const ex = suggestionExcerpt(s);
   const loading = granolaMeetings === null && s.sourceId;
-  return `<p class="sgp-meta">${appLogo('granola', 'xs')}<span>${meet}${sub.slice(1).map(x => ' · ' + escapeHtml(x)).join('')}</span></p>
+  return `<p class="sgp-meta">${appLogo('granola', 'xs')}<span>${meet}${sub.slice(1).map(x => ' · ' + escapeHtml(x)).join('')}</span></p>${addon}
 ${s.description ? `<div class="sgp-sec"><span class="sgp-k">What it’s about</span><p class="sgp-d">${escapeHtml(s.description)}</p></div>` : ''}
 ${s.quote ? `<div class="sgp-sec"><span class="sgp-k">What was said</span><blockquote class="sgp-q">${escapeHtml(s.quote)}</blockquote></div>` : ''}
 ${ex ? `<div class="sgp-sec"><span class="sgp-k">In the meeting notes</span><div class="sgp-ex mtn-body">${meetingNotesHtml(ex)}</div></div>`
@@ -1099,7 +1107,8 @@ function meetingTopHtml(m){
     : can ? 'Any point can be a task for someone on the team.' : mine ? 'Any point can be one of your tasks.' : '';
   const btn = (cls, ic, label, js) => `<button type="button" class="btn sm mtn-ai${cls}" onclick="${js}">${icon(ic)}<span>${label}</span></button>`;
   const acts = v !== 'notes' ? btn('', 'file-pdf', 'Show the Notes', `meetingShowNotes('${m.id}')`)
-    : btn(' is-ai', 'sparkle', can ? 'Pull the Tasks' : 'Pull My Tasks', `meetingToggleView('${m.id}')`) + (meetingWithClient(m) ? btn(' is-ai', 'envelope-simple', 'Draft a Recap', `meetingRecap('${m.id}')`) : '');
+    : btn(' is-ai', 'sparkle', can ? 'Pull the Tasks' : 'Pull My Tasks', `meetingToggleView('${m.id}')`) + (meetingWithClient(m) ? btn(' is-ai', 'envelope-simple', 'Draft a Recap', `meetingRecap('${m.id}')`) : '')
+      + (typeof meetingSprintBtnHtml === 'function' ? meetingSprintBtnHtml(m) : '');   // a sprint from it, with Claude (Nov 25)
   return `<div class="mtn-bar"><p class="mtn-tasks">${v !== 'notes' ? icon('sparkle') : appLogo('granola', 'xs')}<span>${words}</span></p><div class="mtn-btns">${acts}</div></div>`;
 }
 function meetingShowNotes(id){ const m = (granolaMeetings || []).find(x => x.id === id); if(!m) return; meetingView[id] = 'notes'; meetingRedraw(m); }
@@ -1260,7 +1269,8 @@ function mtSideHtml(m, sp){
     return `<button type="button" class="mtp-ok" onclick="meetingOpenTask('${t.id}')" title="Open the task">${icon('check', { weight: 'bold' })}<span>${escapeHtml(who)}</span></button>`;
   }
   const sg = mtSpecSuggestions(m, sp);
-  const note = sg.length ? `<span class="mtp-sg" title="Suggested from the notes; it’s waiting in their Tasks">Suggested to ${escapeHtml(mtList(sg.map(s => mtName(s.assigneeId))))}</span>` : '';
+  const off = sg.find(s => s.out_of_scope || s.outOfScope);
+  const note = (off ? addonTagHtml(off.scope_note || off.scopeNote || '') : '') + (sg.length ? `<span class="mtp-sg" title="Suggested from the notes; it’s waiting in their Tasks">Suggested to ${escapeHtml(mtList(sg.map(s => mtName(s.assigneeId))))}</span>` : '');
   // (iPhone shows the + alone, as a round button)
   if(meetingCanAssign()) return `${note}<button type="button" class="btn sm mtp-go" aria-label="Assign “${escapeHtml(sp.title)}”" onclick="meetingAssign('${m.id}', '${sp.key}')">${icon('plus', { weight: 'bold' })}<span>Assign…</span></button>`;
   if(meetingWasMine(m)) return `${note}<button type="button" class="btn sm mtp-go" aria-label="Add “${escapeHtml(sp.title)}” to my tasks" onclick="meetingAdd('${m.id}', '${sp.key}', this)">${icon('plus', { weight: 'bold' })}<span>Add to My Tasks</span></button>`;

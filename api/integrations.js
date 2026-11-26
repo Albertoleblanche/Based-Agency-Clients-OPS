@@ -39,6 +39,9 @@
 // GET  /api/integrations?provider=gmail → your Gmail (read only) and your Gmail label's status
 // POST /api/integrations  body: { provider: 'gmail', action: 'start' | 'disconnect' | 'read' (force) | 'label-key'
 //   (a new key for your label script; the old one stops working) | 'label-off' } — lib/gmail-tasks.js, lib/gmail-label.js
+// GET  /api/integrations?provider=claude → your plan for today; POST { provider: 'claude', action: 'day-plan' }
+//   makes it again, { action: 'sprint-from-meeting', note } drafts a sprint from a meeting (lib/claude-radar.js;
+//   people with the Assistant on). /api/integrations?route=day-plan-tick: the weekday-morning plans (cron).
 // POST /api/integrations?route=gmail-label (before the sign-in check; header x-radar-key): an email
 //   someone labelled "Radar" in Gmail, from their own Apps Script → a suggested task (lib/gmail-label.js)
 //
@@ -99,6 +102,14 @@ module.exports = async function handler(req, res) {
   if (route === 'gmail-tick') {
     if (process.env.CRON_SECRET && (req.headers.authorization || '') !== `Bearer ${process.env.CRON_SECRET}`) { res.status(401).json({ error: 'Not allowed' }); return; }
     try { res.status(200).json(await gmailTick(createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY), { budgetMs: 45000 })); }
+    catch (e) { res.status(500).json({ error: String(e) }); }
+    return;
+  }
+  // The daily plan (Nov 25): each weekday morning, Claude writes the plan of everyone with the Assistant on
+  // (vercel.json crons, a few runs so everyone fits; lib/claude-radar.js)
+  if (route === 'day-plan-tick') {
+    if (process.env.CRON_SECRET && (req.headers.authorization || '') !== `Bearer ${process.env.CRON_SECRET}`) { res.status(401).json({ error: 'Not allowed' }); return; }
+    try { res.status(200).json(await require('../lib/claude-radar').dayPlanTick(createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY), { budgetMs: 45000 })); }
     catch (e) { res.status(500).json({ error: String(e) }); }
     return;
   }
@@ -163,8 +174,22 @@ module.exports = async function handler(req, res) {
     const userId = userData.user.id;
     const provider = req.method === 'GET' ? req.query.provider : (req.body || {}).provider;
 
-    if (provider !== 'google' && provider !== 'harvest' && provider !== 'push' && provider !== 'granola' && provider !== 'slack-me' && provider !== 'gmail' && provider !== 'clients') {
-      res.status(400).json({ error: 'Missing or unknown provider — expected "google", "harvest", "push", "granola", "slack-me", "gmail" or "clients".' });
+    if (provider !== 'google' && provider !== 'harvest' && provider !== 'push' && provider !== 'granola' && provider !== 'slack-me' && provider !== 'gmail' && provider !== 'clients' && provider !== 'claude') {
+      res.status(400).json({ error: 'Missing or unknown provider — expected "google", "harvest", "push", "granola", "slack-me", "gmail", "clients" or "claude".' });
+      return;
+    }
+
+    // ================= CLAUDE IN RADAR (Nov 25) =================
+    // The Claude buttons, on the agency's Claude key, for people with the Assistant on (lib/claude-radar.js):
+    // today's plan (GET; POST action 'day-plan' makes it again), a meeting as a sprint ('sprint-from-meeting').
+    if (provider === 'claude') {
+      const cr = require('../lib/claude-radar');
+      const b = req.body || {};
+      const r = req.method === 'GET' ? await cr.dayPlanFor(admin, userId)
+        : b.action === 'day-plan' ? await cr.dayPlanFor(admin, userId, { make: true })
+        : b.action === 'sprint-from-meeting' ? await cr.sprintFromMeeting(admin, userId, userData.user.email, b.note)
+        : { error: `Unknown action: ${b.action}`, status: 400 };
+      res.status(r.error ? (r.status || 400) : 200).json(r);
       return;
     }
 

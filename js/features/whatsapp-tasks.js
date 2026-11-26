@@ -634,7 +634,7 @@ function waRowHtml(t, sel, o){
     right = `${nudge}${showWho ? `<b class="wx-who${mine ? ' is-me' : ''}">${escapeHtml(mine ? 'You' : waOwnerName(t))}</b>` : ''}<span class="rmi-when${waLate(t) ? ' is-late' : waDays(t) === 0 ? ' is-new' : ''}">${escapeHtml(when)}</span>`;
   }
   return `<div class="wa-r wx-row${closed ? ' is-done' : ''}${sel && sel.id === t.id ? ' is-sel' : ''}" role="button" tabindex="0" onclick="selectWa('${t.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)selectWa('${t.id}')">${cb}
-<div class="tx">${why}<b>${escapeHtml(t.title)}</b>${sub}</div><div class="wx-row-r">${right}</div></div>`;
+<div class="tx">${why}<b>${escapeHtml(t.title)}</b>${t.out_of_scope && !closed ? addonTagHtml(t.scope_note) : ''}${sub}</div><div class="wx-row-r">${right}</div></div>`;
 }
 // A team member's next thing to do, large, with its buttons; the rest sits under it by client.
 function waNextHtml(t, why){
@@ -644,6 +644,7 @@ function waNextHtml(t, why){
 <div class="wx-next-cl">${c ? `<a href="#" onclick="openClientDetail('${escapeHtml(String(c.id))}');return false;">${escapeHtml(name)}${icon('caret-right')}</a>` : `<b>${escapeHtml(name)}</b>`}${svc ? `<span>${escapeHtml(svc)}</span>` : ''}</div>
 ${why ? `<span class="wx-why${why.red ? ' is-red' : ''}">${escapeHtml(why.text)}</span>` : ''}
 <h3>${escapeHtml(t.title)}</h3>
+${t.out_of_scope ? `<div class="wx-addon">${addonTagHtml('')}${t.scope_note ? `<span>${escapeHtml(t.scope_note)}</span>` : ''}</div>` : ''}
 <span class="wx-next-k">${escapeHtml(WA_KIND[t.kind] || 'Request')}${why && (why.k === 'late' || why.k === 'due' || why.k === 'today') ? '' : ` · ${escapeHtml(waAgeWord(t))}`}</span>
 ${t.source_excerpt ? `<div class="wx-said"><span class="who">In the group · ${escapeHtml(waWhen(t.first_seen))}</span><p>${escapeHtml(t.source_excerpt)}</p></div>` : ''}
 <div class="wx-pa"><button class="btn btn-p" onclick="waMarkDone('${t.id}')">${icon('check')}Mark Done</button><button class="btn" onclick="selectWa('${t.id}')">Open the Chat</button></div>
@@ -902,6 +903,7 @@ function waPanelHtml(t){
   if(!closed){
     if(t.urgent_at) facts.push(`<em class="wa-urg">Urgent</em>`);
     else if(t.priority === 'high') facts.push('<em class="wa-hi">High priority</em>');
+    if(t.out_of_scope) facts.push(addonTagHtml(t.scope_note));
     const d = waDays(t), word = d === 0 ? 'New today' : waDueToday(t) ? `Answer today · waiting ${waAgeWord(t)}` : `Waiting ${waAgeWord(t)}`;
     facts.push(`<b class="${waLate(t) ? 'is-red' : d === 0 ? 'is-new' : ''}">${escapeHtml(word)}</b>`);
     acts = can ? `${taskBtn}<button class="btn" onclick="waDismiss('${t.id}')">Not a Task</button><button class="btn btn-p" onclick="waMarkDone('${t.id}')">${icon('check')}Mark Done</button>` : '';
