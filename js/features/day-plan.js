@@ -202,7 +202,7 @@ function dpRingMount(){
   el.id = 'dpRing'; el.className = 'dpr';
   el.innerHTML = `<div class="dpr-say" role="status" aria-live="polite"></div>
 <div class="dpr-pop" id="dprPop"></div>
-<button type="button" class="dpr-b" onclick="dpRingOpen()" aria-describedby="dprPop"><svg class="dpr-r" viewBox="0 0 22 22" aria-hidden="true"><circle class="dpr-tr" cx="11" cy="11" r="8.5"/><circle class="dpr-pr" cx="11" cy="11" r="8.5" pathLength="100"/><path class="dpr-ck" d="M7.4 11.3l2.4 2.4 4.8-5" pathLength="1"/></svg><span class="dpr-n"></span></button>`;
+<button type="button" class="dpr-b" onclick="dpRingOpen()" aria-describedby="dprPop"><svg class="dpr-r" viewBox="0 0 22 22" aria-hidden="true"><circle class="dpr-tr" cx="11" cy="11" r="8.5"/><circle class="dpr-pr" cx="11" cy="11" r="8.5" pathLength="100"/><path class="dpr-ck" d="M7.4 11.3l2.4 2.4 4.8-5" pathLength="1"/></svg><span class="dpr-name">Today’s Plan</span><span class="dpr-n"></span></button>`;
   document.body.appendChild(el);
   el.addEventListener('mouseenter', () => { clearTimeout(dpRing.closeT); dpRing.openT = setTimeout(() => dpRingPop(true), 90); });
   el.addEventListener('mouseleave', () => { clearTimeout(dpRing.openT); dpRing.closeT = setTimeout(() => dpRingPop(false), 180); });
@@ -213,6 +213,12 @@ function dpRingMount(){
   say.addEventListener('mouseenter', () => clearTimeout(dpRing.sayT));
   say.addEventListener('mouseleave', () => { dpRing.sayT = setTimeout(dpRingSayOff, 2200); });
   requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('is-in')));
+  // the first time anyone sees it: one line on what it is, then never again
+  setTimeout(() => {
+    const k = `bda_dp_intro_${currentUser ? currentUser.id : ''}`;
+    try{ if(localStorage.getItem(k)) return; }catch(e){ return; }
+    if(document.getElementById('dpRing') && dpRingSay('<b>This is your Today’s Plan.</b><span>Claude planned your day; this fills in as you get it done. Hover to see what’s left.</span>', 9000)) try{ localStorage.setItem(k, '1'); }catch(e){}
+  }, 1400);
   return el;
 }
 function dpRingUnmount(){ const el = document.getElementById('dpRing'); if(el) el.remove(); }
