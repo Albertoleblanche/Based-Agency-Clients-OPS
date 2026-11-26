@@ -349,6 +349,7 @@ async function notifOpenSuggestions(n){
   if(!fromIt.length){ showToast('info', mail ? 'Nothing left to decide from those emails' : 'Nothing left to decide from that meeting', 'Its suggestions were added or dismissed.'); return; }
   if(fromIt.length === 1 && typeof tkSgPreview === 'function'){ setTimeout(() => tkSgPreview(fromIt[0].id), 60); return; }
   if(typeof tkSgAll !== 'undefined') tkSgAll = true;
+  window._tkSgOpen = true; window._taskSel = null;   // they're in the Suggestions panel (Nov 26)
   if(typeof renderTasks === 'function') renderTasks();
   setTimeout(() => {
     const rows = fromIt.map(s => document.querySelector(`.tk-sg-r[data-sg="${s.id}"]`)).filter(Boolean);

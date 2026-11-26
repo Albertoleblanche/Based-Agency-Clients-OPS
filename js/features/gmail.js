@@ -51,8 +51,8 @@ async function gmailCheckNow(){
   if(r.suggested && currentViewName === 'tasks' && typeof renderTasks === 'function') renderTasks();
   if(currentViewName === 'settings' && typeof loadIntegrationStatuses === 'function') loadIntegrationStatuses();
 }
-// Check Gmail, in Tasks next to Check Granola (Nov 24): shown once your Gmail is connected.
-let tkGmailBusy = false, gmailAsked = false;
+// Is your Gmail connected (Tasks' Suggestions panel reads it with Check Now, Nov 26)
+let gmailAsked = false;
 function gmailOnHere(){
   if(gmailState === null && !gmailAsked){
     gmailAsked = true;
@@ -63,17 +63,6 @@ function gmailOnHere(){
     });
   }
   return !!(gmailState && gmailState.connected);
-}
-function tkGmailBtn(){
-  if(!gmailOnHere()) return '';
-  return `<button class="btn tk-gr" id="tkGmail" onclick="tkGmailCheck()"${tkGmailBusy ? ' disabled' : ''} title="Look for new requests in your clients’ emails">${tkGmailBusy ? '<span class="tk-gr-spin" aria-hidden="true"></span>Checking…' : `${appLogo('gmail', 'xs')}Check Gmail`}</button>`;
-}
-async function tkGmailCheck(){
-  if(tkGmailBusy) return;
-  tkGmailBusy = true; renderTasks();
-  let r; try{ r = await gmailReadNow(); } finally { tkGmailBusy = false; }
-  gmailReadToast(r);
-  renderTasks();
 }
 // Opening Tasks: if you're connected, new client emails are read (the server skips it if it read in
 // the last 10 minutes), and anything it suggests shows up in the list.

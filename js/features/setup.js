@@ -179,7 +179,7 @@ function setupNudge(){
     const timer = document.getElementById('sideTimer'); if(!timer) return;
     el = document.createElement('div'); el.id = 'setupNudge'; el.className = 'su-nudge';
     el.innerHTML = `<button class="su-nudge-b" onclick="suNudgeGo()"><span class="su-nh"><b>Set Up Radar</b><i class="su-new" hidden>New</i><span class="su-nc"></span></span><span class="su-segs" aria-hidden="true"></span><span class="su-nx"><span class="su-nt"></span>${icon('chevron-right')}</span></button><button class="ib su-nudge-x" aria-label="Hide Set Up Radar" title="Hide" onclick="setupNudgeHide()">${icon('x')}</button>`;
-    timer.parentNode.insertBefore(el, timer);
+    timer.parentNode.insertBefore(el, document.getElementById('dpRing') && document.getElementById('dpRing').parentNode === timer.parentNode ? document.getElementById('dpRing') : timer);   // above Today's Plan
   }
   // the steps that count: the main ones, less any not set up for the team yet
   const main = setupSteps().filter(s => s.k !== 'welcome' && s.k !== 'done' && !s.optional && (!suLoaded || suStatus(s.k) !== 'na'));

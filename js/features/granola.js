@@ -1,50 +1,14 @@
 // Granola (Nov 23): tasks from meetings, on the desktop.
-//  • Tasks: "From your Granola meetings" sits above the board or list while you have suggestions waiting.
-//    Add makes it your task as it is; Edit… opens New Task filled in (saving adds it); × dismisses,
-//    with Undo. The shared parts (loading, adding, deciding) are in sheets-canvas.js.
+//  • Tasks: in the Suggestions panel (Nov 26; it sat above the board), with your clients' emails and
+//    Claude's tips. Add makes it your task as it is; Edit… opens New Task filled in (saving adds it);
+//    Dismiss, with Undo. The shared parts (loading, adding, deciding) are in sheets-canvas.js.
 //  • Settings → Connections → Granola: an admin pastes the workspace API key; everyone sees whether
 //    it's connected, when Radar last read meetings, and how many tasks it has suggested.
 // The server side is lib/granola-tasks.js.
 
 let tkSgAll = false;
 
-// The section, or nothing. It refreshes itself when a minute old (and when a notification comes in).
-function tkSuggestHtml(){
-  if(typeof taskSuggestions === 'undefined') return '';
-  if(taskSuggestions === null || Date.now() - taskSuggestionsAt > 60000) tkSgRefresh();
-  if(tasksScope === 'byme') return '';
-  const list = suggestionsOpen(taskSuggestions).filter(s => tasksClient === 'all' || s.clientId === tasksClient);
-  if(!list.length) return '';
-  const shown = tkSgAll ? list : list.slice(0, 4);
-  const row = s => {
-    const mail = s.source === 'gmail';
-    const sub = suggestionSub(s), meet = s.sourceUrl ? `<a href="${safeUrl(s.sourceUrl)}" target="_blank" rel="noopener" title="${mail ? 'Open the email in Gmail' : 'Open the notes in Granola'}">${mail ? icon('envelope-simple') : ''}${escapeHtml(sub[0])}</a>` : escapeHtml(sub[0]);
-    return `<div class="tk-sg-r" data-sg="${s.id}"><div class="tx" role="button" tabindex="0" aria-label="Preview “${escapeHtml(s.title)}”" onclick="if(!event.target.closest('a'))tkSgPreview('${s.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();tkSgPreview('${s.id}')}"><b>${escapeHtml(s.title)}</b>${s.outOfScope ? addonTagHtml(s.scopeNote) : ''}<span class="s">${meet}${sub.slice(1).map(x => ' · ' + escapeHtml(x)).join('')}</span>${s.quote ? `<span class="q">“${escapeHtml(s.quote)}”</span>` : ''}</div>`
-      + `<div class="tk-sg-a"><button class="btn sm" onclick="tkSgAdd('${s.id}')">Add</button><button class="btn sm" onclick="tkSgEdit('${s.id}')">Edit…</button>`
-      + (s.clientId ? `<button class="ib" aria-label="Move “${escapeHtml(s.title)}” to Reminders" title="It’s something the client owes you: move it to Reminders" onclick="tkSgToReminder('${s.id}')">${icon('bell-ring')}</button>` : '')
-      + `<button class="ib" aria-label="Dismiss “${escapeHtml(s.title)}”" title="Dismiss" onclick="tkSgDismiss('${s.id}')">${icon('x')}</button></div></div>`;
-  };
-  // by client (Nov 23): a client with more than 3 gets Add All
-  const groups = [];
-  list.forEach(s => { const k = s.clientId || ''; let g = groups.find(x => x.k === k); if(!g) groups.push(g = { k, items: [] }); g.items.push(s); });
-  const many = groups.length > 1;
-  let left = tkSgAll ? Infinity : 4;
-  const body = groups.map(g => {
-    const rows = g.items.slice(0, Math.max(0, left)); left -= rows.length;
-    if(!rows.length) return '';
-    const c = g.k && clients.find(x => x.id === g.k), name = c ? c.name : 'No client';
-    const all = g.items.length > 3 ? `<button class="btn sm tk-sg-all" data-sgall="${g.k}" onclick="tkSgAddAll('${g.k}')">Add All ${g.items.length}</button>` : '';
-    const head = many || all ? `<div class="tk-sg-g"><span>${escapeHtml(name)}</span><span class="n">${g.items.length}</span>${all}</div>` : '';
-    return head + rows.map(row).join('');
-  }).join('');
-  // where they're from (Nov 24): Granola meetings, clients' emails, or both
-  const fromMail = list.some(s => s.source === 'gmail'), fromMeet = list.some(s => s.source !== 'gmail');
-  const [logo, head, why] = fromMail && fromMeet ? [appLogoPair('granola', 'gmail', 'xs'), 'Suggested for you', 'From your Granola meetings and your clients’ emails. Add the ones that are yours to do.']
-    : fromMail ? [appLogo('gmail', 'xs'), 'From your clients’ emails', 'Found in your Gmail. Add the ones that are yours to do.']
-    : [appLogo('granola', 'xs'), 'From your Granola meetings', 'Found in your Granola notes. Add the ones that are yours to do.'];
-  return `<section class="tk-sg" aria-label="${escapeHtml(head)}"><div class="tk-sg-h">${logo}<b>${head}</b><span class="n">${list.length}</span><span class="w">${why}</span></div>
-${body}${list.length > 4 ? `<button class="x-lnk tk-sg-more" onclick="tkSgAll=!tkSgAll;renderTasks()">${tkSgAll ? 'Show fewer' : `Show all ${list.length}`}</button>` : ''}</section>`;
-}
+// The suggestions themselves are drawn in Tasks' Suggestions panel (tasks-canvas.js tkSgPanelHtml, Nov 26).
 // Add All (Nov 23): every suggestion waiting for one client becomes your task, as it is.
 async function tkSgAddAll(clientKey){
   const list = suggestionsOpen(taskSuggestions || []).filter(s => (s.clientId || '') === clientKey);
@@ -120,22 +84,6 @@ async function tkSgDismiss(id){
   showToast('info', 'Dismissed', s.title, { action: 'Undo', onAction: async () => {
     if(await decideSuggestion(id, 'pending')){ taskSuggestions = [s, ...(taskSuggestions || []).filter(x => x.id !== id)].sort((a, b) => new Date(b.sourceAt || 0) - new Date(a.sourceAt || 0)); renderTasks(); }
   } });
-}
-
-// Check Granola, in the Tasks header: anyone on the team can ask for new meetings to be read now
-// (they also come in by themselves). Shown once Radar knows Granola is connected.
-let tkGranolaBusy = false;
-function tkGranolaBtn(){
-  granolaWatch(() => { if(currentViewName === 'tasks') renderTasks(); });
-  if(!granolaOn) return '';
-  return `<button class="btn tk-gr" id="tkGranola" onclick="tkGranolaCheck()"${tkGranolaBusy ? ' disabled' : ''} title="Look for new action items in your Granola meetings">${tkGranolaBusy ? '<span class="tk-gr-spin" aria-hidden="true"></span>Checking…' : `${appLogo('granola', 'xs')}Check Granola`}</button>`;
-}
-async function tkGranolaCheck(){
-  if(tkGranolaBusy) return;
-  tkGranolaBusy = true; renderTasks();
-  let r; try{ r = await checkGranolaNow(); } finally { tkGranolaBusy = false; }
-  showToast(r.type, r.title, r.text);
-  renderTasks();
 }
 
 // ---- Settings → Connections → Granola ----------------------------------------------------------

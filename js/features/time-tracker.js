@@ -250,8 +250,9 @@ function renderSideTimer(timeStr){
   const state = timerState.running ? 'run' : paused ? 'pause' : 'idle';
   const label = timerState.running ? (timerState.description || clients.find(x => x.id === timerState.clientId)?.name || 'Tracking time')
     : paused ? (paused.description || clients.find(x => x.id === paused.clientId)?.name || 'Paused') : '';
-  // Settings → General can hide the idle counter; a running or paused timer always shows.
-  if(state === 'idle' && typeof toolbarTimerPref === 'function' && !toolbarTimerPref()){ el.hidden = true; _sideTimerKey = ''; return; }
+  // Nov 26: no idle Start timer here (Today's Plan took its place; start one from New, Time or ⌘K).
+  // A running or paused timer always shows.
+  if(state === 'idle'){ el.hidden = true; _sideTimerKey = ''; return; }
   const key = state + '|' + label;
   // Called without a time (after Pause, Resume…): work it out now rather than flash 0:00:00.
   const t = (timeStr || (timerState.running && typeof clockText === 'function' ? clockText() : '0:00:00')).replace(/^0(\d):/, '$1:');

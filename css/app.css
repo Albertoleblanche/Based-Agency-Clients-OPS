@@ -1366,7 +1366,7 @@ button.tmi-mc.is-wk:hover{background:var(--fill-2)}
 .mac .tk-f .pop{height:30px;gap:7px;font-size:14px;color:var(--label)}
 .tk-f .pop > svg{width:12px;height:12px;color:var(--label-3)}
 .tk-view svg{width:14px;height:14px}
-.tk-board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) minmax(0,.9fr);column-gap:28px;margin-top:30px;align-items:start}
+.tk-board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:28px;margin-top:30px;align-items:start}   /* no Done column (Nov 26) */
 .tk-col{min-width:0}
 .tk-ch{display:flex;align-items:center;gap:8px;height:32px;margin-bottom:10px}
 .tk-ch b{font-size:14px;font-weight:650}
@@ -1464,7 +1464,7 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .tk-lr .tx .s{font-size:12.5px;color:var(--label-2);margin-top:2px}
 .tk-lr.is-done .tx b{color:var(--label-2);font-weight:500;text-decoration:line-through;text-decoration-color:var(--label-3)}
 .tk-empty{margin-top:30px;border-radius:14px;background:var(--fill)}
-@media (max-width:1100px){.tk-board{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:24px}.tk-done{padding-left:0;border-left:0}}
+@media (max-width:900px){.tk-board{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:24px}}
 @media (max-width:700px){.tk{padding:22px 20px 32px}.tk-board{grid-template-columns:minmax(0,1fr)}}
 /* the task panel */
 .tkp-bar{display:inline-flex;align-items:center;gap:6px}
@@ -4279,6 +4279,39 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 }
 @keyframes dp3Fade{from{opacity:0}}
 @media print{ .dpr{display:none} }
+/* In the sidebar (Nov 26), where Start timer was: a row like the timer's, the card opens to its right */
+.dpr.is-side{position:relative;right:auto;bottom:auto;z-index:150;margin:auto 4px 10px}
+.su-nudge:not([hidden]) + .dpr.is-side{margin-top:0}
+.dpr.is-side + .stm{margin-top:0}
+.dpr.is-side .dpr-b{display:flex;width:100%;height:auto;min-height:40px;padding:8px 12px 8px 9px;border-radius:11px;background:var(--fill-2);-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:none;font-size:13px;transition:opacity 380ms cubic-bezier(.23,1,.32,1),transform 380ms cubic-bezier(.23,1,.32,1),background-color 150ms ease}
+.dpr.is-side .dpr-name{flex:1 1 auto;min-width:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dpr.is-side .dpr-n{flex:none;padding-left:0;margin-left:0;border-left:0;font-size:12px}
+@media (hover:hover) and (pointer:fine){ .dpr.is-side .dpr-b:hover,.dpr.is-side.is-pop .dpr-b{background:var(--fill-3);box-shadow:none} }
+.dpr.is-side .dpr-b:focus-visible{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent,var(--blue)) 45%,transparent)}
+.dpr.is-side .dpr-pop,.dpr.is-side .dpr-say{left:calc(100% + 22px);right:auto;bottom:0;transform-origin:bottom left;transform:translateX(-6px) scale(.98)}
+.dpr.is-side.is-pop .dpr-pop,.dpr.is-side.is-say .dpr-say{transform:none}
+.dpr.is-side.is-pop::after{content:"";position:absolute;left:100%;bottom:0;width:24px;height:100%}   /* the gap to the card keeps it open */
+html.ui-w .mac .dpr.is-side .dpr-b{border-radius:16px;background:var(--uw-c2)}
+@media (hover:hover) and (pointer:fine){ html.ui-w .mac .dpr.is-side .dpr-b:hover,html.ui-w .mac .dpr.is-side.is-pop .dpr-b{background:var(--fill-2)} }
+/* the sidebar hidden: the row floats bottom-left */
+body.sidebar-collapsed .dpr.is-side{position:fixed;left:16px;bottom:16px;margin:0;visibility:visible}
+body.sidebar-collapsed .dpr.is-side .dpr-b{width:auto;min-height:34px;border-radius:17px;background:color-mix(in srgb,var(--window) 84%,transparent);-webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);box-shadow:0 0 0 .5px var(--sep-strong),0 6px 20px rgba(0,0,0,.14)}
+body.sidebar-collapsed .dpr.is-side .dpr-pop,body.sidebar-collapsed .dpr.is-side .dpr-say{left:0;bottom:calc(100% + 10px)}
+/* each line in the card works: the circle marks it, the line opens it */
+.dpr-l li{padding:0;gap:0}
+.mac .dpr-l li .dpr-c{width:30px;height:auto;min-height:36px;margin:0;padding:9px 0 0;border:0;border-radius:0;background:none;box-shadow:none;align-items:flex-start;justify-content:flex-start;cursor:pointer;font:inherit}
+.mac .dpr-l .dpr-c::before{content:"";position:absolute;left:0;top:9px;width:16px;height:16px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--label-3,var(--label-2));transition:box-shadow 150ms ease,background-color 150ms ease,transform 120ms cubic-bezier(.23,1,.32,1)}
+.mac .dpr-l .dpr-c svg{position:absolute;left:3px;top:12px;width:10px;height:10px;color:#fff;z-index:1}
+.mac .dpr-l li.is-done .dpr-c{background:none}
+.dpr-l li.is-done .dpr-c::before{background:var(--green);box-shadow:none}
+.dpr-l li.is-next .dpr-c::before{box-shadow:inset 0 0 0 1.5px var(--claude)}
+.mac .dpr-l .dpr-c:disabled{cursor:default}
+.mac .dpr-l .dpr-c:not(:disabled):active::before{transform:scale(.86)}
+@media (hover:hover) and (pointer:fine){ .mac .dpr-l li:not(.is-done) .dpr-c:hover::before{box-shadow:inset 0 0 0 1.5px var(--label-2);background:var(--fill-2)} }
+.mac .dpr-l .dpr-tx{flex:1 1 auto;margin:0 -8px 0 -6px;padding:8px 8px 8px 6px;border:0;border-radius:8px;background:none;color:inherit;text-align:left;font:inherit;cursor:pointer;transition:background-color 120ms ease}
+@media (hover:hover) and (pointer:fine){ .mac .dpr-l .dpr-tx:hover{background:var(--fill)} }
+.mac .dpr-l .dpr-tx:active{background:var(--fill-2)}
+.mac .dpr-l .dpr-c:focus-visible,.mac .dpr-l .dpr-tx:focus-visible{outline:none;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--accent,var(--blue)) 55%,transparent)}
 
 /* Claude's notes on a client (Nov 25): what you're missing, tips and ideas, each with where it came from
    and what to do. On the client's panel, as a fold in All Clients, and as a card on the client's page. */
@@ -4527,3 +4560,60 @@ html .mac .cn-foot .btn.cn-dis{background:none;box-shadow:none;color:var(--label
 .wk12-key span{display:inline-flex;align-items:center;gap:6px}
 .wk12-key .kb{display:inline-block;width:4px;height:12px;border-radius:2px;background:var(--label-3,var(--label-2))}
 @media (prefers-reduced-motion:reduce){ .wk12-c,.cn-todo .ck{transition:none} }
+
+/* Tasks, Nov 26: the done link under the title, and Suggestions behind one button, in the right-hand panel */
+.tk-donel{display:inline-flex;align-items:center;gap:2px;margin-left:4px;color:var(--label);font-weight:500;text-decoration:none;white-space:nowrap;transition:opacity 150ms ease}
+.tk-donel svg{width:11px;height:11px;color:var(--label-2)}
+.tk-donel:active{opacity:.6}
+@media (hover:hover) and (pointer:fine){ .tk-donel:hover{text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--sep-strong)} }
+.mac .tsg-b{position:relative;gap:8px}
+.mac .tsg-b.on{background:var(--fill-2);box-shadow:0 0 0 .5px var(--sep-strong)}
+.tsg-ls{display:inline-flex;align-items:center}
+.tsg-ls .app-logo{box-shadow:0 0 0 2px var(--grp,var(--window))}
+.tsg-ls .app-logo + .app-logo{margin-left:-4px}
+.tsg-n{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--label);color:var(--window);font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;display:inline-grid;place-items:center;line-height:1}
+.tsg-dot{position:absolute;top:-3px;right:-3px;width:9px;height:9px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 2px var(--window)}
+.sp.tsg{padding-bottom:32px}
+.tsg-h h3{margin:2px 0 0;font-size:19px;font-weight:600;letter-spacing:-.01em}
+.tsg-h p{margin:4px 0 0;font-size:13px;line-height:1.45;color:var(--label-2)}
+html.ui-w .tsg-h h3{font-weight:500}
+.tsg-ck{display:flex;align-items:center;gap:10px;margin:14px 0 2px;font-size:12.5px;color:var(--label-2)}
+.tsg-ck > span{flex:1 1 auto;min-width:0}
+.mac .tsg-ck .btn.sm{flex:none;gap:5px}
+.tsg-ck .btn svg{width:13px;height:13px}
+.sp.tsg .tsg-g.tk-sg{margin:14px 0 0;padding:14px 0 0;border-radius:0;border-top:.5px solid var(--sep);background:none;box-shadow:none;overflow:visible}
+.tsg-gh{display:flex;align-items:center;gap:8px;margin:0 0 2px}
+.tsg-gh b{font-size:14px;font-weight:600}
+.tsg-gh .n{font-size:12px;color:var(--label-2);font-variant-numeric:tabular-nums}
+.tsg-gh > svg{width:15px;height:15px;color:var(--claude)}
+.sp.tsg .tsg-t{display:block;margin-top:8px;padding:12px 14px 13px;border:0;border-radius:12px;background:var(--fill);transition:opacity 200ms ease,height 220ms cubic-bezier(.23,1,.32,1),padding 220ms cubic-bezier(.23,1,.32,1),margin 220ms cubic-bezier(.23,1,.32,1)}
+.sp.tsg .tsg-t.is-out,.sp.tsg .tsg-t.is-going{opacity:0;margin-top:0;padding-top:0;padding-bottom:0;overflow:hidden;pointer-events:none}
+.sp.tsg .tsg-t.is-hl{box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--blue) 60%,transparent)}
+.tsg-top{display:flex;align-items:center;gap:8px;min-width:0;margin:0;font-size:12px;color:var(--label-2)}
+.tsg-top .c{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tsg-top .sg-addon{margin-left:auto}
+.mac .tsg-tt{display:block;width:auto;height:auto;margin:5px -4px 0;padding:1px 4px;border:0;border-radius:6px;background:none;box-shadow:none;font:inherit;font-size:13.5px;font-weight:600;line-height:1.35;color:var(--label);text-align:left;cursor:pointer;white-space:normal}
+html.ui-w .mac .tsg-tt{font-weight:500}
+@media (hover:hover) and (pointer:fine){ .mac .tsg-tt:hover{background:var(--fill-2)} }
+.mac .tsg-tt:active{opacity:.7}
+.tsg-w{margin:3px 0 0;font-size:12.5px;line-height:1.45;color:var(--label-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tsg-w.is-q{font-style:italic}
+.tsg-src{display:flex;align-items:center;gap:8px;min-width:0;margin:8px 0 0;flex-wrap:nowrap;font-size:12px;color:var(--label-3,var(--label-2))}
+.mac .tsg-src .cn-ev{flex:0 1 auto;min-width:0;display:inline-flex;align-items:center;gap:4px;max-width:none;height:20px;padding:0 7px;border-radius:10px;font-size:11px;line-height:20px;text-decoration:none}
+.tsg-src.cn-evs{flex:none;flex-wrap:nowrap;gap:6px}
+.tsg-when{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tsg-a{display:flex;align-items:center;gap:6px;margin-top:11px}
+.mac .tsg-a .btn.sm{height:26px;padding:0 10px;border-radius:8px;font-size:12px}
+html .mac .tsg-a .btn.tsg-dis{background:none;box-shadow:none;color:var(--label-2)}
+@media (hover:hover) and (pointer:fine){ html .mac .tsg-a .btn.tsg-dis:hover{background:var(--fill-2);color:var(--label)} }
+.tsg-sp{flex:1}
+.tsg-a .ib{width:28px;height:28px;color:var(--label-2)}
+.tsg-a .ib svg{width:14px;height:14px}
+.tsg-a .dp-ok{font-size:12px;color:var(--green);display:inline-flex;align-items:center;gap:4px}
+.tsg-all{display:flex;align-items:center;gap:8px;margin:10px 0 0;font-size:12.5px;color:var(--label-2)}
+.tsg-all span{flex:1 1 auto;min-width:0}
+.mac .tsg-more{display:block;width:auto;height:auto;margin:10px 0 0;padding:4px 0;border:0;background:none;box-shadow:none;font:inherit;font-size:12.5px;font-weight:500;color:var(--accent,var(--blue));cursor:pointer}
+.tsg-e{margin:28px 0 0;padding:22px 10px;text-align:center;border-top:.5px solid var(--sep)}
+.tsg-e b{display:block;font-size:15px;font-weight:500}
+.tsg-e span{display:block;margin-top:4px;font-size:13px;line-height:1.5;color:var(--label-2)}
+@media (prefers-reduced-motion:reduce){ .sp.tsg .tsg-t{transition:opacity 150ms ease} }

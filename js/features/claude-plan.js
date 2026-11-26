@@ -383,20 +383,7 @@ function cnNavDot(){
 }
 function cnMarkSeen(){ const at = Object.values(claudeNotes.by).reduce((m, v) => v && v.at > m ? v.at : m, ''); if(at) try{ localStorage.setItem(cnSeenKey(), at); }catch(e){} cnNavDot(); }
 
-// Tasks: Claude's tips on your clients, next to the tasks suggested from your emails and meetings
-let tkCnAll = false;
-function tkClaudeTipsHtml(){
-  if(!claudeNotesOn() || (typeof tasksScope !== 'undefined' && tasksScope === 'byme')) return '';
-  if(!claudeNotes.at && !claudeNotes.loading) setTimeout(() => loadClaudeNotes(), 0);
-  const items = cnSorted((typeof clients !== 'undefined' ? clients : []).filter(c => claudeMine(c) && (typeof tasksClient === 'undefined' || tasksClient === 'all' || c.id === tasksClient))
-    .flatMap(c => cnNotesOf(c))).filter(x => x.n.kind === 'tip');
-  if(!items.length) return '';
-  const shown = tkCnAll ? items : items.slice(0, 3), A = jsArg;
-  const row = ({ c, n }) => `<div class="tk-sg-r tk-cn-r cn-n" data-cnl="${escapeHtml(c.id + ':' + n.id)}"><div class="tx" role="button" tabindex="0" aria-label="Why: ${escapeHtml(n.title)}" data-hovertip="${escapeHtml(n.why)}" onclick="cnOpenClient(${A(c.id)})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();cnOpenClient(${A(c.id)})}"><b>${escapeHtml(n.title)}</b><span class="s">${escapeHtml(c.name)}${n.steps && n.steps.length > 1 ? ` · ${n.steps.length} steps` : ''}</span></div>`
-    + `<div class="tk-sg-a"><button class="btn sm" onclick="cnAddTasks(${A(c.id)}, ${A(n.id)}, this)">${n.steps && n.steps.length > 1 ? 'Add Steps' : 'Add'}</button><button class="ib" aria-label="Dismiss “${escapeHtml(n.title)}”" title="Dismiss" onclick="cnDismiss(${A(c.id)}, ${A(n.id)}, this)">${icon('x')}</button></div></div>`;
-  return `<section class="tk-sg tk-cn" aria-label="Tips from Claude"><div class="tk-sg-h"><span class="tk-cn-mark">${CLAUDE_SPARK}</span><b>Tips from Claude</b><span class="n">${items.length}</span><span class="w">Small things that would help your clients. Add the ones worth doing.</span></div>
-${shown.map(row).join('')}${items.length > 3 ? `<button class="x-lnk tk-sg-more" onclick="tkCnAll = !tkCnAll; renderTasks()">${tkCnAll ? 'Show fewer' : `Show all ${items.length}`}</button>` : ''}</section>`;
-}
+// Tasks: Claude's tips are drawn in Tasks' Suggestions panel (tasks-canvas.js tkSgPanelHtml, Nov 26)
 // a client's notes in full: Health with the client's panel open
 function cnOpenClient(id){ switchView('health'); setTimeout(() => { if(typeof selectHealthClient === 'function') selectHealthClient(id); }, 0); }
 // Plan: Claude's ideas on your clients, first in "Worth planning", as small cards (Nov 26, canvas "Plan:

@@ -314,5 +314,6 @@ document.addEventListener('keydown', e => {
   else if(v === 'approve' && window._weekSel){ closeWeekPanel(); }
   else if(v === 'health' && window._healthSel && typeof closeHealthPanel === 'function'){ closeHealthPanel(); }
   else if(v === 'tasks' && window._taskSel && typeof closeTaskPanel === 'function'){ closeTaskPanel(); }
+  else if(v === 'tasks' && window._tkSgOpen && typeof tkSgClose === 'function'){ tkSgClose(); }
   else if(v === 'reminders' && window._remSel && typeof closeRemPanel === 'function'){ closeRemPanel(); }
 });

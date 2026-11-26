@@ -314,7 +314,6 @@ html.ui-w .tk-due.is-late{color:var(--uw-risk);font-weight:500}
 html.ui-w .tk-due.is-soon{font-weight:500}
 html.ui-w .tk-due.is-you{color:var(--label);font-weight:500}
 html.ui-w .tk-who{font-weight:400}
-html.ui-w .tk-done{border-left:1px solid var(--sep);padding-left:24px}
 html.ui-w .tk-d .tx b{font-weight:400}
 html.ui-w .tk-ls b{font-size:15px;font-weight:500}
 html.ui-w .tk-ls span{font-family:var(--mono);font-size:12px;font-weight:500}

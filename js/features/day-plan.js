@@ -3,7 +3,7 @@
 //  • the sheet (the Dashboard's toolbar, or the ring): the headline and why, the few moves in time order
 //    around your meetings, what's ready for you to send (only when there's something), what Claude left
 //    for later on purpose, and what's coming. A new plan reveals itself line by line, once.
-//  • the ring in the bottom-right corner: how much of today's plan is done, worked out from what Radar
+//  • the ring in the sidebar, where Start timer was (Nov 26; bottom-left when the sidebar is hidden): how much of today's plan is done, worked out from what Radar
 //    already knows (claude-radar.js dayPlanItems), so nothing needs ticking. Hover it for what's done and
 //    what's left; finishing something gets one quiet line about what it makes possible; finishing the
 //    plan, one small moment. At most one gentle check-in in the afternoon, only when something is still
@@ -80,7 +80,7 @@ ${p.why ? `<p class="dp3-wy rv" ${rv()}>${escapeHtml(p.why)}</p>` : ''}
 ${ready ? `<section class="dp3-sec"><h4 class="rv" ${rv()}>Ready for you to send</h4>${ready}</section>` : ''}
 ${left ? `<section class="dp3-sec"><h4 class="rv" ${rv()}>Left out on purpose</h4>${left}</section>` : ''}
 ${coming ? `<section class="dp3-sec"><h4 class="rv" ${rv()}>Coming up</h4>${coming}</section>` : ''}
-<p class="dp-foot rv" ${rv()}><span>Planned by Claude${when ? ` at ${escapeHtml(when)}` : ''} from your calendar, tasks, sprints, clients and logged work. · <button type="button" class="x-lnk" onclick="makeDayPlanNow()">Write It Again</button>${hidden ? ' · <button type="button" class="x-lnk" onclick="dpRingShow()">Show Progress in the Corner</button>' : ''}</span></p>`;
+<p class="dp-foot rv" ${rv()}><span>Planned by Claude${when ? ` at ${escapeHtml(when)}` : ''} from your calendar, tasks, sprints, clients and logged work. · <button type="button" class="x-lnk" onclick="makeDayPlanNow()">Write It Again</button>${hidden ? ' · <button type="button" class="x-lnk" onclick="dpRingShow()">Show It in the Sidebar</button>' : ''}</span></p>`;
 }
 function dpProgressText(){ const it = dayPlanItems(); if(!it.length) return ''; const k = it.filter(x => x.done).length; return k === it.length ? 'All done' : `${k} of ${it.length} done`; }
 // Draws the sheet again only when something changed; a move that just got done gets a quiet flash
@@ -185,7 +185,9 @@ async function dpComing(i, btn){
   showToast(k ? 'success' : 'error', k ? `${k} task${k === 1 ? '' : 's'} added` : 'No tasks added', k ? `For ${x.client}, in your Tasks with no date yet.` : 'Try again in a moment.');
 }
 
-// ---- the ring in the corner --------------------------------------------------------------------------
+// ---- the ring in the sidebar (Nov 26: it took Start timer's place; it was in the corner) ----------------
+// Hover it for the plan; each line works from there: the circle marks it done (or does the one task left,
+// through Mark Done), the line opens it (the task, the follow-up's message, the win update).
 const dpRing = { prev: null, sayT: 0, openT: 0, closeT: 0, lastActive: 0, lastLoad: 0, sig: '' };
 function dpRingKey(k){ return `bda_dp_${k}_${currentUser ? currentUser.id : ''}_${(dayPlan.plan || {}).date || ''}`; }
 function dpRingHidden(){ try{ return localStorage.getItem(dpRingKey('hide')) === '1'; }catch(e){ return false; } }
@@ -199,11 +201,13 @@ function dpRingShow(){ try{ localStorage.removeItem(dpRingKey('hide')); }catch(e
 function dpRingMount(){
   let el = document.getElementById('dpRing'); if(el) return el;
   el = document.createElement('div');
-  el.id = 'dpRing'; el.className = 'dpr';
+  el.id = 'dpRing'; el.className = 'dpr is-side';
   el.innerHTML = `<div class="dpr-say" role="status" aria-live="polite"></div>
 <div class="dpr-pop" id="dprPop"></div>
 <button type="button" class="dpr-b" onclick="dpRingOpen()" aria-describedby="dprPop"><svg class="dpr-r" viewBox="0 0 22 22" aria-hidden="true"><circle class="dpr-tr" cx="11" cy="11" r="8.5"/><circle class="dpr-pr" cx="11" cy="11" r="8.5" pathLength="100"/><path class="dpr-ck" d="M7.4 11.3l2.4 2.4 4.8-5" pathLength="1"/></svg><span class="dpr-name">Today’s Plan</span><span class="dpr-n"></span></button>`;
-  document.body.appendChild(el);
+  // above the running timer, under Set Up Radar
+  const timer = document.getElementById('sideTimer');
+  if(timer) timer.parentNode.insertBefore(el, timer); else { el.classList.remove('is-side'); document.body.appendChild(el); }
   el.addEventListener('mouseenter', () => { clearTimeout(dpRing.closeT); dpRing.openT = setTimeout(() => dpRingPop(true), 90); });
   el.addEventListener('mouseleave', () => { clearTimeout(dpRing.openT); dpRing.closeT = setTimeout(() => dpRingPop(false), 180); });
   el.addEventListener('focusin', () => dpRingPop(true));
@@ -229,15 +233,38 @@ function dpRingPop(on){
   el.classList.toggle('is-pop', !!on);
 }
 function dpRingPopHtml(items){
-  const p = dayPlanV3() || {}, k = items.filter(x => x.done).length, next = items.find(x => !x.done);
+  const p = dayPlanV3() || {}, k = items.filter(x => x.done).length, next = items.find(x => !x.done), marked = new Set(dpMarked()), A = jsArg;
   const line = x => {
     const sub = x === next && x.why ? `<em>${escapeHtml(x.why)}</em>` : !x.done && (x.when || x.sub) ? `<small>${escapeHtml(x.kind === 'move' ? [x.when, x.minutes ? dpMins(x.minutes) : ''].filter(Boolean).join(' · ') : x.kind === 'follow' ? 'Ready for you to send' : 'Written, ready for Review')}</small>` : '';
-    return `<li class="${x.done ? 'is-done' : ''}${x === next ? ' is-next' : ''}"><span class="dpr-c">${x.done ? icon('check', { weight: 'bold' }) : ''}<span class="dpr-sr">${x.done ? 'Done' : 'Open'}</span></span><span class="dpr-tx"><b>${escapeHtml(x.title)}</b>${sub}</span></li>`;
+    // the circle: marks it done yourself, or, for a move made of tasks, does the one left (or opens the next)
+    const self = x.kind !== 'move' || x.canMark, open = (x.tasks || []).filter(t => t.status !== 'done');
+    const tip = x.done ? (marked.has(x.id) ? 'Mark not done' : 'Done') : self ? 'Mark done' : open.length === 1 && !(x.wa || []).some(w => w.status === 'open') ? 'Mark the task done' : 'Open the next step';
+    const off = x.done && !marked.has(x.id);
+    return `<li class="${x.done ? 'is-done' : ''}${x === next ? ' is-next' : ''}"><button type="button" class="dpr-c" title="${tip}" aria-label="${escapeHtml(tip + ': ' + x.title)}"${off ? ' disabled' : ` onclick="dpPopTick(${A(x.id)})"`}>${x.done ? icon('check', { weight: 'bold' }) : ''}</button><button type="button" class="dpr-tx" onclick="dpPopOpen(${A(x.id)})" title="${x.kind === 'follow' ? 'Read and send the message' : x.kind === 'win' ? 'Open the update' : open.length || (x.wa || []).length ? 'Open it' : 'Open Today’s Plan'}"><b>${escapeHtml(x.title)}</b>${sub}</button></li>`;
   };
   return `<div class="dpr-ph"><b>Today’s Plan</b><span>${k === items.length ? 'All done' : `${k} of ${items.length} done`}</span></div>
 ${p.headline ? `<p class="dpr-hl">${escapeHtml(p.headline)}</p>` : ''}
 <ul class="dpr-l">${items.map(line).join('')}</ul>
 <div class="dpr-pf"><button type="button" class="btn sm" onclick="dpRingOpen()">Open Today’s Plan</button><button type="button" class="dpr-hide" onclick="dpRingHide()">Hide for Today</button></div>`;
+}
+// a line in the card: open what it's about
+function dpPopOpen(id){
+  const it = dpItem(id); if(!it) return;
+  dpRingPop(false);
+  if(it.kind === 'follow') return dpNudge(it.f.reminderId);
+  if(it.kind === 'win') return dpGo(() => openWeekClient(it.w.clientId));
+  if((it.tasks || []).some(t => t.status !== 'done') || (it.wa || []).some(w => w.status === 'open')) return dpOpenMove(id);
+  openDayPlan();
+}
+// its circle: done by you (and undone), or the one task left goes through Mark Done
+function dpPopTick(id){
+  const it = dpItem(id); if(!it) return;
+  const marked = dpMarked().includes(id);
+  if(it.kind !== 'move' || it.canMark){ if(it.done && !marked) return; dpMarkDone(id, !marked); return; }
+  if(it.done) return;
+  const open = (it.tasks || []).filter(t => t.status !== 'done');
+  if(open.length === 1 && !(it.wa || []).some(w => w.status === 'open') && open[0].assigneeId === currentUser.id){ dpRingPop(false); moveTaskToStatus(open[0].id, 'done'); return; }
+  dpPopOpen(id);
 }
 // one quiet line by the ring; it stays while you read it
 function dpRingSay(html, ms){

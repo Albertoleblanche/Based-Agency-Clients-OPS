@@ -664,6 +664,7 @@ async function finishTask(taskId, notes, link, opts){
   const t = tasks.find(x=>x.id===taskId);
   if(!t) return false;
   const wasAlreadyDone = t.status==='done';
+  const prevStatus = t.status;   // for Undo (Nov 26: with no Done column on Tasks, it's how a mis-tick comes back)
   // finished on another day: that day, at the end of the working day
   const today = toDateStr(new Date()), doneDate = opts.doneDate && opts.doneDate < today ? opts.doneDate : today;
   const doneAt = doneDate === today ? new Date() : atTime(new Date(doneDate + 'T12:00:00'), '17:00');
@@ -719,7 +720,8 @@ async function finishTask(taskId, notes, link, opts){
   updateTasksNavBadge();
   if(typeof renderCalendar === 'function') renderCalendar();            // done there too
   if(typeof currentViewName !== 'undefined' && currentViewName === 'overview' && typeof renderDashboard === 'function') renderDashboard();
-  if(!opts.quiet) showToast('success','Marked complete', `${t.assignerId===currentUser.id ? 'Nice work!' : `${teamProfiles.find(p=>p.id===t.assignerId)?.name||'They'} will be notified.`}${t.clientId ? ' Logged to Past Improvements.' : ''}${timeNote}${waClosed ? ' The WhatsApp item is done too.' : ''}`);
+  if(!opts.quiet) showToast('success','Marked complete', `${t.assignerId===currentUser.id ? 'Nice work!' : `${teamProfiles.find(p=>p.id===t.assignerId)?.name||'They'} will be notified.`}${t.clientId ? ' Logged to Past Improvements.' : ''}${timeNote}${waClosed ? ' The WhatsApp item is done too.' : ''}`,
+    !wasAlreadyDone && prevStatus && prevStatus !== 'done' ? { action: 'Undo', onAction: () => moveTaskToStatus(taskId, prevStatus) } : undefined);
 
   if(t.assignerId !== currentUser.id){
     // Enrich the notification with a preview of what was just added —
