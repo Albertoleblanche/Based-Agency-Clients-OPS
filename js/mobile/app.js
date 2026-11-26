@@ -495,7 +495,7 @@ function mDayPlanCardHtml(){
   if(typeof claudeOn !== 'function' || !claudeOn()) return '';
   if(!dayPlan.at && !dayPlan.loading) setTimeout(() => loadDayPlan(), 0);
   const p = dayPlan.plan; if(!p || p.empty || !(p.clients || []).length) return '';
-  const line = (p.first || [])[0] || `${p.clients.length} client${p.clients.length === 1 ? '' : 's'}: next steps and wins`;
+  const f0 = (p.first || [])[0], line = f0 ? (typeof f0 === 'string' ? f0 : `${f0.client ? f0.client + ': ' : ''}${f0.text}`) : `${p.clients.length} client${p.clients.length === 1 ? '' : 's'}: next steps and wins`;
   return `<button class="idp" onclick="mOpenDayPlan()"><span class="idp-ic">${CLAUDE_SPARK}</span><span class="idp-t"><b>Today’s Plan</b><span>${mEsc(line)}</span></span>${icon('caret-right')}</button>`;
 }
 function mDayPlanLoaded(){ if(mTab === 'today' && !mStack.length) mRenderTab(); }
@@ -504,10 +504,10 @@ function mOpenDayPlan(){
     const p = dayPlan.plan;
     if(!p) return `<h1 class="big">Today’s Plan</h1>${mEmpty('No plan for today yet', 'Claude writes it each weekday morning.')}`;
     const when = p.at ? fmtTime(new Date(p.at)) : '';
-    const first = (p.first || []).length ? mIsh('Today, first') + `<ol class="idp-first">${p.first.map(x => `<li>${mEsc(x)}</li>`).join('')}</ol>` : '';
+    const first = (p.first || []).length ? mIsh('Today, first') + `<ol class="idp-first">${p.first.map(x => typeof x === 'string' ? `<li>${mEsc(x)}</li>` : `<li>${x.client ? `<b>${mEsc(x.client)}</b> ` : ''}${mEsc(x.text)}</li>`).join('')}</ol>` : '';
     const rows = (p.clients || []).map(c => `<div class="ig idp-cl"><button class="idp-h" onclick="mOpenClient(${jsArg(c.id)})"><b>${mEsc(c.client)}</b>${icon('caret-right')}</button>`
       + (c.addon ? `<div class="idp-tag">${addonTagHtml('')}</div>` : '')
-      + `<dl>${c.next ? `<dt>Next step</dt><dd>${mEsc(c.next)}</dd>` : ''}<dt>They owe us</dt><dd>${mEsc(c.owe || 'Nothing')}</dd>${c.win ? `<dt>Win to aim for</dt><dd>${mEsc(c.win)}</dd>` : ''}${c.addon ? `<dt>Add-on to offer</dt><dd>${mEsc(c.addon)}</dd>` : ''}</dl></div>`).join('');
+      + `<dl>${c.next ? `<dt>Next step</dt><dd>${mEsc(c.next)}</dd>` : ''}${c.owe ? `<dt>They owe us</dt><dd>${mEsc(c.owe)}</dd>` : ''}${c.win ? `<dt>Win to aim for</dt><dd>${mEsc(c.win)}</dd>` : ''}${c.addon ? `<dt>Add-on to offer</dt><dd>${mEsc(c.addon)}</dd>` : ''}</dl></div>`).join('');
     return `<h1 class="big">Today’s Plan</h1><p class="big-sub">Written by Claude${when ? ` at ${mEsc(when)}` : ''}</p>${first}${mIsh('Your clients')}${rows}`;
   });
 }

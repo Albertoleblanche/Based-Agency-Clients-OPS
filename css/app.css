@@ -4168,18 +4168,42 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 .dp-h .cl-spark{width:18px;height:18px;color:var(--claude);flex:none}
 .dp-h small{margin-left:auto;font-size:13px;font-weight:400;color:var(--label-2)}
 .dp{display:flex;flex-direction:column;gap:16px;max-height:min(62vh,640px);overflow:auto;margin:4px -4px 0;padding:0 4px}
-.dp-first{padding:12px 14px;border-radius:12px;background:color-mix(in srgb,var(--claude) 9%,transparent);box-shadow:inset 0 0 0 .5px color-mix(in srgb,var(--claude) 28%,transparent)}
-.dp-first h4,.dp-cl dt{margin:0;font-size:11.5px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--label-2)}
-.dp-first ol{margin:6px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-size:14px;line-height:1.4}
-.dp-list{display:flex;flex-direction:column}
-.dp-cl{padding:12px 0;border-top:.5px solid var(--sep)}
-.dp-cl:first-child{border-top:0;padding-top:0}
-.dp-cl header{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
-.dp-cl header a{font-size:15px;font-weight:600;color:var(--label);text-decoration:none}
+.dp-first{padding:12px 14px 10px;border-radius:12px;background:color-mix(in srgb,var(--claude) 9%,transparent);box-shadow:inset 0 0 0 .5px color-mix(in srgb,var(--claude) 28%,transparent)}
+.dp-first header{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.dp-first h4,.dp-k{margin:0;font-size:11.5px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--label-2)}
+.dp-prog{font-size:12px;color:var(--label-2);font-variant-numeric:tabular-nums}
+.dp-prog.is-all{color:var(--green);font-weight:500}
+.dp-first ol{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:2px}
+.dp-first li{display:flex;align-items:flex-start;gap:10px;padding:5px 0}
+.dp-ck{flex:none;width:18px;height:18px;margin-top:1px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:transparent;box-shadow:inset 0 0 0 1.5px var(--label-3,var(--label-2));color:#fff;cursor:pointer;transition:background-color 140ms ease-out,box-shadow 140ms ease-out}
+.dp-ck svg{width:11px;height:11px}
+.dp-ck:active{transform:scale(.92)}
+.dp-ck:focus-visible{outline:none;box-shadow:inset 0 0 0 1.5px var(--claude),0 0 0 3px color-mix(in srgb,var(--claude) 35%,transparent)}
+.dp-first li.is-done .dp-ck{background:var(--claude);box-shadow:none}
+.dp-ft{display:flex;flex-direction:column;gap:1px;font-size:14px;line-height:1.4}
+.dp-ft em{font-style:normal;font-size:12px;font-weight:500;color:var(--label-2)}
+.dp-first li.is-done .dp-ft{color:var(--label-2);text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--label-2) 60%,transparent)}
+.dp-list{display:flex;flex-direction:column;gap:10px}
+.dp-cl{padding:10px 12px 6px;border-radius:12px;box-shadow:inset 0 0 0 .5px var(--sep);background:color-mix(in srgb,var(--label) 2.5%,transparent)}
+.dp-cl header{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px}
+.dp-cl header a{display:inline-flex;align-items:center;gap:2px;font-size:15px;font-weight:600;color:var(--label);text-decoration:none}
+.dp-cl header a svg{width:14px;height:14px;color:var(--label-2)}
 @media (hover:hover) and (pointer:fine){ .dp-cl header a:hover{color:var(--accent)} }
-.dp-cl dl{display:grid;grid-template-columns:118px 1fr;gap:4px 12px;margin:0}
-.dp-cl dt{line-height:20px}
-.dp-cl dd{margin:0;font-size:14px;line-height:20px}
+.dp-ln{display:grid;grid-template-columns:20px 1fr auto;align-items:start;gap:4px 10px;padding:7px 0;border-top:.5px solid var(--sep)}
+.dp-cl header + .dp-ln{border-top:0}
+.dp-ic{display:inline-flex;margin-top:15px;color:var(--label-2)}
+.dp-ic svg{width:16px;height:16px}
+.dp-next .dp-ic{color:var(--claude)}
+.dp-add .dp-ic{color:var(--purple)}
+.dp-tx{min-width:0}
+.dp-tx p{margin:1px 0 0;font-size:14px;line-height:1.4}
+.dp-m{display:block;margin-top:2px;font-size:12px;color:var(--label-2)}
+.dp-win .dp-tx p,.dp-owe .dp-tx p{color:var(--label-2)}
+.dp-acts{display:flex;gap:6px;align-items:center;margin-top:12px;flex-wrap:wrap;justify-content:flex-end}
+.dp-acts .btn{white-space:nowrap}
+.dp-acts .btn .cl-spark{width:12px;height:12px;color:var(--claude)}
+.dp-ok{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:500;color:var(--green)}
+.dp-ok svg{width:12px;height:12px}
 .dp-foot{display:flex;align-items:center;gap:6px;margin:0;font-size:12.5px;color:var(--label-2)}
 .dp-foot .cl-spark{width:12px;height:12px;color:var(--claude);flex:none}
 .dp-wait{display:flex;flex-direction:column;align-items:center;gap:6px;padding:36px 12px;text-align:center}
@@ -4193,7 +4217,7 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 .pls-addons ul{margin:0;padding-left:18px;font-size:13.5px;line-height:1.4}
 .pls-addons p{margin:0;font-size:12.5px;color:var(--label-2)}
 .mtn-btns .cl-claude-btn{height:28px}
-@media (max-width:640px){ .dp-cl dl{grid-template-columns:1fr} .dp-cl dt{margin-top:4px} }
+@media (max-width:640px){ .dp-ln{grid-template-columns:20px 1fr} .dp-acts{grid-column:2;justify-content:flex-start;margin-top:4px} }
 /* Plan with Claude's popup (Nov 25): the message, to change, copy or open in Claude */
 .cpp-h{display:flex;align-items:center;gap:8px}
 .cpp-h .cl-spark{width:18px;height:18px;color:var(--claude);flex:none}

@@ -109,6 +109,56 @@ function dayPlanToolbarHtml(){
   const fresh = p && !p.empty && seen !== p.at;
   return `<button class="btn dp-btn" onclick="openDayPlan()" data-hovertip="Your plan for today, from Claude: each client’s next step, what they owe us and a win to aim for." data-tipdelay="1500">${CLAUDE_SPARK}Today’s Plan${fresh ? '<i class="dp-new" aria-label="New"></i>' : ''}</button>`;
 }
+// Each line is the real thing in Radar (Nov 25): the server sends what it's about (a task, a request from
+// an email or a meeting, a WhatsApp request, a follow-up), so the plan has its buttons, not just words.
+// "Today, first" is a checklist for the day (kept in this browser, with the plan it belongs to).
+function dpDoneKey(){ return `bda_dayplan_done_${currentUser ? currentUser.id : ''}`; }
+function dpDone(p){ try{ const v = JSON.parse(localStorage.getItem(dpDoneKey()) || 'null'); return v && p && v.at === p.at ? new Set(v.done || []) : new Set(); }catch(e){ return new Set(); } }
+function dpTick(i){
+  const p = dayPlan.plan; if(!p) return;
+  const done = dpDone(p); done.has(i) ? done.delete(i) : done.add(i);
+  try{ localStorage.setItem(dpDoneKey(), JSON.stringify({ at: p.at, done: [...done] })); }catch(e){}
+  dayPlanRedraw();
+}
+function dpFirst(p){ return (p.first || []).map(f => typeof f === 'string' ? (() => { const m = f.match(/^([^:]+):\s*(.+)$/); const c = m && clients.find(x => x.name === m[1].trim()); return { id: c ? c.id : null, client: c ? c.name : '', text: c ? m[2] : f, ref: null }; })() : f); }
+function dpTask(ref){ return ref && ref.kind === 'task' && typeof tasks !== 'undefined' ? (tasks || []).find(t => String(t.id) === String(ref.id)) || null : null; }
+// what a line is, in a few words, and its buttons
+function dpRefMeta(ref){
+  if(!ref) return '';
+  if(ref.kind === 'task'){
+    const t = dpTask(ref); if(!t) return 'Your task';
+    if(t.status === 'done') return 'Your task · done';
+    const today = toDateStr(rNow()), due = t.dueDate ? new Date(t.dueDate + 'T12:00:00') : null;
+    return `Your task${due ? ` · due ${fmtShortDate(due)}` : ''}${t.dueDate && t.dueDate < today ? ' · late' : ''}`;
+  }
+  return { suggestion: 'They asked for it · not in your tasks yet', wa: 'Their WhatsApp request', reminder: 'Your follow-up' }[ref.kind] || '';
+}
+function dpNextActs(c){
+  const r = c.nextRef, A = jsArg, sm = (label, js, cls) => `<button type="button" class="btn sm${cls ? ' ' + cls : ''}" onclick="${js}">${label}</button>`;
+  if(r && r.kind === 'task'){
+    const t = dpTask(r);
+    if(t && t.status === 'done') return `<span class="dp-ok">${icon('check', { weight: 'bold' })}Done</span>`;
+    return sm('Open', `dpGo(() => notifOpenTask(${A(r.id)}))`) + (t && t.assigneeId === currentUser.id ? sm(`${icon('check')}Mark Done`, `dpGo(() => moveTaskToStatus(${A(r.id)}, 'done'))`) : '');
+  }
+  if(r && r.kind === 'suggestion') return sm(`${icon('plus')}Add to My Tasks`, `dpAddSuggestion(${A(r.id)}, this)`);
+  if(r && r.kind === 'wa') return sm('Open', `dpGo(() => waOpenItem(${A(r.id)}))`);
+  return sm(`${icon('plus')}Add as Task`, `dpGo(() => openNewTaskModal(currentUser.id, 'todo', { clientId: ${A(c.id)}, title: ${A(c.next)}, due: toDateStr(rNow()) }))`);
+}
+function dpOweActs(c){
+  const r = c.oweRef, A = jsArg;
+  return r && r.kind === 'reminder' ? `<button type="button" class="btn sm" onclick="dpGo(() => openReminderDetailModal(${A(r.id)}))">Follow Up</button>`
+    : `<button type="button" class="btn sm" onclick="dpGo(() => openNewReminderModal(${A(c.id)}))">${icon('plus')}Add Follow-Up</button>`;
+}
+// out of the plan and on to the thing (the plan opens again from the toolbar)
+function dpGo(fn){ closeAppModal(); setTimeout(fn, 0); }
+async function dpAddSuggestion(id, btn){
+  if(btn){ btn.disabled = true; btn.textContent = 'Adding…'; }
+  if(typeof taskSuggestions === 'undefined' || !taskSuggestions || !taskSuggestions.some(x => x.id === id)) await loadTaskSuggestions();
+  const r = await addSuggestedTask(id);
+  if(!btn || !btn.isConnected) return;
+  if(r.error){ btn.disabled = false; btn.innerHTML = `${icon('plus')}Add to My Tasks`; showToast('info', 'Not added', r.error.message === 'Already decided.' ? 'It was already added or dismissed in Tasks.' : r.error.message); return; }
+  btn.outerHTML = `<span class="dp-ok">${icon('check', { weight: 'bold' })}${r.already ? 'Already yours' : 'In your tasks'}</span>`;
+}
 function dayPlanBodyHtml(){
   const d = dayPlan;
   if(d.making) return `<div class="dp-wait">${CLAUDE_SPARK}<p>Claude is writing your plan…</p><span>It reads your tasks, sprints, follow-ups, client emails and WhatsApp. About half a minute.</span></div>`;
@@ -117,19 +167,25 @@ function dayPlanBodyHtml(){
   const p = d.plan;
   if(!p) return emptyState({ icon: 'sparkle', title: 'No plan for today yet', text: `Claude writes it each weekday morning. ${d.last ? 'Yours from ' + fmtShortDate(new Date(d.last + 'T12:00:00')) + ' is out of date. ' : ''}You can have it written now.`, action: 'Make Today’s Plan', onAction: 'makeDayPlanNow()' });
   if(p.empty) return emptyState({ icon: 'check-circle', tone: 'ok', title: 'Nothing on your clients today', text: 'No open tasks, sprints, follow-ups or requests for the clients you work on.' });
-  const A = id => jsArg(id);
-  const first = p.first && p.first.length ? `<section class="dp-first"><h4>Today, first</h4><ol>${p.first.map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ol></section>` : '';
-  const rows = (p.clients || []).map(c => `<section class="dp-cl"><header><a href="#" onclick="closeAppModal();openClientDetail(${A(c.id)});return false;">${escapeHtml(c.client)}</a>${c.addon ? addonTagHtml('') : ''}</header>
-<dl>${c.next ? `<dt>Next step</dt><dd>${escapeHtml(c.next)}</dd>` : ''}<dt>They owe us</dt><dd${c.owe ? '' : ' class="t-3"'}>${escapeHtml(c.owe || 'Nothing')}</dd>${c.win ? `<dt>Win to aim for</dt><dd>${escapeHtml(c.win)}</dd>` : ''}${c.addon ? `<dt>Add-on to offer</dt><dd>${escapeHtml(c.addon)}</dd>` : ''}</dl></section>`).join('');
+  const A = id => jsArg(id), done = dpDone(p), first = dpFirst(p);
+  const nDone = first.filter((f, i) => done.has(i)).length;
+  const firstHtml = first.length ? `<section class="dp-first"><header><h4>Today, first</h4><span class="dp-prog${nDone === first.length ? ' is-all' : ''}">${nDone === first.length ? 'All done' : `${nDone} of ${first.length} done`}</span></header>
+<ol>${first.map((f, i) => `<li class="${done.has(i) ? 'is-done' : ''}"><button type="button" class="dp-ck" role="checkbox" aria-checked="${done.has(i)}" aria-label="${escapeHtml(f.text)}" onclick="dpTick(${i})">${done.has(i) ? icon('check', { weight: 'bold' }) : ''}</button><span class="dp-ft">${f.client ? `<em>${escapeHtml(f.client)}</em>` : ''}<span>${escapeHtml(f.text)}</span></span></li>`).join('')}</ol></section>` : '';
+  const line = (cls, ic, label, text, meta, acts) => `<div class="dp-ln ${cls}"><span class="dp-ic" aria-hidden="true">${icon(ic)}</span><div class="dp-tx"><span class="dp-k">${label}</span><p>${escapeHtml(text)}</p>${meta ? `<span class="dp-m">${escapeHtml(meta)}</span>` : ''}</div>${acts ? `<div class="dp-acts">${acts}</div>` : ''}</div>`;
+  const rows = (p.clients || []).map(c => `<section class="dp-cl"><header><a href="#" onclick="closeAppModal();openClientDetail(${A(c.id)});return false;">${escapeHtml(c.client)}${icon('chevron-right')}</a>${c.addon ? addonTagHtml('') : ''}</header>
+${c.next ? line('dp-next', 'arrow-right', 'Next step', c.next, dpRefMeta(c.nextRef), dpNextActs(c)) : ''}
+${c.owe ? line('dp-owe', 'clock', 'They owe us', c.owe, '', dpOweActs(c)) : ''}
+${c.win ? line('dp-win', 'target', 'Win to aim for', c.win, '', '') : ''}
+${c.addon ? line('dp-add', 'circle-plus', 'Add-on to offer', c.addon, '', `<button type="button" class="btn sm" onclick="dpGo(() => planWithClaude(${A(c.id)}))">${CLAUDE_SPARK}Plan with Claude</button>`) : ''}</section>`).join('');
   const when = p.at ? fmtTime(new Date(p.at)) : '';
-  return `${first}<div class="dp-list">${rows}</div><p class="dp-foot">${CLAUDE_SPARK}<span>Written by Claude${when ? ` at ${escapeHtml(when)}` : ''} from your tasks, sprints, follow-ups, client emails and WhatsApp. · <button type="button" class="x-lnk" onclick="makeDayPlanNow()">Write It Again</button></span></p>`;
+  return `${firstHtml}<div class="dp-list">${rows}</div><p class="dp-foot">${CLAUDE_SPARK}<span>Written by Claude${when ? ` at ${escapeHtml(when)}` : ''} from your tasks, sprints, follow-ups, client emails and WhatsApp. · <button type="button" class="x-lnk" onclick="makeDayPlanNow()">Write It Again</button></span></p>`;
 }
 function dayPlanRedraw(){ const b = document.getElementById('dpBody'); if(b) b.innerHTML = dayPlanBodyHtml(); }
 function openDayPlan(){
   const p = dayPlan.plan;
   if(p) try{ localStorage.setItem(dayPlanSeenKey(), p.at); }catch(e){}
   const day = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-  openAppModal(`<h3 class="dp-h">${CLAUDE_SPARK}<span>Today’s Plan</span><small>${escapeHtml(day)}</small></h3><div class="dp" id="dpBody">${dayPlanBodyHtml()}</div><div class="sheet-a"><button class="btn btn-p" id="dpDone" onclick="closeAppModal()">Done</button></div>`, 620);
+  openAppModal(`<h3 class="dp-h">${CLAUDE_SPARK}<span>Today’s Plan</span><small>${escapeHtml(day)}</small></h3><div class="dp" id="dpBody">${dayPlanBodyHtml()}</div><div class="sheet-a"><button class="btn btn-p" id="dpDone" onclick="closeAppModal()">Done</button></div>`, 700);
   setTimeout(() => document.getElementById('dpDone')?.focus({ preventScroll: true }), 30);   // not on the first client's name
   if(currentViewName === 'overview') setToolbarActions('overview');
   if(!dayPlan.plan && !dayPlan.loading) loadDayPlan(true);
