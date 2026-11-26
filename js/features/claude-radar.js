@@ -6,8 +6,10 @@ function claudeOn(){ return typeof myProfile !== 'undefined' && !!(myProfile && 
 async function claudeApi(body){
   const r = await fetch(body ? '/api/integrations' : '/api/integrations?provider=claude', {
     method: body ? 'POST' : 'GET', headers: await apiAuthHeaders(), body: body ? JSON.stringify({ provider: 'claude', ...body }) : undefined });
-  let data = {}; try{ data = await r.json(); }catch(e){}
-  if(!r.ok || data.error) return { error: data.error || 'Claude didn’t answer. Try again in a moment.' };
+  let data = null; try{ data = await r.json(); }catch(e){}
+  // the server's own reason; otherwise what the answer itself says (Vercel stopped it, or it never came)
+  if(data && data.error) return { error: data.error };
+  if(!r.ok || !data) return { error: r.status === 504 ? 'Claude took too long to answer. Try again in a moment.' : `Radar’s server didn’t answer (${r.status}). Try again in a moment.` };
   return data;
 }
 

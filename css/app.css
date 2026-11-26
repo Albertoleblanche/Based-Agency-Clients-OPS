@@ -4194,3 +4194,10 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 .pls-addons p{margin:0;font-size:12.5px;color:var(--label-2)}
 .mtn-btns .cl-claude-btn{height:28px}
 @media (max-width:640px){ .dp-cl dl{grid-template-columns:1fr} .dp-cl dt{margin-top:4px} }
+/* Plan with Claude's popup (Nov 25): the message, to change, copy or open in Claude */
+.cpp-h{display:flex;align-items:center;gap:8px}
+.cpp-h .cl-spark{width:18px;height:18px;color:var(--claude);flex:none}
+.cpp-h small{margin-left:auto;font-size:13px;font-weight:400;color:var(--label-2);max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cpp-sub{margin:2px 0 12px;font-size:13px;line-height:1.45;color:var(--label-2)}
+.tf.cpp-text{display:block;width:100%;box-sizing:border-box;height:min(46vh,420px);min-height:180px;resize:vertical;font-size:13px;line-height:1.5;padding:10px 12px;white-space:pre-wrap;font-family:inherit}
+.cpp-n{margin-right:auto;font-size:12px;color:var(--label-3,var(--label-2));font-variant-numeric:tabular-nums}

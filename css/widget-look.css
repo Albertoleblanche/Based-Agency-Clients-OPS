@@ -1123,3 +1123,4 @@ html.ui-w .mac .su-nudge-x{top:10px;right:9px;border-radius:8px}
 html.ui-w .mac .su-seg{background:var(--uw-c2)}
 html.ui-w .mac .su-seg.is-next{background:color-mix(in srgb,var(--label) 30%,transparent)}
 @media (hover:hover) and (pointer:fine){html.ui-w .mac .su-nudge:hover{background:var(--grp);box-shadow:0 0 0 1px var(--sep-strong),0 2px 8px rgba(0,0,0,.06)}}
+html.ui-w .mac textarea.tf.cpp-text{height:min(46vh,420px);min-height:180px}

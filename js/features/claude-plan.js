@@ -57,14 +57,41 @@ function claudePlanPrompt(c){
   return out;
 }
 function claudeNewChatUrl(prompt){ return 'https://claude.ai/new?q=' + encodeURIComponent(prompt); }
+// Plan with Claude (Nov 25, later): a popup with the message, to read and change, then Copy Prompt (to
+// paste wherever you use Claude) or Open in Claude (a new chat with it filled in; nothing is sent).
 function planWithClaude(id){
   const c = clients.find(x => x.id === id); if(!c) return;
-  window.open(claudeNewChatUrl(claudePlanPrompt(c)), '_blank', 'noopener');
-  if(typeof showToast === 'function') showToast('info', 'Opened in Claude', 'The message is ready there, in a new tab. Read it over, then send it.');
+  const text = claudePlanPrompt(c);
+  openAppModal(`<h3 class="cpp-h">${CLAUDE_SPARK}<span>Plan with Claude</span><small>${escapeHtml(c.name)}</small></h3>
+<p class="cpp-sub">The message for Claude: this client’s next step, what they pay us for and what’s open. Change anything you like, then copy it or open it in Claude. Nothing is sent until you send it.</p>
+<textarea id="cppText" class="tf cpp-text" spellcheck="true" aria-label="The message for Claude">${escapeHtml(text)}</textarea>
+<div class="sheet-a"><span class="cpp-n" id="cppN"></span><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn" id="cppCopy" onclick="planWithClaudeCopy()">${icon('copy')}Copy Prompt</button><button class="btn cl-claude-btn" id="cppOpen" onclick="planWithClaudeOpen()">${CLAUDE_SPARK}Open in Claude</button></div>`, 680);
+  const ta = document.getElementById('cppText');
+  const count = () => { const n = document.getElementById('cppN'); if(n && ta) n.textContent = `${ta.value.length.toLocaleString('en-US')} characters`; };
+  if(ta){ ta.addEventListener('input', count); count(); setTimeout(() => { ta.scrollTop = 0; document.getElementById('cppCopy')?.focus({ preventScroll: true }); }, 30); }
+}
+function planWithClaudeText(){ return (document.getElementById('cppText')?.value || '').trim(); }
+async function planWithClaudeCopy(){
+  const t = planWithClaudeText(); if(!t) return;
+  const btn = document.getElementById('cppCopy');
+  let done = false;
+  try{ await navigator.clipboard.writeText(t); done = true; }catch(e){
+    const ta = document.getElementById('cppText');
+    if(ta){ ta.focus(); ta.select(); try{ done = document.execCommand('copy'); }catch(e2){} }
+  }
+  if(!done){ showToast('error', 'Couldn’t copy', 'Select the message and copy it yourself.'); return; }
+  if(btn){ btn.innerHTML = `${icon('check')}Copied`; setTimeout(() => { if(btn.isConnected) btn.innerHTML = `${icon('copy')}Copy Prompt`; }, 1800); }
+  showToast('success', 'Copied', 'Paste it in a Claude chat or project.');
+}
+function planWithClaudeOpen(){
+  const t = planWithClaudeText(); if(!t) return;
+  window.open(claudeNewChatUrl(t), '_blank', 'noopener');
+  closeAppModal();
+  showToast('info', 'Opened in Claude', 'The message is ready there, in a new tab. Read it over, then send it.');
 }
 // The button (Nov 25): Claude's own orange with its mark, between Mark Handled and the next step's
 // button. The button is its own tip: held under the pointer for 1.5 s it says, briefly, what it does.
-const CLAUDE_PLAN_TIP = 'Opens Claude with this client’s next step ready to start, inside what they pay us for. Nothing is sent until you send it.';
+const CLAUDE_PLAN_TIP = 'A message for Claude with this client’s next step, inside what they pay us for: copy it or open it in Claude.';
 function planWithClaudeHtml(id, small){
   const A = jsArg(id), tip = escapeHtml(CLAUDE_PLAN_TIP);
   return small
