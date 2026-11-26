@@ -226,9 +226,12 @@ function renderPlan(){
   const room = activeClients().filter(c => c.status !== 'Paused' && c.monthlyHourBudget && clientOwner(c) === me && !planSprints.some(s => !s.doneAt && s.clientId === c.id && s.end >= today))
     .map(c => ({ c, left: c.monthlyHourBudget - monthHours(c, now) })).filter(x => x.left >= 8).sort((a, b) => b.left - a.left).slice(0, 3 - Math.min(ideas.length, 1))
     .map(({ c, left }) => ({ ic: 'clock', t: c.name, s: `${Math.round(left)} h of budget left this month`, run: `openNewSprintModal({ clientId: '${c.id}' })` }));
+  // Claude's ideas on your clients first, as small cards (claude-plan.js claudePlanIdeasHtml, Nov 26), then
+  // your notes' ideas and clients with room, as rows
+  const cIdeas = typeof claudePlanIdeasHtml === 'function' ? claudePlanIdeasHtml() : '';
   const worth = [...ideas, ...room].slice(0, 3);
-  const worthHtml = worth.length ? worth.map(x => `<div class="pl-id"><span class="pl-xi">${icon(x.ic)}</span><div class="tx"><b>${escapeHtml(x.t)}</b><span class="s">${escapeHtml(x.s)}</span></div><button class="btn btn-sm" onclick="${x.run}">Plan</button></div>`).join('')
-    : `<p class="pl-empty">Ideas in your notes and clients with budget left show here.</p>`;
+  const worthHtml = cIdeas || worth.length ? cIdeas + worth.map(x => `<div class="pl-id"><span class="pl-xi">${icon(x.ic)}</span><div class="tx"><b>${escapeHtml(x.t)}</b><span class="s">${escapeHtml(x.s)}</span></div><button class="btn btn-sm" onclick="${x.run}">Plan</button></div>`).join('')
+    : `<p class="pl-empty">Claude’s ideas, ideas in your notes and clients with budget left show here.</p>`;
   const hoursOpts = [5, 10, 15, 20, 25, 30, 35, 40];
   if(!hoursOpts.includes(planWeeklyHours)) hoursOpts.push(planWeeklyHours), hoursOpts.sort((a, b) => a - b);
   const side = `<aside class="pl-side">
@@ -443,7 +446,7 @@ function openNewSprintModal(o){
   // from a meeting's notes (Nov 25): Claude drafts it (psFillFromMeeting)
   const meet = !s && o.meetingId && typeof granolaMeetings !== 'undefined' ? (granolaMeetings || []).find(x => x.id === o.meetingId) : null;
   const pre = !s && o.preset ? o.preset : null;   // Claude's proposal (Today's Plan, Nov 25): its title, goal and steps
-  planSheet = { edit: s ? s.id : null, steps: s ? [] : pre && Array.isArray(pre.steps) && pre.steps.length ? pre.steps.slice(0, 10) : [''], hours: s ? Math.round(s.hours) : 10, noteId: o.noteId || null, taskId: task ? task.id : null, meetingId: meet ? meet.id : null };
+  planSheet = { edit: s ? s.id : null, steps: s ? [] : pre && Array.isArray(pre.steps) && pre.steps.length ? pre.steps.slice(0, 10) : [''], hours: s ? Math.round(s.hours) : 10, noteId: o.noteId || null, taskId: task ? task.id : null, meetingId: meet ? meet.id : null, cnNote: !s && o.cnNote ? o.cnNote : null };   // a Claude idea made a sprint leaves every screen (claude-plan.js cnSettle)
   const clientId = s ? (s.clientId || '') : (o.clientId || (note && note.clientId) || (task && task.clientId) || '');
   const remOn = s ? new Set((s.reminders || []).filter(r => r.kind && r.kind !== 'custom').map(r => r.kind)) : new Set(['start', 'half', 'end']);
   const noteMenu = meet ? `<span style="margin-right:auto"><button type="button" class="btn cl-claude-btn" id="psFillBtn" onclick="psFillFromMeeting()">${CLAUDE_SPARK}Draft Again</button></span>`
@@ -629,6 +632,7 @@ async function savePlanSprint(){
     if(error || !data){ restoreBtn(btn); showToast('error', 'Sprint not created', error?.message || 'Try again in a moment.'); return; }
     id = data.id;
     const sp = planRowFromDb(data), steps = ps.steps.map(x => x.trim()).filter(Boolean), days = planWorkdays(start, end);
+    if(ps.cnNote && typeof cnSettle === 'function') cnSettle(ps.cnNote.clientId, ps.cnNote.noteId);
     if(ps.taskId){
       const { error: e1 } = await supabaseClient.from('tasks').update({ sprint_id: id }).eq('id', ps.taskId);
       if(e1) showToast('error', 'The task wasn’t added to the sprint', e1.message);

@@ -141,6 +141,7 @@ async function loadClaudeNotes(force){
 function claudeNotesRedraw(){
   if(typeof cnNavDot === 'function') cnNavDot();
   if(typeof currentViewName !== 'undefined' && currentViewName === 'health' && typeof renderHealth === 'function'){ renderHealth(); return; }
+  if(typeof currentViewName !== 'undefined' && currentViewName === 'plan' && typeof renderPlan === 'function') renderPlan();   // Claude's ideas in Worth planning
   document.querySelectorAll('[data-cn-client]').forEach(el => {
     const c = clients.find(x => x.id === el.dataset.cnClient); if(!c) return;
     el.outerHTML = claudeNotesHtml(c, el.dataset.cnWhere || 'panel');
@@ -398,11 +399,16 @@ ${shown.map(row).join('')}${items.length > 3 ? `<button class="x-lnk tk-sg-more"
 }
 // a client's notes in full: Health with the client's panel open
 function cnOpenClient(id){ switchView('health'); setTimeout(() => { if(typeof selectHealthClient === 'function') selectHealthClient(id); }, 0); }
-// Plan: Claude's ideas first in "Worth planning"; Plan opens New Sprint with the idea and its steps
-function claudePlanIdeas(){
-  if(!claudeNotesOn()) return [];
+// Plan: Claude's ideas on your clients, first in "Worth planning", as small cards (Nov 26, canvas "Plan:
+// Claude's ideas first in Worth planning"): the Idea pill and the client, the idea, why in two lines (all of
+// it on hover), then Make It a Sprint (New Sprint with the idea and its steps; saving the sprint settles the
+// note, plan.js cnNote) and Dismiss. Three at most; not for paused clients.
+function claudePlanIdeasHtml(){
+  if(!claudeNotesOn()) return '';
   if(!claudeNotes.at && !claudeNotes.loading) setTimeout(() => loadClaudeNotes(), 0);
-  return cnSorted((typeof clients !== 'undefined' ? clients : []).filter(c => claudeMine(c)).flatMap(c => cnNotesOf(c))).filter(x => x.n.kind === 'idea').slice(0, 3)
-    .map(({ c, n }) => ({ claude: true, t: n.title, s: `${c.name} · Claude’s idea`, why: n.why,
-      run: `openNewSprintModal({ clientId: ${jsArg(c.id)}, preset: { title: ${jsArg(n.title)}, goal: ${jsArg(n.why)}, steps: ${escapeHtml(JSON.stringify(n.steps || []))} }, cnNote: { clientId: ${jsArg(c.id)}, noteId: ${jsArg(n.id)} } })` }));
+  else if(claudeNotes.at && Date.now() - claudeNotes.at > 3 * 60000) setTimeout(() => loadClaudeNotes(), 0);
+  const A = jsArg;
+  return cnSorted((typeof clients !== 'undefined' ? clients : []).filter(c => c.status !== 'Paused' && claudeMine(c)).flatMap(c => cnNotesOf(c))).filter(x => x.n.kind === 'idea').slice(0, 3)
+    .map(({ c, n }) => `<div class="pl-ci cn-n is-idea" data-cnl="${escapeHtml(c.id + ':' + n.id)}"><p class="pl-ci-top"><span class="cn-k">Idea</span><span class="c">${escapeHtml(c.name)}</span></p><b>${escapeHtml(n.title)}</b><p class="pl-ci-w" title="${escapeHtml(n.why)}">${escapeHtml(n.why)}</p>`
+      + `<div class="pl-ci-a"><button type="button" class="btn sm btn-p" onclick="openNewSprintModal({ clientId: ${A(c.id)}, preset: { title: ${A(n.title)}, goal: ${A(n.why)}, steps: ${escapeHtml(JSON.stringify(n.steps || []))} }, cnNote: { clientId: ${A(c.id)}, noteId: ${A(n.id)} } })">Make It a Sprint</button><button type="button" class="btn sm cn-dis" onclick="cnDismiss(${A(c.id)}, ${A(n.id)}, this)">Dismiss</button></div></div>`).join('');
 }
