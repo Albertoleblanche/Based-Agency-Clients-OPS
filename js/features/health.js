@@ -4,6 +4,10 @@
 // watch, a tall one at risk, so trouble visibly rises and still reads without color. Hover any week
 // and every row goes back to that week. Clicking a client opens the details on the right. Past weeks
 // re-run the same rules as of that day (withAsOf), so the history needs nothing stored.
+// Nov 26 (canvas "Health: 70/30, Claude noticed on the right"): the numbers and the rows take the left
+// 70%, Claude's notes on these clients the right 30% (claude-plan.js claudeNoticedHtml). A row says why
+// under the client's name; the 12 weeks and the status sit in the middle; pointing at a row lights up its
+// note on the right, and the other way round.
 
 function selectHealthClient(id){ window._healthSel = id; renderHealth(); }
 function closeHealthPanel(){ window._healthSel = null; renderHealth(); }
@@ -115,16 +119,16 @@ function renderHealth(){
       else { act = `<button class="btn sm${primaryUsed || uw ? '' : ' btn-p'}" onclick="event.stopPropagation();planNextStep('${c.id}')">Plan Next Step</button>`; primaryUsed = true; }
     }
     const st = x.lv === 'g' ? '' : `<span class="hx-st ${x.lv}"><i></i>${x.lv === 'h' ? 'Settling' : HL_WORD[x.lv]}</span>`;
-    return `<div class="hx-row${sel && sel.c.id === c.id ? ' on' : ''}" role="button" tabindex="0" data-h="${x.hist.map(k => k || '.').join('')}" onclick="selectHealthClient('${c.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectHealthClient('${c.id}')}">
-<div class="hx-nm"><b>${escapeHtml(c.name)}${focusMark(c)}</b><span>${escapeHtml(everyone ? owner || 'No owner' : c.service || '')}</span></div>
-${healthTrailHtml(x.hist)}<span class="hx-stc">${st}<span class="hx-st then"><i></i></span></span><span class="hx-why">${escapeHtml(why)}</span><span class="hx-act">${act}</span></div>`;
+    const who = everyone && owner !== me ? (owner || 'No owner') : '';   // whose it is, when it isn't yours
+    return `<div class="hx-row${sel && sel.c.id === c.id ? ' on' : ''}" role="button" tabindex="0" data-cid="${escapeHtml(c.id)}" data-h="${x.hist.map(k => k || '.').join('')}" onclick="selectHealthClient('${c.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectHealthClient('${c.id}')}">
+<div class="hx-nm"><b><span class="hx-nt">${escapeHtml(c.name)}</span>${focusMark(c)}</b><span class="hx-why">${escapeHtml(why)}${who ? `<em> · ${escapeHtml(who)}</em>` : ''}</span></div>
+${healthTrailHtml(x.hist)}<span class="hx-stc">${st}<span class="hx-st then"><i></i></span></span><span class="hx-act">${act}</span></div>`;
   };
   const info = (title, text) => `<span class="hx-i" tabindex="0" role="button" aria-label="About ${title}">${icon('info')}<span class="hx-tip" role="tooltip">${text}</span></span>`;
   const names = list => { const n = list.map(x => x.c.name), k = n.length > 3 ? 3 : n.length - 1;
     return n.length < 2 ? n.join('') : `${n.slice(0, k).join(', ')} and ${n.length > 3 ? n.length - 3 + ' more' : n[k]}`; };
-  const uwCount = k => uw ? `<span class="hx-gn">${G[k].length}</span>` : '';
   const uwTail = k => !uw ? '' : k === 'ok' ? `<span class="hx-gl">${escapeHtml(names(G.ok))}</span>` : '<span class="hx-gw">Last 12 weeks</span>';
-  const group = (k, title, text, extra) => G[k].length ? `<section class="hx-g${uw ? ' is-' + k : ''}"><div class="hx-gh"><b>${title}</b>${uwCount(k)}${info(title, text)}${uwTail(k)}${extra || ''}</div>${k === 'ok' ? `<div class="hx-x${window._hlOk ? ' open' : ''}"><div class="hx-xi">${G[k].map(row).join('')}</div></div>` : G[k].map(row).join('')}</section>` : '';
+  const group = (k, title, text, extra) => G[k].length ? `<section class="hx-g${uw ? ' is-' + k : ''}"><div class="hx-gh"><b>${title}</b>${info(title, text)}${uwTail(k)}${extra || ''}</div>${k === 'ok' ? `<div class="hx-x${window._hlOk ? ' open' : ''}"><div class="hx-xi">${G[k].map(row).join('')}</div></div>` : G[k].map(row).join('')}</section>` : '';
   const needN = G.new.length + G.long.length + G.fix.filter(x => x.lv === 'r' || x.lv === 'y').length;
   const okOnly = !G.new.length && !G.long.length && !G.fix.length;
   if(okOnly && window._hlOk === undefined) window._hlOk = true;
@@ -150,54 +154,58 @@ ${healthTrailHtml(x.hist)}<span class="hx-stc">${st}<span class="hx-st then"><i>
     : `<div class="hx-grid">${group('new', 'Slipped this week', 'They were healthy last week')}${group('long', 'Needing care for weeks', 'Two weeks or more, and no plan yet')}
 ${group('fix', 'Being fixed', 'A plan is underway, or it was handled and is settling')}${group('ok', 'Healthy', 'Nothing needs care right now', `<button class="lnk" onclick="hlToggleOk(this)">${window._hlOk ? 'Hide' : 'Show ' + G.ok.length}</button>`)}</div>`;
 
+  const prevRail = root.querySelector('.hcn-list')?.scrollTop || 0;
+  const rail = all.length && typeof claudeNoticedHtml === 'function' ? claudeNoticedHtml(all) : '';
   root.innerHTML = `<div class="spw"><div class="sp-page"><div class="hx">
 <div class="hx-top"><div><h1 class="hx-h">${escapeHtml(headline)}</h1>${subline ? `<p class="hx-s">${uw && slipped ? `<b>${escapeHtml(slipped)}</b>${escapeHtml(subline.slice(slipped.length))}` : escapeHtml(subline)}</p>` : ''}</div><div class="hx-ctl">${show}${seg}</div></div>
-${all.length ? healthGlanceHtml(all, weekAgo) : ''}${body}</div></div>${sel ? healthPanelHtml(sel.c, sel.h) : ''}</div>`;
+<div class="hx-cols${rail ? '' : ' no-rail'}"><div class="hx-main">${all.length ? healthGlanceHtml(all, weekAgo) : ''}${body}</div>${rail}</div></div></div>${sel ? healthPanelHtml(sel.c, sel.h) : ''}</div>`;
+  if(currentViewName === 'health' && typeof cnMarkSeen === 'function' && root.querySelector('[data-cn-feed]')) cnMarkSeen();
+  const rl = root.querySelector('.hcn-list'); if(rl) rl.scrollTop = prevRail;
   root._hlWeeks = weeks;
   hlBindScrub(root);
+  hlBindPairs(root);
   if(currentViewName === 'health') setToolbar('Health', !scoped ? 'How clients are doing, and who is fixing what' : 'How your clients are doing');
 }
 
-// ---- At a glance (Nov 23): where you stand, before the rows --------------------------------------
-// Healthy (and how that moved since last week), how many need care, updates on time over the last 4
-// weeks, hours used this month against the budgets and the month gone, and follow-ups waiting. Then
-// what's behind the clients that need care, by reason. All for the clients shown (yours, or a person's).
+// ---- At a glance (Nov 23; three numbers, Nov 26): where you stand, before the rows --------------------
+// Each number has the same shape: what it is (and over what time, in gray), the number, one small picture
+// and one line. Clients: how many of them are healthy, with the split healthy / on watch / at risk. Updates
+// on time over the last 4 finished weeks. Follow-ups waiting on clients, the due ones in red. Then what's
+// behind the clients that need care, by reason. All for the clients shown (yours, or a person's).
 function healthGlanceHtml(all, weekAgo){
-  const n = all.length, now = rNow();
-  const lv = x => x.h.level, cnt = k => all.filter(x => lv(x) === k).length;
-  const g = cnt('g'), r = cnt('r'), y = cnt('y'), pct = Math.round(g / n * 100);
+  const n = all.length;
+  const cnt = k => all.filter(x => x.h.level === k).length, g = cnt('g'), r = cnt('r'), y = cnt('y');
   const was = all.filter(x => weekAgo[x.c.id]), wasG = was.filter(x => weekAgo[x.c.id].level === 'g').length;
-  const wasPct = was.length ? Math.round(wasG / was.length * 100) : null, d = wasPct == null ? null : pct - wasPct;
-  const delta = d == null || d === 0 ? `<span class="hg-d">same as last week</span>` : `<span class="hg-d ${d > 0 ? 'up' : 'down'}">${d > 0 ? '+' : '−'}${Math.abs(d)} pts vs last week</span>`;
+  const d = was.length ? g - wasG : null;
+  const delta = d == null || d === 0 ? 'Same as last week' : `${d > 0 ? 'Up' : 'Down'} ${Math.abs(d)} from last week`;
   // updates on time: the last 4 finished weeks, every client that gets one
   let on = 0, tot = 0;
   all.filter(x => !x.h.off).forEach(x => { (x.h.seq || []).slice(3, 7).forEach(k => { if(k === 'n' || k === 'p') return; tot++; if(k === 'o') on++; }); });
   const wk = all.filter(x => !x.h.off).map(x => clientWeek(x.c));
-  const sentNow = wk.filter(w => w.sent).length, lateNow = wk.filter(w => w.late).length;
-  // hours: the clients with a monthly budget
-  const hb = all.map(x => x.h.hp || hoursPace(x.c)).filter(hp => hp && hp.budget);
-  const used = hb.reduce((t, h) => t + h.used, 0), budget = hb.reduce((t, h) => t + h.budget, 0);
-  const dim = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(), monthPct = Math.round(now.getDate() / dim * 100), usedPct = budget ? Math.round(used / budget * 100) : 0;
-  const overPace = all.filter(x => x.h.signals.some(sg => sg.key === 'hours')).length, under = all.filter(x => x.h.signals.some(sg => sg.key === 'under')).length;
+  const sentNow = wk.filter(w => w.sent).length, lateNow = wk.filter(w => w.late).length, pct = tot ? Math.round(on / tot * 100) : null;
   // follow-ups with these clients
   const ids = new Set(all.map(x => x.c.id));
   const fu = (typeof clientReminders !== 'undefined' ? clientReminders : []).filter(rm => rm.status === 'waiting' && !rm.waitingOn && ids.has(rm.clientId));
   const fuDue = fu.filter(rm => reminderDisplayStatus(rm) === 'due').length;
-  const tile = (k, label, big, sub, tone, bar) => `<div class="hg-t${tone ? ' ' + tone : ''}" data-k="${k}"><span class="hg-l">${label}</span><b class="hg-b">${big}</b>${bar || ''}<span class="hg-s">${sub}</span></div>`;
-  const meter = (p, mark) => `<span class="hg-m" aria-hidden="true"><i style="width:${Math.min(100, Math.max(0, p))}%"></i>${mark != null ? `<em style="left:${Math.min(100, mark)}%"></em>` : ''}</span>`;
-  const tiles = [
-    tile('healthy', 'Healthy', `${pct}<small>%</small>`, `${g} of ${n} client${n === 1 ? '' : 's'} · ${delta}`, pct >= 80 ? 'ok' : pct < 50 ? 'bad' : '', meter(pct)),
-    tile('care', 'Need care', `${r + y}`, r + y ? `<span class="hg-dot r"></span>${r} at risk <span class="hg-dot y"></span>${y} on watch` : 'Nothing needs care', r ? 'bad' : y ? 'warn' : 'ok'),
-    tile('updates', 'Updates on time', tot ? `${Math.round(on / tot * 100)}<small>%</small>` : '—', `${tot ? `last 4 weeks · ` : ''}${sentNow} sent this week${lateNow ? `, <span class="hg-bad">${lateNow} overdue</span>` : ''}`, tot && on / tot < .7 ? 'warn' : '', tot ? meter(on / tot * 100) : ''),
-    budget ? tile('hours', 'Hours this month', `${Math.round(used)}<small> / ${Math.round(budget)} h</small>`, `${usedPct}% used, ${monthPct}% of the month gone${overPace ? ` · <span class="hg-bad">${overPace} on pace to go over</span>` : under ? ` · ${under} under-used` : ''}`, overPace ? 'warn' : '', meter(usedPct, monthPct)) : '',
-    tile('follow', 'Follow-ups', `${fu.length}`, fu.length ? `waiting on clients${fuDue ? ` · <span class="hg-bad">${fuDue} due</span>` : ''}` : 'Nothing waiting on clients', fuDue ? 'warn' : ''),
-  ].filter(Boolean).join('');
+  const cell = (k, label, aside, value, small, pic, foot) => `<div class="hg-k" data-k="${k}"><p class="hg-kl"><span>${label}</span><em>${aside}</em></p><p class="hg-kv">${value}<small>${small}</small></p>${pic}<p class="hg-kf">${foot}</p></div>`;
+  const split = (parts, label) => `<span class="hg-bar" role="img" aria-label="${escapeHtml(label)}">${parts.filter(([, v]) => v > 0).map(([c, v]) => `<i class="${c}" style="flex:${v}"></i>`).join('')}</span>`;
+  const blocks = (due, rest) => due + rest > 12 ? split([['r', due], ['e', rest]], `${due} due of ${due + rest}`)
+    : `<span class="hg-bar is-blocks" role="img" aria-label="${due} due of ${due + rest}">${'<i class="r"></i>'.repeat(due)}${'<i class="e"></i>'.repeat(rest)}</span>`;
+  const dot = c => `<i class="hg-dot ${c}"></i>`;
+  const cells = [
+    cell('clients', 'Clients', delta, g, `of ${n} healthy`, split([['g', g], ['y', y], ['r', r]], `${g} healthy, ${y} on watch, ${r} at risk`),
+      [`${dot('g')}${g} healthy`, y ? `${dot('y')}${y} on watch` : '', r ? `${dot('r')}${r} at risk` : ''].filter(Boolean).map(t => `<span>${t}</span>`).join('')),
+    cell('updates', 'Updates on time', 'Last 4 weeks', pct == null ? '—' : pct, pct == null ? '' : '%', pct == null ? '<span class="hg-bar"><i class="e" style="flex:1"></i></span>' : split([['n', pct], ['e', 100 - pct]], `${pct}% on time`),
+      `<span>${sentNow} sent this week</span>${lateNow ? `<span class="hg-bad">${dot('r')}${lateNow} overdue</span>` : ''}`),
+    cell('follow', 'Follow-ups', 'Waiting on clients', fu.length, 'open', fu.length ? blocks(fuDue, fu.length - fuDue) : '<span class="hg-bar"><i class="e" style="flex:1"></i></span>',
+      fu.length ? `${fuDue ? `<span>${dot('r')}${fuDue} due</span>` : ''}<span>${fu.length - fuDue} not yet</span>` : '<span>Nothing waiting on clients</span>'),
+  ].join('');
   // why the ones that need care do
   const WHY = { noupdate: 'Updates slipping', late: 'Updates slipping', quiet: 'Nothing logged', hours: 'Over hours', under: 'Hours under-used', tasks: 'Tasks overdue', flag: 'Risk flag', concern: 'Team concern', met: 'No meeting lately' };
   const why = {};
   all.filter(x => x.h.rawLevel !== 'g').forEach(x => { const seen = new Set(); x.h.signals.forEach(sg => { const w = WHY[sg.key]; if(w && !seen.has(w)){ seen.add(w); why[w] = (why[w] || 0) + 1; } }); });
   const reasons = Object.entries(why).sort((a, b) => b[1] - a[1]);
-  return `<section class="hg" aria-label="At a glance"><div class="hg-row">${tiles}</div>${reasons.length ? `<div class="hg-why"><span class="hg-wl">Why</span>${reasons.map(([w, k]) => `<span class="hg-c">${escapeHtml(w)}<b>${k}</b></span>`).join('')}</div>` : ''}</section>`;
+  return `<section class="hg" aria-label="At a glance"><div class="hg-ks">${cells}</div>${reasons.length ? `<div class="hg-why"><span class="hg-wl">Why</span>${reasons.map(([w, k]) => `<span class="hg-c">${escapeHtml(w)}<b>${k}</b></span>`).join('')}</div>` : ''}</section>`;
 }
 
 function healthRemind(id){
@@ -236,25 +244,38 @@ function hlBindScrub(root){
     grid.addEventListener('mouseover', e => {
       const s = e.target.closest('.tl-s');
       if(s && grid.contains(s)) set(+s.dataset.w, s);
-      else if(e.target.closest('.hx-nm, .hx-stc, .hx-why, .hx-act, .hx-gh')) set(null);
+      else if(e.target.closest('.hx-nm, .hx-stc, .hx-act, .hx-gh')) set(null);
     });
     grid.addEventListener('mouseleave', () => set(null));
   }
-  const tl = root.querySelector('.sp .cz-tl');
-  if(tl){
-    const ro = root.querySelector('.sp .hx-ro'), hist = tl.dataset.h || '';
+  const st = root.querySelector('.sp .wk12');
+  if(st){
+    const ro = root.querySelector('.sp .hx-ro'); let say = [];
+    try{ say = JSON.parse(st.dataset.say || '[]'); }catch(e){}
     const set = i => {
-      tl.classList.toggle('scrub', i != null);
-      tl.querySelectorAll('.tl-s.hv').forEach(s => s.classList.remove('hv'));
-      if(i != null) tl.querySelector(`.tl-s[data-w="${i}"]`)?.classList.add('hv');
-      if(ro){ ro.querySelector('b').textContent = i == null ? 'The last 12 weeks' : healthWeekLabel(weeks[i]); ro.querySelector('span').textContent = i == null ? '' : HL_WORD[hist[i] === '.' ? '' : hist[i]]; }
+      st.querySelectorAll('.wk12-c.hv').forEach(s => s.classList.remove('hv'));
+      if(i != null) st.querySelector(`.wk12-c[data-w="${i}"]`)?.classList.add('hv');
+      if(ro){ ro.querySelector('b').textContent = i == null || !say[i] ? ro.dataset.b : say[i][0]; ro.querySelector('span').textContent = i == null || !say[i] ? ro.dataset.s : say[i][1]; }
     };
-    tl.addEventListener('mouseover', e => { const s = e.target.closest('.tl-s'); if(s) set(+s.dataset.w); });
-    tl.addEventListener('mouseleave', () => set(null));
+    st.addEventListener('mouseover', e => { const s = e.target.closest('.wk12-c'); if(s) set(+s.dataset.w); });
+    st.addEventListener('mouseleave', () => set(null));
   }
 }
+// A client's row and its notes on the right light each other up (pointer only; nothing redraws).
+function hlBindPairs(root){
+  const cols = root.querySelector('.hx-cols'); if(!cols || !cols.querySelector('.hcn')) return;
+  let cur = null;
+  const set = id => {
+    if(id === cur) return; cur = id;
+    cols.querySelectorAll('.is-pair').forEach(el => el.classList.remove('is-pair'));
+    if(id) cols.querySelectorAll(`.hx-row[data-cid="${CSS.escape(id)}"], .hcn .cnl[data-cid="${CSS.escape(id)}"]`).forEach(el => el.classList.add('is-pair'));
+  };
+  cols.addEventListener('mouseover', e => { const el = e.target.closest('.hx-row[data-cid], .hcn .cnl[data-cid]'); set(el ? el.dataset.cid : null); });
+  cols.addEventListener('mouseleave', () => set(null));
+}
 
-// The panel: how bad, the next step, why, the 12 weeks, hours, the last 8 updates and what changed.
+// The panel: how bad, the next step, Claude's notes, why, the 12 weeks (health and the weekly update in
+// one strip, Nov 26), hours and what changed. The client's name opens its page.
 function healthPanelHtml(c, h, closeFn){
   const owner = clientOwner(c), next = nextStepTask(c), lvl = h.quiet ? h.rawLevel : h.level;
   const start = c.startDate ? new Date(c.startDate + 'T12:00:00') : null;
@@ -284,25 +305,50 @@ function healthPanelHtml(c, h, closeFn){
   const card = typeof riskCardHtml === 'function' ? riskCardHtml(c, h) : '', workSigs = card ? h.signals.filter(s => s.key !== 'flag' && s.key !== 'concern') : h.signals;
   const why = workSigs.map(s => `<div class="hp-w"><span class="sig ${s.l}">${icon(s.icon)}</span><div class="tx"><b>${escapeHtml(s.title)}</b><span>${escapeHtml(s.text)}</span></div><span class="hp-since">${escapeHtml(relDay(s.since))}</span></div>`).join('');
   const weeks = healthWeeks(), hist = healthTrail(c, h, weeks);
-  const trail = `<div class="sp-sec hx-ro"><b>The last 12 weeks</b><span></span></div>${healthTrailHtml(hist, 'cz-tl').replace('<div class="tl cz-tl"', `<div class="tl cz-tl" data-h="${hist.map(k => k || '.').join('')}"`)}${healthAxisHtml(weeks)}`;
+  const trail = healthStripHtml(c, h, weeks, hist);
   const hp = h.hp, scale = Math.max(hp.budget, hp.projected, hp.used, 1);
   const hours = hp.budget ? `<div class="sp-sec"><b>Hours this month</b><span>${escapeHtml(c.service || '')}</span></div>
 <div class="hp-hb"><i class="${hp.used > hp.budget ? 'over' : ''}" style="width:${(hp.used / scale * 100).toFixed(1)}%"></i><span class="hp-proj" style="width:${(hp.projected / scale * 100).toFixed(1)}%"></span><span class="hp-bud" style="left:${(hp.budget / scale * 100).toFixed(1)}%"></span></div>
 <div class="hp-hl"><span><b>${Math.round(hp.used)} h</b> used</span><span>Budget ${hp.budget} h</span><span class="${hp.projected > hp.budget ? 't-red' : ''}">On pace for ${Math.round(hp.projected)} h</span></div>` : '';
-  const ots = onTimeSummary(h.seq);
   const events = healthEvents(c, h).slice(0, 3).map(e => `<div class="hp-ev"><span>${escapeHtml(relDay(e.at))}</span><b>${escapeHtml(e.t)}</b></div>`).join('');
   return `<aside class="sp" aria-label="${escapeHtml(c.name)}, health">
-<div class="sp-bar"><button class="ib" aria-label="Close" onclick="${closeFn || 'closeHealthPanel()'}">${icon('x')}</button><a class="x-lnk" href="#" onclick="openClientDetail('${c.id}');return false;">Open client</a></div>
-<div class="sp-head">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}${focusMark(c)}</b><span>${meta}</span></div></div>
+<div class="sp-bar"><button class="ib" aria-label="Close" onclick="${closeFn || 'closeHealthPanel()'}">${icon('x')}</button></div>
+<div class="sp-head">${monoHtml(c, 'lg')}<div class="tx"><b><a class="sp-nm" href="#" onclick="openClientDetail('${c.id}');return false;" title="Open client page">${escapeHtml(c.name)}${icon('caret-right', { weight: 'bold' })}</a>${focusMark(c)}</b><span>${meta}</span></div></div>
 <div class="sp-status">${eyebrow}<b>${escapeHtml(title)}</b><span class="sub">${sub}</span>${acts}</div>
 ${card}
 ${typeof claudeNotesHtml === 'function' ? claudeNotesHtml(c, 'panel') : ''}
 ${workSigs.length ? `<div class="sp-sec"><b>${card ? 'From the work' : 'Why'}</b><span>${todayPlural(workSigs.length, 'signal')}</span></div>${why}` : ''}
 ${trail}
 ${hours}
-<div class="sp-sec"><b>Last 8 weekly updates</b><span>${ots.total ? `${ots.onTime} of ${ots.total} on time` : ''}</span></div>${weekStripHtml(c)}
 ${events ? `<div class="sp-sec"><b>What changed</b></div>${events}` : ''}
 </aside>`;
+}
+
+// The weekly update, week by week, for the same weeks as the health trail (oldest first): o on time ·
+// l late (more than 7 days after the one before) · m missed · p this week, not sent yet · n nothing to
+// judge (before the first update on record, or a client without updates). With the day it went out.
+function healthUpdateWeeks(c, h, n){
+  if(h && h.off) return Array.from({ length: n }, () => ({ k: 'n' }));
+  const now = rNow(), sends = sentTimes(c), first = sends[0], monday = dayStart(addDays(now, -((now.getDay() + 6) % 7))), out = [];
+  for(let k = n - 1; k >= 0; k--){
+    const from = addDays(monday, -7 * k), to = addDays(from, 7), i = sends.findIndex(t => t >= from && t < to);
+    if(i >= 0){ out.push({ k: i > 0 && daysBetween(sends[i - 1], sends[i]) > UPDATE_EVERY_DAYS ? 'l' : 'o', sent: sends[i] }); continue; }
+    out.push({ k: k === 0 ? 'p' : !first || first >= to ? 'n' : 'm' });
+  }
+  return out;
+}
+const HL_UPD = { o: 'update on time', l: 'update late', m: 'update missed', p: 'update not sent yet', n: 'no update on record' };
+// The 12 weeks in one strip: a bar for the client's health that week, a dot under it for the update,
+// month names under it. Pointing at a week puts its date and both words in the heading.
+function healthStripHtml(c, h, weeks, hist){
+  const up = healthUpdateWeeks(c, h, weeks.length), done = up.filter(u => u.k !== 'n' && u.k !== 'p');
+  const aside = h.off ? 'No weekly update' : done.length ? `Updates: ${done.filter(u => u.k === 'o').length} of ${done.length} on time` : 'No updates on record yet';
+  const say = i => `${HL_WORD[hist[i] || '']}, ${HL_UPD[up[i].k]}${up[i].sent && up[i].k !== 'o' ? ` (sent ${fmtShortDate(up[i].sent)})` : ''}`;
+  const cols = weeks.map((w, i) => `<span class="wk12-c${w.now ? ' now' : ''}" data-w="${i}" role="listitem" aria-label="${escapeHtml(`${healthWeekLabel(w)}: ${say(i)}`)}"><span class="wk12-b">${hist[i] ? `<i class="${hist[i]}"></i>` : ''}</span><i class="wk12-u ${up[i].k}"></i></span>`).join('');
+  const kinds = new Set(up.map(u => u.k));
+  const key = h.off ? '' : `<div class="wk12-key" aria-hidden="true"><span><i class="kb"></i>Health</span><span><i class="wk12-u o"></i>Update on time</span>${kinds.has('l') ? '<span><i class="wk12-u l"></i>Late</span>' : ''}${kinds.has('m') ? '<span><i class="wk12-u m"></i>Missed</span>' : ''}${kinds.has('p') ? '<span><i class="wk12-u p"></i>Not sent yet</span>' : ''}${kinds.has('n') ? '<span><i class="wk12-u n"></i>No record</span>' : ''}</div>`;
+  return `<div class="sp-sec hx-ro" data-b="The last 12 weeks" data-s="${escapeHtml(aside)}"><b>The last 12 weeks</b><span>${escapeHtml(aside)}</span></div>
+<div class="wk12" role="list" aria-label="Health and weekly updates, last 12 weeks" data-say="${escapeHtml(JSON.stringify(weeks.map((w, i) => [healthWeekLabel(w), say(i)])))}">${cols}</div>${healthAxisHtml(weeks)}${key}`;
 }
 
 // The story so far: signals with the day they started, sends that were late or missed, and handling.

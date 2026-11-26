@@ -129,8 +129,8 @@ html.ui-w .mac ::selection{background:var(--fill-3)}
 }
 
 /* ================= the Dashboard (js/features/dashboard-widgets.js) ================= */
-html.ui-w .mac{--uw-good:#5FD39A;--uw-watch:#F2C35B;--uw-risk:#FF6B57;--uw-goodbg:rgba(95,211,154,.12);--uw-watchbg:rgba(242,195,91,.13);--uw-riskbg:rgba(255,107,87,.13);--uw-c2:var(--card);--uw-c3:#27272B}
-html.ui-w .mac[data-theme="light"]{--uw-good:#1E9A60;--uw-watch:#C2850C;--uw-risk:#DF4A33;--uw-goodbg:rgba(30,154,96,.10);--uw-watchbg:rgba(194,133,12,.12);--uw-riskbg:rgba(223,74,51,.10);--uw-c2:#F3F3F5;--uw-c3:#E6E6EA}
+html.ui-w .mac{--uw-good:#30D158;--uw-watch:#F2C35B;--uw-risk:#FF6B57;--uw-goodbg:rgba(48,209,88,.13);--uw-watchbg:rgba(242,195,91,.13);--uw-riskbg:rgba(255,107,87,.13);--uw-c2:var(--card);--uw-c3:#27272B}
+html.ui-w .mac[data-theme="light"]{--uw-good:#248A3D;--uw-watch:#C2850C;--uw-risk:#DF4A33;--uw-goodbg:rgba(36,138,61,.10);--uw-watchbg:rgba(194,133,12,.12);--uw-riskbg:rgba(223,74,51,.10);--uw-c2:#F3F3F5;--uw-c3:#E6E6EA}
 html.ui-w #dashRoot.content{overflow:auto}
 /* every tab sits the same distance from the sidebar as the Dashboard's cards */
 html.ui-w{--uw-gl:18px}

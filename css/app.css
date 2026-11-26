@@ -4287,25 +4287,8 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 .cn-h > .cl-spark{width:14px;height:14px;color:var(--claude);flex:none}
 .cn-h > b{font-size:13.5px;font-weight:600}
 .cn-c{font-size:12px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.cn-check{margin-left:auto;flex:none}
-.cn-h.is-fold{justify-content:space-between;margin-bottom:2px}
-.cn-h.is-fold .cn-sub{margin:0}
-.cn-sub{margin:3px 0 0;font-size:12px;color:var(--label-2)}
-.cn-list{display:flex;flex-direction:column;margin-top:8px}
-.cn-n{padding:11px 0;border-top:.5px solid var(--sep);transition:opacity 200ms ease,transform 200ms cubic-bezier(.23,1,.32,1)}
-.cn-list .cn-n:first-child{border-top:0}
-.cn-n.is-going{opacity:0;transform:translateX(6px);pointer-events:none}
-.cn-top{display:flex;align-items:baseline;gap:8px;min-width:0}
-.cn-top > b{flex:1 1 auto;min-width:0;font-size:13.5px;font-weight:500;line-height:1.4;text-wrap:pretty}
-.cn-kind{flex:none;font-size:11px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--label-2)}
-.cn-n.is-missing .cn-kind{color:var(--orange,#e8833a)}
-.cn-n.is-tip .cn-kind{color:var(--blue)}
-.cn-n.is-idea .cn-kind{color:var(--purple)}
-.cn-x{flex:none;align-self:flex-start;width:22px;height:22px;margin:-2px -4px 0 0;display:inline-grid;place-items:center;border-radius:50%;color:var(--label-3,var(--label-2));opacity:.7;transition:opacity 120ms ease,background-color 120ms ease}
-.cn-x svg{width:12px;height:12px}
-@media (hover:hover) and (pointer:fine){ .cn-x:hover{opacity:1;background:var(--fill-2)} .cn-ev:hover{color:var(--label);background:var(--fill-3,var(--fill-2))} }
+@media (hover:hover) and (pointer:fine){ .cn-ev:hover{color:var(--label);background:var(--fill-3,var(--fill-2))} }
 .cn-why{margin:4px 0 0;font-size:13px;line-height:1.5;color:var(--label-2);text-wrap:pretty}
-.cn-steps{margin:6px 0 0;padding-left:18px;font-size:13px;line-height:1.5}
 .cn-foot{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
 .cn-evs{display:flex;flex-wrap:wrap;gap:4px;min-width:0;flex:1 1 auto}
 .cn-ev{display:inline-flex;align-items:center;max-width:240px;height:22px;padding:0 8px;border-radius:11px;border:0;background:var(--fill-2);color:var(--label-2);font:inherit;font-size:11.5px;line-height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;text-decoration:none;transition:color 120ms ease,background-color 120ms ease}
@@ -4316,7 +4299,218 @@ html.ui-w #settingsRoot.has-i8 > .i8-corner{grid-column:1 / -1;align-self:end;pa
 .cn-none{margin:8px 0 0;font-size:13px;color:var(--label-2)}
 .cp-cn{grid-column:1 / -1}
 .cp-cn .cn-ic .cl-spark{width:15px;height:15px;color:var(--claude)}
-.cp-cn .cn-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:0 28px}
-.cp-cn .cn-list .cn-n{border-top:.5px solid var(--sep)}
 .cn-panel[data-cn-where="classic"]{margin:14px 0 4px}
-@media (prefers-reduced-motion:reduce){ .cn-n.is-going{transform:none} }
+
+/* Claude's notes, light to read (Nov 26): one line per note, its kind and what Claude noticed; click for
+   why, where it came from, its button and Dismiss. Health shows one kind at a time, with the client. */
+.cn-sp{flex:1 1 auto}
+.cn-when{font-size:12px;color:var(--label-3,var(--label-2));white-space:nowrap}
+.mac .cn-h .cn-check{height:auto;margin:0;padding:2px 0;border:0;background:none;box-shadow:none;font:inherit;font-size:12px;font-weight:500;color:var(--accent,var(--blue));cursor:pointer;white-space:nowrap}
+.mac .cn-h .cn-check:disabled{color:var(--label-2)}
+.cnl-list{display:flex;flex-direction:column;margin-top:6px}
+.cnl{border-top:.5px solid var(--sep);transition:opacity 200ms ease}
+.cnl-list .cnl:first-child{border-top:0}
+.cnl.is-going{opacity:0;pointer-events:none}
+.mac .cnl-h{display:flex;align-items:center;gap:10px;width:calc(100% + 16px);min-height:40px;height:auto;margin:0 -8px;padding:8px;border:0;border-radius:9px;background:none;box-shadow:none;font:inherit;font-size:13.5px;font-weight:400;color:var(--label);text-align:left;cursor:pointer;transition:background-color 120ms ease}
+@media (hover:hover) and (pointer:fine){ .mac .cnl-h:hover{background:var(--fill)} }
+.mac .cnl-h:focus-visible{outline:none;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--accent,var(--blue)) 55%,transparent)}
+.cnl-k{flex:none;width:62px;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--label-2)}
+.cnl.is-missing .cnl-k{color:var(--orange,#e8833a)}
+.cnl.is-tip .cnl-k{color:var(--blue)}
+.cnl.is-idea .cnl-k{color:var(--purple)}
+.cnl-cl{flex:none;width:190px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cnl-t{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cnl.is-open .cnl-t{white-space:normal}
+.cnl-chev{flex:none;width:7px;height:7px;margin:0 4px 3px 4px;border-right:1.5px solid var(--label-3,var(--label-2));border-bottom:1.5px solid var(--label-3,var(--label-2));transform:rotate(45deg);transition:transform 220ms cubic-bezier(.23,1,.32,1)}
+.cnl.is-open .cnl-chev{transform:translateY(3px) rotate(-135deg)}
+.cnl-d{display:grid;grid-template-rows:0fr;transition:grid-template-rows 260ms cubic-bezier(.23,1,.32,1)}
+.cnl.is-open .cnl-d{grid-template-rows:1fr}
+.cnl-di{min-height:0;overflow:hidden;padding-left:72px;opacity:0;transition:opacity 140ms ease}
+.cnl.is-open .cnl-di{opacity:1;transition:opacity 220ms ease 60ms}
+.cnl-di .cn-why{margin:0;padding-top:2px}
+.cnl-di .cn-foot{margin:8px 0 12px}
+.cnl-di .cn-act{display:flex;gap:6px}
+.mac .cn-evs .cn-ev{height:22px;padding:0 9px;font-size:11.5px;font-weight:400;line-height:22px;letter-spacing:0}
+.cn-h.is-fold{display:flex;align-items:center;gap:8px}
+/* Health: Claude noticed, under the numbers */
+.hcn{margin-top:28px}
+.hcn-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:0 0 8px;box-shadow:inset 0 -.5px 0 var(--sep)}
+.hcn-mark{display:inline-flex}
+.hcn-mark .cl-spark{width:14px;height:14px;color:var(--claude)}
+.hcn-h b{font-size:14px;font-weight:600}
+.hcn-c{font-size:12.5px;color:var(--label-2);margin-right:6px}
+.hcn-seg button span{margin-left:6px;color:var(--label-2);font-variant-numeric:tabular-nums}
+.hcn-at{font-size:12px;color:var(--label-3,var(--label-2))}
+.hcn .cnl-k{display:none}
+.hcn .cnl-di{padding-left:200px}
+.mac .hcn .hcn-more{display:block;height:auto;margin:2px 0 0;padding:6px 0;border:0;background:none;box-shadow:none;font:inherit;font-size:12.5px;font-weight:500;color:var(--accent,var(--blue));cursor:pointer}
+html.ui-w .hcn{margin-top:20px;padding:16px 30px 12px;border-radius:var(--uw-r-sec);background:var(--grp);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow),var(--uw-hi)}
+html.ui-w .hcn-h{box-shadow:none;padding-bottom:6px}
+html.ui-w .hcn + .hx-grid{margin-top:14px}
+/* a client's row in Health: how much is missing, under its name */
+.hx-nm .hx-cnm{display:inline-flex;align-items:center;gap:4px;margin-left:10px;font-style:normal;color:var(--claude)}
+.hx-cnm .cl-spark{width:10px;height:10px;color:var(--claude)}
+/* the sidebar: Claude's mark on Health when a client of yours has something new missing */
+.nav-cn{display:inline-flex;flex:none;margin-left:7px;align-self:center}
+.mac[data-theme] .app-win .side .src-i .nav-cn svg.cl-spark,.src-i .nav-cn svg.cl-spark,.nav-item .nav-cn svg.cl-spark{width:11px;height:11px;opacity:1;color:var(--claude)}
+@media (max-width:900px){ .cnl-cl{width:120px} .hcn .cnl-di{padding-left:0} }
+@media (prefers-reduced-motion:reduce){ .cnl-d,.cnl-chev,.cnl-di,.cnl.is-open .cnl-di{transition:none} }
+.cp-cn .cnl-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(440px,1fr));column-gap:36px;align-items:start}
+.cp-cn .cnl-list .cnl:nth-child(2){border-top:0}
+/* Tasks: Claude's tips, next to the suggested tasks; Plan: Claude's ideas first in Worth planning */
+.tk-cn{margin-top:14px}
+.tk-cn-mark{display:inline-flex}
+.tk-cn-mark .cl-spark{width:15px;height:15px;color:var(--claude)}
+.tk-cn-r .tx{cursor:pointer}
+.pl-id.is-claude .pl-xi{background:color-mix(in srgb,var(--claude) 14%,transparent)}
+.pl-id.is-claude .pl-xi .cl-spark{width:14px;height:14px;color:var(--claude)}
+
+/* ---- Health, Nov 26 (canvas "Health: 70/30, Claude noticed on the right") --------------------------------
+   The title across; the numbers and the rows on the left 70%, Claude's notes on the right 30%. */
+.hx-cols{display:grid;grid-template-columns:minmax(0,7fr) minmax(300px,3fr);gap:20px;align-items:start;margin-top:18px}
+.hx-cols.no-rail{grid-template-columns:minmax(0,1fr)}
+.hx-main{min-width:0}
+.hx-main > .hg{margin-top:0}
+html.ui-w .hx-main > .hx-grid,.hx-main > .hx-grid{margin-top:14px}
+@media (max-width:1180px){ .hx-cols{grid-template-columns:minmax(0,1fr)} .hx-cols > .hcn{order:-1;position:static;max-height:none} }
+/* a row: who and why, the 12 weeks and the status in the middle, the action on the right */
+.hx-cols .hx-grid{--cols:minmax(0,1fr) 180px 92px minmax(0,1fr)}
+.hx-cols .hx-row{column-gap:20px}
+.hx-cols .hx-row .tl{grid-template-columns:repeat(12,15px)}
+.hx-nm b{display:flex;align-items:center;min-width:0}
+.hx-nm b .hx-nt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:inherit;color:inherit}
+.hx-nm .fo-mk{flex:none}
+.hx-nm .hx-why{font-size:12.5px;color:var(--label-2)}
+.hx-nm .hx-why em{font-style:normal;color:var(--label-3,var(--label-2))}
+.hx-act{justify-self:end}
+.hx-row.is-pair:not(.on){background:var(--fill)}
+html.ui-w .hx-row.is-pair:not(.on){background:var(--card)}
+.hx-row.is-pair::before,.hx-row.is-pair + .hx-row::before{opacity:0}
+
+/* the numbers: three, the same shape each */
+.hg-ks{display:grid;grid-template-columns:1.35fr 1fr 1fr;border-radius:18px;background:var(--grp);box-shadow:0 0 0 .5px var(--sep)}
+html.ui-w .hg-ks{border-radius:var(--uw-r-sec);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow,none),var(--uw-hi,none)}
+.hg-k{min-width:0;padding:16px 18px 15px}
+.hg-k + .hg-k{border-left:1px solid var(--sep)}
+.hg-kl{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:0;font-size:12.5px;color:var(--label-2)}
+.hg-kl span{white-space:nowrap}
+.hg-kl em{min-width:0;font-style:normal;font-size:11.5px;color:var(--label-3,var(--label-2));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hg-kv{display:flex;align-items:baseline;gap:6px;margin:8px 0 14px;font-size:28px;font-weight:500;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums;color:var(--label)}
+html.ui-w .hg-kv{font-weight:400}
+.hg-kv small{font-size:13px;font-weight:400;letter-spacing:0;color:var(--label-2)}
+.hg-k[data-k="updates"] .hg-kv{gap:2px}
+.hg-bar{display:flex;gap:2px;height:6px}
+.hg-bar i{display:block;height:100%;border-radius:2px;background:var(--fill-3,var(--fill-2))}
+.hg-bar i:first-child{border-top-left-radius:3px;border-bottom-left-radius:3px}
+.hg-bar i:last-child{border-top-right-radius:3px;border-bottom-right-radius:3px}
+.hg-bar .g{background:var(--hx-g)}.hg-bar .y{background:var(--hx-y)}.hg-bar .r{background:var(--hx-r)}.hg-bar .n{background:var(--label-2)}
+.hg-bar.is-blocks{gap:3px}
+.hg-bar.is-blocks i{flex:1;border-radius:3px}
+.hg-kf{display:flex;gap:12px;margin:11px 0 0;font-size:12px;color:var(--label-2);white-space:nowrap;overflow:hidden}
+.hg-kf span{display:inline-flex;align-items:center}
+.hg-kf .hg-dot{margin:0 5px 0 0;vertical-align:0}
+.hg-dot.g{background:var(--hx-g)} .hg-kf .hg-dot.y{background:var(--hx-y)} .hg-kf .hg-dot.r{background:var(--hx-r)}
+.hg-kf .hg-bad{color:var(--hx-r)}
+@media (max-width:900px){ .hg-ks{grid-template-columns:minmax(0,1fr)} .hg-k + .hg-k{border-left:0;border-top:1px solid var(--sep)} }
+
+/* Claude noticed, on the right */
+.hx-cols > .hcn{position:sticky;top:16px;display:flex;flex-direction:column;max-height:calc(100vh - 150px);margin:0;padding:16px 18px 10px;border-radius:18px;background:var(--grp);box-shadow:0 0 0 .5px var(--sep)}
+html.ui-w .hx-cols > .hcn{margin:0;padding:16px 18px 10px;border-radius:var(--uw-r-sec);box-shadow:0 0 0 1px var(--sep),var(--uw-shadow,none),var(--uw-hi,none)}
+.hx-cols .hcn-h{flex-wrap:nowrap;padding:0;box-shadow:none}
+.hx-cols .hcn-mark .cl-spark{width:18px;height:18px}
+.hx-cols .hcn-h b{font-size:14px;font-weight:600;white-space:nowrap}
+.hcn-s{margin:3px 0 8px;font-size:12.5px;color:var(--label-2)}
+.hcn-f{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 4px}
+.mac .hcn-f button{display:inline-flex;align-items:center;gap:5px;height:24px;margin:0;padding:0 9px;border:0;border-radius:12px;background:none;box-shadow:none;font:inherit;font-size:12px;font-weight:400;color:var(--label-2);cursor:pointer;transition:background-color 150ms ease,color 150ms ease}
+.mac .hcn-f button b{font-weight:500;color:var(--label-3,var(--label-2))}
+.mac .hcn-f button.on{background:var(--fill-2);color:var(--label)}
+.mac .hcn-f button.on b{color:var(--label-2)}
+.hcn-list{min-height:0;overflow:auto;margin:0 -8px;padding:0 8px}
+.hcn-list .cnl:first-child{border-top:0}
+.mac .hcn .cnl-h{display:block;width:calc(100% + 16px);margin:0 -8px;padding:10px 8px 11px;text-align:left;border-radius:10px}
+.hcn .cnl.is-pair > .cnl-h{background:var(--fill-2)}
+.hcn .cnl-di{padding-left:0}
+.mac .hcn .hcn-more{display:block;width:100%;height:34px;margin:2px 0 0;padding:0;border:0;border-top:.5px solid var(--sep);border-radius:0;background:none;box-shadow:none;font:inherit;font-size:12.5px;font-weight:500;color:var(--label-2);cursor:pointer}
+
+/* a note's top line: its kind as a small pill, its client (in the column), the arrow; the title under */
+.cnl-top{display:flex;align-items:center;gap:8px;min-width:0;font-size:12px;color:var(--label-2)}
+.cnl-top .cnl-cl{flex:1 1 auto;width:auto;min-width:0;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cnl-top .cnl-chev{margin-left:auto}
+.cnl .cnl-t{display:block;margin-top:4px;font-size:13.5px;line-height:1.4;color:var(--label);white-space:normal}
+.cn-k{flex:none;display:inline-flex;align-items:center;justify-content:center;height:16px;padding:1px 6px 0;border-radius:8px;font-size:9px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;line-height:1;color:var(--blue);background:color-mix(in srgb,var(--blue) 15%,transparent)}
+@supports (text-box:trim-both cap alphabetic){ .cn-k{padding-top:0;text-box:trim-both cap alphabetic} }
+.is-missing .cn-k{color:var(--orange,#e8833a);background:color-mix(in srgb,var(--orange,#e8833a) 15%,transparent)}
+.is-idea .cn-k{color:var(--purple);background:color-mix(in srgb,var(--purple) 15%,transparent)}
+/* open in the column: why, where it came from, what to do, in a soft box */
+.cnl-box{margin:0 0 12px;padding:11px 12px 10px;border-radius:12px;background:var(--fill)}
+.cnl-box .cn-why{margin:0;font-size:12.5px}
+.cn-from{margin-top:9px;min-width:0}
+.cn-fl{display:block;margin-bottom:4px;font-size:11px;color:var(--label-3,var(--label-2))}
+.cn-from .cn-evs{flex-wrap:nowrap;gap:5px}
+.mac .cn-from .cn-ev{flex:0 1 auto;min-width:0;display:inline-flex;align-items:center;gap:4px;max-width:none;height:20px;padding:0 7px;border-radius:10px;font-size:11px;line-height:20px;text-decoration:none}
+.cn-ev svg{flex:none;width:11px;height:11px}
+.cn-ev .cn-go{width:9px;height:9px;opacity:.55;transition:opacity 150ms ease}
+.cn-ev span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (hover:hover) and (pointer:fine){ .cn-ev:hover .cn-go{opacity:1} }
+.cnl-box .cn-foot{flex-wrap:nowrap;margin:11px 0 0;padding-top:10px;border-top:.5px solid var(--sep)}
+.mac .cn-foot .btn.sm{height:24px;padding:0 9px;border-radius:7px;font-size:11.5px}
+html .mac .cn-foot .btn.cn-dis{background:none;box-shadow:none;color:var(--label-2)}
+@media (hover:hover) and (pointer:fine){ html .mac .cn-foot .btn.cn-dis:hover{background:var(--fill-2);color:var(--label)} }
+
+/* Check Now: a small button with its arrow */
+.mac .cn-h .cn-check,.mac .hcn-h .cn-check{display:inline-flex;align-items:center;gap:6px;height:26px;margin:0;padding:0 10px;border:0;border-radius:8px;background:var(--grp);box-shadow:0 0 0 1px var(--sep-strong);font:inherit;font-size:12px;font-weight:500;color:var(--label);white-space:nowrap;cursor:pointer}
+.mac .cn-check svg{width:13px;height:13px;color:var(--label-2)}
+.mac .cn-check:disabled{color:var(--label-2);cursor:default}
+.cn-h > .cl-spark{width:16px;height:16px}
+
+/* ---- The client menu's notes (Nov 26): soft tiles, one open, steps to check ---------------------------- */
+.cn-read{margin:2px 0 8px;font-size:12px;color:var(--label-2)}
+.cn-tiles{display:flex;flex-direction:column;gap:8px}
+.cn-tiles .cnl{border-top:0;padding:0 14px;border-radius:14px;background:var(--fill)}
+.mac .cn-tiles .cnl-h{display:block;width:calc(100% + 28px);margin:0 -14px;padding:12px 14px 13px;text-align:left;border-radius:14px}
+.mac .cn-tiles .cnl.is-open .cnl-h{background:none}
+@media (hover:hover) and (pointer:fine){ .mac .cn-tiles .cnl:not(.is-open) .cnl-h:hover{background:var(--fill-2)} }
+.cn-tiles .cnl-t{margin-top:5px;font-size:14px;font-weight:500;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cn-tiles .cnl.is-open .cnl-t{display:block;overflow:visible}
+.cn-tiles .cnl-di{padding:0}
+.cn-tiles .cn-why{margin:0;font-size:13px}
+.cn-why.is-clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.cn-more[hidden]{display:none!important}
+.mac .cn-more{display:block;height:auto;margin:2px 0 0;padding:0;border:0;background:none;box-shadow:none;font:inherit;font-size:12px;font-weight:500;color:var(--label);cursor:pointer}
+.cn-todo{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.cn-todo label{position:relative;display:grid;grid-template-columns:16px minmax(0,1fr);gap:10px;font-size:13px;line-height:1.4;color:var(--label);cursor:pointer}
+.cn-todo input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.cn-todo .ck{width:16px;height:16px;margin-top:1px;border-radius:50%;display:grid;place-items:center;box-shadow:inset 0 0 0 1.5px var(--label-3,var(--label-2));color:transparent;transition:background-color 150ms ease,box-shadow 150ms ease}
+.cn-todo .ck svg{width:10px;height:10px}
+.cn-todo input:checked + .ck{background:var(--label);box-shadow:none;color:var(--window)}
+.cn-todo input:not(:checked) ~ .tx{color:var(--label-3,var(--label-2));text-decoration:line-through}
+.cn-todo input:focus-visible + .ck{outline:2px solid var(--accent,var(--blue));outline-offset:2px}
+.cn-steps{margin:10px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:13px;line-height:1.45}
+.cn-tiles .cn-from{margin-top:12px}
+.cn-tiles .cn-fl{display:none}
+.cn-tiles .cn-foot{flex-wrap:nowrap;margin:12px 0 14px;padding:0;border:0}
+.mac .cn-tiles .cn-foot .btn.sm{height:28px;padding:0 11px;border-radius:8px;font-size:12px}
+.mac .cn-rest{display:block;width:100%;height:32px;margin:8px 0 0;padding:0;border:0;border-radius:10px;background:var(--fill);box-shadow:none;font:inherit;font-size:12.5px;font-weight:500;color:var(--label-2);cursor:pointer}
+@media (hover:hover) and (pointer:fine){ .mac .cn-rest:hover{background:var(--fill-2);color:var(--label)} }
+/* fewer lines in the menu: space separates the rows inside a section */
+.sp .hp-w + .hp-w,.sp .hp-ev + .hp-ev{border-top:0}
+
+/* ---- The menu's 12 weeks (Nov 26): health and the weekly update in one strip ---------------------------- */
+.wk12{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));margin-top:8px}
+.wk12-c{display:flex;flex-direction:column;align-items:center;gap:9px;padding:8px 0 9px;border-radius:12px;transition:background-color 120ms ease}
+.wk12-c.now{box-shadow:inset 0 0 0 1px var(--sep-strong)}
+.wk12-c.hv{background:var(--fill)}
+.wk12-b{height:22px;display:flex;align-items:center}
+.wk12-b i{display:block;width:5px;height:5px;border-radius:99px;background:var(--hx-q)}
+.wk12-b i.y{width:6px;height:15px;background:var(--hx-y)}
+.wk12-b i.r{width:6px;height:22px;background:var(--hx-r)}
+.wk12-b i.h{background:var(--hx-g)}
+.wk12-u{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--label-2)}
+.wk12-u.l{background:var(--hx-y)}.wk12-u.m{background:var(--hx-r)}
+.wk12-u.p{background:none;box-shadow:inset 0 0 0 1.5px var(--label-2)}
+.wk12-u.n{width:6px;height:2px;border-radius:1px;background:var(--label-3,var(--label-2))}
+.wk12 + .cz-ax{margin-top:5px}
+.wk12-key{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:12px;font-size:11.5px;color:var(--label-2)}
+.wk12-key span{display:inline-flex;align-items:center;gap:6px}
+.wk12-key .kb{display:inline-block;width:4px;height:12px;border-radius:2px;background:var(--label-3,var(--label-2))}
+@media (prefers-reduced-motion:reduce){ .wk12-c,.cn-todo .ck{transition:none} }

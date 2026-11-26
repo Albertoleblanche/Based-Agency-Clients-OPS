@@ -139,6 +139,8 @@ async function loadClaudeNotes(force){
 }
 // draws each notes section on screen again, in place
 function claudeNotesRedraw(){
+  if(typeof cnNavDot === 'function') cnNavDot();
+  if(typeof currentViewName !== 'undefined' && currentViewName === 'health' && typeof renderHealth === 'function'){ renderHealth(); return; }
   document.querySelectorAll('[data-cn-client]').forEach(el => {
     const c = clients.find(x => x.id === el.dataset.cnClient); if(!c) return;
     el.outerHTML = claudeNotesHtml(c, el.dataset.cnWhere || 'panel');
@@ -147,6 +149,15 @@ function claudeNotesRedraw(){
 const CN_KIND = { missing: 'Missing', tip: 'Tip', idea: 'Idea' };
 const CN_REASON = { new: 'after something new came in', first: 'first read', asked: 'when you asked' };
 function cnAgo(at){ const m = Math.round((Date.now() - new Date(at)) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 24 * 60 ? `${Math.round(m / 60)} h ago` : fmtShortDate(new Date(at)); }
+function cnPlural(n, one, many){ return `${n} ${n === 1 ? one : many}`; }
+function cnCounts(notes){ return ['missing', 'tip', 'idea'].map(k => [k, notes.filter(n => n.kind === k).length]).filter(x => x[1]); }
+function cnCountWords(counts){ return counts.map(([k, n]) => k === 'missing' ? `${n} missing` : cnPlural(n, k, k + 's')).join(' · '); }
+
+// Where a note comes from, as a link to it: what it is (its icon), a short name (the whole one on hover),
+// and an arrow when it opens something. Nov 26: the icon says "email" or "meeting", so the name doesn't.
+const CN_EV_ICON = { meeting: 'calendar', whatsapp: 'message-circle', warequest: 'message-circle', email: 'mail', task: 'square-check', reminder: 'bell', win: 'file-text', update: 'send', hours: 'clock' };
+const CN_GO = '<svg class="cn-go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>';
+function cnEvShort(label){ const t = String(label || '').replace(/^(Email|Meeting) (?=\w{3} \d)/, '').replace(/^(Task|Follow-up|WhatsApp request): /, ''); return t.charAt(0).toUpperCase() + t.slice(1); }
 function cnEvidenceHtml(c, e){
   const A = jsArg;
   const go = e.kind === 'meeting' && e.id ? `cnOpen(() => loadGranolaMeetings().then(() => openMeetingNotes(${A(e.id)})))`
@@ -155,40 +166,135 @@ function cnEvidenceHtml(c, e){
     : e.kind === 'task' && e.id ? `cnOpen(() => notifOpenTask(${A(e.id)}))`
     : e.kind === 'reminder' && e.id ? `cnOpen(async () => { if(!(clientReminders || []).some(r => r.id === ${A(e.id)})) await loadClientReminders(); openReminderDetailModal(${A(e.id)}); })`
     : e.kind === 'update' ? `cnOpen(() => openWeekClient(${A(c.id)}))` : '';
-  const label = escapeHtml(e.label || e.kind);
-  if(e.kind === 'email' && e.url) return `<a class="cn-ev" href="${safeUrl(e.url)}" target="_blank" rel="noopener">${label}</a>`;
-  return go ? `<button type="button" class="cn-ev" onclick="${go}">${label}</button>` : `<span class="cn-ev is-plain">${label}</span>`;
+  const full = e.label || e.kind, ic = CN_EV_ICON[e.kind] ? icon(CN_EV_ICON[e.kind]) : '';
+  const inner = `${ic}<span>${escapeHtml(cnEvShort(full))}</span>`;
+  if(e.kind === 'email' && e.url) return `<a class="cn-ev" href="${safeUrl(e.url)}" target="_blank" rel="noopener" title="${escapeHtml(full)}">${inner}${CN_GO}</a>`;
+  return go ? `<button type="button" class="cn-ev" onclick="${go}" title="${escapeHtml(full)}">${inner}${CN_GO}</button>` : `<span class="cn-ev is-plain" title="${escapeHtml(full)}">${inner}</span>`;
 }
 function cnOpen(fn){ if(document.getElementById('appModalOverlay')) closeAppModal(); setTimeout(fn, 0); }
-function cnNoteHtml(c, n){
-  const A = jsArg, word = CN_KIND[n.kind] || CN_KIND.tip, sm = (label, js) => `<button type="button" class="btn sm" onclick="${js}">${label}</button>`;
-  const act = n.action === 'task' ? sm(n.steps && n.steps.length > 1 ? 'Add as Tasks' : 'Add as Task', `cnAddTasks(${A(c.id)}, ${A(n.id)}, this)`)
-    : n.action === 'sprint' ? sm('Make It a Sprint', `cnOpen(() => openNewSprintModal({ clientId: ${A(c.id)}, preset: { title: ${A(n.title)}, goal: ${A(n.why)}, steps: ${escapeHtml(JSON.stringify(n.steps || []))} } }))`)
-    : n.action === 'message' && n.message ? sm('Write to Them', `cnMessage(${A(c.id)}, ${A(n.id)})`)
-    : n.action === 'claude' ? sm(`${CLAUDE_SPARK}Plan with Claude`, `planWithClaude(${A(c.id)}, ${A(`${n.title}. ${n.why}`)})`) : '';
-  return `<div class="cn-n is-${escapeHtml(n.kind)}"><div class="cn-top"><span class="cn-kind">${word}</span><b>${escapeHtml(n.title)}</b><button type="button" class="ib cn-x" aria-label="Dismiss “${escapeHtml(n.title)}”" title="Dismiss" onclick="cnDismiss(${A(c.id)}, ${A(n.id)}, this)">${icon('x')}</button></div>
-<p class="cn-why">${escapeHtml(n.why)}</p>
-${n.steps && n.steps.length ? `<ol class="cn-steps">${n.steps.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ol>` : ''}
-${(n.evidence || []).length || act ? `<div class="cn-foot"><div class="cn-evs">${(n.evidence || []).map(e => cnEvidenceHtml(c, e)).join('')}</div>${act ? `<div class="cn-act">${act}</div>` : ''}</div>` : ''}</div>`;
+// The note's one action. Add as Tasks adds the steps still checked (cnSkip), and says how many.
+function cnTaskCount(c, n){ const sk = cnSkip[`${c.id}:${n.id}`], all = n.steps && n.steps.length ? n.steps.length : 1; return all - (sk ? sk.size : 0); }
+function cnActHtml(c, n, primary){
+  const A = jsArg, cls = `btn sm${primary ? ' btn-p' : ''} cn-go-btn`, b = (label, js, dis) => `<button type="button" class="${cls}" onclick="${js}"${dis ? ' disabled' : ''}>${label}</button>`;
+  if(n.action === 'task'){ const k = cnTaskCount(c, n); return b(k === 1 ? 'Add 1 Task' : `Add ${k} Tasks`, `cnAddTasks(${A(c.id)}, ${A(n.id)}, this)`, !k); }
+  return n.action === 'sprint' ? b('Make It a Sprint', `cnOpen(() => openNewSprintModal({ clientId: ${A(c.id)}, preset: { title: ${A(n.title)}, goal: ${A(n.why)}, steps: ${escapeHtml(JSON.stringify(n.steps || []))} } }))`)
+    : n.action === 'message' && n.message ? b('Write to Them', `cnMessage(${A(c.id)}, ${A(n.id)})`)
+    : n.action === 'claude' ? b(`${CLAUDE_SPARK}Plan with Claude`, `planWithClaude(${A(c.id)}, ${A(`${n.title}. ${n.why}`)})`) : '';
 }
-// the section (panel, or the client page's card); '' when it isn't for you
+function cnFromHtml(c, n){ return (n.evidence || []).length ? `<div class="cn-from"><span class="cn-fl">From</span><div class="cn-evs">${n.evidence.map(e => cnEvidenceHtml(c, e)).join('')}</div></div>` : ''; }
+function cnDismissHtml(c, n){ return `<button type="button" class="btn sm cn-dis" onclick="cnDismiss(${jsArg(c.id)}, ${jsArg(n.id)}, this)">Dismiss</button>`; }
+function cnCheckHtml(js, busy, tip){ return `<button type="button" class="btn sm cn-check" onclick="${js}"${busy ? ' disabled' : ''} data-hovertip="${escapeHtml(tip)}" data-tipdelay="1200">${icon('refresh-cw')}${busy ? 'Reading…' : 'Check Now'}</button>`; }
+
+// ---- A client's notes (Nov 26, canvas "Health: the client menu open, with Claude's real notes") ----------
+// In the client's menu (and its page, and All Clients' fold) each note is a soft tile: its kind, then the
+// title. One is open at a time, the first by default: why (three lines, More for the rest), the steps to
+// check (unchecked ones aren't added), where it came from, its action and Dismiss. Missing comes first;
+// tips and ideas wait behind "Show …" when there's something missing.
+const cnPanelOpen = {}, cnPanelAll = {}, cnSkip = {};
 function claudeNotesHtml(c, where){
   if(!c || !claudeNotesOn() || !claudeMine(c)) return '';
   if(!claudeNotes.at && !claudeNotes.loading) setTimeout(() => loadClaudeNotes(), 0);
   else if(Date.now() - claudeNotes.at > 3 * 60000) setTimeout(() => loadClaudeNotes(), 0);
   const v = claudeNotes.by[c.id], A = jsArg(c.id), notes = (v && v.notes) || [];
-  const counts = ['missing', 'tip', 'idea'].map(k => [k, notes.filter(n => n.kind === k).length]).filter(x => x[1]);
-  const sub = cnBusy[c.id] ? 'Claude is reading this client…' : v ? `Read ${cnAgo(v.at)}${CN_REASON[v.reason] ? `, ${CN_REASON[v.reason]}` : ''}` : claudeNotes.at ? 'Not read yet: Claude reads it when something new comes in' : 'Loading…';
-  const count = counts.length ? `<span class="cn-c">${counts.map(([k, n]) => `${n} ${k === 'missing' ? 'missing' : k + (n === 1 ? '' : 's')}`).join(' · ')}</span>` : '';
-  const check = `<button type="button" class="btn sm cn-check" onclick="cnCheck(${A})"${cnBusy[c.id] ? ' disabled' : ''} data-hovertip="Claude reads this client again now: meetings, emails, WhatsApp, tasks, follow-ups and logged work. Counts toward your 40 a day." data-tipdelay="1500">${cnBusy[c.id] ? 'Reading…' : 'Check Now'}</button>`;
-  // the page's card heads like its other cards; a fold already says what it is; a panel has its own head
-  const head = where === 'page' ? `<div class="uw-wh cn-h"><span class="uw-ic cn-ic">${CLAUDE_SPARK}</span><span class="uw-wt">Claude’s notes</span>${count}<span class="uw-sp"></span>${check}</div><p class="cn-sub">${escapeHtml(sub)}</p>`
-    : where === 'fold' ? `<div class="cn-h is-fold"><p class="cn-sub">${escapeHtml(sub)}</p>${check}</div>`
-    : `<div class="cn-h">${CLAUDE_SPARK}<b>Claude’s notes</b>${count}${check}</div><p class="cn-sub">${escapeHtml(sub)}</p>`;
-  const body = notes.length ? `<div class="cn-list">${notes.map(n => cnNoteHtml(c, n)).join('')}</div>` : v && !cnBusy[c.id] ? '<p class="cn-none">Nothing Claude would flag right now.</p>' : '';
+  const counts = cnCounts(notes), busy = !!cnBusy[c.id];
+  const count = counts.length ? `<span class="cn-c">${cnCountWords(counts)}</span>` : '';
+  const read = busy ? 'Reading now…' : v ? `Read ${cnAgo(v.at)}${CN_REASON[v.reason] ? ', ' + CN_REASON[v.reason] : ''}` : claudeNotes.at ? 'Not read yet' : '';
+  const check = cnCheckHtml(`cnCheck(${A})`, busy, 'Claude reads this client again now: meetings, emails, WhatsApp, tasks, follow-ups and logged work. Counts toward your 40 a day.');
+  const head = where === 'page' ? `<div class="uw-wh cn-h"><span class="uw-ic cn-ic">${CLAUDE_SPARK}</span><span class="uw-wt">Claude’s notes</span>${count}<span class="uw-sp"></span>${check}</div>`
+    : where === 'fold' ? `<div class="cn-h is-fold">${count}<span class="cn-sp"></span>${check}</div>`
+    : `<div class="cn-h">${CLAUDE_SPARK}<b>Claude’s notes</b>${count}<span class="cn-sp"></span>${check}</div>`;
+  const sorted = cnSorted(cnNotesOf(c)), missing = sorted.filter(x => x.n.kind === 'missing'), rest = sorted.filter(x => x.n.kind !== 'missing');
+  const showRest = !missing.length || cnPanelAll[c.id], shown = showRest ? sorted : missing;
+  const openKey = cnPanelOpen[c.id] === undefined ? (shown[0] ? `${c.id}:${shown[0].n.id}` : null) : cnPanelOpen[c.id];
+  const more = missing.length && rest.length ? `<button type="button" class="cn-rest" onclick="cnPanelAll[${A}] = !cnPanelAll[${A}]; claudeNotesRedraw()">${showRest ? 'Hide Tips and Ideas' : `Show ${cnCountWords(cnCounts(rest.map(x => x.n))).replace(/ · /g, ' and ').replace(/\b(tip|idea)s?\b/g, w => w[0].toUpperCase() + w.slice(1))}`}</button>` : '';
+  const body = notes.length ? `<div class="cn-tiles">${shown.map(x => cnTileHtml(c, x.n, openKey === `${c.id}:${x.n.id}`)).join('')}</div>${more}`
+    : v && !busy ? '<p class="cn-none">Nothing Claude would flag right now.</p>' : '';
+  if(notes.length) cnClampSoon();
+  const sec = `${head}${read ? `<p class="cn-read">${escapeHtml(read)}</p>` : ''}${body}`;
   return where === 'page'
-    ? `<section class="uw-w cp-cn cn" data-cn-client="${escapeHtml(c.id)}" data-cn-where="page">${head}${body}</section>`
-    : `<section class="cn cn-panel" data-cn-client="${escapeHtml(c.id)}" data-cn-where="${escapeHtml(where || 'panel')}">${head}${body}</section>`;
+    ? `<section class="uw-w cp-cn cn" data-cn-client="${escapeHtml(c.id)}" data-cn-where="page">${sec}</section>`
+    : `<section class="cn cn-panel" data-cn-client="${escapeHtml(c.id)}" data-cn-where="${escapeHtml(where || 'panel')}">${sec}</section>`;
+}
+function cnTileHtml(c, n, open){
+  const A = jsArg, key = `${c.id}:${n.id}`, sk = cnSkip[key] || new Set();
+  const steps = (n.steps || []).filter(Boolean);
+  const stepsHtml = !steps.length ? '' : n.action === 'task'
+    ? `<ul class="cn-todo" aria-label="Steps to add as tasks">${steps.map((t, i) => `<li><label><input type="checkbox"${sk.has(i) ? '' : ' checked'} onchange="cnStep(${A(c.id)}, ${A(n.id)}, ${i}, this)"><span class="ck" aria-hidden="true">${icon('check', { weight: 'bold' })}</span><span class="tx">${escapeHtml(t)}</span></label></li>`).join('')}</ul>`
+    : `<ol class="cn-steps">${steps.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ol>`;
+  return `<div class="cnl cn-n cn-tile is-${escapeHtml(n.kind)}${open ? ' is-open' : ''}" data-cnl="${escapeHtml(key)}" data-cid="${escapeHtml(c.id)}">
+<button type="button" class="cnl-h" aria-expanded="${open}" onclick="cnToggle(this, true)"><span class="cnl-top"><span class="cn-k">${CN_KIND[n.kind] || CN_KIND.tip}</span><i class="cnl-chev" aria-hidden="true"></i></span><span class="cnl-t">${escapeHtml(n.title)}</span></button>
+<div class="cnl-d"><div class="cnl-di"><p class="cn-why is-clamp">${escapeHtml(n.why)}</p><button type="button" class="cn-more" hidden onclick="this.previousElementSibling.classList.remove('is-clamp'); this.remove()">More</button>
+${stepsHtml}${cnFromHtml(c, n)}<div class="cn-foot">${cnActHtml(c, n, true)}<span class="cn-sp"></span>${cnDismissHtml(c, n)}</div></div></div></div>`;
+}
+// a step checked or not: the button counts the ones that will be added
+function cnStep(id, noteId, i, box){
+  const key = `${id}:${noteId}`, sk = cnSkip[key] || (cnSkip[key] = new Set());
+  if(box.checked) sk.delete(i); else sk.add(i);
+  const c = clients.find(x => x.id === id), n = ((claudeNotes.by[id] || {}).notes || []).find(x => x.id === noteId);
+  const btn = box.closest('.cnl')?.querySelector('.cn-go-btn'); if(!c || !n || !btn) return;
+  const k = cnTaskCount(c, n); btn.textContent = k === 1 ? 'Add 1 Task' : `Add ${k} Tasks`; btn.disabled = !k;
+}
+// "More" only where the why runs past its three lines
+let cnClampT = 0;
+function cnClampSoon(){ if(cnClampT) return; cnClampT = requestAnimationFrame(() => { cnClampT = 0;
+  document.querySelectorAll('.cn-why.is-clamp').forEach(p => { const b = p.nextElementSibling; if(b && b.classList.contains('cn-more')) b.hidden = p.scrollHeight <= p.clientHeight + 1; }); }); }
+
+// ---- Health's right column: Claude noticed (Nov 26, canvas "Health: 70/30, Claude noticed on the right") --
+// The notes on the clients listed, yours: Missing first, then the clients needing care most, Focus, newest.
+// Filters by kind; the first five, then Show More. Each note is its kind and its client over the title;
+// click for why, where it came from, its action and Dismiss. Pointing at a note lights up its client's
+// row (health.js hlBindPairs). Check Now reads again the clients here that need care, oldest read first.
+const CN_RANK = { missing: 0, tip: 1, idea: 2 };
+function cnSorted(list){
+  const L = { r: 0, y: 1, h: 2, g: 3 };
+  return list.sort((a, b) => (CN_RANK[a.n.kind] ?? 3) - (CN_RANK[b.n.kind] ?? 3) || (L[a.lv] ?? 3) - (L[b.lv] ?? 3)
+    || (typeof focusFirst === 'function' ? focusFirst(a.c, b.c) : 0) || String(b.at || '').localeCompare(String(a.at || '')) || a.i - b.i);
+}
+function cnNotesOf(c, lv){ const v = claudeNotes.by[c.id]; return ((v && v.notes) || []).map((n, i) => ({ c, n, lv, at: v.at, i })); }
+const cnOpenSet = new Set();
+function claudeNoticedHtml(entries){
+  if(!claudeNotesOn()) return '';
+  if(!claudeNotes.at && !claudeNotes.loading) setTimeout(() => loadClaudeNotes(), 0);
+  else if(claudeNotes.at && Date.now() - claudeNotes.at > 3 * 60000) setTimeout(() => loadClaudeNotes(), 0);
+  const mine = entries.filter(x => claudeMine(x.c));
+  const items = cnSorted(mine.flatMap(x => cnNotesOf(x.c, x.lv)));
+  // who Check Now reads: yours that need care, the ones read longest ago (or never) first, three at most
+  window._cnCands = mine.filter(x => x.lv === 'r' || x.lv === 'y').map(x => ({ id: x.c.id, at: (claudeNotes.by[x.c.id] || {}).at || '' }))
+    .sort((a, b) => String(a.at).localeCompare(String(b.at))).slice(0, 3).map(x => x.id);
+  const busy = Object.keys(cnBusy).length > 0;
+  const check = mine.length ? cnCheckHtml('cnCheckSome()', busy, 'Claude reads again the clients here that need care and were read longest ago, three at most. Each one counts toward your 40 a day.') : '';
+  const head = `<div class="hcn-h"><span class="hcn-mark">${CLAUDE_SPARK}</span><b>Claude noticed</b><span class="cn-sp"></span>${check}</div>`;
+  if(!items.length) return `<aside class="hcn" data-cn-feed aria-label="Claude noticed">${head}<p class="hcn-s">${claudeNotes.at ? 'Nothing Claude would flag on these clients right now.' : 'Reading Claude’s notes…'}</p></aside>`;
+  const counts = cnCounts(items.map(x => x.n)), kinds = counts.map(x => x[0]);
+  if(window._cnKind && !kinds.includes(window._cnKind)) window._cnKind = null;
+  const kind = window._cnKind || null, list = kind ? items.filter(x => x.n.kind === kind) : items;
+  const all = !!window._cnAll, shown = all ? list : list.slice(0, 5);
+  const newest = items.reduce((m, x) => String(x.at || '') > m ? String(x.at) : m, '');
+  const nClients = new Set(items.map(x => x.c.id)).size;
+  const tab = (k, label, n) => `<button type="button" role="tab" class="${kind === k ? 'on' : ''}" aria-selected="${kind === k}" onclick="window._cnKind = ${k ? jsArg(k) : 'null'}; window._cnAll = false; renderHealth()">${label}<b>${n}</b></button>`;
+  const filters = counts.length > 1 ? `<div class="hcn-f" role="tablist" aria-label="Show">${tab(null, 'All', items.length)}${counts.map(([k, n]) => tab(k, k === 'missing' ? 'Missing' : k === 'tip' ? 'Tips' : 'Ideas', n)).join('')}</div>` : '';
+  return `<aside class="hcn" data-cn-feed aria-label="Claude noticed">${head}
+<p class="hcn-s">${cnPlural(items.length, 'note', 'notes')} on ${cnPlural(nClients, 'client', 'clients')}${newest ? ` · ${escapeHtml(cnAgo(newest))}` : ''}</p>${filters}
+<div class="hcn-list">${shown.map(x => cnLineHtml(x.c, x.n)).join('')}</div>
+${list.length > 5 ? `<button type="button" class="hcn-more" aria-expanded="${all}" onclick="window._cnAll = !window._cnAll; renderHealth()">${all ? 'Show Fewer' : `Show ${list.length - 5} More`}</button>` : ''}</aside>`;
+}
+// a note in the right column: its kind and client, the title; open for why, where it came from and what to do
+function cnLineHtml(c, n){
+  const key = `${c.id}:${n.id}`, open = cnOpenSet.has(key);
+  return `<div class="cnl cn-n is-${escapeHtml(n.kind)}${open ? ' is-open' : ''}" data-cnl="${escapeHtml(key)}" data-cid="${escapeHtml(c.id)}">
+<button type="button" class="cnl-h" aria-expanded="${open}" onclick="cnToggle(this)"><span class="cnl-top"><span class="cn-k">${CN_KIND[n.kind] || CN_KIND.tip}</span><span class="cnl-cl">${escapeHtml(c.name)}</span><i class="cnl-chev" aria-hidden="true"></i></span><span class="cnl-t">${escapeHtml(n.title)}</span></button>
+<div class="cnl-d"><div class="cnl-di"><div class="cnl-box"><p class="cn-why">${escapeHtml(n.why)}</p>${cnFromHtml(c, n)}<div class="cn-foot">${cnActHtml(c, n, true)}<span class="cn-sp"></span>${cnDismissHtml(c, n)}</div></div></div></div></div>`;
+}
+// open or close a note in place (it stays that way while the page redraws); in a client's menu one at a time
+function cnToggle(btn, single){
+  const el = btn.closest('.cnl'); if(!el) return;
+  const on = !el.classList.contains('is-open');
+  if(single){
+    if(on) el.parentElement.querySelectorAll('.cnl.is-open').forEach(o => { if(o !== el){ o.classList.remove('is-open'); o.querySelector('.cnl-h')?.setAttribute('aria-expanded', 'false'); } });
+    cnPanelOpen[el.dataset.cid] = on ? el.dataset.cnl : null;
+    if(on) cnClampSoon();
+  } else if(on) cnOpenSet.add(el.dataset.cnl); else cnOpenSet.delete(el.dataset.cnl);
+  el.classList.toggle('is-open', on); btn.setAttribute('aria-expanded', on);
 }
 const cnBusy = {};
 async function cnCheck(id){
@@ -198,6 +304,20 @@ async function cnCheck(id){
   delete cnBusy[id];
   if(r.error) showToast('error', 'Claude couldn’t read it', r.error);
   else claudeNotes.by[id] = r.insights;
+  claudeNotesRedraw();
+}
+// Health's Check Now: the clients picked in claudeNoticedHtml, one after another
+async function cnCheckSome(){
+  const ids = (window._cnCands || []).filter(id => !cnBusy[id]);
+  if(!ids.length){ await loadClaudeNotes(true); return; }
+  ids.forEach(id => { cnBusy[id] = true; }); claudeNotesRedraw();
+  let failed = '';
+  for(const id of ids){
+    const r = failed ? { error: failed } : await claudeApi({ action: 'client-insights-check', clientId: id });
+    delete cnBusy[id];
+    if(r.error) failed = failed || r.error; else if(r.insights) claudeNotes.by[id] = r.insights;
+  }
+  if(failed) showToast('error', 'Claude couldn’t read them all', failed);
   claudeNotesRedraw();
 }
 async function cnDismiss(id, noteId, btn){
@@ -210,8 +330,10 @@ async function cnDismiss(id, noteId, btn){
 }
 async function cnAddTasks(id, noteId, btn){
   const n = ((claudeNotes.by[id] || {}).notes || []).find(x => x.id === noteId); if(!n) return;
+  const sk = cnSkip[`${id}:${noteId}`] || new Set();
+  const titles = n.steps && n.steps.length ? n.steps.filter((t, i) => t && !sk.has(i)) : [n.title];
+  if(!titles.length) return;
   if(btn){ btn.disabled = true; btn.textContent = 'Adding…'; }
-  const titles = n.steps && n.steps.length ? n.steps : [n.title];
   let k = 0;
   for(const t of titles){
     const res = await insertTaskRow({ title: t, description: `${n.title}. ${n.why}`, priority: 'medium', status: 'todo', assigner_id: currentUser.id, assignee_id: currentUser.id, client_id: id, due_date: null });
@@ -219,6 +341,13 @@ async function cnAddTasks(id, noteId, btn){
   }
   if(btn && btn.isConnected) btn.outerHTML = `<span class="dp-ok">${icon('check', { weight: 'bold' })}${k} task${k === 1 ? '' : 's'} added</span>`;
   showToast(k ? 'success' : 'error', k ? `${k} task${k === 1 ? '' : 's'} added` : 'No tasks added', k ? 'In your Tasks, with no date yet.' : 'Try again in a moment.');
+  if(k){ delete cnSkip[`${id}:${noteId}`]; cnSettle(id, noteId); }
+}
+// a note that's been acted on (made tasks or a sprint) leaves every screen at once: it's one note
+async function cnSettle(id, noteId){
+  const v = claudeNotes.by[id]; if(!v) return;
+  const r = await claudeApi({ action: 'client-note-dismiss', clientId: id, noteId });
+  if(!r.error){ claudeNotes.by[id] = r.insights || { ...v, notes: (v.notes || []).filter(n => n.id !== noteId) }; claudeNotesRedraw(); if(typeof currentViewName !== 'undefined' && currentViewName === 'tasks' && typeof renderTasks === 'function') renderTasks(); }
 }
 // a message Claude wrote to the client: read it, change it, copy it or open it in your mail
 function cnMessage(id, noteId){
@@ -240,4 +369,40 @@ function claudeNotesFold(c){
   const html = claudeNotesHtml(c, 'fold'); if(!html || typeof clientFoldHtml !== 'function') return '';
   const n = ((claudeNotes.by[c.id] || {}).notes || []).length;
   return clientFoldHtml('cn', 'Claude’s notes', n ? `${n} note${n === 1 ? '' : 's'}` : 'Nothing flagged', html);
+}
+// the sidebar: Claude's mark on Health while a client of yours has a "missing" newer than your last look
+function cnSeenKey(){ return `bda_cn_seen_${typeof currentUser !== 'undefined' && currentUser ? currentUser.id : ''}`; }
+function cnNavDot(){
+  const nav = document.querySelector('.nav-item[data-view="health"]'); if(!nav) return;
+  let seen = ''; try{ seen = localStorage.getItem(cnSeenKey()) || ''; }catch(e){}
+  const fresh = claudeNotesOn() && (typeof clients !== 'undefined' ? clients : []).some(c => claudeMine(c) && (claudeNotes.by[c.id] || {}).at > seen && ((claudeNotes.by[c.id] || {}).notes || []).some(n => n.kind === 'missing'));
+  let dot = nav.querySelector('.nav-cn');
+  if(fresh && !dot){ dot = document.createElement('i'); dot.className = 'nav-cn'; dot.setAttribute('aria-label', 'New from Claude'); dot.title = 'Claude noticed something you’re missing'; dot.innerHTML = CLAUDE_SPARK; nav.querySelector('.nav-label').after(dot); }   // Claude's mark, so it isn't read as Health's own dot
+  if(!fresh && dot) dot.remove();
+}
+function cnMarkSeen(){ const at = Object.values(claudeNotes.by).reduce((m, v) => v && v.at > m ? v.at : m, ''); if(at) try{ localStorage.setItem(cnSeenKey(), at); }catch(e){} cnNavDot(); }
+
+// Tasks: Claude's tips on your clients, next to the tasks suggested from your emails and meetings
+let tkCnAll = false;
+function tkClaudeTipsHtml(){
+  if(!claudeNotesOn() || (typeof tasksScope !== 'undefined' && tasksScope === 'byme')) return '';
+  if(!claudeNotes.at && !claudeNotes.loading) setTimeout(() => loadClaudeNotes(), 0);
+  const items = cnSorted((typeof clients !== 'undefined' ? clients : []).filter(c => claudeMine(c) && (typeof tasksClient === 'undefined' || tasksClient === 'all' || c.id === tasksClient))
+    .flatMap(c => cnNotesOf(c))).filter(x => x.n.kind === 'tip');
+  if(!items.length) return '';
+  const shown = tkCnAll ? items : items.slice(0, 3), A = jsArg;
+  const row = ({ c, n }) => `<div class="tk-sg-r tk-cn-r cn-n" data-cnl="${escapeHtml(c.id + ':' + n.id)}"><div class="tx" role="button" tabindex="0" aria-label="Why: ${escapeHtml(n.title)}" data-hovertip="${escapeHtml(n.why)}" onclick="cnOpenClient(${A(c.id)})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();cnOpenClient(${A(c.id)})}"><b>${escapeHtml(n.title)}</b><span class="s">${escapeHtml(c.name)}${n.steps && n.steps.length > 1 ? ` · ${n.steps.length} steps` : ''}</span></div>`
+    + `<div class="tk-sg-a"><button class="btn sm" onclick="cnAddTasks(${A(c.id)}, ${A(n.id)}, this)">${n.steps && n.steps.length > 1 ? 'Add Steps' : 'Add'}</button><button class="ib" aria-label="Dismiss “${escapeHtml(n.title)}”" title="Dismiss" onclick="cnDismiss(${A(c.id)}, ${A(n.id)}, this)">${icon('x')}</button></div></div>`;
+  return `<section class="tk-sg tk-cn" aria-label="Tips from Claude"><div class="tk-sg-h"><span class="tk-cn-mark">${CLAUDE_SPARK}</span><b>Tips from Claude</b><span class="n">${items.length}</span><span class="w">Small things that would help your clients. Add the ones worth doing.</span></div>
+${shown.map(row).join('')}${items.length > 3 ? `<button class="x-lnk tk-sg-more" onclick="tkCnAll = !tkCnAll; renderTasks()">${tkCnAll ? 'Show fewer' : `Show all ${items.length}`}</button>` : ''}</section>`;
+}
+// a client's notes in full: Health with the client's panel open
+function cnOpenClient(id){ switchView('health'); setTimeout(() => { if(typeof selectHealthClient === 'function') selectHealthClient(id); }, 0); }
+// Plan: Claude's ideas first in "Worth planning"; Plan opens New Sprint with the idea and its steps
+function claudePlanIdeas(){
+  if(!claudeNotesOn()) return [];
+  if(!claudeNotes.at && !claudeNotes.loading) setTimeout(() => loadClaudeNotes(), 0);
+  return cnSorted((typeof clients !== 'undefined' ? clients : []).filter(c => claudeMine(c)).flatMap(c => cnNotesOf(c))).filter(x => x.n.kind === 'idea').slice(0, 3)
+    .map(({ c, n }) => ({ claude: true, t: n.title, s: `${c.name} · Claude’s idea`, why: n.why,
+      run: `openNewSprintModal({ clientId: ${jsArg(c.id)}, preset: { title: ${jsArg(n.title)}, goal: ${jsArg(n.why)}, steps: ${escapeHtml(JSON.stringify(n.steps || []))} }, cnNote: { clientId: ${jsArg(c.id)}, noteId: ${jsArg(n.id)} } })` }));
 }
