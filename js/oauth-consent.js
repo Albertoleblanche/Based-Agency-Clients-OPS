@@ -46,7 +46,7 @@
 <li>${CHECK}<span>Change clients, if Radar lets you edit them</span></li>
 <li>${CHECK}<span>It never sends anything to a client</span></li></ul>
 <div class="row"><button class="sec" id="deny">Don’t Allow</button><button class="pri" id="allow">Allow</button></div>
-<p class="foot">You can disconnect it any time in Radar: Settings → Connections → ChatGPT and Claude.</p>`);
+<p class="foot">You can disconnect it any time in Radar: Settings → Connections → Radar in Claude and ChatGPT.</p>`);
     document.getElementById('allow').onclick = () => decide(true);
     document.getElementById('deny').onclick = () => decide(false);
     document.getElementById('other').onclick = async e => { e.preventDefault(); await supabaseClient.auth.signOut({ scope: 'local' }); signIn(); };
