@@ -34,7 +34,7 @@ function aiGrantLogo(name){ return /claude|anthropic/i.test(name) ? appLogo('cla
 function aiGrantId(g){ const c = g.client || {}; return c.client_id || c.id || g.client_id || ''; }
 function aiAppsInner(){
   const s = aiAppsState;
-  const intro = `<p class="t-2 ai-about">Ask ChatGPT or Claude about your clients, tasks, follow-ups and hours, and have it add or finish tasks, plan sprints in your Plan, add follow-ups and log time, as you, with what you can see and do in Radar.</p>
+  const intro = `<p class="t-2 ai-about">Ask ChatGPT or Claude about your clients, tasks, follow-ups and hours, and have it add, finish or delete tasks, change clients, plan sprints in your Plan, add follow-ups and log time, as you, with what you can see and do in Radar.</p>
 <p class="t-2 ai-who">Radar is added once to the company’s Claude. Then each person connects from their own Claude login and signs in to Radar as themselves: that sign-in is how Radar knows who’s asking. People sharing one Claude login would all show as whoever connected it.</p>`;
   if(s.ready == null) return intro + `<p class="t-2 gr-st">Checking…</p>`;
   if(!s.ready) return intro + (canManageSettings()
