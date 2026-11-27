@@ -86,6 +86,7 @@ function shiftCalendarPeriod(dir){
 }
 
 function resetCalendarToToday(){
+  if(typeof calGoToday === 'function') return calGoToday();   // slides there (calendar-canvas.js)
   calendarAnchorDate = new Date();
   renderCalendar();
 }

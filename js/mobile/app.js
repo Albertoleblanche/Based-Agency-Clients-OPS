@@ -1240,7 +1240,9 @@ function mOpenCalendar(){
       const ts = mVisibleTasks().filter(t => t.status !== 'done' && t.dueDate === ds && t.assigneeId === currentUser.id);
       const dueHere = attentionEligibleClients().filter(c => { const due = clientDue(c).due; return toDateStr(due < t0 ? t0 : due) === ds; });
       const send = dueHere.length ? [mIr(`<span class="gl" style="color:var(--red)">${icon('paper-plane-tilt')}</span>`, `${dueHere.length} update${dueHere.length === 1 ? '' : 's'} due`, mEsc(dueHere.slice(0, 3).map(c => c.name).join(', ') + (dueHere.length > 3 ? '…' : '')), '', k === 0 ? 'mOpenWeek()' : null, { n: true })] : [];
-      const rows = [...send, ...evs.map(e => { const m = meetingLink(e), live = meetingJoinable(e);   // Join on a meeting with a link (Nov 23)
+      const hol = typeof usHolidayOn === 'function' ? usHolidayOn(ds) : '';   // US holidays, as on the desktop (Nov 27)
+      const off = hol ? [mIr(`<span class="gl">${icon('sun')}</span>`, mEsc(hol), 'US holiday', 'All day')] : [];
+      const rows = [...off, ...send, ...evs.map(e => { const m = meetingLink(e), live = meetingJoinable(e);   // Join on a meeting with a link (Nov 23)
         return mIr(`<span class="gl">${icon(m ? 'video' : 'calendar-blank')}</span>`, mEsc(e.title), mEsc(clients.find(c => c.id === e.clientId)?.name || (m ? m.name : e.location) || ''),
           m && !e.allDay && new Date(e.endAt || e.startAt) > new Date() ? `<a class="m-join${live ? ' live' : ''}" href="${mEsc(m.url)}" target="_blank" rel="noopener">${live ? 'Join' : fmtTime(new Date(e.startAt))}</a>` : e.allDay ? 'All day' : fmtTime(new Date(e.startAt)), null, { n: true }); }), ...ts.map(mTaskRow)];
       if(rows.length) days.push(`${mIsh(k === 0 ? 'Today' : k === 1 ? 'Tomorrow' : d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }))}<div class="ig">${rows.join('')}</div>`);

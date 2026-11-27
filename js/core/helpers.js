@@ -132,6 +132,28 @@ function toDateStr(d){
   return `${y}-${m}-${day}`;
 }
 
+// US holidays, the ones businesses close for: the days off in Plan and on the Calendar, on desktop and
+// phone. The server keeps the same list (lib/us-holidays.js). On a weekend, the Friday or Monday before
+// or after is the day off.
+const _usHol = {};
+function usHolidays(y){
+  if(_usHol[y]) return _usHol[y];
+  const nth = (m, dow, n) => {
+    if(n > 0){ const d = new Date(y, m, 1); return new Date(y, m, 1 + (dow - d.getDay() + 7) % 7 + 7 * (n - 1)); }
+    const d = new Date(y, m + 1, 0); return new Date(y, m, d.getDate() - (d.getDay() - dow + 7) % 7);
+  };
+  const off = d => { const w = d.getDay(); return w === 6 ? new Date(y, d.getMonth(), d.getDate() - 1) : w === 0 ? new Date(y, d.getMonth(), d.getDate() + 1) : d; };
+  const thanks = nth(10, 4, 4), out = {};
+  [[off(new Date(y, 0, 1)), 'New Year’s Day'], [nth(0, 1, 3), 'Martin Luther King Jr. Day'], [nth(1, 1, 3), 'Presidents’ Day'],
+   [nth(4, 1, -1), 'Memorial Day'], [off(new Date(y, 5, 19)), 'Juneteenth'], [off(new Date(y, 6, 4)), 'Independence Day'],
+   [nth(8, 1, 1), 'Labor Day'], [thanks, 'Thanksgiving'], [new Date(y, 10, thanks.getDate() + 1), 'Day after Thanksgiving'],
+   [off(new Date(y, 11, 24)), 'Christmas Eve'], [off(new Date(y, 11, 25)), 'Christmas Day']]
+    .forEach(([d, n]) => { out[toDateStr(d)] = n; });
+  return (_usHol[y] = out);
+}
+// The holiday on a day (YYYY-MM-DD), or ''. A New Year's Day on a Saturday is off on Dec 31, so the next year counts too.
+function usHolidayOn(ds){ const y = Number(String(ds).slice(0, 4)); return usHolidays(y)[ds] || usHolidays(y + 1)[ds] || ''; }
+
 function formatMinutes(mins){
   const h = Math.floor(mins/60), m = mins%60;
   if(h && m) return `${h}h ${m}m`;

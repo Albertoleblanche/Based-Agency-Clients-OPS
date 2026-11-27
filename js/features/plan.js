@@ -35,23 +35,8 @@ async function loadPlan(){
 function planSprint(id){ return planSprints.find(s => s.id === id); }
 
 // ---- days: weekdays, US holidays (the ones businesses close for) -------------------------------
-function planNth(y, m, dow, n){
-  if(n > 0){ const d = new Date(y, m, 1); return new Date(y, m, 1 + (dow - d.getDay() + 7) % 7 + 7 * (n - 1)); }
-  const d = new Date(y, m + 1, 0); return new Date(y, m, d.getDate() - (d.getDay() - dow + 7) % 7);
-}
-function planObserved(d){ const w = d.getDay(); return w === 6 ? addDays(d, -1) : w === 0 ? addDays(d, 1) : d; }
-const _planHol = {};
-function usHolidays(y){
-  if(_planHol[y]) return _planHol[y];
-  const thanks = planNth(y, 10, 4, 4), out = {};
-  [[planObserved(new Date(y, 0, 1)), 'New Year’s Day'], [planNth(y, 0, 1, 3), 'Martin Luther King Jr. Day'], [planNth(y, 1, 1, 3), 'Presidents’ Day'],
-   [planNth(y, 4, 1, -1), 'Memorial Day'], [planObserved(new Date(y, 5, 19)), 'Juneteenth'], [planObserved(new Date(y, 6, 4)), 'Independence Day'],
-   [planNth(y, 8, 1, 1), 'Labor Day'], [thanks, 'Thanksgiving'], [addDays(thanks, 1), 'Day after Thanksgiving'],
-   [planObserved(new Date(y, 11, 24)), 'Christmas Eve'], [planObserved(new Date(y, 11, 25)), 'Christmas Day']]
-    .forEach(([d, n]) => { out[toDateStr(d)] = n; });
-  return (_planHol[y] = out);
-}
-function planHoliday(ds){ return usHolidays(Number(ds.slice(0, 4)))[ds] || usHolidays(Number(ds.slice(0, 4)) + 1)[ds] || ''; }
+// the list is shared with the Calendar and the phone (js/core/helpers.js usHolidays)
+function planHoliday(ds){ return usHolidayOn(ds); }
 function isPlanWeekend(d){ const w = d.getDay(); return w === 0 || w === 6; }
 function isPlanWorkday(d){ return !isPlanWeekend(d) && !planHoliday(toDateStr(d)); }
 function planWorkdays(start, end){
