@@ -24,6 +24,7 @@ async function loadPlan(){
   if(error){ planReady = false; planSprints = []; return; }
   planReady = true;
   planSprints = (data || []).map(planRowFromDb);
+  planCalTidy();
   const s = await supabaseClient.from('plan_settings').select('*').eq('user_id', currentUser.id).maybeSingle();
   if(!s.error && s.data && Number(s.data.weekly_hours) > 0) planWeeklyHours = Number(s.data.weekly_hours);
   checkPlanReminders();
@@ -376,6 +377,32 @@ async function setPlanSprintDone(id, done){
   s.doneAt = doneAt; renderPlan();
   if(done) showToast('success', 'Sprint done', `${s.title} is marked done.`);
 }
+// The sprint's own all-day event ("Add to my calendar"): it isn't linked by id, so it's found by what it
+// was made with: yours, all day, "Sprint: <title>", on the sprint's dates. Deleting the sprint deletes it,
+// and changing the sprint's name or dates moves it (Nov 27: a deleted sprint stayed on the calendar).
+const planEvDay = v => String(v || '').slice(0, 10);
+function planIsSprintEvent(e){ return !!e && e.allDay && e.createdBy === currentUser.id && /^Sprint: /.test(e.title || ''); }
+function planSprintEvents(s){
+  if(typeof calendarEvents === 'undefined' || !s) return [];
+  return calendarEvents.filter(e => planIsSprintEvent(e) && e.title === `Sprint: ${s.title}` && planEvDay(e.startAt) === s.start && planEvDay(e.endAt) === s.end);
+}
+async function planDropSprintEvents(ids){
+  if(!ids.length) return;
+  const { error } = await supabaseClient.from('calendar_events').delete().in('id', ids);
+  if(error) return showToast('error', 'Still on the calendar', `The sprint’s calendar event wasn’t removed: ${error.message}`);
+  calendarEvents = calendarEvents.filter(e => !ids.includes(e.id));
+  if(typeof currentViewName !== 'undefined' && currentViewName === 'calendar' && typeof renderCalendar === 'function') renderCalendar();
+}
+// Sprints deleted before Nov 27 left theirs behind: a "Sprint: …" event of yours that no sprint of yours
+// has (by name or by dates) goes, once both are loaded.
+let planCalTidied = false;
+async function planCalTidy(){
+  if(planCalTidied || !planReady || typeof calendarDataLoaded === 'undefined' || !calendarDataLoaded || !currentUser) return;
+  planCalTidied = true;
+  const names = new Set(planSprints.map(x => `Sprint: ${x.title}`)), spans = new Set(planSprints.map(x => `${x.start}|${x.end}`));
+  const gone = calendarEvents.filter(e => planIsSprintEvent(e) && e.eventType === 'reminder' && !names.has(e.title) && !spans.has(`${planEvDay(e.startAt)}|${planEvDay(e.endAt)}`)).map(e => e.id);
+  await planDropSprintEvents(gone);
+}
 async function deletePlanSprint(id){
   const s = planSprint(id); if(!s) return;
   const open = planSteps(s).filter(t => t.status !== 'done').length;
@@ -384,6 +411,7 @@ async function deletePlanSprint(id){
   if(error){ showToast('error', 'Not deleted', error.message); return; }
   planSprints = planSprints.filter(x => x.id !== id); window._planSel = null;
   tasks.forEach(t => { if(t.sprintId === id) t.sprintId = null; });
+  await planDropSprintEvents(planSprintEvents(s).map(e => e.id));
   renderPlan(); showToast('success', 'Sprint deleted', open ? 'Its steps are still in Tasks.' : '');
 }
 
@@ -627,6 +655,12 @@ async function savePlanSprint(){
   if(ps.edit){
     const { error } = await supabaseClient.from('plan_sprints').update(row).eq('id', ps.edit).eq('user_id', currentUser.id);
     if(error){ restoreBtn(btn); showToast('error', 'Not saved', error.message); return; }
+    // its calendar event follows a new name or new dates
+    const evs = old ? planSprintEvents(old) : [];
+    if(evs.length && (old.title !== title || old.start !== start || old.end !== end || (old.goal || '') !== goal || (old.clientId || null) !== clientId)){
+      await supabaseClient.from('calendar_events').update({ title: `Sprint: ${title}`, description: goal || null, start_at: `${start}T00:00:00`, end_at: `${end}T23:59:59`, client_id: clientId }).in('id', evs.map(e => e.id));
+      if(typeof loadCalendarEvents === 'function') await loadCalendarEvents();
+    }
   } else {
     const { data, error } = await supabaseClient.from('plan_sprints').insert({ ...row, user_id: currentUser.id, note_id: ps.noteId || null }).select().single();
     if(error || !data){ restoreBtn(btn); showToast('error', 'Sprint not created', error?.message || 'Try again in a moment.'); return; }

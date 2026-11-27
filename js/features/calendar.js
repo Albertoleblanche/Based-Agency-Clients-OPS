@@ -52,6 +52,7 @@ async function loadCalendarEvents(){
     relatedReminderId:e.related_reminder_id || null, meetingUrl:e.meeting_url || null
   }));
   calendarDataLoaded = true;
+  if(typeof planCalTidy === 'function') planCalTidy();   // events left by deleted sprints (plan.js)
   updateCalendarNavBadge();
   if(typeof renderDashboard === 'function') renderDashboard();
 }

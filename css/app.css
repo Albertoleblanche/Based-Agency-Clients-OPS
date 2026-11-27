@@ -183,6 +183,7 @@ button.cb:hover { box-shadow: inset 0 0 0 1.5px var(--label-2); }
 .cal-legend .st svg { width: 13px; height: 13px; }
 .cal-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; }
 .cal-wrap.is-month { overflow: hidden auto; }
+.cal-wrap { overscroll-behavior-x: contain; }   /* a sideways swipe moves the calendar, not the browser back a page (Nov 27) */
 .cal { display: grid; min-width: 760px; }
 .cal-all-l, .cal-all { position: sticky; z-index: 4; background: var(--window); }
 .cal-all-l { font-size: 11px; color: var(--label-3); text-align: right; padding: 7px 8px; border-bottom: .5px solid var(--sep); }

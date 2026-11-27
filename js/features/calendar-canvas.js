@@ -6,11 +6,60 @@ const CAL_START = 7, CAL_END = 21, CAL_H = 64;
 VIEW_TOOLBAR_ACTIONS.calendar = () => `<div class="seg" role="tablist" aria-label="View" style="margin-right:6px">${['day', 'week', 'month'].map(m => `<button class="${calendarViewMode === m ? 'on' : ''}" role="tab" aria-selected="${calendarViewMode === m}" onclick="setCalMode('${m}')">${m[0].toUpperCase() + m.slice(1)}</button>`).join('')}</div>
 <div class="tb-grp"><button class="ib" aria-label="Previous" onclick="calShift(-1)">${icon('caret-left')}</button><button class="btn" style="background:transparent;height:28px;padding:0 8px" onclick="resetCalendarToToday()">Today</button><button class="ib" aria-label="Next" onclick="calShift(1)">${icon('caret-right')}</button></div>`;
 function setCalMode(m){ calendarViewMode = m; try{ localStorage.setItem('bda_cal_mode', m); }catch(e){} setToolbarActions('calendar'); renderCalendar(); }
-function calShift(dir){
+function calShift(dir, axis){
   if(calendarViewMode === 'week') calendarAnchorDate.setDate(calendarAnchorDate.getDate() + dir * 7);
   else if(calendarViewMode === 'day') calendarAnchorDate.setDate(calendarAnchorDate.getDate() + dir);
-  else calendarAnchorDate.setMonth(calendarAnchorDate.getMonth() + dir);
+  else { calendarAnchorDate.setDate(1); calendarAnchorDate.setMonth(calendarAnchorDate.getMonth() + dir); }   // the 31st into a 30-day month
   renderCalendar();
+  calSlideIn(dir, axis || 'x');
+}
+// The new month (week, day) comes in from where you're going: a short slide and fade, so moving through
+// them reads as moving (Nov 27). Reduced motion: the fade alone.
+function calSlideIn(dir, axis){
+  const g = document.querySelector('#calendarRoot > .mgrid, #calendarRoot > .cal');
+  if(!g || !g.animate) return;
+  const calm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const off = calm ? 'none' : `translate${axis === 'x' ? 'X' : 'Y'}(${dir * 18}px)`;
+  g.animate([{ opacity: .35, transform: off }, { opacity: 1, transform: 'none' }], { duration: calm ? 140 : 240, easing: 'cubic-bezier(.23,1,.32,1)' });
+}
+// Months with the mouse wheel or a two-finger swipe (Nov 27). On the month: up/down or left/right moves
+// one month per gesture (a trackpad's glide after the swipe doesn't count; each notch of a mouse wheel
+// is one). On the week and the day, a sideways swipe moves a week or a day; up/down still scrolls the
+// hours. A month too tall for the window scrolls as before, and sideways still moves it.
+const calWheel = { acc: 0, lock: false, pad: false, last: 0, idle: null };
+function calScrollsInside(el, root, dy){
+  for(; el && el !== root; el = el.parentElement){
+    const cs = getComputedStyle(el);
+    if(/(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 1 && (dy > 0 ? el.scrollTop + el.clientHeight < el.scrollHeight - 1 : el.scrollTop > 0)) return true;
+  }
+  return false;
+}
+function calWheelOn(root){
+  // on the view, so the card over an empty month takes it too
+  const view = document.getElementById('view-calendar') || root;
+  if(!root || view.dataset.wheel) return;
+  view.dataset.wheel = '1';
+  view.addEventListener('wheel', e => {
+    if(currentViewName !== 'calendar' || e.ctrlKey || e.metaKey) return;   // pinch to zoom stays the browser's
+    if(!e.target.closest || !e.target.closest('#calendarRoot, #calEmpty')) return;
+    const month = calendarViewMode === 'month', side = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+    if(!side && (!month || root.scrollHeight > root.clientHeight + 2 || calScrollsInside(e.target, root, e.deltaY))) return;
+    e.preventDefault();
+    const d = (side ? e.deltaX : e.deltaY) * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? root.clientHeight : 1);
+    if(!d) return;
+    // a mouse wheel clicks in whole notches; a trackpad (or a smooth wheel) glides
+    const notch = e.deltaMode === 1 || (!side && typeof e.wheelDeltaY === 'number' && e.wheelDeltaY !== 0 && e.wheelDeltaY % 120 === 0);
+    if(!notch) calWheel.pad = true;
+    clearTimeout(calWheel.idle);
+    calWheel.idle = setTimeout(() => { calWheel.lock = false; calWheel.acc = 0; calWheel.pad = false; }, calWheel.pad ? 180 : 120);
+    const mouse = !calWheel.pad;
+    if(calWheel.lock && !(mouse && Date.now() - calWheel.last > 240)) return;
+    calWheel.acc += d;
+    if(Math.abs(calWheel.acc) < (mouse ? 1 : 40)) return;
+    const dir = Math.sign(calWheel.acc);
+    calWheel.acc = 0; calWheel.lock = true; calWheel.last = Date.now();
+    calShift(dir, side ? 'x' : 'y');
+  }, { passive: false });
 }
 function isoWeek(d){ const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - day); const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return Math.ceil(((t - y0) / 86400000 + 1) / 7); }
 function calColor(e){
@@ -114,6 +163,7 @@ function renderCalendar(){
   if(typeof updateCalendarNavBadge === 'function') updateCalendarNavBadge();
   if(typeof closeEventPreview === 'function') closeEventPreview(true);
   if(!root) return;
+  calWheelOn(root);
   if(currentViewName === 'calendar' && typeof gcalSyncQuiet === 'function') gcalSyncQuiet(3 * 60000);   // fresh when you look (Nov 23)
   if(typeof calendarDataLoaded !== 'undefined' && !calendarDataLoaded){ root.classList.remove('is-month'); root.innerHTML = skeletonHtml('calendar', 'Loading the calendar…'); return; }
   // the new look opens on the month the first time, with Coming up beside the grid
