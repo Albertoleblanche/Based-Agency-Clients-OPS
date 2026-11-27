@@ -258,7 +258,12 @@ function claudeNoticedHtml(entries){
   if(!claudeNotes.at && !claudeNotes.loading) setTimeout(() => loadClaudeNotes(), 0);
   else if(claudeNotes.at && Date.now() - claudeNotes.at > 3 * 60000) setTimeout(() => loadClaudeNotes(), 0);
   const mine = entries.filter(x => claudeMine(x.c));
-  const items = cnSorted(mine.flatMap(x => cnNotesOf(x.c, x.lv)));
+  // Nov 27: a client's first note of each kind only (Claude puts the most important first), as on Tasks;
+  // the rest wait on the client's panel, and the next one moves up when one is dismissed
+  const all = cnSorted(mine.flatMap(x => cnNotesOf(x.c, x.lv)));
+  const seen = new Set(), items = all.filter(x => { const k = x.c.id + '|' + x.n.kind; if(seen.has(k)) return false; seen.add(k); return true; });
+  const totals = {}; all.forEach(x => { totals[x.c.id] = (totals[x.c.id] || 0) + 1; });
+  const rest = all.length - items.length;
   // who Check Now reads: yours that need care, the ones read longest ago (or never) first, three at most
   window._cnCands = mine.filter(x => x.lv === 'r' || x.lv === 'y').map(x => ({ id: x.c.id, at: (claudeNotes.by[x.c.id] || {}).at || '' }))
     .sort((a, b) => String(a.at).localeCompare(String(b.at))).slice(0, 3).map(x => x.id);
@@ -269,22 +274,24 @@ function claudeNoticedHtml(entries){
   const counts = cnCounts(items.map(x => x.n)), kinds = counts.map(x => x[0]);
   if(window._cnKind && !kinds.includes(window._cnKind)) window._cnKind = null;
   const kind = window._cnKind || null, list = kind ? items.filter(x => x.n.kind === kind) : items;
-  const all = !!window._cnAll, shown = all ? list : list.slice(0, 5);
+  const open = !!window._cnAll, shown = open ? list : list.slice(0, 5);
   const newest = items.reduce((m, x) => String(x.at || '') > m ? String(x.at) : m, '');
   const nClients = new Set(items.map(x => x.c.id)).size;
   const tab = (k, label, n) => `<button type="button" role="tab" class="${kind === k ? 'on' : ''}" aria-selected="${kind === k}" onclick="window._cnKind = ${k ? jsArg(k) : 'null'}; window._cnAll = false; renderHealth()">${label}<b>${n}</b></button>`;
   const filters = counts.length > 1 ? `<div class="hcn-f" role="tablist" aria-label="Show">${tab(null, 'All', items.length)}${counts.map(([k, n]) => tab(k, k === 'missing' ? 'Missing' : k === 'tip' ? 'Tips' : 'Ideas', n)).join('')}</div>` : '';
   return `<aside class="hcn" data-cn-feed aria-label="Claude noticed">${head}
 <p class="hcn-s">${cnPlural(items.length, 'note', 'notes')} on ${cnPlural(nClients, 'client', 'clients')}${newest ? ` · ${escapeHtml(cnAgo(newest))}` : ''}</p>${filters}
-<div class="hcn-list">${shown.map(x => cnLineHtml(x.c, x.n)).join('')}</div>
-${list.length > 5 ? `<button type="button" class="hcn-more" aria-expanded="${all}" onclick="window._cnAll = !window._cnAll; renderHealth()">${all ? 'Show Fewer' : `Show ${list.length - 5} More`}</button>` : ''}</aside>`;
+<div class="hcn-list">${shown.map(x => cnLineHtml(x.c, x.n, totals[x.c.id])).join('')}</div>
+${list.length > 5 ? `<button type="button" class="hcn-more" aria-expanded="${open}" onclick="window._cnAll = !window._cnAll; renderHealth()">${open ? 'Show Fewer' : `Show ${list.length - 5} More`}</button>` : ''}
+${rest ? `<p class="hcn-rest">Each client’s top note of each kind. ${cnPlural(rest, 'more is', 'more are')} on the clients’ own panels.</p>` : ''}</aside>`;
 }
 // a note in the right column: its kind and client, the title; open for why, where it came from and what to do
-function cnLineHtml(c, n){
+function cnLineHtml(c, n, total){
   const key = `${c.id}:${n.id}`, open = cnOpenSet.has(key);
+  const more = total > 1 && typeof selectHealthClient === 'function' ? `<button type="button" class="lnk-b cnl-all" onclick="selectHealthClient(${jsArg(c.id)})">All ${total} notes on ${escapeHtml(c.name)}${CN_GO}</button>` : '';
   return `<div class="cnl cn-n is-${escapeHtml(n.kind)}${open ? ' is-open' : ''}" data-cnl="${escapeHtml(key)}" data-cid="${escapeHtml(c.id)}">
 <button type="button" class="cnl-h" aria-expanded="${open}" onclick="cnToggle(this)"><span class="cnl-top"><span class="cn-k">${CN_KIND[n.kind] || CN_KIND.tip}</span><span class="cnl-cl">${escapeHtml(c.name)}</span><i class="cnl-chev" aria-hidden="true"></i></span><span class="cnl-t">${escapeHtml(n.title)}</span></button>
-<div class="cnl-d"><div class="cnl-di"><div class="cnl-box"><p class="cn-why">${escapeHtml(n.why)}</p>${cnFromHtml(c, n)}<div class="cn-foot">${cnActHtml(c, n, true)}<span class="cn-sp"></span>${cnDismissHtml(c, n)}</div></div></div></div></div>`;
+<div class="cnl-d"><div class="cnl-di"><div class="cnl-box"><p class="cn-why">${escapeHtml(n.why)}</p>${cnFromHtml(c, n)}${more}<div class="cn-foot">${cnActHtml(c, n, true)}<span class="cn-sp"></span>${cnDismissHtml(c, n)}</div></div></div></div></div>`;
 }
 // open or close a note in place (it stays that way while the page redraws); in a client's menu one at a time
 function cnToggle(btn, single){
