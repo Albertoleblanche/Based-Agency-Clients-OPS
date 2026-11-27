@@ -4614,6 +4614,7 @@ html.ui-w .tsg-h h3{font-weight:500}
 .mac .tsg-ck .btn.sm{flex:none;gap:5px}
 .tsg-ck .btn svg{width:13px;height:13px}
 .sp.tsg .tsg-g.tk-sg{margin:14px 0 0;padding:14px 0 0;border-radius:0;border-top:.5px solid var(--sep);background:none;box-shadow:none;overflow:visible}
+.sp.tsg .tsg-g:is(.tk-miss,.tk-cn,.tk-idea){margin:14px 0 0;padding:14px 0 0;border-top:.5px solid var(--sep)}   /* every kind, the same way (Nov 27) */
 .tsg-gh{display:flex;align-items:center;gap:8px;margin:0 0 2px}
 .tsg-gh b{font-size:14px;font-weight:600}
 .tsg-gh .n{font-size:12px;color:var(--label-2);font-variant-numeric:tabular-nums}
@@ -4649,3 +4650,90 @@ html .mac .tsg-a .btn.tsg-dis{background:none;box-shadow:none;color:var(--label-
 .tsg-e b{display:block;font-size:15px;font-weight:500}
 .tsg-e span{display:block;margin-top:4px;font-size:13px;line-height:1.5;color:var(--label-2)}
 @media (prefers-reduced-motion:reduce){ .sp.tsg .tsg-t{transition:opacity 150ms ease} }
+/* ---- Tasks: the top suggestion of each kind, in a stripe at the bottom (Nov 27; tasks-canvas.js tssHtml) ----
+   A see-through tray pinned to the window's bottom (.spw holds it; it sits in the page so the Icons8 credit
+   sees its Gmail logo), the board scrolling under it. Tiles turn over in place; a kind's column folds away
+   (grid-template-columns eases to 0fr); the chevron folds it to one line. */
+.spw{--tss-min:150px}
+.sp-page.has-tss{padding-bottom:calc(var(--tss-h,212px) + 26px)}
+.tss-fade{position:absolute;left:0;right:0;bottom:0;height:calc(var(--tss-h,212px) + 70px);z-index:3;pointer-events:none;transform-origin:50% 100%;
+  background:linear-gradient(to bottom,transparent,color-mix(in srgb,var(--window) 70%,transparent) 48%,var(--window) 90%);transition:opacity 200ms ease-out}
+.tss{position:absolute;left:40px;right:40px;bottom:16px;z-index:4;padding:8px 10px 10px;border-radius:20px;
+  background:color-mix(in srgb,var(--grp) 80%,transparent);-webkit-backdrop-filter:blur(24px) saturate(1.6);backdrop-filter:blur(24px) saturate(1.6);
+  box-shadow:0 0 0 .5px var(--sep-strong),0 24px 56px -14px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.04);
+  transition:opacity 200ms ease-out,transform 320ms cubic-bezier(.32,.72,0,1)}
+.mac[data-theme="light"] .tss{background:color-mix(in srgb,var(--grp) 76%,transparent);box-shadow:0 0 0 .5px var(--sep-strong),0 18px 44px -16px rgba(0,0,0,.2)}
+.tss.is-going,.tss-fade.is-going{animation:tssAway 200ms cubic-bezier(.23,1,.32,1) forwards;pointer-events:none}
+.tss.is-coming{animation:tssBack 320ms cubic-bezier(.32,.72,0,1)}
+.tss-fade.is-coming{animation:tssFadeIn 240ms ease-out}
+@keyframes tssAway{to{opacity:0;transform:translateY(16px)}}
+@keyframes tssBack{from{opacity:0;transform:translateY(16px)}}
+@keyframes tssFadeIn{from{opacity:0}}
+.tss-fade.is-fold{opacity:.55}
+.tss-h{display:flex;align-items:center;gap:10px;min-width:0;height:34px;padding:0 0 0 8px}
+.tss-h > b{flex:none;font-size:13.5px;font-weight:600;white-space:nowrap}
+html.ui-w .tss-h > b{font-weight:500}
+.tss-h .tsg-ls .app-logo{box-shadow:0 0 0 2px color-mix(in srgb,var(--grp) 80%,transparent)}
+.tss-sub{min-width:0;font-size:12.5px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tss-onew{display:none;min-width:0;height:26px;margin:0 0 0 -4px;padding:0 6px;border:0;border-radius:7px;background:none;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.tss-one{display:flex;align-items:center;gap:8px;min-width:0;font-size:12.5px;color:var(--label-2)}
+.tss-one > span:last-child{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tss-grow{flex:1 1 0;min-width:6px}
+html .mac .btn.tss-all.tss-all{flex:none;gap:3px;height:26px;padding:0 8px 0 10px;border-radius:8px;background:none;box-shadow:none;color:var(--label-2);font-size:12.5px}
+.mac .tss-all svg{width:11px;height:11px;color:var(--label-3)}
+.mac .tss-fold{flex:none;width:28px;height:28px;border-radius:8px;cursor:pointer}
+.tss-fold svg{width:14px;height:14px;transition:transform 320ms cubic-bezier(.32,.72,0,1)}
+.tss.is-fold .tss-fold svg{transform:rotate(180deg)}
+@media (hover:hover) and (pointer:fine){ html .mac .btn.tss-all.tss-all:hover,.mac .tss-fold:hover,.tss-onew:hover,.mac .tss-x:hover{background:var(--fill-2);color:var(--label)} }
+.tss-body{display:grid;grid-template-rows:1fr;transition:grid-template-rows 320ms cubic-bezier(.32,.72,0,1),opacity 200ms ease-out}
+.tss-bi{min-height:0;overflow:hidden}
+.tss.is-fold .tss-body{grid-template-rows:0fr;opacity:0}
+.tss.is-fold .tss-sub{display:none}
+.tss.is-fold .tss-onew{display:block;animation:tssFadeIn 240ms ease-out}
+.tss.is-fold .tss-bi{visibility:hidden;transition:visibility 0s 320ms}
+/* the row: one column a kind; scrolls sideways when the window is narrow */
+.tss-row{display:grid;margin:0 -4px;padding-top:6px;overflow-x:auto;scrollbar-width:none;transition:grid-template-columns 320ms cubic-bezier(.32,.72,0,1)}
+.tss-row::-webkit-scrollbar{display:none}
+.tss-t{position:relative;display:grid;min-width:0;margin:0 4px;border-radius:14px;background:var(--fill);box-shadow:inset 0 0 0 .5px var(--sep);overflow:hidden;transition:opacity 200ms ease-out}
+.mac[data-theme="light"] .tss-t{background:color-mix(in srgb,var(--grp) 72%,transparent)}
+.tss-t > div{grid-area:1/1;min-width:0}
+.tss-t.is-leaving{opacity:0;margin:0}
+.tss-t.is-in .tss-f{animation:tssIn 280ms cubic-bezier(.23,1,.32,1)}
+@keyframes tssIn{from{opacity:0;transform:translateY(4px);filter:blur(2px)}}
+.tss-f{display:flex;flex-direction:column;padding:10px 10px 11px 12px;transition:opacity 180ms ease-out,transform 240ms cubic-bezier(.23,1,.32,1),filter 180ms ease-out}
+.tss-t.is-busy .tss-f{opacity:.6}
+.tss-top{display:flex;align-items:center;gap:6px;min-width:0;height:20px;margin:0;font-size:12px;color:var(--label-2)}
+.tss-top .c{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mac .tss-tt{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;width:auto;height:auto;min-height:2.7em;margin:5px -4px 0;padding:0 4px;border:0;border-radius:6px;background:none;box-shadow:none;
+  font:inherit;font-size:13.5px;font-weight:600;line-height:1.35;color:var(--label);text-align:left;cursor:pointer}
+html.ui-w .mac .tss-tt{font-weight:500}
+@media (hover:hover) and (pointer:fine){ .mac .tss-tt:hover{background:var(--fill-2)} }
+.tss-w{margin:2px 0 0;font-size:12px;color:var(--label-3,var(--label-2));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tss-a{display:flex;align-items:center;gap:6px;margin-top:auto;padding-top:10px}
+.mac .tss-a .btn.sm{height:26px;padding:0 10px;border-radius:8px;font-size:12px;transition:transform 140ms cubic-bezier(.23,1,.32,1)}
+.mac .tss-a .btn.sm:active{transform:scale(.97)}
+.tss-sp{flex:1}
+.mac .tss-x{flex:none;width:24px;height:24px;margin-right:-4px;border-radius:7px;color:var(--label-3,var(--label-2));cursor:pointer}
+.tss-x svg{width:13px;height:13px}
+/* turned over: what happened, and Undo */
+.tss-b{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;padding:10px 14px;opacity:0;transform:translateY(4px) scale(.98);pointer-events:none;
+  transition:opacity 180ms ease-out,transform 240ms cubic-bezier(.23,1,.32,1)}
+.tss-t.is-over .tss-f{opacity:0;transform:scale(.97);filter:blur(2px);pointer-events:none;visibility:hidden;transition:opacity 180ms ease-out,transform 240ms cubic-bezier(.23,1,.32,1),filter 180ms ease-out,visibility 0s 240ms}
+.tss-t.is-over .tss-b{opacity:1;transform:none;pointer-events:auto}
+.tss-ok{width:26px;height:26px;margin-bottom:8px;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--green) 16%,transparent);color:var(--green)}
+.tss-ok.is-dis{background:var(--fill-2);color:var(--label-2)}
+.tss-ok svg{width:13px;height:13px}
+.tss-b b{font-size:13.5px;font-weight:600}
+html.ui-w .tss-b b{font-weight:500}
+.tss-bs{max-width:100%;margin-top:2px;font-size:12px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mac .tss-undo{margin:8px -4px 0;padding:2px 4px;height:auto;border:0;border-radius:6px;background:none;box-shadow:none;font:inherit;font-size:12.5px;font-weight:500;color:var(--label);
+  text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--sep-strong);cursor:pointer}
+@media (hover:hover) and (pointer:fine){ .mac .tss-undo:hover{text-decoration-color:currentColor} }
+/* Done · Undo notes and other toasts sit above the stripe while it shows */
+html:has(#view-tasks.active .tss.is-on) .toast-stack{bottom:calc(var(--tss-h,212px) + 30px)}
+@media (prefers-reduced-motion:reduce){
+  .tss,.tss-fade,.tss-body,.tss-f,.tss-b,.tss-t,.tss-row,.tss-fold svg{transition:opacity 150ms ease}
+  .tss.is-going,.tss-fade.is-going,.tss.is-coming,.tss-fade.is-coming,.tss-t.is-in .tss-f,.tss.is-fold .tss-onew{animation:none}
+  .tss-t.is-over .tss-f,.tss-b{transform:none;filter:none}
+}
+@media (prefers-reduced-transparency:reduce){ .tss,.mac[data-theme="light"] .tss{background:var(--grp);-webkit-backdrop-filter:none;backdrop-filter:none} }

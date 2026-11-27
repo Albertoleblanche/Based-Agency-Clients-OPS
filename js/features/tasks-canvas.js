@@ -5,6 +5,9 @@
 // and open in the panel on the right, with Check Now inside; no Done column ("N done this week ›"
 // under the title opens Finished tasks, and Mark Done's note has Undo). Clicking a task opens it on the right, the same panel as This Week,
 // Health and Focus Reports. Loaded after sheets2-canvas.js.
+// Nov 27 (canvas "Tasks: the top suggestion of each kind, in a stripe at the bottom"): the top one of each
+// kind (Missing, meeting, email, Tip, Idea) in a stripe pinned to the bottom (tssHtml), and Suggestions
+// holds every kind.
 
 let tasksScope = 'everyone', tasksClient = 'all', tasksLayout = (() => { try{ return localStorage.getItem('bda_tasks_layout') || 'columns'; }catch(e){ return 'columns'; } })();
 const TASK_COLS = [['todo', 'To Do'], ['in_progress', 'In Progress'], ['in_review', 'Review']];
@@ -160,7 +163,11 @@ function renderTasks(){
   if(window._taskSel && !sel) window._taskSel = null;
   const prev = root.querySelector('.sp-page')?.scrollTop || 0, prevSp = root.querySelector('.sp:not(.sp-leaving)')?.scrollTop || 0, cmt = document.getElementById('tkpCmt')?.value || '';
   if(sel) window._tkSgOpen = false;
-  root.innerHTML = `<div class="spw"><div class="sp-page"><div class="tk">${head}${body}</div></div>${sel ? taskPanelHtml(sel) : window._tkSgOpen ? tkSgPanelHtml() : ''}</div>`;
+  // the top suggestions sit in the page but are pinned to the window's bottom (.spw holds them), stepping
+  // aside while a panel is open
+  const tss = tssHtml(!!(sel || window._tkSgOpen));
+  root.innerHTML = `<div class="spw"><div class="sp-page"><div class="tk">${head}${body}</div>${tss}</div>${sel ? taskPanelHtml(sel) : window._tkSgOpen ? tkSgPanelHtml() : ''}</div>`;
+  tssMount(root);
   if(typeof icons8Corner === 'function') icons8Corner(root.querySelector('.sp-page'));   // Icons8's Gmail icon, credited in the corner (Nov 24)
   const sp = root.querySelector('.sp-page'); if(sp) sp.scrollTop = prev;
   const pn = root.querySelector('.sp:not(.sp-leaving)'); if(pn){ pn.scrollTop = prevSp; pn._st = prevSp; }
@@ -422,13 +429,28 @@ function tkMore(e, id){
 // looked) opens the panel where a task opens: tasks from your meetings and your clients' emails, then
 // Claude's tips on your clients, the first three of each with Show More. Check Now reads Granola and
 // Gmail together, inside the panel. A task opened closes it; Esc closes it.
-let tkSgCnAll = false, tkSgChecking = false, tkSgCheckedAt = 0;
+// Nov 27: it holds every kind now, so the stripe's See All opens one place: Claude's Missing notes (clients
+// waiting on you) first, then meetings and emails, tips, and Claude's ideas last.
+let tkSgCnAll = false, tkSgMissAll = false, tkSgIdeaAll = false, tkSgChecking = false, tkSgCheckedAt = 0;
 function tkSgSeenKey(){ return `bda_tsg_seen_${currentUser ? currentUser.id : ''}`; }
 function tkSgSeen(){ try{ return new Set(JSON.parse(localStorage.getItem(tkSgSeenKey()) || '[]')); }catch(e){ return new Set(); } }
 function tkSgData(){
-  const meet = typeof suggestionsOpen === 'function' ? suggestionsOpen(typeof taskSuggestions !== 'undefined' ? taskSuggestions || [] : []).filter(s => tasksClient === 'all' || s.clientId === tasksClient) : [];
-  const tips = typeof claudeNotesOn === 'function' && claudeNotesOn() ? cnSorted((clients || []).filter(c => claudeMine(c) && (tasksClient === 'all' || c.id === tasksClient)).flatMap(c => cnNotesOf(c))).filter(x => x.n.kind === 'tip') : [];
-  return { meet, tips, ids: meet.map(s => 'sg:' + s.id).concat(tips.map(x => `cn:${x.c.id}:${x.n.id}`)) };
+  // what the stripe just added or dismissed is gone here too, while the data catches up (tssGone)
+  const meet = typeof suggestionsOpen === 'function' ? suggestionsOpen(typeof taskSuggestions !== 'undefined' ? taskSuggestions || [] : []).filter(s => (tasksClient === 'all' || s.clientId === tasksClient) && !tssGone.has('sg:' + s.id)) : [];
+  const notes = typeof claudeNotesOn === 'function' && claudeNotesOn() ? cnSorted((clients || []).filter(c => claudeMine(c) && (tasksClient === 'all' || c.id === tasksClient)).flatMap(c => cnNotesOf(c))).filter(x => !tssGone.has(`cn:${x.c.id}:${x.n.id}`)) : [];
+  const missing = notes.filter(x => x.n.kind === 'missing'), tips = notes.filter(x => x.n.kind === 'tip'), ideas = notes.filter(x => x.n.kind === 'idea' && x.c.status !== 'Paused');   // as Plan: no ideas for paused clients
+  return { meet, missing, tips, ideas, ids: meet.map(s => 'sg:' + s.id).concat([...missing, ...tips, ...ideas].map(x => `cn:${x.c.id}:${x.n.id}`)) };
+}
+// A Claude note's one button, the same in the panel and the stripe. Tips (and Missing notes with steps or
+// nothing to send) are tasks to add; Missing can be a message Claude wrote, a sprint or a plan with Claude;
+// an idea is a sprint, as in Plan. In the stripe, Add goes through tssAdd (the tile turns over, with Undo).
+function cnNoteBtn(c, n, stripe){
+  const A = jsArg, k = n.steps && n.steps.length > 1 ? n.steps.length : 1, cls = 'btn sm btn-p cn-go-btn';
+  const sprint = `openNewSprintModal({ clientId: ${A(c.id)}, preset: { title: ${A(n.title)}, goal: ${A(n.why)}, steps: ${escapeHtml(JSON.stringify(n.steps || []))} }, cnNote: { clientId: ${A(c.id)}, noteId: ${A(n.id)} } })`;
+  if(n.kind === 'idea' || (n.kind === 'missing' && n.action === 'sprint')) return `<button type="button" class="${cls}" onclick="${sprint}">Make It a Sprint</button>`;
+  if(n.kind === 'missing' && n.action === 'message' && n.message) return `<button type="button" class="${cls}" onclick="cnMessage(${A(c.id)}, ${A(n.id)})">Write to Them</button>`;
+  if(n.kind === 'missing' && n.action === 'claude' && typeof planWithClaude === 'function') return `<button type="button" class="${cls}" onclick="planWithClaude(${A(c.id)}, ${A(`${n.title}. ${n.why}`)})">Plan with Claude</button>`;
+  return `<button type="button" class="${cls}" onclick="${stripe ? `tssAdd(${A(n.kind)})` : `cnAddTasks(${A(c.id)}, ${A(n.id)}, this)`}">${k > 1 ? `Add ${k} Steps` : 'Add'}</button>`;
 }
 function tkSgSources(){ return { granola: typeof granolaOn !== 'undefined' && !!granolaOn, gmail: typeof gmailOnHere === 'function' && gmailOnHere(), claude: typeof claudeNotesOn === 'function' && claudeNotesOn() }; }
 function tkSgBtnHtml(){
@@ -500,18 +522,233 @@ function tkSgPanelHtml(){
     return all + rows.map(tile).join('');
   }).join('');
   const meetMore = d.meet.length > 3 ? `<button type="button" class="tsg-more" onclick="tkSgAll = !tkSgAll; renderTasks()">${tkSgAll ? 'Show Fewer' : `Show ${d.meet.length - 3} More`}</button>` : '';
-  const tips = (tkSgCnAll ? d.tips : d.tips.slice(0, 3)).map(({ c, n }) => `<div class="tsg-t cn-n is-tip" data-cnl="${escapeHtml(c.id + ':' + n.id)}"><p class="tsg-top"><span class="cn-k">Tip</span><span class="c">${escapeHtml(c.name)}</span></p>
+  const cnTile = ({ c, n }) => `<div class="tsg-t cn-n is-${escapeHtml(n.kind)}" data-cnl="${escapeHtml(c.id + ':' + n.id)}"><p class="tsg-top"><span class="cn-k">${CN_KIND[n.kind] || CN_KIND.tip}</span><span class="c">${escapeHtml(c.name)}</span></p>
 <button type="button" class="tsg-tt" onclick="cnOpenClient(${A(c.id)})" title="All of Claude’s notes on ${escapeHtml(c.name)}">${escapeHtml(n.title)}</button><p class="tsg-w" title="${escapeHtml(n.why)}">${escapeHtml(n.why)}</p>
 ${(n.evidence || []).length ? `<div class="tsg-src cn-evs">${n.evidence.slice(0, 2).map(e => cnEvidenceHtml(c, e)).join('')}</div>` : ''}
-<div class="tsg-a"><button type="button" class="btn sm btn-p" onclick="cnAddTasks(${A(c.id)}, ${A(n.id)}, this)">${n.steps && n.steps.length > 1 ? `Add ${n.steps.length} Steps` : 'Add'}</button><button type="button" class="btn sm tsg-dis" onclick="cnDismiss(${A(c.id)}, ${A(n.id)}, this)">Dismiss</button></div></div>`).join('');
-  const tipsMore = d.tips.length > 3 ? `<button type="button" class="tsg-more" onclick="tkSgCnAll = !tkSgCnAll; renderTasks()">${tkSgCnAll ? 'Show Fewer' : `Show ${d.tips.length - 3} More`}</button>` : '';
+<div class="tsg-a">${cnNoteBtn(c, n)}<button type="button" class="btn sm tsg-dis" onclick="cnDismiss(${A(c.id)}, ${A(n.id)}, this)">Dismiss</button></div></div>`;
+  // Claude's notes of one kind: the first three, then Show More
+  const cnGroup = (list, all, flag, cls, head) => list.length ? `<section class="tsg-g ${cls}" aria-label="${head}"><p class="tsg-gh">${CLAUDE_SPARK}<b>${head}</b><span class="n">${list.length}</span></p>${(all ? list : list.slice(0, 3)).map(cnTile).join('')}${list.length > 3 ? `<button type="button" class="tsg-more" onclick="${flag} = !${flag}; renderTasks()">${all ? 'Show Fewer' : `Show ${list.length - 3} More`}</button>` : ''}</section>` : '';
   const fromMeet = src.granola || d.meet.some(s => s.source !== 'gmail'), fromMail = src.gmail || d.meet.some(s => s.source === 'gmail');
   const meetHead = [fromMeet && appLogo('granola', 'xs'), fromMail && appLogo('gmail', 'xs')].filter(Boolean).join('');
   const what = fromMeet && fromMail ? 'From your meetings and emails' : fromMail ? 'From your clients’ emails' : 'From your meetings';
-  const empty = !d.meet.length && !d.tips.length ? `<div class="tsg-e"><b>All caught up</b><span>New ones show up here after your meetings, when a client emails, and when Claude reads your clients again.</span></div>` : '';
+  const empty = !d.ids.length ? `<div class="tsg-e"><b>All caught up</b><span>New ones show up here after your meetings, when a client emails, and when Claude reads your clients again.</span></div>` : '';
   return `<aside class="sp tsg" aria-label="Suggestions">
 <div class="sp-bar"><button class="ib" aria-label="Close" title="Close (Esc)" onclick="tkSgClose()">${icon('x')}</button></div>
-<div class="tsg-h"><h3>Suggestions</h3><p>Tasks worth adding, from your meetings, your clients’ emails and Claude. Add the ones that are yours to do.</p></div>
-${check}${d.meet.length ? `<section class="tsg-g tk-sg" aria-label="${what}"><p class="tsg-gh">${meetHead ? `<span class="tsg-ls">${meetHead}</span>` : ''}<b>${what}</b><span class="n">${d.meet.length}</span></p>${meet}${meetMore}</section>` : ''}
-${d.tips.length ? `<section class="tsg-g tk-cn" aria-label="Tips from Claude"><p class="tsg-gh">${CLAUDE_SPARK}<b>Tips from Claude</b><span class="n">${d.tips.length}</span></p>${tips}${tipsMore}</section>` : ''}${empty}</aside>`;
+<div class="tsg-h"><h3>Suggestions</h3><p>Everything worth doing, from your meetings, your clients’ emails and Claude, the most important first.</p></div>
+${check}${cnGroup(d.missing, tkSgMissAll, 'tkSgMissAll', 'tk-miss', 'Clients waiting on you')}${d.meet.length ? `<section class="tsg-g tk-sg" aria-label="${what}"><p class="tsg-gh">${meetHead ? `<span class="tsg-ls">${meetHead}</span>` : ''}<b>${what}</b><span class="n">${d.meet.length}</span></p>${meet}${meetMore}</section>` : ''}
+${cnGroup(d.tips, tkSgCnAll, 'tkSgCnAll', 'tk-cn', 'Tips from Claude')}${cnGroup(d.ideas, tkSgIdeaAll, 'tkSgIdeaAll', 'tk-idea', 'Ideas from Claude')}${empty}</aside>`;
+}
+
+// ---- Top suggestions (Nov 27, canvas "Tasks: the top suggestion of each kind, in a stripe at the bottom") ----
+// A stripe floats at the bottom of Tasks, the board scrolling under it: the one suggestion that matters most
+// of each kind, always in this order: Missing (a client waiting on you), a meeting, an email, a Tip, an Idea.
+// "Matters most": a meeting or an email that has waited longest (in whole days), then the soonest due, then
+// the client's importance; Claude's notes by how the client is doing (at risk first), then importance, then
+// Claude's own order. A tile says whose it is, what to do and where it came from, with one button and ✕.
+// Add and ✕ turn the tile over ("Added to To Do" · Undo); a few seconds later (longer while you point at the
+// stripe) the next of that kind takes the slot, and a kind with none left folds away while the others widen.
+// The chevron folds it to one line that still names the top one (remembered per person); See All opens
+// Suggestions. It steps aside while a panel is open. Claude's notes are only dismissed for good once the
+// tile has settled, so Undo has nothing to take back on the server.
+const TSS_KINDS = ['missing', 'meeting', 'email', 'tip', 'idea'];
+const TSS_WAIT = 4500;
+const tssDone = new Map();   // kind → { key, item, face, title, sub, undo, commit, timer, busy }
+const tssGone = new Set();   // keys acted on from the stripe, hidden in Tasks until the data catches up
+const tssBusyK = new Set();  // kinds waiting on the server, so a click can't land twice
+let tssFoldV = { uid: null, v: false }, tssWas = null;   // tssWas: 'on' | 'aside', for stepping aside and back
+function tssFoldKey(){ return `bda_tss_fold_${currentUser ? currentUser.id : ''}`; }
+function tssFolded(){
+  const uid = currentUser ? currentUser.id : '';
+  if(tssFoldV.uid !== uid){ let v = false; try{ v = localStorage.getItem(tssFoldKey()) === '1'; }catch(e){} tssFoldV = { uid, v }; }
+  return tssFoldV.v;
+}
+const tssDays = at => at ? Math.floor((Date.now() - new Date(at)) / 864e5) : 0;
+const tssImp = c => (c && +c.importance) || 0;
+function tssItems(){
+  const d = tkSgData(), lv = new Map(), L = { r: 0, y: 1, h: 2, g: 3 }, cOf = id => id && clients.find(x => x.id === id);
+  const level = c => { if(!lv.has(c.id)){ let l = 'g'; try{ if(typeof clientHealth === 'function') l = clientHealth(c).level || 'g'; }catch(e){} lv.set(c.id, l); } return lv.get(c.id); };
+  const note = list => { const x = list.slice().sort((a, b) => (L[level(a.c)] ?? 3) - (L[level(b.c)] ?? 3) || tssImp(b.c) - tssImp(a.c) || (typeof focusFirst === 'function' ? focusFirst(a.c, b.c) : 0) || a.i - b.i)[0];
+    return x && { key: `cn:${x.c.id}:${x.n.id}`, c: x.c, n: x.n }; };
+  const sg = mail => { const s = d.meet.filter(x => (x.source === 'gmail') === mail).sort((a, b) => tssDays(b.sourceAt) - tssDays(a.sourceAt)
+    || (a.dueDate || '9999').localeCompare(b.dueDate || '9999') || tssImp(cOf(b.clientId)) - tssImp(cOf(a.clientId)))[0];
+    return s && { key: 'sg:' + s.id, s, c: cOf(s.clientId) }; };
+  return { items: { missing: note(d.missing), meeting: sg(false), email: sg(true), tip: note(d.tips), idea: note(d.ideas) }, n: d.ids.length };
+}
+const tssWhen = at => at ? fmtShortDate(new Date(at)) : '';
+function tssFrontHtml(kind, it){
+  const A = jsArg, c = it.c, mark = it.s ? appLogo(it.s.source === 'gmail' ? 'gmail' : 'granola', 'xs') : `<span class="cn-k">${CN_KIND[it.n.kind] || CN_KIND.tip}</span>`;
+  const title = it.s ? it.s.title : it.n.title;
+  const meta = it.s ? [it.s.sourceTitle, tssWhen(it.s.sourceAt), it.s.dueDate ? `due ${fmtDay(new Date(it.s.dueDate + 'T12:00:00'))}` : ''].filter(Boolean).join(' · ')
+    : (it.n.evidence || []).slice(0, 2).map(e => cnEvShort(e.label || e.kind)).join(' · ') || it.n.why;
+  const open = it.s ? `tkSgPreview(${A(it.s.id)})` : `cnOpenClient(${A(c.id)})`, tip = it.s ? 'Read it first' : `All of Claude’s notes on ${c.name}`;
+  const btn = it.s ? `<button type="button" class="btn sm btn-p" onclick="tssAdd(${A(kind)})">Add</button>` : cnNoteBtn(c, it.n, true);
+  return `<div class="tss-f"><p class="tss-top">${mark}<span class="c">${escapeHtml(c ? c.name : 'No client')}</span></p>
+<button type="button" class="tss-tt" onclick="${open}" title="${escapeHtml(tip)}">${escapeHtml(title)}</button><p class="tss-w" title="${escapeHtml(meta)}">${escapeHtml(meta)}</p>
+<div class="tss-a">${btn}<span class="tss-sp"></span><button type="button" class="ib tss-x" aria-label="Dismiss “${escapeHtml(title)}”" title="Dismiss" onclick="tssDismiss(${A(kind)})">${icon('x')}</button></div></div>`;
+}
+function tssBackHtml(kind, e){
+  return `<div class="tss-b" role="status"><span class="tss-ok${e.face === 'dismissed' ? ' is-dis' : ''}" aria-hidden="true">${icon(e.face === 'dismissed' ? 'x' : 'check', { weight: 'bold' })}</span><b>${escapeHtml(e.title)}</b>${e.sub ? `<span class="tss-bs" title="${escapeHtml(e.sub)}">${escapeHtml(e.sub)}</span>` : ''}<button type="button" class="tss-undo" onclick="tssUndo(${jsArg(kind)})">Undo</button></div>`;
+}
+function tssTileHtml(kind, it, cls){
+  const e = tssDone.get(kind), item = e ? e.item : it;
+  const busy = !e && tssBusyK.has(kind), front = tssFrontHtml(kind, item);
+  return `<article class="tss-t is-${kind}${e ? ' is-over' : ''}${busy ? ' is-busy' : ''}${cls ? ' ' + cls : ''}" data-tss="${kind}" aria-label="${escapeHtml(item.s ? item.s.title : item.n.title)}">${busy ? front.replace(/<button type="button"/g, '<button type="button" disabled') : front}${e ? tssBackHtml(kind, e) : ''}</article>`;
+}
+// the first one, for the folded line: its kind, its client, what it is
+function tssOneHtml(kind, it){
+  const mark = it.s ? appLogo(it.s.source === 'gmail' ? 'gmail' : 'granola', 'xs') : `<span class="cn-k">${CN_KIND[it.n.kind] || CN_KIND.tip}</span>`;
+  return `<span class="tss-one is-${kind}">${mark}<span>${escapeHtml(it.c ? it.c.name + ': ' : '')}${escapeHtml(it.s ? it.s.title : it.n.title)}</span></span>`;
+}
+// the stripe, or '' when there's nothing to show; `aside` when a panel is open
+function tssHtml(aside){
+  if(typeof tkSgData !== 'function') return '';
+  const { items, n } = tssItems(), kinds = TSS_KINDS.filter(k => tssDone.has(k) || items[k]);
+  if(!kinds.length){ tssWas = null; return ''; }
+  const was = tssWas; tssWas = aside ? 'aside' : 'on';
+  if(aside && was !== 'on') return '';                 // already out of the way
+  const src = tkSgSources(), fold = tssFolded();
+  const logos = [src.granola && appLogo('granola', 'xs'), src.gmail && appLogo('gmail', 'xs'), src.claude && appLogo('claude', 'xs')].filter(Boolean).join('');
+  const first = kinds.find(k => !tssDone.has(k));
+  const cls = aside ? ' is-going' : was === 'aside' ? ' is-coming' : '';
+  return `<div class="tss-fade${fold ? ' is-fold' : ''}${cls}" aria-hidden="true"></div><section class="tss${fold ? ' is-fold' : ''}${aside ? '' : ' is-on'}${cls}" aria-label="Top suggestions" onpointerleave="tssRearm()">
+<div class="tss-h">${logos ? `<span class="tsg-ls" aria-hidden="true">${logos}</span>` : ''}<b>Top suggestions</b><span class="tss-sub">The one that matters most, of each kind</span>${first ? `<button type="button" class="tss-onew" onclick="tssFold(false)" title="Show the top suggestions">${tssOneHtml(first, items[first])}</button>` : ''}<span class="tss-grow"></span>
+<button type="button" class="btn sm tss-all" onclick="tkSgToggle()" title="Open Suggestions: every one, of every kind">See All ${n}${icon('caret-right', { weight: 'bold' })}</button><button type="button" class="ib tss-fold" onclick="tssFold()" aria-expanded="${!fold}" aria-label="${fold ? 'Show the top suggestions' : 'Fold the top suggestions'}" title="${fold ? 'Show' : 'Fold'}">${icon('caret-down', { weight: 'bold' })}</button></div>
+<div class="tss-body"><div class="tss-bi"><div class="tss-row" style="grid-template-columns:repeat(${kinds.length},minmax(var(--tss-min),1fr))">${kinds.map(k => tssTileHtml(k, items[k])).join('')}</div></div></div></section>`;
+}
+const tssEl = () => document.querySelector('#tasksRoot .tss.is-on');
+const tssTile = kind => document.querySelector(`#tasksRoot .tss.is-on .tss-t[data-tss="${kind}"]`);
+const tssCalm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+// after a render: room under the board, and the toasts above the stripe
+function tssMount(root){
+  const el = root.querySelector('.tss'), page = root.querySelector('.sp-page');
+  if(page){ page.classList.toggle('has-tss', !!el); page.classList.toggle('tss-folded', !!el && el.classList.contains('is-fold')); }
+  if(el && page){
+    // lined up with the board, whatever the look's page margins are
+    const tk = page.querySelector('.tk'), cs = tk && getComputedStyle(tk);
+    if(cs){ el.style.left = cs.paddingLeft; el.style.right = `${parseFloat(cs.paddingRight) + page.offsetWidth - page.clientWidth}px`; }
+  }
+  if(el && el.classList.contains('is-on')) tssMeasure();
+}
+function tssMeasure(){
+  const el = tssEl(); if(!el) return;
+  const fold = el.classList.contains('is-fold'), h = el.querySelector('.tss-h').offsetHeight + 16, full = h + (el.querySelector('.tss-bi')?.scrollHeight || 0);
+  document.documentElement.style.setProperty('--tss-h', `${Math.round(fold ? h : full)}px`);
+}
+function tssFold(v){
+  const fold = v === undefined ? !tssFolded() : !!v;
+  tssFoldV = { uid: currentUser ? currentUser.id : '', v: fold };
+  try{ localStorage.setItem(tssFoldKey(), fold ? '1' : '0'); }catch(e){}
+  const el = tssEl(); if(!el) return renderTasks();
+  // in place, so it eases shut and open
+  el.classList.toggle('is-fold', fold); el.previousElementSibling?.classList.toggle('is-fold', fold);
+  const b = el.querySelector('.tss-fold'); if(b){ b.setAttribute('aria-expanded', !fold); b.setAttribute('aria-label', fold ? 'Show the top suggestions' : 'Fold the top suggestions'); b.title = fold ? 'Show' : 'Fold'; }
+  document.querySelector('#tasksRoot .sp-page')?.classList.toggle('tss-folded', fold);
+  tssMeasure();
+}
+// the tile turns over: what happened, and Undo
+function tssOver(kind, item, o){
+  const prev = tssDone.get(kind); if(prev) clearTimeout(prev.timer);
+  const e = { key: item.key, item, at: performance.now(), ...o };
+  tssDone.set(kind, e); tssGone.add(item.key); tssBusyK.delete(kind);
+  const t = tssTile(kind);
+  if(t){ t.querySelector('.tss-b')?.remove(); t.insertAdjacentHTML('beforeend', tssBackHtml(kind, e)); t.offsetWidth; t.classList.remove('is-busy'); t.classList.add('is-over'); }
+  e.timer = setTimeout(() => tssSettle(kind), TSS_WAIT);
+  tssCounts();
+}
+// the counts on Suggestions and See All, without drawing the page again
+function tssCounts(){
+  const n = tkSgData().ids.length, b = document.querySelector('#tasksRoot .tsg-b .tsg-n'), a = document.querySelector('#tasksRoot .tss-all');
+  if(b) b.textContent = n;
+  if(a) a.innerHTML = `See All ${n}${icon('caret-right', { weight: 'bold' })}`;
+}
+// draws the page once the tile has turned over, so the turn isn't cut short
+async function tssAfter(kind){
+  const e = tssDone.get(kind), wait = e ? 300 - (performance.now() - e.at) : 0;
+  if(wait > 0 && !tssCalm()) await new Promise(r => setTimeout(r, wait));
+  renderTasks(); if(typeof updateTasksNavBadge === 'function') updateTasksNavBadge();
+}
+function tssRearm(){ tssDone.forEach((e, k) => { if(e.held){ e.held = false; clearTimeout(e.timer); e.timer = setTimeout(() => tssSettle(k), 1500); } }); }
+function tssSettle(kind){
+  const e = tssDone.get(kind); if(!e) return;
+  // pointing at the stripe holds it, so Undo stays in reach
+  if(e.busy || document.querySelector('#tasksRoot .tss.is-on:hover')){ e.held = true; e.timer = setTimeout(() => tssSettle(kind), 1500); return; }
+  tssDone.delete(kind);
+  if(e.commit) Promise.resolve().then(e.commit).catch(() => {});
+  tssNext(kind);
+}
+// after a tile settles: the next of its kind fades in, or its column folds away and the rest widen
+function tssNext(kind){
+  const el = tssEl(), t = tssTile(kind);
+  if(!el || !t || currentViewName !== 'tasks'){ if(currentViewName === 'tasks') renderTasks(); return; }
+  const { items } = tssItems(), it = items[kind];
+  if(it){ t.outerHTML = tssTileHtml(kind, it, tssCalm() ? '' : 'is-in'); return; }
+  const left = TSS_KINDS.filter(k => tssDone.has(k) || items[k]);
+  if(tssCalm()){ renderTasks(); return; }
+  if(!left.length){ el.classList.add('is-going'); el.previousElementSibling?.classList.add('is-going'); setTimeout(renderTasks, 240); return; }
+  const row = el.querySelector('.tss-row'), tiles = [...row.children];
+  row.style.gridTemplateColumns = tiles.map(x => x === t ? 'minmax(0px,0fr)' : 'minmax(var(--tss-min),1fr)').join(' ');
+  t.classList.add('is-leaving');
+  setTimeout(renderTasks, 340);
+}
+async function tssUndo(kind){
+  const e = tssDone.get(kind); if(!e || e.busy) return;
+  e.busy = true; clearTimeout(e.timer);
+  const t = tssTile(kind); if(t) t.querySelector('.tss-undo')?.setAttribute('disabled', '');
+  let ok = true;
+  try{ if(e.undo) ok = (await e.undo()) !== false; }catch(err){ ok = false; }
+  e.busy = false;
+  if(!ok){ showToast('error', 'Couldn’t undo', 'Try again in a moment.'); if(t) t.querySelector('.tss-undo')?.removeAttribute('disabled'); e.timer = setTimeout(() => tssSettle(kind), TSS_WAIT); return; }
+  tssDone.delete(kind); tssGone.delete(e.key);
+  if(t) t.classList.remove('is-over');
+  setTimeout(async () => { if(typeof loadMyTasks === 'function') await loadMyTasks(); renderTasks(); if(typeof updateTasksNavBadge === 'function') updateTasksNavBadge(); }, tssCalm() ? 0 : 240);
+}
+// tasks added from here and taken back: cancelled (nobody else ever saw them)
+async function tssCancel(ids){
+  if(!ids.length) return true;
+  const { error } = await supabaseClient.from('tasks').update({ cancelled_at: new Date().toISOString() }).in('id', ids);
+  return !error;
+}
+function tssBusy(kind, on){ on ? tssBusyK.add(kind) : tssBusyK.delete(kind); const t = tssTile(kind); if(!t) return; t.classList.toggle('is-busy', on); t.querySelectorAll('.tss-f button').forEach(b => { b.disabled = on; }); }
+async function tssAdd(kind){
+  const it = tssItems().items[kind]; if(!it || tssDone.has(kind) || tssBusyK.has(kind)) return;
+  tssBusy(kind, true);
+  if(it.s){
+    const s = it.s, r = await addSuggestedTask(s.id);
+    if(r.error){ tssBusy(kind, false); showToast('error', 'Not added', r.error.message || 'Try again in a moment.'); return; }
+    tssOver(kind, it, { face: 'added', title: r.already ? 'Already in your tasks' : 'Added to To Do', sub: r.task.title,
+      undo: async () => { if(!r.already && !(await tssCancel([r.task.id]))) return false;
+        if(!(await decideSuggestion(s.id, 'pending'))) return false;
+        taskSuggestions = [s, ...(taskSuggestions || []).filter(x => x.id !== s.id)].sort((a, b) => new Date(b.sourceAt || 0) - new Date(a.sourceAt || 0)); } });
+  } else {
+    const { c, n } = it, titles = n.steps && n.steps.length ? n.steps.filter(Boolean) : [n.title], ids = [];
+    for(const title of titles){
+      const res = await insertTaskRow({ title, description: `${n.title}. ${n.why}`, priority: 'medium', status: 'todo', assigner_id: currentUser.id, assignee_id: currentUser.id, client_id: c.id, due_date: null });
+      if(!res.error && res.data){ ids.push(res.data.id); if(typeof mtKnow === 'function') mtKnow(res.data); }
+    }
+    if(!ids.length){ tssBusy(kind, false); showToast('error', 'Not added', 'Try again in a moment.'); return; }
+    // the note leaves for good once the tile settles; Undo before then only takes the tasks back
+    tssOver(kind, it, { face: 'added', title: ids.length === 1 ? 'Added to To Do' : `Added ${ids.length} steps to To Do`, sub: titles[0], commit: () => cnSettle(c.id, n.id), undo: () => tssCancel(ids) });
+  }
+  if(typeof loadMyTasks === 'function') await loadMyTasks();
+  tssAfter(kind);
+}
+// Claude's note, dismissed for good once its tile has settled; if that fails, it comes back
+async function tssDismissNote(c, n, key){
+  const r = await claudeApi({ action: 'client-note-dismiss', clientId: c.id, noteId: n.id });
+  if(r.error){ tssGone.delete(key); showToast('error', 'Not dismissed', r.error); if(currentViewName === 'tasks') renderTasks(); return; }
+  const v = claudeNotes.by[c.id]; claudeNotes.by[c.id] = r.insights || { ...(v || {}), notes: ((v && v.notes) || []).filter(x => x.id !== n.id) };
+  claudeNotesRedraw();
+}
+async function tssDismiss(kind){
+  const it = tssItems().items[kind]; if(!it || tssDone.has(kind) || tssBusyK.has(kind)) return;
+  if(it.s){
+    const s = it.s; tssBusy(kind, true);
+    if(!(await decideSuggestion(s.id, 'dismissed'))){ tssBusy(kind, false); showToast('error', 'Not dismissed', 'Try again in a moment.'); return; }
+    tssOver(kind, it, { face: 'dismissed', title: 'Dismissed', sub: 'It’s gone from Suggestions',
+      undo: async () => { if(!(await decideSuggestion(s.id, 'pending'))) return false; taskSuggestions = [s, ...(taskSuggestions || []).filter(x => x.id !== s.id)].sort((a, b) => new Date(b.sourceAt || 0) - new Date(a.sourceAt || 0)); } });
+  } else {
+    const { c, n } = it;
+    tssOver(kind, it, { face: 'dismissed', title: 'Dismissed', sub: 'Claude won’t suggest it again', commit: () => tssDismissNote(c, n, it.key) });
+  }
+  if(typeof updateTasksNavBadge === 'function') updateTasksNavBadge();
 }

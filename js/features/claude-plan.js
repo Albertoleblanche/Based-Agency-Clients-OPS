@@ -383,7 +383,8 @@ function cnNavDot(){
 }
 function cnMarkSeen(){ const at = Object.values(claudeNotes.by).reduce((m, v) => v && v.at > m ? v.at : m, ''); if(at) try{ localStorage.setItem(cnSeenKey(), at); }catch(e){} cnNavDot(); }
 
-// Tasks: Claude's tips are drawn in Tasks' Suggestions panel (tasks-canvas.js tkSgPanelHtml, Nov 26)
+// Tasks: Claude's notes of every kind are in Tasks' Suggestions panel (tasks-canvas.js tkSgPanelHtml, Nov 26;
+// Missing and ideas since Nov 27), and the top one of each kind in the stripe at the bottom (tssHtml)
 // a client's notes in full: Health with the client's panel open
 function cnOpenClient(id){ switchView('health'); setTimeout(() => { if(typeof selectHealthClient === 'function') selectHealthClient(id); }, 0); }
 // Plan: Claude's ideas on your clients, first in "Worth planning", as small cards (Nov 26, canvas "Plan:
