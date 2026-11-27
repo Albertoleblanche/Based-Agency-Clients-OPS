@@ -434,15 +434,27 @@ function tkMore(e, id){
 // Gmail together, inside the panel. A task opened closes it; Esc closes it.
 // Nov 27: it holds every kind now, so the stripe's See All opens one place: Claude's Missing notes (clients
 // waiting on you) first, then meetings and emails, tips, and Claude's ideas last.
-let tkSgCnAll = false, tkSgMissAll = false, tkSgIdeaAll = false, tkSgChecking = false, tkSgCheckedAt = 0;
+let tkSgCnAll = false, tkSgMissAll = false, tkSgIdeaAll = false, tkSgOldOpen = false, tkSgChecking = false, tkSgCheckedAt = 0;
 function tkSgSeenKey(){ return `bda_tsg_seen_${currentUser ? currentUser.id : ''}`; }
 function tkSgSeen(){ try{ return new Set(JSON.parse(localStorage.getItem(tkSgSeenKey()) || '[]')); }catch(e){ return new Set(); } }
+// Nov 27, later ("suggestions are piling up quickly"): Tasks keeps to what's worth doing now.
+//  • From meetings and emails: the last two weeks (or due from today on). Older ones fold into "Older"
+//    at the foot of the panel, not counted, with Dismiss All.
+//  • Claude's notes: a client's first of each kind (Claude puts the most important first); the rest stay
+//    on Health and the client's page.
+const TKSG_FRESH_DAYS = 14;
+function tkSgOld(s){
+  if(s.dueDate && s.dueDate >= toDateStr(new Date())) return false;
+  const at = s.sourceAt || s.createdAt; return !!at && Date.now() - new Date(at) > TKSG_FRESH_DAYS * 864e5;
+}
 function tkSgData(){
   // what the stripe just added or dismissed is gone here too, while the data catches up (tssGone)
-  const meet = typeof suggestionsOpen === 'function' ? suggestionsOpen(typeof taskSuggestions !== 'undefined' ? taskSuggestions || [] : []).filter(s => (tasksClient === 'all' || s.clientId === tasksClient) && !tssGone.has('sg:' + s.id)) : [];
-  const notes = typeof claudeNotesOn === 'function' && claudeNotesOn() ? cnSorted((clients || []).filter(c => claudeMine(c) && (tasksClient === 'all' || c.id === tasksClient)).flatMap(c => cnNotesOf(c))).filter(x => !tssGone.has(`cn:${x.c.id}:${x.n.id}`)) : [];
+  const all = typeof suggestionsOpen === 'function' ? suggestionsOpen(typeof taskSuggestions !== 'undefined' ? taskSuggestions || [] : []).filter(s => (tasksClient === 'all' || s.clientId === tasksClient) && !tssGone.has('sg:' + s.id)) : [];
+  const meet = all.filter(s => !tkSgOld(s)), older = all.filter(tkSgOld);
+  const seen = new Set(), firstOfKind = x => { const k = x.c.id + '|' + x.n.kind; if(seen.has(k)) return false; seen.add(k); return true; };
+  const notes = typeof claudeNotesOn === 'function' && claudeNotesOn() ? cnSorted((clients || []).filter(c => claudeMine(c) && (tasksClient === 'all' || c.id === tasksClient)).flatMap(c => cnNotesOf(c))).filter(x => !tssGone.has(`cn:${x.c.id}:${x.n.id}`)).filter(firstOfKind) : [];
   const missing = notes.filter(x => x.n.kind === 'missing'), tips = notes.filter(x => x.n.kind === 'tip'), ideas = notes.filter(x => x.n.kind === 'idea' && x.c.status !== 'Paused');   // as Plan: no ideas for paused clients
-  return { meet, missing, tips, ideas, ids: meet.map(s => 'sg:' + s.id).concat([...missing, ...tips, ...ideas].map(x => `cn:${x.c.id}:${x.n.id}`)) };
+  return { meet, older, missing, tips, ideas, ids: meet.map(s => 'sg:' + s.id).concat([...missing, ...tips, ...ideas].map(x => `cn:${x.c.id}:${x.n.id}`)) };
 }
 // A Claude note's one button, the same in the panel and the stripe. Tips (and Missing notes with steps or
 // nothing to send) are tasks to add; Missing can be a message Claude wrote, a sprint or a plan with Claude;
@@ -521,7 +533,7 @@ function tkSgPanelHtml(){
     const rows = g.items.slice(0, Math.max(0, left)); left -= rows.length;
     if(!rows.length) return '';
     const c = g.k && clients.find(x => x.id === g.k);
-    const all = g.items.length > 3 ? `<div class="tsg-all"><span>${escapeHtml(c ? c.name : 'No client')} has ${g.items.length}</span><button type="button" class="btn sm tk-sg-all" data-sgall="${g.k}" onclick="tkSgAddAll('${g.k}')">Add All ${g.items.length}</button></div>` : '';
+    const all = g.items.length > 3 ? `<div class="tsg-all"><span>${escapeHtml(c ? c.name : 'No client')} has ${g.items.length}</span><button type="button" class="btn sm tsg-dis" onclick="tkSgDismissMany('client', ${A(g.k)})" data-hovertip="Dismiss all ${g.items.length} of ${escapeHtml(c ? c.name : 'these')}’s suggestions. Undo brings them back." data-tipdelay="500">Dismiss All</button><button type="button" class="btn sm tk-sg-all" data-sgall="${g.k}" onclick="tkSgAddAll('${g.k}')">Add All ${g.items.length}</button></div>` : '';
     return all + rows.map(tile).join('');
   }).join('');
   const meetMore = d.meet.length > 3 ? `<button type="button" class="tsg-more" onclick="tkSgAll = !tkSgAll; renderTasks()">${tkSgAll ? 'Show Fewer' : `Show ${d.meet.length - 3} More`}</button>` : '';
@@ -534,12 +546,32 @@ ${(n.evidence || []).length ? `<div class="tsg-src cn-evs">${n.evidence.slice(0,
   const fromMeet = src.granola || d.meet.some(s => s.source !== 'gmail'), fromMail = src.gmail || d.meet.some(s => s.source === 'gmail');
   const meetHead = [fromMeet && appLogo('granola', 'xs'), fromMail && appLogo('gmail', 'xs')].filter(Boolean).join('');
   const what = fromMeet && fromMail ? 'From your meetings and emails' : fromMail ? 'From your clients’ emails' : 'From your meetings';
+  // older than two weeks: folded at the foot, not counted, with Dismiss All
+  const older = d.older.length ? `<details class="tsg-old"${tkSgOldOpen ? ' open' : ''} ontoggle="tkSgOldOpen = this.open"><summary><span class="tsg-old-t">${icon('caret-right', { weight: 'bold' })}Older than two weeks</span><span class="n">${d.older.length}</span><span class="tsg-sp"></span><button type="button" class="btn sm tsg-dis" onclick="event.preventDefault();event.stopPropagation();tkSgDismissMany('older')" data-hovertip="Dismiss every suggestion here, from meetings and emails over two weeks old. Undo brings them back." data-tipdelay="500">Dismiss All</button></summary>
+<p class="tsg-old-w">From meetings and emails over two weeks ago. They aren’t counted or shown in the stripe; add any still worth doing.</p>${d.older.map(tile).join('')}</details>` : '';
   const empty = !d.ids.length ? `<div class="tsg-e"><b>All caught up</b><span>New ones show up here after your meetings, when a client emails, and when Claude reads your clients again.</span></div>` : '';
   return `<aside class="sp tsg" aria-label="Suggestions">
 <div class="sp-bar"><button class="ib" aria-label="Close" title="Close (Esc)" onclick="tkSgClose()">${icon('x')}</button></div>
 <div class="tsg-h"><h3>Suggestions</h3><p>Everything worth doing, from your meetings, your clients’ emails and Claude, the most important first.</p></div>
 ${check}${cnGroup(d.missing, tkSgMissAll, 'tkSgMissAll', 'tk-miss', 'Clients waiting on you')}${d.meet.length ? `<section class="tsg-g tk-sg" aria-label="${what}"><p class="tsg-gh">${meetHead ? `<span class="tsg-ls">${meetHead}</span>` : ''}<b>${what}</b><span class="n">${d.meet.length}</span></p>${meet}${meetMore}</section>` : ''}
-${cnGroup(d.tips, tkSgCnAll, 'tkSgCnAll', 'tk-cn', 'Tips from Claude')}${cnGroup(d.ideas, tkSgIdeaAll, 'tkSgIdeaAll', 'tk-idea', 'Ideas from Claude')}${empty}</aside>`;
+${cnGroup(d.tips, tkSgCnAll, 'tkSgCnAll', 'tk-cn', 'Tips from Claude')}${cnGroup(d.ideas, tkSgIdeaAll, 'tkSgIdeaAll', 'tk-idea', 'Ideas from Claude')}${empty}${older}</aside>`;
+}
+
+// Dismiss All: a client's suggestions from meetings and emails, or the older ones. Undo brings them back.
+async function tkSgDismissMany(what, key){
+  const d = tkSgData(), list = what === 'older' ? d.older : d.meet.concat(d.older).filter(s => (s.clientId || '') === (key || ''));
+  if(!list.length) return;
+  const ids = list.map(s => s.id), c = key && clients.find(x => x.id === key);
+  const { error } = await supabaseClient.from('task_suggestions').update({ status: 'dismissed', decided_at: new Date().toISOString() }).in('id', ids);
+  if(error) return showToast('error', 'Not dismissed', 'Try again in a moment.');
+  taskSuggestions = (taskSuggestions || []).filter(s => !ids.includes(s.id));
+  renderTasks();
+  showToast('info', `Dismissed ${ids.length}`, what === 'older' ? 'The older suggestions are gone from Tasks.' : `${c ? c.name : 'Those'}: gone from Suggestions.`, { action: 'Undo', onAction: async () => {
+    const { error: e2 } = await supabaseClient.from('task_suggestions').update({ status: 'pending', decided_at: null }).in('id', ids);
+    if(e2) return showToast('error', 'Couldn’t undo', 'Try again in a moment.');
+    taskSuggestions = [...list, ...(taskSuggestions || []).filter(s => !ids.includes(s.id))].sort((a, b) => new Date(b.sourceAt || 0) - new Date(a.sourceAt || 0));
+    renderTasks();
+  } });
 }
 
 // ---- Top suggestions (Nov 27, canvas "Tasks: the top suggestion of each kind, in a stripe at the bottom") ----

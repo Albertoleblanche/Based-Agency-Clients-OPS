@@ -2692,6 +2692,7 @@ a.mi{text-decoration:none;color:inherit}
 .mac .itip:focus-visible{outline:none;box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 55%,transparent)}
 #itipPop{display:none;position:fixed;z-index:3000;width:max-content;max-width:290px;padding:10px 12px;border-radius:10px;background:var(--window);color:var(--label);box-shadow:0 0 0 .5px var(--sep-strong),0 12px 32px rgba(0,0,0,.28);font-size:12.5px;font-weight:400;line-height:1.5;letter-spacing:0;text-align:left;white-space:normal;pointer-events:none;opacity:0;transform:translateY(-3px);transition:opacity 140ms cubic-bezier(.23,1,.32,1),transform 140ms cubic-bezier(.23,1,.32,1)}
 #itipPop[data-side="above"]{transform:translateY(3px)}
+#itipPop[data-side="left"]{transform:translateX(3px)}#itipPop[data-side="right"]{transform:translateX(-3px)}
 #itipPop.on{opacity:1;transform:none}
 #itipPop p{margin:0}
 #itipPop p + p{margin-top:6px}
@@ -4658,6 +4659,19 @@ html .mac .tsg-a .btn.tsg-dis{background:none;box-shadow:none;color:var(--label-
 .tsg-e b{display:block;font-size:15px;font-weight:500}
 .tsg-e span{display:block;margin-top:4px;font-size:13px;line-height:1.5;color:var(--label-2)}
 @media (prefers-reduced-motion:reduce){ .sp.tsg .tsg-t{transition:opacity 150ms ease} }
+/* older than two weeks: folded at the foot, not counted (Nov 27) */
+.sp.tsg .tsg-old{margin:18px 0 0;padding:12px 0 0;border-top:.5px solid var(--sep)}
+.tsg-old > summary{display:flex;align-items:center;gap:8px;min-height:30px;list-style:none;cursor:pointer;user-select:none}
+.tsg-old > summary::-webkit-details-marker{display:none}
+.tsg-old-t{display:inline-flex;align-items:center;gap:7px;font-size:14px;font-weight:600;color:var(--label-2)}
+html.ui-w .tsg-old-t{font-weight:500}
+.tsg-old-t svg{width:11px;height:11px;transition:transform 200ms cubic-bezier(.23,1,.32,1)}
+.tsg-old[open] .tsg-old-t svg{transform:rotate(90deg)}
+.tsg-old > summary .n{font-size:12px;color:var(--label-2);font-variant-numeric:tabular-nums}
+.tsg-old-w{margin:6px 0 2px;font-size:12.5px;line-height:1.45;color:var(--label-2)}
+html .mac :is(.tsg-old,.tsg-all) .btn.sm.tsg-dis{height:26px;padding:0 10px;border-radius:8px;font-size:12px;background:none;box-shadow:none;color:var(--label-2)}
+@media (hover:hover) and (pointer:fine){ html .mac :is(.tsg-old,.tsg-all) .btn.sm.tsg-dis:hover{background:var(--fill-2);color:var(--label)} .tsg-old > summary:hover .tsg-old-t{color:var(--label)} }
+@media (prefers-reduced-motion:reduce){ .tsg-old-t svg{transition:none} }
 /* ---- Tasks: the top suggestion of each kind, in a stripe at the bottom (Nov 27; tasks-canvas.js tssHtml) ----
    A see-through tray pinned to the window's bottom (.spw holds it; it sits in the page so the Icons8 credit
    sees its Gmail logo), the board scrolling under it. Tiles turn over in place; a kind's column folds away

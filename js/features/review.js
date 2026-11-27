@@ -386,6 +386,14 @@ ${letter}</div>`;
 <div class="rvn-mail"><div class="rvn-cols">${doc}${rail}</div></div>
 <div class="rvn-ft">${foot}</div>`;
 }
+// What each of Review's "…" items does, shown beside the menu on hover (Nov 27)
+const RVN_TIP = {
+  later: 'Approve it now and keep it in Approved. You, or another approver, send it later with Send Now.',
+  laterAll: 'Approve every part that’s waiting and keep the update in Approved. Send it later with Send Now, as one email.',
+  back: 'Take the approval back. It goes back to Waiting for a yes, where it can be edited or rewritten before it’s approved again.',
+  skip: 'Send nothing to the client this week. You choose whether the work goes in next week’s update or is left out, and whoever wrote it hears why. The week counts as skipped, not missed, and Undo puts it back.',
+};
+const rvnTip = k => ` data-hovertip="${escapeHtml(RVN_TIP[k])}" data-tipside="left" data-tipdelay="450"`;
 // "…" on a client's parts: approve them all to send later, open the client, copy the email.
 function reviewPartsMore(e, clientId){
   e.stopPropagation();
@@ -399,7 +407,7 @@ function reviewPartsMore(e, clientId){
   const r = e.currentTarget.getBoundingClientRect();
   m.style.top = (r.bottom + 4) + 'px'; m.style.right = (window.innerWidth - r.right) + 'px';
   const ap = canApproveUpdates() && reviewTab !== 'sent', anyApproved = clientParts(c).some(p => p.state === 'approved');
-  m.innerHTML = `${waiting && ap ? `<button class="mi" role="menuitem" onclick="approveAllParts('${clientId}')">${icon('check-circle')}Approve All, Send Later</button>` : ''}${anyApproved && ap ? `<button class="mi" role="menuitem" onclick="reviewBackToWaiting('${clientId}')">${icon('undo-2')}Back to Waiting</button>` : ''}${ap ? `<button class="mi" role="menuitem" onclick="skipWeekSheet('${clientId}')">${icon('minus-circle')}Skip This Week…</button><div class="msep"></div>` : ''}
+  m.innerHTML = `${waiting && ap ? `<button class="mi" role="menuitem"${rvnTip('laterAll')} onclick="approveAllParts('${clientId}')">${icon('check-circle')}Approve All, Send Later</button>` : ''}${anyApproved && ap ? `<button class="mi" role="menuitem"${rvnTip('back')} onclick="reviewBackToWaiting('${clientId}')">${icon('undo-2')}Back to Waiting</button>` : ''}${ap ? `<button class="mi" role="menuitem"${rvnTip('skip')} onclick="skipWeekSheet('${clientId}')">${icon('minus-circle')}Skip This Week…</button><div class="msep"></div>` : ''}
 <button class="mi" role="menuitem" onclick="openClientDetail('${clientId}')">${icon('buildings')}Open Client Page</button>
 <button class="mi" role="menuitem" onclick="reviewCopyParts('${clientId}')">${icon('clipboard-text')}Copy Text</button>`;
   document.body.appendChild(m);
@@ -505,7 +513,7 @@ function reviewMore(e, clientId, author){
   m.style.top = (r.bottom + 4) + 'px'; m.style.right = (window.innerWidth - r.right) + 'px';
   const A = `'${clientId}',${jsArg(author)}`;
   // Nov 27: Back to Waiting for an approved one, and Skip This Week… for either (approvers)
-  m.innerHTML = `${waiting && ap ? `<button class="mi" role="menuitem" onclick="approveDraft(${A})">${icon('check-circle')}Approve, Send Later</button>` : ''}${approved && ap ? `<button class="mi" role="menuitem" onclick="reviewBackToWaiting('${clientId}')">${icon('undo-2')}Back to Waiting</button>` : ''}${(waiting || approved) && ap ? `<button class="mi" role="menuitem" onclick="skipWeekSheet('${clientId}')">${icon('minus-circle')}Skip This Week…</button><div class="msep"></div>` : ''}
+  m.innerHTML = `${waiting && ap ? `<button class="mi" role="menuitem"${rvnTip('later')} onclick="approveDraft(${A})">${icon('check-circle')}Approve, Send Later</button>` : ''}${approved && ap ? `<button class="mi" role="menuitem"${rvnTip('back')} onclick="reviewBackToWaiting('${clientId}')">${icon('undo-2')}Back to Waiting</button>` : ''}${(waiting || approved) && ap ? `<button class="mi" role="menuitem"${rvnTip('skip')} onclick="skipWeekSheet('${clientId}')">${icon('minus-circle')}Skip This Week…</button><div class="msep"></div>` : ''}
 <button class="mi" role="menuitem" onclick="openClientDetail('${clientId}')">${icon('buildings')}Open Client Page</button>
 ${winViaWhatsapp(c) && !waiting ? '' : `<button class="mi" role="menuitem" onclick="reviewCopy(${A})">${icon('clipboard-text')}Copy Text</button>`}`;
   document.body.appendChild(m);

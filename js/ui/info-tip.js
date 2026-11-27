@@ -21,12 +21,21 @@ function itipShow(btn){
   const el = itipPop(), text = btn.getAttribute('data-tip') || btn.getAttribute('data-hovertip') || '';
   el.innerHTML = text.split(/\n\s*\n/).map(p => `<p>${escapeHtml(p.trim()).replace(/\n/g, '<br>')}</p>`).join('');
   el.classList.remove('on'); el.style.display = 'block';
-  const r = btn.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight, pad = 8;
-  const left = Math.max(pad, Math.min(innerWidth - w - pad, r.left + r.width / 2 - w / 2));
-  const below = r.bottom + 8 + h <= innerHeight - pad;
-  el.style.left = left + 'px';
-  el.style.top = (below ? r.bottom + 8 : Math.max(pad, r.top - 8 - h)) + 'px';
-  el.dataset.side = below ? 'below' : 'above';
+  const r = btn.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight, pad = 8, side = btn.getAttribute('data-tipside');
+  if(side === 'left' || side === 'right'){
+    // beside it (Nov 27: a menu's items, so the tip doesn't cover the next one); the other side when there's no room
+    let left = side === 'left' ? r.left - 10 - w : r.right + 10;
+    if(left < pad || left + w > innerWidth - pad) left = side === 'left' ? r.right + 10 : r.left - 10 - w;
+    el.style.left = Math.max(pad, Math.min(innerWidth - w - pad, left)) + 'px';
+    el.style.top = Math.max(pad, Math.min(innerHeight - h - pad, r.top + r.height / 2 - h / 2)) + 'px';
+    el.dataset.side = side;
+  } else {
+    const left = Math.max(pad, Math.min(innerWidth - w - pad, r.left + r.width / 2 - w / 2));
+    const below = r.bottom + 8 + h <= innerHeight - pad;
+    el.style.left = left + 'px';
+    el.style.top = (below ? r.bottom + 8 : Math.max(pad, r.top - 8 - h)) + 'px';
+    el.dataset.side = below ? 'below' : 'above';
+  }
   btn.setAttribute('aria-expanded', 'true'); btn.setAttribute('aria-describedby', 'itipPop');
   ITIP.btn = btn;
   requestAnimationFrame(() => el.classList.add('on'));
