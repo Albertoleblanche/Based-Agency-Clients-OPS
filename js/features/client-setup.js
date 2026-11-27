@@ -91,7 +91,7 @@ function clientSetupPanelHtml(c){
   const off = !getsUpdates(c), ch = off ? 'none' : winChannel(c), g = winGroupFor(c), d = winDay(c);
   const ps = hvProjectsOf(c), hc = hvLinkOf(c);
   const mark = on => `<span class="su-m${on ? ' ok' : ''}" aria-label="${on ? 'Done' : 'To do'}">${on ? icon('check', { weight: 'bold' }) : ''}</span>`;
-  const row = (k, label, val, done, note) => `<div class="su-r${done == null ? ' is-opt' : ''}">${done == null ? '<span class="su-m none"></span>' : mark(done)}<span class="su-k">${label}</span><div class="su-v">${val}${note ? `<span class="su-n">${note}</span>` : ''}</div></div>`;
+  const row = (k, label, val, done, note) => `<div class="su-r${done == null ? ' is-opt' : ''}">${done == null ? '<span class="su-m none"></span>' : mark(done)}<span class="su-k">${label}</span><div class="su-v">${val}${note ? `<span class="su-hint">${note}</span>` : ''}</div></div>`;
   const pick = (id, label, opts, value, fn, ph) => approver
     ? `<label class="cl-own su-pick"><select id="${id}" onchange="${fn}" aria-label="${label}">${value ? '' : `<option value="" selected disabled hidden></option>`}${opts.map(([v, t]) => `<option value="${escapeHtml(v)}"${String(v) === String(value) ? ' selected' : ''}>${escapeHtml(t)}</option>`).join('')}</select><span${value ? '' : ' class="t-3"'}>${escapeHtml(value ? (opts.find(o => String(o[0]) === String(value)) || [, value])[1] : ph)}</span>${icon('caret-down', { weight: 'bold' })}</label>`
     : (value ? escapeHtml(value) : '<span class="t-3">Not set</span>');

@@ -2518,7 +2518,8 @@ button.tk-cb:hover{box-shadow:inset 0 0 0 1.5px var(--label-2)}
 .su-k{color:var(--label-2);line-height:26px}
 .su-v{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0;line-height:26px}
 .su-v > .seg{margin:0}
-.su-n{font-size:11.5px;line-height:1.4;color:var(--label-3)}
+/* a field's hint (Nov 27: its own name; .su-n is Set Up Radar's step number, a 22px circle, and drew it in one) */
+.su-hint{font-size:11.5px;line-height:1.4;color:var(--label-3);white-space:normal;overflow-wrap:anywhere}
 /* Settings → Areas: who works on which clients */
 .ar-g .fr{gap:14px}
 .ar-g .fr .l{flex:1 1 auto;min-width:0}
