@@ -205,7 +205,7 @@ async function mLoadAll(){
   notifications = nf.data || [];
   teamProfiles = pr.data || [];
   myProfile = teamProfiles.find(p => p.id === uid) || myProfile;
-  calendarEvents = (ev.data || []).map(e => ({ id: e.id, title: e.title, startAt: e.start_at, endAt: e.end_at, allDay: e.all_day, clientId: e.client_id, location: e.location, eventType: e.event_type, attendeeIds: e.attendee_ids || [], createdBy: e.created_by,
+  calendarEvents = (ev.data || []).map(e => ({ id: e.id, title: e.title, startAt: e.all_day ? allDayAt(e.start_at) : e.start_at, endAt: e.all_day ? allDayAt(e.end_at || e.start_at, true) : e.end_at, allDay: e.all_day, clientId: e.client_id, location: e.location, eventType: e.event_type, attendeeIds: e.attendee_ids || [], createdBy: e.created_by,
     description: e.description || '', meetingUrl: e.meeting_url || null, googleEventId: e.google_event_id || null, googleOwner: e.google_calendar_owner || null }));
   await Promise.all([loadUpdateHistory(), loadHealthHandled(), loadTaskDueTimes(), typeof hvTimeLoad === 'function' ? hvTimeLoad() : null,
     typeof loadDangerHistory === 'function' ? loadDangerHistory() : null, mLoadSprints(), typeof loadClientConcerns === 'function' ? loadClientConcerns() : null]);   // who set a client's Risk (Nov 25)

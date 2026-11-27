@@ -43,7 +43,8 @@ async function loadCalendarEvents(){
   const { data, error } = await supabaseClient.from('calendar_events').select('*').order('start_at', { ascending:true });
   if(error){ console.error('loadCalendarEvents error', error); calendarEvents = []; calendarDataLoaded = true; return; }
   calendarEvents = (data||[]).map(e=>({
-    id:e.id, title:e.title, description:e.description||'', startAt:e.start_at, endAt:e.end_at,
+    id:e.id, title:e.title, description:e.description||'',
+    startAt:e.all_day ? allDayAt(e.start_at) : e.start_at, endAt:e.all_day ? allDayAt(e.end_at || e.start_at, true) : e.end_at,   // an all-day event on its day (helpers.js)
     allDay:e.all_day, clientId:e.client_id, createdBy:e.created_by, eventType:e.event_type,
     googleEventId:e.google_event_id, googleOwner:e.google_calendar_owner,
     location:e.location||'', attendeeIds:e.attendee_ids||[],

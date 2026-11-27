@@ -365,7 +365,7 @@ async function setPlanSprintDone(id, done){
 // The sprint's own all-day event ("Add to my calendar"): it isn't linked by id, so it's found by what it
 // was made with: yours, all day, "Sprint: <title>", on the sprint's dates. Deleting the sprint deletes it,
 // and changing the sprint's name or dates moves it (Nov 27: a deleted sprint stayed on the calendar).
-const planEvDay = v => String(v || '').slice(0, 10);
+const planEvDay = v => v ? toDateStr(new Date(v)) : '';   // events are on their local day (helpers.js allDayAt)
 function planIsSprintEvent(e){ return !!e && e.allDay && e.createdBy === currentUser.id && /^Sprint: /.test(e.title || ''); }
 function planSprintEvents(s){
   if(typeof calendarEvents === 'undefined' || !s) return [];

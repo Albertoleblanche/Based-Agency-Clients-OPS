@@ -151,6 +151,14 @@ function usHolidays(y){
     .forEach(([d, n]) => { out[toDateStr(d)] = n; });
   return (_usHol[y] = out);
 }
+// An all-day event is a day, not a moment (Nov 27). Google's all-day events, sprints, follow-ups and due
+// dates are saved as midnight UTC, which in the Americas is the evening before, so they showed a day
+// early (a Friday payday on Thursday); all-day events made in the event form are saved as local
+// midnight. Either way the day is the nearest UTC day boundary: the start's midnight, the end's next one.
+// Read back as local times, so everything that reads startAt and endAt puts the event on its day.
+function allDayDay(v, end){ const t = new Date(v); return isNaN(t) ? '' : new Date(t.getTime() + (end ? -12 : 12) * 3600000).toISOString().slice(0, 10); }
+function allDayAt(v, end){ const d = allDayDay(v, end); return d ? new Date(d + (end ? 'T23:59:59' : 'T00:00:00')).toISOString() : v; }
+
 // The holiday on a day (YYYY-MM-DD), or ''. A New Year's Day on a Saturday is off on Dec 31, so the next year counts too.
 function usHolidayOn(ds){ const y = Number(String(ds).slice(0, 4)); return usHolidays(y)[ds] || usHolidays(y + 1)[ds] || ''; }
 
