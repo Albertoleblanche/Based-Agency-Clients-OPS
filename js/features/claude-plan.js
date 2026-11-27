@@ -399,3 +399,95 @@ function claudePlanIdeasHtml(){
     .map(({ c, n }) => `<div class="pl-ci cn-n is-idea" data-cnl="${escapeHtml(c.id + ':' + n.id)}"><p class="pl-ci-top"><span class="cn-k">Idea</span><span class="c">${escapeHtml(c.name)}</span></p><b>${escapeHtml(n.title)}</b><p class="pl-ci-w" title="${escapeHtml(n.why)}">${escapeHtml(n.why)}</p>`
       + `<div class="pl-ci-a"><button type="button" class="btn sm btn-p" onclick="openNewSprintModal({ clientId: ${A(c.id)}, preset: { title: ${A(n.title)}, goal: ${A(n.why)}, steps: ${escapeHtml(JSON.stringify(n.steps || []))} }, cnNote: { clientId: ${A(c.id)}, noteId: ${A(n.id)} } })">Make It a Sprint</button><button type="button" class="btn sm cn-dis" onclick="cnDismiss(${A(c.id)}, ${A(n.id)}, this)">Dismiss</button></div></div>`).join('');
 }
+
+// ---- Work with Claude on a task (Nov 27) ---------------------------------------------------------
+// On your open tasks: the Claude mark on its card or row, and Work with Claude in its panel. It opens a
+// new Claude chat with a message about the task filled in (claude.ai/new?q=; nothing is sent until you
+// send it there): the task, its notes, checklist, link and comments, its sprint, and for a client's
+// task what they pay us for and what else is open. Claude plans it in a few steps and starts on the
+// first with you; with the Radar connection in that chat it can mark it done and log the time after.
+// More → Copy Message for Claude puts the same message on the clipboard, for a Claude project or the app.
+function claudeTaskPrompt(t){
+  const me = typeof currentUser !== 'undefined' && currentUser ? currentUser.id : null;
+  const team = typeof teamProfiles !== 'undefined' ? teamProfiles : [];
+  const nameOf = id => (team.find(p => p.id === id) || {}).name || '';
+  const c = t.clientId && typeof clients !== 'undefined' ? clients.find(x => x.id === t.clientId) : null;
+  const today = toDateStr(new Date());
+  const L = [];
+  L.push('I work at Based Agency, a marketing agency for home service and remodeling companies. Help me get this task done now: plan it in a few steps, then do the work with me.');
+  L.push('');
+  L.push(`Task: ${claudeClip(t.title, 300)}`);
+  const due = t.dueDate ? (() => { const d = new Date(t.dueDate + 'T12:00:00'), late = t.dueDate < today ? daysBetween(dayStart(d), dayStart(new Date())) : 0;
+    return `Due ${claudeDay(d)}${t.dueDate === today ? ' (today)' : late ? ` (${late === 1 ? 'a day' : late + ' days'} late)` : ''}`; })() : '';
+  const facts = [due, t.priority === 'high' ? 'High priority' : '', t.assignerId && t.assignerId !== me && nameOf(t.assignerId) ? `${nameOf(t.assignerId)} gave it to me` : ''].filter(Boolean);
+  if(facts.length) L.push(claudeEnd(facts.join('. ')));
+  if(c){
+    const owner = typeof clientOwner === 'function' ? clientOwner(c) : '', contact = typeof clientContact === 'function' ? clientContact(c) : '';
+    const site = String(c.website || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const areas = typeof waClientAreas === 'function' ? waClientAreas(c) : null, areaWords = areas && areas.length && typeof waWords === 'function' ? waWords(areas) : '';
+    const services = [...new Set((c.service || '').split(/\s*·\s*/).map(s => s.trim()).filter(Boolean))];
+    L.push(`Client: ${c.name}${site ? ` (${site})` : ''}${owner ? `. Owner on our team: ${owner}` : ''}${contact ? `. Their contact: ${contact}` : ''}.`);
+    L.push(`What they pay us for: ${services.length ? services.join(', ') : 'not set in Radar'}${areaWords ? `. That covers: ${areaWords}` : ''}.`);
+    if(c.sow) L.push(`Scope of work: ${claudeClip(c.sow, 700)}`);
+  }
+  const sp = t.sprintId && typeof planSprints !== 'undefined' ? planSprints.find(x => x.id === t.sprintId) : null;
+  if(sp){
+    const steps = (typeof tasks !== 'undefined' ? tasks : []).filter(x => x.sprintId === sp.id && x.id !== t.id && !x.cancelledAt);
+    L.push(`It’s a step of my sprint “${claudeBare(sp.title)}” (${claudeDay(sp.start + 'T12:00:00')} to ${claudeDay(sp.end + 'T12:00:00')})${sp.goal ? `. Its goal: ${claudeBare(claudeClip(sp.goal, 300))}` : ''}.`);
+    if(steps.length) L.push(claudeEnd(`Its other steps: ${steps.slice(0, 8).map(x => `${claudeBare(claudeClip(x.title, 90))}${x.status === 'done' ? ' (done)' : ''}`).join('; ')}`));
+  }
+  const { notes, ck } = typeof tkSplitDesc === 'function' ? tkSplitDesc(t.description) : { notes: String(t.description || ''), ck: [] };
+  const n = String(notes || '').trim();
+  if(n) L.push(`Notes: ${claudeEnd(claudeClip(n, 1500))}`);
+  if(ck.length){ L.push('Checklist:'); ck.slice(0, 12).forEach(x => L.push(`- [${x.on ? 'x' : ' '}] ${claudeClip(x.t, 160)}`)); }
+  if(t.link) L.push(`Link: ${String(t.link).trim()}`);
+  const wa = typeof waTasks !== 'undefined' ? waTasks.find(x => x.task_id != null && String(x.task_id) === String(t.id)) : null;
+  if(wa && (wa.title || wa.quote)) L.push(claudeEnd(`It came from the client’s WhatsApp group${typeof waGroupName === 'function' && waGroupName(wa) ? ` (${waGroupName(wa)})` : ''}: ${claudeBare(claudeClip(wa.quote || wa.title, 400))}`));
+  const cm = (typeof taskComments !== 'undefined' && taskComments[t.id]) || [];
+  if(cm.length){ L.push('Latest comments:'); cm.slice(-4).forEach(m => L.push(`- ${firstName(nameOf(m.user_id) || 'Someone')}: ${claudeClip(m.body, 240)}`)); }
+  if(c){
+    const open = (typeof tasks !== 'undefined' ? tasks : []).filter(x => x.clientId === c.id && x.id !== t.id && x.status !== 'done' && !x.cancelledAt && (!sp || x.sprintId !== sp.id)).slice(0, 5);
+    if(open.length) L.push(claudeEnd(`Other open tasks for them: ${open.map(x => claudeBare(claudeClip(x.title, 90))).join('; ')}`));
+    const owes = (typeof clientReminders !== 'undefined' ? clientReminders : []).filter(r => r.clientId === c.id && r.status === 'waiting').slice(0, 4);
+    if(owes.length) L.push(claudeEnd(`Waiting on them: ${owes.map(r => claudeBare(claudeClip(r.question, 120))).join('; ')}`));
+  }
+  L.push('');
+  L.push('What I need:');
+  let k = 0;
+  if(c) L.push(`${++k}. Stay inside what they pay us for. If the task needs work outside that, say so in one line and suggest how to offer it to them as an add-on instead of doing it.`);
+  L.push(`${++k}. Break the task into 3 to 6 short steps, with roughly how long each takes.`);
+  L.push(`${++k}. Start on step 1 with me now: draft the actual work (copy, code, a page section, ad variations, a message${c ? ' to the client' : ''}, whatever fits). Ask me for anything you need, like access, files or numbers.`);
+  if(c) L.push(`${++k}. When it’s done, give me a one-line win we can send the client: specific and positive, with no mention of problems or delays.`);
+  L.push('');
+  L.push(`If the Radar connector is on in this chat, use it for more context${c ? ` (get_client "${c.name}", and its meetings)` : ''}, and when we’re done, offer to mark this task done in Radar (update_task, task id ${t.id}) and log my time${c ? ` on ${c.name}` : ''}; ask me first.`);
+  let out = L.join('\n');
+  if(out.length > CLAUDE_PROMPT_MAX) out = out.slice(0, CLAUDE_PROMPT_MAX - 1) + '…';
+  return out;
+}
+// Yours and still open: the button shows on it
+function canWorkWithClaude(t){ return !!t && t.status !== 'done' && !t.cancelledAt && typeof currentUser !== 'undefined' && !!currentUser && t.assigneeId === currentUser.id; }
+function workWithClaude(id){
+  const t = (typeof tasks !== 'undefined' ? tasks : []).find(x => x.id === id); if(!t) return;
+  window.open(claudeNewChatUrl(claudeTaskPrompt(t)), '_blank', 'noopener');
+  showToast('info', 'Opened in Claude', 'The message about this task is filled in, in a new tab. Read it over, then send it.');
+}
+async function workWithClaudeCopy(id){
+  const t = (typeof tasks !== 'undefined' ? tasks : []).find(x => x.id === id); if(!t) return;
+  document.getElementById('tkMenu')?.remove();
+  const text = claudeTaskPrompt(t);
+  let done = false;
+  try{ await navigator.clipboard.writeText(text); done = true; }catch(e){
+    const ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;opacity:0;left:-9999px';
+    document.body.appendChild(ta); ta.select(); try{ done = document.execCommand('copy'); }catch(e2){} ta.remove();
+  }
+  done ? showToast('success', 'Copied', 'The message for Claude about this task. Paste it in a Claude chat or project.') : showToast('error', 'Couldn’t copy', 'Use Work with Claude instead: it opens the message in Claude.');
+}
+const CLAUDE_TASK_TIP = 'Opens Claude with this task, ready to plan it and start on it with you. Nothing is sent until you send it.';
+// small: the Claude mark on a card or row; otherwise the button for the panel
+function workWithClaudeHtml(t, small){
+  if(!canWorkWithClaude(t)) return '';
+  const tip = escapeHtml(CLAUDE_TASK_TIP);
+  return small
+    ? `<button class="ib tk-claude" aria-label="Work with Claude" data-hovertip="Work with Claude. ${tip}" onclick="event.stopPropagation();workWithClaude('${t.id}')">${CLAUDE_SPARK}</button>`
+    : `<button class="btn cl-claude-btn" onclick="workWithClaude('${t.id}')" data-hovertip="${tip}" data-tipdelay="1500">${CLAUDE_SPARK}Work with Claude</button>`;
+}

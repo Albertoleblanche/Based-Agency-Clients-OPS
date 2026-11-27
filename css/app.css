@@ -3854,6 +3854,21 @@ button.wx-t.on + button.wx-t{box-shadow:none}
 .tk-cf .tk-remind{margin:-4px -4px -4px -6px}
 .tk-cf:has(.tk-remind) .tk-who{margin-left:auto}
 .tk-lr .tk-remind{margin:0 4px 0 0}
+/* Work with Claude on a task (Nov 27): Claude's mark, quiet until you're on the card or row */
+.ib.tk-claude{flex:0 0 auto;width:26px;height:26px;border-radius:7px;color:var(--label-3);transition:color 150ms ease,background-color 150ms ease,transform 120ms ease}
+.tk-claude .cl-spark{width:14px;height:14px;display:block}
+:is(.tk-c,.tk-lr):is(:focus-within,.is-sel) .ib.tk-claude{color:var(--claude)}
+.tk-claude:active{transform:scale(.9)}
+.tk-claude:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--claude) 40%,transparent)}
+@media (hover:hover) and (pointer:fine){
+  :is(.tk-c,.tk-lr):hover .ib.tk-claude{color:var(--claude)}
+  .ib.tk-claude:hover{background:color-mix(in srgb,var(--claude) 14%,transparent)}
+}
+@media (hover:none){ .ib.tk-claude{color:var(--claude)} }
+.tk-cf .tk-claude{margin:-5px -7px -5px -4px}
+.tk-cf:has(.tk-claude) .tk-who{margin-left:auto}
+.tk-lr .tk-claude{margin:0 2px 0 0}
+.tkp-acts .cl-claude-btn{flex:0 0 auto}
 /* Notes: When (Nov 24) */
 .n1-when .pl{display:inline-flex;align-items:center;gap:6px}
 .n1-when .pl svg{width:14px;height:14px;color:var(--label-2)}

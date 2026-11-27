@@ -52,6 +52,8 @@ function tkRemindBtn(t){
   const who = tkWho(t.assigneeId);
   return `<button class="ib tk-remind" aria-label="Remind ${escapeHtml(who)}" title="Remind ${escapeHtml(who)} on Slack" onclick="event.stopPropagation();remindTaskAssignee('${t.id}')">${icon('paper-plane-tilt')}</button>`;
 }
+// Work with Claude, on a card or row of yours that's open (Nov 27; claude-plan.js)
+function tkClaudeBtn(t){ return typeof workWithClaudeHtml === 'function' ? workWithClaudeHtml(t, true) : ''; }
 // ---- sprints in Tasks (Nov 25): one row per sprint, its next step (sprintFold in data.js) ----
 let tkFoldNow = null;                 // this render's sprints, by the step that stands for them
 const tkSprintOpen = new Set();       // sprints showing all their steps
@@ -92,7 +94,7 @@ function tkCardHtml(t){
   return `<article class="tk-c${t.color ? ' has-c c-' + t.color : ''}${g && tkSprintOpen.has(g.sprint.id) ? ' sp-open' : ''}${window._taskSel === t.id ? ' is-sel' : ''}"${g ? tkSprintAttrs(g) : ''} role="button" tabindex="0" aria-label="${escapeHtml(t.title)}" onclick="selectTask('${t.id}')" onkeydown="if((event.key==='Enter'||event.key===' ')&&event.target===this){event.preventDefault();selectTask('${t.id}')}">
 ${g ? tkSprintLabel(g) : ''}<div class="tk-ct">${tkCb(t)}<b>${escapeHtml(t.title)}</b>${flag}</div>
 ${c ? `<div class="tk-cm"><span class="tk-cl">${escapeHtml(c.name)}${focusMark(c)}</span></div>` : ''}
-<div class="tk-cf"><span class="tk-due ${kind}">${escapeHtml(due)}</span><span class="tk-who">${g ? tkSprintMore(g) : escapeHtml(tkWho(t.assigneeId))}</span>${tkRemindBtn(t)}</div>${g ? tkSprintSteps(g) : ''}</article>`;
+<div class="tk-cf"><span class="tk-due ${kind}">${escapeHtml(due)}</span><span class="tk-who">${g ? tkSprintMore(g) : escapeHtml(tkWho(t.assigneeId))}</span>${tkRemindBtn(t)}${tkClaudeBtn(t)}</div>${g ? tkSprintSteps(g) : ''}</article>`;
 }
 function tkListRowHtml(t){
   const g = t.status !== 'done' && tkFoldNow && tkFoldNow.lead.get(t.id);
@@ -101,7 +103,7 @@ function tkListRowHtml(t){
 <div class="tx">${g ? tkSprintLabel(g) : ''}<b>${t.color && !done ? `<i class="cc-dot c-${t.color}" aria-hidden="true"></i>` : ''}${escapeHtml(t.title)}${t.priority === 'high' && !done ? `<span class="tk-flag" title="High priority">${icon('flag')}</span>` : ''}</b><span class="s">${g
     ? [c ? escapeHtml(c.name) + focusMark(c) : '', tkSprintLate(g), tkSprintBtn(g)].filter(Boolean).join(' · ')
     : (c ? escapeHtml(c.name) + focusMark(c) + ' · ' : '') + escapeHtml(tkWho(t.assigneeId))}</span></div>
-${tkRemindBtn(t)}<span class="tk-due ${kind}">${escapeHtml(done && t.completedAt ? 'Done ' + fmtShortDate(new Date(t.completedAt)) : due)}</span>${g ? tkSprintSteps(g) : ''}</div>`;
+${tkRemindBtn(t)}${tkClaudeBtn(t)}<span class="tk-due ${kind}">${escapeHtml(done && t.completedAt ? 'Done ' + fmtShortDate(new Date(t.completedAt)) : due)}</span>${g ? tkSprintSteps(g) : ''}</div>`;
 }
 
 function renderTasks(){
@@ -286,7 +288,8 @@ function taskPanelHtml(t){
     const rWhen = amAssigner && !amAssignee && assignee && typeof nudgeWhenWords === 'function' ? nudgeWhenWords('task:' + t.id, 'Reminded') : '';
     const remind = amAssigner && !amAssignee && assignee ? `<button class="btn${late ? ' btn-p' : ''}" onclick="remindTaskAssignee('${t.id}')">${icon('paper-plane-tilt')}${rWhen ? 'Remind Again…' : `Remind ${escapeHtml(firstName(assignee.name))}…`}</button>${rWhen ? `<span class="nd-when">${escapeHtml(rWhen)}</span>` : ''}` : '';
     const mark = amAssignee ? `<button class="btn btn-p" onclick="moveTaskToStatus('${t.id}','done')">${icon('check')}Mark Done</button>` : '';
-    acts = remind || mark ? `<div class="tkp-acts">${remind}${mark}</div>` : '';
+    const claude = typeof workWithClaudeHtml === 'function' ? workWithClaudeHtml(t) : '';   // Work with Claude (Nov 27)
+    acts = remind || mark || claude ? `<div class="tkp-acts">${remind}${claude}${mark}</div>` : '';
   } else if(amAssignee || amAssigner){
     acts = `<div class="tkp-acts"><button class="btn" onclick="hideTaskFromMyList('${t.id}')">${icon('archive')}Archive</button></div>`;
   }
@@ -307,6 +310,7 @@ function taskPanelHtml(t){
   const more = [];
   if(amAssignee && !done && typeof timerState !== 'undefined' && !timerState.running) more.push(`<button class="mi" onclick="openTimerModal(${jsArg(t.clientId || '')},${jsArg(t.title)})">${icon('play')}Start Timer</button>`);
   if(t.dueDate && !linked && !done) more.push(`<button class="mi" onclick="addTaskToCalendar('${t.id}')">${icon('calendar-plus')}Add to Calendar</button>`);
+  if(typeof canWorkWithClaude === 'function' && canWorkWithClaude(t)) more.push(`<button class="mi" onclick="workWithClaudeCopy('${t.id}')">${icon('copy')}Copy Message for Claude</button>`);
   if(amAssignee && !done && !sp && typeof openNewSprintModal === 'function') more.push(`<button class="mi" onclick="openNewSprintModal({ taskId: '${t.id}' })">${icon('route')}Plan a Sprint…</button>`);
   if(amAssigner && !done) more.push(`${more.length ? '<div class="msep"></div>' : ''}<button class="mi danger" onclick="cancelTask('${t.id}')">${icon('x')}Cancel Task…</button>`);
   if(done && hasPermission('delete_tasks')) more.push(`<div class="msep"></div><button class="mi danger" onclick="deleteTaskPermanently('${t.id}')">${icon('trash')}Delete…</button>`);
