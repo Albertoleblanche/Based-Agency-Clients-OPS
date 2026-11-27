@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Connect to Radar</title>
+<link rel="icon" href="/icons/icon-192.png">
+<style>
+  /* Signing ChatGPT or Claude in to Radar (Supabase's OAuth consent step). Light and dark, on its own. */
+  :root { --bg:#f5f5f7; --card:#fff; --label:#1d1d1f; --label-2:#6e6e73; --label-3:#a1a1a6; --sep:rgba(0,0,0,.1); --fill:rgba(0,0,0,.05); --fill-2:rgba(0,0,0,.08); --red:#d70015; --green:#248a3d; --pri:#1d1d1f; --on-pri:#fff; --ring:rgba(0,113,227,.45); color-scheme:light; }
+  [data-theme="dark"] { --bg:#0f0f11; --card:#1c1c1e; --label:#f5f5f7; --label-2:#a1a1a6; --label-3:#6e6e73; --sep:rgba(255,255,255,.1); --fill:rgba(255,255,255,.07); --fill-2:rgba(255,255,255,.1); --red:#ff6961; --green:#30d158; --pri:#f5f5f7; --on-pri:#1d1d1f; color-scheme:dark; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; }
+  body { font:15px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI", system-ui, sans-serif; background:var(--bg); color:var(--label); -webkit-font-smoothing:antialiased; display:grid; place-items:center; padding:24px 16px calc(24px + env(safe-area-inset-bottom)); }
+  .card { width:100%; max-width:400px; background:var(--card); border-radius:18px; box-shadow:0 0 0 1px var(--sep), 0 24px 60px -30px rgba(0,0,0,.35); padding:28px 28px 24px; opacity:0; transform:translateY(6px) scale(.99); transition:opacity 220ms cubic-bezier(.23,1,.32,1), transform 260ms cubic-bezier(.23,1,.32,1); }
+  .card.in { opacity:1; transform:none; }
+  .mark { display:flex; align-items:center; gap:10px; margin-bottom:22px; }
+  .mark .tile { width:34px; height:34px; border-radius:9px; background:#bf4716; color:#fff; display:grid; place-items:center; font-weight:700; font-size:13px; letter-spacing:.02em; }
+  .mark b { font-size:15px; font-weight:600; }
+  .mark span { display:block; font-size:12px; color:var(--label-2); }
+  h1 { font-size:22px; line-height:1.25; font-weight:650; letter-spacing:-.02em; margin:0 0 6px; }
+  .sub { color:var(--label-2); font-size:14px; margin:0 0 18px; }
+  .sub a, .foot a { color:inherit; text-decoration:underline; text-underline-offset:2px; text-decoration-color:var(--label-3); }
+  ul.can { list-style:none; margin:0 0 20px; padding:14px 16px; border-radius:12px; background:var(--fill); display:flex; flex-direction:column; gap:10px; }
+  ul.can li { display:flex; gap:10px; font-size:14px; }
+  ul.can svg { width:16px; height:16px; flex:none; margin-top:2px; color:var(--green); }
+  .row { display:flex; gap:10px; }
+  button, .btn { appearance:none; border:0; font:inherit; font-size:15px; font-weight:600; height:44px; padding:0 18px; border-radius:11px; cursor:default; flex:1; transition:transform 100ms ease-out, opacity 120ms ease, background-color 120ms ease; }
+  button:active:not(:disabled) { transform:scale(.97); }
+  button:focus-visible, input:focus-visible { outline:none; box-shadow:0 0 0 3px var(--ring); }
+  button:disabled { opacity:.55; }
+  .pri { background:var(--pri); color:var(--on-pri); }
+  .sec { background:var(--fill-2); color:var(--label); }
+  .foot { margin:16px 0 0; font-size:12.5px; color:var(--label-2); }
+  label { display:block; font-size:13px; font-weight:550; margin:0 0 6px; }
+  input { width:100%; height:44px; border-radius:11px; border:1px solid var(--sep); background:var(--card); color:var(--label); font:inherit; font-size:16px; padding:0 12px; margin:0 0 14px; }
+  .err { color:var(--red); font-size:13.5px; min-height:0; margin:-4px 0 12px; }
+  .err:empty { display:none; }
+  .center { text-align:center; }
+  .center svg { width:34px; height:34px; color:var(--label-3); margin-bottom:10px; }
+  .spin { width:22px; height:22px; border-radius:50%; border:2px solid var(--fill-2); border-top-color:var(--label-2); animation:spin 700ms linear infinite; margin:8px auto; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @media (prefers-reduced-motion:reduce) { .card { transition:opacity 120ms ease; transform:none; } .spin { animation:none; } button { transition:none; } }
+</style>
+</head>
+<body data-theme="light">
+<script>
+  try{ const t = localStorage.getItem('bda_theme'); if(t === 'dark' || ((!t || t === 'auto' || t === 'system') && matchMedia('(prefers-color-scheme: dark)').matches)) document.body.dataset.theme = 'dark'; }catch(e){}
+</script>
+<main class="card" id="card" aria-live="polite">
+  <div class="mark"><span class="tile">BA</span><div><b>Radar</b><span>Based Agency</span></div></div>
+  <div id="view"><div class="spin" role="status" aria-label="Loading"></div></div>
+</main>
+<!-- absolute paths: the page is served at /oauth/consent, where "vendor/…" would point into /oauth/ -->
+<script src="/vendor/supabase-2.119.0.js"></script>
+<script src="/js/core/helpers.js"></script>
+<script src="/js/core/data.js"></script>
+<script src="/js/oauth-consent.js"></script>
+<script>
+  // If the page couldn't load what it needs, say so instead of staying empty.
+  (function(){
+    function fail(){
+      var card = document.getElementById('card');
+      if(card.classList.contains('in')) return;
+      document.getElementById('view').innerHTML = '<div class="center"><h1>Couldn’t load this page</h1><p class="sub">Reload it. If it still doesn’t open, start connecting again from ChatGPT or Claude.</p></div>';
+      card.classList.add('in');
+    }
+    // a script that failed part-way can leave supabaseClient declared but never set, where even typeof throws
+    window.addEventListener('load', function(){ var ready = false; try{ ready = !!supabaseClient; }catch(e){} if(!ready) fail(); });
+    setTimeout(fail, 20000);
+  })();
+</script>
+</body>
+</html>

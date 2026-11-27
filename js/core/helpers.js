@@ -30,10 +30,25 @@ function emptyStateHtml(iconSvg, title, sub, actionHtml){
 // actually arrived — distinct from the real empty state, so someone who
 // clicks into Tasks/Notes/Calendar right after signing in sees "loading"
 // rather than what looks like a genuinely empty board.
+// A screen's loading state: soft placeholders (js/ui/skeleton.js) that fade in after a moment;
+// a screen with its own shape passes it to skeletonHtml() itself.
 function loadingStateHtml(label){
+  if(typeof skeletonHtml === 'function') return skeletonHtml('rows', label || 'Loading…');
   return `<div class="empty-rich"><span class="spinner" style="width:16px;height:16px;border-width:2.5px;"></span><div class="empty-rich-sub" style="margin-top:10px;">${escapeHtml(label)||'Loading…'}</div></div>`;
 }
 
+// Only Based Agency addresses sign in, get an account or become someone's sign-in email (Nov 20).
+// The server checks the same (api/admin-user-actions.js, addendum-email-domain.sql).
+const TEAM_EMAIL_DOMAIN = 'based-agency.com';
+function isTeamEmail(v){ const e = String(v || '').trim().toLowerCase(); return /^[^\s@]+@[^\s@]+$/.test(e) && e.endsWith('@' + TEAM_EMAIL_DOMAIN); }
+// What to say about an address that isn't one: empty, not an email, or another domain.
+function teamEmailProblem(v, whose){
+  const e = String(v || '').trim();
+  if(!e) return whose === 'their' ? 'Enter their work email.' : 'Enter your work email.';
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return 'That doesn’t look like an email address.';
+  if(!isTeamEmail(e)) return whose === 'their' ? `Use their @${TEAM_EMAIL_DOMAIN} email.` : whose === 'new' ? `Use an @${TEAM_EMAIL_DOMAIN} email.` : `Use your @${TEAM_EMAIL_DOMAIN} email.`;
+  return '';
+}
 function escapeHtml(str){
   if(str===null || str===undefined) return '';
   return String(str)
@@ -117,6 +132,36 @@ function toDateStr(d){
   return `${y}-${m}-${day}`;
 }
 
+// US holidays, the ones businesses close for: the days off in Plan and on the Calendar, on desktop and
+// phone. The server keeps the same list (lib/us-holidays.js). On a weekend, the Friday or Monday before
+// or after is the day off.
+const _usHol = {};
+function usHolidays(y){
+  if(_usHol[y]) return _usHol[y];
+  const nth = (m, dow, n) => {
+    if(n > 0){ const d = new Date(y, m, 1); return new Date(y, m, 1 + (dow - d.getDay() + 7) % 7 + 7 * (n - 1)); }
+    const d = new Date(y, m + 1, 0); return new Date(y, m, d.getDate() - (d.getDay() - dow + 7) % 7);
+  };
+  const off = d => { const w = d.getDay(); return w === 6 ? new Date(y, d.getMonth(), d.getDate() - 1) : w === 0 ? new Date(y, d.getMonth(), d.getDate() + 1) : d; };
+  const thanks = nth(10, 4, 4), out = {};
+  [[off(new Date(y, 0, 1)), 'New Year’s Day'], [nth(0, 1, 3), 'Martin Luther King Jr. Day'], [nth(1, 1, 3), 'Presidents’ Day'],
+   [nth(4, 1, -1), 'Memorial Day'], [off(new Date(y, 5, 19)), 'Juneteenth'], [off(new Date(y, 6, 4)), 'Independence Day'],
+   [nth(8, 1, 1), 'Labor Day'], [thanks, 'Thanksgiving'], [new Date(y, 10, thanks.getDate() + 1), 'Day after Thanksgiving'],
+   [off(new Date(y, 11, 24)), 'Christmas Eve'], [off(new Date(y, 11, 25)), 'Christmas Day']]
+    .forEach(([d, n]) => { out[toDateStr(d)] = n; });
+  return (_usHol[y] = out);
+}
+// An all-day event is a day, not a moment (Nov 27). Google's all-day events, sprints, follow-ups and due
+// dates are saved as midnight UTC, which in the Americas is the evening before, so they showed a day
+// early (a Friday payday on Thursday); all-day events made in the event form are saved as local
+// midnight. Either way the day is the nearest UTC day boundary: the start's midnight, the end's next one.
+// Read back as local times, so everything that reads startAt and endAt puts the event on its day.
+function allDayDay(v, end){ const t = new Date(v); return isNaN(t) ? '' : new Date(t.getTime() + (end ? -12 : 12) * 3600000).toISOString().slice(0, 10); }
+function allDayAt(v, end){ const d = allDayDay(v, end); return d ? new Date(d + (end ? 'T23:59:59' : 'T00:00:00')).toISOString() : v; }
+
+// The holiday on a day (YYYY-MM-DD), or ''. A New Year's Day on a Saturday is off on Dec 31, so the next year counts too.
+function usHolidayOn(ds){ const y = Number(String(ds).slice(0, 4)); return usHolidays(y)[ds] || usHolidays(y + 1)[ds] || ''; }
+
 function formatMinutes(mins){
   const h = Math.floor(mins/60), m = mins%60;
   if(h && m) return `${h}h ${m}m`;
@@ -131,4 +176,112 @@ function getWeekStart(d){
   date.setDate(date.getDate()-diff);
   date.setHours(0,0,0,0);
   return date;
+}
+
+// How urgent an unread notification is, for the dot on the bell (and each unread row): red when
+// something is late or at risk, yellow when it's waiting on you, blue for news.
+const NOTIF_RED = ['update_behind', 'reminder_escalated', 'client_danger_maxed', 'connection_lost'];
+const NOTIF_YELLOW = ['draft_ready', 'win_approved', 'draft_written', 'task_assigned', 'reminder_follow_up_due', 'harvest_client', 'email_change_requested', 'event_invited', 'event_rsvp',
+  'task_due', 'task_overdue', 'task_wrap_up', 'whatsapp_waiting', 'review_nudge', 'whatsapp_nudge', 'whatsapp_handoff', 'review_question', 'health_ask', 'task_from_email', 'setup_reminder'];
+function notifSeverity(n){
+  const t = String((n && n.type) || '');
+  return NOTIF_RED.includes(t) || t.includes('denied') ? 'red' : NOTIF_YELLOW.includes(t) ? 'yellow' : 'blue';
+}
+function notifTopSeverity(list){
+  const s = (list || []).filter(n => !n.read).map(notifSeverity);
+  return s.includes('red') ? 'red' : s.includes('yellow') ? 'yellow' : s.length ? 'blue' : '';
+}
+
+// ---- App logos (Nov 23): each connection shows its own mark (Settings, Tasks, client Details; iPhone too)
+// Logos that fill their square (Claude, Granola, Harvest) sit edge to edge; marks on white (ChatGPT,
+// Google, Slack) sit inset on a white tile, as on a home screen. Two apps in one row overlap.
+const APP_LOGOS = { claude: ['Claude', 'fill'], chatgpt: ['ChatGPT', 'mark'], granola: ['Granola', 'fill'],
+  google: ['Google', 'mark'], slack: ['Slack', 'mark'], harvest: ['Harvest', 'fill'], whatsapp: ['WhatsApp', 'mark'],
+  gmail: ['Gmail', 'mark'], gcalendar: ['Google Calendar', 'mark'], gsheets: ['Google Sheets', 'mark'] };
+// Gmail, Google Calendar and Google Sheets icons are Icons8's (Nov 24): free with a link to Icons8
+// wherever they show. icons8Credit(['gmail', …]) is that line.
+const ICONS8 = { gmail: ['Gmail', 'https://icons8.com/icon/Iq5AZypojpBD/logotipo-do-gmail'],
+  gcalendar: ['Google Calendar', 'https://icons8.com/icons/set/google-calendar'],
+  gsheets: ['Google Sheets', 'https://icons8.com/icon/30461/google-sheets'] };
+function icons8Credit(apps, cls){
+  const list = [...new Set(apps || [])].filter(a => ICONS8[a]); if(!list.length) return '';
+  const names = list.map(a => `<a href="${ICONS8[a][1]}" target="_blank" rel="noopener">${ICONS8[a][0]}</a>`);
+  const joined = names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : names[0];
+  return `<p class="i8-credit${cls ? ' ' + cls : ''}">${joined} icon${list.length > 1 ? 's' : ''} by <a href="https://icons8.com" target="_blank" rel="noopener">Icons8</a></p>`;
+}
+// A page's credit, in its bottom-right corner: for whichever of these icons the page shows now
+function icons8Corner(page){
+  if(!page) return;
+  const old = page.querySelector(':scope > .i8-corner'); if(old) old.remove();
+  const used = Object.keys(ICONS8).filter(k => page.querySelector('.app-logo.lg-' + k));
+  page.classList.toggle('has-i8', !!used.length);
+  if(used.length) page.insertAdjacentHTML('beforeend', icons8Credit(used, 'i8-corner'));
+}
+function appLogo(app, size){
+  const a = APP_LOGOS[app]; if(!a) return '';
+  return `<span class="app-logo is-${a[1]} lg-${app}${size ? ' ' + size : ''}" aria-hidden="true"><img src="/icons/apps/${app}.png" alt="" width="96" height="96" decoding="async" draggable="false"></span>`;
+}
+function appLogoPair(a, b, size){ return `<span class="app-pair${size ? ' ' + size : ''}" aria-hidden="true">${appLogo(a)}${appLogo(b)}</span>`; }
+// An app without a logo of its own here (a connected app Radar doesn't know) gets its symbol on a plain tile the same size.
+function appGlyph(name, size){ return `<span class="app-logo is-glyph${size ? ' ' + size : ''}" aria-hidden="true">${icon(name)}</span>`; }
+
+// ---- The notification sound (Nov 23) -------------------------------------------------------------
+// A soft two-note chime when something new comes in, made here (no sound file). On by default, per
+// device (Settings → Notifications → Sound). Browsers only let a page play sound after you've
+// clicked or typed in it, so the first chime waits for that. While the window is in the background
+// the phone or computer's own push alert sounds instead, so this one stays quiet then.
+let radarAudio = null;
+function radarSoundOn(){ try{ return localStorage.getItem('radar-sound') !== '0'; }catch(e){ return true; } }
+function setRadarSound(on){ try{ localStorage.setItem('radar-sound', on ? '1' : '0'); }catch(e){} if(on) radarChime(true); }
+function radarAudioCtx(){
+  if(radarAudio) return radarAudio;
+  const AC = window.AudioContext || window.webkitAudioContext; if(!AC) return null;
+  try{ radarAudio = new AC(); }catch(e){ radarAudio = null; }
+  return radarAudio;
+}
+['pointerdown', 'keydown', 'touchstart'].forEach(ev => window.addEventListener(ev, () => { const c = radarAudioCtx(); if(c && c.state === 'suspended') c.resume().catch(() => {}); }, { passive: true }));
+function radarChime(force){
+  if(!force && !radarSoundOn()) return false;
+  const pushOn = typeof Notification !== 'undefined' && Notification.permission === 'granted';
+  if(!force && document.visibilityState !== 'visible' && pushOn) return false;
+  const c = radarAudioCtx(); if(!c || c.state !== 'running') return false;
+  const t0 = c.currentTime + 0.01;
+  [[880, 0, 0.11], [1318.5, 0.09, 0.22]].forEach(([f, at, len]) => {
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = 'sine'; o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, t0 + at);
+    g.gain.exponentialRampToValueAtTime(0.09, t0 + at + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + len);
+    o.connect(g); g.connect(c.destination);
+    o.start(t0 + at); o.stop(t0 + at + len + 0.02);
+  });
+  window._radarChimes = (window._radarChimes || 0) + 1;
+  return true;
+}
+
+// ---- Joining a meeting (Nov 23) ---------------------------------------------------------------
+// The link to join: Google Meet from Google Calendar (calendar_events.meeting_url), else a Zoom, Meet,
+// Teams, Webex or Whereby link in the place or the notes, else a place that is a link.
+const MEET_LINK_RE = /https?:\/\/[^\s<>"')\]]*(?:zoom\.us|meet\.google\.com|teams\.microsoft\.com|teams\.live\.com|webex\.com|whereby\.com|gotomeeting\.com|meet\.jit\.si)[^\s<>"')\]]*/i;
+function meetingLink(e){
+  if(!e) return null;
+  const loc = String(e.location || '').trim();
+  let u = e.meetingUrl || (loc.match(MEET_LINK_RE) || [])[0] || (String(e.description || '').match(MEET_LINK_RE) || [])[0] || (/^https?:\/\/\S+$/i.test(loc) ? loc : '');
+  if(!u) return null;
+  u = u.replace(/[.,;]+$/, '');
+  if(!/^https:\/\//i.test(u)) return null;
+  const name = /zoom\.us/i.test(u) ? 'Zoom' : /meet\.google/i.test(u) ? 'Google Meet' : /teams\.(microsoft|live)/i.test(u) ? 'Teams' : /webex/i.test(u) ? 'Webex' : /whereby/i.test(u) ? 'Whereby' : 'the meeting';
+  return { url: u, name };
+}
+// Joinable now: from 15 minutes before it starts until it ends (not all-day ones)
+function meetingJoinable(e, now){
+  if(!e || e.allDay || !meetingLink(e)) return false;
+  const t = (now || new Date()).getTime(), s = new Date(e.startAt).getTime(), en = new Date(e.endAt || e.startAt).getTime() || s + 3600000;
+  return t >= s - 15 * 60000 && t <= Math.max(en, s + 5 * 60000);
+}
+// The Join button: a link to the meeting, in a new tab. "Join Google Meet", or just "Join" when small.
+function joinMeetingBtn(e, cls){
+  const m = meetingLink(e); if(!m) return '';
+  const small = /\bsm\b/.test(cls || ''), label = small || m.name === 'the meeting' ? 'Join' : 'Join ' + m.name;
+  return `<a class="btn ${cls || ''} join-b" href="${escapeHtml(m.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${typeof icon === 'function' ? icon('video') : ''}${escapeHtml(label)}</a>`;
 }

@@ -91,9 +91,9 @@ function renderPayrollRatesList(){
     return `<div class="integ-row">
       <div><div class="integ-name">${escapeHtml(p.name)}</div><div class="integ-desc">${escapeHtml(p.title) || escapeHtml(p.role)}</div></div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:13px;color:var(--muted-lt);">$</span>
-        <input type="number" min="0" step="0.5" id="payrollRateInput-${p.id}" value="${rate || ''}" placeholder="0.00" style="width:90px;font-family:var(--font);font-size:13px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);">
-        <span style="font-size:11px;color:var(--muted-lt);">/hr</span>
+        <span style="font-size:14px;color:var(--muted-lt);">$</span>
+        <input type="number" min="0" step="0.5" id="payrollRateInput-${p.id}" value="${rate || ''}" placeholder="0.00" style="width:90px;font-family:var(--font);font-size:14px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);">
+        <span style="font-size:12px;color:var(--muted-lt);">/hr</span>
         <button class="btn btn-outline" onclick="savePayrollRate('${p.id}')">Save</button>
       </div>
     </div>`;
@@ -242,7 +242,7 @@ async function markPayrollPeriodPaid(){
 async function renderPayrollHistory(){
   const el = document.getElementById('payrollHistoryList');
   if(!el) return;
-  el.innerHTML = `<div class="empty"><span class="spinner"></span>Loading…</div>`;
+  el.innerHTML = `${loadingStateHtml('Loading…')}`;
   const { data, error } = await supabaseClient.from('payroll_periods').select('*').order('period_start', { ascending:false }).limit(26);
   if(error){ el.innerHTML = `<div class="empty">Could not load payroll history.</div>`; return; }
   if(!data || !data.length){ el.innerHTML = `<div class="empty">No periods marked as paid yet.</div>`; return; }

@@ -56,17 +56,50 @@ function syncThemeColor(){
   if(bg) meta.setAttribute('content', bg);
 }
 
-// ---- Scrollbars that show while scrolling (as on macOS) --------------------
-// css/desktop-app.css hides scrollbar thumbs at rest; a scroller gets
-// .is-scrolling while it moves and for a moment after.
-const _scrollHideTimers = new WeakMap();
+// ---- Scrollbars that fade in and out (Nov 23) ------------------------------------------------
+// In the new look a scroller's scrollbar is hidden until the pointer is over it or it's scrolling,
+// then fades in, and fades out a moment after (css/widget-look.css). The fade animates the
+// scroller's --sb colour from wherever it is, so moving in and out quickly never jumps.
+const _sb = { over: new Set(), anim: new WeakMap(), idle: new WeakMap(), ovf: new WeakMap() };
+function sbOn(){ return document.documentElement.classList.contains('ui-w') && !matchMedia('(hover:none)').matches; }
+function sbScrolls(el){
+  if(!el || el.nodeType !== 1) return false;
+  let o = _sb.ovf.get(el);
+  if(o === undefined){ const cs = getComputedStyle(el); o = /(auto|scroll|overlay)/.test(cs.overflowY + ' ' + cs.overflowX) || el === document.documentElement; _sb.ovf.set(el, o); }
+  return o && (el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1);
+}
+function sbFade(el, show){
+  const cs = getComputedStyle(el), from = cs.getPropertyValue('--sb').trim() || 'rgba(0,0,0,0)';
+  const to = show ? (cs.getPropertyValue('--sb-on').trim() || 'rgba(128,128,128,.4)') : 'rgba(0,0,0,0)';
+  const prev = _sb.anim.get(el);
+  if(prev && prev._show === show) return;
+  if(!el.animate){ return; }
+  const a = el.animate([{ '--sb': from }, { '--sb': to }], { duration: show ? 160 : 420, easing: show ? 'cubic-bezier(.23,1,.32,1)' : 'ease-in-out', fill: 'forwards' });
+  a._show = show;
+  if(prev) prev.cancel();
+  if(!show) a.onfinish = () => { if(_sb.anim.get(el) === a){ a.cancel(); _sb.anim.delete(el); } };
+  _sb.anim.set(el, a);
+}
+function sbHideLater(el, ms){
+  clearTimeout(_sb.idle.get(el));
+  _sb.idle.set(el, setTimeout(() => { _sb.idle.delete(el); if(!_sb.over.has(el)) sbFade(el, false); }, ms));
+}
+document.addEventListener('pointerover', (e) => {
+  if(!sbOn() || e.pointerType === 'touch') return;
+  const now = new Set();
+  for(let el = e.target; el && el.nodeType === 1; el = el.parentElement) if(sbScrolls(el)) now.add(el);
+  now.forEach(el => { if(!_sb.over.has(el)){ clearTimeout(_sb.idle.get(el)); sbFade(el, true); } });
+  _sb.over.forEach(el => { if(!now.has(el) && !_sb.idle.has(el)) sbFade(el, false); });
+  _sb.over = now;
+}, { capture: true, passive: true });
+document.documentElement.addEventListener('pointerleave', () => { _sb.over.forEach(el => { if(!_sb.idle.has(el)) sbFade(el, false); }); _sb.over = new Set(); });
 document.addEventListener('scroll', (e) => {
+  if(!sbOn()) return;
   const el = e.target === document ? document.documentElement : e.target;
-  if(!el || !el.classList) return;
-  el.classList.add('is-scrolling');
-  clearTimeout(_scrollHideTimers.get(el));
-  _scrollHideTimers.set(el, setTimeout(() => el.classList.remove('is-scrolling'), 900));
-}, { capture:true, passive:true });
+  if(!el || el.nodeType !== 1) return;
+  sbFade(el, true);
+  sbHideLater(el, 900);
+}, { capture: true, passive: true });
 
 // ---- Right-click menus -------------------------------------------------------
 // Right-clicking a card or row opens that item's own ⋯ menu at the pointer,
@@ -133,7 +166,7 @@ document.addEventListener('contextmenu', (e) => {
 // ⌘/Ctrl+\ shows or hides the sidebar, ⌘/Ctrl+/ lists the shortcuts.
 // ⌘/Ctrl+K (search) lives with the command palette in navigation.js.
 function visibleNavItems(){
-  return [...document.querySelectorAll('.sidebar .nav-item[data-view]')].filter(isShown);
+  return [...document.querySelectorAll('#appSidebar .src .nav-item[data-view]')].filter(isShown);
 }
 
 function shortcutLabelForView(view){
@@ -157,10 +190,11 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     item.click();
   } else if(e.key === ',' && !e.shiftKey){
-    const settingsItem = document.querySelector('.sidebar .nav-item[data-view="settings"]');
-    if(!isShown(settingsItem) || appModalOpen) return;
+    // Settings lives in your menu (under your name) now; ⌘, still opens it.
+    if(appModalOpen) return;
     e.preventDefault();
-    settingsItem.click();
+    if(typeof closeSidebarProfileMenu === 'function') closeSidebarProfileMenu();
+    switchView('settings');
   } else if(e.key === '\\'){
     e.preventDefault();
     toggleSidebar();
@@ -171,29 +205,19 @@ document.addEventListener('keydown', (e) => {
 });
 
 function openShortcutsSheet(){
-  // "Ctrl+K" → [Ctrl][K]; "⌘K" → [⌘][K]; "Esc" → [Esc]
+  // "Ctrl+K" → Ctrl K; "⌘K" → ⌘ K — each key its own little cap.
   const keys = (combo) => {
     const parts = combo.startsWith('Ctrl+') ? ['Ctrl', combo.slice(5)] : combo.startsWith('⌘') ? ['⌘', combo.slice(1)] : [combo];
     return parts.map(part => `<kbd class="kbd">${escapeHtml(part)}</kbd>`).join('');
   };
-  const navRows = visibleNavItems().slice(0, 9).map((n, i) => {
-    const label = n.querySelector('.nav-label')?.textContent || n.dataset.tooltip || n.dataset.view;
-    return [label, MOD_LABEL + (i + 1)];
-  });
-  const rows = [
-    ['Search clients and pages', MOD_LABEL + 'K'],
-    ...navRows,
-    ['Settings', MOD_LABEL + ','],
-    ['Show or hide the sidebar', MOD_LABEL + '\\'],
-    ['Keyboard shortcuts', MOD_LABEL + '/'],
-    ['Close a window or menu', 'Esc'],
+  const navRows = visibleNavItems().slice(0, 9).map((n, i) => [n.querySelector('.nav-label')?.textContent.trim() || n.dataset.view, MOD_LABEL + (i + 1)]);
+  const groups = [
+    ['Anywhere', [['Search clients, tasks and screens', MOD_LABEL + 'K'], ['Log an improvement', MOD_LABEL + 'N'], ['Show or hide the sidebar', MOD_LABEL + '\\'], ['These shortcuts', MOD_LABEL + '/'], ['Close a sheet or menu', 'Esc']]],
+    ['Go to', [...navRows, ['Settings', MOD_LABEL + ',']]],
   ];
-  openAppModal(`
-    <div class="modal-head"><span class="panel-title">Keyboard shortcuts</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
-    <div class="modal-body shortcut-list">
-      ${rows.map(([label, combo]) => `<div class="shortcut-row"><span>${escapeHtml(label)}</span><span class="shortcut-keys">${keys(combo)}</span></div>`).join('')}
-    </div>
-    <div class="modal-actions"><button class="btn btn-brand" onclick="closeAppModal()">Done</button></div>`, 420);
+  openAppModal(`<h3>Keyboard Shortcuts</h3>
+${groups.map(([g, rows]) => `<div class="kb-g"><div class="kb-h">${g}</div><div class="grp">${rows.map(([label, combo]) => `<div class="row sm"><div class="tx"><span class="t" style="font-weight:400">${escapeHtml(label)}</span></div><div class="r kb-keys">${keys(combo)}</div></div>`).join('')}</div></div>`).join('')}
+<div class="sheet-a"><button class="btn btn-p" onclick="closeAppModal()">Done</button></div>`, 440);
 }
 
 // ---- Start-up ---------------------------------------------------------------

@@ -7,11 +7,82 @@
     {
       "path": "/api/cron-google-calendar-sync",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/integrations?route=calendar-tick&run=12",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/integrations?route=calendar-tick&run=16",
+      "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/integrations?route=calendar-tick&run=20",
+      "schedule": "0 20 * * *"
+    },
+    {
+      "path": "/api/integrations?route=gmail-tick&run=13",
+      "schedule": "0 13 * * 1-5"
+    },
+    {
+      "path": "/api/integrations?route=gmail-tick&run=17",
+      "schedule": "0 17 * * 1-5"
+    },
+    {
+      "path": "/api/integrations?route=gmail-tick&run=21",
+      "schedule": "0 21 * * 1-5"
+    },
+    {
+      "path": "/api/integrations?route=day-plan-tick&run=1000",
+      "schedule": "0 10 * * 1-5"
+    },
+    {
+      "path": "/api/integrations?route=day-plan-tick&run=1030",
+      "schedule": "30 10 * * 1-5"
+    },
+    {
+      "path": "/api/integrations?route=day-plan-tick&run=1100",
+      "schedule": "0 11 * * 1-5"
     }
   ],
   "functions": {
     "api/cron-wednesday-notify.js": {
       "maxDuration": 60
+    },
+    "api/cron-google-calendar-sync.js": {
+      "maxDuration": 60
+    },
+    "api/integrations.js": {
+      "maxDuration": 60
+    },
+    "api/send-slack-message.js": {
+      "maxDuration": 30
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/mcp",
+      "destination": "/api/integrations?route=mcp"
+    },
+    {
+      "source": "/.well-known/oauth-protected-resource",
+      "destination": "/api/integrations?route=oauth-resource"
+    },
+    {
+      "source": "/.well-known/oauth-protected-resource/mcp",
+      "destination": "/api/integrations?route=oauth-resource"
+    },
+    {
+      "source": "/slack/oauth",
+      "destination": "/api/integrations?route=slack-me-callback"
+    },
+    {
+      "source": "/hooks/granola",
+      "destination": "/api/send-slack-message?source=granola"
+    },
+    {
+      "source": "/oauth/consent",
+      "destination": "/oauth-consent.html"
+    }
+  ]
 }

@@ -5,12 +5,12 @@ function clientFormHtml(title, submitLabel, customValues){
     <div class="modal-head"><span class="panel-title">${escapeHtml(title)}</span><span class="toast-close" onclick="closeClientForm()">✕</span></div>
     <div class="modal-body">
       <div class="form-grid">
-        <div><label>Client name</label><input id="ncName" placeholder="e.g. Premium Homes" oninput="checkDuplicateClientName()"><div id="ncNameWarning" style="display:none;font-size:11px;color:var(--red);margin-top:5px;"></div></div>
+        <div><label>Client name</label><input id="ncName" placeholder="e.g. Premium Homes" oninput="checkDuplicateClientName()"><div id="ncNameWarning" style="display:none;font-size:12px;color:var(--red);margin-top:5px;"></div></div>
         <div><label>Website <span style="font-weight:400;color:var(--muted-lt);">(optional)</span></label><input id="ncWebsite" placeholder="https://client.com"></div>
         <div><label>Service</label><select id="ncService"></select></div>
         <div><label>Status</label><select id="ncStatus"></select></div>
         <div><label>Importance (1–10)</label><select id="ncImportance"></select></div>
-        <div><label>Danger score (1–5)</label><select id="ncDanger"><option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select><div id="ncDangerNudge" style="display:none;font-size:11px;color:var(--amber);margin-top:5px;"></div></div>
+        <div><label>Danger score (1–5)</label><select id="ncDanger"><option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select><div id="ncDangerNudge" style="display:none;font-size:12px;color:var(--amber);margin-top:5px;"></div></div>
         <div><label>Monthly hour budget</label><input type="number" id="ncBudget" min="0" step="0.5" placeholder="e.g. 20 (optional)"></div>
         <div style="position:relative;">
           <label>Start date <span style="font-weight:400;color:var(--muted-lt);">(optional)</span></label>
@@ -19,7 +19,7 @@ function clientFormHtml(title, submitLabel, customValues){
         <div style="grid-column:1/-1;">
           <label>Client email</label>
           <input id="ncEmail" style="width:100%;" placeholder="contact@client.com, billing@client.com">
-          <p style="font-size:11.5px;color:var(--muted-lt);margin:6px 0 0;line-height:1.5;">Add more than one address by separating them with commas — updates will go to everyone listed here.</p>
+          <p style="font-size:12.5px;color:var(--muted-lt);margin:6px 0 0;line-height:1.5;">Add more than one address by separating them with commas — updates will go to everyone listed here.</p>
         </div>
         <div style="grid-column:1/-1;"><label>SOW / scope notes</label><input id="ncSow" spellcheck="true" placeholder="Brief scope summary"></div>
         ${customFieldsFormHtml(customValues)}
@@ -44,7 +44,7 @@ function resetClientFormFields(){
 }
 
 function openAddClientForm(){
-  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can add clients.'); return; }
+  if(!canEditClients()){ showToast('error','Not allowed','Only admins and approvers can add clients.'); return; }
   editingClientId = null;
   openAppModal(clientFormHtml('Add client', 'Save client'), 560);
   resetClientFormFields();
@@ -69,17 +69,17 @@ function renderDangerWeights(){
     return `
     <div>
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">
-        <label style="font-size:12.5px;font-weight:600;color:var(--ink);">${escapeHtml(w.label)}</label>
-        <span id="dangerWeight-${w.key}-val" style="font-size:12px;color:var(--muted);font-weight:600;">${escapeHtml(val)}</span>
+        <label style="font-size:13.5px;font-weight:600;color:var(--ink);">${escapeHtml(w.label)}</label>
+        <span id="dangerWeight-${w.key}-val" style="font-size:13px;color:var(--muted);font-weight:600;">${escapeHtml(val)}</span>
       </div>
-      <p style="font-size:11px;color:var(--muted-lt);margin:0 0 6px;">${w.hint}</p>
+      <p style="font-size:12px;color:var(--muted-lt);margin:0 0 6px;">${w.hint}</p>
       <input type="range" min="0" max="5" step="1" value="${escapeHtml(val)}" id="dangerWeight-${w.key}" oninput="document.getElementById('dangerWeight-${w.key}-val').textContent=this.value" style="width:100%;accent-color:var(--brand);">
     </div>`;
   }).join('');
 }
 
 async function saveDangerWeights(){
-  if(!isAdmin()){ showToast('error','Not allowed','Only admins can change this.'); return; }
+  if(!canManageSettings()){ showToast('error','Not allowed','Only admins can change this.'); return; }
   const weights = {};
   DANGER_WEIGHT_META.forEach(w=>{ weights[w.key] = parseInt(document.getElementById(`dangerWeight-${w.key}`).value); });
   settings.dangerWeights = weights;
@@ -130,7 +130,7 @@ function computeSuggestedDanger(c){
 }
 
 function openEditClientForm(id){
-  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can edit clients.'); return; }
+  if(!canEditClients()){ showToast('error','Not allowed','Only admins and approvers can edit clients.'); return; }
   const c = clients.find(x=>x.id===id);
   if(!c){ showToast('error','Client not found','Someone may have removed this — refreshing.'); fullRefresh(); return; }
   editingClientId = id;
@@ -207,7 +207,7 @@ function checkDuplicateClientName(){
   if(!input || !warningEl) return;
   const name = input.value.trim().toLowerCase();
   if(!name){ warningEl.style.display = 'none'; return; }
-  const duplicate = activeClients().find(c => c.id !== editingClientId && c.name.trim().toLowerCase() === name);
+  const duplicate = liveClients().find(c => c.id !== editingClientId && c.name.trim().toLowerCase() === name);
   if(duplicate){
     warningEl.textContent = `A client named "${duplicate.name}" already exists.`;
     warningEl.style.display = 'block';
@@ -225,13 +225,27 @@ function checkDuplicateClientName(){
 // "already was at 5/5, someone just re-saved the client" — without it,
 // every unrelated edit to a client already at max danger would re-fire
 // the alert below, which would train people to ignore it.
-function logDangerHistory(clientId, danger, previousDanger){
-  supabaseClient.from('client_danger_history').insert({ client_id: clientId, danger }).then(({error})=>{
+// Who set it is kept too (Nov 25), so Health can say "Flagged by Dan" and not guess from the owner.
+// Before the set_by column (addendum-risk-set-by.sql) it's saved without.
+// Why (Nov 25, addendum-risk-flags.sql): the reason it was set, shown on Health; kind 'kept' is a
+// review that left it as it was (Keep It). Before that SQL, saved without them.
+function logDangerHistory(clientId, danger, previousDanger, reason, kind){
+  const row = { client_id: clientId, danger, set_by: (typeof myName === 'function' && myName()) || null };
+  const extra = { ...(reason ? { reason: String(reason).trim().slice(0, 500) } : {}), ...(kind ? { kind } : {}) };
+  const done = supabaseClient.from('client_danger_history').insert({ ...row, ...extra }).then(({error})=>{
+    if(error && Object.keys(extra).length && /reason|kind/.test(error.message || '')) return supabaseClient.from('client_danger_history').insert(row);
+    if(error && /set_by/.test(error.message || '')) return supabaseClient.from('client_danger_history').insert({ client_id: clientId, danger });
     if(error) console.error('logDangerHistory error', error);
-  });
-  if(danger === 5 && previousDanger !== 5) alertClientDangerMaxed(clientId);
-  else if(previousDanger != null && danger < previousDanger) alertClientDangerDecreased(clientId, previousDanger, danger);
+  }).then(r => { if(r && r.error) console.error('logDangerHistory error', r.error); });
+  if(typeof dangerHistory !== 'undefined' && Array.isArray(dangerHistory)) dangerHistory.push({ clientId, danger, recordedAt: new Date(), setBy: row.set_by || '', reason: extra.reason || '', kind: kind || null });
+  if(kind !== 'kept'){
+    if(danger === 5 && previousDanger !== 5) alertClientDangerMaxed(clientId, extra.reason);
+    else if(previousDanger != null && danger < previousDanger) alertClientDangerDecreased(clientId, previousDanger, danger);
+  }
+  return done;
 }
+// Setting a Risk of 3 or more, higher than it was, takes a reason: it's what Health shows beside it
+function riskNeedsReason(danger, before){ return Number(danger) >= 3 && Number(danger) > Number(before || 0); }
 
 // Real-time alert the moment a client's danger score maxes out, rather
 // than waiting for it to surface in the weekly focus report's "needs
@@ -239,11 +253,11 @@ function logDangerHistory(clientId, danger, previousDanger){
 // the same "useful to whoever's actually doing the client work, not just
 // admins" reasoning as the weekly report itself — except the person who
 // just set it, since they obviously already know.
-async function alertClientDangerMaxed(clientId){
+async function alertClientDangerMaxed(clientId, reason){
   const c = clients.find(x=>x.id===clientId);
   if(!c) return;
-  const title = `${c.name} just hit max danger (5/5)`;
-  const body = `${myName()||'Someone'} flagged ${c.name} at the highest danger level — might be worth a look before it waits for the weekly report.`;
+  const title = `${c.name} is flagged at the highest Risk (5 of 5)`;
+  const body = `${myName()||'Someone'} flagged ${c.name}${reason ? `: “${reason}”` : ''}. Worth a look before the weekly report.`;
   const recipients = teamProfiles.filter(p=>p.id !== currentUser?.id);
   for(const p of recipients){
     sendNotification(p.id, 'client_danger_maxed', title, body, 'client-detail', clientId);
@@ -257,8 +271,8 @@ async function alertClientDangerMaxed(clientId){
 async function alertClientDangerDecreased(clientId, previousDanger, newDanger){
   const c = clients.find(x=>x.id===clientId);
   if(!c) return;
-  const title = `${c.name}'s danger score went down`;
-  const body = `${myName()||'Someone'} lowered ${c.name}'s danger from ${previousDanger}/5 to ${newDanger}/5.`;
+  const title = newDanger < 3 && previousDanger >= 3 ? `${c.name}’s Risk flag was cleared` : `${c.name}’s Risk went down`;
+  const body = `${myName()||'Someone'} lowered ${c.name}’s Risk from ${previousDanger} to ${newDanger} of 5.`;
   const recipients = teamProfiles.filter(p=>p.id !== currentUser?.id);
   for(const p of recipients){
     sendNotification(p.id, 'client_danger_decreased', title, body, 'client-detail', clientId);
@@ -270,7 +284,7 @@ async function saveClientForm(){
   // block reaching this form at all for a member, but this covers the
   // edge case of the modal already being open when a role changes
   // mid-session, or the function being called directly some other way.
-  if(!canApprove()){ showToast('error','Not allowed','Only admins and approvers can add or edit clients.'); return; }
+  if(!canEditClients()){ showToast('error','Not allowed','Only admins and approvers can add or edit clients.'); return; }
   const name = document.getElementById('ncName').value.trim();
   if(!name){ showToast('error','Client name required','Enter a name before saving.'); return; }
   const emailValue = document.getElementById('ncEmail').value.trim();
@@ -282,7 +296,7 @@ async function saveClientForm(){
   setBtnLoading(btn, 'Saving…');
   await loadAll();
   const normalizedName = name.toLowerCase();
-  const duplicate = activeClients().find(c => c.id !== editingClientId && c.name.trim().toLowerCase() === normalizedName);
+  const duplicate = liveClients().find(c => c.id !== editingClientId && c.name.trim().toLowerCase() === normalizedName);
   if(duplicate){
     restoreBtn(btn);
     showToast('error','Client already exists', `${duplicate.name} is already in the system — pick a different name, or open that client instead.`);
@@ -300,11 +314,27 @@ async function saveClientForm(){
     sow:document.getElementById('ncSow').value.trim(),
     startDate: document.getElementById('ncStartDate').value || null,
   };
-  const customFieldValues = {};
+  // What's set outside this form stays: how the weekly win is sent (client panel) and a client's
+  // Harvest setup. Only the fields below change here.
+  const customFieldValues = editingClientId ? Object.assign({}, (clients.find(x=>x.id===editingClientId) || {}).customFieldValues || {}) : {};
   (settings.customFields||[]).forEach(f=>{
     const el = document.getElementById('ncCustom_'+f.id);
     if(el) customFieldValues[f.id] = el.value.trim();
   });
+  // owner (empty: automatic) and the weekly update (Nov 22: "No weekly update" for internal clients)
+  const ownerEl = document.getElementById('ncOwner');
+  if(ownerEl){ if(ownerEl.value) customFieldValues.owner = ownerEl.value; else delete customFieldValues.owner; }
+  const weeklyEl = document.getElementById('ncWeekly');
+  if(weeklyEl){ if(weeklyEl.value === 'off') customFieldValues.weeklyUpdate = 'off'; else delete customFieldValues.weeklyUpdate; }
+  // Focus (Nov 23): when it's switched on, and by whom, is kept until it's switched off
+  const focusEl = document.getElementById('ncFocus');
+  if(focusEl){
+    if(focusEl.value === 'on'){ if(!customFieldValues.focus) Object.assign(customFieldValues, { focus: true, focusAt: new Date().toISOString(), focusBy: myName() || '' }); }
+    else { delete customFieldValues.focus; delete customFieldValues.focusAt; delete customFieldValues.focusBy; }
+  }
+  // the main contact: who wins and updates greet by name
+  const contactEl = document.getElementById('ncContact');
+  if(contactEl){ const v = contactEl.value.trim().replace(/\s+/g, ' ').slice(0, 80); if(v) customFieldValues.contact = v; else delete customFieldValues.contact; }
   const missingRequired = (settings.customFields||[]).find(f => f.required && !customFieldValues[f.id]);
   if(missingRequired){
     restoreBtn(btn);
@@ -312,6 +342,8 @@ async function saveClientForm(){
     return;
   }
   fields.customFieldValues = customFieldValues;
+  // paused: when, and by whom; a "Still a client?" question ends with a new status (client-status.js)
+  if(typeof clientStatusCfv === 'function') fields.customFieldValues = clientStatusCfv({ status: editingClientId ? (clients.find(x => x.id === editingClientId) || {}).status : '', customFieldValues }, fields.status, myName() || '');
   let ok, msg, loggedClientId;
   if(editingClientId){
     const c = clients.find(x=>x.id===editingClientId);
@@ -324,9 +356,15 @@ async function saveClientForm(){
     // specific per-person override on the team card for anyone who
     // needs it without making them a full admin.
     if(Number(fields.danger) < Number(before.danger) && !canLowerDangerScore()){
-      showToast('error','Not allowed','Only admins can lower a client\'s danger score — ask one to adjust it, or to grant you that permission.');
+      showToast('error','Not allowed','Only approvers and admins can lower a client’s Risk. Ask one to clear it.');
       restoreBtn(btn);
       return;
+    }
+    // a Risk of 3 or more, raised: say why (Nov 25)
+    const why = (document.getElementById('ncDangerWhy')?.value || '').trim();
+    if(riskNeedsReason(fields.danger, before.danger) && !why && document.getElementById('ncDangerWhy')){
+      showToast('error', 'Say why', `Risk ${fields.danger} shows on Health with the reason. One line is enough.`);
+      document.getElementById('ncDangerWhy').focus(); restoreBtn(btn); return;
     }
     ok = await updateClientRow(editingClientId, fields);
     if(ok) Object.assign(c, fields);
@@ -338,6 +376,7 @@ async function saveClientForm(){
         .filter(key => key!=='customFieldValues' && String(before[key]||'') !== String(fields[key]||''))
         .map(key => `${fieldLabels[key]||key}: "${before[key]||'—'}" → "${fields[key]||'—'}"`);
       const beforeCustom = before.customFieldValues || {};
+      if((beforeCustom.contact || '') !== (customFieldValues.contact || '')) changes.push(`Main contact: "${beforeCustom.contact || '—'}" → "${customFieldValues.contact || '—'}"`);
       (settings.customFields||[]).forEach(f=>{
         const oldVal = beforeCustom[f.id] || '';
         const newVal = customFieldValues[f.id] || '';
@@ -348,10 +387,12 @@ async function saveClientForm(){
         : `${myName()||'Someone'} saved this client (no actual field changes).`;
       logClientActivity(loggedClientId, 'client_edited', desc);
       refreshClientDetailActivityIfOpen(loggedClientId);
-      if(before.danger !== fields.danger) logDangerHistory(loggedClientId, fields.danger, before.danger);
+      if(before.danger !== fields.danger) logDangerHistory(loggedClientId, fields.danger, before.danger, why);
+      // paused: the rest of the team hears it (client-status.js)
+      if(fields.status === 'Paused' && before.status !== 'Paused' && typeof notifyClientsPaused === 'function') notifyClientsPaused([c]);
     }
   } else {
-    const newId = 'c'+Date.now();
+    const newId = 'c'+Date.now(), newWhy = (document.getElementById('ncDangerWhy')?.value || '').trim();
     const { error: insertErr } = await supabaseClient.from('clients').insert({ id:newId, ...clientFieldsToDb(fields), draft:'', draft_status:'none' });
     ok = !insertErr;
     if(ok) clients.push({ id:newId, ...fields, improvements:[], draft:'', draftStatus:'none' });
@@ -359,11 +400,12 @@ async function saveClientForm(){
     loggedClientId = newId;
     if(ok){
       logClientActivity(loggedClientId, 'client_created', `${myName()||'Someone'} added this client to the roster.`);
-      logDangerHistory(loggedClientId, fields.danger, null);
+      logDangerHistory(loggedClientId, fields.danger, null, newWhy);
     }
   }
+  const wasEditing = !!editingClientId;
   closeClientForm();
   restoreBtn(btn);
   renderAll();
-  ok ? showToast('success', editingClientId ? 'Client updated' : 'Client added', msg) : showToast('error','Save failed','Could not save — check your connection and try again.');
+  ok ? showToast('success', wasEditing ? 'Client updated' : 'Client added', msg) : showToast('error','Save failed','Could not save — check your connection and try again.');
 }

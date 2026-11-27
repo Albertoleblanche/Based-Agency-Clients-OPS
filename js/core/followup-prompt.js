@@ -1,0 +1,80 @@
+// The nudge: a short follow-up to a client who hasn't answered a question yet, written by the AI
+// from a reminder in Reminders. Friendly, easy to answer, never pushy, and it never makes the
+// agency look bad. Email (a subject and a body) or a WhatsApp message, by how the client hears
+// from us. One copy for the desktop app (work-canvas.js) and the iPhone app (mobile/app.js).
+// Needs winFirstNames (js/core/win-prompt.js).
+
+function followUpPrompt(o){
+  // o: { client, contact, ask, askedOn, waitedDays, sender, agency, whatsapp } | { teammate, client?, ask, askedOn, waitedDays, sender }
+  if(o.teammate) return followUpTeammatePrompt(o);
+  const who = String(o.contact || '').trim(), first = typeof winFirstNames === 'function' ? winFirstNames(who) : who.split(/\s+/)[0];
+  const kind = o.whatsapp ? 'WhatsApp message to their group' : 'email';
+  return `Write a short follow-up ${kind} to ${o.client}, a home-services/construction client, from ${o.sender ? o.sender + ' at ' : ''}their marketing agency (${o.agency || 'Based Agency'}). We asked them something and are still waiting on the answer.
+
+What we're waiting on (our own internal note, NOT text to copy): ${o.ask}
+Asked: ${o.askedOn || 'recently'}${o.waitedDays != null ? ` (${o.waitedDays} day${o.waitedDays === 1 ? '' : 's'} ago, for your context only)` : ''}
+Main contact: ${who ? `${who} (greet them as "${first}")` : 'not known'}
+
+How to write it:
+- Turn the note into the one thing we need from them, said plainly. Never copy its wording: a note like "Follow up with Sahar on the Austin website launch date" becomes asking Sahar for the launch date of the Austin website.
+- If the note names the person to ask, greet that person by first name; otherwise the main contact; otherwise ${o.whatsapp ? '"Hey guys"' : '"Hi there"'}.
+- Warm and light, like a quick note from someone they like working with. One clear question, and make it easy to answer when it fits (a rough date is fine, a quick yes or no works).
+- Only use facts from the note. Never invent a deadline, a date, a reason, a meeting or a detail.
+- Never say or hint that they're slow or late: no "just checking in", "friendly reminder", "as per my last message", "I haven't heard back", "still waiting", "circling back", "bumping this", and no counting days.
+- Never make the agency look bad: no apologizing, no admitting delays, mistakes or problems on our side, no excuses.
+- No emojis and no markdown.
+${o.whatsapp
+    ? `- Like a text: two or three short sentences, 15 to 50 words, plain text, no sign-off.
+- Reply with JSON only, no other text: {"subject": "", "body": "the message"}`
+    : `- The body: a greeting line, then two or three short sentences (25 to 80 words), then "Thanks," and ${o.sender ? `"${o.sender}"` : 'no name'} on the next line. No signature block.
+- The subject: under 8 words, says what it's about (like "Austin website launch date"), never "Following up", "Reminder" or "Checking in".
+- Reply with JSON only, no other text: {"subject": "...", "body": "..."}`}`;
+}
+
+// A teammate (Nov 23): a Slack message from the person, to someone on their own team.
+function followUpTeammatePrompt(o){
+  return `Write a short Slack direct message from ${o.sender || 'me'} to ${o.teammate}, a teammate at the same marketing agency. ${o.sender || 'I'} asked ${o.teammate} for something and is waiting on it.
+
+What I'm waiting on (my own internal note, NOT text to copy): ${o.ask}${o.client ? `\nIt's for the client: ${o.client}` : ''}
+Asked: ${o.askedOn || 'recently'}${o.waitedDays != null ? ` (${o.waitedDays} day${o.waitedDays === 1 ? '' : 's'} ago, for your context only)` : ''}
+
+How to write it:
+- Turn the note into the one thing I need from them, said plainly. Never copy its wording.
+- Like a quick message between teammates who get along: casual, direct, friendly. Start with "Hey ${o.teammate}," and ask the one question; make it easy to answer (a rough ETA is fine).
+- Only use facts from the note. Never invent a deadline, a date, a reason or a detail.
+- Never pushy or passive-aggressive: no "just checking in", "friendly reminder", "as per my last message", "still waiting", "bumping this", and no counting days.
+- One to three short sentences, 10 to 40 words. No sign-off, no emojis, no markdown.
+- Reply with JSON only, no other text: {"subject": "", "body": "the message"}`;
+}
+
+// When the AI can't write it: a plain, friendly version.
+function followUpPlain(o){
+  if(o.teammate){
+    const t = String(o.ask || '').replace(/\s+$/, '').replace(/[.?!]+$/, '');
+    const forC = o.client && !t.toLowerCase().includes(String(o.client).toLowerCase().split(/\s+/)[0]) ? ` for ${o.client}` : '';
+    return { subject: '', body: `Hey ${o.teammate}, any update on ${t.charAt(0).toLowerCase() + t.slice(1)}${forC}? Thanks!` };
+  }
+  const who = String(o.contact || '').trim(), first = typeof winFirstNames === 'function' ? winFirstNames(who) : who.split(/\s+/)[0];
+  const ask = String(o.ask || '').replace(/^\s*follow(?:ing)?[\s-]*up\s+(?:with\s+\S+\s+)?(?:on|about|re:?)\s+/i, '').replace(/\s+$/, '').replace(/[.?!]+$/, '');
+  if(o.whatsapp) return { subject: '', body: `Hey ${first || 'guys'}! Quick one: any update on ${ask.charAt(0).toLowerCase() + ask.slice(1)}?` };
+  return {
+    subject: ask.length > 60 ? ask.slice(0, 57).trim() + '…' : ask.charAt(0).toUpperCase() + ask.slice(1),
+    body: `Hi ${first || 'there'},\n\nQuick one when you have a minute: any update on ${ask.charAt(0).toLowerCase() + ask.slice(1)}?\n\nThanks,\n${o.sender || ''}`.trim(),
+  };
+}
+
+// No emojis in a nudge, even if the AI adds one: they're taken out, with the space they leave.
+function followUpNoEmoji(s){
+  return String(s || '').replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}\uFE0F\u200D\u20E3]/gu, '')
+    .replace(/[ \t]+([.,!?])/g, '$1').replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+$/gm, '').trim();
+}
+// The AI's answer, as { subject, body }; a plain reply becomes the body.
+function followUpParse(text, whatsapp){
+  const t = String(text || '').trim();
+  if(!t) return null;
+  const m = t.match(/\{[\s\S]*\}/);
+  if(m){ try{ const j = JSON.parse(m[0]); if(j && typeof j.body === 'string' && j.body.trim()) return { subject: whatsapp ? '' : followUpNoEmoji(j.subject), body: followUpNoEmoji(j.body) }; }catch(e){} }
+  return { subject: '', body: followUpNoEmoji(t.replace(/^```\w*\n?|```$/g, '')) };
+}
+
+if(typeof module !== 'undefined' && module.exports) module.exports = { followUpPrompt, followUpTeammatePrompt, followUpPlain, followUpParse, followUpNoEmoji };

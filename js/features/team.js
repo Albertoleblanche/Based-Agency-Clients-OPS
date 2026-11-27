@@ -15,6 +15,8 @@ async function addTeamMember(){
   const role = document.getElementById('tmRole').value;
   const title = document.getElementById('tmTitle').value;
   if(!name || !email){ showToast('error','Missing info','Enter both a name and email.'); return; }
+  const bad = teamEmailProblem(email, 'their');
+  if(bad){ showToast('error','Use a Based Agency email', bad); document.getElementById('tmEmail')?.focus(); return; }
 
   const btn = clickedBtn();
   setBtnLoading(btn, 'Creating…');
@@ -79,7 +81,7 @@ function renderTeam(){
         ${m.email ? `<a class="btn btn-outline" href="mailto:${escapeHtml(m.email)}" style="text-decoration:none;">Email</a>` : ''}
         <button class="btn btn-outline" onclick="openTeamMemberDetail('${m.id}')">View</button>
         ${isAdmin() ? `<button class="icon-menu-btn team-card-menu-btn" onclick='toggleTeamActionsMenu(event, ${escapeHtml(JSON.stringify({id:m.id,name:m.name,access_revoked:isRevoked}))})' title="Actions">
-        <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M112,60a16,16,0,1,1,16,16A16,16,0,0,1,112,60Zm16,52a16,16,0,1,0,16,16A16,16,0,0,0,128,112Zm0,68a16,16,0,1,0,16,16A16,16,0,0,0,128,180Z"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1" /> <circle cx="12" cy="5" r="1" /> <circle cx="12" cy="19" r="1" /></svg>
       </button>` : ''}
       </div>
     </div>`;
@@ -97,13 +99,25 @@ function teamCardAvatarHtml(m){
 // Named list rather than hardcoded checkboxes — adding a future
 // permission (the user's own "we can expand later") is one line here,
 // not new HTML in the modal below.
+// Extra access an admin can give, on top of a role (Nov 25; the list and its rules are in
+// js/core/session.js). roles: who it's for (an approver already has the approver powers).
 const EXTRA_PERMISSIONS_META = [
-  { key:'view_team_queue', label: "See Team Queue (everyone's drafts)" },
-  { key:'view_ai_visibility', label: 'View AI SEO Reports' },
-  { key:'delete_tasks', label: 'Permanently delete tasks' },
-  { key:'delete_clients', label: 'Manage & permanently delete clients from Trash' },
-  { key:'lower_danger_score', label: "Lower a client's danger score" },
+  { key:'approve_updates', label: 'Approves and sends updates', sub: 'Anyone’s draft in Review: approve, skip, send', roles: ['member'] },
+  { key:'view_team_queue', label: 'Sees everyone’s drafts', sub: 'Review, read only', roles: ['member'] },
+  { key:'edit_clients', label: 'Adds and edits clients', sub: 'Edit Client, Bulk Edit, owners, Focus, Risk, setup, Harvest links', roles: ['member'] },
+  { key:'lower_danger_score', label: 'Clears a client’s Risk flag', roles: ['member'] },
+  { key:'delete_tasks', label: 'Deletes tasks for good', roles: ['member'] },
+  { key:'delete_clients', label: 'Restores and deletes clients', sub: 'Trash, Recently Deleted', roles: ['member'] },
+  { key:'manage_settings', label: 'Settings & connections', sub: 'Harvest, Granola, Slack, Gmail, WhatsApp, AI, and the update and Health rules', roles: ['member', 'approver'] },
 ];
+// the switches for someone: [meta, on, implied-by-another]
+function extraAccessRows(m){
+  const x = (m && m.extra_permissions) || [];
+  return EXTRA_PERMISSIONS_META.filter(p => m && p.roles.includes(m.role)).map(p => {
+    const implied = p.key === 'view_team_queue' && x.includes('approve_updates');
+    return { p, on: implied || x.includes(p.key), implied };
+  });
+}
 
 function openTeamMemberDetail(id){
   const m = teamProfiles.find(x=>x.id===id);
@@ -111,20 +125,20 @@ function openTeamMemberDetail(id){
   const isSelf = currentUser && m.id === currentUser.id;
   const isRevoked = !!m.access_revoked;
   const roleControl = (isAdmin() && !isSelf)
-    ? `<select onchange="changeTeamRole('${m.id}', this.value)" style="font-family:var(--font);font-size:12px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);width:100%;">
+    ? `<select onchange="changeTeamRole('${m.id}', this.value)" style="font-family:var(--font);font-size:13px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);width:100%;">
         <option value="member" ${m.role==='member'?'selected':''}>Member</option>
         <option value="approver" ${m.role==='approver'?'selected':''}>Approver</option>
         <option value="admin" ${m.role==='admin'?'selected':''}>Admin</option>
       </select>`
     : `<span class="role-chip">${escapeHtml(roleDisplayLabel(m.role))}${isSelf ? ' · you' : ''}</span>`;
   const titleControl = isAdmin()
-    ? `<select onchange="changeTeamTitle('${m.id}', this.value)" style="font-family:var(--font);font-size:12px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);width:100%;">
+    ? `<select onchange="changeTeamTitle('${m.id}', this.value)" style="font-family:var(--font);font-size:13px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);width:100%;">
         <option value="">No title</option>
         ${(settings.teamTitleOptions||[]).map(o=>`<option value="${escapeHtml(o)}" ${m.title===o?'selected':''}>${escapeHtml(o)}</option>`).join('')}
       </select>`
-    : (m.title ? `<span class="role-chip">${escapeHtml(m.title)}</span>` : `<span style="color:var(--muted-lt);font-size:12px;">No title set</span>`);
+    : (m.title ? `<span class="role-chip">${escapeHtml(m.title)}</span>` : `<span style="color:var(--muted-lt);font-size:13px;">No title set</span>`);
   const slackIdControl = isAdmin()
-    ? `<input type="text" value="${escapeHtml(m.slack_user_id||'')}" placeholder="e.g. U0123ABCDEF" onblur="changeTeamSlackId('${m.id}', this.value.trim())" style="font-family:var(--font);font-size:12px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);width:100%;">`
+    ? `<input type="text" value="${escapeHtml(m.slack_user_id||'')}" placeholder="e.g. U0123ABCDEF" onblur="changeTeamSlackId('${m.id}', this.value.trim())" style="font-family:var(--font);font-size:13px;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);width:100%;">`
     : '';
 
   // A real section header, not a plain field <label> (11px, muted) — the
@@ -133,10 +147,10 @@ function openTeamMemberDetail(id){
   // heading was smaller than its own contents. This matches the section
   // header treatment already used elsewhere (Additional Info, weekly
   // report steps).
-  const sectionHeadingStyle = 'font-family:var(--font);font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink);display:block;margin-bottom:2px;';
+  const sectionHeadingStyle = 'font-family:var(--font);font-size:12px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink);display:block;margin-bottom:2px;';
   const toggleRow = (label, isOn, onclickJs, showDivider) => `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;${showDivider?'border-bottom:1px solid var(--border);':''}">
-      <span style="font-size:12.5px;color:var(--ink);">${escapeHtml(label)}</span>
+      <span style="font-size:13.5px;color:var(--ink);">${escapeHtml(label)}</span>
       <button class="theme-toggle-switch ${isOn?'on':''}" onclick="${onclickJs}"></button>
     </div>`;
 
@@ -145,18 +159,10 @@ function openTeamMemberDetail(id){
   // members, since admins/approvers already have those by role), an
   // admin needs to be able to revoke Assistant access from a specific
   // admin/approver too, not just grant it to a member.
-  // lower_danger_score is admin-only by default (canLowerDangerScore()
-  // doesn't extend it to approvers the way hasPermission() does for the
-  // three below) — so unlike those, granting it to an approver is
-  // meaningful, not redundant. Shown for anyone who isn't already an
-  // admin, not just members.
-  const lowerDangerRow = m.role !== 'admin'
-    ? toggleRow(EXTRA_PERMISSIONS_META.find(p=>p.key==='lower_danger_score').label, (m.extra_permissions||[]).includes('lower_danger_score'), `changeTeamPermission('${m.id}','lower_danger_score',${!(m.extra_permissions||[]).includes('lower_danger_score')})`, true)
-    : '';
-  const memberOnlyPermissionRows = m.role==='member'
-    ? EXTRA_PERMISSIONS_META.filter(p=>p.key!=='lower_danger_score').map((p,i)=> toggleRow(p.label, (m.extra_permissions||[]).includes(p.key), `changeTeamPermission('${m.id}','${p.key}',${!(m.extra_permissions||[]).includes(p.key)})`, true))
-    : [];
-  const allToggleRows = [ toggleRow('AI Assistant access', !!m.ai_chat_enabled, `toggleMemberAiChatEnabled('${m.id}', ${!!m.ai_chat_enabled})`, true), ...(lowerDangerRow ? [lowerDangerRow] : []), ...memberOnlyPermissionRows ];
+  // extra access on top of the role (Nov 25): approver powers for members, Settings & connections for
+  // approvers and members too
+  const extraRows = extraAccessRows(m).filter(r => !r.implied).map(r => toggleRow(r.p.label, r.on, `changeTeamPermission('${m.id}','${r.p.key}',${!r.on})`, true));
+  const allToggleRows = [ toggleRow('AI Assistant access', !!m.ai_chat_enabled, `toggleMemberAiChatEnabled('${m.id}', ${!!m.ai_chat_enabled})`, true), ...extraRows ];
   // Strip the trailing divider off the last row in the list so the
   // section doesn't end on a stray line right before its own caption.
   const permissionsHtml = allToggleRows.map((row,i)=> i===allToggleRows.length-1 ? row.replace('border-bottom:1px solid var(--border);','') : row).join('');
@@ -164,7 +170,7 @@ function openTeamMemberDetail(id){
     <div style="grid-column:1/-1;padding-top:14px;margin-top:2px;border-top:1px solid var(--border);">
       <span style="${sectionHeadingStyle}">Extra Permissions</span>
       <div style="margin-top:8px;">${permissionsHtml}</div>
-      <p style="font-size:10.5px;color:var(--muted-lt);margin:8px 0 0;">${m.role==='member' ? 'Grants specific extra access without changing their role.' : 'Everything else here is already covered automatically by role — these are the specific things worth adjusting per person instead.'}</p>
+      <p style="font-size:11px;color:var(--muted-lt);margin:8px 0 0;">${m.role==='admin' ? 'Admins can do everything already.' : 'Extra access on top of their role, without changing it. Roles, extra access, passwords and removing people stay with admins.'}</p>
     </div>` : '';
   openAppModal(`
     <div class="modal-head"><span class="panel-title">${escapeHtml(m.name)}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
@@ -172,11 +178,11 @@ function openTeamMemberDetail(id){
       ${teamCardAvatarHtml(m)}
       ${isRevoked ? `<span class="pill pill-bad">Access revoked</span>` : ''}
       <div class="form-grid" style="width:100%;row-gap:16px;">
-        <div><label>Email</label><div style="font-size:13px;color:var(--ink);">${escapeHtml(m.email) || '—'}</div></div>
-        <div><label>Phone</label><div style="font-size:13px;color:var(--ink);">${m.phone || '—'}</div></div>
+        <div><label>Email</label><div style="font-size:14px;color:var(--ink);">${escapeHtml(m.email) || '—'}</div></div>
+        <div><label>Phone</label><div style="font-size:14px;color:var(--ink);">${m.phone || '—'}</div></div>
         <div><label>Title</label>${titleControl}</div>
         <div><label>Role</label>${roleControl}</div>
-        ${isAdmin() ? `<div style="grid-column:1/-1;padding-top:14px;border-top:1px solid var(--border);"><label>Slack member ID</label>${slackIdControl}<p style="font-size:10.5px;color:var(--muted-lt);margin:6px 0 0;">From their Slack profile → "..." → Copy member ID. Lets this app DM them notifications, and lets Slack's /task command recognize them.</p></div>` : ''}
+        ${isAdmin() ? `<div style="grid-column:1/-1;padding-top:14px;border-top:1px solid var(--border);"><label>Slack member ID</label>${slackIdControl}<p style="font-size:11px;color:var(--muted-lt);margin:6px 0 0;">From their Slack profile → "..." → Copy member ID. Lets this app DM them notifications, and lets Slack's /task command recognize them.</p></div>` : ''}
         ${permissionsControl}
       </div>
     </div>
@@ -246,13 +252,18 @@ async function changeTeamPermission(userId, key, granted){
   const m = teamProfiles.find(p=>p.id===userId);
   if(!m) return;
   const current = m.extra_permissions || [];
+  if(granted && !EXTRA_PERMISSIONS_META.some(p => p.key === key && p.roles.includes(m.role))) return;
   const updated = granted ? [...new Set([...current, key])] : current.filter(k=>k!==key);
   const { error } = await supabaseClient.from('team_profiles').update({ extra_permissions: updated }).eq('id', userId);
   if(error){ showToast('error','Could not save', error.message); await loadTeamProfiles(); return; }
   m.extra_permissions = updated;
   await loadTeamProfiles();
+  if(typeof renderTeam === 'function' && typeof currentViewName !== 'undefined' && currentViewName === 'team') renderTeam();
   const label = EXTRA_PERMISSIONS_META.find(p=>p.key===key)?.label || key;
-  showToast('success', granted ? 'Permission granted' : 'Permission removed', `${label} — ${granted ? 'now allowed' : 'no longer allowed'} for ${m.name}.`);
+  showToast('success', granted ? 'Access given' : 'Access taken away', `${firstName(m.name) || m.name}: ${label}${granted ? '' : ', not anymore'}.`);
+  // they hear about it (it changes what they see the next time Radar loads)
+  if(userId !== currentUser?.id && typeof sendNotification === 'function')
+    sendNotification(userId, 'profile_changed', granted ? `You can now: ${label}` : `Taken away: ${label}`, `${myName() || 'An admin'} ${granted ? 'gave you extra access' : 'took back extra access'}, on top of your role. It’s on your profile.`, 'profile');
   if(document.getElementById('appModalOverlay')) openTeamMemberDetail(userId);
 }
 
@@ -270,7 +281,7 @@ async function adminResetPassword(userId, name){
     openAppModal(`
       <div class="modal-head"><span class="panel-title">Password reset for ${escapeHtml(name)}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
       <div class="modal-body">
-        <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Send this to ${escapeHtml(name)} directly — it won't be shown again. They should change it after logging in.</p>
+        <p style="font-size:13.5px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Send this to ${escapeHtml(name)} directly — it won't be shown again. They should change it after logging in.</p>
         <div class="settings-field"><label>Temporary password</label><input value="${data.tempPassword}" readonly style="font-family:var(--font);font-weight:600;"></div>
       </div>
       <div class="modal-actions"><button class="btn btn-outline" onclick="closeAppModal()">Close</button></div>`, 440);
@@ -309,13 +320,13 @@ async function confirmDeleteUser(userId, name){
   openAppModal(`
     <div class="modal-head"><span class="panel-title" style="color:var(--red);">Permanently delete ${escapeHtml(name)}?</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
-      <p style="font-size:12.5px;color:var(--ink);line-height:1.6;margin:0 0 10px;">This can't be undone. It permanently deletes:</p>
-      <ul style="font-size:12.5px;color:var(--ink);line-height:1.7;margin:0 0 14px;padding-left:20px;">
+      <p style="font-size:13.5px;color:var(--ink);line-height:1.6;margin:0 0 10px;">This can't be undone. It permanently deletes:</p>
+      <ul style="font-size:13.5px;color:var(--ink);line-height:1.7;margin:0 0 14px;padding-left:20px;">
         <li>${escapeHtml(name)}'s account and profile</li>
         <li>Every task where they're the assignee <b>or the assigner</b> — including tasks they assigned to other people</li>
         <li>Their notes, calendar events, and time entries</li>
       </ul>
-      <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 14px;">Most of the time, <b>Revoke access</b> is what you actually want — it locks them out immediately without deleting anything, and can be undone. Use delete only for genuinely permanent cleanup.</p>
+      <p style="font-size:13.5px;color:var(--muted);line-height:1.5;margin:0 0 14px;">Most of the time, <b>Revoke access</b> is what you actually want — it locks them out immediately without deleting anything, and can be undone. Use delete only for genuinely permanent cleanup.</p>
       <div class="settings-field"><label>Type "${escapeHtml(name)}" to confirm</label><input id="deleteUserConfirmInput" placeholder="${escapeHtml(name)}" oninput="document.getElementById('deleteUserConfirmBtn').disabled = this.value.trim() !== ${jsArg(name)}"></div>
     </div>
     <div class="modal-actions">

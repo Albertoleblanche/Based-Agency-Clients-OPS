@@ -61,10 +61,11 @@ module.exports = async function handler(req, res) {
     // resolved to a real name here. Not filtering out trashed clients —
     // a time entry logged against a client that's since been moved to
     // Trash should still show its real name, not "Unknown client".
-    const [{ data: entries, error: entriesErr }, { data: profiles, error: profilesErr }, { data: clientsData, error: clientsErr }] = await Promise.all([
+    const [{ data: entries, error: entriesErr }, { data: profiles, error: profilesErr }, { data: clientsData, error: clientsErr }, { data: harvestPeople }] = await Promise.all([
       entriesQuery,
       admin.from('team_profiles').select('id, name'),
       admin.from('clients').select('id, name'),
+      admin.from('harvest_users').select('harvest_id, first_name, last_name'), // time from someone in Harvest only (step 4)
     ]);
     if (entriesErr || profilesErr || clientsErr) {
       res.status(500).json({ error: (entriesErr || profilesErr || clientsErr).message });
@@ -75,11 +76,13 @@ module.exports = async function handler(req, res) {
     const nameOf = (id) => profiles?.find(p => p.id === id)?.name || 'Someone no longer on the team';
     const clientNameOf = (id) => clients.find(c => c.id === id)?.name || 'Unknown client';
 
+    const harvestNameOf = (id) => { const u = (harvestPeople || []).find(x => String(x.harvest_id) === String(id)); return u ? [u.first_name, u.last_name].filter(Boolean).join(' ') : 'Someone in Harvest'; };
     const byUser = {};
     (entries || []).forEach(e => {
-      if (!byUser[e.user_id]) byUser[e.user_id] = { userId: e.user_id, name: nameOf(e.user_id), totalMinutes: 0, entries: [] };
-      byUser[e.user_id].totalMinutes += e.minutes;
-      byUser[e.user_id].entries.push({
+      const key = e.user_id || `hv:${e.harvest_user_id || ''}`;
+      if (!byUser[key]) byUser[key] = { userId: e.user_id || key, name: e.user_id ? nameOf(e.user_id) : harvestNameOf(e.harvest_user_id), totalMinutes: 0, entries: [] };
+      byUser[key].totalMinutes += e.minutes;
+      byUser[key].entries.push({
         client: clientNameOf(e.client_id),
         service: e.service || '',
         description: e.description || '',

@@ -14,7 +14,7 @@ function renderOptionsManager(kind){
       </span>
       ${escapeHtml(o)} <span class="option-chip-x" onclick="removeFieldOption('${kind}',${jsArg(o)})">✕</span>
     </span>
-  `).join('') || `<span style="color:var(--muted-lt);font-size:12px;">No options yet.</span>`;
+  `).join('') || `<span style="color:var(--muted-lt);font-size:13px;">No options yet.</span>`;
 }
 
 async function addFieldOption(kind){
@@ -109,14 +109,14 @@ function customFieldModalHtml(editing){
         </select>
       </div>
       <div id="cfSelectOptionsWrap" style="display:none;">
-        <label style="font-family:var(--font);font-size:10px;color:var(--muted);display:block;margin:14px 0 8px;">Dropdown options</label>
+        <label style="font-family:var(--font);font-size:10.5px;color:var(--muted);display:block;margin:14px 0 8px;">Dropdown options</label>
         <div id="cfSelectOptionsList" class="options-list"></div>
         <div style="display:flex;gap:8px;margin-top:10px;">
-          <input id="cfSelectOptionInput" placeholder="New option" style="flex:1;font-family:var(--font);font-size:12.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);">
+          <input id="cfSelectOptionInput" placeholder="New option" style="flex:1;font-family:var(--font);font-size:13.5px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);">
           <button class="btn btn-outline" onclick="addCustomFieldOptionDraft()">Add</button>
         </div>
       </div>
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--ink);margin-top:16px;">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--ink);margin-top:16px;">
         <input type="checkbox" id="cfRequired" ${editing&&editing.required?'checked':''}>
         Required — can't save a client without this filled in
       </label>
@@ -147,7 +147,7 @@ function renderCustomFieldOptionsDraft(){
   if(!el) return;
   el.innerHTML = customFieldDraftOptions.map(o=>`
     <span class="option-chip">${escapeHtml(o)} <span class="option-chip-x" onclick="removeCustomFieldOptionDraft(${jsArg(o)})">✕</span></span>
-  `).join('') || `<span style="color:var(--muted-lt);font-size:12px;">No options yet.</span>`;
+  `).join('') || `<span style="color:var(--muted-lt);font-size:13px;">No options yet.</span>`;
 }
 
 function addCustomFieldOptionDraft(){
@@ -208,7 +208,7 @@ function customFieldInputHtml(field, value){
     return `<div><label>${labelHtml}</label><select id="${id}">${opts}</select></div>`;
   }
   if(field.type==='textarea'){
-    return `<div style="grid-column:1/-1;"><label>${labelHtml}</label><textarea spellcheck="true" id="${id}" style="width:100%;min-height:70px;font-family:var(--font);font-size:13px;padding:9px 11px;border-radius:6px;border:1px solid var(--border);box-sizing:border-box;">${escapeHtml(val)}</textarea></div>`;
+    return `<div style="grid-column:1/-1;"><label>${labelHtml}</label><textarea spellcheck="true" id="${id}" style="width:100%;min-height:70px;font-family:var(--font);font-size:14px;padding:9px 11px;border-radius:6px;border:1px solid var(--border);box-sizing:border-box;">${escapeHtml(val)}</textarea></div>`;
   }
   const htmlType = { text:'text', url:'url', email:'email', phone:'tel', number:'number' }[field.type] || 'text';
   return `<div><label>${labelHtml}</label><input type="${htmlType}" id="${id}" value="${escVal}" placeholder="${escapeHtml(field.label)}"></div>`;

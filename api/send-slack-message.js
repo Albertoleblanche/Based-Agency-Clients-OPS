@@ -6,8 +6,10 @@
 // creates a task IN the app. The first three only ever run after a human
 // has reviewed the exact text and clicked confirm (or fire automatically
 // alongside an in-app notification, same as the push-notification path).
-// The slash command is a direct action someone typed in Slack — nothing
-// here reads or infers intent from ordinary conversation.
+// The slash command is a direct action someone typed in Slack. Since Nov 23
+// Radar can also read the channels it's invited to (Slack's Events API) and
+// turn a request to a teammate into a task by itself (lib/slack-tasks.js);
+// that's switched off in Settings → Connections → Slack.
 //
 // bodyParser is disabled for this whole file (not just the slash-command
 // path) because Slack's request signature has to be computed over the
@@ -26,11 +28,24 @@
 // POST body (JSON):             { action: 'client-message', clientId, text }
 // POST body (JSON):             { action: 'dm', targetUserId, notificationType, text }
 // POST body (form, from Slack): command=/task&text=...&user_id=...  (see handleTaskSlashCommand)
+// POST body (JSON, from Slack): Events API — url_verification, and event_callback for messages and
+//   reactions in the channels Radar is in: tasks by themselves (lib/slack-tasks.js, Nov 23).
+// POST /hooks/granola (rewritten to ?source=granola): Granola's webhook when a meeting's notes are
+//   ready — signed like Slack's, so it lives here with the raw body. Radar reads the meeting and
+//   suggests its action items as tasks (lib/granola-tasks.js). Granola wants an answer within 15
+//   seconds; the reading happens after.
 
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 const { sendSlackDM } = require('../lib/slack-notify');
+const { slackMeSendToId } = require('../lib/slack-me');
 const { sendPushToUser, pushUrlFor } = require('../lib/push-notify');
+const { parseTaskCommandText, handleSlackEvent, teamToday, fmtDue, TASK_HELP } = require('../lib/slack-tasks');
+const { handleGranolaHook } = require('../lib/granola-tasks');
+// Keeps the function running after Slack has its answer (it wants one within 3 seconds; reading a
+// message with the AI can take longer). Without it, the work is done before answering.
+let waitUntil = null;
+try { ({ waitUntil } = require('@vercel/functions')); } catch (e) {}
 
 module.exports.config = { api: { bodyParser: false } };
 
@@ -68,34 +83,8 @@ function verifySlackSignature(rawBody, headers) {
   return { ok: true };
 }
 
-// Supported syntax: /task @person the task title due:2026-08-25
-// due: also accepts "today" and "tomorrow". Anything else after due: is
-// left as-is (rather than guessed at) — deliberately not attempting
-// full natural-language date parsing here, which would add a lot of
-// ambiguity (does "friday" mean this week or next?) for a command meant
-// to be quick and unambiguous to type.
-function parseTaskCommandText(text) {
-  const mentionMatch = text.match(/<@([A-Z0-9]+)(?:\|[^>]*)?>/);
-  const assigneeSlackId = mentionMatch ? mentionMatch[1] : null;
-
-  let dueDate = null;
-  const dueMatch = text.match(/\bdue:(\S+)/i);
-  if (dueMatch) {
-    const raw = dueMatch[1].toLowerCase();
-    const today = new Date();
-    if (raw === 'today') dueDate = today.toISOString().slice(0, 10);
-    else if (raw === 'tomorrow') { today.setDate(today.getDate() + 1); dueDate = today.toISOString().slice(0, 10); }
-    else if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) dueDate = raw;
-  }
-
-  const title = text
-    .replace(/<@[A-Z0-9]+(?:\|[^>]*)?>/g, '')
-    .replace(/\bdue:\S+/i, '')
-    .trim();
-
-  return { assigneeSlackId, dueDate, title };
-}
-
+// The command's text is read by parseTaskCommandText (lib/slack-tasks.js): the person, the title,
+// due:, and the links, which go on the task.
 async function handleTaskSlashCommand(req, res, rawBody, admin) {
   const verification = verifySlackSignature(rawBody, req.headers);
   if (!verification.ok) {
@@ -113,7 +102,32 @@ async function handleTaskSlashCommand(req, res, rawBody, admin) {
     return;
   }
 
-  const { assigneeSlackId, dueDate, title } = parseTaskCommandText(text);
+  if (!text || /^(help|\?)$/i.test(text)) { res.status(200).json({ response_type: 'ephemeral', text: TASK_HELP }); return; }
+
+  // the clients (for client: and to find one by itself), this channel's client, and today where the team is
+  const channelId = params.get('channel_id');
+  const [{ data: clientRows }, { data: chMap }, { data: setRow }] = await Promise.all([
+    admin.from('clients').select('id, name, website, deleted_at'),
+    admin.from('slack_client_channels').select('client_id, slack_channel_id'),
+    admin.from('app_storage').select('value').eq('key', 'settings').maybeSingle(),
+  ]);
+  const clients = (clientRows || []).filter(c => !c.deleted_at);
+  const ch = channelId && (chMap || []).find(m => m.slack_channel_id === channelId);
+  let tz = process.env.TEAM_TIMEZONE || 'America/New_York';
+  try { const st = setRow && setRow.value ? JSON.parse(setRow.value) : {}; if (st.timezone) tz = st.timezone; } catch (e) {}
+  const { date: today } = teamToday(tz);
+  const { assigneeSlackId, dueDate, dueAsk, title, link, description, client, clientHow, clientAsk, clientOptions } =
+    parseTaskCommandText(text, today, { clients, channelClient: ch ? clients.find(c => c.id === ch.client_id) || null : null });
+  if (clientAsk) {
+    res.status(200).json({ response_type: 'ephemeral', text: clientOptions.length
+      ? `More than one client matches “${clientAsk}”: ${clientOptions.join(', ')}. Add more of the name, like \`client:${clientOptions[0].toLowerCase().split(/\s+/).slice(0, 2).join('-').replace(/[^a-z0-9-]/g, '')}\`.`
+      : `No client called “${clientAsk}” in Radar. Part of the name is enough, like \`client:harbor\`. Nothing was added.` });
+    return;
+  }
+  if (dueAsk) {
+    res.status(200).json({ response_type: 'ephemeral', text: `I couldn’t read the due date “${dueAsk}”. Use today, tomorrow, a day like fri, 12/3 or 2026-12-03. Nothing was added.` });
+    return;
+  }
   if (!assigneeSlackId) {
     res.status(200).json({
       response_type: 'ephemeral',
@@ -145,10 +159,10 @@ async function handleTaskSlashCommand(req, res, rawBody, admin) {
     return;
   }
 
-  const { data: task, error } = await admin.from('tasks').insert({
-    title, description: null, priority: 'medium', status: 'todo',
-    assigner_id: runnerProfile.id, assignee_id: assigneeProfile.id, due_date: dueDate,
-  }).select().single();
+  const row = { title, description: description || null, priority: 'medium', status: 'todo',
+    assigner_id: runnerProfile.id, assignee_id: assigneeProfile.id, due_date: dueDate, link: link || null, client_id: client ? client.id : null };
+  let { data: task, error } = await admin.from('tasks').insert(row).select().single();
+  if (error && /link|client_id/.test(error.message || '')) { const { link: _l, client_id: _c, ...rest } = row; ({ data: task, error } = await admin.from('tasks').insert(rest).select().single()); }
 
   if (error || !task) {
     res.status(200).json({ response_type: 'ephemeral', text: `Couldn't create the task: ${error?.message || 'unknown error'}` });
@@ -159,18 +173,24 @@ async function handleTaskSlashCommand(req, res, rawBody, admin) {
   // session involved in a Slack-originated request), so its three
   // effects — in-app row, push, Slack DM — are replicated by hand here,
   // same as the cron reminder functions already do.
+  const forClient = client ? ` · ${client.name}` : '';
   if (assigneeProfile.id !== runnerProfile.id) {
     await admin.from('notifications').insert({
       user_id: assigneeProfile.id, type: 'task_assigned', title: 'New task assigned to you',
-      body: `${runnerProfile.name || 'Someone'}: "${title}"`, target_view: 'tasks',
+      body: `${runnerProfile.name || 'Someone'}: "${title}"${forClient}`, target_view: 'tasks',
     });
-    try { await sendPushToUser(admin, assigneeProfile.id, 'New task assigned to you', `${runnerProfile.name || 'Someone'}: "${title}"`, pushUrlFor('tasks')); } catch (e) {}
-    try { await sendSlackDM(admin, assigneeProfile.id, 'task_assigned', `*New task assigned to you*\n${runnerProfile.name || 'Someone'}: "${title}"`); } catch (e) {}
+    try { await sendPushToUser(admin, assigneeProfile.id, 'New task assigned to you', `${runnerProfile.name || 'Someone'}: "${title}"${forClient}`, pushUrlFor('tasks')); } catch (e) {}
+    try { await sendSlackDM(admin, assigneeProfile.id, 'task_assigned', `*New task assigned to you*\n${runnerProfile.name || 'Someone'}: "${title}"${forClient}`); } catch (e) {}
   }
+  await admin.from('activity_log').insert({ client_id: client ? client.id : null, user_id: runnerProfile.id, action_type: 'task_created',
+    description: `${runnerProfile.name} added “${title}” for ${assigneeProfile.name} from Slack.` }).then(() => {}, () => {});
 
+  // what it did, and how it found the client (so a wrong guess is easy to spot)
+  const how = { asked: '', channel: ' (this channel’s client)', website: ' (from the link)', name: ' (named in the task)' }[clientHow] || '';
+  const bits = [client ? `Client: ${client.name}${how}` : 'No client (add `client:name` to set one)', dueDate ? `Due ${dueDate === today ? 'today' : fmtDue(dueDate)}` : '', link ? `Link: ${link}` : ''].filter(Boolean);
   res.status(200).json({
     response_type: 'ephemeral',
-    text: `Task "${title}" assigned to ${assigneeProfile.name || 'them'}${dueDate ? ` (due ${dueDate})` : ''}.`,
+    text: `Task “${title}” for ${assigneeProfile.name || 'them'}.\n${bits.join(' · ')}`,
   });
 }
 
@@ -200,6 +220,33 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  // ---- Granola: a meeting's notes are ready ----
+  if ((req.query || {}).source === 'granola' || req.headers['webhook-signature']) {
+    const r = await handleGranolaHook(admin, rawBody, req.headers).catch(e => ({ status: 500, body: { error: String(e) } }));
+    const work = r.work ? r.work.catch(e => ({ error: String(e) })) : null;
+    if (work && waitUntil) { waitUntil(work); res.status(r.status).json(r.body); return; }
+    if (work) await work;
+    res.status(r.status).json(r.body);
+    return;
+  }
+
+  // ---- Slack's Events API: the URL check, then messages and reactions (tasks by themselves) ----
+  if (req.headers['x-slack-signature']) {
+    const verification = verifySlackSignature(rawBody, req.headers);
+    if (!verification.ok) { res.status(401).json({ error: verification.reason }); return; }
+    let payload = {};
+    try { payload = JSON.parse(rawBody || '{}'); } catch (e) { res.status(400).json({ error: 'Malformed JSON body' }); return; }
+    if (payload.type === 'url_verification') { res.status(200).json({ challenge: payload.challenge }); return; }
+    // Slack sends an event again when it didn't hear back in time; the first one is already being read.
+    if (req.headers['x-slack-retry-num']) { res.status(200).json({ ok: true, retry: true }); return; }
+    if (payload.type !== 'event_callback') { res.status(200).json({ ok: true }); return; }
+    const work = handleSlackEvent(admin, payload, { appUrl: process.env.APP_URL || `https://${req.headers.host}` }).catch(e => ({ error: String(e) }));
+    if (waitUntil) { waitUntil(work); res.status(200).json({ ok: true }); return; }
+    const result = await work;
+    res.status(200).json({ ok: true, result });
+    return;
+  }
+
   // ---- Everything below is the app's own frontend calling in, JSON-based ----
   const callerToken = (req.headers.authorization || '').replace('Bearer ', '');
   if (!callerToken) {
@@ -225,7 +272,7 @@ module.exports = async function handler(req, res) {
     catch (e) { res.status(400).json({ error: 'Malformed JSON body' }); return; }
 
     const { action, text } = body;
-    if (!text && action !== 'personal-summaries') { res.status(400).json({ error: 'Missing text' }); return; }
+    if (!text && action !== 'personal-summaries' && action !== 'phone-link') { res.status(400).json({ error: 'Missing text' }); return; }
 
     // ---- Existing daily-summary flow, unchanged from before the rename ----
     if (!action || action === 'summary') {
@@ -284,6 +331,15 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    // ---- Your own link to Radar, for your phone (Set Up Radar, Nov 24): to you only, any day ----
+    if (action === 'phone-link') {
+      const appUrl = (process.env.APP_URL || `https://${req.headers['x-forwarded-host'] || req.headers.host}`).replace(/\/+$/, '');
+      const text1 = `Here’s Radar for your phone: <${appUrl}/|Open Radar>\nOn iPhone, open it in Safari, tap Share, then Add to Home Screen. On Android, open it in Chrome, tap ⋮, then Install app. Then open Radar from your Home Screen and turn on notifications in More → Settings.`;
+      const result = await sendSlackDM(admin, callerData.user.id, 'phone_link', text1, null, { anyDay: true });
+      res.status(200).json(result);
+      return;
+    }
+
     // ---- DM a specific team member, mirroring an in-app notification ----
     if (action === 'dm') {
       const { targetUserId, notificationType } = body;
@@ -319,16 +375,31 @@ module.exports = async function handler(req, res) {
         if (!person.userId || !person.entries || !person.entries.length) continue;
 
         const { data: profile } = await admin
-          .from('team_profiles').select('daily_summary_slack_id, slack_user_id').eq('id', person.userId).maybeSingle();
-        const overrideId = profile?.daily_summary_slack_id || null;
+          .from('team_profiles').select('name, daily_summary_slack_id, slack_user_id, muted_notification_types').eq('id', person.userId).maybeSingle();
+        const overrideId = (profile?.daily_summary_slack_id || '').trim() || null;
 
+        // what you worked on, client by client; no hours (Nov 24)
         const entryLines = person.entries.map(e =>
-          `• ${e.client}${e.service ? ` (${e.service})` : ''} — ${formatMinutesServer(e.minutes)}${e.description ? `: ${e.description}` : ''}`
+          `• ${e.client}${e.service ? ` (${e.service})` : ''}${e.description ? `: ${e.description}` : ''}`
         ).join('\n');
-        const personalText = `*Your Daily Summary — ${dateLabel}*\n\n${entryLines}\n\n*Total:* ${formatMinutesServer(person.totalMinutes)}`;
 
-        const result = await sendSlackDM(admin, person.userId, 'daily_summary', personalText, overrideId);
-        results.push({ userId: person.userId, name: person.name, ...result });
+        // Sent to a Slack ID other than their own: it goes from their own Slack, as them (Nov 24).
+        // If they haven't connected Slack as themselves (or their Slack can't post it), Radar's bot
+        // sends it, saying whose summary it is.
+        if (overrideId && overrideId !== profile?.slack_user_id) {
+          const muted = profile.muted_notification_types || [];
+          if (muted.includes('daily_summary') || muted.includes('slack:daily_summary')) { results.push({ userId: person.userId, name: person.name, sent: false, reason: 'muted' }); continue; }
+          const mine = await slackMeSendToId(admin, person.userId, overrideId, `*My Daily Summary — ${dateLabel}*\n\n${entryLines}`);
+          if (mine.ok) { results.push({ userId: person.userId, name: person.name, sent: true, via: 'them' }); continue; }
+          const who = profile?.name || person.name || 'Daily Summary';
+          const result = await sendSlackDM(admin, person.userId, 'daily_summary', `*${who}’s Daily Summary — ${dateLabel}*\n\n${entryLines}`, overrideId, { anyDay: true });
+          results.push({ userId: person.userId, name: person.name, ...result, via: 'radar', notAsThem: mine.notConnected ? 'not_connected' : (mine.error || 'slack_error') });
+          continue;
+        }
+
+        const personalText = `*Your Daily Summary — ${dateLabel}*\n\n${entryLines}`;
+        const result = await sendSlackDM(admin, person.userId, 'daily_summary', personalText, overrideId, { anyDay: true });   // someone pressed Send
+        results.push({ userId: person.userId, name: person.name, ...result, via: 'radar' });
       }
 
       res.status(200).json({ results });

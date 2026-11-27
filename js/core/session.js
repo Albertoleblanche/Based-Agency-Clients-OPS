@@ -2,46 +2,114 @@
 // (myProfile, isAdmin, canApprove…), profile loading, button loading states.
 
 /* ---------- Theme ---------- */
+// Appearance is 'auto' (follows the computer), 'light', 'dark', or 'night': dark from night to
+// morning, light through the day. 'night' is 7 PM to 7 AM; other hours are kept as
+// 'night:20:00-06:30'. myProfile.theme follows you to other devices; localStorage is this device's
+// guess for the first paint, before you're signed in.
+const NIGHT_HOURS = ['19:00', '07:00'];
+function themePrefNow(){
+  try{ return (myProfile && myProfile.theme != null) ? myProfile.theme : (localStorage.getItem('bda_theme') || 'auto'); }catch(e){ return 'auto'; }
+}
+function nightHours(pref){
+  const m = /^night(?::(\d{2}:\d{2})-(\d{2}:\d{2}))?$/.exec(pref || '');
+  return m ? [m[1] || NIGHT_HOURS[0], m[2] || NIGHT_HOURS[1]] : null;
+}
+function nightPref(from, to){ return from === NIGHT_HOURS[0] && to === NIGHT_HOURS[1] ? 'night' : `night:${from}-${to}`; }
+const hhmmToMin = v => { const [h, m] = String(v).split(':').map(Number); return h * 60 + (m || 0); };
+function isNightNow(pref, now){
+  const r = nightHours(pref); if(!r) return false;
+  now = now || new Date();
+  const t = now.getHours() * 60 + now.getMinutes(), a = hhmmToMin(r[0]), b = hhmmToMin(r[1]);
+  return a === b ? false : a > b ? (t >= a || t < b) : (t >= a && t < b);
+}
+function resolvedTheme(pref){
+  if(pref === 'dark' || pref === 'light') return pref;
+  if(nightHours(pref)) return isNightNow(pref) ? 'dark' : 'light';
+  return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+// Puts the right appearance on now and, for Night, sets a timer for the next change (in the
+// evening it eases to dark while you work, in the morning back to light).
+function applyTheme(fade){
+  const pref = themePrefNow(), want = resolvedTheme(pref);
+  if(document.body.dataset.theme !== want){
+    if(fade){ document.body.classList.add('theme-switching'); clearTimeout(applyTheme._f); applyTheme._f = setTimeout(() => document.body.classList.remove('theme-switching'), 260); }
+    document.body.dataset.theme = want;
+  }
+  if(typeof syncDarkModeToggleUI === 'function') syncDarkModeToggleUI();
+  if(typeof onThemeApplied === 'function') onThemeApplied(want);
+  clearTimeout(applyTheme._t);
+  const r = nightHours(pref);
+  if(r){
+    const now = new Date(), t = now.getHours() * 60 + now.getMinutes();
+    const mins = Math.min(...r.map(x => ((hhmmToMin(x) - t + 1440) % 1440) || 1440));
+    applyTheme._t = setTimeout(() => applyTheme(true), mins * 60000 - now.getSeconds() * 1000 - now.getMilliseconds() + 400);
+  }
+}
+// A computer that slept through the change catches up when you come back to it.
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible' && nightHours(themePrefNow())) applyTheme(true); });
 async function initTheme(){
   try{
-    // myProfile.theme is the real, per-account source of truth — only
-    // fall back to the localStorage guess if this account has never set
-    // a preference at all (myProfile.theme is null/undefined).
-    const saved = myProfile && myProfile.theme != null ? myProfile.theme : localStorage.getItem('bda_theme');
-    // Nobody has picked a theme yet → follow the system appearance (like a
-    // Mac app) instead of defaulting to light.
-    const systemDark = !!(window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
-    const pref = saved || (systemDark ? 'dark' : 'light');
-    if(pref === 'dark') document.body.dataset.theme = 'dark';
-    else delete document.body.dataset.theme;
-    // Keep localStorage in sync so this device's early FOUC-prevention
-    // script (which runs before login, with no access to Supabase) has
-    // an accurate guess to paint with on the next load — but only for a
-    // real choice; an unset preference keeps following the system.
-    if(saved) localStorage.setItem('bda_theme', pref === 'dark' ? 'dark' : 'light');
-    else localStorage.removeItem('bda_theme');
+    applyTheme(false);
+    // Keep this device's first-paint guess in step with the real choice; an unset one keeps
+    // following the system.
+    const pref = themePrefNow();
+    if(pref && pref !== 'auto') localStorage.setItem('bda_theme', pref); else localStorage.removeItem('bda_theme');
     watchSystemTheme();
-  }catch(e){ delete document.body.dataset.theme; }
+  }catch(e){ document.body.dataset.theme = 'light'; }
 }
 
-// While nobody has picked a theme, follow the system live — e.g. when
-// macOS switches to dark at sunset with Appearance set to "Auto".
+// While Appearance is Auto, follow the system live — e.g. when macOS switches to dark at sunset
+// with its own Appearance set to "Auto".
 function watchSystemTheme(){
   if(watchSystemTheme._on || !window.matchMedia) return;
   watchSystemTheme._on = true;
   const mq = matchMedia('(prefers-color-scheme: dark)');
-  const follow = () => {
-    const chosen = (myProfile && myProfile.theme != null) || localStorage.getItem('bda_theme');
-    if(chosen) return;
-    if(mq.matches) document.body.dataset.theme = 'dark';
-    else delete document.body.dataset.theme;
-    if(typeof syncDarkModeToggleUI === 'function') syncDarkModeToggleUI();
-  };
+  const follow = () => { if(themePrefNow() === 'auto') applyTheme(true); };
   if(mq.addEventListener) mq.addEventListener('change', follow);
   else if(mq.addListener) mq.addListener(follow);
 }
+// Saves an appearance choice: this device at once, your account for your other devices.
+async function saveThemePref(pref){
+  const v = pref === 'auto' ? null : pref;
+  if(myProfile) myProfile.theme = v;
+  try{ v ? localStorage.setItem('bda_theme', v) : localStorage.removeItem('bda_theme'); }catch(e){}
+  applyTheme(true);
+  if(!currentUser) return;
+  const { error } = await supabaseClient.from('team_profiles').update({ theme: v }).eq('id', currentUser.id);
+  if(error){ console.error('theme save', error); showToast('info', 'Saved on this computer', 'Your other devices keep the appearance they had.'); }
+}
+
+/* ---------- New look ---------- */
+// The widget look (rounded cards, big thin numbers, Geist) is everyone's look. team_profiles.ui_style
+// keeps one person's choice from Settings → Appearance: null or 'widgets' is the new look, 'off' the
+// classic one. This device remembers it for the first paint, like the theme.
+function uiStyleOffered(){ return !!myProfile; }
+function uiStyleOn(){ return uiStyleOffered() && myProfile.ui_style !== 'off'; }
+function loadUiFont(){
+  if(document.getElementById('uiwFont')) return;
+  const l = document.createElement('link');
+  l.id = 'uiwFont'; l.rel = 'stylesheet';
+  l.href = 'https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500;600&display=swap';
+  document.head.appendChild(l);
+}
+function applyUiStyle(){
+  const on = uiStyleOn();
+  document.documentElement.classList.toggle('ui-w', on);
+  if(on) loadUiFont();
+  try{ on ? localStorage.setItem('bda_ui_style', 'widgets') : localStorage.removeItem('bda_ui_style'); }catch(e){}
+}
+async function saveUiStyle(on){
+  if(!uiStyleOffered() || !currentUser) return;
+  const v = on ? 'widgets' : 'off';
+  myProfile.ui_style = v;
+  applyUiStyle();
+  if(typeof renderDashboard === 'function') renderDashboard();   // the Dashboard has its own layout in each look
+  const { error } = await supabaseClient.from('team_profiles').update({ ui_style: v }).eq('id', currentUser.id);
+  if(error){ console.error('ui_style save', error); showToast('info', 'Saved on this computer', 'Your other devices keep the look they had.'); }
+}
 
 function toggleSidebar(){
+  document.body.classList.add('side-anim');   // slide it, only when toggled (not on load)
   const collapsed = document.body.classList.toggle('sidebar-collapsed');
   try{ localStorage.setItem('bda_sidebar_collapsed', collapsed ? '1' : '0'); }catch(e){}
   const btn = document.querySelector('.sidebar-collapse-btn');
@@ -90,15 +158,41 @@ let currentDetailClientId = null;  // which client's detail page is open, if any
 
 function myName(){ return myProfile ? myProfile.name : ''; }
 function canApprove(){ return !!myProfile && (myProfile.role === 'admin' || myProfile.role === 'approver'); }
-function hasPermission(key){ return canApprove() || !!(myProfile && (myProfile.extra_permissions||[]).includes(key)); }
 function isAdmin(){ return !!myProfile && myProfile.role === 'admin'; }
-// Deliberately NOT built on hasPermission()/canApprove() — those treat
-// "approver or admin" as the same automatic base tier, but this one is
-// admin-only by default, with a specific per-person override (see the
-// "Lower a client's danger score" toggle on the team card) rather than a
-// role-wide grant. An approver doesn't get this just for being an
-// approver, unlike everything hasPermission() covers.
-function canLowerDangerScore(){ return isAdmin() || !!(myProfile && (myProfile.extra_permissions||[]).includes('lower_danger_score')); }
+
+// Extra access (Nov 25): what each role does by default, and what an admin can give someone on top
+// of their role, one switch each in Team, without changing the role. Approver powers go to members;
+// Settings & connections (an admin's) goes to approvers and members. Roles, extra access, passwords
+// and removing people stay with admins. The server and the database check the same list
+// (lib/access.js, addendum-extra-access.sql).
+const ACCESS_LEVEL = {
+  view_team_queue: 'approver',     // sees everyone's drafts in Review
+  approve_updates: 'approver',     // approves, skips and sends anyone's update (and sees them all)
+  edit_clients: 'approver',        // adds and edits clients: Bulk Edit, owners, Focus, Risk, setup, Harvest links
+  lower_danger_score: 'approver',  // clears a Risk flag
+  delete_tasks: 'approver',        // deletes tasks for good
+  delete_clients: 'approver',      // moves clients to Trash, restores them and deletes them for good
+  manage_settings: 'admin',        // Settings and connections: Harvest, Granola, Slack, Gmail, WhatsApp, AI, the rules
+};
+function profileHasAccess(p, key){
+  if(!p || p.access_revoked) return false;
+  if(p.role === 'admin') return true;
+  if(p.role === 'approver' && ACCESS_LEVEL[key] === 'approver') return true;
+  const x = p.extra_permissions || [];
+  return x.includes(key) || (key === 'view_team_queue' && x.includes('approve_updates'));
+}
+function hasAccess(key){ return profileHasAccess(myProfile, key); }
+function hasPermission(key){ return hasAccess(key); }
+function canEditClients(){ return hasAccess('edit_clients'); }
+function canApproveUpdates(){ return hasAccess('approve_updates'); }
+function canManageSettings(){ return hasAccess('manage_settings'); }
+// the update and Health rules in Settings: approvers by role, or anyone given Settings & connections
+function canChangeRules(){ return canApprove() || canManageSettings(); }
+// who to tell about something only some can act on: everyone else with that access
+function teamWithAccess(key){ return (typeof teamProfiles !== 'undefined' ? teamProfiles : []).filter(p => profileHasAccess(p, key) && (!currentUser || p.id !== currentUser.id)); }
+// Clearing a flag (lowering a Risk): admins and approvers (Nov 25: approvers too; they're the ones who
+// raise them), or a member given the permission in Team.
+function canLowerDangerScore(){ return hasAccess('lower_danger_score'); }
 
 let lastProfileError = null;
 async function loadMyProfile(){
@@ -118,7 +212,19 @@ let dangerHistory = [];
 async function loadDangerHistory(){
   const { data, error } = await supabaseClient.from('client_danger_history').select('*');
   if(error){ console.error('loadDangerHistory error', error); dangerHistory = []; return; }
-  dangerHistory = (data||[]).map(h => ({ clientId: h.client_id, danger: h.danger, recordedAt: new Date(h.recorded_at) }));
+  dangerHistory = (data||[]).map(h => ({ clientId: h.client_id, danger: h.danger, recordedAt: new Date(h.recorded_at), setBy: h.set_by || '', reason: h.reason || '', kind: h.kind || null }));
+}
+// Concerns about a client (Nov 25, addendum-risk-flags.sql): anyone on the team raises one, with why;
+// it puts the client on Watch until an approver or admin puts it At risk or clears it. null: the
+// table isn't there yet.
+let clientConcerns = [];
+let clientConcernsReady = null;
+async function loadClientConcerns(){
+  const { data, error } = await supabaseClient.from('client_concerns').select('*').order('created_at', { ascending: true });
+  if(error){ clientConcernsReady = /client_concerns|PGRST205|42P01|does not exist|schema cache/i.test(`${error.code || ''} ${error.message || ''}`) ? false : clientConcernsReady; clientConcerns = clientConcernsReady === false ? [] : clientConcerns; return; }
+  clientConcernsReady = true;
+  clientConcerns = (data || []).map(r => ({ id: r.id, clientId: r.client_id, reason: r.reason || '', raisedBy: r.raised_by || '', raisedById: r.raised_by_id || null,
+    createdAt: new Date(r.created_at), resolvedAt: r.resolved_at ? new Date(r.resolved_at) : null, resolvedBy: r.resolved_by || '', outcome: r.outcome || null }));
 }
 
 // One-time backfill for clients that predate this feature — gives every
@@ -137,17 +243,24 @@ async function seedDangerHistoryIfEmpty(){
   await loadDangerHistory();
 }
 
+// The account menu floats above your name, wider than the sidebar: it lives on the page itself
+// (the sidebar would clip it), placed from the button each time it opens.
 function toggleSidebarProfileMenu(){
   const trigger = document.querySelector('.sidebar-profile-trigger');
   const menu = document.getElementById('sidebarProfileMenu');
   const isOpen = menu.style.display === 'block';
   if(isOpen){ closeSidebarProfileMenu(); return; }
+  if(menu.parentElement !== document.body) document.body.appendChild(menu);
+  const foot = trigger.closest('.side-foot') || trigger, r = foot.getBoundingClientRect();
+  menu.style.left = Math.max(8, Math.round(r.left)) + 'px';
+  menu.style.bottom = Math.round(window.innerHeight - r.top + 6) + 'px';
+  menu.dataset.from = 'below';   // it opens upward from your name, and closes back down into it
   menu.style.display = 'block';
   trigger.classList.add('open');
 }
 function closeSidebarProfileMenu(){
   const menu = document.getElementById('sidebarProfileMenu');
-  if(menu) menu.style.display = 'none';
+  if(menu && menu.style.display !== 'none') typeof hidePop === 'function' ? hidePop(menu) : (menu.style.display = 'none');
   document.querySelector('.sidebar-profile-trigger')?.classList.remove('open');
 }
 function switchToMobileVersion(){
@@ -156,24 +269,8 @@ function switchToMobileVersion(){
 }
 
 async function toggleDarkMode(){
-  // Page-wide color fade only for the moment of switching (see .theme-switching CSS).
-  document.body.classList.add('theme-switching');
-  clearTimeout(toggleDarkMode._t);
-  toggleDarkMode._t = setTimeout(()=> document.body.classList.remove('theme-switching'), 260);
-  const isDark = document.body.dataset.theme === 'dark';
-  const newTheme = isDark ? 'light' : 'dark';
-  if(isDark){ delete document.body.dataset.theme; }
-  else { document.body.dataset.theme = 'dark'; }
-  try{ localStorage.setItem('bda_theme', newTheme); }catch(e){}
-  syncDarkModeToggleUI();
-  if(currentUser){
-    if(myProfile) myProfile.theme = newTheme;
-    const { error } = await supabaseClient.from('team_profiles').update({ theme: newTheme }).eq('id', currentUser.id);
-    if(error){
-      console.error('toggleDarkMode save error:', error);
-      showToast('error','Preference not saved','This won\'t follow you to other devices — ask your admin to check the theme column exists on team_profiles.');
-    }
-  }
+  // the switch in your menu: a plain Light or Dark (Auto and Night to Morning are in Settings)
+  await saveThemePref(document.body.dataset.theme === 'dark' ? 'light' : 'dark');
 }
 
 // Syncs the toggle switch's own visual .on state to match whatever the
@@ -186,8 +283,12 @@ function syncDarkModeToggleUI(){
 }
 
 document.addEventListener('click', function(e){
-  if(!e.target.closest('.sidebar-foot')) closeSidebarProfileMenu();
+  if(!e.target.closest('.side-foot') && !e.target.closest('#sidebarProfileMenu')) closeSidebarProfileMenu();
 });
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape' && document.getElementById('sidebarProfileMenu')?.style.display === 'block') closeSidebarProfileMenu();
+});
+window.addEventListener('resize', () => closeSidebarProfileMenu());
 
 function roleDisplayLabel(role){
   return role==='admin' ? 'Admin' : role==='approver' ? 'Approver' : 'Team member';
@@ -210,16 +311,17 @@ function renderWhoAmI(){
       avatarEl.style.display = 'none';
       if(placeholderEl){
         placeholderEl.style.display = 'flex';
-        placeholderEl.textContent = myProfile && myProfile.name ? myProfile.name.trim().charAt(0).toUpperCase() : '?';
-        placeholderEl.style.background = myProfile && myProfile.name ? avatarColorForName(myProfile.name) : '';
-        placeholderEl.style.color = '#fff';
+        placeholderEl.textContent = myProfile && myProfile.name ? initialsOf(myProfile.name) : '?';
+        placeholderEl.className = 'av a' + (myProfile && myProfile.name ? avatarColorIndex(myProfile.name) : 1);
       }
     }
   }
   if(nameEl && roleEl){
     if(myProfile){
       nameEl.textContent = myProfile.name;
-      roleEl.textContent = myProfile.title || roleDisplayLabel(myProfile.role);
+      // what you do (Account Manager, PPC Specialist), not your access level; the access level
+      // only shows if no job title has been set
+      roleEl.textContent = (myProfile.title || '').trim() || roleDisplayLabel(myProfile.role);
     } else {
       nameEl.textContent = '—'; roleEl.textContent = '';
     }
@@ -227,8 +329,30 @@ function renderWhoAmI(){
 }
 
 async function handleLogout(){
+  closeFloatingUi();
   await supabaseClient.auth.signOut();
   // onAuthStateChange fires SIGNED_OUT → showLoginScreen() runs.
+}
+
+// Signing out: what floats over the app (the account menu, open menus and pickers, a sheet, the
+// bell's panel, an (i) tip) closes, and the ones made on the fly go, so nothing is left over the
+// sign-in screen or comes back after the next sign-in. While signed out, the body's "signed-out"
+// class hides everything but the sign-in screen and toasts (mac.css).
+const STATIC_EL = new WeakSet();
+document.addEventListener('DOMContentLoaded', () => document.querySelectorAll('*').forEach(el => STATIC_EL.add(el)));
+function closeFloatingUi(){
+  try{
+    if(typeof closeSidebarProfileMenu === 'function') closeSidebarProfileMenu();
+    if(typeof closeAppModal === 'function') closeAppModal();
+    if(typeof itipHide === 'function') itipHide();
+    if(typeof closeTeamActionsMenu === 'function') closeTeamActionsMenu();
+    const np = document.getElementById('notifPanel'); if(np) np.style.display = 'none';
+    const ts = document.getElementById('toastStack'); if(ts) ts.innerHTML = ''; // messages from before don't carry over
+    [...document.body.children].forEach(el => {
+      if(['SCRIPT', 'STYLE', 'LINK', 'TEMPLATE'].includes(el.tagName) || el.id === 'loginOverlay' || el.id === 'appRoot' || el.id === 'toastStack' || el.id === 'itipPop') return;
+      if(!STATIC_EL.has(el)) el.remove();
+    });
+  }catch(e){ console.warn('closeFloatingUi', e); }
 }
 
 /* ---------- Button loading state ---------- */

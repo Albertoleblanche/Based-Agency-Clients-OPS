@@ -115,7 +115,7 @@ body.sidebar-collapsed .nav-item:hover::before{display:none;}
 /* cards that open something: hover lift + instant press */
 .kpi-click:hover, .donut-card:hover, .dsummary-card:hover, .team-card:hover, .cal-event-card:hover, .kanban-card:hover, .q-card:hover{box-shadow:var(--shadow), 0 6px 20px rgba(0,0,0,.06);}
 body[data-theme="dark"] :is(.kpi-click, .donut-card, .dsummary-card, .team-card, .cal-event-card, .kanban-card, .q-card):hover{background:#1A1A1C;box-shadow:var(--shadow);}
-.kpi-click:active, .dsummary-card:active, .team-card:active, .kanban-card:active, .q-card:active{transform:scale(.99);transition:transform 100ms ease-out;}
+.kpi-click:active:not(:has(:is(button,a,[onclick],[role=button],[role=checkbox]):active)), .dsummary-card:active:not(:has(:is(button,a,[onclick],[role=button],[role=checkbox]):active)), .team-card:active:not(:has(:is(button,a,[onclick],[role=button],[role=checkbox]):active)), .kanban-card:active:not(:has(:is(button,a,[onclick],[role=button],[role=checkbox]):active)), .q-card:active:not(:has(:is(button,a,[onclick],[role=button],[role=checkbox]):active)){transform:scale(.99);transition:transform 100ms ease-out;}
 /* card headers: no coloured banners (they were inline backgrounds) — a quiet
    title row like a macOS group box; the icon keeps its colour */
 .ov-card-title-row, .ov-mini-cal-head{background:transparent !important;border-radius:0;border-bottom:.5px solid var(--border);margin:0 0 4px;padding-left:0;padding-right:0;}

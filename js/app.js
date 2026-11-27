@@ -1,12 +1,6 @@
 // Activity log rendering, the countdown gauge, login/logout screens and
 // app startup (auth state, live-update safety nets). Loaded last.
 
-// Enter in the password field submits the login form.
-document.addEventListener('DOMContentLoaded', function(){
-  const pw = document.getElementById('loginPassword');
-  if(pw) pw.addEventListener('keydown', (e)=>{ if(e.key==='Enter') handleLogin(); });
-});
-
 function nowTime(){ return new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
 
 function logEntryLabel(l){
@@ -45,6 +39,12 @@ function renderLog(){
 
 function pad2(n){ return String(n).padStart(2,'0'); }
 
+// A refresh nobody should notice: reload the data and redraw without entrance animations.
+function silentRefresh(){
+  document.body.classList.add('silent-refresh');
+  return fullRefresh().finally(()=> setTimeout(()=> document.body.classList.remove('silent-refresh'), 200));
+}
+
 function renderGauge(){
   if(document.hidden) return; // nothing to see in a background tab
   const now = new Date();
@@ -78,27 +78,37 @@ function renderGauge(){
   document.querySelectorAll('.gauge-row').forEach(e=> e.classList.toggle('crit', isCrit));
 }
 
+// The sign-in screen itself (panes, reset link, new password, opening) is js/ui/signin.js.
 async function handleLogin(){
   const email = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value;
-  const errEl = document.getElementById('loginError');
-  errEl.style.display = 'none';
-  if(!email || !password){ errEl.textContent = 'Enter both email and password.'; errEl.style.display = 'block'; return; }
   const btn = document.getElementById('loginBtn');
-  setBtnLoading(btn, 'Signing in…');
-  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-  if(error){ restoreBtn(btn); errEl.textContent = error.message; errEl.style.display = 'block'; return; }
+  if(btn.disabled) return;
+  const bad = teamEmailProblem(email);
+  if(bad){ siErr('loginError', bad, ['loginEmail']); document.getElementById('loginEmail').focus(); return; }
+  if(!password){ siErr('loginError', 'Enter your password.', ['loginPassword']); document.getElementById('loginPassword').focus(); return; }
+  siErr('loginError', '');
+  siBusy(btn, 'Signing In…', ['loginEmail', 'loginPassword']);
+  let error = null;
+  try{ ({ error } = await supabaseClient.auth.signInWithPassword({ email, password })); }catch(e){ error = e; }
+  if(error){ siIdle(btn); siErr('loginError', siAuthMessage(error, 'signin'), ['loginPassword']); document.getElementById('loginPassword').select(); return; }
   // On success, onAuthStateChange fires SIGNED_IN → showApp() takes over.
 }
 
 function showLoginScreen(){
-  document.getElementById('loginOverlay').style.display = 'flex';
-  document.getElementById('loginLoadingCard').style.display = 'none';
-  document.getElementById('loginFormCard').style.display = 'block';
+  if(typeof closeFloatingUi === 'function') closeFloatingUi();
+  document.body.classList.add('signed-out');
+  const overlay = document.getElementById('loginOverlay');
+  overlay.style.display = ''; overlay.classList.remove('is-app');
   document.getElementById('appRoot').style.display = 'none';
+  document.getElementById('appRoot').classList.remove('si-app-in');
   teardownRealtimeSubscriptions();
   currentUser = null; myProfile = null;
-  restoreBtn(document.getElementById('loginBtn'));
+  if(typeof applyUiStyle === 'function') applyUiStyle();
+  siIdle(document.getElementById('loginBtn'));
+  document.getElementById('loginPassword').value = '';
+  siHidePasswords();
+  siSet('form'); siFocus('form');
   // Defensive reset — makes sure nothing from a previous session (e.g. an
   // admin's team-wide time entries) can render even briefly for whoever
   // logs in next on this same tab, before their own fresh data loads in.
@@ -115,41 +125,53 @@ function showLoginScreen(){
   claudeQuickActionsPicked = [];
 }
 
-async function showApp(session){
+async function showApp(session, o){
   try{
     currentUser = session.user;
+    // The sign-in screen becomes the opening: the panel fades, a thin line runs, and the greeting
+    // comes in once the profile has loaded. The screen stays up the whole time, so there's never a
+    // gap where nothing covers the window, and appRoot stays hidden until it's fully drawn.
+    siOpening(o);
     await loadMyProfile();
     if(!myProfile){
       // Auth account exists but no team_profiles row — shouldn't normally happen
       // since create-member.js creates both together, but handle it gracefully.
       const detail = lastProfileError ? ` (${lastProfileError.message || JSON.stringify(lastProfileError)})` : '';
-      document.getElementById('loginError').textContent = `Your account has no profile set up${detail}. Ask your admin to check the team_profiles table.`;
-      document.getElementById('loginError').style.display = 'block';
       await supabaseClient.auth.signOut();
+      showLoginScreen();
+      siErr('loginError', `This account isn’t set up on the team yet${detail}. Ask an admin to add you from Team.`);
       return;
     }
-    // Swap the overlay's own content from the login form to a loading
-    // spinner — the overlay itself stays up the whole time, so there's
-    // never a gap where nothing is covering the screen. appRoot stays
-    // display:none until right before renderAll() actually populates it,
-    // so the user goes straight from "loading" to a fully-populated app —
-    // never a flash of the empty static shell underneath.
-    document.getElementById('loginFormCard').style.display = 'none';
-    document.getElementById('loginLoadingCard').style.display = 'block';
+    siGreet(myProfile.name);
     await initTheme();
+    applyUiStyle();
     await loadAll();
+    siStep(1);
     // Everything below only fills its own list, so it loads in parallel
     // instead of one request after another (the seed step needs the
     // danger history first, so those two stay chained).
+    // The opening ticks off "Your day" and "Messages" as their parts arrive.
+    const day = Promise.all([loadMyNotes(), loadMyTasks(), loadCalendarEvents(), typeof loadPlan === 'function' ? loadPlan() : null]).then(() => siStep(2));
+    const msgs = Promise.all([loadNotifications(), typeof loadWaTasks === 'function' ? loadWaTasks() : null]).then(() => siStep(3));
     await Promise.all([
-      loadTeamProfiles(), loadMyNotes(), loadTimeEntries(), loadMyTasks(),
-      loadNotifications(), loadCalendarEvents(),
+      loadTeamProfiles(), loadTimeEntries(), day, msgs,
       loadDangerHistory().then(seedDangerHistoryIfEmpty),
+      typeof loadClientConcerns === 'function' ? loadClientConcerns() : null,   // concerns about clients (Nov 25)
+      // The weekly model reads these: without them the first screen counts every client
+      // as never updated until the next refresh.
+      typeof loadUpdateHistory === 'function' ? loadUpdateHistory() : null, typeof loadUpdateSkips === 'function' ? loadUpdateSkips() : null,
+      typeof loadHealthHandled === 'function' ? loadHealthHandled() : null,
+      typeof loadClientReminders === 'function' ? loadClientReminders() : null,
+      typeof loadTaskDueTimes === 'function' ? loadTaskDueTimes() : null,
+      // Harvest's clients and projects: what each client buys, and the lists Log Time uses
+      typeof hvTimeLoad === 'function' ? hvTimeLoad() : null,
     ]);
-    document.getElementById('appRoot').style.display = 'grid';
+    document.getElementById('appRoot').style.display = 'flex';
+    document.body.classList.remove('signed-out');
     renderAll();
-    document.getElementById('loginOverlay').style.display = 'none';
+    siEnterApp();
     updateTasksNavBadge();
+    if(typeof granolaAutoStart === 'function') granolaAutoStart();   // meetings come in by themselves
     applyAppIcon();
     applyAppBranding();
     applyNavLabels();
@@ -164,40 +186,83 @@ async function showApp(session){
     if(myProfile?.ai_chat_enabled){ loadClaudeHistory().then(renderClaudeMessages); }
     await checkForNewNotificationToasts();
     setupRealtimeSubscriptions();
+    if(typeof integPrefetch === 'function') integPrefetch();   // Settings → Connections ready before it's opened
+    if(typeof gcalAutoStart === 'function') gcalAutoStart();   // your calendar kept current, meetings announced (Nov 23)
+    // Read what changed in Harvest's clients, projects and tasks (the server skips it if it read in the last 10 minutes).
+    if(typeof harvestSyncInBackground === 'function') harvestSyncInBackground();
     // Open the screen the address points at (a refresh, bookmark, shared
     // link or push notification). The Google Calendar return is handled
     // separately in init() below.
-    if(location.hash && !/gcal=/.test(location.hash)) openScreenFromAddress(location.hash);
+    if(location.hash && !/gcal=|slackme=|gmail=/.test(location.hash)) openScreenFromAddress(location.hash);
+    // The first time someone signs in: Set Up Radar (Nov 24, setup.js)
+    if(typeof setupMaybeOpen === 'function') setupMaybeOpen();
   }catch(e){
     console.error('showApp failed', e);
-    document.getElementById('loginLoadingCard').style.display = 'none';
-    document.getElementById('loginFormCard').style.display = 'block';
-    document.getElementById('loginOverlay').style.display = 'flex';
+    document.body.classList.add('signed-out');
     document.getElementById('appRoot').style.display = 'none';
-    const errEl = document.getElementById('loginError');
-    if(errEl){ errEl.textContent = 'Something went wrong loading your workspace — please try signing in again.'; errEl.style.display = 'block'; }
-    restoreBtn(document.getElementById('loginBtn'));
+    document.getElementById('loginOverlay').style.display = '';
+    document.getElementById('loginOverlay').classList.remove('is-app');
+    siIdle(document.getElementById('loginBtn'));
+    siSet('form');
+    siErr('loginError', 'Your workspace didn’t finish loading. Sign in again to retry.');
   }
 }
 
 (async function init(){
   initSidebarState();
   const { data: { session } } = await supabaseClient.auth.getSession();
-  if(session){ await showApp(session); } else { showLoginScreen(); }
+  // A reset link that expired or was already used: say so, and offer a new one.
+  const linkError = siTakeLinkError();
+  if(linkError && /error/.test(location.hash)) history.replaceState(null, '', location.pathname);
+  if(session && siRecovering()){ siShowNewPassword(session); }   // from a reset link: set a new password first
+  else if(session){ siSetRecovering(false); await showApp(session); }
+  else {
+    siSetRecovering(false);
+    showLoginScreen();
+    if(linkError){ siShow('forgot'); siErr('siResetErr', 'That link has expired or was already used. Enter your email for a new one.'); }
+  }
 
   // Google redirects back to #profile?gcal=connected|denied|error after the
-  // OAuth flow — pick that up, land on Profile, and clean the URL so a
-  // refresh doesn't re-show the same toast.
+  // OAuth flow — pick that up, land on Settings → Connections (where Google Calendar lives; it left
+  // My Profile on Nov 25), and clean the URL so a refresh doesn't re-show the same toast.
   const hash = window.location.hash;
   if(hash.startsWith('#profile') && hash.includes('gcal=')){
     const outcome = new URLSearchParams(hash.split('?')[1]).get('gcal');
-    if(session){
-      await switchView('profile');
-      if(outcome==='connected') showToast('success','Google Calendar connected','Click "Sync now" to pull in your meetings.');
-      else if(outcome==='denied') showToast('info','Not connected','You can connect Google Calendar anytime from this page.');
+    // connected from Set Up Radar: back to it (Nov 24)
+    let gBack = ''; try{ gBack = sessionStorage.getItem('gcal-back') || ''; sessionStorage.removeItem('gcal-back'); }catch(e){}
+    if(session && gBack){
+      history.replaceState(null, '', window.location.pathname + gBack);
+      openScreenFromAddress(gBack);
+      if(outcome==='connected') showToast('success','Google Calendar connected','Your meetings are coming into Radar.');
+      else if(outcome==='denied') showToast('info','Not connected','You can connect Google Calendar later in Settings → Connections.');
+      else showToast('error','Google Calendar didn’t connect','Something went wrong. Try again.');
+    } else if(session){
+      history.replaceState(null, '', window.location.pathname + '#settings');
+      if(typeof openSettingsTab === 'function') openSettingsTab('connections'); else await switchView('settings');
+      if(outcome==='connected') showToast('success','Google Calendar connected','Your meetings are coming into Radar. Sync Now pulls them in right away.');
+      else if(outcome==='denied') showToast('info','Not connected','You can connect Google Calendar anytime from here.');
       else if(outcome==='error') showToast('error','Connection failed','Something went wrong connecting Google Calendar — try again.');
     }
-    history.replaceState(null, '', window.location.pathname + (session ? '#profile' : ''));
+    if(!session) history.replaceState(null, '', window.location.pathname);
+  }
+
+  // Google sends you back to #settings?gmail=… after you connect Gmail (Nov 24, gmail.js)
+  if(typeof gmailReturn === 'function') gmailReturn(hash, session);
+
+  // Slack sends you back to #settings?slackme=connected|denied|wrong-account|setup|error after you let
+  // Radar send messages as you (Nov 23): back to where you pressed Connect, and say how it went.
+  if(hash.includes('slackme=')){
+    const outcome = new URLSearchParams(hash.split('?')[1] || '').get('slackme');
+    let back = '#reminders'; try{ back = sessionStorage.getItem('slackme-back') || '#settings'; sessionStorage.removeItem('slackme-back'); }catch(e){}
+    history.replaceState(null, '', window.location.pathname + (session ? back : ''));
+    if(session){
+      if(typeof slackMe !== 'undefined') slackMe = null;
+      openScreenFromAddress(back);
+      const say = { connected: ['success', 'Slack connected', 'Nudges to teammates now go from your Slack, as you.'], denied: ['info', 'Not connected', 'You can connect your Slack anytime from Settings → Connections.'],
+        'wrong-account': ['error', 'That’s a different Slack account', 'Sign in to Slack as yourself (the account on your Radar profile) and try again.'],
+        setup: ['error', 'Almost there', 'An admin needs to run addendum-teammate-reminders.sql in Supabase first.'] }[outcome] || ['error', 'Slack didn’t connect', 'Something went wrong. Try again.'];
+      showToast(...say);
+    }
   }
 
   // Back/Forward, or an address typed/pasted into the bar → open that screen.
@@ -224,7 +289,13 @@ async function showApp(session){
   let ignoreNextAuthEvent = true;
   supabaseClient.auth.onAuthStateChange(async (event, session) => {
     if(ignoreNextAuthEvent){ ignoreNextAuthEvent = false; return; }
-    if(event === 'SIGNED_IN' && session){ await showApp(session); }
+    // Supabase reports SIGNED_IN again every time the tab comes back into view (it re-checks
+    // the saved session). The app is already open for that person, so there's nothing to do:
+    // running showApp() again reloaded everything, redrew every screen and replayed the
+    // screen's entrance, which was the "glitch" when switching back to the window.
+    // A reset link signs the person in for one thing: choosing a new password.
+    if(event === 'PASSWORD_RECOVERY' && session){ siShowNewPassword(session); return; }
+    if(event === 'SIGNED_IN' && session){ if(siRecovering() || (currentUser && currentUser.id === session.user?.id)) return; await showApp(session); }
     if(event === 'SIGNED_OUT'){ showLoginScreen(); }
   });
 
@@ -241,24 +312,19 @@ async function showApp(session){
   // just a safety net in case a connection silently drops and doesn't
   // reconnect on its own, which does happen occasionally with websockets.
   // Infrequent on purpose: if realtime is working, this rarely finds
-  // anything new to show.
-  setInterval(()=>{
-    if(currentUser && !isLoggingActive()){
-      document.body.classList.add('silent-refresh');
-      fullRefresh().finally(()=>{
-        setTimeout(()=> document.body.classList.remove('silent-refresh'), 200);
-      });
-    }
-  }, 180000);
+  // anything new to show. Silent: nothing on screen should move.
+  setInterval(()=>{ if(currentUser && !isLoggingActive() && !document.hidden) silentRefresh(); }, 180000);
 
   // Browsers throttle background tabs, including websocket activity — catch
-  // up on anything potentially missed the moment the tab becomes visible
-  // again, rather than waiting for the next safety-net poll.
+  // up on anything potentially missed when the tab comes back after a real
+  // absence. Switching between windows for a few seconds redraws nothing.
+  let hiddenAt = 0;
   document.addEventListener('visibilitychange', ()=>{
-    if(document.visibilityState==='visible' && currentUser && !isLoggingActive()){
-      fullRefresh();
-      setupRealtimeSubscriptions();
-    }
+    if(document.visibilityState === 'hidden'){ hiddenAt = Date.now(); return; }
+    if(!currentUser || isLoggingActive()) return;
+    if(!realtimeChannel || realtimeChannel.state !== 'joined' && realtimeChannel.state !== 'joining') setupRealtimeSubscriptions();
+    if(hiddenAt && Date.now() - hiddenAt < 60000) return;
+    silentRefresh();
   });
 
   const toastStackEl = document.getElementById('toastStack');

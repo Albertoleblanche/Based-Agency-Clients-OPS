@@ -1,0 +1,3 @@
+
+# WhatsApp connector runs on its own always-on server (see whatsapp-connector/README.md), not on Vercel
+whatsapp-connector/

@@ -28,9 +28,9 @@ function openNotePreview(noteId){
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
         <span class="pill" style="background:${stage.color}18;color:${stage.color};">${escapeHtml(stage.label)}</span>
         ${client ? `<span class="row-link" onclick="closeAppModal();openClientDetail('${client.id}')">${escapeHtml(client.name)}</span>` : ''}
-        <span style="font-size:11px;color:var(--muted-lt);margin-left:auto;">Updated ${updatedLabel}</span>
+        <span style="font-size:12px;color:var(--muted-lt);margin-left:auto;">Updated ${updatedLabel}</span>
       </div>
-      <div style="white-space:pre-wrap;font-size:13.5px;line-height:1.6;color:var(--ink);">${escapeHtml(n.text)}</div>
+      <div style="white-space:pre-wrap;font-size:14.5px;line-height:1.6;color:var(--ink);">${escapeHtml(n.text)}</div>
       ${n.link ? `<a href="${safeUrl(normalizeUrl(n.link))}" target="_blank" rel="noopener" class="note-link" style="margin-top:14px;display:inline-block;">🔗 ${escapeHtml(truncateLinkDisplay(n.link, 60))}</a>` : ''}
     </div>
     <div class="modal-actions">
@@ -54,7 +54,7 @@ function openNoteModal(noteId, presetClientId, presetStatus){
     <div class="modal-head"><span class="panel-title">${editing ? 'Edit note' : 'Add note'}</span><span class="toast-close" onclick="closeAppModal()">✕</span></div>
     <div class="modal-body">
       <div class="settings-field"><label>Title</label><input id="noteTitleInput" type="text" style="width:100%;" placeholder="Short title for this note" value="${editing && editing.title ? escapeHtml(editing.title) : ''}"></div>
-      <div class="settings-field"><label>Note</label><textarea spellcheck="true" id="noteTextInput" style="width:100%;min-height:64px;font-family:var(--font);font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${editing ? escapeHtml(editing.text) : ''}</textarea></div>
+      <div class="settings-field"><label>Note</label><textarea spellcheck="true" id="noteTextInput" style="width:100%;min-height:64px;font-family:var(--font);font-size:14px;padding:10px;border-radius:8px;border:1px solid var(--border);resize:vertical;">${editing ? escapeHtml(editing.text) : ''}</textarea></div>
       <div class="form-grid">
         <div class="settings-field"><label>Client</label><select id="noteClientSelect" style="width:100%;">${clientOptions}</select></div>
         <div class="settings-field"><label>Status</label>
@@ -71,7 +71,7 @@ function openNoteModal(noteId, presetClientId, presetStatus){
         <div class="settings-field"><label>Link (optional)</label><input id="noteLinkInput" type="url" placeholder="https://…" value="${editing && editing.link ? escapeHtml(editing.link) : ''}"></div>
         <div class="settings-field" style="position:relative;"><label>Follow-up date (optional)</label>${datePickerFieldHtml('noteFollowUpInput', { minDate: toDateStr(new Date()) })}</div>
       </div>
-      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink);cursor:pointer;margin-top:2px;"><input type="checkbox" id="noteAddToCalendarInput"> Add to calendar (needs a follow-up date)</label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink);cursor:pointer;margin-top:2px;"><input type="checkbox" id="noteAddToCalendarInput"> Add to calendar (needs a follow-up date)</label>
       ` : `
       <div class="settings-field"><label>Link (optional)</label><input id="noteLinkInput" type="url" placeholder="https://…" value="${editing && editing.link ? escapeHtml(editing.link) : ''}"></div>
       `}
@@ -93,7 +93,7 @@ async function loadMyNotes(){
     .is('deleted_at', null)
     .order('updated_at', { ascending: false });
   if(error){ console.error('loadMyNotes error', error); notes = []; notesDataLoaded = true; return; }
-  notes = (data||[]).map(n => ({ id:n.id, clientId:n.client_id, title:n.title, text:n.text, status:n.status, link:n.link, followUpDate:n.follow_up_date, createdAt:n.created_at, updatedAt:n.updated_at }));
+  notes = (data||[]).map(n => ({ id:n.id, clientId:n.client_id, title:n.title, text:n.text, status:n.status, link:n.link, followUpDate:n.follow_up_date, color:n.color||null, createdAt:n.created_at, updatedAt:n.updated_at }));
   notesDataLoaded = true;
 }
 
@@ -223,10 +223,10 @@ function populateNotesClientFilter(){
 }
 
 const NOTE_STAGES = [
-  { key:'idea',        label:'Idea',        color:'#7C93B0', icon:'<svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M176,232a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,232Zm40-128a87.55,87.55,0,0,1-33.64,69.21A16.24,16.24,0,0,0,176,186v6a16,16,0,0,1-16,16H96a16,16,0,0,1-16-16v-6a16,16,0,0,0-6.23-12.66A87.59,87.59,0,0,1,40,104.49C39.74,56.83,78.26,17.14,125.88,16A88,88,0,0,1,216,104Zm-16,0a72,72,0,0,0-73.74-72c-39,.92-70.47,33.39-70.26,72.39a71.65,71.65,0,0,0,27.64,56.3A32,32,0,0,1,96,186v6h64v-6a32.15,32.15,0,0,1,12.47-25.35A71.65,71.65,0,0,0,200,104Zm-16.11-9.34a57.6,57.6,0,0,0-46.56-46.55,8,8,0,0,0-2.66,15.78c16.57,2.79,30.63,16.85,33.44,33.45A8,8,0,0,0,176,104a9,9,0,0,0,1.35-.11A8,8,0,0,0,183.89,94.66Z"/></svg>' },
-  { key:'planned',      label:'Planned',     color:'#C99A55', icon:'<svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM72,48v8a8,8,0,0,0,16,0V48h80v8a8,8,0,0,0,16,0V48h24V80H48V48ZM208,208H48V96H208V208Z"/></svg>' },
-  { key:'in-progress',  label:'In Progress', color:'#C17A6E', icon:'<svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm48.24-94.78-64-40A8,8,0,0,0,100,88v80a8,8,0,0,0,12.24,6.78l64-40a8,8,0,0,0,0-13.56ZM116,153.57V102.43L156.91,128Z"/></svg>' },
-  { key:'done',         label:'Done',        color:'#117F3A', icon:'<svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg>' },
+  { key:'idea',        label:'Idea',        color:'#7C93B0', icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" /> <path d="M9 18h6" /> <path d="M10 22h4" /></svg>' },
+  { key:'planned',      label:'Planned',     color:'#C99A55', icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3" /> <path d="M16 2v3" /> <rect x="3" y="3" width="18" height="18" rx="2" /> <path d="M3 9h18" /> <path d="M8 13h.01" /> <path d="M12 13h.01" /> <path d="M16 13h.01" /> <path d="M8 17h.01" /> <path d="M12 17h.01" /> <path d="M16 17h.01" /></svg>' },
+  { key:'in-progress',  label:'In Progress', color:'#C17A6E', icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 9.003a1 1 0 0 1 1.517-.859l4.997 2.997a1 1 0 0 1 0 1.718l-4.997 2.997A1 1 0 0 1 9 14.996z" /> <circle cx="12" cy="12" r="10" /></svg>' },
+  { key:'done',         label:'Done',        color:'#117F3A', icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="m16 9-5.5 5.5L8 12" /></svg>' },
 ];
 
 // Notes works like Mail and Apple Notes: the list on the left, the note
@@ -276,7 +276,7 @@ function renderNotes(){
     <div class="note-bar">
       ${c ? `<span class="row-link" onclick="openClientDetail('${c.id}')">${escapeHtml(c.name)}</span>` : ''}
       <label class="note-status"><span class="sr-only">Status</span><select onchange="changeNoteStatus('${n.id}', this.value)">${statusOptions}</select></label>
-      <span class="note-private"><svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208,80H176V56a48,48,0,0,0-96,0V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80ZM96,56a32,32,0,0,1,64,0V80H96ZM208,208H48V96H208V208Z"/></svg>Only you can see this note</span>
+      <span class="note-private"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /> <path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>Only you can see this note</span>
     </div>
     <h2 class="note-title">${escapeHtml(n.title || 'Untitled note')}</h2>
     <div class="note-text">${escapeHtml(n.text || '')}</div>
@@ -290,10 +290,12 @@ function renderNotes(){
   board.innerHTML = `<div class="notes-list" role="listbox" aria-label="Notes">${list}</div><section class="notes-pane" aria-label="Selected note">${pane}</section>`;
 }
 
+// Notes in the sidebar counts the Granola meetings read since you last opened Notes (Nov 23)
 function updateNotesBadge(){
   const badge = document.getElementById('navNotesBadge');
   if(!badge) return;
-  const open = notes.filter(n=>n.status!=='done').length;
-  badge.textContent = open;
-  badge.style.display = open ? 'inline-flex' : 'none';
+  const n = typeof granolaNewN !== 'undefined' ? granolaNewN : 0;
+  badge.textContent = n;
+  badge.style.display = n ? '' : 'none';   // the stylesheet lays out the count circle
+  badge.title = n ? `${n} new meeting${n === 1 ? '' : 's'} from Granola` : '';
 }

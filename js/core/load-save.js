@@ -15,12 +15,13 @@ const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 let _loadAllSeq = 0;
 async function loadAll(){
   const mySeq = ++_loadAllSeq;
-  const [activityRows, s, clientsRes, impRes, draftsRes] = await Promise.all([
+  const [activityRows, s, clientsRes, impRes, draftsRes, winGroupsRes] = await Promise.all([
     fetchActivityLog(),
     safeGet('settings'),
     supabaseClient.from('clients').select('*'),
-    supabaseClient.from('client_improvements').select('*').order('date', { ascending:true }),
+    selectAll(() => supabaseClient.from('client_improvements').select('*').order('date', { ascending:true }).order('id')),
     supabaseClient.from('client_drafts').select('*'),
+    typeof winsGroupsFetch === 'function' ? winsGroupsFetch() : null,
   ]);
   // A newer loadAll() call has started since this one began — its data (or
   // data from whichever call turns out to resolve last) is what should win,
@@ -57,8 +58,9 @@ async function loadAll(){
   if(impRes.error) console.error('loadAll: client_improvements fetch failed', impRes.error);
   if(draftsRes.error) console.error('loadAll: client_drafts fetch failed', draftsRes.error);
   clients = (clientsRes.data || []).map(clientRowFromDb);
-  clientImprovements = (impRes.data || []).map(improvementRowFromDb);
+  setLoadedWork(impRes.data);   // deleted work is kept apart, for Recently Deleted
   clientDrafts = (draftsRes.data || []).map(draftRowFromDb);
+  if(typeof winsAfterLoad === 'function') winsAfterLoad(draftsRes.data, winGroupsRes);
   clients.forEach(c => {
     c.improvements = clientImprovements.filter(i => i.clientId === c.id);
     c.drafts = clientDrafts.filter(d => d.clientId === c.id);
@@ -187,13 +189,13 @@ function showSendEmailConfirm(to, subject, body, onSent, includeSignature){
     <div class="modal-body">
       <div class="settings-field"><label>To</label><input id="mailModalTo" value="${escapeHtml(to)}" readonly style="width:100%;"></div>
       <div class="settings-field"><label>Subject</label><input id="mailModalSubject" style="width:100%;"></div>
-      <div class="settings-field"><label>Body</label><textarea spellcheck="true" id="mailModalBody" style="min-height:150px;width:100%;font-family:var(--font);font-size:13px;padding:10px;border-radius:6px;border:1px solid var(--border);"></textarea></div>
-      <p style="font-size:11.5px;color:var(--muted-lt);margin:8px 0 0;line-height:1.5;">Review the text above — clicking Send delivers it immediately from the app, no further confirmation.</p>
+      <div class="settings-field"><label>Body</label><textarea spellcheck="true" id="mailModalBody" style="min-height:150px;width:100%;font-family:var(--font);font-size:14px;padding:10px;border-radius:6px;border:1px solid var(--border);"></textarea></div>
+      <p style="font-size:12.5px;color:var(--muted-lt);margin:8px 0 0;line-height:1.5;">Review the text above — clicking Send delivers it immediately from the app, no further confirmation.</p>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-brand" id="sendEmailConfirmBtn" onclick="confirmSendEmail()"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M227.32,28.68a16,16,0,0,0-15.66-4.08l-.15,0L19.57,82.84a16,16,0,0,0-2.49,29.8L102,154l41.3,84.87A15.86,15.86,0,0,0,157.74,248q.69,0,1.38-.06a15.88,15.88,0,0,0,14-11.51l58.2-191.94c0-.05,0-.1,0-.15A16,16,0,0,0,227.32,28.68ZM157.83,231.85l-.05.14,0-.07-40.06-82.3,48-48a8,8,0,0,0-11.31-11.31l-48,48L24.08,98.25l-.07,0,.14,0L216,40Z"/></svg>Send Email</button>
-      <button class="btn btn-outline" id="mailModalCopyBtn" onclick="copyMailModalBody()"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z"/></svg>Copy details</button>
-      <button class="btn btn-outline" onclick="closeAppModal()"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></svg>Cancel</button>
+      <button class="btn btn-brand" id="sendEmailConfirmBtn" onclick="confirmSendEmail()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /> <path d="m21.854 2.147-10.94 10.939" /></svg>Send Email</button>
+      <button class="btn btn-outline" id="mailModalCopyBtn" onclick="copyMailModalBody()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /> <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>Copy details</button>
+      <button class="btn btn-outline" onclick="closeAppModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></svg>Cancel</button>
     </div>`, 500);
   document.getElementById('mailModalSubject').value = subject;
   document.getElementById('mailModalBody').value = body;
@@ -231,7 +233,7 @@ async function confirmSendEmail(){
 // Lets other admins/approvers know a client email went out, since whoever
 // clicked Send is the only one who'd otherwise know it happened.
 async function notifyOthersOfEmailSent(to, subject){
-  const recipients = teamProfiles.filter(p=> (p.role==='admin' || p.role==='approver') && p.id!==currentUser.id);
+  const recipients = teamWithAccess('approve_updates');
   for(const p of recipients){
     await sendNotification(p.id, 'email_sent', 'Client email sent', `${myName()||'Someone'} sent "${subject}" to ${to}.`, 'approve');
   }

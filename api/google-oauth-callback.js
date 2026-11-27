@@ -8,6 +8,15 @@ module.exports = async function handler(req, res) {
   const { code, state, error: googleError } = req.query;
   const appUrl = (process.env.APP_URL || `https://${req.headers.host}`).replace(/\/+$/, '');
 
+  // Gmail (Nov 24, lib/gmail-tasks.js) comes back through the same address, with a signed state
+  if (String(state || '').includes('.')) {
+    const { gmailCallback } = require('../lib/gmail-tasks');
+    let to = `${appUrl}/#settings?gmail=error`;
+    try { to = await gmailCallback(createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY), req.query || {}, appUrl); } catch (e) {}
+    res.writeHead(302, { Location: to }); res.end();
+    return;
+  }
+
   if (googleError) {
     res.writeHead(302, { Location: `${appUrl}/#profile?gcal=denied` });
     res.end();
@@ -79,6 +88,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    await require('../lib/conn-alerts').connOk(admin, 'gcal', { userId, force: true }).catch(() => {});   // connected again (Nov 26)
     res.writeHead(302, { Location: `${appUrl}/#profile?gcal=connected` });
     res.end();
   } catch (e) {

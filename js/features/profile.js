@@ -48,8 +48,16 @@ async function uploadAvatar(file){
 
 async function saveProfileBasicInfo(){
   const name = document.getElementById('profileNameInput').value.trim();
-  const phone = document.getElementById('profilePhoneInput').value.trim();
+  let phone = document.getElementById('profilePhoneInput').value.trim();
   if(!name){ showToast('error','Name required','Your name can\'t be empty.'); return; }
+  // the phone is your WhatsApp number (Who's on the team matches it): kept with its country code
+  if(phone && phone !== (myProfile.phone || '')){
+    const d = phone.replace(/\D/g, '');
+    const num = phone.startsWith('+') ? (/^\d{8,15}$/.test(d) ? d : null) : d.length === 10 ? '1' + d : null;
+    if(!num){ showToast('error', 'Check the number', 'Start with + and the country code, like +55 41 98875-3180 or +1 305 555 0101.'); document.getElementById('profilePhoneInput').focus(); return; }
+    phone = typeof waFmtNum === 'function' ? waFmtNum(num) : '+' + num;
+    document.getElementById('profilePhoneInput').value = phone;
+  }
   const { error } = await supabaseClient.from('team_profiles').update({ name, phone }).eq('id', currentUser.id);
   if(error){ showToast('error','Save failed', error.message); return; }
   myProfile.name = name; myProfile.phone = phone;
@@ -64,7 +72,13 @@ async function saveDailySummarySlackId(value){
   if(error){ showToast('error','Could not save', error.message); return; }
   myProfile.daily_summary_slack_id = value || null;
   await loadTeamProfiles();
-  showToast('success', value ? 'Saved' : 'Cleared', value ? 'Your daily summary will go there instead.' : 'Your daily summary will use your regular Slack DM ID.');
+  if(typeof dsSlackSubRefresh === 'function') await dsSlackSubRefresh(true);
+  const sm = (typeof slackMe !== 'undefined' && slackMe) || {};
+  const other = value && value !== myProfile.slack_user_id;
+  showToast('success', value ? 'Saved' : 'Cleared', !value ? 'Your daily summary will use your regular Slack DM ID.'
+    : !other ? 'Your daily summary will go to your own Slack.'
+    : sm.connected ? 'Your daily summary will go there, from your Slack, as you.'
+    : 'Your daily summary will go there. Radar sends it until you connect your Slack.');
 }
 
 function renderProfileEmailPanel(){
@@ -72,18 +86,18 @@ function renderProfileEmailPanel(){
   if(!el) return;
   if(isAdmin()){
     el.innerHTML = `
-      <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">As an admin, you can change your own login email directly. Supabase will send a confirmation link to the new address before the change actually takes effect.</p>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;line-height:1.5;">As an admin, you can change your own login email directly. Supabase will send a confirmation link to the new address before the change actually takes effect.</p>
       <div class="form-grid">
         <div><label>Current email</label><input value="${escapeHtml(currentUser.email)}" readonly style="color:var(--muted-lt);"></div>
-        <div><label>New email</label><input id="directEmailInput" placeholder="new@basedagency.com"></div>
+        <div><label>New email</label><input id="directEmailInput" placeholder="new@based-agency.com"></div>
       </div>
       <button class="btn btn-brand" style="margin-top:6px;" onclick="saveDirectEmailChange()">Update email</button>`;
   } else {
     el.innerHTML = `
-      <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Changing your login email needs admin approval — submit a request below and an admin will confirm or deny it.</p>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Changing your login email needs admin approval — submit a request below and an admin will confirm or deny it.</p>
       <div class="form-grid">
         <div><label>Current email</label><input value="${escapeHtml(currentUser.email)}" readonly style="color:var(--muted-lt);"></div>
-        <div><label>Requested new email</label><input id="requestEmailInput" placeholder="new@basedagency.com"></div>
+        <div><label>Requested new email</label><input id="requestEmailInput" placeholder="new@based-agency.com"></div>
       </div>
       <button class="btn btn-brand" style="margin-top:6px;" onclick="submitEmailChangeRequest()">Submit request</button>
       <div id="myEmailRequestsList" style="margin-top:16px;"></div>`;
@@ -93,15 +107,18 @@ function renderProfileEmailPanel(){
 
 async function saveDirectEmailChange(){
   const newEmail = document.getElementById('directEmailInput').value.trim();
-  if(!newEmail || !newEmail.includes('@')){ showToast('error','Invalid email','Enter a valid email address.'); return; }
+  const bad = teamEmailProblem(newEmail, 'new');
+  if(bad){ showToast('error','Use a Based Agency email', bad); return; }
   const { error } = await supabaseClient.auth.updateUser({ email: newEmail });
   if(error){ showToast('error','Update failed', error.message); return; }
   showToast('success','Confirmation sent', `Check ${newEmail} for a link to confirm the change.`);
+  return true;
 }
 
 async function submitEmailChangeRequest(){
   const requested = document.getElementById('requestEmailInput').value.trim();
-  if(!requested || !requested.includes('@')){ showToast('error','Invalid email','Enter a valid email address.'); return; }
+  const bad = teamEmailProblem(requested, 'new');
+  if(bad){ showToast('error','Use a Based Agency email', bad); return; }
   const { error } = await supabaseClient.from('email_change_requests').insert({
     user_id: currentUser.id, current_email: currentUser.email, requested_email: requested
   });
@@ -114,6 +131,7 @@ async function submitEmailChangeRequest(){
   document.getElementById('requestEmailInput').value = '';
   renderMyEmailRequests();
   showToast('success','Request submitted','An admin will review it soon.');
+  return true;
 }
 
 async function renderMyEmailRequests(){
@@ -121,12 +139,12 @@ async function renderMyEmailRequests(){
   if(!el) return;
   const { data, error } = await supabaseClient.from('email_change_requests').select('*').eq('user_id', currentUser.id).order('created_at',{ascending:false}).limit(5);
   if(error || !data || !data.length){ el.innerHTML = ''; return; }
-  const statusMeta = { pending:{cls:'pill-mid',label:'Pending'}, approved:{cls:'pill-good',label:'Approved'}, denied:{cls:'pill-bad',label:'Denied'} };
-  el.innerHTML = `<label style="font-family:var(--font);font-size:10px;color:var(--muted);display:block;margin-bottom:8px;">Your requests</label>` +
-    data.map(r=>{
-      const s = statusMeta[r.status];
-      return `<div class="integ-row"><div><div class="integ-name">${escapeHtml(r.requested_email)}</div><div class="integ-desc">${new Date(r.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div></div><span class="pill ${s.cls}">${escapeHtml(s.label)}</span></div>`;
-    }).join('');
+  // as rows in the Sign-in card (Nov 25): the address you asked for, when, and where it stands
+  const statusMeta = { pending: { dot: 'gray', label: 'Waiting for an admin' }, approved: { dot: 'green', label: 'Approved' }, denied: { dot: 'red', label: 'Not approved' } };
+  el.innerHTML = data.map(r => {
+    const s = statusMeta[r.status] || statusMeta.pending;
+    return `<div class="fr"><div class="l"><b>${escapeHtml(r.requested_email)}</b><span>Asked ${new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span></div><span class="st"><span class="dot ${s.dot}"></span>${escapeHtml(s.label)}</span></div>`;
+  }).join('');
 }
 
 function updateEmailRequestBadges(count){
@@ -135,14 +153,14 @@ function updateEmailRequestBadges(count){
   [navBadge, subtabBadge].forEach(b=>{
     if(!b) return;
     b.textContent = count;
-    b.style.display = count ? 'flex' : 'none';
+    b.style.display = count ? (b === navBadge ? '' : 'flex') : 'none';   // the sidebar's circle is laid out by the stylesheet
   });
 }
 
 async function renderPendingEmailRequests(){
   const el = document.getElementById('pendingEmailRequestsList');
   if(!el) return;
-  el.innerHTML = `<div class="empty"><span class="spinner"></span>Loading…</div>`;
+  el.innerHTML = `${loadingStateHtml('Loading…')}`;
   const { data, error } = await supabaseClient.from('email_change_requests').select('*').eq('status','pending').order('created_at',{ascending:true});
   if(error){ el.innerHTML = `<div class="empty">Could not load requests.</div>`; return; } // badges left untouched — a network error here doesn't mean the real count changed
   updateEmailRequestBadges(data ? data.length : 0);
