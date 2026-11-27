@@ -211,7 +211,8 @@ function dpRingMount(){
   el.addEventListener('mouseenter', () => { clearTimeout(dpRing.closeT); dpRing.openT = setTimeout(() => dpRingPop(true), 90); });
   el.addEventListener('mouseleave', () => { clearTimeout(dpRing.openT); dpRing.closeT = setTimeout(() => dpRingPop(false), 180); });
   el.addEventListener('focusin', () => dpRingPop(true));
-  el.addEventListener('focusout', e => { if(!el.contains(e.relatedTarget)) dpRingPop(false); });
+  // a redraw takes the focused button away (focus goes nowhere): with the pointer still on the card, it stays
+  el.addEventListener('focusout', e => { if(!el.contains(e.relatedTarget) && !(e.relatedTarget === null && el.matches(':hover'))) dpRingPop(false); });
   el.addEventListener('keydown', e => { if(e.key === 'Escape'){ dpRingPop(false); el.querySelector('.dpr-b').blur(); } });
   const say = el.querySelector('.dpr-say');
   say.addEventListener('mouseenter', () => clearTimeout(dpRing.sayT));
@@ -229,8 +230,19 @@ function dpRingUnmount(){ const el = document.getElementById('dpRing'); if(el) e
 function dpRingOpen(){ dpRingPop(false); dpRingSayOff(); openDayPlan(); }
 function dpRingPop(on){
   const el = document.getElementById('dpRing'); if(!el) return;
-  if(on){ dpRingSayOff(); el.querySelector('.dpr-pop').innerHTML = dpRingPopHtml(dayPlanItems()); }
+  if(on){ dpRingSayOff(); dpRingDraw(el, dayPlanItems()); }
   el.classList.toggle('is-pop', !!on);
+}
+// The card is drawn again only when what it says changed (Nov 27). Pressing a button in it moves focus
+// into the ring, which opens the card again: drawing it then swapped the pressed button for a copy before
+// the mouse came up, so no click ever happened (Open Today’s Plan, the circles, the lines).
+function dpRingDraw(el, items){
+  const pop = el.querySelector('.dpr-pop'), html = dpRingPopHtml(items);
+  if(pop._html === html) return;
+  // the control you're on keeps the focus across the redraw (a circle you just ticked, from the keyboard)
+  const was = document.activeElement && pop.contains(document.activeElement) ? document.activeElement.getAttribute('onclick') : null;
+  pop.innerHTML = html; pop._html = html;
+  if(was){ const again = [...pop.querySelectorAll('button')].find(b => b.getAttribute('onclick') === was); if(again) again.focus({ preventScroll: true }); }
 }
 function dpRingPopHtml(items){
   const p = dayPlanV3() || {}, k = items.filter(x => x.done).length, next = items.find(x => !x.done), marked = new Set(dpMarked()), A = jsArg;
@@ -238,7 +250,8 @@ function dpRingPopHtml(items){
     const sub = x === next && x.why ? `<em>${escapeHtml(x.why)}</em>` : !x.done && (x.when || x.sub) ? `<small>${escapeHtml(x.kind === 'move' ? [x.when, x.minutes ? dpMins(x.minutes) : ''].filter(Boolean).join(' · ') : x.kind === 'follow' ? 'Ready for you to send' : 'Written, ready for Review')}</small>` : '';
     // the circle: marks it done yourself, or, for a move made of tasks, does the one left (or opens the next)
     const self = x.kind !== 'move' || x.canMark, open = (x.tasks || []).filter(t => t.status !== 'done');
-    const tip = x.done ? (marked.has(x.id) ? 'Mark not done' : 'Done') : self ? 'Mark done' : open.length === 1 && !(x.wa || []).some(w => w.status === 'open') ? 'Mark the task done' : 'Open the next step';
+    const mineOpen = open.filter(t => t.assigneeId === currentUser.id), waOpen = (x.wa || []).some(w => w.status === 'open');
+    const tip = x.done ? (marked.has(x.id) ? 'Mark not done' : 'Done') : self ? 'Mark done' : mineOpen.length && !waOpen ? (open.length === 1 ? 'Mark the task done' : `Mark the next task done: ${open.length} left`) : 'Open the next step';
     const off = x.done && !marked.has(x.id);
     return `<li class="${x.done ? 'is-done' : ''}${x === next ? ' is-next' : ''}"><button type="button" class="dpr-c" title="${tip}" aria-label="${escapeHtml(tip + ': ' + x.title)}"${off ? ' disabled' : ` onclick="dpPopTick(${A(x.id)})"`}>${x.done ? icon('check', { weight: 'bold' }) : ''}</button><button type="button" class="dpr-tx" onclick="dpPopOpen(${A(x.id)})" title="${x.kind === 'follow' ? 'Read and send the message' : x.kind === 'win' ? 'Open the update' : open.length || (x.wa || []).length ? 'Open it' : 'Open Today’s Plan'}"><b>${escapeHtml(x.title)}</b>${sub}</button></li>`;
   };
@@ -262,8 +275,10 @@ function dpPopTick(id){
   const marked = dpMarked().includes(id);
   if(it.kind !== 'move' || it.canMark){ if(it.done && !marked) return; dpMarkDone(id, !marked); return; }
   if(it.done) return;
-  const open = (it.tasks || []).filter(t => t.status !== 'done');
-  if(open.length === 1 && !(it.wa || []).some(w => w.status === 'open') && open[0].assigneeId === currentUser.id){ dpRingPop(false); moveTaskToStatus(open[0].id, 'done'); return; }
+  // your next open task goes through Mark Done (Nov 27: a move of two tasks too, one at a time); the
+  // move ticks itself once they're all done. A WhatsApp request, or someone else's task, opens instead.
+  const next = (it.tasks || []).find(t => t.status !== 'done' && t.assigneeId === currentUser.id);
+  if(next && !(it.wa || []).some(w => w.status === 'open')){ dpRingPop(false); moveTaskToStatus(next.id, 'done'); return; }
   dpPopOpen(id);
 }
 // one quiet line by the ring; it stays while you read it
@@ -293,7 +308,7 @@ function dpRingUpdate(items){
   }
   el.querySelector('.dpr-b').setAttribute('aria-label', `Today’s Plan: ${all ? 'all done' : `${k} of ${items.length} done`}`);
   const sig = items.map(x => x.id + (x.done ? '+' : '-')).join();
-  if(sig !== dpRing.sig){ dpRing.sig = sig; if(el.classList.contains('is-pop')) el.querySelector('.dpr-pop').innerHTML = dpRingPopHtml(items); }
+  if(sig !== dpRing.sig){ dpRing.sig = sig; if(el.classList.contains('is-pop')) dpRingDraw(el, items); }
   // just done (this session, not before): what it makes possible, and what's next
   const done = new Set(items.filter(x => x.done).map(x => x.id));
   let seen = []; try{ seen = JSON.parse(localStorage.getItem(dpRingKey('said')) || '[]'); }catch(e){}
