@@ -96,7 +96,7 @@ const QU_STATE = {
 function quStateOf(x){ return quWaToSend(x) ? 'send' : x.st; }
 // "4d overdue", "Due today", "Sent · next Fri": short enough for a row.
 function quDueShort(w){
-  if(w.sent) return `Sent · next ${w.due ? DAY_NAMES[w.due.getDay()].slice(0, 3) : 'week'}`;
+  if(w.sent) return `${w.skipped ? 'Skipped' : 'Sent'} · next ${w.due ? DAY_NAMES[w.due.getDay()].slice(0, 3) : 'week'}`;
   return w.late ? overdueShort(w) : w.dueText;
 }
 
@@ -221,7 +221,7 @@ function queueReadHtml(x, list, split){
   // The client, and where its update stands.
   const sentAt = x.st === 'sent' ? new Date(d.draftSentAt) : null;
   const due = sentAt ? `Sent ${relDayLower(sentAt)} at ${fmtTime(sentAt)}` : x.st === 'next' ? `Next update · after the one ${x.held && x.held.draftStatus === 'approved' ? 'approved' : 'in review'} is sent`
-    : w.sent ? `Last update sent ${relDayLower(w.last)} · next ${w.dueText.replace(/^Due /, 'due ')}` : w.dueText;
+    : w.sent ? `${w.skipped ? `This week’s update skipped ${relDayLower(w.last)}` : `Last update sent ${relDayLower(w.last)}`} · next ${w.dueText.replace(/^Due /, 'due ')}` : w.dueText;
   const head = `<div class="rvn-hd">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}${focusMark(c)}</b><span class="s"><span class="${!sentAt && !w.sent && w.late && x.st !== 'next' ? 't-red' : ''}">${escapeHtml(due)}</span></span><span class="s">${escapeHtml([c.service, w.owner ? (w.owner === me ? 'Yours' : 'Owner ' + firstName(w.owner)) : ''].filter(Boolean).join(' · '))}</span></div></div>`;
   // Your work: each item with its email switch, Edit and Delete; Log More under it, with the date
   // (today unless you pick another) and the time spent, kept while you move around the page.

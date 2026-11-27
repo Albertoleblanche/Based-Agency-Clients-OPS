@@ -214,7 +214,7 @@ function clientStageWord(w){
 }
 function clientWeekCell(w){
   if(w.off) return ['No weekly update', 'is-none', 'Internal'];
-  if(w.sent){ const d = relDay(w.last); return [`Sent ${d === 'Today' ? 'today' : d}`, 'is-sent', w.dueText.replace(/^Due /, 'Next due ')]; }
+  if(w.sent) return [weekDoneWord(w), 'is-sent', w.dueText.replace(/^Due /, 'Next due ')];   // or "Skipped …" (Nov 27)
   if(w.late) return [lateWords(w), 'is-late', clientStageWord(w)];
   return [clientStageWord(w), w.done === 0 && !w.logged.length ? 'is-none' : '', w.dueText];
 }
@@ -386,7 +386,7 @@ function clientPanelHtml({ c, h, w, owner }){
     title = 'No weekly update'; sub = 'Work and hours are still logged here. Pick how it’s sent under Weekly win to turn it back on.';
   } else if(w.sent){
     eyebrow = `<span class="sp-eb ok">${icon('check', { weight: 'bold' })}Healthy</span>`;
-    title = 'This week’s update is out'; sub = `Sent ${escapeHtml(relDayLower(w.last))}. Next one ${escapeHtml(w.dueText.replace(/^Due /, 'due '))}.`;
+    title = w.skipped ? 'This week’s update was skipped' : 'This week’s update is out'; sub = `${escapeHtml(weekDoneWord(w))}${w.skipped && w.skipped.by ? ` by ${escapeHtml(w.skipped.by === myName() ? 'you' : firstName(w.skipped.by))}` : ''}. Next one ${escapeHtml(w.dueText.replace(/^Due /, 'due '))}.`;
   } else {
     const t = weekTodo(w);
     eyebrow = `<span class="sp-eb ok">${icon('check', { weight: 'bold' })}Healthy · ${escapeHtml(w.dueText.toLowerCase())}</span>`;
@@ -395,7 +395,7 @@ function clientPanelHtml({ c, h, w, owner }){
   }
   // three numbers: this week's update (opens it in This Week), hours this month, on time
   const hp = h.hp, ots = onTimeSummary(h.seq), lateNow = w.late && !w.sent;
-  const weekB = w.off ? 'Off' : w.sent ? 'Sent' : lateNow ? lateWords(w) : w.dueText;
+  const weekB = w.off ? 'Off' : w.sent ? (w.skipped ? 'Skipped' : 'Sent') : lateNow ? lateWords(w) : w.dueText;
   const weekS = w.off ? 'No weekly update' : w.sent ? relDay(w.last) : w.done >= 3 ? 'Approved, not sent yet' : w.done === 2 ? (canApproveUpdates() ? 'Waiting for you' : 'Waiting for review')
     : w.draft ? 'Not sent for review' : w.forEmail.length ? 'Not written yet' : w.logged.length ? 'Only internal work logged' : 'Nothing logged yet';
   const hoursB = hp.budget ? `<span${hp.used > hp.budget ? ' class="t-red"' : ''}>${Math.round(hp.used)}</span> / ${hp.budget} h` : `${Math.round(hp.used)} h`;

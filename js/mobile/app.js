@@ -207,7 +207,7 @@ async function mLoadAll(){
   myProfile = teamProfiles.find(p => p.id === uid) || myProfile;
   calendarEvents = (ev.data || []).map(e => ({ id: e.id, title: e.title, startAt: e.all_day ? allDayAt(e.start_at) : e.start_at, endAt: e.all_day ? allDayAt(e.end_at || e.start_at, true) : e.end_at, allDay: e.all_day, clientId: e.client_id, location: e.location, eventType: e.event_type, attendeeIds: e.attendee_ids || [], createdBy: e.created_by,
     description: e.description || '', meetingUrl: e.meeting_url || null, googleEventId: e.google_event_id || null, googleOwner: e.google_calendar_owner || null }));
-  await Promise.all([loadUpdateHistory(), loadHealthHandled(), loadTaskDueTimes(), typeof hvTimeLoad === 'function' ? hvTimeLoad() : null,
+  await Promise.all([loadUpdateHistory(), loadUpdateSkips(), loadHealthHandled(), loadTaskDueTimes(), typeof hvTimeLoad === 'function' ? hvTimeLoad() : null,
     typeof loadDangerHistory === 'function' ? loadDangerHistory() : null, mLoadSprints(), typeof loadClientConcerns === 'function' ? loadClientConcerns() : null]);   // who set a client's Risk (Nov 25)
 }
 // Your sprints from Plan (Nov 25): Tasks shows each one as a single row, its next step (sprintFold in
@@ -915,8 +915,10 @@ function mDraftRow(x){
   const row = `<button class="ir" onclick="mOpenDraft('${c.id}',${jsArg(d.author)})" style="align-items:flex-start;padding:12px 16px">${monoHtml(c)}<div class="tx">
 <div style="display:flex;gap:8px;align-items:baseline"><span class="t" style="flex:1">${mEsc(c.name)}</span><span style="font-size:14px;color:var(--label-2)">${mReviewWhen(x)}</span></div>
 <span class="s">Weekly update · ${mEsc(d.author)}</span><span class="s2">${stale ? 'New work was logged after you approved this draft.' : mEsc(String(d.draft || '').replace(/\s+/g, ' ').slice(0, 140))}</span>${stale ? `<span style="margin-top:4px">${mDot('yellow', 'Needs re-review')}</span>` : ''}</div></button>`;
-  if(mReviewTab !== 'waiting' || !canApproveUpdates()) return row;
-  return `<div class="swipe" data-c="${c.id}" data-a="${mEsc(d.author)}">${row}<div class="acts"><button style="background:#636366" onclick="mSkipDraft('${c.id}',${jsArg(d.author)})">Skip</button><button style="background:var(--accent-fill)" onclick="mApproveDraft('${c.id}',${jsArg(d.author)})">Approve</button></div></div>`;
+  if(mReviewTab === 'sent' || !canApproveUpdates()) return row;
+  // Approved (Nov 27): back to Waiting, or skip the week
+  if(mReviewTab === 'approved') return `<div class="swipe" data-c="${c.id}" data-a="${mEsc(d.author)}">${row}<div class="acts"><button style="background:#636366" onclick="mSkipDraft('${c.id}')">Skip</button><button style="background:var(--accent-fill)" onclick="mBackToWaiting('${c.id}')">Waiting</button></div></div>`;
+  return `<div class="swipe" data-c="${c.id}" data-a="${mEsc(d.author)}">${row}<div class="acts"><button style="background:#636366" onclick="mSkipDraft('${c.id}')">Skip</button><button style="background:var(--accent-fill)" onclick="mApproveDraft('${c.id}',${jsArg(d.author)})">Approve</button></div></div>`;
 }
 function mReviewHtml(){
   const it = mReviewItems(), list = it[mReviewTab];
@@ -927,7 +929,7 @@ function mReviewHtml(){
 <h1 class="big">Review</h1><p class="big-sub">${sub}</p>
 ${mSeg([['waiting', 'Waiting', it.waiting.length], ['approved', 'Approved', it.approved.length], ['sent', 'Sent', it.sent.length]], 'mSetReviewTab', mReviewTab)}
 ${list.length ? `<div class="ig" style="margin-top:16px">${list.map(mDraftRow).join('')}</div>` : `<div style="margin-top:16px">${mEmpty(mReviewTab === 'waiting' ? 'Nothing waiting' : 'Nothing here yet', mReviewTab === 'waiting' ? 'Drafts appear here when they’re sent for review.' : '')}</div>`}
-${mReviewTab === 'waiting' && list.length && canApproveUpdates() ? '<p class="ifoot">Swipe left on a draft to approve or skip it.</p>' : ''}`;
+${mReviewTab !== 'sent' && list.length && canApproveUpdates() ? `<p class="ifoot">${mReviewTab === 'approved' ? 'Swipe left on one to move it back to Waiting or skip the week.' : 'Swipe left on a draft to approve or skip it.'}</p>` : ''}`;
 }
 function mWireSwipes(){
   document.querySelectorAll('#mMain .swipe').forEach(sw => {
@@ -1034,15 +1036,33 @@ async function mApproveDraft(clientId, author, stay, quiet){
   if(!quiet) showToast('success', 'Approved', 'Send it from Review when you’re ready.');
   if(!stay && mStack.length) mPop();
 }
-async function mSkipDraft(clientId, author){
-  if(!canApproveUpdates() || !(await confirmDialog(`Nothing is sent, and its improvements won’t go in a later draft.`, { title: `Skip ${author}’s update?`, confirmLabel: 'Skip', danger: true }))) return;
-  const { c, d } = mDraftFor(clientId, author); if(!d) return;
-  const ids = d.draftImprovementIds || [];
-  const ok = await saveDraftFor(clientId, author, { draftStatus: 'none', draft: '', draftImprovementIds: [], draftSentAt: null, draftSentBy: '' });
-  if(!ok){ showToast('error', 'Couldn’t skip it', 'Try again.'); return; }
-  if(ids.length) await supabaseClient.from('client_improvements').update({ include_in_email: false }).in('id', ids);
-  mLog(clientId, 'draft_skipped', `${myName()} skipped ${author}'s update.`, `Skipped ${escapeHtml(author)}'s draft for <b>${escapeHtml(c.name)}</b> — no email sent.`);
-  await mRefresh(); showToast('info', 'Skipped', `${c.name}: nothing was sent.`);
+// Skip this week (Nov 27, as the desktop's Review): the client's whole update, nothing sent, the week
+// counted as skipped. The work waits for next week's update, or is left out for good (update-parts.js).
+function mSkipDraft(clientId){
+  const c = clients.find(x => x.id === clientId); if(!c || !canApproveUpdates()) return;
+  mActions(`Skip ${c.name}’s update this week? Nothing goes to the client.`, [
+    { label: 'Skip, Keep the Work for Next Week', fn: () => mSkipWeek(clientId, true) },
+    { label: 'Skip, Leave the Work Out', danger: true, fn: () => mSkipWeek(clientId, false) },
+  ]);
+}
+async function mSkipWeek(clientId, keep){
+  const c = clients.find(x => x.id === clientId); if(!c) return;
+  const r = await skipUpdateWeek(c, { keep });
+  if(r.error){ showToast('error', 'Couldn’t skip it', r.error); return; }
+  mLog(clientId, 'draft_skipped', `${myName()} skipped this week’s update. ${keep ? 'The work goes in next week’s.' : 'The work was left out.'}`, `Skipped this week’s update for <b>${escapeHtml(c.name)}</b> — no email sent.`);
+  const words = skipWeekWords(c, r);
+  skipWeekPeople(c, r.parts, r.ids).forEach(p => mNotify(p.id, 'draft_skipped', words.title, words.body, 'teamqueue', c.id));
+  await mRefresh();
+  showToast('info', 'Skipped', `${c.name}: nothing was sent.`, { action: 'Undo', onAction: async () => { if(!(await r.undo())) return showToast('error', 'Couldn’t undo', 'Try again.'); mLog(clientId, 'draft_skipped', `${myName()} took back skipping this week’s update.`); await mRefresh(); } });
+  if(mStack.length) mPop();
+}
+async function mBackToWaiting(clientId){
+  const c = clients.find(x => x.id === clientId); if(!c || !canApproveUpdates()) return;
+  const r = await unapproveWeek(c);
+  if(r.error){ showToast('error', 'Couldn’t move it back', r.error); return; }
+  mLog(clientId, 'draft_unapproved', `${myName()} moved the update back to Waiting.`);
+  await mRefresh(); showToast('info', 'Back in Waiting', `${c.name}: approve it again when it’s ready.`);
+  if(mStack.length) mPop();
 }
 async function mSendForReview(clientId, author){
   const { c, d } = mDraftFor(clientId, author);

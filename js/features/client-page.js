@@ -47,7 +47,7 @@ ${callout}${typeof claudeNotesHtml === 'function' && cdTab === 'overview' ? clau
   // ---- Overview
   const stepTxt = [w.sent ? 'Logged' : `${w.forEmail.length} improvement${w.forEmail.length === 1 ? '' : 's'}`,
     w.sent || w.done > 1 ? 'Sent for review' : w.draft && w.done === 1 ? 'Waiting on ' + firstName(w.draft.author) : 'Draft not written',
-    w.sent || w.done > 2 ? 'Approved' : 'By an approver', w.sent ? `Sent ${relDayLower(w.last)}` : w.dueText];
+    w.sent || w.done > 2 ? 'Approved' : 'By an approver', w.sent ? weekDoneWord(w) : w.dueText];
   const stepper = STEP_NAMES.map((n, k) => {
     const cls = w.sent ? 's d' : k < w.done ? 'd' : (w.behind === k ? 'b' + (w.late ? ' r' : '') : '');
     const mark = (w.sent || k < w.done) ? icon('check', { weight: 'bold' }) : (w.behind === k ? icon('exclamation-mark', { weight: 'bold' }) : '');
@@ -115,15 +115,15 @@ function cpUwGridHtml(c, x){
   // this week's update: where it stands, the four steps, what to do
   const names = ['LOGGED', 'DRAFT', 'REVIEW', 'SENT'];
   const done = w.sent ? 4 : w.done >= 3 ? 3 : (w.done === 2 || w.draft) ? 2 : (w.forEmail && w.forEmail.length) ? 1 : 0;
-  const state = w.sent ? `Sent ${relDayLower(w.last)}` : clientStageWord(w);
+  const state = w.sent ? weekDoneWord(w) : clientStageWord(w);
   const detail = w.sent ? (w.note || '') : `${w.forEmail.length ? `${w.forEmail.length} improvement${w.forEmail.length === 1 ? '' : 's'} for the email` : w.logged.length ? INTERNAL_ONLY_NOTE : 'Nothing logged yet'} · ${w.dueText.replace(/^Due /, 'due ')}`;
   const act = w.sent ? '' : `<div class="uw-fa cp-fa">${w.draft ? `<button class="uw-wb" onclick="openReviewDraft('${c.id}',${jsArg(w.draft.author)})">Open draft${icon('arrow-right')}</button>` : `<button class="uw-wb" onclick="openWeekClient('${c.id}')">Open in This Week${icon('arrow-right')}</button>`}${holder && holder !== myName() ? `<button class="uw-pill cp-pl" onclick="remindHolder('${c.id}')">Remind ${escapeHtml(firstName(holder))}</button>` : ''}</div>`;
   // set to "No weekly update" (the agency itself, an internal client): nothing is due (Nov 22)
   const update = w.off ? `<section class="uw-w uw-s6 cp-up">${head('activity', 'This week’s update', '<span class="cp-due">Off</span>')}
 <div class="uw-fn"><div class="uw-mono">NO WEEKLY UPDATE</div><h3>No weekly update</h3><p>It stays off This Week, Today, the Queue and Health. Work and hours are still logged here.</p></div>
 ${canEditClients() ? `<div class="uw-fa cp-fa"><button class="uw-wb" onclick="setWeeklyUpdate('${c.id}',true)">Turn the weekly update on${icon('arrow-right')}</button></div>` : ''}</section>`
-  : `<section class="uw-w uw-s6 cp-up">${head('activity', 'This week’s update', `<span class="cp-due${w.late ? ' is-late' : ''}">${escapeHtml(w.sent ? 'Sent' : w.dueText)}</span>`)}
-<div class="uw-fn"><div class="uw-mono">${done >= 4 ? 'DONE · SENT' : 'NOW · ' + names[done]}</div><h3>${escapeHtml(state)}</h3><p>${escapeHtml(detail)}</p></div>
+  : `<section class="uw-w uw-s6 cp-up">${head('activity', 'This week’s update', `<span class="cp-due${w.late ? ' is-late' : ''}">${escapeHtml(w.sent ? (w.skipped ? 'Skipped' : 'Sent') : w.dueText)}</span>`)}
+<div class="uw-fn"><div class="uw-mono">${done >= 4 ? (w.skipped ? 'DONE · SKIPPED' : 'DONE · SENT') : 'NOW · ' + names[done]}</div><h3>${escapeHtml(state)}</h3><p>${escapeHtml(detail)}</p></div>
 ${uwSteps(w)}${act}
 <div class="cp-ot">${histDotsHtml(seq)}<span>${ots.total ? `On time ${ots.onTime} of ${ots.total}` : 'No updates yet'}</span><b>${sentAt ? 'Last sent ' + escapeHtml(fmtShortDate(sentAt)) : 'None sent yet'}</b></div></section>`;
   // health: the word, why in a line, the last 12 weeks, the one thing to do

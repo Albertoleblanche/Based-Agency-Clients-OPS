@@ -5,6 +5,8 @@
 // and open in the panel on the right, with Check Now inside; no Done column ("N done this week ›"
 // under the title opens Finished tasks, and Mark Done's note has Undo). Clicking a task opens it on the right, the same panel as This Week,
 // Health and Focus Reports. Loaded after sheets2-canvas.js.
+// Nov 27: a Finished button at the end of the header, always there (the link under the title only shows
+// when something in view is done, and wasn't found).
 // Nov 27 (canvas "Tasks: the top suggestion of each kind, in a stripe at the bottom"): the top one of each
 // kind (Missing, meeting, email, Tip, Idea) in a stripe pinned to the bottom (tssHtml), and Suggestions
 // holds every kind.
@@ -141,7 +143,8 @@ function renderTasks(){
 <div class="tk-f">${tkSgBtnHtml()}${(everyone ? [['everyone', 'Everyone', ''], ['mine', 'Mine', mineN]] : byMe.length ? [['mine', 'Mine', mineN], ['byme', 'Assigned by Me', byMeN]] : [])
   .map(([k, t, n], i, a) => (i ? '' : '<div class="seg" role="tablist" aria-label="Whose">') + `<button class="${tasksScope === k ? 'on' : ''}" role="tab" aria-selected="${tasksScope === k}" onclick="setTasksScope('${k}')">${t}${n !== '' ? ` <span class="c">${n}</span>` : ''}</button>` + (i === a.length - 1 ? '</div>' : '')).join('')}
 <label class="pop pop-sel"><span class="pl">Client: ${escapeHtml(curC ? curC.name : 'All')}</span>${icon('caret-down')}<select aria-label="Client" onchange="setTasksClient(this.value)"><option value="all">All</option>${usedClients.map(c => `<option value="${c.id}"${c === curC ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></label>
-<div class="seg tk-view" role="tablist" aria-label="Layout"><button class="${tasksLayout === 'list' ? 'on' : ''}" role="tab" aria-selected="${tasksLayout === 'list'}" onclick="setTasksLayout('list')">${icon('list-bullets')}List</button><button class="${tasksLayout === 'columns' ? 'on' : ''}" role="tab" aria-selected="${tasksLayout === 'columns'}" onclick="setTasksLayout('columns')">${icon('squares-four')}Columns</button></div></div></div>`;
+<div class="seg tk-view" role="tablist" aria-label="Layout"><button class="${tasksLayout === 'list' ? 'on' : ''}" role="tab" aria-selected="${tasksLayout === 'list'}" onclick="setTasksLayout('list')">${icon('list-bullets')}List</button><button class="${tasksLayout === 'columns' ? 'on' : ''}" role="tab" aria-selected="${tasksLayout === 'columns'}" onclick="setTasksLayout('columns')">${icon('squares-four')}Columns</button></div>
+<button type="button" class="btn tk-fin" onclick="switchView('task-archive')" title="Finished tasks: everything that’s been done${doneWeek.length ? `, ${doneWeek.length} this week` : ''}">${icon('check-circle')}Finished${doneWeek.length ? `<span class="c">${doneWeek.length}</span>` : ''}</button></div></div>`;
   let body;
   // Nothing at all to show here: say what goes here and give the way in, instead of empty columns.
   const anyMine = tasks.some(t => !t.cancelledAt && (t.assignerId === me || t.assigneeId === me));

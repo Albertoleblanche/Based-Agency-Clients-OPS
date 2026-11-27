@@ -329,24 +329,25 @@ ${events ? `<div class="sp-sec"><b>What changed</b></div>${events}` : ''}
 // judge (before the first update on record, or a client without updates). With the day it went out.
 function healthUpdateWeeks(c, h, n){
   if(h && h.off) return Array.from({ length: n }, () => ({ k: 'n' }));
-  const now = rNow(), sends = sentTimes(c), first = sends[0], monday = dayStart(addDays(now, -((now.getDay() + 6) % 7))), out = [];
+  const now = rNow(), sends = sentTimes(c), covered = coveredTimes(c), first = covered[0], monday = dayStart(addDays(now, -((now.getDay() + 6) % 7))), out = [];
   for(let k = n - 1; k >= 0; k--){
-    const from = addDays(monday, -7 * k), to = addDays(from, 7), i = sends.findIndex(t => t >= from && t < to);
-    if(i >= 0){ out.push({ k: i > 0 && daysBetween(sends[i - 1], sends[i]) > UPDATE_EVERY_DAYS ? 'l' : 'o', sent: sends[i] }); continue; }
+    const from = addDays(monday, -7 * k), to = addDays(from, 7), x = weekLetter(c, sends, covered, from, to);
+    if(x === 's'){ const sk = skipIn(c, from, to); out.push({ k: 's', skip: sk }); continue; }   // skipped, on purpose (Nov 27)
+    if(x){ out.push({ k: x, sent: sends.find(t => t >= from && t < to) }); continue; }
     out.push({ k: k === 0 ? 'p' : !first || first >= to ? 'n' : 'm' });
   }
   return out;
 }
-const HL_UPD = { o: 'update on time', l: 'update late', m: 'update missed', p: 'update not sent yet', n: 'no update on record' };
+const HL_UPD = { o: 'update on time', l: 'update late', m: 'update missed', p: 'update not sent yet', n: 'no update on record', s: 'update skipped' };
 // The 12 weeks in one strip: a bar for the client's health that week, a dot under it for the update,
 // month names under it. Pointing at a week puts its date and both words in the heading.
 function healthStripHtml(c, h, weeks, hist){
-  const up = healthUpdateWeeks(c, h, weeks.length), done = up.filter(u => u.k !== 'n' && u.k !== 'p');
+  const up = healthUpdateWeeks(c, h, weeks.length), done = up.filter(u => u.k !== 'n' && u.k !== 'p' && u.k !== 's');
   const aside = h.off ? 'No weekly update' : done.length ? `Updates: ${done.filter(u => u.k === 'o').length} of ${done.length} on time` : 'No updates on record yet';
-  const say = i => `${HL_WORD[hist[i] || '']}, ${HL_UPD[up[i].k]}${up[i].sent && up[i].k !== 'o' ? ` (sent ${fmtShortDate(up[i].sent)})` : ''}`;
+  const say = i => `${HL_WORD[hist[i] || '']}, ${HL_UPD[up[i].k]}${up[i].sent && up[i].k !== 'o' ? ` (sent ${fmtShortDate(up[i].sent)})` : ''}${up[i].skip ? ` by ${up[i].skip.by === myName() ? 'you' : firstName(up[i].skip.by)}${up[i].skip.reason ? `: ${up[i].skip.reason}` : ''}` : ''}`;
   const cols = weeks.map((w, i) => `<span class="wk12-c${w.now ? ' now' : ''}" data-w="${i}" role="listitem" aria-label="${escapeHtml(`${healthWeekLabel(w)}: ${say(i)}`)}"><span class="wk12-b">${hist[i] ? `<i class="${hist[i]}"></i>` : ''}</span><i class="wk12-u ${up[i].k}"></i></span>`).join('');
   const kinds = new Set(up.map(u => u.k));
-  const key = h.off ? '' : `<div class="wk12-key" aria-hidden="true"><span><i class="kb"></i>Health</span><span><i class="wk12-u o"></i>Update on time</span>${kinds.has('l') ? '<span><i class="wk12-u l"></i>Late</span>' : ''}${kinds.has('m') ? '<span><i class="wk12-u m"></i>Missed</span>' : ''}${kinds.has('p') ? '<span><i class="wk12-u p"></i>Not sent yet</span>' : ''}${kinds.has('n') ? '<span><i class="wk12-u n"></i>No record</span>' : ''}</div>`;
+  const key = h.off ? '' : `<div class="wk12-key" aria-hidden="true"><span><i class="kb"></i>Health</span><span><i class="wk12-u o"></i>Update on time</span>${kinds.has('l') ? '<span><i class="wk12-u l"></i>Late</span>' : ''}${kinds.has('m') ? '<span><i class="wk12-u m"></i>Missed</span>' : ''}${kinds.has('s') ? '<span><i class="wk12-u s"></i>Skipped</span>' : ''}${kinds.has('p') ? '<span><i class="wk12-u p"></i>Not sent yet</span>' : ''}${kinds.has('n') ? '<span><i class="wk12-u n"></i>No record</span>' : ''}</div>`;
   return `<div class="sp-sec hx-ro" data-b="The last 12 weeks" data-s="${escapeHtml(aside)}"><b>The last 12 weeks</b><span>${escapeHtml(aside)}</span></div>
 <div class="wk12" role="list" aria-label="Health and weekly updates, last 12 weeks" data-say="${escapeHtml(JSON.stringify(weeks.map((w, i) => [healthWeekLabel(w), say(i)])))}">${cols}</div>${healthAxisHtml(weeks)}${key}`;
 }

@@ -86,7 +86,7 @@ function dbClientsTable(n){
   const head = `<tr><th>Client</th><th>Why</th><th>Owner</th><th>This week’s update</th><th class="num">Hours this month</th><th>Last update</th></tr>`;
   const rows = list.map(x => {
     const c = x.c, w = clientWeek(c), hp = x.h.hp || {}, last = lastSentAt(c), owner = clientOwner(c);
-    const week = w.sent ? `Sent ${relDayLower(new Date(w.last))}` : w.dueText;
+    const week = w.sent ? weekDoneWord(w) : w.dueText;
     const hrs = hp.budget ? `<span class="${hp.used > hp.budget ? 't-red' : ''}">${Math.round(hp.used)} / ${hp.budget} h</span>` : (hp.used ? `${Math.round(hp.used)} h` : '<span class="db-mute">—</span>');
     return `<tr class="db-go" data-item onclick="dbOpenHealth('${c.id}')"><td><span class="db-cl"><span class="db-dot ${x.h.level}" aria-label="${x.h.level === 'r' ? 'At risk' : 'To watch'}"></span><b>${escapeHtml(c.name)}${focusMark(c)}</b></span></td>
 <td class="db-why">${escapeHtml(tableSignal(x.h, c) || '')}</td><td>${owner ? escapeHtml(firstName(owner)) : '<span class="db-mute">No owner</span>'}</td>

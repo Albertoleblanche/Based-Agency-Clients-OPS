@@ -26,7 +26,7 @@ function reviewItems(){
 // WhatsApp-only clients keep a row per part (each part is its own message in the group).
 function reviewRows(items, tab){
   const list = items[tab], out = [], seen = new Set();
-  if(!hasPermission('view_team_queue') || typeof clientParts !== 'function') return list.slice();
+  if(!hasPermission('view_team_queue') || typeof clientParts !== 'function') return tab === 'sent' ? list.concat(reviewSkipRows()).sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0)) : list.slice();
   if(tab === 'sent'){
     list.forEach(x => {
       if(!partsByEmail(x.c)) return out.push(x);
@@ -35,7 +35,7 @@ function reviewRows(items, tab){
       if(seen.has(k)) return; seen.add(k);
       out.push(same.length > 1 ? { c: x.c, d: same[0].d, group: true, parts: same.map(y => ({ d: y.d, author: y.d.author, state: 'sent' })), at: x.at } : x);
     });
-    return out;
+    return out.concat(reviewSkipRows()).sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0));   // and the weeks skipped (Nov 27)
   }
   list.forEach(x => {
     if(seen.has(x.c.id)) return;
@@ -86,11 +86,12 @@ function renderTeamQueue(){
   let sel = list.find(x => reviewRowIs(x, want));
   if(!sel && want){ for(const t of ['waiting', 'approved', 'sent']){ if(t !== reviewTab && rowsOf(t).some(x => reviewRowIs(x, want))){ reviewTab = t; return renderTeamQueue(); } } }
   sel = sel || list[0];
-  if(sel){ window._reviewSel = { clientId: sel.c.id, author: sel.group ? '*' : sel.d.author }; if(reviewTab === 'waiting') (sel.group ? sel.parts : [sel]).forEach(p => markReviewSeen({ c: sel.c, d: p.d })); }
+  if(sel){ window._reviewSel = { clientId: sel.c.id, author: sel.group ? '*' : sel.d.author }; if(reviewTab === 'waiting' && !sel.skip) (sel.group ? sel.parts : [sel]).forEach(p => markReviewSeen({ c: sel.c, d: p.d })); }
   const seen = reviewSeen();
   const tabs = [['waiting', 'Waiting'], ['approved', 'Approved'], ['sent', 'Sent']].map(([k, t]) =>
     `<button class="${reviewTab === k ? 'on' : ''}" role="tab" aria-selected="${reviewTab === k}" onclick="setReviewTab('${k}')">${t} <span class="c">${rowsOf(k).length}</span></button>`).join('');
   const rows = list.map(x => {
+    if(x.skip) return reviewSkipRowHtml(x, x === sel);
     if(x.group) return reviewGroupRowHtml(x, x === sel, seen);
     const on = x === sel, w = clientWeek(x.c), h = clientHealth(x.c);
     const unread = reviewTab === 'waiting' && !seen[reviewSeenKey(x)] ? '<span class="rvn-dot" aria-label="Not opened yet"></span>' : '';
@@ -121,8 +122,8 @@ ${list.length > 1 ? `<p class="rvn-keys"><span><kbd>J</kbd><kbd>K</kbd> next and
 </section>
 ${(() => {
   // the new look: the letter and "Before you send" are two cards, as on the canvas
-  const uw = typeof uiStyleOn === 'function' && uiStyleOn(), parts = sel ? (sel.group ? reviewPartsHtml(sel, list, uw) : reviewReadHtml(sel, list, uw)) : null;
-  if(uw && parts) return `<section class="rvn-read" aria-label="Selected draft">${parts.main}</section><section class="rvn-railc">${parts.rail}</section>`;
+  const uw = typeof uiStyleOn === 'function' && uiStyleOn(), parts = sel ? (sel.skip ? reviewSkipHtml(sel, list, uw) : sel.group ? reviewPartsHtml(sel, list, uw) : reviewReadHtml(sel, list, uw)) : null;
+  if(uw && parts) return `<section class="rvn-read" aria-label="Selected draft">${parts.main}</section>${parts.rail ? `<section class="rvn-railc">${parts.rail}</section>` : ''}`;
   return `<section class="rvn-read" aria-label="Selected draft">${sel ? parts : `<div class="rvn-none">${reviewEmptyHtml(items)}</div>`}</section>`;
 })()}
 </div>`;
@@ -397,7 +398,8 @@ function reviewPartsMore(e, clientId){
   Object.assign(m.style, { position: 'fixed', zIndex: '1200' });
   const r = e.currentTarget.getBoundingClientRect();
   m.style.top = (r.bottom + 4) + 'px'; m.style.right = (window.innerWidth - r.right) + 'px';
-  m.innerHTML = `${waiting && canApproveUpdates() && reviewTab !== 'sent' ? `<button class="mi" role="menuitem" onclick="approveAllParts('${clientId}')">${icon('check-circle')}Approve All, Send Later</button><div class="msep"></div>` : ''}
+  const ap = canApproveUpdates() && reviewTab !== 'sent', anyApproved = clientParts(c).some(p => p.state === 'approved');
+  m.innerHTML = `${waiting && ap ? `<button class="mi" role="menuitem" onclick="approveAllParts('${clientId}')">${icon('check-circle')}Approve All, Send Later</button>` : ''}${anyApproved && ap ? `<button class="mi" role="menuitem" onclick="reviewBackToWaiting('${clientId}')">${icon('undo-2')}Back to Waiting</button>` : ''}${ap ? `<button class="mi" role="menuitem" onclick="skipWeekSheet('${clientId}')">${icon('minus-circle')}Skip This Week…</button><div class="msep"></div>` : ''}
 <button class="mi" role="menuitem" onclick="openClientDetail('${clientId}')">${icon('buildings')}Open Client Page</button>
 <button class="mi" role="menuitem" onclick="reviewCopyParts('${clientId}')">${icon('clipboard-text')}Copy Text</button>`;
   document.body.appendChild(m);
@@ -495,14 +497,15 @@ function reviewMore(e, clientId, author){
   if(had) return;
   const c = clients.find(x => x.id === clientId), d = c && (c.drafts || []).find(x => x.author === author);
   if(!c || !d) return;
-  const waiting = !d.draftSentAt && d.draftStatus !== 'approved';
+  const waiting = !d.draftSentAt && d.draftStatus !== 'approved', approved = !d.draftSentAt && d.draftStatus === 'approved', ap = canApproveUpdates();
   const m = document.createElement('div');
   m.className = 'menu'; m.id = 'rvnMenu'; m.setAttribute('role', 'menu');
   Object.assign(m.style, { position: 'fixed', zIndex: '1200' });
   const r = e.currentTarget.getBoundingClientRect();
   m.style.top = (r.bottom + 4) + 'px'; m.style.right = (window.innerWidth - r.right) + 'px';
   const A = `'${clientId}',${jsArg(author)}`;
-  m.innerHTML = `${waiting && canApproveUpdates() ? `<button class="mi" role="menuitem" onclick="approveDraft(${A})">${icon('check-circle')}Approve, Send Later</button><div class="msep"></div>` : ''}
+  // Nov 27: Back to Waiting for an approved one, and Skip This Week… for either (approvers)
+  m.innerHTML = `${waiting && ap ? `<button class="mi" role="menuitem" onclick="approveDraft(${A})">${icon('check-circle')}Approve, Send Later</button>` : ''}${approved && ap ? `<button class="mi" role="menuitem" onclick="reviewBackToWaiting('${clientId}')">${icon('undo-2')}Back to Waiting</button>` : ''}${(waiting || approved) && ap ? `<button class="mi" role="menuitem" onclick="skipWeekSheet('${clientId}')">${icon('minus-circle')}Skip This Week…</button><div class="msep"></div>` : ''}
 <button class="mi" role="menuitem" onclick="openClientDetail('${clientId}')">${icon('buildings')}Open Client Page</button>
 ${winViaWhatsapp(c) && !waiting ? '' : `<button class="mi" role="menuitem" onclick="reviewCopy(${A})">${icon('clipboard-text')}Copy Text</button>`}`;
   document.body.appendChild(m);
@@ -556,4 +559,92 @@ function reviewEmptyHtml(items){
     text: 'Approved updates wait here until they go out.', link: items.waiting.length ? `Review the ${items.waiting.length} waiting` : '', onLink: "setReviewTab('waiting')" });
   return emptyState({ icon: 'send', title: 'Nothing sent this week', text: 'Updates sent to clients this week show here, newest first.',
     link: items.waiting.length ? `Review the ${items.waiting.length} waiting` : '', onLink: "setReviewTab('waiting')" });
+}
+
+// ---- Skip This Week… and Back to Waiting (Nov 27) ------------------------------------------------
+// An admin or approver skips a client's update for the week from the "…" menu, waiting or approved:
+// nothing is sent, every open part is cleared, and the work either waits for next week's update or is
+// left out for good. Whoever's part or work it was, and whoever approved it, hear why. The week counts as
+// skipped, not missed, and shows in Sent as skipped. Undo puts it all back. (update-parts.js skipUpdateWeek)
+function skipWeekSheet(clientId){
+  document.getElementById('rvnMenu')?.remove();
+  const c = clients.find(x => x.id === clientId); if(!c || !canApproveUpdates()) return;
+  const parts = weekOpenParts(c); if(!parts.length) return showToast('info', 'Nothing to skip', 'This week’s update has no part open.');
+  const me = myName(), others = [...new Set(parts.map(d => d.author).filter(a => a !== me))];
+  const what = parts.length > 1 ? partNames(parts.map(d => d.author), me) : parts[0].draftStatus === 'approved' ? 'the approved update' : parts[0].author === me ? 'your draft' : `${firstName(parts[0].author)}’s draft`;
+  const tell = skipWeekPeople(c, parts, [...new Set(parts.flatMap(d => d.draftImprovementIds || []))]);
+  openAppModal(`<h3 class="skw-h">Skip ${escapeHtml(c.name)}’s update this week?</h3>
+<p class="skw-sub">Nothing goes to the client. ${escapeHtml(what.charAt(0).toUpperCase() + what.slice(1))} won’t be sent, and the week counts as skipped, not missed.</p>
+<div class="skw-os" role="radiogroup" aria-label="The work in it">
+<label class="skw-o"><input type="radio" name="skwKeep" value="1" checked><span class="skw-r" aria-hidden="true"></span><span class="tx"><b>Keep the work for next week’s update</b><span>It goes in the next draft, with whatever’s logged by then.</span></span></label>
+<label class="skw-o"><input type="radio" name="skwKeep" value="0"><span class="skw-r" aria-hidden="true"></span><span class="tx"><b>Leave the work out for good</b><span>It stays logged, but never goes in an update.</span></span></label>
+</div>
+${tell.length ? `<label class="skw-why"><span>Tell ${escapeHtml(joinNames(tell.map(p => firstName(p.name))))} why <i>(optional)</i></span><textarea id="skwReason" class="tf" rows="2" maxlength="300" placeholder="They’re on vacation this week, say"></textarea></label>` : ''}
+<div class="sheet-a"><button class="btn" onclick="closeAppModal()">Cancel</button><button class="btn btn-p" id="skwGo" onclick="skipWeekGo(${jsArg(c.id)})">Skip This Week</button></div>`, 520);
+  setTimeout(() => document.querySelector('#appModalOverlay input[name="skwKeep"]')?.focus({ preventScroll: true }), 30);
+}
+async function skipWeekGo(clientId){
+  const c = clients.find(x => x.id === clientId); if(!c) return;
+  const keep = (document.querySelector('#appModalOverlay input[name="skwKeep"]:checked') || {}).value !== '0';
+  const reason = (document.getElementById('skwReason')?.value || '').trim();
+  const go = document.getElementById('skwGo'); if(go){ go.disabled = true; go.textContent = 'Skipping…'; }
+  const r = await skipUpdateWeek(c, { keep, reason });
+  if(r.error){ if(go){ go.disabled = false; go.textContent = 'Skip This Week'; } showToast('error', 'Not skipped', r.error); return; }
+  closeAppModal();
+  const me = myName() || 'Someone', names = joinNames(r.entry.authors.map(a => a === me ? 'your' : `${a}’s`));
+  log.unshift({ t: nowTime(), tag: 'you', userId: currentUser?.id, text: `Skipped this week’s update for <b>${escapeHtml(c.name)}</b> — no email sent${keep ? '; the work goes in next week’s' : '; the work was left out'}.` });
+  persistLog();
+  logClientActivity(c.id, 'draft_skipped', `${me} skipped this week’s update (${names} ${r.entry.authors.length === 1 ? 'part' : 'parts'})${reason ? `: “${reason}”` : ''}. ${keep ? 'The work goes in next week’s.' : 'The work was left out.'}`);
+  refreshClientDetailActivityIfOpen(c.id);
+  const words = skipWeekWords(c, r);
+  skipWeekPeople(c, r.parts, r.ids).forEach(p => sendNotification(p.id, 'draft_skipped', words.title, words.body, 'teamqueue', c.id));
+  window._reviewSel = null;   // on to the next one, not to Sent
+  renderQueue(); renderTeamQueue(); renderLog(); renderKpis();
+  if(typeof renderThisWeek === 'function') renderThisWeek();
+  showToast('info', 'Skipped', `${c.name}: nothing was sent. ${keep ? 'The work goes in next week’s update.' : 'The work was left out.'}`, { action: 'Undo', onAction: async () => {
+    const ok = await r.undo();
+    if(!ok){ showToast('error', 'Couldn’t undo', 'Try again in a moment.'); return; }
+    logClientActivity(c.id, 'draft_skipped', `${me} took back skipping this week’s update.`);
+    skipWeekPeople(c, r.parts, r.ids).forEach(p => sendNotification(p.id, 'draft_skipped', `${c.name}: the update wasn’t skipped after all`, `${me} undid skipping it. It’s back in Review.`, 'teamqueue', c.id));
+    window._reviewSel = { clientId: c.id, author: r.parts.length > 1 && hasParts(c) ? '*' : r.parts[0].author };
+    renderQueue(); renderTeamQueue(); renderKpis(); if(typeof renderThisWeek === 'function') renderThisWeek();
+  } });
+}
+async function reviewBackToWaiting(clientId){
+  document.getElementById('rvnMenu')?.remove();
+  const c = clients.find(x => x.id === clientId); if(!c || !canApproveUpdates()) return;
+  const r = await unapproveWeek(c);
+  if(r.error) return showToast('error', 'Not moved', r.error);
+  logClientActivity(c.id, 'draft_unapproved', `${myName() || 'Someone'} moved ${r.parts.length === 1 ? `${r.parts[0].author}’s update` : 'the update'} back to Waiting.`);
+  refreshClientDetailActivityIfOpen(c.id);
+  reviewTab = 'waiting'; window._reviewSel = { clientId: c.id, author: r.parts.length > 1 || hasParts(c) ? '*' : r.parts[0].author };
+  renderQueue(); renderTeamQueue(); renderKpis(); if(typeof renderThisWeek === 'function') renderThisWeek();
+  showToast('info', 'Back in Waiting', `${c.name}: approve it again when it’s ready, or skip it.`);
+}
+// Sent: the weeks skipped since the week began, as rows of their own
+function reviewSkipRows(){
+  const cyc = updateCycle(), me = myName(), all = hasPermission('view_team_queue');
+  return attentionEligibleClients().flatMap(c => skipsOf(c).filter(x => x.t >= cyc.weekStart && (all || (x.authors || []).includes(me)))
+    .map(x => ({ c, d: { author: 'skip:' + x.at, draftSentAt: x.at }, skip: x, at: x.at })));
+}
+function reviewSkipRowHtml(x, on){
+  const s = x.skip, who = s.by === myName() ? 'You' : firstName(s.by || 'Someone');
+  return `<a class="rvn-r is-skip${on ? ' is-sel' : ''}" href="#teamqueue" onclick="selectReview('${x.c.id}',${jsArg(x.d.author)});return false;"${on ? ' aria-current="true"' : ''}>${monoHtml(x.c, 'sm')}
+<div class="tx"><b>${escapeHtml(x.c.name)}${focusMark(x.c)}</b><span class="s wn-rs"><span>${escapeHtml(who)} skipped it · ${escapeHtml(relDay(s.t).replace(/^Today$/, 'today'))}</span></span></div>
+<div class="rvn-rr"><time>${escapeHtml(fmtTime(s.t))}</time><span class="rvn-note is-quiet">Skipped</span></div></a>`;
+}
+function reviewSkipHtml(x, list, split){
+  const c = x.c, s = x.skip, w = clientWeek(c), i = list.indexOf(x), me = myName();
+  const nav = `<div class="rvn-nav"><button class="ib" aria-label="Previous" title="Previous (K)" onclick="reviewStep(-1)"${i <= 0 ? ' disabled' : ''}>${icon('chevron-up')}</button><button class="ib" aria-label="Next" title="Next (J)" onclick="reviewStep(1)"${i >= list.length - 1 ? ' disabled' : ''}>${icon('chevron-down')}</button><span>${i + 1} of ${list.length}</span></div>`;
+  const parts = (s.authors || []).map(a => a === me ? 'your' : `${firstName(a)}’s`);
+  const doc = `<div class="rvn-doc">
+<div class="rvn-hd">${monoHtml(c, 'lg')}<div class="tx"><b>${escapeHtml(c.name)}${focusMark(c)}</b><span class="s">Skipped by ${s.by === me ? 'you' : escapeHtml(s.by || 'someone')} ${escapeHtml(relDayLower(s.t))} at ${escapeHtml(fmtTime(s.t))}</span></div></div>
+<div class="rvn-skip"><span class="rvn-skip-ic" aria-hidden="true">${icon('minus-circle')}</span><h2 class="rvn-subj">This week’s update was skipped</h2>
+<p>Nothing was sent to ${escapeHtml(c.name)}${parts.length ? `, and ${escapeHtml(joinNames(parts))} ${parts.length === 1 ? 'part was' : 'parts were'} cleared` : ''}.</p>
+<p>${s.keep === false ? 'The work in it was left out: it stays logged, but won’t go in an update.' : 'The work in it goes in next week’s update.'}</p>
+${s.reason ? `<blockquote class="rvn-skip-why">${escapeHtml(s.reason)}</blockquote>` : ''}</div></div>`;
+  const foot = `<span class="rvn-ft-note">${icon('clock')}Next update ${escapeHtml(w.dueText.replace(/^Due /, 'due ').replace(/^Due/, 'due'))}</span><span class="rvn-sp"></span><button class="btn" onclick="openClientDetail('${c.id}')">${icon('buildings')}Open Client Page</button>`;
+  const top = `<div class="rvn-top">${nav}<span class="rvn-sp"></span></div>`;
+  if(split) return { main: `${top}<div class="rvn-mail"><div class="rvn-cols is-one">${doc}</div></div><div class="rvn-ft">${foot}</div>`, rail: '' };
+  return `${top}<div class="rvn-mail"><div class="rvn-cols">${doc}</div></div><div class="rvn-ft">${foot}</div>`;
 }

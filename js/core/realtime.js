@@ -37,6 +37,8 @@ function setupRealtimeSubscriptions(){
     const changedKey = payload?.new?.key ?? payload?.old?.key;
     // a meeting read from Granola: the count on Notes (Nov 23)
     if(String(changedKey || '').startsWith('granola-note:')){ if(typeof granolaCountNew === 'function') granolaCountNew().catch(() => {}); return; }
+    // a week skipped by someone else (Nov 27): the weeks read again, everywhere they show
+    if(changedKey === 'update-skips'){ if(typeof loadUpdateSkips === 'function') loadUpdateSkips().then(() => silentSection(async () => { renderQueue(); renderTeamQueue(); renderAttentionList(); if(typeof renderThisWeek === 'function') renderThisWeek(); if(typeof renderHealth === 'function' && currentViewName === 'health') renderHealth(); })).catch(() => {}); return; }
     if(changedKey !== 'app-data' && changedKey !== 'settings') return;
     silentSection(async ()=>{
       await loadAll();
@@ -186,7 +188,7 @@ async function fullRefresh(showFeedback){
   await Promise.all([
     loadMyNotes(), loadTimeEntries(), loadMyTasks(),
     loadNotifications(), loadCalendarEvents(), loadClientReminders(),
-    loadUpdateHistory(), loadHealthHandled(),
+    loadUpdateHistory(), loadUpdateSkips(), loadHealthHandled(),
     typeof loadTaskDueTimes === 'function' ? loadTaskDueTimes() : null,
     typeof loadPlan === 'function' ? loadPlan() : null,
     typeof loadWaTasks === 'function' ? loadWaTasks() : null,

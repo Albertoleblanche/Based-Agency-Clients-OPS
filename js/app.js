@@ -159,7 +159,7 @@ async function showApp(session, o){
       typeof loadClientConcerns === 'function' ? loadClientConcerns() : null,   // concerns about clients (Nov 25)
       // The weekly model reads these: without them the first screen counts every client
       // as never updated until the next refresh.
-      typeof loadUpdateHistory === 'function' ? loadUpdateHistory() : null,
+      typeof loadUpdateHistory === 'function' ? loadUpdateHistory() : null, typeof loadUpdateSkips === 'function' ? loadUpdateSkips() : null,
       typeof loadHealthHandled === 'function' ? loadHealthHandled() : null,
       typeof loadClientReminders === 'function' ? loadClientReminders() : null,
       typeof loadTaskDueTimes === 'function' ? loadTaskDueTimes() : null,

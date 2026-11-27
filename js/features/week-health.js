@@ -84,7 +84,7 @@ function whenShort(d){ return daysBetween(d, rNow()) <= 0 ? fmtTime(new Date(d))
 // weekend moves to the Friday before). One that never had one is due once, then late (below).
 function clientDue(c, now){
   now = now || rNow();
-  const last = lastSentAt(c);
+  const last = lastCoveredAt(c);   // a skipped week counts (Nov 27)
   // A client with a win day (Monday to Friday) gets its win that day, every calendar week: sent
   // any day this week counts, and next week's is due on next week's win day.
   const wd = typeof winDay === 'function' ? winDay(c) : null;
@@ -122,7 +122,8 @@ function dueText(daysLeft, due){
 }
 // The dates an update covers: the day after the last one to today ("November 11 to 17").
 function updateRangeLabel(c){
-  const now = rNow(), last = c ? lastSentAt(c) : null;
+  const now = rNow(), sent = c ? lastSentAt(c) : null, out = c ? skipsOf(c).filter(x => x.keep === false).pop() : null;
+  const last = out && (!sent || out.t > sent) ? out.t : sent;   // a skip that kept its work: this one covers that week too
   let a = last ? addDays(dayStart(last), 1) : addDays(dayStart(now), -(UPDATE_EVERY_DAYS - 1));
   if(a > now) a = dayStart(now);
   const long = d => d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
@@ -188,6 +189,32 @@ async function recordUpdateSent(clientId, at){
   updateHistory[clientId] = list.slice(-40);
   await safeSet('update-history', JSON.stringify(updateHistory));
 }
+// ---- skipped weeks (Nov 27) ----------------------------------------------------------------------
+// An admin or approver can skip a client's update for a week (Review, or the iPhone): nothing goes out,
+// and the week counts as skipped, not missed. Kept in app_storage 'update-skips' as
+// { clientId: [{ at, by, keep, reason, authors }] } (update-parts.js skipUpdateWeek). A skip covers the
+// week the way a send does: the next one is due a week later, nobody is chased, Health doesn't call it
+// missed or late. The server reads the same list (lib/update-automations.js).
+let updateSkips = {};
+async function loadUpdateSkips(){
+  const raw = await safeGet('update-skips');
+  try{ updateSkips = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : {}; }catch(e){ updateSkips = {}; }
+}
+function skipsOf(c){ return ((c && updateSkips[c.id]) || []).filter(x => x && x.at).map(x => Object.assign({}, x, { t: new Date(x.at) })).filter(x => x.t <= rNow()).sort((a, b) => a.t - b.t); }
+// sends and skips together: what "the last one" means for when the next is due
+function coveredTimes(c){ return sentTimes(c).concat(skipsOf(c).map(x => x.t)).sort((a, b) => a - b); }
+function lastCoveredAt(c){ const s = coveredTimes(c); return s.length ? s[s.length - 1] : null; }
+// the skip in a week, if nothing was sent that week
+function skipIn(c, from, to){ return skipsOf(c).filter(x => x.t >= from && x.t < to).pop() || null; }
+// a week's letter, from sends and skips: o on time · l late (more than 7 days after the one before,
+// a skip counting as one before) · s skipped · then whatever the caller says for neither
+function weekLetter(c, sends, covered, from, to){
+  const t = sends.find(x => x >= from && x < to);
+  if(t){ const prev = covered.filter(x => x < t).pop(); return prev && daysBetween(prev, t) > UPDATE_EVERY_DAYS ? 'l' : 'o'; }
+  return skipIn(c, from, to) ? 's' : null;
+}
+// "Sent today" · "Skipped Monday": what happened to this week's update
+function weekDoneWord(w){ return `${w.skipped ? 'Skipped' : 'Sent'} ${relDayLower(w.last)}`; }
 function sentTimes(c){
   const fromHist = (updateHistory[c.id] || []).map(t => new Date(t));
   (c.drafts || []).forEach(d => { if(d.draftSentAt){ const t = new Date(d.draftSentAt); if(!fromHist.some(x => Math.abs(x - t) < 60000)) fromHist.push(t); } });
@@ -198,29 +225,29 @@ function lastSentAt(c){ const s = sentTimes(c); return s.length ? s[s.length - 1
 // The last 8 weeks (Monday to Sunday), oldest first: 'o' sent on time · 'l' sent late (more than
 // 7 days after the one before) · 'm' nothing sent · 'p' this week, not sent yet · 'n' before history began.
 function weekHistory(c){
-  const now = rNow(), sends = sentTimes(c), first = sends[0], out = [];
+  const now = rNow(), sends = sentTimes(c), covered = coveredTimes(c), first = covered[0], out = [];
   const monday = dayStart(addDays(now, -((now.getDay() + 6) % 7)));
   for(let k = 7; k >= 0; k--){
     const from = addDays(monday, -7 * k), to = addDays(from, 7);
-    const i = sends.findIndex(t => t >= from && t < to);
-    if(i >= 0){ out.push(i > 0 && daysBetween(sends[i - 1], sends[i]) > UPDATE_EVERY_DAYS ? 'l' : 'o'); continue; }
+    const x = weekLetter(c, sends, covered, from, to);   // o · l · s (skipped, Nov 27)
+    if(x){ out.push(x); continue; }
     if(k === 0){ out.push('p'); continue; }
     out.push(!first || first >= to ? 'n' : 'm');
   }
   return out;
 }
 function onTimeSummary(seq){
-  const done = seq.slice(0, 7).filter(x => x !== 'n');
+  const done = seq.slice(0, 7).filter(x => x !== 'n' && x !== 's');   // a skipped week is neither on time nor late
   return { onTime: done.filter(x => x === 'o').length, total: done.length };
 }
 function histDotsHtml(seq){
   const late = seq.filter(x => x === 'l' || x === 'm').length;
-  const cls = { o: '', l: 'l', m: 'm', p: 'p', n: 'p' };
+  const cls = { o: '', l: 'l', m: 'm', p: 'p', n: 'p', s: 's' };
   return `<span class="hist" role="img" aria-label="Last 8 weekly updates: ${late} late or missed">${seq.map(x => cls[x] ? `<i class="${cls[x]}"></i>` : '<i></i>').join('')}</span>`;
 }
 function weekStripHtml(c){
   const now = rNow(), seq = weekHistory(c), sends = sentTimes(c), monday = dayStart(addDays(now, -((now.getDay() + 6) % 7)));
-  const words = { o: 'On time', l: 'Late', m: 'Missed', n: '—' }, cls = { o: '', l: 'l', m: 'm', p: 'p', n: 'p' };
+  const words = { o: 'On time', l: 'Late', m: 'Missed', n: '—', s: 'Skipped' }, cls = { o: '', l: 'l', m: 'm', p: 'p', n: 'p', s: 's' };
   return `<div class="wkstrip" role="list" aria-label="Weekly updates, last 8 weeks">${seq.map((x, i) => {
     const from = addDays(monday, -7 * (7 - i)), sent = sends.find(t => t >= from && t < addDays(from, 7));
     const word = x === 'p' ? dueText(clientDue(c).daysLeft, clientDue(c).due) : words[x];
@@ -325,9 +352,11 @@ function clientWeek(c){
   if(doneThisWeek){
     const sentDraft = drafts.filter(d => d.draftSentAt).sort((a, b) => new Date(b.draftSentAt) - new Date(a.draftSentAt))[0] || null;
     const ago = daysBetween(last, now), sentWord = ago === 0 ? 'today' : ago === 1 ? 'yesterday' : fmtShortDate(last);
+    // skipped rather than sent (Nov 27): the last one is a skip, with nothing sent after it
+    const sk = skipsOf(c).pop(), skipped = sk && +sk.t === +last ? sk : null;
     w.next = { done: w.done, draft: w.draft, holder: w.holder, note: w.note };
-    return Object.assign(w, { done: 4, sent: true, state: 'sent', draft: sentDraft, holder: '',
-      note: `Sent ${sentWord} · next due ${daysLeft === 1 ? 'tomorrow' : (daysLeft < 7 ? DAY_NAMES[due.getDay()] : fmtShortDate(due))}` });
+    return Object.assign(w, { done: 4, sent: true, state: 'sent', draft: skipped ? null : sentDraft, holder: '', skipped,
+      note: `${skipped ? `Skipped by ${skipped.by === myName() ? 'you' : firstName(skipped.by)}` : 'Sent'} ${sentWord} · next due ${daysLeft === 1 ? 'tomorrow' : (daysLeft < 7 ? DAY_NAMES[due.getDay()] : fmtShortDate(due))}` });
   }
   // Due or overdue: the next step is the one it's waiting on.
   // Not sent: late, due today, or (a client with a win day later this week) coming up.
@@ -480,7 +509,7 @@ function flagReview(c, h){
 function clientHealth(c){
   const T = clientThresholds(c), now = rNow(), sig = [];
   const lvl = (v, [w, r]) => (v >= r ? 'r' : (v >= w ? 'y' : null));
-  const last = lastSentAt(c);
+  const last = lastCoveredAt(c);   // a skipped week was decided, not slipped (Nov 27)
   const noUpd = last ? daysBetween(last, now) : null;
   const w = clientWeek(c);
   // No weekly update (the agency itself, an internal client): Health doesn't watch it, so it never

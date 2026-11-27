@@ -41,12 +41,12 @@ function joinNames(a){ return a.length <= 1 ? (a[0] || '') : a.slice(0, -1).join
 
 // Weeks of on-time history for every client, oldest first: o on time · l late · m missed · '' none.
 function todayWeekCodes(c, weeks){
-  const now = rNow(), sends = sentTimes(c), first = sends[0], out = [];
+  const now = rNow(), sends = sentTimes(c), covered = coveredTimes(c), first = covered[0], out = [];
   const monday = dayStart(addDays(now, -((now.getDay() + 6) % 7)));
   for(let k = weeks; k >= 1; k--){
     const from = addDays(monday, -7 * k), to = addDays(from, 7);
-    const i = sends.findIndex(t => t >= from && t < to);
-    if(i >= 0) out.push(i > 0 && daysBetween(sends[i - 1], sends[i]) > UPDATE_EVERY_DAYS ? 'l' : 'o');
+    const x = weekLetter(c, sends, covered, from, to);
+    if(x) out.push(x === 's' ? '' : x);   // a skipped week (Nov 27) counts as neither
     else out.push(!first || first >= to ? '' : 'm');
   }
   return out;

@@ -1381,6 +1381,11 @@ button.tmi-mc.is-wk:hover{background:var(--fill-2)}
 .mac .tk-f .pop{height:30px;gap:7px;font-size:14px;color:var(--label)}
 .tk-f .pop > svg{width:12px;height:12px;color:var(--label-3)}
 .tk-view svg{width:14px;height:14px}
+/* Finished: the way to past tasks, always at the end of the header (Nov 27) */
+.mac .tk-fin{height:30px;gap:6px;font-size:14px}
+.tk-fin svg{width:14px;height:14px;color:var(--label-2)}
+.tk-fin .c{font-size:12px;color:var(--label-2);font-variant-numeric:tabular-nums}
+html.ui-w .tk-fin .c{font-family:var(--mono);font-size:11.5px}
 .tk-board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:28px;margin-top:30px;align-items:start}   /* no Done column (Nov 26) */
 .tk-col{min-width:0}
 .tk-ch{display:flex;align-items:center;gap:8px;height:32px;margin-bottom:10px}
@@ -3008,6 +3013,7 @@ html:not(.ui-w) .wd-b:hover{scrollbar-color:rgba(128,128,128,.45) transparent}  
 .hist i.l{height:9px;background:var(--hs-y)}
 .hist i.m{height:14px;background:var(--hs-r)}
 .hist i.p{background:transparent;box-shadow:inset 0 0 0 1.25px var(--hs-q)}
+.hist i.s{background:transparent;box-shadow:inset 0 0 0 1.25px var(--hs-q);opacity:.7}   /* skipped (Nov 27) */
 .cl-mc .s .hist{margin-top:6px}
 .mac .cl-act:active{background:var(--fill-2);color:var(--label);transition:none}
 .cl-own:active{background:var(--fill-2)}
@@ -4586,6 +4592,8 @@ html .mac .cn-foot .btn.cn-dis{background:none;box-shadow:none;color:var(--label
 .wk12-u{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--label-2)}
 .wk12-u.l{background:var(--hx-y)}.wk12-u.m{background:var(--hx-r)}
 .wk12-u.p{background:none;box-shadow:inset 0 0 0 1.5px var(--label-2)}
+.wk12-u.s{background:none;box-shadow:inset 0 0 0 1.5px var(--label-3,var(--label-2));position:relative}   /* skipped, on purpose (Nov 27) */
+.wk12-u.s::after{content:"";position:absolute;left:1px;right:1px;top:50%;height:1.5px;margin-top:-.75px;background:var(--label-3,var(--label-2));transform:rotate(-45deg)}
 .wk12-u.n{width:6px;height:2px;border-radius:1px;background:var(--label-3,var(--label-2))}
 .wk12 + .cz-ax{margin-top:5px}
 .wk12-key{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:12px;font-size:11.5px;color:var(--label-2)}
@@ -4737,3 +4745,32 @@ html:has(#view-tasks.active .tss.is-on) .toast-stack{bottom:calc(var(--tss-h,212
   .tss-t.is-over .tss-f,.tss-b{transform:none;filter:none}
 }
 @media (prefers-reduced-transparency:reduce){ .tss,.mac[data-theme="light"] .tss{background:var(--grp);-webkit-backdrop-filter:none;backdrop-filter:none} }
+/* ---- Review: Skip This Week… (Nov 27; review.js skipWeekSheet) ---- */
+.skw-h{margin:0;font-size:17px;font-weight:600;letter-spacing:-.01em;line-height:1.3}
+html.ui-w .skw-h{font-weight:500}
+.skw-sub{margin:6px 0 14px;font-size:13px;line-height:1.45;color:var(--label-2)}
+.skw-os{display:flex;flex-direction:column;gap:8px}
+.skw-o{position:relative;display:flex;align-items:flex-start;gap:11px;padding:11px 13px;border-radius:12px;background:var(--fill);box-shadow:inset 0 0 0 .5px var(--sep);cursor:pointer;transition:background-color 120ms ease,box-shadow 120ms ease}
+.skw-o input{position:absolute;opacity:0;pointer-events:none}
+.skw-r{flex:none;width:16px;height:16px;margin-top:1px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--sep-strong);background:var(--grp,var(--window));transition:box-shadow 140ms cubic-bezier(.23,1,.32,1)}
+.skw-o:has(input:checked){background:color-mix(in srgb,var(--accent,var(--blue)) 9%,var(--fill));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent,var(--blue)) 55%,transparent)}
+.skw-o:has(input:checked) .skw-r{box-shadow:inset 0 0 0 5px var(--accent,var(--blue))}
+.skw-o:has(input:focus-visible){outline:2px solid color-mix(in srgb,var(--accent,var(--blue)) 60%,transparent);outline-offset:2px}
+.skw-o .tx{display:flex;flex-direction:column;gap:2px;min-width:0}
+.skw-o .tx b{font-size:13.5px;font-weight:600}
+html.ui-w .skw-o .tx b{font-weight:500}
+.skw-o .tx span{font-size:12.5px;line-height:1.4;color:var(--label-2)}
+@media (hover:hover) and (pointer:fine){ .skw-o:hover:not(:has(input:checked)){background:var(--fill-2)} }
+.skw-why{display:flex;flex-direction:column;gap:6px;margin-top:14px;font-size:12.5px;color:var(--label-2)}
+.skw-why i{font-style:normal;color:var(--label-3,var(--label-2))}
+.mac .skw-why textarea.tf{height:auto;min-height:56px;padding:8px 10px;line-height:1.4;resize:vertical;font-size:13px}
+#appModalOverlay .skw-h + .skw-sub + .skw-os ~ .sheet-a{margin-top:16px}
+/* a skipped week in Sent */
+.rvn-r.is-skip b{color:var(--label-2)}
+.rvn-skip{margin-top:6px}
+.rvn-skip-ic{display:grid;place-items:center;width:34px;height:34px;margin-top:22px;border-radius:50%;background:var(--fill-2);color:var(--label-2)}
+.rvn-skip-ic svg{width:17px;height:17px}
+.rvn-skip .rvn-subj{margin-top:12px}
+.rvn-skip p{margin:10px 0 0;font-size:14px;line-height:1.55;color:var(--label-2)}
+.rvn-skip-why{margin:14px 0 0;padding:10px 14px;border-radius:10px;background:var(--fill);font-size:14px;line-height:1.5;color:var(--label)}
+@media (prefers-reduced-motion:reduce){ .skw-o,.skw-r{transition:none} }

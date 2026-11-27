@@ -92,3 +92,77 @@ function partNames(names, me){
   const s = n.length <= 1 ? (n[0] || '') : n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1];
   return `${s} part${names.length === 1 ? '' : 's'}`;
 }
+
+// ---- skipping a week, taking an approval back (Nov 27) -------------------------------------------
+// From Review (Waiting or Approved; desktop and iPhone), an admin or approver can skip a client's update
+// for the week: nothing goes to the client, and every part still open (being written, waiting, approved)
+// is cleared. The work in them either waits for next week's update (include in email, carry over) or is
+// left out for good (out of the email). The skip is kept in app_storage 'update-skips' so the week
+// counts as skipped, not missed, and nobody is chased for it (week-health.js coveredTimes, and the
+// server's lib/update-automations.js). Undo puts everything back as it was.
+function weekOpenParts(c){ return ((c && c.drafts) || []).filter(d => d.draft && !d.draftSentAt && (d.draftStatus === 'pending' || d.draftStatus === 'approved')); }
+// the work's flags, on the server and here; carry_over needs addendum-flow-gaps.sql, and without it the
+// work still goes in (two weeks' carry-over in clientWeek covers a skipped week)
+async function setWorkFlags(c, ids, flags){
+  if(!ids.length) return true;
+  const row = {}; if('includeInEmail' in flags) row.include_in_email = flags.includeInEmail; if('carryOver' in flags) row.carry_over = flags.carryOver;
+  let { error } = await supabaseClient.from('client_improvements').update(row).in('id', ids);
+  if(error && 'carry_over' in row && typeof workColumnMissing === 'function' && workColumnMissing(error, 'carry_over')){ delete row.carry_over; ({ error } = await supabaseClient.from('client_improvements').update(row).in('id', ids)); }
+  if(error) return false;
+  (c.improvements || []).forEach(i => { if(ids.includes(i.id)){ if('include_in_email' in row) i.includeInEmail = row.include_in_email; if('carry_over' in row) i.carryOver = row.carry_over; } });
+  return true;
+}
+async function saveUpdateSkips(mutate){
+  await loadUpdateSkips();   // someone else's skips since this page loaded stay
+  mutate(updateSkips);
+  return safeSet('update-skips', JSON.stringify(updateSkips));
+}
+// o: { keep: true|false, reason }. Returns { ok, undo } or { error }.
+async function skipUpdateWeek(c, o){
+  const parts = weekOpenParts(c), ids = [...new Set(parts.flatMap(d => d.draftImprovementIds || []))];
+  const keep = o.keep !== false, at = new Date().toISOString(), by = myName() || '';
+  const snap = parts.map(d => ({ author: d.author, fields: { draft: d.draft, draftStatus: d.draftStatus, draftImprovementIds: d.draftImprovementIds || [], draftPendingSince: d.draftPendingSince || null,
+    readyToNotify: !!d.readyToNotify, approvedBy: d.approvedBy || '', approvedAt: d.approvedAt || null, winTier: d.winTier || null } }));
+  const work = (c.improvements || []).filter(i => ids.includes(i.id)).map(i => ({ id: i.id, includeInEmail: i.includeInEmail, carryOver: !!i.carryOver }));
+  const done = [];
+  for(const d of parts){
+    if(!(await saveDraftFor(c.id, d.author, { draftStatus: 'none', draft: '', draftImprovementIds: [], draftSentAt: null, draftSentBy: '', readyToNotify: false }))){
+      for(const s of snap.filter(x => done.includes(x.author))) await saveDraftFor(c.id, s.author, s.fields);   // all or nothing
+      return { error: 'The update couldn’t be cleared. Try again in a moment.' };
+    }
+    done.push(d.author);
+  }
+  await setWorkFlags(c, ids, keep ? { includeInEmail: true, carryOver: true } : { includeInEmail: false, carryOver: false });
+  const entry = { at, by, keep, reason: String(o.reason || '').trim().slice(0, 300), authors: parts.map(d => d.author) };
+  await saveUpdateSkips(all => { all[c.id] = [...(all[c.id] || []), entry].slice(-40); });
+  return { ok: true, entry, parts, ids, undo: async () => {
+    for(const s of snap) if(!(await saveDraftFor(c.id, s.author, s.fields))) return false;
+    const on = work.filter(x => x.includeInEmail !== false).map(x => x.id), off = work.filter(x => x.includeInEmail === false).map(x => x.id);
+    await setWorkFlags(c, on, { includeInEmail: true }); await setWorkFlags(c, off, { includeInEmail: false });
+    await setWorkFlags(c, work.filter(x => !x.carryOver).map(x => x.id), { carryOver: false });
+    return saveUpdateSkips(all => { all[c.id] = (all[c.id] || []).filter(x => x.at !== at); });
+  } };
+}
+// Back to Waiting: an approved part goes back for a yes, as it was when it was sent for review. Its work
+// was marked as sent when it was approved; it's for the email again.
+async function unapproveWeek(c, authors){
+  const parts = weekOpenParts(c).filter(d => d.draftStatus === 'approved' && (!authors || authors.includes(d.author)));
+  for(const d of parts){
+    if(!(await saveDraftFor(c.id, d.author, { draftStatus: 'pending', readyToNotify: true, approvedBy: '', approvedAt: null, waCopiedBy: '', waCopiedAt: null }))) return { error: 'It couldn’t be moved back. Try again in a moment.' };
+    await setWorkFlags(c, d.draftImprovementIds || [], { includeInEmail: true });
+  }
+  return { ok: true, parts };
+}
+// Who hears about a skip: whoever wrote a part, whoever's work was in one, and whoever approved one.
+function skipWeekPeople(c, parts, ids){
+  const names = new Set(parts.map(d => d.author));
+  (c.improvements || []).forEach(i => { if(ids.includes(i.id) && i.author) names.add(i.author); });
+  parts.forEach(d => { if(d.approvedBy) names.add(d.approvedBy); });
+  names.delete(myName());
+  return [...names].map(n => (typeof teamProfiles !== 'undefined' ? teamProfiles : []).find(p => p.name === n && !p.access_revoked)).filter(Boolean);
+}
+function skipWeekWords(c, r){
+  const me = myName() || 'An approver', why = r.entry.reason ? `: “${r.entry.reason}”` : '.';
+  return { title: `${c.name}: this week’s update was skipped`,
+    body: `${me} skipped it${why} Nothing was sent. ${r.entry.keep ? 'The work in it goes in next week’s update.' : 'The work in it won’t go in an update.'}` };
+}
