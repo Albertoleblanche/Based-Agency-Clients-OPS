@@ -28,6 +28,10 @@ window.openTaskDetailModal = (sheet => function(id){
 })(window.openTaskDetailModal);
 
 const tkWho = id => id === currentUser?.id ? 'You' : firstName((teamProfiles.find(p => p.id === id) || {}).name || 'Someone');
+// a step of one of your own sprints: it's in Plan, not on Tasks (Nov 27)
+function tkInPlan(t){ return !!(t && t.sprintId && t.assigneeId === currentUser?.id && typeof planSprints !== 'undefined' && Array.isArray(planSprints) && planSprints.some(s => s.id === t.sprintId)); }
+// your sprints with a step still open
+function tkPlanSprints(){ return (typeof planSprints !== 'undefined' && Array.isArray(planSprints) ? planSprints : []).filter(s => !s.doneAt && tasks.some(t => t.sprintId === s.id && t.assigneeId === currentUser?.id && t.status !== 'done' && !t.cancelledAt)); }
 // When it's due, in words: "Due yesterday", "6 days late", "Today, 2:00 PM", "Fri, Nov 20",
 // "Waiting on your review". Past days are counted, never named: "Due Wednesday" read as the
 // coming Wednesday when it meant the last one.
@@ -116,7 +120,9 @@ function renderTasks(){
   if(!root || !currentUser) return;
   if(typeof tasksDataLoaded !== 'undefined' && !tasksDataLoaded){ root.innerHTML = `<div class="spw"><div class="sp-page"><div class="tk">${skeletonHtml('tasks', 'Loading tasks…')}</div></div></div>`; return; }
   const me = currentUser.id, today = toDateStr(new Date());
-  let vis = tasks.filter(t => !t.cancelledAt && (t.assignerId === me || t.assigneeId === me) && !(t.status === 'done' && ((t.assignerId === me && t.hiddenByAssigner) || (t.assigneeId === me && t.hiddenByAssignee))));
+  // Sprints live in Plan (Nov 27: "I don't want my task board full of sprints, tasks is for specific
+  // tasks"): the steps of your own sprints aren't on Tasks; a line under the title points to Plan.
+  let vis = tasks.filter(t => !t.cancelledAt && !tkInPlan(t) && (t.assignerId === me || t.assigneeId === me) && !(t.status === 'done' && ((t.assignerId === me && t.hiddenByAssigner) || (t.assigneeId === me && t.hiddenByAssignee))));
   // Approvers and admins switch between Everyone (every task they're part of) and Mine. A team
   // member sees the tasks assigned to them, and the ones they handed to someone else on their own.
   const everyone = seesEveryone();
@@ -137,8 +143,9 @@ function renderTasks(){
   const doneWeek = done.filter(t => t.completedAt && new Date(t.completedAt) >= monday);
   const usedClients = [...new Set(tasks.map(t => t.clientId).filter(Boolean))].map(id => clients.find(c => c.id === id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
   const curC = usedClients.find(c => c.id === tasksClient);
+  const spN = tkPlanSprints().length, planLink = spN ? ` <a class="tk-donel tk-planl" href="#plan" onclick="switchView('plan');return false;" title="Your sprints and their steps are in Plan">${spN} sprint${spN === 1 ? '' : 's'} in Plan${icon('caret-right', { weight: 'bold' })}</a>` : '';
   const doneLink = done.length ? ` <a class="tk-donel" href="#" onclick="switchView('task-archive');return false;" title="Open Finished tasks">${doneWeek.length ? `${doneWeek.length} done this week` : 'Finished tasks'}${icon('caret-right', { weight: 'bold' })}</a>` : '';
-  const sub = ([overdue.length ? `<b>${overdue.length} ${overdue.length === 1 ? 'is' : 'are'} overdue.</b>` : '', review.length ? `${review.length} ${review.length === 1 ? 'is' : 'are'} waiting on your review.` : ''].filter(Boolean).join(' ') || (open.length ? 'Nothing is overdue.' : 'Nothing open right now.')) + doneLink;
+  const sub = ([overdue.length ? `<b>${overdue.length} ${overdue.length === 1 ? 'is' : 'are'} overdue.</b>` : '', review.length ? `${review.length} ${review.length === 1 ? 'is' : 'are'} waiting on your review.` : ''].filter(Boolean).join(' ') || (open.length ? 'Nothing is overdue.' : 'Nothing open right now.')) + doneLink + planLink;
   const head = `<div class="tk-hd"><div><h2>${sprintFoldHeadline(fold, open.length)}</h2><p>${sub}</p></div>
 <div class="tk-f">${tkSgBtnHtml()}${(everyone ? [['everyone', 'Everyone', ''], ['mine', 'Mine', mineN]] : byMe.length ? [['mine', 'Mine', mineN], ['byme', 'Assigned by Me', byMeN]] : [])
   .map(([k, t, n], i, a) => (i ? '' : '<div class="seg" role="tablist" aria-label="Whose">') + `<button class="${tasksScope === k ? 'on' : ''}" role="tab" aria-selected="${tasksScope === k}" onclick="setTasksScope('${k}')">${t}${n !== '' ? ` <span class="c">${n}</span>` : ''}</button>` + (i === a.length - 1 ? '</div>' : '')).join('')}
